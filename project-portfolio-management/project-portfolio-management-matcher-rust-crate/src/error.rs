@@ -2,10 +2,10 @@
 
 use thiserror::Error;
 
-/// Errors produced by work-item matching and normalization.
+/// Errors produced by plan matching and normalization.
 ///
 /// Reserved for future fallible APIs: every current entry point
-/// ([`crate::MatchingEngine::match_work_items`] and the component
+/// ([`crate::MatchingEngine::match_plans`] and the component
 /// functions) is total and returns a [`crate::MatchResult`] directly, so
 /// nothing constructs an `Error` today. The type stays part of the
 /// `SemVer` surface so a future fallible path (e.g. validated

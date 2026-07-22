@@ -14,7 +14,7 @@
 //!   change without its event, and vice versa). The transaction-aware
 //!   write+emit path is exposed as [`create_and_emit`] /
 //!   [`update_and_emit`] / [`delete_and_emit`] / [`merge_and_emit`], which
-//!   the work-item controller calls so it never has to know the transport.
+//!   the plan controller calls so it never has to know the transport.
 //!   Phase 3 (the Fluvio relay worker) is roadmap.
 //!
 //! The operator endpoint `GET /api/{collection}/events/recent` returns the
@@ -29,21 +29,21 @@ use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
 
 use loco_rs::prelude::ModelResult;
-use project_portfolio_management_matcher::WorkItem;
+use project_portfolio_management_matcher::Plan;
 use sea_orm::{ConnectionTrait, DatabaseConnection, IntoActiveModel, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::event_outbox::{Model as OutboxRow, OutboxInsert};
-use crate::models::work_items::Model as WorkItemModel;
+use crate::models::plans::Model as PlanModel;
 
 /// Envelope schema version (§4). Bumped only on a breaking change to the
 /// envelope shape; additive fields do not bump it.
 pub const SCHEMA_VERSION: u32 = 1;
 
 /// The entity name carried by every envelope (§4).
-pub const ENTITY: &str = "work_item";
+pub const ENTITY: &str = "plan";
 
 /// Serde default for [`Envelope::entity`] (it is never read from input).
 fn default_entity() -> &'static str {
@@ -77,7 +77,7 @@ pub struct Envelope {
     pub event_id: Uuid,
     /// Envelope schema version; always [`SCHEMA_VERSION`] in Phase 1.
     pub schema_version: u32,
-    /// The entity name; always [`ENTITY`] (`work_item`) for this crate.
+    /// The entity name; always [`ENTITY`] (`plan`) for this crate.
     /// It is a `&'static str` (the compile-time constant), so on the wire
     /// it serializes verbatim and on the way back in it is filled from
     /// the constant rather than borrowed from the input — a `&'static
@@ -347,11 +347,11 @@ async fn audit_best_effort(
     }
 }
 
-/// Create a work item in `kind` and emit its `Created` event, atomically
-/// under the active transport. `memory`: insert on `db`, then push to the
-/// ring buffer (today's behaviour). `outbox`: open one transaction, insert
-/// the row, the `event_outbox` row, **and** the audit row on it, then
-/// commit — so a crash can never persist one without the others.
+/// Create a plan and emit its `Created` event, atomically under the
+/// active transport. `memory`: insert on `db`, then push to the ring
+/// buffer (today's behaviour). `outbox`: open one transaction, insert the
+/// row, the `event_outbox` row, **and** the audit row on it, then commit
+/// — so a crash can never persist one without the others.
 ///
 /// # Errors
 ///
@@ -359,13 +359,12 @@ async fn audit_best_effort(
 /// insert) fails; the transaction rolls back all writes on any error.
 pub async fn create_and_emit(
     db: &DatabaseConnection,
-    kind: &str,
-    wi: &WorkItem,
+    wi: &Plan,
     actor: Option<&str>,
-) -> ModelResult<WorkItemModel> {
+) -> ModelResult<PlanModel> {
     match transport() {
         EventTransport::Memory => {
-            let model = WorkItemModel::create(db, kind, wi).await?;
+            let model = PlanModel::create(db, wi).await?;
             publish_with_actor(
                 EventKind::Created,
                 &model.pid.to_string(),
@@ -377,7 +376,7 @@ pub async fn create_and_emit(
         }
         EventTransport::Outbox => {
             let txn = db.begin().await?;
-            let model = WorkItemModel::create(&txn, kind, wi).await?;
+            let model = PlanModel::create(&txn, wi).await?;
             let env = envelope(
                 EventKind::Created,
                 &model.pid.to_string(),
@@ -393,7 +392,7 @@ pub async fn create_and_emit(
     }
 }
 
-/// Replace a work item's payload and emit its `Updated` event, atomically
+/// Replace a plan's payload and emit its `Updated` event, atomically
 /// under the active transport (see [`create_and_emit`] for the two paths).
 /// Consumes the fetched `model`.
 ///
@@ -403,10 +402,10 @@ pub async fn create_and_emit(
 /// fails.
 pub async fn update_and_emit(
     db: &DatabaseConnection,
-    model: WorkItemModel,
-    wi: &WorkItem,
+    model: PlanModel,
+    wi: &Plan,
     actor: Option<&str>,
-) -> ModelResult<WorkItemModel> {
+) -> ModelResult<PlanModel> {
     match transport() {
         EventTransport::Memory => {
             let updated = model.into_active_model().update_data(db, wi).await?;
@@ -450,7 +449,7 @@ pub async fn update_and_emit(
     }
 }
 
-/// Soft-delete a work item and emit its `Deleted` event, atomically under
+/// Soft-delete a plan and emit its `Deleted` event, atomically under
 /// the active transport. Returns the record's `(pid, name)` — captured
 /// before the delete — so the caller can audit and respond.
 ///
@@ -460,7 +459,7 @@ pub async fn update_and_emit(
 /// insert) fails.
 pub async fn delete_and_emit(
     db: &DatabaseConnection,
-    model: WorkItemModel,
+    model: PlanModel,
     actor: Option<&str>,
 ) -> ModelResult<(Uuid, String)> {
     let (pid, name) = (model.pid, model.name.clone());
@@ -486,7 +485,7 @@ pub async fn delete_and_emit(
 /// on the survivor, `Deleted` on the duplicate), atomically under the
 /// active transport. Under `outbox`, both writes and both outbox rows
 /// share one transaction. `merged_wi` is the pre-computed merged payload
-/// (`merge::merge_work_items` runs in the controller). Returns
+/// (`merge::merge_plans` runs in the controller). Returns
 /// `(merged_survivor, duplicate_pid, duplicate_name)` for the caller's
 /// merge-record / audit follow-up.
 ///
@@ -496,11 +495,11 @@ pub async fn delete_and_emit(
 /// fails; the transaction rolls back the whole merge on any error.
 pub async fn merge_and_emit(
     db: &DatabaseConnection,
-    main: WorkItemModel,
-    duplicate: WorkItemModel,
-    merged_wi: &WorkItem,
+    main: PlanModel,
+    duplicate: PlanModel,
+    merged_wi: &Plan,
     actor: Option<&str>,
-) -> ModelResult<(WorkItemModel, Uuid, String)> {
+) -> ModelResult<(PlanModel, Uuid, String)> {
     let (dup_pid, dup_name) = (duplicate.pid, duplicate.name.clone());
     match transport() {
         EventTransport::Memory => {
@@ -548,7 +547,7 @@ mod tests {
     use super::*;
 
     /// Pins the envelope wire contract: schema version is 1, `entity` is
-    /// `"work_item"`, and a full serialize→deserialize round-trip preserves
+    /// `"plan"`, and a full serialize→deserialize round-trip preserves
     /// every field (including the `skip_deserializing` `entity`, refilled
     /// from the constant).
     #[test]
@@ -561,12 +560,12 @@ mod tests {
         );
         assert_eq!(env.schema_version, SCHEMA_VERSION);
         assert_eq!(env.schema_version, 1);
-        assert_eq!(env.entity, "work_item");
+        assert_eq!(env.entity, "plan");
         let json = serde_json::to_string(&env).expect("serialize envelope");
         let back: Envelope = serde_json::from_str(&json).expect("deserialize envelope");
         assert_eq!(back.event_id, env.event_id);
         assert_eq!(back.schema_version, 1);
-        assert_eq!(back.entity, "work_item");
+        assert_eq!(back.entity, "plan");
         assert_eq!(back.kind, EventKind::Created);
         assert_eq!(back.pid, "pid-1");
         assert_eq!(back.actor.as_deref(), Some("user-7"));

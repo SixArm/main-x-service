@@ -9,14 +9,14 @@
   import { onMount } from "svelte";
   import { Gantt, Willow } from "@svar-ui/svelte-gantt";
   import { PpmClient } from "$lib/api/ppm";
-  import { WorkItemRepository } from "$lib/api/work-items";
-  import type { WorkItemRef } from "$lib/api/types";
+  import { PlanRepository } from "$lib/api/plans";
+  import type { PlanRef } from "$lib/api/types";
   import type { ScheduleView } from "$lib/api/ppm";
   import { t } from "$lib/i18n.svelte";
 
   const client = PpmClient.withFetch();
 
-  let portfolios = $state<WorkItemRef[]>([]);
+  let portfolios = $state<PlanRef[]>([]);
   let selected = $state<string>("");
   let schedule = $state<ScheduleView | null>(null);
   let loading = $state(true);
@@ -38,7 +38,7 @@
 
   onMount(async () => {
     try {
-      portfolios = await WorkItemRepository.withFetch("portfolios").list();
+      portfolios = await PlanRepository.withFetch().list();
       selected = portfolios[0]?.pid ?? "";
       if (selected) await loadSchedule(selected);
       else loading = false;

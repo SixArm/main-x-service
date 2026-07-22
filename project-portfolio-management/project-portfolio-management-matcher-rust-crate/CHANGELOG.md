@@ -10,14 +10,38 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- 2026-07-22 — **Five new `PlanKind` labels: `Practice`, `Process`,
+  `Purpose`, `Pathway`, `Proposal`.** Additive on the closed set that
+  already held `Portfolio` / `Project` / `Product` / `Program`; `kind`
+  remains **optional descriptive metadata** and is still never a match
+  gate, so the new labels change no scoring behaviour. A stored payload
+  with one of the new labels round-trips through serde; old payloads are
+  unaffected.
+
 ### Changed
+
+- 2026-07-20 — **BREAKING: unified the four kinds into one recursive
+  plan tree.** `Plan.kind` is now `Option<PlanKind>`
+  (optional descriptive metadata) instead of a required discriminator,
+  and the **hard kind gate (R-GATE) is removed** — any two plans
+  may now match regardless of `kind`. `Plan::new` drops its `kind`
+  argument (`new(name)`; kind defaults `None`). `parent_ref` is now a
+  general containment link (any plan may contain any other), and the
+  parent component (`parent_score`) applies to every plan rather
+  than only the former child kinds. `MatchBreakdown.kind_gate_blocked` is
+  retained but vestigial (always `false`). `PlanKind` loses its
+  `Default` impl and `is_child()` method. Removed the kind-gate tests;
+  added tests pinning that different kinds still match and that a shared
+  deterministic id matches across kinds.
 
 - 2026-07-18 — **Subproject renamed**: `portfolio` →
   `project-portfolio-management` (directory, crate/package name, lib
   ident, env-var prefix `PORTFOLIO_*` → `PROJECT_PORTFOLIO_MANAGEMENT_*`,
-  database names). The **domain language is unchanged**: the work-item
-  kinds (portfolio / project / product / program), the `work_items`
-  table, the API routes, and the matcher's `WorkItem` type keep their
+  database names). The **domain language is unchanged**: the plan
+  kinds (portfolio / project / product / program), the `plans`
+  table, the API routes, and the matcher's `Plan` type keep their
   names — the rename repositions the *subproject* as a project
   portfolio management (PPM) product; see the feature roadmap in
   `../spec/15-roadmap.md`.
@@ -27,8 +51,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate adopting
   the person-matcher reference scaffolding, with two coverage-guided
-  libFuzzer targets: `match_work_items` (deserialize a JSON `[work_item_a, work_item_b]` tuple →
-  `MatchingEngine::match_work_items`; finite score in `[0,1]`, both orders) and
+  libFuzzer targets: `match_plans` (deserialize a JSON `[plan_a, plan_b]` tuple →
+  `MatchingEngine::match_plans`; finite score in `[0,1]`, both orders) and
   `normalize` (the pure `normalize` free functions — fold / code / URL / fold-set / ISO date — over arbitrary
   UTF-8, never-panic). Two targets rather than the reference three because
   this crate exposes its similarity primitives only through the engine (the
@@ -46,8 +70,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   well-behaved on arbitrary input rather than only hand-picked examples:
   - `score_is_finite_and_bounded` — the engine never panics and every
     `score` is a real number in `[0.0, 1.0]` (never `NaN`).
-  - `matching_is_symmetric_same_kind` — `match_work_items(a, b)` equals
-    `match_work_items(b, a)` in score, `is_match`, and confidence for
+  - `matching_is_symmetric_same_kind` — `match_plans(a, b)` equals
+    `match_plans(b, a)` in score, `is_match`, and confidence for
     same-kind records.
   - `kind_gate_blocks_all_cross_kind_pairs` — the **kind gate**: any pair of
     different `kind` always scores `0.0`, never matches, and sets
@@ -66,7 +90,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - **SEC-M2 — a bare root `same_as` URL no longer forces a deterministic
   match.** `normalize::url("/")` returns `"/"` (non-empty by design), so
-  two different work items sharing only `same_as=["/"]` short-circuited to
+  two different plans sharing only `same_as=["/"]` short-circuited to
   `1.0`. The `R-2` `same_as` overlap in `src/matcher.rs` now skips a value
   that is empty-after-normalization or a bare `"/"` root, so such a
   placeholder is not treated as identity evidence. Added the
@@ -91,24 +115,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Added
 
 - **Inaugural release.** Specification + doc-set **and the implemented
-  crate** for pairwise work-item (Portfolio / Project / Product /
+  crate** for pairwise plan (Portfolio / Project / Product /
   Program) record matching, copy-adapted from the plan-matcher /
   care-pathway-matcher / case-matcher template. `spec/index.md` is the
   single source of truth. The crate builds and is fully tested
   (55 unit + 10 integration + 7 doctests; `clippy --all-targets
   --all-features -- -D warnings` clean; `cargo fmt` clean; zero
-  `#[allow]`). Modules: `work_item`, `matcher`, `scoring`, `config`,
+  `#[allow]`). Modules: `plan`, `matcher`, `scoring`, `config`,
   `normalize` (incl. `url` + ISO-date `iso_date_to_days`), `phonetic`,
   `error`; plus a `main.rs` demo binary. `MatchBreakdown` carries a
   `kind_gate_blocked` flag alongside `deterministic_match`.
-  - Domain model: `WorkItem` (kind / name / alternate_names / code /
+  - Domain model: `Plan` (kind / name / alternate_names / code /
     owner_org_id / owner_org_name / lead_ref / portfolio_ref / status /
     goals / start_date / target_date / keywords / tags / identifiers /
-    sameAs / in_language / relationships), `WorkItemKind` (closed set —
+    sameAs / in_language / relationships), `PlanKind` (closed set —
     Portfolio / Project / Product / Program, no `Custom`), `Goal` /
-    `GoalStatus`, `WorkItemStatus`, `WorkItemIdentifier` /
-    `IdentifierScheme`, `WorkItemRelationship` / `RelationKind`. The
-    crate's `WorkItem` type is the API DTO + persisted JSONB payload +
+    `GoalStatus`, `PlanStatus`, `PlanIdentifier` /
+    `IdentifierScheme`, `PlanRelationship` / `RelationKind`. The
+    crate's `Plan` type is the API DTO + persisted JSONB payload +
     match input (no adapter).
   - **Kind gate (R-GATE)**: `A.kind != B.kind` short-circuits to `0.0`
     before every other rule — matching is within-kind only (replaces the
@@ -123,7 +147,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     (owner-scoped), owner org 0.10 (case-folded exact), portfolio 0.08
     (same parent `portfolio_ref`, child kinds), timeframe 0.07 (date
     proximity, Gaussian decay), keywords 0.05 (Jaccard), relationships
-    0.05 (typed-set Jaccard over `(relation, work_item_id)` pairs), tags
+    0.05 (typed-set Jaccard over `(relation, plan_id)` pairs), tags
     0.05 (set Jaccard); renormalised over present components.
   - Normalisation: `fold`, `code` (alphanumeric-only), `fold_set`.
   - Classification: `High` ≥ 0.95, `Medium` ≥ 0.70, else `Low`; default

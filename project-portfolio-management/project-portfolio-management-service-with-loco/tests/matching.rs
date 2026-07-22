@@ -1,59 +1,62 @@
 //! DB-free tests: the service embeds `project-portfolio-management-matcher` directly and
-//! persists `WorkItem` as JSON, so both the matcher contract (including
-//! the kind gate) and the storage round-trip can be checked without a
-//! database.
+//! persists `Plan` as JSON, so both the matcher contract (one unified
+//! recursive collection, no kind gate) and the storage round-trip can be
+//! checked without a database.
 
 use project_portfolio_management_matcher::{
-    IdentifierScheme, MatchingEngine, WorkItem, WorkItemIdentifier, WorkItemKind,
+    IdentifierScheme, MatchingEngine, Plan, PlanIdentifier, PlanKind,
 };
 
 /// Pins that the service uses the canonical `project-portfolio-management-matcher` engine,
-/// not a fork: two same-kind work items sharing a Jira project key hit
+/// not a fork: two same-kind plans sharing a Jira project key hit
 /// the deterministic short-circuit and score exactly `1.0`.
 #[test]
 fn embeds_the_canonical_matcher() {
     let engine = MatchingEngine::default_config();
-    let mut a = WorkItem::new(WorkItemKind::Project, "Apollo platform migration");
-    let mut b = WorkItem::new(WorkItemKind::Project, "Apollo migration");
-    a.identifiers.push(WorkItemIdentifier {
+    let mut a = Plan::new("Apollo platform migration");
+    let mut b = Plan::new("Apollo migration");
+    a.identifiers.push(PlanIdentifier {
         scheme: IdentifierScheme::JiraProjectKey,
         value: "APOLLO".into(),
     });
-    b.identifiers.push(WorkItemIdentifier {
+    b.identifiers.push(PlanIdentifier {
         scheme: IdentifierScheme::JiraProjectKey,
         value: "APOLLO".into(),
     });
-    let r = engine.match_work_items(&a, &b);
+    let r = engine.match_plans(&a, &b);
     assert!((r.score - 1.0).abs() < f64::EPSILON);
     assert!(r.breakdown.deterministic_match);
 }
 
-/// Pins the kind gate end to end from the service's perspective: a
-/// project and a product with identical names never match (distinct
-/// collections), so cross-collection matching is impossible.
+/// Pins the unified model end to end from the service's perspective:
+/// `kind` is an optional label and never gates matching, so two plans
+/// with different kinds but identical names still match.
 #[test]
-fn kind_gate_blocks_cross_collection() {
+fn different_kinds_still_match() {
     let engine = MatchingEngine::default_config();
-    let a = WorkItem::new(WorkItemKind::Project, "Apollo");
-    let b = WorkItem::new(WorkItemKind::Product, "Apollo");
-    let r = engine.match_work_items(&a, &b);
-    assert!(r.score.abs() < f64::EPSILON);
-    assert!(r.breakdown.kind_gate_blocked);
+    let mut a = Plan::new("Apollo");
+    a.kind = Some(PlanKind::Project);
+    let mut b = Plan::new("Apollo");
+    b.kind = Some(PlanKind::Product);
+    let r = engine.match_plans(&a, &b);
+    assert!(r.score >= 0.99, "got {}", r.score);
+    assert!(r.is_match);
+    assert!(!r.breakdown.kind_gate_blocked);
 }
 
-/// Pins the storage contract: a `WorkItem` survives a JSON round-trip
+/// Pins the storage contract: a `Plan` survives a JSON round-trip
 /// (`to_value` → `from_value`) unchanged, which is how the row's `data`
 /// column persists and reloads the payload verbatim.
 #[test]
-fn work_item_json_round_trips_for_storage() {
-    let mut w = WorkItem::new(WorkItemKind::Project, "Apollo platform migration");
+fn plan_json_round_trips_for_storage() {
+    let mut w = Plan::new("Apollo platform migration");
     w.code = Some("PROJ-2026".into());
     w.owner_org_id = Some("organization:9a2f".into());
-    w.portfolio_ref = Some(uuid::Uuid::new_v4().to_string());
+    w.parent_ref = Some(uuid::Uuid::new_v4().to_string());
     let value = serde_json::to_value(&w).expect("to json");
-    let back: WorkItem = serde_json::from_value(value).expect("from json");
+    let back: Plan = serde_json::from_value(value).expect("from json");
     assert_eq!(back.name, w.name);
     assert_eq!(back.kind, w.kind);
     assert_eq!(back.code, w.code);
-    assert_eq!(back.portfolio_ref, w.portfolio_ref);
+    assert_eq!(back.parent_ref, w.parent_ref);
 }

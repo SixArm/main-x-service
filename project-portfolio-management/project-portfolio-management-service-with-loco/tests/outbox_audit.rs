@@ -13,9 +13,9 @@
 //! `cargo test --test outbox_audit -- --ignored`.
 
 use loco_rs::testing::prelude::*;
-use project_portfolio_management_matcher::{WorkItem, WorkItemKind};
+use project_portfolio_management_matcher::Plan;
 use project_portfolio_management_service::app::App;
-use project_portfolio_management_service::models::_entities::{audit_logs, event_outbox, work_items};
+use project_portfolio_management_service::models::_entities::{audit_logs, event_outbox, plans};
 use project_portfolio_management_service::streaming;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serial_test::serial;
@@ -33,22 +33,22 @@ async fn outbox_create_and_emit_writes_entity_event_and_audit_atomically() {
 
     request::<App, _, _>(|_request, ctx| async move {
         let actor = "11111111-1111-1111-1111-111111111111";
-        let wi = WorkItem::new(WorkItemKind::Portfolio, "Outbox Audit Portfolio");
+        let wi = Plan::new("Outbox Audit Portfolio");
 
         // The real handler path: entity + event + audit, one transaction.
-        let model = streaming::create_and_emit(&ctx.db, "Portfolio", &wi, Some(actor))
+        let model = streaming::create_and_emit(&ctx.db, &wi, Some(actor))
             .await
             .expect("create_and_emit under outbox transport");
 
         // Entity committed.
         assert_eq!(
-            work_items::Entity::find()
-                .filter(work_items::Column::Pid.eq(model.pid))
+            plans::Entity::find()
+                .filter(plans::Column::Pid.eq(model.pid))
                 .count(&ctx.db)
                 .await
-                .expect("count work items"),
+                .expect("count plans"),
             1,
-            "the work_items row committed"
+            "the plans row committed"
         );
 
         // Exactly one outbox row, unpublished, for this record.

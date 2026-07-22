@@ -1,22 +1,22 @@
-//! Pure record-merge logic for work items.
+//! Pure record-merge logic for plans.
 //!
-//! Merging folds a confirmed-duplicate work item into a surviving "main"
+//! Merging folds a confirmed-duplicate plan into a surviving "main"
 //! record: list fields are unioned, scalar identity fields keep main's
 //! value (falling back to the duplicate's when main's is empty), and the
 //! duplicate's former name is preserved as an `alternate_names` entry.
 //! The DB orchestration (update main, soft-delete the duplicate, write
 //! the audit + merge-history rows, publish the event) lives in the
-//! controller; this module is pure and unit-testable. Both records are
-//! always of the same `kind` (merge is scoped to one collection), so the
-//! survivor's `kind` is never changed.
+//! controller; this module is pure and unit-testable. The survivor keeps
+//! its own optional `kind` label — merging never changes `name` or
+//! `kind`.
 
-use project_portfolio_management_matcher::{Goal, WorkItem};
+use project_portfolio_management_matcher::{Goal, Plan};
 use serde_json::Value;
 
-/// The result of merging a duplicate into a surviving (main) work item.
+/// The result of merging a duplicate into a surviving (main) plan.
 pub struct MergeOutcome {
     /// The survivor's new payload — main plus everything transferred.
-    pub merged: WorkItem,
+    pub merged: Plan,
     /// Snapshot of the duplicate at merge time, kept in the merge-history
     /// record for auditability.
     pub transferred: Value,
@@ -25,7 +25,7 @@ pub struct MergeOutcome {
 /// Merge `duplicate` into `main`, returning the survivor's new payload.
 ///
 /// - **Scalars** (`code`, `owner_org_id`, `owner_org_name`, `lead_ref`,
-///   `portfolio_ref`, `status`, `start_date`, `target_date`,
+///   `parent_ref`, `status`, `start_date`, `target_date`,
 ///   `in_language`): keep main's value, else take the duplicate's.
 /// - **Lists** (`alternate_names`, `goals`, `keywords`, `tags`,
 ///   `same_as`, `identifiers`, `relationships`): unioned, dropping exact
@@ -34,7 +34,7 @@ pub struct MergeOutcome {
 ///   `alternate_names` (when it differs). `name` and `kind` are never
 ///   changed.
 #[must_use]
-pub fn merge_work_items(main: &WorkItem, duplicate: &WorkItem) -> MergeOutcome {
+pub fn merge_plans(main: &Plan, duplicate: &Plan) -> MergeOutcome {
     let mut merged = main.clone();
 
     // The duplicate's former name becomes an alternate name on main.
@@ -55,10 +55,10 @@ pub fn merge_work_items(main: &WorkItem, duplicate: &WorkItem) -> MergeOutcome {
         .clone()
         .or_else(|| duplicate.owner_org_name.clone());
     merged.lead_ref = main.lead_ref.clone().or_else(|| duplicate.lead_ref.clone());
-    merged.portfolio_ref = main
-        .portfolio_ref
+    merged.parent_ref = main
+        .parent_ref
         .clone()
-        .or_else(|| duplicate.portfolio_ref.clone());
+        .or_else(|| duplicate.parent_ref.clone());
     merged.status = main.status.clone().or_else(|| duplicate.status.clone());
     merged.start_date = main
         .start_date
@@ -82,7 +82,7 @@ pub fn merge_work_items(main: &WorkItem, duplicate: &WorkItem) -> MergeOutcome {
         a.scheme == b.scheme && a.value == b.value
     });
     merged.relationships = union_by(&main.relationships, &duplicate.relationships, |a, b| {
-        a.relation == b.relation && a.work_item_id == b.work_item_id
+        a.relation == b.relation && a.plan_id == b.plan_id
     });
 
     let transferred = serde_json::to_value(duplicate).unwrap_or(Value::Null);
@@ -117,15 +117,15 @@ fn union_by<T: Clone>(main: &[T], extra: &[T], eq: impl Fn(&T, &T) -> bool) -> V
 mod tests {
     use super::*;
     use project_portfolio_management_matcher::{
-        IdentifierScheme, RelationKind, WorkItemIdentifier, WorkItemKind, WorkItemRelationship,
+        IdentifierScheme, PlanIdentifier, PlanRelationship, RelationKind,
     };
 
-    fn project(name: &str) -> WorkItem {
-        WorkItem::new(WorkItemKind::Project, name)
+    fn project(name: &str) -> Plan {
+        Plan::new(name)
     }
 
-    fn ident(scheme: IdentifierScheme, value: &str) -> WorkItemIdentifier {
-        WorkItemIdentifier {
+    fn ident(scheme: IdentifierScheme, value: &str) -> PlanIdentifier {
+        PlanIdentifier {
             scheme,
             value: value.to_string(),
         }
@@ -135,7 +135,7 @@ mod tests {
     fn duplicate_name_becomes_an_alternate_name() {
         let main = project("Apollo platform migration");
         let dup = project("Apollo migration");
-        let out = merge_work_items(&main, &dup);
+        let out = merge_plans(&main, &dup);
         assert_eq!(out.merged.name, "Apollo platform migration");
         assert!(
             out.merged
@@ -148,12 +148,7 @@ mod tests {
     fn same_name_is_not_added_as_alternate() {
         let main = project("Apollo");
         let dup = project("Apollo");
-        assert!(
-            merge_work_items(&main, &dup)
-                .merged
-                .alternate_names
-                .is_empty()
-        );
+        assert!(merge_plans(&main, &dup).merged.alternate_names.is_empty());
     }
 
     #[test]
@@ -163,7 +158,7 @@ mod tests {
         let mut dup = project("Q");
         dup.code = Some("DUP-01".into());
         dup.owner_org_id = Some("organization:9a2f".into());
-        let out = merge_work_items(&main, &dup);
+        let out = merge_plans(&main, &dup);
         assert_eq!(out.merged.code.as_deref(), Some("MAIN-01")); // kept
         assert_eq!(
             out.merged.owner_org_id.as_deref(),
@@ -176,9 +171,9 @@ mod tests {
         let mut main = project("P");
         main.keywords = vec!["infra".into(), "latency".into()];
         main.identifiers = vec![ident(IdentifierScheme::JiraProjectKey, "APOLLO")];
-        main.relationships = vec![WorkItemRelationship {
+        main.relationships = vec![PlanRelationship {
             relation: RelationKind::DependsOn,
-            work_item_id: "p2".into(),
+            plan_id: "p2".into(),
         }];
         let mut dup = project("Q");
         dup.keywords = vec!["latency".into(), "perf".into()]; // "latency" overlaps
@@ -186,11 +181,11 @@ mod tests {
             ident(IdentifierScheme::JiraProjectKey, "APOLLO"), // same → dropped
             ident(IdentifierScheme::LinearId, "LIN-9"),        // new
         ];
-        dup.relationships = vec![WorkItemRelationship {
+        dup.relationships = vec![PlanRelationship {
             relation: RelationKind::DependsOn,
-            work_item_id: "p2".into(), // same → dropped
+            plan_id: "p2".into(), // same → dropped
         }];
-        let out = merge_work_items(&main, &dup);
+        let out = merge_plans(&main, &dup);
         assert_eq!(out.merged.keywords, vec!["infra", "latency", "perf"]);
         assert_eq!(out.merged.identifiers.len(), 2);
         assert_eq!(out.merged.relationships.len(), 1);
@@ -214,7 +209,7 @@ mod tests {
                 ..Default::default()
             },
         ];
-        let out = merge_work_items(&main, &dup);
+        let out = merge_plans(&main, &dup);
         assert_eq!(out.merged.goals.len(), 2);
     }
 
@@ -223,7 +218,7 @@ mod tests {
         let main = project("P");
         let mut dup = project("Q");
         dup.keywords = vec!["x".into()];
-        let out = merge_work_items(&main, &dup);
+        let out = merge_plans(&main, &dup);
         assert_eq!(out.transferred["name"], "Q");
         assert_eq!(out.transferred["keywords"][0], "x");
     }

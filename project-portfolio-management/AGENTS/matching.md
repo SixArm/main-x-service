@@ -1,33 +1,33 @@
 # Matching Algorithm Reference — Portfolio Entity
 
-The matching system compares two `WorkItem` records and produces a
+The matching system compares two `Plan` records and produces a
 `MatchResult`: score in `[0.0, 1.0]`, `Confidence`, `is_match`, and a
 per-component `MatchBreakdown`. The algorithm lives entirely in the
 matcher crate; the service embeds it unchanged. Canonical detail:
 matcher [spec §5–§18](../project-portfolio-management-matcher-rust-crate/spec/index.md) and
 [AGENTS/matching-algorithm.md](../project-portfolio-management-matcher-rust-crate/AGENTS/matching-algorithm.md).
 
-Matching is over the **work-item identity** — the Portfolio / Project /
-Product / Program header. The operational sub-resources (tasks, issues)
-are **not** matched; only goal titles feed a probabilistic component (see
-below). Within-collection deduplication (e.g. two duplicate projects, two
-duplicate portfolios) is the primary use case.
+Matching is over the **plan identity** — the plan header. The optional
+`kind` label (Portfolio / Project / Product / Program / Practice /
+Process / Purpose / Pathway / Proposal) is descriptive only and does
+**not** affect matching. The operational sub-resources (tasks, issues)
+are **not** matched; only goal titles feed a probabilistic component
+(see below). Deduplication (e.g. two duplicate plans) is the primary use
+case.
 
-## The kind gate (→ 0.0)
+## Kind is not a gate
 
-| Rule | Condition |
-|---|---|
-| R-GATE | `A.kind != B.kind` → **0.0** (no match) — different kinds are distinct record types in distinct collections |
-
-R-GATE runs **first**, before any short-circuit or component. It is the
-headline rule that distinguishes the portfolio matcher from a
-single-entity matcher: a project and a product are never the same record,
-so the matcher refuses to score them. `kind` is therefore a **gate, not a
-weighted component** — there is no `kind`/`type` score.
+Matching is **kind-agnostic**: any two plans may match regardless of
+their `kind` labels. There is no kind gate — a plan labelled `Project`
+can match one labelled `Product` if the other signals agree. `kind` is a
+purely descriptive/display/grouping label; it is neither a gate nor a
+weighted component, so there is no `kind`/`type` score.
+(`MatchBreakdown.kind_gate_blocked` remains only as a vestigial,
+always-`false` field for wire compatibility.)
 
 ## Deterministic short-circuits (→ 1.0)
 
-Evaluated only after R-GATE passes (same `kind`):
+Evaluated for any pair (kind is never consulted):
 
 | Rule | Condition |
 |---|---|
@@ -49,15 +49,15 @@ Renormalised weighted average over the components both records carry
 | Goals | 0.15 | Jaccard over `fold_set` of goal titles | both sides empty |
 | Code | 0.15 | Same owner: 1.0 if normalised codes equal, else 0.0 | differing / missing owner |
 | OwnerOrg | 0.10 | Exact `owner_org_id` match: 1.0 / 0.0 | either side unset |
-| Portfolio | 0.08 | Child kinds only: same parent `portfolio_ref` exact 1.0 / 0.0 | either side unset (always for Portfolio kind) |
+| Parent | 0.08 | Same parent `parent_ref` exact 1.0 / 0.0 | either side unset |
 | Timeframe | 0.07 | Date proximity over `[start_date, target_date]` (Gaussian decay on day gap, σ default 90) | either side lacks dates |
 | Keywords | 0.05 | Jaccard over `fold_set` | both sides empty (0.0 if exactly one populated) |
-| Relationships | 0.05 | Jaccard over typed `"relation:work_item_id"` token set | **either** side empty (strict — supporting signal) |
+| Relationships | 0.05 | Jaccard over typed `"relation:plan_id"` token set | **either** side empty (strict — supporting signal) |
 | Tags | 0.05 | Jaccard over `fold_set` | **either** side empty (strict — supporting signal) |
 
-Weights sum to 1.00. `Portfolio` (0.08) replaces plan's `PlanType`
-component — kind is now a gate (R-GATE), and the parent-portfolio link is
-the new weighted corroborator for child kinds.
+Weights sum to 1.00. The `Parent` (0.08) component corroborates two
+plans that share the same parent plan; it contributes nothing when either
+side has no `parent_ref`.
 
 ## Normalisation
 
@@ -78,38 +78,36 @@ the new weighted corroborator for child kinds.
 
 ## Entity-level tuning notes
 
-- R-GATE is non-negotiable: matching is partitioned by `kind`, mirroring
-  the four distinct collections. Never relax it into a weighted
-  component.
-- Name is the dominant signal for within-collection dedup — hence the
-  highest weight. Goals and an owner-scoped `code` are the two strongest
-  corroborators.
+- Matching is kind-agnostic: `kind` is a descriptive label, never a gate
+  or a weighted component. Any two plans may match. Never re-introduce a
+  kind gate.
+- Name is the dominant signal for dedup — hence the highest weight. Goals
+  and an owner-scoped `code` are the two strongest corroborators.
 - Goals are matched only by **title** (Jaccard over goal titles), not by
   goal body or status — titles are the stable, comparable surface.
 - A shared `owner_org_id` alone is weak corroboration (`OwnerOrg` 0.10);
   it only pins a match when combined with an equal `code` (R-1).
-- `Portfolio` (0.08) corroborates two children sharing the same parent;
-  it contributes nothing for Portfolio-kind records (no `portfolio_ref`).
+- `Parent` (0.08) corroborates two plans sharing the same parent plan; it
+  contributes nothing when either side has no `parent_ref`.
 - Do not change default weights / threshold without updating the matcher
   spec §7, this file, the entity spec §6.2, and CHANGELOGs.
 
 ## Where matching runs in the service
 
 **File:** [`src/controllers/`](../project-portfolio-management-service-with-loco/src/controllers/)
-— each collection's two matching endpoints construct
+— the plan matching endpoints construct
 `MatchingEngine::new(MatchConfig::default())`:
 
-- `POST /api/{collection}/match` → `engine.rank(query, candidates)`
+- `POST /api/plans/match` → `engine.rank(query, candidates)`
   over the request payload (no DB).
-- `POST /api/{collection}/check-duplicates` → loads up to 1 000 active
-  rows **from that collection only**, `match_work_items` per candidate,
-  returns `is_match` hits sorted by score descending. (R-GATE makes
-  cross-collection matching impossible even if rows leaked in.)
+- `POST /api/plans/check-duplicates` → loads up to 1 000 active plan
+  rows, `match_plans` per candidate, returns `is_match` hits sorted by
+  score descending.
 
 ## Source files (matcher crate)
 
-- `src/matcher.rs` — `MatchingEngine`, the R-GATE check, per-component
-  fns, deterministic rules, `rank`, `find_matches`
+- `src/matcher.rs` — `MatchingEngine`, per-component fns, deterministic
+  rules, `rank`, `find_matches`
 - `src/scoring.rs` — `MatchResult`, `MatchBreakdown`, `Confidence`,
   weighted average
 - `src/config.rs` — `MatchConfig` (weights + threshold + presets)

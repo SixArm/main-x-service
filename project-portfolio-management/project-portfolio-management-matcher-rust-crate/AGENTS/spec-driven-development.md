@@ -32,15 +32,15 @@ from the §1–§18 shape used by the service crates).
 | A new term in the vocabulary | §3 Glossary |
 | Citing a paper or external rule | §4 Research basis |
 | The pipeline at a glance | §5 Algorithm overview |
-| The list of `WorkItem` fields | §6 Domain model |
+| The list of `Plan` fields | §6 Domain model |
 | Default weights or threshold | §7 Configuration |
 | Normalisation behaviour | §8 Normalisation |
 | Name-similarity algorithm | §9 Name similarity |
 | Goal-title overlap (Jaccard) | §10 Goals |
 | Code rule (same-owner gate, shape) | §11 Code |
 | Owner-org score | §11a Owner org |
-| Portfolio (parent-portfolio) score | §11b Portfolio |
-| Kind gate (R-GATE) / timeframe score | §12 Kind gate & timeframe |
+| Parent (parent-plan) score | §11b Parent |
+| Kind (no gate) / timeframe score | §12 Kind (no gate) & timeframe |
 | Keywords Jaccard | §13 Keywords |
 | Relationships typed-set Jaccard | §13.1 Relationships |
 | Tags set Jaccard | §13.2 Tags |
@@ -89,14 +89,14 @@ bigger, split it (`T-12a`, `T-12b`).
 | Spec section | Corresponds to |
 |---|---|
 | §1 Purpose / §2 Scope | repo-level positioning (also `AGENTS.md`) |
-| §3 Glossary | `src/work_item.rs` types, `src/scoring.rs` enums |
+| §3 Glossary | `src/plan.rs` types, `src/scoring.rs` enums |
 | §4 Research basis | `AGENTS/matching-algorithm.md` |
 | §5 Algorithm overview | `src/matcher.rs` |
-| §6 Domain model | `src/work_item.rs` |
+| §6 Domain model | `src/plan.rs` |
 | §7 Configuration | `src/config.rs` (`MatchConfig`) |
 | §8 Normalisation | `src/normalize.rs`, `AGENTS/normalization.md` |
 | §9–§13 per-component scoring | `src/matcher.rs` component fns |
-| §12 Kind gate (R-GATE) | `src/matcher.rs` gate (first rule) |
+| §12 Kind (no gate — optional metadata) | `src/plan.rs` (`Plan::kind`), `src/matcher.rs` |
 | §15–§16 short-circuits | `src/matcher.rs` deterministic gate |
 | §17 Renormalisation | `src/scoring.rs` weighted-sum helper |
 | §18 Confidence classification | `src/scoring.rs` `Confidence` |
@@ -124,8 +124,9 @@ When you finish a task:
 - "The spec is wrong; let me just fix it to match the code" —
   without first confirming the code's behaviour is the *intended*
   behaviour, you're laundering a bug into a feature.
-- **Matching across kinds.** Per §12, R-GATE refuses any `A.kind !=
-  B.kind` comparison at `0.0`. A project is never a product.
+- **Reintroducing a kind gate.** Per §12, `kind` is optional
+  descriptive metadata and never gates matching — two plans with
+  different kinds may still be the same identity. Do not compare `kind`.
 - **Adjusting a default weight without a §7 spec edit.** Reviewers
   diff the spec against `MatchConfig::default()`.
 - **Adding a deterministic-identifier scheme without bridge-test

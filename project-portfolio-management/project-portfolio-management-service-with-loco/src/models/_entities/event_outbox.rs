@@ -25,7 +25,7 @@ pub struct Model {
     /// Envelope id — the consumer dedup key.
     #[sea_orm(unique)]
     pub event_id: Uuid,
-    /// The entity name (e.g. `work_item`).
+    /// The entity name (e.g. `plan`).
     pub entity: String,
     /// The record pid — the bus partition key.
     pub entity_pid: Uuid,

@@ -1,13 +1,12 @@
-//! `project-portfolio-management-service` — a loco.rs registry for **work-item** records
-//! across four collections (portfolio / project / product / program),
-//! with CRUD + matching.
+//! `project-portfolio-management-service` — a loco.rs registry for **plan**
+//! records in one recursive collection, with CRUD + matching.
 //!
-//! The API DTO is `project_portfolio_management_matcher::WorkItem` itself: the service stores
-//! it verbatim (JSONB in the `work_items` table) and matches with the
+//! The API DTO is `project_portfolio_management_matcher::Plan` itself: the service stores
+//! it verbatim (JSONB in the `plans` table) and matches with the
 //! canonical [`project_portfolio_management_matcher`] engine, so there is no separate domain
-//! model to drift. The four collections share one table; a row's `kind`
-//! is its collection, and matching is always scoped within one collection
-//! (the matcher's kind gate).
+//! model to drift. Every plan lives in one `plans` table; `kind` is an
+//! optional descriptive label and matching is kind-agnostic (there is
+//! no kind gate).
 //!
 //! ## Modules
 //!
@@ -27,30 +26,40 @@
 
 pub mod app;
 pub mod auth;
+/// Pure workflow-automation rules (trigger matching, action shapes, due-ness).
+pub mod automation;
+/// Pure collaborative-review + assignee-workload rules.
+pub mod collaboration;
 pub mod controllers;
 pub mod data;
-/// Pure PPM governance rules (proposal pipeline, phase gates, risks, money).
-pub mod governance;
 /// Pure rules for the engineering-team features (tasks / burndown / MoSCoW).
 pub mod engineering;
+/// Pure PPM governance rules (proposal pipeline, phase gates, risks, money).
+pub mod governance;
+pub mod initializers;
 /// Pure derivations for the executive insight areas (CEO / CFO / CTO).
 pub mod insights;
-/// Pure PPM strategy rules (scenario evaluation, OKR weights, ROI).
-pub mod strategy;
-/// Pure PPM visibility rules (schedule math, RAG, capacity, CSV).
-pub mod visibility;
-pub mod initializers;
+/// Pure bird.s-eye lifecycle rules (the funnel + next-phase readiness).
+pub mod lifecycle;
 pub mod merge;
 pub mod metrics;
 pub mod models;
 pub mod openapi;
+/// The pure, explainable Smart Score behind data-driven prioritisation.
+pub mod prioritisation;
 /// Durable event bus Phase 3: the outbox relay loop + retention purge.
 pub mod relay;
+/// The set-and-forget ticker: the optional scheduled-action sweep loop.
+pub mod scheduler;
 /// Point-in-time estate snapshots (board / CRO trends).
 pub mod snapshots;
+/// Pure PPM strategy rules (scenario evaluation, OKR weights, ROI).
+pub mod strategy;
 pub mod streaming;
 pub mod tasks;
 pub mod validation;
 /// Header-based API versioning (`Accepts-version`) for the REST surface.
 pub mod version;
+/// Pure PPM visibility rules (schedule math, RAG, capacity, CSV).
+pub mod visibility;
 pub mod workers;

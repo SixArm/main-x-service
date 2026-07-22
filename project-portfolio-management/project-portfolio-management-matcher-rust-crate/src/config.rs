@@ -20,9 +20,9 @@ pub struct MatchConfig {
     pub code_weight: f64,
     /// Weight of the owner-org exact component. Default 0.10.
     pub owner_org_weight: f64,
-    /// Weight of the parent-portfolio exact component (child kinds).
+    /// Weight of the parent plan exact component (`parent_ref`).
     /// Default 0.08.
-    pub portfolio_weight: f64,
+    pub parent_weight: f64,
     /// Weight of the timeframe (date-proximity) component. Default 0.07.
     pub timeframe_weight: f64,
     /// Weight of the keywords (Jaccard) component. Default 0.05.
@@ -58,9 +58,9 @@ impl Default for MatchConfig {
             code_weight: 0.15,
             // Same sponsoring organisation: useful exact signal.
             owner_org_weight: 0.10,
-            // Same parent portfolio (child kinds): replaces the
-            // plan-family `plan_type` weight — kind is a gate, not a weight.
-            portfolio_weight: 0.08,
+            // Same parent plan (`parent_ref`): a corroborating
+            // containment signal in the unified recursive tree.
+            parent_weight: 0.08,
             // Timeframe proximity: corroborating, decays with the day gap.
             timeframe_weight: 0.07,
             // Free-form keywords: moderate corroboration.
@@ -119,7 +119,7 @@ impl MatchConfig {
             + self.goals_weight
             + self.code_weight
             + self.owner_org_weight
-            + self.portfolio_weight
+            + self.parent_weight
             + self.timeframe_weight
             + self.keywords_weight
             + self.relationships_weight

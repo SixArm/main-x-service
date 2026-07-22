@@ -16,7 +16,7 @@ pub struct Model {
     pub id: i32,
     #[sea_orm(unique)]
     pub pid: Uuid,
-    pub work_item_pid: Uuid,
+    pub plan_pid: Uuid,
     pub category: String,
     pub description: String,
     pub currency: String,

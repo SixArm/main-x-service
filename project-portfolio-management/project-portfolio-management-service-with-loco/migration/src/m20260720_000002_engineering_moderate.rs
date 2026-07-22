@@ -39,7 +39,7 @@ impl MigrationTrait for Migration {
                      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                      id SERIAL PRIMARY KEY,
                      pid UUID NOT NULL UNIQUE,
-                     work_item_pid UUID NOT NULL,
+                     plan_pid UUID NOT NULL,
                      kind VARCHAR NOT NULL,
                      environment VARCHAR NULL,
                      version VARCHAR NULL,

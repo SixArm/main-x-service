@@ -5,72 +5,82 @@
 > work queue is §13.
 >
 > Entity-wide contract: [portfolio entity spec](../../spec/index.md) (the API
-> DTO **is** the matcher's `WorkItem` type; canonical domain model in its §5).
+> DTO **is** the matcher's `Plan` type; canonical domain model in its §5).
 > Sibling matcher: [project-portfolio-management-matcher](../../project-portfolio-management-matcher-rust-crate/spec/index.md).
 > Sibling front-end: [project-portfolio-management-front-end-with-svelte](../../project-portfolio-management-front-end-with-svelte/spec/index.md).
 
 ## 1. Purpose and vision
 
-A registry of **work-item** records for the Main X Index family — and a
-project-management tool. A *work item* is a matchable identity for one
-of **four distinct kinds**: a **Portfolio** (the umbrella container), a
-**Project**, a **Product**, or a **Program**. The service has **two
-faces that share one record**: a deduplicated, matchable identity
-registry (the thin `WorkItem` payload, scored by the canonical
-project-portfolio-management-matcher) and a project workspace (each work item *owns*
-operational sub-resources — goals, tasks, issues — plus derived timeline
-/ burndown views). The four kinds are **separate collections and
-tables**: a Portfolio is the umbrella, and Projects / Products / Programs
-sit **under** a portfolio (they carry a `portfolio_ref` to their parent).
-Built on loco.rs.
+A registry of **plan** records for the Main X Index family — and a
+project-management tool. A *plan* is a matchable identity in one
+recursive collection; its `kind` — **Portfolio**, **Project**,
+**Product**, **Program**, **Practice**, **Process**, **Purpose**,
+**Pathway**, or **Proposal** — is an **optional descriptive label** (a
+display / grouping hint), not a required discriminator and not a separate
+collection. The service has **two faces that share one record**: a
+deduplicated, matchable identity registry (the thin `Plan` payload,
+scored by the canonical project-portfolio-management-matcher) and a
+project workspace (each plan *owns* operational sub-resources — goals,
+tasks, issues — plus derived timeline / burndown views). All plans live
+in **one collection and table**; any plan may contain any other plan via
+a `parent_ref` to its parent (a recursive tree). Built on loco.rs.
 
 ## 2. Scope
 
 MVP: CRUD + `ILIKE` name search + matching + record merge + audit log +
-in-memory event streaming (durable-bus Phase 1) across the **four
-matchable collections** (`portfolios`, `projects`, `products`,
-`programs`) + the operational sub-resources (goals, tasks, issues) on any
-work item + derived timeline / burndown read views + cross-service entity
-links (write side) + OpenAPI/Swagger + Prometheus metrics + offline
-PASETO v4 public token verification (Ed25519, published key) + blanket
-`/api/*` auth enforcement (off by default) + payload validation.
-Matching is **within a collection only** — a project never matches a
-product (enforced by the matcher's `kind` gate, §5/§9.2).
+in-memory event streaming (durable-bus Phase 1) over **one recursive
+`plans` collection** + the operational sub-resources (goals, tasks,
+issues) on any plan + derived timeline / burndown read views +
+cross-service entity links (write side) + collaborative review +
+workflow automation + the set-and-forget scheduler + the Smart Score /
+bird's-eye lifecycle views (§9.4a) + OpenAPI/Swagger + Prometheus
+metrics + offline PASETO v4 public token verification (Ed25519,
+published key) + blanket `/api/*` auth enforcement (off by default) +
+payload validation. Matching is **kind-agnostic** — any two plans may
+match; the `kind` label does not gate matching (§5/§9.2). `kind` is an
+optional Portfolio / Project / Product / Program / Practice / Process /
+Purpose / Pathway / Proposal label, and any plan may contain any other
+plan via `parent_ref` (a self- or descendant-cycle is rejected `422`).
 Deferred (§13): the goals/issues sub-resource tables + the derived
 timeline view (tasks + sprints + burndown landed 2026-07-20), Tantivy
-full-text/fuzzy search, search-blocked dedup
-candidates, the durable event bus's Fluvio broker sink (Phase 2 outbox +
-Phase 3 relay/retention landed), privacy,
-front-end merge action, bulk import/export,
-gRPC, and the deferred `posts` / `comments` / `members` collaboration
+full-text/fuzzy search, search-blocked dedup candidates, the durable
+event bus's Fluvio broker sink (Phase 2 outbox + Phase 3 relay/retention
+landed), privacy, front-end merge action, bulk import/export, gRPC, and
+the deferred `posts` / `comments` / `members` collaboration
 sub-resources. (The paseto-keys-over-HTTP fetch at boot landed
-2026-07-04 — `PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS_URL`, §9.6/§13.) Token **issuance** is out of scope — provided by the central
+2026-07-04 — `PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS_URL`, §9.6/§13.)
+Token **issuance** is out of scope — provided by the central
 authentication-service. Auth source of truth (supersedes the RS256-JWT
-model): [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
+model):
+[`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
 
 ## 3. Stakeholders and users
 
-Portfolio / programme managers and delivery teams curating work items and
+Portfolio / programme managers and delivery teams curating plans and
 working the boards; peer services (person / worker / organization /
 authentication, and the cross-service link aggregator); the portfolio
 front-end.
 
 ## 4. Glossary
 
-- **work item** — a portfolio / project / product / program; the
-  matchable identity record. The canonical Rust type is `WorkItem`, with
-  a required `kind` discriminator.
-- **kind** — `Portfolio` | `Project` | `Product` | `Program`; the
-  collection / table the record lives in, and a hard match gate.
-- **portfolio** — the umbrella kind of work item; the container under
-  which projects / products / programs sit.
-- **pid** — public UUID of a work-item record.
-- **data** — the full `WorkItem` payload stored as JSONB.
-- **portfolio_ref** — the parent portfolio `pid` carried by a Project /
-  Product / Program (the umbrella link); absent for Portfolio kind.
-- **sub-resource** — operational data a work item owns (goal, task,
-  issue), in its own table keyed by the parent `(kind, pid)`; **not**
-  part of the matcher payload (except goal **titles** via `data.goals[]`).
+- **plan** — the matchable identity record. The canonical Rust type is
+  `Plan`, with an **optional** `kind` label (`Plan::new(name)` leaves
+  `kind` `None`).
+- **kind** — an optional `Portfolio` | `Project` | `Product` |
+  `Program` | `Practice` | `Process` | `Purpose` | `Pathway` |
+  `Proposal` descriptive / grouping label; it does **not** fix a
+  collection and does **not** gate matching.
+- **portfolio** — a plan whose `kind` label is `Portfolio`;
+  conventionally an umbrella under which other plans sit, but only by
+  `parent_ref`, not by a separate collection.
+- **pid** — public UUID of a plan record.
+- **data** — the full `Plan` payload stored as JSONB.
+- **parent_ref** — the parent plan `pid` a plan may carry (the
+  containment link); any plan may contain any other (a recursive tree);
+  optional.
+- **sub-resource** — operational data a plan owns (goal, task, issue),
+  in its own table keyed by the parent plan `pid`; **not** part of the
+  matcher payload (except goal **titles** via `data.goals[]`).
 - **EntityRef** — `<entity_type>:<uuid>` URN naming a record in another
   service (lead / assignee / owner org).
 - **derived view** — a read-only projection (timeline / burndown)
@@ -78,10 +88,10 @@ front-end.
 
 ## 5. Domain model
 
-The API DTO is `project_portfolio_management_matcher::WorkItem` — the canonical model lives
+The API DTO is `project_portfolio_management_matcher::Plan` — the canonical model lives
 in the [portfolio entity spec §5](../../spec/index.md). Matchable payload
-(thin identity): `kind`, `name`, `alternate_names`, `code`,
-`owner_org_id`, `owner_org_name`, `lead_ref`, `portfolio_ref`, `status`,
+(thin identity): optional `kind` label, `name`, `alternate_names`, `code`,
+`owner_org_id`, `owner_org_name`, `lead_ref`, `parent_ref`, `status`,
 `goals` (titles + optional target dates), `start_date`, `target_date`,
 `keywords`, `tags`, `identifiers`, `same_as`, `in_language`,
 `relationships`. **The high-volume operational data is deliberately
@@ -89,14 +99,15 @@ excluded from the payload** — tasks and issues live in their own tables
 (§10) and are never fed to the matcher; goals are the one bridge (their
 titles feed matching via `data.goals[]`).
 
-> **Match gate — within-kind only.** Matching is partitioned by `kind`:
-> the matcher short-circuits to `0.0` when two work items have different
-> `kind` (the R-GATE, [project-portfolio-management-matcher §1–§25](../../project-portfolio-management-matcher-rust-crate/spec/index.md)).
-> You never match a project against a product. Each REST collection only
-> ever compares records within its own collection.
+> **Matching is kind-agnostic.** There is no kind gate: two plans may
+> match regardless of their (optional) `kind` labels
+> ([project-portfolio-management-matcher §1–§25](../../project-portfolio-management-matcher-rust-crate/spec/index.md)).
+> The matcher's `MatchBreakdown.kind_gate_blocked` remains only as a
+> vestigial, always-`false` field. Containment is expressed with
+> `parent_ref`, not with a collection boundary.
 
 > **Partition rule — within-payload relationships vs cross-service
-> links.** `relationships` inside the `WorkItem` payload are within-entity
+> links.** `relationships` inside the `Plan` payload are within-entity
 > and **are** a matcher signal (Jaccard component). Cross-service links
 > (§9.7) live only in `entity_links`, the `linked`/`unlinked` events, and
 > the aggregator — they are **never** stored in the payload and **never**
@@ -105,89 +116,89 @@ titles feed matching via `data.goals[]`).
 
 ## 6. Functional requirements
 
-The **four collections** — `portfolios`, `projects`, `products`,
-`programs` — share an **identical controller shape**; `{collection}`
-below stands for any one of them, and `{kind}` for its `WorkItemKind`.
-Child collections (`projects` / `products` / `programs`) additionally
-carry `portfolio_ref` → parent portfolio pid; the `portfolios` collection
-does not.
+All plans live in **one collection** — `/api/plans` — with an identical
+controller shape for every plan. A plan carries an **optional** `kind`
+label (Portfolio / Project / Product / Program / Practice / Process /
+Purpose / Pathway / Proposal) and an optional `parent_ref` → parent plan
+pid; any plan may contain any other (a recursive tree), so containment
+is expressed by `parent_ref`, never by a collection boundary.
 
-1. `POST /api/{collection}` — create; `kind` is fixed by the
-   collection (server-stamped / rejected if mismatched), `name` required,
-   `identifiers` structurally checked per scheme (canonical UUID for
-   `Uuid`; external PM-tool id shapes for `JiraProjectKey` / `AsanaGid` /
-   `TrelloBoardId` / `MsProjectId` / `GitHubProjectId` / `LinearId`; URI
-   shape for `Uri`; non-blank for the rest), `goals` titles non-blank, and
-   `in_language` checked for BCP-47 syntax; child kinds require a
-   well-formed `portfolio_ref`; `422` on any problem, **all reported
-   together** — also enforced on update. Real-time duplicate detection on
-   create returns `409 Conflict` with candidate matches (within this
-   collection only) when duplicates are found. Rules in
-   [`src/validation.rs`](../src/validation.rs).
-2. `GET /api/{collection}` — list active (cap 100), `{pid, name}`.
-   `GET /api/{collection}/search?q=` — case-insensitive name search
-   (Postgres `ILIKE`, cap 50; blank `q` → `400`).
-3. `GET /api/{collection}/{pid}` — return the stored `WorkItem`.
-4. `PUT /api/{collection}/{pid}` — replace the payload (`422` if `name`
-   is blank, or any `goals` / `identifiers` / `in_language` /
-   `portfolio_ref` entry is malformed).
-5. `DELETE /api/{collection}/{pid}` — soft-delete.
-6. `POST /api/{collection}/match` — rank an explicit `{query,
-   candidates}` set (no persistence). Candidates of a different `kind`
-   from the query gate to `0.0` (R-GATE).
-7. `POST /api/{collection}/check-duplicates` — match a query against
-   stored active records **in this collection**; return those above
-   threshold, ranked.
-   `POST /api/{collection}/deduplicate` — batch scan of active rows
-   in this collection into the review queue (status `Pending`/`Confirmed`/
-   `Rejected`/`AutoMerged`).
-8. `POST /api/{collection}/merge` — fold a duplicate into a survivor
-   **of the same kind** (union payload fields, former-name alias,
-   soft-delete the duplicate, `merge_records` history + transferred
-   snapshot, `Replaces` link from survivor → duplicate, `Merged` event);
-   `422` equal pids or cross-kind merge, `404` unknown.
-   `GET /api/{collection}/merges/recent` — merge history.
-9. Operational sub-resource CRUD on **any** work item (separate tables
-   keyed by the parent `(kind, pid)`):
-   - **Goals** — `…/{collection}/{pid}/goals` (also part of the matcher
-     payload via `data.goals[]` mutation — the goals bridge).
-   - **Tasks** — `…/{collection}/{pid}/tasks` (`status` Todo/InProgress/
-     InReview/Done/Blocked; `assignee_ref` EntityRef; `goal_id?`,
-     `parent_task_id?`, `estimate`, `remaining`, `due_date`).
-   - **Issues** — `…/{collection}/{pid}/issues` (`kind` Bug/Risk/Blocker/
-     Question/Improvement; `severity` Low/Med/High/Critical; `status`
-     Open/InProgress/Resolved/Closed; `assignee_ref`).
-   Full CRUD on each; every write audits + emits a `created`/`updated`/
-   `deleted` event scoped to the sub-resource and its parent. (Deferred
-   §13: `posts` / `comments` / `members` collaboration sub-resources.)
-10. Derived read views — `GET /api/{collection}/{pid}/timeline`
+1. `POST /api/plans` — create; `kind` is an **optional** label (accepted
+   as sent, never server-stamped and never mismatched against a
+   collection), `name` required, `identifiers` structurally checked per
+   scheme (canonical UUID for `Uuid`; external PM-tool id shapes for
+   `JiraProjectKey` / `AsanaGid` / `TrelloBoardId` / `MsProjectId` /
+   `GitHubProjectId` / `LinearId`; URI shape for `Uri`; non-blank for
+   the rest), `goals` titles non-blank, and `in_language` checked for
+   BCP-47 syntax; when present, `parent_ref` must be a well-formed UUID
+   **and** must not introduce a containment cycle (a plan may not be its
+   own ancestor); `422` on any problem, **all reported together** — also
+   enforced on update. Real-time duplicate detection on create returns
+   `409 Conflict` with candidate matches (kind-agnostic) when duplicates
+   are found. Rules in [`src/validation.rs`](../src/validation.rs).
+2. `GET /api/plans` — list active (cap 100), `{pid, name}`. `GET
+   /api/plans?parent={pid}` — roll up a plan's **direct children** (by
+   denormalised `parent_pid`). `GET /api/plans/search?q=` —
+   case-insensitive name search (Postgres `ILIKE`, cap 50; blank `q` →
+   `400`).
+3. `GET /api/plans/{pid}` — return the stored `Plan`.
+4. `PUT /api/plans/{pid}` — replace the payload (`422` if `name` is
+   blank, or any `goals` / `identifiers` / `in_language` entry is
+   malformed, or `parent_ref` is malformed or would form a cycle).
+5. `DELETE /api/plans/{pid}` — soft-delete.
+6. `POST /api/plans/match` — rank an explicit `{query, candidates}` set
+   (no persistence). Candidates are scored regardless of their
+   (optional) `kind` labels — there is no kind gate.
+7. `POST /api/plans/check-duplicates` — match a query against stored
+   active plans; return those above threshold, ranked. `POST
+   /api/plans/deduplicate` — batch scan of active plans into the review
+   queue (status `Pending`/`Confirmed`/`Rejected`/`AutoMerged`).
+8. `POST /api/plans/merge` — fold a duplicate into **any** survivor
+   (union payload fields, former-name alias, soft-delete the duplicate,
+   `merge_records` history + transferred snapshot, `Replaces` link from
+   survivor → duplicate, `Merged` event); `422` equal pids, `404`
+   unknown. Merge is **not** scoped by kind or collection — any two
+   plans may merge. `GET /api/plans/merges/recent` — merge history.
+9. Operational sub-resource CRUD on **any** plan (separate tables keyed
+   by the parent plan `pid`):
+- **Goals** — `…/plans/{pid}/goals` (also part of the matcher payload
+  via `data.goals[]` mutation — the goals bridge).
+- **Tasks** — `…/plans/{pid}/tasks` (`status` Todo/InProgress/
+  InReview/Done/Blocked; `assignee_ref` EntityRef; `goal_id?`,
+  `parent_task_id?`, `estimate`, `remaining`, `due_date`).
+- **Issues** — `…/plans/{pid}/issues` (`kind` Bug/Risk/Blocker/
+  Question/Improvement; `severity` Low/Med/High/Critical; `status`
+  Open/InProgress/Resolved/Closed; `assignee_ref`). Full CRUD on each;
+  every write audits + emits a `created`/`updated`/ `deleted` event
+  scoped to the sub-resource and its parent plan. (Deferred §13: `posts`
+  / `comments` / `members` collaboration sub-resources.)
+10. Derived read views — `GET /api/plans/{pid}/timeline`
    (goals-with-target-date milestones + task date ranges → Gantt) and
-   `GET /api/{collection}/{pid}/burndown` (remaining-vs-estimate over
-   time from task estimate/remaining snapshots). Read-only projections;
-   never persisted as their own row.
-11. Cross-service links — `POST`/`GET`/`DELETE
-   /api/{collection}/{pid}/links` (§9.7), emitting `linked` /
-   `unlinked`.
-12. `GET /api/{collection}/audit/recent` + `/{pid}/audit` — audit-log
-   query; `GET /api/{collection}/events/recent` — in-memory event
-   stream. Each create/update/delete/merge (work item and sub-resource)
-   writes an `audit_logs` row and publishes a `created`/`updated`/
+   `GET /api/plans/{pid}/burndown` (remaining-vs-estimate over time from
+   task estimate/remaining snapshots). Read-only projections; never
+   persisted as their own row.
+11. Cross-service links — `POST`/`GET`/`DELETE /api/plans/{pid}/links`
+   (§9.7), emitting `linked` / `unlinked`.
+12. `GET /api/plans/audit/recent` + `/{pid}/audit` — audit-log query;
+   `GET /api/plans/events/recent` — in-memory event stream. Each
+   create/update/delete/merge (plan and sub-resource) writes an
+   `audit_logs` row and publishes a `created`/`updated`/
    `deleted`/`merged` (and `linked`/`unlinked`) event.
-13. `GET /api/{collection}/whoami` — echo verified bearer-token claims
-   (`401` without a valid token); proves offline PASETO verification.
-14. `GET /api-docs/openapi.json` + `GET /swagger-ui` — OpenAPI 3 document
-   and a Swagger UI page rendering it.
+13. `GET /api/plans/whoami` — echo verified bearer-token claims (`401`
+   without a valid token); proves offline PASETO verification.
+14. `GET /api-docs/openapi.json` + `GET /swagger-ui` — OpenAPI 3
+   document and a Swagger UI page rendering it.
 15. `GET /metrics.prom` — Prometheus metrics in text-exposition format
    (`Content-Type: text/plain; version=0.0.4`), mounted at the root (not
    under `/api`) and public under blanket auth enforcement so a scraper
-   needs no token. Exposes per-collection CRUD/merge counters
-   (`portfolio_{collection}_created_total` / `_updated_total` /
-   `_deleted_total` / `_merged_total`) plus `http_requests_total`.
+   needs no token. Exposes plan CRUD/merge counters
+   (`portfolio_plan_created_total` / `_updated_total` / `_deleted_total`
+   / `_merged_total`) plus `http_requests_total`.
 16. Bulk import/export (deferred, §13) — async, job-based, on the loco
-   `bg_pg` worker: the five endpoints per collection (§9.8). The uniform
-   family contract (execution model, JSONL/CSV/Parquet codecs,
-   upsert-by-stable-key + dedupe-to-review, per-row error report, export
-   masking + audit) is fixed in
+   `bg_pg` worker: the five endpoints on the plans collection (§9.8).
+   The uniform family contract (execution model, JSONL/CSV/Parquet
+   codecs, upsert-by-stable-key + dedupe-to-review, per-row error
+   report, export masking + audit) is fixed in
    [`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md);
    portfolio-specific bits are in §9.8 / §10.
 
@@ -196,25 +207,25 @@ does not.
 loco-idiomatic; Postgres persistence; deterministic + probabilistic
 matching via the embedded `project-portfolio-management-matcher` (`MatchingEngine::new(
 MatchConfig::default())` in
-[`src/controllers/work_items.rs`](../src/controllers/work_items.rs));
-soft-delete with audit-friendly timestamps. The four collections share
-one parameterised controller core (one `kind` per route group), so they
-never drift. Sub-resource tables are sized for high-volume operational
-churn and are kept off the matcher hot path (the matcher only ever sees
-the thin JSONB payload). The within-kind match gate keeps each
-collection's dedup scan scoped to its own rows.
+[`src/controllers/plans.rs`](../src/controllers/plans.rs));
+soft-delete with audit-friendly timestamps. One shared controller core
+serves the single plans collection (`kind` is an optional label, not a
+route discriminator), so there is no per-kind drift. Sub-resource tables
+are sized for high-volume operational churn and are kept off the matcher
+hot path (the matcher only ever sees the thin JSONB payload). The dedup
+scan ranges over the plans collection's active rows with no kind gate.
 
 ## 8. Architecture
 
-loco `App` (`src/app.rs`) registers the four work-item collection
-controllers (one shared core, parameterised by `kind`) and the
-sub-resource controllers. One table per kind (`portfolios`, `projects`,
-`products`, `programs`) stores `pid` + denormalised `name` + the full
-`WorkItem` JSONB `data` (child tables also denormalise `portfolio_pid`);
+loco `App` (`src/app.rs`) registers the single plan-collection controller
+(one shared core) and the sub-resource controllers. One `plans` table
+stores `pid` + denormalised `name` + the full `Plan` JSONB `data` + a
+**nullable** `kind` column (the optional label) + a denormalised
+`parent_pid` UUID (from `data.parent_ref`, for child roll-up queries);
 the operational sub-resources live in their own tables keyed by the
-parent `(kind, pid)` (§10). Matching calls `project-portfolio-management-matcher` directly
+parent plan `pid` (§10). Matching calls `project-portfolio-management-matcher` directly
 on the deserialised payloads — **no adapter**, mirroring care-pathway —
-and the matcher's R-GATE makes cross-kind pairs score `0.0`. Cross-service
+with **no kind gate**, so any two plans may match. Cross-service
 links use the hybrid topology
 ([cross-service linking §4](../../../agents/share/cross-service-linking.md)):
 the service writes its outbound edges locally and emits events; a
@@ -226,48 +237,49 @@ API URLs are version-free; a client selects the representation version
 with the `Accepts-version` request header (default `1.0`) — see
 [`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
 
-Raw loco JSON under `/api/`. `{collection}` ∈ `{portfolios, projects,
-products, programs}`. `404` for unknown `pid`; `422` for a validation
-failure (blank `name`, a malformed `goals` / `identifiers` / `in_language`
-/ `portfolio_ref` entry — family convention, via `Error::CustomError(
+Raw loco JSON under `/api/`. All plans live at `/api/plans`. `404` for
+unknown `pid`; `422` for a validation failure (blank `name`, a malformed
+`goals` / `identifiers` / `in_language` entry, or a malformed / cyclic
+`parent_ref` — family convention, via `Error::CustomError(
 StatusCode::UNPROCESSABLE_ENTITY, …)`, every problem in one body); `400`
 for a malformed body; `409 Conflict` for a real-time create duplicate
-(within the collection).
+(kind-agnostic).
 
-### 9.1 Work-item CRUD (per collection)
-
-| Method | Path | Purpose |
-|---|---|---|
-| POST | `/api/{collection}` | Create (`409` on duplicate) → `{pid, name}` |
-| GET | `/api/{collection}` | List active (cap 100) |
-| GET | `/api/{collection}/search?q=` | Case-insensitive name search (`ILIKE`, cap 50) |
-| GET | `/api/{collection}/{pid}` | Fetch the stored `WorkItem` |
-| PUT | `/api/{collection}/{pid}` | Replace payload |
-| DELETE | `/api/{collection}/{pid}` | Soft-delete |
-
-Concretely the four collections are `/api/portfolios`,
-`/api/projects`, `/api/products`, `/api/programs`.
-
-### 9.2 Match / dedupe / merge (within a collection)
+### 9.1 Plan CRUD
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/api/{collection}/match` | Rank `{query, candidates}` (no persistence; cross-kind → `0.0`) |
-| POST | `/api/{collection}/check-duplicates` | Match a query vs stored active records in this collection |
-| POST | `/api/{collection}/deduplicate` | Batch scan this collection's active rows → review queue |
-| POST | `/api/{collection}/merge` | Merge a duplicate into a same-kind survivor (`422` equal pids / cross-kind, `404` unknown) |
-| GET | `/api/{collection}/merges/recent` | Merge-history records |
+| POST | `/api/plans` | Create (`409` on duplicate) → `{pid, name}` |
+| GET | `/api/plans` | List active (cap 100); `?parent={pid}` rolls up direct children |
+| GET | `/api/plans/search?q=` | Case-insensitive name search (`ILIKE`, cap 50) |
+| GET | `/api/plans/{pid}` | Fetch the stored `Plan` |
+| PUT | `/api/plans/{pid}` | Replace payload |
+| DELETE | `/api/plans/{pid}` | Soft-delete |
 
-The matcher's **R-GATE** (different `kind` ⇒ `0.0`) makes matching
-within-collection only; the controller never compares across collections.
+`kind` is an optional descriptive label carried in the payload, never a
+path segment; `parent_ref` (containment) is a payload field, denormalised
+to `parent_pid` for the `?parent=` roll-up.
 
-### 9.3 Sub-resources (keyed by the parent `(kind, pid)`)
+### 9.2 Match / dedupe / merge
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/plans/match` | Rank `{query, candidates}` (no persistence; kind-agnostic) |
+| POST | `/api/plans/check-duplicates` | Match a query vs stored active plans |
+| POST | `/api/plans/deduplicate` | Batch scan active plans → review queue |
+| POST | `/api/plans/merge` | Merge a duplicate into any survivor (`422` equal pids, `404` unknown) |
+| GET | `/api/plans/merges/recent` | Merge-history records |
+
+Matching is **kind-agnostic** — there is no kind gate, so two plans may
+match, dedupe, and merge regardless of their (optional) `kind` labels.
+
+### 9.3 Sub-resources (keyed by the parent plan `pid`)
 
 | Resource | Base path | Notable fields |
 |---|---|---|
-| Goals | `/api/{collection}/{pid}/goals` | title, target_date (also in payload via `data.goals[]`) |
-| Tasks | `/api/{collection}/{pid}/tasks` | title, assignee_ref, status, goal_id?, parent_task_id?, estimate, remaining, due_date |
-| Issues | `/api/{collection}/{pid}/issues` | title, kind, severity, status, assignee_ref |
+| Goals | `/api/plans/{pid}/goals` | title, target_date (also in payload via `data.goals[]`) |
+| Tasks | `/api/plans/{pid}/tasks` | title, assignee_ref, status, goal_id?, parent_task_id?, estimate, remaining, due_date |
+| Issues | `/api/plans/{pid}/issues` | title, kind, severity, status, assignee_ref |
 
 Each base path supports `POST` (create), `GET` (list), `GET /{sub_pid}`
 (fetch), `PUT /{sub_pid}` (update), `DELETE /{sub_pid}` (soft-delete).
@@ -277,16 +289,121 @@ Each base path supports `POST` (create), `GET` (list), `GET /{sub_pid}`
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/{collection}/{pid}/timeline` | Goals-milestone + task date ranges → Gantt |
-| GET | `/api/{collection}/{pid}/burndown` | Remaining-vs-estimate over time |
+| GET | `/api/plans/{pid}/timeline` | Goals-milestone + task date ranges → Gantt |
+| GET | `/api/plans/{pid}/burndown` | Remaining-vs-estimate over time |
+
+### 9.4a Collaboration, automation, and prioritisation
+
+**Collaborative review** — delegate one idea / proposal / plan to the
+right internal or external expert:
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST / GET | `/api/reviews` | Invite an expert; list invitations (`?subject_kind=&subject_pid=&reviewer=&status=`) |
+| GET | `/api/reviews/consensus` | Aggregate verdict for one subject (`?subject_kind=&subject_pid=`) |
+| POST | `/api/reviews/{pid}/respond` | Accept / decline |
+| POST | `/api/reviews/{pid}/submit` | Verdict: `score` 0–100 (optional), `recommendation` advance/hold/reject, `comment` |
+| DELETE | `/api/reviews/{pid}` | Withdraw an invitation (a submitted verdict cannot be withdrawn) |
+
+Reviewers are `EntityRef` URNs (`person:` / `worker:` /
+`organization:`) — **never raw email**; an outside expert is a record in
+the person registry, so no contact detail is duplicated here.
+`reviewer_scope` (`internal` / `external`) is stored explicitly, because
+sharing with an outsider is a disclosure decision, never an inference.
+The state machine is `invited → accepted → submitted`, with
+`declined` / `expired` / `withdrawn` terminal: **only a reviewer who
+accepted may submit**, so an unanswered invitation never becomes
+evidence. Consensus reports a **strict** majority only (a tie or
+plurality reports none), a `mean_score` of `null` until somebody scores,
+and the count still **outstanding**.
+
+**Assignees + notifications:**
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/plans/{pid}/tasks/{t_pid}/assign` | Assign / unassign (`assignee_ref: null` unassigns); notifies the assignee |
+| GET | `/api/assignees/workload` | Open work per assignee, busiest first, including the `unassigned` pile (`?plan=`) |
+| GET | `/api/notifications` | One recipient's in-app inbox (`?recipient=&unread=`) |
+| POST | `/api/notifications/{pid}/read` | Mark read (idempotent) |
+
+Notifications are **in-app only** — this service has no email or push
+transport and does not pretend to.
+
+**Workflow automation** — configure once, fires as work crosses the
+board:
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST / GET | `/api/automations` | Configure / list rules (`?plan=&trigger=&enabled=`) |
+| POST | `/api/automations/{pid}/enable` · `/disable` | The off switch (keeps the rule and its history) |
+| DELETE | `/api/automations/{pid}` | Soft-delete a rule |
+| GET | `/api/automations/runs` | What actually fired (`?automation=&subject=&outcome=`) |
+
+Triggers: `task_moved` (with optional `from_status` / `to_status`;
+unset = any column), `review_submitted`, `plan_stage_changed`. Actions:
+`assign`, `add_label`, `notify`, `schedule_action`, `set_task_status`.
+Three invariants: an action's shape is validated at **write** time (a
+malformed rule can never fail silently at fire time); a rule **never
+breaks the operator's action** (a failure is a `failed` run, not an
+undo); and actions are applied **without re-entering the engine**, so
+automations cannot cascade. A rule scoped to a plan never fires on
+another plan; a rule constraining a status the trigger does not carry
+fails closed.
+
+**Set and forget** — the deadline queue:
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST / GET | `/api/scheduled-actions` | Queue a deadline (`notify` / `expire_review`, `in_days` 1–365); list (`?status=&subject=&overdue=`) |
+| POST | `/api/scheduled-actions/sweep` | Fire everything due |
+| DELETE | `/api/scheduled-actions/{pid}` | Cancel a pending deadline |
+
+The sweep **claims** each due row with a conditional update
+(`pending → fired`) and only acts when it won the claim, so two
+concurrent sweeps — or the optional in-process ticker
+(`PROJECT_PORTFOLIO_MANAGEMENT_SCHEDULER_MINUTES`, default off) racing
+the endpoint — cannot double-fire a deadline. Each sweep is capped and
+reports whether it hit the cap.
+
+**Data-driven prioritisation + bird's-eye visibility** (derived; no new
+tables):
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/plans/{pid}/smart-score` | One plan's Smart Score **with its full breakdown** |
+| GET | `/api/prioritisation` | Ranked queue, highest first (`?limit=&band=`) |
+| GET | `/api/lifecycle` | The challenge funnel: live + stalled per phase |
+| GET | `/api/plans/{pid}/lifecycle` | Phase, next gate, readiness checklist, review consensus |
+
+The **Smart Score** is a renormalised weighted average over seven
+components — `roi` (25 %), `strategic_alignment` (20 %),
+`expert_review` (15 %), `risk` (15 %, inverted), `demand` (10 %),
+`priority` (10 %, from the `moscow:<band>` tag), `momentum` (5 %) —
+tunable via `PROJECT_PORTFOLIO_MANAGEMENT_SMART_SCORE_WEIGHTS` (a
+complete map summing to 10 000 basis points; anything else is warned
+about and ignored wholesale). **Absent evidence is absent, not zero**:
+a missing component is dropped, the rest renormalise, every gap is
+named in `missing`, and `coverage` reports how much of the weight had
+data behind it. No evidence at all ⇒ `score: null` and band `unscored`,
+which sorts **last** in the ranked queue rather than as a zero. ROI is
+computed **only** when a plan's benefit and budget lines are all in one
+currency — the family forbids FX conversion, so mixed-currency money is
+reported as no ROI evidence rather than silently summed.
+
+**Readiness** is a checklist, not a verdict: five fixed checks
+(`gate_journey_open`, `no_severe_open_risks`, `reviews_answered`,
+`no_overdue_actions`, `nothing_blocked`) are always all reported with
+the count behind each, and `ready` is simply "no check failed". The
+funnel reports every phase even at zero, and items whose phase cannot be
+resolved are counted separately rather than absorbed.
 
 ### 9.5 Audit / events / docs / metrics
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/{collection}/audit/recent` · `/{pid}/audit` | Audit-log query |
-| GET | `/api/{collection}/events/recent` | In-memory event stream |
-| GET | `/api/{collection}/whoami` | Verified bearer-token claims (`401` without one) |
+| GET | `/api/plans/audit/recent` · `/{pid}/audit` | Audit-log query |
+| GET | `/api/plans/events/recent` | In-memory event stream |
+| GET | `/api/plans/whoami` | Verified bearer-token claims (`401` without one) |
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 | GET | `/metrics.prom` | Prometheus metrics (root path, public under auth enforcement) |
 
@@ -324,7 +441,7 @@ blanket-enforcement contract: [`agents/share/jwt-enforcement.md`](../../../agent
 the request's action is derived from the HTTP method plus this crate's
 destructive named POSTs (`auth::DESTRUCTIVE_POST_SUFFIXES` — `/merge`,
 `/deduplicate`, `/import`), matched on path suffix so the corresponding
-POST on any of the four collections is `Destructive` rather than `Write`
+POST on the plans collection is `Destructive` rather than `Write`
 (a `/links` DELETE is covered by the `DELETE`⇒`Delete` rule). The shared
 engine in `authentication-verifier` 0.3 evaluates the policy over the
 token's `attrs` claim, first-match-wins. Configure with
@@ -339,8 +456,8 @@ sketch.
 ### 9.7 Cross-service entity links (write side)
 
 Per [cross-service linking](../../../agents/share/cross-service-linking.md),
-the Portfolio Service originates outbound cross-service edges from a work
-item (or a goal / task / issue) to records in **any** index entity (case /
+the Portfolio Service originates outbound cross-service edges from a plan
+(or a goal / task / issue) to records in **any** index entity (case /
 course / place / person / worker / organization / …). Edges are stored in
 a dedicated `entity_links` table (§10), **separate** from the
 within-payload `relationships` and **never** read by the matcher (the
@@ -348,9 +465,9 @@ partition rule, §5).
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/api/{collection}/{pid}/links` | Create / upsert an outbound edge; emits `linked` |
-| GET | `/api/{collection}/{pid}/links` | List this work item's outbound edges |
-| DELETE | `/api/{collection}/{pid}/links/{id}` | Soft-delete an edge; emits `unlinked` |
+| POST | `/api/plans/{pid}/links` | Create / upsert an outbound edge; emits `linked` |
+| GET | `/api/plans/{pid}/links` | List this plan's outbound edges |
+| DELETE | `/api/plans/{pid}/links/{id}` | Soft-delete an edge; emits `unlinked` |
 
 The write is **optimistic** — it stores the assertion and emits an event;
 it does **not** call the target service. Verification status is the
@@ -358,23 +475,23 @@ aggregator's concern (it sees both ends).
 
 ### 9.8 Bulk import/export (deferred, §13)
 
-The five uniform endpoints per collection
+The five uniform endpoints on the plans collection
 ([`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md) §4):
 
 ```
-POST /api/{collection}/import         202 {job_id}
-GET  /api/{collection}/import/{id}     status + counts + errors_url + review_url
-POST /api/{collection}/export         202 {job_id}
-GET  /api/{collection}/export/{id}     status + download_url
-GET  /api/{collection}/bulk-jobs       list (filter by kind/status)
+POST /api/plans/import         202 {job_id}
+GET  /api/plans/import/{id}     status + counts + errors_url + review_url
+POST /api/plans/export         202 {job_id}
+GET  /api/plans/export/{id}     status + download_url
+GET  /api/plans/bulk-jobs       list (filter by kind/status)
 ```
 
 **Stable upsert key** = a deterministic external PM identifier
 (`JiraProjectKey` / `AsanaGid` / `TrelloBoardId` / `MsProjectId` /
 `GitHubProjectId` / `LinearId` / `Uri` / `Uuid`) or owner-scoped `code`
 (with `owner_org_id`, same-owner only) or `pid`; keyless rows run the
-normal duplicate detection → review queue (`provenance = import`), still
-within-collection. CSV flattens every repeated/nested field to a
+normal duplicate detection → review queue (`provenance = import`),
+kind-agnostic. CSV flattens every repeated/nested field to a
 JSON-in-cell. Export is business/ops data (light masking) but **lead /
 assignee / person refs are personal data**, so any export carrying them
 is audited (even zero-row).
@@ -384,61 +501,74 @@ is audited (even zero-row).
 PostgreSQL via SeaORM + `sea-orm-migration`. `auto_migrate` on in
 development. Tables / migrations:
 
-- `m20220101_000001_portfolios` / `…_projects` / `…_products` /
-  `…_programs` — one row table per work-item kind: `id` serial PK, `pid`
-  UUID unique, `name` (denormalised from `data.name`), `data` JSONB (full
-  `WorkItem`), `active` bool, `deleted_at` timestamptz null. The three
-  child tables (`projects` / `products` / `programs`) additionally carry a
-  denormalised `portfolio_pid` UUID column (from `data.portfolio_ref`) for
-  parent roll-up queries; `portfolios` does not.
+- `m20220101_000001_plans` — the single plan row table: `id` serial PK,
+  `pid` UUID unique, `name` (denormalised from `data.name`), `data`
+  JSONB (full `Plan`), a **nullable** `kind` column (the optional
+  label), a denormalised `parent_pid` UUID column (from
+  `data.parent_ref`, for parent roll-up queries; nullable), `active`
+  bool, `deleted_at` timestamptz null.
 - `m20220101_000002_audit_logs` — the CRUD audit trail (carries the
-  `kind` of the affected work item).
+  optional `kind` of the affected plan).
 - `m20220101_000003_merge_records` — record-merge history + snapshot.
 - `m20220101_000004_tasks` / `…_goals` / `…_issues` — operational
-  sub-resource tables, each keyed by the parent `(parent_kind,
-  parent_pid)`, with their own `pid`, soft-delete, and created/updated
-  timestamps. **Excluded from the matcher payload** (goal titles bridge in
-  via `data.goals[]` on the parent row).
+  sub-resource tables, each keyed by the parent plan `pid`, with their
+  own `pid`, soft-delete, and created/updated timestamps. **Excluded
+  from the matcher payload** (goal titles bridge in via `data.goals[]`
+  on the parent row).
 - `m20220101_000005_entity_links` — the cross-service link write side
   (§9.7), separate from the within-payload `relationships`, per
-  [cross-service linking §4.1](../../../agents/share/cross-service-linking.md).
+  [cross-service linking
+  §4.1](../../../agents/share/cross-service-linking.md).
+- `m20260722_000001_capabilities` — the collaboration / automation
+  tables: `reviews` (one subject delegated to one expert; partial
+  unique index keeps one **live** invitation per subject+reviewer),
+  `automations` + `automation_runs` (the rules and the append-only log
+  of what each firing did), `scheduled_actions` (the set-and-forget
+  queue, claimed atomically so a deadline fires exactly once), and
+  `notifications` (the in-app inbox those two write into). **No Smart
+  Score table**: the score is derived on read from rows the service
+  already stores, so it cannot drift from the evidence it summarises.
 - `bulk_jobs` (deferred, §13) — the shared bulk-job table
-  ([`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md) §3,
-  `UNIQUE (entity, kind, idempotency_key)`).
+  ([`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md)
+  §3, `UNIQUE (entity, kind, idempotency_key)`).
 - `review_queue` — duplicate-review items (`Pending` / `Confirmed` /
-  `Rejected` / `AutoMerged`, `provenance`), scoped to a collection.
+  `Rejected` / `AutoMerged`, `provenance`) over the plans collection.
 
 ## 11. Testing strategy
 
 DB-free tests: `tests/matching.rs` (matcher embedding + JSON round-trip +
-R-GATE: cross-kind pairs score `0.0`), the `src/validation.rs` unit tests
+kind-agnostic scoring: two plans match on content regardless of their
+`kind` labels), the `src/validation.rs` unit tests
 (UUID / PM-tool-id / URI identifier shapes, blank goal titles, BCP-47
-`in_language` syntax, child-kind `portfolio_ref` shape), the `src/auth.rs`
+`in_language` syntax, `parent_ref` UUID shape + containment-cycle
+rejection), the `src/auth.rs`
 unit tests (mint a real PASETO v4 public token + matching Ed25519 key
 in-process, then assert valid → claims and missing / non-bearer / expired /
 tampered / empty-verifier → `401`; plus `parse_bool` and `enforce` —
 off+no-token → `Ok`, on+public → `Ok`, on+protected+{no/valid/expired/
 tampered} → `401`/`Ok`), the `src/merge.rs` unit tests (former-name alias,
 scalar fallback, list union, transferred snapshot, `is_self_merge`
-equal-pid pin, cross-kind merge rejected), the `escape_like` unit test,
-the `src/metrics.rs` unit tests (rendered text carries every per-collection
-metric name + `# HELP`/`# TYPE` preamble + content type), and the
+equal-pid pin, any-two-plans merge with no kind scoping), the `escape_like`
+unit test, the `src/metrics.rs` unit tests (rendered text carries every
+plan metric name + `# HELP`/`# TYPE` preamble + content type), and the
 derived-view unit tests (timeline ordering, burndown remaining-vs-estimate
-from snapshots). Request-level tests (`tests/requests/work_items.rs`, loco
-testing harness) cover, for each of the four collections, CRUD + match +
-dedupe + merge, the sub-resource CRUD, the timeline/burndown views,
+from snapshots). Request-level tests (`tests/requests/plans.rs`, loco
+testing harness) cover CRUD + match + dedupe + merge over the plans
+collection, the sub-resource CRUD, the timeline/burndown views,
 `/links`, unknown-pid `404` on GET / PUT / DELETE (and the merge `404`),
-the `409` real-time create duplicate, the cross-collection isolation
-(a project query never matches a product), the audit/event trail, `whoami`
-(no token → `401`), blanket enforcement (with `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH=1`
-in-test: un-authed `GET /api/projects` → `401`, public
+the `409` real-time create duplicate, the kind-agnostic matching
+(a plan matches a plan of any/other kind label), the `parent_ref`
+containment-cycle `422`, the `?parent=` child roll-up, the audit/event
+trail, `whoami` (no token → `401`), blanket enforcement (with
+`PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH=1`
+in-test: un-authed `GET /api/plans` → `401`, public
 `GET /api-docs/openapi.json` → `200`; `#[serial]`), and OpenAPI/Swagger —
 these need Postgres, so they are `#[ignore]`-gated; run with
 `cargo test -- --ignored` and a `DATABASE_URL`.
 
 ## 12. Compliance
 
-Work items are business / operational data (no patient data), so the
+Plans are business / operational data (no patient data), so the
 default posture is light masking. However, **lead / assignee / member /
 person refs are personal data** — leads, assignees, and owners are user
 identities — so any read or export that surfaces them is audited, and
@@ -449,111 +579,160 @@ HIPAA/NHS/GDPR posture for audit and access controls.
 
 ## 13. Tasks (live work queue)
 
-- [ ] loco boot + one table/migration per kind (`portfolios`, `projects`,
-  `products`, `programs`) + a shared parameterised CRUD controller core
-  with `422` validation (blank `name`; UUID / PM-tool-id / URI
-  `identifiers` shapes; blank goal titles; BCP-47 `in_language` syntax;
-  child-kind `portfolio_ref` shape — all problems reported together) +
-  real-time create duplicate detection (`409`, within-collection).
+- [x] **2026-07-22 — Collaboration / automation / prioritisation
+  capabilities (§9.4a).** Migration `m20260722_000001_capabilities`
+  (`reviews`, `automations`, `automation_runs`, `scheduled_actions`,
+  `notifications`); four pure rule modules (`collaboration.rs`,
+  `automation.rs`, `prioritisation.rs`, `lifecycle.rs`) with 56 DB-free
+  unit tests; three controllers (`collaboration`, `automation`,
+  `prioritisation`); the engine fires from `move_task` and from a
+  submitted plan review; the optional sweep ticker
+  (`PROJECT_PORTFOLIO_MANAGEMENT_SCHEDULER_MINUTES`, default off) in
+  `src/scheduler.rs`; OpenAPI + a doc test; six `#[ignore]`d request
+  tests. Every mutation audits. **Not built:** email / push transport
+  (notifications are in-app only), a `votes` component on the Smart
+  Score (a plan does not link back to its originating idea), and
+  record-level ABAC on the new endpoints — they sit behind the blanket
+  guard only.
+
+- [x] **2026-07-22 — Accept the five new `kind` labels.**
+  `parse_kind_label` maps `practice`/`process`/`purpose`/`pathway`/
+  `proposal` (and their plurals) to the matcher's new `PlanKind`
+  variants; the OpenAPI `Plan.kind` enum and the `kind_target` /
+  `collection` validation messages list them. Matching stays
+  kind-agnostic. The `Proposal` *label* is unrelated to the
+  `proposals` intake resource (§9.4).
+
+- [x] **2026-07-20 — Unify the four "work item" kinds into one recursive
+  `plan`.** The former Portfolio / Project / Product / Program
+  collections are unified into a **single** matchable entity, the
+  **plan**: the type is `Plan` (was `WorkItem`), the table is `plans`
+  (was per-kind tables),
+  and the DTO is `project_portfolio_management_matcher::Plan` stored as
+  JSONB. `kind` becomes `Option<PlanKind>` — an **optional** descriptive
+  label that neither gates matching nor fixes a collection; the
+  matcher's hard kind gate is **removed** (any two plans may match /
+  dedupe / merge). The four REST collections collapse to **one**
+  `/api/plans` collection (CRUD + match + check-duplicates + merge +
+  audit/events + whoami, and all sub-resources moved under
+  `/api/plans/{pid}/…`); `GET /api/plans?parent={pid}` rolls up a plan's
+  direct children (was the per-portfolio roll-up), and `GET
+  /api/plans/{pid}/schedule` is no longer restricted to a Portfolio-kind
+  plan. Containment generalises from `portfolio_ref` (portfolio→child
+  only) to `parent_ref` (any plan may contain any other, a recursive
+  tree); the service adds a containment **cycle check** returning `422`.
+  The denormalised column is `parent_pid` (was `portfolio_pid`) and the
+  `kind` column is nullable. Merge proposals carry an optional
+  `kind_target` label (blank = none). Builds and tests green.
+- [ ] loco boot + the single `plans` table/migration + a shared CRUD
+  controller core with `422` validation (blank `name`; UUID / PM-tool-id
+  / URI `identifiers` shapes; blank goal titles; BCP-47 `in_language`
+  syntax; `parent_ref` UUID + containment-cycle check — all problems
+  reported together) + real-time create duplicate detection (`409`,
+  kind-agnostic).
 - [x] **SEC-M1 — input-size caps in `src/validation.rs`** (2026-07-13).
-  Bound every scalar text field (`MAX_TEXT_LEN = 1024` chars), every array
-  (`MAX_ARRAY_LEN = 256` entries), and every string entry inside an array
-  (`MAX_ITEM_LEN = 512` chars, incl. `goals[i].title` /
-  `identifiers[i].value` / `relationships[i].work_item_id`) → `422`,
-  before store/match, to close the matcher's `O(n·m)` CPU/memory DoS
-  vector (amplified by check-duplicates). `kind` is an enum, not capped.
-- [ ] Matching — embed `project-portfolio-management-matcher` (`MatchingEngine::new(
-  MatchConfig::default())`); `POST /match`, `POST /check-duplicates`
-  (scan this collection's active rows), `POST /deduplicate` (batch →
-  review queue). **R-GATE**: cross-`kind` pairs score `0.0`, so matching
-  is partitioned per collection (never match a project against a product);
-  cover it in `tests/matching.rs`.
-- [ ] Name search — `GET /search?q=` Postgres `ILIKE` on the denormalised
-  `name` (cap 50, wildcards escaped), per collection. Tantivy full-text /
+  Bound every scalar text field (`MAX_TEXT_LEN = 1024` chars), every
+  array (`MAX_ARRAY_LEN = 256` entries), and every string entry inside
+  an array (`MAX_ITEM_LEN = 512` chars, incl. `goals[i].title` /
+  `identifiers[i].value` / `relationships[i].plan_id`) → `422`, before
+  store/match, to close the matcher's `O(n·m)` CPU/memory DoS vector
+  (amplified by check-duplicates). `kind` is an enum, not capped.
+- [ ] Matching — embed `project-portfolio-management-matcher`
+  (`MatchingEngine::new( MatchConfig::default())`); `POST /match`, `POST
+  /check-duplicates` (scan active plans), `POST /deduplicate` (batch →
+  review queue). Matching is **kind-agnostic** — no kind gate, so any
+  two plans may match regardless of their optional `kind` labels; cover
+  it in `tests/matching.rs`.
+- [ ] Name search — `GET /search?q=` Postgres `ILIKE` on the
+  denormalised `name` (cap 50, wildcards escaped). Tantivy full-text /
   fuzzy deferred.
 - [ ] Operational sub-resources — `tasks` / `goals` / `issues` tables +
-  CRUD controllers, each keyed by the parent `(kind, pid)`, audited,
+  CRUD controllers, each keyed by the parent plan `pid`, audited,
   emitting scoped events. (`posts` / `comments` / `members` deferred.)
 - [ ] Derived views — `GET /{pid}/timeline` (Gantt) + `/{pid}/burndown`
   from task estimate/remaining snapshots; pure projection logic + unit
   tests.
-- [ ] Record merge — `POST /merge` (union fields, former-name alias,
-  soft-delete, `merge_records` history + snapshot, `Replaces` link,
-  `Merged` event); reject cross-kind merge; `/merges/recent`; pure
-  `src/merge.rs`.
-- [ ] Event streaming + audit log on CRUD (work item + sub-resources) —
-  `audit_logs` table + best-effort row per write; in-memory event stream;
-  `/audit/recent`, `/{pid}/audit`, `/events/recent`. **Phase 1** of the
-  durable event bus (canonical versioned `Envelope` + `EventPublisher`
-  seam + `InMemoryPublisher` ring buffer; frozen `EventView` projection);
-  Phase 2 (transactional outbox) + Phase 3 (relay + retention) are landed
-  below; the Fluvio broker sink is the remaining infra-gated follow-up,
-  designed in
-  [`agents/share/event-bus.md`](../../../agents/share/event-bus.md).
-- [x] **Durable event bus — Phase 3 (relay + retention).** `src/relay.rs`:
-  the `EventSink` trait (the bus seam), a working no-broker **`LoggingSink`**
-  default, `drain_once` (`unpublished` → `sink.send` → `mark_published`,
-  at-least-once, per-pid order preserved on a send failure), and
-  `purge_published` (retention — **enforced**: deletes `published_at <
-  now() - INTERVAL '<n> days'`). A background loop (`relay::spawn`, started
-  in `App::after_routes`) ticks every `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_RELAY_INTERVAL_SECS`
-  (default 5, floored at 1) and purges every N ticks using
-  `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_RETENTION_DAYS` (default 7) — **gated by
-  `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TRANSPORT=outbox` AND `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_RELAY`** (truthy
+- [ ] Record merge — `POST /merge` (union fields, former-name
+  alias, soft-delete, `merge_records` history + snapshot, `Replaces`
+  link, `Merged` event); merge any two plans (no kind scoping);
+  `/merges/recent`; pure `src/merge.rs`.
+- [ ] Event streaming + audit log on CRUD (plan + sub-resources) —
+  `audit_logs` table + best-effort row per write; in-memory event
+  stream; `/audit/recent`, `/{pid}/audit`, `/events/recent`. **Phase 1**
+  of the durable event bus (canonical versioned `Envelope` +
+  `EventPublisher` seam + `InMemoryPublisher` ring buffer; frozen
+  `EventView` projection); Phase 2 (transactional outbox) + Phase 3
+  (relay + retention) are landed below; the Fluvio broker sink is the
+  remaining infra-gated follow-up, designed in
+  [`agents/share/event-bus.md`](../../../agents/share/event-bus.md). -
+  [x] **Durable event bus — Phase 3 (relay + retention).**
+  `src/relay.rs`: the `EventSink` trait (the bus seam), a working
+  no-broker **`LoggingSink`** default, `drain_once` (`unpublished` →
+  `sink.send` → `mark_published`, at-least-once, per-pid order preserved
+  on a send failure), and `purge_published` (retention — **enforced**:
+  deletes `published_at < now() - INTERVAL '<n> days'`). A background
+  loop (`relay::spawn`, started in `App::after_routes`) ticks every
+  `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_RELAY_INTERVAL_SECS` (default 5,
+  floored at 1) and purges every N ticks using
+  `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_RETENTION_DAYS` (default 7) —
+  **gated by `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TRANSPORT=outbox` AND
+  `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_RELAY`** (truthy
   `1`/`true`/`yes`/`on`), so it is a no-op by default. Tests: DB-free
-  `LoggingSink`/capturing-sink send + config defaults; the drain/ack seams
-  (`unpublished`/`mark_published`) are DB-gated via the outbox suite.
-  **Broker-gated follow-up:** a real **`FluvioSink`** (`impl EventSink`
-  behind a `fluvio` cargo feature) — the trait is the seam, so the drain
-  loop is unchanged when it lands
-  ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §5, §8).
+  `LoggingSink`/capturing-sink send + config defaults; the drain/ack
+  seams (`unpublished`/`mark_published`) are DB-gated via the outbox
+  suite. **Broker-gated follow-up:** a real **`FluvioSink`** (`impl
+  EventSink` behind a `fluvio` cargo feature) — the trait is the seam,
+  so the drain loop is unchanged when it lands
+  ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §5,
+  §8).
 - [ ] Cross-service links — `m20220101_000005_entity_links` migration +
-  `POST`/`GET`/`DELETE /api/{collection}/{pid}/links`; emit `linked` /
+  `POST`/`GET`/`DELETE /api/plans/{pid}/links`; emit `linked` /
   `unlinked`; optimistic write (no cross-service call); never a matcher
   signal. Contract:
   [`agents/share/cross-service-linking.md`](../../../agents/share/cross-service-linking.md).
 - [ ] OpenAPI/Swagger — `src/openapi.rs` (utoipa) served at
   `/api-docs/openapi.json` + `/swagger-ui` by `controllers/docs.rs`
-  (covering all four collections).
-- [ ] Prometheus metrics — `GET /metrics.prom` (root path,
-  `text/plain; version=0.0.4`); process-wide `OnceLock` registry in
-  `src/metrics.rs` (per-collection CRUD/merge counters +
-  `http_requests_total`); public under blanket auth enforcement.
+  (covering the plans collection).
+- [ ] Prometheus metrics — `GET /metrics.prom` (root path, `text/plain;
+  version=0.0.4`); process-wide `OnceLock` registry in `src/metrics.rs`
+  (plan CRUD/merge counters + `http_requests_total`); public under
+  blanket auth enforcement.
 - [ ] Offline PASETO v4 public verification (`authentication-verifier`);
   `src/auth.rs` per
   [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
   (supersedes the RS256-JWT model). `src/auth.rs` embeds
-  `authentication-verifier` (a PASETO v4.public verifier); offline Ed25519
-  verification via a process-wide `Verifier` (env-configured
-  keys/issuer/audience); `AuthUser`/`MaybeAuthUser` extractors; `/whoami`
-  protected; audit `actor` from the token.
-  - [ ] Blanket `/api/*` enforcement — `auth::enforce(require_auth, path,
-    headers, verifier)` + an `after_routes` layer, gated per-request by
-    `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` (off by default). Public paths stay open.
-    Family contract: `agents/share/jwt-enforcement.md`.
-  - [x] paseto-keys-over-HTTP fetch at boot — done 2026-07-04.
-    `PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS_URL` set (non-blank) ⇒ `auth::init` (called
-    from `App::after_routes`, before serving) fetches the published key
-    set once via `Verifier::from_paseto_keys_url` (verifier `fetch`
-    feature); success ⇒ fetched key set wins over
-    `PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS` (`tracing::info!`), failure ⇒
-    `tracing::warn!` + fall back to the env path (the service always
-    boots); unset/blank ⇒ prior behaviour unchanged. No refresh loop
-    (rotation-triggered refetch → §16). Tests: a `#[tokio::test]` local
-    ephemeral-port HTTP listener proves the fetch-built verifier accepts
-    a token signed by the served key, and a fast-failing URL
-    (`http://127.0.0.1:1/`) proves fallback without panic.
+  `authentication-verifier` (a PASETO v4.public verifier); offline
+  Ed25519 verification via a process-wide `Verifier` (env-configured
+  keys/issuer/audience); `AuthUser`/`MaybeAuthUser` extractors;
+  `/whoami` protected; audit `actor` from the token.
+- [ ] Blanket `/api/*` enforcement — `auth::enforce(require_auth, path,
+  headers, verifier)` + an `after_routes` layer, gated per-request by
+  `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` (off by default). Public
+  paths stay open. Family contract: `agents/share/jwt-enforcement.md`. -
+  [x] paseto-keys-over-HTTP fetch at boot — done 2026-07-04.
+  `PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS_URL` set (non-blank) ⇒
+  `auth::init` (called from `App::after_routes`, before serving) fetches
+  the published key set once via `Verifier::from_paseto_keys_url`
+  (verifier `fetch` feature); success ⇒ fetched key set wins over
+  `PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS` (`tracing::info!`), failure
+  ⇒ `tracing::warn!` + fall back to the env path (the service always
+  boots); unset/blank ⇒ prior behaviour unchanged. No refresh loop
+  (rotation-triggered refetch → §16). Tests: a `#[tokio::test]` local
+  ephemeral-port HTTP listener proves the fetch-built verifier accepts a
+  token signed by the served key, and a fast-failing URL
+  (`http://127.0.0.1:1/`) proves fallback without panic.
 - [ ] Privacy — masking of lead / assignee / person refs on read +
   export; GDPR obligations for those people.
-- [ ] Bulk import/export — `bulk_jobs` migration + the five endpoints per
-  collection (§9.8); `bg_pg` worker draining `queued → running →
-  completed | completed_with_errors | failed`; JSONL/CSV/Parquet codecs
-  (CSV JSON-in-cell flattening; Parquet export-only, feature-gated);
-  per-row pipeline reusing `src/validation.rs` + the matcher + the review
-  queue (upsert by external PM id / owner-scoped `code` / `pid`; keyless →
-  dedupe → review, `provenance = import`, within-collection); per-row
-  error report; export masking + audit (lead/person refs personal data).
-  Uniform contract:
+- [ ] Bulk import/export — `bulk_jobs` migration + the five endpoints on
+  the plans collection (§9.8); `bg_pg` worker draining `queued → running
+  → completed | completed_with_errors
+  | failed`; JSONL/CSV/Parquet codecs (CSV JSON-in-cell flattening;
+  Parquet export-only, feature-gated); per-row pipeline reusing
+  `src/validation.rs` + the matcher + the review queue (upsert by
+  external PM id / owner-scoped `code` / `pid`; keyless → dedupe →
+  review, `provenance = import`, kind-agnostic); per-row error report;
+  export masking + audit (lead/person refs personal data). Uniform
+  contract:
   [`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md).
 - [ ] Collaboration sub-resources (deferred) — `posts` / `comments` /
   `members` tables + CRUD, mirroring the plan template's collaboration
@@ -575,20 +754,20 @@ HIPAA/NHS/GDPR posture for audit and access controls.
 - [x] **T-PPM-A — Governance core (PPM-1/3/10/12; spec
   `../spec/15-roadmap.md`), delivered 2026-07-18.** Migration
   `…_000005_governance` (`proposals`, `gate_reviews`, `risks`,
-  `budget_lines`, + operational `work_items.stage`); pure rules in
+  `budget_lines`, + operational `plans.stage`); pure rules in
   `src/governance.rs` (proposal pipeline state machine, strictly
   ordered g0–g5 gates, 1–5×1–5 risk exposure, ISO-4217 shape,
   overflow-safe minor-unit money — all DB-free unit-tested);
   `controllers/governance.rs` (intake pipeline
   draft→submitted→in_review→approved/rejected→promoted with the
-  promote step minting the work item via `create_and_emit` and
+  promote step minting the plan via `create_and_emit` and
   `provenance=intake` audit; matcher-backed duplicate-demand check
-  over live work items + sibling proposals; gate reviews advancing
+  over live plans + sibling proposals; gate reviews advancing
   `stage`; risks with exposure-ranked list + escalate; budget lines
   with per-currency planned/actual/variance and accumulate-actual;
-  the per-item `/governance` summary). Record-level ABAC:
-  `auth::work_item_resource_attrs` exposes `resource.stage` and
-  `auth::authorize_record` gates work-item `PUT` + gate-review
+  the per-plan `/governance` summary). Record-level ABAC:
+  `auth::plan_resource_attrs` exposes `resource.stage` and
+  `auth::authorize_record` gates plan `PUT` + gate-review
   `POST`, so gate-locking is policy. OpenAPI `governance` tag; every
   mutation audited. Tests: 4 pure-rule unit tests + 5 DB-gated
   request tests (`tests/requests/governance.rs`), all green vs
@@ -598,7 +777,7 @@ HIPAA/NHS/GDPR posture for audit and access controls.
 
 - [x] **T-PPM-B — Visibility (PPM-6/7/8/9; spec
   `../spec/15-roadmap.md`), delivered 2026-07-18.** Migration
-  `…_000006_visibility` (`work_item_dependencies`, `milestones`,
+  `…_000006_visibility` (`plan_dependencies`, `milestones`,
   `allocations`, `report_definitions`); pure rules in
   `src/visibility.rs` (flexible-date parsing `YYYY[-MM[-DD]]`,
   DFS cycle detection, finish-start violation checks with lag, a
@@ -606,11 +785,11 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   heuristic, window-overlap capacity sums, RFC-4180 CSV escaping —
   7 DB-free unit tests); `controllers/visibility.rs` (dependencies
   with self/duplicate/cycle refusal; `GET
-  /portfolios/{pid}/schedule` with violations + critical path +
+  /plans/{pid}/schedule` with violations + critical path +
   undated members; milestones with overdue flags; allocations +
   `GET /capacity` per-person rollup flagging > 100 %; saved reports
   run synchronously as JSON or CSV, row cap 1000; the
-  ETag-conditional `GET /at-a-glance` dashboard with per-collection
+  ETag-conditional `GET /at-a-glance` dashboard with per-kind
   RAG / stage rollups and site tiles). 5 DB-gated request tests,
   green vs Postgres 18. Scheduled/artifact report runs await the
   family bulk machinery (roadmap).
@@ -627,7 +806,7 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   `provenance=idea`; scenarios evaluated over live budgets, risks,
   and alignment with **infeasible commits refused** and the
   evaluation snapshot audited on commit; the OKR registry with
-  weighted per-pair-upserting item mappings and per-collection
+  weighted per-pair-upserting plan mappings and per-kind
   alignment rollups; benefits with financial minor-unit targets or
   non-financial notes, accumulate-realize, and per-currency ROI
   against recorded budget actuals). 4 DB-gated request tests, green
@@ -644,7 +823,7 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   proposals + merges, newest first), `GET /api/executive/benefits`
   (per-portfolio per-currency target vs realized; ratio only with a
   positive target), `GET /api/financials/variance` (minor-unit
-  variance by collection / category / portfolio, one row per currency,
+  variance by kind / category / portfolio, one row per currency,
   no FX), `GET /api/financials/exposure` (per-currency estate totals,
   deliberately no cross-currency sum), `GET
   /api/technology/dependency-risk` (top fan-out, cross-portfolio
@@ -661,9 +840,9 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   insight areas, one migration (`m20260719_000002_insight_columns`, all
   columns nullable so existing rows keep their behaviour):
   **stage-gated funding tranches** — `budget_lines.gate` +
-  `released_at`; a gated line is HELD (actuals `422`) until the item's
+  `released_at`; a gated line is HELD (actuals `422`) until the plan's
   stage reaches the gate and `POST
-  /{collection}/{pid}/budget-lines/{line_pid}/release` succeeds
+  /{plans}/{pid}/budget-lines/{line_pid}/release` succeeds
   (`rules::gate_reached`, fail-closed; audit `budget_line_released`;
   `financials/exposure` reports `held_minor` per currency);
   **technical-debt register** — `risks.category`
@@ -673,8 +852,8 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   `milestones.done_at` stamped on complete + `GET /api/technology/flow`
   (throughput/month, median lead days; pre-stamp completions counted
   but never timed); **strategic-alignment coverage** — `GET
-  /api/executive/alignment` (per-collection aligned/unaligned via
-  `objective_links`, unaligned spend per currency, items ranked by
+  /api/executive/alignment` (per-kind aligned/unaligned via
+  `objective_links`, unaligned spend per currency, plans ranked by
   largest single-currency planned — disclosed heuristic, currencies
   never summed); **scenario comparison** — `GET
   /api/scenarios/compare?a=&b=` (two live evaluations side-by-side,
@@ -744,9 +923,9 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   `m20260720_000002_engineering_moderate`: **story points** on tasks
   (0–100, validated; team-local) + `GET .../velocity` (per-sprint done
   counts + point sums from real `done_at` stamps; the served note says
-  never to compare across teams/items); **WIP limits** via
+  never to compare across teams/plans); **WIP limits** via
   `PROJECT_PORTFOLIO_MANAGEMENT_WIP_LIMITS` JSON (per-status caps per
-  item board; a move into a full capped column is `422`; unset ⇒ no
+  plan board; a move into a full capped column is `422`; unset ⇒ no
   caps, fail-open by design and disclosed); **sprint notes** (retro +
   RAD feedback log: `went_well` / `improve` / `action` / `feedback`,
   with `action`/`feedback` convertible once into a task —
@@ -767,11 +946,12 @@ HIPAA/NHS/GDPR posture for audit and access controls.
 ## 14. Implementation status
 
 **Implemented (MVP v0.1.0 + PPM Phases A/B/C; see §13 for the
-delivered-task detail).** The crate builds and tests green: four REST
-collections (portfolios / projects / products / programs) over one
-`kind`-keyed `work_items` table — CRUD + `ILIKE` search + within-kind
-matching (embedded matcher, R-GATE) + real-time create duplicate
-detection + record merge + payload validation (`422`) + audit log +
+delivered-task detail).** The crate builds and tests green: one REST
+collection (`/api/plans`) over one `plans` table with a nullable `kind`
+label and a `parent_pid` containment column — CRUD + `ILIKE` search +
+kind-agnostic matching (embedded matcher, no kind gate) + real-time
+create duplicate detection + record merge + payload validation (`422`,
+incl. `parent_ref` containment-cycle check) + audit log +
 durable-outbox events (Phase 2 outbox + Phase 3 relay/retention,
 default-off via `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TRANSPORT=memory`)
 + offline PASETO v4.public verification with the blanket ABAC guard
@@ -779,20 +959,21 @@ default-off via `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TRANSPORT=memory`)
 / Swagger + Prometheus, plus the three PPM phases (Governance:
 proposals / gate reviews / risks / budget lines; Visibility:
 dependencies / schedule / milestones / allocations / capacity / reports
-/ at-a-glance; Strategy: ideas / scenarios / objectives / benefits).
-Still open (§13): the operational sub-resources (goals / tasks /
-issues) + derived timeline / burndown views, `deduplicate` + review
+/ at-a-glance; Strategy: ideas / scenarios / objectives / benefits) and
+the engineering core (tasks / sprints / burndown / standup / DevOps).
+Still open (§13): the remaining operational sub-resources (goals /
+issues) + the derived timeline view, `deduplicate` + review
 queue, cross-service `entity_links`, bulk import/export, Tantivy,
 privacy, the collaboration sub-resources, gRPC, and the Fluvio broker
-sink. The canonical `WorkItem` domain model is owned by the
+sink. The canonical `Plan` domain model is owned by the
 [portfolio entity spec §5](../../spec/index.md); this crate spec
 references it.
 
 ## 15. Roadmap
 
-`0.1.0` (unreleased) target: the CRUD + matching MVP across the four
-collections, then `ILIKE` search + audit + in-memory streaming, then the
-operational sub-resources (goals / tasks / issues) + derived views +
+`0.1.0` (unreleased) target: the CRUD + matching MVP over the single
+plans collection, then `ILIKE` search + audit + in-memory streaming, then
+the operational sub-resources (goals / tasks / issues) + derived views +
 record merge + cross-service links + OpenAPI/Swagger + Prometheus +
 offline PASETO v4 public verification + blanket `/api/*` enforcement (auth
 source of truth, superseding the RS256-JWT model:
@@ -813,9 +994,10 @@ paseto-keys-over-HTTP fetch at boot, 2026-07-04 —
   route to the review queue?
 - Burndown snapshot cadence — on every task write, or a periodic `bg_pg`
   snapshot job?
-- Should a portfolio's child roll-up (its projects / products / programs)
-  be a derived read view on the portfolio (`…/{pid}/children`), or driven
-  purely by the front-end querying each child collection by `portfolio_ref`?
+- Should a plan's child roll-up be served only as `GET /api/plans?parent={pid}`
+  (its direct children by `parent_pid`), or additionally as a recursive
+  descendant walk (`…/{pid}/descendants`) once traversal-depth limits are
+  fixed?
 - Key-set refresh: the boot-time paseto-keys fetch is once-only — add a
   rotation-triggered refetch (e.g. on `UnknownKid`) or a periodic
   refresh loop?

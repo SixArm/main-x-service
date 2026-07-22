@@ -2,21 +2,24 @@
 
 **All three subprojects implemented** (2026-06-19; originally
 spec-only as of 2026-06-18). The matcher crate, the service crate, and
-the SvelteKit front-end are built, tested, and clippy-clean: within-kind
-matching with the hard kind gate; four REST collections over one
-`kind`-keyed `work_items` table with CRUD + matching + merge + audit +
+the SvelteKit front-end are built, tested, and clippy-clean:
+**kind-agnostic** matching (no kind gate) over one recursive `Plan`;
+one `/api/plans` REST collection over one `plans` table (nullable
+`kind`, nullable `parent_pid`) with CRUD + matching + merge + audit +
 durable-outbox events + PASETO/ABAC auth (default-off) + the PPM
 Governance / Visibility / Strategy phases; and the operator SPA (SVAR
-grid / Kanban / Gantt, Lily chrome, 13-locale i18n). Consult each
-subproject's own spec §13/§14 for what remains open (service: operational
-sub-resources + derived views, deduplicate + review queue, links, bulk,
-Tantivy, privacy; see the tables below for per-subproject detail).
+grid / Kanban / Gantt, Lily chrome, 13-locale i18n). The four former
+work-item kinds were unified into the recursive `Plan` on 2026-07-20
+(§13 T-10). Consult each subproject's own spec §13/§14 for what remains
+open (service: operational sub-resources + derived views, deduplicate +
+review queue, links, bulk, Tantivy, privacy; see the tables below for
+per-subproject detail).
 
 ### 14.1 Delivered
 
 | Subproject | Capability | Notes |
 |---|---|---|
-| (entity) | Canonical specification | This §1–§18 entity spec: domain model (§5, the canonical home) — the `WorkItem` type, the four matchable kinds, the kind gate, and the matchable/operational partition — the cross-subproject DTO contract, and the family-integration adoptions (cross-service links, bulk import/export) |
+| (entity) | Canonical specification | This §1–§18 entity spec: domain model (§5, the canonical home) — the recursive `Plan` type, its optional `kind` label, kind-agnostic matching, and the matchable/operational partition — the cross-subproject DTO contract, and the family-integration adoptions (cross-service links, bulk import/export) |
 
 Nothing else is delivered. The matcher / service / front-end rows are
 intentionally empty.
@@ -28,8 +31,8 @@ the headline gaps:
 
 | Gap | Task |
 |---|---|
-| No matcher crate (no `WorkItem` type, no kind gate, no matching) | T-2 |
-| No service crate (no per-collection CRUD, no matching endpoints, no sub-resources, no derived views, no roll-up) | T-3, T-4 |
+| No matcher crate (no `Plan` type, no kind-agnostic matching) | T-2 |
+| No service crate (no plans-collection CRUD, no matching endpoints, no sub-resources, no derived views, no roll-up) | T-3, T-4 |
 | No audit log / event stream / PASETO token verification | T-5 |
 | No front-end (no routes, no sub-resource workspaces) | T-6 |
 | No cross-service link write-side (`entity_links`, `linked`/`unlinked`) | T-7 |

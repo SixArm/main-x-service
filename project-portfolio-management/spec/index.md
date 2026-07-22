@@ -1,29 +1,28 @@
 # Portfolio Entity — Living Specification
 
-> **Source of truth — for the cross-subproject contract.** This
-> document is the canonical artefact for the **portfolio entity as a
-> whole**: how the trio composes (front-end → service REST API →
-> embedded matcher), the DTO contract (the API DTO **is** the
-> matcher's `WorkItem` type, persisted as JSONB), shared invariants,
-> the partition between the thin matchable `WorkItem` record and the
-> high-volume operational sub-resources (goals, tasks, issues), the
-> **four matchable kinds** (Portfolio, Project, Product, Program) as
-> distinct collections, the within-kind match gate, and entity-wide
-> goals. Each subproject's own `spec/` remains the single source of
-> truth **for that subproject's internals**. When this spec and a
-> crate spec disagree about crate internals, the crate spec wins; when
-> they disagree about the integration contract, this spec wins. Open a
-> task in §13 to bring the loser in line — do not silently rewrite
-> either spec.
->
-> **§5 is the canonical domain model.** This entity-level spec owns
-> the canonical `WorkItem` domain model, the `WorkItemKind`
-> discriminator, the kind gate, and the sub-resource partition; the
-> matcher and service crate specs reference §5 rather than redefining
-> it.
->
-> **Three-part PRs.** A behavioural change is one PR: spec edit + code
-> edit + test edit. See [`AGENTS/spec-driven-development.md`](../AGENTS/spec-driven-development.md).
+> **Source of truth — for the cross-subproject contract.** This >
+> document is the canonical artefact for the **portfolio entity as a >
+> whole**: how the trio composes (front-end → service REST API → >
+> embedded matcher), the DTO contract (the API DTO **is** the >
+> matcher's `Plan` type, persisted as JSONB), shared invariants, > the
+> partition between the thin matchable `Plan` record and the >
+> high-volume operational sub-resources (goals, tasks, issues), the >
+> optional `kind` label (Portfolio, Project, Product, Program, Practice,
+> Process, Purpose, Pathway, Proposal) and its > single recursive
+> `/api/plans` collection, general `parent_ref` > containment, and
+> entity-wide goals. Each subproject's own `spec/` remains the single
+> source of > truth **for that subproject's internals**. When this spec
+> and a > crate spec disagree about crate internals, the crate spec
+> wins; when > they disagree about the integration contract, this spec
+> wins. Open a > task in §13 to bring the loser in line — do not
+> silently rewrite > either spec. > > **§5 is the canonical domain
+> model.** This entity-level spec owns > the canonical `Plan` domain
+> model, the optional `PlanKind` label, > recursive `parent_ref`
+> containment, and the sub-resource partition; > the matcher and service
+> crate specs reference §5 rather than > redefining it. > > **Three-part
+> PRs.** A behavioural change is one PR: spec edit + code > edit + test
+> edit. See
+> [`AGENTS/spec-driven-development.md`](../AGENTS/spec-driven-development.md).
 
 Subproject specs:
 

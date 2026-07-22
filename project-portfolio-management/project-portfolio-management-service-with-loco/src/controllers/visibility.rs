@@ -15,11 +15,10 @@ use sea_orm::QueryOrder;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use super::work_items::Collection;
+use super::plans::parse_kind_label;
 use crate::auth::MaybeAuthUser;
 use crate::models::_entities::{
-    allocations, budget_lines, milestones, report_definitions, risks, work_item_dependencies,
-    work_items,
+    allocations, budget_lines, milestones, plan_dependencies, plans, report_definitions, risks,
 };
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::visibility as vis_models;
@@ -33,12 +32,12 @@ fn unprocessable(message: &str) -> Error {
     )
 }
 
-/// Find an active work item by pid across **any** collection (edges
+/// Find an active plan by pid across **any** collection (edges
 /// may span kinds).
-async fn find_any_item(ctx: &AppContext, pid: Uuid) -> Result<work_items::Model> {
-    work_items::Entity::find()
-        .filter(work_items::Column::Pid.eq(pid))
-        .filter(work_items::Column::DeletedAt.is_null())
+async fn find_any_item(ctx: &AppContext, pid: Uuid) -> Result<plans::Model> {
+    plans::Entity::find()
+        .filter(plans::Column::Pid.eq(pid))
+        .filter(plans::Column::DeletedAt.is_null())
         .one(&ctx.db)
         .await
         .map_err(|e| Error::Model(ModelError::from(e)))?
@@ -46,7 +45,7 @@ async fn find_any_item(ctx: &AppContext, pid: Uuid) -> Result<work_items::Model>
 }
 
 /// The schedule facts (parsed flexible dates) of one stored item.
-pub(crate) fn schedule_item(model: &work_items::Model) -> rules::ScheduleItem {
+pub(crate) fn schedule_item(model: &plans::Model) -> rules::ScheduleItem {
     let start = model.data.get("start_date").and_then(|v| v.as_str());
     let end = model.data.get("target_date").and_then(|v| v.as_str());
     rules::ScheduleItem {
@@ -57,7 +56,7 @@ pub(crate) fn schedule_item(model: &work_items::Model) -> rules::ScheduleItem {
 }
 
 /// Whether the stored item is finished (Completed / Cancelled).
-pub(crate) fn is_finished(model: &work_items::Model) -> bool {
+pub(crate) fn is_finished(model: &plans::Model) -> bool {
     matches!(
         model.data.get("status").and_then(|v| v.as_str()),
         Some("Completed" | "Cancelled")
@@ -87,10 +86,9 @@ async fn create_dependency(
     find_any_item(&ctx, payload.predecessor_pid).await?;
     find_any_item(&ctx, payload.successor_pid).await?;
     let existing = vis_models::all_dependencies(&ctx.db).await?;
-    if existing
-        .iter()
-        .any(|e| e.predecessor_pid == payload.predecessor_pid && e.successor_pid == payload.successor_pid)
-    {
+    if existing.iter().any(|e| {
+        e.predecessor_pid == payload.predecessor_pid && e.successor_pid == payload.successor_pid
+    }) {
         return Err(unprocessable("this dependency already exists"));
     }
     let edges: Vec<(Uuid, Uuid)> = existing
@@ -100,7 +98,7 @@ async fn create_dependency(
     if rules::would_create_cycle(&edges, payload.predecessor_pid, payload.successor_pid) {
         return Err(unprocessable("this dependency would create a cycle"));
     }
-    let row = work_item_dependencies::ActiveModel {
+    let row = plan_dependencies::ActiveModel {
         pid: ActiveValue::set(Uuid::new_v4()),
         predecessor_pid: ActiveValue::set(payload.predecessor_pid),
         successor_pid: ActiveValue::set(payload.successor_pid),
@@ -152,7 +150,7 @@ async fn delete_dependency(
     let pid = Uuid::parse_str(&pid).map_err(|_| Error::NotFound)?;
     let row = vis_models::find_dependency(&ctx.db, pid).await?;
     let row_pid = row.pid;
-    work_item_dependencies::Entity::delete_by_id(row.id)
+    plan_dependencies::Entity::delete_by_id(row.id)
         .exec(&ctx.db)
         .await
         .map_err(|e| Error::Model(ModelError::from(e)))?;
@@ -162,23 +160,21 @@ async fn delete_dependency(
     format::empty_json()
 }
 
-/// `GET /api/portfolios/{pid}/schedule` — the roadmap view for one
-/// portfolio umbrella: its children's timeframes, the dependency
-/// edges among them, finish-start violations, and the critical path.
+/// `GET /api/plans/{pid}/schedule` — the roadmap view for one plan: its
+/// children's timeframes, the dependency edges among them, finish-start
+/// violations, and the critical path. Any plan may contain children, so
+/// this is no longer restricted to a `Portfolio`-kind plan.
 #[debug_handler]
 async fn portfolio_schedule(
     State(ctx): State<AppContext>,
     Path(pid): Path<String>,
 ) -> Result<Response> {
-    let portfolio_pid = Uuid::parse_str(&pid).map_err(|_| Error::NotFound)?;
-    let portfolio = find_any_item(&ctx, portfolio_pid).await?;
-    if portfolio.kind != "Portfolio" {
-        return Err(Error::NotFound);
-    }
-    let mut members = work_items::Entity::find()
-        .filter(work_items::Column::PortfolioPid.eq(portfolio_pid))
-        .filter(work_items::Column::DeletedAt.is_null())
-        .order_by_asc(work_items::Column::Id)
+    let parent_pid = Uuid::parse_str(&pid).map_err(|_| Error::NotFound)?;
+    let portfolio = find_any_item(&ctx, parent_pid).await?;
+    let mut members = plans::Entity::find()
+        .filter(plans::Column::ParentPid.eq(parent_pid))
+        .filter(plans::Column::DeletedAt.is_null())
+        .order_by_asc(plans::Column::Id)
         .all(&ctx.db)
         .await
         .map_err(|e| Error::Model(ModelError::from(e)))?;
@@ -188,7 +184,9 @@ async fn portfolio_schedule(
     let edges: Vec<rules::ScheduleEdge> = vis_models::all_dependencies(&ctx.db)
         .await?
         .into_iter()
-        .filter(|e| member_pids.contains(&e.predecessor_pid) && member_pids.contains(&e.successor_pid))
+        .filter(|e| {
+            member_pids.contains(&e.predecessor_pid) && member_pids.contains(&e.successor_pid)
+        })
         .map(|e| rules::ScheduleEdge {
             pid: e.pid,
             predecessor: e.predecessor_pid,
@@ -203,14 +201,14 @@ async fn portfolio_schedule(
         .zip(&facts)
         .map(|(m, f)| {
             serde_json::json!({
-                "pid": m.pid.to_string(), "kind": m.kind, "name": m.name,
+                "pid": m.pid.to_string(), "kind": m.kind.as_deref().unwrap_or("unspecified"), "name": m.name,
                 "stage": m.stage, "start": f.start, "end": f.end,
                 "on_critical_path": critical.contains(&m.pid),
             })
         })
         .collect();
     format::json(serde_json::json!({
-        "portfolio_pid": portfolio_pid.to_string(),
+        "parent_pid": parent_pid.to_string(),
         "items": items,
         "edges": edges.iter().map(|e| serde_json::json!({
             "pid": e.pid.to_string(),
@@ -225,7 +223,7 @@ async fn portfolio_schedule(
     }))
 }
 
-/// `POST /api/{collection}/{pid}/milestones` body.
+/// `POST /api/plans/{pid}/milestones` body.
 #[derive(Debug, Deserialize)]
 struct MilestonePayload {
     name: String,
@@ -240,7 +238,7 @@ struct MilestonePayload {
 async fn create_milestone(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
-    Path((collection, pid)): Path<(String, String)>,
+    Path(pid): Path<String>,
     Json(payload): Json<MilestonePayload>,
 ) -> Result<Response> {
     if payload.name.trim().is_empty() || payload.name.len() > MAX_TEXT_LEN {
@@ -254,10 +252,10 @@ async fn create_milestone(
             crate::engineering::MILESTONE_KINDS
         )));
     }
-    let item = super::governance::find_item(&ctx, &collection, &pid).await?;
+    let item = super::governance::find_item(&ctx, &pid).await?;
     let row = milestones::ActiveModel {
         pid: ActiveValue::set(Uuid::new_v4()),
-        work_item_pid: ActiveValue::set(item.pid),
+        plan_pid: ActiveValue::set(item.pid),
         name: ActiveValue::set(payload.name.clone()),
         due: ActiveValue::set(payload.due),
         kind: ActiveValue::set(payload.kind.clone()),
@@ -274,14 +272,14 @@ async fn create_milestone(
     format::json(serde_json::json!({ "pid": row.pid.to_string() }))
 }
 
-/// `GET /api/{collection}/{pid}/milestones` — due-date order, with
+/// `GET /api/plans/{pid}/milestones` — due-date order, with
 /// overdue flags.
 #[debug_handler]
 async fn list_milestones(
     State(ctx): State<AppContext>,
-    Path((collection, pid)): Path<(String, String)>,
+    Path(pid): Path<String>,
 ) -> Result<Response> {
-    let item = super::governance::find_item(&ctx, &collection, &pid).await?;
+    let item = super::governance::find_item(&ctx, &pid).await?;
     let today = chrono::Utc::now().date_naive();
     let rows = vis_models::milestones_for(&ctx.db, item.pid).await?;
     let views: Vec<_> = rows
@@ -297,17 +295,17 @@ async fn list_milestones(
     format::json(views)
 }
 
-/// `POST /api/{collection}/{pid}/milestones/{m_pid}/complete`.
+/// `POST /api/plans/{pid}/milestones/{m_pid}/complete`.
 #[debug_handler]
 async fn complete_milestone(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
-    Path((collection, pid, m_pid)): Path<(String, String, String)>,
+    Path((pid, m_pid)): Path<(String, String)>,
 ) -> Result<Response> {
-    let item = super::governance::find_item(&ctx, &collection, &pid).await?;
+    let item = super::governance::find_item(&ctx, &pid).await?;
     let m_pid = Uuid::parse_str(&m_pid).map_err(|_| Error::NotFound)?;
     let milestone = vis_models::find_milestone(&ctx.db, m_pid).await?;
-    if milestone.work_item_pid != item.pid {
+    if milestone.plan_pid != item.pid {
         return Err(Error::NotFound);
     }
     let row_pid = milestone.pid;
@@ -320,13 +318,19 @@ async fn complete_milestone(
         .update(&ctx.db)
         .await
         .map_err(|e| Error::Model(ModelError::from(e)))?;
-    AuditModel::record(&ctx.db, row_pid, "milestone_completed", caller.actor(), None)
-        .await
-        .ok();
+    AuditModel::record(
+        &ctx.db,
+        row_pid,
+        "milestone_completed",
+        caller.actor(),
+        None,
+    )
+    .await
+    .ok();
     format::json(row)
 }
 
-/// `POST /api/{collection}/{pid}/allocations` body.
+/// `POST /api/plans/{pid}/allocations` body.
 #[derive(Debug, Deserialize)]
 struct AllocationPayload {
     /// `person:` / `worker:` `EntityRef` URN.
@@ -345,7 +349,7 @@ struct AllocationPayload {
 async fn create_allocation(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
-    Path((collection, pid)): Path<(String, String)>,
+    Path(pid): Path<String>,
     Json(payload): Json<AllocationPayload>,
 ) -> Result<Response> {
     let mut problems = Vec::new();
@@ -356,16 +360,17 @@ async fn create_allocation(
         problems.push(format!("percent must be 1–100, got {}", payload.percent));
     }
     if let (Some(start), Some(end)) = (payload.start_date, payload.end_date)
-        && end < start {
-            problems.push("end_date is before start_date".to_string());
-        }
+        && end < start
+    {
+        problems.push("end_date is before start_date".to_string());
+    }
     if !problems.is_empty() {
         return Err(unprocessable(&problems.join("; ")));
     }
-    let item = super::governance::find_item(&ctx, &collection, &pid).await?;
+    let item = super::governance::find_item(&ctx, &pid).await?;
     let row = allocations::ActiveModel {
         pid: ActiveValue::set(Uuid::new_v4()),
-        work_item_pid: ActiveValue::set(item.pid),
+        plan_pid: ActiveValue::set(item.pid),
         person_ref: ActiveValue::set(payload.person_ref.clone()),
         role: ActiveValue::set(payload.role.clone()),
         percent: ActiveValue::set(payload.percent),
@@ -383,27 +388,27 @@ async fn create_allocation(
     format::json(serde_json::json!({ "pid": row.pid.to_string() }))
 }
 
-/// `GET /api/{collection}/{pid}/allocations`.
+/// `GET /api/plans/{pid}/allocations`.
 #[debug_handler]
 async fn list_allocations(
     State(ctx): State<AppContext>,
-    Path((collection, pid)): Path<(String, String)>,
+    Path(pid): Path<String>,
 ) -> Result<Response> {
-    let item = super::governance::find_item(&ctx, &collection, &pid).await?;
+    let item = super::governance::find_item(&ctx, &pid).await?;
     format::json(vis_models::allocations_for(&ctx.db, item.pid).await?)
 }
 
-/// `DELETE /api/{collection}/{pid}/allocations/{a_pid}` — soft-delete.
+/// `DELETE /api/plans/{pid}/allocations/{a_pid}` — soft-delete.
 #[debug_handler]
 async fn delete_allocation(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
-    Path((collection, pid, a_pid)): Path<(String, String, String)>,
+    Path((pid, a_pid)): Path<(String, String)>,
 ) -> Result<Response> {
-    let item = super::governance::find_item(&ctx, &collection, &pid).await?;
+    let item = super::governance::find_item(&ctx, &pid).await?;
     let a_pid = Uuid::parse_str(&a_pid).map_err(|_| Error::NotFound)?;
     let allocation = vis_models::find_allocation(&ctx.db, a_pid).await?;
-    if allocation.work_item_pid != item.pid {
+    if allocation.plan_pid != item.pid {
         return Err(Error::NotFound);
     }
     let row_pid = allocation.pid;
@@ -476,7 +481,14 @@ struct ReportPayload {
 
 /// Columns a report may project.
 const REPORT_FIELDS: &[&str] = &[
-    "pid", "kind", "name", "stage", "status", "start_date", "target_date", "created_at",
+    "pid",
+    "kind",
+    "name",
+    "stage",
+    "status",
+    "start_date",
+    "target_date",
+    "created_at",
 ];
 
 #[debug_handler]
@@ -489,15 +501,24 @@ async fn create_report(
     if payload.name.trim().is_empty() || payload.name.len() > MAX_TEXT_LEN {
         problems.push("name is required (and capped)".to_string());
     }
-    if Collection::from_segment(&payload.collection).is_none() {
-        problems.push("collection must be portfolios/projects/products/programs".to_string());
+    // `collection` is legacy metadata now that there is one recursive
+    // `plans` collection: blank means "all plans", and a non-blank value
+    // is accepted only as an optional kind filter
+    // (portfolio/project/product/program/practice/process/purpose/pathway/proposal).
+    if !payload.collection.trim().is_empty() && parse_kind_label(&payload.collection).is_none() {
+        problems.push(
+            "collection must be blank (all plans) or a kind (portfolio/project/product/program/practice/process/purpose/pathway/proposal)"
+                .to_string(),
+        );
     }
     if payload.fields.is_empty() {
         problems.push("fields must name at least one column".to_string());
     }
     for field in &payload.fields {
         if !REPORT_FIELDS.contains(&field.as_str()) {
-            problems.push(format!("unknown field {field:?} (allowed: {REPORT_FIELDS:?})"));
+            problems.push(format!(
+                "unknown field {field:?} (allowed: {REPORT_FIELDS:?})"
+            ));
         }
     }
     if !problems.is_empty() {
@@ -556,10 +577,13 @@ async fn delete_report(
 }
 
 /// One projected report cell.
-fn report_cell(model: &work_items::Model, field: &str) -> String {
+fn report_cell(model: &plans::Model, field: &str) -> String {
     match field {
         "pid" => model.pid.to_string(),
-        "kind" => model.kind.clone(),
+        "kind" => model
+            .kind
+            .clone()
+            .unwrap_or_else(|| "unspecified".to_string()),
         "name" => model.name.clone(),
         "stage" => model.stage.clone().unwrap_or_default(),
         "created_at" => model.created_at.to_rfc3339(),
@@ -590,7 +614,10 @@ async fn run_report(
 ) -> Result<Response> {
     let pid = Uuid::parse_str(&pid).map_err(|_| Error::NotFound)?;
     let def = vis_models::find_report(&ctx.db, pid).await?;
-    let collection = Collection::from_segment(&def.collection).ok_or(Error::NotFound)?;
+    // The report's legacy `collection` is now an optional kind filter over
+    // the single recursive `plans` collection: blank (or unrecognised) ⇒
+    // all plans; a kind label ⇒ that kind only (filtered in-memory below).
+    let kind_filter = parse_kind_label(&def.collection);
     let fields: Vec<String> = serde_json::from_value(def.fields.clone()).unwrap_or_default();
     let stage = def.filters.get("stage").and_then(|v| v.as_str());
     let status = def.filters.get("status").and_then(|v| v.as_str());
@@ -599,9 +626,13 @@ async fn run_report(
         .get("name_like")
         .and_then(|v| v.as_str())
         .map(str::to_lowercase);
-    let rows = crate::models::work_items::Model::list(&ctx.db, collection.kind_str(), 1000).await?;
-    let selected: Vec<&work_items::Model> = rows
+    let rows = crate::models::plans::Model::list(&ctx.db, 1000).await?;
+    let selected: Vec<&plans::Model> = rows
         .iter()
+        .filter(|m| {
+            kind_filter
+                .is_none_or(|want| m.kind.as_deref().and_then(parse_kind_label) == Some(want))
+        })
         .filter(|m| stage.is_none_or(|want| m.stage.as_deref() == Some(want)))
         .filter(|m| {
             status.is_none_or(|want| m.data.get("status").and_then(|v| v.as_str()) == Some(want))
@@ -630,7 +661,10 @@ async fn run_report(
         }
         return Ok((
             StatusCode::OK,
-            [(header::CONTENT_TYPE, header::HeaderValue::from_static("text/csv"))],
+            [(
+                header::CONTENT_TYPE,
+                header::HeaderValue::from_static("text/csv"),
+            )],
             csv,
         )
             .into_response());
@@ -661,8 +695,8 @@ async fn run_report(
 #[allow(clippy::too_many_lines)] // one pass over the whole estate
 async fn at_a_glance(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
     let today = chrono::Utc::now().date_naive();
-    let items = work_items::Entity::find()
-        .filter(work_items::Column::DeletedAt.is_null())
+    let items = plans::Entity::find()
+        .filter(plans::Column::DeletedAt.is_null())
         .all(&ctx.db)
         .await
         .map_err(|e| Error::Model(ModelError::from(e)))?;
@@ -699,22 +733,35 @@ async fn at_a_glance(State(ctx): State<AppContext>, headers: HeaderMap) -> Resul
     let violated: std::collections::HashSet<Uuid> =
         all_violations.iter().map(|v| v.successor).collect();
 
-    // Per-item RAG.
-    let mut per_collection: std::collections::BTreeMap<&str, Vec<&work_items::Model>> =
+    // Per-item RAG, grouped by the optional `kind` label (one recursive
+    // collection now; a missing label groups under "unspecified").
+    let mut per_collection: std::collections::BTreeMap<String, Vec<&plans::Model>> =
         std::collections::BTreeMap::new();
     for item in &items {
-        per_collection.entry(item.kind.as_str()).or_default().push(item);
+        per_collection
+            .entry(
+                item.kind
+                    .clone()
+                    .unwrap_or_else(|| "unspecified".to_string()),
+            )
+            .or_default()
+            .push(item);
     }
     let mut collections = Vec::new();
     for (kind, members) in &per_collection {
-        let mut rag_counts = std::collections::BTreeMap::from([("red", 0), ("amber", 0), ("green", 0)]);
-        let mut stages: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+        let mut rag_counts =
+            std::collections::BTreeMap::from([("red", 0), ("amber", 0), ("green", 0)]);
+        let mut stages: std::collections::BTreeMap<String, usize> =
+            std::collections::BTreeMap::new();
         for member in members {
             let member_risks: Vec<_> = risk_rows
                 .iter()
-                .filter(|r| r.work_item_pid == member.pid)
+                .filter(|r| r.plan_pid == member.pid)
                 .collect();
-            let materialised = member_risks.iter().filter(|r| r.status == "materialised").count();
+            let materialised = member_risks
+                .iter()
+                .filter(|r| r.status == "materialised")
+                .count();
             let max_exposure = member_risks
                 .iter()
                 .filter(|r| matches!(r.status.as_str(), "open" | "mitigating"))
@@ -723,7 +770,7 @@ async fn at_a_glance(State(ctx): State<AppContext>, headers: HeaderMap) -> Resul
                 .unwrap_or(0);
             let member_budgets: Vec<_> = budget_rows
                 .iter()
-                .filter(|b| b.work_item_pid == member.pid)
+                .filter(|b| b.plan_pid == member.pid)
                 .collect();
             let overrun = {
                 let mut currencies: Vec<&str> =
@@ -731,8 +778,16 @@ async fn at_a_glance(State(ctx): State<AppContext>, headers: HeaderMap) -> Resul
                 currencies.sort_unstable();
                 currencies.dedup();
                 currencies.into_iter().any(|c| {
-                    let planned: i64 = member_budgets.iter().filter(|b| b.currency == c).map(|b| b.planned_minor).sum();
-                    let actual: i64 = member_budgets.iter().filter(|b| b.currency == c).map(|b| b.actual_minor).sum();
+                    let planned: i64 = member_budgets
+                        .iter()
+                        .filter(|b| b.currency == c)
+                        .map(|b| b.planned_minor)
+                        .sum();
+                    let actual: i64 = member_budgets
+                        .iter()
+                        .filter(|b| b.currency == c)
+                        .map(|b| b.actual_minor)
+                        .sum();
                     actual > planned
                 })
             };
@@ -752,7 +807,12 @@ async fn at_a_glance(State(ctx): State<AppContext>, headers: HeaderMap) -> Resul
             );
             *rag_counts.get_mut(colour).expect("fixed keys") += 1;
             *stages
-                .entry(member.stage.clone().unwrap_or_else(|| "pre_gate".to_string()))
+                .entry(
+                    member
+                        .stage
+                        .clone()
+                        .unwrap_or_else(|| "pre_gate".to_string()),
+                )
                 .or_default() += 1;
         }
         collections.push(serde_json::json!({
@@ -774,7 +834,10 @@ async fn at_a_glance(State(ctx): State<AppContext>, headers: HeaderMap) -> Resul
         .filter(|p| matches!(p.status.as_str(), "draft" | "submitted" | "in_review"))
         .count();
     let over_allocated = {
-        let mut people: Vec<&str> = allocation_rows.iter().map(|a| a.person_ref.as_str()).collect();
+        let mut people: Vec<&str> = allocation_rows
+            .iter()
+            .map(|a| a.person_ref.as_str())
+            .collect();
         people.sort_unstable();
         people.dedup();
         people
@@ -793,7 +856,7 @@ async fn at_a_glance(State(ctx): State<AppContext>, headers: HeaderMap) -> Resul
         "as_of": chrono::Utc::now(),
         "collections": collections,
         "site_tiles": {
-            "work_items": items.len(),
+            "plans": items.len(),
             "proposals_open": proposals_open,
             "materialised_risks": risk_rows.iter().filter(|r| r.status == "materialised").count(),
             "open_risk_exposure": open_risk_exposure,
@@ -815,17 +878,17 @@ pub fn routes() -> Routes {
         .add("/dependencies", post(create_dependency))
         .add("/dependencies", get(list_dependencies))
         .add("/dependencies/{pid}", delete(delete_dependency))
-        .add("/portfolios/{pid}/schedule", get(portfolio_schedule))
-        .add("/{collection}/{pid}/milestones", post(create_milestone))
-        .add("/{collection}/{pid}/milestones", get(list_milestones))
+        .add("/plans/{pid}/schedule", get(portfolio_schedule))
+        .add("/plans/{pid}/milestones", post(create_milestone))
+        .add("/plans/{pid}/milestones", get(list_milestones))
         .add(
-            "/{collection}/{pid}/milestones/{m_pid}/complete",
+            "/plans/{pid}/milestones/{m_pid}/complete",
             post(complete_milestone),
         )
-        .add("/{collection}/{pid}/allocations", post(create_allocation))
-        .add("/{collection}/{pid}/allocations", get(list_allocations))
+        .add("/plans/{pid}/allocations", post(create_allocation))
+        .add("/plans/{pid}/allocations", get(list_allocations))
         .add(
-            "/{collection}/{pid}/allocations/{a_pid}",
+            "/plans/{pid}/allocations/{a_pid}",
             delete(delete_allocation),
         )
         .add("/capacity", get(capacity))

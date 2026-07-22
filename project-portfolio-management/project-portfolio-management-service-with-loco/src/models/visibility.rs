@@ -6,9 +6,9 @@ use loco_rs::prelude::*;
 use sea_orm::{ConnectionTrait, QueryOrder};
 use uuid::Uuid;
 
-use super::_entities::{allocations, milestones, report_definitions, work_item_dependencies};
+use super::_entities::{allocations, milestones, plan_dependencies, report_definitions};
 
-impl ActiveModelBehavior for work_item_dependencies::ActiveModel {}
+impl ActiveModelBehavior for plan_dependencies::ActiveModel {}
 impl ActiveModelBehavior for milestones::ActiveModel {}
 impl ActiveModelBehavior for allocations::ActiveModel {}
 impl ActiveModelBehavior for report_definitions::ActiveModel {}
@@ -19,11 +19,9 @@ impl ActiveModelBehavior for report_definitions::ActiveModel {}
 /// # Errors
 ///
 /// When the query fails.
-pub async fn all_dependencies<C: ConnectionTrait>(
-    db: &C,
-) -> Result<Vec<work_item_dependencies::Model>> {
-    work_item_dependencies::Entity::find()
-        .order_by_asc(work_item_dependencies::Column::Id)
+pub async fn all_dependencies<C: ConnectionTrait>(db: &C) -> Result<Vec<plan_dependencies::Model>> {
+    plan_dependencies::Entity::find()
+        .order_by_asc(plan_dependencies::Column::Id)
         .all(db)
         .await
         .map_err(|e| Error::Model(ModelError::from(e)))
@@ -37,9 +35,9 @@ pub async fn all_dependencies<C: ConnectionTrait>(
 pub async fn find_dependency<C: ConnectionTrait>(
     db: &C,
     pid: Uuid,
-) -> Result<work_item_dependencies::Model> {
-    work_item_dependencies::Entity::find()
-        .filter(work_item_dependencies::Column::Pid.eq(pid))
+) -> Result<plan_dependencies::Model> {
+    plan_dependencies::Entity::find()
+        .filter(plan_dependencies::Column::Pid.eq(pid))
         .one(db)
         .await
         .map_err(|e| Error::Model(ModelError::from(e)))?
@@ -70,17 +68,17 @@ find_active!(find_milestone, milestones);
 find_active!(find_allocation, allocations);
 find_active!(find_report, report_definitions);
 
-/// A work item's active milestones, due-date order.
+/// A plan's active milestones, due-date order.
 ///
 /// # Errors
 ///
 /// When the query fails.
 pub async fn milestones_for(
     db: &DatabaseConnection,
-    work_item_pid: Uuid,
+    plan_pid: Uuid,
 ) -> Result<Vec<milestones::Model>> {
     milestones::Entity::find()
-        .filter(milestones::Column::WorkItemPid.eq(work_item_pid))
+        .filter(milestones::Column::PlanPid.eq(plan_pid))
         .filter(milestones::Column::DeletedAt.is_null())
         .order_by_asc(milestones::Column::Due)
         .all(db)
@@ -88,17 +86,17 @@ pub async fn milestones_for(
         .map_err(|e| Error::Model(ModelError::from(e)))
 }
 
-/// A work item's active allocations, oldest first.
+/// A plan's active allocations, oldest first.
 ///
 /// # Errors
 ///
 /// When the query fails.
 pub async fn allocations_for(
     db: &DatabaseConnection,
-    work_item_pid: Uuid,
+    plan_pid: Uuid,
 ) -> Result<Vec<allocations::Model>> {
     allocations::Entity::find()
-        .filter(allocations::Column::WorkItemPid.eq(work_item_pid))
+        .filter(allocations::Column::PlanPid.eq(plan_pid))
         .filter(allocations::Column::DeletedAt.is_null())
         .order_by_asc(allocations::Column::Id)
         .all(db)

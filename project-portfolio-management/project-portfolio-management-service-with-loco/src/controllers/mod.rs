@@ -1,14 +1,17 @@
 //! HTTP controllers for the portfolio service.
 
+pub mod automation;
+pub mod collaboration;
 pub mod docs;
 pub mod engineering;
 pub mod governance;
 pub mod insights;
+pub mod metrics;
 pub mod oversight;
+pub mod plans;
+pub mod prioritisation;
 pub mod strategy;
 pub mod visibility;
-pub mod metrics;
-pub mod work_items;
 
 /// Map a model-layer error to its HTTP shape: a missing record is
 /// `404 Not Found`; anything else stays a model error (500-class).
@@ -27,9 +30,7 @@ pub fn model_not_found(err: loco_rs::model::ModelError) -> loco_rs::Error {
 /// a loco error: `403` = policy denied; `401` = fail-safe when claims
 /// are missing behind the guard.
 #[must_use]
-pub fn record_rejection(
-    (status, reason): (axum::http::StatusCode, String),
-) -> loco_rs::Error {
+pub fn record_rejection((status, reason): (axum::http::StatusCode, String)) -> loco_rs::Error {
     let code = if status == axum::http::StatusCode::FORBIDDEN {
         "forbidden"
     } else {

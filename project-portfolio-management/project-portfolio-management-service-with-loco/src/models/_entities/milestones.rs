@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `milestones`. Dated checkpoints on a work item
+//! `SeaORM` Entity — `milestones`. Dated checkpoints on a plan
 //! (PPM-6).
 
 #![allow(missing_docs)]
@@ -15,7 +15,7 @@ pub struct Model {
     pub id: i32,
     #[sea_orm(unique)]
     pub pid: Uuid,
-    pub work_item_pid: Uuid,
+    pub plan_pid: Uuid,
     pub name: String,
     pub due: Date,
     pub done: bool,

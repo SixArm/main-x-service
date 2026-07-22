@@ -2,64 +2,70 @@
 
 The portfolio entity is two things at once:
 
-1. A **matchable identity** — the `WorkItem` header, discriminated by a
-   required `kind` (Portfolio / Project / Product / Program). The matcher
-   crate's `WorkItem` is the API DTO, the persisted JSONB payload, and
-   the matching input. One shape, end to end — no adapter (mirrors
+1. A **matchable identity** — the `Plan` header, with an optional
+   descriptive `kind` label (Portfolio / Project / Product / Program /
+   Practice / Process / Purpose / Pathway / Proposal). The matcher
+   crate's `Plan` is the API DTO, the persisted JSONB payload, and the
+   matching input. One shape, end to end — no adapter (mirrors
    care-pathway).
-2. A **project-management tool** — a `WorkItem` owns operational
+2. A **project-management tool** — a `Plan` owns operational
    sub-resources (goals, tasks, issues) and exposes derived read views
    (timeline / Gantt, burndown).
 
 Normative definitions: entity spec [§5](../spec/05-domain-model.md)
 and matcher [spec §6](../project-portfolio-management-matcher-rust-crate/spec/index.md).
 
-## The kind discriminator — four matchable record types
+## The optional kind label + recursive containment
 
-A **Portfolio** is the umbrella container; **Project**, **Product**, and
-**Program** are distinct record types that sit under a portfolio. They
-are modelled as the single canonical `WorkItem` type plus a required
-`kind: WorkItemKind` discriminator — the "umbrella kind of work item"
-naming — but each kind is a **distinct service table and REST
-collection**, not a variant on one shared collection. Child kinds
-(Project / Product / Program) carry a `portfolio_ref` to their parent
-portfolio; Portfolio records do not. `kind` is also a **hard match gate**
-([matching.md](matching.md) R-GATE): cross-kind pairs never match.
+Every record is a `Plan`. **Portfolio**, **Project**, **Product**,
+**Program**, **Practice**, **Process**, **Purpose**, **Pathway**, and
+**Proposal** are optional values of the descriptive `kind` label — used
+for display and grouping only. `kind` is **not required**, **not a
+discriminator**, does **not** fix a collection, and does **not** gate
+matching ([matching.md](matching.md) — matching is kind-agnostic).
 
-## `WorkItem` (matchable identity)
+Containment is **recursive**: any plan may contain any other plan via
+`parent_ref`, forming a tree (`parent_ref` replaces the former
+`portfolio_ref`). The service rejects a `parent_ref` that points a plan
+at itself or at one of its descendants (a containment cycle) with
+HTTP `422`.
 
-**File:** [`project-portfolio-management-matcher-rust-crate/src/work_item.rs`](../project-portfolio-management-matcher-rust-crate/src/work_item.rs)
+## `Plan` (matchable identity)
+
+**File:** [`project-portfolio-management-matcher-rust-crate/src/plan.rs`](../project-portfolio-management-matcher-rust-crate/src/plan.rs)
 
 | Field | Type | Description |
 |---|---|---|
-| kind | WorkItemKind | **Required.** Portfolio / Project / Product / Program — the collection / table it lives in; a hard match gate |
-| name | String | Work-item title (required; service rejects blank) |
+| kind | Option\<PlanKind\> | **Optional.** Portfolio / Project / Product / Program / Practice / Process / Purpose / Pathway / Proposal — a descriptive display / grouping label; not a discriminator, not a gate |
+| name | String | Plan title (required; service rejects blank) |
 | alternate_names | Vec\<String\> | Aliases, former titles, codenames |
 | code | Option\<String\> | Owner-scoped code (e.g. `PROJ-2026`) |
 | owner_org_id | Option\<String\> | EntityRef `organization:<id>` — sponsoring / owning org; scopes `code` |
 | owner_org_name | Option\<String\> | Owning-org display name (informational-only) |
 | lead_ref | Option\<String\> | EntityRef `person:<id>` \| `worker:<id>` — the lead. **Not scored** |
-| portfolio_ref | Option\<String\> | Parent portfolio `pid` for Project / Product / Program (the umbrella link); absent / ignored for Portfolio kind |
-| status | Option\<WorkItemStatus\> | Lifecycle status — informational-only, NOT a match signal |
+| parent_ref | Option\<String\> | Parent plan `pid` (recursive containment); absent for a root plan |
+| status | Option\<PlanStatus\> | Lifecycle status — informational-only, NOT a match signal |
 | goals | Vec\<Goal\> | In the payload; goal **titles** feed the `Goals` component |
 | start_date | Option\<Date\> | Planned / actual start (feeds `Timeframe`) |
 | target_date | Option\<Date\> | Planned completion / due date (feeds `Timeframe`) |
 | keywords | Vec\<String\> | Descriptive / discovery terms (what it *is*) |
 | tags | Vec\<String\> | Operator labels for grouping / workflow |
-| identifiers | Vec\<WorkItemIdentifier\> | Typed external identifiers |
+| identifiers | Vec\<PlanIdentifier\> | Typed external identifiers |
 | same_as | Vec\<String\> | Canonical URLs (schema.org `sameAs`) |
 | in_language | Option\<String\> | ISO 639-1 language code |
-| relationships | Vec\<WorkItemRelationship\> | Typed links to other work items |
+| relationships | Vec\<PlanRelationship\> | Typed links to other plans |
+
+Construct with `Plan::new(name)` — `kind` defaults to `None`.
 
 ## Supporting types (matching surface)
 
 | Type | Variants / shape |
 |---|---|
-| `WorkItemKind` | `Portfolio`, `Project`, `Product`, `Program` — **closed set** (no `Custom`, not `#[non_exhaustive]`); maps to fixed tables / collections |
-| `WorkItemStatus` | `Proposed`, `Active`, `OnHold`, `Completed`, `Cancelled`, `Custom(String)` — informational-only |
-| `WorkItemRelationship` | `{ relation: RelationKind, work_item_id: String }` (`work_item_id` = `pid` or URI) |
+| `PlanKind` | `Portfolio`, `Project`, `Product`, `Program`, `Practice`, `Process`, `Purpose`, `Pathway`, `Proposal` — **closed set** (no `Custom`, not `#[non_exhaustive]`); an optional descriptive label |
+| `PlanStatus` | `Proposed`, `Active`, `OnHold`, `Completed`, `Cancelled`, `Custom(String)` — informational-only |
+| `PlanRelationship` | `{ relation: RelationKind, plan_id: String }` (`plan_id` = `pid` or URI) |
 | `RelationKind` | `ParentOf` / `ChildOf` (inverses), `DependsOn` / `BlockedBy` (inverses), `Supersedes` / `SupersededBy` (inverses), `SimilarTo` (symmetric), `RelatedTo` (symmetric), `Custom(String)` |
-| `WorkItemIdentifier` | `{ scheme: IdentifierScheme, value: String }` |
+| `PlanIdentifier` | `{ scheme: IdentifierScheme, value: String }` |
 | `IdentifierScheme` | Deterministic: `Uri`, `Uuid`, `JiraProjectKey`, `AsanaGid`, `TrelloBoardId`, `MsProjectId`, `GitHubProjectId`, `LinearId` · Owner-scoped: `Code`, `LocalId` · `Custom(String)` |
 
 Deterministic schemes pin a match to 1.0 on a shared value;
@@ -67,11 +73,11 @@ owner-scoped schemes never do (see [matching.md](matching.md)).
 
 ## Operational sub-resources
 
-These hang off any `WorkItem` (portfolio / project / product / program)
-and make it a project-management tool. They are **not** part of the
-matching surface (except goal *titles* — [matching.md](matching.md)
-`Goals` component). Each is owned by its parent work item, has its own
-table, and is reached under `/api/{collection}/{pid}/…`.
+These hang off any `Plan` and make it a project-management tool. They are
+**not** part of the matching surface (except goal *titles* —
+[matching.md](matching.md) `Goals` component). Each is owned by its
+parent plan, has its own table, and is reached under
+`/api/plans/{pid}/…`.
 
 | Sub-resource | Key fields | Notes |
 |---|---|---|
@@ -89,7 +95,7 @@ table, and is reached under `/api/{collection}/{pid}/…`.
 
 `*_ref` fields are opaque references (person `pid`, worker `pid`,
 organization `pid`, auth user id) resolved by the consuming front-end /
-link aggregator — the portfolio service stores them verbatim.
+link aggregator — the plan service stores them verbatim.
 
 > Posts / comments / members are **not** core sub-resources for the
 > portfolio entity (deferred; roadmap only if a collaboration surface is
@@ -98,7 +104,7 @@ link aggregator — the portfolio service stores them verbatim.
 
 ## Derived views (read-only)
 
-Computed from the work item + its sub-resources; never stored as
+Computed from the plan + its sub-resources; never stored as
 canonical state.
 
 | View | Computed from | Endpoint |
@@ -112,18 +118,17 @@ canonical state.
 [`src/models/`](../project-portfolio-management-service-with-loco/src/models/),
 [`migration/src/`](../project-portfolio-management-service-with-loco/migration/src/)
 
-One core table **per work-item kind** — `portfolios`, `projects`,
-`products`, `programs` — each `{id` (PK)`, pid` (public UUID)`, name`
-(denormalised from `data.name`)`, data` (JSONB `WorkItem`)`, active,
-deleted_at` (soft delete)`}`. The child kinds (`projects` / `products` /
-`programs`) additionally carry a denormalised `portfolio_pid` column.
-Model helpers per table: `create`, `find_by_pid`, `list(limit)`,
-`to_work_item()` (deserialise), `update_data`, `soft_delete`.
+One core table `plans` — `{id` (PK)`, pid` (public UUID)`, name`
+(denormalised from `data.name`)`, kind` (nullable)`, parent_pid`
+(nullable, the recursive containment link)`, data` (JSONB `Plan`)`,
+active, deleted_at` (soft delete)`}`. Model helpers: `create`,
+`find_by_pid`, `list(limit)`, `to_plan()` (deserialise), `update_data`,
+`soft_delete`.
 
 Each sub-resource gets its own child table (`tasks`, `goals`, `issues`)
-keyed by the parent `(parent_kind, parent_pid)`. Supporting tables:
-`audit_logs`, `merge_records`, `entity_links`, `review_queue`, plus a
-deferred `bulk_jobs`.
+keyed by the parent `plan_pid`. Supporting tables: `audit_logs`,
+`merge_records`, `entity_links`, `review_queue`, plus a deferred
+`bulk_jobs`.
 
 ## Wire DTOs (service controller)
 
@@ -131,16 +136,16 @@ deferred `bulk_jobs`.
 
 | Type | Shape | Used by |
 |---|---|---|
-| `WorkItemRef` | `{ pid, name }` | create / update / list responses |
-| `MatchRequest` | `{ query: WorkItem, candidates: [WorkItem] }` | `POST …/match` |
+| `PlanRef` | `{ pid, name }` | create / update / list responses |
+| `MatchRequest` | `{ query: Plan, candidates: [Plan] }` | `POST …/match` |
 | `ScoredRef` | `{ pid, name, score, confidence, is_match }` | `POST …/check-duplicates` |
 
 ## Front-end TypeScript mirror
 
 **File:** [`src/lib/api/types.ts`](../project-portfolio-management-front-end-with-svelte/src/lib/api/types.ts)
-— `WorkItem`, `WorkItemKind`, `WorkItemStatus`, `Goal`, `GoalStatus`,
+— `Plan`, `PlanKind`, `PlanStatus`, `Goal`, `GoalStatus`,
 `Task`, `TaskStatus`, `Issue`, `IssueKind`, `IssueSeverity`,
-`IssueStatus`, `WorkItemRelationship`, `RelationKind`,
-`IdentifierScheme`, `WorkItemRef`, `ScoredRef`. Hand-mirrored; MUST be
+`IssueStatus`, `PlanRelationship`, `RelationKind`,
+`IdentifierScheme`, `PlanRef`, `ScoredRef`. Hand-mirrored; MUST be
 updated in the same change cycle as any matcher-type change (entity
 spec §18).

@@ -1,6 +1,6 @@
-//! Field-level validation for incoming `WorkItem` payloads.
+//! Field-level validation for incoming `Plan` payloads.
 //!
-//! The service stores the matcher's `WorkItem` verbatim, so payload
+//! The service stores the matcher's `Plan` verbatim, so payload
 //! validation is the *service's* responsibility — the matcher is a pure
 //! scoring library and performs none. These checks return human-readable
 //! problem strings that the controller surfaces as a single `422
@@ -12,10 +12,10 @@
 //! - **`goals[i].title`** — each goal title must not be blank.
 //! - **`identifiers[i].value`** — must not be blank; a `Uuid`-scheme
 //!   value must be a valid UUID, a `Uri`-scheme value must look like a URI.
-//! - **`portfolio_ref`** — when present, must be a valid UUID.
+//! - **`parent_ref`** — when present, must be a valid UUID.
 //! - **`in_language`** — when present, must look like a BCP-47 tag.
 //! - **`keywords[i]` / `tags[i]` / `alternate_names[i]`** — non-blank.
-//! - **`relationships[i].work_item_id`** — non-blank.
+//! - **`relationships[i].plan_id`** — non-blank.
 //! - **input-size caps (SEC-M1)** — every scalar text field is bounded at
 //!   [`MAX_TEXT_LEN`], every array at [`MAX_ARRAY_LEN`] entries, and every
 //!   string entry inside an array at [`MAX_ITEM_LEN`]. The matcher runs
@@ -24,7 +24,7 @@
 //!   (amplified by the check-duplicates scan) — rejected here, before the
 //!   record is stored or matched.
 
-use project_portfolio_management_matcher::{IdentifierScheme, WorkItem};
+use project_portfolio_management_matcher::{IdentifierScheme, Plan};
 
 /// Maximum length, in Unicode scalar values, of any single scalar text
 /// field (e.g. `name`, `code`). SEC-M1 denial-of-service guard.
@@ -42,7 +42,7 @@ pub const MAX_ITEM_LEN: usize = 512;
 /// Collect every validation problem for `wi`. An empty vector means the
 /// payload is valid. The controller joins these into one `422`.
 #[must_use]
-pub fn problems(wi: &WorkItem) -> Vec<String> {
+pub fn problems(wi: &Plan) -> Vec<String> {
     let mut out = Vec::new();
 
     if wi.name.trim().is_empty() {
@@ -78,10 +78,10 @@ pub fn problems(wi: &WorkItem) -> Vec<String> {
         }
     }
 
-    if let Some(parent) = &wi.portfolio_ref
+    if let Some(parent) = &wi.parent_ref
         && uuid::Uuid::parse_str(parent.trim()).is_err()
     {
-        out.push(format!("portfolio_ref: {parent:?} is not a valid UUID"));
+        out.push(format!("parent_ref: {parent:?} is not a valid UUID"));
     }
 
     if let Some(lang) = &wi.in_language
@@ -101,10 +101,8 @@ pub fn problems(wi: &WorkItem) -> Vec<String> {
         }
     }
     for (i, rel) in wi.relationships.iter().enumerate() {
-        if rel.work_item_id.trim().is_empty() {
-            out.push(format!(
-                "relationships[{i}]: work_item_id must not be blank"
-            ));
+        if rel.plan_id.trim().is_empty() {
+            out.push(format!("relationships[{i}]: plan_id must not be blank"));
         }
     }
 
@@ -119,8 +117,8 @@ pub fn problems(wi: &WorkItem) -> Vec<String> {
 /// and Jaccard over these fields; an unbounded string or array is a
 /// denial-of-service vector, amplified by the check-duplicates scan.
 /// Reject oversized input here, before the record is stored or matched.
-/// (The `kind` discriminator is an enum, not free text — nothing to cap.)
-fn push_size_cap_problems(wi: &WorkItem, out: &mut Vec<String>) {
+/// (The optional `kind` label is an enum, not free text — nothing to cap.)
+fn push_size_cap_problems(wi: &Plan, out: &mut Vec<String>) {
     // Scalar text fields.
     if wi.name.chars().count() > MAX_TEXT_LEN {
         out.push(format!("name: exceeds {MAX_TEXT_LEN} characters"));
@@ -130,7 +128,7 @@ fn push_size_cap_problems(wi: &WorkItem, out: &mut Vec<String>) {
         ("owner_org_id", &wi.owner_org_id),
         ("owner_org_name", &wi.owner_org_name),
         ("lead_ref", &wi.lead_ref),
-        ("portfolio_ref", &wi.portfolio_ref),
+        ("parent_ref", &wi.parent_ref),
         ("start_date", &wi.start_date),
         ("target_date", &wi.target_date),
         ("in_language", &wi.in_language),
@@ -195,9 +193,9 @@ fn push_size_cap_problems(wi: &WorkItem, out: &mut Vec<String>) {
         }
     }
     for (i, rel) in wi.relationships.iter().enumerate() {
-        if rel.work_item_id.chars().count() > MAX_ITEM_LEN {
+        if rel.plan_id.chars().count() > MAX_ITEM_LEN {
             out.push(format!(
-                "relationships[{i}].work_item_id: exceeds {MAX_ITEM_LEN} characters"
+                "relationships[{i}].plan_id: exceeds {MAX_ITEM_LEN} characters"
             ));
         }
     }
@@ -243,14 +241,14 @@ fn looks_like_bcp47(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use project_portfolio_management_matcher::{Goal, WorkItem, WorkItemIdentifier, WorkItemKind};
+    use project_portfolio_management_matcher::{Goal, Plan, PlanIdentifier};
 
-    fn project(name: &str) -> WorkItem {
-        WorkItem::new(WorkItemKind::Project, name)
+    fn project(name: &str) -> Plan {
+        Plan::new(name)
     }
 
     #[test]
-    fn valid_work_item_has_no_problems() {
+    fn valid_plan_has_no_problems() {
         let mut wi = project("Apollo platform migration");
         wi.goals = vec![Goal {
             title: "Cut latency".into(),
@@ -258,8 +256,8 @@ mod tests {
         }];
         wi.keywords = vec!["infra".into()];
         wi.in_language = Some("en".into());
-        wi.portfolio_ref = Some(uuid::Uuid::new_v4().to_string());
-        wi.identifiers = vec![WorkItemIdentifier {
+        wi.parent_ref = Some(uuid::Uuid::new_v4().to_string());
+        wi.identifiers = vec![PlanIdentifier {
             scheme: IdentifierScheme::JiraProjectKey,
             value: "APOLLO".into(),
         }];
@@ -289,7 +287,7 @@ mod tests {
     #[test]
     fn malformed_uuid_identifier_is_a_problem() {
         let mut wi = project("Apollo");
-        wi.identifiers = vec![WorkItemIdentifier {
+        wi.identifiers = vec![PlanIdentifier {
             scheme: IdentifierScheme::Uuid,
             value: "not-a-uuid".into(),
         }];
@@ -301,12 +299,12 @@ mod tests {
     #[test]
     fn malformed_uri_identifier_is_a_problem() {
         let mut wi = project("Apollo");
-        wi.identifiers = vec![WorkItemIdentifier {
+        wi.identifiers = vec![PlanIdentifier {
             scheme: IdentifierScheme::Uri,
             value: "just text".into(),
         }];
         assert_eq!(problems(&wi).len(), 1);
-        wi.identifiers = vec![WorkItemIdentifier {
+        wi.identifiers = vec![PlanIdentifier {
             scheme: IdentifierScheme::Uri,
             value: "https://pm.example.com/p/1".into(),
         }];
@@ -314,12 +312,12 @@ mod tests {
     }
 
     #[test]
-    fn malformed_portfolio_ref_is_a_problem() {
+    fn malformed_parent_ref_is_a_problem() {
         let mut wi = project("Apollo");
-        wi.portfolio_ref = Some("nope".into());
+        wi.parent_ref = Some("nope".into());
         let p = problems(&wi);
         assert_eq!(p.len(), 1);
-        assert!(p[0].contains("portfolio_ref"));
+        assert!(p[0].contains("parent_ref"));
     }
 
     #[test]
@@ -335,7 +333,7 @@ mod tests {
     fn reports_every_issue_at_once() {
         let mut wi = project(""); // blank name
         wi.in_language = Some("zzzz!".into()); // bad
-        wi.identifiers = vec![WorkItemIdentifier {
+        wi.identifiers = vec![PlanIdentifier {
             scheme: IdentifierScheme::Uuid,
             value: " ".into(), // blank
         }];

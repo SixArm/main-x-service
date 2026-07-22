@@ -1,20 +1,20 @@
-//! `project-portfolio-management-matcher` — pairwise work-item record matching.
+//! `project-portfolio-management-matcher` — pairwise plan record matching.
 //!
-//! A *work item* is a named unit of intended work in a portfolio /
-//! project-management registry. It comes in four **kinds**: a
-//! `Portfolio` (the umbrella container) or a `Project` / `Product` /
-//! `Program` that sits under a portfolio. The matcher takes two
-//! [`WorkItem`] records and produces a [`MatchResult`] with a score in
-//! `[0.0, 1.0]`, a [`Confidence`] band, an `is_match` boolean, and a
-//! per-component [`MatchBreakdown`].
+//! A *plan* is a named unit of intended work in a portfolio /
+//! project-management registry, forming one recursive tree: any work
+//! item may contain any other via `parent_ref`. The former `Portfolio` /
+//! `Project` / `Product` / `Program` kinds were unified into this single
+//! type; `kind` survives only as **optional descriptive metadata** and
+//! no longer gates matching. The matcher takes two [`Plan`] records
+//! and produces a [`MatchResult`] with a score in `[0.0, 1.0]`, a
+//! [`Confidence`] band, an `is_match` boolean, and a per-component
+//! [`MatchBreakdown`].
 //!
-//! ## The kind gate
+//! ## No kind gate
 //!
-//! The four kinds are **distinct record types** in distinct
-//! collections, so matching is **within a kind only**: comparing two
-//! records of different kind short-circuits to `0.0` with
-//! `breakdown.kind_gate_blocked = true`, before any other rule. A project
-//! and a product are never the same identity.
+//! Because the kinds were unified, **any two plans may match**
+//! regardless of their (optional) `kind`. The `MatchBreakdown` retains a
+//! vestigial `kind_gate_blocked` field, now always `false`.
 //!
 //! ## Strategies
 //!
@@ -31,20 +31,20 @@
 //! ## Usage
 //!
 //! ```
-//! use project_portfolio_management_matcher::{WorkItem, WorkItemKind, MatchConfig, MatchingEngine};
+//! use project_portfolio_management_matcher::{Plan, MatchConfig, MatchingEngine};
 //!
 //! let engine = MatchingEngine::new(MatchConfig::default());
-//! let a = WorkItem::new(WorkItemKind::Project, "Apollo platform migration");
-//! let b = WorkItem::new(WorkItemKind::Project, "Apollo platform migrate");
-//! let result = engine.match_work_items(&a, &b);
+//! let a = Plan::new("Apollo platform migration");
+//! let b = Plan::new("Apollo platform migrate");
+//! let result = engine.match_plans(&a, &b);
 //! assert!(result.score >= 0.0 && result.score <= 1.0);
 //! ```
 //!
 //! ## Public types
 //!
-//! - [`WorkItem`], [`WorkItemKind`], [`WorkItemStatus`], [`Goal`],
-//!   [`GoalStatus`], [`WorkItemIdentifier`], [`IdentifierScheme`],
-//!   [`WorkItemRelationship`], [`RelationKind`].
+//! - [`Plan`], [`PlanKind`], [`PlanStatus`], [`Goal`],
+//!   [`GoalStatus`], [`PlanIdentifier`], [`IdentifierScheme`],
+//!   [`PlanRelationship`], [`RelationKind`].
 //! - [`MatchingEngine`], [`MatchConfig`], [`MatchResult`],
 //!   [`MatchBreakdown`], [`Confidence`].
 
@@ -68,10 +68,10 @@ pub mod matcher;
 pub mod normalize;
 /// Soundex phonetic encoder backing the name-component bonus.
 pub mod phonetic;
+/// Domain model: the [`Plan`] record and its categorical enums.
+pub mod plan;
 /// Match-result shape and the renormalised weighted-average helper.
 pub mod scoring;
-/// Domain model: the [`WorkItem`] record and its categorical enums.
-pub mod work_item;
 
 // ─── Public re-exports ───────────────────────────────────────────────
 // The flat, stable API surface. These are the only paths downstream
@@ -80,8 +80,8 @@ pub mod work_item;
 pub use config::MatchConfig;
 pub use error::{Error, Result};
 pub use matcher::MatchingEngine;
-pub use scoring::{Confidence, MatchBreakdown, MatchResult};
-pub use work_item::{
-    Goal, GoalStatus, IdentifierScheme, RelationKind, WorkItem, WorkItemIdentifier, WorkItemKind,
-    WorkItemRelationship, WorkItemStatus,
+pub use plan::{
+    Goal, GoalStatus, IdentifierScheme, Plan, PlanIdentifier, PlanKind, PlanRelationship,
+    PlanStatus, RelationKind,
 };
+pub use scoring::{Confidence, MatchBreakdown, MatchResult};

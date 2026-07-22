@@ -28,17 +28,17 @@ describe("PpmClient paths", () => {
     await ppm.promoteProposal("p1");
     await ppm.proposalDuplicates("p1");
     await ppm.convertIdea("i1", "projects");
-    await ppm.governance("projects", "w1");
-    await ppm.reviewGate("projects", "w1", { gate: "g0_concept", decision: "approved" });
-    await ppm.escalateRisk("programs", "w2", "r1");
-    await ppm.recordActual("portfolios", "w3", "l1", 500);
-    await ppm.realizeBenefit("products", "w4", "b1", { amount_minor: 1 });
+    await ppm.governance("w1");
+    await ppm.reviewGate("w1", { gate: "g0_concept", decision: "approved" });
+    await ppm.escalateRisk("w2", "r1");
+    await ppm.recordActual("w3", "l1", 500);
+    await ppm.realizeBenefit("w4", "b1", { amount_minor: 1 });
     await ppm.schedule("w3");
     await ppm.capacity("2026-07-01", "2026-07-31");
     await ppm.evaluateScenario("s1");
     await ppm.commitScenario("s1");
     await ppm.alignment("o1");
-    await ppm.linkObjective("projects", "w1", "o1", 4);
+    await ppm.linkObjective("w1", "o1", 4);
     await ppm.runReport("rep1");
     await ppm.executiveHealth();
     await ppm.executiveDecisions(10);
@@ -62,21 +62,21 @@ describe("PpmClient paths", () => {
     await ppm.riskHeatmap();
     await ppm.securityRegister();
     await ppm.regulatorExtract();
-    await ppm.listTasks("projects", "w1");
-    await ppm.createTask("projects", "w1", { title: "T" });
-    await ppm.moveTask("projects", "w1", "t1", "done");
-    await ppm.listSprints("projects", "w1");
-    await ppm.createSprint("projects", "w1", { name: "S1" });
-    await ppm.burndown("projects", "w1", "s1");
-    await ppm.standup("projects", "w1");
+    await ppm.listTasks("w1");
+    await ppm.createTask("w1", { title: "T" });
+    await ppm.moveTask("w1", "t1", "done");
+    await ppm.listSprints("w1");
+    await ppm.createSprint("w1", { name: "S1" });
+    await ppm.burndown("w1", "s1");
+    await ppm.standup("w1");
     await ppm.engineeringBlocked();
     await ppm.engineeringMoscow();
     await ppm.engineeringDeliveryLinks();
     await ppm.milestoneCalendar("demo");
-    await ppm.velocity("projects", "w1");
-    await ppm.listNotes("projects", "w1", "s1");
-    await ppm.createNote("projects", "w1", "s1", { category: "action", body: "B" });
-    await ppm.convertNote("projects", "w1", "s1", "n1");
+    await ppm.velocity("w1");
+    await ppm.listNotes("w1", "s1");
+    await ppm.createNote("w1", "s1", { category: "action", body: "B" });
+    await ppm.convertNote("w1", "s1", "n1");
     await ppm.devopsMetrics(6);
     await ppm.devopsReleases();
 
@@ -87,17 +87,17 @@ describe("PpmClient paths", () => {
       "POST http://svc/api/proposals/p1/promote",
       "GET http://svc/api/proposals/p1/duplicates",
       "POST http://svc/api/ideas/i1/convert",
-      "GET http://svc/api/projects/w1/governance",
-      "POST http://svc/api/projects/w1/gate-reviews",
-      "POST http://svc/api/programs/w2/risks/r1/escalate",
-      "POST http://svc/api/portfolios/w3/budget-lines/l1/actual",
-      "POST http://svc/api/products/w4/benefits/b1/realize",
-      "GET http://svc/api/portfolios/w3/schedule",
+      "GET http://svc/api/plans/w1/governance",
+      "POST http://svc/api/plans/w1/gate-reviews",
+      "POST http://svc/api/plans/w2/risks/r1/escalate",
+      "POST http://svc/api/plans/w3/budget-lines/l1/actual",
+      "POST http://svc/api/plans/w4/benefits/b1/realize",
+      "GET http://svc/api/plans/w3/schedule",
       "GET http://svc/api/capacity?from=2026-07-01&to=2026-07-31",
       "GET http://svc/api/scenarios/s1/evaluate",
       "POST http://svc/api/scenarios/s1/commit",
       "GET http://svc/api/objectives/o1/alignment",
-      "POST http://svc/api/projects/w1/objectives",
+      "POST http://svc/api/plans/w1/objectives",
       "GET http://svc/api/reports/rep1/run",
       "GET http://svc/api/executive/health",
       "GET http://svc/api/executive/decisions?limit=10",
@@ -121,21 +121,21 @@ describe("PpmClient paths", () => {
       "GET http://svc/api/risk/heatmap",
       "GET http://svc/api/security/register",
       "GET http://svc/api/regulator/extract",
-      "GET http://svc/api/projects/w1/tasks",
-      "POST http://svc/api/projects/w1/tasks",
-      "PATCH http://svc/api/projects/w1/tasks/t1",
-      "GET http://svc/api/projects/w1/sprints",
-      "POST http://svc/api/projects/w1/sprints",
-      "GET http://svc/api/projects/w1/burndown?sprint=s1",
-      "GET http://svc/api/projects/w1/standup",
+      "GET http://svc/api/plans/w1/tasks",
+      "POST http://svc/api/plans/w1/tasks",
+      "PATCH http://svc/api/plans/w1/tasks/t1",
+      "GET http://svc/api/plans/w1/sprints",
+      "POST http://svc/api/plans/w1/sprints",
+      "GET http://svc/api/plans/w1/burndown?sprint=s1",
+      "GET http://svc/api/plans/w1/standup",
       "GET http://svc/api/engineering/blocked",
       "GET http://svc/api/engineering/moscow",
       "GET http://svc/api/engineering/delivery-links",
       "GET http://svc/api/engineering/milestone-calendar?kind=demo",
-      "GET http://svc/api/projects/w1/velocity",
-      "GET http://svc/api/projects/w1/sprints/s1/notes",
-      "POST http://svc/api/projects/w1/sprints/s1/notes",
-      "POST http://svc/api/projects/w1/sprints/s1/notes/n1/convert",
+      "GET http://svc/api/plans/w1/velocity",
+      "GET http://svc/api/plans/w1/sprints/s1/notes",
+      "POST http://svc/api/plans/w1/sprints/s1/notes",
+      "POST http://svc/api/plans/w1/sprints/s1/notes/n1/convert",
       "GET http://svc/api/devops/metrics?months=6",
       "GET http://svc/api/devops/releases",
     ]);

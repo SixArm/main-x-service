@@ -1,5 +1,5 @@
 //! PPM Phase-A governance controllers (spec/15-roadmap PPM-1/3/10/12):
-//! the `proposals` work-intake pipeline, per-work-item phase-gate
+//! the `proposals` work-intake pipeline, per-plan phase-gate
 //! reviews, risks, and budget lines, plus the per-item governance
 //! summary. Every mutation writes an audit row; the pure rules live in
 //! [`crate::governance`]; nothing here ever feeds the matcher (the §8
@@ -8,18 +8,18 @@
 use axum::http::StatusCode;
 use loco_rs::controller::ErrorDetail;
 use loco_rs::prelude::*;
-use project_portfolio_management_matcher::{MatchConfig, MatchingEngine, WorkItem};
+use project_portfolio_management_matcher::{MatchConfig, MatchingEngine, Plan};
 use sea_orm::QueryOrder;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::work_items::Collection;
+use super::plans::parse_kind_label;
 use crate::auth::{self, MaybeAuthUser};
 use crate::governance as rules;
-use crate::models::_entities::{budget_lines, gate_reviews, proposals, risks, work_items};
+use crate::models::_entities::{budget_lines, gate_reviews, plans, proposals, risks};
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::governance as gov;
-use crate::models::work_items::Model as WorkItemModel;
+use crate::models::plans::Model as PlanModel;
 use crate::streaming;
 use crate::validation::MAX_TEXT_LEN;
 
@@ -89,21 +89,30 @@ fn validate_proposal(p: &ProposalPayload) -> Vec<String> {
     }
     cap(&mut problems, "title", &p.title);
     cap_opt(&mut problems, "summary", p.summary.as_deref());
-    cap_opt(&mut problems, "strategic_rationale", p.strategic_rationale.as_deref());
-    if Collection::from_segment(&p.kind_target).is_none() {
+    cap_opt(
+        &mut problems,
+        "strategic_rationale",
+        p.strategic_rationale.as_deref(),
+    );
+    // `kind_target` is now an optional descriptive label for the plan a
+    // promoted proposal mints. Blank means "no kind"; a non-blank value
+    // must be a recognised kind label.
+    if !p.kind_target.trim().is_empty() && parse_kind_label(&p.kind_target).is_none() {
         problems.push(format!(
-            "kind_target must be one of portfolios/projects/products/programs, got {:?}",
+            "kind_target, when set, must be one of portfolio/project/product/program/practice/process/purpose/pathway/proposal, got {:?}",
             p.kind_target
         ));
     }
     if let Some(sponsor) = p.sponsor_ref.as_deref()
-        && !valid_ref(sponsor, &["person", "worker", "organization"]) {
-            problems.push("sponsor_ref must be a person:/worker:/organization: URN".to_string());
-        }
+        && !valid_ref(sponsor, &["person", "worker", "organization"])
+    {
+        problems.push("sponsor_ref must be a person:/worker:/organization: URN".to_string());
+    }
     if p.requested_minor.is_some() {
         match p.currency.as_deref() {
             Some(code) if rules::valid_currency(code) => {}
-            _ => problems.push("currency (ISO 4217, e.g. GBP) is required with requested_minor".to_string()),
+            _ => problems
+                .push("currency (ISO 4217, e.g. GBP) is required with requested_minor".to_string()),
         }
     }
     problems
@@ -130,7 +139,7 @@ async fn create_proposal(
         requested_minor: ActiveValue::set(payload.requested_minor),
         currency: ActiveValue::set(payload.currency.clone()),
         status: ActiveValue::set("draft".to_string()),
-        promoted_work_item_pid: ActiveValue::set(None),
+        promoted_plan_pid: ActiveValue::set(None),
         deleted_at: ActiveValue::set(None),
         ..Default::default()
     }
@@ -191,7 +200,10 @@ async fn update_proposal(
     }
     let row = gov::find_proposal(&ctx.db, gov::parse_pid(&pid)?).await?;
     if !rules::proposal_editable(&row.status) {
-        return Err(refuse(&format!("a {} proposal is no longer editable", row.status)));
+        return Err(refuse(&format!(
+            "a {} proposal is no longer editable",
+            row.status
+        )));
     }
     let row_pid = row.pid;
     let mut active: proposals::ActiveModel = row.into();
@@ -252,7 +264,7 @@ pipeline_handler!(review_proposal, rules::ProposalAction::Review);
 pipeline_handler!(approve_proposal, rules::ProposalAction::Approve);
 pipeline_handler!(reject_proposal, rules::ProposalAction::Reject);
 
-/// `POST /api/proposals/{pid}/promote` — mint the work item from an
+/// `POST /api/proposals/{pid}/promote` — mint the plan from an
 /// approved proposal (`provenance` recorded in the audit trail) and
 /// mark the proposal `promoted`.
 #[debug_handler]
@@ -264,28 +276,25 @@ async fn promote_proposal(
     let row = gov::find_proposal(&ctx.db, gov::parse_pid(&pid)?).await?;
     let next = rules::proposal_transition(&row.status, rules::ProposalAction::Promote)
         .map_err(|e| refuse(&e))?;
-    let collection = Collection::from_segment(&row.kind_target)
-        .ok_or_else(|| refuse("proposal has an unknown kind_target"))?;
-    let mut work_item = WorkItem {
-        kind: collection.kind(),
+    let mut plan = Plan {
+        kind: parse_kind_label(&row.kind_target),
         name: row.title.clone(),
-        ..WorkItem::default()
+        ..Plan::default()
     };
     if let Some(summary) = &row.summary {
-        work_item.keywords = vec![summary.clone()];
+        plan.keywords = vec![summary.clone()];
     }
-    let model = streaming::create_and_emit(&ctx.db, collection.kind_str(), &work_item, caller.actor())
-        .await?;
+    let model = streaming::create_and_emit(&ctx.db, &plan, caller.actor()).await?;
     let proposal_pid = row.pid;
     let mut active: proposals::ActiveModel = row.into();
     active.status = ActiveValue::set(next.to_string());
-    active.promoted_work_item_pid = ActiveValue::set(Some(model.pid));
+    active.promoted_plan_pid = ActiveValue::set(Some(model.pid));
     let updated = active
         .update(&ctx.db)
         .await
         .map_err(|e| Error::Model(ModelError::from(e)))?;
     let snapshot = serde_json::json!({
-        "work_item_pid": model.pid.to_string(),
+        "plan_pid": model.pid.to_string(),
         "collection": updated.kind_target,
         "provenance": "intake",
     });
@@ -301,7 +310,7 @@ async fn promote_proposal(
     format::json(serde_json::json!({
         "pid": updated.pid.to_string(),
         "status": updated.status,
-        "work_item_pid": model.pid.to_string(),
+        "plan_pid": model.pid.to_string(),
         "collection": updated.kind_target,
     }))
 }
@@ -317,7 +326,7 @@ struct DemandHit {
 
 /// `GET /api/proposals/{pid}/duplicates` — duplicate-demand check
 /// (the registry heritage applied at intake): match the proposal's
-/// title against the live work items of its target collection **and**
+/// title against the live plans of its target collection **and**
 /// the other open proposals.
 #[debug_handler]
 async fn proposal_duplicates(
@@ -325,28 +334,21 @@ async fn proposal_duplicates(
     Path(pid): Path<String>,
 ) -> Result<Response> {
     let row = gov::find_proposal(&ctx.db, gov::parse_pid(&pid)?).await?;
-    let collection = Collection::from_segment(&row.kind_target)
-        .ok_or_else(|| refuse("proposal has an unknown kind_target"))?;
     let engine = MatchingEngine::new(MatchConfig::default());
-    let query = WorkItem {
-        kind: collection.kind(),
+    let query = Plan {
+        kind: parse_kind_label(&row.kind_target),
         name: row.title.clone(),
-        ..WorkItem::default()
+        ..Plan::default()
     };
     let mut hits: Vec<DemandHit> = Vec::new();
-    // Live work items of the target collection.
-    let items = WorkItemModel::list(
-        &ctx.db,
-        collection.kind_str(),
-        super::work_items::CHECK_DUPLICATES_SCAN_CAP,
-    )
-    .await?;
+    // Live plans (one recursive collection).
+    let items = PlanModel::list(&ctx.db, super::plans::CHECK_DUPLICATES_SCAN_CAP).await?;
     for item in &items {
-        let candidate = item.to_work_item()?;
-        let result = engine.match_work_items(&query, &candidate);
+        let candidate = item.to_plan()?;
+        let result = engine.match_plans(&query, &candidate);
         if result.is_match {
             hits.push(DemandHit {
-                source: "work_item",
+                source: "plan",
                 pid: item.pid.to_string(),
                 name: item.name.clone(),
                 score: result.score,
@@ -363,12 +365,12 @@ async fn proposal_duplicates(
         .await
         .map_err(|e| Error::Model(ModelError::from(e)))?;
     for sibling in &siblings {
-        let candidate = WorkItem {
-            kind: collection.kind(),
+        let candidate = Plan {
+            kind: parse_kind_label(&sibling.kind_target),
             name: sibling.title.clone(),
-            ..WorkItem::default()
+            ..Plan::default()
         };
-        let result = engine.match_work_items(&query, &candidate);
+        let result = engine.match_plans(&query, &candidate);
         if result.is_match {
             hits.push(DemandHit {
                 source: "proposal",
@@ -378,24 +380,22 @@ async fn proposal_duplicates(
             });
         }
     }
-    hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    hits.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     format::json(hits)
 }
 
-/// Resolve `{collection}/{pid}` to the stored work item (404 on
-/// either being unknown).
-pub(crate) async fn find_item(
-    ctx: &AppContext,
-    collection: &str,
-    pid: &str,
-) -> Result<work_items::Model> {
-    let collection = Collection::from_segment(collection).ok_or(Error::NotFound)?;
-    WorkItemModel::find_by_pid(&ctx.db, collection.kind_str(), pid)
+/// Resolve `plans/{pid}` to the stored plan (404 when unknown).
+pub(crate) async fn find_item(ctx: &AppContext, pid: &str) -> Result<plans::Model> {
+    PlanModel::find_by_pid(&ctx.db, pid)
         .await
         .map_err(super::model_not_found)
 }
 
-/// `POST /api/{collection}/{pid}/gate-reviews` body.
+/// `POST /api/plans/{pid}/gate-reviews` body.
 #[derive(Debug, Deserialize)]
 struct GateReviewPayload {
     gate: String,
@@ -406,7 +406,7 @@ struct GateReviewPayload {
     approver_ref: Option<String>,
 }
 
-/// `POST /api/{collection}/{pid}/gate-reviews` — record a phase-gate
+/// `POST /api/plans/{pid}/gate-reviews` — record a phase-gate
 /// decision; an approving decision advances the item's `stage`
 /// (strictly in gate order). Record-level ABAC applies
 /// (`resource.stage`), so gate-locking is policy.
@@ -414,30 +414,32 @@ struct GateReviewPayload {
 async fn create_gate_review(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
-    Path((collection, pid)): Path<(String, String)>,
+    Path(pid): Path<String>,
     Json(payload): Json<GateReviewPayload>,
 ) -> Result<Response> {
     let mut problems = Vec::new();
     cap_opt(&mut problems, "conditions", payload.conditions.as_deref());
     if let Some(approver) = payload.approver_ref.as_deref()
-        && !valid_ref(approver, &["worker", "person"]) {
-            problems.push("approver_ref must be a worker:/person: URN".to_string());
-        }
+        && !valid_ref(approver, &["worker", "person"])
+    {
+        problems.push("approver_ref must be a worker:/person: URN".to_string());
+    }
     if !problems.is_empty() {
         return Err(unprocessable(&problems));
     }
-    let item = find_item(&ctx, &collection, &pid).await?;
+    let item = find_item(&ctx, &pid).await?;
     auth::authorize_record(
         &caller,
         authentication_verifier::Action::Write,
-        &auth::work_item_resource_attrs(item.stage.as_deref()),
+        &auth::plan_resource_attrs(item.stage.as_deref()),
     )
     .map_err(super::record_rejection)?;
-    let new_stage = rules::apply_gate_review(item.stage.as_deref(), &payload.gate, &payload.decision)
-        .map_err(|e| refuse(&e))?;
+    let new_stage =
+        rules::apply_gate_review(item.stage.as_deref(), &payload.gate, &payload.decision)
+            .map_err(|e| refuse(&e))?;
     let review = gate_reviews::ActiveModel {
         pid: ActiveValue::set(Uuid::new_v4()),
-        work_item_pid: ActiveValue::set(item.pid),
+        plan_pid: ActiveValue::set(item.pid),
         gate: ActiveValue::set(payload.gate.clone()),
         decision: ActiveValue::set(payload.decision.clone()),
         conditions: ActiveValue::set(payload.conditions.clone()),
@@ -450,7 +452,7 @@ async fn create_gate_review(
     .map_err(|e| Error::Model(ModelError::from(e)))?;
     let item_pid = item.pid;
     let old_stage = item.stage.clone();
-    let mut active: work_items::ActiveModel = item.into();
+    let mut active: plans::ActiveModel = item.into();
     active.stage = ActiveValue::set(new_stage.clone());
     active
         .update(&ctx.db)
@@ -463,9 +465,15 @@ async fn create_gate_review(
         "to_stage": new_stage,
         "approver_ref": payload.approver_ref,
     });
-    AuditModel::record(&ctx.db, item_pid, "gate_reviewed", caller.actor(), Some(snapshot))
-        .await
-        .ok();
+    AuditModel::record(
+        &ctx.db,
+        item_pid,
+        "gate_reviewed",
+        caller.actor(),
+        Some(snapshot),
+    )
+    .await
+    .ok();
     format::json(serde_json::json!({
         "pid": review.pid.to_string(),
         "gate": review.gate,
@@ -474,13 +482,13 @@ async fn create_gate_review(
     }))
 }
 
-/// `GET /api/{collection}/{pid}/gate-reviews`.
+/// `GET /api/plans/{pid}/gate-reviews`.
 #[debug_handler]
 async fn list_gate_reviews(
     State(ctx): State<AppContext>,
-    Path((collection, pid)): Path<(String, String)>,
+    Path(pid): Path<String>,
 ) -> Result<Response> {
-    let item = find_item(&ctx, &collection, &pid).await?;
+    let item = find_item(&ctx, &pid).await?;
     let reviews = gov::gate_reviews_for(&ctx.db, item.pid).await?;
     format::json(serde_json::json!({
         "stage": item.stage,
@@ -489,7 +497,7 @@ async fn list_gate_reviews(
     }))
 }
 
-/// `POST /api/{collection}/{pid}/risks` body.
+/// `POST /api/plans/{pid}/risks` body.
 #[derive(Debug, Deserialize)]
 struct RiskPayload {
     title: String,
@@ -509,12 +517,12 @@ struct RiskPayload {
     category: Option<String>,
 }
 
-/// `POST /api/{collection}/{pid}/risks` — raise a risk (status `open`).
+/// `POST /api/plans/{pid}/risks` — raise a risk (status `open`).
 #[debug_handler]
 async fn create_risk(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
-    Path((collection, pid)): Path<(String, String)>,
+    Path(pid): Path<String>,
     Json(payload): Json<RiskPayload>,
 ) -> Result<Response> {
     let mut problems = Vec::new();
@@ -528,20 +536,25 @@ async fn create_risk(
         problems.push(e);
     }
     if let Some(owner) = payload.owner_ref.as_deref()
-        && !valid_ref(owner, &["worker", "person"]) {
-            problems.push("owner_ref must be a worker:/person: URN".to_string());
-        }
+        && !valid_ref(owner, &["worker", "person"])
+    {
+        problems.push("owner_ref must be a worker:/person: URN".to_string());
+    }
     if let Some(category) = payload.category.as_deref()
-        && !rules::is_token(rules::RISK_CATEGORIES, category) {
-            problems.push(format!("category must be one of {:?}", rules::RISK_CATEGORIES));
-        }
+        && !rules::is_token(rules::RISK_CATEGORIES, category)
+    {
+        problems.push(format!(
+            "category must be one of {:?}",
+            rules::RISK_CATEGORIES
+        ));
+    }
     if !problems.is_empty() {
         return Err(unprocessable(&problems));
     }
-    let item = find_item(&ctx, &collection, &pid).await?;
+    let item = find_item(&ctx, &pid).await?;
     let row = risks::ActiveModel {
         pid: ActiveValue::set(Uuid::new_v4()),
-        work_item_pid: ActiveValue::set(item.pid),
+        plan_pid: ActiveValue::set(item.pid),
         title: ActiveValue::set(payload.title.clone()),
         description: ActiveValue::set(payload.description.clone()),
         probability: ActiveValue::set(payload.probability),
@@ -564,14 +577,11 @@ async fn create_risk(
     format::json(serde_json::json!({ "pid": row.pid.to_string() }))
 }
 
-/// `GET /api/{collection}/{pid}/risks` — active risks with derived
+/// `GET /api/plans/{pid}/risks` — active risks with derived
 /// exposure, highest first.
 #[debug_handler]
-async fn list_risks(
-    State(ctx): State<AppContext>,
-    Path((collection, pid)): Path<(String, String)>,
-) -> Result<Response> {
-    let item = find_item(&ctx, &collection, &pid).await?;
+async fn list_risks(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Result<Response> {
+    let item = find_item(&ctx, &pid).await?;
     let mut rows = gov::risks_for(&ctx.db, item.pid).await?;
     rows.sort_by_key(|r| -(r.probability * r.impact));
     let views: Vec<_> = rows
@@ -589,7 +599,7 @@ async fn list_risks(
     format::json(views)
 }
 
-/// `PUT /api/{collection}/{pid}/risks/{risk_pid}` — update scoring /
+/// `PUT /api/plans/{pid}/risks/{risk_pid}` — update scoring /
 /// status / mitigation.
 #[derive(Debug, Deserialize)]
 struct RiskUpdate {
@@ -609,19 +619,20 @@ struct RiskUpdate {
 async fn update_risk(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
-    Path((collection, pid, risk_pid)): Path<(String, String, String)>,
+    Path((pid, risk_pid)): Path<(String, String)>,
     Json(payload): Json<RiskUpdate>,
 ) -> Result<Response> {
-    let item = find_item(&ctx, &collection, &pid).await?;
+    let item = find_item(&ctx, &pid).await?;
     let risk = gov::find_risk(&ctx.db, gov::parse_pid(&risk_pid)?).await?;
-    if risk.work_item_pid != item.pid {
+    if risk.plan_pid != item.pid {
         return Err(Error::NotFound);
     }
     let mut problems = Vec::new();
     if let Some(status) = payload.status.as_deref()
-        && !rules::is_token(rules::RISK_STATUSES, status) {
-            problems.push(format!("status must be one of {:?}", rules::RISK_STATUSES));
-        }
+        && !rules::is_token(rules::RISK_STATUSES, status)
+    {
+        problems.push(format!("status must be one of {:?}", rules::RISK_STATUSES));
+    }
     let probability = payload.probability.unwrap_or(risk.probability);
     let impact = payload.impact.unwrap_or(risk.impact);
     if let Err(e) = rules::risk_exposure(probability, impact) {
@@ -654,18 +665,18 @@ async fn update_risk(
     format::json(row)
 }
 
-/// `POST /api/{collection}/{pid}/risks/{risk_pid}/escalate` — a
+/// `POST /api/plans/{pid}/risks/{risk_pid}/escalate` — a
 /// materialised risk: status → `materialised`, stamped. (Conversion
 /// into a tracked issue arrives with the issues sub-resource.)
 #[debug_handler]
 async fn escalate_risk(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
-    Path((collection, pid, risk_pid)): Path<(String, String, String)>,
+    Path((pid, risk_pid)): Path<(String, String)>,
 ) -> Result<Response> {
-    let item = find_item(&ctx, &collection, &pid).await?;
+    let item = find_item(&ctx, &pid).await?;
     let risk = gov::find_risk(&ctx.db, gov::parse_pid(&risk_pid)?).await?;
-    if risk.work_item_pid != item.pid {
+    if risk.plan_pid != item.pid {
         return Err(Error::NotFound);
     }
     if !matches!(risk.status.as_str(), "open" | "mitigating") {
@@ -679,13 +690,19 @@ async fn escalate_risk(
         .update(&ctx.db)
         .await
         .map_err(|e| Error::Model(ModelError::from(e)))?;
-    AuditModel::record(&ctx.db, risk_row_pid, "risk_escalated", caller.actor(), None)
-        .await
-        .ok();
+    AuditModel::record(
+        &ctx.db,
+        risk_row_pid,
+        "risk_escalated",
+        caller.actor(),
+        None,
+    )
+    .await
+    .ok();
     format::json(row)
 }
 
-/// `POST /api/{collection}/{pid}/budget-lines` body.
+/// `POST /api/plans/{pid}/budget-lines` body.
 #[derive(Debug, Deserialize)]
 struct BudgetPayload {
     category: String,
@@ -697,22 +714,25 @@ struct BudgetPayload {
     #[serde(default)]
     period_end: Option<chrono::NaiveDate>,
     /// Optional funding gate: the line is HELD (no actuals) until the
-    /// work item's stage reaches this gate and the line is released.
+    /// plan's stage reaches this gate and the line is released.
     #[serde(default)]
     gate: Option<String>,
 }
 
-/// `POST /api/{collection}/{pid}/budget-lines`.
+/// `POST /api/plans/{pid}/budget-lines`.
 #[debug_handler]
 async fn create_budget_line(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
-    Path((collection, pid)): Path<(String, String)>,
+    Path(pid): Path<String>,
     Json(payload): Json<BudgetPayload>,
 ) -> Result<Response> {
     let mut problems = Vec::new();
     if !rules::is_token(rules::BUDGET_CATEGORIES, &payload.category) {
-        problems.push(format!("category must be one of {:?}", rules::BUDGET_CATEGORIES));
+        problems.push(format!(
+            "category must be one of {:?}",
+            rules::BUDGET_CATEGORIES
+        ));
     }
     if payload.description.trim().is_empty() {
         problems.push("description is required".to_string());
@@ -725,20 +745,22 @@ async fn create_budget_line(
         problems.push("planned_minor must be non-negative".to_string());
     }
     if let (Some(start), Some(end)) = (payload.period_start, payload.period_end)
-        && end < start {
-            problems.push("period_end is before period_start".to_string());
-        }
+        && end < start
+    {
+        problems.push("period_end is before period_start".to_string());
+    }
     if let Some(gate) = payload.gate.as_deref()
-        && !rules::is_token(rules::GATES, gate) {
-            problems.push(format!("gate must be one of {:?}", rules::GATES));
-        }
+        && !rules::is_token(rules::GATES, gate)
+    {
+        problems.push(format!("gate must be one of {:?}", rules::GATES));
+    }
     if !problems.is_empty() {
         return Err(unprocessable(&problems));
     }
-    let item = find_item(&ctx, &collection, &pid).await?;
+    let item = find_item(&ctx, &pid).await?;
     let row = budget_lines::ActiveModel {
         pid: ActiveValue::set(Uuid::new_v4()),
-        work_item_pid: ActiveValue::set(item.pid),
+        plan_pid: ActiveValue::set(item.pid),
         category: ActiveValue::set(payload.category.clone()),
         description: ActiveValue::set(payload.description.clone()),
         currency: ActiveValue::set(payload.currency.clone()),
@@ -754,20 +776,26 @@ async fn create_budget_line(
     .insert(&ctx.db)
     .await
     .map_err(|e| Error::Model(ModelError::from(e)))?;
-    AuditModel::record(&ctx.db, row.pid, "budget_line_created", caller.actor(), None)
-        .await
-        .ok();
+    AuditModel::record(
+        &ctx.db,
+        row.pid,
+        "budget_line_created",
+        caller.actor(),
+        None,
+    )
+    .await
+    .ok();
     format::json(serde_json::json!({ "pid": row.pid.to_string() }))
 }
 
-/// `GET /api/{collection}/{pid}/budget-lines` — lines + per-currency
+/// `GET /api/plans/{pid}/budget-lines` — lines + per-currency
 /// totals (planned / actual / variance).
 #[debug_handler]
 async fn list_budget_lines(
     State(ctx): State<AppContext>,
-    Path((collection, pid)): Path<(String, String)>,
+    Path(pid): Path<String>,
 ) -> Result<Response> {
-    let item = find_item(&ctx, &collection, &pid).await?;
+    let item = find_item(&ctx, &pid).await?;
     let rows = gov::budget_lines_for(&ctx.db, item.pid).await?;
     format::json(serde_json::json!({
         "lines": rows,
@@ -803,7 +831,7 @@ fn budget_totals(rows: &[budget_lines::Model]) -> Vec<serde_json::Value> {
         .collect()
 }
 
-/// `POST /api/{collection}/{pid}/budget-lines/{line_pid}/actual` —
+/// `POST /api/plans/{pid}/budget-lines/{line_pid}/actual` —
 /// record spend against a line (accumulates; negative adjustments
 /// allowed; overflow refused).
 #[derive(Debug, Deserialize)]
@@ -817,12 +845,12 @@ struct ActualPayload {
 async fn record_actual(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
-    Path((collection, pid, line_pid)): Path<(String, String, String)>,
+    Path((pid, line_pid)): Path<(String, String)>,
     Json(payload): Json<ActualPayload>,
 ) -> Result<Response> {
-    let item = find_item(&ctx, &collection, &pid).await?;
+    let item = find_item(&ctx, &pid).await?;
     let line = gov::find_budget_line(&ctx.db, gov::parse_pid(&line_pid)?).await?;
-    if line.work_item_pid != item.pid {
+    if line.plan_pid != item.pid {
         return Err(Error::NotFound);
     }
     // A stage-gated tranche is HELD until released: no actuals may be
@@ -848,29 +876,37 @@ async fn record_actual(
         "actual_minor": next,
         "note": payload.note,
     });
-    AuditModel::record(&ctx.db, line_pid, "budget_actual_recorded", caller.actor(), Some(snapshot))
-        .await
-        .ok();
+    AuditModel::record(
+        &ctx.db,
+        line_pid,
+        "budget_actual_recorded",
+        caller.actor(),
+        Some(snapshot),
+    )
+    .await
+    .ok();
     format::json(row)
 }
 
-/// `POST /api/{collection}/{pid}/budget-lines/{line_pid}/release` —
+/// `POST /api/plans/{pid}/budget-lines/{line_pid}/release` —
 /// release a stage-gated funding tranche. Refused (`422`) when the
-/// line has no gate, is already released, or the work item's stage has
+/// line has no gate, is already released, or the plan's stage has
 /// not reached the gate (first the governance, then the money).
 #[debug_handler]
 async fn release_budget_line(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
-    Path((collection, pid, line_pid)): Path<(String, String, String)>,
+    Path((pid, line_pid)): Path<(String, String)>,
 ) -> Result<Response> {
-    let item = find_item(&ctx, &collection, &pid).await?;
+    let item = find_item(&ctx, &pid).await?;
     let line = gov::find_budget_line(&ctx.db, gov::parse_pid(&line_pid)?).await?;
-    if line.work_item_pid != item.pid {
+    if line.plan_pid != item.pid {
         return Err(Error::NotFound);
     }
     let Some(gate) = line.gate.clone() else {
-        return Err(refuse("budget line has no funding gate; nothing to release"));
+        return Err(refuse(
+            "budget line has no funding gate; nothing to release",
+        ));
     };
     if line.released_at.is_some() {
         return Err(refuse("budget line is already released"));
@@ -900,14 +936,14 @@ async fn release_budget_line(
     format::json(row)
 }
 
-/// `GET /api/{collection}/{pid}/governance` — the per-item summary:
+/// `GET /api/plans/{pid}/governance` — the per-item summary:
 /// stage + next gate, risk posture, and budget totals in one read.
 #[debug_handler]
 async fn governance_summary(
     State(ctx): State<AppContext>,
-    Path((collection, pid)): Path<(String, String)>,
+    Path(pid): Path<String>,
 ) -> Result<Response> {
-    let item = find_item(&ctx, &collection, &pid).await?;
+    let item = find_item(&ctx, &pid).await?;
     let reviews = gov::gate_reviews_for(&ctx.db, item.pid).await?;
     let risks = gov::risks_for(&ctx.db, item.pid).await?;
     let budgets = gov::budget_lines_for(&ctx.db, item.pid).await?;
@@ -948,21 +984,24 @@ pub fn routes() -> Routes {
         .add("/proposals/{pid}/reject", post(reject_proposal))
         .add("/proposals/{pid}/promote", post(promote_proposal))
         .add("/proposals/{pid}/duplicates", get(proposal_duplicates))
-        .add("/{collection}/{pid}/gate-reviews", post(create_gate_review))
-        .add("/{collection}/{pid}/gate-reviews", get(list_gate_reviews))
-        .add("/{collection}/{pid}/risks", post(create_risk))
-        .add("/{collection}/{pid}/risks", get(list_risks))
-        .add("/{collection}/{pid}/risks/{risk_pid}", put(update_risk))
-        .add("/{collection}/{pid}/risks/{risk_pid}/escalate", post(escalate_risk))
-        .add("/{collection}/{pid}/budget-lines", post(create_budget_line))
-        .add("/{collection}/{pid}/budget-lines", get(list_budget_lines))
+        .add("/plans/{pid}/gate-reviews", post(create_gate_review))
+        .add("/plans/{pid}/gate-reviews", get(list_gate_reviews))
+        .add("/plans/{pid}/risks", post(create_risk))
+        .add("/plans/{pid}/risks", get(list_risks))
+        .add("/plans/{pid}/risks/{risk_pid}", put(update_risk))
         .add(
-            "/{collection}/{pid}/budget-lines/{line_pid}/actual",
+            "/plans/{pid}/risks/{risk_pid}/escalate",
+            post(escalate_risk),
+        )
+        .add("/plans/{pid}/budget-lines", post(create_budget_line))
+        .add("/plans/{pid}/budget-lines", get(list_budget_lines))
+        .add(
+            "/plans/{pid}/budget-lines/{line_pid}/actual",
             post(record_actual),
         )
         .add(
-            "/{collection}/{pid}/budget-lines/{line_pid}/release",
+            "/plans/{pid}/budget-lines/{line_pid}/release",
             post(release_budget_line),
         )
-        .add("/{collection}/{pid}/governance", get(governance_summary))
+        .add("/plans/{pid}/governance", get(governance_summary))
 }

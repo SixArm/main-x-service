@@ -1,5 +1,5 @@
 //! Migration: the PPM Phase-B **visibility** tables (spec/15-roadmap
-//! PPM-6/8/9) — `work_item_dependencies` (finish-start edges with
+//! PPM-6/8/9) — `plan_dependencies` (finish-start edges with
 //! lag), `milestones`, `allocations` (resource capacity), and
 //! `report_definitions` (saved reports). The PPM-7 dashboard is a
 //! derived read over these plus the Phase-A governance tables — no
@@ -22,7 +22,7 @@ impl MigrationTrait for Migration {
     async fn up(&self, m: &SchemaManager) -> Result<(), DbErr> {
         create_table(
             m,
-            "work_item_dependencies",
+            "plan_dependencies",
             &[
                 ("id", ColType::PkAuto),
                 ("pid", ColType::UuidUniq),
@@ -41,7 +41,7 @@ impl MigrationTrait for Migration {
             &[
                 ("id", ColType::PkAuto),
                 ("pid", ColType::UuidUniq),
-                ("work_item_pid", ColType::Uuid),
+                ("plan_pid", ColType::Uuid),
                 ("name", ColType::String),
                 ("due", ColType::Date),
                 ("done", ColType::BooleanWithDefault(false)),
@@ -56,7 +56,7 @@ impl MigrationTrait for Migration {
             &[
                 ("id", ColType::PkAuto),
                 ("pid", ColType::UuidUniq),
-                ("work_item_pid", ColType::Uuid),
+                ("plan_pid", ColType::Uuid),
                 // `person:` / `worker:` EntityRef URN — a reference,
                 // never copied demographics; never a matcher signal.
                 ("person_ref", ColType::String),
@@ -92,7 +92,7 @@ impl MigrationTrait for Migration {
         // One edge per ordered pair; cycle prevention is app-level.
         conn.execute_unprepared(
             "CREATE UNIQUE INDEX IF NOT EXISTS dependencies_pair \
-             ON work_item_dependencies (predecessor_pid, successor_pid)",
+             ON plan_dependencies (predecessor_pid, successor_pid)",
         )
         .await?;
         for (index, table) in [
@@ -100,7 +100,7 @@ impl MigrationTrait for Migration {
             ("allocations_item", "allocations"),
         ] {
             conn.execute_unprepared(&format!(
-                "CREATE INDEX IF NOT EXISTS {index} ON {table} (work_item_pid)"
+                "CREATE INDEX IF NOT EXISTS {index} ON {table} (plan_pid)"
             ))
             .await?;
         }
@@ -121,7 +121,7 @@ impl MigrationTrait for Migration {
         drop_table(m, "report_definitions").await?;
         drop_table(m, "allocations").await?;
         drop_table(m, "milestones").await?;
-        drop_table(m, "work_item_dependencies").await?;
+        drop_table(m, "plan_dependencies").await?;
         Ok(())
     }
 }

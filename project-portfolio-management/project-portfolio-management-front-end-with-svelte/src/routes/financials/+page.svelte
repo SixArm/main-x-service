@@ -54,7 +54,7 @@
           <td>{money(row.actual_minor, row.currency)}</td>
           <td>{money(row.remaining_minor, row.currency)}</td>
           <td>{row.line_count}</td>
-          <td>{row.work_items}</td>
+          <td>{row.plans}</td>
         </tr>
       {:else}
         <tr><td colspan="6" class="muted">No budget lines recorded yet.</td></tr>

@@ -40,7 +40,10 @@ pub fn parse_flex_date(value: &str, end_of_period: bool) -> Option<NaiveDate> {
 
 /// The last day of the month containing `date`.
 fn last_day_of_month(date: NaiveDate) -> NaiveDate {
-    let (year, month) = (chrono::Datelike::year(&date), chrono::Datelike::month(&date));
+    let (year, month) = (
+        chrono::Datelike::year(&date),
+        chrono::Datelike::month(&date),
+    );
     let next = if month == 12 {
         NaiveDate::from_ymd_opt(year + 1, 1, 1)
     } else {
@@ -69,14 +72,15 @@ pub fn would_create_cycle(edges: &[(Uuid, Uuid)], predecessor: Uuid, successor: 
             return true;
         }
         if seen.insert(node)
-            && let Some(nexts) = adjacency.get(&node) {
-                stack.extend(nexts.iter().copied());
-            }
+            && let Some(nexts) = adjacency.get(&node)
+        {
+            stack.extend(nexts.iter().copied());
+        }
     }
     false
 }
 
-/// One work item's schedule facts.
+/// One plan's schedule facts.
 #[derive(Debug, Clone, Copy)]
 pub struct ScheduleItem {
     /// The item's pid.
@@ -131,7 +135,8 @@ pub fn violations(items: &[ScheduleItem], edges: &[ScheduleEdge]) -> Vec<Violati
         let (Some(pred_end), Some(succ_start)) = (pred.end, succ.start) else {
             continue;
         };
-        let earliest = pred_end + chrono::Days::new(u64::try_from(edge.lag_days.max(0)).unwrap_or(0));
+        let earliest =
+            pred_end + chrono::Days::new(u64::try_from(edge.lag_days.max(0)).unwrap_or(0));
         if succ_start < earliest {
             out.push(Violation {
                 edge_pid: edge.pid,
@@ -188,7 +193,10 @@ pub fn critical_path(items: &[ScheduleItem], edges: &[ScheduleEdge]) -> Vec<Uuid
         .collect();
     let mut successors: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
     for edge in edges {
-        successors.entry(edge.predecessor).or_default().push(edge.successor);
+        successors
+            .entry(edge.predecessor)
+            .or_default()
+            .push(edge.successor);
     }
     let mut memo = HashMap::new();
     let mut top: (i64, Vec<Uuid>) = (0, Vec::new());
@@ -201,7 +209,7 @@ pub fn critical_path(items: &[ScheduleItem], edges: &[ScheduleEdge]) -> Vec<Uuid
     top.1
 }
 
-/// RAG health for one work item — a documented heuristic, not a
+/// RAG health for one plan — a documented heuristic, not a
 /// score: **red** when a risk has materialised, the target date has
 /// passed on an unfinished item, or the budget is overrun; **amber**
 /// when any open risk has exposure ≥ 15 or a schedule dependency is
@@ -216,7 +224,8 @@ pub fn rag(
     budget_overrun: bool,
     has_violation: bool,
 ) -> &'static str {
-    if materialised_risks > 0 || budget_overrun || (!finished && target.is_some_and(|t| t < today)) {
+    if materialised_risks > 0 || budget_overrun || (!finished && target.is_some_and(|t| t < today))
+    {
         "red"
     } else if max_open_exposure >= 15 || has_violation {
         "amber"
@@ -237,9 +246,7 @@ pub fn summed_percent(
 ) -> i64 {
     allocations
         .iter()
-        .filter(|(_, start, end)| {
-            start.is_none_or(|s| s <= to) && end.is_none_or(|e| e >= from)
-        })
+        .filter(|(_, start, end)| start.is_none_or(|s| s <= to) && end.is_none_or(|e| e >= from))
         .map(|(percent, _, _)| i64::from(*percent))
         .sum()
 }
@@ -271,7 +278,10 @@ mod tests {
     /// junk.
     #[test]
     fn flex_dates() {
-        assert_eq!(parse_flex_date("2026-07-18", false), Some(date(2026, 7, 18)));
+        assert_eq!(
+            parse_flex_date("2026-07-18", false),
+            Some(date(2026, 7, 18))
+        );
         assert_eq!(parse_flex_date("2026-02", false), Some(date(2026, 2, 1)));
         assert_eq!(parse_flex_date("2026-02", true), Some(date(2026, 2, 28)));
         assert_eq!(parse_flex_date("2024-02", true), Some(date(2024, 2, 29)));
@@ -298,11 +308,28 @@ mod tests {
     #[test]
     fn finish_start_violations() {
         let items = vec![
-            ScheduleItem { pid: pid(1), start: Some(date(2026, 1, 1)), end: Some(date(2026, 3, 31)) },
-            ScheduleItem { pid: pid(2), start: Some(date(2026, 3, 1)), end: Some(date(2026, 6, 30)) },
-            ScheduleItem { pid: pid(3), start: None, end: None },
+            ScheduleItem {
+                pid: pid(1),
+                start: Some(date(2026, 1, 1)),
+                end: Some(date(2026, 3, 31)),
+            },
+            ScheduleItem {
+                pid: pid(2),
+                start: Some(date(2026, 3, 1)),
+                end: Some(date(2026, 6, 30)),
+            },
+            ScheduleItem {
+                pid: pid(3),
+                start: None,
+                end: None,
+            },
         ];
-        let edge = |p, s, lag| ScheduleEdge { pid: pid(9), predecessor: p, successor: s, lag_days: lag };
+        let edge = |p, s, lag| ScheduleEdge {
+            pid: pid(9),
+            predecessor: p,
+            successor: s,
+            lag_days: lag,
+        };
         // 2 starts 2026-03-01, before 1 ends 2026-03-31 ⇒ violation.
         let found = violations(&items, &[edge(pid(1), pid(2), 0)]);
         assert_eq!(found.len(), 1);
@@ -310,8 +337,16 @@ mod tests {
         assert_eq!(found[0].actual_start, date(2026, 3, 1));
         // With the successor starting after end + lag ⇒ clean.
         let items_ok = vec![
-            ScheduleItem { pid: pid(1), start: Some(date(2026, 1, 1)), end: Some(date(2026, 2, 28)) },
-            ScheduleItem { pid: pid(2), start: Some(date(2026, 3, 10)), end: Some(date(2026, 6, 30)) },
+            ScheduleItem {
+                pid: pid(1),
+                start: Some(date(2026, 1, 1)),
+                end: Some(date(2026, 2, 28)),
+            },
+            ScheduleItem {
+                pid: pid(2),
+                start: Some(date(2026, 3, 10)),
+                end: Some(date(2026, 6, 30)),
+            },
         ];
         assert!(violations(&items_ok, &[edge(pid(1), pid(2), 5)]).is_empty());
         // Lag pushes earliest start past the actual start ⇒ violation.
@@ -325,15 +360,40 @@ mod tests {
     fn critical_path_is_longest_chain() {
         // a(31d) → b(30d) → d(10d)  vs  a(31d) → c(90d)
         let items = vec![
-            ScheduleItem { pid: pid(1), start: Some(date(2026, 1, 1)), end: Some(date(2026, 1, 31)) },
-            ScheduleItem { pid: pid(2), start: Some(date(2026, 2, 1)), end: Some(date(2026, 3, 2)) },
-            ScheduleItem { pid: pid(3), start: Some(date(2026, 2, 1)), end: Some(date(2026, 5, 1)) },
-            ScheduleItem { pid: pid(4), start: Some(date(2026, 3, 10)), end: Some(date(2026, 3, 19)) },
+            ScheduleItem {
+                pid: pid(1),
+                start: Some(date(2026, 1, 1)),
+                end: Some(date(2026, 1, 31)),
+            },
+            ScheduleItem {
+                pid: pid(2),
+                start: Some(date(2026, 2, 1)),
+                end: Some(date(2026, 3, 2)),
+            },
+            ScheduleItem {
+                pid: pid(3),
+                start: Some(date(2026, 2, 1)),
+                end: Some(date(2026, 5, 1)),
+            },
+            ScheduleItem {
+                pid: pid(4),
+                start: Some(date(2026, 3, 10)),
+                end: Some(date(2026, 3, 19)),
+            },
         ];
-        let edge = |n, p, s| ScheduleEdge { pid: pid(n), predecessor: p, successor: s, lag_days: 0 };
+        let edge = |n, p, s| ScheduleEdge {
+            pid: pid(n),
+            predecessor: p,
+            successor: s,
+            lag_days: 0,
+        };
         let path = critical_path(
             &items,
-            &[edge(9, pid(1), pid(2)), edge(10, pid(2), pid(4)), edge(11, pid(1), pid(3))],
+            &[
+                edge(9, pid(1), pid(2)),
+                edge(10, pid(2), pid(4)),
+                edge(11, pid(1), pid(3)),
+            ],
         );
         assert_eq!(path, vec![pid(1), pid(3)], "a→c (121d) beats a→b→d (71d)");
     }
@@ -343,11 +403,23 @@ mod tests {
     #[test]
     fn rag_heuristic() {
         let today = date(2026, 7, 18);
-        assert_eq!(rag(false, Some(date(2026, 8, 1)), today, 0, 4, false, false), "green");
-        assert_eq!(rag(false, Some(date(2026, 8, 1)), today, 0, 16, false, false), "amber");
+        assert_eq!(
+            rag(false, Some(date(2026, 8, 1)), today, 0, 4, false, false),
+            "green"
+        );
+        assert_eq!(
+            rag(false, Some(date(2026, 8, 1)), today, 0, 16, false, false),
+            "amber"
+        );
         assert_eq!(rag(false, None, today, 0, 0, false, true), "amber");
-        assert_eq!(rag(false, Some(date(2026, 7, 1)), today, 0, 0, false, false), "red");
-        assert_eq!(rag(true, Some(date(2026, 7, 1)), today, 0, 0, false, false), "green");
+        assert_eq!(
+            rag(false, Some(date(2026, 7, 1)), today, 0, 0, false, false),
+            "red"
+        );
+        assert_eq!(
+            rag(true, Some(date(2026, 7, 1)), today, 0, 0, false, false),
+            "green"
+        );
         assert_eq!(rag(false, None, today, 1, 0, false, false), "red");
         assert_eq!(rag(false, None, today, 0, 0, true, false), "red");
     }

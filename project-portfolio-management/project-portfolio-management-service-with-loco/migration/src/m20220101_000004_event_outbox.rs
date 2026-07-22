@@ -39,7 +39,7 @@ impl MigrationTrait for Migration {
                  id SERIAL PRIMARY KEY,
                  -- Envelope id — consumer dedup key (unique, below).
                  event_id UUID NOT NULL,
-                 -- Entity name, e.g. \"work_item\".
+                 -- Entity name, e.g. \"plan\".
                  entity VARCHAR NOT NULL,
                  -- The record pid — Fluvio partition key (per-record order).
                  entity_pid UUID NOT NULL,

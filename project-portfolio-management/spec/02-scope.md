@@ -6,25 +6,28 @@ This spec owns the **cross-subproject contract**:
 
 - Composition: front-end → service REST API → embedded matcher.
 - The DTO contract: the API request/response body for the **thin
-  matchable record** **is** `project_portfolio_management_matcher::WorkItem`, stored
-  verbatim as JSONB (§5). There is no separate service model and no
-  adapter (exactly the care-pathway posture).
-- **The four matchable kinds.** Portfolio, Project, Product, Program
-  are distinct record types — one `WorkItemKind` discriminator, four
-  service tables, four REST collections — and matching is **within a
-  kind only** (the matcher's kind gate, R-GATE, §5.5 / §6.3). Child
-  kinds (Project / Product / Program) carry a `portfolio_ref` to their
-  parent portfolio; Portfolio is the umbrella and carries none.
-- **The matchable/operational partition** (§5.6): the thin `WorkItem`
+  matchable record** **is**
+  `project_portfolio_management_matcher::Plan`, stored verbatim as JSONB
+  (§5). There is no separate service model and no adapter (exactly the
+  care-pathway posture).
+- **The optional `kind` label.** Portfolio, Project, Product, Program,
+  Practice, Process, Purpose, Pathway, Proposal are the values of an
+  **optional** `PlanKind` label — one recursive `plans` table, one REST
+  collection (`/api/plans`) — used for description / display / grouping,
+  **not** as a discriminator and **not** a match gate: matching is
+  **kind-agnostic** (§5.5 / §6.3). Any plan may **contain** any other
+  plan via `parent_ref` (a recursive tree); a `parent_ref` that points a
+  plan at itself or at one of its descendants is rejected `422`.
+- **The matchable/operational partition** (§5.6): the thin `Plan`
   matcher type vs the high-volume sub-resources (tasks, issues) that
   live in their own service tables and never enter the matcher payload.
   `Goal` is the one sub-resource that is **also** part of the payload
   (goal titles feed matching).
-- The service ↔ front-end wire contract: raw loco JSON (no
-  envelope), TypeScript type mirroring (§5.7).
+- The service ↔ front-end wire contract: raw loco JSON (no envelope),
+  TypeScript type mirroring (§5.7).
 - Shared invariants that more than one subproject must uphold (§5.8).
-- The family integrations this entity adopts wholesale:
-  cross-service entity linking
+- The family integrations this entity adopts wholesale: cross-service
+  entity linking
   ([`agents/share/cross-service-linking.md`](../../agents/share/cross-service-linking.md))
   and bulk import / export
   ([`agents/share/bulk-import-export.md`](../../agents/share/bulk-import-export.md)).
@@ -35,63 +38,58 @@ This spec owns the **cross-subproject contract**:
 
 **project-portfolio-management-service-with-loco** owns:
 
-- WorkItem CRUD with soft delete (`deleted_at`) over the thin matchable
-  record, across the **four collections** (`portfolios`, `projects`,
-  `products`, `programs`), each with the identical controller shape.
-- The operational sub-resource CRUD: goals, tasks, issues — each a
-  child resource of a work item, keyed by `(parent_kind, parent_pid)`,
-  in its own Postgres table (§10).
-- Derived views: timeline / Gantt (goals-with-`target_date`
-  milestones + task date ranges) and burndown (remaining-vs-estimate
-  over time from task snapshots) — §6.4.
+- Plan CRUD with soft delete (`deleted_at`) over the thin matchable
+  record on the single `/api/plans` collection.
+- The operational sub-resource CRUD: goals, tasks, issues — each a child
+  resource of a plan, keyed by `parent_pid`, in its own Postgres table
+  (§10).
+- Derived views: timeline / Gantt (goals-with-`target_date` milestones +
+  task date ranges) and burndown (remaining-vs-estimate over time from
+  task snapshots) — §6.4.
 - `POST …/match` (rank an explicit candidate set, no persistence) and
-  `POST …/check-duplicates` (match a query against stored work items of
-  the same kind), real-time duplicate detection on create (`409`),
-  record merge, ILIKE name search — all **within a single collection**
-  (the kind gate enforces it; you never match a project against a
-  product).
+  `POST …/check-duplicates` (match a query against stored plans),
+  real-time duplicate detection on create (`409`), record merge (any two
+  plans), ILIKE name search — all kind-agnostic across the one
+  collection.
 - Audit log + event streaming, PASETO v4 public token verification,
   cross-service links, bulk import / export, OpenAPI / Swagger.
-- One table per kind (`portfolios`, `projects`, `products`,
-  `programs`): `pid` + denormalised `name` + the full `WorkItem` JSONB
-  `data` (+ a denormalised `portfolio_pid` column on the child kinds);
-  plus the sub-resource and family-baseline tables (§10).
+- One `plans` table: `pid` + denormalised `name` + the full `Plan` JSONB
+  `data` + a nullable denormalised `parent_pid` column; plus the
+  sub-resource and family-baseline tables (§10).
 - loco.rs app structure, migrations, configuration.
 
 **project-portfolio-management-matcher-rust-crate** owns:
 
-- Pure-library pairwise comparison: a hard **kind gate** (different
-  `kind` → no match), then deterministic short-circuits (shared
-  deterministic-scheme identifier, same owner-org + code, `same_as`
-  URL overlap) + weighted probabilistic scoring (name, goals, code,
-  owner org, parent portfolio, timeframe, keywords, relationships,
-  tags) with per-component breakdown.
-- The `WorkItem` domain type, its `WorkItemKind` discriminator, and the
-  supporting enums — the entity's canonical DTO — **including the
-  `Goal` shape** (goals are part of the matchable payload; their titles
-  are a match signal).
+- Pure-library pairwise comparison: kind-agnostic deterministic
+  short-circuits (shared deterministic-scheme identifier, same owner-org
+  + code, `same_as` URL overlap) + weighted probabilistic scoring (name,
+  goals, code, owner org, parent plan, timeframe, keywords,
+  relationships, tags) with per-component breakdown.
+- The `Plan` domain type, its optional `PlanKind` label, and the
+  supporting enums — the entity's canonical DTO — **including the `Goal`
+  shape** (goals are part of the matchable payload; their titles are a
+  match signal).
 - Normalisation (`fold`, code, set folding), Soundex bonus,
   date-proximity scoring, config presets (`strict` / `default` /
   `lenient`).
 
 **project-portfolio-management-front-end-with-svelte** owns:
 
-- Operator routes for the four collections — list (`/portfolios`,
-  `/projects`, `/products`, `/programs`), create (`…/new`), detail +
-  delete + check-duplicates (`…/[pid]`), edit (`…/[pid]/edit`), and the
-  sub-resource workspaces (goals / tasks / issues, plus timeline +
-  burndown views) — route detail in §9.3.
-- A portfolio detail that rolls up its child projects / products /
-  programs.
-- Its own copy of API types, client, and form primitives (drift
-  between front-ends is accepted — repo decision 2026-06-02).
+- Operator routes for the one plans collection — list (`/plans`), create
+  (`/plans/new`), detail + delete + check-duplicates (`/plans/[pid]`),
+  edit (`/plans/[pid]/edit`), and the sub-resource workspaces (goals /
+  tasks / issues, plus timeline + burndown views) — route detail in
+  §9.3.
+- A plan detail that rolls up its child plans (via `parent_ref`).
+- Its own copy of API types, client, and form primitives (drift between
+  front-ends is accepted — repo decision 2026-06-02).
 
 ### 2.3 Out of scope (today) — MVP deferrals
 
 The entity is **spec-only; no code exists yet** (§14). The first
-buildable slice is CRUD + matching over the thin record across the four
-collections plus the core sub-resources; explicitly deferred, tracked
-in §13 / §15 and the crate specs' §13:
+buildable slice is CRUD + matching over the thin record on the one
+plans collection plus the core sub-resources; explicitly deferred,
+tracked in §13 / §15 and the crate specs' §13:
 
 - Deep PM features mirrored from source tools (custom workflows,
   automation, sprint ceremonies, time tracking).
@@ -99,16 +97,16 @@ in §13 / §15 and the crate specs' §13:
   lineage had them; this entity ships goals / tasks / issues only —
   collaboration threads and membership management are a roadmap item,
   §15).
-- Tantivy full-text search over the JSONB payload + the front-end
-  search box (ILIKE name search ships first).
+- Tantivy full-text search over the JSONB payload + the front-end search
+  box (ILIKE name search ships first).
 - Durable event bus (the MVP ships an in-memory stream, same shape as
   the sibling services; the durable bus is the family roadmap item —
   [`agents/share/event-bus.md`](../../agents/share/event-bus.md)).
 - The cross-service link **aggregator** (`link-graph-service`); the
-  portfolio service ships the **write-side** `entity_links` + `linked`
-  / `unlinked` events only (§9.5).
-- Privacy masking / GDPR export beyond the audit posture in §12
-  (lead / assignee / person references are personal data; full masking
-  is re-assessed there).
-- gRPC, Parquet import (export-only first), terminology / IANA
-  registry existence checks.
+  portfolio service ships the **write-side** `entity_links` + `linked` /
+  `unlinked` events only (§9.5).
+- Privacy masking / GDPR export beyond the audit posture in §12 (lead /
+  assignee / person references are personal data; full masking is
+  re-assessed there).
+- gRPC, Parquet import (export-only first), terminology / IANA registry
+  existence checks.

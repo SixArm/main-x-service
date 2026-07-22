@@ -18,7 +18,7 @@ carries **two** targets rather than the reference's three.
 
 | Target | What it fuzzes |
 |---|---|
-| `match_work_items` | Deserialize a JSON `[work_item_a, work_item_b]` tuple → `MatchingEngine::match_work_items`. The whole deserialize → normalize → score path; asserts finite score in `[0,1]` in both argument orders. |
+| `match_plans` | Deserialize a JSON `[plan_a, plan_b]` tuple → `MatchingEngine::match_plans`. The whole deserialize → normalize → score path; asserts finite score in `[0,1]` in both argument orders. |
 | `normalize` | The pure `normalize` free functions (fold / code / URL / fold-set / ISO date) over arbitrary UTF-8 — never-panic. |
 
 ## Running
@@ -29,7 +29,7 @@ Requires a **nightly** toolchain and `cargo-fuzz`
 ```sh
 # From the crate root:
 cargo +nightly fuzz build                 # compile all targets
-cargo +nightly fuzz run match_work_items     # fuzz until a crash / Ctrl-C
+cargo +nightly fuzz run match_plans     # fuzz until a crash / Ctrl-C
 cargo +nightly fuzz run normalize -- -max_total_time=60   # time-boxed (CI)
 cargo +nightly fuzz list                  # list targets
 ```

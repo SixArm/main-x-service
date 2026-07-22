@@ -132,7 +132,7 @@
       {#each trends.series as row (row.taken_at)}
         <tr>
           <td>{row.taken_at}</td>
-          <td>{String(row.body["work_items"] ?? "—")}</td>
+          <td>{String(row.body["plans"] ?? "—")}</td>
           <td>{String(row.body["portfolios"] ?? "—")}</td>
           <td>{String(row.body["open_exposure"] ?? "—")}</td>
         </tr>

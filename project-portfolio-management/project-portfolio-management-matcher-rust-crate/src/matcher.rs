@@ -1,16 +1,14 @@
 //! `MatchingEngine` — the public entry point.
 //!
-//! Three phases:
+//! Two phases (the former kind gate is gone — the four kinds were unified
+//! into one recursive plan tree, so any two plans may match
+//! regardless of their now-optional, descriptive `kind`):
 //!
-//! 1. **Kind gate (R-GATE).** If the two records have different `kind`,
-//!    they are distinct record types in distinct collections and never
-//!    match: return score `0.0` with `breakdown.kind_gate_blocked = true`
-//!    and every component left `None`. This runs before everything else.
-//! 2. **Deterministic short-circuit.** If both (same-kind) records share
-//!    a value on a deterministic identifier scheme (the tool/registry ids
-//!    plus URI / UUID) OR share `owner_org_id` + normalised `code` OR
-//!    overlap on a `same_as` URL, return score `1.0`.
-//! 3. **Probabilistic scoring.** Per-component scores, then a weighted
+//! 1. **Deterministic short-circuit.** If both records share a value on a
+//!    deterministic identifier scheme (the tool/registry ids plus URI /
+//!    UUID) OR share `owner_org_id` + normalised `code` OR overlap on a
+//!    `same_as` URL, return score `1.0`.
+//! 2. **Probabilistic scoring.** Per-component scores, then a weighted
 //!    average over the *present* components.
 
 use strsim::jaro_winkler;
@@ -18,8 +16,8 @@ use strsim::jaro_winkler;
 use crate::config::MatchConfig;
 use crate::normalize;
 use crate::phonetic;
+use crate::plan::{Plan, PlanRelationship, RelationKind};
 use crate::scoring::{Confidence, MatchBreakdown, MatchResult, weighted_average};
-use crate::work_item::{RelationKind, WorkItem, WorkItemRelationship};
 
 /// Additive Soundex bonus applied to the name component when the two
 /// names share a phonetic code but the raw Jaro-Winkler score is still
@@ -32,11 +30,11 @@ const PHONETIC_BONUS: f64 = 0.05;
 /// keeps the phonetic-only path strictly below a "certain" name match.
 const PHONETIC_CEILING: f64 = 0.95;
 
-/// The work-item matcher: holds a [`MatchConfig`] and scores pairs.
+/// The plan matcher: holds a [`MatchConfig`] and scores pairs.
 ///
 /// Construct once with [`MatchingEngine::new`] (or
 /// [`MatchingEngine::default_config`]) and reuse across many
-/// [`MatchingEngine::match_work_items`] calls — the engine is immutable
+/// [`MatchingEngine::match_plans`] calls — the engine is immutable
 /// and holds no per-call state.
 pub struct MatchingEngine {
     /// The weights + threshold governing the probabilistic strategy.
@@ -65,14 +63,13 @@ impl MatchingEngine {
         &self.config
     }
 
-    /// Score two work items. Always returns a result (never errs).
+    /// Score two plans. Always returns a result (never errs).
     ///
-    /// Runs the three-phase pipeline: the **kind gate** (different kind →
-    /// `0.0`, `kind_gate_blocked`), then the deterministic short-circuit
+    /// Runs the two-phase pipeline: the deterministic short-circuit
     /// (`R-0`/`R-1`/`R-2` → pinned `1.0`/[`Confidence::High`],
     /// `deterministic_match`), then the probabilistic strategy —
     /// per-component scores fed through [`weighted_average`], compared
-    /// against the configured threshold.
+    /// against the configured threshold. There is no kind gate.
     ///
     /// `a` and `b` are the two records to compare; argument order does
     /// not affect the score. Returns the populated [`MatchResult`].
@@ -81,30 +78,19 @@ impl MatchingEngine {
     /// # Examples
     ///
     /// ```
-    /// use project_portfolio_management_matcher::{WorkItem, WorkItemKind, MatchingEngine};
+    /// use project_portfolio_management_matcher::{Plan, MatchingEngine};
     ///
     /// let engine = MatchingEngine::default_config();
-    /// let a = WorkItem::new(WorkItemKind::Project, "Apollo platform migration");
-    /// let b = WorkItem::new(WorkItemKind::Project, "Apollo platform migration");
-    /// let r = engine.match_work_items(&a, &b);
+    /// let a = Plan::new("Apollo platform migration");
+    /// let b = Plan::new("Apollo platform migration");
+    /// let r = engine.match_plans(&a, &b);
     /// assert!((0.0..=1.0).contains(&r.score));
     /// ```
     #[must_use]
-    pub fn match_work_items(&self, a: &WorkItem, b: &WorkItem) -> MatchResult {
-        // Phase 0: the kind gate. Different kinds are distinct record
-        // types and can never be the same identity — pin to a 0.0 no-match
-        // and record the reason, skipping every other rule (including the
-        // deterministic short-circuit).
-        if a.kind != b.kind {
-            return MatchResult {
-                breakdown: MatchBreakdown {
-                    kind_gate_blocked: true,
-                    ..Default::default()
-                },
-                ..Default::default()
-            };
-        }
-
+    pub fn match_plans(&self, a: &Plan, b: &Plan) -> MatchResult {
+        // The four kinds were unified into one recursive plan tree,
+        // so there is no longer a kind gate: any two plans may match
+        // regardless of their (now optional, descriptive) `kind`.
         // Phase 1: deterministic short-circuit. A globally-unique
         // identifier match, a same-owner code match, or a `same_as` URL
         // overlap is conclusive — pin the result to a certain match.
@@ -128,7 +114,7 @@ impl MatchingEngine {
         let goals_score = set_jaccard(&goal_titles(a), &goal_titles(b));
         let code_score = code_score(a, b);
         let owner_org_score = owner_org_score(a, b);
-        let portfolio_score = portfolio_score(a, b);
+        let parent_score = parent_score(a, b);
         let timeframe_score = timeframe_score(a, b, self.config.timeframe_sigma_days);
         let keywords_score = set_jaccard(&a.keywords, &b.keywords);
         let relationships_score = set_jaccard_strict(
@@ -142,7 +128,7 @@ impl MatchingEngine {
             (goals_score, self.config.goals_weight),
             (code_score, self.config.code_weight),
             (owner_org_score, self.config.owner_org_weight),
-            (portfolio_score, self.config.portfolio_weight),
+            (parent_score, self.config.parent_weight),
             (timeframe_score, self.config.timeframe_weight),
             (keywords_score, self.config.keywords_weight),
             (relationships_score, self.config.relationships_weight),
@@ -159,7 +145,7 @@ impl MatchingEngine {
                 goals_score,
                 code_score,
                 owner_org_score,
-                portfolio_score,
+                parent_score,
                 timeframe_score,
                 keywords_score,
                 relationships_score,
@@ -175,21 +161,21 @@ impl MatchingEngine {
     /// Scores `query` against every entry of `candidates`, preserving
     /// order so result `i` corresponds to `candidates[i]`.
     #[must_use]
-    pub fn match_one_to_many(&self, query: &WorkItem, candidates: &[WorkItem]) -> Vec<MatchResult> {
+    pub fn match_one_to_many(&self, query: &Plan, candidates: &[Plan]) -> Vec<MatchResult> {
         candidates
             .iter()
-            .map(|c| self.match_work_items(query, c))
+            .map(|c| self.match_plans(query, c))
             .collect()
     }
 
     /// One-to-many: `(index, result)` sorted by descending score. Each
     /// pair's `usize` is the candidate's original index.
     #[must_use]
-    pub fn rank(&self, query: &WorkItem, candidates: &[WorkItem]) -> Vec<(usize, MatchResult)> {
+    pub fn rank(&self, query: &Plan, candidates: &[Plan]) -> Vec<(usize, MatchResult)> {
         let mut ranked: Vec<(usize, MatchResult)> = candidates
             .iter()
             .enumerate()
-            .map(|(i, c)| (i, self.match_work_items(query, c)))
+            .map(|(i, c)| (i, self.match_plans(query, c)))
             .collect();
         // Descending by score; `partial_cmp` defensively treats any
         // incomparable pair as Equal rather than panicking.
@@ -203,11 +189,7 @@ impl MatchingEngine {
 
     /// Rank then drop everything below [`MatchConfig`]'s threshold.
     #[must_use]
-    pub fn find_matches(
-        &self,
-        query: &WorkItem,
-        candidates: &[WorkItem],
-    ) -> Vec<(usize, MatchResult)> {
+    pub fn find_matches(&self, query: &Plan, candidates: &[Plan]) -> Vec<(usize, MatchResult)> {
         self.rank(query, candidates)
             .into_iter()
             .filter(|(_, r)| r.is_match)
@@ -224,7 +206,7 @@ impl MatchingEngine {
 ///
 /// `w` is the record to key. Returns the borrowed key, or `None` when
 /// `owner_org_id` is unset or empty.
-fn owner_key(w: &WorkItem) -> Option<&str> {
+fn owner_key(w: &Plan) -> Option<&str> {
     w.owner_org_id.as_deref().filter(|s| !s.is_empty())
 }
 
@@ -234,7 +216,7 @@ fn owner_key(w: &WorkItem) -> Option<&str> {
 /// - `R-0` — a shared value on the same globally-unique identifier scheme.
 /// - `R-1` — the same `owner_org_id` and the same normalised `code`.
 /// - `R-2` — an overlapping `same_as` identity URL.
-fn deterministic_match(a: &WorkItem, b: &WorkItem) -> bool {
+fn deterministic_match(a: &Plan, b: &Plan) -> bool {
     // R-0 — any pair of deterministic identifiers shares a value. Owner-
     // scoped / custom schemes are excluded via `is_deterministic`.
     for ai in &a.identifiers {
@@ -272,7 +254,7 @@ fn deterministic_match(a: &WorkItem, b: &WorkItem) -> bool {
         let an = normalize::url(au);
         // SEC-M2: skip trivial / non-identity URLs — empty, or a bare
         // root `"/"` (`normalize::url` deliberately keeps a lone slash
-        // non-empty) — so two different work items sharing only `"/"` do
+        // non-empty) — so two different plans sharing only `"/"` do
         // not short-circuit to a certain match.
         if an.is_empty() || an == "/" {
             continue;
@@ -296,7 +278,7 @@ fn deterministic_match(a: &WorkItem, b: &WorkItem) -> bool {
 /// +[`PHONETIC_BONUS`] (clamped to [`PHONETIC_CEILING`]) on the primary
 /// names when they agree phonetically but the literal score is below the
 /// ceiling. Name is required, so this component is always present.
-fn name_score(a: &WorkItem, b: &WorkItem) -> f64 {
+fn name_score(a: &Plan, b: &Plan) -> f64 {
     let an = normalize::fold(&a.name);
     let bn = normalize::fold(&b.name);
     let mut best = jaro_winkler(&an, &bn);
@@ -314,19 +296,19 @@ fn name_score(a: &WorkItem, b: &WorkItem) -> f64 {
 
 /// The folded set input for the goals component: each goal's title.
 /// Empty titles are dropped by the downstream `fold_set`.
-fn goal_titles(w: &WorkItem) -> Vec<String> {
+fn goal_titles(w: &Plan) -> Vec<String> {
     w.goals.iter().map(|g| g.title.clone()).collect()
 }
 
 /// Score the owner-scoped code component for `a` vs `b`.
 ///
-/// A code only identifies a work item *within* its owning organisation,
+/// A code only identifies a plan *within* its owning organisation,
 /// so this is a binary, owner-gated comparison. Both records must carry a
 /// non-empty code AND share an `owner_org_id`; otherwise the component is
 /// skipped (`None`) so a local code cannot match across owners. Returns
 /// `Some(1.0)` for equal normalised codes under the same owner,
 /// `Some(0.0)` for differing codes under the same owner, else `None`.
-fn code_score(a: &WorkItem, b: &WorkItem) -> Option<f64> {
+fn code_score(a: &Plan, b: &Plan) -> Option<f64> {
     let (ac, bc) = match (a.code.as_deref(), b.code.as_deref()) {
         (Some(ac), Some(bc)) if !ac.is_empty() && !bc.is_empty() => (ac, bc),
         _ => return None,
@@ -349,7 +331,7 @@ fn code_score(a: &WorkItem, b: &WorkItem) -> Option<f64> {
 /// when both are present and equal, `Some(0.0)` when both present but
 /// differ, `None` when either is unset. Keys solely on the id, never on
 /// `owner_org_name`.
-fn owner_org_score(a: &WorkItem, b: &WorkItem) -> Option<f64> {
+fn owner_org_score(a: &Plan, b: &Plan) -> Option<f64> {
     match (owner_key(a), owner_key(b)) {
         (Some(x), Some(y)) => Some(if normalize::fold(x) == normalize::fold(y) {
             1.0
@@ -360,22 +342,17 @@ fn owner_org_score(a: &WorkItem, b: &WorkItem) -> Option<f64> {
     }
 }
 
-/// Score the parent-portfolio component for `a` vs `b`.
+/// Score the parent plan component for `a` vs `b`.
 ///
-/// Applies only to **child kinds** (`Project` / `Product` / `Program`);
-/// for the `Portfolio` kind the component is always skipped. Both records
-/// must carry a non-empty `portfolio_ref`: `Some(1.0)` when they name the
+/// Applies to any plan (there is no kind restriction). Both records
+/// must carry a non-empty `parent_ref`: `Some(1.0)` when they name the
 /// same parent, `Some(0.0)` when they differ, `None` otherwise. Two
-/// children of the same portfolio are mildly more likely to be the same
+/// children of the same parent are mildly more likely to be the same
 /// initiative — a supporting signal, never decisive.
-fn portfolio_score(a: &WorkItem, b: &WorkItem) -> Option<f64> {
-    // Kind is gated equal before this runs, so checking `a` suffices.
-    if !a.kind.is_child() {
-        return None;
-    }
+fn parent_score(a: &Plan, b: &Plan) -> Option<f64> {
     match (
-        a.portfolio_ref.as_deref().filter(|s| !s.is_empty()),
-        b.portfolio_ref.as_deref().filter(|s| !s.is_empty()),
+        a.parent_ref.as_deref().filter(|s| !s.is_empty()),
+        b.parent_ref.as_deref().filter(|s| !s.is_empty()),
     ) {
         (Some(x), Some(y)) => Some(if normalize::fold(x) == normalize::fold(y) {
             1.0
@@ -395,7 +372,7 @@ fn portfolio_score(a: &WorkItem, b: &WorkItem) -> Option<f64> {
 /// distance (near-misses are not snapped to 0). Returns `None` when no
 /// date pair is comparable on both sides. `sigma` is the decay width in
 /// days (guarded to a positive value).
-fn timeframe_score(a: &WorkItem, b: &WorkItem, sigma: f64) -> Option<f64> {
+fn timeframe_score(a: &Plan, b: &Plan, sigma: f64) -> Option<f64> {
     // Guard against a non-positive σ: fall back to a 1-day width.
     let sigma_eff = if sigma > 0.0 { sigma } else { 1.0 };
     let pairs = [
@@ -428,14 +405,14 @@ fn timeframe_score(a: &WorkItem, b: &WorkItem, sigma: f64) -> Option<f64> {
 }
 
 /// Render a record's relationships to a folded token set for the
-/// typed-set Jaccard: each link becomes `"<relation>\u{1f}<work_item_id>"`
+/// typed-set Jaccard: each link becomes `"<relation>\u{1f}<plan_id>"`
 /// so a `DependsOn` link only agrees with a `DependsOn` link to the
 /// **same** id. The relation kind is rendered verbatim (no inversion or
 /// transitive closure). Empty ids are dropped by the downstream folding.
-fn relationship_tokens(rels: &[WorkItemRelationship]) -> Vec<String> {
+fn relationship_tokens(rels: &[PlanRelationship]) -> Vec<String> {
     rels.iter()
-        .filter(|r| !r.work_item_id.trim().is_empty())
-        .map(|r| format!("{}\u{1f}{}", relation_label(&r.relation), r.work_item_id))
+        .filter(|r| !r.plan_id.trim().is_empty())
+        .map(|r| format!("{}\u{1f}{}", relation_label(&r.relation), r.plan_id))
         .collect()
 }
 
@@ -503,58 +480,62 @@ fn jaccard(a_set: &[String], b_set: &[String]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::work_item::{
-        Goal, IdentifierScheme, WorkItemIdentifier, WorkItemKind, WorkItemRelationship,
-        WorkItemStatus,
+    use crate::plan::{
+        Goal, IdentifierScheme, PlanIdentifier, PlanKind, PlanRelationship, PlanStatus,
     };
 
-    fn ident(scheme: IdentifierScheme, value: &str) -> WorkItemIdentifier {
-        WorkItemIdentifier {
+    fn ident(scheme: IdentifierScheme, value: &str) -> PlanIdentifier {
+        PlanIdentifier {
             scheme,
             value: value.into(),
         }
     }
 
-    fn project(name: &str) -> WorkItem {
-        WorkItem::new(WorkItemKind::Project, name)
+    fn project(name: &str) -> Plan {
+        Plan::new(name)
     }
 
-    // Pins the kind gate: two records of different kind never match, even
-    // with an otherwise-identical name, and the reason is recorded.
+    // Pins the unified model: there is no kind gate. Two plans with
+    // different (optional) kinds but an identical name score as a normal
+    // probabilistic match; `kind_gate_blocked` is always false.
     #[test]
-    fn kind_gate_blocks_cross_kind() {
+    fn different_kinds_still_match() {
         let engine = MatchingEngine::default_config();
-        let a = WorkItem::new(WorkItemKind::Project, "Apollo");
-        let b = WorkItem::new(WorkItemKind::Product, "Apollo");
-        let r = engine.match_work_items(&a, &b);
-        assert!(r.score.abs() < 1e-9);
-        assert!(!r.is_match);
-        assert!(r.breakdown.kind_gate_blocked);
-        assert!(r.breakdown.name_score.is_none());
+        let mut a = Plan::new("Apollo");
+        a.kind = Some(PlanKind::Portfolio);
+        let mut b = Plan::new("Apollo");
+        b.kind = Some(PlanKind::Project);
+        let r = engine.match_plans(&a, &b);
+        assert!(r.score >= 0.99, "got {}", r.score);
+        assert!(r.is_match);
+        assert!(!r.breakdown.kind_gate_blocked);
+        assert!(r.breakdown.name_score.is_some());
     }
 
-    // Pins that the kind gate beats even a shared deterministic id: a
-    // shared UUID across kinds is NOT a match (distinct record types).
+    // Pins that a shared deterministic id pins to 1.0 regardless of kind:
+    // the gate no longer suppresses a cross-kind deterministic match.
     #[test]
-    fn kind_gate_beats_deterministic_id() {
+    fn shared_id_matches_across_kinds() {
         let engine = MatchingEngine::default_config();
-        let mut a = WorkItem::new(WorkItemKind::Project, "A");
-        let mut b = WorkItem::new(WorkItemKind::Program, "B");
+        let mut a = Plan::new("A");
+        a.kind = Some(PlanKind::Product);
+        let mut b = Plan::new("B");
+        b.kind = Some(PlanKind::Program);
         a.identifiers.push(ident(IdentifierScheme::Uuid, "shared"));
         b.identifiers.push(ident(IdentifierScheme::Uuid, "shared"));
-        let r = engine.match_work_items(&a, &b);
-        assert!(r.breakdown.kind_gate_blocked);
-        assert!(!r.breakdown.deterministic_match);
-        assert!(r.score.abs() < 1e-9);
+        let r = engine.match_plans(&a, &b);
+        assert!(!r.breakdown.kind_gate_blocked);
+        assert!(r.breakdown.deterministic_match);
+        assert!((r.score - 1.0).abs() < 1e-9);
     }
 
     // Pins: identical same-kind names drive the probabilistic score ~1.0.
     #[test]
-    fn identical_work_items_score_high() {
+    fn identical_plans_score_high() {
         let engine = MatchingEngine::default_config();
         let a = project("Apollo platform migration");
         let b = project("Apollo platform migration");
-        let r = engine.match_work_items(&a, &b);
+        let r = engine.match_plans(&a, &b);
         assert!(r.score >= 0.99, "got {}", r.score);
         assert!(r.is_match);
     }
@@ -569,7 +550,7 @@ mod tests {
             .push(ident(IdentifierScheme::JiraProjectKey, "APOLLO"));
         b.identifiers
             .push(ident(IdentifierScheme::JiraProjectKey, "apollo"));
-        let r = engine.match_work_items(&a, &b);
+        let r = engine.match_plans(&a, &b);
         assert!((r.score - 1.0).abs() < 1e-9);
         assert!(r.breakdown.deterministic_match);
     }
@@ -598,13 +579,13 @@ mod tests {
         let mut b = project("Omega");
         a.same_as = vec!["https://pm.example.com/p/APOLLO".into()];
         b.same_as = vec!["  https://pm.example.com/p/APOLLO/  ".into()];
-        let r = engine.match_work_items(&a, &b);
+        let r = engine.match_plans(&a, &b);
         assert!((r.score - 1.0).abs() < 1e-9);
     }
 
     // SEC-M2: a bare root `same_as` URL (`"/"`, which `normalize::url`
     // deliberately keeps non-empty) is not identity evidence — two
-    // DIFFERENT work items sharing only `"/"` must NOT short-circuit,
+    // DIFFERENT plans sharing only `"/"` must NOT short-circuit,
     // while a real shared URL still does.
     #[test]
     fn trivial_root_same_as_does_not_short_circuit() {
@@ -614,7 +595,7 @@ mod tests {
         root_a.same_as = vec!["/".into()];
         root_b.same_as = vec!["/".into()];
         assert!(!deterministic_match(&root_a, &root_b));
-        let r = engine.match_work_items(&root_a, &root_b);
+        let r = engine.match_plans(&root_a, &root_b);
         assert!(!r.breakdown.deterministic_match);
         assert!(!r.is_match, "got {}", r.score);
 
@@ -640,7 +621,7 @@ mod tests {
             title: "CUT LATENCY".into(),
             ..Default::default()
         }];
-        let r = engine.match_work_items(&a, &b);
+        let r = engine.match_plans(&a, &b);
         assert_eq!(r.breakdown.goals_score, Some(1.0));
     }
 
@@ -658,23 +639,21 @@ mod tests {
         assert_eq!(owner_org_score(&a, &b), None);
     }
 
-    // Pins the parent-portfolio component: child kinds compare the parent
-    // ref; the Portfolio kind always skips it.
+    // Pins the parent component: any two plans with a parent_ref
+    // compare it exactly (matching parents → 1.0, differing → 0.0);
+    // absent on either side → None. There is no kind-based skip.
     #[test]
-    fn portfolio_component_child_only() {
+    fn parent_component_compares_refs() {
         let mut a = project("A");
         let mut b = project("B");
-        a.portfolio_ref = Some("portfolio-1".into());
-        b.portfolio_ref = Some("portfolio-1".into());
-        assert_eq!(portfolio_score(&a, &b), Some(1.0));
-        b.portfolio_ref = Some("portfolio-2".into());
-        assert_eq!(portfolio_score(&a, &b), Some(0.0));
-        // Portfolio kind never participates.
-        let mut pa = WorkItem::new(WorkItemKind::Portfolio, "A");
-        let mut pb = WorkItem::new(WorkItemKind::Portfolio, "B");
-        pa.portfolio_ref = Some("x".into());
-        pb.portfolio_ref = Some("x".into());
-        assert_eq!(portfolio_score(&pa, &pb), None);
+        a.parent_ref = Some("parent-1".into());
+        b.parent_ref = Some("parent-1".into());
+        assert_eq!(parent_score(&a, &b), Some(1.0));
+        b.parent_ref = Some("parent-2".into());
+        assert_eq!(parent_score(&a, &b), Some(0.0));
+        // Absent on one side → not comparable.
+        b.parent_ref = None;
+        assert_eq!(parent_score(&a, &b), None);
     }
 
     // Pins the timeframe Gaussian: equal dates → 1.0, a σ-sized gap →
@@ -700,19 +679,19 @@ mod tests {
     // a different relation kind to the same id does not; strict-empty.
     #[test]
     fn relationships_typed_set_jaccard() {
-        let a = relationship_tokens(&[WorkItemRelationship {
+        let a = relationship_tokens(&[PlanRelationship {
             relation: RelationKind::DependsOn,
-            work_item_id: "p2".into(),
+            plan_id: "p2".into(),
         }]);
-        let b = relationship_tokens(&[WorkItemRelationship {
+        let b = relationship_tokens(&[PlanRelationship {
             relation: RelationKind::DependsOn,
-            work_item_id: "p2".into(),
+            plan_id: "p2".into(),
         }]);
         assert_eq!(set_jaccard_strict(&a, &b), Some(1.0));
         // Different relation to the same id → no overlap.
-        let c = relationship_tokens(&[WorkItemRelationship {
+        let c = relationship_tokens(&[PlanRelationship {
             relation: RelationKind::BlockedBy,
-            work_item_id: "p2".into(),
+            plan_id: "p2".into(),
         }]);
         assert_eq!(set_jaccard_strict(&a, &c), Some(0.0));
         // Strict emptiness: either side empty → None.
@@ -746,22 +725,22 @@ mod tests {
         let engine = MatchingEngine::default_config();
         let mut a = project("Apollo platform migration");
         let mut b = project("Apollo platform migration");
-        a.status = Some(WorkItemStatus::Active);
-        b.status = Some(WorkItemStatus::Completed);
-        let differing = engine.match_work_items(&a, &b).score;
-        b.status = Some(WorkItemStatus::Active);
-        let same = engine.match_work_items(&a, &b).score;
+        a.status = Some(PlanStatus::Active);
+        b.status = Some(PlanStatus::Completed);
+        let differing = engine.match_plans(&a, &b).score;
+        b.status = Some(PlanStatus::Active);
+        let same = engine.match_plans(&a, &b).score;
         assert!((differing - same).abs() < 1e-9);
     }
 
     // Pins the negative case: dissimilar same-kind names with no
     // corroboration fall below threshold and into the Low band.
     #[test]
-    fn unrelated_work_items_score_low() {
+    fn unrelated_plans_score_low() {
         let engine = MatchingEngine::default_config();
         let a = project("Apollo platform migration");
         let b = project("Cafeteria refit programme");
-        let r = engine.match_work_items(&a, &b);
+        let r = engine.match_plans(&a, &b);
         assert!(!r.is_match, "got {}", r.score);
         assert_eq!(r.confidence, Confidence::Low);
     }

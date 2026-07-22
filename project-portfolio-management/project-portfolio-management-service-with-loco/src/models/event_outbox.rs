@@ -226,7 +226,7 @@ mod tests {
         let row = OutboxInsert::from_envelope(&env, occurred_at).unwrap();
 
         assert_eq!(row.event_id, env.event_id);
-        assert_eq!(row.entity, "work_item");
+        assert_eq!(row.entity, "plan");
         assert_eq!(row.entity_pid, Uuid::parse_str(pid).unwrap());
         assert_eq!(row.kind, "created");
         assert_eq!(row.occurred_at, occurred_at);
@@ -238,7 +238,7 @@ mod tests {
         assert_eq!(row.payload["pid"], pid);
         assert_eq!(row.payload["seq"], 7);
         assert_eq!(row.payload["name"], "Apollo platform migration");
-        assert_eq!(row.payload["entity"], "work_item");
+        assert_eq!(row.payload["entity"], "plan");
         assert_eq!(row.payload["kind"], "created");
         assert_eq!(row.payload["actor"], "user-1");
     }

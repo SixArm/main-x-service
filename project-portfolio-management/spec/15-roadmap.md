@@ -7,14 +7,14 @@ and accept.
 
 The subproject rename (`portfolio` → `project-portfolio-management`)
 repositions this trio as a **project portfolio management product**,
-not just a matchable registry of work-item identities. The catalogue
+not just a matchable registry of plan identities. The catalogue
 below maps the standard PPM capability set onto what the trio already
-ships (registry CRUD + within-kind matching/merge across the four
-collections; goals / tasks / issues sub-resources; timeline + burndown
+ships (registry CRUD + kind-agnostic matching/merge over the one
+`plans` collection; goals / tasks / issues sub-resources; timeline + burndown
 views; audit + events; bulk import/export; cross-service people/org
 links; ABAC). Design doctrine for every item: new capabilities are
-**operational sub-resources** (tables keyed `(parent_kind,
-parent_pid)`, like goals/tasks/issues), every mutation audits + emits,
+**operational sub-resources** (tables keyed `parent_pid`, like
+goals/tasks/issues), every mutation audits + emits,
 record-level ABAC attributes gate the governance actions, and nothing
 here ever becomes a **matcher signal** (the §8 partition rule —
 sameness evidence and operational state stay separate).
@@ -24,49 +24,49 @@ sameness evidence and operational state stay separate).
 - **PPM-1 Work intake.** ✅ *Delivered 2026-07-18 (service T-PPM-A).* A `proposals` pipeline (draft → submitted →
   in-review → approved / rejected → promoted): demand records with
   sponsor, strategic rationale, rough sizing, and requested funding.
-  Promotion mints the real work item with `provenance = intake` and a
+  Promotion mints the real plan with `provenance = intake` and a
   link back to the proposal. Bonus the registry heritage makes cheap:
   run the **matcher at intake** so a duplicate demand is flagged
-  against both existing proposals and live work items before it is
+  against both existing proposals and live plans before it is
   funded.
 - **PPM-2 Idea management.** ✅ *Delivered 2026-07-18 (service T-PPM-C).* Lightweight `ideas` (title, pitch, tags,
   votes) convertible to proposals in one action; the roadmap's
   posts/comments sub-resources attach here first so brainstorming
   threads live with the idea. Ideas are deliberately schema-thin —
-  the funnel is idea → proposal → work item, each step adding rigour.
-- **PPM-3 Phase-gate approvals.** ✅ *Delivered 2026-07-18 (service T-PPM-A).* A per-work-item `stage` plus
+  the funnel is idea → proposal → plan, each step adding rigour.
+- **PPM-3 Phase-gate approvals.** ✅ *Delivered 2026-07-18 (service T-PPM-A).* A per-plan `stage` plus
   first-class `gate_reviews` (gate name, decision, conditions,
-  approver `worker:` ref, date). Writes on a gate-locked work item are
+  approver `worker:` ref, date). Writes on a gate-locked plan are
   policy-refusable via a `resource.stage` ABAC attribute ("deny write
   past gate-3 unless `access=admin`"), making governance a policy
   statement, not code. Approvals are audited governance events.
 - **PPM-4 Scenario planning.** ✅ *Delivered 2026-07-18 (service T-PPM-C).* `scenarios`: named candidate portfolios
-  (a set of work items / proposals + constraint knobs — budget cap,
+  (a set of plans / proposals + constraint knobs — budget cap,
   capacity cap, must-include). A pure-core evaluator scores each
   scenario against PPM-8 capacity and PPM-10 budget data (total cost,
   demand vs capacity, alignment score) so what-if comparison is
   arithmetic over live data, patient-flow-at-a-glance style.
   Committing a scenario stamps the chosen items' funding state.
 - **PPM-5 OKR / objective alignment.** ✅ *Delivered 2026-07-18 (service T-PPM-C).* An org-level `objectives`
-  registry (OKRs) and a work-item → objective mapping with weights;
-  alignment rolls up per collection and per parent portfolio, so
-  "how much of the portfolio serves objective X" is a query. Work-item
+  registry (OKRs) and a plan → objective mapping with weights;
+  alignment rolls up per parent plan (up the containment tree), so
+  "how much of the portfolio serves objective X" is a query. Plan
   `goals` already exist; this adds the strategic layer above them.
 
 **Pillar 2 — Execution & visibility**
 
 - **PPM-6 Roadmap & dependency views.** ✅ *Delivered 2026-07-18 (service T-PPM-B).* Timeline/Gantt exists;
-  add cross-work-item `dependencies` (finish-start edges between
-  tasks/work items, with lag) + milestone records, and derive the
+  add cross-plan `dependencies` (finish-start edges between
+  tasks/plans, with lag) + milestone records, and derive the
   critical path + slipping-dependency warnings in the timeline view.
 - **PPM-7 Portfolio dashboards.** ✅ *Delivered 2026-07-18 (service T-PPM-B).* A portfolio-level at-a-glance
-  endpoint (the patient-flow pattern, ETag-conditional): per-collection
+  endpoint (the patient-flow pattern, ETag-conditional): per-parent-plan
   rollups of RAG health, schedule variance (timeframe vs today), open
   risks/issues by severity, budget variance (PPM-10), capacity
   hot-spots (PPM-8), gate-stage distribution — plus site-tile
   headlines for the executive view.
 - **PPM-8 Resource capacity planning.** ✅ *Delivered 2026-07-18 (service T-PPM-B).* `allocations`: person/worker
-  `EntityRef` + work item (or task) + percentage + timeframe. Rollup
+  `EntityRef` + plan (or task) + percentage + timeframe. Rollup
   per person against a configurable weekly capacity ⇒ over-allocation
   detection, a capacity heatmap, and reassignment suggestions
   (largest-slack first). People stay references — no demographics
@@ -81,13 +81,13 @@ sameness evidence and operational state stay separate).
 
 **Pillar 3 — Value realization & governance**
 
-- **PPM-10 Budget tracking.** ✅ *Delivered 2026-07-18 (service T-PPM-A).* `budget_lines` per work item
+- **PPM-10 Budget tracking.** ✅ *Delivered 2026-07-18 (service T-PPM-A).* `budget_lines` per plan
   (capex/opex, currency amount via `bigdecimal`, period) + recorded
   actuals (manual or bulk-imported from finance) ⇒ projected-vs-actual
-  variance in the dashboards, rolled up the parent-portfolio
+  variance in the dashboards, rolled up the parent-plan containment
   hierarchy. Centralises financial oversight without becoming a
   ledger — actuals are imported facts, not double-entry bookkeeping.
-- **PPM-11 Benefits tracking.** ✅ *Delivered 2026-07-18 (service T-PPM-C).* `benefits` per work item: category,
+- **PPM-11 Benefits tracking.** ✅ *Delivered 2026-07-18 (service T-PPM-C).* `benefits` per plan: category,
   metric, baseline, target, expected realization date — then recorded
   actuals over time ⇒ realized-vs-projected value and simple ROI
   (with PPM-10 costs). Benefits are reviewed at phase gates (PPM-3),
@@ -119,28 +119,27 @@ The items below predate the PPM repositioning and remain valid.
 - **Collaboration sub-resources.** The plan-family lineage carried
   posts, comments, and membership sub-resources; this entity ships
   goals / tasks / issues only (§2.3). Add posts / comments (Markdown
-  update threads on a work item / task / issue) and members (a user's
-  membership of a work item with a role) when collaboration becomes a
-  requirement — each a new sub-resource table keyed by `(parent_kind,
-  parent_pid)`, with membership-scoped write authorisation.
+  update threads on a plan / task / issue) and members (a user's
+  membership of a plan with a role) when collaboration becomes a
+  requirement — each a new sub-resource table keyed by `parent_pid`, with membership-scoped write authorisation.
 - **Family parity — match / search / merge.** Beyond the MVP
   baseline, reach the mature-sibling shape
   ([`agents/share/match-search-merge.md`](../../agents/share/match-search-merge.md)):
-  Tantivy full-text + fuzzy search over the JSONB payload (per
-  collection), search-blocked duplicate candidates (replacing the
+  Tantivy full-text + fuzzy search over the JSONB payload of the
+  `plans` collection, search-blocked duplicate candidates (replacing the
   in-memory scan, OQ-2), batch deduplicate scan, and a front-end merge
   action.
 - **Auditability — durable event bus.** The MVP ships an in-memory
-  `WorkItemEvent` stream (T-5); replace it with the durable event bus
+  `PlanEvent` stream (T-5); replace it with the durable event bus
   ([`agents/share/event-bus.md`](../../agents/share/event-bus.md)) so
   peer registries, analytics, and the cross-service link aggregator
-  can subscribe across replicas. Work-item events are high-volume
+  can subscribe across replicas. Plan events are high-volume
   (every task write), so batched outbox emission matters.
 - **Cross-service link aggregator.** Stand up (or join) the
   `link-graph-service`
   ([`agents/share/cross-service-linking.md` §4.3](../../agents/share/cross-service-linking.md))
-  so a work item's `EntityRef`s and `entity_links` become a traversable
-  graph (a work item's people → their orgs, related work items across
+  so a plan's `EntityRef`s and `entity_links` become a traversable
+  graph (a plan's people → their orgs, related plans across
   departments). The portfolio trio ships only the write-side (T-7); the
   aggregator is a separate service.
 - **Sub-resource bulk + linking.** Extend bulk import/export and the
@@ -154,7 +153,7 @@ The items below predate the PPM repositioning and remain valid.
   [`agents/share/authorization-attributes.md`](../../agents/share/authorization-attributes.md);
   delivered, supersedes the earlier role-based sketch) — deployments
   express read/write/destructive tiers and any read-integrator vs
-  work-item-operator split as policy attributes, not fixed roles;
+  plan-operator split as policy attributes, not fixed roles;
   rate limiting.
 - **PM-tool sync.** Two-way sync with Jira / Asana / MS Project /
   Linear / GitHub Projects keyed on the deterministic external-id
@@ -162,7 +161,7 @@ The items below predate the PPM repositioning and remain valid.
   its source-tool twin without becoming a full PM replacement (§8.7).
 - **Localization.** Operator UI in the
   [`agents/share/locales.md`](../../agents/share/locales.md) locale
-  set; multilingual work-item names via `alternate_names` +
+  set; multilingual plan names via `alternate_names` +
   `in_language`; cross-language duplicate linkage through deterministic
   identifiers / `same_as`.
 - **Scale-out and operations.** Multi-replica deployment, PostgreSQL

@@ -1,5 +1,5 @@
 //! `SeaORM` Entity — `audit_logs`. One row per CRUD action on a
-//! work item (who / what / when + a snapshot).
+//! plan (who / what / when + a snapshot).
 
 // SeaORM-generated entity: the field-level shape is documented by the
 // migration and the `audit_logs` table, not by per-field rustdoc.

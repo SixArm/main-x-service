@@ -1,6 +1,6 @@
 //! `SeaORM` Entity — `proposals`. Work-intake demand records
 //! (PPM-1): the pipeline that stands between an idea and a funded
-//! work item.
+//! plan.
 
 #![allow(missing_docs)]
 
@@ -24,7 +24,7 @@ pub struct Model {
     pub requested_minor: Option<i64>,
     pub currency: Option<String>,
     pub status: String,
-    pub promoted_work_item_pid: Option<Uuid>,
+    pub promoted_plan_pid: Option<Uuid>,
     pub deleted_at: Option<DateTimeWithTimeZone>,
 }
 

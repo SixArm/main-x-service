@@ -1,5 +1,5 @@
 //! `SeaORM` Entity — `risks`. Portfolio-level risk records (PPM-12)
-//! alongside a work item; exposure = probability × impact (derived).
+//! alongside a plan; exposure = probability × impact (derived).
 
 #![allow(missing_docs)]
 
@@ -15,7 +15,7 @@ pub struct Model {
     pub id: i32,
     #[sea_orm(unique)]
     pub pid: Uuid,
-    pub work_item_pid: Uuid,
+    pub plan_pid: Uuid,
     pub title: String,
     pub description: Option<String>,
     pub probability: i32,

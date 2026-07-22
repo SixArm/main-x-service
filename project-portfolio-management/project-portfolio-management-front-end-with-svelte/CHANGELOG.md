@@ -9,6 +9,74 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- 2026-07-22 — **Capability views for collaborative review, workflow
+  automation, prioritisation, and bird's-eye visibility**, consuming
+  the service's new endpoints (service spec §9.4a):
+  - `src/lib/api/capabilities.ts` — `CapabilityClient` plus the wire
+    types (`Review`, `Consensus`, `Automation`, `AutomationRun`,
+    `ScheduledAction`, `Notification`, `SmartScore`, `RankedPlan`,
+    `LifecycleFunnel`, `PlanLifecycle`, `AssigneeLoad`). One method per
+    endpoint; unset query parameters are omitted rather than sent blank.
+  - `/prioritisation` — the Smart Score queue with an **Explain**
+    toggle showing each component's weight, value, and points, plus the
+    per-plan evidence coverage. Unscored plans read as `unscored`, never
+    as a low score.
+  - `/lifecycle` — the challenge funnel: live and stalled counts for
+    every phase (empty phases included) and any items in an
+    unrecognised phase.
+  - `/reviews` — delegate an item to an internal or external expert,
+    accept/decline, submit a verdict, withdraw, and read the consensus
+    (which shows outstanding invitations and reports a tie as a tie).
+  - `/automations` — configure rules (trigger + action, with the action
+    fields switching on the chosen action kind), enable/disable/delete,
+    the pending deadline queue with a manual sweep, and the run log
+    including skipped and failed runs.
+  - Nav entries for the four new pages; 6 vitest cases pinning the
+    client's endpoint paths.
+  - **Not built:** these four pages are English-first (the 13-locale
+    catalogues are not yet extended to them, matching the other PPM
+    catalogue views), and there is no dedicated notifications inbox page
+    — the inbox endpoint is wired in the client only.
+
+- 2026-07-22 — **Five new `PlanKind` values: `Practice`, `Process`,
+  `Purpose`, `Pathway`, `Proposal`** in `src/lib/api/types.ts`, so the
+  `PlanForm` kind `<select>` (driven by `ALL_KINDS`) offers them. The
+  legacy `COLLECTIONS` segments gain `practices` / `processes` /
+  `purposes` / `pathways` for the proposal / idea / report kind-target
+  selects; `proposals` is deliberately **not** added there, because that
+  segment already names the separate proposals catalogue route.
+
+### Changed — unify the four collections into one recursive `/api/plans` collection + rename to `plan` (2026-07-20)
+
+- **One recursive collection.** The four PPM REST collections
+  (portfolios / projects / products / programs) are unified into a single
+  recursive `/api/plans` collection: every record is a **plan** under
+  `/api/plans`, and matching runs across the whole collection rather than
+  being gated by kind.
+- **Entity renamed `work item` → `plan`.** `src/lib/api/types.ts` renames
+  `WorkItem` → `Plan` (and `WorkItemKind` → `PlanKind`, `WorkItemEvent` →
+  `PlanEvent`, `WorkItemIdentifier` → `PlanIdentifier`, `WorkItemRef` →
+  `PlanRef`); `kind` is now **optional** (a descriptive label —
+  Portfolio / Project / Product / Program — not a collection selector);
+  `portfolio_ref` → `parent_ref` (any plan may contain any other).
+- **Routes.** The dynamic `[collection]` route directory is collapsed to a
+  static `plans/` directory (`/plans`, `/plans/new`, `/plans/[pid]`,
+  `/plans/[pid]/{edit,board,schedule,governance}`). The nav's collection
+  switcher is gone — there is a single **Plans** destination.
+- **API client.** `src/lib/api/work-items.ts` → `src/lib/api/plans.ts`
+  exporting `PlanRepository` (no longer collection-bound; all paths under
+  `/api/plans`, with the `?parent=` child roll-up and
+  `/api/plans/{pid}/schedule`).
+- **Form.** `WorkItemForm.svelte` → `PlanForm.svelte`; `kind` is now an
+  optional `<select>` (a plan may have no kind); `parent_ref` is an
+  optional plan picker for any plan.
+- **Tests.** `tests/unit/work-items.test.ts` → `tests/unit/plans.test.ts`
+  and `tests/unit/work-item-form.test.ts` →
+  `tests/unit/plan-form.test.ts`. `svelte-check` is 0 errors / 0 warnings
+  and the vitest suite (45 tests) is green.
+
 ### Added — engineering moderate views (2026-07-20)
 
 - Board gains story-point input (+pt on cards), the per-sprint

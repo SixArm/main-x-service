@@ -5,25 +5,27 @@
 //! they require a reachable PostgreSQL instance and are therefore
 //! `#[ignore]`d (run with `cargo test -- --ignored`). They exercise the
 //! exact write path the `outbox` transport takes in the CRUD handlers:
-//! one transaction spanning the `work_items` insert **and** the
+//! one transaction spanning the `plans` insert **and** the
 //! `event_outbox` insert, so the two commit or roll back together.
 //!
 //! The pure envelope→row mapping and the transport-string parsing are
 //! pinned DB-free in `src/models/event_outbox.rs` and `src/streaming.rs`.
 
 use loco_rs::testing::prelude::*;
-use project_portfolio_management_matcher::{WorkItem, WorkItemKind};
+use project_portfolio_management_matcher::Plan;
 use project_portfolio_management_service::app::App;
-use project_portfolio_management_service::models::_entities::{event_outbox, work_items};
+use project_portfolio_management_service::models::_entities::{event_outbox, plans};
 use project_portfolio_management_service::models::event_outbox::OutboxInsert;
-use project_portfolio_management_service::models::work_items::Model as WorkItemModel;
-use project_portfolio_management_service::streaming::{ENTITY, Envelope, EventKind, SCHEMA_VERSION};
+use project_portfolio_management_service::models::plans::Model as PlanModel;
+use project_portfolio_management_service::streaming::{
+    ENTITY, Envelope, EventKind, SCHEMA_VERSION,
+};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, TransactionTrait};
 use serial_test::serial;
 use uuid::Uuid;
 
-/// Build a `Created` envelope for a freshly-created work-item row.
-fn created_envelope(model: &WorkItemModel) -> Envelope {
+/// Build a `Created` envelope for a freshly-created plan row.
+fn created_envelope(model: &PlanModel) -> Envelope {
     Envelope {
         event_id: Uuid::new_v4(),
         schema_version: SCHEMA_VERSION,
@@ -36,21 +38,19 @@ fn created_envelope(model: &WorkItemModel) -> Envelope {
     }
 }
 
-/// Outbox happy path: creating a work item writes BOTH the work-item row
+/// Outbox happy path: creating a plan writes BOTH the plan row
 /// and exactly one `event_outbox` row, in one transaction. This mirrors
 /// the `outbox`-transport CRUD handler path (`streaming::create_and_emit`).
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
-async fn outbox_create_writes_work_item_and_one_event_atomically() {
+async fn outbox_create_writes_plan_and_one_event_atomically() {
     request::<App, _, _>(|_request, ctx| async move {
-        let wi = WorkItem::new(WorkItemKind::Project, "Outbox platform migration");
+        let wi = Plan::new("Outbox platform migration");
 
         // One transaction spanning the entity insert and the outbox insert.
         let txn = ctx.db.begin().await.expect("begin tx");
-        let model = WorkItemModel::create(&txn, "Project", &wi)
-            .await
-            .expect("create work item");
+        let model = PlanModel::create(&txn, &wi).await.expect("create plan");
         let env = created_envelope(&model);
         OutboxInsert::from_envelope(&env, chrono::Utc::now().into())
             .expect("map envelope")
@@ -59,12 +59,12 @@ async fn outbox_create_writes_work_item_and_one_event_atomically() {
             .expect("enqueue outbox row");
         txn.commit().await.expect("commit tx");
 
-        // The work-item row persisted...
-        let wi_count = work_items::Entity::find()
+        // The plan row persisted...
+        let wi_count = plans::Entity::find()
             .count(&ctx.db)
             .await
-            .expect("count work items");
-        assert_eq!(wi_count, 1, "the work_items row committed");
+            .expect("count plans");
+        assert_eq!(wi_count, 1, "the plans row committed");
 
         // ...and exactly one outbox row for it, unpublished, correctly mapped.
         let rows = event_outbox::Entity::find()
@@ -72,13 +72,9 @@ async fn outbox_create_writes_work_item_and_one_event_atomically() {
             .all(&ctx.db)
             .await
             .expect("load outbox rows");
-        assert_eq!(
-            rows.len(),
-            1,
-            "exactly one event_outbox row for the work item"
-        );
+        assert_eq!(rows.len(), 1, "exactly one event_outbox row for the plan");
         assert_eq!(rows[0].kind, "created");
-        assert_eq!(rows[0].entity, "work_item");
+        assert_eq!(rows[0].entity, "plan");
         assert_eq!(rows[0].event_id, env.event_id);
         assert!(
             rows[0].published_at.is_none(),
@@ -89,7 +85,7 @@ async fn outbox_create_writes_work_item_and_one_event_atomically() {
 }
 
 /// Outbox atomicity: a failure before commit rolls back BOTH the
-/// work-item row and its `event_outbox` row — neither is left behind.
+/// plan row and its `event_outbox` row — neither is left behind.
 /// This is the crash window the outbox closes (no committed change without
 /// its event, and no event without its committed change).
 #[tokio::test]
@@ -97,12 +93,10 @@ async fn outbox_create_writes_work_item_and_one_event_atomically() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn outbox_failure_rolls_back_both_writes() {
     request::<App, _, _>(|_request, ctx| async move {
-        let wi = WorkItem::new(WorkItemKind::Project, "Rollback platform migration");
+        let wi = Plan::new("Rollback platform migration");
 
         let txn = ctx.db.begin().await.expect("begin tx");
-        let model = WorkItemModel::create(&txn, "Project", &wi)
-            .await
-            .expect("create work item");
+        let model = PlanModel::create(&txn, &wi).await.expect("create plan");
         let env = created_envelope(&model);
         OutboxInsert::from_envelope(&env, chrono::Utc::now().into())
             .expect("map envelope")
@@ -114,11 +108,11 @@ async fn outbox_failure_rolls_back_both_writes() {
         txn.rollback().await.expect("rollback tx");
 
         // Neither write survived — the two are all-or-nothing.
-        let wi_count = work_items::Entity::find()
+        let wi_count = plans::Entity::find()
             .count(&ctx.db)
             .await
-            .expect("count work items");
-        assert_eq!(wi_count, 0, "the work_items insert rolled back");
+            .expect("count plans");
+        assert_eq!(wi_count, 0, "the plans insert rolled back");
         let event_count = event_outbox::Entity::find()
             .count(&ctx.db)
             .await

@@ -14,16 +14,16 @@ serde_json = "1"
 [dependencies.project-portfolio-management-matcher]
 path = ".."
 
-# cargo-fuzz scaffolding for the work_item matcher (SEC-I2), mirroring the
+# cargo-fuzz scaffolding for the plan matcher (SEC-I2), mirroring the
 # person-matcher reference. This crate exposes its pure helpers as free
 # functions in the `normalize` module (no `Scorer` struct), so it carries two
 # targets: the engine over deserialized input, and the pure normalizers. Run
-# on nightly: `cargo +nightly fuzz run match_work_items`. Not a member of any parent
+# on nightly: `cargo +nightly fuzz run match_plans`. Not a member of any parent
 # workspace, so it never affects the matcher's normal build/test/clippy.
 
 [[bin]]
-name = "match_work_items"
-path = "fuzz_targets/match_work_items.rs"
+name = "match_plans"
+path = "fuzz_targets/match_plans.rs"
 test = false
 doc = false
 bench = false

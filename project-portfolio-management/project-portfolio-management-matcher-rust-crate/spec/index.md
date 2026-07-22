@@ -6,32 +6,35 @@
 
 ## 1. Purpose
 
-`project-portfolio-management-matcher` is a reusable, dependency-light Rust library for
-**pairwise work-item record matching**. A *work item* is a named unit of
-intended work — a **Portfolio** (the umbrella container), or a
-**Project**, **Product**, or **Program** that sits under a portfolio —
-each with goals and a timeframe, tracked in a portfolio /
-project-management registry. The canonical matchable type is
-`WorkItem`, carrying a required discriminator `kind: WorkItemKind`
-(`Portfolio` | `Project` | `Product` | `Program`); a Portfolio is the
-umbrella kind of work item. Given two `WorkItem` records the matcher
-returns a `MatchResult`: score in `[0.0, 1.0]`, `Confidence`,
-`is_match`, and a per-component `MatchBreakdown`. It is the canonical
-algorithm embedded in `project-portfolio-management-service`'s matching layer for
-deduplication **within each work-item collection**.
+`project-portfolio-management-matcher` is a reusable, dependency-light
+Rust library for **pairwise plan record matching**. A *plan* is a named
+unit of intended work — with goals and a timeframe — that may contain
+other plans, forming a recursive tree, tracked in a portfolio /
+project-management registry. The canonical matchable type is `Plan`,
+carrying an optional descriptive `kind: Option<PlanKind>` (`Portfolio` |
+`Project` | `Product` | `Program` | `Practice` | `Process` | `Purpose` |
+`Pathway` | `Proposal`) used only as a display / grouping label. Given
+two `Plan` records the matcher returns a `MatchResult`: score in `[0.0,
+1.0]`, `Confidence`, `is_match`, and a per-component `MatchBreakdown`.
+It is the canonical algorithm embedded in
+`project-portfolio-management-service`'s matching layer for
+deduplication **across the single plan collection**.
 
-The four kinds map to four distinct service collections / tables
-(`portfolios`, `projects`, `products`, `programs`); they are **not**
-types of one collapsed entity. The matcher reuses **one** comparison
-core but **gates on kind** (§5, R-GATE): two work items of different
-kind never match. Matching is always *within-kind*.
+The four former kinds (Portfolio / Project / Product / Program) were
+**unified into one recursive plan tree** stored in one collection /
+table (`plans`); any plan may contain any other via `parent_ref`.
+`kind` survives only as **optional descriptive metadata** (a display /
+grouping label, since extended with `Practice` / `Process` / `Purpose` /
+`Pathway` / `Proposal`). The
+matcher uses **one** comparison core with **no kind gate**: any two
+plans may match regardless of their (optional) `kind`.
 
 ## 2. Scope
 
-In scope: the attributes that distinguish one work item from another —
-name, goals, owner-scoped code, owning organisation, parent portfolio,
+In scope: the attributes that distinguish one plan from another —
+name, goals, owner-scoped code, owning organisation, parent plan,
 timeframe, keywords, tags, relationships, and tool/registry
-identifiers. Out of scope: the full work-item content (task breakdown,
+identifiers. Out of scope: the full plan content (task breakdown,
 resourcing, Gantt scheduling, status history, issues), person-level
 assignment data, and anything requiring IO, a runtime, or network
 access. The operational sub-resources (tasks / issues, and goals beyond
@@ -39,38 +42,38 @@ their titles) belong to the service, not the matcher.
 
 ## 3. Glossary
 
-- **Work item** — a named unit of intended work, of `kind` Portfolio /
-  Project / Product / Program, with goals and a timeframe.
-- **Kind** — the required `WorkItemKind` discriminator; a hard match
-  gate (§5, R-GATE) and the collection/table the record lives in.
-- **Portfolio** — the umbrella `kind` of work item; Project / Product /
-  Program records carry a `portfolio_ref` to their parent portfolio.
+- **Plan** — a named unit of intended work, with goals and a
+  timeframe, that may contain other plans (`parent_ref`).
+- **Kind** — the optional `PlanKind` label (`Portfolio` / `Project` /
+  `Product` / `Program` / `Practice` / `Process` / `Purpose` /
+  `Pathway` / `Proposal`); descriptive metadata only. It does **not**
+  gate matching and does **not** fix a collection.
+- **Parent ref** — `parent_ref`, the containment link: any plan may
+  reference any other as its parent (a recursive tree).
 - **Deterministic identifier** — globally unique (URI, UUID, Jira
   project key, Asana GID, Trello board id, MS Project id, GitHub
   project id, Linear id). A match pins the score to `1.0`.
 - **Owner-scoped code** — `code`/`Code`/`LocalId`; only unique within
   the issuing organisation.
-- **Goal** — a discrete intended outcome of the work item; its
+- **Goal** — a discrete intended outcome of the plan; its
   **title** is the matchable surface.
 
 ## 4. Research basis
 
-Work items are largely identified by the tool that tracks them (Jira,
+Plans are largely identified by the tool that tracks them (Jira,
 Asana, Trello, MS Project, GitHub Projects, Linear) and by their owning
 organisation, name, and goals. The same initiative is frequently
 re-entered across tools or teams, so matching combines deterministic
 linkage on the tool/registry identifiers with fuzzy comparison of the
-name and overlap of the goal titles, owner, parent portfolio, timeframe,
-keywords, tags, and relationships. Because the registry partitions work
-items into distinct collections by `kind`, the matcher first refuses any
-cross-kind comparison (R-GATE): a project and a product are different
-record types and are never the same record.
+name and overlap of the goal titles, owner, parent plan, timeframe,
+keywords, tags, and relationships. The registry holds all plans in
+one recursive collection, so the matcher compares any two records
+regardless of their (optional) `kind` — there is no cross-kind refusal.
 
 ## 5. Algorithm overview
 
 ```
-Input: WorkItem A, WorkItem B, MatchConfig
-  ├─ R-GATE A.kind != B.kind?                   ─yes─> 0.0 (no match)
+Input: Plan A, Plan B, MatchConfig
   ├─ R-0 deterministic identifier match?        ─yes─> 1.0
   ├─ R-1 same owner + code?                     ─yes─> 1.0
   ├─ R-2 same_as URL overlap?                   ─yes─> 1.0
@@ -79,45 +82,45 @@ Input: WorkItem A, WorkItem B, MatchConfig
   ├─ goals_score         (≥1 set)   Jaccard over folded goal titles
   ├─ code_score          (same owner)  1.0/0.0
   ├─ owner_org_score     (both set) case-folded exact (1.0/0.0)
-  ├─ portfolio_score     (both set, child kinds) same parent portfolio_ref exact (1.0/0.0)
+  ├─ parent_score        (both set) same parent_ref exact (1.0/0.0)
   ├─ timeframe_score     (dates set) date proximity (Gaussian decay)
   ├─ keywords_score      (≥1 set)   Jaccard
-  ├─ relationships_score (≥1 set)   typed-set Jaccard over (relation, work_item_id)
+  ├─ relationships_score (≥1 set)   typed-set Jaccard over (relation, plan_id)
   ├─ tags_score          (both set) set Jaccard over normalised tags
   └─ renormalised weighted average over present components
 ```
 
-**R-GATE is the headline rule.** It runs *before* every other rule,
-deterministic or probabilistic: if `A.kind != B.kind`, the result is an
-immediate `0.0` no-match (different collections — a project is never a
-product). It is not a weighted component; it is a gate. All subsequent
-rules and components assume `A.kind == B.kind`. See §12 for the gate's
-formal statement.
+**There is no kind gate.** The four kinds were unified into one
+recursive plan tree, so any two plans may match regardless of
+their (optional, descriptive) `kind`. The `MatchBreakdown` retains a
+vestigial `kind_gate_blocked` field, now always `false`. See §12.
 
 ## 6. Domain model
 
 The canonical domain model lives in the **entity-level spec**
 ([`../../spec/index.md`](../../spec/index.md) §5); this section restates
-only the matcher-relevant surface. The crate's `WorkItem` type **is**
+only the matcher-relevant surface. The crate's `Plan` type **is**
 that model (§20) — the matcher type, the API DTO, and the persisted
 JSONB payload are one shape, no adapter.
 
-`WorkItem`: `kind` (`WorkItemKind`, **required**), `name` (required),
+`Plan`: `kind` (`Option<PlanKind>`, optional descriptive label),
+`name` (required),
 `alternate_names`, `code` (`Option<String>`, owner-scoped),
 `owner_org_id` (`Option<String>`, EntityRef organization),
 `owner_org_name` (`Option<String>`), `lead_ref` (`Option<String>`,
-EntityRef person/worker), `portfolio_ref` (`Option<String>`, parent
-portfolio `pid` — set on Project / Product / Program, absent on
-Portfolio), `status` (`Option<WorkItemStatus>`), `goals` (`Vec<Goal>`),
+EntityRef person/worker), `parent_ref` (`Option<String>`, parent
+plan `pid` — the containment link; any plan may reference any other),
+`status` (`Option<PlanStatus>`), `goals` (`Vec<Goal>`),
 `start_date` (`Option<Date>`), `target_date` (`Option<Date>`),
 `keywords`, `tags` (`Vec<String>`, default empty), `identifiers`
-(`WorkItemIdentifier { scheme, value }`), `same_as`, `in_language`,
-`relationships` (`WorkItemRelationship { relation, work_item_id }`).
+(`PlanIdentifier { scheme, value }`), `same_as`, `in_language`,
+`relationships` (`PlanRelationship { relation, plan_id }`).
 
-`kind: WorkItemKind` is **required** and is the match gate (§5, §12).
-`WorkItemKind`: `Portfolio`, `Project`, `Product`, `Program`. The set is
-**closed** — it is **not** `#[non_exhaustive]` and carries **no**
-`Custom` variant, because it maps to a fixed set of tables/collections.
+`kind: Option<PlanKind>` is **optional descriptive metadata** — a
+display / grouping label that does **not** gate matching (§5, §12).
+`PlanKind`: `Portfolio`, `Project`, `Product`, `Program`, `Practice`,
+`Process`, `Purpose`, `Pathway`, `Proposal`. The set is **closed** — it
+is **not** `#[non_exhaustive]` and carries **no** `Custom` variant.
 
 `Goal { title: String, description: Option<String>, target_date:
 Option<Date>, status: Option<GoalStatus> }` where `GoalStatus` is an
@@ -127,15 +130,15 @@ enum: `NotStarted`, `InProgress`, `Achieved`,
 informational-only — serialized for callers but never read by the
 matcher.
 
-`WorkItemStatus`: `Proposed`, `Active`, `OnHold`, `Completed`,
+`PlanStatus`: `Proposed`, `Active`, `OnHold`, `Completed`,
 `Cancelled`, `Custom(String)`. `status` is informational-only — not a
 matching signal (two records of the same initiative routinely sit at
 different statuses).
 
-`portfolio_ref: Option<String>` is the parent portfolio's `pid` for
-Project / Product / Program records (the umbrella link); it is absent
-and ignored for the Portfolio kind. It is an **exact-match supporting
-signal** for the child kinds (§11b), never a fuzzy comparison.
+`parent_ref: Option<String>` is the containing plan's `pid` — the
+general containment link, by which any plan may reference any other as
+its parent (a recursive tree). It is an **exact-match supporting
+signal** for every plan that carries one (§11b), never a fuzzy comparison.
 
 `tags: Vec<String>` holds operator-applied free-text labels for
 grouping / workflow (e.g. `vip`, `review`, `q3`); each is whitespace-
@@ -144,13 +147,13 @@ Distinct from `keywords` (descriptive / discovery terms about *what the
 record is*): tags are user-applied operational labels. A supporting
 signal, not an identifying field on its own (§13.2).
 
-`relationships: Vec<WorkItemRelationship>` holds typed work-item-to-
-work-item references — `WorkItemRelationship { relation: RelationKind,
-work_item_id: String }` where `RelationKind` is an
+`relationships: Vec<PlanRelationship>` holds typed plan-to-
+plan references — `PlanRelationship { relation: RelationKind,
+plan_id: String }` where `RelationKind` is an
 enum mirroring the service: `ParentOf` / `ChildOf` (hierarchy inverses),
 `DependsOn` / `BlockedBy` (dependency inverses), `Supersedes` /
 `SupersededBy` (versioning inverses), `SimilarTo` (symmetric),
-`RelatedTo` (symmetric), plus `Custom(String)`. `work_item_id` is an
+`RelatedTo` (symmetric), plus `Custom(String)`. `plan_id` is an
 opaque registry id (whitespace-trimmed, non-empty); the matcher does
 **not** resolve, invert, or transitively close the references — it
 compares the two records' relationship **sets** (§13.1). A supporting
@@ -170,17 +173,17 @@ organisation-name comparison. `lead_ref` is likewise informational-only.
 ## 7. Configuration
 
 `MatchConfig` weights (default, sum 1.0): name 0.30, goals 0.15,
-code 0.15, owner_org 0.10, **portfolio 0.08**, timeframe 0.07, keywords
+code 0.15, owner_org 0.10, **parent 0.08**, timeframe 0.07, keywords
 0.05, `relationships_weight` 0.05 (§13.1), `tags_weight` 0.05 (§13.2).
 The weighted average is renormalised over the components actually
 present (§17), so the supporting weights never break the
 renormalisation. Threshold 0.85. Presets: `strict()` 0.95, `lenient()`
 0.70.
 
-The `portfolio` weight (0.08) **replaces** the `plan_type` weight the
-ancestor `plan-matcher` carried: `kind` is now a hard gate (§5, §12),
-not a weighted component, and the freed weight funds the parent-portfolio
-corroboration signal (§11b).
+The `parent` weight (0.08) **replaces** the `plan_type` weight the
+ancestor `plan-matcher` carried: `kind` is now optional descriptive
+metadata (§5, §12), not a weighted component and not a gate, and the
+freed weight funds the parent-plan corroboration signal (§11b).
 
 Changing any weight (including `relationships_weight` or `tags_weight`)
 is a config-section + `CHANGELOG.md` edit in the same PR (§25).
@@ -217,28 +220,25 @@ else 0.0. Across owners (or missing owner): `None` (a local code like
 either side is unset. Keys solely on the opaque id, never on
 `owner_org_name`.
 
-### 11b. Portfolio
+### 11b. Parent
 
-Parent-portfolio corroboration for the **child kinds** (`Project` /
-`Product` / `Program`): when both sides carry a non-empty
-`portfolio_ref`, 1.0 if the (case-folded) parent portfolio `pid`s are
-equal else 0.0. `None` (does not participate) when either side is unset,
-which is always the case for the `Portfolio` kind (a portfolio has no
-parent portfolio). An exact-match **supporting** signal weighted
-`portfolio` (§7, default `0.08`); two children sharing a parent
-corroborate but do not by themselves establish a match. The matcher
-never fuzzy-matches `portfolio_ref`.
+Parent-plan corroboration for **any** plan carrying a containment link:
+when both sides carry a non-empty `parent_ref`, 1.0 if the (case-folded)
+parent plan `pid`s are equal else 0.0. `None` (does not participate) when
+either side is unset (e.g. a root plan with no parent). An exact-match
+**supporting** signal weighted `parent` (§7, default `0.08`); two plans
+sharing a parent corroborate but do not by themselves establish a match.
+The matcher never fuzzy-matches `parent_ref`.
 
-## 12. Kind gate & timeframe
+## 12. Kind (no gate) & timeframe
 
-`kind` is **not** a weighted component. It is the **R-GATE** (§5): the
-very first rule, evaluated before R-0/R-1/R-2 and every probabilistic
-component. If `A.kind != B.kind` the matcher returns `0.0`
-(`is_match = false`, `Confidence::Low`, an all-`None` breakdown flagged
-as a kind mismatch) — two work items of different kind are distinct
-record types in distinct collections and never match. If
-`A.kind == B.kind` the gate is transparent and matching proceeds. This
-replaces the ancestor's `plan_type` exact-enum component, which is gone.
+`kind` is **not** a weighted component and **not** a gate. Since the four
+kinds were unified into one recursive plan tree, `kind` is only optional
+descriptive metadata (a display / grouping label) and never affects a
+match: any two plans may match regardless of their (optional) `kind`, and
+`kind` is never compared. The `MatchBreakdown` retains a vestigial
+`kind_gate_blocked` field, now always `false` (§5). This replaces the
+ancestor's `plan_type` exact-enum component, which is gone.
 
 `timeframe_score`: **date proximity** over `start_date` / `target_date`.
 The two records' available dates are compared pairwise (start↔start,
@@ -256,11 +256,11 @@ exactly one side is populated.
 
 ### 13.1 Relationships — `relationships_score`
 
-Typed-set **Jaccard** over the `(relation, work_item_id)` pairs: `score =
+Typed-set **Jaccard** over the `(relation, plan_id)` pairs: `score =
 |A ∩ B| / |A ∪ B|`, where each side's set is `{ (r.relation,
-r.work_item_id) for r in relationships }`. The relation kind is part of
+r.plan_id) for r in relationships }`. The relation kind is part of
 the key, so a `Supersedes` reference only agrees with a `Supersedes`
-reference to the **same** work-item id; `ParentOf` / `ChildOf` /
+reference to the **same** plan id; `ParentOf` / `ChildOf` /
 `DependsOn` / `BlockedBy` / `SupersededBy` / `SimilarTo` / `RelatedTo`
 are compared as opaque, distinct kinds (no inversion or transitive
 closure). `None` (does not participate) when **either** side has no
@@ -282,8 +282,8 @@ single-handedly establish a match.
 
 ## 15. Deterministic identifier short-circuits
 
-R-0: any shared value on a deterministic scheme → 1.0 (only when the
-kinds already agree — R-GATE precedes R-0, §5). Empty values ignored.
+R-0: any shared value on a deterministic scheme → 1.0, regardless of the
+two records' (optional) `kind`. Empty values ignored.
 Deterministic schemes: `Uri`, `Uuid`, `JiraProjectKey`, `AsanaGid`,
 `TrelloBoardId`, `MsProjectId`, `GitHubProjectId`, `LinearId`. `Code` /
 `LocalId` / `Custom` are excluded (owner-scoped or free-form, not
@@ -292,16 +292,14 @@ globally unique).
 ## 16. Owner+code, same_as, and open questions
 
 R-1: shared non-empty `owner_org_id` + equal normalised `code` → 1.0.
-R-2: any case-folded `same_as` URL overlap → 1.0. Both presuppose the
-kinds agree (R-GATE precedes them, §5).
+R-2: any case-folded `same_as` URL overlap → 1.0. Both apply regardless
+of the two records' (optional) `kind`.
 
 Open questions: should a goal-title exact overlap alone be a strong pin
-(currently probabilistic — many work items share a headline goal)?
-Should a `portfolio_ref` mismatch between two children *penalise* rather
+(currently probabilistic — many plans share a headline goal)?
+Should a `parent_ref` mismatch between two plans *penalise* rather
 than just not corroborate? Should the timeframe `σ` differ by `kind` (a
-project's months vs. a portfolio's years)? Should a shared `same_as`
-URL across *different* kinds be allowed to escape R-GATE (currently it
-cannot — the gate is absolute)?
+project's months vs. a portfolio's years)?
 
 ## 17. Renormalisation
 
@@ -311,8 +309,7 @@ contributing weights.
 ## 18. Confidence classification
 
 `High` ≥ 0.95, `Medium` ≥ 0.70, else `Low`. Separate from
-`MatchConfig::threshold` (`is_match`). A kind mismatch (R-GATE) yields
-`Low` at score `0.0`.
+`MatchConfig::threshold` (`is_match`).
 
 ## 19. Quality goals
 
@@ -321,32 +318,33 @@ deterministic; explainable; diacritic-correct.
 
 ## 20. Consumption
 
-`project-portfolio-management-service` embeds this crate directly: the crate's `WorkItem`
+`project-portfolio-management-service` embeds this crate directly: the crate's `Plan`
 type **is** the API DTO, the persisted JSONB payload, and the match
-input (no adapter) — the same posture as care-pathway. The four
-collections (`portfolios` / `projects` / `products` / `programs`) all
-store and compare `WorkItem`; matching is within a collection only
-(enforced by R-GATE — the service never matches a project against a
-product). A bridge test in the service pins the contract.
+input (no adapter) — the same posture as care-pathway. All plans live
+in one collection / table (`plans`) and are stored and compared as
+`Plan`; matching spans the whole collection regardless of a record's
+(optional) `kind` (there is no kind gate). A bridge test in the service
+pins the contract.
 
 ## 21. Compatibility
 
 Semantic versioning. Re-exports from `lib.rs` are the contract:
-`WorkItem`, `WorkItemIdentifier`, `IdentifierScheme`, `WorkItemKind`,
-`WorkItemStatus`, `Goal`, `GoalStatus`, `WorkItemRelationship`,
+`Plan`, `PlanIdentifier`, `IdentifierScheme`, `PlanKind`,
+`PlanStatus`, `Goal`, `GoalStatus`, `PlanRelationship`,
 `RelationKind`, `MatchingEngine`, `MatchConfig`, `MatchResult`,
 `MatchBreakdown`, `Confidence`, `Error`, `Result`.
 
 `Error`/`Result` are **reserved for future fallible APIs**: every
-current entry point (`match_work_items` and all component fns) is total
+current entry point (`match_plans` and all component fns) is total
 and returns `MatchResult` directly, so nothing produces an `Error`
 today. They remain part of the SemVer surface so a future fallible path
 (e.g. validated construction) can be added without a breaking re-export.
 
 ## 22. Anti-patterns
 
-Never match across kinds — R-GATE is absolute (a project is never a
-product). Do not short-circuit on owner-scoped or free-form schemes
+Never reintroduce a kind gate — `kind` is optional descriptive metadata,
+and two plans with different kinds may still be the same identity. Do not
+compare `kind` as a matching signal. Do not short-circuit on owner-scoped or free-form schemes
 (`Code` / `LocalId` / `Custom`). Do not score a `code` across owners. Do
 not match on `status` (it drifts between duplicate records). Do not
 strip diacritics. Do not add IO, async, or panics to library code.
@@ -358,23 +356,32 @@ strip diacritics. Do not add IO, async, or panics to library code.
 > --all-features -- -D warnings` clean, `cargo fmt` clean, zero
 > `#[allow]`. The boxes below are checked accordingly.
 
-- [x] Implement the domain model in code: `WorkItem`, `WorkItemKind`
+- [x] **2026-07-22 — Extend `PlanKind` with `Practice`, `Process`,
+  `Purpose`, `Pathway`, `Proposal`.** Additive variants on the closed
+  set (§6.2); `kind` stays optional descriptive metadata and is still
+  never a match gate, so scoring is unchanged. Pinned by the
+  kind-never-gates-matching integration test (every ordered pair of
+  the nine labels) and the property-test kind strategy.
+
+- [x] Implement the domain model in code: `Plan`, `PlanKind`
       (closed — **not** `#[non_exhaustive]`, no `Custom`), `Goal` /
-      `GoalStatus`, `WorkItemStatus`, `WorkItemIdentifier` /
-      `IdentifierScheme`, `WorkItemRelationship` / `RelationKind`, with
-      serde derives and `WorkItem::new(kind, name)`. (The supporting
-      enums are plain — **not** `#[non_exhaustive]` — matching the
-      `case-matcher` sibling house style so the service can match them
-      without wildcard arms.)
-- [x] Implement the **R-GATE** (§12): `A.kind != B.kind` short-circuits
-      to `0.0` before every other rule, with an all-`None` breakdown
-      flagged `kind_gate_blocked`.
+      `GoalStatus`, `PlanStatus`, `PlanIdentifier` /
+      `IdentifierScheme`, `PlanRelationship` / `RelationKind`, with
+      serde derives and `Plan::new(name)` (`kind` defaults to `None`).
+      (The supporting enums are plain — **not** `#[non_exhaustive]` —
+      matching the `case-matcher` sibling house style so the service can
+      match them without wildcard arms.)
+- [x] Unify the four former kinds into one recursive plan tree and
+      **remove the kind gate** (§12): any two plans may match regardless
+      of their (optional) `kind`, which is never compared. The
+      `MatchBreakdown.kind_gate_blocked` field is retained but vestigial
+      (always `false`).
 - [x] Implement deterministic short-circuits: R-0 (deterministic scheme
       overlap), R-1 (same owner + code), R-2 (`same_as` overlap), and
-      `IdentifierScheme::is_deterministic` — all gated behind R-GATE.
+      `IdentifierScheme::is_deterministic` — all independent of `kind`.
 - [x] Implement the probabilistic components: name (Jaro-Winkler +
       Soundex), goals (Jaccard over folded titles, §10), code (§11),
-      owner_org (§11a), portfolio (§11b), timeframe (Gaussian decay,
+      owner_org (§11a), parent (§11b), timeframe (Gaussian decay,
       §12), keywords (§13), with the weighted average renormalised over
       present components (§17).
 - [x] Implement `relationships` (§13.1): the typed-set Jaccard component,
@@ -398,8 +405,10 @@ Unit tests embedded per module; an integration suite
 run as doctests. Gate (mirrors CI): `cargo test`, `cargo clippy
 --all-targets --all-features -- -D warnings`, `cargo fmt --check`.
 Library code carries **no** `#[allow(clippy::…)]` attributes — it is
-clippy-clean without suppressions (repo-wide invariant). The R-GATE
-cross-kind no-match has dedicated coverage (every kind pair → `0.0`).
+clippy-clean without suppressions (repo-wide invariant). Dedicated
+coverage pins that `kind` does not gate matching (two plans with
+different kinds still match on their other signals; `kind_gate_blocked`
+is always `false`).
 
 ## 25. Change control
 

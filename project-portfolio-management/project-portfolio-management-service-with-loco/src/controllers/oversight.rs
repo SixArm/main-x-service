@@ -36,8 +36,8 @@ use authentication_verifier::Action;
 use crate::auth::{MaybeAuthUser, authorize_record};
 use crate::insights;
 use crate::models::_entities::{
-    audit_logs, benefits, budget_lines, gate_reviews, insight_snapshots, merge_records,
-    milestones, proposals, risks, scenarios, work_items,
+    audit_logs, benefits, budget_lines, gate_reviews, insight_snapshots, merge_records, milestones,
+    plans, proposals, risks, scenarios,
 };
 use crate::models::visibility as vis_models;
 
@@ -75,9 +75,7 @@ fn parse_instant(raw: &str, end_of_day: bool) -> Option<chrono::DateTime<chrono:
 }
 
 /// Resolve the window (default: trailing 90 days ending now).
-fn window(
-    query: &WindowQuery,
-) -> (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) {
+fn window(query: &WindowQuery) -> (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) {
     let now = chrono::Utc::now();
     let to = query
         .to
@@ -116,7 +114,7 @@ async fn board_pack(
     headers: HeaderMap,
 ) -> Result<Response> {
     let (from, to) = window(&query);
-    let items = live!(work_items, &ctx.db);
+    let items = live!(plans, &ctx.db);
     let risk_rows = live!(risks, &ctx.db);
     let budget_rows = live!(budget_lines, &ctx.db);
     let milestone_rows = live!(milestones, &ctx.db);
@@ -128,11 +126,14 @@ async fn board_pack(
     // Current portfolio health summary (worst member colour per bucket).
     let mut status_counts =
         std::collections::BTreeMap::from([("red", 0usize), ("amber", 0), ("green", 0)]);
-    for portfolio in items.iter().filter(|i| i.kind == "Portfolio") {
+    for portfolio in items
+        .iter()
+        .filter(|i| i.kind.as_deref() == Some("Portfolio"))
+    {
         let mut worst = "green";
         for member in items
             .iter()
-            .filter(|i| i.pid == portfolio.pid || i.portfolio_pid == Some(portfolio.pid))
+            .filter(|i| i.pid == portfolio.pid || i.parent_pid == Some(portfolio.pid))
         {
             let colour = rag[&member.pid];
             if colour == "red" || (colour == "amber" && worst == "green") {
@@ -152,8 +153,10 @@ async fn board_pack(
 
     // Benefits realized in the window: `benefit_realized` audit rows,
     // amounts from their snapshots, currency joined from the benefit.
-    let currency_of: std::collections::BTreeMap<Uuid, Option<String>> =
-        benefit_rows.iter().map(|b| (b.pid, b.currency.clone())).collect();
+    let currency_of: std::collections::BTreeMap<Uuid, Option<String>> = benefit_rows
+        .iter()
+        .map(|b| (b.pid, b.currency.clone()))
+        .collect();
     let realized_rows = audit_logs::Entity::find()
         .filter(audit_logs::Column::Action.eq("benefit_realized"))
         .filter(audit_logs::Column::CreatedAt.gte(from))
@@ -223,44 +226,53 @@ async fn board_pack(
 /// requested amount). Cap 100.
 #[debug_handler]
 async fn board_investments(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
-    let items = live!(work_items, &ctx.db);
-    let by_pid: std::collections::BTreeMap<Uuid, &work_items::Model> =
+    let items = live!(plans, &ctx.db);
+    let by_pid: std::collections::BTreeMap<Uuid, &plans::Model> =
         items.iter().map(|i| (i.pid, i)).collect();
     let mut entries: Vec<(chrono::DateTime<chrono::Utc>, serde_json::Value)> = Vec::new();
     for scenario in live!(scenarios, &ctx.db) {
         if let Some(at) = scenario.committed_at {
             let at = at.to_utc();
-            entries.push((at, serde_json::json!({
-                "kind": "scenario_commit", "at": at,
-                "name": scenario.name,
-                "budget_cap_minor": scenario.budget_cap_minor,
-                "currency": scenario.currency,
-            })));
+            entries.push((
+                at,
+                serde_json::json!({
+                    "kind": "scenario_commit", "at": at,
+                    "name": scenario.name,
+                    "budget_cap_minor": scenario.budget_cap_minor,
+                    "currency": scenario.currency,
+                }),
+            ));
         }
     }
     for line in live!(budget_lines, &ctx.db) {
         if let Some(at) = line.released_at {
             let at = at.to_utc();
-            entries.push((at, serde_json::json!({
-                "kind": "tranche_release", "at": at,
-                "description": line.description,
-                "gate": line.gate,
-                "planned_minor": line.planned_minor,
-                "currency": line.currency,
-                "item": by_pid.get(&line.work_item_pid).map(|i| item_ref(i)),
-            })));
+            entries.push((
+                at,
+                serde_json::json!({
+                    "kind": "tranche_release", "at": at,
+                    "description": line.description,
+                    "gate": line.gate,
+                    "planned_minor": line.planned_minor,
+                    "currency": line.currency,
+                    "item": by_pid.get(&line.plan_pid).map(|i| item_ref(i)),
+                }),
+            ));
         }
     }
     for proposal in live!(proposals, &ctx.db) {
         if matches!(proposal.status.as_str(), "approved" | "promoted") {
             let at = proposal.updated_at.to_utc();
-            entries.push((at, serde_json::json!({
-                "kind": "proposal", "at": at,
-                "title": proposal.title,
-                "decision": proposal.status,
-                "requested_minor": proposal.requested_minor,
-                "currency": proposal.currency,
-            })));
+            entries.push((
+                at,
+                serde_json::json!({
+                    "kind": "proposal", "at": at,
+                    "title": proposal.title,
+                    "decision": proposal.status,
+                    "requested_minor": proposal.requested_minor,
+                    "currency": proposal.currency,
+                }),
+            ));
         }
     }
     entries.sort_by_key(|entry| std::cmp::Reverse(entry.0));
@@ -277,10 +289,7 @@ async fn board_investments(State(ctx): State<AppContext>, headers: HeaderMap) ->
 /// (portfolio counts, open exposure, per-currency money). The trend
 /// series only ever contains what was actually captured.
 #[debug_handler]
-async fn take_snapshot(
-    State(ctx): State<AppContext>,
-    caller: MaybeAuthUser,
-) -> Result<Response> {
+async fn take_snapshot(State(ctx): State<AppContext>, caller: MaybeAuthUser) -> Result<Response> {
     let row = crate::snapshots::capture(&ctx.db)
         .await
         .map_err(Error::Model)?;
@@ -373,7 +382,11 @@ async fn auditor_trail(
         let pid = Uuid::parse_str(entity).map_err(|_| Error::NotFound)?;
         find = find.filter(audit_logs::Column::EntityPid.eq(pid));
     }
-    if let Some(from) = query.from.as_deref().and_then(|raw| parse_instant(raw, false)) {
+    if let Some(from) = query
+        .from
+        .as_deref()
+        .and_then(|raw| parse_instant(raw, false))
+    {
         find = find.filter(audit_logs::Column::CreatedAt.gte(from));
     }
     if let Some(to) = query.to.as_deref().and_then(|raw| parse_instant(raw, true)) {
@@ -419,8 +432,8 @@ async fn auditor_trail(
 /// cross-space comparisons.
 #[debug_handler]
 async fn auditor_findings(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
-    let items = live!(work_items, &ctx.db);
-    let by_pid: std::collections::BTreeMap<Uuid, &work_items::Model> =
+    let items = live!(plans, &ctx.db);
+    let by_pid: std::collections::BTreeMap<Uuid, &plans::Model> =
         items.iter().map(|i| (i.pid, i)).collect();
     let audit_rows = audit_logs::Entity::find()
         .all(&ctx.db)
@@ -428,20 +441,22 @@ async fn auditor_findings(State(ctx): State<AppContext>, headers: HeaderMap) -> 
         .map_err(|e| Error::Model(ModelError::from(e)))?;
     let line_item: std::collections::BTreeMap<Uuid, Uuid> = live!(budget_lines, &ctx.db)
         .iter()
-        .map(|line| (line.pid, line.work_item_pid))
+        .map(|line| (line.pid, line.plan_pid))
         .collect();
     let mut findings: Vec<serde_json::Value> = Vec::new();
 
     // Rule 1: the same actor recorded a gate review AND a tranche
-    // release on the same work item.
+    // release on the same plan.
     let gate_actors: std::collections::BTreeSet<(Uuid, &str)> = audit_rows
         .iter()
         .filter(|row| row.action == "gate_reviewed")
         .filter_map(|row| row.actor.as_deref().map(|actor| (row.entity_pid, actor)))
         .collect();
-    for row in audit_rows.iter().filter(|row| row.action == "budget_line_released") {
-        let (Some(actor), Some(item_pid)) =
-            (row.actor.as_deref(), line_item.get(&row.entity_pid))
+    for row in audit_rows
+        .iter()
+        .filter(|row| row.action == "budget_line_released")
+    {
+        let (Some(actor), Some(item_pid)) = (row.actor.as_deref(), line_item.get(&row.entity_pid))
         else {
             continue;
         };
@@ -527,7 +542,10 @@ async fn evidence_pack(
     axum::extract::Query(query): axum::extract::Query<EvidenceQuery>,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
-    let win = WindowQuery { from: query.from.clone(), to: query.to.clone() };
+    let win = WindowQuery {
+        from: query.from.clone(),
+        to: query.to.clone(),
+    };
     let (from, to) = window(&win);
     let audit_rows = audit_logs::Entity::find()
         .filter(audit_logs::Column::CreatedAt.gte(from))
@@ -601,7 +619,7 @@ async fn compliance_findings(
     let review_days = i64::from(query.review_days.unwrap_or(90).clamp(1, 365));
     let now = chrono::Utc::now();
     let today = now.date_naive();
-    let items = live!(work_items, &ctx.db);
+    let items = live!(plans, &ctx.db);
     let risk_rows = live!(risks, &ctx.db);
     let review_rows = gate_reviews::Entity::find()
         .all(&ctx.db)
@@ -611,10 +629,11 @@ async fn compliance_findings(
 
     // Rule 1: unfinished item past its target date with no gate review
     // in the last `review_days` days.
-    let last_review: std::collections::BTreeMap<Uuid, chrono::DateTime<chrono::Utc>> =
-        review_rows.iter().fold(std::collections::BTreeMap::new(), |mut acc, review| {
+    let last_review: std::collections::BTreeMap<Uuid, chrono::DateTime<chrono::Utc>> = review_rows
+        .iter()
+        .fold(std::collections::BTreeMap::new(), |mut acc, review| {
             let at = review.decided_at.to_utc();
-            let entry = acc.entry(review.work_item_pid).or_insert(at);
+            let entry = acc.entry(review.plan_pid).or_insert(at);
             if at > *entry {
                 *entry = at;
             }
@@ -642,7 +661,10 @@ async fn compliance_findings(
     }
 
     // Rule 2: escalated risks with no owner.
-    for risk in risk_rows.iter().filter(|r| r.escalated_at.is_some() && r.owner_ref.is_none()) {
+    for risk in risk_rows
+        .iter()
+        .filter(|r| r.escalated_at.is_some() && r.owner_ref.is_none())
+    {
         findings.push(serde_json::json!({
             "rule": "escalated_risk_without_owner",
             "detail": "an escalated risk has no recorded owner",
@@ -696,9 +718,9 @@ async fn compliance_findings(
 #[allow(clippy::too_many_lines)] // one pass: matrix + posture + hygiene + appetite
 async fn risk_heatmap(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
     let today = chrono::Utc::now().date_naive();
-    let items = live!(work_items, &ctx.db);
+    let items = live!(plans, &ctx.db);
     let risk_rows = live!(risks, &ctx.db);
-    let by_pid: std::collections::BTreeMap<Uuid, &work_items::Model> =
+    let by_pid: std::collections::BTreeMap<Uuid, &plans::Model> =
         items.iter().map(|i| (i.pid, i)).collect();
     let open: Vec<&risks::Model> = risk_rows
         .iter()
@@ -706,7 +728,10 @@ async fn risk_heatmap(State(ctx): State<AppContext>, headers: HeaderMap) -> Resu
         .collect();
 
     let cells = insights::heatmap_cells(
-        &open.iter().map(|r| (r.probability, r.impact)).collect::<Vec<_>>(),
+        &open
+            .iter()
+            .map(|r| (r.probability, r.impact))
+            .collect::<Vec<_>>(),
     );
     let mut top: Vec<&&risks::Model> = open.iter().collect();
     top.sort_by_key(|r| std::cmp::Reverse(r.probability * r.impact));
@@ -718,7 +743,7 @@ async fn risk_heatmap(State(ctx): State<AppContext>, headers: HeaderMap) -> Resu
                 "pid": risk.pid, "title": risk.title,
                 "exposure": risk.probability * risk.impact,
                 "category": risk.category.as_deref().unwrap_or("delivery"),
-                "item": by_pid.get(&risk.work_item_pid).map(|i| item_ref(i)),
+                "item": by_pid.get(&risk.plan_pid).map(|i| item_ref(i)),
             })
         })
         .collect();
@@ -726,13 +751,17 @@ async fn risk_heatmap(State(ctx): State<AppContext>, headers: HeaderMap) -> Resu
     // Posture per portfolio bucket.
     let bucket_of = |pid: &Uuid| -> Option<Uuid> {
         by_pid.get(pid).and_then(|item| {
-            if item.kind == "Portfolio" { Some(item.pid) } else { item.portfolio_pid }
+            if item.kind.as_deref() == Some("Portfolio") {
+                Some(item.pid)
+            } else {
+                item.parent_pid
+            }
         })
     };
     let mut posture: std::collections::BTreeMap<Option<Uuid>, (i32, usize, usize)> =
         std::collections::BTreeMap::new();
     for risk in &risk_rows {
-        let bucket = bucket_of(&risk.work_item_pid);
+        let bucket = bucket_of(&risk.plan_pid);
         let entry = posture.entry(bucket).or_default();
         if matches!(risk.status.as_str(), "open" | "mitigating") {
             entry.0 += risk.probability * risk.impact;
@@ -784,7 +813,9 @@ async fn risk_heatmap(State(ctx): State<AppContext>, headers: HeaderMap) -> Resu
 
     // Declared appetite (or an honest absence).
     let appetite = insights::parse_appetite(
-        std::env::var("PROJECT_PORTFOLIO_MANAGEMENT_RISK_APPETITE").ok().as_deref(),
+        std::env::var("PROJECT_PORTFOLIO_MANAGEMENT_RISK_APPETITE")
+            .ok()
+            .as_deref(),
     );
     let breaches: Vec<serde_json::Value> = match &appetite {
         None => Vec::new(),
@@ -840,18 +871,20 @@ async fn risk_heatmap(State(ctx): State<AppContext>, headers: HeaderMap) -> Resu
 #[debug_handler]
 async fn security_register(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
     let mut body = risk_register_body(&ctx, "security").await?;
-    let items = live!(work_items, &ctx.db);
+    let items = live!(plans, &ctx.db);
     let risk_rows = live!(risks, &ctx.db);
     let with_security: std::collections::HashSet<Uuid> = risk_rows
         .iter()
         .filter(|r| r.category.as_deref() == Some("security"))
-        .map(|r| r.work_item_pid)
+        .map(|r| r.plan_pid)
         .collect();
     let late = ["g3_delivery", "g4_launch", "g5_benefits"];
     let unreviewed: Vec<serde_json::Value> = items
         .iter()
         .filter(|item| {
-            item.stage.as_deref().is_some_and(|stage| late.contains(&stage))
+            item.stage
+                .as_deref()
+                .is_some_and(|stage| late.contains(&stage))
                 && !with_security.contains(&item.pid)
         })
         .map(|item| serde_json::json!({ "item": item_ref(item), "stage": item.stage }))
@@ -885,11 +918,14 @@ async fn regulator_extract(
     // attach the `mask` obligation (e.g. for dept=regulator tokens).
     let obligations = authorize_record(&caller, Action::Read, &std::collections::BTreeMap::new())
         .map_err(|(status, reason)| {
-            Error::CustomError(status, loco_rs::controller::ErrorDetail::new("forbidden", &reason))
-        })?;
+        Error::CustomError(
+            status,
+            loco_rs::controller::ErrorDetail::new("forbidden", &reason),
+        )
+    })?;
     let masked = obligations.iter().any(|o| o == "mask");
 
-    let items = live!(work_items, &ctx.db);
+    let items = live!(plans, &ctx.db);
     let budget_rows = live!(budget_lines, &ctx.db);
     let benefit_rows = live!(benefits, &ctx.db);
     let review_rows = gate_reviews::Entity::find()
@@ -898,24 +934,32 @@ async fn regulator_extract(
         .map_err(|e| Error::Model(ModelError::from(e)))?;
 
     let mut portfolios = Vec::new();
-    for portfolio in items.iter().filter(|i| i.kind == "Portfolio") {
+    for portfolio in items
+        .iter()
+        .filter(|i| i.kind.as_deref() == Some("Portfolio"))
+    {
         let member_pids: std::collections::HashSet<Uuid> = items
             .iter()
-            .filter(|i| i.pid == portfolio.pid || i.portfolio_pid == Some(portfolio.pid))
+            .filter(|i| i.pid == portfolio.pid || i.parent_pid == Some(portfolio.pid))
             .map(|i| i.pid)
             .collect();
         let mut members: std::collections::BTreeMap<&str, usize> =
             std::collections::BTreeMap::new();
         for item in items.iter().filter(|i| member_pids.contains(&i.pid)) {
-            *members.entry(item.kind.as_str()).or_default() += 1;
+            *members
+                .entry(item.kind.as_deref().unwrap_or("unspecified"))
+                .or_default() += 1;
         }
         let mut gates: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
-        for review in review_rows.iter().filter(|r| member_pids.contains(&r.work_item_pid)) {
+        for review in review_rows
+            .iter()
+            .filter(|r| member_pids.contains(&r.plan_pid))
+        {
             *gates.entry(review.decision.as_str()).or_default() += 1;
         }
         let lines: Vec<&budget_lines::Model> = budget_rows
             .iter()
-            .filter(|b| member_pids.contains(&b.work_item_pid))
+            .filter(|b| member_pids.contains(&b.plan_pid))
             .collect();
         let spend = insights::variance_by_currency(&money_lines(&lines))
             .into_iter()
@@ -929,7 +973,10 @@ async fn regulator_extract(
             .collect::<Vec<_>>();
         let mut benefits_per_currency: std::collections::BTreeMap<&str, (i64, i64)> =
             std::collections::BTreeMap::new();
-        for benefit in benefit_rows.iter().filter(|b| member_pids.contains(&b.work_item_pid)) {
+        for benefit in benefit_rows
+            .iter()
+            .filter(|b| member_pids.contains(&b.plan_pid))
+        {
             if let Some(currency) = benefit.currency.as_deref() {
                 let entry = benefits_per_currency.entry(currency).or_default();
                 entry.0 = entry.0.saturating_add(benefit.target_minor.unwrap_or(0));
@@ -970,9 +1017,9 @@ async fn regulator_extract(
 /// The category risk-register body (compliance / security), mirroring
 /// the technical-debt register's shape.
 async fn risk_register_body(ctx: &AppContext, category: &str) -> Result<serde_json::Value> {
-    let items = live!(work_items, &ctx.db);
+    let items = live!(plans, &ctx.db);
     let risk_rows = live!(risks, &ctx.db);
-    let by_pid: std::collections::BTreeMap<Uuid, &work_items::Model> =
+    let by_pid: std::collections::BTreeMap<Uuid, &plans::Model> =
         items.iter().map(|i| (i.pid, i)).collect();
     let mut rows = category_risks(&risk_rows, category);
     rows.sort_by_key(|r| std::cmp::Reverse(r.probability * r.impact));
@@ -995,7 +1042,7 @@ async fn risk_register_body(ctx: &AppContext, category: &str) -> Result<serde_js
                 "exposure": risk.probability * risk.impact,
                 "escalated": risk.escalated_at.is_some(),
                 "owner_ref": risk.owner_ref,
-                "item": by_pid.get(&risk.work_item_pid).map(|i| item_ref(i)),
+                "item": by_pid.get(&risk.plan_pid).map(|i| item_ref(i)),
             })
         })
         .collect();

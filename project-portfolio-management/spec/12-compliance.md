@@ -1,23 +1,23 @@
 ## 12. Compliance
 
 The Main X Index targets worldwide public governmental systems.
-Work items are **operational / business data** rather than clinical or
+Plans are **operational / business data** rather than clinical or
 patient data, so the technology-compliance posture leads, with the
-data-protection posture engaged by the **people references** a work
-item carries. Frameworks:
+data-protection posture engaged by the **people references** a plan
+carries. Frameworks:
 [`agents/share/compliance-for-technology.md`](../../agents/share/compliance-for-technology.md)
 and
 [`agents/share/compliance-for-healthcare.md`](../../agents/share/compliance-for-healthcare.md).
 
 ### 12.1 Data classification
 
-A work item's thin record (name, goals, code, kind, parent portfolio,
-timeframe, identifiers) is **business data**, not personal data. Two
-angles keep the data-protection posture in force:
+A plan's thin record (name, goals, code, optional `kind` label, parent
+plan, timeframe, identifiers) is **business data**, not personal data.
+Two angles keep the data-protection posture in force:
 
 - **People references are personal data.** `lead_ref` and task
   `assignee_ref`s are `EntityRef`s to **people** (person / worker /
-  authentication identities). Who leads or staffs a work item — and the
+  authentication identities). Who leads or staffs a plan — and the
   audit trail of who changed what — is personal data about identifiable
   individuals. **GDPR / UK DPA 2018 apply** to these references and to
   the audit log.
@@ -50,7 +50,7 @@ is retained for governmental information governance.
   personal field appears.
 - **Masking on export.** Bulk export defaults to masked, with the
   people references revealed only under elevated authorisation (§9.6);
-  the `case ↔ person`-style sensitivity does **not** apply (work items
+  the `case ↔ person`-style sensitivity does **not** apply (plans
   are not case data), but lead / assignee references are still personal
   data and masked by default.
 - **Auditability.** Full audit log + event stream of every CRUD **and
@@ -68,5 +68,5 @@ is retained for governmental information governance.
   delivered, supersedes the earlier role-based sketch); default-off
   until the coordinated SSO activation (§15).
 - **Explainability for accountability.** Per-component match
-  breakdowns — and the kind gate — give auditors a replayable rationale
-  for every duplicate decision; keep this property (NFR-8).
+  breakdowns give auditors a replayable rationale for every duplicate
+  decision; keep this property (NFR-8).

@@ -25,10 +25,11 @@ Built in `matcher.rs` (not a public normalize fn): `start_date` /
 decay `exp(-(Δdays/σ)²/2)`. No string folding applies — dates are
 compared as calendar values.
 
-## `portfolio_ref`
+## `parent_ref`
 
 Compared by `fold` (case-folded exact) only — it is an opaque parent
-portfolio `pid`, never fuzzy-matched. No alphanumeric stripping applies.
+plan `pid` (the containment link), never fuzzy-matched. No alphanumeric
+stripping applies.
 
 ## Rule of thumb
 

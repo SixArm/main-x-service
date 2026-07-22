@@ -5,7 +5,7 @@
 //! Each property generates many random inputs via `proptest` and asserts an
 //! invariant that must hold for **every** input. These catch the failure
 //! modes example-based tests miss: pathological Unicode in names, junk /
-//! overflow-prone date strings, and sparse-vs-dense `WorkItem` records.
+//! overflow-prone date strings, and sparse-vs-dense `Plan` records.
 //!
 //! The load-bearing invariants proven here:
 //!
@@ -17,7 +17,7 @@
 //! - the **kind gate** pins any cross-kind pair to a `0.0` non-match;
 //! - an identical clone of a record matches itself.
 
-use project_portfolio_management_matcher::{Confidence, MatchingEngine, WorkItem, WorkItemKind, normalize, phonetic};
+use project_portfolio_management_matcher::{MatchingEngine, Plan, PlanKind, normalize, phonetic};
 use proptest::prelude::*;
 
 // ---------- Strategies ----------
@@ -28,13 +28,18 @@ fn text() -> impl Strategy<Value = String> {
     "\\PC{0,32}"
 }
 
-/// One of the four work-item kinds.
-fn kind_strategy() -> impl Strategy<Value = WorkItemKind> {
+/// One of the plan kinds.
+fn kind_strategy() -> impl Strategy<Value = PlanKind> {
     prop_oneof![
-        Just(WorkItemKind::Portfolio),
-        Just(WorkItemKind::Project),
-        Just(WorkItemKind::Product),
-        Just(WorkItemKind::Program),
+        Just(PlanKind::Portfolio),
+        Just(PlanKind::Project),
+        Just(PlanKind::Product),
+        Just(PlanKind::Program),
+        Just(PlanKind::Practice),
+        Just(PlanKind::Process),
+        Just(PlanKind::Purpose),
+        Just(PlanKind::Pathway),
+        Just(PlanKind::Proposal),
     ]
 }
 
@@ -50,11 +55,11 @@ fn maybe_date() -> impl Strategy<Value = Option<String>> {
     ]
 }
 
-/// A `WorkItem` of the given `kind`, varying the string-ish fields the
+/// A `Plan` of the given `kind`, varying the string-ish fields the
 /// probabilistic strategy actually reads (name, alternate names, code,
 /// owner org, keywords, tags, dates). Lightweight by design — enough
 /// surface to exercise every component without a full-fat builder.
-fn work_item(kind: WorkItemKind) -> impl Strategy<Value = WorkItem> {
+fn plan(kind: PlanKind) -> impl Strategy<Value = Plan> {
     (
         text(),
         prop::collection::vec(text(), 0..3),
@@ -67,7 +72,8 @@ fn work_item(kind: WorkItemKind) -> impl Strategy<Value = WorkItem> {
     )
         .prop_map(
             move |(name, alts, code, owner, keywords, tags, start, target)| {
-                let mut w = WorkItem::new(kind, name);
+                let mut w = Plan::new(name);
+                w.kind = Some(kind);
                 w.alternate_names = alts;
                 w.code = code;
                 w.owner_org_id = owner;
@@ -80,21 +86,21 @@ fn work_item(kind: WorkItemKind) -> impl Strategy<Value = WorkItem> {
         )
 }
 
-/// An arbitrary `WorkItem` of any kind.
-fn any_work_item() -> impl Strategy<Value = WorkItem> {
-    kind_strategy().prop_flat_map(work_item)
+/// An arbitrary `Plan` of any kind.
+fn any_plan() -> impl Strategy<Value = Plan> {
+    kind_strategy().prop_flat_map(plan)
 }
 
-/// Two `WorkItem`s of the **same** (randomly chosen) kind.
-fn same_kind_pair() -> impl Strategy<Value = (WorkItem, WorkItem)> {
-    kind_strategy().prop_flat_map(|k| (work_item(k), work_item(k)))
+/// Two `Plan`s of the **same** (randomly chosen) kind.
+fn same_kind_pair() -> impl Strategy<Value = (Plan, Plan)> {
+    kind_strategy().prop_flat_map(|k| (plan(k), plan(k)))
 }
 
-/// Two `WorkItem`s of **different** kinds.
-fn diff_kind_pair() -> impl Strategy<Value = (WorkItem, WorkItem)> {
+/// Two `Plan`s of **different** kinds.
+fn diff_kind_pair() -> impl Strategy<Value = (Plan, Plan)> {
     (kind_strategy(), kind_strategy())
         .prop_filter("kinds must differ", |(a, b)| a != b)
-        .prop_flat_map(|(ka, kb)| (work_item(ka), work_item(kb)))
+        .prop_flat_map(|(ka, kb)| (plan(ka), plan(kb)))
 }
 
 /// A date-shaped string biased toward the year-overflow danger zone:
@@ -112,23 +118,23 @@ proptest! {
     /// The match engine MUST NOT panic on arbitrary input, and every score
     /// it returns MUST be a real number in `[0.0, 1.0]`.
     #[test]
-    fn score_is_finite_and_bounded(a in any_work_item(), b in any_work_item()) {
+    fn score_is_finite_and_bounded(a in any_plan(), b in any_plan()) {
         let engine = MatchingEngine::default_config();
-        let r = engine.match_work_items(&a, &b);
+        let r = engine.match_plans(&a, &b);
         prop_assert!(!r.score.is_nan(), "score is NaN");
         prop_assert!(r.score.is_finite(), "score is not finite: {}", r.score);
         prop_assert!(r.score >= 0.0, "score < 0.0: {}", r.score);
         prop_assert!(r.score <= 1.0, "score > 1.0: {}", r.score);
     }
 
-    /// `match_work_items` MUST be symmetric for records of the SAME kind:
+    /// `match_plans` MUST be symmetric for records of the SAME kind:
     /// swapping the arguments changes neither the score, the `is_match`
     /// verdict, nor the confidence band.
     #[test]
     fn matching_is_symmetric_same_kind((a, b) in same_kind_pair()) {
         let engine = MatchingEngine::default_config();
-        let forward = engine.match_work_items(&a, &b);
-        let reverse = engine.match_work_items(&b, &a);
+        let forward = engine.match_plans(&a, &b);
+        let reverse = engine.match_plans(&b, &a);
         prop_assert!(
             (forward.score - reverse.score).abs() < 1e-9,
             "score asymmetric: {} vs {}",
@@ -139,28 +145,28 @@ proptest! {
         prop_assert_eq!(forward.confidence, reverse.confidence);
     }
 
-    /// The KIND GATE: two records of DIFFERENT kinds MUST always score
-    /// exactly `0.0`, never match, flag `kind_gate_blocked`, and leave every
-    /// component `None` — regardless of any field values.
+    /// NO KIND GATE: `kind` is optional descriptive metadata, so two
+    /// records of DIFFERENT kinds are scored by the normal probabilistic
+    /// pipeline — `kind_gate_blocked` is never set, the name component is
+    /// scored, the score stays bounded, and matching remains symmetric.
     #[test]
-    fn kind_gate_blocks_all_cross_kind_pairs((a, b) in diff_kind_pair()) {
+    fn different_kinds_are_not_gated((a, b) in diff_kind_pair()) {
         let engine = MatchingEngine::default_config();
-        let r = engine.match_work_items(&a, &b);
-        prop_assert!(r.score.abs() < 1e-12, "cross-kind score not 0.0: {}", r.score);
-        prop_assert!(!r.is_match, "cross-kind pair matched");
-        prop_assert!(r.breakdown.kind_gate_blocked, "kind_gate_blocked not set");
-        prop_assert!(!r.breakdown.deterministic_match, "deterministic fired across kinds");
-        prop_assert!(r.breakdown.name_score.is_none(), "name scored across kinds");
-        prop_assert_eq!(r.confidence, Confidence::Low);
+        let forward = engine.match_plans(&a, &b);
+        let reverse = engine.match_plans(&b, &a);
+        prop_assert!(!forward.breakdown.kind_gate_blocked, "kind gate fired across kinds");
+        prop_assert!(forward.breakdown.name_score.is_some(), "name not scored across kinds");
+        prop_assert!(forward.score >= 0.0 && forward.score <= 1.0, "score out of bounds: {}", forward.score);
+        prop_assert!((forward.score - reverse.score).abs() < 1e-9, "cross-kind score asymmetric");
     }
 
     /// REFLEXIVE: an identical clone of any well-formed record matches
     /// itself. We assert `is_match` (not exactly `1.0`) per the crate's
     /// contract — self-match need only clear the threshold.
     #[test]
-    fn identical_clone_matches_itself(a in any_work_item()) {
+    fn identical_clone_matches_itself(a in any_plan()) {
         let engine = MatchingEngine::default_config();
-        let r = engine.match_work_items(&a, &a);
+        let r = engine.match_plans(&a, &a);
         prop_assert!(
             r.is_match && r.score >= engine.config().threshold,
             "self-match failed: score={} threshold={}",

@@ -10,22 +10,23 @@ crate.
 
 | Question | Answer |
 |---|---|
-| What does the crate do? | Pairwise work-item (Portfolio / Project / Product / Program) record matching, deterministic + probabilistic, for within-collection dedup. |
+| What does the crate do? | Pairwise plan record matching, deterministic + probabilistic, for dedup. The four former kinds (Portfolio / Project / Product / Program / Practice / Process / Purpose / Pathway / Proposal) are unified into one recursive plan tree; `kind` is optional descriptive metadata and does not gate matching. |
 | Canonical spec? | [`spec/index.md`](./spec/index.md). |
 | Entity domain model? | [`../spec/index.md`](../spec/index.md) §5 (entity-level umbrella). |
 | Build / test / lint / fmt | `cargo build` · `cargo test` · `cargo clippy --all-targets -- -D warnings` · `cargo fmt` |
 | Run the demo | `cargo run` (`src/main.rs`; not SemVer surface). |
-| Public types | `src/lib.rs` re-exports from `src/{work_item,matcher,scoring,config,normalize,phonetic,error}.rs`. |
-| Match gate (R-GATE) | `A.kind != B.kind` → `0.0` no-match, **before** every other rule. Matching is within-kind only. |
+| Public types | `src/lib.rs` re-exports from `src/{plan,matcher,scoring,config,normalize,phonetic,error}.rs`. |
+| Match gate | **None.** The former kind gate was removed; any two plans may match. `MatchBreakdown.kind_gate_blocked` is vestigial (always `false`). |
 | Deterministic schemes (→ 1.0) | URI, UUID, Jira project key, Asana GID, Trello board id, MS Project id, GitHub project id, Linear id; plus same-owner code (R-1) and `same_as` URL overlap (R-2). |
-| Probabilistic components | name (Jaro-Winkler + Soundex), goals (Jaccard over titles), owner-scoped code, owner org, portfolio (parent-portfolio exact), timeframe (Gaussian decay), keywords (Jaccard), relationships (typed-set Jaccard), tags (set Jaccard). |
-| Public API shape | `MatchingEngine::new(MatchConfig::default()).match_work_items(&a, &b) -> MatchResult`. |
+| Probabilistic components | name (Jaro-Winkler + Soundex), goals (Jaccard over titles), owner-scoped code, owner org, parent (parent plan exact via `parent_ref`), timeframe (Gaussian decay), keywords (Jaccard), relationships (typed-set Jaccard), tags (set Jaccard). |
+| Public API shape | `MatchingEngine::new(MatchConfig::default()).match_plans(&a, &b) -> MatchResult`. `Plan::new(name)` (kind defaults `None`). |
 
 ## Golden rules
 
 1. **Spec-first.** Behavioural change ⇒ update `spec/index.md`.
-2. **Kind-gated.** Two work items of different `kind` never match — the
-   R-GATE is absolute (§5 / §12).
+2. **No kind gate.** The four kinds were unified into one recursive
+   plan tree; `kind` is optional descriptive metadata and never
+   gates matching. Any two plans may match.
 3. **Pure library.** No IO, no logging, no global state in `src/`
    (excluding `src/main.rs`).
 4. **No `unsafe`. No `unwrap`/`expect`/`panic!`** in library code.
@@ -35,8 +36,8 @@ crate.
 
 ## What not to do
 
-- Do not match across kinds — R-GATE refuses a Project vs. Product
-  comparison at `0.0`.
+- Do not reintroduce a kind gate — `kind` is descriptive metadata, and
+  two plans with different kinds may still be the same identity.
 - Do not short-circuit on owner-scoped (`Code`/`LocalId`) or `Custom`
   schemes — they are not globally unique.
 - Do not score a `code` across differing owners.
@@ -57,8 +58,8 @@ crate.
 src/
 ├── lib.rs         public re-exports
 ├── main.rs        demo binary (not SemVer surface)
-├── work_item.rs   domain types (WorkItem, WorkItemKind, Goal, GoalStatus, WorkItemStatus, IdentifierScheme, WorkItemIdentifier, WorkItemRelationship, RelationKind)
-├── matcher.rs     MatchingEngine + R-GATE + per-component fns + deterministic rules
+├── plan.rs   domain types (Plan, PlanKind [optional label], Goal, GoalStatus, PlanStatus, IdentifierScheme, PlanIdentifier, PlanRelationship, RelationKind)
+├── matcher.rs     MatchingEngine + per-component fns + deterministic rules (no kind gate)
 ├── scoring.rs     MatchResult, MatchBreakdown, Confidence, weighted_average
 ├── normalize.rs   fold, code, fold_set
 ├── phonetic.rs    Soundex (name component bonus)

@@ -1,14 +1,13 @@
 # project-portfolio-management-front-end-with-svelte — documentation index
 
-Operator UI for work-item **identity CRUD + matching + name search +
-merge + audit timeline** across **four matchable collections**
-(portfolios, projects, products, programs), plus the
+Operator UI for **plan** identity CRUD + matching + name search + merge +
+audit timeline over **one recursive `/api/plans` collection**, plus the
 **project-management workspace** (Kanban board, issues, timeline / Gantt,
 burndown, goals) and cookie-session / SSO auth (BFF; the browser holds no
 token), consuming the [Portfolio Service](../project-portfolio-management-service-with-loco).
 
-> **Status: spec-only (v0.1.0).** No `src/` yet — the build queue is
-> [spec/index.md](./spec/index.md) §13.
+> **Status: implemented (v0.1.0).** `npm run check` is 0/0 and the vitest
+> suite passes; the build queue is [spec/index.md](./spec/index.md) §13.
 
 ## Start here
 
@@ -16,42 +15,35 @@ token), consuming the [Portfolio Service](../project-portfolio-management-servic
 |---|---|
 | [spec/index.md](./spec/index.md) | **Single source of truth** (§1–§18). |
 | [AGENTS.md](./AGENTS.md) | Conventions, planned `src/` tree, API consumption map, layout shell. |
-| [README.md](./README.md) | Collections, routes, layout / chrome, quick start, configuration. |
+| [README.md](./README.md) | Plans, routes, layout / chrome, quick start, configuration. |
 | [CHANGELOG.md](./CHANGELOG.md) | Release history. |
 | [../spec/index.md](../spec/index.md) | Entity umbrella spec (cross-subproject contract). |
 
-## Collections
+## Plans
 
-Four matchable work-item kinds, each its own collection / list / CRUD;
-matching is within a collection only. A **Portfolio** is the umbrella;
-**Project** / **Product** / **Program** carry a `portfolio_ref` to their
-parent and roll up under it.
-
-| Collection | Kind | Parent |
-|---|---|---|
-| `/portfolios` | `Portfolio` | — (umbrella) |
-| `/projects` | `Project` | `portfolio_ref` |
-| `/products` | `Product` | `portfolio_ref` |
-| `/programs` | `Program` | `portfolio_ref` |
+One recursive collection: every record is a **plan**, all under
+`/api/plans`. `kind` (Portfolio / Project / Product / Program / Practice
+/ Process / Purpose / Pathway / Proposal) is an **optional descriptive
+label** — it does not gate matching or select a collection. Any plan may
+contain any other via a `parent_ref`, and `GET /api/plans?parent={pid}`
+rolls up a plan's direct children.
 
 ## Flow
 
-`{collection} ∈ { portfolios, projects, products, programs }`.
-
 ```text
-/{collection}         ──>  GET  /api/{collection}                   list (SVAR DataGrid)
-                          GET  /api/{collection}/search?q=migration name search
-                          GET  /api/{collection}/events/recent      recent activity -> WorkItemEvent[]
-/{collection}/new     ──>  POST /api/{collection}  {WorkItem}       create -> /{collection}/[pid]
-/{collection}/[pid]   ──>  GET  /api/{collection}/{pid}             detail
-                          POST /api/{collection}/check-duplicates    -> ScoredRef[] w/ MatchBreakdown
-                          POST /api/{collection}/merge  {main_pid, duplicate_pid, reason?}  merge -> MergeResult
-                          GET  /api/{collection}/{pid}/audit         audit timeline -> AuditEntry[]
-                          DELETE /api/{collection}/{pid}            soft-delete
-                          (portfolio) GET /api/{projects,products,programs}?portfolio_ref={pid}  roll-up
-/{collection}/[pid]/edit ─> PUT /api/{collection}/{pid}             edit
+/plans          ──>  GET  /api/plans                       list (SVAR DataGrid)
+                     GET  /api/plans/search?q=migration     name search
+                     GET  /api/plans/events/recent          recent activity -> PlanEvent[]
+/plans/new      ──>  POST /api/plans  {Plan}                create -> /plans/[pid]
+/plans/[pid]    ──>  GET  /api/plans/{pid}                  detail
+                     POST /api/plans/check-duplicates       -> ScoredRef[] w/ MatchBreakdown
+                     POST /api/plans/merge  {main_pid, duplicate_pid, reason?}  merge -> MergeResult
+                     GET  /api/plans/{pid}/audit            audit timeline -> AuditEntry[]
+                     DELETE /api/plans/{pid}               soft-delete
+                     GET  /api/plans?parent={pid}          child roll-up
+/plans/[pid]/edit ─> PUT /api/plans/{pid}                  edit
 
-project-management workspace (sub-resources under /api/{collection}/{pid}/…):
+project-management workspace (sub-resources under /api/plans/{pid}/…):
 …/board    ──>  GET/POST …/tasks · PATCH …/tasks/{tid}    Kanban; drag = status change
 …/issues   ──>  GET/POST …/issues · PUT …/issues/{iid}    issues (kind/severity/status)
 …/timeline ──>  GET …/timeline    -> TimelineRow[]        Gantt (milestones + task ranges)
@@ -62,9 +54,9 @@ project-management workspace (sub-resources under /api/{collection}/{pid}/…):
 ## Layout & chrome
 
 Global navigation is a full-width **top bar** with a **leftmost
-hamburger** toggle (no left sidebar; content is full-width). The chrome
-area carries a **collection switcher** (portfolios / projects / products /
-programs), a **theme selector** (full shared catalogue — selecting a
+hamburger** toggle (no left sidebar; content is full-width). The nav has
+a single **Plans** destination (no collection switcher). The chrome area
+carries a **theme selector** (full shared catalogue — selecting a
 theme restyles the whole site), a **locale selector** (13 locales;
 selecting one switches the language; `ar` / `ur` are RTL), and the
 session affordance.

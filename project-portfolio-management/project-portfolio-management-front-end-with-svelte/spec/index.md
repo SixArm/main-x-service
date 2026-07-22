@@ -9,46 +9,42 @@
 ## 1. Purpose and vision
 
 A SvelteKit SPA for portfolio managers, programme leads, and project
-operators to register, browse, edit, and duplicate-check **work-item**
-identities across **four matchable collections — portfolios, projects,
-products, programs** — **and** to run each work item as a live project
-workspace: goals, a Kanban task board, issues, a timeline / Gantt, and a
-burndown chart. It is a thin presentation layer over the portfolio
-service's REST API (`/api/{portfolios,projects,products,programs}/...`);
-the Rust service is the system of record.
+operators to register, browse, edit, and duplicate-check **plan**
+identities in **one recursive collection** — **and** to run each plan as a
+live project workspace: goals, a Kanban task board, issues, a timeline /
+Gantt, and a burndown chart. It is a thin presentation layer over the
+portfolio service's REST API (`/api/plans/...`); the Rust service is the
+system of record.
 
 The entity has two faces that share one record (entity spec §1): a
-**matchable identity registry** (portfolio-level dedup across the four
-collections) and a **project-management tool** (operational
+**matchable identity registry** (plan-level dedup across the whole
+collection) and a **project-management tool** (operational
 sub-resources). The front-end surfaces both — identity CRUD +
 duplicate-check + merge on one side, the project-management views on the
-other. The canonical matchable Rust type is **`WorkItem`** with a required
-`kind: WorkItemKind` discriminator; a Portfolio is the umbrella kind of
-work item, and Project / Product / Program sit under a portfolio (they
-carry a `portfolio_ref` to their parent). The four kinds are **distinct
-collections / tables**, not types of one collection, so a project never
-matches a product (the matcher's `kind` gate enforces this).
+other. The canonical matchable Rust type is **`Plan`** with an
+**optional** `kind: PlanKind` descriptive label; a plan may contain any
+other plan (it carries an optional `parent_ref` to its parent), so the
+tree is recursive. Every record is a plan in **one collection / table**,
+and matching runs across the whole collection — it is **not** gated by
+kind.
 
 ## 2. Scope
 
 In scope:
 
-- The **identity routes** for **each of the four collections**
-  (`/portfolios`, `/projects`, `/products`, `/programs`, with
-  `/{collection}/new`, `/{collection}/[pid]`,
-  `/{collection}/[pid]/edit`): the work-item list (SVAR DataGrid),
-  create/edit form, detail page. A **collection switcher** in the chrome
-  moves between the four list views.
-- The **API client** (`src/lib/api/{types,client,work-items}.ts`), the
-  work-item form, a name-search box on each list, a duplicate-check /
+- The **identity routes** under the static `plans/` directory
+  (`/plans`, with `/plans/new`, `/plans/[pid]`, `/plans/[pid]/edit`):
+  the plan list (SVAR DataGrid), create/edit form, detail page. The nav
+  has a single **Plans** destination (no collection switcher).
+- The **API client** (`src/lib/api/{types,client,plans}.ts`), the
+  plan form, a name-search box on the list, a duplicate-check /
   match screen with a per-component **MatchBreakdown** visual, a
-  merge-duplicate action on the detail page, and a per-work-item audit
+  merge-duplicate action on the detail page, and a per-plan audit
   timeline.
-- The **portfolio roll-up**: a Portfolio detail page also lists its child
-  projects / products / programs (those whose `portfolio_ref` is this
-  portfolio's pid).
+- The **child roll-up**: a plan detail page also lists its child plans
+  (those whose `parent_ref` is this plan's pid).
 - The **project-management views** on the detail page (or its
-  sub-routes) for any work item: a **Kanban task board** (drag = status
+  sub-routes) for any plan: a **Kanban task board** (drag = status
   change), an **Issues** list, a **Gantt / timeline** view, a
   **burndown** chart, and a **Goals** panel.
 - The **layout shell**: a top navigation bar with a leftmost hamburger
@@ -70,31 +66,36 @@ server attaches a short-lived PASETO server-side — no token in JS, no
 
 ## 3. Stakeholders and users
 
-Portfolio managers and PMO analysts (dedup, roll-up across the four
-collections), programme / project leads (the workspace), team
+Portfolio managers and PMO analysts (dedup, roll-up across the plan
+tree), programme / project leads (the workspace), team
 contributors (tasks, issues, goals), and auditors (the audit timeline +
 match breakdown).
 
 ## 4. Glossary
 
-- **pid** — the work item's public id (route param).
-- **WorkItem** — the `project_portfolio_management_matcher::WorkItem` payload (the matchable
-  identity header; the API DTO = the matcher type, persisted as JSONB).
-  Required `kind` (Portfolio / Project / Product / Program) selects the
-  collection / table it lives in.
-- **Collection** — one of the four matchable record types: `portfolios`,
-  `projects`, `products`, `programs`. Each is its own REST collection /
-  list / CRUD; matching is **within a collection only**.
-- **portfolio_ref** — the parent portfolio `pid` carried by a Project /
-  Product / Program; absent for the Portfolio kind. Drives the roll-up
-  and is an exact-match supporting signal for child kinds.
-- **Sub-resource** — a `Goal` / `Task` / `Issue` owned by a work item,
-  reached under `/api/{collection}/{pid}/…`. Not part of the matching
+- **pid** — the plan's public id (route param).
+- **Plan** — the `project_portfolio_management_matcher::Plan` payload (the
+  matchable identity header; the API DTO = the matcher type, persisted as
+  JSONB). Carries an **optional** `kind` (Portfolio / Project / Product /
+  Program / Practice / Process / Purpose / Pathway / Proposal)
+  descriptive label; every plan lives in one collection / table.
+- **Collection** — the single recursive `/api/plans` collection holding
+  every plan. One REST collection / list / CRUD; matching runs across the
+  whole collection.
+- **kind** — an **optional** descriptive label on a plan (Portfolio /
+  Project / Product / Program / Practice / Process / Purpose /
+  Pathway / Proposal). It is display metadata; matching is **not**
+  gated by kind.
+- **parent_ref** — the containing plan's `pid` carried by any plan
+  (optional; any plan may contain any other). Drives the roll-up and is an
+  exact-match supporting signal.
+- **Sub-resource** — a `Goal` / `Task` / `Issue` owned by a plan,
+  reached under `/api/plans/{pid}/…`. Not part of the matching
   surface (except goal titles).
 - **check-duplicates** — POST the current record to find stored matches
-  (within its collection).
+  (across the whole collection).
 - **MatchBreakdown** — the per-component score map returned by a match
-  (name, goals, code, owner org, portfolio, timeframe, keywords,
+  (name, goals, code, owner org, parent, timeframe, keywords,
   relationships, tags).
 - **EntityRef** — an opaque `*_ref` into person / worker / auth-user /
   organization, stored verbatim and resolved by the front-end picker.
@@ -104,17 +105,17 @@ match breakdown).
 ## 5. Information architecture
 
 ```
-/                            collection switcher → defaults to /portfolios
+/                            landing → links to /plans
 /dashboard                   PPM dashboard (site tiles + RAG / stage rollups)
-/{collection}                list (SVAR DataGrid + FilterBar)
-/{collection}/new            create form
-/{collection}/[pid]          detail + delete + check-duplicates
-/{collection}/[pid]/edit     edit form
-/{collection}/[pid]/governance  governance panel (gates, risks, budget,
+/plans                       list (SVAR DataGrid + FilterBar)
+/plans/new                   create form
+/plans/[pid]                 detail + delete + check-duplicates
+/plans/[pid]/edit            edit form
+/plans/[pid]/governance      governance panel (gates, risks, budget,
                              benefits + ROI, OKR mappings, milestones,
                              allocations)
-/{collection}/[pid]/schedule portfolio schedule (portfolios only)
-/{collection}/[pid]/board    per-item task Kanban + sprints +
+/plans/[pid]/schedule        plan schedule (child timeframes)
+/plans/[pid]/board           per-plan task Kanban + sprints +
                              honest burndown + standup digest
 /gantt                       schedule Gantt (SVAR; dependency links +
                              critical path; read-only)
@@ -141,21 +142,17 @@ match breakdown).
 /regulator                   coarse regulator extract (mask-aware)
 /signin · /verify            BFF magic-link sign-in / verification
 
-Roadmap (per-work-item project-management sub-routes, §13/§15;
+Roadmap (per-plan project-management sub-routes, §13/§15;
 the board landed 2026-07-20 and is listed above):
-/{collection}/[pid]/issues   issues list (kind / severity / status)
-/{collection}/[pid]/timeline Gantt / timeline (goal milestones + task date ranges)
-/{collection}/[pid]/burndown burndown chart (remaining estimate over time)
-/{collection}/[pid]/goals    goals panel
+/plans/[pid]/issues          issues list (kind / severity / status)
+/plans/[pid]/timeline        Gantt / timeline (goal milestones + task date ranges)
+/plans/[pid]/burndown        burndown chart (remaining estimate over time)
+/plans/[pid]/goals           goals panel
 ```
 
-where `{collection} ∈ { portfolios, projects, products, programs }`.
-
-(The collection switcher MAY be a top-bar control rendering four list
-views, or four sibling routes; the project-management views MAY be
-implemented as detail-page tabs rather than discrete sub-routes. The
-spec fixes the *capabilities*, not the URL shape. If sub-routes are used
-they share the `[pid]` layout.)
+(The project-management views MAY be implemented as detail-page tabs
+rather than discrete sub-routes. The spec fixes the *capabilities*, not
+the URL shape. If sub-routes are used they share the `[pid]` layout.)
 
 ### Layout shell & navigation
 
@@ -170,11 +167,11 @@ here:
   behind it. The hamburger is present (leftmost) regardless of viewport.
 - The main content area MUST be **full-width** — never inset by a
   persistent side-navigation column.
-- A chrome utility area in the top bar carries the **collection
-  switcher** (portfolios / projects / products / programs), the **theme
-  selector** (`lily-design-system-svelte-theme-select`) and the **locale
-  selector** (`lily-design-system-svelte-locale-select`), plus the
-  session affordance (Sign in / Sign out).
+- The nav has a single **Plans** destination (no collection switcher). A
+  chrome utility area in the top bar carries the **theme selector**
+  (`lily-design-system-svelte-theme-select`) and the **locale selector**
+  (`lily-design-system-svelte-locale-select`), plus the session affordance
+  (Sign in / Sign out).
 
 ### Theming
 
@@ -200,74 +197,75 @@ keys fall back to `en`.
 
 ## 6. Functional requirements
 
-1. **List** active work items for the selected collection
-   (`GET /api/{collection}`) in a **SVAR DataGrid** with columns:
-   name, status, owner org, lead, `portfolio_ref` (child kinds only),
-   target date, tags. Sortable; client-side filter/search.
+1. **List** active plans (`GET /api/plans`) in a **SVAR DataGrid** with
+   columns: name, kind, status, owner org, lead, `parent_ref`, target
+   date, tags. Sortable; client-side filter/search.
    - Search box (search-on-submit): a non-blank query calls
-     `GET /api/{collection}/search?q=` (URL-encoded) and renders the
+     `GET /api/plans/search?q=` (URL-encoded) and renders the
      filtered results; **Clear** (or an empty query) restores the full
      list. Loading and empty-result states are shown.
    - Recent activity: a "Show recent activity" toggle lazy-loads
-     `GET /api/{collection}/events/recent` on first open and renders
+     `GET /api/plans/events/recent` on first open and renders
      the events newest-first (highest `seq` first): the kind
-     (created/updated/deleted/merged), the name (linked to the work item
+     (created/updated/deleted/merged), the name (linked to the plan
      by pid), and the `seq`. Loading, empty, and error states; the panel
      does not auto-load on mount.
-2. **Create** (`POST /api/{collection}`), redirect to the new detail
-   page. The collection (kind) is fixed by the route.
-3. **Detail**: render the stored `WorkItem`; offer edit, delete,
+2. **Create** (`POST /api/plans`), redirect to the new detail page. The
+   `kind` label is chosen on the form (optional).
+3. **Detail**: render the stored `Plan`; offer edit, delete,
    check-duplicates, merge, the audit timeline, and entry points to the
-   project-management views. A **Portfolio** detail page additionally
-   rolls up its **child work items** — the projects / products / programs
-   whose `portfolio_ref` equals this portfolio's pid — as linked lists.
+   project-management views. A plan detail page additionally rolls up its
+   **child plans** — those whose `parent_ref` equals this plan's pid — as
+   linked lists.
 4. **Edit** (`PUT`), redirect back to detail.
-5. **Delete** (`DELETE`, soft), redirect to the collection list.
+5. **Delete** (`DELETE`, soft), redirect to the plans list.
 6. **Check-duplicates** posts the current record and lists matches
-   (name, score, confidence) **within the same collection**, excluding
+   (name, score, confidence) **across the whole collection**, excluding
    the record itself, each with a visual **MatchBreakdown** (per-component
-   bars for name / goals / code / owner org / portfolio / timeframe /
-   keywords / relationships / tags). There is no `plan_type` component —
-   `kind` is a hard match gate, not a scored component.
+   bars for name / goals / code / owner org / parent / timeframe /
+   keywords / relationships / tags). Matching is **not** gated by `kind`;
+   there is no `plan_type` / kind component.
 7. **Merge**: each duplicate row offers "Merge into this record" (the
    detail record is the survivor/main; the row's pid is the duplicate).
-   A two-step inline confirm calls `POST /api/{collection}/merge` with
+   A two-step inline confirm calls `POST /api/plans/merge` with
    `{main_pid, duplicate_pid, reason?}`. On success it adopts the
    returned survivor record, re-runs check-duplicates, and shows a
    success message. Equal pids are guarded client-side (the service
    `422`s); `404`/other errors surface via the error banner.
 8. **Audit timeline**: a "Show audit trail" toggle lazy-loads
-   `GET /api/{collection}/{pid}/audit` on first open and renders the
+   `GET /api/plans/{pid}/audit` on first open and renders the
    rows newest-first (action, actor or "—" when null, timestamp).
    Loading, empty, and error states; the panel does not auto-load on
    mount.
-9. **The work-item form** (create/edit) edits: `name` (required),
+9. **The plan form** (create/edit) edits: `name` (required),
    `alternate_names`, `code` (owner-scoped), `owner_org_id` (**org
    picker** into the organization entity), `owner_org_name`, `lead_ref`
-   (**person / worker picker**), `portfolio_ref` (**portfolio picker**;
-   shown only for child kinds — Project / Product / Program), `status`, a
-   **goals editor** (title + description + status + target date rows),
-   `start_date` / `target_date`, `keywords`, `tags`, `identifiers`
-   (scheme + value rows), `same_as`, `in_language`, and `relationships`
-   (kind + target rows). The `kind` is fixed by the collection route (not
-   an editable field). Comma-list fields split on submit; blanks null;
-   empty repeatable rows dropped.
-10. **Kanban task board** (`/{collection}/[pid]/board`): columns **Todo /
+   (**person / worker picker**), `parent_ref` (**plan picker**; optional
+   for any plan), `kind` (**optional** select — Portfolio / Project /
+   Product / Program / Practice / Process / Purpose / Pathway /
+   Proposal, or none), `status`, a **goals editor** (title +
+   description + status + target date rows), `start_date` / `target_date`,
+   `keywords`, `tags`, `identifiers` (scheme + value rows), `same_as`,
+   `in_language`, and `relationships` (kind + target rows). Comma-list
+   fields split on submit; blanks null; empty repeatable rows dropped.
+10. **Kanban task board** (`/plans/[pid]/board`): columns **Todo /
     InProgress / InReview / Done / Blocked**; cards show task title,
     assignee, estimate, due date. **Drag a card to a column = status
-    change** (`PATCH …/{pid}/tasks/{tid}`). Create / edit task inline.
-11. **Issues list** (`/{collection}/[pid]/issues`): table of issues with
+    change** (`PATCH /api/plans/{pid}/tasks/{tid}`). Create / edit task
+    inline.
+11. **Issues list** (`/plans/[pid]/issues`): table of issues with
     kind (Bug / Risk / Blocker / Question / Improvement), severity
     (Low / Med / High / Critical), status (Open / InProgress / Resolved /
     Closed), reporter, assignee; create / edit; filter by status /
     severity.
-12. **Gantt / timeline** (`/{collection}/[pid]/timeline`): renders
-    `GET …/{pid}/timeline` — goal milestones (target dates) + task date
-    ranges (start / due) as Gantt-shaped rows over the work-item
+12. **Gantt / timeline** (`/plans/[pid]/timeline`): renders
+    `GET /api/plans/{pid}/timeline` — goal milestones (target dates) +
+    task date ranges (start / due) as Gantt-shaped rows over the plan
     timeframe.
-13. **Burndown chart** (`/{collection}/[pid]/burndown`): renders
-    `GET …/{pid}/burndown` — remaining estimate over time as a series.
-14. **Goals panel** (`/{collection}/[pid]/goals`): list / create / edit /
+13. **Burndown chart** (`/plans/[pid]/burndown`): renders
+    `GET /api/plans/{pid}/burndown` — remaining estimate over time as a
+    series.
+14. **Goals panel** (`/plans/[pid]/goals`): list / create / edit /
     delete goals (title, description, status, target date). Goal titles
     feed the match `Goals` component (display-only note) via the
     `data.goals[]` bridge.
@@ -286,8 +284,9 @@ keys fall back to `en`.
     [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
 16. **Layout shell**: global navigation is a full-width **top bar**
     (header) with a **leftmost hamburger** toggle — NOT a left sidebar —
-    the main content area is **full-width**, and the chrome area carries
-    the collection switcher and the theme + locale selectors.
+    the main content area is **full-width**, the nav has a single **Plans**
+    destination (no collection switcher), and the chrome area carries
+    the theme + locale selectors.
 
 ## 7. Non-functional requirements
 
@@ -296,65 +295,66 @@ keys fall back to `en`.
 - **SvelteKit 2**, SPA (`ssr = false` / `prerender = false`).
 - **TypeScript strict** with `noUncheckedIndexedAccess`; no `any`
   without a justifying comment.
-- **SVAR Svelte DataGrid** for each collection list and any tabular
+- **SVAR Svelte DataGrid** for the plans list and any tabular
   sub-view; native HTML for simple lists.
 - **Lily Design System Svelte Headless** for accessibility primitives
   (focus trap, listbox, combobox, dialog) and the theme / locale
   selectors; native HTML elsewhere.
-- **No global stores** for HTTP state — construct a `WorkItemRepository`
-  (bound to a collection) per page/component.
+- **No global stores** for HTTP state — construct a `PlanRepository`
+  (all paths under `/api/plans`) per page/component.
 - Drift accepted: own copy of API client / types / form primitives; no
   shared package (repo decision 2026-06-02).
 
 ## 8. Architecture
 
 `ApiClient` (lean, raw-JSON, get/post/put/patch/delete + `ApiError`) →
-`WorkItemRepository` (constructed for a given collection) → routes. The
+`PlanRepository` (all paths under `/api/plans`) → routes. The
 service is loco.rs and returns **raw JSON** (no envelope). Under the BFF
 model (§6.15) the browser carries only the `__Host-mxi_session` cookie
 and the SvelteKit server attaches the short-lived PASETO server-side when
 calling the service; no token is read or attached in browser JS.
-`WorkItemForm` builds a `WorkItem` from the inputs (comma lists split,
+`PlanForm` builds a `Plan` from the inputs (comma lists split,
 blanks nulled, goals / identifiers / relationships as editable rows;
 empty rows dropped on submit; a seeded `Custom` enum collapses to "—";
-`kind` injected from the route, `portfolio_ref` shown only for child
-kinds). The project-management views call the sub-resource endpoints via
-the same repository. Layout chrome (collection switcher, theme / locale
-selectors, hamburger nav, session affordance) lives in `+layout.svelte`;
+`kind` is an optional select, `parent_ref` an optional plan picker). The
+project-management views call the sub-resource endpoints via the same
+repository. Layout chrome (Plans destination, theme / locale selectors,
+hamburger nav, session affordance) lives in `+layout.svelte`;
 `+layout.ts` sets the SPA toggles.
 
-`types.ts` hand-mirrors `project_portfolio_management_matcher::WorkItem` and the
-sub-resource / DTO shapes: `WorkItem`, `WorkItemKind`, `WorkItemStatus`,
+`types.ts` hand-mirrors `project_portfolio_management_matcher::Plan` and the
+sub-resource / DTO shapes: `Plan`, `PlanKind`, `PlanStatus`,
 `Goal`, `GoalStatus`, `Task`, `TaskStatus`, `Issue`, `IssueKind`,
 `IssueSeverity`, `IssueStatus`, `Relationship`, `RelationKind`,
-`WorkItemIdentifier`, `IdentifierScheme`, `WorkItemRef`, `ScoredRef`,
-`MatchBreakdown`, `MergeResult`, `AuditEntry`, `WorkItemEvent`,
+`PlanIdentifier`, `IdentifierScheme`, `PlanRef`, `ScoredRef`,
+`MatchBreakdown`, `MergeResult`, `AuditEntry`, `PlanEvent`,
 `TimelineRow`, `BurndownPoint`. It MUST be updated in the same change
 cycle as any matcher-type change (entity spec §18).
 
 ## 9. API consumption
 
-`{collection} ∈ { portfolios, projects, products, programs }`.
+Every plan lives under `/api/plans` (one recursive collection).
 
 | Route / action | Endpoint |
 |---|---|
-| list | `GET /api/{collection}` |
-| search | `GET /api/{collection}/search?q=` |
-| recent activity | `GET /api/{collection}/events/recent` (→ `WorkItemEvent[]`) |
-| create | `POST /api/{collection}` |
-| detail load | `GET /api/{collection}/{pid}` |
-| delete | `DELETE /api/{collection}/{pid}` |
-| duplicates | `POST /api/{collection}/check-duplicates` (→ `ScoredRef[]` w/ `MatchBreakdown`) |
-| merge | `POST /api/{collection}/merge` (`{main_pid, duplicate_pid, reason?}`) |
-| audit | `GET /api/{collection}/{pid}/audit` (→ `AuditEntry[]`) |
-| edit | `PUT /api/{collection}/{pid}` |
-| roll-up (portfolio) | `GET /api/{projects,products,programs}?portfolio_ref={pid}` |
-| board: list / move | `GET …/{pid}/tasks` · `PATCH …/{pid}/tasks/{tid}` (status) |
-| board: create / edit | `POST …/{pid}/tasks` · `PUT …/{pid}/tasks/{tid}` |
-| issues | `GET / POST …/{pid}/issues` · `PUT …/{pid}/issues/{iid}` |
-| goals | `GET / POST …/{pid}/goals` · `PUT / DELETE …/{pid}/goals/{gid}` |
-| timeline | `GET …/{pid}/timeline` (→ `TimelineRow[]`) |
-| burndown | `GET …/{pid}/burndown` (→ `BurndownPoint[]`) |
+| list | `GET /api/plans` |
+| search | `GET /api/plans/search?q=` |
+| recent activity | `GET /api/plans/events/recent` (→ `PlanEvent[]`) |
+| create | `POST /api/plans` |
+| detail load | `GET /api/plans/{pid}` |
+| delete | `DELETE /api/plans/{pid}` |
+| duplicates | `POST /api/plans/check-duplicates` (→ `ScoredRef[]` w/ `MatchBreakdown`) |
+| merge | `POST /api/plans/merge` (`{main_pid, duplicate_pid, reason?}`) |
+| audit | `GET /api/plans/{pid}/audit` (→ `AuditEntry[]`) |
+| edit | `PUT /api/plans/{pid}` |
+| child roll-up | `GET /api/plans?parent={pid}` |
+| schedule | `GET /api/plans/{pid}/schedule` |
+| board: list / move | `GET /api/plans/{pid}/tasks` · `PATCH /api/plans/{pid}/tasks/{tid}` (status) |
+| board: create / edit | `POST /api/plans/{pid}/tasks` · `PUT /api/plans/{pid}/tasks/{tid}` |
+| issues | `GET / POST /api/plans/{pid}/issues` · `PUT /api/plans/{pid}/issues/{iid}` |
+| goals | `GET / POST /api/plans/{pid}/goals` · `PUT / DELETE /api/plans/{pid}/goals/{gid}` |
+| timeline | `GET /api/plans/{pid}/timeline` (→ `TimelineRow[]`) |
+| burndown | `GET /api/plans/{pid}/burndown` (→ `BurndownPoint[]`) |
 
 (Sub-resource verbs/paths track the service spec §9; pin them in tests
 when the controllers land.)
@@ -377,21 +377,21 @@ httpOnly cookie — no auth token in `localStorage` (BFF model, §6.15).
   CSRF on mutating browser→BFF calls per
   [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md);
   no client-held token to test);
-- `WorkItemRepository` **per collection** (every method's path + verb,
-  incl. `check-duplicates`, `search()` `/search?q=` URL-encoding,
+- `PlanRepository` (`tests/unit/plans.test.ts`; every method's path +
+  verb, incl. `check-duplicates`, `search()` `/search?q=` URL-encoding,
   `merge()` body `{main_pid, duplicate_pid, reason?}` with `404` / `422`
-  `ApiError` propagation, `audit()`, `recentEvents()`, the portfolio
-  roll-up query, and the sub-resource methods — task move `PATCH`,
+  `ApiError` propagation, `audit()`, `recentEvents()`, the `?parent=`
+  child roll-up query, and the sub-resource methods — task move `PATCH`,
   issues, goals, timeline, burndown);
-- the **`WorkItemForm`** component (required-name guard blocks `onsubmit`
-  on blank/whitespace; `build()` trims scalars, nulls blanks, splits
-  comma lists, drops empty goal / identifier / relationship rows,
-  collapses a `Custom` enum seed, injects `kind` from the route, shows
-  `portfolio_ref` only for child kinds);
+- the **`PlanForm`** component (`tests/unit/plan-form.test.ts`;
+  required-name guard blocks `onsubmit` on blank/whitespace; `build()`
+  trims scalars, nulls blanks, splits comma lists, drops empty goal /
+  identifier / relationship rows, collapses a `Custom` enum seed, leaves
+  `kind` optional, `parent_ref` an optional plan picker);
 - the **i18n catalogue** (every key present in `en`; fallback to `en`
   for a missing key; RTL flag for `ar` / `ur`);
 - a **`+layout` render test** asserting the **hamburger toggles the
-  nav** (collapsed → expanded), and that the collection switcher and the
+  nav** (collapsed → expanded), and that the Plans destination and the
   theme + locale selectors render.
 
 Component tests run via `@testing-library/svelte` mounted client-side
@@ -399,22 +399,21 @@ by the `svelteTesting()` vite plugin.
 
 **Playwright** smoke tests (`tests/e2e/`) with the API stubbed via
 `page.route`, run against the production build (`vite preview`) to
-avoid the `vite dev` cold-start module race: load the identity routes
-for a collection; the list search box (matching keeps the row,
+avoid the `vite dev` cold-start module race: load the plan identity
+routes; the list search box (matching keeps the row,
 non-matching shows the empty message); the detail-page merge action
 (check-duplicates → confirm merge → success, asserting the merge
 endpoint fired); the audit timeline; the recent-activity panel; the
-portfolio roll-up of child work items; the Kanban board (drag a card →
+child-plan roll-up; the Kanban board (drag a card →
 status PATCH fired); the issues list; the timeline / burndown views
-render; and the layout (hamburger toggles nav; collection switcher
-changes the list; theme + locale selectors switch `data-theme` / `lang`
-+ `dir`, incl. RTL for `ar`).
+render; and the layout (hamburger toggles nav; theme + locale selectors
+switch `data-theme` / `lang` + `dir`, incl. RTL for `ar`).
 
 Run: `pnpm test` (vitest) and `pnpm test:e2e` (Playwright).
 
 ## 12. Compliance
 
-Work items are business / portfolio artefacts; defer to the service's
+Plans are business / portfolio artefacts; defer to the service's
 controls for access / audit. Lead / assignee / author refs are opaque
 `EntityRef`s into person / worker — the front-end displays them but does
 not resolve PII beyond what the referenced services return. Cross-service
@@ -425,55 +424,83 @@ links are **never** a match signal (entity spec §1).
 > This is the build queue for the implemented app (MVP shipped); check off
 > in three-part PRs (spec + code + test).
 
-- [ ] Scaffold the SvelteKit 2 / Svelte 5 (runes) SPA: `package.json`,
+- [x] **2026-07-22 — Capability views (service spec §9.4a).**
+  `CapabilityClient` + wire types in `src/lib/api/capabilities.ts`, and
+  four pages: `/prioritisation` (Smart Score queue + per-component
+  explanation), `/lifecycle` (the phase funnel), `/reviews`
+  (delegation, verdicts, consensus), `/automations` (rules, the
+  deadline queue + manual sweep, and the run log). Nav entries added;
+  vitest pins every client path. English-first (locale catalogues not
+  extended yet); no standalone notifications page.
+
+- [x] **2026-07-22 — Offer the five new `kind` labels.** `PlanKind` /
+  `ALL_KINDS` in `src/lib/api/types.ts` gain `Practice`, `Process`,
+  `Purpose`, `Pathway`, `Proposal`, so the `PlanForm` kind `<select>`
+  lists them. `COLLECTIONS` gains the matching plural segments except
+  `proposals`, which already names the proposals catalogue route.
+
+- [x] **Unify the four collections into one recursive `/api/plans`
+  collection + rename the entity to `plan` (2026-07-20).** Collapsed the
+  dynamic `[collection]` route directory to a static `plans/` directory
+  (`/plans`, `/plans/new`, `/plans/[pid]`,
+  `/plans/[pid]/{edit,board,schedule,governance}`); removed the collection
+  switcher (one **Plans** destination). `WorkItemForm` → `PlanForm`
+  (`kind` now an **optional** select); `src/lib/api/work-items.ts` →
+  `src/lib/api/plans.ts` exporting `PlanRepository` (not collection-bound;
+  all paths under `/api/plans`, `?parent=` roll-up,
+  `/api/plans/{pid}/schedule`); `types.ts` renamed `WorkItem` → `Plan`,
+  `kind` optional, `portfolio_ref` → `parent_ref`. Tests renamed to
+  `tests/unit/plans.test.ts` + `tests/unit/plan-form.test.ts`. `kind` is
+  an optional descriptive label; matching is **not** gated by kind.
+  svelte-check 0/0, 45 vitest pass.
+- [x] Scaffold the SvelteKit 2 / Svelte 5 (runes) SPA: `package.json`,
   `svelte.config.js`, `vite.config.ts`, `tsconfig` (strict +
   `noUncheckedIndexedAccess`), `src/app.html`, `src/app.css`,
   `.env.example` (`PUBLIC_API_BASE_URL`, `VITE_AUTH_FRONTEND_URL`).
-- [ ] `src/lib/api/types.ts` — mirror `project_portfolio_management_matcher::WorkItem` +
-  `WorkItemKind` + sub-resource + DTO shapes (per §8).
-- [ ] `src/lib/api/client.ts` — lean fetch wrapper (get/post/put/patch/
+- [x] `src/lib/api/types.ts` — mirror `project_portfolio_management_matcher::Plan` +
+  `PlanKind` (optional) + sub-resource + DTO shapes (per §8).
+- [x] `src/lib/api/client.ts` — lean fetch wrapper (get/post/put/patch/
   delete) + `ApiError`. Browser→BFF calls only; the SvelteKit server
   attaches the PASETO bearer server-side (no client-held token).
-- [ ] `src/lib/api/work-items.ts` — `WorkItemRepository` (collection-bound:
-  CRUD + search + checkDuplicates + merge + audit + recentEvents +
-  portfolio roll-up + sub-resource methods + timeline + burndown).
-- [ ] Auth — adopt BFF + httpOnly cookie + CSRF: `hooks.server.ts` /
+- [x] `src/lib/api/plans.ts` — `PlanRepository` (CRUD + search +
+  checkDuplicates + merge + audit + recentEvents + `?parent=` child
+  roll-up + sub-resource methods + timeline + burndown; all paths under
+  `/api/plans`).
+- [x] Auth — adopt BFF + httpOnly cookie + CSRF: `hooks.server.ts` /
   server routes read the `__Host-mxi_session` cookie, exchange it for a
   short-lived PASETO server-side, and attach it when calling the
   portfolio service; CSRF on mutating browser→BFF calls. No
   `mxi_access_token` / `localStorage` bearer, no fragment handoff (per
   [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
-- [ ] `src/lib/config.ts` — `PUBLIC_API_BASE_URL` + `VITE_AUTH_FRONTEND_URL`
+- [x] `src/lib/config.ts` — `PUBLIC_API_BASE_URL` + `VITE_AUTH_FRONTEND_URL`
   + `signInUrl()` (BFF sign-in redirect).
-- [ ] `src/lib/i18n/` — 13-locale catalogues (en, cy, es, fr, de, ar,
+- [x] `src/lib/i18n/` — 13-locale catalogues (en, cy, es, fr, de, ar,
   ru, hi, zh, bn, pt, id, ur) + RTL flags + `en` fallback.
-- [ ] `+layout.svelte` / `+layout.ts` — top-bar nav with **leftmost
-  hamburger**, full-width content, collection switcher + theme + locale
+- [x] `+layout.svelte` / `+layout.ts` — top-bar nav with **leftmost
+  hamburger**, full-width content, Plans destination + theme + locale
   selectors, session affordance (Sign in / Sign out — BFF, no token
   paste); SPA toggles.
-- [ ] Identity routes for the four collections: `/{collection}` (SVAR
-  DataGrid list + search + recent activity), `/{collection}/new`,
-  `/{collection}/[pid]` (detail + delete + check-duplicates +
-  MatchBreakdown + merge + audit timeline; portfolio roll-up of child
-  work items), `/{collection}/[pid]/edit`.
-- [ ] `WorkItemForm` component (incl. org picker, person/worker lead
-  picker, portfolio picker for child kinds, goals / identifiers /
-  relationships editors; `kind` from route).
-- [ ] `MatchBreakdown` visual component (per-component score bars incl.
-  goals / portfolio / relationships / tags; no `plan_type`).
-- [ ] Kanban task board (`/{collection}/[pid]/board`) — drag = status
-  PATCH.
-- [ ] Issues list (`/{collection}/[pid]/issues`).
-- [ ] Gantt / timeline view (`/{collection}/[pid]/timeline`).
-- [ ] Burndown chart (`/{collection}/[pid]/burndown`).
-- [ ] Goals panel (`/{collection}/[pid]/goals`).
-- [ ] vitest unit suite (client, repository per collection, BFF auth
-  integration, signInUrl, WorkItemForm, i18n, `+layout`
+- [x] Plan identity routes: `/plans` (SVAR
+  DataGrid list + search + recent activity), `/plans/new`,
+  `/plans/[pid]` (detail + delete + check-duplicates +
+  MatchBreakdown + merge + audit timeline; child-plan roll-up),
+  `/plans/[pid]/edit`.
+- [x] `PlanForm` component (incl. org picker, person/worker lead
+  picker, optional plan `parent_ref` picker, goals / identifiers /
+  relationships editors; `kind` optional select).
+- [x] `MatchBreakdown` visual component (per-component score bars incl.
+  goals / parent / relationships / tags; no `plan_type` / kind gate).
+- [x] Kanban task board (`/plans/[pid]/board`) — drag = status PATCH.
+- [ ] Issues list (`/plans/[pid]/issues`).
+- [ ] Gantt / timeline view (`/plans/[pid]/timeline`).
+- [ ] Burndown chart (`/plans/[pid]/burndown`).
+- [ ] Goals panel (`/plans/[pid]/goals`).
+- [x] vitest unit suite (client, `PlanRepository`, BFF auth
+  integration, signInUrl, `PlanForm`, i18n, `+layout`
   hamburger-toggle render test).
-- [ ] Playwright e2e smoke (identity routes, search, merge, audit,
-  recent activity, portfolio roll-up, board drag, issues,
-  timeline/burndown, layout hamburger + collection switcher +
-  theme/locale switch incl. RTL).
+- [x] Playwright e2e smoke (plan routes, search, merge, audit,
+  recent activity, child-plan roll-up, board drag, issues,
+  timeline/burndown, layout hamburger + theme/locale switch incl. RTL).
 
 ## 14. Implementation status
 
@@ -482,14 +509,13 @@ links are **never** a match signal (entity spec §1).
 ## 15. Roadmap
 
 - **v0.1** (here): spec + docs only.
-- **v0.2**: scaffold + identity routes for the four collections (list /
-  create / detail / edit) + collection switcher + lean client +
-  repository + BFF auth (httpOnly cookie + CSRF, per
+- **v0.2**: scaffold + plan identity routes (list / create / detail /
+  edit) + lean client + repository + BFF auth (httpOnly cookie + CSRF, per
   [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md))
   + SSO sign-in + layout shell (top-bar hamburger, theme + locale
   selectors) + vitest + Playwright smoke.
 - **v0.3**: duplicate-check + MatchBreakdown visual + merge + audit
-  timeline + portfolio roll-up of child work items.
+  timeline + child-plan roll-up.
 - **v0.4**: project-management views — Kanban board, issues, timeline /
   Gantt, burndown, goals.
 - **v0.5**: full 13-locale translation catalogues + RTL polish.
@@ -498,13 +524,11 @@ links are **never** a match signal (entity spec §1).
 
 ## 16. Open questions
 
-- Collection switcher as a top-bar control over four list views, or four
-  discrete sibling routes?
 - Project-management views as detail-page tabs or discrete sub-routes?
 - Real-time duplicate warning on the create form?
 - Which charting primitive for the Gantt / burndown (SVAR vs. native
   SVG vs. a Lily chart helper)?
-- How rich should the org / person / worker / portfolio pickers be
+- How rich should the org / person / worker / plan pickers be
   (typeahead against the sibling services vs. raw `pid` entry) for MVP?
 
 ## 17. References
@@ -523,5 +547,5 @@ links are **never** a match signal (entity spec §1).
 
 Update this spec with any behavioural change; a behavioural change is
 one PR with three parts (spec + code + test). Bump `CHANGELOG.md`. Keep
-`src/lib/api/types.ts` in lockstep with the matcher `WorkItem` type — if
+`src/lib/api/types.ts` in lockstep with the matcher `Plan` type — if
 a field changes in the service / matcher, fix it here in the same cycle.

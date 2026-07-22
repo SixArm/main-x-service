@@ -1,6 +1,6 @@
 //! PPM Phase-C strategy controllers (spec/15-roadmap PPM-2/4/5/11):
 //! the idea funnel, what-if scenarios, OKR objectives + weighted
-//! work-item mappings, and value-realization benefits. Pure rules
+//! plan mappings, and value-realization benefits. Pure rules
 //! live in [`crate::strategy`]; every mutation audits; nothing here
 //! feeds the matcher (§8 partition rule).
 
@@ -12,12 +12,11 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use super::governance::valid_ref;
-use super::work_items::Collection;
+use super::plans::parse_kind_label;
 use crate::auth::MaybeAuthUser;
 use crate::governance as gov_rules;
 use crate::models::_entities::{
-    benefits, budget_lines, ideas, objective_links, objectives, proposals, risks, scenarios,
-    work_items,
+    benefits, budget_lines, ideas, objective_links, objectives, plans, proposals, risks, scenarios,
 };
 use crate::models::audit_logs::Model as AuditModel;
 use crate::strategy as rules;
@@ -75,8 +74,15 @@ async fn create_idea(
     if payload.title.trim().is_empty() || payload.title.len() > MAX_TEXT_LEN {
         return Err(unprocessable("title is required (and capped)"));
     }
-    if payload.tags.len() > 32 || payload.tags.iter().any(|t| t.trim().is_empty() || t.len() > 64) {
-        return Err(unprocessable("tags: at most 32, non-blank, each ≤ 64 chars"));
+    if payload.tags.len() > 32
+        || payload
+            .tags
+            .iter()
+            .any(|t| t.trim().is_empty() || t.len() > 64)
+    {
+        return Err(unprocessable(
+            "tags: at most 32, non-blank, each ≤ 64 chars",
+        ));
     }
     let row = ideas::ActiveModel {
         pid: ActiveValue::set(Uuid::new_v4()),
@@ -169,7 +175,8 @@ async fn dismiss_idea(
 /// item; PPM-2).
 #[derive(Debug, Deserialize)]
 struct ConvertPayload {
-    /// The collection the eventual work item belongs to.
+    /// Optional descriptive kind label for the eventual plan. Blank means
+    /// "no kind"; a non-blank value must be a recognised kind label.
     kind_target: String,
     #[serde(default)]
     sponsor_ref: Option<String>,
@@ -182,15 +189,18 @@ async fn convert_idea(
     Path(pid): Path<String>,
     Json(payload): Json<ConvertPayload>,
 ) -> Result<Response> {
-    if Collection::from_segment(&payload.kind_target).is_none() {
+    if !payload.kind_target.trim().is_empty() && parse_kind_label(&payload.kind_target).is_none() {
         return Err(unprocessable(
-            "kind_target must be portfolios/projects/products/programs",
+            "kind_target, when set, must be one of portfolio/project/product/program/practice/process/purpose/pathway/proposal",
         ));
     }
     if let Some(sponsor) = payload.sponsor_ref.as_deref()
-        && !valid_ref(sponsor, &["person", "worker", "organization"]) {
-            return Err(unprocessable("sponsor_ref must be a person:/worker:/organization: URN"));
-        }
+        && !valid_ref(sponsor, &["person", "worker", "organization"])
+    {
+        return Err(unprocessable(
+            "sponsor_ref must be a person:/worker:/organization: URN",
+        ));
+    }
     let idea = find_idea(&ctx, &pid).await?;
     if idea.status != "open" {
         return Err(unprocessable(&format!("idea is {}", idea.status)));
@@ -205,7 +215,7 @@ async fn convert_idea(
         requested_minor: ActiveValue::set(None),
         currency: ActiveValue::set(None),
         status: ActiveValue::set("draft".to_string()),
-        promoted_work_item_pid: ActiveValue::set(None),
+        promoted_plan_pid: ActiveValue::set(None),
         deleted_at: ActiveValue::set(None),
         ..Default::default()
     }
@@ -222,9 +232,15 @@ async fn convert_idea(
         "kind_target": payload.kind_target,
         "provenance": "idea",
     });
-    AuditModel::record(&ctx.db, idea_pid, "idea_converted", caller.actor(), Some(snapshot))
-        .await
-        .ok();
+    AuditModel::record(
+        &ctx.db,
+        idea_pid,
+        "idea_converted",
+        caller.actor(),
+        Some(snapshot),
+    )
+    .await
+    .ok();
     format::json(serde_json::json!({
         "pid": row.pid.to_string(),
         "status": row.status,
@@ -239,7 +255,7 @@ struct ScenarioPayload {
     #[serde(default)]
     description: Option<String>,
     #[serde(default)]
-    work_item_pids: Vec<Uuid>,
+    plan_pids: Vec<Uuid>,
     #[serde(default)]
     proposal_pids: Vec<Uuid>,
     #[serde(default)]
@@ -261,7 +277,7 @@ async fn create_scenario(
     if payload.name.trim().is_empty() || payload.name.len() > MAX_TEXT_LEN {
         problems.push("name is required (and capped)".to_string());
     }
-    if payload.work_item_pids.len() + payload.proposal_pids.len() > 256 {
+    if payload.plan_pids.len() + payload.proposal_pids.len() > 256 {
         problems.push("at most 256 members".to_string());
     }
     if payload.budget_cap_minor.is_some() {
@@ -271,16 +287,16 @@ async fn create_scenario(
         }
     }
     // Every named member must exist (unknown pids listed at once).
-    for pid in &payload.work_item_pids {
-        let exists = work_items::Entity::find()
-            .filter(work_items::Column::Pid.eq(*pid))
-            .filter(work_items::Column::DeletedAt.is_null())
+    for pid in &payload.plan_pids {
+        let exists = plans::Entity::find()
+            .filter(plans::Column::Pid.eq(*pid))
+            .filter(plans::Column::DeletedAt.is_null())
             .one(&ctx.db)
             .await
             .map_err(db_err)?
             .is_some();
         if !exists {
-            problems.push(format!("unknown work item {pid}"));
+            problems.push(format!("unknown plan {pid}"));
         }
     }
     for pid in &payload.proposal_pids {
@@ -303,7 +319,7 @@ async fn create_scenario(
         name: ActiveValue::set(payload.name.clone()),
         description: ActiveValue::set(payload.description.clone()),
         members: ActiveValue::set(serde_json::json!({
-            "work_item_pids": payload.work_item_pids,
+            "plan_pids": payload.plan_pids,
             "proposal_pids": payload.proposal_pids,
         })),
         budget_cap_minor: ActiveValue::set(payload.budget_cap_minor),
@@ -336,10 +352,13 @@ async fn list_scenarios(State(ctx): State<AppContext>) -> Result<Response> {
 }
 
 /// Prepare a scenario's member facts and run the pure evaluation.
-pub(crate) async fn evaluate(ctx: &AppContext, scenario: &scenarios::Model) -> Result<rules::Evaluation> {
-    let work_item_pids: Vec<Uuid> = scenario
+pub(crate) async fn evaluate(
+    ctx: &AppContext,
+    scenario: &scenarios::Model,
+) -> Result<rules::Evaluation> {
+    let plan_pids: Vec<Uuid> = scenario
         .members
-        .get("work_item_pids")
+        .get("plan_pids")
         .and_then(|v| serde_json::from_value(v.clone()).ok())
         .unwrap_or_default();
     let proposal_pids: Vec<Uuid> = scenario
@@ -348,9 +367,9 @@ pub(crate) async fn evaluate(ctx: &AppContext, scenario: &scenarios::Model) -> R
         .and_then(|v| serde_json::from_value(v.clone()).ok())
         .unwrap_or_default();
     let mut members = Vec::new();
-    for pid in &work_item_pids {
+    for pid in &plan_pids {
         let budgets = budget_lines::Entity::find()
-            .filter(budget_lines::Column::WorkItemPid.eq(*pid))
+            .filter(budget_lines::Column::PlanPid.eq(*pid))
             .filter(budget_lines::Column::DeletedAt.is_null())
             .all(&ctx.db)
             .await
@@ -363,7 +382,7 @@ pub(crate) async fn evaluate(ctx: &AppContext, scenario: &scenarios::Model) -> R
             }
         }
         let open_exposure: i32 = risks::Entity::find()
-            .filter(risks::Column::WorkItemPid.eq(*pid))
+            .filter(risks::Column::PlanPid.eq(*pid))
             .filter(risks::Column::DeletedAt.is_null())
             .all(&ctx.db)
             .await
@@ -373,7 +392,7 @@ pub(crate) async fn evaluate(ctx: &AppContext, scenario: &scenarios::Model) -> R
             .map(|r| r.probability * r.impact)
             .sum();
         let alignment_weight: i32 = objective_links::Entity::find()
-            .filter(objective_links::Column::WorkItemPid.eq(*pid))
+            .filter(objective_links::Column::PlanPid.eq(*pid))
             .all(&ctx.db)
             .await
             .map_err(db_err)?
@@ -434,9 +453,7 @@ async fn compare_scenarios(
     axum::extract::Query(query): axum::extract::Query<CompareQuery>,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
-    let load = |pid: &str| -> Result<Uuid> {
-        Uuid::parse_str(pid).map_err(|_| Error::NotFound)
-    };
+    let load = |pid: &str| -> Result<Uuid> { Uuid::parse_str(pid).map_err(|_| Error::NotFound) };
     let (a_pid, b_pid) = (load(&query.a)?, load(&query.b)?);
     let mut pair = Vec::new();
     for pid in [a_pid, b_pid] {
@@ -539,9 +556,15 @@ async fn commit_scenario(
     active.committed_at = ActiveValue::set(Some(chrono::Utc::now().into()));
     let row = active.update(&ctx.db).await.map_err(db_err)?;
     let snapshot = serde_json::to_value(&evaluation).unwrap_or_default();
-    AuditModel::record(&ctx.db, row_pid, "scenario_committed", caller.actor(), Some(snapshot))
-        .await
-        .ok();
+    AuditModel::record(
+        &ctx.db,
+        row_pid,
+        "scenario_committed",
+        caller.actor(),
+        Some(snapshot),
+    )
+    .await
+    .ok();
     format::json(row)
 }
 
@@ -595,7 +618,7 @@ async fn list_objectives(State(ctx): State<AppContext>) -> Result<Response> {
 }
 
 /// `GET /api/objectives/{pid}/alignment` — which items serve the
-/// objective, with weights and per-collection totals.
+/// objective, with weights and per-kind totals.
 #[debug_handler]
 async fn objective_alignment(
     State(ctx): State<AppContext>,
@@ -611,18 +634,22 @@ async fn objective_alignment(
     let mut per_collection: std::collections::BTreeMap<String, i32> =
         std::collections::BTreeMap::new();
     for link in &links {
-        let Some(item) = work_items::Entity::find()
-            .filter(work_items::Column::Pid.eq(link.work_item_pid))
-            .filter(work_items::Column::DeletedAt.is_null())
+        let Some(item) = plans::Entity::find()
+            .filter(plans::Column::Pid.eq(link.plan_pid))
+            .filter(plans::Column::DeletedAt.is_null())
             .one(&ctx.db)
             .await
             .map_err(db_err)?
         else {
             continue;
         };
-        *per_collection.entry(item.kind.clone()).or_default() += link.weight;
+        let kind_label = item
+            .kind
+            .clone()
+            .unwrap_or_else(|| "unspecified".to_string());
+        *per_collection.entry(kind_label.clone()).or_default() += link.weight;
         items.push(serde_json::json!({
-            "pid": item.pid.to_string(), "kind": item.kind, "name": item.name,
+            "pid": item.pid.to_string(), "kind": kind_label, "name": item.name,
             "weight": link.weight,
         }));
     }
@@ -636,7 +663,7 @@ async fn objective_alignment(
     }))
 }
 
-/// `POST /api/{collection}/{pid}/objectives` body: a weighted mapping
+/// `POST /api/plans/{pid}/objectives` body: a weighted mapping
 /// (upserts on the pair — re-linking updates the weight).
 #[derive(Debug, Deserialize)]
 struct LinkPayload {
@@ -648,17 +675,17 @@ struct LinkPayload {
 async fn link_objective(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
-    Path((collection, pid)): Path<(String, String)>,
+    Path(pid): Path<String>,
     Json(payload): Json<LinkPayload>,
 ) -> Result<Response> {
     if !rules::valid_weight(payload.weight) {
         return Err(unprocessable("weight must be 1–5"));
     }
-    let item = super::governance::find_item(&ctx, &collection, &pid).await?;
+    let item = super::governance::find_item(&ctx, &pid).await?;
     let objective = find_objective(&ctx, &payload.objective_pid.to_string()).await?;
     let existing = objective_links::Entity::find()
         .filter(objective_links::Column::ObjectivePid.eq(objective.pid))
-        .filter(objective_links::Column::WorkItemPid.eq(item.pid))
+        .filter(objective_links::Column::PlanPid.eq(item.pid))
         .one(&ctx.db)
         .await
         .map_err(db_err)?;
@@ -670,7 +697,7 @@ async fn link_objective(
         objective_links::ActiveModel {
             pid: ActiveValue::set(Uuid::new_v4()),
             objective_pid: ActiveValue::set(objective.pid),
-            work_item_pid: ActiveValue::set(item.pid),
+            plan_pid: ActiveValue::set(item.pid),
             weight: ActiveValue::set(payload.weight),
             ..Default::default()
         }
@@ -684,15 +711,15 @@ async fn link_objective(
     format::json(serde_json::json!({ "pid": row.pid.to_string(), "weight": row.weight }))
 }
 
-/// `GET /api/{collection}/{pid}/objectives` — the item's mappings.
+/// `GET /api/plans/{pid}/objectives` — the item's mappings.
 #[debug_handler]
 async fn item_objectives(
     State(ctx): State<AppContext>,
-    Path((collection, pid)): Path<(String, String)>,
+    Path(pid): Path<String>,
 ) -> Result<Response> {
-    let item = super::governance::find_item(&ctx, &collection, &pid).await?;
+    let item = super::governance::find_item(&ctx, &pid).await?;
     let links = objective_links::Entity::find()
-        .filter(objective_links::Column::WorkItemPid.eq(item.pid))
+        .filter(objective_links::Column::PlanPid.eq(item.pid))
         .all(&ctx.db)
         .await
         .map_err(db_err)?;
@@ -717,7 +744,7 @@ async fn item_objectives(
     format::json(out)
 }
 
-/// `POST /api/{collection}/{pid}/benefits` body.
+/// `POST /api/plans/{pid}/benefits` body.
 #[derive(Debug, Deserialize)]
 struct BenefitPayload {
     title: String,
@@ -732,13 +759,13 @@ struct BenefitPayload {
     expected_on: Option<chrono::NaiveDate>,
 }
 
-/// `POST /api/{collection}/{pid}/benefits` — declare an expected
+/// `POST /api/plans/{pid}/benefits` — declare an expected
 /// benefit (financial via minor units, or non-financial via note).
 #[debug_handler]
 async fn create_benefit(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
-    Path((collection, pid)): Path<(String, String)>,
+    Path(pid): Path<String>,
     Json(payload): Json<BenefitPayload>,
 ) -> Result<Response> {
     let mut problems = Vec::new();
@@ -746,7 +773,10 @@ async fn create_benefit(
         problems.push("title is required (and capped)".to_string());
     }
     if !rules::BENEFIT_CATEGORIES.contains(&payload.category.as_str()) {
-        problems.push(format!("category must be one of {:?}", rules::BENEFIT_CATEGORIES));
+        problems.push(format!(
+            "category must be one of {:?}",
+            rules::BENEFIT_CATEGORIES
+        ));
     }
     if payload.target_minor.is_some() {
         match payload.currency.as_deref() {
@@ -760,10 +790,10 @@ async fn create_benefit(
     if !problems.is_empty() {
         return Err(unprocessable(&problems.join("; ")));
     }
-    let item = super::governance::find_item(&ctx, &collection, &pid).await?;
+    let item = super::governance::find_item(&ctx, &pid).await?;
     let row = benefits::ActiveModel {
         pid: ActiveValue::set(Uuid::new_v4()),
-        work_item_pid: ActiveValue::set(item.pid),
+        plan_pid: ActiveValue::set(item.pid),
         title: ActiveValue::set(payload.title.clone()),
         category: ActiveValue::set(payload.category.clone()),
         currency: ActiveValue::set(payload.currency.clone()),
@@ -785,25 +815,22 @@ async fn create_benefit(
     format::json(serde_json::json!({ "pid": row.pid.to_string() }))
 }
 
-/// `GET /api/{collection}/{pid}/benefits` — the benefits plus
+/// `GET /api/plans/{pid}/benefits` — the benefits plus
 /// per-currency target/realized totals and a simple ROI against the
 /// item's recorded budget actuals (basis points; absent when spend
 /// is zero or currencies differ).
 #[debug_handler]
-async fn list_benefits(
-    State(ctx): State<AppContext>,
-    Path((collection, pid)): Path<(String, String)>,
-) -> Result<Response> {
-    let item = super::governance::find_item(&ctx, &collection, &pid).await?;
+async fn list_benefits(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Result<Response> {
+    let item = super::governance::find_item(&ctx, &pid).await?;
     let rows = benefits::Entity::find()
-        .filter(benefits::Column::WorkItemPid.eq(item.pid))
+        .filter(benefits::Column::PlanPid.eq(item.pid))
         .filter(benefits::Column::DeletedAt.is_null())
         .order_by_asc(benefits::Column::Id)
         .all(&ctx.db)
         .await
         .map_err(db_err)?;
     let budget_rows = budget_lines::Entity::find()
-        .filter(budget_lines::Column::WorkItemPid.eq(item.pid))
+        .filter(budget_lines::Column::PlanPid.eq(item.pid))
         .filter(budget_lines::Column::DeletedAt.is_null())
         .all(&ctx.db)
         .await
@@ -841,7 +868,7 @@ async fn list_benefits(
     format::json(serde_json::json!({ "benefits": rows, "totals": totals }))
 }
 
-/// `POST /api/{collection}/{pid}/benefits/{b_pid}/realize` — record
+/// `POST /api/plans/{pid}/benefits/{b_pid}/realize` — record
 /// realized value (accumulates; overflow refused) and optionally move
 /// the status.
 #[derive(Debug, Deserialize)]
@@ -858,19 +885,20 @@ struct RealizePayload {
 async fn realize_benefit(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
-    Path((collection, pid, b_pid)): Path<(String, String, String)>,
+    Path((pid, b_pid)): Path<(String, String)>,
     Json(payload): Json<RealizePayload>,
 ) -> Result<Response> {
     if let Some(status) = payload.status.as_deref()
-        && !rules::BENEFIT_STATUSES.contains(&status) {
-            return Err(unprocessable(&format!(
-                "status must be one of {:?}",
-                rules::BENEFIT_STATUSES
-            )));
-        }
-    let item = super::governance::find_item(&ctx, &collection, &pid).await?;
+        && !rules::BENEFIT_STATUSES.contains(&status)
+    {
+        return Err(unprocessable(&format!(
+            "status must be one of {:?}",
+            rules::BENEFIT_STATUSES
+        )));
+    }
+    let item = super::governance::find_item(&ctx, &pid).await?;
     let benefit = find_benefit(&ctx, &b_pid).await?;
-    if benefit.work_item_pid != item.pid {
+    if benefit.plan_pid != item.pid {
         return Err(Error::NotFound);
     }
     let next = match payload.amount_minor {
@@ -894,9 +922,15 @@ async fn realize_benefit(
         "note": payload.note,
         "status": payload.status,
     });
-    AuditModel::record(&ctx.db, row_pid, "benefit_realized", caller.actor(), Some(snapshot))
-        .await
-        .ok();
+    AuditModel::record(
+        &ctx.db,
+        row_pid,
+        "benefit_realized",
+        caller.actor(),
+        Some(snapshot),
+    )
+    .await
+    .ok();
     format::json(row)
 }
 
@@ -917,12 +951,12 @@ pub fn routes() -> Routes {
         .add("/objectives", post(create_objective))
         .add("/objectives", get(list_objectives))
         .add("/objectives/{pid}/alignment", get(objective_alignment))
-        .add("/{collection}/{pid}/objectives", post(link_objective))
-        .add("/{collection}/{pid}/objectives", get(item_objectives))
-        .add("/{collection}/{pid}/benefits", post(create_benefit))
-        .add("/{collection}/{pid}/benefits", get(list_benefits))
+        .add("/plans/{pid}/objectives", post(link_objective))
+        .add("/plans/{pid}/objectives", get(item_objectives))
+        .add("/plans/{pid}/benefits", post(create_benefit))
+        .add("/plans/{pid}/benefits", get(list_benefits))
         .add(
-            "/{collection}/{pid}/benefits/{b_pid}/realize",
+            "/plans/{pid}/benefits/{b_pid}/realize",
             post(realize_benefit),
         )
 }

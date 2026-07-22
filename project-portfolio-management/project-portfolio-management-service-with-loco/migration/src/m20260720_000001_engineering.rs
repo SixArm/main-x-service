@@ -25,19 +25,19 @@ impl MigrationTrait for Migration {
                      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                      id SERIAL PRIMARY KEY,
                      pid UUID NOT NULL UNIQUE,
-                     work_item_pid UUID NOT NULL,
+                     plan_pid UUID NOT NULL,
                      name VARCHAR NOT NULL,
                      starts_on DATE NOT NULL,
                      ends_on DATE NOT NULL,
                      deleted_at TIMESTAMPTZ NULL
                  );
-                 CREATE INDEX IF NOT EXISTS sprints_item ON sprints (work_item_pid);
+                 CREATE INDEX IF NOT EXISTS sprints_item ON sprints (plan_pid);
                  CREATE TABLE IF NOT EXISTS tasks (
                      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                      id SERIAL PRIMARY KEY,
                      pid UUID NOT NULL UNIQUE,
-                     work_item_pid UUID NOT NULL,
+                     plan_pid UUID NOT NULL,
                      sprint_pid UUID NULL,
                      title VARCHAR NOT NULL,
                      description VARCHAR NULL,
@@ -47,7 +47,7 @@ impl MigrationTrait for Migration {
                      done_at TIMESTAMPTZ NULL,
                      deleted_at TIMESTAMPTZ NULL
                  );
-                 CREATE INDEX IF NOT EXISTS tasks_item ON tasks (work_item_pid);
+                 CREATE INDEX IF NOT EXISTS tasks_item ON tasks (plan_pid);
                  CREATE INDEX IF NOT EXISTS tasks_status ON tasks (status);
                  ALTER TABLE milestones ADD COLUMN IF NOT EXISTS kind VARCHAR NULL;",
             )

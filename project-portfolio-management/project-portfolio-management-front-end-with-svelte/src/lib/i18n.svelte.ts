@@ -124,10 +124,10 @@ const STRINGS = {
     "session.useToken": "Use token",
     "session.hint": "From the authentication-service (magic-link sign-in).",
     // Cases list
-    "list.title": "Work items",
+    "list.title": "Plans",
     "list.new": "New",
     "list.loading": "Loading…",
-    "list.empty": "No work items yet.",
+    "list.empty": "No plans yet.",
     "list.createOne": "Create one",
     "list.loadFailed": "Failed to load cases",
     // Case detail
@@ -160,7 +160,7 @@ const STRINGS = {
     "edit.saveChanges": "Save changes",
     // Case form
     "form.title": "Name",
-    "form.caseType": "Case type",
+    "form.caseType": "Kind",
     "form.status": "Status",
     "form.priority": "Priority",
     "form.caseNumber": "Code",

@@ -32,10 +32,7 @@ macro_rules! find_active {
         /// # Errors
         ///
         /// [`Error::NotFound`] when absent or soft-deleted.
-        pub async fn $fn_name<C: ConnectionTrait>(
-            db: &C,
-            pid: Uuid,
-        ) -> Result<$module::Model> {
+        pub async fn $fn_name<C: ConnectionTrait>(db: &C, pid: Uuid) -> Result<$module::Model> {
             let row = $module::Entity::find()
                 .filter($module::Column::Pid.eq(pid))
                 .filter($module::Column::DeletedAt.is_null())
@@ -51,17 +48,17 @@ find_active!(find_proposal, proposals);
 find_active!(find_risk, risks);
 find_active!(find_budget_line, budget_lines);
 
-/// A work item's gate reviews, oldest first.
+/// A plan's gate reviews, oldest first.
 ///
 /// # Errors
 ///
 /// When the query fails.
 pub async fn gate_reviews_for(
     db: &DatabaseConnection,
-    work_item_pid: Uuid,
+    plan_pid: Uuid,
 ) -> Result<Vec<gate_reviews::Model>> {
     let rows = gate_reviews::Entity::find()
-        .filter(gate_reviews::Column::WorkItemPid.eq(work_item_pid))
+        .filter(gate_reviews::Column::PlanPid.eq(plan_pid))
         .order_by_asc(gate_reviews::Column::Id)
         .all(db)
         .await
@@ -69,14 +66,14 @@ pub async fn gate_reviews_for(
     Ok(rows)
 }
 
-/// A work item's active risks, oldest first.
+/// A plan's active risks, oldest first.
 ///
 /// # Errors
 ///
 /// When the query fails.
-pub async fn risks_for(db: &DatabaseConnection, work_item_pid: Uuid) -> Result<Vec<risks::Model>> {
+pub async fn risks_for(db: &DatabaseConnection, plan_pid: Uuid) -> Result<Vec<risks::Model>> {
     let rows = risks::Entity::find()
-        .filter(risks::Column::WorkItemPid.eq(work_item_pid))
+        .filter(risks::Column::PlanPid.eq(plan_pid))
         .filter(risks::Column::DeletedAt.is_null())
         .order_by_asc(risks::Column::Id)
         .all(db)
@@ -85,17 +82,17 @@ pub async fn risks_for(db: &DatabaseConnection, work_item_pid: Uuid) -> Result<V
     Ok(rows)
 }
 
-/// A work item's active budget lines, oldest first.
+/// A plan's active budget lines, oldest first.
 ///
 /// # Errors
 ///
 /// When the query fails.
 pub async fn budget_lines_for(
     db: &DatabaseConnection,
-    work_item_pid: Uuid,
+    plan_pid: Uuid,
 ) -> Result<Vec<budget_lines::Model>> {
     let rows = budget_lines::Entity::find()
-        .filter(budget_lines::Column::WorkItemPid.eq(work_item_pid))
+        .filter(budget_lines::Column::PlanPid.eq(plan_pid))
         .filter(budget_lines::Column::DeletedAt.is_null())
         .order_by_asc(budget_lines::Column::Id)
         .all(db)

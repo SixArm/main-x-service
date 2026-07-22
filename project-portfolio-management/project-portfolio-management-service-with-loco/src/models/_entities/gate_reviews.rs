@@ -1,5 +1,5 @@
 //! `SeaORM` Entity — `gate_reviews`. One phase-gate decision on a
-//! work item (PPM-3); an approved review advances the item's `stage`.
+//! plan (PPM-3); an approved review advances the item's `stage`.
 
 #![allow(missing_docs)]
 
@@ -15,7 +15,7 @@ pub struct Model {
     pub id: i32,
     #[sea_orm(unique)]
     pub pid: Uuid,
-    pub work_item_pid: Uuid,
+    pub plan_pid: Uuid,
     pub gate: String,
     pub decision: String,
     pub conditions: Option<String>,

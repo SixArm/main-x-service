@@ -1,5 +1,5 @@
 //! `SeaORM` Entity — `allocations`. A person's percentage allocation
-//! to a work item over a timeframe (PPM-8). The person is an
+//! to a plan over a timeframe (PPM-8). The person is an
 //! `EntityRef` URN — never copied demographics, never a matcher signal.
 
 #![allow(missing_docs)]
@@ -16,7 +16,7 @@ pub struct Model {
     pub id: i32,
     #[sea_orm(unique)]
     pub pid: Uuid,
-    pub work_item_pid: Uuid,
+    pub plan_pid: Uuid,
     pub person_ref: String,
     pub role: Option<String>,
     pub percent: i32,

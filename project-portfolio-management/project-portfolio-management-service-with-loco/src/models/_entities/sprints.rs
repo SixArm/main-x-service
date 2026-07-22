@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `sprints`. Time-boxed iterations on a work item,
+//! `SeaORM` Entity — `sprints`. Time-boxed iterations on a plan,
 //! behind the honest burndown view.
 
 // SeaORM-generated entity shape: documented by the migration.
@@ -16,7 +16,7 @@ pub struct Model {
     pub id: i32,
     #[sea_orm(unique)]
     pub pid: Uuid,
-    pub work_item_pid: Uuid,
+    pub plan_pid: Uuid,
     pub name: String,
     pub starts_on: Date,
     pub ends_on: Date,

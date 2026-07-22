@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// The outcome of matching two work items.
+/// The outcome of matching two plans.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchResult {
     /// Overall score in `[0.0, 1.0]`.
@@ -80,8 +80,8 @@ pub struct MatchBreakdown {
     pub code_score: Option<f64>,
     /// Owner-org exact match.
     pub owner_org_score: Option<f64>,
-    /// Parent-portfolio exact match (child kinds only).
-    pub portfolio_score: Option<f64>,
+    /// Parent plan exact match (`parent_ref`).
+    pub parent_score: Option<f64>,
     /// Timeframe (date-proximity) similarity.
     pub timeframe_score: Option<f64>,
     /// Keywords (Jaccard) similarity.
@@ -92,9 +92,10 @@ pub struct MatchBreakdown {
     pub tags_score: Option<f64>,
     /// True when the deterministic short-circuit fired.
     pub deterministic_match: bool,
-    /// True when the **kind gate** blocked the match (the two records are
-    /// of different kinds, so the score is pinned to `0.0` and every
-    /// component is left `None`).
+    /// Vestigial: always `false`. The former **kind gate** was removed
+    /// when the four plan kinds were unified into one recursive
+    /// tree, so no pair is ever gate-blocked. Retained for wire /
+    /// breakdown compatibility.
     pub kind_gate_blocked: bool,
 }
 

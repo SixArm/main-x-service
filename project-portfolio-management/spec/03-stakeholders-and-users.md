@@ -5,15 +5,15 @@ governmental system. Stakeholders span the trio:
 
 | Stakeholder | Interest | Primary surface |
 |---|---|---|
-| Government departments / agencies (portfolio owners) | One canonical registry of portfolios and the projects / products / programs under them; dedupe of overlapping or duplicated initiatives | Service `/api/portfolios/*` + child collections |
-| Programme / portfolio managers (PMO) | Register portfolios and roll up their child projects / products / programs; see parent/child hierarchy; spot duplicate or dependent initiatives | Front-end routes + check-duplicates + `portfolio_ref` roll-up |
-| Project / product / program leads | Own a work item's goals, tasks, issues; assign work; track timeline / burndown | Front-end sub-resource workspaces |
+| Government departments / agencies (portfolio owners) | One canonical registry of plans and the recursive containment trees they form; dedupe of overlapping or duplicated initiatives | Service `/api/plans/*` |
+| Programme / portfolio managers (PMO) | Register plans and roll up their child plans; see parent/child hierarchy; spot duplicate or dependent initiatives | Front-end routes + check-duplicates + `parent_ref` roll-up |
+| Project / product / program leads | Own a plan's goals, tasks, issues; assign work; track timeline / burndown | Front-end sub-resource workspaces |
 | Team members / contributors | Pick up tasks, raise issues, track goals | Front-end sub-resource workspaces |
-| Sponsoring organisations | Their work items registered once, linked to the owning org (`owner_org_id` → [organization entity](../../organization/)) | Service create + identifiers + cross-service links |
+| Sponsoring organisations | Their plans registered once, linked to the owning org (`owner_org_id` → [organization entity](../../organization/)) | Service create + identifiers + cross-service links |
 | Integrators (Jira / Asana / MS Project / Linear / GitHub Projects) | Register / sync a project via its external id; stable REST surface; deterministic-id linkage | Service `/api/*` + bulk import/export |
-| Auditors / information-governance officers | Who changed what, when; explainable match decisions; who was on which work item | Audit endpoints + event stream + soft-delete timestamps |
+| Auditors / information-governance officers | Who changed what, when; explainable match decisions; who was on which plan | Audit endpoints + event stream + soft-delete timestamps |
 | Operations / DBA / SRE | Schema + migration discipline, backups, health checks, scaling | Service deployment artefacts, `/_health` |
-| Developers / AI agents | Clear SDD contracts; which spec governs what; the four-kind model + the matchable/operational partition | This spec + the three crate specs |
+| Developers / AI agents | Clear SDD contracts; which spec governs what; the optional-`kind` label model + the matchable/operational partition | This spec + the three crate specs |
 | Other Main X Index entities | Cross-references via `EntityRef` (lead, assignees, members → person / worker / authentication; sponsor → organization); cross-service links to any entity | Service REST API + the link aggregator |
 
 Per-subproject stakeholder detail: service

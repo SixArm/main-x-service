@@ -4,8 +4,14 @@
 //! `flow/` posture applied here).
 
 /// Proposal pipeline statuses (PPM-1), in lifecycle order.
-pub const PROPOSAL_STATUSES: &[&str] =
-    &["draft", "submitted", "in_review", "approved", "rejected", "promoted"];
+pub const PROPOSAL_STATUSES: &[&str] = &[
+    "draft",
+    "submitted",
+    "in_review",
+    "approved",
+    "rejected",
+    "promoted",
+];
 
 /// Phase gates (PPM-3), strictly ordered: an approved review at gate
 /// *n+1* is only legal when the item's stage is gate *n*.
@@ -31,7 +37,7 @@ pub const BUDGET_CATEGORIES: &[&str] = &["capex", "opex"];
 /// lifecycle (an uncategorised stored risk reads as `delivery`).
 pub const RISK_CATEGORIES: &[&str] = &["delivery", "tech_debt", "compliance", "security", "other"];
 
-/// Whether a work item whose current `stage` (the last approved gate)
+/// Whether a plan whose current `stage` (the last approved gate)
 /// has reached `gate` — the release condition for a stage-gated
 /// funding tranche. `stage = None` (pre-gate) has reached nothing;
 /// unknown tokens have reached nothing (fail closed).
@@ -66,7 +72,7 @@ pub enum ProposalAction {
     Approve,
     /// `in_review` → rejected.
     Reject,
-    /// approved → promoted (mints the work item).
+    /// approved → promoted (mints the plan).
     Promote,
 }
 
@@ -300,5 +306,4 @@ mod tests {
         assert!(!gate_reached(Some("nonsense"), "g0_concept"));
         assert!(!gate_reached(Some("g5_benefits"), "nonsense"));
     }
-
 }

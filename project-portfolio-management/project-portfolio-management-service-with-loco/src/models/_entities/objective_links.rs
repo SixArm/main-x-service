@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `objective_links`. A weighted work-item →
+//! `SeaORM` Entity — `objective_links`. A weighted plan →
 //! objective mapping (PPM-5); unique per pair.
 
 #![allow(missing_docs)]
@@ -16,7 +16,7 @@ pub struct Model {
     #[sea_orm(unique)]
     pub pid: Uuid,
     pub objective_pid: Uuid,
-    pub work_item_pid: Uuid,
+    pub plan_pid: Uuid,
     pub weight: i32,
 }
 

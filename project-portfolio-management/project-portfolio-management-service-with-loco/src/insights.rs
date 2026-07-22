@@ -67,7 +67,7 @@ pub fn variance_by_currency(lines: &[MoneyLine]) -> Vec<VarianceRow> {
 /// The four technology-radar rings, outermost first.
 pub const RADAR_RINGS: [&str; 4] = ["assess", "trial", "adopt", "hold"];
 
-/// Parse one work-item tag against the radar convention:
+/// Parse one plan tag against the radar convention:
 /// `tech:<name>` or `tech:<name>:<ring>` (ring ∈ [`RADAR_RINGS`]).
 /// The name is lowercased and trimmed; blank names and unknown rings
 /// are rejected (`None`) rather than guessed.
@@ -183,13 +183,28 @@ mod tests {
     #[test]
     fn variance_keeps_currencies_apart_and_flags_overrun() {
         let rows = variance_by_currency(&[
-            MoneyLine { currency: "GBP".into(), planned_minor: 10_000, actual_minor: 12_000 },
-            MoneyLine { currency: "GBP".into(), planned_minor: 5_000, actual_minor: 1_000 },
-            MoneyLine { currency: "USD".into(), planned_minor: 7_000, actual_minor: 7_000 },
+            MoneyLine {
+                currency: "GBP".into(),
+                planned_minor: 10_000,
+                actual_minor: 12_000,
+            },
+            MoneyLine {
+                currency: "GBP".into(),
+                planned_minor: 5_000,
+                actual_minor: 1_000,
+            },
+            MoneyLine {
+                currency: "USD".into(),
+                planned_minor: 7_000,
+                actual_minor: 7_000,
+            },
         ]);
         assert_eq!(rows.len(), 2, "one row per currency, never merged");
         let gbp = &rows[0];
-        assert_eq!((gbp.currency.as_str(), gbp.planned_minor, gbp.actual_minor), ("GBP", 15_000, 13_000));
+        assert_eq!(
+            (gbp.currency.as_str(), gbp.planned_minor, gbp.actual_minor),
+            ("GBP", 15_000, 13_000)
+        );
         assert_eq!(gbp.remaining_minor, 2_000);
         assert!(!gbp.overrun);
         assert_eq!(gbp.line_count, 2);
@@ -212,19 +227,31 @@ mod tests {
             parse_tech_tag("tech:Rust:Adopt"),
             Some(("rust".into(), Some("adopt".into())))
         );
-        assert_eq!(parse_tech_tag("tech: postgres :trial"), Some(("postgres".into(), Some("trial".into()))));
+        assert_eq!(
+            parse_tech_tag("tech: postgres :trial"),
+            Some(("postgres".into(), Some("trial".into())))
+        );
         assert_eq!(parse_tech_tag("tech:"), None, "blank name refused");
-        assert_eq!(parse_tech_tag("tech:x:sideways"), None, "unknown ring refused");
+        assert_eq!(
+            parse_tech_tag("tech:x:sideways"),
+            None,
+            "unknown ring refused"
+        );
         assert_eq!(parse_tech_tag("owner:alice"), None, "non-tech tag ignored");
     }
 
     #[test]
     fn ring_consensus_majority_ties_and_default() {
-        let r = |xs: &[&str]| ring_consensus(&xs.iter().map(|s| (*s).to_string()).collect::<Vec<_>>());
+        let r =
+            |xs: &[&str]| ring_consensus(&xs.iter().map(|s| (*s).to_string()).collect::<Vec<_>>());
         assert_eq!(r(&["adopt", "adopt", "trial"]), "adopt");
         assert_eq!(r(&["assess", "adopt"]), "assess", "tie breaks cautious");
         assert_eq!(r(&[]), "unclassified");
-        assert_eq!(r(&["nonsense"]), "unclassified", "unknown rings never count");
+        assert_eq!(
+            r(&["nonsense"]),
+            "unclassified",
+            "unknown rings never count"
+        );
     }
 
     #[test]
@@ -259,5 +286,4 @@ mod tests {
         assert_eq!(a.max_open_exposure, Some(60));
         assert_eq!(a.max_item_exposure, None);
     }
-
 }

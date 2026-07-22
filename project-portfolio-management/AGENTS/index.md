@@ -9,9 +9,9 @@ service crate + matcher crate + front-end.
 |---|---|
 | [spec-driven-development.md](spec-driven-development.md) | SDD discipline at entity level — authority model, three-part PRs, section mapping |
 | [subprojects.md](subprojects.md) | The trio — responsibilities, dependency direction, how to run each |
-| [models.md](models.md) | Domain model reference — the `WorkItem` DTO, its four kinds, sub-resources and derived views |
-| [matching.md](matching.md) | Matching algorithm reference — the kind gate, weights, components, deterministic rules |
-| [restful.md](restful.md) | REST API (4 collections) + front-end consumption + matcher library API |
+| [models.md](models.md) | Domain model reference — the `Plan` DTO, its optional `kind` label, recursive containment, sub-resources and derived views |
+| [matching.md](matching.md) | Matching algorithm reference — kind-agnostic scoring, weights, components, deterministic rules |
+| [restful.md](restful.md) | REST API (one `/api/plans` collection) + front-end consumption + matcher library API |
 | [testing.md](testing.md) | Testing strategy across the trio |
 
 ## Subproject docs

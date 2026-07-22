@@ -3,7 +3,7 @@
 //! This module owns a process-wide [`Registry`](prometheus::Registry)
 //! populated with a fixed set of counters. Application code increments the
 //! global [`Metrics`] via [`Metrics::global`] (e.g.
-//! `Metrics::global().work_item_created_total.inc()` in the `work_items` controller).
+//! `Metrics::global().plan_created_total.inc()` in the `plans` controller).
 //! The REST API exposes the registry at `GET /metrics.prom` in Prometheus
 //! text-exposition format (see [`crate::controllers`] / `controllers::metrics`).
 //! Configure your scraper with `metrics_path: /metrics.prom`.
@@ -16,10 +16,10 @@
 //!
 //! | Name | Type | Labels |
 //! |---|---|---|
-//! | `work_item_created_total` | counter | — |
-//! | `work_item_updated_total` | counter | — |
-//! | `work_item_deleted_total` | counter | — |
-//! | `work_item_merged_total` | counter | — |
+//! | `plan_created_total` | counter | — |
+//! | `plan_updated_total` | counter | — |
+//! | `plan_deleted_total` | counter | — |
+//! | `plan_merged_total` | counter | — |
 //! | `http_requests_total` | counter vec | `method`, `path`, `status` |
 
 use std::sync::OnceLock;
@@ -42,14 +42,14 @@ pub struct Metrics {
     /// service-specific metrics beyond this default set.
     pub registry: Registry,
 
-    /// Count of work-item records created (`POST /api/{collection}`).
-    pub work_item_created_total: Counter,
-    /// Count of work-item records updated (`PUT /api/{collection}/{pid}`).
-    pub work_item_updated_total: Counter,
-    /// Count of work-item records soft-deleted (`DELETE /api/{collection}/{pid}`).
-    pub work_item_deleted_total: Counter,
-    /// Count of work-item records merged (`POST /api/{collection}/merge`).
-    pub work_item_merged_total: Counter,
+    /// Count of plan records created (`POST /api/plans`).
+    pub plan_created_total: Counter,
+    /// Count of plan records updated (`PUT /api/plans/{pid}`).
+    pub plan_updated_total: Counter,
+    /// Count of plan records soft-deleted (`DELETE /api/plans/{pid}`).
+    pub plan_deleted_total: Counter,
+    /// Count of plan records merged (`POST /api/plans/merge`).
+    pub plan_merged_total: Counter,
 
     /// HTTP requests handled, labeled by `method`, `path`, and `status`.
     pub http_requests_total: IntCounterVec,
@@ -65,26 +65,24 @@ impl Metrics {
     fn new() -> Self {
         let registry = Registry::new();
 
-        let work_item_created_total = Counter::with_opts(Opts::new(
-            "work_item_created_total",
-            "Total work-item records created.",
+        let plan_created_total = Counter::with_opts(Opts::new(
+            "plan_created_total",
+            "Total plan records created.",
         ))
         .expect("static counter opts are always valid");
-        let work_item_updated_total = Counter::with_opts(Opts::new(
-            "work_item_updated_total",
-            "Total work-item records updated.",
+        let plan_updated_total = Counter::with_opts(Opts::new(
+            "plan_updated_total",
+            "Total plan records updated.",
         ))
         .expect("static counter opts are always valid");
-        let work_item_deleted_total = Counter::with_opts(Opts::new(
-            "work_item_deleted_total",
-            "Total work-item records soft-deleted.",
+        let plan_deleted_total = Counter::with_opts(Opts::new(
+            "plan_deleted_total",
+            "Total plan records soft-deleted.",
         ))
         .expect("static counter opts are always valid");
-        let work_item_merged_total = Counter::with_opts(Opts::new(
-            "work_item_merged_total",
-            "Total work-item records merged.",
-        ))
-        .expect("static counter opts are always valid");
+        let plan_merged_total =
+            Counter::with_opts(Opts::new("plan_merged_total", "Total plan records merged."))
+                .expect("static counter opts are always valid");
 
         let http_requests_total = IntCounterVec::new(
             Opts::new(
@@ -96,10 +94,10 @@ impl Metrics {
         .expect("static counter-vec opts are always valid");
 
         for collector in [
-            Box::new(work_item_created_total.clone()) as Box<dyn prometheus::core::Collector>,
-            Box::new(work_item_updated_total.clone()),
-            Box::new(work_item_deleted_total.clone()),
-            Box::new(work_item_merged_total.clone()),
+            Box::new(plan_created_total.clone()) as Box<dyn prometheus::core::Collector>,
+            Box::new(plan_updated_total.clone()),
+            Box::new(plan_deleted_total.clone()),
+            Box::new(plan_merged_total.clone()),
         ] {
             registry
                 .register(collector)
@@ -111,10 +109,10 @@ impl Metrics {
 
         Self {
             registry,
-            work_item_created_total,
-            work_item_updated_total,
-            work_item_deleted_total,
-            work_item_merged_total,
+            plan_created_total,
+            plan_updated_total,
+            plan_deleted_total,
+            plan_merged_total,
             http_requests_total,
         }
     }
@@ -159,7 +157,7 @@ mod tests {
     #[test]
     fn render_yields_valid_prometheus_text() {
         let metrics = Metrics::global();
-        metrics.work_item_created_total.inc();
+        metrics.plan_created_total.inc();
         // A counter vec only emits a metric family once it has at least one
         // observed label set, so touch one combination here.
         metrics
@@ -170,17 +168,17 @@ mod tests {
 
         // Each registered counter contributes HELP + TYPE lines.
         assert!(
-            body.contains("# HELP work_item_created_total"),
-            "missing HELP for work_item_created_total; got: {body}"
+            body.contains("# HELP plan_created_total"),
+            "missing HELP for plan_created_total; got: {body}"
         );
         assert!(
-            body.contains("# TYPE work_item_created_total counter"),
-            "missing TYPE for work_item_created_total; got: {body}"
+            body.contains("# TYPE plan_created_total counter"),
+            "missing TYPE for plan_created_total; got: {body}"
         );
         // The incremented sample is present and non-zero.
         assert!(
-            body.contains("work_item_created_total"),
-            "missing work_item_created_total sample; got: {body}"
+            body.contains("plan_created_total"),
+            "missing plan_created_total sample; got: {body}"
         );
         // The label-bearing HTTP counter vec is registered too.
         assert!(

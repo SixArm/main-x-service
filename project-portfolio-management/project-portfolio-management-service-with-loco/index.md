@@ -1,10 +1,11 @@
 # Portfolio Service — documentation index
 
-A loco.rs registry of work-item records — and a project-management tool:
-CRUD + matching (embedding the canonical project-portfolio-management-matcher) across the
-**four matchable kinds** (Portfolio / Project / Product / Program), plus
-operational sub-resources (goals, tasks, issues) and derived timeline /
-burndown views.
+A loco.rs registry of plan records — and a project-management tool:
+CRUD + matching (embedding the canonical project-portfolio-management-matcher) over one
+recursive `plans` collection with an **optional** Portfolio / Project /
+Product / Program / Practice / Process / Purpose / Pathway / Proposal
+kind label, plus operational sub-resources (goals,
+tasks, issues) and derived timeline / burndown views.
 
 > **Implemented (MVP, v0.1.0).** The crate exists and builds (`src/`,
 > seven migrations); the remaining deferrals live in the work queue at
@@ -15,62 +16,61 @@ burndown views.
 | Doc | Purpose |
 |---|---|
 | [spec/index.md](./spec/index.md) | **Single source of truth** for this crate (§1–§18). |
-| [../spec/index.md](../spec/index.md) | Entity-wide contract + canonical `WorkItem` model (§5). |
+| [../spec/index.md](../spec/index.md) | Entity-wide contract + canonical `Plan` model (§5). |
 | [AGENTS.md](./AGENTS.md) | How to work here; API surface; MVP scope. |
 | [README.md](./README.md) | User-facing intro + quick start. |
 | [CHANGELOG.md](./CHANGELOG.md) | Release history. |
 
 ## Worked flow
 
-`{collection}` is one of `portfolios` / `projects` / `products` /
-`programs` — each with the identical shape below.
+Plans live in one collection at `/api/plans`; plan-scoped sub-resources
+hang off `/api/plans/{pid}/...`.
 
 ```text
-create   ──>  POST   /api/{collection}                {WorkItem}          -> {pid, name}  (409 on duplicate)
-read     ──>  GET    /api/{collection}/{pid}                              -> WorkItem
-update   ──>  PUT    /api/{collection}/{pid}          {WorkItem}          -> {pid, name}
-delete   ──>  DELETE /api/{collection}/{pid}                              -> 204
-list     ──>  GET    /api/{collection}                                    -> [{pid, name}]  (cap 100)
-search   ──>  GET    /api/{collection}/search?q=migration                -> [{pid, name}]  (ILIKE, cap 50)
-dedupe   ──>  POST   /api/{collection}/check-duplicates  {query}          -> [{pid, score, ...}]
-match    ──>  POST   /api/{collection}/match   {query, candidates}        -> ranked results (cross-kind → 0.0)
-batch    ──>  POST   /api/{collection}/deduplicate                        -> review-queue items
-merge    ──>  POST   /api/{collection}/merge   {main_pid, duplicate_pid}  -> merge record (same kind only)
-merges   ──>  GET    /api/{collection}/merges/recent                      -> [merge record]
+create   ──>  POST   /api/plans                {Plan}                     -> {pid, name}  (409 on duplicate)
+read     ──>  GET    /api/plans/{pid}                                     -> Plan
+update   ──>  PUT    /api/plans/{pid}          {Plan}                     -> {pid, name}
+delete   ──>  DELETE /api/plans/{pid}                                     -> 204
+list     ──>  GET    /api/plans                                           -> [{pid, name}]  (cap 100)
+search   ──>  GET    /api/plans/search?q=migration                       -> [{pid, name}]  (ILIKE, cap 50)
+dedupe   ──>  POST   /api/plans/check-duplicates  {query}                 -> [{pid, score, ...}]
+match    ──>  POST   /api/plans/match   {query, candidates}               -> ranked results (kind-agnostic)
+batch    ──>  POST   /api/plans/deduplicate                              -> review-queue items
+merge    ──>  POST   /api/plans/merge   {main_pid, duplicate_pid}         -> merge record (any two plans)
+merges   ──>  GET    /api/plans/merges/recent                            -> [merge record]
 
-goals    ──>  POST   /api/{collection}/{pid}/goals    {Goal}              -> {pid, ...}
-tasks    ──>  POST   /api/{collection}/{pid}/tasks    {Task}              -> {pid, ...}
-issues   ──>  POST   /api/{collection}/{pid}/issues   {Issue}             -> {pid, ...}
-timeline ──>  GET    /api/{collection}/{pid}/timeline                     -> Gantt projection
-burndown ──>  GET    /api/{collection}/{pid}/burndown                     -> remaining-vs-estimate series
+goals    ──>  POST   /api/plans/{pid}/goals    {Goal}                     -> {pid, ...}
+tasks    ──>  POST   /api/plans/{pid}/tasks    {Task}                     -> {pid, ...}
+issues   ──>  POST   /api/plans/{pid}/issues   {Issue}                    -> {pid, ...}
+timeline ──>  GET    /api/plans/{pid}/timeline                            -> Gantt projection
+burndown ──>  GET    /api/plans/{pid}/burndown                            -> remaining-vs-estimate series
 
-links    ──>  POST·GET·DELETE /api/{collection}/{pid}/links               -> cross-service edges
-audit    ──>  GET    /api/{collection}/audit/recent  ·  /{pid}/audit      -> [audit row]
-events   ──>  GET    /api/{collection}/events/recent                      -> [{kind, pid, name, seq}]
-whoami   ──>  GET    /api/{collection}/whoami          (Bearer PASETO)    -> verified claims (401 without)
+links    ──>  POST·GET·DELETE /api/plans/{pid}/links                      -> cross-service edges
+audit    ──>  GET    /api/plans/audit/recent  ·  /{pid}/audit             -> [audit row]
+events   ──>  GET    /api/plans/events/recent                            -> [{kind, pid, name, seq}]
+whoami   ──>  GET    /api/plans/whoami          (Bearer PASETO)           -> verified claims (401 without)
 docs     ──>  GET    /api-docs/openapi.json  ·  /swagger-ui                  -> OpenAPI 3 + Swagger UI
 metrics  ──>  GET    /metrics.prom                                           -> Prometheus text (public)
 ```
 
-The `WorkItem` body shape is the `project-portfolio-management-matcher` type (kind, name,
-code, owner org, parent `portfolio_ref`, goals, dates, keywords, tags,
-relationships, identifiers, sameAs). The four kinds — Portfolio / Project
-/ Product / Program — are **distinct collections and tables**, and
-**matching is within a collection only** (the matcher's R-GATE makes a
-project never match a product). Projects / Products / Programs carry a
-`portfolio_ref` to their parent portfolio. The high-volume operational
-data — tasks, issues — lives in **separate tables** keyed by the parent
-`(kind, pid)` and is **never** fed to the matcher (the partition rule);
-only the thin identity payload is matched, with goal **titles** bridging
-in via `data.goals[]`.
+The `Plan` body shape is the `project-portfolio-management-matcher` type (optional `kind`
+label, name, code, owner org, `parent_ref`, goals, dates, keywords, tags,
+relationships, identifiers, sameAs). All plans live in **one collection
+and table**, and **matching is kind-agnostic** (there is no kind gate, so
+any two plans may match). Any plan may contain any other plan via a
+`parent_ref` to its parent (a recursive tree; a self- or descendant-cycle
+is rejected `422`). The high-volume operational data — tasks, issues —
+lives in **separate tables** keyed by the parent plan `pid` and is
+**never** fed to the matcher (the partition rule); only the thin identity
+payload is matched, with goal **titles** bridging in via `data.goals[]`.
 
 A create/update payload is validated (blank `name`, UUID / PM-tool-id /
-URI identifier shapes, blank goal titles, BCP-47 `in_language`, child-kind
-`portfolio_ref`) and returns `422` with every problem in one body. A
-real-time create duplicate returns `409 Conflict` with the candidate
-matches. Each create/update/delete/merge (work item and sub-resource)
-writes an `audit_logs` row, publishes an event, and bumps the matching
-per-collection Prometheus counter.
+URI identifier shapes, blank goal titles, BCP-47 `in_language`,
+`parent_ref` UUID + containment-cycle check) and returns `422` with every
+problem in one body. A real-time create duplicate returns `409 Conflict`
+with the candidate matches. Each create/update/delete/merge (plan and
+sub-resource) writes an `audit_logs` row, publishes an event, and bumps
+the matching Prometheus counter.
 
 Auth is optional per route by default: send `Authorization: Bearer
 <paseto>` — a short-lived PASETO v4.public token minted by the

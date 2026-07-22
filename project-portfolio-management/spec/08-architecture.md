@@ -6,35 +6,33 @@
 +--------------------------------------------------------------+
 |              project-portfolio-management-front-end-with-svelte                  |
 |  SvelteKit 2 SPA · Svelte 5 runes · TypeScript strict         |
-|  routes: /{portfolios,projects,products,programs}             |
-|          …/new  …/[pid]  …/[pid]/edit                         |
-|          …/[pid]/{goals,tasks,issues}                         |
-|          …/[pid]/{timeline,burndown}                          |
-|  lib/api: client.ts → workItems.ts + sub-resource repos       |
+|  routes: /plans                                               |
+|          /plans/new  /plans/[pid]  /plans/[pid]/edit          |
+|          /plans/[pid]/{goals,tasks,issues}                    |
+|          /plans/[pid]/{timeline,burndown}                     |
+|  lib/api: client.ts → plans.ts + sub-resource repos           |
 +------------------------------+-------------------------------+
                                | REST (raw loco JSON, no envelope)
                                | PUBLIC_API_BASE_URL (default :5150)
 +------------------------------v-------------------------------+
 |              project-portfolio-management-service-with-loco                     |
 |  loco.rs 0.16 (Axum 0.8) · port 5150                          |
-|  controllers/portfolios.rs projects.rs products.rs programs.rs|
-|     (identical shape) CRUD + /match + /check-duplicates       |
-|                       + merge + search  (within-kind)         |
+|  controllers/plans.rs                                         |
+|     CRUD + /match + /check-duplicates                         |
+|                       + merge + search  (kind-agnostic)       |
 |  controllers/{goals,tasks,issues}.rs   (sub-resources)        |
 |  controllers/{timeline,burndown}.rs    (derived, read-only)   |
 |  controllers/links.rs        entity_links write-side          |
 |  controllers/bulk.rs         import/export jobs (bg_pg)        |
-|  models/{portfolios,projects,products,programs}.rs + subs     |
+|  models/plans.rs + sub-resources                              |
 +--------------+-------------------------------+----------------+
                |  path dependency (Cargo)      |
 +--------------v---------------+  +------------v---------------+
 |  project-portfolio-management-matcher           |  |  PostgreSQL (SeaORM 1.1)   |
-|  pure library, no IO         |  |  portfolios · projects ·    |
-|  MatchingEngine ·            |  |  products · programs        |
-|  MatchConfig · WorkItem ·    |  |  (each {…, data JSONB}) +   |
-|  kind gate (R-GATE)          |  |  goals(via JSONB) · tasks · |
-|                              |  |  issues · audit_logs ·      |
-|                              |  |  merge_records ·            |
+|  pure library, no IO         |  |  plans ({…, data JSONB}) +  |
+|  MatchingEngine ·            |  |  goals(via JSONB) · tasks · |
+|  MatchConfig · Plan ·        |  |  issues · audit_logs ·      |
+|  kind-agnostic               |  |  merge_records ·            |
 |                              |  |  entity_links · bulk_jobs   |
 +------------------------------+  +-----------------------------+
 ```
@@ -44,25 +42,21 @@ matcher. The matcher depends on nothing in the workspace (serde,
 strsim, unicode-normalization, chrono/time for date proximity,
 thiserror only). The service declares
 `project-portfolio-management-matcher = { path = "../project-portfolio-management-matcher-rust-crate" }` and
-uses the matcher's `WorkItem` directly as its API DTO for the thin
+uses the matcher's `Plan` directly as its API DTO for the thin
 record — there is no adapter layer (the care-pathway posture).
 
-### 8.2 The four-kind model and the matchable/operational split
+### 8.2 The single collection and the matchable/operational split
 
 The service is **two co-located concerns** behind one app:
 
-- the **identity registry** — CRUD + matching over the thin `WorkItem`
-  across **four collections** (`portfolios`, `projects`, `products`,
-  `programs`), each its own table with a JSONB `data` column. Every
-  collection uses the **identical** controller shape; the only
-  difference is the `kind` it pins and (for the three child kinds) the
-  denormalised `portfolio_pid` column. Matching is **within a
-  collection only**: the controller feeds same-kind candidates and the
-  matcher's kind gate (§5.5) guarantees a project is never scored
-  against a product.
+- the **identity registry** — CRUD + matching over the thin `Plan`
+  on the one `plans` collection (a JSONB `data` column + a nullable
+  denormalised `parent_pid`). Matching is **kind-agnostic**: the
+  controller feeds candidate plans without kind filtering and the
+  matcher never gates on `kind` (§5.5).
 - the **project-management tool** — the operational sub-resources
-  (tasks, issues, in their own tables keyed by `(parent_kind,
-  parent_pid)`) and the two derived views, hanging off any work item.
+  (tasks, issues, in their own tables keyed by `parent_pid`) and the
+  two derived views, hanging off any plan.
 
 Only the registry half touches the matcher. The PM half is ordinary
 relational CRUD with events + audit. The one bridge is `goals[]`
@@ -77,18 +71,16 @@ project-portfolio-management-service-with-loco/
 │   ├── app.rs                       loco Hooks (routes, truncate)
 │   ├── bin/main.rs                  loco CLI entrypoint
 │   ├── controllers/
-│   │   ├── portfolios.rs projects.rs products.rs programs.rs
-│   │   │                            CRUD + match + check-duplicates + merge + search
+│   │   ├── plans.rs                 CRUD + match + check-duplicates + merge + search
 │   │   ├── goals.rs tasks.rs issues.rs   sub-resources
 │   │   ├── timeline.rs burndown.rs  derived, read-only
 │   │   ├── links.rs                 entity_links write-side
 │   │   ├── bulk.rs                  import/export jobs
 │   │   └── docs.rs                  OpenAPI + Swagger UI
-│   ├── models/                      per-kind + sub-resource CRUD helpers
+│   ├── models/                      plans + sub-resource CRUD helpers
 │   ├── matching helpers, merge.rs, validation.rs, streaming.rs, auth.rs
 │   └── workers/bulk.rs              bg_pg drain
-├── migration/src/                   portfolios, projects, products, programs,
-│                                    sub-resources, audit_logs, merge_records,
+├── migration/src/                   plans, sub-resources, audit_logs, merge_records,
 │                                    entity_links, bulk_jobs
 ├── config/{development,production,test}.yaml
 └── tests/                           matcher-embedding + request-level
@@ -100,23 +92,23 @@ development). The front-end runs with `pnpm dev` against
 
 ### 8.4 Matching data flow
 
-- **`/{collection}/match`** — request carries `{query, candidates}`
-  (thin records, all of the collection's kind); the controller calls
-  `MatchingEngine::rank` and returns the scored pairs. No database
-  access. A mismatched `kind` in the payload is gated to 0.0 (§5.5).
-- **`/{collection}/check-duplicates`** — request carries a `WorkItem`;
-  the controller loads up to a capped set of active rows **from that
-  collection**, deserialises each payload, calls `match_work_items` per
-  candidate, and returns hits with `is_match == true`, sorted by score.
+- **`/plans/match`** — request carries `{query, candidates}`
+  (thin records); the controller calls `MatchingEngine::rank` and
+  returns the scored pairs. No database access. `kind` labels do not
+  affect scoring (§5.5).
+- **`/plans/check-duplicates`** — request carries a `Plan`;
+  the controller loads up to a capped set of active rows, deserialises
+  each payload, calls `match_plans` per candidate, and returns hits
+  with `is_match == true`, sorted by score.
   *(roadmap: replace the full scan with search-based candidate blocking
   — OQ-2.)*
-- **create-time** — the same path runs on `POST /api/{collection}` to
+- **create-time** — the same path runs on `POST /api/plans` to
   back the `409` real-time duplicate detection (FR-11a).
 
 ### 8.5 Cross-service & federation topology
 
-A work item references other entities by `EntityRef` (sponsor org,
-lead, assignees) and a parent portfolio by `portfolio_ref`, and may
+A plan references other entities by `EntityRef` (sponsor org,
+lead, assignees) and a parent plan by `parent_ref`, and may
 carry `entity_links` to **any** entity, per
 [`agents/share/cross-service-linking.md`](../../agents/share/cross-service-linking.md).
 The portfolio service is a **write-side** participant: it stores
@@ -125,9 +117,8 @@ bus; it does **not** call the target service on the write path
 (optimistic integrity, §5 there). The read-model aggregator
 (`link-graph-service`) consuming those events to answer graph queries
 is a separate service, out of scope for this trio (§2.3). `EntityRef`s
-are never a match signal (§7 there); `portfolio_ref` is an in-entity
-reference and **is** a (supporting) match signal for child kinds
-(§5.5).
+are never a match signal (§7 there); `parent_ref` is an in-entity
+reference and **is** a (supporting) match signal (§5.5).
 
 ### 8.6 Deployment topology (government-portfolio scale)
 
@@ -150,14 +141,14 @@ and [`agents/share/availability.md`](../../agents/share/availability.md):
 
 ### 8.7 Positioning vs full PM suites
 
-This entity is a **registry of work-item identities (organised under
-portfolios) with a charter-level PM tool attached**, not a replacement
-for Jira / Asana / MS Project / Linear / GitHub Projects. Those tools
-own deep workflow, automation, and sprint mechanics; this registry
-tells the portfolio *which* portfolio / project / product / program is
-which, dedupes them within their kind, and tracks the charter-level
-goals / tasks / issues. Interop is via identifiers: a Jira project key
-maps to a `JiraProjectKey` identifier, an Asana GID to `AsanaGid`, and
-so on (the deterministic R-0 schemes), so a project synced from a
-source tool deduplicates against its registry twin in the `projects`
-collection. See §17.
+This entity is a **registry of plan identities (organised into
+recursive containment trees) with a charter-level PM tool attached**,
+not a replacement for Jira / Asana / MS Project / Linear / GitHub
+Projects. Those tools own deep workflow, automation, and sprint
+mechanics; this registry tells the portfolio *which* plan is which,
+dedupes them, and tracks the charter-level goals / tasks / issues.
+Interop is via identifiers: a Jira project key maps to a
+`JiraProjectKey` identifier, an Asana GID to `AsanaGid`, and so on (the
+deterministic R-0 schemes), so a project synced from a source tool
+deduplicates against its registry twin in the `plans` collection. See
+§17.

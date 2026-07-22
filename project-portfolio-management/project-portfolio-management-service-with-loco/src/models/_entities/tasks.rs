@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `tasks`. The per-work-item operational task
+//! `SeaORM` Entity — `tasks`. The per-plan operational task
 //! sub-resource (spec §13): Kanban status + honest flow stamps
 //! (`status_changed_at`, first `done_at`).
 
@@ -17,7 +17,7 @@ pub struct Model {
     pub id: i32,
     #[sea_orm(unique)]
     pub pid: Uuid,
-    pub work_item_pid: Uuid,
+    pub plan_pid: Uuid,
     pub sprint_pid: Option<Uuid>,
     pub title: String,
     pub description: Option<String>,

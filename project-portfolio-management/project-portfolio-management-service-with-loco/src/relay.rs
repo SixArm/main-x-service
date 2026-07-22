@@ -242,11 +242,7 @@ mod tests {
             .unwrap();
         let out = rt.block_on(async {
             LoggingSink
-                .send(
-                    "work_item",
-                    "pid-1",
-                    &serde_json::json!({"kind": "created"}),
-                )
+                .send("plan", "pid-1", &serde_json::json!({"kind": "created"}))
                 .await
         });
         assert!(out.is_ok());
@@ -261,13 +257,13 @@ mod tests {
             .unwrap();
         let sink = CapturingSink(Mutex::new(Vec::new()));
         rt.block_on(async {
-            sink.send("work_item", "pid-9", &serde_json::json!({}))
+            sink.send("plan", "pid-9", &serde_json::json!({}))
                 .await
                 .unwrap();
         });
         assert_eq!(
             sink.0.lock().unwrap().as_slice(),
-            &[("work_item".to_string(), "pid-9".to_string())]
+            &[("plan".to_string(), "pid-9".to_string())]
         );
     }
 

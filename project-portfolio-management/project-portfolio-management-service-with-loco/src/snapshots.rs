@@ -13,7 +13,7 @@ use loco_rs::prelude::*;
 use sea_orm::{ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 
 use crate::insights;
-use crate::models::_entities::{budget_lines, insight_snapshots, risks, work_items};
+use crate::models::_entities::{budget_lines, insight_snapshots, plans, risks};
 
 /// Capture one `estate` snapshot row from live data and insert it.
 ///
@@ -21,8 +21,8 @@ use crate::models::_entities::{budget_lines, insight_snapshots, risks, work_item
 ///
 /// Returns the model error if a query or the insert fails.
 pub async fn capture(db: &DatabaseConnection) -> Result<insight_snapshots::Model, ModelError> {
-    let items = work_items::Entity::find()
-        .filter(work_items::Column::DeletedAt.is_null())
+    let items = plans::Entity::find()
+        .filter(plans::Column::DeletedAt.is_null())
         .all(db)
         .await?;
     let risk_rows = risks::Entity::find()
@@ -48,9 +48,12 @@ pub async fn capture(db: &DatabaseConnection) -> Result<insight_snapshots::Model
         })
         .collect();
     let money = insights::variance_by_currency(&lines);
-    let portfolios = items.iter().filter(|i| i.kind == "Portfolio").count();
+    let portfolios = items
+        .iter()
+        .filter(|i| i.kind.as_deref() == Some("Portfolio"))
+        .count();
     let body = serde_json::json!({
-        "work_items": items.len(),
+        "plans": items.len(),
         "portfolios": portfolios,
         "open_exposure": open_exposure,
         "money": money,

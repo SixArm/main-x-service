@@ -1,6 +1,6 @@
 //! Migration: the PPM Phase-A **governance core** (spec/15-roadmap
 //! PPM-1/3/10/12) — `proposals` (work intake), `gate_reviews` +
-//! a `work_items.stage` column (phase gates), `risks`, and
+//! a `plans.stage` column (phase gates), `risks`, and
 //! `budget_lines`. All are operational sub-resources: never matcher
 //! signals, always audited. Money is stored as integer **minor
 //! units** (`*_minor`) plus an ISO-4217 currency code — exact, no
@@ -16,7 +16,7 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     /// Create `proposals`, `gate_reviews`, `risks`, `budget_lines`,
-    /// and add the operational `stage` column to `work_items`.
+    /// and add the operational `stage` column to `plans`.
     ///
     /// # Errors
     ///
@@ -40,8 +40,8 @@ impl MigrationTrait for Migration {
                 ("currency", ColType::StringNull),
                 // draft | submitted | in_review | approved | rejected | promoted.
                 ("status", ColType::String),
-                // Set on promote: the minted work item.
-                ("promoted_work_item_pid", ColType::UuidNull),
+                // Set on promote: the minted plan.
+                ("promoted_plan_pid", ColType::UuidNull),
                 ("deleted_at", ColType::TimestampWithTimeZoneNull),
             ],
             &[],
@@ -53,7 +53,7 @@ impl MigrationTrait for Migration {
             &[
                 ("id", ColType::PkAuto),
                 ("pid", ColType::UuidUniq),
-                ("work_item_pid", ColType::Uuid),
+                ("plan_pid", ColType::Uuid),
                 // g0_concept … g5_benefits (ordered; see governance rules).
                 ("gate", ColType::String),
                 // approved | approved_with_conditions | hold | rejected.
@@ -72,7 +72,7 @@ impl MigrationTrait for Migration {
             &[
                 ("id", ColType::PkAuto),
                 ("pid", ColType::UuidUniq),
-                ("work_item_pid", ColType::Uuid),
+                ("plan_pid", ColType::Uuid),
                 ("title", ColType::String),
                 ("description", ColType::TextNull),
                 // 1–5 each; exposure = probability × impact (derived).
@@ -95,7 +95,7 @@ impl MigrationTrait for Migration {
             &[
                 ("id", ColType::PkAuto),
                 ("pid", ColType::UuidUniq),
-                ("work_item_pid", ColType::Uuid),
+                ("plan_pid", ColType::Uuid),
                 // capex | opex.
                 ("category", ColType::String),
                 ("description", ColType::String),
@@ -112,9 +112,9 @@ impl MigrationTrait for Migration {
         )
         .await?;
         let conn = m.get_connection();
-        // Operational stage on the work item itself: the highest gate
+        // Operational stage on the plan itself: the highest gate
         // passed (null until the first approved gate review).
-        conn.execute_unprepared("ALTER TABLE work_items ADD COLUMN stage VARCHAR NULL")
+        conn.execute_unprepared("ALTER TABLE plans ADD COLUMN stage VARCHAR NULL")
             .await?;
         conn.execute_unprepared(
             "CREATE INDEX IF NOT EXISTS proposals_status ON proposals (status) \
@@ -127,7 +127,7 @@ impl MigrationTrait for Migration {
             ("budget_lines_item", "budget_lines"),
         ] {
             conn.execute_unprepared(&format!(
-                "CREATE INDEX IF NOT EXISTS {index} ON {table} (work_item_pid)"
+                "CREATE INDEX IF NOT EXISTS {index} ON {table} (plan_pid)"
             ))
             .await?;
         }
@@ -141,7 +141,7 @@ impl MigrationTrait for Migration {
     /// Propagates any DDL error.
     async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
         m.get_connection()
-            .execute_unprepared("ALTER TABLE work_items DROP COLUMN IF EXISTS stage")
+            .execute_unprepared("ALTER TABLE plans DROP COLUMN IF EXISTS stage")
             .await?;
         drop_table(m, "budget_lines").await?;
         drop_table(m, "risks").await?;

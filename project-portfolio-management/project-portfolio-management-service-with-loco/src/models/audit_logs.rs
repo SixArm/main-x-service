@@ -55,7 +55,7 @@ impl Model {
         Ok(rows)
     }
 
-    /// Audit entries for one work item, most-recent first.
+    /// Audit entries for one plan, most-recent first.
     ///
     /// # Errors
     ///

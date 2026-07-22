@@ -24,8 +24,8 @@ use uuid::Uuid;
 use super::visibility::{is_finished, schedule_item};
 use crate::insights;
 use crate::models::_entities::{
-    benefits, budget_lines, gate_reviews, merge_records, milestones, objective_links, proposals,
-    risks, scenarios, work_items,
+    benefits, budget_lines, gate_reviews, merge_records, milestones, objective_links, plans,
+    proposals, risks, scenarios,
 };
 use crate::models::visibility as vis_models;
 use crate::visibility as rules;
@@ -45,10 +45,10 @@ macro_rules! live {
 /// derivation `/api/at-a-glance` uses (materialised risks, budget
 /// overrun, missed target, exposure, schedule violations).
 pub(crate) fn rag_by_pid(
-    items: &[work_items::Model],
+    items: &[plans::Model],
     risk_rows: &[risks::Model],
     budget_rows: &[budget_lines::Model],
-    dependency_rows: &[crate::models::_entities::work_item_dependencies::Model],
+    dependency_rows: &[crate::models::_entities::plan_dependencies::Model],
     today: chrono::NaiveDate,
 ) -> std::collections::BTreeMap<Uuid, &'static str> {
     let facts: Vec<rules::ScheduleItem> = items.iter().map(schedule_item).collect();
@@ -68,9 +68,14 @@ pub(crate) fn rag_by_pid(
     items
         .iter()
         .map(|item| {
-            let member_risks: Vec<_> =
-                risk_rows.iter().filter(|r| r.work_item_pid == item.pid).collect();
-            let materialised = member_risks.iter().filter(|r| r.status == "materialised").count();
+            let member_risks: Vec<_> = risk_rows
+                .iter()
+                .filter(|r| r.plan_pid == item.pid)
+                .collect();
+            let materialised = member_risks
+                .iter()
+                .filter(|r| r.status == "materialised")
+                .count();
             let max_exposure = member_risks
                 .iter()
                 .filter(|r| matches!(r.status.as_str(), "open" | "mitigating"))
@@ -79,7 +84,7 @@ pub(crate) fn rag_by_pid(
                 .unwrap_or(0);
             let member_budgets: Vec<_> = budget_rows
                 .iter()
-                .filter(|b| b.work_item_pid == item.pid)
+                .filter(|b| b.plan_pid == item.pid)
                 .map(|b| insights::MoneyLine {
                     currency: b.currency.clone(),
                     planned_minor: b.planned_minor,
@@ -108,9 +113,9 @@ pub(crate) fn rag_by_pid(
         .collect()
 }
 
-/// `{pid, name, kind}` reference for a work item.
-pub(crate) fn item_ref(item: &work_items::Model) -> serde_json::Value {
-    serde_json::json!({ "pid": item.pid, "name": item.name, "kind": item.kind })
+/// `{pid, name, kind}` reference for a plan.
+pub(crate) fn item_ref(item: &plans::Model) -> serde_json::Value {
+    serde_json::json!({ "pid": item.pid, "name": item.name, "kind": item.kind.as_deref().unwrap_or("unspecified") })
 }
 
 /// The live risks carrying `category` (exposure-sort left to callers).
@@ -132,7 +137,7 @@ pub(crate) fn category_risks<'r>(
 #[debug_handler]
 async fn executive_health(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
     let today = chrono::Utc::now().date_naive();
-    let items = live!(work_items, &ctx.db);
+    let items = live!(plans, &ctx.db);
     let risk_rows = live!(risks, &ctx.db);
     let budget_rows = live!(budget_lines, &ctx.db);
     let milestone_rows = live!(milestones, &ctx.db);
@@ -141,19 +146,21 @@ async fn executive_health(State(ctx): State<AppContext>, headers: HeaderMap) -> 
 
     // Buckets: each portfolio item (itself + the items under it), plus
     // an `unassigned` bucket for parentless non-portfolio items.
-    let mut buckets: Vec<(Option<&work_items::Model>, Vec<&work_items::Model>)> = items
+    let mut buckets: Vec<(Option<&plans::Model>, Vec<&plans::Model>)> = items
         .iter()
-        .filter(|i| i.kind == "Portfolio")
+        .filter(|i| i.kind.as_deref() == Some("Portfolio"))
         .map(|p| {
-            let mut members: Vec<&work_items::Model> =
-                items.iter().filter(|i| i.portfolio_pid == Some(p.pid)).collect();
+            let mut members: Vec<&plans::Model> = items
+                .iter()
+                .filter(|i| i.parent_pid == Some(p.pid))
+                .collect();
             members.push(p);
             (Some(p), members)
         })
         .collect();
-    let unassigned: Vec<&work_items::Model> = items
+    let unassigned: Vec<&plans::Model> = items
         .iter()
-        .filter(|i| i.kind != "Portfolio" && i.portfolio_pid.is_none())
+        .filter(|i| i.kind.as_deref() != Some("Portfolio") && i.parent_pid.is_none())
         .collect();
     if !unassigned.is_empty() {
         buckets.push((None, unassigned));
@@ -176,23 +183,23 @@ async fn executive_health(State(ctx): State<AppContext>, headers: HeaderMap) -> 
         };
         let overdue_milestones = milestone_rows
             .iter()
-            .filter(|m| member_pids.contains(&m.work_item_pid) && !m.done && m.due < today)
+            .filter(|m| member_pids.contains(&m.plan_pid) && !m.done && m.due < today)
             .count();
         let escalated_risks = risk_rows
             .iter()
-            .filter(|r| member_pids.contains(&r.work_item_pid) && r.escalated_at.is_some())
+            .filter(|r| member_pids.contains(&r.plan_pid) && r.escalated_at.is_some())
             .count();
         let open_risk_exposure: i32 = risk_rows
             .iter()
             .filter(|r| {
-                member_pids.contains(&r.work_item_pid)
+                member_pids.contains(&r.plan_pid)
                     && matches!(r.status.as_str(), "open" | "mitigating")
             })
             .map(|r| r.probability * r.impact)
             .sum();
         let lines: Vec<insights::MoneyLine> = budget_rows
             .iter()
-            .filter(|b| member_pids.contains(&b.work_item_pid))
+            .filter(|b| member_pids.contains(&b.plan_pid))
             .map(|b| insights::MoneyLine {
                 currency: b.currency.clone(),
                 planned_minor: b.planned_minor,
@@ -240,7 +247,7 @@ async fn executive_health(State(ctx): State<AppContext>, headers: HeaderMap) -> 
 pub(crate) async fn decision_entries(
     ctx: &AppContext,
 ) -> Result<Vec<(chrono::DateTime<chrono::Utc>, serde_json::Value)>> {
-    let items = live!(work_items, &ctx.db);
+    let items = live!(plans, &ctx.db);
     let names: std::collections::BTreeMap<Uuid, &str> =
         items.iter().map(|i| (i.pid, i.name.as_str())).collect();
     let mut entries: Vec<(chrono::DateTime<chrono::Utc>, serde_json::Value)> = Vec::new();
@@ -251,38 +258,50 @@ pub(crate) async fn decision_entries(
         .map_err(|e| Error::Model(ModelError::from(e)))?
     {
         let at = review.decided_at.to_utc();
-        entries.push((at, serde_json::json!({
-            "kind": "gate_review",
-            "at": at,
-            "decision": review.decision,
-            "gate": review.gate,
-            "subject": { "pid": review.work_item_pid,
-                         "name": names.get(&review.work_item_pid) },
-            "actor": review.approver_ref,
-            "conditions": review.conditions,
-        })));
+        entries.push((
+            at,
+            serde_json::json!({
+                "kind": "gate_review",
+                "at": at,
+                "decision": review.decision,
+                "gate": review.gate,
+                "subject": { "pid": review.plan_pid,
+                             "name": names.get(&review.plan_pid) },
+                "actor": review.approver_ref,
+                "conditions": review.conditions,
+            }),
+        ));
     }
     for scenario in live!(scenarios, &ctx.db) {
         if let Some(committed_at) = scenario.committed_at {
             let at = committed_at.to_utc();
-            entries.push((at, serde_json::json!({
-                "kind": "scenario_commit",
-                "at": at,
-                "decision": "committed",
-                "subject": { "pid": scenario.pid, "name": scenario.name },
-            })));
+            entries.push((
+                at,
+                serde_json::json!({
+                    "kind": "scenario_commit",
+                    "at": at,
+                    "decision": "committed",
+                    "subject": { "pid": scenario.pid, "name": scenario.name },
+                }),
+            ));
         }
     }
     for proposal in live!(proposals, &ctx.db) {
-        if matches!(proposal.status.as_str(), "approved" | "rejected" | "promoted") {
+        if matches!(
+            proposal.status.as_str(),
+            "approved" | "rejected" | "promoted"
+        ) {
             let at = proposal.updated_at.to_utc();
-            entries.push((at, serde_json::json!({
-                "kind": "proposal",
-                "at": at,
-                "decision": proposal.status,
-                "subject": { "pid": proposal.pid, "name": proposal.title },
-                "sponsor": proposal.sponsor_ref,
-            })));
+            entries.push((
+                at,
+                serde_json::json!({
+                    "kind": "proposal",
+                    "at": at,
+                    "decision": proposal.status,
+                    "subject": { "pid": proposal.pid, "name": proposal.title },
+                    "sponsor": proposal.sponsor_ref,
+                }),
+            ));
         }
     }
     for merge in merge_records::Entity::find()
@@ -291,15 +310,18 @@ pub(crate) async fn decision_entries(
         .map_err(|e| Error::Model(ModelError::from(e)))?
     {
         let at = merge.created_at.to_utc();
-        entries.push((at, serde_json::json!({
-            "kind": "merge",
-            "at": at,
-            "decision": "merged",
-            "subject": { "pid": merge.main_pid, "name": names.get(&merge.main_pid) },
-            "merged_from": merge.duplicate_pid,
-            "actor": merge.actor,
-            "reason": merge.reason,
-        })));
+        entries.push((
+            at,
+            serde_json::json!({
+                "kind": "merge",
+                "at": at,
+                "decision": "merged",
+                "subject": { "pid": merge.main_pid, "name": names.get(&merge.main_pid) },
+                "merged_from": merge.duplicate_pid,
+                "actor": merge.actor,
+                "reason": merge.reason,
+            }),
+        ));
     }
     Ok(entries)
 }
@@ -343,22 +365,29 @@ async fn executive_decisions(
 /// status. Currencies never merge.
 #[debug_handler]
 async fn executive_benefits(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
-    let items = live!(work_items, &ctx.db);
+    let items = live!(plans, &ctx.db);
     let benefit_rows = live!(benefits, &ctx.db);
     let portfolio_of: std::collections::BTreeMap<Uuid, Option<Uuid>> = items
         .iter()
         .map(|i| {
-            let bucket = if i.kind == "Portfolio" { Some(i.pid) } else { i.portfolio_pid };
+            let bucket = if i.kind.as_deref() == Some("Portfolio") {
+                Some(i.pid)
+            } else {
+                i.parent_pid
+            };
             (i.pid, bucket)
         })
         .collect();
-    let portfolio_items: std::collections::BTreeMap<Uuid, &work_items::Model> =
-        items.iter().filter(|i| i.kind == "Portfolio").map(|i| (i.pid, i)).collect();
+    let portfolio_items: std::collections::BTreeMap<Uuid, &plans::Model> = items
+        .iter()
+        .filter(|i| i.kind.as_deref() == Some("Portfolio"))
+        .map(|i| (i.pid, i))
+        .collect();
 
     let mut buckets: std::collections::BTreeMap<Option<Uuid>, Vec<&benefits::Model>> =
         std::collections::BTreeMap::new();
     for benefit in &benefit_rows {
-        let bucket = portfolio_of.get(&benefit.work_item_pid).copied().flatten();
+        let bucket = portfolio_of.get(&benefit.plan_pid).copied().flatten();
         buckets.entry(bucket).or_default().push(benefit);
     }
 
@@ -414,19 +443,28 @@ async fn executive_benefits(State(ctx): State<AppContext>, headers: HeaderMap) -
 /// collection, by portfolio bucket, and by budget-line category.
 #[debug_handler]
 async fn financial_variance(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
-    let items = live!(work_items, &ctx.db);
+    let items = live!(plans, &ctx.db);
     let budget_rows = live!(budget_lines, &ctx.db);
-    let kind_of: std::collections::BTreeMap<Uuid, &str> =
-        items.iter().map(|i| (i.pid, i.kind.as_str())).collect();
+    let kind_of: std::collections::BTreeMap<Uuid, &str> = items
+        .iter()
+        .map(|i| (i.pid, i.kind.as_deref().unwrap_or("unspecified")))
+        .collect();
     let bucket_of: std::collections::BTreeMap<Uuid, Option<Uuid>> = items
         .iter()
         .map(|i| {
-            let bucket = if i.kind == "Portfolio" { Some(i.pid) } else { i.portfolio_pid };
+            let bucket = if i.kind.as_deref() == Some("Portfolio") {
+                Some(i.pid)
+            } else {
+                i.parent_pid
+            };
             (i.pid, bucket)
         })
         .collect();
-    let portfolio_items: std::collections::BTreeMap<Uuid, &work_items::Model> =
-        items.iter().filter(|i| i.kind == "Portfolio").map(|i| (i.pid, i)).collect();
+    let portfolio_items: std::collections::BTreeMap<Uuid, &plans::Model> = items
+        .iter()
+        .filter(|i| i.kind.as_deref() == Some("Portfolio"))
+        .map(|i| (i.pid, i))
+        .collect();
 
     let line_of = |b: &budget_lines::Model| insights::MoneyLine {
         currency: b.currency.clone(),
@@ -445,7 +483,11 @@ async fn financial_variance(State(ctx): State<AppContext>, headers: HeaderMap) -
     };
 
     let by_collection = group(&|b| {
-        kind_of.get(&b.work_item_pid).copied().unwrap_or("unknown").to_string()
+        kind_of
+            .get(&b.plan_pid)
+            .copied()
+            .unwrap_or("unknown")
+            .to_string()
     });
     let by_category = group(&|b| b.category.clone());
     let mut by_portfolio = Vec::new();
@@ -453,7 +495,7 @@ async fn financial_variance(State(ctx): State<AppContext>, headers: HeaderMap) -
         let mut per: std::collections::BTreeMap<Option<Uuid>, Vec<insights::MoneyLine>> =
             std::collections::BTreeMap::new();
         for row in &budget_rows {
-            let bucket = bucket_of.get(&row.work_item_pid).copied().flatten();
+            let bucket = bucket_of.get(&row.plan_pid).copied().flatten();
             per.entry(bucket).or_default().push(line_of(row));
         }
         for (bucket, lines) in per {
@@ -495,7 +537,7 @@ async fn financial_exposure(State(ctx): State<AppContext>, headers: HeaderMap) -
             let mut item_pids: Vec<Uuid> = budget_rows
                 .iter()
                 .filter(|b| b.currency == row.currency)
-                .map(|b| b.work_item_pid)
+                .map(|b| b.plan_pid)
                 .collect();
             item_pids.sort_unstable();
             item_pids.dedup();
@@ -514,7 +556,7 @@ async fn financial_exposure(State(ctx): State<AppContext>, headers: HeaderMap) -
                 "held_minor": held_minor,
                 "overrun": row.overrun,
                 "line_count": row.line_count,
-                "work_items": item_pids.len(),
+                "plans": item_pids.len(),
             })
         })
         .collect();
@@ -538,12 +580,12 @@ async fn technology_dependency_risk(
     headers: HeaderMap,
 ) -> Result<Response> {
     let today = chrono::Utc::now().date_naive();
-    let items = live!(work_items, &ctx.db);
+    let items = live!(plans, &ctx.db);
     let risk_rows = live!(risks, &ctx.db);
     let budget_rows = live!(budget_lines, &ctx.db);
     let dependency_rows = vis_models::all_dependencies(&ctx.db).await?;
     let rag = rag_by_pid(&items, &risk_rows, &budget_rows, &dependency_rows, today);
-    let by_pid: std::collections::BTreeMap<Uuid, &work_items::Model> =
+    let by_pid: std::collections::BTreeMap<Uuid, &plans::Model> =
         items.iter().map(|i| (i.pid, i)).collect();
 
     let edge_pairs: Vec<(Uuid, Uuid)> = dependency_rows
@@ -568,8 +610,16 @@ async fn technology_dependency_risk(
         .filter_map(|edge| {
             let p = by_pid.get(&edge.predecessor_pid)?;
             let s = by_pid.get(&edge.successor_pid)?;
-            let pb = if p.kind == "Portfolio" { Some(p.pid) } else { p.portfolio_pid };
-            let sb = if s.kind == "Portfolio" { Some(s.pid) } else { s.portfolio_pid };
+            let pb = if p.kind.as_deref() == Some("Portfolio") {
+                Some(p.pid)
+            } else {
+                p.parent_pid
+            };
+            let sb = if s.kind.as_deref() == Some("Portfolio") {
+                Some(s.pid)
+            } else {
+                s.parent_pid
+            };
             (pb != sb).then(|| {
                 serde_json::json!({
                     "edge": edge.pid,
@@ -604,7 +654,7 @@ async fn technology_dependency_risk(
 }
 
 /// `GET /api/technology/radar` — the tag-encoded technology radar.
-/// Convention (documented in the response): a work item tagged
+/// Convention (documented in the response): a plan tagged
 /// `tech:<name>` uses that technology; `tech:<name>:<ring>` also casts
 /// a ring vote (`assess` / `trial` / `adopt` / `hold`); a technology's
 /// ring is the majority vote, ties breaking toward the more cautious
@@ -619,9 +669,8 @@ struct Tech<'a> {
 
 #[debug_handler]
 async fn technology_radar(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
-    let items = live!(work_items, &ctx.db);
-    let mut techs: std::collections::BTreeMap<String, Tech<'_>> =
-        std::collections::BTreeMap::new();
+    let items = live!(plans, &ctx.db);
+    let mut techs: std::collections::BTreeMap<String, Tech<'_>> = std::collections::BTreeMap::new();
     for item in &items {
         let tags = item
             .data
@@ -631,7 +680,9 @@ async fn technology_radar(State(ctx): State<AppContext>, headers: HeaderMap) -> 
         let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
         for tag in tags {
             let Some(tag) = tag.as_str() else { continue };
-            let Some((name, ring)) = insights::parse_tech_tag(tag) else { continue };
+            let Some((name, ring)) = insights::parse_tech_tag(tag) else {
+                continue;
+            };
             let tech = techs.entry(name.clone()).or_insert_with(|| Tech {
                 rings: Vec::new(),
                 per_kind: std::collections::BTreeMap::new(),
@@ -642,7 +693,10 @@ async fn technology_radar(State(ctx): State<AppContext>, headers: HeaderMap) -> 
             }
             // Count each item once per technology even if tagged twice.
             if seen.insert(name) {
-                *tech.per_kind.entry(item.kind.as_str()).or_default() += 1;
+                *tech
+                    .per_kind
+                    .entry(item.kind.as_deref().unwrap_or("unspecified"))
+                    .or_default() += 1;
                 if tech.items.len() < 20 {
                     tech.items.push(item_ref(item));
                 }
@@ -678,20 +732,24 @@ async fn technology_radar(State(ctx): State<AppContext>, headers: HeaderMap) -> 
 /// each item's largest single-currency planned amount (a disclosed
 /// heuristic — cross-currency amounts are never summed).
 #[debug_handler]
-async fn executive_alignment(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
-    let items = live!(work_items, &ctx.db);
+async fn executive_alignment(
+    State(ctx): State<AppContext>,
+    headers: HeaderMap,
+) -> Result<Response> {
+    let items = live!(plans, &ctx.db);
     let budget_rows = live!(budget_lines, &ctx.db);
     let link_rows = objective_links::Entity::find()
         .all(&ctx.db)
         .await
         .map_err(|e| Error::Model(ModelError::from(e)))?;
-    let aligned: std::collections::HashSet<Uuid> =
-        link_rows.iter().map(|l| l.work_item_pid).collect();
+    let aligned: std::collections::HashSet<Uuid> = link_rows.iter().map(|l| l.plan_pid).collect();
 
     let mut per_collection: std::collections::BTreeMap<&str, (usize, usize)> =
         std::collections::BTreeMap::new();
     for item in &items {
-        let entry = per_collection.entry(item.kind.as_str()).or_default();
+        let entry = per_collection
+            .entry(item.kind.as_deref().unwrap_or("unspecified"))
+            .or_default();
         entry.0 += 1;
         if aligned.contains(&item.pid) {
             entry.1 += 1;
@@ -701,7 +759,7 @@ async fn executive_alignment(State(ctx): State<AppContext>, headers: HeaderMap) 
     // Unaligned spend per currency + the ranked unaligned list.
     let unaligned_lines: Vec<insights::MoneyLine> = budget_rows
         .iter()
-        .filter(|b| !aligned.contains(&b.work_item_pid))
+        .filter(|b| !aligned.contains(&b.plan_pid))
         .map(|b| insights::MoneyLine {
             currency: b.currency.clone(),
             planned_minor: b.planned_minor,
@@ -715,7 +773,7 @@ async fn executive_alignment(State(ctx): State<AppContext>, headers: HeaderMap) 
         .map(|item| {
             let lines: Vec<insights::MoneyLine> = budget_rows
                 .iter()
-                .filter(|b| b.work_item_pid == item.pid)
+                .filter(|b| b.plan_pid == item.pid)
                 .map(|b| insights::MoneyLine {
                     currency: b.currency.clone(),
                     planned_minor: b.planned_minor,
@@ -723,21 +781,31 @@ async fn executive_alignment(State(ctx): State<AppContext>, headers: HeaderMap) 
                 })
                 .collect();
             let per_currency = insights::variance_by_currency(&lines);
-            let rank = per_currency.iter().map(|r| r.planned_minor).max().unwrap_or(0);
-            (rank, serde_json::json!({
-                "item": item_ref(item),
-                "planned": per_currency
-                    .iter()
-                    .map(|r| serde_json::json!({
-                        "currency": r.currency, "planned_minor": r.planned_minor,
-                    }))
-                    .collect::<Vec<_>>(),
-            }))
+            let rank = per_currency
+                .iter()
+                .map(|r| r.planned_minor)
+                .max()
+                .unwrap_or(0);
+            (
+                rank,
+                serde_json::json!({
+                    "item": item_ref(item),
+                    "planned": per_currency
+                        .iter()
+                        .map(|r| serde_json::json!({
+                            "currency": r.currency, "planned_minor": r.planned_minor,
+                        }))
+                        .collect::<Vec<_>>(),
+                }),
+            )
         })
         .collect();
     unaligned_items.sort_by_key(|(rank, _)| std::cmp::Reverse(*rank));
-    let unaligned_items: Vec<serde_json::Value> =
-        unaligned_items.into_iter().take(25).map(|(_, v)| v).collect();
+    let unaligned_items: Vec<serde_json::Value> = unaligned_items
+        .into_iter()
+        .take(25)
+        .map(|(_, v)| v)
+        .collect();
 
     let body = serde_json::json!({
         "as_of": chrono::Utc::now(),
@@ -764,9 +832,9 @@ async fn executive_alignment(State(ctx): State<AppContext>, headers: HeaderMap) 
 /// stays off this view.
 #[debug_handler]
 async fn technology_debt(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
-    let items = live!(work_items, &ctx.db);
+    let items = live!(plans, &ctx.db);
     let risk_rows = live!(risks, &ctx.db);
-    let by_pid: std::collections::BTreeMap<Uuid, &work_items::Model> =
+    let by_pid: std::collections::BTreeMap<Uuid, &plans::Model> =
         items.iter().map(|i| (i.pid, i)).collect();
     let mut debt: Vec<&risks::Model> = category_risks(&risk_rows, "tech_debt");
     debt.sort_by_key(|r| std::cmp::Reverse(r.probability * r.impact));
@@ -789,7 +857,7 @@ async fn technology_debt(State(ctx): State<AppContext>, headers: HeaderMap) -> R
                 "exposure": risk.probability * risk.impact,
                 "escalated": risk.escalated_at.is_some(),
                 "owner_ref": risk.owner_ref,
-                "item": by_pid.get(&risk.work_item_pid).map(|i| item_ref(i)),
+                "item": by_pid.get(&risk.plan_pid).map(|i| item_ref(i)),
             })
         })
         .collect();
@@ -835,7 +903,9 @@ async fn technology_flow(
             Some(done_at) => {
                 let done_at = done_at.to_utc();
                 if done_at >= window_start {
-                    *per_month.entry(done_at.format("%Y-%m").to_string()).or_default() += 1;
+                    *per_month
+                        .entry(done_at.format("%Y-%m").to_string())
+                        .or_default() += 1;
                     lead_days.push((done_at - milestone.created_at.to_utc()).num_days());
                 }
             }
@@ -883,7 +953,10 @@ pub fn routes() -> Routes {
         .add("/executive/alignment", get(executive_alignment))
         .add("/financials/variance", get(financial_variance))
         .add("/financials/exposure", get(financial_exposure))
-        .add("/technology/dependency-risk", get(technology_dependency_risk))
+        .add(
+            "/technology/dependency-risk",
+            get(technology_dependency_risk),
+        )
         .add("/technology/radar", get(technology_radar))
         .add("/technology/debt", get(technology_debt))
         .add("/technology/flow", get(technology_flow))

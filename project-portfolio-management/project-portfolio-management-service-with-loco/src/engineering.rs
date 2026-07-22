@@ -18,7 +18,7 @@ pub const MILESTONE_KINDS: &[&str] = &["milestone", "demo", "release", "checkpoi
 /// The `MoSCoW` bands, priority order.
 pub const MOSCOW_BANDS: &[&str] = &["must", "should", "could", "wont"];
 
-/// Parse one work-item tag against the `MoSCoW` convention
+/// Parse one plan tag against the `MoSCoW` convention
 /// (`moscow:<band>`); unknown bands are rejected, never guessed.
 #[must_use]
 pub fn parse_moscow_tag(tag: &str) -> Option<&'static str> {
@@ -52,7 +52,10 @@ pub fn burndown(
     let mut steps = 0;
     while day <= to && steps <= 366 {
         let done = done_dates.iter().filter(|d| **d <= day).count();
-        points.push(BurndownPoint { date: day, remaining: total.saturating_sub(done) });
+        points.push(BurndownPoint {
+            date: day,
+            remaining: total.saturating_sub(done),
+        });
         day = match day.succ_opt() {
             Some(next) => next,
             None => break,
@@ -108,8 +111,16 @@ mod tests {
     fn moscow_tags_parse_and_reject() {
         assert_eq!(parse_moscow_tag("moscow:must"), Some("must"));
         assert_eq!(parse_moscow_tag(" moscow:WONT "), Some("wont"));
-        assert_eq!(parse_moscow_tag("moscow:maybe"), None, "unknown band refused");
-        assert_eq!(parse_moscow_tag("tech:rust"), None, "non-moscow tag ignored");
+        assert_eq!(
+            parse_moscow_tag("moscow:maybe"),
+            None,
+            "unknown band refused"
+        );
+        assert_eq!(
+            parse_moscow_tag("tech:rust"),
+            None,
+            "non-moscow tag ignored"
+        );
     }
 
     #[test]
@@ -121,13 +132,22 @@ mod tests {
             d("2026-07-04"),
         );
         let remaining: Vec<usize> = points.iter().map(|p| p.remaining).collect();
-        assert_eq!(remaining, vec![3, 2, 1, 1], "steps down only on real done days");
+        assert_eq!(
+            remaining,
+            vec![3, 2, 1, 1],
+            "steps down only on real done days"
+        );
         assert_eq!(points[0].date, d("2026-07-01"));
     }
 
     #[test]
     fn burndown_never_goes_negative_and_bounds_the_window() {
-        let points = burndown(1, &[d("2026-07-01"), d("2026-07-01")], d("2026-07-01"), d("2026-07-02"));
+        let points = burndown(
+            1,
+            &[d("2026-07-01"), d("2026-07-01")],
+            d("2026-07-01"),
+            d("2026-07-02"),
+        );
         assert_eq!(points[1].remaining, 0, "saturates at zero");
         let long = burndown(1, &[], d("2020-01-01"), d("2030-01-01"));
         assert!(long.len() <= 367, "window truncated");
@@ -136,11 +156,18 @@ mod tests {
     fn wip_limits_parse_or_decline() {
         assert_eq!(parse_wip_limits(None), None);
         assert_eq!(parse_wip_limits(Some("nonsense")), None);
-        assert_eq!(parse_wip_limits(Some(r#"{"sideways": 3}"#)), None, "unknown status refused");
-        assert_eq!(parse_wip_limits(Some(r#"{"in_progress": 0}"#)), None, "non-positive refused");
+        assert_eq!(
+            parse_wip_limits(Some(r#"{"sideways": 3}"#)),
+            None,
+            "unknown status refused"
+        );
+        assert_eq!(
+            parse_wip_limits(Some(r#"{"in_progress": 0}"#)),
+            None,
+            "non-positive refused"
+        );
         let limits = parse_wip_limits(Some(r#"{"in_progress": 3, "in_review": 2}"#)).unwrap();
         assert_eq!(limits["in_progress"], 3);
         assert_eq!(limits["in_review"], 2);
     }
-
 }

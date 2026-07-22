@@ -1,6 +1,6 @@
 //! SEC-I2 fuzz target: the pure `normalize` helpers over arbitrary UTF-8.
 //!
-//! These free functions run on caller-supplied work-item names, owner-scoped codes, URLs, and ISO dates — prime never-panic
+//! These free functions run on caller-supplied plan names, owner-scoped codes, URLs, and ISO dates — prime never-panic
 //! targets. This feeds them arbitrary UTF-8 and asserts only that they
 //! return (no panic, no overflow, no infinite loop within the fuzzer's
 //! time budget). `fold_set` is exercised with the input as a single-element

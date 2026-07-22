@@ -2,44 +2,47 @@
 //! everything reachable via `use project_portfolio_management_matcher::…`.
 
 use project_portfolio_management_matcher::{
-    Confidence, Goal, IdentifierScheme, MatchConfig, MatchingEngine, RelationKind, WorkItem,
-    WorkItemIdentifier, WorkItemKind, WorkItemRelationship,
+    Confidence, Goal, IdentifierScheme, MatchConfig, MatchingEngine, Plan, PlanIdentifier,
+    PlanKind, PlanRelationship, RelationKind,
 };
 
-fn ident(scheme: IdentifierScheme, value: &str) -> WorkItemIdentifier {
-    WorkItemIdentifier {
+fn ident(scheme: IdentifierScheme, value: &str) -> PlanIdentifier {
+    PlanIdentifier {
         scheme,
         value: value.into(),
     }
 }
 
-fn project(name: &str) -> WorkItem {
-    WorkItem::new(WorkItemKind::Project, name)
+fn project(name: &str) -> Plan {
+    Plan::new(name)
 }
 
-// Pins the kind gate across every cross-kind pairing: different kinds
-// never match, even with identical names.
+// Pins the unified model across every kind pairing: `kind` is optional
+// descriptive metadata and never gates matching — identical names match
+// regardless of kind, and `kind_gate_blocked` is never set.
 #[test]
-fn kind_gate_blocks_all_cross_kind_pairs() {
+fn kind_never_gates_matching() {
     let engine = MatchingEngine::default_config();
     let kinds = [
-        WorkItemKind::Portfolio,
-        WorkItemKind::Project,
-        WorkItemKind::Product,
-        WorkItemKind::Program,
+        PlanKind::Portfolio,
+        PlanKind::Project,
+        PlanKind::Product,
+        PlanKind::Program,
+        PlanKind::Practice,
+        PlanKind::Process,
+        PlanKind::Purpose,
+        PlanKind::Pathway,
+        PlanKind::Proposal,
     ];
     for ka in kinds {
         for kb in kinds {
-            let a = WorkItem::new(ka, "Identical name");
-            let b = WorkItem::new(kb, "Identical name");
-            let r = engine.match_work_items(&a, &b);
-            if ka == kb {
-                assert!(r.is_match, "{ka:?}=={kb:?} identical names should match");
-                assert!(!r.breakdown.kind_gate_blocked);
-            } else {
-                assert!(r.score.abs() < 1e-9, "{ka:?} vs {kb:?} must be 0.0");
-                assert!(r.breakdown.kind_gate_blocked, "{ka:?} vs {kb:?}");
-            }
+            let mut a = Plan::new("Identical name");
+            a.kind = Some(ka);
+            let mut b = Plan::new("Identical name");
+            b.kind = Some(kb);
+            let r = engine.match_plans(&a, &b);
+            assert!(r.is_match, "{ka:?} vs {kb:?} identical names should match");
+            assert!(!r.breakdown.kind_gate_blocked, "{ka:?} vs {kb:?}");
         }
     }
 }
@@ -63,7 +66,7 @@ fn r0_fires_for_every_deterministic_scheme() {
         let mut b = project("Right");
         a.identifiers.push(ident(scheme.clone(), "shared-123"));
         b.identifiers.push(ident(scheme.clone(), "shared-123"));
-        let r = engine.match_work_items(&a, &b);
+        let r = engine.match_plans(&a, &b);
         assert!(
             r.breakdown.deterministic_match,
             "{scheme:?} should short-circuit"
@@ -88,7 +91,7 @@ fn owner_scoped_and_custom_schemes_do_not_short_circuit() {
         let mut b = project("Beta project");
         a.identifiers.push(ident(scheme.clone(), "shared-123"));
         b.identifiers.push(ident(scheme.clone(), "shared-123"));
-        let r = engine.match_work_items(&a, &b);
+        let r = engine.match_plans(&a, &b);
         assert!(
             !r.breakdown.deterministic_match,
             "{scheme:?} must not short-circuit"
@@ -107,7 +110,7 @@ fn same_owner_code_short_circuits() {
     b.owner_org_id = Some("organization:9a2f".into());
     a.code = Some("PROJ-2026".into());
     b.code = Some("proj 2026".into());
-    let r = engine.match_work_items(&a, &b);
+    let r = engine.match_plans(&a, &b);
     assert!((r.score - 1.0).abs() < 1e-9);
     assert!(r.breakdown.deterministic_match);
 }
@@ -123,7 +126,7 @@ fn code_does_not_cross_match_across_owners() {
     b.owner_org_id = Some("organization:2".into());
     a.code = Some("PROJ-2026".into());
     b.code = Some("PROJ-2026".into());
-    let r = engine.match_work_items(&a, &b);
+    let r = engine.match_plans(&a, &b);
     assert!(!r.breakdown.deterministic_match);
     assert!(r.breakdown.code_score.is_none());
 }
@@ -136,12 +139,12 @@ fn same_as_overlap_short_circuits() {
     let mut b = project("Omega");
     a.same_as = vec!["https://pm.example.com/p/APOLLO".into()];
     b.same_as = vec!["  https://pm.example.com/p/APOLLO/  ".into()];
-    let r = engine.match_work_items(&a, &b);
+    let r = engine.match_plans(&a, &b);
     assert!((r.score - 1.0).abs() < 1e-9);
     assert!(r.breakdown.deterministic_match);
 }
 
-// Pins the parent-portfolio supporting signal: two child work items with
+// Pins the parent-portfolio supporting signal: two child plans with
 // fuzzy names but a shared parent portfolio score higher than the same
 // pair with different parents.
 #[test]
@@ -149,13 +152,13 @@ fn shared_parent_portfolio_corroborates() {
     let engine = MatchingEngine::default_config();
     let mut a = project("Apollo platform migration");
     let mut b = project("Apollo platform migrate");
-    a.portfolio_ref = Some("portfolio-1".into());
-    b.portfolio_ref = Some("portfolio-1".into());
-    let shared = engine.match_work_items(&a, &b);
-    b.portfolio_ref = Some("portfolio-2".into());
-    let different = engine.match_work_items(&a, &b);
-    assert!(shared.breakdown.portfolio_score == Some(1.0));
-    assert!(different.breakdown.portfolio_score == Some(0.0));
+    a.parent_ref = Some("portfolio-1".into());
+    b.parent_ref = Some("portfolio-1".into());
+    let shared = engine.match_plans(&a, &b);
+    b.parent_ref = Some("portfolio-2".into());
+    let different = engine.match_plans(&a, &b);
+    assert!(shared.breakdown.parent_score == Some(1.0));
+    assert!(different.breakdown.parent_score == Some(0.0));
     assert!(shared.score > different.score);
 }
 
@@ -168,8 +171,8 @@ fn breakdown_is_populated_and_in_range() {
     let mut b = project("Apollo platform migrate");
     a.owner_org_id = Some("organization:9a2f".into());
     b.owner_org_id = Some("organization:9a2f".into());
-    a.portfolio_ref = Some("portfolio-1".into());
-    b.portfolio_ref = Some("portfolio-1".into());
+    a.parent_ref = Some("portfolio-1".into());
+    b.parent_ref = Some("portfolio-1".into());
     a.goals = vec![Goal {
         title: "Cut latency".into(),
         ..Default::default()
@@ -184,21 +187,21 @@ fn breakdown_is_populated_and_in_range() {
     b.keywords = vec!["infra".into()];
     a.tags = vec!["q1".into()];
     b.tags = vec!["q1".into()];
-    a.relationships = vec![WorkItemRelationship {
+    a.relationships = vec![PlanRelationship {
         relation: RelationKind::DependsOn,
-        work_item_id: "proj-9".into(),
+        plan_id: "proj-9".into(),
     }];
-    b.relationships = vec![WorkItemRelationship {
+    b.relationships = vec![PlanRelationship {
         relation: RelationKind::DependsOn,
-        work_item_id: "proj-9".into(),
+        plan_id: "proj-9".into(),
     }];
-    let r = engine.match_work_items(&a, &b);
+    let r = engine.match_plans(&a, &b);
     let bd = &r.breakdown;
     for s in [
         bd.name_score,
         bd.goals_score,
         bd.owner_org_score,
-        bd.portfolio_score,
+        bd.parent_score,
         bd.timeframe_score,
         bd.keywords_score,
         bd.relationships_score,
@@ -222,34 +225,34 @@ fn presets_only_change_is_match() {
     let mut b = project("Apollo platform migration");
     a.owner_org_id = Some("organization:1".into());
     b.owner_org_id = Some("organization:2".into());
-    let lenient = MatchingEngine::new(MatchConfig::lenient()).match_work_items(&a, &b);
-    let strict = MatchingEngine::new(MatchConfig::strict()).match_work_items(&a, &b);
+    let lenient = MatchingEngine::new(MatchConfig::lenient()).match_plans(&a, &b);
+    let strict = MatchingEngine::new(MatchConfig::strict()).match_plans(&a, &b);
     assert!((lenient.score - strict.score).abs() < 1e-9);
     assert!((lenient.score - 0.75).abs() < 1e-9, "got {}", lenient.score);
     assert!(lenient.is_match);
     assert!(!strict.is_match);
 }
 
-// Pins the service bridge contract: a `WorkItem` round-trips losslessly
+// Pins the service bridge contract: a `Plan` round-trips losslessly
 // through serde_json (the API DTO is this very type, persisted as JSONB).
 #[test]
-fn work_item_json_round_trip() {
+fn plan_json_round_trip() {
     let mut w = project("Apollo platform migration");
     w.code = Some("PROJ-2026".into());
     w.owner_org_id = Some("organization:9a2f".into());
-    w.portfolio_ref = Some("portfolio-1".into());
+    w.parent_ref = Some("portfolio-1".into());
     w.goals = vec![Goal {
         title: "Cut latency".into(),
         ..Default::default()
     }];
     w.keywords = vec!["infra".into()];
     w.tags = vec!["q1".into()];
-    w.relationships = vec![WorkItemRelationship {
+    w.relationships = vec![PlanRelationship {
         relation: RelationKind::DependsOn,
-        work_item_id: "proj-9".into(),
+        plan_id: "proj-9".into(),
     }];
     let json = serde_json::to_value(&w).expect("serialize");
-    let back: WorkItem = serde_json::from_value(json).expect("deserialize");
+    let back: Plan = serde_json::from_value(json).expect("deserialize");
     let again = serde_json::to_value(&back).expect("re-serialize");
     assert_eq!(serde_json::to_value(&w).unwrap(), again);
 }

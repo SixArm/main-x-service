@@ -9,6 +9,101 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- 2026-07-22 — **Collaboration, automation, and prioritisation
+  capabilities** (spec §9.4a). Migration
+  `m20260722_000001_capabilities` adds `reviews`, `automations`,
+  `automation_runs`, `scheduled_actions`, and `notifications`.
+  - **Collaborative review** — `POST`/`GET /api/reviews`,
+    `/{pid}/respond`, `/{pid}/submit`, `DELETE /{pid}`, and
+    `/api/reviews/consensus`. Reviewers are `EntityRef` URNs, never raw
+    emails; `reviewer_scope` records the internal/external disclosure
+    decision explicitly. Only a reviewer who **accepted** may submit, so
+    an unanswered invitation never becomes evidence; consensus requires
+    a **strict** majority (a tie or plurality reports none) and always
+    reports what is still outstanding.
+  - **Assignees** — `POST /api/plans/{pid}/tasks/{t_pid}/assign`
+    (`null` unassigns, notifies the assignee) and
+    `GET /api/assignees/workload`, which surfaces the `unassigned` pile
+    rather than dropping it.
+  - **Workflow automation** — `POST`/`GET /api/automations`,
+    enable/disable, delete, and `GET /api/automations/runs`. Rules fire
+    from a Kanban move and from a submitted plan review. Action shapes
+    are validated at write time; a failing rule is logged as a `failed`
+    run and never undoes the operator's move; actions are applied
+    without re-entering the engine, so automations cannot cascade.
+  - **Set and forget** — `POST`/`GET /api/scheduled-actions`,
+    `/sweep`, and cancel. The sweep **claims** each due row with a
+    conditional update, so a deadline fires exactly once even if the
+    optional ticker (`PROJECT_PORTFOLIO_MANAGEMENT_SCHEDULER_MINUTES`,
+    default off) races a manual sweep. Sweeps are capped and say so.
+  - **Data-driven prioritisation** — `GET /api/plans/{pid}/smart-score`
+    and `/api/prioritisation`. The Smart Score is a renormalised
+    weighted average over seven components with a full per-component
+    breakdown; absent evidence is **dropped and disclosed** (`missing`
+    + `coverage`), not scored zero, and a plan with no evidence scores
+    `null` / `unscored` and sorts last. ROI is computed only within a
+    single currency (no FX conversion, ever). Weights are tunable via
+    `PROJECT_PORTFOLIO_MANAGEMENT_SMART_SCORE_WEIGHTS` (a complete
+    10 000-basis-point map; anything else is warned about and ignored).
+  - **Bird's-eye visibility** — `GET /api/lifecycle` and
+    `/api/plans/{pid}/lifecycle`. Every phase is reported even at zero,
+    items in an unresolvable phase are counted separately, and
+    readiness is a five-check checklist that names each blocker.
+  - Every mutation writes an `audit_logs` row; all four rule modules
+    (`collaboration`, `automation`, `prioritisation`, `lifecycle`) are
+    pure and DB-free with 56 unit tests, plus six `#[ignore]`d request
+    tests and OpenAPI coverage.
+  - **Not built:** email / push transport (notifications are in-app
+    only), a `votes` Smart Score component (a plan carries no link back
+    to its originating idea), and record-level ABAC on the new
+    endpoints — they sit behind the blanket guard only.
+
+- 2026-07-22 — **Five new `kind` labels: `Practice`, `Process`,
+  `Purpose`, `Pathway`, `Proposal`.** `parse_kind_label` accepts the
+  singular and plural spellings of each (`practice`/`practices`, …), the
+  OpenAPI `Plan.kind` enum lists them, and the `kind_target` /
+  `collection` validation messages on `/api/proposals`,
+  `/api/ideas/{pid}/convert`, and `/api/reports` name them. Matching is
+  unchanged — still kind-agnostic. (The `Proposal` **label** on a plan is
+  unrelated to the `proposals` intake pipeline resource.)
+
+### Changed — BREAKING: work items unified into one recursive `plan` collection (2026-07-20)
+
+- **`WorkItem` → `Plan` rename.** The registered entity is now a **plan**.
+  The embedded matcher exposes `Plan`, `PlanKind`, `PlanIdentifier`,
+  `PlanRelationship`, `PlanStatus`, and `MatchingEngine::match_plans`
+  (was `match_work_items`); `Plan::new(name)` leaves `kind` `None`. The
+  service DTO, controller (`controllers/plans.rs`), and model
+  (`models/plans.rs`) follow.
+- **Four collections → one `/api/plans` collection.** The four REST
+  collections (`/api/portfolios`, `/api/projects`, `/api/products`,
+  `/api/programs`) are replaced by a single `/api/plans` collection; the
+  `{collection}` path segment is gone. Plan-scoped sub-resources moved to
+  `/api/plans/{pid}/...` (tasks, sprints, milestones, allocations,
+  gate-reviews, risks, budget-lines, objectives, benefits, schedule,
+  governance, audit).
+- **`kind` is now an optional label — the kind gate is removed.** `kind`
+  is `Option<PlanKind>`, an optional Portfolio / Project / Product /
+  Program descriptive/grouping label; it no longer fixes a collection and
+  no longer gates matching. The matcher's hard kind gate ("R-GATE") is
+  gone — **any two plans may match** regardless of kind
+  (`MatchBreakdown.kind_gate_blocked` remains only as a vestigial,
+  always-false field).
+- **General containment via `parent_ref` + cycle check.** `portfolio_ref`
+  is renamed `parent_ref`: any plan may contain any other plan (a
+  recursive tree). A `parent_ref` that points a plan at itself or at one
+  of its descendants is now rejected `422` (new containment-cycle check).
+- **Schema.** One `plans` table (was `work_items`) with a **nullable**
+  `kind` column and a `parent_pid` column (was `portfolio_pid`);
+  migration `..._000001_plans`.
+- **Merge is unscoped.** Merge is no longer collection/kind-scoped — any
+  two plans may merge; it returns `422` only on a self-merge (equal pids)
+  and `404` on an unknown pid (the former cross-kind rejection is gone).
+- **Proposals.** The proposal `kind_target` is now an optional descriptive
+  label (blank = none), validated via the `parse_kind_label` helper.
+
 ### Added — engineering moderate fits (2026-07-20)
 
 - Story points on tasks + `GET .../velocity` (team-local; real

@@ -133,8 +133,8 @@
               promote
             </button>
           {/if}
-          {#if proposal.status === "promoted" && proposal.promoted_work_item_pid}
-            <a href={`/${proposal.kind_target}/${proposal.promoted_work_item_pid}`}>{t("ppm.proposals.workItem")}</a>
+          {#if proposal.status === "promoted" && proposal.promoted_plan_pid}
+            <a href={`/plans/${proposal.promoted_plan_pid}`}>{t("ppm.proposals.workItem")}</a>
           {:else}
             <button class="button small" onclick={() => showDuplicates(proposal.pid)}>
               {t("ppm.proposals.duplicates")}
@@ -150,7 +150,7 @@
             {:else}
               {#each duplicates[proposal.pid] ?? [] as hit (hit.pid)}
                 <span class="chip">
-                  {hit.source === "work_item" ? "live:" : "proposal:"}
+                  {hit.source === "plan" ? "live:" : "proposal:"}
                   {hit.name} ({hit.score.toFixed(2)})
                 </span>
               {/each}

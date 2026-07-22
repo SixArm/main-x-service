@@ -94,6 +94,10 @@
     })),
     // PPM catalogue views (fully localized 2026-07-18).
     { href: "/dashboard", label: t("ppm.nav.dashboard") },
+    { href: "/prioritisation", label: "Prioritisation" },
+    { href: "/lifecycle", label: "Lifecycle" },
+    { href: "/reviews", label: "Reviews" },
+    { href: "/automations", label: "Automations" },
     { href: "/proposals", label: t("ppm.nav.proposals") },
     { href: "/ideas", label: t("ppm.nav.ideas") },
     { href: "/scenarios", label: t("ppm.nav.scenarios") },

@@ -7,9 +7,9 @@ posture relative to this landscape is §8.7.
 ### 17.1 Standards and vocabularies
 
 - [schema.org/Project](https://schema.org/Project) — nearest
-  schema.org type for a project / work item;
+  schema.org type for a project / plan;
   [schema.org/Product](https://schema.org/Product) for the product
-  kind; `same_as` follows schema.org
+  label; `same_as` follows schema.org
   [`sameAs`](https://schema.org/sameAs) semantics.
 - [Dublin Core](https://www.dublincore.org/) — `title` / `subject` /
   `identifier` term semantics that `name` / `keywords` / `identifiers`
@@ -23,7 +23,7 @@ posture relative to this landscape is §8.7.
 
 The deterministic identifier schemes (§5.2, R-0) are the external ids
 these tools expose, so a project synced from a source tool deduplicates
-against its registry twin in the `projects` collection (§8.7):
+against its registry twin in the `plans` collection (§8.7):
 
 - [Jira](https://www.atlassian.com/software/jira) — `JiraProjectKey`
   (e.g. `MIG`); REST + webhook surface for sync.
@@ -40,7 +40,7 @@ against its registry twin in the `projects` collection (§8.7):
 
 Charter-level planning concepts the sub-resources echo — out of
 matching scope, useful when judging whether two records describe the
-same work item:
+same plan:
 
 - **Goals / OKRs** — objectives and key results; `goals[]` is the
   charter-level objective list (not a full OKR engine).
@@ -49,11 +49,13 @@ same work item:
 - **Issue / risk tracking** — `Issue { kind, severity, status }`
   covers bug / risk / blocker / question / improvement at charter
   level.
-- **Portfolio / programme management** — the **umbrella** Portfolio
-  kind with child Project / Product / Program via `portfolio_ref`
-  models the portfolio → programme → project hierarchy; the `ParentOf`
-  / `ChildOf` relationships model the same hierarchy among work items,
-  and `DependsOn` / `BlockedBy` model cross-initiative dependencies.
+- **Portfolio / programme management** — recursive containment via
+  `parent_ref` (any plan may contain any other plan) models the
+  portfolio → programme → project hierarchy, with the optional `kind`
+  label (`Portfolio` / `Program` / `Project` / `Product`) describing
+  each level; the `ParentOf` / `ChildOf` relationships model the same
+  hierarchy among plans, and `DependsOn` / `BlockedBy` model
+  cross-initiative dependencies.
 - **Burndown / Gantt** — the two derived views (§6.4); standard
   progress projections, computed not stored.
 

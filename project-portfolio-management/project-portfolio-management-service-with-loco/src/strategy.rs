@@ -33,14 +33,14 @@ pub fn valid_weight(weight: i32) -> bool {
 /// the evaluation itself stays pure).
 #[derive(Debug, Clone)]
 pub struct MemberFact {
-    /// The member's pid (work item or proposal).
+    /// The member's pid (plan or proposal).
     pub pid: Uuid,
-    /// Planned budget per currency (work items) or the requested
+    /// Planned budget per currency (plans) or the requested
     /// funding (proposals), in minor units.
     pub planned_by_currency: Vec<(String, i64)>,
-    /// Sum of open risk exposure (work items; proposals carry 0).
+    /// Sum of open risk exposure (plans; proposals carry 0).
     pub open_exposure: i32,
-    /// Sum of OKR mapping weights (work items; proposals carry 0).
+    /// Sum of OKR mapping weights (plans; proposals carry 0).
     pub alignment_weight: i32,
 }
 
@@ -84,9 +84,10 @@ pub fn evaluate_scenario(members: &[MemberFact], constraints: &Constraints) -> E
     }
     planned.sort();
     let mut violations = Vec::new();
-    if let (Some(cap), Some(cap_currency)) =
-        (constraints.budget_cap_minor, constraints.currency.as_deref())
-    {
+    if let (Some(cap), Some(cap_currency)) = (
+        constraints.budget_cap_minor,
+        constraints.currency.as_deref(),
+    ) {
         let total = planned
             .iter()
             .find(|(c, _)| c == cap_currency)
@@ -134,7 +135,10 @@ mod tests {
     fn member(n: u128, planned: &[(&str, i64)], exposure: i32, alignment: i32) -> MemberFact {
         MemberFact {
             pid: pid(n),
-            planned_by_currency: planned.iter().map(|(c, a)| ((*c).to_string(), *a)).collect(),
+            planned_by_currency: planned
+                .iter()
+                .map(|(c, a)| ((*c).to_string(), *a))
+                .collect(),
             open_exposure: exposure,
             alignment_weight: alignment,
         }

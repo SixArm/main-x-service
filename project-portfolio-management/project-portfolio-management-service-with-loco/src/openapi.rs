@@ -1,11 +1,11 @@
 //! Hand-written `OpenAPI` 3 description of the portfolio REST API.
 //!
-//! The request/response `WorkItem` body is the `project_portfolio_management_matcher::WorkItem`
+//! The request/response `Plan` body is the `project_portfolio_management_matcher::Plan`
 //! shape. That crate is intentionally dependency-light (no `utoipa`), so
 //! the schema is authored here by hand rather than derived — which also
-//! keeps the doc accurate to the wire format. The four collections
-//! (portfolios / projects / products / programs) share one templated path
-//! set under `/api/{collection}`.
+//! keeps the doc accurate to the wire format. All plans live in one
+//! recursive collection under `/api/plans`; `kind` is an optional
+//! descriptive label and any plan may contain any other via `parent_ref`.
 
 use serde_json::{Value, json};
 
@@ -15,9 +15,9 @@ pub fn spec() -> Value {
     json!({
         "openapi": "3.0.3",
         "info": {
-            "title": "Portfolio Service API",
+            "title": "Project Portfolio Management Service API",
             "version": env!("CARGO_PKG_VERSION"),
-            "description": "Registry of work-item identities across four collections (portfolios / projects / products / programs): CRUD + within-collection matching. The request/response body is the project-portfolio-management-matcher WorkItem shape. Validation failures (blank name, blank goal title, malformed identifier, malformed portfolio_ref / in_language) return 422. Matching never crosses collections (the matcher's kind gate)."
+            "description": "Registry of plan identities in one recursive collection (any plan may contain any other via parent_ref; kind is an optional descriptive label): CRUD + matching. The request/response body is the project-portfolio-management-matcher Plan shape. Validation failures (blank name, blank goal title, malformed identifier, malformed parent_ref / in_language, or a containment cycle) return 422. Matching is not gated by kind."
         },
         "paths": paths(),
         "components": components(),
@@ -30,7 +30,100 @@ fn paths() -> Value {
     let mut paths = crud_paths();
     merge_object(&mut paths, aux_paths());
     merge_object(&mut paths, insight_paths());
+    merge_object(&mut paths, capability_paths());
     paths
+}
+
+/// The collaboration / automation / prioritisation capability paths:
+/// collaborative review, assignee management, workflow automation, the
+/// set-and-forget scheduler, the Smart Score, and bird's-eye lifecycle
+/// visibility.
+fn capability_paths() -> Value {
+    let get = |tag: &str, summary: &str| {
+        json!({ "get": { "tags": [tag], "summary": summary,
+            "responses": { "200": { "description": "OK" } } } })
+    };
+    let derived = |tag: &str, summary: &str| {
+        json!({ "get": { "tags": [tag], "summary": summary,
+            "responses": { "200": { "description": "Derived view (ETag-conditional; carries as_of)" },
+                           "304": { "description": "Not modified" } } } })
+    };
+    json!({
+        // --- collaborative review --------------------------------------
+        "/api/reviews": {
+            "post": { "tags": ["collaboration"],
+                "summary": "Delegate an idea / proposal / plan to one internal or external expert",
+                "description": "reviewer_ref is an EntityRef URN (person:/worker:/organization:), never a raw email; reviewer_scope records the internal/external disclosure decision explicitly. A second live invitation for the same reviewer + subject is refused.",
+                "requestBody": { "required": true, "content": { "application/json": {
+                    "schema": { "$ref": "#/components/schemas/ReviewInvite" } } } },
+                "responses": { "200": { "description": "The invitation" },
+                               "422": { "description": "Validation failure / already invited / unknown subject" } } },
+            "get": { "tags": ["collaboration"],
+                "summary": "List review invitations (?subject_kind=&subject_pid=&reviewer=&status=; cap 200)",
+                "responses": { "200": { "description": "Invitations, newest first" } } } },
+        "/api/reviews/consensus": get("collaboration", "Aggregate verdict for one subject (?subject_kind=&subject_pid=): mean score, recommendation counts, strict majority (a tie reports none), outstanding invitations"),
+        "/api/reviews/{pid}/respond": { "post": { "tags": ["collaboration"],
+            "summary": "Reviewer accepts or declines the invitation",
+            "responses": { "200": { "description": "The updated invitation" },
+                           "422": { "description": "Illegal transition" } } } },
+        "/api/reviews/{pid}/submit": { "post": { "tags": ["collaboration"],
+            "summary": "Submit the verdict (score 0-100 optional, recommendation advance|hold|reject); only an accepted invitation may submit",
+            "responses": { "200": { "description": "The submitted review" },
+                           "422": { "description": "Illegal transition / validation failure" } } } },
+        "/api/reviews/{pid}": { "delete": { "tags": ["collaboration"],
+            "summary": "Withdraw an invitation; a submitted verdict cannot be withdrawn",
+            "responses": { "204": { "description": "Withdrawn" },
+                           "422": { "description": "Already final" } } } },
+        // --- assignees --------------------------------------------------
+        "/api/plans/{pid}/tasks/{t_pid}/assign": { "post": { "tags": ["collaboration"],
+            "summary": "Assign or unassign one task (null assignee_ref unassigns); notifies the new assignee",
+            "responses": { "200": { "description": "The updated task" },
+                           "422": { "description": "assignee_ref is not a person:/worker: URN" } } } },
+        "/api/assignees/workload": derived("collaboration", "Open work per assignee, busiest first, including the unassigned pile (?plan=)"),
+        // --- notifications ----------------------------------------------
+        "/api/notifications": get("collaboration", "One recipient's in-app inbox (?recipient=&unread=; cap 200). In-app only: this service sends no email or push"),
+        "/api/notifications/{pid}/read": { "post": { "tags": ["collaboration"],
+            "summary": "Mark one notification read (idempotent)",
+            "responses": { "200": { "description": "The notification" } } } },
+        // --- workflow automation ----------------------------------------
+        "/api/automations": {
+            "post": { "tags": ["automation"],
+                "summary": "Configure one rule: when a trigger fires, apply one action",
+                "description": "Triggers: task_moved (with optional from_status/to_status), review_submitted, plan_stage_changed. Actions: assign, add_label, notify, schedule_action, set_task_status. The action shape is validated here, at write time.",
+                "requestBody": { "required": true, "content": { "application/json": {
+                    "schema": { "$ref": "#/components/schemas/Automation" } } } },
+                "responses": { "200": { "description": "The stored rule" },
+                               "422": { "description": "Unknown trigger/action or malformed action_value" } } },
+            "get": { "tags": ["automation"], "summary": "List rules (?plan=&trigger=&enabled=; cap 200)",
+                "responses": { "200": { "description": "Rules" } } } },
+        "/api/automations/runs": get("automation", "What the automations actually did (?automation=&subject=&outcome=applied|skipped|failed; cap 200)"),
+        "/api/automations/{pid}/enable": { "post": { "tags": ["automation"], "summary": "Switch a rule on",
+            "responses": { "200": { "description": "The rule" } } } },
+        "/api/automations/{pid}/disable": { "post": { "tags": ["automation"], "summary": "Switch a rule off, keeping it and its run history",
+            "responses": { "200": { "description": "The rule" } } } },
+        "/api/automations/{pid}": { "delete": { "tags": ["automation"], "summary": "Soft-delete a rule",
+            "responses": { "204": { "description": "Deleted" } } } },
+        // --- set and forget ----------------------------------------------
+        "/api/scheduled-actions": {
+            "post": { "tags": ["automation"],
+                "summary": "Configure one deadline (notify | expire_review) in_days ahead, then forget it",
+                "responses": { "200": { "description": "The queued action" },
+                               "422": { "description": "Unknown action_kind, out-of-range in_days, or a notify with no recipient" } } },
+            "get": { "tags": ["automation"], "summary": "The deadline queue, soonest first (?status=&subject=&overdue=; cap 200)",
+                "responses": { "200": { "description": "Scheduled actions" } } } },
+        "/api/scheduled-actions/sweep": { "post": { "tags": ["automation"],
+            "summary": "Fire every action now due (claim-based, so a deadline fires exactly once; capped per sweep)",
+            "responses": { "200": { "description": "Counts: fired, skipped_already_claimed, capped" } } } },
+        "/api/scheduled-actions/{pid}": { "delete": { "tags": ["automation"],
+            "summary": "Cancel a pending deadline; an action that already fired cannot be cancelled",
+            "responses": { "204": { "description": "Cancelled" },
+                           "422": { "description": "Not pending" } } } },
+        // --- data-driven prioritisation + bird's-eye visibility ----------
+        "/api/plans/{pid}/smart-score": derived("prioritisation", "One plan's Smart Score with the full breakdown: per-component weight/raw/contribution, the components with no evidence, and the coverage those gaps leave. No evidence scores null, never zero"),
+        "/api/prioritisation": derived("prioritisation", "Ranked queue, highest Smart Score first (?limit=&band=high|medium|low|unscored); unscored plans sort last rather than as zeros"),
+        "/api/lifecycle": derived("prioritisation", "Bird's-eye challenge funnel: live and stalled counts for every lifecycle phase, plus any items in an unknown phase"),
+        "/api/plans/{pid}/lifecycle": derived("prioritisation", "One plan's phase, its next gate, the readiness checklist with each blocker named, and its review consensus"),
+    })
 }
 
 /// The executive-insight read paths (CEO / CFO / CTO derived views;
@@ -64,33 +157,33 @@ fn insight_paths() -> Value {
         "/api/risk/heatmap": get("oversight", "CRO heatmap: probability x impact cells, top risks, posture, concentration, hygiene, declared appetite + breaches"),
         "/api/security/register": get("oversight", "Security risk register + the no-security-risk-at-late-stage heuristic"),
         "/api/regulator/extract": get("oversight", "Deliberately coarse per-portfolio aggregates; ABAC mask obligation withholds names"),
-        "/api/{collection}/{pid}/tasks": {
-            "parameters": [collection_param(), { "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "/api/plans/{pid}/tasks": {
+            "parameters": [{ "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
             "get": { "tags": ["engineering"], "summary": "The item's live tasks + per-status board counts", "responses": { "200": { "description": "Tasks + counts" } } },
             "post": { "tags": ["engineering"], "summary": "Create a task (default status todo; done on create stamps done_at)",
                 "responses": { "200": { "description": "The task" }, "422": { "description": "Validation failure" } } }
         },
-        "/api/{collection}/{pid}/tasks/{t_pid}": {
-            "parameters": [collection_param(),
+        "/api/plans/{pid}/tasks/{t_pid}": {
+            "parameters": [
                 { "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
                 { "name": "t_pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
             "put": { "tags": ["engineering"], "summary": "Update task fields (status changes go through PATCH)", "responses": { "200": { "description": "The task" }, "422": { "description": "Validation failure" } } },
             "patch": { "tags": ["engineering"], "summary": "Board move: {status}; stamps status_changed_at, first done stamps done_at", "responses": { "200": { "description": "The task" }, "422": { "description": "Unknown status" } } },
             "delete": { "tags": ["engineering"], "summary": "Soft-delete the task", "responses": { "200": { "description": "Deleted" } } }
         },
-        "/api/{collection}/{pid}/sprints": {
-            "parameters": [collection_param(), { "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "/api/plans/{pid}/sprints": {
+            "parameters": [{ "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
             "get": { "tags": ["engineering"], "summary": "The item's sprints", "responses": { "200": { "description": "Sprints" } } },
             "post": { "tags": ["engineering"], "summary": "Create a time-boxed sprint", "responses": { "200": { "description": "The sprint" }, "422": { "description": "ends_on before starts_on" } } }
         },
-        "/api/{collection}/{pid}/burndown": get("engineering", "Honest sprint burndown (?sprint=): remaining per day from real done_at stamps; no ideal line"),
-        "/api/{collection}/{pid}/standup": get("engineering", "Last-24h digest: tasks created/moved, current blockers (audit-derived)"),
-        "/api/{collection}/{pid}/velocity": get("engineering", "Per-sprint completed counts + story-point sums (points are team-local; item-own trend only)"),
-        "/api/{collection}/{pid}/sprints/{s_pid}/notes": {
+        "/api/plans/{pid}/burndown": get("engineering", "Honest sprint burndown (?sprint=): remaining per day from real done_at stamps; no ideal line"),
+        "/api/plans/{pid}/standup": get("engineering", "Last-24h digest: tasks created/moved, current blockers (audit-derived)"),
+        "/api/plans/{pid}/velocity": get("engineering", "Per-sprint completed counts + story-point sums (points are team-local; item-own trend only)"),
+        "/api/plans/{pid}/sprints/{s_pid}/notes": {
             "get": { "tags": ["engineering"], "summary": "The sprint's retro/feedback notes", "responses": { "200": { "description": "Notes" } } },
             "post": { "tags": ["engineering"], "summary": "Add a note (went_well/improve/action/feedback)", "responses": { "200": { "description": "The note" }, "422": { "description": "Unknown category / blank body" } } }
         },
-        "/api/{collection}/{pid}/sprints/{s_pid}/notes/{n_pid}/convert": { "post": { "tags": ["engineering"],
+        "/api/plans/{pid}/sprints/{s_pid}/notes/{n_pid}/convert": { "post": { "tags": ["engineering"],
             "summary": "Convert an action/feedback note into a task (once)",
             "responses": { "200": { "description": "The note + created task" }, "422": { "description": "Not convertible / already converted" } } } },
         "/api/devops/events": { "post": { "tags": ["devops"],
@@ -117,71 +210,59 @@ fn merge_object(dst: &mut Value, src: Value) {
     }
 }
 
-/// The `collection` path parameter shared by every templated path.
-fn collection_param() -> Value {
-    json!({
-        "name": "collection", "in": "path", "required": true,
-        "schema": { "type": "string", "enum": ["portfolios", "projects", "products", "programs"] }
-    })
-}
-
-/// The CRUD + matching + merge paths (templated over `{collection}`).
+/// The CRUD + matching + merge paths over the single `/api/plans`
+/// collection.
 fn crud_paths() -> Value {
     json!({
-            "/api/{collection}": {
-                "parameters": [collection_param()],
+            "/api/plans": {
                 "get": {
-                    "tags": ["work-items"],
-                    "summary": "List active work items in the collection (cap 100; ?portfolio= rolls up children)",
+                    "tags": ["plans"],
+                    "summary": "List active plans (cap 100; ?parent= rolls up a plan children)",
                     "responses": { "200": { "description": "List of references",
-                        "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/WorkItemRef" } } } } } }
+                        "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PlanRef" } } } } } }
                 },
                 "post": {
-                    "tags": ["work-items"],
-                    "summary": "Create a work item in the collection",
-                    "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkItem" } } } },
+                    "tags": ["plans"],
+                    "summary": "Create a plan",
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Plan" } } } },
                     "responses": {
-                        "200": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkItemRef" } } } },
-                        "422": { "description": "Validation failure: blank name, kind not matching the collection, or a malformed goal/identifier/portfolio_ref/in_language" }
+                        "200": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlanRef" } } } },
+                        "422": { "description": "Validation failure: blank name, a containment cycle, or a malformed goal/identifier/parent_ref/in_language" }
                     }
                 }
             },
-            "/api/{collection}/search": {
-                "parameters": [collection_param()],
+            "/api/plans/search": {
                 "get": {
-                    "tags": ["work-items"],
-                    "summary": "Case-insensitive name search within the collection (Postgres ILIKE, cap 50)",
+                    "tags": ["plans"],
+                    "summary": "Case-insensitive name search (Postgres ILIKE, cap 50)",
                     "parameters": [{ "name": "q", "in": "query", "required": true, "schema": { "type": "string" } }],
                     "responses": {
-                        "200": { "description": "Matches", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/WorkItemRef" } } } } },
+                        "200": { "description": "Matches", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PlanRef" } } } } },
                         "400": { "description": "Missing or blank `q`" }
                     }
                 }
             },
-            "/api/{collection}/match": {
-                "parameters": [collection_param()],
+            "/api/plans/match": {
                 "post": {
                     "tags": ["matching"],
-                    "summary": "Rank a query against an explicit candidate list (no persistence; cross-kind candidates score 0.0)",
+                    "summary": "Rank a query against an explicit candidate list (no persistence; kind does not gate matching)",
                     "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MatchRequest" } } } },
                     "responses": { "200": { "description": "Ranked results (index + MatchResult)" } }
                 }
             },
-            "/api/{collection}/check-duplicates": {
-                "parameters": [collection_param()],
+            "/api/plans/check-duplicates": {
                 "post": {
                     "tags": ["matching"],
-                    "summary": "Match a query against stored work items in the collection",
-                    "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkItem" } } } },
+                    "summary": "Match a query against stored plans",
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Plan" } } } },
                     "responses": { "200": { "description": "Scored matches",
                         "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ScoredRef" } } } } } }
                 }
             },
-            "/api/{collection}/merge": {
-                "parameters": [collection_param()],
+            "/api/plans/merge": {
                 "post": {
                     "tags": ["matching"],
-                    "summary": "Merge a confirmed duplicate into a surviving work item (same collection)",
+                    "summary": "Merge a confirmed duplicate into a surviving plan",
                     "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MergeRequest" } } } },
                     "responses": {
                         "200": { "description": "The survivor's merged payload + the merged pids" },
@@ -190,8 +271,7 @@ fn crud_paths() -> Value {
                     }
                 }
             },
-            "/api/{collection}/merges/recent": {
-                "parameters": [collection_param()],
+            "/api/plans/merges/recent": {
                 "get": { "tags": ["matching"], "summary": "Recent merge-history records", "responses": { "200": { "description": "Merge records" } } }
             }
     })
@@ -200,8 +280,7 @@ fn crud_paths() -> Value {
 /// The auth / audit / events / single-record / metrics paths.
 fn aux_paths() -> Value {
     json!({
-            "/api/{collection}/whoami": {
-                "parameters": [collection_param()],
+            "/api/plans/whoami": {
                 "get": {
                     "tags": ["auth"],
                     "summary": "Echo the verified claims of the bearer token",
@@ -212,26 +291,24 @@ fn aux_paths() -> Value {
                     }
                 }
             },
-            "/api/{collection}/audit/recent": {
-                "parameters": [collection_param()],
+            "/api/plans/audit/recent": {
                 "get": { "tags": ["audit"], "summary": "Recent audit-log entries", "responses": { "200": { "description": "Audit entries" } } }
             },
-            "/api/{collection}/events/recent": {
-                "parameters": [collection_param()],
+            "/api/plans/events/recent": {
                 "get": { "tags": ["audit"], "summary": "Recent events from the in-memory stream", "responses": { "200": { "description": "Events" } } }
             },
-            "/api/{collection}/{pid}": {
-                "parameters": [collection_param(), { "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
-                "get": { "tags": ["work-items"], "summary": "Fetch the stored work item",
-                    "responses": { "200": { "description": "WorkItem", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkItem" } } } }, "404": { "description": "Not found" } } },
-                "put": { "tags": ["work-items"], "summary": "Replace a work item's payload",
-                    "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkItem" } } } },
-                    "responses": { "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkItemRef" } } } }, "404": { "description": "Not found" }, "422": { "description": "Validation failure" } } },
-                "delete": { "tags": ["work-items"], "summary": "Soft-delete a work item", "responses": { "200": { "description": "Deleted" } } }
+            "/api/plans/{pid}": {
+                "parameters": [{ "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                "get": { "tags": ["plans"], "summary": "Fetch the stored plan",
+                    "responses": { "200": { "description": "Plan", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Plan" } } } }, "404": { "description": "Not found" } } },
+                "put": { "tags": ["plans"], "summary": "Replace a plan's payload",
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Plan" } } } },
+                    "responses": { "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlanRef" } } } }, "404": { "description": "Not found" }, "422": { "description": "Validation failure" } } },
+                "delete": { "tags": ["plans"], "summary": "Soft-delete a plan", "responses": { "200": { "description": "Deleted" } } }
             },
-            "/api/{collection}/{pid}/audit": {
-                "parameters": [collection_param(), { "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
-                "get": { "tags": ["audit"], "summary": "Audit trail for one work item", "responses": { "200": { "description": "Audit entries" } } }
+            "/api/plans/{pid}/audit": {
+                "parameters": [{ "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                "get": { "tags": ["audit"], "summary": "Audit trail for one plan", "responses": { "200": { "description": "Audit entries" } } }
             },
             "/metrics.prom": {
                 "get": {
@@ -253,41 +330,56 @@ fn components() -> Value {
                     "description": "Short-lived PASETO v4.public token from the authentication-service, verified offline against its published Ed25519 key." }
             },
             "schemas": {
-                "WorkItemRef": { "type": "object", "required": ["pid", "name"], "properties": {
+                "PlanRef": { "type": "object", "required": ["pid", "name"], "properties": {
                     "pid": { "type": "string", "format": "uuid" }, "name": { "type": "string" } } },
                 "ScoredRef": { "type": "object", "properties": {
                     "pid": { "type": "string" }, "name": { "type": "string" },
                     "score": { "type": "number", "format": "double" }, "confidence": { "type": "string" },
                     "is_match": { "type": "boolean" } } },
                 "MatchRequest": { "type": "object", "required": ["query", "candidates"], "properties": {
-                    "query": { "$ref": "#/components/schemas/WorkItem" },
-                    "candidates": { "type": "array", "items": { "$ref": "#/components/schemas/WorkItem" } } } },
+                    "query": { "$ref": "#/components/schemas/Plan" },
+                    "candidates": { "type": "array", "items": { "$ref": "#/components/schemas/Plan" } } } },
+                "ReviewInvite": { "type": "object", "required": ["subject_kind", "subject_pid", "reviewer_ref"], "properties": {
+                    "subject_kind": { "type": "string", "enum": ["idea", "proposal", "plan"] },
+                    "subject_pid": { "type": "string", "format": "uuid" },
+                    "reviewer_ref": { "type": "string", "description": "EntityRef URN: person:<uuid> / worker:<uuid> / organization:<uuid>" },
+                    "reviewer_scope": { "type": "string", "enum": ["internal", "external"], "default": "internal" },
+                    "expertise": { "type": "string", "nullable": true, "description": "Why this expert: the specialism the delegation is for" },
+                    "due_on": { "type": "string", "format": "date", "nullable": true } } },
+                "Automation": { "type": "object", "required": ["name", "trigger_kind", "action_kind"], "properties": {
+                    "plan_pid": { "type": "string", "format": "uuid", "nullable": true, "description": "Scope to one plan's board; absent = every plan" },
+                    "name": { "type": "string" },
+                    "trigger_kind": { "type": "string", "enum": ["task_moved", "review_submitted", "plan_stage_changed"] },
+                    "from_status": { "type": "string", "nullable": true, "description": "task_moved only; absent = any column" },
+                    "to_status": { "type": "string", "nullable": true, "description": "task_moved only; absent = any column" },
+                    "action_kind": { "type": "string", "enum": ["assign", "add_label", "notify", "schedule_action", "set_task_status"] },
+                    "action_value": { "type": "object", "description": "Action-specific: assign {assignee_ref}, add_label {label}, notify {recipient_ref, message?}, schedule_action {action_kind, in_days, recipient_ref?}, set_task_status {status}" } } },
                 "MergeRequest": { "type": "object", "required": ["main_pid", "duplicate_pid"], "properties": {
                     "main_pid": { "type": "string", "format": "uuid" },
                     "duplicate_pid": { "type": "string", "format": "uuid" },
                     "reason": { "type": "string", "nullable": true } } },
-                "WorkItemIdentifier": { "type": "object", "required": ["scheme", "value"], "properties": {
+                "PlanIdentifier": { "type": "object", "required": ["scheme", "value"], "properties": {
                     "scheme": { "description": "Uri | Uuid | JiraProjectKey | AsanaGid | TrelloBoardId | MsProjectId | GitHubProjectId | LinearId | Code | LocalId | {Custom: string}" },
                     "value": { "type": "string", "description": "Must be non-blank." } } },
-                "WorkItem": { "type": "object", "required": ["kind", "name"], "properties": {
-                    "kind": { "type": "string", "enum": ["Portfolio", "Project", "Product", "Program"], "description": "The collection; must match the path collection" },
+                "Plan": { "type": "object", "required": ["name"], "properties": {
+                    "kind": { "type": "string", "enum": ["Portfolio", "Project", "Product", "Program", "Practice", "Process", "Purpose", "Pathway", "Proposal"], "nullable": true, "description": "Optional descriptive label; does not gate matching or fix a collection" },
                     "name": { "type": "string" },
                     "alternate_names": { "type": "array", "items": { "type": "string" } },
                     "code": { "type": "string", "nullable": true, "description": "Owner-scoped code, e.g. PROJ-2026" },
                     "owner_org_id": { "type": "string", "nullable": true, "description": "EntityRef organization:<id>" },
                     "owner_org_name": { "type": "string", "nullable": true },
                     "lead_ref": { "type": "string", "nullable": true, "description": "EntityRef person:<id> | worker:<id>" },
-                    "portfolio_ref": { "type": "string", "nullable": true, "description": "Parent portfolio pid (child kinds; UUID)" },
+                    "parent_ref": { "type": "string", "nullable": true, "description": "Parent plan pid (the containment link; any plan may contain any other; UUID)" },
                     "status": { "type": "string", "nullable": true, "description": "Proposed | Active | OnHold | Completed | Cancelled | {Custom: string}" },
                     "goals": { "type": "array", "items": { "type": "object", "properties": { "title": { "type": "string" }, "description": { "type": "string", "nullable": true }, "target_date": { "type": "string", "nullable": true }, "status": { "type": "string", "nullable": true } } } },
                     "start_date": { "type": "string", "nullable": true, "description": "ISO-8601 YYYY / YYYY-MM / YYYY-MM-DD" },
                     "target_date": { "type": "string", "nullable": true },
                     "keywords": { "type": "array", "items": { "type": "string" } },
                     "tags": { "type": "array", "items": { "type": "string" } },
-                    "identifiers": { "type": "array", "items": { "$ref": "#/components/schemas/WorkItemIdentifier" } },
+                    "identifiers": { "type": "array", "items": { "$ref": "#/components/schemas/PlanIdentifier" } },
                     "same_as": { "type": "array", "items": { "type": "string" } },
                     "in_language": { "type": "string", "nullable": true, "description": "BCP-47 language tag" },
-                    "relationships": { "type": "array", "items": { "type": "object", "properties": { "relation": { "type": "string" }, "work_item_id": { "type": "string" } } } } } }
+                    "relationships": { "type": "array", "items": { "type": "object", "properties": { "relation": { "type": "string" }, "plan_id": { "type": "string" } } } } } }
             }
     })
 }
@@ -301,13 +393,11 @@ mod tests {
     fn spec_is_wellformed() {
         let s = spec();
         assert_eq!(s["openapi"], "3.0.3");
-        assert!(s["paths"]["/api/{collection}"]["post"].is_object());
-        assert!(s["paths"]["/api/{collection}/check-duplicates"]["post"].is_object());
-        assert!(s["components"]["schemas"]["WorkItem"]["properties"]["name"].is_object());
-        assert!(s["components"]["schemas"]["WorkItem"]["properties"]["kind"].is_object());
-        assert!(
-            s["components"]["schemas"]["WorkItemIdentifier"]["properties"]["value"].is_object()
-        );
+        assert!(s["paths"]["/api/plans"]["post"].is_object());
+        assert!(s["paths"]["/api/plans/check-duplicates"]["post"].is_object());
+        assert!(s["components"]["schemas"]["Plan"]["properties"]["name"].is_object());
+        assert!(s["components"]["schemas"]["Plan"]["properties"]["kind"].is_object());
+        assert!(s["components"]["schemas"]["PlanIdentifier"]["properties"]["value"].is_object());
     }
 
     /// Pins that the seven core CRUD + matching operations are documented.
@@ -315,13 +405,13 @@ mod tests {
     fn spec_documents_core_endpoints() {
         let s = spec();
         let paths = &s["paths"];
-        assert!(paths["/api/{collection}"]["get"].is_object());
-        assert!(paths["/api/{collection}"]["post"].is_object());
-        assert!(paths["/api/{collection}/match"]["post"].is_object());
-        assert!(paths["/api/{collection}/check-duplicates"]["post"].is_object());
-        assert!(paths["/api/{collection}/{pid}"]["get"].is_object());
-        assert!(paths["/api/{collection}/{pid}"]["put"].is_object());
-        assert!(paths["/api/{collection}/{pid}"]["delete"].is_object());
+        assert!(paths["/api/plans"]["get"].is_object());
+        assert!(paths["/api/plans"]["post"].is_object());
+        assert!(paths["/api/plans/match"]["post"].is_object());
+        assert!(paths["/api/plans/check-duplicates"]["post"].is_object());
+        assert!(paths["/api/plans/{pid}"]["get"].is_object());
+        assert!(paths["/api/plans/{pid}"]["put"].is_object());
+        assert!(paths["/api/plans/{pid}"]["delete"].is_object());
     }
 
     /// Pins that the audit + event-stream endpoints are documented.
@@ -329,16 +419,16 @@ mod tests {
     fn spec_documents_audit_and_event_endpoints() {
         let s = spec();
         let paths = &s["paths"];
-        assert!(paths["/api/{collection}/audit/recent"]["get"].is_object());
-        assert!(paths["/api/{collection}/events/recent"]["get"].is_object());
-        assert!(paths["/api/{collection}/{pid}/audit"]["get"].is_object());
+        assert!(paths["/api/plans/audit/recent"]["get"].is_object());
+        assert!(paths["/api/plans/events/recent"]["get"].is_object());
+        assert!(paths["/api/plans/{pid}/audit"]["get"].is_object());
     }
 
     /// Pins that the name-search endpoint is documented with its `q` param.
     #[test]
     fn spec_documents_search_endpoint() {
         let s = spec();
-        let op = &s["paths"]["/api/{collection}/search"]["get"];
+        let op = &s["paths"]["/api/plans/search"]["get"];
         assert!(op.is_object());
         assert_eq!(op["parameters"][0]["name"], "q");
     }
@@ -347,8 +437,8 @@ mod tests {
     #[test]
     fn spec_documents_merge_endpoints() {
         let s = spec();
-        assert!(s["paths"]["/api/{collection}/merge"]["post"].is_object());
-        assert!(s["paths"]["/api/{collection}/merges/recent"]["get"].is_object());
+        assert!(s["paths"]["/api/plans/merge"]["post"].is_object());
+        assert!(s["paths"]["/api/plans/merges/recent"]["get"].is_object());
         assert!(s["components"]["schemas"]["MergeRequest"]["properties"]["main_pid"].is_object());
     }
 
@@ -361,11 +451,40 @@ mod tests {
         assert!(op["responses"]["200"]["content"]["text/plain"].is_object());
     }
 
+    /// Pins that the capability endpoints are documented.
+    #[test]
+    fn spec_documents_capability_endpoints() {
+        let s = spec();
+        let paths = &s["paths"];
+        for path in [
+            "/api/reviews",
+            "/api/reviews/consensus",
+            "/api/assignees/workload",
+            "/api/notifications",
+            "/api/automations",
+            "/api/automations/runs",
+            "/api/scheduled-actions",
+            "/api/scheduled-actions/sweep",
+            "/api/prioritisation",
+            "/api/lifecycle",
+            "/api/plans/{pid}/smart-score",
+            "/api/plans/{pid}/lifecycle",
+        ] {
+            assert!(paths[path].is_object(), "{path} is undocumented");
+        }
+        assert!(paths["/api/reviews"]["post"].is_object());
+        assert!(paths["/api/automations"]["post"].is_object());
+        assert!(
+            s["components"]["schemas"]["ReviewInvite"]["properties"]["reviewer_scope"].is_object()
+        );
+        assert!(s["components"]["schemas"]["Automation"]["properties"]["trigger_kind"].is_object());
+    }
+
     /// Pins that `/whoami` carries a bearer security requirement.
     #[test]
     fn spec_documents_whoami_with_bearer_security() {
         let s = spec();
-        assert!(s["paths"]["/api/{collection}/whoami"]["get"]["security"][0]["bearer"].is_array());
+        assert!(s["paths"]["/api/plans/whoami"]["get"]["security"][0]["bearer"].is_array());
         assert_eq!(
             s["components"]["securitySchemes"]["bearer"]["scheme"],
             "bearer"

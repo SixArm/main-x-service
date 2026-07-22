@@ -47,7 +47,7 @@ impl MigrationTrait for Migration {
                 ("pid", ColType::UuidUniq),
                 ("name", ColType::String),
                 ("description", ColType::TextNull),
-                // Candidate membership: {"work_item_pids": [...],
+                // Candidate membership: {"plan_pids": [...],
                 // "proposal_pids": [...]} (JSON).
                 ("members", ColType::JsonBinary),
                 // Constraint knobs (nullable = unconstrained).
@@ -85,7 +85,7 @@ impl MigrationTrait for Migration {
                 ("id", ColType::PkAuto),
                 ("pid", ColType::UuidUniq),
                 ("objective_pid", ColType::Uuid),
-                ("work_item_pid", ColType::Uuid),
+                ("plan_pid", ColType::Uuid),
                 // How strongly the item serves the objective (1–5).
                 ("weight", ColType::Integer),
             ],
@@ -98,7 +98,7 @@ impl MigrationTrait for Migration {
             &[
                 ("id", ColType::PkAuto),
                 ("pid", ColType::UuidUniq),
-                ("work_item_pid", ColType::Uuid),
+                ("plan_pid", ColType::Uuid),
                 ("title", ColType::String),
                 // cost_saving | revenue | risk_reduction | quality |
                 // compliance | other.
@@ -122,12 +122,12 @@ impl MigrationTrait for Migration {
         // One mapping per (objective, item); re-linking updates weight.
         conn.execute_unprepared(
             "CREATE UNIQUE INDEX IF NOT EXISTS objective_links_pair \
-             ON objective_links (objective_pid, work_item_pid)",
+             ON objective_links (objective_pid, plan_pid)",
         )
         .await?;
         for (index, table, column) in [
-            ("objective_links_item", "objective_links", "work_item_pid"),
-            ("benefits_item", "benefits", "work_item_pid"),
+            ("objective_links_item", "objective_links", "plan_pid"),
+            ("benefits_item", "benefits", "plan_pid"),
         ] {
             conn.execute_unprepared(&format!(
                 "CREATE INDEX IF NOT EXISTS {index} ON {table} ({column})"

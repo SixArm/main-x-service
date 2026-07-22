@@ -26,7 +26,12 @@ use std::path::Path;
 #[allow(unused_imports)]
 use crate::{
     auth, controllers,
-    models::_entities::{allocations, audit_logs, benefits, budget_lines, event_outbox, gate_reviews, ideas, merge_records, milestones, objective_links, objectives, proposals, report_definitions, risks, scenarios, work_item_dependencies, work_items},
+    models::_entities::{
+        allocations, audit_logs, automation_runs, automations, benefits, budget_lines,
+        event_outbox, gate_reviews, ideas, merge_records, milestones, notifications,
+        objective_links, objectives, plan_dependencies, plans, proposals, report_definitions,
+        reviews, risks, scenarios, scheduled_actions,
+    },
     tasks,
     workers::downloader::DownloadWorker,
 };
@@ -89,13 +94,16 @@ impl Hooks for App {
 
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
-            .add_route(controllers::work_items::routes())
+            .add_route(controllers::plans::routes())
             .add_route(controllers::governance::routes())
             .add_route(controllers::visibility::routes())
             .add_route(controllers::insights::routes())
             .add_route(controllers::oversight::routes())
             .add_route(controllers::engineering::routes())
             .add_route(controllers::strategy::routes())
+            .add_route(controllers::collaboration::routes())
+            .add_route(controllers::automation::routes())
+            .add_route(controllers::prioritisation::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
     }
@@ -113,6 +121,9 @@ impl Hooks for App {
         crate::relay::spawn(ctx.db.clone());
         // Optional estate-snapshot ticker (env-gated, default off).
         crate::snapshots::spawn(ctx.db.clone());
+        // Set-and-forget: the optional scheduled-action sweep ticker
+        // (env-gated, default off — the sweep endpoint always works).
+        crate::scheduler::spawn(ctx.clone());
         // Blanket JWT enforcement layer. Added unconditionally; the
         // `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` flag is read per request and the layer is a
         // near-noop when the flag is off (the default).
@@ -132,6 +143,11 @@ impl Hooks for App {
         // tasks-inject (do not remove)
     }
     async fn truncate(ctx: &AppContext) -> Result<()> {
+        truncate_table(&ctx.db, notifications::Entity).await?;
+        truncate_table(&ctx.db, automation_runs::Entity).await?;
+        truncate_table(&ctx.db, automations::Entity).await?;
+        truncate_table(&ctx.db, scheduled_actions::Entity).await?;
+        truncate_table(&ctx.db, reviews::Entity).await?;
         truncate_table(&ctx.db, benefits::Entity).await?;
         truncate_table(&ctx.db, objective_links::Entity).await?;
         truncate_table(&ctx.db, objectives::Entity).await?;
@@ -140,7 +156,7 @@ impl Hooks for App {
         truncate_table(&ctx.db, report_definitions::Entity).await?;
         truncate_table(&ctx.db, allocations::Entity).await?;
         truncate_table(&ctx.db, milestones::Entity).await?;
-        truncate_table(&ctx.db, work_item_dependencies::Entity).await?;
+        truncate_table(&ctx.db, plan_dependencies::Entity).await?;
         truncate_table(&ctx.db, budget_lines::Entity).await?;
         truncate_table(&ctx.db, risks::Entity).await?;
         truncate_table(&ctx.db, gate_reviews::Entity).await?;
@@ -148,7 +164,7 @@ impl Hooks for App {
         truncate_table(&ctx.db, event_outbox::Entity).await?;
         truncate_table(&ctx.db, merge_records::Entity).await?;
         truncate_table(&ctx.db, audit_logs::Entity).await?;
-        truncate_table(&ctx.db, work_items::Entity).await?;
+        truncate_table(&ctx.db, plans::Entity).await?;
         Ok(())
     }
     async fn seed(_ctx: &AppContext, _base: &Path) -> Result<()> {

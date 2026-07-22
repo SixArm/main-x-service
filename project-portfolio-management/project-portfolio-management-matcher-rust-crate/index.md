@@ -1,8 +1,10 @@
 # project-portfolio-management-matcher — documentation index
 
-Pairwise work-item (Portfolio / Project / Product / Program) record
-matching, kind-gated + deterministic + probabilistic, for
-within-collection deduplication.
+Pairwise plan record matching, deterministic + probabilistic, for
+deduplication across one recursive plan collection. The four former
+kinds (Portfolio / Project / Product / Program / Practice / Process /
+Purpose / Pathway / Proposal) are unified into one entity; `kind` is
+optional descriptive metadata that does not gate matching.
 
 ## Start here
 
@@ -12,7 +14,7 @@ within-collection deduplication.
 | [AGENTS.md](./AGENTS.md) | How to work in this crate; public API; layout. |
 | [README.md](./README.md) | User-facing intro + usage. |
 | [CHANGELOG.md](./CHANGELOG.md) | Release history. |
-| [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md) | R-GATE + per-component derivations + weights. |
+| [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md) | No kind gate + per-component derivations + weights. |
 | [AGENTS/normalization.md](./AGENTS/normalization.md) | Fold / code rules. |
 | [AGENTS/testing.md](./AGENTS/testing.md) | Test layout. |
 
@@ -22,30 +24,30 @@ The entity-level domain model lives in
 ## Worked example
 
 ```text
-match_work_items(
+match_plans(
+  { name: "Onboarding", identifiers: [JiraProjectKey "ONB"] },
+  { name: "Customer onboarding revamp", identifiers: [JiraProjectKey "onb"] },
+) -> score 1.0  (R-0 deterministic Jira project key match)
+
+match_plans(
   { kind: Project, name: "Onboarding", identifiers: [JiraProjectKey "ONB"] },
-  { kind: Project, name: "Customer onboarding revamp", identifiers: [JiraProjectKey "onb"] },
-) -> score 1.0  (R-0 deterministic Jira project key match; kinds agree)
+  { kind: Product, name: "Onboarding", identifiers: [JiraProjectKey "onb"] },
+) -> score 1.0  (kind is ignored; R-0 still fires despite differing kinds)
 
-match_work_items(
-  { kind: Project, name: "Onboarding" },
-  { kind: Product, name: "Onboarding" },
-) -> score 0.0  (R-GATE: different kind, distinct collections)
-
-match_work_items(
-  { kind: Program, name: "Customer Onboarding Revamp", goals: ["Reduce time-to-value"] },
-  { kind: Program, name: "Onboarding Revamp",          goals: ["Reduce time to value"] },
+match_plans(
+  { name: "Customer Onboarding Revamp", goals: ["Reduce time-to-value"] },
+  { name: "Onboarding Revamp",          goals: ["Reduce time to value"] },
 ) -> high score (name + goals corroborate)
 
-match_work_items(
-  { kind: Project, name: "Q3 Plan v1", owner_org_id: "org-1", code: "PROJ-01" },
-  { kind: Project, name: "Q3 Plan v2", owner_org_id: "org-1", code: "proj 01" },
+match_plans(
+  { name: "Q3 Plan v1", owner_org_id: "org-1", code: "PROJ-01" },
+  { name: "Q3 Plan v2", owner_org_id: "org-1", code: "proj 01" },
 ) -> score 1.0  (R-1 same-owner code; codes normalise equal,
                  so differing names are irrelevant)
 
-match_work_items(
-  { kind: Portfolio, name: "Alpha", same_as: ["https://example.org/portfolios/42"] },
-  { kind: Portfolio, name: "Omega", same_as: ["  https://example.org/portfolios/42  "] },
+match_plans(
+  { name: "Alpha", same_as: ["https://example.org/plans/42"] },
+  { name: "Omega", same_as: ["  https://example.org/plans/42  "] },
 ) -> score 1.0  (R-2 same_as URL overlap; folding trims the whitespace)
 ```
 
@@ -53,13 +55,13 @@ match_work_items(
 
 When a present component scores `0.0` it *does* pull the average down —
 unlike an absent (`None`) component, which is dropped from the divisor.
-Consider two **Project** children with identical names but mismatched
-parent portfolios and nothing else:
+Consider two plans with identical names but mismatched
+parent plans and nothing else:
 
 ```text
-match_work_items(
-  { kind: Project, name: "Mobile App Relaunch", portfolio_ref: "pf-1" },
-  { kind: Project, name: "Mobile App Relaunch", portfolio_ref: "pf-2" },
+match_plans(
+  { name: "Mobile App Relaunch", parent_ref: "pf-1" },
+  { name: "Mobile App Relaunch", parent_ref: "pf-2" },
 )
 ```
 
@@ -68,7 +70,7 @@ Only two components are present:
 | Component | Score | Weight |
 |-----------|-------|--------|
 | name      | 1.00  | 0.30   |
-| portfolio | 0.00  | 0.08   |
+| parent    | 0.00  | 0.08   |
 
 Renormalised over the present weights (§17):
 
@@ -77,7 +79,7 @@ Renormalised over the present weights (§17):
 ```
 
 So the pair lands at `~0.79` — `Medium` confidence, below the default
-`0.85` threshold. The mismatched parent portfolio demonstrably drags the
+`0.85` threshold. The mismatched parent plan demonstrably drags the
 name-only score down from `~1.0`.
 
 Part of the Main X Index family; embedded by

@@ -127,7 +127,10 @@ pub async fn init() {
     {
         Some(url) => {
             let issuer = env_or("PROJECT_PORTFOLIO_MANAGEMENT_TOKEN_ISSUER", DEFAULT_ISSUER);
-            let audience = env_or("PROJECT_PORTFOLIO_MANAGEMENT_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
+            let audience = env_or(
+                "PROJECT_PORTFOLIO_MANAGEMENT_TOKEN_AUDIENCE",
+                DEFAULT_AUDIENCE,
+            );
             fetch_or(url.trim(), &issuer, &audience, build_from_env()).await
         }
         None => build_from_env(),
@@ -170,8 +173,9 @@ pub async fn fetch_or(url: &str, issuer: &str, audience: &str, fallback: Verifie
 #[must_use]
 pub fn require_auth() -> bool {
     static REQUIRE_AUTH: OnceLock<bool> = OnceLock::new();
-    *REQUIRE_AUTH
-        .get_or_init(|| parse_bool(&std::env::var("PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH").unwrap_or_default()))
+    *REQUIRE_AUTH.get_or_init(|| {
+        parse_bool(&std::env::var("PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH").unwrap_or_default())
+    })
 }
 
 /// The process-wide ABAC policy, read once from
@@ -316,7 +320,10 @@ fn env_or(name: &str, default: &str) -> String {
 /// boots without credentials configured.
 fn build_from_env() -> Verifier {
     let issuer = env_or("PROJECT_PORTFOLIO_MANAGEMENT_TOKEN_ISSUER", DEFAULT_ISSUER);
-    let audience = env_or("PROJECT_PORTFOLIO_MANAGEMENT_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
+    let audience = env_or(
+        "PROJECT_PORTFOLIO_MANAGEMENT_TOKEN_AUDIENCE",
+        DEFAULT_AUDIENCE,
+    );
     let keys = std::env::var("PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS")
         .ok()
         .filter(|s| !s.trim().is_empty())
@@ -402,15 +409,13 @@ impl MaybeAuthUser {
     }
 }
 
-/// The **record-level resource attributes** of a work item for the
+/// The **record-level resource attributes** of a plan for the
 /// ABAC decision (`authorization-attributes.md` §9): today the
 /// phase-gate `resource.stage` (PPM-3), so a deployment can write
 /// e.g. "deny write past `g3_delivery` unless `access=admin`" purely
 /// as policy. An item with no stage yet exposes no `stage` key.
 #[must_use]
-pub fn work_item_resource_attrs(
-    stage: Option<&str>,
-) -> std::collections::BTreeMap<String, Vec<String>> {
+pub fn plan_resource_attrs(stage: Option<&str>) -> std::collections::BTreeMap<String, Vec<String>> {
     let mut attrs = std::collections::BTreeMap::new();
     if let Some(stage) = stage {
         attrs.insert("stage".to_string(), vec![stage.to_string()]);

@@ -28,11 +28,11 @@ export interface Proposal {
     | "approved"
     | "rejected"
     | "promoted";
-  promoted_work_item_pid: string | null;
+  promoted_plan_pid: string | null;
 }
 
 export interface DemandHit {
-  source: "work_item" | "proposal";
+  source: "plan" | "proposal";
   pid: string;
   name: string;
   score: number;
@@ -187,7 +187,7 @@ export interface Dashboard {
     stages: Record<string, number>;
   }[];
   site_tiles: {
-    work_items: number;
+    plans: number;
     proposals_open: number;
     materialised_risks: number;
     open_risk_exposure: number;
@@ -340,23 +340,38 @@ export interface FinancialVariance {
   note: string;
   by_collection: Array<{ collection: string; variance: VarianceRow[] }>;
   by_category: Array<{ category: string; variance: VarianceRow[] }>;
-  by_portfolio: Array<{ portfolio: InsightItemRef | null; variance: VarianceRow[] }>;
+  by_portfolio: Array<{
+    portfolio: InsightItemRef | null;
+    variance: VarianceRow[];
+  }>;
 }
 
 /** `GET /api/financials/exposure` response. */
 export interface FinancialExposure {
   as_of: string;
   note: string;
-  currencies: Array<VarianceRow & { work_items: number }>;
+  currencies: Array<VarianceRow & { plans: number }>;
 }
 
 /** `GET /api/technology/dependency-risk` response. */
 export interface DependencyRisk {
   as_of: string;
   edges: number;
-  top_fan_out: Array<{ item: InsightItemRef; dependents: number; rag: string | null }>;
-  cross_portfolio: Array<{ edge: string; predecessor: InsightItemRef; successor: InsightItemRef }>;
-  red_predecessor_edges: Array<{ edge: string; predecessor: InsightItemRef; successor: InsightItemRef }>;
+  top_fan_out: Array<{
+    item: InsightItemRef;
+    dependents: number;
+    rag: string | null;
+  }>;
+  cross_portfolio: Array<{
+    edge: string;
+    predecessor: InsightItemRef;
+    successor: InsightItemRef;
+  }>;
+  red_predecessor_edges: Array<{
+    edge: string;
+    predecessor: InsightItemRef;
+    successor: InsightItemRef;
+  }>;
 }
 
 /** `GET /api/technology/radar` response. */
@@ -372,12 +387,16 @@ export interface TechnologyRadar {
   }>;
 }
 
-
 /** `GET /api/executive/alignment` response. */
 export interface AlignmentCoverage {
   as_of: string;
   derivation: string;
-  by_collection: Array<{ collection: string; total: number; aligned: number; unaligned: number }>;
+  by_collection: Array<{
+    collection: string;
+    total: number;
+    aligned: number;
+    unaligned: number;
+  }>;
   unaligned_spend: VarianceRow[];
   unaligned_items: Array<{
     item: InsightItemRef;
@@ -418,7 +437,12 @@ export interface ScenarioComparison {
   a: ScenarioSide;
   b: ScenarioSide;
   deltas: {
-    planned_by_currency: Array<{ currency: string; a_minor: number; b_minor: number; delta_minor: number }>;
+    planned_by_currency: Array<{
+      currency: string;
+      a_minor: number;
+      b_minor: number;
+      delta_minor: number;
+    }>;
     exposure: number;
     alignment: number;
   };
@@ -438,7 +462,6 @@ export interface ScenarioSide {
     violations: string[];
   };
 }
-
 
 /** A risk-register row shared by the compliance / security views. */
 export interface RegisterRow {
@@ -506,7 +529,11 @@ export interface TrendSeries {
 export interface AuditTrail {
   as_of: string;
   returned: number;
-  stats: { per_day: Record<string, number>; distinct_actors: number; actorless: number };
+  stats: {
+    per_day: Record<string, number>;
+    distinct_actors: number;
+    actorless: number;
+  };
   rows: Array<{
     created_at: string;
     actor: string | null;
@@ -550,8 +577,15 @@ export interface RiskHeatmap {
     materialised: number;
   }>;
   concentration: Array<{ pid: string; title: string; exposure: number }>;
-  overdue_reviews: Array<{ pid: string; title: string; review_date: string | null }>;
-  appetite: { max_open_exposure: number | null; max_item_exposure: number | null } | null;
+  overdue_reviews: Array<{
+    pid: string;
+    title: string;
+    review_date: string | null;
+  }>;
+  appetite: {
+    max_open_exposure: number | null;
+    max_item_exposure: number | null;
+  } | null;
   appetite_note: string;
   breaches: Array<Record<string, unknown> & { rule: string }>;
 }
@@ -567,11 +601,18 @@ export interface RegulatorExtract {
     stage: string | null;
     members: Record<string, number>;
     gate_decisions: Record<string, number>;
-    spend: Array<{ currency: string; planned_minor: number; actual_minor: number }>;
-    benefits: Array<{ currency: string; target_minor: number; realized_minor: number }>;
+    spend: Array<{
+      currency: string;
+      planned_minor: number;
+      actual_minor: number;
+    }>;
+    benefits: Array<{
+      currency: string;
+      target_minor: number;
+      realized_minor: number;
+    }>;
   }>;
 }
-
 
 /** One task (the per-item Kanban sub-resource). */
 export interface Task {
@@ -610,8 +651,17 @@ export interface Standup {
   as_of: string;
   since: string;
   item: InsightItemRef;
-  tasks_created: Array<{ at: string; task: string | null; actor: string | null }>;
-  tasks_moved: Array<{ at: string; task: string | null; actor: string | null; move: unknown }>;
+  tasks_created: Array<{
+    at: string;
+    task: string | null;
+    actor: string | null;
+  }>;
+  tasks_moved: Array<{
+    at: string;
+    task: string | null;
+    actor: string | null;
+    move: unknown;
+  }>;
   blocked_now: Task[];
   risks_raised_estate_wide: number;
 }
@@ -635,7 +685,10 @@ export interface MoscowView {
 export interface DeliveryLinks {
   as_of: string;
   schemes: string[];
-  tracked: Array<{ item: InsightItemRef; links: Array<{ scheme: string; value: string }> }>;
+  tracked: Array<{
+    item: InsightItemRef;
+    links: Array<{ scheme: string; value: string }>;
+  }>;
   untracked: InsightItemRef[];
 }
 
@@ -652,7 +705,6 @@ export interface MilestoneCalendar {
     item: InsightItemRef | null;
   }>;
 }
-
 
 /** One sprint retro / feedback note. */
 export interface SprintNote {
@@ -735,7 +787,7 @@ export class PpmClient {
   }
   promoteProposal(
     pid: string,
-  ): Promise<{ work_item_pid: string; collection: Collection }> {
+  ): Promise<{ plan_pid: string; kind_target: string | null }> {
     return this.http.post(`/api/proposals/${pid}/promote`, { body: {} });
   }
   proposalDuplicates(pid: string): Promise<DemandHit[]> {
@@ -765,133 +817,92 @@ export class PpmClient {
   }
 
   // ---- governance panel (PPM-3/10/12 + benefits/objectives) ----
-  governance(collection: Collection, pid: string): Promise<GovernanceSummary> {
-    return this.http.get(`/api/${collection}/${pid}/governance`);
+  governance(pid: string): Promise<GovernanceSummary> {
+    return this.http.get(`/api/plans/${pid}/governance`);
   }
-  gateJourney(collection: Collection, pid: string): Promise<GateJourney> {
-    return this.http.get(`/api/${collection}/${pid}/gate-reviews`);
+  gateJourney(pid: string): Promise<GateJourney> {
+    return this.http.get(`/api/plans/${pid}/gate-reviews`);
   }
-  reviewGate(
-    collection: Collection,
-    pid: string,
-    body: unknown,
-  ): Promise<{ stage: string | null }> {
-    return this.http.post(`/api/${collection}/${pid}/gate-reviews`, { body });
+  reviewGate(pid: string, body: unknown): Promise<{ stage: string | null }> {
+    return this.http.post(`/api/plans/${pid}/gate-reviews`, { body });
   }
-  listRisks(collection: Collection, pid: string): Promise<Risk[]> {
-    return this.http.get(`/api/${collection}/${pid}/risks`);
+  listRisks(pid: string): Promise<Risk[]> {
+    return this.http.get(`/api/plans/${pid}/risks`);
   }
-  createRisk(
-    collection: Collection,
-    pid: string,
-    body: unknown,
-  ): Promise<{ pid: string }> {
-    return this.http.post(`/api/${collection}/${pid}/risks`, { body });
+  createRisk(pid: string, body: unknown): Promise<{ pid: string }> {
+    return this.http.post(`/api/plans/${pid}/risks`, { body });
   }
-  escalateRisk(
-    collection: Collection,
-    pid: string,
-    riskPid: string,
-  ): Promise<Risk> {
-    return this.http.post(
-      `/api/${collection}/${pid}/risks/${riskPid}/escalate`,
-      { body: {} },
-    );
+  escalateRisk(pid: string, riskPid: string): Promise<Risk> {
+    return this.http.post(`/api/plans/${pid}/risks/${riskPid}/escalate`, {
+      body: {},
+    });
   }
-  budget(collection: Collection, pid: string): Promise<BudgetBoard> {
-    return this.http.get(`/api/${collection}/${pid}/budget-lines`);
+  budget(pid: string): Promise<BudgetBoard> {
+    return this.http.get(`/api/plans/${pid}/budget-lines`);
   }
-  createBudgetLine(
-    collection: Collection,
-    pid: string,
-    body: unknown,
-  ): Promise<{ pid: string }> {
-    return this.http.post(`/api/${collection}/${pid}/budget-lines`, { body });
+  createBudgetLine(pid: string, body: unknown): Promise<{ pid: string }> {
+    return this.http.post(`/api/plans/${pid}/budget-lines`, { body });
   }
   recordActual(
-    collection: Collection,
     pid: string,
     linePid: string,
     amountMinor: number,
   ): Promise<unknown> {
-    return this.http.post(
-      `/api/${collection}/${pid}/budget-lines/${linePid}/actual`,
-      {
-        body: { amount_minor: amountMinor },
-      },
-    );
+    return this.http.post(`/api/plans/${pid}/budget-lines/${linePid}/actual`, {
+      body: { amount_minor: amountMinor },
+    });
   }
-  benefits(collection: Collection, pid: string): Promise<BenefitBoard> {
-    return this.http.get(`/api/${collection}/${pid}/benefits`);
+  benefits(pid: string): Promise<BenefitBoard> {
+    return this.http.get(`/api/plans/${pid}/benefits`);
   }
-  createBenefit(
-    collection: Collection,
-    pid: string,
-    body: unknown,
-  ): Promise<{ pid: string }> {
-    return this.http.post(`/api/${collection}/${pid}/benefits`, { body });
+  createBenefit(pid: string, body: unknown): Promise<{ pid: string }> {
+    return this.http.post(`/api/plans/${pid}/benefits`, { body });
   }
   realizeBenefit(
-    collection: Collection,
     pid: string,
     benefitPid: string,
     body: unknown,
   ): Promise<unknown> {
-    return this.http.post(
-      `/api/${collection}/${pid}/benefits/${benefitPid}/realize`,
-      { body },
-    );
+    return this.http.post(`/api/plans/${pid}/benefits/${benefitPid}/realize`, {
+      body,
+    });
   }
   itemObjectives(
-    collection: Collection,
     pid: string,
   ): Promise<{ objective_pid: string; title: string; weight: number }[]> {
-    return this.http.get(`/api/${collection}/${pid}/objectives`);
+    return this.http.get(`/api/plans/${pid}/objectives`);
   }
   linkObjective(
-    collection: Collection,
     pid: string,
     objectivePid: string,
     weight: number,
   ): Promise<unknown> {
-    return this.http.post(`/api/${collection}/${pid}/objectives`, {
+    return this.http.post(`/api/plans/${pid}/objectives`, {
       body: { objective_pid: objectivePid, weight },
     });
   }
-  milestones(collection: Collection, pid: string): Promise<Milestone[]> {
-    return this.http.get(`/api/${collection}/${pid}/milestones`);
+  milestones(pid: string): Promise<Milestone[]> {
+    return this.http.get(`/api/plans/${pid}/milestones`);
   }
-  createMilestone(
-    collection: Collection,
-    pid: string,
-    body: unknown,
-  ): Promise<{ pid: string }> {
-    return this.http.post(`/api/${collection}/${pid}/milestones`, { body });
+  createMilestone(pid: string, body: unknown): Promise<{ pid: string }> {
+    return this.http.post(`/api/plans/${pid}/milestones`, { body });
   }
-  completeMilestone(
-    collection: Collection,
-    pid: string,
-    milestonePid: string,
-  ): Promise<unknown> {
+  completeMilestone(pid: string, milestonePid: string): Promise<unknown> {
     return this.http.post(
-      `/api/${collection}/${pid}/milestones/${milestonePid}/complete`,
+      `/api/plans/${pid}/milestones/${milestonePid}/complete`,
       { body: {} },
     );
   }
-  allocations(collection: Collection, pid: string): Promise<Allocation[]> {
-    return this.http.get(`/api/${collection}/${pid}/allocations`);
+  allocations(pid: string): Promise<Allocation[]> {
+    return this.http.get(`/api/plans/${pid}/allocations`);
   }
-  createAllocation(
-    collection: Collection,
-    pid: string,
-    body: unknown,
-  ): Promise<{ pid: string }> {
-    return this.http.post(`/api/${collection}/${pid}/allocations`, { body });
+  createAllocation(pid: string, body: unknown): Promise<{ pid: string }> {
+    return this.http.post(`/api/plans/${pid}/allocations`, { body });
   }
 
   // ---- schedule (PPM-6) ----
   schedule(portfolioPid: string): Promise<ScheduleView> {
-    return this.http.get(`/api/portfolios/${portfolioPid}/schedule`);
+    return this.http.get(`/api/plans/${portfolioPid}/schedule`);
   }
 
   // ---- capacity (PPM-8) ----
@@ -943,8 +954,12 @@ export class PpmClient {
   executiveHealth(): Promise<ExecutiveHealth> {
     return this.http.get("/api/executive/health");
   }
-  executiveDecisions(limit?: number): Promise<{ decisions: DecisionEntry[]; total: number; as_of: string }> {
-    return this.http.get(`/api/executive/decisions${limit ? `?limit=${limit}` : ""}`);
+  executiveDecisions(
+    limit?: number,
+  ): Promise<{ decisions: DecisionEntry[]; total: number; as_of: string }> {
+    return this.http.get(
+      `/api/executive/decisions${limit ? `?limit=${limit}` : ""}`,
+    );
   }
   executiveBenefits(): Promise<ExecutiveBenefits> {
     return this.http.get("/api/executive/benefits");
@@ -968,7 +983,9 @@ export class PpmClient {
     return this.http.get("/api/technology/debt");
   }
   technologyFlow(months?: number): Promise<FlowMetrics> {
-    return this.http.get(`/api/technology/flow${months ? `?months=${months}` : ""}`);
+    return this.http.get(
+      `/api/technology/flow${months ? `?months=${months}` : ""}`,
+    );
   }
   compareScenarios(a: string, b: string): Promise<ScenarioComparison> {
     return this.http.get(
@@ -991,7 +1008,10 @@ export class PpmClient {
   boardTrends(): Promise<TrendSeries> {
     return this.http.get("/api/board/trends");
   }
-  auditorTrail(filter?: { actor?: string; action?: string }): Promise<AuditTrail> {
+  auditorTrail(filter?: {
+    actor?: string;
+    action?: string;
+  }): Promise<AuditTrail> {
     const params = new URLSearchParams();
     if (filter?.actor) params.set("actor", filter.actor);
     if (filter?.action) params.set("action", filter.action);
@@ -1019,28 +1039,30 @@ export class PpmClient {
   regulatorExtract(): Promise<RegulatorExtract> {
     return this.http.get("/api/regulator/extract");
   }
-  listTasks(collection: string, pid: string): Promise<{ tasks: Task[]; counts: Record<string, number> }> {
-    return this.http.get(`/api/${collection}/${pid}/tasks`);
+  listTasks(
+    pid: string,
+  ): Promise<{ tasks: Task[]; counts: Record<string, number> }> {
+    return this.http.get(`/api/plans/${pid}/tasks`);
   }
-  createTask(collection: string, pid: string, body: unknown): Promise<Task> {
-    return this.http.post(`/api/${collection}/${pid}/tasks`, { body });
+  createTask(pid: string, body: unknown): Promise<Task> {
+    return this.http.post(`/api/plans/${pid}/tasks`, { body });
   }
-  moveTask(collection: string, pid: string, taskPid: string, status: string): Promise<Task> {
-    return this.http.patch(`/api/${collection}/${pid}/tasks/${taskPid}`, {
+  moveTask(pid: string, taskPid: string, status: string): Promise<Task> {
+    return this.http.patch(`/api/plans/${pid}/tasks/${taskPid}`, {
       body: { status },
     });
   }
-  listSprints(collection: string, pid: string): Promise<Sprint[]> {
-    return this.http.get(`/api/${collection}/${pid}/sprints`);
+  listSprints(pid: string): Promise<Sprint[]> {
+    return this.http.get(`/api/plans/${pid}/sprints`);
   }
-  createSprint(collection: string, pid: string, body: unknown): Promise<Sprint> {
-    return this.http.post(`/api/${collection}/${pid}/sprints`, { body });
+  createSprint(pid: string, body: unknown): Promise<Sprint> {
+    return this.http.post(`/api/plans/${pid}/sprints`, { body });
   }
-  burndown(collection: string, pid: string, sprintPid: string): Promise<Burndown> {
-    return this.http.get(`/api/${collection}/${pid}/burndown?sprint=${sprintPid}`);
+  burndown(pid: string, sprintPid: string): Promise<Burndown> {
+    return this.http.get(`/api/plans/${pid}/burndown?sprint=${sprintPid}`);
   }
-  standup(collection: string, pid: string): Promise<Standup> {
-    return this.http.get(`/api/${collection}/${pid}/standup`);
+  standup(pid: string): Promise<Standup> {
+    return this.http.get(`/api/plans/${pid}/standup`);
   }
   engineeringBlocked(): Promise<BlockedWork> {
     return this.http.get("/api/engineering/blocked");
@@ -1052,25 +1074,39 @@ export class PpmClient {
     return this.http.get("/api/engineering/delivery-links");
   }
   milestoneCalendar(kind?: string): Promise<MilestoneCalendar> {
-    return this.http.get(`/api/engineering/milestone-calendar${kind ? `?kind=${kind}` : ""}`);
+    return this.http.get(
+      `/api/engineering/milestone-calendar${kind ? `?kind=${kind}` : ""}`,
+    );
   }
-  velocity(collection: string, pid: string): Promise<Velocity> {
-    return this.http.get(`/api/${collection}/${pid}/velocity`);
+  velocity(pid: string): Promise<Velocity> {
+    return this.http.get(`/api/plans/${pid}/velocity`);
   }
-  listNotes(collection: string, pid: string, sprintPid: string): Promise<SprintNote[]> {
-    return this.http.get(`/api/${collection}/${pid}/sprints/${sprintPid}/notes`);
+  listNotes(pid: string, sprintPid: string): Promise<SprintNote[]> {
+    return this.http.get(`/api/plans/${pid}/sprints/${sprintPid}/notes`);
   }
-  createNote(collection: string, pid: string, sprintPid: string, body: unknown): Promise<SprintNote> {
-    return this.http.post(`/api/${collection}/${pid}/sprints/${sprintPid}/notes`, { body });
+  createNote(
+    pid: string,
+    sprintPid: string,
+    body: unknown,
+  ): Promise<SprintNote> {
+    return this.http.post(`/api/plans/${pid}/sprints/${sprintPid}/notes`, {
+      body,
+    });
   }
-  convertNote(collection: string, pid: string, sprintPid: string, notePid: string): Promise<{ note: SprintNote; task: Task }> {
+  convertNote(
+    pid: string,
+    sprintPid: string,
+    notePid: string,
+  ): Promise<{ note: SprintNote; task: Task }> {
     return this.http.post(
-      `/api/${collection}/${pid}/sprints/${sprintPid}/notes/${notePid}/convert`,
+      `/api/plans/${pid}/sprints/${sprintPid}/notes/${notePid}/convert`,
       { body: {} },
     );
   }
   devopsMetrics(months?: number): Promise<DevopsMetrics> {
-    return this.http.get(`/api/devops/metrics${months ? `?months=${months}` : ""}`);
+    return this.http.get(
+      `/api/devops/metrics${months ? `?months=${months}` : ""}`,
+    );
   }
   devopsReleases(): Promise<DevopsReleases> {
     return this.http.get("/api/devops/releases");

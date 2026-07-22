@@ -10,10 +10,12 @@ use project_portfolio_management_service::app::App;
 use serde_json::{Value, json};
 use serial_test::serial;
 
-/// Create a work item in `collection` with optional dates; returns pid.
+/// Create a plan (with an optional `kind` label + dates); returns pid.
+/// The former per-collection segment is gone — all plans post to
+/// `/api/plans` and carry `kind` only as a descriptive label.
 async fn item(
     request: &axum_test::TestServer,
-    collection: &str,
+    _collection: &str,
     kind: &str,
     name: &str,
     start: Option<&str>,
@@ -26,7 +28,7 @@ async fn item(
     if let Some(target) = target {
         body["target_date"] = json!(target);
     }
-    let created: Value = request.post(&format!("/api/{collection}")).json(&body).await.json();
+    let created: Value = request.post("/api/plans").json(&body).await.json();
     created["pid"].as_str().expect("pid").to_string()
 }
 
@@ -37,8 +39,16 @@ async fn item(
 // reports the violation, the critical path, and undated members.
 async fn dependencies_schedule_violations_and_critical_path() {
     request::<App, _, _>(|request, _ctx| async move {
-        let portfolio = item(&request, "portfolios", "Portfolio", "Change 2026", Some("2026-01"), Some("2026-12")).await;
-        // Children reference their parent by portfolio_ref.
+        let portfolio = item(
+            &request,
+            "portfolios",
+            "Portfolio",
+            "Change 2026",
+            Some("2026-01"),
+            Some("2026-12"),
+        )
+        .await;
+        // Children reference their parent by parent_ref.
         let child = |name: &str, start: &str, end: &str| {
             let request = &request;
             let portfolio = portfolio.clone();
@@ -46,10 +56,10 @@ async fn dependencies_schedule_violations_and_critical_path() {
             let (start, end) = (start.to_string(), end.to_string());
             async move {
                 let created: Value = request
-                    .post("/api/projects")
+                    .post("/api/plans")
                     .json(&json!({
                         "kind": "Project", "name": name,
-                        "portfolio_ref": portfolio,
+                        "parent_ref": portfolio,
                         "start_date": start, "target_date": end,
                     }))
                     .await
@@ -65,24 +75,44 @@ async fn dependencies_schedule_violations_and_critical_path() {
         // c→a would close a cycle and refuses.
         let dep = |from: &str, to: &str| json!({ "predecessor_pid": from, "successor_pid": to });
         assert_eq!(
-            request.post("/api/dependencies").json(&dep(&a, &a)).await.status_code(),
+            request
+                .post("/api/dependencies")
+                .json(&dep(&a, &a))
+                .await
+                .status_code(),
             422
         );
-        request.post("/api/dependencies").json(&dep(&a, &b)).await.assert_status_ok();
-        request.post("/api/dependencies").json(&dep(&b, &c)).await.assert_status_ok();
+        request
+            .post("/api/dependencies")
+            .json(&dep(&a, &b))
+            .await
+            .assert_status_ok();
+        request
+            .post("/api/dependencies")
+            .json(&dep(&b, &c))
+            .await
+            .assert_status_ok();
         assert_eq!(
-            request.post("/api/dependencies").json(&dep(&a, &b)).await.status_code(),
+            request
+                .post("/api/dependencies")
+                .json(&dep(&a, &b))
+                .await
+                .status_code(),
             422,
             "duplicate edge"
         );
         assert_eq!(
-            request.post("/api/dependencies").json(&dep(&c, &a)).await.status_code(),
+            request
+                .post("/api/dependencies")
+                .json(&dep(&c, &a))
+                .await
+                .status_code(),
             422,
             "cycle"
         );
 
         let schedule: Value = request
-            .get(&format!("/api/portfolios/{portfolio}/schedule"))
+            .get(&format!("/api/plans/{portfolio}/schedule"))
             .await
             .json();
         // a→b violates (b starts 2026-03-01 before a ends 2026-03-31).
@@ -97,7 +127,9 @@ async fn dependencies_schedule_violations_and_critical_path() {
         let items = schedule["items"].as_array().expect("items");
         assert_eq!(items.len(), 4, "portfolio + three children");
         assert!(
-            items.iter().any(|i| i["pid"] == a.as_str() && i["on_critical_path"] == true),
+            items
+                .iter()
+                .any(|i| i["pid"] == a.as_str() && i["on_critical_path"] == true),
         );
     })
     .await;
@@ -111,26 +143,32 @@ async fn milestones_flag_overdue_until_completed() {
     request::<App, _, _>(|request, _ctx| async move {
         let pid = item(&request, "projects", "Project", "Milestoned", None, None).await;
         request
-            .post(&format!("/api/projects/{pid}/milestones"))
+            .post(&format!("/api/plans/{pid}/milestones"))
             .json(&json!({ "name": "Design signed off", "due": "2026-01-31" }))
             .await
             .assert_status_ok();
         request
-            .post(&format!("/api/projects/{pid}/milestones"))
+            .post(&format!("/api/plans/{pid}/milestones"))
             .json(&json!({ "name": "Go-live", "due": "2099-12-31" }))
             .await
             .assert_status_ok();
-        let listed: Value = request.get(&format!("/api/projects/{pid}/milestones")).await.json();
+        let listed: Value = request
+            .get(&format!("/api/plans/{pid}/milestones"))
+            .await
+            .json();
         let listed = listed.as_array().expect("milestones");
         assert_eq!(listed[0]["name"], "Design signed off", "due order");
         assert_eq!(listed[0]["overdue"], true);
         assert_eq!(listed[1]["overdue"], false);
         let m_pid = listed[0]["pid"].as_str().expect("m pid");
         request
-            .post(&format!("/api/projects/{pid}/milestones/{m_pid}/complete"))
+            .post(&format!("/api/plans/{pid}/milestones/{m_pid}/complete"))
             .await
             .assert_status_ok();
-        let after: Value = request.get(&format!("/api/projects/{pid}/milestones")).await.json();
+        let after: Value = request
+            .get(&format!("/api/plans/{pid}/milestones"))
+            .await
+            .json();
         assert_eq!(after[0]["done"], true);
         assert_eq!(after[0]["overdue"], false, "done clears overdue");
     })
@@ -149,7 +187,7 @@ async fn capacity_flags_over_allocation() {
         let person = format!("worker:{}", uuid::Uuid::new_v4());
         assert_eq!(
             request
-                .post(&format!("/api/projects/{one}/allocations"))
+                .post(&format!("/api/plans/{one}/allocations"))
                 .json(&json!({ "person_ref": "bob", "percent": 50 }))
                 .await
                 .status_code(),
@@ -158,19 +196,19 @@ async fn capacity_flags_over_allocation() {
         );
         assert_eq!(
             request
-                .post(&format!("/api/projects/{one}/allocations"))
+                .post(&format!("/api/plans/{one}/allocations"))
                 .json(&json!({ "person_ref": person, "percent": 120 }))
                 .await
                 .status_code(),
             422
         );
         request
-            .post(&format!("/api/projects/{one}/allocations"))
+            .post(&format!("/api/plans/{one}/allocations"))
             .json(&json!({ "person_ref": person, "percent": 60, "role": "engineer" }))
             .await
             .assert_status_ok();
         request
-            .post(&format!("/api/products/{two}/allocations"))
+            .post(&format!("/api/plans/{two}/allocations"))
             .json(&json!({ "person_ref": person, "percent": 70 }))
             .await
             .assert_status_ok();
@@ -195,7 +233,15 @@ async fn capacity_flags_over_allocation() {
 // field projection; unknown fields refuse at save time.
 async fn reports_filter_project_and_render_csv() {
     request::<App, _, _>(|request, _ctx| async move {
-        item(&request, "projects", "Project", "Alpha, phase 1", None, Some("2026-06")).await;
+        item(
+            &request,
+            "projects",
+            "Project",
+            "Alpha, phase 1",
+            None,
+            Some("2026-06"),
+        )
+        .await;
         item(&request, "projects", "Project", "Beta", None, None).await;
         assert_eq!(
             request
@@ -216,14 +262,21 @@ async fn reports_filter_project_and_render_csv() {
             .await
             .json();
         let report = saved["pid"].as_str().expect("report pid");
-        let ran: Value = request.get(&format!("/api/reports/{report}/run")).await.json();
+        let ran: Value = request
+            .get(&format!("/api/reports/{report}/run"))
+            .await
+            .json();
         assert_eq!(ran["rows"], 1);
         assert_eq!(ran["data"][0]["name"], "Alpha, phase 1");
         assert_eq!(ran["data"][0]["target_date"], "2026-06");
         let csv = request
             .get(&format!("/api/reports/{report}/run?format=csv"))
             .await;
-        assert!(csv.headers().get("content-type").is_some_and(|v| v == "text/csv"));
+        assert!(
+            csv.headers()
+                .get("content-type")
+                .is_some_and(|v| v == "text/csv")
+        );
         let text = csv.text();
         assert!(text.starts_with("name,target_date\n"));
         assert!(
@@ -243,18 +296,45 @@ async fn dashboard_rolls_up_and_is_conditional() {
     request::<App, _, _>(|request, _ctx| async move {
         // A red item (overdue target), a green one, and a materialised
         // risk elsewhere.
-        let red = item(&request, "projects", "Project", "Late project", Some("2025-01-01"), Some("2025-12-31")).await;
-        item(&request, "projects", "Project", "Fine project", None, Some("2099-12")).await;
-        let risky = item(&request, "programs", "Program", "Risky programme", None, None).await;
+        let red = item(
+            &request,
+            "projects",
+            "Project",
+            "Late project",
+            Some("2025-01-01"),
+            Some("2025-12-31"),
+        )
+        .await;
+        item(
+            &request,
+            "projects",
+            "Project",
+            "Fine project",
+            None,
+            Some("2099-12"),
+        )
+        .await;
+        let risky = item(
+            &request,
+            "programs",
+            "Program",
+            "Risky programme",
+            None,
+            None,
+        )
+        .await;
         request
-            .post(&format!("/api/programs/{risky}/risks"))
+            .post(&format!("/api/plans/{risky}/risks"))
             .json(&json!({ "title": "Went wrong", "probability": 4, "impact": 4 }))
             .await
             .assert_status_ok();
-        let risks: Value = request.get(&format!("/api/programs/{risky}/risks")).await.json();
+        let risks: Value = request
+            .get(&format!("/api/plans/{risky}/risks"))
+            .await
+            .json();
         let risk_pid = risks[0]["pid"].as_str().expect("risk pid");
         request
-            .post(&format!("/api/programs/{risky}/risks/{risk_pid}/escalate"))
+            .post(&format!("/api/plans/{risky}/risks/{risk_pid}/escalate"))
             .await
             .assert_status_ok();
 
@@ -274,10 +354,16 @@ async fn dashboard_rolls_up_and_is_conditional() {
             .find(|c| c["collection"] == "Project")
             .expect("Project rollup")
             .clone();
-        assert!(projects["rag"]["red"].as_u64().unwrap_or(0) >= 1, "{projects}");
+        assert!(
+            projects["rag"]["red"].as_u64().unwrap_or(0) >= 1,
+            "{projects}"
+        );
         assert!(projects["rag"]["green"].as_u64().unwrap_or(0) >= 1);
         assert!(
-            glance["site_tiles"]["materialised_risks"].as_u64().unwrap_or(0) >= 1
+            glance["site_tiles"]["materialised_risks"]
+                .as_u64()
+                .unwrap_or(0)
+                >= 1
         );
 
         // Unchanged ⇒ 304; a new gate review changes the fingerprint.
@@ -287,7 +373,7 @@ async fn dashboard_rolls_up_and_is_conditional() {
             .await;
         assert_eq!(unchanged.status_code(), 304);
         request
-            .post(&format!("/api/projects/{red}/gate-reviews"))
+            .post(&format!("/api/plans/{red}/gate-reviews"))
             .json(&json!({ "gate": "g0_concept", "decision": "approved" }))
             .await
             .assert_status_ok();
