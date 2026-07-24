@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `leave_requests`. One leave request with its decision trail (HCM-R5).
+//! `SeaORM` Entity — `leave_requests`. One leave request with its decision trail (WPM-R5).
 
 #![allow(missing_docs)]
 

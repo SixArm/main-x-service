@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `requisitions`. One funded job opening with its hiring pipeline (HCM-R1).
+//! `SeaORM` Entity — `requisitions`. One funded job opening with its hiring pipeline (WPM-R1).
 
 #![allow(missing_docs)]
 

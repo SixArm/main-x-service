@@ -1,4 +1,4 @@
-// Lightweight, dependency-free i18n for the HCM SPA (family pattern,
+// Lightweight, dependency-free i18n for the WPM SPA (family pattern,
 // copy-adapted from the project-portfolio-management front-end): a
 // per-locale strings map plus a reactive `$state` current-locale
 // (Svelte 5 runes), exposed via a `t(key)` accessor. `en` is the
@@ -36,14 +36,36 @@ export function isRtl(locale: string): boolean {
 }
 
 /** localStorage key under which the chosen UI locale persists. */
-export const LOCALE_KEY = "mxi.hcm.locale";
+export const LOCALE_KEY = "mxi.wpm.locale";
+
+/**
+ * The pre-rename locale key (2026-07-23, `HCM` -> `WPM`).
+ *
+ * A returning user has their choice stored under the old key. Reading
+ * it once — see `readStoredLocale` — is the difference between "the app
+ * remembers me" and "the app silently reset to English".
+ */
+// NOTE to a future renamer: this literal is deliberately the OLD name.
+// A blanket search-and-replace over the codebase must not "fix" it.
+export const LEGACY_LOCALE_KEY = "mxi.hcm.locale";
 
 // Every translatable UI string, keyed by a stable dotted key.
 const STRINGS = {
   en: {
+    "nav.wellbeing": "Wellbeing",
+    "wb.prompts": "Health entitlements",
+    "wb.reminder": "Reminder",
+    "wb.noPrompts": "No prompts right now",
+    "wb.info": "More info",
+    "wb.booked": "I've booked it",
+    "wb.done": "Done",
+    "wb.declined": "No thanks",
+    "wb.dismissed": "Dismiss",
+    "wb.rules": "Entitlement rules",
+    "wb.uptake": "Uptake",
     "nav.learning": "Learning",
     "nav.mentorship": "Mentorship",
-    "brand.name": "Main X · HCM",
+    "brand.name": "Main X · WPM",
     "nav.dashboard": "Dashboard",
     "nav.employees": "Employees",
     "nav.orgChart": "Org chart",
@@ -93,9 +115,20 @@ const STRINGS = {
     "bench.flag": "Flag",
   },
   cy: {
+    "nav.wellbeing": "Llesiant",
+    "wb.prompts": "Hawliau iechyd",
+    "wb.reminder": "Nodyn atgoffa",
+    "wb.noPrompts": "Dim awgrymiadau ar hyn o bryd",
+    "wb.info": "Mwy o wybodaeth",
+    "wb.booked": "Wedi archebu",
+    "wb.done": "Wedi'i wneud",
+    "wb.declined": "Dim diolch",
+    "wb.dismissed": "Diystyru",
+    "wb.rules": "Rheolau hawliau",
+    "wb.uptake": "Defnydd",
     "nav.learning": "Dysgu",
     "nav.mentorship": "Mentora",
-    "brand.name": "Main X · HCM",
+    "brand.name": "Main X · WPM",
     "nav.dashboard": "Dangosfwrdd",
     "nav.employees": "Gweithwyr",
     "nav.orgChart": "Siart trefniadaeth",
@@ -145,9 +178,20 @@ const STRINGS = {
     "bench.flag": "Fflag",
   },
   es: {
+    "nav.wellbeing": "Bienestar",
+    "wb.prompts": "Derechos de salud",
+    "wb.reminder": "Recordatorio",
+    "wb.noPrompts": "No hay avisos por ahora",
+    "wb.info": "Más información",
+    "wb.booked": "Cita reservada",
+    "wb.done": "Hecho",
+    "wb.declined": "No, gracias",
+    "wb.dismissed": "Descartar",
+    "wb.rules": "Reglas de derechos",
+    "wb.uptake": "Aceptación",
     "nav.learning": "Aprendizaje",
     "nav.mentorship": "Mentoría",
-    "brand.name": "Main X · HCM",
+    "brand.name": "Main X · WPM",
     "nav.dashboard": "Panel",
     "nav.employees": "Empleados",
     "nav.orgChart": "Organigrama",
@@ -197,9 +241,20 @@ const STRINGS = {
     "bench.flag": "Indicador",
   },
   fr: {
+    "nav.wellbeing": "Bien-être",
+    "wb.prompts": "Droits de santé",
+    "wb.reminder": "Rappel",
+    "wb.noPrompts": "Aucune invitation pour le moment",
+    "wb.info": "En savoir plus",
+    "wb.booked": "Rendez-vous pris",
+    "wb.done": "Fait",
+    "wb.declined": "Non merci",
+    "wb.dismissed": "Ignorer",
+    "wb.rules": "Règles des droits",
+    "wb.uptake": "Adhésion",
     "nav.learning": "Apprentissage",
     "nav.mentorship": "Mentorat",
-    "brand.name": "Main X · HCM",
+    "brand.name": "Main X · WPM",
     "nav.dashboard": "Tableau de bord",
     "nav.employees": "Employés",
     "nav.orgChart": "Organigramme",
@@ -249,9 +304,20 @@ const STRINGS = {
     "bench.flag": "Indicateur",
   },
   de: {
+    "nav.wellbeing": "Wohlbefinden",
+    "wb.prompts": "Gesundheitsansprüche",
+    "wb.reminder": "Erinnerung",
+    "wb.noPrompts": "Derzeit keine Hinweise",
+    "wb.info": "Mehr erfahren",
+    "wb.booked": "Termin gebucht",
+    "wb.done": "Erledigt",
+    "wb.declined": "Nein danke",
+    "wb.dismissed": "Ausblenden",
+    "wb.rules": "Anspruchsregeln",
+    "wb.uptake": "Inanspruchnahme",
     "nav.learning": "Lernen",
     "nav.mentorship": "Mentoring",
-    "brand.name": "Main X · HCM",
+    "brand.name": "Main X · WPM",
     "nav.dashboard": "Übersicht",
     "nav.employees": "Mitarbeiter",
     "nav.orgChart": "Organigramm",
@@ -301,9 +367,20 @@ const STRINGS = {
     "bench.flag": "Kennzeichen",
   },
   ar: {
+    "nav.wellbeing": "العافية",
+    "wb.prompts": "استحقاقات صحية",
+    "wb.reminder": "تذكير",
+    "wb.noPrompts": "لا توجد تنبيهات حالياً",
+    "wb.info": "مزيد من المعلومات",
+    "wb.booked": "تم الحجز",
+    "wb.done": "تم",
+    "wb.declined": "لا شكراً",
+    "wb.dismissed": "تجاهل",
+    "wb.rules": "قواعد الاستحقاق",
+    "wb.uptake": "معدل الاستفادة",
     "nav.learning": "التعلّم",
     "nav.mentorship": "الإرشاد",
-    "brand.name": "Main X · HCM",
+    "brand.name": "Main X · WPM",
     "nav.dashboard": "لوحة التحكم",
     "nav.employees": "الموظفون",
     "nav.orgChart": "الهيكل التنظيمي",
@@ -353,9 +430,20 @@ const STRINGS = {
     "bench.flag": "علامة",
   },
   ru: {
+    "nav.wellbeing": "Благополучие",
+    "wb.prompts": "Права на здравоохранение",
+    "wb.reminder": "Напоминание",
+    "wb.noPrompts": "Пока нет уведомлений",
+    "wb.info": "Подробнее",
+    "wb.booked": "Записался",
+    "wb.done": "Готово",
+    "wb.declined": "Нет, спасибо",
+    "wb.dismissed": "Скрыть",
+    "wb.rules": "Правила прав",
+    "wb.uptake": "Охват",
     "nav.learning": "Обучение",
     "nav.mentorship": "Наставничество",
-    "brand.name": "Main X · HCM",
+    "brand.name": "Main X · WPM",
     "nav.dashboard": "Панель",
     "nav.employees": "Сотрудники",
     "nav.orgChart": "Оргструктура",
@@ -405,9 +493,20 @@ const STRINGS = {
     "bench.flag": "Флаг",
   },
   hi: {
+    "nav.wellbeing": "कल्याण",
+    "wb.prompts": "स्वास्थ्य अधिकार",
+    "wb.reminder": "अनुस्मारक",
+    "wb.noPrompts": "अभी कोई सूचना नहीं",
+    "wb.info": "अधिक जानकारी",
+    "wb.booked": "बुक कर लिया",
+    "wb.done": "हो गया",
+    "wb.declined": "नहीं, धन्यवाद",
+    "wb.dismissed": "हटाएँ",
+    "wb.rules": "अधिकार नियम",
+    "wb.uptake": "उपयोग",
     "nav.learning": "सीखना",
     "nav.mentorship": "परामर्श",
-    "brand.name": "Main X · HCM",
+    "brand.name": "Main X · WPM",
     "nav.dashboard": "डैशबोर्ड",
     "nav.employees": "कर्मचारी",
     "nav.orgChart": "संगठन चार्ट",
@@ -457,9 +556,20 @@ const STRINGS = {
     "bench.flag": "फ्लैग",
   },
   zh: {
+    "nav.wellbeing": "健康福祉",
+    "wb.prompts": "健康权益",
+    "wb.reminder": "提醒",
+    "wb.noPrompts": "暂无提示",
+    "wb.info": "了解更多",
+    "wb.booked": "已预约",
+    "wb.done": "已完成",
+    "wb.declined": "不需要",
+    "wb.dismissed": "忽略",
+    "wb.rules": "权益规则",
+    "wb.uptake": "参与率",
     "nav.learning": "学习",
     "nav.mentorship": "导师制",
-    "brand.name": "Main X · HCM",
+    "brand.name": "Main X · WPM",
     "nav.dashboard": "仪表盘",
     "nav.employees": "员工",
     "nav.orgChart": "组织架构",
@@ -509,9 +619,20 @@ const STRINGS = {
     "bench.flag": "标记",
   },
   bn: {
+    "nav.wellbeing": "সুস্থতা",
+    "wb.prompts": "স্বাস্থ্য অধিকার",
+    "wb.reminder": "অনুস্মারক",
+    "wb.noPrompts": "এখন কোনো বিজ্ঞপ্তি নেই",
+    "wb.info": "আরও তথ্য",
+    "wb.booked": "বুক করেছি",
+    "wb.done": "সম্পন্ন",
+    "wb.declined": "না, ধন্যবাদ",
+    "wb.dismissed": "বাতিল",
+    "wb.rules": "অধিকারের নিয়ম",
+    "wb.uptake": "গ্রহণের হার",
     "nav.learning": "শেখা",
     "nav.mentorship": "পরামর্শদান",
-    "brand.name": "Main X · HCM",
+    "brand.name": "Main X · WPM",
     "nav.dashboard": "ড্যাশবোর্ড",
     "nav.employees": "কর্মচারী",
     "nav.orgChart": "সংগঠন চার্ট",
@@ -561,9 +682,20 @@ const STRINGS = {
     "bench.flag": "ফ্ল্যাগ",
   },
   pt: {
+    "nav.wellbeing": "Bem-estar",
+    "wb.prompts": "Direitos de saúde",
+    "wb.reminder": "Lembrete",
+    "wb.noPrompts": "Sem avisos no momento",
+    "wb.info": "Mais informações",
+    "wb.booked": "Consulta marcada",
+    "wb.done": "Concluído",
+    "wb.declined": "Não, obrigado",
+    "wb.dismissed": "Dispensar",
+    "wb.rules": "Regras de direitos",
+    "wb.uptake": "Adesão",
     "nav.learning": "Aprendizagem",
     "nav.mentorship": "Mentoria",
-    "brand.name": "Main X · HCM",
+    "brand.name": "Main X · WPM",
     "nav.dashboard": "Painel",
     "nav.employees": "Funcionários",
     "nav.orgChart": "Organograma",
@@ -613,9 +745,20 @@ const STRINGS = {
     "bench.flag": "Indicador",
   },
   id: {
+    "nav.wellbeing": "Kesejahteraan",
+    "wb.prompts": "Hak kesehatan",
+    "wb.reminder": "Pengingat",
+    "wb.noPrompts": "Tidak ada pemberitahuan saat ini",
+    "wb.info": "Info lebih lanjut",
+    "wb.booked": "Sudah dijadwalkan",
+    "wb.done": "Selesai",
+    "wb.declined": "Tidak, terima kasih",
+    "wb.dismissed": "Abaikan",
+    "wb.rules": "Aturan hak",
+    "wb.uptake": "Partisipasi",
     "nav.learning": "Pembelajaran",
     "nav.mentorship": "Bimbingan",
-    "brand.name": "Main X · HCM",
+    "brand.name": "Main X · WPM",
     "nav.dashboard": "Dasbor",
     "nav.employees": "Karyawan",
     "nav.orgChart": "Struktur organisasi",
@@ -665,9 +808,20 @@ const STRINGS = {
     "bench.flag": "Penanda",
   },
   ur: {
+    "nav.wellbeing": "بہبود",
+    "wb.prompts": "صحت کے حقوق",
+    "wb.reminder": "یاد دہانی",
+    "wb.noPrompts": "فی الحال کوئی اطلاع نہیں",
+    "wb.info": "مزید معلومات",
+    "wb.booked": "بک کر لیا",
+    "wb.done": "ہو گیا",
+    "wb.declined": "نہیں شکریہ",
+    "wb.dismissed": "نظر انداز کریں",
+    "wb.rules": "حقوق کے قواعد",
+    "wb.uptake": "استعمال کی شرح",
     "nav.learning": "سیکھنا",
     "nav.mentorship": "رہنمائی",
-    "brand.name": "Main X · HCM",
+    "brand.name": "Main X · WPM",
     "nav.dashboard": "ڈیش بورڈ",
     "nav.employees": "ملازمین",
     "nav.orgChart": "تنظیمی ڈھانچہ",
@@ -735,9 +889,26 @@ function normaliseLocale(raw: string | null | undefined): Locale | null {
 }
 
 // Seed the reactive locale from localStorage (default off the browser).
+//
+// Falls back to the pre-rename key once, adopting and re-persisting the
+// value under the current key so the migration happens silently on the
+// user's next visit rather than resetting their language.
 function readStoredLocale(): Locale {
   if (!browser || typeof localStorage === "undefined") return DEFAULT_LOCALE;
-  return normaliseLocale(localStorage.getItem(LOCALE_KEY)) ?? DEFAULT_LOCALE;
+
+  const stored = normaliseLocale(localStorage.getItem(LOCALE_KEY));
+  if (stored !== null) return stored;
+
+  const legacy = normaliseLocale(localStorage.getItem(LEGACY_LOCALE_KEY));
+  if (legacy === null) return DEFAULT_LOCALE;
+  try {
+    localStorage.setItem(LOCALE_KEY, legacy);
+    localStorage.removeItem(LEGACY_LOCALE_KEY);
+  } catch {
+    // A full or blocked store must not stop the app rendering; the
+    // locale is still adopted for this session.
+  }
+  return legacy;
 }
 
 // Reactive current-locale state; mutating it re-renders every `t(...)`.

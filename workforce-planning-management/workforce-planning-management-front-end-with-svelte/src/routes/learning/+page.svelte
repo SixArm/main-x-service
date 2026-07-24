@@ -11,7 +11,7 @@
     pathProgress,
     skillsMatrix,
     trainingAnalytics,
-  } from "$lib/api/hcm";
+  } from "$lib/api/wpm";
   import { t } from "$lib/i18n.svelte";
 
   type Matrix = Awaited<ReturnType<typeof skillsMatrix>>;
@@ -58,7 +58,7 @@
     total === 0 ? "—" : `${Math.round((done / total) * 100)}%`;
 </script>
 
-<svelte:head><title>{t("nav.learning")} — HCM</title></svelte:head>
+<svelte:head><title>{t("nav.learning")} — WPM</title></svelte:head>
 
 <h1>{t("nav.learning")}</h1>
 {#if error}<p class="error" data-testid="error">{error}</p>{/if}

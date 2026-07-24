@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `training_enrollments`. One enrolment against the family course registry (HCM-R11, HCM-D10).
+//! `SeaORM` Entity — `training_enrollments`. One enrolment against the family course registry (WPM-R11, WPM-D10).
 
 #![allow(missing_docs)]
 

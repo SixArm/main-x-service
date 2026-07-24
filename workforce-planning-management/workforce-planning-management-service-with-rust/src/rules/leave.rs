@@ -1,4 +1,4 @@
-//! Leave balance arithmetic (HCM-R5), DB-free.
+//! Leave balance arithmetic (WPM-R5), DB-free.
 //!
 //! Balances are whole **days** per employee / kind / year. Annual
 //! leave over the remaining balance is refused; sick leave may go

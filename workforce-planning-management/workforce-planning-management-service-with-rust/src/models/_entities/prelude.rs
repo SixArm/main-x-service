@@ -1,11 +1,20 @@
 //! Re-exports of every entity for `use ..._entities::prelude::*`.
 
 pub use super::applications::Entity as Applications;
+pub use super::assessment_instruments::Entity as AssessmentInstruments;
+pub use super::assessment_results::Entity as AssessmentResults;
+pub use super::assessments::Entity as Assessments;
 pub use super::audit_logs::Entity as AuditLogs;
 pub use super::benchmarks::Entity as Benchmarks;
 pub use super::benefit_enrollments::Entity as BenefitEnrollments;
 pub use super::benefit_plans::Entity as BenefitPlans;
 pub use super::candidates::Entity as Candidates;
+pub use super::development_plan_items::Entity as DevelopmentPlanItems;
+pub use super::development_plans::Entity as DevelopmentPlans;
+pub use super::early_career_programs::Entity as EarlyCareerPrograms;
+pub use super::pipeline_members::Entity as PipelineMembers;
+pub use super::program_placements::Entity as ProgramPlacements;
+pub use super::talent_pipelines::Entity as TalentPipelines;
 pub use super::employees::Entity as Employees;
 pub use super::event_outbox::Entity as EventOutbox;
 pub use super::feedback_entries::Entity as FeedbackEntries;
@@ -23,5 +32,7 @@ pub use super::shift_assignments::Entity as ShiftAssignments;
 pub use super::shifts::Entity as Shifts;
 pub use super::succession_candidates::Entity as SuccessionCandidates;
 pub use super::succession_plans::Entity as SuccessionPlans;
+pub use super::entitlement_acknowledgements::Entity as EntitlementAcknowledgements;
 pub use super::time_entries::Entity as TimeEntries;
 pub use super::training_enrollments::Entity as TrainingEnrollments;
+pub use super::wellbeing_entitlements::Entity as WellbeingEntitlements;

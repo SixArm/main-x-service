@@ -1,10 +1,10 @@
-//! HR core (HCM-R7–R9): employee CRUD + the status state machine +
+//! HR core (WPM-R7–R9): employee CRUD + the status state machine +
 //! the derived org chart, and benefits administration.
 //!
 //! Every mutation runs on one transaction: the row change, its audit
 //! entry, and (under the `outbox` transport) its event share a commit
-//! boundary (HCM-D9). Employee reads run the record-level ABAC pass
-//! and honour the `mask` obligation (salary redaction, HCM-R15).
+//! boundary (WPM-D9). Employee reads run the record-level ABAC pass
+//! and honour the `mask` obligation (salary redaction, WPM-R15).
 
 use loco_rs::prelude::*;
 use sea_orm::{PaginatorTrait, QueryOrder, QuerySelect, TransactionTrait};
@@ -252,7 +252,7 @@ async fn list_employees(
 }
 
 /// `GET /api/employees/{pid}` — one employee; a salary-bearing read
-/// is audited (HCM-D7); the `mask` obligation redacts the salary.
+/// is audited (WPM-D7); the `mask` obligation redacts the salary.
 #[debug_handler]
 async fn get_employee(
     State(ctx): State<AppContext>,
@@ -286,7 +286,7 @@ async fn get_employee(
 }
 
 /// `PUT /api/employees/{pid}` — update mutable employment facts.
-/// A manager change runs the org-chart cycle check (HCM-R7).
+/// A manager change runs the org-chart cycle check (WPM-R7).
 #[debug_handler]
 async fn update_employee(
     State(ctx): State<AppContext>,
@@ -369,7 +369,7 @@ async fn update_employee(
 
 /// `POST /api/employees/{pid}/status` — one lifecycle transition.
 /// `onboarding → active` requires every mandatory onboarding item
-/// complete or waived (HCM-R3).
+/// complete or waived (WPM-R3).
 #[debug_handler]
 async fn change_status(
     State(ctx): State<AppContext>,
@@ -589,7 +589,7 @@ async fn list_plans(State(ctx): State<AppContext>) -> Result<Response> {
 }
 
 /// `POST /api/employees/{pid}/benefit-enrollments` — enrol; the
-/// partial unique index refuses a double enrolment (HCM-R9).
+/// partial unique index refuses a double enrolment (WPM-R9).
 #[debug_handler]
 async fn enroll(
     State(ctx): State<AppContext>,

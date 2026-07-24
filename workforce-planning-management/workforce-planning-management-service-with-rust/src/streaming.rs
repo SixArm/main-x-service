@@ -2,7 +2,7 @@
 //! transport seam (`agents/share/event-bus.md`).
 //!
 //! Every mutation emits one envelope. The transport is selected by
-//! `HCM_EVENT_TRANSPORT` (default `memory`):
+//! `WPM_EVENT_TRANSPORT` (default `memory`):
 //!
 //! - `memory` — an in-process ring buffer ([`InMemoryPublisher`]),
 //!   served by `GET /api/events/recent`. Lost on restart; Phase 1.
@@ -11,7 +11,7 @@
 //!   no committed change lacks its event (Phase 2). A Phase-3 relay to
 //!   Fluvio is roadmap, family-wide.
 //!
-//! Unlike the single-entity registries, HCM emits for several record
+//! Unlike the single-entity registries, WPM emits for several record
 //! kinds, so `entity` and `kind` are `String`s: `employee` /
 //! `requisition` / `application` / `leave_request` / `payroll_run` /
 //! … × `created` / `updated` / `deleted` / `employee_hired` /
@@ -154,12 +154,12 @@ impl EventTransport {
 }
 
 /// The process-wide transport, read once from
-/// `HCM_EVENT_TRANSPORT` (default `memory`).
+/// `WPM_EVENT_TRANSPORT` (default `memory`).
 #[must_use]
 pub fn transport() -> EventTransport {
     static TRANSPORT: OnceLock<EventTransport> = OnceLock::new();
     *TRANSPORT.get_or_init(|| {
-        EventTransport::parse(&std::env::var("HCM_EVENT_TRANSPORT").unwrap_or_default())
+        EventTransport::parse(&crate::compat::env_var("WPM_EVENT_TRANSPORT").unwrap_or_default())
     })
 }
 

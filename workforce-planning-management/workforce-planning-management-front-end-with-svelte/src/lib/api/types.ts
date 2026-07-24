@@ -1,4 +1,4 @@
-// Wire types mirroring the HCM service's JSON (the service spec is
+// Wire types mirroring the WPM service's JSON (the service spec is
 // the contract; drift is a test failure in the stubbed e2e suite).
 
 /** One employment relationship (salary fields null when masked). */

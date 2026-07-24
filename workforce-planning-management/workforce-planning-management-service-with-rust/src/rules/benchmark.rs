@@ -1,4 +1,4 @@
-//! Salary benchmarking flags (HCM-R14), DB-free.
+//! Salary benchmarking flags (WPM-R14), DB-free.
 
 /// The comparison verdict for one employee against a benchmark.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -13,7 +13,7 @@ pub enum BenchmarkFlag {
 }
 
 /// Compare a salary to a benchmark band. `None` when the currencies
-/// differ — mixed currencies never silently compare (HCM-D4 family
+/// differ — mixed currencies never silently compare (WPM-D4 family
 /// posture).
 #[must_use]
 pub fn compare(

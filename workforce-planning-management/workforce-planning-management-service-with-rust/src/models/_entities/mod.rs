@@ -1,12 +1,19 @@
 //! `SeaORM` entity definitions, one module per table.
 
 pub mod applications;
+pub mod assessment_instruments;
+pub mod assessment_results;
+pub mod assessments;
 pub mod audit_logs;
 pub mod benchmarks;
 pub mod benefit_enrollments;
 pub mod benefit_plans;
 pub mod candidates;
+pub mod development_plan_items;
+pub mod development_plans;
+pub mod early_career_programs;
 pub mod employee_skills;
+pub mod entitlement_acknowledgements;
 pub mod employees;
 pub mod event_outbox;
 pub mod feedback_entries;
@@ -32,4 +39,8 @@ pub mod succession_candidates;
 pub mod succession_plans;
 pub mod time_entries;
 pub mod training_enrollments;
+pub mod wellbeing_entitlements;
+pub mod pipeline_members;
+pub mod program_placements;
+pub mod talent_pipelines;
 pub mod prelude;

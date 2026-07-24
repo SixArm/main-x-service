@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `payroll_runs`. One payroll run per organization and period (HCM-R13, HCM-D5).
+//! `SeaORM` Entity — `payroll_runs`. One payroll run per organization and period (WPM-R13, WPM-D5).
 
 #![allow(missing_docs)]
 

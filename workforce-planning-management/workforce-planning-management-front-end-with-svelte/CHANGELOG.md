@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added — learning + mentorship areas (HCM-T20, 2026-07-20)
+### Added — wellbeing area (WPM-T23 / WPM-R25, 2026-07-24)
+
+- Employee profile: a **Health entitlements** card listing the
+  employee's live prompts (with the one multi-dose reminder flagged)
+  and the four acknowledgement actions
+  (booked / done / declined / dismiss) — informational only.
+- `/wellbeing` HR admin page: the configured entitlement rules
+  (cohort shown as age band + departments + titles), a create form,
+  soft-close, and the **aggregate-only** uptake table (counts by
+  response + rate with its terms; no individual appears).
+- Six client functions with path pins; nav + 11 keys in 13 locales
+  (parity green); one stubbed Playwright spec (suite now 8).
+
+### Added — learning + mentorship areas (WPM-T20, 2026-07-20)
 
 - `/learning` (skills matrix + gap list, per-department training
   analytics, learning-path progress with a path selector) and
@@ -37,10 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   locale `<select>` is replaced by **LocaleSelect** (wired to the
   i18n store; `applyDir` off), a **ThemeSelect** offers the full
   45-theme catalogue (stylesheets via the `static/assets/themes`
-  symlink; choice persisted to `mxi.hcm.theme`), and the **Lily
+  symlink; choice persisted to `mxi.wpm.theme`), and the **Lily
   headless** component library is a dependency.
 
-- 2026-07-18 — HCM-T18/T19 implementation round: SvelteKit 2 +
+- 2026-07-18 — WPM-T18/T19 implementation round: SvelteKit 2 +
   Svelte 5 runes SPA with same-origin BFF proxy (session → PASETO
   exchange seam; `Accepts-version: 1.0` stamped; no token in browser
   JS), 13-locale i18n (48 keys, parity-tested, RTL ar/ur), typed API
@@ -50,6 +63,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   benchmarks). svelte-check clean; 5 vitest + 4 Playwright
   (`page.route`-stubbed) tests green.
 
-- 2026-07-18 — HCM-T0 specification round: cross-cutting spec
+- 2026-07-18 — WPM-T0 specification round: cross-cutting spec
   (`../spec/`) and this edition's doc scaffold. No code yet; this
-  edition is HCM-T18/T19 in the queue.
+  edition is WPM-T18/T19 in the queue.

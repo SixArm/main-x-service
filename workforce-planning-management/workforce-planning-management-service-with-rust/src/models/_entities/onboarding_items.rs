@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `onboarding_items`. One onboarding checklist obligation gating activation (HCM-R3).
+//! `SeaORM` Entity — `onboarding_items`. One onboarding checklist obligation gating activation (WPM-R3).
 
 #![allow(missing_docs)]
 

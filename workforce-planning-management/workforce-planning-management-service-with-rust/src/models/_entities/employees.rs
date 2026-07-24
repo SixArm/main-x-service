@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `employees`. One employment relationship: the single source of employment truth (HCM-R7). Identities are `EntityRef` URNs; salary is minor units (sensitive).
+//! `SeaORM` Entity — `employees`. One employment relationship: the single source of employment truth (WPM-R7). Identities are `EntityRef` URNs; salary is minor units (sensitive).
 
 #![allow(missing_docs)]
 

@@ -1,6 +1,6 @@
 # Domain model
 
-All identities are **EntityRef URNs**; HCM's own records use public
+All identities are **EntityRef URNs**; WPM's own records use public
 UUID `pid`s; every table carries `created_at` / `updated_at` and (where
 meaningful) soft-delete `deleted_at`. Money is integer **minor units**
 + ISO-4217 currency (family posture; no floats).
@@ -100,9 +100,59 @@ Benchmark (job_title × currency)
   `certificate_expires_on?` (expiring certifications drive the
   compliance dashboard).
 - **SuccessionPlan** — `position_title`, `department`,
-  `incumbent_pid?`, criticality (1–5); **SuccessionCandidate** —
-  plan × employee, `readiness` (`ready_now` \| `ready_1y` \|
-  `ready_2y`), `development_note?`.
+  `incumbent_pid?`, criticality (1–5), `risk_of_loss?` (`low` \|
+  `medium` \| `high`), `vacancy_expected_on?`;
+  **SuccessionCandidate** — plan × employee, `readiness`
+  (`ready_now` \| `ready_1y` \| `ready_2y`), `development_note?`.
+  Both the plan's judgements and a candidate's readiness are
+  updatable in place; readiness may move **down**.
+
+## Assessments
+
+- **AssessmentInstrument** — the catalog entry for a named test:
+  `name`, `category` (`aptitude` \| `personality` \| `psychometric`
+  \| `selection`), `provider?`, `scales[]` (each must suit the
+  category), `duration_minutes?`, `validity_months?` (drives a
+  completed sitting's expiry).
+- **Assessment** — one administration: instrument × subject
+  (`candidate` \| `employee` + pid) × optional `application_pid`,
+  `status` (`scheduled → in_progress → completed → expired`, or
+  `cancelled`), `scheduled_on?` / `completed_on?` / `expires_on?`,
+  `administered_by?`, `notes?`.
+- **AssessmentResult** — assessment × `scale` (one row per scale):
+  `raw_score?` / `max_score?` (whole points), `percentile?` (0–100),
+  `band?` (`low` \| `below_average` \| `average` \| `above_average`
+  \| `high`, derived from the percentile unless given),
+  `narrative?`. Sensitive: masked under the ABAC `mask` obligation,
+  unmasked reads audited.
+
+## Talent strategy
+
+- **DevelopmentPlan** — employee × `kind` (`upskill` \| `reskill`),
+  `target_job_title?` / `target_department?` (**required** for a
+  reskill, **refused** for an upskill), `rationale?`, `status`
+  (`draft → active → completed`, or `cancelled`), `started_on?`,
+  `target_on?`; **DevelopmentPlanItem** — plan × skill,
+  `current_level` → `target_level` (1–5, target strictly higher),
+  `method` (`course` \| `mentorship` \| `on_the_job` \|
+  `apprenticeship` \| `internship` \| `self_study`), `course_ref?`,
+  `due_on?`, `status` (`planned` \| `in_progress` \| `achieved` \|
+  `abandoned`).
+- **TalentPipeline** — `name`, `purpose` (`succession` \| `hiring`
+  \| `early_careers` \| `internal_mobility`), target role/department;
+  **PipelineMember** — pipeline × subject (`candidate` \|
+  `employee`), `stage` (`identified → assessing → developing → ready
+  → placed`, `exited` from any open stage, and `ready → developing`
+  as a legitimate regression), `readiness?`, `added_on`.
+- **EarlyCareerProgram** — `name`, `kind` (`apprenticeship` \|
+  `internship` \| `graduate`), `level?`, `duration_months`,
+  `min_off_the_job_hours?` (**required** for an apprenticeship),
+  `provider_ref?` (an `organization:` URN); **ProgramPlacement** —
+  programme × employee, `supervisor_pid?`, `started_on`, `ends_on?`,
+  `status` (`offered → active → completed`, or `withdrawn`),
+  `off_the_job_hours` (accrued; only an active placement accrues),
+  `outcome` (`pending` \| `converted` \| `not_converted` \|
+  `withdrawn`).
 
 ## Payroll & compensation
 

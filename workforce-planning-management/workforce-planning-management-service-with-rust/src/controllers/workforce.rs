@@ -1,6 +1,6 @@
-//! Workforce management (HCM-R4–R6): time & attendance, leave, and
+//! Workforce management (WPM-R4–R6): time & attendance, leave, and
 //! shift scheduling. Approval races serialize on the request row
-//! (`FOR UPDATE`, HCM-D9); balances change in the decision's
+//! (`FOR UPDATE`, WPM-D9); balances change in the decision's
 //! transaction.
 
 use loco_rs::prelude::*;
@@ -79,7 +79,7 @@ const fn default_headcount() -> i32 {
 }
 
 /// `POST /api/employees/{pid}/time-entries` — record time; the day
-/// total is capped at 24 h (HCM-R4).
+/// total is capped at 24 h (WPM-R4).
 #[debug_handler]
 async fn create_time_entry(
     State(ctx): State<AppContext>,
@@ -122,7 +122,7 @@ async fn create_time_entry(
 }
 
 /// `GET /api/employees/{pid}/time-entries?from=&to=` — entries plus
-/// the derived per-day overtime (HCM-R4).
+/// the derived per-day overtime (WPM-R4).
 #[derive(Debug, Deserialize)]
 struct TimeListParams {
     #[serde(default)]
@@ -176,7 +176,7 @@ async fn list_time_entries(
 }
 
 /// `POST /api/time-entries/{pid}/approve` — manager approval; only
-/// approved time feeds payroll (HCM-R4).
+/// approved time feeds payroll (WPM-R4).
 #[debug_handler]
 async fn approve_time_entry(
     State(ctx): State<AppContext>,
@@ -257,7 +257,7 @@ async fn list_entitlements(State(ctx): State<AppContext>, Path(pid): Path<String
 
 /// `POST /api/employees/{pid}/leave-requests` — request leave. The
 /// balance is **checked** here (annual over-balance ⇒ 422; sick may
-/// flag negative) and **decremented on approval** (HCM-R5).
+/// flag negative) and **decremented on approval** (WPM-R5).
 #[debug_handler]
 async fn create_leave_request(
     State(ctx): State<AppContext>,
@@ -341,7 +341,7 @@ async fn list_leave_requests(State(ctx): State<AppContext>, Path(pid): Path<Stri
 
 /// One leave decision (`approved` / `rejected` / `cancelled`),
 /// serialized on the locked request row; approval decrements the
-/// balance in the same transaction (HCM-R5, HCM-D9).
+/// balance in the same transaction (WPM-R5, WPM-D9).
 async fn decide_leave(
     ctx: &AppContext,
     caller: &MaybeAuthUser,
@@ -465,7 +465,7 @@ async fn create_shift(
     format::json(PidRef { pid: row.pid.to_string() })
 }
 
-/// `GET /api/shifts?department=&date=` — the day rota (HCM-R6).
+/// `GET /api/shifts?department=&date=` — the day rota (WPM-R6).
 #[derive(Debug, Deserialize)]
 struct RotaParams {
     #[serde(default)]
@@ -508,7 +508,7 @@ async fn list_shifts(
 
 /// `POST /api/shifts/{pid}/assignments` — assign an employee. Refuses
 /// a double booking (overlapping assigned shift) and an assignment
-/// overlapping approved leave (HCM-R6).
+/// overlapping approved leave (WPM-R6).
 #[debug_handler]
 async fn assign_shift(
     State(ctx): State<AppContext>,

@@ -1,10 +1,10 @@
 <script lang="ts">
   import { page } from "$app/state";
-  import { getRun, money, runAction, runPayslips } from "$lib/api/hcm";
+  import { getRun, money, runAction, runPayslips } from "$lib/api/wpm";
   import { i18n, t } from "$lib/i18n.svelte";
   import type { Payslip, PayrollRun } from "$lib/api/types";
 
-  /** The action(s) each run status offers (HCM-D5: derive, approve, pay). */
+  /** The action(s) each run status offers (WPM-D5: derive, approve, pay). */
   const ACTIONS: Record<string, ("calculate" | "approve" | "pay" | "reopen")[]> = {
     draft: ["calculate"],
     calculated: ["approve", "reopen"],

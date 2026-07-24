@@ -1,11 +1,11 @@
-# Human Capital Management service — edition spec
+# Workforce Planning Management service — edition spec
 
 Stack-specific specification for the Loco edition. The
 **cross-cutting spec at [`../../spec/`](../../spec/index.md) is the
 single source of truth** for the domain (model, pillars, state
 machines, auth posture); this file adds only what is specific to
 this edition. It will grow topic files (routes, api-contract,
-database, examples) as implementation phases land — each HCM-T* task
+database, examples) as implementation phases land — each WPM-T* task
 adds its spec detail here in the same PR as the code.
 
 ## Stack
@@ -22,12 +22,12 @@ tracing + OTLP, Podman.
 
 - **Config**: `config/{development,test,production}.yaml`;
   development and test default upstream clients to `stub` and
-  `HCM_EVENT_TRANSPORT=memory`.
-- **Env vars**: `HCM_REQUIRE_AUTH`, `HCM_PASETO_KEYS[_URL]`,
-  `HCM_ABAC_POLICY[_FILE]`, `HCM_EVENT_TRANSPORT`, upstream base
-  URLs (`HCM_PERSON_SERVICE_URL`, `HCM_WORKER_SERVICE_URL`,
-  `HCM_ORGANIZATION_SERVICE_URL`, `HCM_COURSE_SERVICE_URL`),
-  `HCM_UPSTREAM_MODE` (default `stub`).
+  `WPM_EVENT_TRANSPORT=memory`.
+- **Env vars**: `WPM_REQUIRE_AUTH`, `WPM_PASETO_KEYS[_URL]`,
+  `WPM_ABAC_POLICY[_FILE]`, `WPM_EVENT_TRANSPORT`, upstream base
+  URLs (`WPM_PERSON_SERVICE_URL`, `WPM_WORKER_SERVICE_URL`,
+  `WPM_ORGANIZATION_SERVICE_URL`, `WPM_COURSE_SERVICE_URL`),
+  `WPM_UPSTREAM_MODE` (default `stub`).
 - **Identifiers**: public UUID `pid` on every owned record; EntityRef
   URNs for all upstream references; employee number unique per
   organization.
@@ -37,9 +37,9 @@ tracing + OTLP, Podman.
 ## Edition-specific implementation notes (as landed)
 
 - **Layout**: `src/{app,auth,clients,metrics,openapi,streaming,
-  validation,version}.rs`, `src/rules/` (pure core), `src/models/`
+validation,version}.rs`, `src/rules/` (pure core), `src/models/`
   (+`_entities/`), `src/controllers/{hr_core,acquisition,workforce,
-  development,payroll,audits,docs,metrics}.rs`, `src/tasks/seed.rs`,
+development,payroll,audits,docs,metrics}.rs`, `src/tasks/seed.rs`,
   crate-root `migration/` (7 migrations, explicit SQL).
 - **Masking**: `mask_employee` clears `salary_minor`+currency;
   `mask_payslip` zeroes amounts and drops the deduction lines;
@@ -58,6 +58,6 @@ tracing + OTLP, Podman.
 
 ## Delivery
 
-The queue is [../../spec/tasks.md](../../spec/tasks.md): HCM-T1–T17
+The queue is [../../spec/tasks.md](../../spec/tasks.md): WPM-T1–T17
 **delivered 2026-07-18**. Tests per
 [../../spec/testing.md](../../spec/testing.md).

@@ -2,23 +2,23 @@
 
 Numbered, stable; tasks ([tasks.md](tasks.md)) trace to them.
 
-## HCM-D1 — Consumer application, identities by URN
+## WPM-D1 — Consumer application, identities by URN
 
-HCM is the operational employment layer over the family registries:
+WPM is the operational employment layer over the family registries:
 `person:` (the human), `worker:` (professional identity),
 `organization:` (employer), `course:`/`courseinstance:` (training).
 It stores URNs + cached display names, never demographic copies.
 The registry's `employed_by` link stays identity-level; emitting it
 from hire/termination is roadmap ([integrations.md](integrations.md)).
 
-## HCM-D2 — Normalized relational schema
+## WPM-D2 — Normalized relational schema
 
 Employment data is constraint-heavy (unique employee numbers,
 balances, pipelines, payslip totals), so the schema is normalized
 SeaORM tables — not DTO-as-JSONB. All-plural table names (the loco
 `create_table` pluralization lesson).
 
-## HCM-D3 — Every lifecycle is a pure-core state machine
+## WPM-D3 — Every lifecycle is a pure-core state machine
 
 Requisition, application, employee status, leave, review, payroll
 run: one transition table each in DB-free `rules/` modules,
@@ -26,14 +26,14 @@ exhaustively unit-tested; controllers only wire them. Illegal
 transition ⇒ `422` naming the current state (the patient-flow
 pattern).
 
-## HCM-D4 — Money in minor units
+## WPM-D4 — Money in minor units
 
 `i64` minor units + ISO-4217 everywhere (salary, bands, benefit
 costs, payslips, benchmarks); arithmetic refuses overflow; no floats.
 Payslip reconciliation (`net = gross − Σ deductions`) is a pure-core
 invariant checked before persist.
 
-## HCM-D5 — Payroll is a derivation, not an editor
+## WPM-D5 — Payroll is a derivation, not an editor
 
 `calculate` derives payslips from upstream facts (salary, FTE,
 approved overtime, benefit enrolments) with stub tax tables; humans
@@ -41,48 +41,111 @@ approve or return to draft — they never edit payslip lines. Approved
 runs are immutable; corrections are a new run (roadmap: supplemental
 runs).
 
-## HCM-D6 — Personas are policy, not code
+## WPM-D6 — Personas are policy, not code
 
 One API surface; employee/manager/HR/payroll are ABAC policy
 profiles over `attrs` + record-level `resource.*` attrs + `$sub`
 ownership. Salary/review/succession masking is the `mask` obligation,
 not bespoke endpoints.
 
-## HCM-D7 — Sensitive reads are audited
+## WPM-D7 — Sensitive reads are audited
 
 Beyond the family mutation-audit baseline: reads of salary-bearing
 records, payslips, review content, and succession plans write audit
 rows ([audit.md](audit.md)) — the GDPR-accountability substrate.
 
-## HCM-D8 — Consent-bounded candidate pool
+## WPM-D8 — Consent-bounded candidate pool
 
 Candidates carry `consent_until`; expiry removes them from search
 and queues them for purge. Data minimisation is a design property,
 not a policy afterthought.
 
-## HCM-D9 — Transactional integrity
+## WPM-D9 — Transactional integrity
 
 Hire (application → employee), leave approval (decision + balance),
 payroll approval, and every audit/outbox write share the mutation's
 transaction; approval races serialize on row locks (`FOR UPDATE`).
 
-## HCM-D10 — LMS = enrollments over course-service
+## WPM-D10 — LMS = enrollments over course-service
 
-No course content in HCM: TrainingEnrollment references the family
-course registry; HCM adds only status, completion, and certificate
-expiry — the thinnest LMS that satisfies HCM-R11.
+No course content in WPM: TrainingEnrollment references the family
+course registry; WPM adds only status, completion, and certificate
+expiry — the thinnest LMS that satisfies WPM-R11.
 
-## HCM-D11 — Stub-first upstream clients
+## WPM-D11 — Stub-first upstream clients
 
 Display-name lookups behind traits with `http` + `stub`
 implementations, config-selected, cached, best-effort — the service
-boots and tests with no siblings running (patient-flow HCM-D
+boots and tests with no siblings running (patient-flow WPM-D
 precedent).
 
-## HCM-D12 — Family fixtures from day one
+## WPM-D12 — Family fixtures from day one
 
 Loco-idiomatic layout, forbid-unsafe + clippy-pedantic, OpenAPI +
 Swagger, `Accepts-version`, OTLP + `/metrics.prom`, Podman, input
 caps, `404` mapping at `find_by_pid` call sites, enforcement tests
 in their own binary (the OnceLock lesson), 13-locale i18n in the
 front-end from the start (the PPM lesson).
+
+## WPM-D13 — Assessment categories are a closed vocabulary with one deliberate overlap
+
+The category↔scale mapping is data
+(`rules::assessment::category_permits`), not convention: a result on a
+scale the category does not measure is a `422`. The single exception
+is `psychometric`, which accepts aptitude and personality scales
+because a psychometric test covers both by definition. Without this
+rule the profile views would silently mix families and the "what has
+not been assessed" list would be meaningless.
+
+Assessment scores are **integers** (percentile 0–100; whole raw
+points out of a whole maximum) — the same discipline as money, for
+the same reason: a stored float invites rounding drift into a record
+someone is judged by. The only float is a reported *mean*, and it is
+always accompanied by its numerator and denominator.
+
+## WPM-D14 — Development plans report claimed and verified progress separately
+
+Marking a plan item `achieved` is a claim by a manager; the
+employee's **declared proficiency** reaching the target is evidence.
+WPM computes and returns both
+(`rules::talent::plan_progress` / `verified_progress`) rather than
+letting one stand in for the other, and completing an item never
+mutates the declared proficiency — that stays a separate, evidenced
+act.
+
+## WPM-D15 — Regulated-programme obligations are state-machine preconditions
+
+An apprenticeship's off-the-job training hours are a legal
+requirement, so completing a placement below the declared minimum is
+**refused** (`rules::talent::may_complete_placement`), in the same way
+activation is gated on onboarding items (WPM-D5). Recording the
+obligation and then not enforcing it would make the record worse than
+useless. Withdrawal forces the `withdrawn` outcome so a withdrawn
+placement can never be counted as a conversion.
+
+## WPM-D16 — Analytics carry their terms
+
+Every ratio the workforce-intelligence layer returns is
+`{numerator, denominator, value}` and is `null` — never `0` — when
+the denominator is zero (`rules::talent::ratio`). Denominators are
+chosen to be honest rather than flattering: conversion divides by
+*completed* placements (a running one has not had the chance to
+convert); plan progress keeps *abandoned* items in the denominator.
+Every payload also carries a `derivation` string, because a coverage
+number computed from declarations is not a measurement of ability and
+must not read like one.
+
+## WPM-D17 — Wellbeing prompts hold acknowledgements, never health data
+
+Public-health eligibility can derive from special-category data (an
+immunosuppressed cohort qualifies for the NHS shingles vaccine at
+50+). WPM refuses that branch by design: entitlement rules may
+predicate only on non-clinical facts the platform already holds or
+can resolve — age from the upstream person record, role, department —
+so a prompt can never disclose *why* someone qualifies beyond
+age/role, and the rule vocabulary has no place to put a diagnosis.
+The stored artifact is the employee's **acknowledgement** of a prompt
+(`booked | done | declined | dismissed`) — an HR workflow fact — not
+a vaccination status, which is clinical and stays out of WPM
+entirely. Acknowledgements are `$sub`-owned; HR sees aggregate counts
+only (WPM-D16 terms); managers see nothing.

@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `benefit_enrollments`. One employee's enrolment in one plan (HCM-R9).
+//! `SeaORM` Entity — `benefit_enrollments`. One employee's enrolment in one plan (WPM-R9).
 
 #![allow(missing_docs)]
 

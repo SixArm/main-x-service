@@ -6,13 +6,17 @@ use loco_rs::controller::ErrorDetail;
 use loco_rs::prelude::*;
 
 pub mod acquisition;
+pub mod assessments;
 pub mod audits;
 pub mod development;
 pub mod docs;
 pub mod hr_core;
+pub mod intelligence;
 pub mod learning;
 pub mod metrics;
 pub mod payroll;
+pub mod talent;
+pub mod wellbeing;
 pub mod workforce;
 
 /// Map a non-empty problem list to the family's `422 Unprocessable

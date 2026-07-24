@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `time_entries`. One day's recorded time in whole minutes (HCM-R4).
+//! `SeaORM` Entity — `time_entries`. One day's recorded time in whole minutes (WPM-R4).
 
 #![allow(missing_docs)]
 

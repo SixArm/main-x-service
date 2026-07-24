@@ -6,6 +6,30 @@
 
   let { children } = $props();
 
+  // localStorage key ThemeSelect persists the chosen theme under, and
+  // its pre-rename spelling (2026-07-23, `HCM` -> `WPM`).
+  // NOTE to a future renamer: THEME_KEY_LEGACY is deliberately the OLD
+  // name — a blanket search-and-replace must not "fix" it.
+  const THEME_KEY = "mxi.wpm.theme";
+  const THEME_KEY_LEGACY = "mxi.hcm.theme";
+
+  // Adopt a returning user's saved theme once, before ThemeSelect reads
+  // the key: without this the rename silently resets everyone to the
+  // default theme. Runs at module scope (not `onMount`) so it lands
+  // before the component initialises; guarded for SSR and for a blocked
+  // or full store, neither of which may stop the app rendering.
+  if (typeof localStorage !== "undefined") {
+    try {
+      const legacy = localStorage.getItem(THEME_KEY_LEGACY);
+      if (legacy !== null && localStorage.getItem(THEME_KEY) === null) {
+        localStorage.setItem(THEME_KEY, legacy);
+        localStorage.removeItem(THEME_KEY_LEGACY);
+      }
+    } catch {
+      // Ignore: a missing theme preference is cosmetic.
+    }
+  }
+
   // Lily theme catalogue offered in the theme select (DaisyUI-style
   // slugs plus government/NHS design-system themes). Each slug has a
   // stylesheet at `static/assets/themes/<slug>.css` (a symlink to the
@@ -44,6 +68,7 @@
   <a href="/development">{t("nav.development")}</a>
   <a href="/learning">{t("nav.learning")}</a>
   <a href="/mentorship">{t("nav.mentorship")}</a>
+  <a href="/wellbeing">{t("nav.wellbeing")}</a>
   <a href="/payroll">{t("nav.payroll")}</a>
   <a href="/benchmarks">{t("nav.benchmarks")}</a>
   <span class="spacer"></span>
@@ -62,7 +87,7 @@
     label="Theme"
     themesUrl="/assets/themes/"
     themes={THEMES}
-    storageKey="mxi.hcm.theme"
+    storageKey={THEME_KEY}
   />
   <a href="/signin">{t("nav.signin")}</a>
 </nav>

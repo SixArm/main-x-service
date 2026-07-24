@@ -17,6 +17,6 @@ Beyond the v1 queue ([tasks.md](tasks.md)):
   time-to-fill; strictly additive over the v1 arithmetic dashboards.
 - **Multi-org / group payroll** — one deployment serving a corporate
   group with consolidated reporting.
-- **HCM ↔ PPM bridge** — allocations in
-  project-portfolio-management referencing HCM employees for
+- **WPM ↔ PPM bridge** — allocations in
+  project-portfolio-management referencing WPM employees for
   capacity-vs-contract checks.

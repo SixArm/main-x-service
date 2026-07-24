@@ -5,7 +5,7 @@
 
 ## Observed by design
 
-- **Data minimisation** — identities are URNs; HCM stores employment
+- **Data minimisation** — identities are URNs; WPM stores employment
   facts, not demographics; display names are refreshable caches.
 - **Purpose limitation & consent** — the candidate pool is
   consent-bounded (`consent_until`); expired candidates leave search

@@ -1,9 +1,9 @@
-//! Payroll derivation (HCM-R13, HCM-R14): draft → calculate →
+//! Payroll derivation (WPM-R13, WPM-R14): draft → calculate →
 //! approve → paid with reconciled payslips, the approved-run
 //! immutability, and the benchmark comparison flags.
 
-use human_capital_management_service::app::App;
-use human_capital_management_service::rules::payroll as rules;
+use workforce_planning_management_service::app::App;
+use workforce_planning_management_service::rules::payroll as rules;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;

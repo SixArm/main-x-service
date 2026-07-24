@@ -2,9 +2,8 @@
 
 import { env } from "$env/dynamic/private";
 
-/** Base URL of the human-capital-management service the BFF proxies to. */
-export const HCM_API_URL: string =
-  env.HCM_API_URL ?? "http://localhost:5150";
+/** Base URL of the workforce-planning-management service the BFF proxies to. */
+export const WPM_API_URL: string = env.WPM_API_URL ?? "http://localhost:5150";
 
 /** Authentication service base URL — for the session→PASETO exchange
  *  and the magic-link login flow (PF-T18). */

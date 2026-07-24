@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `benefit_plans`. One benefit plan with minor-unit costs (HCM-R9).
+//! `SeaORM` Entity — `benefit_plans`. One benefit plan with minor-unit costs (WPM-R9).
 
 #![allow(missing_docs)]
 

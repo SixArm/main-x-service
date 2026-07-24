@@ -1,4 +1,4 @@
-//! Migration: the workforce-management tables (HCM-R4–R6) —
+//! Migration: the workforce-management tables (WPM-R4–R6) —
 //! `time_entries` (whole minutes), `leave_entitlements` +
 //! `leave_requests` (whole days), `shifts` + `shift_assignments`.
 

@@ -1,17 +1,17 @@
 [workspace]
 
 [package]
-name = "human-capital-management-service"
+name = "workforce-planning-management-service"
 version = "0.1.0"
 edition = "2024"
 publish = true
-default-run = "human-capital-management-service"
+default-run = "workforce-planning-management-service"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
-description = "Human capital management service — employee lifecycle, ATS, workforce, payroll"
+description = "Workforce planning management service — employee lifecycle, ATS, workforce, payroll"
 readme = "README.md"
-repository = "https://github.com/sixarm/main-x-service/human-capital-management-service-with-rust"
+repository = "https://github.com/sixarm/main-x-service/workforce-planning-management-service-with-rust"
 license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
-keywords = ["hcm", "hr", "payroll", "ats", "workforce"]
+keywords = ["wpm", "hr", "payroll", "ats", "workforce"]
 categories = ["development-tools", "rust-patterns"]
 include = ["src/**/*", "README.md"]
 
@@ -22,7 +22,7 @@ loco-rs = { version = "0.16" }
 loco-rs = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
-tokio = { version = "1.52", default-features = false, features = [
+tokio = { version = "1.53", default-features = false, features = [
   "rt-multi-thread",
 ] }
 async-trait = { version = "0.1" }
@@ -37,7 +37,7 @@ sea-orm = { version = "1.1", features = [
   "macros",
 ] }
 chrono = { version = "0.4" }
-uuid = { version = "1.23", features = ["v4", "serde"] }
+uuid = { version = "1.24", features = ["v4", "serde"] }
 mimalloc = { version = "0.1.52" }
 prometheus = { version = "0.13" }
 # Upstream display-name lookups (`http` client mode only; stub is the
@@ -55,7 +55,7 @@ entity-ref = { path = "../../link/entity-ref-rust-crate" }
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
 
 [[bin]]
-name = "human-capital-management-service"
+name = "workforce-planning-management-service"
 path = "src/bin/main.rs"
 required-features = []
 
@@ -63,8 +63,8 @@ required-features = []
 loco-rs = { workspace = true, features = ["testing"] }
 # Name the `TestServer` type in shared request-test helpers (same
 # version loco's testing feature uses internally).
-axum-test = { version = "17.0.1" }
-tokio = { version = "1.52", default-features = false, features = [
+axum-test = { version = "17.3.0" }
+tokio = { version = "1.53", default-features = false, features = [
   "rt-multi-thread",
   "macros",
   "net",

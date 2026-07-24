@@ -1,14 +1,14 @@
-// BFF reverse proxy for human-capital-management API calls.
+// BFF reverse proxy for workforce-planning-management API calls.
 //
 // The browser calls this same-origin proxy; the server forwards to the
-// human-capital-management service. No token ever lives in browser JS: when a
+// workforce-planning-management service. No token ever lives in browser JS: when a
 // session cookie is present (PF-T18 magic-link flow), the server
 // exchanges it for a short-lived PASETO and injects the bearer here.
-// With `HCM_REQUIRE_AUTH` off (the shipped default) the
+// With `WPM_REQUIRE_AUTH` off (the shipped default) the
 // unauthenticated forward is sufficient and the exchange is skipped.
 
 import type { RequestHandler } from "./$types";
-import { HCM_API_URL } from "$lib/server/config";
+import { WPM_API_URL } from "$lib/server/config";
 import { exchangeToken } from "$lib/server/auth";
 
 const proxy: RequestHandler = async ({
@@ -18,7 +18,7 @@ const proxy: RequestHandler = async ({
   locals,
   fetch,
 }) => {
-  const target = `${HCM_API_URL}/${params.path}${url.search}`;
+  const target = `${WPM_API_URL}/${params.path}${url.search}`;
 
   // Copy request headers, but drop hop-by-hop / origin-specific ones and
   // never forward the browser's cookie to the entity service.

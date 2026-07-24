@@ -11,7 +11,8 @@
   let { form }: { form: ActionData } = $props();
 </script>
 
-<svelte:head><title>Sign in — Human Capital Management</title></svelte:head>
+<svelte:head><title>Sign in — Workforce Planning Management</title></svelte:head
+>
 
 <h1>Sign in</h1>
 

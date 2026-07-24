@@ -21,6 +21,30 @@ record (`status = onboarding`) with the agreed salary, links back to
 the application for provenance, and counts toward the requisition's
 headcount.
 
+## Selection testing
+
+Hiring decisions lean on **selection tests** — job simulations, skills
+assessments, and judgement tests — alongside interviews. WPM records
+them through the assessment surface
+([talent-development.md](talent-development.md) § Assessments): a
+sitting is booked against the **candidate** and, when it belongs to a
+hiring process, against the **application** (the service refuses a
+sitting whose application belongs to a different candidate, so a
+result can never be filed against the wrong person).
+
+`GET /api/applications/{pid}/assessments` is the hiring view: what the
+candidate has been asked to do, how many sittings are still
+outstanding, and how the completed ones read.
+`GET /api/candidates/{pid}/assessment-profile` gives the
+cross-category picture including `selection_suitability` — the mean
+percentile of current selection results.
+
+That figure is **reported, never prescriptive**: WPM does not rank
+candidates, does not recommend a hire, and does not gate a stage
+transition on a score. Assessment results are one input a human
+weighs, and the payload says so (every derived figure names its
+derivation and is `null` rather than zero when nothing was measured).
+
 ## Candidate pool
 
 Candidates persist beyond a single application (source: applied /

@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `benchmarks`. One recorded market pay band for a job title (HCM-R14).
+//! `SeaORM` Entity — `benchmarks`. One recorded market pay band for a job title (WPM-R14).
 
 #![allow(missing_docs)]
 

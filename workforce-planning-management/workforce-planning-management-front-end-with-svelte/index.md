@@ -1,6 +1,6 @@
 # Documentation index
 
-Human Capital Management — SvelteKit edition. Browser client for
+Workforce Planning Management — SvelteKit edition. Browser client for
 the Loco JSON API sibling.
 
 ## Start here
@@ -15,4 +15,4 @@ the Loco JSON API sibling.
 ## The task queue
 
 Live delivery checklist: [../spec/tasks.md](../spec/tasks.md)
-(this edition: HCM-T18/T19).
+(this edition: WPM-T18/T19).

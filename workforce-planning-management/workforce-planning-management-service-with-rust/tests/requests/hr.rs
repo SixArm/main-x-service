@@ -1,7 +1,7 @@
-//! The hire journey end-to-end (HCM-R1–R3, HCM-R7) plus the
+//! The hire journey end-to-end (WPM-R1–R3, WPM-R7) plus the
 //! unknown-pid `404` contract and the org-chart cycle refusal.
 
-use human_capital_management_service::app::App;
+use workforce_planning_management_service::app::App;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;

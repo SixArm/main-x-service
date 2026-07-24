@@ -1,10 +1,10 @@
-# Human Capital Management front-end — edition spec
+# Workforce Planning Management front-end — edition spec
 
 Stack-specific specification for the Svelte edition. The
 **cross-cutting spec at [`../../spec/`](../../spec/index.md) is the
 single source of truth**; this file adds only what is specific to
 this edition, and grows topic files (routes, components, i18n) as
-HCM-T18/T19 land.
+WPM-T18/T19 land.
 
 ## Stack
 
@@ -32,8 +32,8 @@ and `money()` are the closest source). BFF auth per
 - **Copy source**: the patient-flow front-end (BFF proxy, session
   flow, SPA mode) + the PPM front-end's i18n pattern (compact 48-key
   catalogue here).
-- **Layout**: `src/lib/{i18n.svelte.ts,api/{client,types,hcm}.ts,
-  components/OrgTree.svelte,server/*}`, routes per the README table;
+- **Layout**: `src/lib/{i18n.svelte.ts,api/{client,types,wpm}.ts,
+components/OrgTree.svelte,server/*}`, routes per the README table;
   the proxy strips cookies, stamps `Accepts-version: 1.0`, and
   carries the session→PASETO exchange seam.
 - **Masked money**: `money(null, …)` renders an em dash and the
@@ -45,11 +45,11 @@ and `money()` are the closest source). BFF auth per
 - **Lily Design System** (2026-07-19): the chrome uses the Lily
   **ThemeSelect** (45-theme catalogue incl. the NHS design-system
   themes; stylesheets via the `static/assets/themes` symlink; choice
-  persisted to `mxi.hcm.theme`) and **LocaleSelect** (wired to the i18n
+  persisted to `mxi.wpm.theme`) and **LocaleSelect** (wired to the i18n
   store, `applyDir` off — the app's own effect owns `lang`/`dir`);
   the **Lily headless** primitives are available as a dependency.
 
 ## Delivery
 
-HCM-T18/T19 **delivered 2026-07-18** — see
+WPM-T18/T19 **delivered 2026-07-18** — see
 [../../spec/tasks.md](../../spec/tasks.md).

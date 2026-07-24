@@ -13,7 +13,9 @@ use sea_orm::ConnectionTrait;
 use uuid::Uuid;
 
 use super::_entities::{
-    applications, benchmarks, benefit_enrollments, benefit_plans, candidates, employees,
+    applications, assessment_instruments, assessment_results, assessments, benchmarks,
+    benefit_enrollments, benefit_plans, candidates, development_plan_items, development_plans,
+    early_career_programs, employees, pipeline_members, program_placements, talent_pipelines,
     feedback_entries, goals, interviews, leave_entitlements, leave_requests, onboarding_items,
     payroll_runs, payslips, requisitions, review_cycles, reviews, shift_assignments, shifts,
     succession_candidates, succession_plans, time_entries, training_enrollments,
@@ -21,6 +23,15 @@ use super::_entities::{
 
 impl ActiveModelBehavior for employees::ActiveModel {}
 impl ActiveModelBehavior for requisitions::ActiveModel {}
+impl ActiveModelBehavior for assessment_instruments::ActiveModel {}
+impl ActiveModelBehavior for assessments::ActiveModel {}
+impl ActiveModelBehavior for assessment_results::ActiveModel {}
+impl ActiveModelBehavior for development_plans::ActiveModel {}
+impl ActiveModelBehavior for development_plan_items::ActiveModel {}
+impl ActiveModelBehavior for talent_pipelines::ActiveModel {}
+impl ActiveModelBehavior for pipeline_members::ActiveModel {}
+impl ActiveModelBehavior for early_career_programs::ActiveModel {}
+impl ActiveModelBehavior for program_placements::ActiveModel {}
 impl ActiveModelBehavior for candidates::ActiveModel {}
 impl ActiveModelBehavior for applications::ActiveModel {}
 impl ActiveModelBehavior for interviews::ActiveModel {}
@@ -91,3 +102,10 @@ find_active_by_pid!(find_review, reviews);
 find_active_by_pid!(find_training_enrollment, training_enrollments);
 find_active_by_pid!(find_succession_plan, succession_plans);
 find_active_by_pid!(find_payroll_run, payroll_runs);
+find_active_by_pid!(find_assessment_instrument, assessment_instruments);
+find_active_by_pid!(find_assessment, assessments);
+find_active_by_pid!(find_development_plan, development_plans);
+find_active_by_pid!(find_talent_pipeline, talent_pipelines);
+find_active_by_pid!(find_pipeline_member, pipeline_members);
+find_active_by_pid!(find_early_career_program, early_career_programs);
+find_active_by_pid!(find_program_placement, program_placements);

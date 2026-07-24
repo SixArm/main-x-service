@@ -1,6 +1,6 @@
 //! Model layer: `SeaORM` entities (`_entities/`) plus helpers.
 //!
-//! HCM owns a **normalized relational schema** (HCM-D2) — not the
+//! WPM owns a **normalized relational schema** (WPM-D2) — not the
 //! matcher-DTO-as-JSONB shape of the entity registries — because its
 //! value is constraints and lifecycles. Controllers query the entities
 //! directly; [`records`] provides the shared finders and the

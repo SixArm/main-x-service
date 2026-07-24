@@ -4,6 +4,6 @@
 //! `DATABASE_URL`) and are `#[ignore]`d by default — run with
 //! `cargo test -- --ignored`. The auth-activation matrix lives in the
 //! sibling `tests/enforcement.rs` target (its own process, because
-//! `HCM_REQUIRE_AUTH` is cached in a `OnceLock`).
+//! `WPM_REQUIRE_AUTH` is cached in a `OnceLock`).
 
 mod requests;

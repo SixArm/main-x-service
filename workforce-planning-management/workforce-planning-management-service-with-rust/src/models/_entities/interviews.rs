@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `interviews`. One scheduled interview on an application (HCM-R2).
+//! `SeaORM` Entity — `interviews`. One scheduled interview on an application (WPM-R2).
 
 #![allow(missing_docs)]
 

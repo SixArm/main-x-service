@@ -1,9 +1,9 @@
 {
-  "name": "human-capital-management-front-end-with-svelte",
+  "name": "workforce-planning-management-front-end-with-svelte",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "SvelteKit front-end for the Human Capital Management Service (Main X Index): ward whiteboards, bed management, inpatient journey.",
+  "description": "SvelteKit front-end for the Workforce Planning Management Service (Main X Index): ward whiteboards, bed management, inpatient journey.",
   "license": "MIT OR Apache-2.0",
   "scripts": {
     "dev": "vite dev",

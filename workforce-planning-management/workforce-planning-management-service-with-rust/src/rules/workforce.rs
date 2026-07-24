@@ -1,7 +1,7 @@
-//! Time & attendance and scheduling rules (HCM-R4, HCM-R6), DB-free.
+//! Time & attendance and scheduling rules (WPM-R4, WPM-R6), DB-free.
 //!
 //! Time is recorded in whole **minutes** (no float hours). Overtime is
-//! **derived** against the contracted day, scaled by FTE (HCM-D3).
+//! **derived** against the contracted day, scaled by FTE (WPM-D3).
 
 /// Minutes in a day — the hard cap on one day's recorded time.
 pub const DAY_MINUTES: i32 = 24 * 60;
@@ -10,7 +10,7 @@ pub const DAY_MINUTES: i32 = 24 * 60;
 pub const CONTRACTED_DAY_MINUTES: i32 = 450;
 
 /// Validate one time entry's minutes: positive, and a single day's
-/// total (existing + new) may not exceed 24 h (HCM-R4).
+/// total (existing + new) may not exceed 24 h (WPM-R4).
 ///
 /// # Errors
 ///
@@ -48,7 +48,7 @@ pub fn overtime_minutes(regular_minutes: i32, explicit_overtime_minutes: i32, ft
 }
 
 /// Whether two half-open time windows `[start, end)` overlap — the
-/// shift double-booking check (HCM-R6).
+/// shift double-booking check (WPM-R6).
 #[must_use]
 pub fn windows_overlap(
     a_start: chrono::DateTime<chrono::FixedOffset>,

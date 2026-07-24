@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { listEmployees, orgChart } from "$lib/api/hcm";
+  import { listEmployees, orgChart } from "$lib/api/wpm";
   import { t } from "$lib/i18n.svelte";
   import type { OrgNode } from "$lib/api/types";
   import OrgTree from "$lib/components/OrgTree.svelte";

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Kanban, Willow, getCardShape } from "@svar-ui/svelte-kanban";
   import type { KanbanInstanceApi } from "@svar-ui/svelte-kanban";
-  import { listRequisitions, money, requisitionStatus } from "$lib/api/hcm";
+  import { listRequisitions, money, requisitionStatus } from "$lib/api/wpm";
   import { i18n, t } from "$lib/i18n.svelte";
   import type { Requisition } from "$lib/api/types";
 

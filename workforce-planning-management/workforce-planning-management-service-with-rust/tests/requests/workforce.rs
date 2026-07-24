@@ -1,7 +1,7 @@
-//! Workforce flows (HCM-R4–R6): time caps + overtime, the leave
+//! Workforce flows (WPM-R4–R6): time caps + overtime, the leave
 //! balance journey (+ the two-approver race), and shift conflicts.
 
-use human_capital_management_service::app::App;
+use workforce_planning_management_service::app::App;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;

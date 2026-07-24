@@ -1,7 +1,7 @@
-//! Talent development (HCM-R10–R12): review cycles / reviews / goals
+//! Talent development (WPM-R10–R12): review cycles / reviews / goals
 //! / feedback, training enrollments over the course registry, and
 //! succession plans with the gap report. Review content is
-//! high-sensitivity: reads are audited (HCM-D7).
+//! high-sensitivity: reads are audited (WPM-D7).
 
 use loco_rs::prelude::*;
 use sea_orm::{PaginatorTrait, QueryOrder, QuerySelect, TransactionTrait};
@@ -95,6 +95,38 @@ struct SuccessionPayload {
     criticality: i32,
     #[serde(default)]
     incumbent_pid: Option<Uuid>,
+    /// How likely the incumbent is to leave: `low` | `medium` | `high`.
+    /// Together with `criticality` this is what makes a role a single
+    /// point of failure (`/api/workforce-intelligence/succession`).
+    #[serde(default)]
+    risk_of_loss: Option<String>,
+    /// When the role is expected to fall vacant, when that is known.
+    #[serde(default)]
+    vacancy_expected_on: Option<chrono::NaiveDate>,
+}
+
+/// `PUT /api/succession-plans/{pid}` body — restate the planning
+/// judgements as they change. Every field is optional.
+#[derive(Debug, Deserialize)]
+struct SuccessionUpdate {
+    #[serde(default)]
+    criticality: Option<i32>,
+    #[serde(default)]
+    risk_of_loss: Option<String>,
+    #[serde(default)]
+    vacancy_expected_on: Option<chrono::NaiveDate>,
+    #[serde(default)]
+    incumbent_pid: Option<Uuid>,
+}
+
+/// `PUT /api/succession-candidates/{pid}` body — readiness moves as a
+/// successor develops (or regresses).
+#[derive(Debug, Deserialize)]
+struct SuccessionCandidateUpdate {
+    #[serde(default)]
+    readiness: Option<String>,
+    #[serde(default)]
+    rank: Option<i32>,
 }
 
 /// `POST /api/succession-plans/{pid}/candidates` body.
@@ -198,7 +230,7 @@ async fn create_review(
 
 /// `GET /api/employees/{pid}/reviews` — an employee's reviews.
 /// Draft/submitted/calibrated content is redacted; `shared` reviews
-/// carry content, and the content read is audited (HCM-R10).
+/// carry content, and the content read is audited (WPM-R10).
 #[debug_handler]
 async fn list_reviews(
     State(ctx): State<AppContext>,
@@ -393,7 +425,7 @@ async fn review_detail(
         .order_by_asc(feedback_entries::Column::Id)
         .all(&ctx.db)
         .await?;
-    // Reading a review with content is a sensitive read (HCM-D7).
+    // Reading a review with content is a sensitive read (WPM-D7).
     if review.content.is_some() {
         Audit::record(&ctx.db, "review", review.pid, "review_content_read", caller.actor(), None).await?;
     }
@@ -432,7 +464,7 @@ async fn create_feedback(
 }
 
 /// `POST /api/employees/{pid}/training-enrollments` — enrol against a
-/// `course:` / `courseinstance:` URN (HCM-D10).
+/// `course:` / `courseinstance:` URN (WPM-D10).
 #[debug_handler]
 async fn create_training(
     State(ctx): State<AppContext>,
@@ -518,7 +550,7 @@ async fn update_training(
 }
 
 /// `GET /api/training/expiring?within_days=` — certificates expiring
-/// soon (HCM-R11).
+/// soon (WPM-R11).
 #[derive(Debug, Deserialize)]
 struct ExpiringParams {
     #[serde(default = "default_within")]
@@ -560,6 +592,11 @@ async fn create_succession(
     if !(1..=5).contains(&payload.criticality) {
         problems.push(format!("criticality {} out of range 1-5", payload.criticality));
     }
+    problems.token_opt(
+        "risk_of_loss",
+        crate::rules::talent::RISK_OF_LOSS,
+        payload.risk_of_loss.as_deref(),
+    );
     ensure_valid(&problems.into_vec())?;
     if let Some(incumbent) = payload.incumbent_pid {
         records::find_employee(&ctx.db, incumbent).await?;
@@ -571,6 +608,8 @@ async fn create_succession(
         department: ActiveValue::set(payload.department.clone()),
         criticality: ActiveValue::set(payload.criticality),
         incumbent_pid: ActiveValue::set(payload.incumbent_pid),
+        risk_of_loss: ActiveValue::set(payload.risk_of_loss.clone()),
+        vacancy_expected_on: ActiveValue::set(payload.vacancy_expected_on),
         deleted_at: ActiveValue::set(None),
         ..Default::default()
     }
@@ -582,7 +621,7 @@ async fn create_succession(
 }
 
 /// `GET /api/succession-plans` — plans + candidates; the read is
-/// audited (high-sensitivity, HCM-R12).
+/// audited (high-sensitivity, WPM-R12).
 #[debug_handler]
 async fn list_succession(State(ctx): State<AppContext>, caller: MaybeAuthUser) -> Result<Response> {
     let plans = succession_plans::Entity::find()
@@ -649,7 +688,7 @@ async fn add_succession_candidate(
 }
 
 /// `GET /api/succession-plans/gaps` — critical roles (criticality ≥ 4)
-/// with no `ready_now` candidate (HCM-R12).
+/// with no `ready_now` candidate (WPM-R12).
 #[debug_handler]
 async fn succession_gaps(State(ctx): State<AppContext>) -> Result<Response> {
     let plans = succession_plans::Entity::find()
@@ -670,6 +709,116 @@ async fn succession_gaps(State(ctx): State<AppContext>) -> Result<Response> {
         }
     }
     format::json(serde_json::json!({ "gaps": gaps }))
+}
+
+/// `PUT /api/succession-plans/{pid}` — restate a plan's criticality,
+/// risk of loss, expected vacancy date, or incumbent as the picture
+/// changes. Succession judgements go stale faster than anything else in
+/// WPM, so they must be updatable without deleting the plan and its
+/// bench.
+#[debug_handler]
+async fn update_succession(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path(pid): Path<String>,
+    Json(payload): Json<SuccessionUpdate>,
+) -> Result<Response> {
+    let plan = records::find_succession_plan(&ctx.db, records::parse_pid(&pid)?).await?;
+    let mut problems = Problems::new();
+    if let Some(criticality) = payload.criticality
+        && !(1..=5).contains(&criticality)
+    {
+        problems.push(format!("criticality {criticality} out of range 1-5"));
+    }
+    problems.token_opt(
+        "risk_of_loss",
+        crate::rules::talent::RISK_OF_LOSS,
+        payload.risk_of_loss.as_deref(),
+    );
+    ensure_valid(&problems.into_vec())?;
+    if let Some(incumbent) = payload.incumbent_pid {
+        records::find_employee(&ctx.db, incumbent).await?;
+    }
+
+    let plan_pid = plan.pid;
+    let before = serde_json::json!({
+        "criticality": plan.criticality,
+        "risk_of_loss": plan.risk_of_loss,
+        "vacancy_expected_on": plan.vacancy_expected_on,
+        "incumbent_pid": plan.incumbent_pid,
+    });
+    let txn = ctx.db.begin().await?;
+    let mut active: succession_plans::ActiveModel = plan.into();
+    if let Some(criticality) = payload.criticality {
+        active.criticality = ActiveValue::set(criticality);
+    }
+    if payload.risk_of_loss.is_some() {
+        active.risk_of_loss = ActiveValue::set(payload.risk_of_loss.clone());
+    }
+    if payload.vacancy_expected_on.is_some() {
+        active.vacancy_expected_on = ActiveValue::set(payload.vacancy_expected_on);
+    }
+    if payload.incumbent_pid.is_some() {
+        active.incumbent_pid = ActiveValue::set(payload.incumbent_pid);
+    }
+    let updated = active.update(&txn).await?;
+    Audit::record(
+        &txn,
+        "succession_plan",
+        plan_pid,
+        "updated",
+        caller.actor(),
+        Some(serde_json::json!({ "before": before })),
+    )
+    .await?;
+    txn.commit().await?;
+    format::json(updated)
+}
+
+/// `PUT /api/succession-candidates/{pid}` — move a successor's
+/// readiness or rank. Readiness may go **down** as well as up: a bench
+/// that can only improve on paper would overstate the organisation's
+/// cover.
+#[debug_handler]
+async fn update_succession_candidate(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path(pid): Path<String>,
+    Json(payload): Json<SuccessionCandidateUpdate>,
+) -> Result<Response> {
+    let mut problems = Problems::new();
+    problems.token_opt("readiness", tokens::READINESS, payload.readiness.as_deref());
+    if payload.rank.is_some_and(|r| r < 1) {
+        problems.push("rank must be 1 or greater");
+    }
+    ensure_valid(&problems.into_vec())?;
+
+    let candidate = succession_candidates::Entity::find()
+        .filter(succession_candidates::Column::Pid.eq(records::parse_pid(&pid)?))
+        .filter(succession_candidates::Column::DeletedAt.is_null())
+        .one(&ctx.db)
+        .await?
+        .ok_or(Error::NotFound)?;
+    let candidate_pid = candidate.pid;
+    let from = candidate.readiness.clone();
+    let mut active: succession_candidates::ActiveModel = candidate.into();
+    if payload.readiness.is_some() {
+        active.readiness = ActiveValue::set(payload.readiness.clone().unwrap_or(from.clone()));
+    }
+    if let Some(rank) = payload.rank {
+        active.rank = ActiveValue::set(rank);
+    }
+    let updated = active.update(&ctx.db).await?;
+    Audit::record(
+        &ctx.db,
+        "succession_candidate",
+        candidate_pid,
+        "updated",
+        caller.actor(),
+        Some(serde_json::json!({ "readiness_from": from, "readiness_to": payload.readiness })),
+    )
+    .await?;
+    format::json(updated)
 }
 
 /// Employee-existence helper used by list handlers above (kept for
@@ -700,5 +849,7 @@ pub fn routes() -> Routes {
         .add("/succession-plans", post(create_succession))
         .add("/succession-plans", get(list_succession))
         .add("/succession-plans/gaps", get(succession_gaps))
+        .add("/succession-plans/{pid}", put(update_succession))
         .add("/succession-plans/{pid}/candidates", post(add_succession_candidate))
+        .add("/succession-candidates/{pid}", put(update_succession_candidate))
 }

@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `goals`. One weighted goal on a review (HCM-R10).
+//! `SeaORM` Entity — `goals`. One weighted goal on a review (WPM-R10).
 
 #![allow(missing_docs)]
 

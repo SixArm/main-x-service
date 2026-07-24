@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `reviews`. One employee's review in one cycle; content is high-sensitivity (HCM-R10).
+//! `SeaORM` Entity — `reviews`. One employee's review in one cycle; content is high-sensitivity (WPM-R10).
 
 #![allow(missing_docs)]
 

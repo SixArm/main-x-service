@@ -1,12 +1,12 @@
-//! `human-capital-management-service` — a loco.rs consumer application
-//! for **human capital management** across the employee lifecycle:
+//! `workforce-planning-management-service` — a loco.rs consumer application
+//! for **workforce planning management** across the employee lifecycle:
 //! requisitions and the applicant-tracking pipeline, onboarding
 //! checklists, employee records with the derived org chart, time &
 //! attendance, leave, shift scheduling, benefits, performance reviews,
 //! training enrollments, succession planning, payroll runs with
 //! derived payslips, and salary benchmarking.
 //!
-//! HCM **owns the employment relationship and its operational state**
+//! WPM **owns the employment relationship and its operational state**
 //! (its own tables) and **references identities**: humans are
 //! person-service records, professional identities worker-service,
 //! employers organization-service, training courses course-service —
@@ -35,6 +35,8 @@
 pub mod app;
 pub mod auth;
 pub mod clients;
+/// Backward-compatibility shims for the 2026-07-23 `HCM` → `WPM` rename.
+pub mod compat;
 pub mod controllers;
 pub mod metrics;
 pub mod models;

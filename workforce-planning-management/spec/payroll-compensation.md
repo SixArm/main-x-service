@@ -33,5 +33,5 @@ active employees to their title's benchmark and flags:
 - `above_max` — cost outlier,
 
 with the portfolio-style rollup per department. Benchmarks are data
-the deployment loads (import or manual entry) — HCM does not scrape
+the deployment loads (import or manual entry) — WPM does not scrape
 market data.

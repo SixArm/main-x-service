@@ -1,9 +1,11 @@
 <script lang="ts">
   import { page } from "$app/state";
   import {
+    acknowledgeWellbeing,
     changeStatus,
     completeItem,
     employeePayslips,
+    employeeWellbeingPrompts,
     getEmployee,
     listEntitlements,
     listLeaveRequests,
@@ -11,7 +13,8 @@
     listReviews,
     listTraining,
     money,
-  } from "$lib/api/hcm";
+    type WellbeingPrompt,
+  } from "$lib/api/wpm";
   import { i18n, t } from "$lib/i18n.svelte";
   import type {
     Employee,
@@ -30,6 +33,7 @@
   let payslips = $state<Payslip[]>([]);
   let reviews = $state<Review[]>([]);
   let training = $state<TrainingEnrollment[]>([]);
+  let wellbeing = $state<WellbeingPrompt[]>([]);
   let error = $state<string | null>(null);
   let actionError = $state<string | null>(null);
 
@@ -38,14 +42,17 @@
   async function load() {
     try {
       employee = await getEmployee(pid);
-      [onboarding, balances, leave, payslips, reviews, training] = await Promise.all([
+      let prompts: { prompts: WellbeingPrompt[] };
+      [onboarding, balances, leave, payslips, reviews, training, prompts] = await Promise.all([
         listOnboarding(pid),
         listEntitlements(pid),
         listLeaveRequests(pid),
         employeePayslips(pid),
         listReviews(pid),
         listTraining(pid),
+        employeeWellbeingPrompts(pid),
       ]);
+      wellbeing = prompts.prompts;
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
     }
@@ -69,6 +76,19 @@
     actionError = null;
     try {
       await completeItem(itemPid);
+      await load();
+    } catch (cause) {
+      actionError = cause instanceof Error ? cause.message : String(cause);
+    }
+  }
+
+  async function respond(
+    entitlementPid: string,
+    response: "booked" | "done" | "declined" | "dismissed",
+  ) {
+    actionError = null;
+    try {
+      await acknowledgeWellbeing(pid, entitlementPid, response);
       await load();
     } catch (cause) {
       actionError = cause instanceof Error ? cause.message : String(cause);
@@ -103,6 +123,28 @@
       <p class="error" data-testid="action-error">{actionError}</p>
     {/if}
   </div>
+
+  {#if wellbeing.length}
+    <h2>{t("wb.prompts")}</h2>
+    <ul class="panel" data-testid="wellbeing-prompts">
+      {#each wellbeing as prompt (prompt.entitlement_pid)}
+        <li>
+          <strong>{prompt.name}</strong>
+          {#if prompt.kind === "reminder"}<span class="chip">{t("wb.reminder")}</span>{/if}
+          <br />
+          {prompt.description}
+          {#if prompt.info_url}
+            · <a href={prompt.info_url} target="_blank" rel="noreferrer">{t("wb.info")}</a>
+          {/if}
+          <br />
+          <button onclick={() => void respond(prompt.entitlement_pid, "booked")}>{t("wb.booked")}</button>
+          <button onclick={() => void respond(prompt.entitlement_pid, "done")}>{t("wb.done")}</button>
+          <button onclick={() => void respond(prompt.entitlement_pid, "declined")}>{t("wb.declined")}</button>
+          <button onclick={() => void respond(prompt.entitlement_pid, "dismissed")}>{t("wb.dismissed")}</button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
 
   {#if onboarding.length}
     <h2>{t("emp.onboarding")}</h2>

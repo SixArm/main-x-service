@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { decideLeave, listEmployees, listLeaveRequests, listShifts } from "$lib/api/hcm";
+  import { decideLeave, listEmployees, listLeaveRequests, listShifts } from "$lib/api/wpm";
   import { t } from "$lib/i18n.svelte";
   import type { Employee, LeaveRequest } from "$lib/api/types";
 

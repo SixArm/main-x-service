@@ -1,6 +1,6 @@
 # Integrations
 
-HCM is a consumer of the Main X Index family; it holds **EntityRef
+WPM is a consumer of the Main X Index family; it holds **EntityRef
 URNs** and never duplicates upstream records.
 
 | Service | Used for | How |
@@ -19,15 +19,15 @@ best-effort, and never block writes.
 
 The registry's cross-service link `employed_by` (worker →
 organization, with `role` and validity dates) is the identity-level
-assertion the family's link-graph aggregates. HCM's Employee record
+assertion the family's link-graph aggregates. WPM's Employee record
 is the operational layer above it. **Roadmap**: on hire/termination
-HCM emits the corresponding `entity_links` write (or a `linked` /
+WPM emits the corresponding `entity_links` write (or a `linked` /
 `unlinked` event) so the registry edge tracks employment facts
 automatically — until then the two layers are maintained
 independently, and this file is the record of that gap.
 
 ## Events
 
-Family envelope via the `HCM_EVENT_TRANSPORT` seam (default
+Family envelope via the `WPM_EVENT_TRANSPORT` seam (default
 `memory`; Postgres outbox rows share the mutation's transaction under
 `outbox`). Event kinds are listed in [audit.md](audit.md).

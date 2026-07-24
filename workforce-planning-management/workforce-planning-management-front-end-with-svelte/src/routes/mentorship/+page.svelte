@@ -5,7 +5,7 @@
   All server-derived.
 -->
 <script lang="ts">
-  import { mentorshipOverview } from "$lib/api/hcm";
+  import { mentorshipOverview } from "$lib/api/wpm";
   import { t } from "$lib/i18n.svelte";
 
   type Overview = Awaited<ReturnType<typeof mentorshipOverview>>;
@@ -23,7 +23,7 @@
   });
 </script>
 
-<svelte:head><title>{t("nav.mentorship")} — HCM</title></svelte:head>
+<svelte:head><title>{t("nav.mentorship")} — WPM</title></svelte:head>
 
 <h1>{t("nav.mentorship")}</h1>
 {#if error}<p class="error" data-testid="error">{error}</p>{/if}

@@ -1,5 +1,5 @@
-//! Migration: benefits (HCM-R9) and talent-development tables
-//! (HCM-R10–R12) — `benefit_plans` + `benefit_enrollments`,
+//! Migration: benefits (WPM-R9) and talent-development tables
+//! (WPM-R10–R12) — `benefit_plans` + `benefit_enrollments`,
 //! `review_cycles` / `reviews` / `goals` / `feedback_entries`,
 //! `training_enrollments`, `succession_plans` +
 //! `succession_candidates`.
@@ -49,7 +49,7 @@ impl MigrationTrait for Migration {
              )",
         )
         .await?;
-        // One live enrolment per employee per plan (HCM-R9).
+        // One live enrolment per employee per plan (WPM-R9).
         conn.execute_unprepared(
             "CREATE UNIQUE INDEX IF NOT EXISTS benefit_enrollments_key \
              ON benefit_enrollments (plan_pid, employee_pid) WHERE deleted_at IS NULL",

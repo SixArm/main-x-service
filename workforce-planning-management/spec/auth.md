@@ -4,7 +4,7 @@ The family stack unchanged
 ([authentication-sessions](../../agents/share/authentication-sessions.md),
 [authorization-attributes](../../agents/share/authorization-attributes.md)):
 cookie sessions + BFF for humans, offline PASETO v4.public for
-services, blanket guard `HCM_REQUIRE_AUTH` (default **off** — the
+services, blanket guard `WPM_REQUIRE_AUTH` (default **off** — the
 family activation gate; any real deployment MUST activate before
 exposure, and HR data makes that non-negotiable), shared ABAC engine.
 

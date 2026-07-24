@@ -10,7 +10,7 @@ all of the above. Every handoff between those silos loses data,
 delays people, and creates compliance risk — employment records are
 regulated personal data with statutory retention duties.
 
-## What HCM does
+## What WPM does
 
 One operational system for the **employment lifecycle**, hire to
 retire, organized as five pillars:
@@ -56,8 +56,28 @@ retire, organized as five pillars:
 - **Learning (LMS)** — training enrollments referencing the family's
   [course-service](../../course/course-service-with-loco/) courses
   and instances (compliance courses, certifications with expiry).
-- **Succession planning** — key positions, incumbents, and a
-  readiness-rated pipeline of high-potential employees.
+- **Assessments** — aptitude, personality, psychometric, and
+  selection tests (numerical and verbal reasoning, problem-solving and
+  logical thinking; work style, team compatibility, introversion /
+  extraversion; behavioural styles, emotional intelligence, cognitive
+  ability; job simulations, skills assessments, judgement tests) with
+  per-scale results, score bands, validity, and a derived profile.
+  Reported, never prescriptive: WPM does not rank or recommend.
+- **Succession planning** — key positions, incumbents with a risk of
+  loss, a readiness-rated bench, and the single points of failure that
+  fall out of criticality × risk.
+- **Upskilling and reskilling plans** — per-employee skill steps
+  toward the current role (upskill) or a different one (reskill),
+  reporting claimed *and* verified progress.
+- **Talent pipelines** — pools grown toward succession, hiring, early
+  careers, or internal mobility, where readiness can regress as well
+  as improve.
+- **Apprenticeships and internships** — early-career programmes and
+  placements, with off-the-job training hours enforced as a completion
+  precondition, and honest conversion rates.
+- **Workforce intelligence** — headcount and shape, capability and
+  gaps, bench strength, and pipeline funnel; every rate carrying its
+  numerator and denominator.
 
 ### 5. Payroll & compensation
 
@@ -84,6 +104,6 @@ retire, organized as five pillars:
 - Not a tax engine — statutory tables are configuration/stubs, not
   jurisdiction-complete tax law.
 - Not a course-content platform — the course-service owns courses;
-  HCM owns *enrollments*.
+  WPM owns *enrollments*.
 - Not a general accounting ledger — payroll produces payslips and
   totals, not double-entry books.

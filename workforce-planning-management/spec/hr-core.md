@@ -38,3 +38,16 @@ per-employee enrollments with effective ranges. Enrollment changes
 are audited; active enrollments feed payslip deduction lines
 (pension) in payroll. A plan cannot be deleted while enrollments are
 active (soft-close instead).
+
+## Health & wellbeing entitlements
+
+Configurable public-health entitlement rules (e.g. NHS vaccination
+cohorts — flu for frontline roles, shingles at 65+) evaluated over
+**non-clinical** facts only (age via the upstream person record,
+role, department). Eligible employees see an informational prompt in
+self-service and record one acknowledgement
+(`booked | done | declined | dismissed`); one optional reminder for
+multi-dose courses. Acknowledgements are employee-owned and
+aggregate-only for HR — never manager-visible; WPM stores no
+vaccination status or clinical data ([design.md](design.md)
+WPM-D17; [requirements.md](requirements.md) WPM-R25).

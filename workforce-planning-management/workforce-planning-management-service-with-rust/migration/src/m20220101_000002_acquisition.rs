@@ -1,4 +1,4 @@
-//! Migration: the talent-acquisition tables (HCM-R1–R3) —
+//! Migration: the talent-acquisition tables (WPM-R1–R3) —
 //! `requisitions`, `candidates` (consent-bounded), `applications`,
 //! `interviews`, and the `onboarding_items` checklists.
 

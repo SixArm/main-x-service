@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `candidates`. One retained applicant profile, consent-bounded (HCM-R2, HCM-D8).
+//! `SeaORM` Entity — `candidates`. One retained applicant profile, consent-bounded (WPM-R2, WPM-D8).
 
 #![allow(missing_docs)]
 

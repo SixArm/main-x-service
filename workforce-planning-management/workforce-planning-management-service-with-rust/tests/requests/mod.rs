@@ -1,10 +1,16 @@
 //! Request-level test suites: the hire journey + employee lifecycle
-//! in [`hr`], the time / leave / shift flows in [`workforce`], and
-//! the payroll derivation in [`payroll`].
+//! in [`hr`], the time / leave / shift flows in [`workforce`], the
+//! payroll derivation in [`payroll`], the L&D surface in [`learning`],
+//! the aptitude / personality / psychometric / selection tests in
+//! [`assessments`], and the talent-strategy surface (development plans,
+//! pipelines, early careers, workforce intelligence) in [`talent`].
 
+mod assessments;
 mod hr;
 mod learning;
 mod payroll;
+mod talent;
+mod wellbeing;
 mod workforce;
 
 use serde_json::{Value, json};

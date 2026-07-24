@@ -6,7 +6,7 @@ subproject. Read this **before** opening a PR.
 ## What this project is
 
 A **SvelteKit browser client** for the
-[Loco JSON API sibling](../human-capital-management-service-with-rust/):
+[Loco JSON API sibling](../workforce-planning-management-service-with-rust/):
 requisition and application boards, the onboarding tracker, team
 calendar and rota, employee profiles and the org chart, review and
 training panels, the payroll run screen, benchmarking, and the HR
@@ -23,7 +23,7 @@ round-trips through the API.
    [`../spec/`](../spec/index.md) is the single source of truth —
    especially [auth](../spec/auth.md) (personas + masking) and
    [architecture](../spec/architecture.md). Task queue:
-   [`../spec/tasks.md`](../spec/tasks.md) (HCM-T18/T19).
+   [`../spec/tasks.md`](../spec/tasks.md) (WPM-T18/T19).
 2. **Family front-end conventions.** SvelteKit 2, **Svelte 5 runes
    only** (no legacy stores/`$:`), TypeScript strict, SPA mode.
    Drift between front-ends is accepted — copy-adapt from a sibling

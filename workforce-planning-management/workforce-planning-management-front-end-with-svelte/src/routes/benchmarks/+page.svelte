@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { benchmarkComparison, listBenchmarks, listEmployees, money } from "$lib/api/hcm";
+  import { benchmarkComparison, listBenchmarks, listEmployees, money } from "$lib/api/wpm";
   import { i18n, t } from "$lib/i18n.svelte";
   import type { Benchmark, ComparisonRow } from "$lib/api/types";
 

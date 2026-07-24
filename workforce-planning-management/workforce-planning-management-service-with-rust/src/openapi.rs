@@ -1,10 +1,10 @@
-//! Hand-written `OpenAPI` 3 description of the HCM REST API.
+//! Hand-written `OpenAPI` 3 description of the WPM REST API.
 //!
 //! Summary-level by design: every path and verb is present with its
 //! request/response essentials; the full field-by-field shapes live in
 //! the spec (`../spec/domain-model.md`).
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 /// The full `OpenAPI` document, served at `/api-docs/openapi.json`.
 #[must_use]
@@ -22,9 +22,9 @@ pub fn spec() -> Value {
     json!({
         "openapi": "3.0.3",
         "info": {
-            "title": "Human Capital Management Service API",
+            "title": "Workforce Planning Management Service API",
             "version": env!("CARGO_PKG_VERSION"),
-            "description": "HCM across the employee lifecycle: requisitions/ATS, onboarding, employee records + org chart, time & attendance, leave, shifts, benefits, reviews, training, succession, payroll runs with derived payslips, benchmarking. Identities are EntityRef URNs (person:/worker:/organization:/course:). Money is minor units + ISO-4217. Validation failures return 422. API version is negotiated with the Accepts-version header (1.0)."
+            "description": "WPM across the employee lifecycle: requisitions/ATS, onboarding, employee records + org chart, time & attendance, leave, shifts, benefits, reviews, training, succession, payroll runs with derived payslips, benchmarking. Identities are EntityRef URNs (person:/worker:/organization:/course:). Money is minor units + ISO-4217. Validation failures return 422. API version is negotiated with the Accepts-version header (1.0)."
         },
         "paths": {
             "/api/employees": {
@@ -120,6 +120,8 @@ pub fn spec() -> Value {
                 "get": { "tags": ["development"], "summary": "Plans + ranked candidates (read audited)", "responses": ok("Plans") }
             },
             "/api/succession-plans/gaps": { "get": { "tags": ["development"], "summary": "Criticality ≥ 4 roles with no ready_now candidate", "responses": ok("Gaps") } },
+            "/api/succession-plans/{pid}": { "put": { "tags": ["talent"], "summary": "Restate criticality / risk_of_loss / expected vacancy / incumbent", "responses": ok("Plan") } },
+            "/api/succession-candidates/{pid}": { "put": { "tags": ["talent"], "summary": "Move a successor's readiness or rank (readiness may go down)", "responses": ok("Candidate") } },
             "/api/succession-plans/{pid}/candidates": { "post": { "tags": ["development"], "summary": "Add a ranked candidate (ready_now|ready_1y|ready_2y)", "responses": created } },
             "/api/payroll-runs": {
                 "post": { "tags": ["payroll"], "summary": "Open a draft run (organization URN + period)", "responses": created },
@@ -137,6 +139,57 @@ pub fn spec() -> Value {
                 "get": { "tags": ["compensation"], "summary": "List benchmarks", "responses": ok("Benchmarks") }
             },
             "/api/benchmarks/comparison": { "get": { "tags": ["compensation"], "summary": "Employees vs bands: below_min|within|above_max flags only (?organization=; audited)", "responses": ok("Comparison") } },
+            "/api/assessment-instruments": {
+                "post": { "tags": ["assessments"], "summary": "Add a test to the catalog (category + the scales it reports; a scale must suit the category)", "responses": created },
+                "get": { "tags": ["assessments"], "summary": "The catalog (?category=aptitude|personality|psychometric|selection)", "responses": ok("Instruments") }
+            },
+            "/api/assessments": { "post": { "tags": ["assessments"], "summary": "Schedule a sitting for a candidate or employee (application-linked sittings must match the candidate)", "responses": created } },
+            "/api/assessments/{pid}": {
+                "get": { "tags": ["assessments"], "summary": "One sitting + its per-scale results (sensitive: mask honoured, unmasked reads audited)", "responses": ok("Assessment") },
+                "delete": { "tags": ["assessments"], "summary": "Withdraw a sitting (soft delete)", "responses": ok("Deleted") }
+            },
+            "/api/assessments/{pid}/status": { "post": { "tags": ["assessments"], "summary": "Lifecycle move; completing requires ≥1 result and derives expires_on from the instrument validity", "responses": transition } },
+            "/api/assessments/{pid}/results": { "post": { "tags": ["assessments"], "summary": "Record a scale result (upsert; percentile 0–100, band derived; scale must suit the category)", "responses": created } },
+            "/api/assessments/analytics": { "get": { "tags": ["assessments"], "summary": "Aggregate sittings by category/status + band distribution (no individual scores)", "responses": ok("Analytics") } },
+            "/api/applications/{pid}/assessments": { "get": { "tags": ["assessments"], "summary": "The hiring view: one application's sittings, outstanding count, results (mask honoured)", "responses": ok("Assessments") } },
+            "/api/candidates/{pid}/assessment-profile": { "get": { "tags": ["assessments"], "summary": "A candidate's profile: current reading per scale, gaps, selection suitability", "responses": ok("Profile") } },
+            "/api/employees/{pid}/assessment-profile": { "get": { "tags": ["assessments"], "summary": "An employee's profile (authorized + masked at the employee level)", "responses": ok("Profile") } },
+            "/api/employees/{pid}/development-plans": {
+                "post": { "tags": ["talent"], "summary": "Open an upskill or reskill plan with its skill steps (reskill must name a target role; upskill must not)", "responses": created },
+                "get": { "tags": ["talent"], "summary": "The employee's plans with declared AND verified progress", "responses": ok("Plans") }
+            },
+            "/api/development-plans/{pid}/status": { "post": { "tags": ["talent"], "summary": "draft→active→completed (completing needs every item resolved)", "responses": transition } },
+            "/api/development-plan-items/{pid}": { "put": { "tags": ["talent"], "summary": "Move one step's status (claiming achievement does not change declared proficiency)", "responses": ok("Item") } },
+            "/api/talent-pipelines": {
+                "post": { "tags": ["talent"], "summary": "Open a pipeline (succession|hiring|early_careers|internal_mobility)", "responses": created },
+                "get": { "tags": ["talent"], "summary": "Pipelines with health (live pool excludes placed/exited)", "responses": ok("Pipelines") }
+            },
+            "/api/talent-pipelines/{pid}": { "get": { "tags": ["talent"], "summary": "One pipeline, its health, and its members", "responses": ok("Pipeline") } },
+            "/api/talent-pipelines/{pid}/members": { "post": { "tags": ["talent"], "summary": "Add a candidate or employee at the identified stage (one row per subject)", "responses": created } },
+            "/api/pipeline-members/{pid}/stage": { "post": { "tags": ["talent"], "summary": "Stage move; ready may regress to developing", "responses": transition } },
+            "/api/early-career-programs": {
+                "post": { "tags": ["early-careers"], "summary": "Add an apprenticeship / internship / graduate scheme (an apprenticeship must declare its off-the-job hours)", "responses": created },
+                "get": { "tags": ["early-careers"], "summary": "The catalog with placement counts + conversion rate (?kind=)", "responses": ok("Programs") }
+            },
+            "/api/early-career-programs/{pid}/placements": { "post": { "tags": ["early-careers"], "summary": "Place someone on the programme (offered)", "responses": created } },
+            "/api/program-placements/{pid}/hours": { "post": { "tags": ["early-careers"], "summary": "Log off-the-job training hours (active placements only; checked add)", "responses": ok("Placement") } },
+            "/api/program-placements/{pid}/status": { "post": { "tags": ["early-careers"], "summary": "offered→active→completed; completing an apprenticeship requires its off-the-job hours", "responses": transition } },
+            "/api/employees/{pid}/placements": { "get": { "tags": ["early-careers"], "summary": "One person's placements with hours against the requirement", "responses": ok("Placements") } },
+            "/api/workforce-intelligence/overview": { "get": { "tags": ["intelligence"], "summary": "Headcount, FTE, tenure buckets, spans of control (?as_of=)", "responses": ok("Overview") } },
+            "/api/workforce-intelligence/capability": { "get": { "tags": ["intelligence"], "summary": "Declared skill coverage + gaps, plans in flight, assessment coverage", "responses": ok("Capability") } },
+            "/api/workforce-intelligence/succession": { "get": { "tags": ["intelligence"], "summary": "Bench strength + single points of failure (criticality × risk of loss)", "responses": ok("Succession") } },
+            "/api/workforce-intelligence/pipelines": { "get": { "tags": ["intelligence"], "summary": "Pipeline funnel + early-career conversion rates", "responses": ok("Pipelines") } },
+            "/api/wellbeing-entitlements": {
+                "post": { "tags": ["wellbeing"], "summary": "Add a health-entitlement rule (non-clinical predicates only: age band, departments, job titles; WPM-D17)", "responses": created },
+                "get": { "tags": ["wellbeing"], "summary": "The configured entitlement rules", "responses": ok("Entitlements") }
+            },
+            "/api/wellbeing-entitlements/{pid}": {
+                "put": { "tags": ["wellbeing"], "summary": "Restate a rule (cohorts change year to year; acknowledgements untouched)", "responses": ok("Entitlement") },
+                "delete": { "tags": ["wellbeing"], "summary": "Soft-close a rule (history kept)", "responses": ok("Deleted") }
+            },
+            "/api/employees/{pid}/wellbeing-prompts": { "get": { "tags": ["wellbeing"], "summary": "The employee's live prompts (self-service, employee-owned; one reminder max per multi-dose course; unknown age fails an age-banded rule)", "responses": ok("Prompts") } },
+            "/api/employees/{pid}/wellbeing-acknowledgements": { "post": { "tags": ["wellbeing"], "summary": "Acknowledge a prompt (booked|done|declined|dismissed; a workflow fact, never a vaccination status; audited)", "responses": created } },
+            "/api/wellbeing/uptake": { "get": { "tags": ["wellbeing"], "summary": "HR aggregate uptake: counts by response + rate with its terms; no individual appears", "responses": ok("Uptake") } },
             "/api/audits/recent": { "get": { "tags": ["audit"], "summary": "Recent audit entries", "responses": ok("Audit entries") } },
             "/api/audits": { "get": { "tags": ["audit"], "summary": "Department-scoped trail (?department=&since=)", "responses": ok("Audit entries") } },
             "/api/audits/{entity_pid}": { "get": { "tags": ["audit"], "summary": "One record's audit trail", "responses": ok("Audit entries") } },
@@ -163,6 +216,17 @@ mod tests {
             "/api/payroll-runs/{pid}/calculate",
             "/api/benchmarks/comparison",
             "/api/succession-plans/gaps",
+            "/api/assessments/{pid}/results",
+            "/api/employees/{pid}/assessment-profile",
+            "/api/employees/{pid}/development-plans",
+            "/api/talent-pipelines/{pid}/members",
+            "/api/early-career-programs/{pid}/placements",
+            "/api/program-placements/{pid}/status",
+            "/api/workforce-intelligence/succession",
+            "/api/wellbeing-entitlements",
+            "/api/employees/{pid}/wellbeing-prompts",
+            "/api/employees/{pid}/wellbeing-acknowledgements",
+            "/api/wellbeing/uptake",
         ] {
             assert!(paths.contains_key(p), "missing {p}");
         }

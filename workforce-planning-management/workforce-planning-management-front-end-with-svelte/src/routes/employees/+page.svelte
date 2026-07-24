@@ -6,7 +6,7 @@
     Willow as FilterTheme,
     createArrayFilter,
   } from "@svar-ui/svelte-filter";
-  import { listEmployees, money } from "$lib/api/hcm";
+  import { listEmployees, money } from "$lib/api/wpm";
   import { i18n, t } from "$lib/i18n.svelte";
   import type { Employee } from "$lib/api/types";
 

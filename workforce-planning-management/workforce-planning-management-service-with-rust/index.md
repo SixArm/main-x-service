@@ -1,6 +1,6 @@
 # Documentation index
 
-Human Capital Management — Loco edition. JSON-only back-end API for
+Workforce Planning Management — Loco edition. JSON-only back-end API for
 the employment lifecycle: hiring, workforce, HR core, talent
 development, payroll.
 
@@ -17,4 +17,4 @@ development, payroll.
 ## The task queue
 
 Live delivery checklist: [../spec/tasks.md](../spec/tasks.md)
-(HCM-T*, phased; production gates HCM-G*).
+(WPM-T*, phased; production gates WPM-G*).

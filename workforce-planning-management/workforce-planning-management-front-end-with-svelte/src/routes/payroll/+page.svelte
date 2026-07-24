@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { listRuns } from "$lib/api/hcm";
+  import { listRuns } from "$lib/api/wpm";
   import { t } from "$lib/i18n.svelte";
   import type { PayrollRun } from "$lib/api/types";
 

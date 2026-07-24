@@ -16,7 +16,9 @@
   );
 </script>
 
-<svelte:head><title>Sign-in link — Human Capital Management</title></svelte:head>
+<svelte:head
+  ><title>Sign-in link — Workforce Planning Management</title></svelte:head
+>
 
 <h1>Sign-in link</h1>
 <div class="panel">

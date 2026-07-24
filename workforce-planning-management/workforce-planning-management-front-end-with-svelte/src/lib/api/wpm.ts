@@ -1,4 +1,4 @@
-// Typed HCM API surface over the BFF proxy, plus the family `money()`
+// Typed WPM API surface over the BFF proxy, plus the family `money()`
 // formatter. Paths mirror the service routes one-to-one — the
 // Playwright suite stubs these exact paths, so drift fails loudly.
 
@@ -300,4 +300,83 @@ export function mentorshipOverview(days?: number, init?: FetchLike): Promise<{
 /** Change a mentorship's lifecycle status. */
 export function mentorshipStatus(pid: string, to: string): Promise<unknown> {
   return api(`/mentorships/${pid}/status`, { method: "POST", body: { to } });
+}
+
+// ─── Wellbeing (health entitlements, WPM-R25) ───────────────────────
+
+/** One configurable health-entitlement rule (non-clinical predicates only). */
+export interface WellbeingEntitlement {
+  pid: string;
+  name: string;
+  description: string;
+  info_url: string | null;
+  min_age: number | null;
+  max_age: number | null;
+  departments: string[];
+  job_titles: string[];
+  doses: number;
+  active_from: string | null;
+  active_until: string | null;
+}
+
+/** One live prompt (or the one multi-dose reminder) for an employee. */
+export interface WellbeingPrompt {
+  kind: "prompt" | "reminder";
+  entitlement_pid: string;
+  name: string;
+  description: string;
+  info_url: string | null;
+  doses: number;
+  response: string | null;
+}
+
+/** The configured entitlement rules. */
+export function listWellbeingEntitlements(init?: FetchLike): Promise<WellbeingEntitlement[]> {
+  return api("/wellbeing-entitlements", init);
+}
+
+/** Add an entitlement rule (HR configuration). */
+export function createWellbeingEntitlement(
+  body: Partial<Omit<WellbeingEntitlement, "pid">> & { name: string; description: string },
+): Promise<{ pid: string }> {
+  return api("/wellbeing-entitlements", { method: "POST", body });
+}
+
+/** Soft-close an entitlement rule. */
+export function deleteWellbeingEntitlement(pid: string): Promise<unknown> {
+  return api(`/wellbeing-entitlements/${pid}`, { method: "DELETE" });
+}
+
+/** An employee's live prompts (self-service). */
+export function employeeWellbeingPrompts(
+  pid: string,
+  init?: FetchLike,
+): Promise<{ as_of: string; age_known: boolean; derivation: string; prompts: WellbeingPrompt[] }> {
+  return api(`/employees/${pid}/wellbeing-prompts`, init);
+}
+
+/** Acknowledge a prompt (booked | done | declined | dismissed). */
+export function acknowledgeWellbeing(
+  employeePid: string,
+  entitlementPid: string,
+  response: "booked" | "done" | "declined" | "dismissed",
+): Promise<unknown> {
+  return api(`/employees/${employeePid}/wellbeing-acknowledgements`, {
+    method: "POST",
+    body: { entitlement_pid: entitlementPid, response },
+  });
+}
+
+/** HR aggregate uptake: counts only, no individuals. */
+export function wellbeingUptake(init?: FetchLike): Promise<{
+  as_of: string;
+  derivation: string;
+  entitlements: Array<{
+    entitlement_pid: string;
+    name: string;
+    by_response: Record<string, number>;
+    uptake_rate: { numerator: number; denominator: number; value: number | null };
+  }>;
+}> {
+  return api("/wellbeing/uptake", init);
 }

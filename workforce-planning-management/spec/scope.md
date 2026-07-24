@@ -36,18 +36,18 @@
 
 ## Boundary with the family
 
-| Concern | Owner | HCM holds |
+| Concern | Owner | WPM holds |
 |---|---|---|
 | Person identity (name, contacts, demographics) | person-service | `person:<pid>` EntityRef |
 | Professional identity, registrations | worker-service | `worker:<pid>` EntityRef |
 | Employer organization | organization-service | `organization:<pid>` EntityRef |
 | Courses / course instances | course-service | `course:` / `courseinstance:` EntityRefs on enrollments |
 | Sign-on, tokens, ABAC attrs | authentication-service | verified PASETO claims |
-| Employment relationship + all operational HR state | **HCM** | its own PostgreSQL tables |
+| Employment relationship + all operational HR state | **WPM** | its own PostgreSQL tables |
 
 The registry's `employed_by` (worker → organization) cross-service
-edge is the *identity-level* assertion of employment; HCM's Employee
-record is the *operational* record. HCM can emit/refresh the
+edge is the *identity-level* assertion of employment; WPM's Employee
+record is the *operational* record. WPM can emit/refresh the
 `employed_by` edge on hire/termination (roadmap), but the two are
 deliberately separate layers — see
 [integrations.md](integrations.md).

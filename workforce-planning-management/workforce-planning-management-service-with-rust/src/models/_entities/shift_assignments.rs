@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `shift_assignments`. One employee assigned to one shift; unassign = soft delete (HCM-R6).
+//! `SeaORM` Entity — `shift_assignments`. One employee assigned to one shift; unassign = soft delete (WPM-R6).
 
 #![allow(missing_docs)]
 

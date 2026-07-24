@@ -1,4 +1,4 @@
-//! Bearer-token authentication for the human-capital-management API.
+//! Bearer-token authentication for the workforce-planning-management API.
 //!
 //! [`AuthUser`] is an Axum extractor that pulls `Authorization: Bearer
 //! <paseto>`, verifies the PASETO `v4.public` (Ed25519) signature, issuer,
@@ -16,29 +16,29 @@
 //! called from `App::after_routes`, before the app serves traffic) and
 //! built from the environment:
 //!
-//! - `HCM_PASETO_KEYS_URL` — optional URL of the auth service's
+//! - `WPM_PASETO_KEYS_URL` — optional URL of the auth service's
 //!   published key set (`/.well-known/paseto-keys`). Set (non-blank) ⇒
 //!   the key set is fetched over HTTP **once at boot** via
 //!   [`Verifier::from_paseto_keys_url`]; on success the fetched key set
-//!   wins over `HCM_PASETO_KEYS` (`tracing::info!`), on failure the
+//!   wins over `WPM_PASETO_KEYS` (`tracing::info!`), on failure the
 //!   service logs a `tracing::warn!` and falls back to the env path
 //!   below — the service always boots. The key set is then **re-fetched
 //!   periodically** ([`spawn_key_refresh`]) so a key rotation is picked
-//!   up without a restart (interval `HCM_PASETO_KEYS_REFRESH_SECS`,
+//!   up without a restart (interval `WPM_PASETO_KEYS_REFRESH_SECS`,
 //!   default 1 h; `0` disables; keeps the current keys on a failed
 //!   fetch).
-//! - `HCM_PASETO_KEYS` — the Ed25519 key set (JSON, OKP/Ed25519
+//! - `WPM_PASETO_KEYS` — the Ed25519 key set (JSON, OKP/Ed25519
 //!   JWK form) the auth service publishes at `/.well-known/paseto-keys`.
 //!   Absent ⇒ an empty key set, so every token is rejected (the service
 //!   still boots).
-//! - `HCM_TOKEN_ISSUER` — expected `iss` (default
+//! - `WPM_TOKEN_ISSUER` — expected `iss` (default
 //!   `authentication-service`).
-//! - `HCM_TOKEN_AUDIENCE` — expected `aud` (default
+//! - `WPM_TOKEN_AUDIENCE` — expected `aud` (default
 //!   `main-x-service`).
 //!
 //! ## Blanket enforcement
 //!
-//! When `HCM_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
+//! When `WPM_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
 //! case-insensitive), the [`enforce`] decision — wired as an Axum
 //! middleware layer in `src/app.rs` — requires a valid bearer token on
 //! every route except the public health/ping, OpenAPI/Swagger, and
@@ -52,7 +52,7 @@
 //!
 //! ## Authorization (ABAC)
 //!
-//! Inside the same guard — so it applies only when `HCM_REQUIRE_AUTH`
+//! Inside the same guard — so it applies only when `WPM_REQUIRE_AUTH`
 //! is on — a verified token is further checked against an
 //! **attribute-based access control** policy per
 //! `agents/share/authorization-attributes.md`: the request's action is
@@ -60,8 +60,8 @@
 //! POSTs ([`DESTRUCTIVE_POST_SUFFIXES`]), and the shared engine in the
 //! `authentication-verifier` crate evaluates the policy over the
 //! token's `attrs` claim. The policy is read once per process
-//! ([`policy`], built by [`policy_from_env`]) from `HCM_ABAC_POLICY`
-//! (inline JSON) or `HCM_ABAC_POLICY_FILE` (path); unset or unparsable
+//! ([`policy`], built by [`policy_from_env`]) from `WPM_ABAC_POLICY`
+//! (inline JSON) or `WPM_ABAC_POLICY_FILE` (path); unset or unparsable
 //! ⇒ the built-in default policy (`svc=true` ⇒ everything;
 //! `access=admin` ⇒ destructive+write; `access=write` ⇒ write;
 //! otherwise read-only) — the service always boots. **401** =
@@ -85,7 +85,7 @@ use crate::models::_entities::{employees, payslips};
 
 /// The resource entity this crate guards, as seen by ABAC policies
 /// (the `entity` pseudo-attribute in rule `when` clauses).
-pub const ENTITY: &str = "hcm";
+pub const ENTITY: &str = "wpm";
 
 /// Path suffixes of this crate's **destructive named POSTs** (per
 /// `authorization-attributes.md` §2, fixed family-wide): record merge
@@ -116,18 +116,18 @@ pub fn verifier() -> &'static ReloadableVerifier {
 }
 
 /// Seed the process-wide [`verifier`] before the app serves traffic
-/// (called from `App::after_routes`). When `HCM_PASETO_KEYS_URL` is set
+/// (called from `App::after_routes`). When `WPM_PASETO_KEYS_URL` is set
 /// (non-blank) the published key set is fetched over HTTP **once at boot**
 /// and, on success, swapped in over the env-built one; on fetch failure,
 /// or with the URL unset/blank, the env-built verifier stands, so the
 /// service always boots. Idempotent enough to call once at boot.
 pub async fn init() {
-    if let Some(url) = std::env::var("HCM_PASETO_KEYS_URL")
-        .ok()
+    if let Some(url) = crate::compat::env_var("WPM_PASETO_KEYS_URL")
+        
         .filter(|s| !s.trim().is_empty())
     {
-        let issuer = env_or("HCM_TOKEN_ISSUER", DEFAULT_ISSUER);
-        let audience = env_or("HCM_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
+        let issuer = env_or("WPM_TOKEN_ISSUER", DEFAULT_ISSUER);
+        let audience = env_or("WPM_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
         // `fetch_or` keeps the env-built verifier as the fallback on a
         // failed fetch, so the service always has a usable verifier.
         let fetched = fetch_or(url.trim(), &issuer, &audience, build_from_env()).await;
@@ -136,37 +136,37 @@ pub async fn init() {
 }
 
 /// Default key-set refresh interval (seconds) when
-/// `HCM_PASETO_KEYS_REFRESH_SECS` is unset. One hour — key rotation is
+/// `WPM_PASETO_KEYS_REFRESH_SECS` is unset. One hour — key rotation is
 /// infrequent, so a slow poll suffices.
 const KEY_REFRESH_DEFAULT_SECS: u64 = 3600;
 
 /// Spawn a background task that periodically re-fetches the published
-/// key set from `HCM_PASETO_KEYS_URL` and swaps it into the live
+/// key set from `WPM_PASETO_KEYS_URL` and swaps it into the live
 /// [`verifier`], so a **key rotation** at the auth-service is picked up
 /// **without restarting** this service. On a failed fetch it keeps the
 /// current key set (a transient auth-service outage never locks callers
-/// out). Interval from `HCM_PASETO_KEYS_REFRESH_SECS` (default
+/// out). Interval from `WPM_PASETO_KEYS_REFRESH_SECS` (default
 /// [`KEY_REFRESH_DEFAULT_SECS`]); **`0` disables** the loop.
 ///
-/// A no-op when `HCM_PASETO_KEYS_URL` is unset (env-supplied keys have
+/// A no-op when `WPM_PASETO_KEYS_URL` is unset (env-supplied keys have
 /// nothing to re-fetch). Call once at boot (`app.rs::after_routes`).
 pub fn spawn_key_refresh() {
-    let Some(url) = std::env::var("HCM_PASETO_KEYS_URL")
-        .ok()
+    let Some(url) = crate::compat::env_var("WPM_PASETO_KEYS_URL")
+        
         .map(|u| u.trim().to_string())
         .filter(|u| !u.is_empty())
     else {
         return;
     };
-    let secs = std::env::var("HCM_PASETO_KEYS_REFRESH_SECS")
-        .ok()
+    let secs = crate::compat::env_var("WPM_PASETO_KEYS_REFRESH_SECS")
+        
         .and_then(|v| v.trim().parse::<u64>().ok())
         .unwrap_or(KEY_REFRESH_DEFAULT_SECS);
     if secs == 0 {
         return; // explicitly disabled
     }
-    let issuer = env_or("HCM_TOKEN_ISSUER", DEFAULT_ISSUER);
-    let audience = env_or("HCM_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
+    let issuer = env_or("WPM_TOKEN_ISSUER", DEFAULT_ISSUER);
+    let audience = env_or("WPM_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(std::time::Duration::from_secs(secs));
         ticker.tick().await; // the first tick is immediate — skip it
@@ -183,7 +183,7 @@ pub fn spawn_key_refresh() {
             }
         }
     });
-    tracing::info!(secs, "polling HCM_PASETO_KEYS_URL for key rotation");
+    tracing::info!(secs, "polling WPM_PASETO_KEYS_URL for key rotation");
 }
 
 /// Build a verifier by fetching the published key set from `url`
@@ -215,14 +215,14 @@ pub async fn fetch_or(url: &str, issuer: &str, audience: &str, fallback: Verifie
 }
 
 /// Whether blanket `/api/*` enforcement is on, read once from
-/// `HCM_REQUIRE_AUTH` and cached. Off by default — see the
+/// `WPM_REQUIRE_AUTH` and cached. Off by default — see the
 /// module docs and `agents/share/jwt-enforcement.md`. Mirrors
 /// [`verifier`]: a process-wide `OnceLock` built from the environment.
 #[must_use]
 pub fn require_auth() -> bool {
     static REQUIRE_AUTH: OnceLock<bool> = OnceLock::new();
     *REQUIRE_AUTH
-        .get_or_init(|| parse_bool(&std::env::var("HCM_REQUIRE_AUTH").unwrap_or_default()))
+        .get_or_init(|| parse_bool(&crate::compat::env_var("WPM_REQUIRE_AUTH").unwrap_or_default()))
 }
 
 /// Lenient boolean parse: `1`/`true`/`yes`/`on` (case-insensitive,
@@ -274,8 +274,8 @@ pub fn derive_action(method: &Method, path: &str) -> Action {
     }
 }
 
-/// Load the ABAC policy: `HCM_ABAC_POLICY` (inline JSON) wins, then
-/// `HCM_ABAC_POLICY_FILE` (path to a JSON file), else the built-in
+/// Load the ABAC policy: `WPM_ABAC_POLICY` (inline JSON) wins, then
+/// `WPM_ABAC_POLICY_FILE` (path to a JSON file), else the built-in
 /// default policy. A present-but-unparsable policy (bad JSON, unknown
 /// effect/action names, unreadable file) `tracing::warn!`s and falls
 /// back to the default — the service always boots, matching the
@@ -283,12 +283,12 @@ pub fn derive_action(method: &Method, path: &str) -> Action {
 /// change.
 #[must_use]
 pub fn policy_from_env() -> Policy {
-    let source = std::env::var("HCM_ABAC_POLICY")
-        .ok()
+    let source = crate::compat::env_var("WPM_ABAC_POLICY")
+        
         .filter(|v| !v.trim().is_empty())
         .or_else(|| {
-            let path = std::env::var("HCM_ABAC_POLICY_FILE")
-                .ok()
+            let path = crate::compat::env_var("WPM_ABAC_POLICY_FILE")
+                
                 .filter(|v| !v.trim().is_empty())?;
             match std::fs::read_to_string(path.trim()) {
                 Ok(contents) => Some(contents),
@@ -299,16 +299,46 @@ pub fn policy_from_env() -> Policy {
             }
         });
     match source {
-        Some(json) => Policy::from_json(&json).unwrap_or_else(|error| {
-            tracing::warn!(%error, "ABAC policy JSON invalid; using the built-in default policy");
-            Policy::default_policy()
-        }),
+        Some(json) => parse_policy(&json).unwrap_or_else(Policy::default_policy),
         None => Policy::default_policy(),
     }
 }
 
+/// Parse a mounted ABAC policy, first migrating any pre-rename
+/// `entity: "hcm"` condition to the current entity name
+/// ([`crate::compat::migrate_policy_entity`]).
+///
+/// The migration matters because a stale entity condition fails
+/// **silently**: the rule simply stops matching and the decision falls
+/// through to the default, so a policy that used to deny could start
+/// allowing with nothing in the logs. Rewriting it (with a deprecation
+/// warning) keeps a mounted policy meaning what its author wrote.
+///
+/// Returns `None` — warn-logged — when the JSON is not a valid policy,
+/// so the caller falls back to the built-in default and the service
+/// still boots.
+fn parse_policy(json: &str) -> Option<Policy> {
+    // Migrate on the parsed JSON when it is well-formed; a policy that
+    // does not even parse as JSON is handed to `Policy::from_json`
+    // unchanged so its own error message is the one reported.
+    let migrated = match serde_json::from_str::<serde_json::Value>(json) {
+        Ok(mut value) => {
+            crate::compat::migrate_policy_entity(&mut value);
+            serde_json::to_string(&value).unwrap_or_else(|_| json.to_string())
+        }
+        Err(_) => json.to_string(),
+    };
+    match Policy::from_json(&migrated) {
+        Ok(policy) => Some(policy),
+        Err(error) => {
+            tracing::warn!(%error, "ABAC policy JSON invalid; using the built-in default policy");
+            None
+        }
+    }
+}
+
 /// The process-wide **hot-reloadable** ABAC policy, initialised from
-/// `HCM_ABAC_POLICY` / `HCM_ABAC_POLICY_FILE` (else the built-in
+/// `WPM_ABAC_POLICY` / `WPM_ABAC_POLICY_FILE` (else the built-in
 /// default). Read the active snapshot with `policy().current()` per
 /// request; swap it at runtime with [`reload_policy`] (e.g. from the
 /// policy-file watcher in `app.rs`) — **no restart needed**.
@@ -318,8 +348,8 @@ pub fn policy() -> &'static ReloadablePolicy {
     POLICY.get_or_init(|| ReloadablePolicy::new(policy_from_env()))
 }
 
-/// Re-read the ABAC policy from the environment (`HCM_ABAC_POLICY` /
-/// `HCM_ABAC_POLICY_FILE`, same rules and default-fallback as
+/// Re-read the ABAC policy from the environment (`WPM_ABAC_POLICY` /
+/// `WPM_ABAC_POLICY_FILE`, same rules and default-fallback as
 /// [`policy_from_env`]) and swap it into the live [`policy`] holder.
 /// Called by the policy-file watcher (`app.rs`) when the file changes;
 /// a malformed policy falls back to the built-in default (never leaves
@@ -334,18 +364,18 @@ pub fn reload_policy() {
 const POLICY_WATCH_SECS: u64 = 15;
 
 /// Spawn a background task that hot-reloads the ABAC policy when the
-/// `HCM_ABAC_POLICY_FILE` changes on disk — so operators can edit the
+/// `WPM_ABAC_POLICY_FILE` changes on disk — so operators can edit the
 /// policy file and have it take effect without a restart. It polls the
 /// file's mtime every [`POLICY_WATCH_SECS`] and calls [`reload_policy`]
 /// on a change (mtime-poll, not an OS notify, to stay dependency-light).
 ///
-/// A no-op when `HCM_ABAC_POLICY_FILE` is unset — an inline
-/// `HCM_ABAC_POLICY` (or the built-in default) has nothing to watch,
+/// A no-op when `WPM_ABAC_POLICY_FILE` is unset — an inline
+/// `WPM_ABAC_POLICY` (or the built-in default) has nothing to watch,
 /// and env vars do not change at runtime. Call once at boot
 /// (`app.rs::after_routes`).
 pub fn spawn_policy_watcher() {
-    let Some(path) = std::env::var("HCM_ABAC_POLICY_FILE")
-        .ok()
+    let Some(path) = crate::compat::env_var("WPM_ABAC_POLICY_FILE")
+        
         .map(|p| p.trim().to_string())
         .filter(|p| !p.is_empty())
     else {
@@ -368,7 +398,7 @@ pub fn spawn_policy_watcher() {
     });
     tracing::info!(
         secs = POLICY_WATCH_SECS,
-        "watching HCM_ABAC_POLICY_FILE for changes"
+        "watching WPM_ABAC_POLICY_FILE for changes"
     );
 }
 
@@ -427,7 +457,7 @@ pub fn enforce(
 ///
 /// A deployment can then write e.g. "allow read only when
 /// `resource.department` is one of the caller's `dept` attributes",
-/// "allow when `resource.person = $sub`" (self-service, HCM-R8), or
+/// "allow when `resource.person = $sub`" (self-service, WPM-R8), or
 /// "allow a **masked** read otherwise" (an `allow` rule with the
 /// `mask` obligation) — entirely as policy, no code change.
 #[must_use]
@@ -453,7 +483,7 @@ pub const MASKED: &str = "\u{2022}\u{2022}\u{2022}";
 
 /// Apply the `mask` obligation to an employee: redact the salary
 /// (amount **and** currency). Employment facts — title, department,
-/// dates, status — remain visible (HCM-R15: structure stays, money
+/// dates, status — remain visible (WPM-R15: structure stays, money
 /// goes).
 #[must_use]
 pub fn mask_employee(mut employee: employees::Model) -> employees::Model {
@@ -514,7 +544,7 @@ fn env_attrs_at(hour: u32) -> BTreeMap<String, Vec<String>> {
 /// decision with attributes of the *specific* record and the request
 /// context.
 ///
-/// Gated on the same `HCM_REQUIRE_AUTH` flag as the blanket guard:
+/// Gated on the same `WPM_REQUIRE_AUTH` flag as the blanket guard:
 /// when enforcement is **off** this is a no-op (behaviour-neutral, no
 /// authn/authz); when **on**, the blanket guard guarantees a token, so
 /// absent claims here are a `401` fail-safe.
@@ -555,12 +585,12 @@ pub fn authorize_record(
 
 /// Read env var `name`, treating unset/blank as absent and falling back
 /// to `default`. Used for the issuer/audience so a blank value doesn't
-/// override the sensible default.
+/// override the sensible default. Goes through
+/// [`crate::compat::env_var`], so a deployment still setting the
+/// pre-rename `HCM_*` spelling keeps working (with a deprecation
+/// warning) instead of silently reverting to the default.
 fn env_or(name: &str, default: &str) -> String {
-    std::env::var(name)
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| default.to_string())
+    crate::compat::env_var(name).unwrap_or_else(|| default.to_string())
 }
 
 /// Build the process-wide [`Verifier`] from the environment: issuer,
@@ -568,11 +598,9 @@ fn env_or(name: &str, default: &str) -> String {
 /// set yields an empty key set (every token rejected) so the service still
 /// boots without credentials configured.
 fn build_from_env() -> Verifier {
-    let issuer = env_or("HCM_TOKEN_ISSUER", DEFAULT_ISSUER);
-    let audience = env_or("HCM_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
-    let keys = std::env::var("HCM_PASETO_KEYS")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
+    let issuer = env_or("WPM_TOKEN_ISSUER", DEFAULT_ISSUER);
+    let audience = env_or("WPM_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
+    let keys = crate::compat::env_var("WPM_PASETO_KEYS")
         .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
         .unwrap_or_else(|| serde_json::json!({ "keys": [] }));
     Verifier::from_paseto_keys_value(&keys, &issuer, &audience)
@@ -875,7 +903,7 @@ mod tests {
         }
     }
 
-    /// SEC-G8 — the default-off **exposure pin**. With `HCM_REQUIRE_AUTH`
+    /// SEC-G8 — the default-off **exposure pin**. With `WPM_REQUIRE_AUTH`
     /// off (the shipped default), the most sensitive reads — the audit
     /// trail, patient locate, and a single stay's PII — are **open without
     /// a token**. This is by design

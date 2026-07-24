@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `succession_candidates`. One ranked successor on a plan (HCM-R12).
+//! `SeaORM` Entity — `succession_candidates`. One ranked successor on a plan (WPM-R12).
 
 #![allow(missing_docs)]
 

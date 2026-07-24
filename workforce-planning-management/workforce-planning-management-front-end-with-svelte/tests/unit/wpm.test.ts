@@ -3,7 +3,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { money } from "../../src/lib/api/hcm";
+import { money } from "../../src/lib/api/wpm";
 import {
   DEFAULT_LOCALE,
   LOCALES,
@@ -61,20 +61,23 @@ describe("api path map", () => {
         });
       }),
     );
-    const hcm = await import("../../src/lib/api/hcm");
-    await hcm.listEmployees({ department: "engineering" });
-    await hcm.getEmployee("p1");
-    await hcm.orgChart("organization:abc");
-    await hcm.listRequisitions("open");
-    await hcm.listRuns();
-    await hcm.runPayslips("r1");
-    await hcm.benchmarkComparison("organization:abc");
-    await hcm.listSkills();
-    await hcm.skillsMatrix();
-    await hcm.trainingAnalytics();
-    await hcm.listPaths();
-    await hcm.pathProgress("path1");
-    await hcm.mentorshipOverview(30);
+    const wpm = await import("../../src/lib/api/wpm");
+    await wpm.listEmployees({ department: "engineering" });
+    await wpm.getEmployee("p1");
+    await wpm.orgChart("organization:abc");
+    await wpm.listRequisitions("open");
+    await wpm.listRuns();
+    await wpm.runPayslips("r1");
+    await wpm.benchmarkComparison("organization:abc");
+    await wpm.listSkills();
+    await wpm.skillsMatrix();
+    await wpm.trainingAnalytics();
+    await wpm.listPaths();
+    await wpm.pathProgress("path1");
+    await wpm.mentorshipOverview(30);
+    await wpm.listWellbeingEntitlements();
+    await wpm.employeeWellbeingPrompts("p1");
+    await wpm.wellbeingUptake();
     expect(calls).toEqual([
       "/api/proxy/employees?department=engineering",
       "/api/proxy/employees/p1",
@@ -89,6 +92,9 @@ describe("api path map", () => {
       "/api/proxy/learning-paths",
       "/api/proxy/learning-paths/path1/progress",
       "/api/proxy/learning/mentorship-overview?days=30",
+      "/api/proxy/wellbeing-entitlements",
+      "/api/proxy/employees/p1/wellbeing-prompts",
+      "/api/proxy/wellbeing/uptake",
     ]);
     vi.unstubAllGlobals();
   });

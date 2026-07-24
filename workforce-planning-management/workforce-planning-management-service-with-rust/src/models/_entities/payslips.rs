@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `payslips`. One employee's payslip in one run: gross, deduction lines (JSONB), net (HCM-R13).
+//! `SeaORM` Entity — `payslips`. One employee's payslip in one run: gross, deduction lines (JSONB), net (WPM-R13).
 
 #![allow(missing_docs)]
 

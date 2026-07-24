@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `leave_entitlements`. One employee's leave entitlement per kind and year, whole days (HCM-R5).
+//! `SeaORM` Entity — `leave_entitlements`. One employee's leave entitlement per kind and year, whole days (WPM-R5).
 
 #![allow(missing_docs)]
 

@@ -219,3 +219,34 @@ test("mentorship area renders load, unmatched, and stale", async ({ page }) => {
   await expect(page.getByTestId("unmatched").getByText("Solo Dev")).toBeVisible();
   await expect(page.getByTestId("stale-mentorships").getByText("2026-05-01")).toBeVisible();
 });
+
+test("wellbeing area renders rules and aggregate-only uptake", async ({ page }) => {
+  await page.route("**/api/proxy/wellbeing-entitlements", (route) =>
+    route.fulfill({
+      json: [{
+        pid: "w1", name: "Seasonal flu vaccination",
+        description: "Free NHS flu jab for frontline staff.",
+        info_url: null, min_age: null, max_age: null,
+        departments: ["engineering"], job_titles: [], doses: 2,
+        active_from: null, active_until: null,
+      }],
+    }),
+  );
+  await page.route("**/api/proxy/wellbeing/uptake", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-24T00:00:00Z",
+        derivation: "uptake = (booked + done) / all acknowledgements; counts only",
+        entitlements: [{
+          entitlement_pid: "w1", name: "Seasonal flu vaccination",
+          by_response: { booked: 3, done: 1, declined: 1, dismissed: 0 },
+          uptake_rate: { numerator: 4, denominator: 5, value: 0.8 },
+        }],
+      },
+    }),
+  );
+  await page.goto("/wellbeing");
+  await expect(page.getByTestId("wellbeing-rules").getByText("Seasonal flu vaccination")).toBeVisible();
+  await expect(page.getByTestId("wellbeing-rules").getByText("engineering")).toBeVisible();
+  await expect(page.getByTestId("wellbeing-uptake").getByText("80% (4/5)")).toBeVisible();
+});

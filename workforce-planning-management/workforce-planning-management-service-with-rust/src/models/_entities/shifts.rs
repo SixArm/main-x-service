@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `shifts`. One planned shift for a department (HCM-R6).
+//! `SeaORM` Entity — `shifts`. One planned shift for a department (WPM-R6).
 
 #![allow(missing_docs)]
 

@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `succession_plans`. One critical role's succession plan (HCM-R12).
+//! `SeaORM` Entity — `succession_plans`. One critical role's succession plan (WPM-R12).
 
 #![allow(missing_docs)]
 
@@ -18,6 +18,10 @@ pub struct Model {
     pub department: String,
     pub criticality: i32,
     pub incumbent_pid: Option<Uuid>,
+    /// How likely the incumbent is to leave: `low` | `medium` | `high`.
+    pub risk_of_loss: Option<String>,
+    /// When the role is expected to fall vacant, when that is known.
+    pub vacancy_expected_on: Option<Date>,
     pub deleted_at: Option<DateTimeWithTimeZone>,
 }
 

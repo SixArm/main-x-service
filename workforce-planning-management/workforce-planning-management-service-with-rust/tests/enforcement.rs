@@ -1,7 +1,7 @@
-//! Auth-activation persona matrix over the live routes (HCM-R15).
+//! Auth-activation persona matrix over the live routes (WPM-R15).
 //!
 //! Its own test binary (not part of `tests/mod.rs`) because
-//! `HCM_REQUIRE_AUTH` and the key set are cached in process-wide
+//! `WPM_REQUIRE_AUTH` and the key set are cached in process-wide
 //! `OnceLock`s — the flag must be set **before** the app boots, once
 //! per process. A throwaway Ed25519 key mints PASETO tokens + the
 //! matching key set in-process (no auth service needed).
@@ -13,7 +13,7 @@
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use ed25519_dalek::SigningKey;
-use human_capital_management_service::app::App;
+use workforce_planning_management_service::app::App;
 use loco_rs::testing::prelude::*;
 use rusty_paseto::core::{Footer, Key, Paseto, PasetoAsymmetricPrivateKey, Payload, Public, V4};
 use serde_json::{Value, json};
@@ -90,9 +90,9 @@ async fn enforcement_personas_gate_and_mask() {
     // The auth OnceLocks read these on first use — set before boot.
     // `set_var` is `unsafe` in edition 2024; single-threaded setup step.
     unsafe {
-        std::env::set_var("HCM_REQUIRE_AUTH", "1");
-        std::env::set_var("HCM_PASETO_KEYS", keys.to_string());
-        std::env::set_var("HCM_ABAC_POLICY", test_policy());
+        std::env::set_var("WPM_REQUIRE_AUTH", "1");
+        std::env::set_var("WPM_PASETO_KEYS", keys.to_string());
+        std::env::set_var("WPM_ABAC_POLICY", test_policy());
     }
     let my_person = uuid::Uuid::new_v4();
     let me = sign_as(&kid, &my_person.to_string(), &[]);

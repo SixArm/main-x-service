@@ -1,4 +1,4 @@
-//! Payslip arithmetic (HCM-R13, HCM-D4/D5), DB-free: minor units
+//! Payslip arithmetic (WPM-R13, WPM-D4/D5), DB-free: minor units
 //! only, every operation overflow-checked, and the reconciliation
 //! invariant `net = gross − Σ deductions` enforced by construction
 //! and re-checked before persist.
@@ -6,7 +6,7 @@
 //! The tax table is a deliberate **stub** (demo software): a flat
 //! `TAX_RATE_PERCENT` above a monthly `TAX_FREE_MINOR` allowance.
 //! Production requires jurisdiction-correct tables (spec
-//! `regulatory.md`; gate HCM-G2).
+//! `regulatory.md`; gate WPM-G2).
 
 /// One deduction line on a payslip.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -134,7 +134,7 @@ pub fn compute_payslip(
 }
 
 /// The persist-gate reconciliation: `net = gross − Σ deductions`
-/// (HCM-R13). Called by [`compute_payslip`] and again by the
+/// (WPM-R13). Called by [`compute_payslip`] and again by the
 /// controller before insert, so a hand-constructed slip cannot lie.
 ///
 /// # Errors

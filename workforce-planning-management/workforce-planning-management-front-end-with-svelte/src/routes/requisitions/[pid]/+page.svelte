@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from "$app/state";
-  import { applicationStage, getRequisition, listApplications } from "$lib/api/hcm";
+  import { applicationStage, getRequisition, listApplications } from "$lib/api/wpm";
   import { t } from "$lib/i18n.svelte";
   import type { Application, Requisition } from "$lib/api/types";
 

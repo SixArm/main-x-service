@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `review_cycles`. One performance review cycle (HCM-R10).
+//! `SeaORM` Entity — `review_cycles`. One performance review cycle (WPM-R10).
 
 #![allow(missing_docs)]
 

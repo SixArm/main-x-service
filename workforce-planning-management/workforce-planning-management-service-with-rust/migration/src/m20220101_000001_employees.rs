@@ -1,5 +1,5 @@
 //! Migration: create the `employees` table — the single source of
-//! employment truth (HCM-R7). Identities are EntityRef URNs; the
+//! employment truth (WPM-R7). Identities are EntityRef URNs; the
 //! employee number is unique per organization; salary is minor units
 //! (sensitive — masked at the read surface).
 //!
@@ -47,7 +47,7 @@ impl MigrationTrait for Migration {
              )",
         )
         .await?;
-        // The per-organization employee-number uniqueness (HCM-R7),
+        // The per-organization employee-number uniqueness (WPM-R7),
         // scoped to live rows so a re-used number after termination +
         // soft delete stays possible.
         conn.execute_unprepared(

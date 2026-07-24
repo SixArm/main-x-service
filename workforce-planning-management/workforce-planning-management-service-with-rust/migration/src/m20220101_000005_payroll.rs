@@ -1,4 +1,4 @@
-//! Migration: the payroll & compensation tables (HCM-R13, HCM-R14) —
+//! Migration: the payroll & compensation tables (WPM-R13, WPM-R14) —
 //! `payroll_runs`, `payslips` (minor units; deductions as JSONB
 //! lines), `benchmarks`.
 

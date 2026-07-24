@@ -1,8 +1,8 @@
-//! Payroll & compensation (HCM-R13, HCM-R14): runs (draft →
-//! calculated → approved → paid), derived payslips (HCM-D5: payroll
+//! Payroll & compensation (WPM-R13, WPM-R14): runs (draft →
+//! calculated → approved → paid), derived payslips (WPM-D5: payroll
 //! is a derivation, not an editor), and salary benchmarking.
 //! Payslip reads honour the `mask` obligation via the owning
-//! employee's record-level ABAC pass (HCM-R15).
+//! employee's record-level ABAC pass (WPM-R15).
 
 use loco_rs::prelude::*;
 use sea_orm::{QueryOrder, QuerySelect, TransactionTrait};
@@ -108,7 +108,7 @@ async fn get_run(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Resu
 /// `POST /api/payroll-runs/{pid}/calculate` — derive one payslip per
 /// salaried in-scope employee from salary × FTE, **approved**
 /// overtime in the period, and benefit employee-costs; stub tax
-/// (HCM-R13, HCM-D5). Re-calculation replaces the run's payslips
+/// (WPM-R13, WPM-D5). Re-calculation replaces the run's payslips
 /// (drafts only — the lifecycle gate enforces it).
 #[allow(clippy::too_many_lines)] // one linear derivation walk per employee
 #[debug_handler]
@@ -181,7 +181,7 @@ async fn calculate_run(
         }
         let slip = rules::compute_payslip(salary, employee.fte_percent, overtime, &benefit_costs)
             .map_err(|e| unprocessable(&format!("payslip for {}: {e}", employee.employee_number)))?;
-        // The persist gate re-checks the invariant (HCM-R13).
+        // The persist gate re-checks the invariant (WPM-R13).
         rules::reconcile(&slip).map_err(|e| unprocessable(&e))?;
         payslips::ActiveModel {
             pid: ActiveValue::set(Uuid::new_v4()),
@@ -304,7 +304,7 @@ async fn masked_payslips(
 }
 
 /// `GET /api/payroll-runs/{pid}/payslips` — the run's payslips; the
-/// read is audited (HCM-D7).
+/// read is audited (WPM-D7).
 #[debug_handler]
 async fn run_payslips(
     State(ctx): State<AppContext>,
@@ -323,7 +323,7 @@ async fn run_payslips(
 }
 
 /// `GET /api/employees/{pid}/payslips` — one employee's payslips
-/// (self-service surface, HCM-R8); audited.
+/// (self-service surface, WPM-R8); audited.
 #[debug_handler]
 async fn employee_payslips(
     State(ctx): State<AppContext>,
@@ -390,7 +390,7 @@ async fn list_benchmarks(State(ctx): State<AppContext>) -> Result<Response> {
 
 /// `GET /api/benchmarks/comparison?organization=<ref>` — every
 /// salaried employee vs the newest benchmark for their job title:
-/// `below_min` / `within` / `above_max` (HCM-R14). Salary values are
+/// `below_min` / `within` / `above_max` (WPM-R14). Salary values are
 /// **not** echoed — only the flags — so the view is compensation-
 /// persona data without leaking amounts; the read is audited.
 #[derive(Debug, Deserialize)]

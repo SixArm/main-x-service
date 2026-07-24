@@ -1,11 +1,11 @@
-//! Lifecycle state machines (HCM-D3): one transition table per
+//! Lifecycle state machines (WPM-D3): one transition table per
 //! pipeline, all funnelled through [`check`] so every controller gives
 //! the same `422`-shaped answer ("cannot move X from `a` to `b`").
 //!
 //! Tables are `(from, to)` pairs — small, explicit, and exhaustively
 //! unit-tested below. Terminal states simply have no outgoing pairs.
 
-/// The legal employee status transitions (HCM-R7).
+/// The legal employee status transitions (WPM-R7).
 /// `onboarding → active` additionally requires the onboarding gate
 /// ([`crate::rules::workforce`] has no say here — the controller checks
 /// item completion; this table is the shape).
@@ -20,7 +20,7 @@ pub const EMPLOYEE: &[(&str, &str)] = &[
     ("onboarding", "terminated"), // failed pre-start (e.g. right-to-work)
 ];
 
-/// The legal requisition transitions (HCM-R1).
+/// The legal requisition transitions (WPM-R1).
 pub const REQUISITION: &[(&str, &str)] = &[
     ("draft", "open"),
     ("open", "interviewing"),
@@ -33,7 +33,7 @@ pub const REQUISITION: &[(&str, &str)] = &[
     ("offer", "cancelled"),
 ];
 
-/// The legal application stage transitions (HCM-R2). `rejected` and
+/// The legal application stage transitions (WPM-R2). `rejected` and
 /// `withdrawn` are reachable from every non-terminal stage.
 pub const APPLICATION: &[(&str, &str)] = &[
     ("received", "screened"),
@@ -50,7 +50,7 @@ pub const APPLICATION: &[(&str, &str)] = &[
     ("offer", "withdrawn"),
 ];
 
-/// The legal leave request transitions (HCM-R5).
+/// The legal leave request transitions (WPM-R5).
 pub const LEAVE: &[(&str, &str)] = &[
     ("requested", "approved"),
     ("requested", "rejected"),
@@ -58,7 +58,7 @@ pub const LEAVE: &[(&str, &str)] = &[
     ("approved", "cancelled"), // pre-start cancellation restores balance
 ];
 
-/// The legal review transitions (HCM-R10).
+/// The legal review transitions (WPM-R10).
 pub const REVIEW: &[(&str, &str)] = &[
     ("draft", "submitted"),
     ("submitted", "calibrated"),
@@ -66,7 +66,7 @@ pub const REVIEW: &[(&str, &str)] = &[
     ("calibrated", "shared"),
 ];
 
-/// The legal payroll run transitions (HCM-R13). `calculated → draft`
+/// The legal payroll run transitions (WPM-R13). `calculated → draft`
 /// is the re-open for re-calculation; `approved` is immutable except
 /// the `paid` stamp.
 pub const PAYROLL: &[(&str, &str)] = &[
@@ -199,7 +199,7 @@ mod tests {
 
     /// Payroll: draft ⇄ calculated, approve only from calculated, pay
     /// only from approved; `paid` is terminal; approved never returns
-    /// to draft (immutability, HCM-R13).
+    /// to draft (immutability, WPM-R13).
     #[test]
     fn payroll_matrix() {
         assert!(permits(PAYROLL, "draft", "calculated"));

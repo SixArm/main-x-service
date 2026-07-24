@@ -4,10 +4,10 @@
  employee / manager / HR browser
         │  (cookie session; no token in JS)
         ▼
- human-capital-management-front-end-with-svelte  (SvelteKit BFF)
+ workforce-planning-management-front-end-with-svelte  (SvelteKit BFF)
         │  Authorization: Bearer v4.public.…
         ▼
- human-capital-management-service-with-rust  (Loco: Axum + SeaORM + PostgreSQL)
+ workforce-planning-management-service-with-rust  (Loco: Axum + SeaORM + PostgreSQL)
         │  EntityRef lookups (read-only, cached, stub-able)
         ▼
  person / worker / organization / course / authentication services

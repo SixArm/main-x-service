@@ -1,7 +1,7 @@
 //! loco.rs application wiring: the [`App`] `Hooks` implementation that
 //! registers routes, the blanket auth guard, the API-version
 //! middleware, and the truncate lifecycle for
-//! `human-capital-management-service`.
+//! `workforce-planning-management-service`.
 
 use async_trait::async_trait;
 use axum::{
@@ -26,7 +26,7 @@ use std::path::Path;
 
 use crate::{auth, controllers, models::_entities::prelude::*, tasks};
 
-/// Blanket auth-enforcement middleware: reads `HCM_REQUIRE_AUTH` per
+/// Blanket auth-enforcement middleware: reads `WPM_REQUIRE_AUTH` per
 /// request and delegates to the pure [`auth::enforce`] (public paths
 /// and the disabled flag pass through; otherwise a valid bearer PASETO
 /// is required (`401`) and its `attrs` must satisfy the ABAC policy
@@ -50,7 +50,7 @@ async fn require_auth_mw(req: Request, next: Next) -> Response {
     }
 }
 
-/// The loco.rs application hooks for `human-capital-management-service`.
+/// The loco.rs application hooks for `workforce-planning-management-service`.
 pub struct App;
 #[async_trait]
 impl Hooks for App {
@@ -84,10 +84,14 @@ impl Hooks for App {
         AppRoutes::with_default_routes()
             .add_route(controllers::hr_core::routes())
             .add_route(controllers::acquisition::routes())
+            .add_route(controllers::assessments::routes())
             .add_route(controllers::workforce::routes())
             .add_route(controllers::development::routes())
             .add_route(controllers::learning::routes())
+            .add_route(controllers::talent::routes())
+            .add_route(controllers::intelligence::routes())
             .add_route(controllers::payroll::routes())
+            .add_route(controllers::wellbeing::routes())
             .add_route(controllers::audits::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
@@ -95,7 +99,7 @@ impl Hooks for App {
 
     async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
         // Seed the PASETO verifier (boot-time key fetch when
-        // `HCM_PASETO_KEYS_URL` is set; env fallback — the service
+        // `WPM_PASETO_KEYS_URL` is set; env fallback — the service
         // always boots), then keep keys + policy fresh.
         auth::init().await;
         auth::spawn_key_refresh();
@@ -119,6 +123,17 @@ impl Hooks for App {
     async fn truncate(ctx: &AppContext) -> Result<()> {
         truncate_table(&ctx.db, EventOutbox).await?;
         truncate_table(&ctx.db, AuditLogs).await?;
+        truncate_table(&ctx.db, EntitlementAcknowledgements).await?;
+        truncate_table(&ctx.db, WellbeingEntitlements).await?;
+        truncate_table(&ctx.db, ProgramPlacements).await?;
+        truncate_table(&ctx.db, EarlyCareerPrograms).await?;
+        truncate_table(&ctx.db, PipelineMembers).await?;
+        truncate_table(&ctx.db, TalentPipelines).await?;
+        truncate_table(&ctx.db, DevelopmentPlanItems).await?;
+        truncate_table(&ctx.db, DevelopmentPlans).await?;
+        truncate_table(&ctx.db, AssessmentResults).await?;
+        truncate_table(&ctx.db, Assessments).await?;
+        truncate_table(&ctx.db, AssessmentInstruments).await?;
         truncate_table(&ctx.db, Benchmarks).await?;
         truncate_table(&ctx.db, Payslips).await?;
         truncate_table(&ctx.db, PayrollRuns).await?;

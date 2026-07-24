@@ -1,4 +1,4 @@
-//! Prometheus metrics for the HCM service.
+//! Prometheus metrics for the WPM service.
 //!
 //! A process-wide [`Registry`](prometheus::Registry) with lifecycle
 //! counters plus live workforce **gauges** (headcount, open
@@ -12,7 +12,7 @@ use prometheus::{Counter, Encoder, IntGauge, Opts, Registry, TextEncoder};
 /// Content type for the Prometheus text-exposition format.
 pub const CONTENT_TYPE: &str = "text/plain; version=0.0.4";
 
-/// Process-wide registry and the HCM metric handles.
+/// Process-wide registry and the WPM metric handles.
 pub struct Metrics {
     /// The underlying registry.
     pub registry: Registry,

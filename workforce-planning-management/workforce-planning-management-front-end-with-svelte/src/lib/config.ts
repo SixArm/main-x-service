@@ -1,4 +1,4 @@
-// Build/runtime configuration for the human-capital-management operator front-end.
+// Build/runtime configuration for the workforce-planning-management operator front-end.
 //
 // API calls go to the same-origin BFF proxy (`/api/proxy/...`); the
 // browser never holds a token (see `../spec/auth.md`). The base is

@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `feedback_entries`. One feedback entry on a review (HCM-R10).
+//! `SeaORM` Entity — `feedback_entries`. One feedback entry on a review (WPM-R10).
 
 #![allow(missing_docs)]
 

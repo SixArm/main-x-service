@@ -1,7 +1,7 @@
 //! Closed token vocabularies for the string-typed domain columns.
 //!
 //! Each `const` slice is the closed set the validators accept; the
-//! database stores the token verbatim (HCM-D2 keeps the schema plain
+//! database stores the token verbatim (WPM-D2 keeps the schema plain
 //! strings so a vocabulary can grow by data migration, not DDL).
 
 /// Employee statuses (lifecycle in [`crate::rules::lifecycle`]).
@@ -41,7 +41,7 @@ pub const INTERVIEW_OUTCOMES: &[&str] = &["pending", "advance", "reject"];
 /// Onboarding item statuses.
 pub const ONBOARDING_STATUSES: &[&str] = &["pending", "complete", "waived"];
 
-/// Time entry kinds. Overtime is **derived** (HCM-R4); the `overtime`
+/// Time entry kinds. Overtime is **derived** (WPM-R4); the `overtime`
 /// kind exists for explicitly-agreed extra time.
 pub const TIME_KINDS: &[&str] = &["regular", "overtime", "on_call"];
 
@@ -49,7 +49,7 @@ pub const TIME_KINDS: &[&str] = &["regular", "overtime", "on_call"];
 pub const TIME_STATUSES: &[&str] = &["recorded", "approved"];
 
 /// Leave kinds. Annual leave enforces the balance; sick may go
-/// negative but is flagged (HCM-R5).
+/// negative but is flagged (WPM-R5).
 pub const LEAVE_KINDS: &[&str] = &["annual", "sick", "parental", "unpaid", "other"];
 
 /// Leave request statuses.

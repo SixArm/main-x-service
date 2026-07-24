@@ -1,4 +1,4 @@
-//! `human-capital-management-service` binary entrypoint — boots the loco.rs CLI,
+//! `workforce-planning-management-service` binary entrypoint — boots the loco.rs CLI,
 //! wiring the `App` hooks and the database migrator. See the crate
 //! library docs for the service overview.
 
@@ -12,7 +12,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 use loco_rs::cli;
 use migration::Migrator;
-use human_capital_management_service::app::App;
+use workforce_planning_management_service::app::App;
 
 #[tokio::main]
 async fn main() -> loco_rs::Result<()> {

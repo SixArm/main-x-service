@@ -1,6 +1,6 @@
-//! Talent acquisition (HCM-R1–R3): requisitions, candidates,
+//! Talent acquisition (WPM-R1–R3): requisitions, candidates,
 //! applications + interviews, and onboarding checklists. Hiring an
-//! application creates the Employee in one transaction (HCM-D9).
+//! application creates the Employee in one transaction (WPM-D9).
 
 use loco_rs::prelude::*;
 use sea_orm::{PaginatorTrait, QueryOrder, QuerySelect, TransactionTrait};
@@ -203,7 +203,7 @@ async fn get_requisition(State(ctx): State<AppContext>, Path(pid): Path<String>)
 }
 
 /// `POST /api/requisitions/{pid}/status` — one pipeline transition.
-/// `filled` requires hired applications ≥ headcount (HCM-R1).
+/// `filled` requires hired applications ≥ headcount (WPM-R1).
 #[derive(Debug, Deserialize)]
 struct RequisitionStatusPayload {
     to: String,
@@ -300,7 +300,7 @@ async fn create_candidate(
 }
 
 /// `GET /api/candidates` — the pool. Consent-expired candidates are
-/// **excluded** (HCM-D8); `?expired=1` lists only the purge queue.
+/// **excluded** (WPM-D8); `?expired=1` lists only the purge queue.
 #[derive(Debug, Deserialize)]
 struct CandidateListParams {
     #[serde(default)]
@@ -386,7 +386,7 @@ async fn list_applications(State(ctx): State<AppContext>, Path(pid): Path<String
 
 /// `POST /api/applications/{pid}/stage` — one stage transition.
 /// `hired` creates the Employee (onboarding status) **in the same
-/// transaction** (HCM-R2, HCM-D9) and emits `employee_hired`.
+/// transaction** (WPM-R2, WPM-D9) and emits `employee_hired`.
 #[allow(clippy::too_many_lines)] // one linear stage walk incl. the in-tx hire
 #[debug_handler]
 async fn application_stage(
@@ -698,7 +698,7 @@ async fn complete_item(
 }
 
 /// `POST /api/onboarding-items/{pid}/waive` — waive with a recorded
-/// reason (HCM-R3).
+/// reason (WPM-R3).
 #[debug_handler]
 async fn waive_item(
     State(ctx): State<AppContext>,

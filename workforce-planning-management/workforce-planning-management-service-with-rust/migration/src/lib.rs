@@ -1,5 +1,5 @@
 //! `sea-orm-migration` schema migrations for
-//! `human-capital-management-service`.
+//! `workforce-planning-management-service`.
 //!
 //! The [`Migrator`] runs the ordered list below at boot (or via
 //! `cargo loco db migrate`): the employee core, the acquisition
@@ -19,6 +19,9 @@ mod m20220101_000005_payroll;
 mod m20220101_000006_audit_logs;
 mod m20220101_000007_event_outbox;
 mod m20260720_000008_learning;
+mod m20260723_000009_assessments;
+mod m20260723_000010_talent;
+mod m20260724_000011_wellbeing;
 
 /// The crate's migrator: drives the ordered migration set for the loco
 /// CLI / boot-time migration.
@@ -39,6 +42,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20220101_000006_audit_logs::Migration),
             Box::new(m20220101_000007_event_outbox::Migration),
             Box::new(m20260720_000008_learning::Migration),
+            Box::new(m20260723_000009_assessments::Migration),
+            Box::new(m20260723_000010_talent::Migration),
+            Box::new(m20260724_000011_wellbeing::Migration),
             // inject-above (do not remove this comment)
         ]
     }

@@ -1,4 +1,4 @@
-//! `SeaORM` Entity — `applications`. One candidate's application to one requisition (HCM-R2).
+//! `SeaORM` Entity — `applications`. One candidate's application to one requisition (WPM-R2).
 
 #![allow(missing_docs)]
 

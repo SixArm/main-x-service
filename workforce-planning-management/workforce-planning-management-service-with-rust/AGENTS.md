@@ -6,16 +6,19 @@ subproject. Read this **before** opening a PR.
 ## What this project is
 
 A **back-end JSON API**, written in Rust on [Loco](https://loco.rs)
-(Axum + SeaORM + PostgreSQL), for human capital management: employee
+(Axum + SeaORM + PostgreSQL), for workforce planning management: employee
 records and the employment lifecycle, the applicant-tracking
 pipeline and onboarding checklists, time & attendance, leave, shift
 scheduling, benefits, performance reviews, training enrollments,
-succession plans, payroll runs with payslips, and salary
+assessments (aptitude / personality / psychometric / selection),
+upskilling and reskilling plans, talent pipelines, apprenticeships
+and internships, succession plans with bench strength, workforce
+intelligence, payroll runs with payslips, and salary
 benchmarking. There is no built-in UI — the
-[Svelte sibling](../human-capital-management-front-end-with-svelte/)
+[Svelte sibling](../workforce-planning-management-front-end-with-svelte/)
 is the HR / manager / self-service client.
 
-**Domain ownership.** HCM **owns the employment relationship and its
+**Domain ownership.** WPM **owns the employment relationship and its
 operational state** (its own tables) but **references identities**:
 humans are person-service records, professional identities
 worker-service, employers organization-service, training courses
@@ -32,8 +35,8 @@ duplicated demographics. See the cross-cutting spec's
    [`../spec/`](../spec/index.md) is the single source of truth;
    this subproject's `spec/` adds stack detail only. A behavioural
    change is spec edit + code + tests in one PR. The live task queue
-   is [`../spec/tasks.md`](../spec/tasks.md) (HCM-T* ids, traced to
-   HCM-D*/HCM-R*).
+   is [`../spec/tasks.md`](../spec/tasks.md) (WPM-T* ids, traced to
+   WPM-D*/WPM-R*).
 2. **Family conventions.** Loco-idiomatic layout
    (`src/controllers/`), `#![forbid(unsafe_code)]`, thiserror,
    tracing + OTLP, OpenAPI/Swagger, header API versioning
@@ -45,7 +48,7 @@ duplicated demographics. See the cross-cutting spec's
    leave-balance and overtime arithmetic, shift-conflict checks, the
    org-chart cycle check, and payslip derivation live in DB-free
    `src/rules/` modules with exhaustive unit tests; controllers only
-   wire them ([design](../spec/design.md) HCM-D3–D5).
+   wire them ([design](../spec/design.md) WPM-D3–D5).
 4. **Money discipline.** Minor units (`i64`) + ISO-4217 everywhere;
    overflow refused; `net = gross − Σ deductions` enforced before
    persist. No floats.

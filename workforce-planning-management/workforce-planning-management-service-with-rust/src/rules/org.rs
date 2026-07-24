@@ -1,4 +1,4 @@
-//! Org-chart rules (HCM-R7), DB-free: the manager chain must stay a
+//! Org-chart rules (WPM-R7), DB-free: the manager chain must stay a
 //! forest — assigning a manager may not create a cycle.
 
 use std::collections::HashMap;

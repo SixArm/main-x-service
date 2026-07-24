@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { listEmployees, listRequisitions, successionGaps } from "$lib/api/hcm";
+  import { listEmployees, listRequisitions, successionGaps } from "$lib/api/wpm";
   import { t } from "$lib/i18n.svelte";
   import type { Employee, Requisition } from "$lib/api/types";
 
