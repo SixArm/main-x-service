@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — ergonomic (DSE) assessments + cognitive testing (WPM-T34/T35, 2026-07-25)
+
+- **Ergonomics (WPM-R32, new WPM-D24)**: workstation assessments with
+  the default 8-item DSE checklist (no item names a symptom — the
+  workstation, never the body; a test pins it), `ok`/`issue` answers
+  with equipment notes, an every-item-answered completion gate, and a
+  rota-tier department issues report. Erasure scrubs and closes them;
+  subject access includes them; both tables join the sweep (40).
+- **Cognitive testing (WPM-R20)**: a fifth assessment category with
+  standard index scales (verbal comprehension, working memory,
+  processing speed, spatial reasoning, fluid reasoning). No composite
+  "IQ number" exists; `selection` instruments refuse cognitive scales
+  (no silent hiring use); `psychometric` batteries span them; masking,
+  audited reads, and distribution-only analytics apply unchanged.
+
 ### Added — 360° notifications (WPM-T33 / WPM-R31, 2026-07-25)
 
 - In-app notifications (new WPM-D23: in-app, reference-only,

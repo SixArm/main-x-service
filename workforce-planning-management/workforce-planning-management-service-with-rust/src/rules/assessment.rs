@@ -25,7 +25,7 @@
 
 /// The assessment categories.
 pub const ASSESSMENT_CATEGORIES: &[&str] =
-    &["aptitude", "personality", "psychometric", "selection"];
+    &["aptitude", "personality", "psychometric", "selection", "cognitive"];
 
 /// The scales an `aptitude` test measures.
 pub const APTITUDE_SCALES: &[&str] = &[
@@ -51,6 +51,19 @@ pub const PSYCHOMETRIC_SCALES: &[&str] = &[
     "cognitive_ability",
 ];
 
+/// The scales a `cognitive` (IQ-style) test measures — standard
+/// index names (WAIS shape), not a single "IQ" number: WPM records
+/// per-scale readings and **never** derives a composite ranking
+/// (WPM-R20: report, never gate; equality-law review is a deployment
+/// duty before any selection use).
+pub const COGNITIVE_SCALES: &[&str] = &[
+    "verbal_comprehension",
+    "working_memory",
+    "processing_speed",
+    "spatial_reasoning",
+    "fluid_reasoning",
+];
+
 /// The scales a `selection` test measures.
 pub const SELECTION_SCALES: &[&str] =
     &["job_simulation", "skills_assessment", "judgement_test"];
@@ -70,6 +83,11 @@ pub const ASSESSMENT_SCALES: &[&str] = &[
     "job_simulation",
     "skills_assessment",
     "judgement_test",
+    "verbal_comprehension",
+    "working_memory",
+    "processing_speed",
+    "spatial_reasoning",
+    "fluid_reasoning",
 ];
 
 /// Assessment lifecycle statuses.
@@ -105,6 +123,7 @@ pub fn own_scales(category: &str) -> Option<&'static [&'static str]> {
         "personality" => Some(PERSONALITY_SCALES),
         "psychometric" => Some(PSYCHOMETRIC_SCALES),
         "selection" => Some(SELECTION_SCALES),
+        "cognitive" => Some(COGNITIVE_SCALES),
         _ => None,
     }
 }
@@ -121,7 +140,8 @@ pub fn scale_category(scale: &str) -> Option<&'static str> {
 /// Whether `scale` may be reported on an assessment of `category`.
 ///
 /// A category always permits its own scales; `psychometric`
-/// additionally permits every aptitude and personality scale. An
+/// additionally permits every aptitude, personality, and cognitive
+/// scale (a full psychometric battery spans them by definition). An
 /// unknown category or scale token permits nothing.
 #[must_use]
 pub fn category_permits(category: &str, scale: &str) -> bool {
@@ -129,7 +149,8 @@ pub fn category_permits(category: &str, scale: &str) -> bool {
         None => false,
         Some(home) => {
             home == category
-                || (category == "psychometric" && matches!(home, "aptitude" | "personality"))
+                || (category == "psychometric"
+                    && matches!(home, "aptitude" | "personality" | "cognitive"))
         }
     }
 }
@@ -396,5 +417,20 @@ mod tests {
         );
         // Nothing measured for an unknown category.
         assert!(scales_not_assessed("astrology", &measured).is_empty());
+    }
+
+    /// The cognitive (IQ-style) category: its own index scales are
+    /// permitted, psychometric spans them, and selection does not —
+    /// an IQ scale cannot ride into a selection test unreviewed.
+    #[test]
+    fn cognitive_category_scales_and_overlap() {
+        for scale in COGNITIVE_SCALES {
+            assert!(category_permits("cognitive", scale));
+            assert!(category_permits("psychometric", scale), "battery spans cognitive");
+            assert!(!category_permits("selection", scale), "no silent selection use");
+            assert!(!category_permits("aptitude", scale));
+        }
+        assert!(!category_permits("cognitive", "job_simulation"));
+        assert!(!category_permits("cognitive", "work_style"));
     }
 }

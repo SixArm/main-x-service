@@ -207,6 +207,13 @@ pub fn spec() -> Value {
             "/api/appraisals/{pid}/status": { "post": { "tags": ["appraisals"], "summary": "draft -> collecting (needs >= 3 non-self raters) -> shared (stamps shared_on)", "responses": transition } },
             "/api/appraisals/{pid}/responses": { "post": { "tags": ["appraisals"], "summary": "One rater's response: collecting only, nominated only, once per rater, every declared competency scored 1-5 ($sub-owned)", "responses": created } },
             "/api/appraisals/{pid}/report": { "get": { "tags": ["appraisals"], "summary": "Group-floored report (shared only; reads audited): group x competency count+mean, pooled comments; peer/report cells under 3 responses withheld, count included", "responses": ok("Report") } },
+            "/api/employees/{pid}/ergonomic-assessments": {
+                "post": { "tags": ["ergonomics"], "summary": "Open a DSE workstation assessment (default checklist when no items given; workstation, never the body -- WPM-D24)", "responses": created },
+                "get": { "tags": ["ergonomics"], "summary": "The employee's assessments with items and open-issue counts", "responses": ok("Assessments") }
+            },
+            "/api/ergonomic-items/{pid}": { "put": { "tags": ["ergonomics"], "summary": "Answer one item (ok|issue + equipment note; open assessments only)", "responses": ok("Item") } },
+            "/api/ergonomic-assessments/{pid}/complete": { "post": { "tags": ["ergonomics"], "summary": "Complete (every item must be answered; stamps the date; audited with the issue count)", "responses": transition } },
+            "/api/ergonomics/issues": { "get": { "tags": ["ergonomics"], "summary": "Issue-flagged items by department (rota-tier visibility; equipment facts only)", "responses": ok("Issues") } },
             "/api/employees/{pid}/notifications": { "get": { "tags": ["notifications"], "summary": "The employee's in-app notifications, unread first ($sub-owned; reference-only bodies, WPM-D23)", "responses": ok("Notifications") } },
             "/api/notifications/{pid}/read": { "post": { "tags": ["notifications"], "summary": "Mark one notification read (owner-only)", "responses": ok("Notification") } },
             "/api/employees/{pid}/subject-access": { "get": { "tags": ["privacy"], "summary": "Subject-access export: everything WPM holds for this employee, exclusions named (audited; $sub/HR)", "responses": ok("Export") } },
@@ -261,6 +268,8 @@ mod tests {
             "/api/retention/sweep",
             "/api/employees/{pid}/notifications",
             "/api/notifications/{pid}/read",
+            "/api/employees/{pid}/ergonomic-assessments",
+            "/api/ergonomics/issues",
         ] {
             assert!(paths.contains_key(p), "missing {p}");
         }

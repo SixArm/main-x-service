@@ -11,6 +11,7 @@ pub mod assessments;
 pub mod audits;
 pub mod development;
 pub mod docs;
+pub mod ergonomics;
 pub mod hr_core;
 pub mod intelligence;
 pub mod learning;

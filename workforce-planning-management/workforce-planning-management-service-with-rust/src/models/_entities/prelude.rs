@@ -39,6 +39,8 @@ pub use super::shifts::Entity as Shifts;
 pub use super::succession_candidates::Entity as SuccessionCandidates;
 pub use super::succession_plans::Entity as SuccessionPlans;
 pub use super::entitlement_acknowledgements::Entity as EntitlementAcknowledgements;
+pub use super::ergonomic_assessments::Entity as ErgonomicAssessments;
+pub use super::ergonomic_items::Entity as ErgonomicItems;
 pub use super::time_entries::Entity as TimeEntries;
 pub use super::training_enrollments::Entity as TrainingEnrollments;
 pub use super::wellbeing_entitlements::Entity as WellbeingEntitlements;

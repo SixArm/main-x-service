@@ -204,6 +204,15 @@ results turning into an automated verdict.*
   audited; aggregate analytics report distributions only.
 - WPM reports; it does not rank, recommend, or gate a stage on a
   score.
+- **Cognitive (IQ-style) testing** is a fifth category with standard
+  index scales (verbal comprehension, working memory, processing
+  speed, spatial reasoning, fluid reasoning) — per-scale readings,
+  **never a composite "IQ number"**, and never permitted on a
+  `selection` instrument (an IQ scale cannot ride into hiring
+  unreviewed); `psychometric` batteries span it. Equality-law review
+  before any selection use is a deployment duty
+  ([regulatory.md](regulatory.md)) — the report-never-gate posture
+  above applies with full force here.
 
 ## WPM-R21 — Upskilling & reskilling plans
 
@@ -447,6 +456,30 @@ out my report is ready — without leaving the app.*
   contact details — identities are URNs — so external channels are a
   deployment integration over the upstream person service, not a WPM
   feature.
+
+## WPM-R32 — Ergonomic (DSE) workstation assessments
+
+*As an HR/safety administrator I can run display-screen-equipment
+assessments (UK DSE Regulations shape) so workstation problems are
+recorded and fixed — without WPM becoming a health record.*
+
+- An assessment belongs to an employee, names the **workstation**
+  (e.g. "Desk 4.12", "home office"), and instantiates a checklist —
+  the default DSE item set (screen, chair, keyboard/mouse, desk,
+  lighting, posture/leg room, breaks, software legibility) or a
+  custom list.
+- Items are answered `ok` / `issue` (with an optional **equipment**
+  note); completing the assessment requires every item answered
+  (the WPM-D15 record-and-enforce posture) and stamps the date.
+- **About the workstation, never the body**
+  ([design.md](design.md) WPM-D24): no symptom, condition, or
+  health field exists; notes describe equipment and environment.
+- `GET /api/ergonomics/issues` reports open issues (`issue`-flagged
+  items) by department with employee, workstation, item, and note —
+  rota-tier visibility (WPM-R27 precedent); counts per department.
+- Erasure soft-deletes the employee's assessments and scrubs item
+  notes; the subject-access export includes them; both tables join
+  the retention sweep.
 
 ## WPM-R17 — Family fixtures
 

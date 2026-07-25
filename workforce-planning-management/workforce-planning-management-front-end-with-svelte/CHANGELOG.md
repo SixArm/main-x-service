@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — ergonomics area (WPM-T34 / WPM-R32, 2026-07-25)
+
+- Employee profile: a DSE assessments panel (open with the default
+  checklist, answer ok/issue with an equipment note, complete).
+  `/workforce`: an ergonomic-issues table (rota-tier). 7 i18n keys ×
+  13 locales.
+
 ### Added — notifications panel (WPM-T33 / WPM-R31, 2026-07-25)
 
 - Employee profile: an in-app Notifications panel (unread first) with

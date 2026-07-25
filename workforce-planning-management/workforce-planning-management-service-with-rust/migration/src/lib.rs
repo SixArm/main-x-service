@@ -26,6 +26,7 @@ mod m20260725_000012_benefits_awareness;
 mod m20260725_000013_pulse;
 mod m20260725_000014_appraisals;
 mod m20260725_000015_notifications;
+mod m20260725_000016_ergonomics;
 
 /// The crate's migrator: drives the ordered migration set for the loco
 /// CLI / boot-time migration.
@@ -53,6 +54,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260725_000013_pulse::Migration),
             Box::new(m20260725_000014_appraisals::Migration),
             Box::new(m20260725_000015_notifications::Migration),
+            Box::new(m20260725_000016_ergonomics::Migration),
             // inject-above (do not remove this comment)
         ]
     }

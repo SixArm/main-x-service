@@ -255,3 +255,19 @@ and they are **owned data**, so erasure deletes them and the
 subject-access export includes them. Outbound channels (email, push,
 chat) are a deployment integration over the upstream person service's
 contact details, deliberately out of WPM.
+
+## WPM-D24 — Ergonomic assessments assess the workstation, not the body
+
+A DSE assessment sits one step from health data: "wrist pain" is a
+symptom, "keyboard too high" is equipment. WPM records only the
+second kind — the item vocabulary names equipment and environment
+checks, the note field is for equipment descriptions, and **no
+symptom, condition, or adjustment-reason field exists** (the same
+unrepresentability move as WPM-D17: what must not be stored gets no
+column). An employee who needs adjustments for a health reason is
+routed through occupational-health referral outside WPM; the
+assessment can record *that the chair was changed*, never *why the
+person needed it*. Issue visibility is rota-tier (named employees,
+like the WPM-R27 flags): a broken chair is an operational fact, not a
+sensitive one — precisely because the design keeps the sensitive part
+out.

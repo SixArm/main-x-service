@@ -461,3 +461,42 @@ code + tests in one PR.
       suite 17/17 vs Postgres 18 (133 unit); clippy pedantic clean;
       svelte-check 0; vitest 10; Playwright 9. (WPM-D21, WPM-D23;
       WPM-R31)
+
+- [x] WPM-T34 (2026-07-25) **Ergonomic (DSE) workstation
+      assessments.** Migration `m20260725_000016_ergonomics`
+      (`ergonomic_assessments` + `ergonomic_items`).
+      `rules/ergonomics.rs` (pure): the default 8-item DSE checklist
+      (a test pins that **no item names a symptom** — WPM-D24: the
+      workstation, never the body), the every-item-answered completion
+      gate (WPM-D15 posture), and the open-issue count.
+      `controllers/ergonomics.rs`: create (default or custom
+      checklist), answer (`ok`/`issue` + equipment note; open
+      assessments only — completed ones freeze), complete (stamps the
+      date; audited with the issue count), and
+      `GET /api/ergonomics/issues` (rota-tier department report).
+      Erasure scrubs item notes + soft-deletes the employee's
+      assessments; subject access includes them; both tables join the
+      sweep list (now 40, pinned). Front-end: an Ergonomics panel on
+      the profile (create / answer / complete) and an issues table on
+      `/workforce`; 7 i18n keys × 13 locales. **Acceptance:** 3 pure
+      pins + the DB-gated `ergonomics_round_trip` (default checklist,
+      completion gate, freeze-after-complete, department issue report
+      with note, custom checklist) — suite 18/18 vs Postgres 18
+      (136 unit); clippy pedantic clean; svelte-check 0; vitest 10;
+      Playwright 9. (WPM-D15, WPM-D24; WPM-R32)
+
+- [x] WPM-T35 (2026-07-25) **Cognitive (IQ-style) testing.** The
+      assessment vocabulary (WPM-R20) gains a fifth category,
+      `cognitive`, with standard index scales (verbal comprehension,
+      working memory, processing speed, spatial reasoning, fluid
+      reasoning) — per-scale readings through the existing engine
+      (masked reads, audited unmasked reads, distribution-only
+      analytics all apply unchanged), **no composite score exists**,
+      and `category_permits` refuses cognitive scales on `selection`
+      instruments — an IQ scale cannot ride into hiring unreviewed;
+      `psychometric` batteries span it. **Acceptance:** the
+      `cognitive_category_scales_and_overlap` pin (own scales permit,
+      psychometric spans, selection refuses, aptitude refuses) + the
+      existing exhaustiveness pins re-derive over the widened
+      vocabulary — 137 unit green; clippy pedantic clean. (WPM-D13;
+      WPM-R20)

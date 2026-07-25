@@ -329,6 +329,78 @@ export function workingTime(
   return api(`/workforce/working-time${qs}`, init);
 }
 
+// ─── Ergonomic (DSE) assessments (WPM-R32) ──────────────────────────
+
+/** One DSE checklist item (equipment note only — WPM-D24). */
+export interface ErgonomicItem {
+  pid: string;
+  name: string;
+  ok: boolean | null;
+  note: string | null;
+}
+
+/** One workstation assessment with its items. */
+export interface ErgonomicAssessment {
+  pid: string;
+  workstation: string;
+  status: "open" | "completed";
+  assessed_on: string | null;
+  open_issues: number;
+  items: ErgonomicItem[];
+}
+
+/** The employee's DSE assessments. */
+export function listErgonomicAssessments(
+  pid: string,
+  init?: FetchLike,
+): Promise<ErgonomicAssessment[]> {
+  return api(`/employees/${pid}/ergonomic-assessments`, init);
+}
+
+/** Open an assessment (default DSE checklist when items omitted). */
+export function createErgonomicAssessment(
+  pid: string,
+  workstation: string,
+  items?: string[],
+): Promise<{ pid: string }> {
+  return api(`/employees/${pid}/ergonomic-assessments`, {
+    method: "POST",
+    body: { workstation, items: items ?? [] },
+  });
+}
+
+/** Answer one checklist item (ok | issue + equipment note). */
+export function answerErgonomicItem(
+  pid: string,
+  ok: boolean,
+  note?: string,
+): Promise<ErgonomicItem> {
+  return api(`/ergonomic-items/${pid}`, { method: "PUT", body: { ok, note } });
+}
+
+/** Complete an assessment (every item must be answered). */
+export function completeErgonomicAssessment(pid: string): Promise<ErgonomicAssessment> {
+  return api(`/ergonomic-assessments/${pid}/complete`, { method: "POST" });
+}
+
+/** Issue-flagged items by department (rota-tier visibility). */
+export function ergonomicIssues(init?: FetchLike): Promise<{
+  as_of: string;
+  by_department: Record<string, number>;
+  issues: Array<{
+    department: string;
+    employee_pid: string;
+    display_name: string;
+    workstation: string;
+    item: string;
+    note: string | null;
+    assessment_status: string;
+  }>;
+  derivation: string;
+}> {
+  return api("/ergonomics/issues", init);
+}
+
 // ─── Notifications (WPM-R31) ────────────────────────────────────────
 
 /** One in-app notification (reference-only body, WPM-D23). */

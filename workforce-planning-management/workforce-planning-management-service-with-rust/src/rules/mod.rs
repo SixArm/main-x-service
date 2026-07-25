@@ -7,6 +7,7 @@
 pub mod appraisal;
 pub mod assessment;
 pub mod benchmark;
+pub mod ergonomics;
 pub mod learning;
 pub mod leave;
 pub mod notify;

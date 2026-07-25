@@ -2,9 +2,12 @@
   import { page } from "$app/state";
   import {
     acknowledgeWellbeing,
+    answerErgonomicItem,
     appraisalReport,
     appraisalRequests,
     appraisalStatus,
+    completeErgonomicAssessment,
+    createErgonomicAssessment,
     changeStatus,
     completeItem,
     createAppraisal,
@@ -16,6 +19,7 @@
     listAppraisals,
     listEmployees,
     listEntitlements,
+    listErgonomicAssessments,
     listLeaveRequests,
     listNotifications,
     listOnboarding,
@@ -29,6 +33,7 @@
     submitPulse,
     type AppraisalRequest,
     type AppraisalSummary,
+    type ErgonomicAssessment,
     type Notification,
     type PulseSurvey,
     type WellbeingPrompt,
@@ -57,6 +62,8 @@
   let appraisals = $state<AppraisalSummary[]>([]);
   let myRequests = $state<AppraisalRequest[]>([]);
   let notifications = $state<Notification[]>([]);
+  let ergonomics = $state<ErgonomicAssessment[]>([]);
+  let workstation = $state("");
   let requestScores = $state<Record<string, number>>({});
   let requestComment = $state("");
   let openRequest = $state<string | null>(null);
@@ -91,6 +98,7 @@
       appraisals = await listAppraisals(pid);
       myRequests = await appraisalRequests(pid);
       notifications = await listNotifications(pid);
+      ergonomics = await listErgonomicAssessments(pid);
       if (openAppraisal) await toggleAppraisal(openAppraisal.pid, true);
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
@@ -457,6 +465,48 @@
             <p class="muted">{openReport.derivation}</p>
           {/if}
         {/if}
+      </div>
+    {/each}
+  </div>
+
+  <h2>{t("erg.title")}</h2>
+  <div class="panel" data-testid="ergonomics">
+    <input placeholder={t("erg.workstation")} bind:value={workstation} />
+    <button
+      disabled={!workstation.trim()}
+      onclick={() => void act(async () => {
+        await createErgonomicAssessment(pid, workstation.trim());
+        workstation = "";
+      })}
+    >{t("erg.new")}</button>
+    {#each ergonomics as assessment (assessment.pid)}
+      <div>
+        <strong>{assessment.workstation}</strong>
+        <span class="chip">{assessment.status}</span>
+        {#if assessment.status === "open"}
+          <button onclick={() => void act(() => completeErgonomicAssessment(assessment.pid))}>
+            {t("erg.complete")}
+          </button>
+        {:else if assessment.open_issues > 0}
+          <span class="chip">{assessment.open_issues} ⚠</span>
+        {/if}
+        <ul>
+          {#each assessment.items as item (item.pid)}
+            <li>
+              {item.name}
+              {#if item.ok === true}✓{:else if item.ok === false}✗ <span class="muted">{item.note}</span>{/if}
+              {#if assessment.status === "open" && item.ok === null}
+                <button onclick={() => void act(() => answerErgonomicItem(item.pid, true))}>{t("erg.ok")}</button>
+                <button
+                  onclick={() => {
+                    const note = window.prompt(t("erg.issue")) ?? "";
+                    void act(() => answerErgonomicItem(item.pid, false, note.trim() || undefined));
+                  }}
+                >{t("erg.issue")}</button>
+              {/if}
+            </li>
+          {/each}
+        </ul>
       </div>
     {/each}
   </div>

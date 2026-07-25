@@ -87,6 +87,8 @@ describe("api path map", () => {
     await wpm.appraisalReport("a1");
     await wpm.retentionReport();
     await wpm.listNotifications("p1");
+    await wpm.listErgonomicAssessments("p1");
+    await wpm.ergonomicIssues();
     expect(calls).toEqual([
       "/api/proxy/employees?department=engineering",
       "/api/proxy/employees/p1",
@@ -113,6 +115,8 @@ describe("api path map", () => {
       "/api/proxy/appraisals/a1/report",
       "/api/proxy/retention",
       "/api/proxy/employees/p1/notifications",
+      "/api/proxy/employees/p1/ergonomic-assessments",
+      "/api/proxy/ergonomics/issues",
     ]);
     vi.unstubAllGlobals();
   });

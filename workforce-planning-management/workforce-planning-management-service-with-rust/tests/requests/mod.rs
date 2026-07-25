@@ -7,6 +7,7 @@
 
 mod appraisals;
 mod assessments;
+mod ergonomics;
 mod hr;
 mod learning;
 mod payroll;

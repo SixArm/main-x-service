@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { decideLeave, listEmployees, listLeaveRequests, listShifts, workingTime } from "$lib/api/wpm";
+  import { decideLeave, ergonomicIssues, listEmployees, listLeaveRequests, listShifts, workingTime } from "$lib/api/wpm";
   import { t } from "$lib/i18n.svelte";
   import type { Employee, LeaveRequest } from "$lib/api/types";
 
@@ -9,6 +9,7 @@
   let pending = $state<(LeaveRequest & { employee?: Employee })[] | null>(null);
   let shifts = $state<ShiftRow[]>([]);
   let signals = $state<WorkingTimeSignals | null>(null);
+  let ergIssues = $state<Awaited<ReturnType<typeof ergonomicIssues>> | null>(null);
   let error = $state<string | null>(null);
   let actionError = $state<string | null>(null);
 
@@ -25,6 +26,7 @@
         .map((r) => ({ ...r, employee: byPid.get(r.employee_pid) }));
       shifts = await listShifts();
       signals = await workingTime();
+      ergIssues = await ergonomicIssues();
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
     }
@@ -84,6 +86,21 @@
       {/each}
     </tbody>
   </table>
+
+  {#if ergIssues && ergIssues.issues.length > 0}
+    <h2>{t("erg.issues")}</h2>
+    <table data-testid="ergonomic-issues">
+      <tbody>
+        {#each ergIssues.issues as issue, index (index)}
+          <tr>
+            <td>{issue.display_name} <span class="muted">({issue.department})</span></td>
+            <td>{issue.workstation}</td>
+            <td>{issue.item}{#if issue.note} — <span class="muted">{issue.note}</span>{/if}</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  {/if}
 
   {#if signals}
     <h2>{t("wf.workingTime")}</h2>

@@ -17,6 +17,8 @@ pub mod development_plans;
 pub mod early_career_programs;
 pub mod employee_skills;
 pub mod entitlement_acknowledgements;
+pub mod ergonomic_assessments;
+pub mod ergonomic_items;
 pub mod employees;
 pub mod event_outbox;
 pub mod feedback_entries;

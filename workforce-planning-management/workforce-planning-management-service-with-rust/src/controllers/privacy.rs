@@ -14,7 +14,8 @@ use crate::auth::{self, MaybeAuthUser};
 use crate::models::_entities::{
     appraisal_nominations, appraisal_responses, appraisals, assessments, benefit_enrollments,
     candidates, development_plans, employee_skills, employees, entitlement_acknowledgements,
-    leave_entitlements, leave_requests, mentorships, notifications, path_enrollments, payslips,
+    ergonomic_assessments, leave_entitlements, leave_requests, mentorships, notifications,
+    path_enrollments, payslips,
     pipeline_members, program_placements, reviews, shift_assignments, time_entries,
     training_enrollments,
 };
@@ -112,6 +113,7 @@ async fn subject_access(
         "wellbeing_acknowledgements":
             rows_for!(db, entitlement_acknowledgements, EmployeePid, epid),
         "notifications": rows_for!(db, notifications, EmployeePid, epid),
+        "ergonomic_assessments": rows_for!(db, ergonomic_assessments, EmployeePid, epid),
         "assessments": rows_for!(db, assessments, SubjectPid, epid),
         "pipeline_memberships": rows_for!(db, pipeline_members, SubjectPid, epid),
         "mentorships": mentorship_rows,
@@ -182,6 +184,11 @@ async fn erase(
         format!("UPDATE appraisals SET deleted_at = now() WHERE employee_pid = '{epid}' AND deleted_at IS NULL"),
         format!("DELETE FROM entitlement_acknowledgements WHERE employee_pid = '{epid}'"),
         format!("DELETE FROM notifications WHERE employee_pid = '{epid}'"),
+        format!(
+            "UPDATE ergonomic_items SET note = NULL, deleted_at = now() WHERE assessment_pid IN \
+             (SELECT pid FROM ergonomic_assessments WHERE employee_pid = '{epid}')"
+        ),
+        format!("UPDATE ergonomic_assessments SET deleted_at = now() WHERE employee_pid = '{epid}' AND deleted_at IS NULL"),
     ];
     let mut affected = Vec::new();
     for statement in &statements {
@@ -201,6 +208,8 @@ async fn erase(
             "appraisals_closed": affected[3],
             "acknowledgements_deleted": affected[4],
             "notifications_deleted": affected[5],
+            "ergonomic_items_scrubbed": affected[6],
+            "ergonomic_assessments_closed": affected[7],
         })),
     )
     .await?;
