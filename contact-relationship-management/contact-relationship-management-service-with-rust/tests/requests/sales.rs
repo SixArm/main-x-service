@@ -59,7 +59,10 @@ async fn sales_journey_end_to_end() {
             }))
             .await
             .json();
-        let deal_pid = converted["deal_pid"].as_str().expect("deal opened").to_string();
+        let deal_pid = converted["deal_pid"]
+            .as_str()
+            .expect("deal opened")
+            .to_string();
         assert!(converted["contact_pid"].is_string(), "contact created");
         // Forecast at the first stage (10%): 100,000.
         let forecast: Value = request.get("/api/forecast").await.json();
@@ -98,11 +101,17 @@ async fn sales_journey_end_to_end() {
             .await
             .assert_status_ok();
         let forecast: Value = request.get("/api/forecast").await.json();
-        assert_eq!(forecast["totals_minor"]["GBP"], 500_000, "reopened at Proposal");
+        assert_eq!(
+            forecast["totals_minor"]["GBP"], 500_000,
+            "reopened at Proposal"
+        );
         // The sales dashboard reports the honest win rate parts.
         let dashboard: Value = request.get("/api/dashboards/sales").await.json();
         assert_eq!(dashboard["win_rate"]["denominator"], 0);
-        assert!(dashboard["win_rate"]["value"].is_null(), "0/0 is null, not 0%");
+        assert!(
+            dashboard["win_rate"]["value"].is_null(),
+            "0/0 is null, not 0%"
+        );
     })
     .await;
 }
@@ -135,10 +144,17 @@ async fn contracts_404_and_pipeline_membership() {
             .await
             .json();
         let cross = request
-            .post(&format!("/api/deals/{}/stage", deal["pid"].as_str().unwrap()))
+            .post(&format!(
+                "/api/deals/{}/stage",
+                deal["pid"].as_str().unwrap()
+            ))
             .json(&json!({ "stage_pid": stages_b[1] }))
             .await;
-        assert_eq!(cross.status_code(), 422, "stage from another pipeline refused");
+        assert_eq!(
+            cross.status_code(),
+            422,
+            "stage from another pipeline refused"
+        );
     })
     .await;
 }

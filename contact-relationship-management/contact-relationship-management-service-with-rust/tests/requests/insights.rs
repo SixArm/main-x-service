@@ -44,8 +44,10 @@ async fn insight_views_round_trip() {
             .assert_status_ok();
         request
             .post("/api/deals")
-            .json(&json!({ "name": "Neglected deal", "pipeline_pid": pipeline_pid,
-                            "amount_minor": 0_i64, "currency": "GBP" }))
+            .json(
+                &json!({ "name": "Neglected deal", "pipeline_pid": pipeline_pid,
+                            "amount_minor": 0_i64, "currency": "GBP" }),
+            )
             .await
             .assert_status_ok();
         let won: Value = request
@@ -86,7 +88,10 @@ async fn insight_views_round_trip() {
             .assert_status_ok();
 
         // A forecast snapshot for the trend series.
-        request.post("/api/forecast/snapshot").await.assert_status_ok();
+        request
+            .post("/api/forecast/snapshot")
+            .await
+            .assert_status_ok();
 
         // One withdrawal for the DPO window.
         request
@@ -100,7 +105,12 @@ async fn insight_views_round_trip() {
         let stale: Value = request.get("/api/insights/stale-deals?days=1").await.json();
         assert_eq!(stale["open_deals"], 2);
         assert_eq!(stale["stale_deals"], 0);
-        assert!(stale["derivation"].as_str().unwrap().contains("deal_stage_changed"));
+        assert!(
+            stale["derivation"]
+                .as_str()
+                .unwrap()
+                .contains("deal_stage_changed")
+        );
 
         // ── Follow-ups: the overdue call shows with its age.
         let followups: Value = request.get("/api/insights/followups").await.json();
@@ -111,7 +121,10 @@ async fn insight_views_round_trip() {
         // ── Hygiene: the neglected deal fires amount + close + activity
         // rules; the moved deal only the recent-activity rule is spared
         // (it has an activity logged today via occurred_at default).
-        let hygiene: Value = request.get("/api/insights/pipeline-hygiene?days=1").await.json();
+        let hygiene: Value = request
+            .get("/api/insights/pipeline-hygiene?days=1")
+            .await
+            .json();
         let rules: Vec<&str> = hygiene["findings"]
             .as_array()
             .unwrap()
@@ -134,7 +147,12 @@ async fn insight_views_round_trip() {
         // ── Forecast trends: the stored snapshot only.
         let trends: Value = request.get("/api/insights/forecast-trends").await.json();
         assert_eq!(trends["series"].as_array().unwrap().len(), 1);
-        assert!(trends["note"].as_str().unwrap().contains("no interpolated history"));
+        assert!(
+            trends["note"]
+                .as_str()
+                .unwrap()
+                .contains("no interpolated history")
+        );
 
         // ── SLA register: the 1-minute first-response deadline may or
         // may not have passed yet; workload always reports the open
@@ -156,7 +174,13 @@ async fn insight_views_round_trip() {
 
         // ── ETag replay on one view.
         let first = request.get("/api/insights/dpo").await;
-        let etag = first.headers().get("etag").unwrap().to_str().unwrap().to_string();
+        let etag = first
+            .headers()
+            .get("etag")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
         let replay = request
             .get("/api/insights/dpo")
             .add_header("if-none-match", etag)

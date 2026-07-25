@@ -17,7 +17,9 @@ use crate::auth::{self, MaybeAuthUser};
 use crate::flow::bed_state::{BedState, Transition};
 use crate::flow::{journey, tokens};
 use crate::metrics::Metrics;
-use crate::models::_entities::{bays, beds, infection_flags, red_green_days, stays, transfers, wards};
+use crate::models::_entities::{
+    bays, beds, infection_flags, red_green_days, stays, transfers, wards,
+};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
 use crate::streaming;
@@ -139,8 +141,16 @@ fn validate_admit(p: &AdmitPayload) -> Vec<String> {
     problems.require_ref("person_ref", entity_ref::EntityType::Person, &p.person_ref);
     problems.require_token("source", tokens::STAY_SOURCES, &p.source);
     problems.cap_opt("display_name", p.display_name.as_deref());
-    problems.ref_opt("named_nurse_ref", entity_ref::EntityType::Worker, p.named_nurse_ref.as_deref());
-    problems.ref_opt("consultant_ref", entity_ref::EntityType::Worker, p.consultant_ref.as_deref());
+    problems.ref_opt(
+        "named_nurse_ref",
+        entity_ref::EntityType::Worker,
+        p.named_nurse_ref.as_deref(),
+    );
+    problems.ref_opt(
+        "consultant_ref",
+        entity_ref::EntityType::Worker,
+        p.consultant_ref.as_deref(),
+    );
     problems.cap_opt("ccd", p.ccd.as_deref());
     problems.cap_opt("home_location_note", p.home_location_note.as_deref());
     problems.cap_list("alerts", &p.alerts);
@@ -204,9 +214,13 @@ async fn admit(
     ensure_valid(&validate_admit(&payload))?;
     // Resolve the display name outside the transaction (best-effort;
     // never blocks the admission — PF-D11).
-    let display_name = if let Some(name) = &payload.display_name { name.clone() } else {
-        let entity_ref: entity_ref::EntityRef =
-            payload.person_ref.parse().map_err(|_| unprocessable("bad person_ref"))?;
+    let display_name = if let Some(name) = &payload.display_name {
+        name.clone()
+    } else {
+        let entity_ref: entity_ref::EntityRef = payload
+            .person_ref
+            .parse()
+            .map_err(|_| unprocessable("bad person_ref"))?;
         crate::clients::display_name(&entity_ref)
             .await
             .unwrap_or_else(|| payload.person_ref.clone())
@@ -260,19 +274,28 @@ async fn admit(
     .await?;
     // Fulfil the originating bed request, when named.
     if let Some(request_pid) = payload.bed_request_pid
-        && let Ok(request) = records::find_bed_request(&txn, request_pid).await {
-            let mut active: crate::models::_entities::bed_requests::ActiveModel = request.into();
-            active.status = ActiveValue::set("fulfilled".to_string());
-            active.resolved_at = ActiveValue::set(Some(chrono::Utc::now().into()));
-            active.update(&txn).await?;
-        }
+        && let Ok(request) = records::find_bed_request(&txn, request_pid).await
+    {
+        let mut active: crate::models::_entities::bed_requests::ActiveModel = request.into();
+        active.status = ActiveValue::set("fulfilled".to_string());
+        active.resolved_at = ActiveValue::set(Some(chrono::Utc::now().into()));
+        active.update(&txn).await?;
+    }
     let snapshot = serde_json::json!({
         "ward_pid": ward.pid.to_string(),
         "bed_pid": bed_row.pid.to_string(),
         "source": payload.source,
         "edd_missing": stay.edd.is_none(),
     });
-    Audit::record(&txn, "stay", stay.pid, "stay_admitted", caller.actor(), Some(snapshot)).await?;
+    Audit::record(
+        &txn,
+        "stay",
+        stay.pid,
+        "stay_admitted",
+        caller.actor(),
+        Some(snapshot),
+    )
+    .await?;
     streaming::emit_on(
         &txn,
         "stay",
@@ -314,8 +337,9 @@ async fn get_stay(
     Path(pid): Path<String>,
 ) -> Result<Response> {
     let stay = records::find_stay(&ctx.db, records::parse_pid(&pid)?).await?;
-    let obligations = auth::authorize_record(&caller, Action::Read, &auth::stay_resource_attrs(&stay))
-        .map_err(record_rejection)?;
+    let obligations =
+        auth::authorize_record(&caller, Action::Read, &auth::stay_resource_attrs(&stay))
+            .map_err(record_rejection)?;
     let mut stay = stay;
     if obligations.iter().any(|o| o == "mask") {
         stay = auth::mask_stay(stay);
@@ -337,7 +361,11 @@ async fn get_stay(
         .await?;
     let now: chrono::DateTime<chrono::FixedOffset> = chrono::Utc::now().into();
     let detail = StayDetail {
-        length_of_stay_days: journey::length_of_stay_days(stay.admitted_at, stay.discharged_at, now),
+        length_of_stay_days: journey::length_of_stay_days(
+            stay.admitted_at,
+            stay.discharged_at,
+            now,
+        ),
         dtoc: journey::is_dtoc(stay.discharge_ready_at, stay.discharged_at, now),
         stay,
         transfers: transfer_rows,
@@ -351,7 +379,10 @@ async fn get_stay(
         detail.stay.pid,
         "stay_read",
         caller.actor(),
-        detail.stay.ward_pid.map(|w| serde_json::json!({ "ward_pid": w.to_string() })),
+        detail
+            .stay
+            .ward_pid
+            .map(|w| serde_json::json!({ "ward_pid": w.to_string() })),
     )
     .await?;
     format::json(detail)
@@ -368,8 +399,16 @@ async fn update_stay(
 ) -> Result<Response> {
     let mut problems = Problems::new();
     problems.cap_opt("display_name", payload.display_name.as_deref());
-    problems.ref_opt("named_nurse_ref", entity_ref::EntityType::Worker, payload.named_nurse_ref.as_deref());
-    problems.ref_opt("consultant_ref", entity_ref::EntityType::Worker, payload.consultant_ref.as_deref());
+    problems.ref_opt(
+        "named_nurse_ref",
+        entity_ref::EntityType::Worker,
+        payload.named_nurse_ref.as_deref(),
+    );
+    problems.ref_opt(
+        "consultant_ref",
+        entity_ref::EntityType::Worker,
+        payload.consultant_ref.as_deref(),
+    );
     problems.cap_opt("ccd", payload.ccd.as_deref());
     problems.cap_opt("home_location_note", payload.home_location_note.as_deref());
     if let Some(alerts) = &payload.alerts {
@@ -421,7 +460,16 @@ async fn update_stay(
         ward_pid.map(|w| serde_json::json!({ "ward_pid": w.to_string() })),
     )
     .await?;
-    streaming::emit_on(&txn, "stay", "updated", &stay_pid.to_string(), &row.display_name, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "stay",
+        "updated",
+        &stay_pid.to_string(),
+        &row.display_name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }
@@ -438,7 +486,10 @@ async fn transfer(
     let mut problems = Problems::new();
     problems.require_token("reason", tokens::TRANSFER_REASONS, &payload.reason);
     if (payload.override_sex || payload.override_ward_fit)
-        && payload.override_reason.as_deref().is_none_or(|r| r.trim().is_empty())
+        && payload
+            .override_reason
+            .as_deref()
+            .is_none_or(|r| r.trim().is_empty())
     {
         problems.push("override_reason is required when overriding an allocation rule");
     }
@@ -447,7 +498,9 @@ async fn transfer(
     if stay.status == "discharged" {
         return Err(unprocessable("stay is discharged"));
     }
-    let from_bed_pid = stay.bed_pid.ok_or_else(|| unprocessable("stay has no current bed"))?;
+    let from_bed_pid = stay
+        .bed_pid
+        .ok_or_else(|| unprocessable("stay has no current bed"))?;
     if from_bed_pid == payload.to_bed_pid {
         return Err(unprocessable("destination is the current bed"));
     }
@@ -508,13 +561,16 @@ async fn transfer(
         })
         .collect();
     if !breaches.is_empty() {
-        return Err(unprocessable(&format!("destination bed ineligible: {breaches:?}")));
+        return Err(unprocessable(&format!(
+            "destination bed ineligible: {breaches:?}"
+        )));
     }
     // Vacate the old bed, occupy the new one.
     let out_old = super::topology::apply_transition(&from_bed, &Transition::Vacate { infectious })?;
     super::topology::persist_outcome(&txn, from_bed, &out_old, caller.actor()).await?;
     let out_new = super::topology::apply_transition(&to_bed, &Transition::Admit)?;
-    let to_bed_row = super::topology::persist_outcome(&txn, to_bed, &out_new, caller.actor()).await?;
+    let to_bed_row =
+        super::topology::persist_outcome(&txn, to_bed, &out_new, caller.actor()).await?;
     let stay_pid = stay.pid;
     let display_name = stay.display_name.clone();
     let mut active: stays::ActiveModel = stay.into();
@@ -542,8 +598,25 @@ async fn transfer(
         "override_ward_fit": payload.override_ward_fit,
         "override_reason": payload.override_reason,
     });
-    Audit::record(&txn, "stay", stay_pid, "stay_transferred", caller.actor(), Some(snapshot)).await?;
-    streaming::emit_on(&txn, "stay", "stay_transferred", &stay_pid.to_string(), &display_name, caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "stay",
+        stay_pid,
+        "stay_transferred",
+        caller.actor(),
+        Some(snapshot),
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "stay",
+        "stay_transferred",
+        &stay_pid.to_string(),
+        &display_name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     Metrics::global().stay_transferred_total.inc();
     format::json(row)
@@ -565,7 +638,9 @@ async fn discharge_ready(
         return Err(unprocessable(&format!("stay is {}", stay.status)));
     }
     if stay.edd.is_none() {
-        return Err(unprocessable("set an expected discharge date first (SAFER)"));
+        return Err(unprocessable(
+            "set an expected discharge date first (SAFER)",
+        ));
     }
     if !stay.ccd_met {
         return Err(unprocessable("clinical criteria for discharge are not met"));
@@ -583,8 +658,25 @@ async fn discharge_ready(
         "pathway": payload.pathway,
         "ward_pid": ward_pid.map(|w| w.to_string()),
     });
-    Audit::record(&txn, "stay", stay_pid, "stay_discharge_ready", caller.actor(), Some(snapshot)).await?;
-    streaming::emit_on(&txn, "stay", "stay_discharge_ready", &stay_pid.to_string(), &display_name, caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "stay",
+        stay_pid,
+        "stay_discharge_ready",
+        caller.actor(),
+        Some(snapshot),
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "stay",
+        "stay_discharge_ready",
+        &stay_pid.to_string(),
+        &display_name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }
@@ -598,7 +690,11 @@ async fn discharge(
     Json(payload): Json<DischargePayload>,
 ) -> Result<Response> {
     let mut problems = Problems::new();
-    problems.require_token("destination", tokens::DISCHARGE_DESTINATIONS, &payload.destination);
+    problems.require_token(
+        "destination",
+        tokens::DISCHARGE_DESTINATIONS,
+        &payload.destination,
+    );
     ensure_valid(&problems.into_vec())?;
     let stay = records::find_stay(&ctx.db, records::parse_pid(&pid)?).await?;
     if stay.status == "discharged" {
@@ -649,8 +745,25 @@ async fn discharge(
         "destination": payload.destination,
         "ward_pid": ward_pid.map(|w| w.to_string()),
     });
-    Audit::record(&txn, "stay", stay_pid, "stay_discharged", caller.actor(), Some(snapshot)).await?;
-    streaming::emit_on(&txn, "stay", "stay_discharged", &stay_pid.to_string(), &display_name, caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "stay",
+        stay_pid,
+        "stay_discharged",
+        caller.actor(),
+        Some(snapshot),
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "stay",
+        "stay_discharged",
+        &stay_pid.to_string(),
+        &display_name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     Metrics::global().stay_discharged_total.inc();
     format::json(row)
@@ -702,8 +815,25 @@ async fn red_green(
         "delay_reasons": payload.delay_reasons,
         "ward_pid": stay.ward_pid.map(|w| w.to_string()),
     });
-    Audit::record(&txn, "red_green", stay.pid, "red_green_recorded", caller.actor(), Some(snapshot)).await?;
-    streaming::emit_on(&txn, "red_green", "red_green_recorded", &stay.pid.to_string(), &stay.display_name, caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "red_green",
+        stay.pid,
+        "red_green_recorded",
+        caller.actor(),
+        Some(snapshot),
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "red_green",
+        "red_green_recorded",
+        &stay.pid.to_string(),
+        &stay.display_name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }
@@ -745,10 +875,29 @@ async fn add_flag(
         "status": payload.status,
         "ward_pid": stay.ward_pid.map(|w| w.to_string()),
     });
-    Audit::record(&txn, "infection_flag", row.pid, "infection_flagged", caller.actor(), Some(snapshot)).await?;
-    streaming::emit_on(&txn, "infection_flag", "infection_flagged", &row.pid.to_string(), &stay.display_name, caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "infection_flag",
+        row.pid,
+        "infection_flagged",
+        caller.actor(),
+        Some(snapshot),
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "infection_flag",
+        "infection_flagged",
+        &row.pid.to_string(),
+        &stay.display_name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `POST /api/stays/{pid}/infection-flags/{flag_pid}/clear`.
@@ -780,10 +929,20 @@ async fn clear_flag(
         flag_pid,
         "infection_cleared",
         caller.actor(),
-        stay.ward_pid.map(|w| serde_json::json!({ "ward_pid": w.to_string() })),
+        stay.ward_pid
+            .map(|w| serde_json::json!({ "ward_pid": w.to_string() })),
     )
     .await?;
-    streaming::emit_on(&txn, "infection_flag", "infection_cleared", &flag_pid.to_string(), &stay.display_name, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "infection_flag",
+        "infection_cleared",
+        &flag_pid.to_string(),
+        &stay.display_name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::empty_json()
 }
@@ -800,5 +959,8 @@ pub fn routes() -> Routes {
         .add("/stays/{pid}/discharge", post(discharge))
         .add("/stays/{pid}/red-green", post(red_green))
         .add("/stays/{pid}/infection-flags", post(add_flag))
-        .add("/stays/{pid}/infection-flags/{flag_pid}/clear", post(clear_flag))
+        .add(
+            "/stays/{pid}/infection-flags/{flag_pid}/clear",
+            post(clear_flag),
+        )
 }

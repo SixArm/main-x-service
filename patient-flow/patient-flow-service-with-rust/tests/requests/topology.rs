@@ -20,7 +20,10 @@ async fn topology_creates_and_reads_back() {
         assert_eq!(ward["kind"], "inpatient");
         assert_eq!(ward["specialty"], "respiratory");
         assert_eq!(ward["open"], true);
-        let bed: Value = request.get(&format!("/api/beds/{}", bed_pids[0])).await.json();
+        let bed: Value = request
+            .get(&format!("/api/beds/{}", bed_pids[0]))
+            .await
+            .json();
         assert_eq!(bed["state"], "available");
         assert_eq!(bed["deep_clean_required"], false);
         let wards: Value = request.get("/api/wards").await.json();
@@ -31,10 +34,31 @@ async fn topology_creates_and_reads_back() {
         // Unknown-pid contract: an honest 404, not a 500 (loco 0.16
         // does not map ModelError::EntityNotFound itself).
         let ghost = uuid::Uuid::new_v4();
-        assert_eq!(request.get(&format!("/api/wards/{ghost}")).await.status_code(), 404);
-        assert_eq!(request.get(&format!("/api/beds/{ghost}")).await.status_code(), 404);
-        assert_eq!(request.get(&format!("/api/stays/{ghost}")).await.status_code(), 404);
-        assert_eq!(request.get("/api/wards/not-a-uuid").await.status_code(), 404);
+        assert_eq!(
+            request
+                .get(&format!("/api/wards/{ghost}"))
+                .await
+                .status_code(),
+            404
+        );
+        assert_eq!(
+            request
+                .get(&format!("/api/beds/{ghost}"))
+                .await
+                .status_code(),
+            404
+        );
+        assert_eq!(
+            request
+                .get(&format!("/api/stays/{ghost}"))
+                .await
+                .status_code(),
+            404
+        );
+        assert_eq!(
+            request.get("/api/wards/not-a-uuid").await.status_code(),
+            404
+        );
     })
     .await;
 }
@@ -46,13 +70,20 @@ async fn topology_creates_and_reads_back() {
 // name, and unknown bay sex designation are each refused.
 async fn topology_validation_is_422() {
     request::<App, _, _>(|request, _ctx| async move {
-        let site: Value = request.post("/api/sites").json(&json!({ "name": "S" })).await.json();
+        let site: Value = request
+            .post("/api/sites")
+            .json(&json!({ "name": "S" }))
+            .await
+            .json();
         let bad_kind = request
             .post("/api/wards")
             .json(&json!({ "site_pid": site["pid"], "name": "W", "code": "W", "kind": "icu" }))
             .await;
         assert_eq!(bad_kind.status_code(), 422, "unknown ward kind is 422");
-        let blank_name = request.post("/api/sites").json(&json!({ "name": "  " })).await;
+        let blank_name = request
+            .post("/api/sites")
+            .json(&json!({ "name": "  " }))
+            .await;
         assert_eq!(blank_name.status_code(), 422, "blank site name is 422");
     })
     .await;

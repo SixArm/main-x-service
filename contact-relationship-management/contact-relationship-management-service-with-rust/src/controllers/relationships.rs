@@ -91,10 +91,22 @@ async fn create_contact(
     Json(payload): Json<ContactPayload>,
 ) -> Result<Response> {
     let mut problems = Problems::new();
-    problems.require_ref("person_ref", entity_ref::EntityType::Person, &payload.person_ref);
+    problems.require_ref(
+        "person_ref",
+        entity_ref::EntityType::Person,
+        &payload.person_ref,
+    );
     problems.require_text("display_name", &payload.display_name);
-    problems.ref_opt("owner_ref", entity_ref::EntityType::Worker, payload.owner_ref.as_deref());
-    problems.require_token("preferred_channel", tokens::CHANNELS, &payload.preferred_channel);
+    problems.ref_opt(
+        "owner_ref",
+        entity_ref::EntityType::Worker,
+        payload.owner_ref.as_deref(),
+    );
+    problems.require_token(
+        "preferred_channel",
+        tokens::CHANNELS,
+        &payload.preferred_channel,
+    );
     problems.cap_opt("job_title", payload.job_title.as_deref());
     ensure_valid(&problems.into_vec())?;
     if let Some(account) = payload.account_pid {
@@ -126,9 +138,20 @@ async fn create_contact(
         Some(serde_json::json!({ "owner": row.owner_ref })),
     )
     .await?;
-    streaming::emit_on(&txn, "contact", "created", &row.pid.to_string(), &row.display_name, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "contact",
+        "created",
+        &row.pid.to_string(),
+        &row.display_name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/contacts` — active contacts.
@@ -185,7 +208,11 @@ async fn repoint_contact(
 ) -> Result<Response> {
     let contact = records::find_contact(&ctx.db, records::parse_pid(&pid)?).await?;
     let mut problems = Problems::new();
-    problems.require_ref("person_ref", entity_ref::EntityType::Person, &payload.person_ref);
+    problems.require_ref(
+        "person_ref",
+        entity_ref::EntityType::Person,
+        &payload.person_ref,
+    );
     problems.require_text("reason", &payload.reason);
     ensure_valid(&problems.into_vec())?;
     let txn = ctx.db.begin().await?;
@@ -199,7 +226,9 @@ async fn repoint_contact(
         row.pid,
         "repointed",
         caller.actor(),
-        Some(serde_json::json!({ "from": from, "to": payload.person_ref, "reason": payload.reason })),
+        Some(
+            serde_json::json!({ "from": from, "to": payload.person_ref, "reason": payload.reason }),
+        ),
     )
     .await?;
     txn.commit().await?;
@@ -221,7 +250,11 @@ async fn create_account(
     );
     problems.require_text("display_name", &payload.display_name);
     problems.require_token("tier", tokens::ACCOUNT_TIERS, &payload.tier);
-    problems.ref_opt("owner_ref", entity_ref::EntityType::Worker, payload.owner_ref.as_deref());
+    problems.ref_opt(
+        "owner_ref",
+        entity_ref::EntityType::Worker,
+        payload.owner_ref.as_deref(),
+    );
     problems.cap_opt("industry", payload.industry.as_deref());
     ensure_valid(&problems.into_vec())?;
     let txn = ctx.db.begin().await?;
@@ -238,9 +271,20 @@ async fn create_account(
     .insert(&txn)
     .await?;
     Audit::record(&txn, "account", row.pid, "created", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "account", "created", &row.pid.to_string(), &row.display_name, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "account",
+        "created",
+        &row.pid.to_string(),
+        &row.display_name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/accounts`.
@@ -284,13 +328,27 @@ async fn create_activity(
     Json(payload): Json<ActivityPayload>,
 ) -> Result<Response> {
     let mut problems = Problems::new();
-    problems.require_token("subject_kind", tokens::ACTIVITY_SUBJECTS, &payload.subject_kind);
-    problems.token_opt("sentiment", crate::rules::engagement::SENTIMENTS, payload.sentiment.as_deref());
+    problems.require_token(
+        "subject_kind",
+        tokens::ACTIVITY_SUBJECTS,
+        &payload.subject_kind,
+    );
+    problems.token_opt(
+        "sentiment",
+        crate::rules::engagement::SENTIMENTS,
+        payload.sentiment.as_deref(),
+    );
     problems.require_token("kind", tokens::ACTIVITY_KINDS, &payload.kind);
     problems.require_text("summary", &payload.summary);
-    problems.ref_opt("actor_ref", entity_ref::EntityType::Worker, payload.actor_ref.as_deref());
+    problems.ref_opt(
+        "actor_ref",
+        entity_ref::EntityType::Worker,
+        payload.actor_ref.as_deref(),
+    );
     ensure_valid(&problems.into_vec())?;
-    let occurred_at = payload.occurred_at.unwrap_or_else(|| chrono::Utc::now().into());
+    let occurred_at = payload
+        .occurred_at
+        .unwrap_or_else(|| chrono::Utc::now().into());
     let txn = ctx.db.begin().await?;
     let row = activities::ActiveModel {
         pid: ActiveValue::set(Uuid::new_v4()),
@@ -315,8 +373,8 @@ async fn create_activity(
         && let Ok(ticket) = records::find_ticket(&txn, payload.subject_pid).await
     {
         {
-            let is_assignee = ticket.assignee_ref.is_some()
-                && ticket.assignee_ref == payload.actor_ref;
+            let is_assignee =
+                ticket.assignee_ref.is_some() && ticket.assignee_ref == payload.actor_ref;
             if is_assignee && ticket.first_responded_at.is_none() && ticket.status != "closed" {
                 let ticket_pid = ticket.pid;
                 let mut active: tickets::ActiveModel = ticket.into();
@@ -337,7 +395,9 @@ async fn create_activity(
     }
     Audit::record(&txn, "activity", row.pid, "created", caller.actor(), None).await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/activities?subject_kind=&subject_pid=` — one object's

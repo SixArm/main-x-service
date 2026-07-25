@@ -74,6 +74,7 @@
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
+use crate::models::_entities::{stays, wards};
 use authentication_verifier::{
     Action, Claims, Policy, ReloadablePolicy, ReloadableVerifier, Verifier,
 };
@@ -81,7 +82,6 @@ use axum::extract::FromRequestParts;
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
 use axum::http::{HeaderMap, Method, StatusCode};
-use crate::models::_entities::{stays, wards};
 
 /// The resource entity this crate guards, as seen by ABAC policies
 /// (the `entity` pseudo-attribute in rule `when` clauses).
@@ -183,7 +183,10 @@ pub fn spawn_key_refresh() {
             }
         }
     });
-    tracing::info!(secs, "polling PATIENT_FLOW_PASETO_KEYS_URL for key rotation");
+    tracing::info!(
+        secs,
+        "polling PATIENT_FLOW_PASETO_KEYS_URL for key rotation"
+    );
 }
 
 /// Build a verifier by fetching the published key set from `url`

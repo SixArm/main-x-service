@@ -126,7 +126,11 @@ pub fn score(facts: &LeadFacts, weights: &Weights) -> ScoreBreakdown {
         .days_since_last_activity
         .map_or(0, |days| recency_points(days, weights.recent_activity));
     let rules = vec![
-        fired("source_referral", facts.source == "referral", weights.referral),
+        fired(
+            "source_referral",
+            facts.source == "referral",
+            weights.referral,
+        ),
         fired(
             "source_campaign",
             facts.source == "campaign" && facts.campaign_attributed,
@@ -138,8 +142,16 @@ pub fn score(facts: &LeadFacts, weights: &Weights) -> ScoreBreakdown {
             rule: "recent_activity".to_string(),
             points: recency,
         },
-        fired("activity_volume", facts.activity_count >= 3, weights.activity_volume),
-        fired("campaign_click", facts.campaign_click, weights.campaign_click),
+        fired(
+            "activity_volume",
+            facts.activity_count >= 3,
+            weights.activity_volume,
+        ),
+        fired(
+            "campaign_click",
+            facts.campaign_click,
+            weights.campaign_click,
+        ),
         fired("unsubscribe", facts.unsubscribed, weights.unsubscribe),
     ];
     let total: i32 = rules.iter().map(|r| r.points).sum();
@@ -151,7 +163,11 @@ pub fn score(facts: &LeadFacts, weights: &Weights) -> ScoreBreakdown {
     } else {
         "cold"
     };
-    ScoreBreakdown { score, label, rules }
+    ScoreBreakdown {
+        score,
+        label,
+        rules,
+    }
 }
 
 #[cfg(test)]
@@ -212,13 +228,19 @@ mod tests {
         let base = facts();
         for freemail in ["gmail.com", "hotmail.com"] {
             let s = score(
-                &LeadFacts { email_domain: Some(freemail.to_string()), ..base.clone() },
+                &LeadFacts {
+                    email_domain: Some(freemail.to_string()),
+                    ..base.clone()
+                },
                 &Weights::default(),
             );
             assert_eq!(s.score, 0, "{freemail}");
         }
         let s = score(
-            &LeadFacts { email_domain: Some("initech.example".to_string()), ..base },
+            &LeadFacts {
+                email_domain: Some("initech.example".to_string()),
+                ..base
+            },
             &Weights::default(),
         );
         assert_eq!(s.score, 10);
@@ -244,7 +266,10 @@ mod tests {
     #[test]
     fn unsubscribe_clamps_at_zero() {
         let s = score(
-            &LeadFacts { unsubscribed: true, ..facts() },
+            &LeadFacts {
+                unsubscribed: true,
+                ..facts()
+            },
             &Weights::default(),
         );
         assert_eq!(s.score, 0);

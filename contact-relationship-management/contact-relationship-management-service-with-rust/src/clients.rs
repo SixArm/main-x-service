@@ -58,7 +58,11 @@ fn cache() -> &'static Mutex<HashMap<String, String>> {
 /// WPM request.
 pub async fn display_name(entity_ref: &EntityRef) -> Option<String> {
     let urn = entity_ref.to_string();
-    if let Some(hit) = cache().lock().unwrap_or_else(std::sync::PoisonError::into_inner).get(&urn) {
+    if let Some(hit) = cache()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .get(&urn)
+    {
         return Some(hit.clone());
     }
     if mode() != Mode::Http {
@@ -136,6 +140,9 @@ mod tests {
         let entity_ref = EntityRef::from_str(&urn).unwrap();
         assert_eq!(display_name(&entity_ref).await, None);
         prime(&urn, "Ada Lovelace");
-        assert_eq!(display_name(&entity_ref).await.as_deref(), Some("Ada Lovelace"));
+        assert_eq!(
+            display_name(&entity_ref).await.as_deref(),
+            Some("Ada Lovelace")
+        );
     }
 }

@@ -2,11 +2,11 @@
 //! approve → paid with reconciled payslips, the approved-run
 //! immutability, and the benchmark comparison flags.
 
-use workforce_planning_management_service::app::App;
-use workforce_planning_management_service::rules::payroll as rules;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
+use workforce_planning_management_service::app::App;
+use workforce_planning_management_service::rules::payroll as rules;
 
 use super::{activate, an_org, seed_employee};
 
@@ -45,7 +45,10 @@ async fn payroll_run_derives_reconciled_payslips() {
             .await
             .json();
         request
-            .post(&format!("/api/time-entries/{}/approve", entry["pid"].as_str().unwrap()))
+            .post(&format!(
+                "/api/time-entries/{}/approve",
+                entry["pid"].as_str().unwrap()
+            ))
             .await
             .assert_status_ok();
         // Unapproved time must NOT count: another 900-minute day left
@@ -66,7 +69,9 @@ async fn payroll_run_derives_reconciled_payslips() {
             .json();
         let run_pid = run["pid"].as_str().unwrap().to_string();
         // Approve from draft is an illegal transition.
-        let premature = request.post(&format!("/api/payroll-runs/{run_pid}/approve")).await;
+        let premature = request
+            .post(&format!("/api/payroll-runs/{run_pid}/approve"))
+            .await;
         assert_eq!(premature.status_code(), 422);
         // Calculate.
         let calculated: Value = request
@@ -98,8 +103,7 @@ async fn payroll_run_derives_reconciled_payslips() {
             .find(|s| s["employee_pid"].as_str() == Some(enrolled.as_str()))
             .unwrap();
         let expected_base = 400_000;
-        let expected_overtime =
-            rules::overtime_pay_minor(expected_base, 450).unwrap();
+        let expected_overtime = rules::overtime_pay_minor(expected_base, 450).unwrap();
         assert_eq!(
             enrolled_slip["gross_minor"].as_i64().unwrap(),
             expected_base + expected_overtime,

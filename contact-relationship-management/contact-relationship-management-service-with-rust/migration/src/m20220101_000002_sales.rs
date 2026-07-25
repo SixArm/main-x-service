@@ -103,14 +103,10 @@ impl MigrationTrait for Migration {
             "CREATE INDEX IF NOT EXISTS pipeline_stages_pipeline ON pipeline_stages (pipeline_pid, position)",
         )
         .await?;
-        conn.execute_unprepared(
-            "CREATE INDEX IF NOT EXISTS deals_stage ON deals (stage_pid)",
-        )
-        .await?;
-        conn.execute_unprepared(
-            "CREATE INDEX IF NOT EXISTS deals_account ON deals (account_pid)",
-        )
-        .await?;
+        conn.execute_unprepared("CREATE INDEX IF NOT EXISTS deals_stage ON deals (stage_pid)")
+            .await?;
+        conn.execute_unprepared("CREATE INDEX IF NOT EXISTS deals_account ON deals (account_pid)")
+            .await?;
         Ok(())
     }
 
@@ -121,7 +117,13 @@ impl MigrationTrait for Migration {
     /// Propagates any DDL error.
     async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
         let conn = m.get_connection();
-        for table in ["forecast_snapshots", "deals", "pipeline_stages", "pipelines", "leads"] {
+        for table in [
+            "forecast_snapshots",
+            "deals",
+            "pipeline_stages",
+            "pipelines",
+            "leads",
+        ] {
             conn.execute_unprepared(&format!("DROP TABLE IF EXISTS {table}"))
                 .await?;
         }

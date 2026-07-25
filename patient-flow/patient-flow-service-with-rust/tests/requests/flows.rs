@@ -29,15 +29,25 @@ async fn full_journey_request_to_deep_clean() {
             }))
             .await
             .json();
-        let request_pid = bed_request["pid"].as_str().expect("request pid").to_string();
+        let request_pid = bed_request["pid"]
+            .as_str()
+            .expect("request pid")
+            .to_string();
         let eligible: Value = request
             .get(&format!("/api/bed-requests/{request_pid}/eligible"))
             .await
             .json();
-        assert_eq!(eligible.as_array().map(Vec::len), Some(2), "both beds eligible");
+        assert_eq!(
+            eligible.as_array().map(Vec::len),
+            Some(2),
+            "both beds eligible"
+        );
 
         // Allocate the first bed: request → allocated, bed → reserved.
-        let chosen = eligible[0]["bed_pid"].as_str().expect("bed pid").to_string();
+        let chosen = eligible[0]["bed_pid"]
+            .as_str()
+            .expect("bed pid")
+            .to_string();
         let allocated: Value = request
             .post(&format!("/api/bed-requests/{request_pid}/allocate"))
             .json(&json!({ "bed_pid": chosen }))
@@ -89,7 +99,9 @@ async fn full_journey_request_to_deep_clean() {
         // owes a deep clean, and a routine clean-complete is refused.
         request
             .post(&format!("/api/stays/{stay_pid}/infection-flags"))
-            .json(&json!({ "precaution": "droplet", "organism": "covid-19", "status": "suspected" }))
+            .json(
+                &json!({ "precaution": "droplet", "organism": "covid-19", "status": "suspected" }),
+            )
             .await
             .assert_status_ok();
         let ready: Value = request
@@ -117,7 +129,11 @@ async fn full_journey_request_to_deep_clean() {
             .post(&format!("/api/beds/{chosen}/state"))
             .json(&json!({ "transition": "clean_complete" }))
             .await;
-        assert_eq!(routine.status_code(), 422, "routine clean refused while deep clean owed");
+        assert_eq!(
+            routine.status_code(),
+            422,
+            "routine clean refused while deep clean owed"
+        );
         let deep: Value = request
             .post(&format!("/api/beds/{chosen}/state"))
             .json(&json!({ "transition": "clean_complete", "deep_clean_done": true }))
@@ -129,7 +145,11 @@ async fn full_journey_request_to_deep_clean() {
         // The stay detail records the whole narrative.
         let detail: Value = request.get(&format!("/api/stays/{stay_pid}")).await.json();
         assert_eq!(detail["stay"]["status"], "discharged");
-        assert_eq!(detail["transfers"].as_array().map(Vec::len), Some(2), "admit + discharge moves");
+        assert_eq!(
+            detail["transfers"].as_array().map(Vec::len),
+            Some(2),
+            "admit + discharge moves"
+        );
         assert_eq!(detail["red_green"][0]["classification"], "red");
     })
     .await;

@@ -116,7 +116,10 @@ impl std::fmt::Display for TransitionError {
             }
             Self::BadClosureReason(r) => write!(f, "unknown closure reason {r:?}"),
             Self::DeepCleanOutstanding => {
-                write!(f, "bed requires a deep clean; routine clean-complete refused")
+                write!(
+                    f,
+                    "bed requires a deep clean; routine clean-complete refused"
+                )
             }
         }
     }
@@ -152,7 +155,11 @@ pub struct Outcome {
 /// machine; [`TransitionError::BadClosureReason`] on an unknown close
 /// reason; [`TransitionError::DeepCleanOutstanding`] when a routine
 /// clean-complete is attempted on a deep-clean-owed bed.
-pub fn apply(state: BedState, transition: &Transition, ctx: BedContext) -> Result<Outcome, TransitionError> {
+pub fn apply(
+    state: BedState,
+    transition: &Transition,
+    ctx: BedContext,
+) -> Result<Outcome, TransitionError> {
     use BedState as S;
     let illegal = |t: &str| TransitionError::Illegal {
         from: state.token(),
@@ -228,7 +235,11 @@ mod tests {
     #[test]
     fn legal_transitions() {
         let cases: Vec<(BedState, Transition, BedState)> = vec![
-            (BedState::Available, Transition::Allocate, BedState::Reserved),
+            (
+                BedState::Available,
+                Transition::Allocate,
+                BedState::Reserved,
+            ),
             (BedState::Reserved, Transition::Release, BedState::Available),
             (BedState::Available, Transition::Admit, BedState::Occupied),
             (BedState::Reserved, Transition::Admit, BedState::Occupied),
@@ -237,10 +248,16 @@ mod tests {
                 Transition::Vacate { infectious: false },
                 BedState::AwaitingClean,
             ),
-            (BedState::AwaitingClean, Transition::CleanStart, BedState::Cleaning),
+            (
+                BedState::AwaitingClean,
+                Transition::CleanStart,
+                BedState::Cleaning,
+            ),
             (
                 BedState::Cleaning,
-                Transition::CleanComplete { deep_clean_done: false },
+                Transition::CleanComplete {
+                    deep_clean_done: false,
+                },
                 BedState::Available,
             ),
         ];
@@ -255,7 +272,14 @@ mod tests {
     #[test]
     fn illegal_transitions_are_refused() {
         use BedState as S;
-        let all = [S::Available, S::Reserved, S::Occupied, S::AwaitingClean, S::Cleaning, S::Closed];
+        let all = [
+            S::Available,
+            S::Reserved,
+            S::Occupied,
+            S::AwaitingClean,
+            S::Cleaning,
+            S::Closed,
+        ];
         let legal_from = |t: &Transition| -> Vec<BedState> {
             match t {
                 Transition::Allocate => vec![S::Available],
@@ -274,7 +298,9 @@ mod tests {
             Transition::Admit,
             Transition::Vacate { infectious: false },
             Transition::CleanStart,
-            Transition::CleanComplete { deep_clean_done: false },
+            Transition::CleanComplete {
+                deep_clean_done: false,
+            },
             Transition::Reopen,
         ];
         for t in &transitions {
@@ -294,14 +320,24 @@ mod tests {
     #[test]
     fn close_rules() {
         use BedState as S;
-        let close = Transition::Close { reason: "infection".to_string() };
-        for from in [S::Available, S::Reserved, S::AwaitingClean, S::Cleaning, S::Closed] {
+        let close = Transition::Close {
+            reason: "infection".to_string(),
+        };
+        for from in [
+            S::Available,
+            S::Reserved,
+            S::AwaitingClean,
+            S::Cleaning,
+            S::Closed,
+        ] {
             let out = apply(from, &close, ctx()).unwrap();
             assert_eq!(out.state, S::Closed);
             assert_eq!(out.closure_reason.as_deref(), Some("infection"));
         }
         assert!(apply(S::Occupied, &close, ctx()).is_err());
-        let bad = Transition::Close { reason: "meteor".to_string() };
+        let bad = Transition::Close {
+            reason: "meteor".to_string(),
+        };
         assert_eq!(
             apply(S::Available, &bad, ctx()),
             Err(TransitionError::BadClosureReason("meteor".to_string()))
@@ -313,15 +349,36 @@ mod tests {
     /// confirmed, which clears the flag.
     #[test]
     fn deep_clean_propagation() {
-        let out = apply(BedState::Occupied, &Transition::Vacate { infectious: true }, ctx()).unwrap();
+        let out = apply(
+            BedState::Occupied,
+            &Transition::Vacate { infectious: true },
+            ctx(),
+        )
+        .unwrap();
         assert_eq!(out.state, BedState::AwaitingClean);
         assert!(out.deep_clean_required);
-        let deep = BedContext { is_virtual: false, deep_clean_required: true };
+        let deep = BedContext {
+            is_virtual: false,
+            deep_clean_required: true,
+        };
         assert_eq!(
-            apply(BedState::Cleaning, &Transition::CleanComplete { deep_clean_done: false }, deep),
+            apply(
+                BedState::Cleaning,
+                &Transition::CleanComplete {
+                    deep_clean_done: false
+                },
+                deep
+            ),
             Err(TransitionError::DeepCleanOutstanding)
         );
-        let done = apply(BedState::Cleaning, &Transition::CleanComplete { deep_clean_done: true }, deep).unwrap();
+        let done = apply(
+            BedState::Cleaning,
+            &Transition::CleanComplete {
+                deep_clean_done: true,
+            },
+            deep,
+        )
+        .unwrap();
         assert_eq!(done.state, BedState::Available);
         assert!(!done.deep_clean_required);
     }
@@ -330,8 +387,16 @@ mod tests {
     /// to available and never owes a deep clean (PF-D8).
     #[test]
     fn virtual_slots_skip_cleaning() {
-        let virt = BedContext { is_virtual: true, deep_clean_required: false };
-        let out = apply(BedState::Occupied, &Transition::Vacate { infectious: true }, virt).unwrap();
+        let virt = BedContext {
+            is_virtual: true,
+            deep_clean_required: false,
+        };
+        let out = apply(
+            BedState::Occupied,
+            &Transition::Vacate { infectious: true },
+            virt,
+        )
+        .unwrap();
         assert_eq!(out.state, BedState::Available);
         assert!(!out.deep_clean_required);
     }
@@ -340,7 +405,10 @@ mod tests {
     /// is owed, else straight to available.
     #[test]
     fn reopen_respects_owed_deep_clean() {
-        let owed = BedContext { is_virtual: false, deep_clean_required: true };
+        let owed = BedContext {
+            is_virtual: false,
+            deep_clean_required: true,
+        };
         let out = apply(BedState::Closed, &Transition::Reopen, owed).unwrap();
         assert_eq!(out.state, BedState::AwaitingClean);
         assert!(out.deep_clean_required);

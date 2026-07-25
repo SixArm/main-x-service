@@ -1,10 +1,10 @@
 //! Workforce flows (WPM-R4–R6): time caps + overtime, the leave
 //! balance journey (+ the two-approver race), and shift conflicts.
 
-use workforce_planning_management_service::app::App;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
+use workforce_planning_management_service::app::App;
 
 use super::{activate, an_org, seed_employee};
 
@@ -42,7 +42,9 @@ async fn time_caps_and_overtime() {
             .post(&format!("/api/time-entries/{entry_pid}/approve"))
             .await
             .assert_status_ok();
-        let again = request.post(&format!("/api/time-entries/{entry_pid}/approve")).await;
+        let again = request
+            .post(&format!("/api/time-entries/{entry_pid}/approve"))
+            .await;
         assert_eq!(again.status_code(), 422, "double approval refused");
     })
     .await;
@@ -109,7 +111,9 @@ async fn leave_balance_journey() {
         assert_eq!(annual_balance["used_days"], 5);
         // The second decision on the same request is refused (the
         // race's loser sees the decided status).
-        let second = request.post(&format!("/api/leave-requests/{annual_pid}/reject")).await;
+        let second = request
+            .post(&format!("/api/leave-requests/{annual_pid}/reject"))
+            .await;
         assert_eq!(second.status_code(), 422, "already decided");
         // Cancelling the approved request restores the balance.
         request
@@ -126,7 +130,10 @@ async fn leave_balance_journey() {
             .iter()
             .find(|b| b["kind"] == "annual")
             .unwrap();
-        assert_eq!(annual_balance["used_days"], 0, "cancel restores the balance");
+        assert_eq!(
+            annual_balance["used_days"], 0,
+            "cancel restores the balance"
+        );
     })
     .await;
 }
@@ -168,17 +175,26 @@ async fn shift_conflicts() {
         // Assign the early shift; the overlapping one is refused; the
         // back-to-back one is fine.
         request
-            .post(&format!("/api/shifts/{}/assignments", early["pid"].as_str().unwrap()))
+            .post(&format!(
+                "/api/shifts/{}/assignments",
+                early["pid"].as_str().unwrap()
+            ))
             .json(&json!({ "employee_pid": employee }))
             .await
             .assert_status_ok();
         let double = request
-            .post(&format!("/api/shifts/{}/assignments", overlapping["pid"].as_str().unwrap()))
+            .post(&format!(
+                "/api/shifts/{}/assignments",
+                overlapping["pid"].as_str().unwrap()
+            ))
             .json(&json!({ "employee_pid": employee }))
             .await;
         assert_eq!(double.status_code(), 422, "double booking refused");
         request
-            .post(&format!("/api/shifts/{}/assignments", late["pid"].as_str().unwrap()))
+            .post(&format!(
+                "/api/shifts/{}/assignments",
+                late["pid"].as_str().unwrap()
+            ))
             .json(&json!({ "employee_pid": employee }))
             .await
             .assert_status_ok();
@@ -194,7 +210,10 @@ async fn shift_conflicts() {
             .await
             .json();
         request
-            .post(&format!("/api/leave-requests/{}/approve", leave["pid"].as_str().unwrap()))
+            .post(&format!(
+                "/api/leave-requests/{}/approve",
+                leave["pid"].as_str().unwrap()
+            ))
             .await
             .assert_status_ok();
         let on_leave_shift: Value = request
@@ -206,10 +225,17 @@ async fn shift_conflicts() {
             .await
             .json();
         let conflicted = request
-            .post(&format!("/api/shifts/{}/assignments", on_leave_shift["pid"].as_str().unwrap()))
+            .post(&format!(
+                "/api/shifts/{}/assignments",
+                on_leave_shift["pid"].as_str().unwrap()
+            ))
             .json(&json!({ "employee_pid": employee }))
             .await;
-        assert_eq!(conflicted.status_code(), 422, "assignment over approved leave refused");
+        assert_eq!(
+            conflicted.status_code(),
+            422,
+            "assignment over approved leave refused"
+        );
     })
     .await;
 }

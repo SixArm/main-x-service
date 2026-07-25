@@ -49,10 +49,8 @@ impl MigrationTrait for Migration {
              )",
         )
         .await?;
-        conn.execute_unprepared(
-            "CREATE INDEX IF NOT EXISTS payslips_run ON payslips (run_pid)",
-        )
-        .await?;
+        conn.execute_unprepared("CREATE INDEX IF NOT EXISTS payslips_run ON payslips (run_pid)")
+            .await?;
         conn.execute_unprepared(
             "CREATE INDEX IF NOT EXISTS payslips_employee ON payslips (employee_pid)",
         )

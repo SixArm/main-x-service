@@ -74,6 +74,7 @@
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
+use crate::models::_entities::{contacts, deals};
 use authentication_verifier::{
     Action, Claims, Policy, ReloadablePolicy, ReloadableVerifier, Verifier,
 };
@@ -81,7 +82,6 @@ use axum::extract::FromRequestParts;
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
 use axum::http::{HeaderMap, Method, StatusCode};
-use crate::models::_entities::{contacts, deals};
 
 /// The resource entity this crate guards, as seen by ABAC policies
 /// (the `entity` pseudo-attribute in rule `when` clauses).
@@ -221,8 +221,7 @@ pub async fn fetch_or(url: &str, issuer: &str, audience: &str, fallback: Verifie
 #[must_use]
 pub fn require_auth() -> bool {
     static REQUIRE_AUTH: OnceLock<bool> = OnceLock::new();
-    *REQUIRE_AUTH
-        .get_or_init(|| parse_bool(&std::env::var("CRM_REQUIRE_AUTH").unwrap_or_default()))
+    *REQUIRE_AUTH.get_or_init(|| parse_bool(&std::env::var("CRM_REQUIRE_AUTH").unwrap_or_default()))
 }
 
 /// Lenient boolean parse: `1`/`true`/`yes`/`on` (case-insensitive,
@@ -431,7 +430,9 @@ pub fn enforce(
 pub fn deal_resource_attrs(deal: &deals::Model) -> BTreeMap<String, Vec<String>> {
     let mut attrs = BTreeMap::new();
     if let Some(owner_ref) = &deal.owner_ref {
-        let owner = owner_ref.split_once(':').map_or(owner_ref.as_str(), |(_, id)| id);
+        let owner = owner_ref
+            .split_once(':')
+            .map_or(owner_ref.as_str(), |(_, id)| id);
         attrs.insert("owner".to_string(), vec![owner.to_string()]);
         attrs.insert("owner_ref".to_string(), vec![owner_ref.clone()]);
     }
@@ -452,7 +453,9 @@ pub fn deal_resource_attrs(deal: &deals::Model) -> BTreeMap<String, Vec<String>>
 pub fn contact_resource_attrs(contact: &contacts::Model) -> BTreeMap<String, Vec<String>> {
     let mut attrs = BTreeMap::new();
     if let Some(owner_ref) = &contact.owner_ref {
-        let owner = owner_ref.split_once(':').map_or(owner_ref.as_str(), |(_, id)| id);
+        let owner = owner_ref
+            .split_once(':')
+            .map_or(owner_ref.as_str(), |(_, id)| id);
         attrs.insert("owner".to_string(), vec![owner.to_string()]);
         attrs.insert("owner_ref".to_string(), vec![owner_ref.clone()]);
     }
@@ -1381,7 +1384,11 @@ mod tests {
     }
 
     /// A deal model for the resource-attribute tests.
-    fn a_deal(owner: Option<uuid::Uuid>, closed: bool, won: bool) -> crate::models::_entities::deals::Model {
+    fn a_deal(
+        owner: Option<uuid::Uuid>,
+        closed: bool,
+        won: bool,
+    ) -> crate::models::_entities::deals::Model {
         crate::models::_entities::deals::Model {
             created_at: chrono::Utc::now().into(),
             updated_at: chrono::Utc::now().into(),
@@ -1413,8 +1420,14 @@ mod tests {
         let attrs = deal_resource_attrs(&a_deal(Some(owner), false, false));
         assert_eq!(attrs["owner"], vec![owner.to_string()]);
         assert_eq!(attrs["status"], vec!["open".to_string()]);
-        assert_eq!(deal_resource_attrs(&a_deal(None, true, true))["status"], vec!["won".to_string()]);
-        assert_eq!(deal_resource_attrs(&a_deal(None, true, false))["status"], vec!["lost".to_string()]);
+        assert_eq!(
+            deal_resource_attrs(&a_deal(None, true, true))["status"],
+            vec!["won".to_string()]
+        );
+        assert_eq!(
+            deal_resource_attrs(&a_deal(None, true, false))["status"],
+            vec!["lost".to_string()]
+        );
         assert!(!deal_resource_attrs(&a_deal(None, false, false)).contains_key("owner"));
     }
 

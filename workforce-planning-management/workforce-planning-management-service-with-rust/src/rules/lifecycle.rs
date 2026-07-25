@@ -105,7 +105,10 @@ mod tests {
     /// matching vocabulary — a typo in a table is a test failure.
     #[test]
     fn tables_use_vocabulary_tokens_only() {
-        type Case = (&'static [(&'static str, &'static str)], &'static [&'static str]);
+        type Case = (
+            &'static [(&'static str, &'static str)],
+            &'static [&'static str],
+        );
         let cases: &[Case] = &[
             (EMPLOYEE, tokens::EMPLOYEE_STATUSES),
             (REQUISITION, tokens::REQUISITION_STATUSES),

@@ -213,7 +213,9 @@ async fn get_one(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
 ) -> Result<Response> {
-    let model = CaseModel::find_by_pid(&ctx.db, &pid).await.map_err(super::model_not_found)?;
+    let model = CaseModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(super::model_not_found)?;
     let case = model.to_case()?;
     let obligations = crate::auth::authorize_record(
         &caller,
@@ -249,7 +251,9 @@ async fn update(
     Json(case): Json<Case>,
 ) -> Result<Response> {
     validate(&case)?;
-    let model = CaseModel::find_by_pid(&ctx.db, &pid).await.map_err(super::model_not_found)?;
+    let model = CaseModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(super::model_not_found)?;
     // Record-level check uses the *existing* stored case's attributes
     // (e.g. deny modifying a case whose stored status is `closed`).
     crate::auth::authorize_record(
@@ -281,7 +285,9 @@ async fn remove(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
 ) -> Result<Response> {
-    let model = CaseModel::find_by_pid(&ctx.db, &pid).await.map_err(super::model_not_found)?;
+    let model = CaseModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(super::model_not_found)?;
     crate::auth::authorize_record(
         &caller,
         Action::Delete,
@@ -450,8 +456,12 @@ async fn merge(
             ErrorDetail::new("validation", "main_pid and duplicate_pid must differ"),
         ));
     }
-    let main = CaseModel::find_by_pid(&ctx.db, &req.main_pid).await.map_err(super::model_not_found)?;
-    let duplicate = CaseModel::find_by_pid(&ctx.db, &req.duplicate_pid).await.map_err(super::model_not_found)?;
+    let main = CaseModel::find_by_pid(&ctx.db, &req.main_pid)
+        .await
+        .map_err(super::model_not_found)?;
+    let duplicate = CaseModel::find_by_pid(&ctx.db, &req.duplicate_pid)
+        .await
+        .map_err(super::model_not_found)?;
 
     let outcome = merge_cases(&main.to_case()?, &duplicate.to_case()?);
 

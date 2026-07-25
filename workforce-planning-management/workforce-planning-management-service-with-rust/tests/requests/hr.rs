@@ -1,10 +1,10 @@
 //! The hire journey end-to-end (WPM-R1–R3, WPM-R7) plus the
 //! unknown-pid `404` contract and the org-chart cycle refusal.
 
-use workforce_planning_management_service::app::App;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
+use workforce_planning_management_service::app::App;
 
 use super::{a_person, a_worker, activate, an_org, seed_employee};
 
@@ -67,7 +67,10 @@ async fn hire_journey_end_to_end() {
             .await
             .json();
         let outcome = request
-            .put(&format!("/api/interviews/{}", interview["pid"].as_str().unwrap()))
+            .put(&format!(
+                "/api/interviews/{}",
+                interview["pid"].as_str().unwrap()
+            ))
             .json(&json!({ "outcome": "advance" }))
             .await;
         assert_eq!(outcome.status_code(), 200);
@@ -93,8 +96,14 @@ async fn hire_journey_end_to_end() {
             }))
             .await
             .json();
-        let employee_pid = hired["employee_pid"].as_str().expect("employee created").to_string();
-        let employee: Value = request.get(&format!("/api/employees/{employee_pid}")).await.json();
+        let employee_pid = hired["employee_pid"]
+            .as_str()
+            .expect("employee created")
+            .to_string();
+        let employee: Value = request
+            .get(&format!("/api/employees/{employee_pid}"))
+            .await
+            .json();
         assert_eq!(employee["status"], "onboarding");
         assert_eq!(employee["department"], "engineering");
         // Onboarding gate: a pending mandatory item blocks activation.
@@ -117,7 +126,11 @@ async fn hire_journey_end_to_end() {
             .post(&format!("/api/employees/{employee_pid}/status"))
             .json(&json!({ "to": "active" }))
             .await;
-        assert_eq!(blocked.status_code(), 422, "mandatory items block activation");
+        assert_eq!(
+            blocked.status_code(),
+            422,
+            "mandatory items block activation"
+        );
         // Complete one, waive the other (reason required).
         let no_reason = request
             .post(&format!("/api/onboarding-items/{}/waive", item_pids[1]))
@@ -146,7 +159,10 @@ async fn hire_journey_end_to_end() {
             .await
             .assert_status_ok();
         // The audit trail recorded the journey.
-        let audits: Value = request.get(&format!("/api/audits/{employee_pid}")).await.json();
+        let audits: Value = request
+            .get(&format!("/api/audits/{employee_pid}"))
+            .await
+            .json();
         let actions: Vec<&str> = audits
             .as_array()
             .unwrap()
@@ -154,7 +170,10 @@ async fn hire_journey_end_to_end() {
             .filter_map(|a| a["action"].as_str())
             .collect();
         assert!(actions.contains(&"employee_hired"), "actions: {actions:?}");
-        assert!(actions.contains(&"employee_activated"), "actions: {actions:?}");
+        assert!(
+            actions.contains(&"employee_activated"),
+            "actions: {actions:?}"
+        );
     })
     .await;
 }
@@ -216,7 +235,11 @@ async fn contracts_404_cycle_and_uniqueness() {
                 "job_title": "Engineer", "hired_on": "2026-01-05",
             }))
             .await;
-        assert_ne!(duplicate.status_code(), 200, "duplicate employee number refused");
+        assert_ne!(
+            duplicate.status_code(),
+            200,
+            "duplicate employee number refused"
+        );
         // Validation contract: bad URN, bad token, bad FTE ⇒ 422.
         let invalid = request
             .post("/api/employees")

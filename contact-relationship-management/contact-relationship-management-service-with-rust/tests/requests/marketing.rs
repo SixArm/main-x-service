@@ -88,7 +88,9 @@ async fn consent_gates_campaign_and_nurture() {
             .json();
         let sequence_pid = sequence["pid"].as_str().unwrap().to_string();
         request
-            .post(&format!("/api/nurture-sequences/{sequence_pid}/enrollments"))
+            .post(&format!(
+                "/api/nurture-sequences/{sequence_pid}/enrollments"
+            ))
             .json(&json!({ "contact_pid": consented }))
             .await
             .assert_status_ok();
@@ -124,7 +126,9 @@ async fn consent_gates_campaign_and_nurture() {
         assert_eq!(actions, vec!["granted", "withdrawn"]);
         // An enrolment for a non-consented contact is refused outright.
         let refused = request
-            .post(&format!("/api/nurture-sequences/{sequence_pid}/enrollments"))
+            .post(&format!(
+                "/api/nurture-sequences/{sequence_pid}/enrollments"
+            ))
             .json(&json!({ "contact_pid": consented }))
             .await;
         assert_eq!(refused.status_code(), 422);

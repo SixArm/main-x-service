@@ -2,10 +2,10 @@
 //! category↔scale rule, a sitting's lifecycle, per-scale results, the
 //! derived profile, and the aggregate analytics.
 
-use workforce_planning_management_service::app::App;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
+use workforce_planning_management_service::app::App;
 
 use super::{activate, an_org, seed_employee};
 
@@ -51,7 +51,10 @@ async fn assessment_round_trip() {
             }))
             .await
             .json();
-        let aptitude_pid = aptitude["pid"].as_str().expect("instrument pid").to_string();
+        let aptitude_pid = aptitude["pid"]
+            .as_str()
+            .expect("instrument pid")
+            .to_string();
 
         // Psychometric spans aptitude and personality — the one overlap.
         let psychometric: Value = request
@@ -155,7 +158,10 @@ async fn assessment_round_trip() {
             .await
             .assert_status_ok();
 
-        let detail: Value = request.get(&format!("/api/assessments/{sitting_pid}")).await.json();
+        let detail: Value = request
+            .get(&format!("/api/assessments/{sitting_pid}"))
+            .await
+            .json();
         let results = detail["results"].as_array().expect("results");
         assert_eq!(results.len(), 2, "the re-recorded scale is one row");
         let numerical = results
@@ -163,7 +169,10 @@ async fn assessment_round_trip() {
             .find(|r| r["scale"] == "numerical_reasoning")
             .expect("numerical result");
         assert_eq!(numerical["percentile"], 92, "the later recording wins");
-        assert_eq!(numerical["band"], "high", "band derived from the percentile");
+        assert_eq!(
+            numerical["band"], "high",
+            "band derived from the percentile"
+        );
 
         // ── Lifecycle: an illegal move is refused; completing derives
         // the expiry from the instrument's validity.
@@ -181,7 +190,10 @@ async fn assessment_round_trip() {
             .json(&json!({ "to": "completed" }))
             .await
             .assert_status_ok();
-        let completed: Value = request.get(&format!("/api/assessments/{sitting_pid}")).await.json();
+        let completed: Value = request
+            .get(&format!("/api/assessments/{sitting_pid}"))
+            .await
+            .json();
         assert!(
             completed["assessment"]["expires_on"].is_string(),
             "24-month validity derived an expiry"
@@ -201,7 +213,10 @@ async fn assessment_round_trip() {
             .clone();
         assert_eq!(aptitude_slice["recorded"], 1);
         assert_eq!(aptitude_slice["current"], 1, "completed and unexpired");
-        assert_eq!(aptitude_slice["scales"].as_array().expect("scales").len(), 2);
+        assert_eq!(
+            aptitude_slice["scales"].as_array().expect("scales").len(),
+            2
+        );
         let not_assessed = aptitude_slice["scales_not_assessed"]
             .as_array()
             .expect("gaps");
@@ -215,7 +230,10 @@ async fn assessment_round_trip() {
         );
         // Every category appears, even with nothing recorded
         // (five since the cognitive category landed, WPM-T35).
-        assert_eq!(profile["categories"].as_array().expect("categories").len(), 5);
+        assert_eq!(
+            profile["categories"].as_array().expect("categories").len(),
+            5
+        );
 
         // ── Aggregate analytics carry no individual score.
         let analytics: Value = request.get("/api/assessments/analytics").await.json();

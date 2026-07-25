@@ -27,7 +27,9 @@ pub fn may_complete(answers: &[Option<bool>]) -> Result<(), String> {
     if unanswered == 0 {
         Ok(())
     } else {
-        Err(format!("{unanswered} item(s) unanswered — every item needs ok or issue"))
+        Err(format!(
+            "{unanswered} item(s) unanswered — every item needs ok or issue"
+        ))
     }
 }
 
@@ -59,12 +61,18 @@ mod tests {
         assert!(may_complete(&[Some(true), Some(false)]).is_ok());
         let err = may_complete(&[Some(true), None, None]).unwrap_err();
         assert!(err.contains('2'), "counts the unanswered");
-        assert!(may_complete(&[]).is_ok(), "an empty checklist has nothing unanswered");
+        assert!(
+            may_complete(&[]).is_ok(),
+            "an empty checklist has nothing unanswered"
+        );
     }
 
     #[test]
     fn open_issues_counts_flagged_only() {
-        assert_eq!(open_issues(&[Some(true), Some(false), None, Some(false)]), 2);
+        assert_eq!(
+            open_issues(&[Some(true), Some(false), None, Some(false)]),
+            2
+        );
         assert_eq!(open_issues(&[Some(true), None]), 0);
     }
 }

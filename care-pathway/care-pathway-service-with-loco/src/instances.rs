@@ -9,12 +9,26 @@ pub const INSTANCE_STATUSES: &[&str] = &["active", "on_hold", "completed", "disc
 pub const URGENCY_LEVELS: &[&str] = &["routine", "urgent", "emergency"];
 
 /// Care-team roles.
-pub const TEAM_ROLES: &[&str] =
-    &["lead_clinician", "gp", "specialist", "nurse", "mental_health", "coordinator", "other"];
+pub const TEAM_ROLES: &[&str] = &[
+    "lead_clinician",
+    "gp",
+    "specialist",
+    "nurse",
+    "mental_health",
+    "coordinator",
+    "other",
+];
 
 /// Recorded closure outcomes (declared at close, never inferred).
-pub const OUTCOMES: &[&str] =
-    &["improved", "stable", "deteriorated", "deceased", "transferred", "not_achieved", "other"];
+pub const OUTCOMES: &[&str] = &[
+    "improved",
+    "stable",
+    "deteriorated",
+    "deceased",
+    "transferred",
+    "not_achieved",
+    "other",
+];
 
 /// Instance event kinds (recorded, not inferred).
 pub const EVENT_KINDS: &[&str] = &["note", "review", "escalation", "de_escalation", "referral"];
@@ -34,7 +48,9 @@ pub fn is_terminal(status: &str) -> bool {
 /// A human-readable refusal.
 pub fn instance_transition(current: &str, to: &str) -> Result<(), String> {
     if !INSTANCE_STATUSES.contains(&to) {
-        return Err(format!("unknown status `{to}` (statuses: {INSTANCE_STATUSES:?})"));
+        return Err(format!(
+            "unknown status `{to}` (statuses: {INSTANCE_STATUSES:?})"
+        ));
     }
     if is_terminal(current) {
         return Err(format!("`{current}` is terminal and does not transition"));
@@ -61,9 +77,18 @@ mod tests {
         assert!(instance_transition("on_hold", "active").is_ok());
         assert!(instance_transition("active", "completed").is_ok());
         assert!(instance_transition("on_hold", "discontinued").is_ok());
-        assert!(instance_transition("active", "active").is_err(), "no self-loop");
-        assert!(instance_transition("completed", "active").is_err(), "terminal");
-        assert!(instance_transition("active", "sideways").is_err(), "unknown");
+        assert!(
+            instance_transition("active", "active").is_err(),
+            "no self-loop"
+        );
+        assert!(
+            instance_transition("completed", "active").is_err(),
+            "terminal"
+        );
+        assert!(
+            instance_transition("active", "sideways").is_err(),
+            "unknown"
+        );
     }
 
     #[test]

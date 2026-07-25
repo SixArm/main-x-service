@@ -20,7 +20,9 @@ pub fn check_day_minutes(existing_minutes: i32, new_minutes: i32) -> Result<(), 
         return Err("minutes must be positive".to_string());
     }
     if new_minutes > DAY_MINUTES {
-        return Err(format!("minutes {new_minutes} exceeds a day ({DAY_MINUTES})"));
+        return Err(format!(
+            "minutes {new_minutes} exceeds a day ({DAY_MINUTES})"
+        ));
     }
     let total = existing_minutes.saturating_add(new_minutes);
     if total > DAY_MINUTES {
@@ -41,7 +43,11 @@ pub fn contracted_day_minutes(fte_percent: i32) -> i32 {
 /// Derived overtime for one day: recorded `regular` minutes beyond the
 /// FTE-scaled contracted day, plus all explicit `overtime` minutes.
 #[must_use]
-pub fn overtime_minutes(regular_minutes: i32, explicit_overtime_minutes: i32, fte_percent: i32) -> i32 {
+pub fn overtime_minutes(
+    regular_minutes: i32,
+    explicit_overtime_minutes: i32,
+    fte_percent: i32,
+) -> i32 {
     let contracted = contracted_day_minutes(fte_percent);
     let derived = (regular_minutes - contracted).max(0);
     derived.saturating_add(explicit_overtime_minutes.max(0))

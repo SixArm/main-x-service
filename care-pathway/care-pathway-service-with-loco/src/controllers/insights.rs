@@ -89,10 +89,14 @@ async fn directory(State(ctx): State<AppContext>) -> Result<Response> {
         if let Some(map) = entry.as_object_mut() {
             map.insert(
                 "specialty".to_string(),
-                keyword_value(pathway, "specialty:").map_or(serde_json::Value::Null, serde_json::Value::from),
+                keyword_value(pathway, "specialty:")
+                    .map_or(serde_json::Value::Null, serde_json::Value::from),
             );
         }
-        by_setting.entry(setting_key(pathway.care_setting.as_ref())).or_default().push(entry);
+        by_setting
+            .entry(setting_key(pathway.care_setting.as_ref()))
+            .or_default()
+            .push(entry);
         if let Some(specialty) = keyword_value(pathway, "specialty:") {
             *by_specialty.entry(specialty).or_default() += 1;
         }
@@ -120,7 +124,10 @@ async fn coverage(State(ctx): State<AppContext>) -> Result<Response> {
     for (_pid, _name, pathway) in &pathways {
         let setting = setting_key(pathway.care_setting.as_ref());
         for condition in condition_keys(pathway) {
-            per_condition.entry(condition).or_default().insert(setting.clone());
+            per_condition
+                .entry(condition)
+                .or_default()
+                .insert(setting.clone());
         }
     }
     let primary = format!("{:?}", CareSetting::PrimaryCare);
@@ -217,7 +224,10 @@ async fn providers(State(ctx): State<AppContext>) -> Result<Response> {
     for (_pid, _name, pathway) in &pathways {
         let entry = per_provider.entry(provider_key(pathway)).or_default();
         entry.0 += 1;
-        *entry.1.entry(setting_key(pathway.care_setting.as_ref())).or_default() += 1;
+        *entry
+            .1
+            .entry(setting_key(pathway.care_setting.as_ref()))
+            .or_default() += 1;
     }
     let rows: Vec<serde_json::Value> = per_provider
         .iter()
@@ -241,8 +251,10 @@ async fn languages(State(ctx): State<AppContext>) -> Result<Response> {
     let mut per_language: std::collections::BTreeMap<String, usize> =
         std::collections::BTreeMap::new();
     // condition → set of languages across its pathways
-    let mut condition_langs: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
-        std::collections::BTreeMap::new();
+    let mut condition_langs: std::collections::BTreeMap<
+        String,
+        std::collections::BTreeSet<String>,
+    > = std::collections::BTreeMap::new();
     for (_pid, _name, pathway) in &pathways {
         for language in &pathway.in_language {
             *per_language.entry(language.clone()).or_default() += 1;

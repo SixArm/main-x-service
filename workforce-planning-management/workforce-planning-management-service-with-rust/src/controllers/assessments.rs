@@ -207,13 +207,8 @@ async fn create_assessment(
     ensure_valid(&problems.into_vec())?;
 
     let instrument = records::find_assessment_instrument(&ctx.db, payload.instrument_pid).await?;
-    let subject_name = subject_display_name(
-        &ctx,
-        &payload.subject_kind,
-        payload.subject_pid,
-        &caller,
-    )
-    .await?;
+    let subject_name =
+        subject_display_name(&ctx, &payload.subject_kind, payload.subject_pid, &caller).await?;
 
     if let Some(application_pid) = payload.application_pid {
         let application = records::find_application(&ctx.db, application_pid).await?;
@@ -415,7 +410,10 @@ async fn record_result(
             payload.scale, instrument.name
         ));
     }
-    if payload.percentile.is_some_and(|p| !rules::valid_percentile(p)) {
+    if payload
+        .percentile
+        .is_some_and(|p| !rules::valid_percentile(p))
+    {
         problems.push("percentile must be between 0 and 100");
     }
     match (payload.raw_score, payload.max_score) {
@@ -433,10 +431,11 @@ async fn record_result(
     }
     ensure_valid(&problems.into_vec())?;
 
-    let band = payload
-        .band
-        .clone()
-        .or_else(|| payload.percentile.map(|p| rules::band_for_percentile(p).to_string()));
+    let band = payload.band.clone().or_else(|| {
+        payload
+            .percentile
+            .map(|p| rules::band_for_percentile(p).to_string())
+    });
 
     let existing = assessment_results::Entity::find()
         .filter(assessment_results::Column::AssessmentPid.eq(assessment.pid))
@@ -560,15 +559,7 @@ async fn delete_assessment(
     let mut active: assessments::ActiveModel = assessment.into();
     active.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
     active.update(&txn).await?;
-    Audit::record(
-        &txn,
-        "assessment",
-        row_pid,
-        "deleted",
-        caller.actor(),
-        None,
-    )
-    .await?;
+    Audit::record(&txn, "assessment", row_pid, "deleted", caller.actor(), None).await?;
     streaming::emit_on(
         &txn,
         "assessment",

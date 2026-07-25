@@ -2,10 +2,10 @@
 //! proficiency + the matrix/gaps, learning paths + honest progress,
 //! training analytics, and the mentorship lifecycle + overview.
 
-use workforce_planning_management_service::app::App;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
+use workforce_planning_management_service::app::App;
 
 use super::{activate, an_org, seed_employee};
 

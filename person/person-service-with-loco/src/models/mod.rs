@@ -60,8 +60,8 @@ pub use merge::{MergeRecord, MergeRequest, MergeResponse, MergeStatus};
 pub use organization::Organization;
 pub use person::{HumanName, LinkType, NameUse, Person, PersonLink};
 pub use review_queue::{
-    BatchDeduplicationRequest, BatchDeduplicationResponse, ReviewDecision,
-    ReviewDecisionRequest, ReviewQueueItem, ReviewQueueListResponse, ReviewStatus,
+    BatchDeduplicationRequest, BatchDeduplicationResponse, ReviewDecision, ReviewDecisionRequest,
+    ReviewQueueItem, ReviewQueueListResponse, ReviewStatus,
 };
 
 /// Administrative gender, modeled on the HL7 FHIR `AdministrativeGender`

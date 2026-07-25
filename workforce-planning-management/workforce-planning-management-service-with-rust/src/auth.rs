@@ -74,6 +74,7 @@
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
+use crate::models::_entities::{employees, payslips};
 use authentication_verifier::{
     Action, Claims, Policy, ReloadablePolicy, ReloadableVerifier, Verifier,
 };
@@ -81,7 +82,6 @@ use axum::extract::FromRequestParts;
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
 use axum::http::{HeaderMap, Method, StatusCode};
-use crate::models::_entities::{employees, payslips};
 
 /// The resource entity this crate guards, as seen by ABAC policies
 /// (the `entity` pseudo-attribute in rule `when` clauses).
@@ -125,9 +125,8 @@ pub fn verifier() -> &'static ReloadableVerifier {
 /// or with the URL unset/blank, the env-built verifier stands, so the
 /// service always boots. Idempotent enough to call once at boot.
 pub async fn init() {
-    if let Some(url) = crate::compat::env_var("WPM_PASETO_KEYS_URL")
-        
-        .filter(|s| !s.trim().is_empty())
+    if let Some(url) =
+        crate::compat::env_var("WPM_PASETO_KEYS_URL").filter(|s| !s.trim().is_empty())
     {
         let issuer = env_or("WPM_TOKEN_ISSUER", DEFAULT_ISSUER);
         let audience = env_or("WPM_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
@@ -155,14 +154,12 @@ const KEY_REFRESH_DEFAULT_SECS: u64 = 3600;
 /// nothing to re-fetch). Call once at boot (`app.rs::after_routes`).
 pub fn spawn_key_refresh() {
     let Some(url) = crate::compat::env_var("WPM_PASETO_KEYS_URL")
-        
         .map(|u| u.trim().to_string())
         .filter(|u| !u.is_empty())
     else {
         return;
     };
     let secs = crate::compat::env_var("WPM_PASETO_KEYS_REFRESH_SECS")
-        
         .and_then(|v| v.trim().parse::<u64>().ok())
         .unwrap_or(KEY_REFRESH_DEFAULT_SECS);
     if secs == 0 {
@@ -378,7 +375,6 @@ const POLICY_WATCH_SECS: u64 = 15;
 /// (`app.rs::after_routes`).
 pub fn spawn_policy_watcher() {
     let Some(path) = crate::compat::env_var("WPM_ABAC_POLICY_FILE")
-        
         .map(|p| p.trim().to_string())
         .filter(|p| !p.is_empty())
     else {
@@ -1406,7 +1402,11 @@ mod tests {
     }
 
     /// An employee model for the resource-attribute tests.
-    fn an_employee(person: uuid::Uuid, department: &str, status: &str) -> crate::models::_entities::employees::Model {
+    fn an_employee(
+        person: uuid::Uuid,
+        department: &str,
+        status: &str,
+    ) -> crate::models::_entities::employees::Model {
         crate::models::_entities::employees::Model {
             created_at: chrono::Utc::now().into(),
             updated_at: chrono::Utc::now().into(),

@@ -5,15 +5,20 @@
 
 /// Stakeholder roles a contact or account may be **declared** as.
 pub const STAKEHOLDER_ROLES: &[&str] = &[
-    "customer", "partner", "regulator", "sponsor", "community", "media", "member",
+    "customer",
+    "partner",
+    "regulator",
+    "sponsor",
+    "community",
+    "media",
+    "member",
 ];
 
 /// Recorded interaction sentiments.
 pub const SENTIMENTS: &[&str] = &["positive", "neutral", "negative"];
 
 /// Innovation-partnership kinds.
-pub const PARTNERSHIP_KINDS: &[&str] =
-    &["university", "startup", "vendor", "accelerator", "other"];
+pub const PARTNERSHIP_KINDS: &[&str] = &["university", "startup", "vendor", "accelerator", "other"];
 
 /// Partnership stages, in order.
 pub const PARTNERSHIP_STAGES: &[&str] = &["scouting", "pilot", "scaled", "retired"];
@@ -36,7 +41,9 @@ pub fn valid_grid_score(score: i32) -> bool {
 /// A human-readable refusal naming the legal moves.
 pub fn partnership_transition(current: &str, to: &str) -> Result<(), String> {
     if !PARTNERSHIP_STAGES.contains(&to) {
-        return Err(format!("unknown stage `{to}` (stages: {PARTNERSHIP_STAGES:?})"));
+        return Err(format!(
+            "unknown stage `{to}` (stages: {PARTNERSHIP_STAGES:?})"
+        ));
     }
     if current == "retired" {
         return Err("a retired partnership does not transition".to_string());
@@ -71,9 +78,21 @@ mod tests {
         assert!(partnership_transition("scouting", "pilot").is_ok());
         assert!(partnership_transition("pilot", "scaled").is_ok());
         assert!(partnership_transition("scouting", "retired").is_ok());
-        assert!(partnership_transition("scouting", "scaled").is_err(), "no skipping");
-        assert!(partnership_transition("pilot", "scouting").is_err(), "no going back");
-        assert!(partnership_transition("retired", "pilot").is_err(), "retired is terminal");
-        assert!(partnership_transition("pilot", "sideways").is_err(), "unknown refused");
+        assert!(
+            partnership_transition("scouting", "scaled").is_err(),
+            "no skipping"
+        );
+        assert!(
+            partnership_transition("pilot", "scouting").is_err(),
+            "no going back"
+        );
+        assert!(
+            partnership_transition("retired", "pilot").is_err(),
+            "retired is terminal"
+        );
+        assert!(
+            partnership_transition("pilot", "sideways").is_err(),
+            "unknown refused"
+        );
     }
 }

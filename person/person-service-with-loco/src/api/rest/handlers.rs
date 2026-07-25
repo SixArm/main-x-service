@@ -1406,7 +1406,6 @@ pub async fn review_decision(
     }
 }
 
-
 // ─── Data Export (GDPR Right of Access) ─────────────────────────────────────
 
 /// Export all data for a person (GDPR right of access)

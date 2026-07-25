@@ -40,11 +40,29 @@ impl Task for Seed {
         .await?;
         // (name, code, kind, specialty, escalation)
         let ward_defs = [
-            ("Ward 7 — Respiratory", "W7", "inpatient", Some("respiratory"), false),
-            ("Ward 8 — Orthopaedics", "W8", "inpatient", Some("orthopaedics"), false),
+            (
+                "Ward 7 — Respiratory",
+                "W7",
+                "inpatient",
+                Some("respiratory"),
+                false,
+            ),
+            (
+                "Ward 8 — Orthopaedics",
+                "W8",
+                "inpatient",
+                Some("orthopaedics"),
+                false,
+            ),
             ("Acute Assessment Unit", "AAU", "assessment", None, false),
             ("Escalation Ward", "ESC", "inpatient", None, true),
-            ("Respiratory Virtual Ward", "VW1", "virtual", Some("respiratory"), false),
+            (
+                "Respiratory Virtual Ward",
+                "VW1",
+                "virtual",
+                Some("respiratory"),
+                false,
+            ),
         ];
         let mut demo_names = (1..=200).map(|i| format!("Test Patient {i:03}"));
         for (name, code, kind, specialty, escalation) in ward_defs {
@@ -90,7 +108,13 @@ impl Task for Seed {
                 }
                 .insert(db)
                 .await?;
-                let bed_count = if *side_room { 1 } else if is_virtual { 20 } else { 6 };
+                let bed_count = if *side_room {
+                    1
+                } else if is_virtual {
+                    20
+                } else {
+                    6
+                };
                 for n in 1..=bed_count {
                     let bed_pid = Uuid::new_v4();
                     // Occupy roughly two-thirds of the beds.
@@ -100,9 +124,13 @@ impl Task for Seed {
                         bay_pid: ActiveValue::set(bay_pid),
                         number: ActiveValue::set(format!("{code}-{bay_name}-{n}")),
                         state: ActiveValue::set(
-                            if occupied { BedState::Occupied } else { BedState::Available }
-                                .token()
-                                .to_string(),
+                            if occupied {
+                                BedState::Occupied
+                            } else {
+                                BedState::Available
+                            }
+                            .token()
+                            .to_string(),
                         ),
                         state_since: ActiveValue::set(now),
                         closure_reason: ActiveValue::set(None),
@@ -118,8 +146,9 @@ impl Task for Seed {
                     .await?;
                     if occupied {
                         let stay_pid = Uuid::new_v4();
-                        let display_name =
-                            demo_names.next().unwrap_or_else(|| "Test Patient".to_string());
+                        let display_name = demo_names
+                            .next()
+                            .unwrap_or_else(|| "Test Patient".to_string());
                         stays::ActiveModel {
                             pid: ActiveValue::set(stay_pid),
                             person_ref: ActiveValue::set(format!("person:{}", Uuid::new_v4())),
@@ -127,7 +156,12 @@ impl Task for Seed {
                             status: ActiveValue::set("admitted".to_string()),
                             admitted_at: ActiveValue::set(now),
                             source: ActiveValue::set(
-                                if is_virtual { "virtual_admission" } else { "ed" }.to_string(),
+                                if is_virtual {
+                                    "virtual_admission"
+                                } else {
+                                    "ed"
+                                }
+                                .to_string(),
                             ),
                             ward_pid: ActiveValue::set(Some(ward_pid)),
                             bed_pid: ActiveValue::set(Some(bed_pid)),
@@ -144,7 +178,8 @@ impl Task for Seed {
                             ))),
                             senior_review_at: ActiveValue::set(None),
                             edd: ActiveValue::set(Some(
-                                now.date_naive() + chrono::Days::new(u64::try_from(n % 5).unwrap_or(0)),
+                                now.date_naive()
+                                    + chrono::Days::new(u64::try_from(n % 5).unwrap_or(0)),
                             )),
                             ccd: ActiveValue::set(Some("clinically stable".to_string())),
                             ccd_met: ActiveValue::set(false),

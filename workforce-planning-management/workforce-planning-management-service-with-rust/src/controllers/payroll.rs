@@ -81,10 +81,29 @@ async fn create_run(
     }
     .insert(&txn)
     .await?;
-    Audit::record(&txn, "payroll_run", row.pid, "created", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "payroll_run", "created", &row.pid.to_string(), "", caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "payroll_run",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "payroll_run",
+        "created",
+        &row.pid.to_string(),
+        "",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/payroll-runs`.
@@ -135,8 +154,13 @@ async fn calculate_run(
         .await?;
     let mut count: u64 = 0;
     for employee in &staff {
-        let Some(salary) = employee.salary_minor else { continue };
-        let currency = employee.salary_currency.clone().unwrap_or_else(|| "GBP".to_string());
+        let Some(salary) = employee.salary_minor else {
+            continue;
+        };
+        let currency = employee
+            .salary_currency
+            .clone()
+            .unwrap_or_else(|| "GBP".to_string());
         // Approved time in the period → overtime minutes.
         let entries = time_entries::Entity::find()
             .filter(time_entries::Column::EmployeePid.eq(employee.pid))
@@ -159,7 +183,11 @@ async fn calculate_run(
         let overtime: i64 = days
             .values()
             .map(|(regular, explicit)| {
-                i64::from(workforce::overtime_minutes(*regular, *explicit, employee.fte_percent))
+                i64::from(workforce::overtime_minutes(
+                    *regular,
+                    *explicit,
+                    employee.fte_percent,
+                ))
             })
             .sum();
         // Benefit employee-costs (same currency only).
@@ -175,12 +203,16 @@ async fn calculate_run(
                 .filter(benefit_plans::Column::DeletedAt.is_null())
                 .one(&txn)
                 .await?
-                && plan.currency.eq_ignore_ascii_case(&currency) && plan.employee_cost_minor > 0 {
-                    benefit_costs.push((plan.name.clone(), plan.employee_cost_minor));
-                }
+                && plan.currency.eq_ignore_ascii_case(&currency)
+                && plan.employee_cost_minor > 0
+            {
+                benefit_costs.push((plan.name.clone(), plan.employee_cost_minor));
+            }
         }
         let slip = rules::compute_payslip(salary, employee.fte_percent, overtime, &benefit_costs)
-            .map_err(|e| unprocessable(&format!("payslip for {}: {e}", employee.employee_number)))?;
+            .map_err(|e| {
+            unprocessable(&format!("payslip for {}: {e}", employee.employee_number))
+        })?;
         // The persist gate re-checks the invariant (WPM-R13).
         rules::reconcile(&slip).map_err(|e| unprocessable(&e))?;
         payslips::ActiveModel {
@@ -189,7 +221,9 @@ async fn calculate_run(
             employee_pid: ActiveValue::set(employee.pid),
             currency: ActiveValue::set(currency),
             gross_minor: ActiveValue::set(slip.gross_minor),
-            deductions: ActiveValue::set(serde_json::to_value(&slip.deductions).unwrap_or_default()),
+            deductions: ActiveValue::set(
+                serde_json::to_value(&slip.deductions).unwrap_or_default(),
+            ),
             net_minor: ActiveValue::set(slip.net_minor),
             deleted_at: ActiveValue::set(None),
             ..Default::default()
@@ -254,26 +288,47 @@ async fn run_transition(
         Some(serde_json::json!({ "from": from })),
     )
     .await?;
-    streaming::emit_on(&txn, "payroll_run", &kind, &row.pid.to_string(), "", caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "payroll_run",
+        &kind,
+        &row.pid.to_string(),
+        "",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }
 
 /// `POST /api/payroll-runs/{pid}/approve`.
 #[debug_handler]
-async fn approve_run(State(ctx): State<AppContext>, caller: MaybeAuthUser, Path(pid): Path<String>) -> Result<Response> {
+async fn approve_run(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path(pid): Path<String>,
+) -> Result<Response> {
     run_transition(&ctx, &caller, &pid, "approved").await
 }
 
 /// `POST /api/payroll-runs/{pid}/pay`.
 #[debug_handler]
-async fn pay_run(State(ctx): State<AppContext>, caller: MaybeAuthUser, Path(pid): Path<String>) -> Result<Response> {
+async fn pay_run(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path(pid): Path<String>,
+) -> Result<Response> {
     run_transition(&ctx, &caller, &pid, "paid").await
 }
 
 /// `POST /api/payroll-runs/{pid}/reopen` — calculated → draft.
 #[debug_handler]
-async fn reopen_run(State(ctx): State<AppContext>, caller: MaybeAuthUser, Path(pid): Path<String>) -> Result<Response> {
+async fn reopen_run(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path(pid): Path<String>,
+) -> Result<Response> {
     run_transition(&ctx, &caller, &pid, "draft").await
 }
 
@@ -318,7 +373,15 @@ async fn run_payslips(
         .order_by_asc(payslips::Column::Id)
         .all(&ctx.db)
         .await?;
-    Audit::record(&ctx.db, "payroll_run", run.pid, "payslips_read", caller.actor(), None).await?;
+    Audit::record(
+        &ctx.db,
+        "payroll_run",
+        run.pid,
+        "payslips_read",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(masked_payslips(&ctx, &caller, rows).await?)
 }
 
@@ -337,7 +400,15 @@ async fn employee_payslips(
         .order_by_asc(payslips::Column::Id)
         .all(&ctx.db)
         .await?;
-    Audit::record(&ctx.db, "employee", employee.pid, "payslips_read", caller.actor(), None).await?;
+    Audit::record(
+        &ctx.db,
+        "employee",
+        employee.pid,
+        "payslips_read",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(masked_payslips(&ctx, &caller, rows).await?)
 }
 
@@ -352,7 +423,10 @@ async fn create_benchmark(
     problems.require_text("job_title", &payload.job_title);
     problems.require_text("currency", &payload.currency);
     problems.require_text("source", &payload.source);
-    if payload.min_minor < 0 || payload.min_minor > payload.median_minor || payload.median_minor > payload.max_minor {
+    if payload.min_minor < 0
+        || payload.min_minor > payload.median_minor
+        || payload.median_minor > payload.max_minor
+    {
         problems.push("band must satisfy 0 <= min <= median <= max".to_string());
     }
     ensure_valid(&problems.into_vec())?;
@@ -373,7 +447,9 @@ async fn create_benchmark(
     .await?;
     Audit::record(&txn, "benchmark", row.pid, "created", caller.actor(), None).await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/benchmarks`.
@@ -417,7 +493,9 @@ async fn benchmark_comparison(
         .await?;
     let mut rows = Vec::new();
     for employee in &staff {
-        let (Some(salary), Some(currency)) = (employee.salary_minor, employee.salary_currency.as_deref()) else {
+        let (Some(salary), Some(currency)) =
+            (employee.salary_minor, employee.salary_currency.as_deref())
+        else {
             continue;
         };
         let band = bands
@@ -434,7 +512,15 @@ async fn benchmark_comparison(
             "flag": flag,
         }));
     }
-    Audit::record(&ctx.db, "benchmark", Uuid::nil(), "comparison_read", caller.actor(), None).await?;
+    Audit::record(
+        &ctx.db,
+        "benchmark",
+        Uuid::nil(),
+        "comparison_read",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(serde_json::json!({ "organization": params.organization, "rows": rows }))
 }
 

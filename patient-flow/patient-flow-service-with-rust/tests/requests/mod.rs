@@ -57,7 +57,10 @@ pub async fn seed_ward(
             .json();
         bed_pids.push(bed["pid"].as_str().expect("bed pid").to_string());
     }
-    (ward["pid"].as_str().expect("ward pid").to_string(), bed_pids)
+    (
+        ward["pid"].as_str().expect("ward pid").to_string(),
+        bed_pids,
+    )
 }
 
 /// A fresh synthetic `person:` URN.

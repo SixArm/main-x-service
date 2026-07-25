@@ -1,11 +1,11 @@
 //! HTTP controllers for the care-pathway service.
 
 pub mod care_pathways;
-pub mod insights;
-pub mod instances;
 pub mod docs;
 /// HL7 FHIR R5 endpoints for the `PlanDefinition` resource (`/fhir/*`).
 pub mod fhir;
+pub mod insights;
+pub mod instances;
 pub mod metrics;
 
 /// Map a model-layer error to its HTTP shape: a missing record is

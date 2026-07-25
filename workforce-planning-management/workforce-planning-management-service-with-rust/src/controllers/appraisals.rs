@@ -55,7 +55,11 @@ async fn create_appraisal(
     }
     problems.cap_list("competencies", &payload.competencies);
     let mut seen = std::collections::HashSet::new();
-    if payload.competencies.iter().any(|c| !seen.insert(c.trim().to_lowercase())) {
+    if payload
+        .competencies
+        .iter()
+        .any(|c| !seen.insert(c.trim().to_lowercase()))
+    {
         problems.push("competencies must be unique");
     }
     ensure_valid(&problems.into_vec())?;
@@ -83,7 +87,9 @@ async fn create_appraisal(
     .await?;
     Audit::record(&txn, "appraisal", row.pid, "created", caller.actor(), None).await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/employees/{pid}/appraisals` — the subject's appraisals
@@ -181,9 +187,18 @@ async fn nominate(
     }
     .insert(&ctx.db)
     .await?;
-    Audit::record(&ctx.db, "appraisal_nomination", row.pid, "created", caller.actor(), None)
-        .await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    Audit::record(
+        &ctx.db,
+        "appraisal_nomination",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `POST /api/appraisals/{pid}/status` body.
@@ -338,7 +353,9 @@ async fn respond(
     ensure_valid(&problems.into_vec())?;
     let appraisal = find_appraisal(&ctx, &pid).await?;
     if appraisal.status != "collecting" {
-        return Err(unprocessable("responses are accepted only while collecting"));
+        return Err(unprocessable(
+            "responses are accepted only while collecting",
+        ));
     }
     let declared: Vec<String> =
         serde_json::from_value(appraisal.competencies.clone()).unwrap_or_default();
@@ -374,8 +391,15 @@ async fn respond(
     }
     .insert(&ctx.db)
     .await?;
-    Audit::record(&ctx.db, "appraisal_response", row.pid, "submitted", caller.actor(), None)
-        .await?;
+    Audit::record(
+        &ctx.db,
+        "appraisal_response",
+        row.pid,
+        "submitted",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(serde_json::json!({ "submitted": true }))
 }
 
@@ -413,8 +437,10 @@ async fn report(
         .await?;
     let mut groups = Vec::new();
     for group in rules::GROUPS {
-        let group_responses: Vec<&appraisal_responses::Model> =
-            responses.iter().filter(|r| r.rater_group == *group).collect();
+        let group_responses: Vec<&appraisal_responses::Model> = responses
+            .iter()
+            .filter(|r| r.rater_group == *group)
+            .collect();
         if group_responses.is_empty() {
             continue;
         }
@@ -426,9 +452,7 @@ async fn report(
         for competency in &declared {
             let scores: Vec<i32> = group_responses
                 .iter()
-                .filter_map(|r| {
-                    r.scores.get(competency).and_then(serde_json::Value::as_i64)
-                })
+                .filter_map(|r| r.scores.get(competency).and_then(serde_json::Value::as_i64))
                 .filter_map(|s| i32::try_from(s).ok())
                 .collect();
             if let Some((count, mean)) = rules::competency_mean(&scores) {
@@ -455,8 +479,15 @@ async fn report(
             "comments_withheld": comments_masked,
         }));
     }
-    Audit::record(&ctx.db, "appraisal", appraisal.pid, "report_read", caller.actor(), None)
-        .await?;
+    Audit::record(
+        &ctx.db,
+        "appraisal",
+        appraisal.pid,
+        "report_read",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(serde_json::json!({
         "appraisal": {
             "pid": appraisal.pid,

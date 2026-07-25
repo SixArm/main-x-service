@@ -2,10 +2,10 @@
 //! checklist instantiates, completion is gated on every answer, a
 //! completed assessment freezes, and issues surface by department.
 
-use workforce_planning_management_service::app::App;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
+use workforce_planning_management_service::app::App;
 
 use super::{activate, an_org, seed_employee};
 

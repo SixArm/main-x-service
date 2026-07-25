@@ -18,8 +18,14 @@ pub const EMPLOYEE_STATUSES: &[&str] = &[
 pub const EMPLOYMENT_TYPES: &[&str] = &["permanent", "fixed_term", "contractor", "intern"];
 
 /// Requisition statuses.
-pub const REQUISITION_STATUSES: &[&str] =
-    &["draft", "open", "interviewing", "offer", "filled", "cancelled"];
+pub const REQUISITION_STATUSES: &[&str] = &[
+    "draft",
+    "open",
+    "interviewing",
+    "offer",
+    "filled",
+    "cancelled",
+];
 
 /// Candidate sources.
 pub const CANDIDATE_SOURCES: &[&str] = &["web", "referral", "event", "import", "agency", "other"];

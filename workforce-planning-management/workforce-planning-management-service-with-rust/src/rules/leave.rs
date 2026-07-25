@@ -116,7 +116,9 @@ mod tests {
         );
         assert_eq!(
             check_balance("sick", 10, 8, 5),
-            BalanceCheck::NegativeFlagged { remaining_after: -3 }
+            BalanceCheck::NegativeFlagged {
+                remaining_after: -3
+            }
         );
     }
 
@@ -135,16 +137,39 @@ mod tests {
     fn day_span_rules() {
         assert_eq!(day_span(d(2026, 8, 3), d(2026, 8, 7)).unwrap(), 5);
         assert_eq!(day_span(d(2026, 8, 3), d(2026, 8, 3)).unwrap(), 1);
-        assert!(day_span(d(2026, 8, 7), d(2026, 8, 3)).unwrap_err().contains("before"));
-        assert!(day_span(d(2026, 1, 1), d(2028, 1, 1)).unwrap_err().contains("cap"));
+        assert!(
+            day_span(d(2026, 8, 7), d(2026, 8, 3))
+                .unwrap_err()
+                .contains("before")
+        );
+        assert!(
+            day_span(d(2026, 1, 1), d(2028, 1, 1))
+                .unwrap_err()
+                .contains("cap")
+        );
     }
 
     /// Range overlap: touching endpoints overlap; disjoint ranges do
     /// not.
     #[test]
     fn overlap_rules() {
-        assert!(ranges_overlap(d(2026, 8, 1), d(2026, 8, 5), d(2026, 8, 5), d(2026, 8, 9)));
-        assert!(ranges_overlap(d(2026, 8, 1), d(2026, 8, 9), d(2026, 8, 3), d(2026, 8, 4)));
-        assert!(!ranges_overlap(d(2026, 8, 1), d(2026, 8, 4), d(2026, 8, 5), d(2026, 8, 9)));
+        assert!(ranges_overlap(
+            d(2026, 8, 1),
+            d(2026, 8, 5),
+            d(2026, 8, 5),
+            d(2026, 8, 9)
+        ));
+        assert!(ranges_overlap(
+            d(2026, 8, 1),
+            d(2026, 8, 9),
+            d(2026, 8, 3),
+            d(2026, 8, 4)
+        ));
+        assert!(!ranges_overlap(
+            d(2026, 8, 1),
+            d(2026, 8, 4),
+            d(2026, 8, 5),
+            d(2026, 8, 9)
+        ));
     }
 }

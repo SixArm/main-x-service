@@ -58,9 +58,7 @@ impl Task for Seed {
                 manager_pid: ActiveValue::set(None),
                 salary_minor: ActiveValue::set(Some(6_500_000)),
                 salary_currency: ActiveValue::set(Some("GBP".to_string())),
-                hired_on: ActiveValue::set(
-                    chrono::NaiveDate::from_ymd_opt(2020, 1, 6).unwrap(),
-                ),
+                hired_on: ActiveValue::set(chrono::NaiveDate::from_ymd_opt(2020, 1, 6).unwrap()),
                 terminated_on: ActiveValue::set(None),
                 deleted_at: ActiveValue::set(None),
                 ..Default::default()
@@ -79,9 +77,16 @@ impl Task for Seed {
                     organization_ref: ActiveValue::set(org.clone()),
                     employee_number: ActiveValue::set(format!("E-{n:04}")),
                     display_name: ActiveValue::set(format!("Test Employee {n:03}")),
-                    status: ActiveValue::set(if i == 8 { "onboarding" } else { "active" }.to_string()),
+                    status: ActiveValue::set(
+                        if i == 8 { "onboarding" } else { "active" }.to_string(),
+                    ),
                     employment_type: ActiveValue::set(
-                        if i % 4 == 3 { "fixed_term" } else { "permanent" }.to_string(),
+                        if i % 4 == 3 {
+                            "fixed_term"
+                        } else {
+                            "permanent"
+                        }
+                        .to_string(),
                     ),
                     fte_percent: ActiveValue::set(if i % 5 == 4 { 60 } else { 100 }),
                     department: ActiveValue::set(department.to_string()),

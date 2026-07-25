@@ -10,10 +10,10 @@
 
 #![no_main]
 
+use authentication_verifier::{Action, Claims, Policy};
 use libfuzzer_sys::fuzz_target;
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
-use authentication_verifier::{Action, Claims, Policy};
 
 fn claims() -> &'static Claims {
     static C: OnceLock<Claims> = OnceLock::new();

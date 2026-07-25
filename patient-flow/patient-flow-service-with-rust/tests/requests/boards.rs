@@ -50,7 +50,11 @@ async fn whiteboard_cards_and_etag_cycle() {
             .get(&format!("/api/whiteboard/{ward_pid}"))
             .add_header("if-none-match", etag.clone())
             .await;
-        assert_eq!(unchanged.status_code(), 304, "unchanged board is Not Modified");
+        assert_eq!(
+            unchanged.status_code(),
+            304,
+            "unchanged board is Not Modified"
+        );
         assert!(unchanged.text().is_empty(), "304 carries no body");
 
         // A state change invalidates the tag: the same conditional read
@@ -149,9 +153,15 @@ async fn locate_finds_and_audits_the_read() {
             "the locate read is audited"
         );
         // A malformed URN is 422, an unknown person 404.
-        assert_eq!(request.get("/api/locate/not-a-urn").await.status_code(), 422);
         assert_eq!(
-            request.get(&format!("/api/locate/{}", a_person())).await.status_code(),
+            request.get("/api/locate/not-a-urn").await.status_code(),
+            422
+        );
+        assert_eq!(
+            request
+                .get(&format!("/api/locate/{}", a_person()))
+                .await
+                .status_code(),
             404
         );
     })

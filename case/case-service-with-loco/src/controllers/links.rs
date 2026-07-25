@@ -224,7 +224,9 @@ async fn create_link(
     caller: MaybeAuthUser,
     Json(req): Json<LinkRequest>,
 ) -> Result<Response> {
-    let case = CaseModel::find_by_pid(&ctx.db, &pid).await.map_err(super::model_not_found)?;
+    let case = CaseModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(super::model_not_found)?;
     authorize_case(&caller, Action::Write, &case)?;
     let (edge_kind, to) =
         validate_edge(&req.kind, &req.to_ref).map_err(|reason| unprocessable(&reason))?;
@@ -262,7 +264,9 @@ async fn list_links(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
 ) -> Result<Response> {
-    let case = CaseModel::find_by_pid(&ctx.db, &pid).await.map_err(super::model_not_found)?;
+    let case = CaseModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(super::model_not_found)?;
     authorize_case(&caller, Action::Read, &case)?;
     let rows = EntityLinkModel::list_active(&ctx.db, case.pid).await?;
     let views: Vec<LinkView> = rows.iter().map(LinkView::of).collect();
@@ -287,7 +291,9 @@ async fn delete_link(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
 ) -> Result<Response> {
-    let case = CaseModel::find_by_pid(&ctx.db, &pid).await.map_err(super::model_not_found)?;
+    let case = CaseModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(super::model_not_found)?;
     authorize_case(&caller, Action::Delete, &case)?;
     let Ok(edge_id) = uuid::Uuid::parse_str(&id) else {
         return bad_request("invalid link id");

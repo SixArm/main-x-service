@@ -24,8 +24,13 @@
 //! and always accompanied by its numerator and denominator).
 
 /// The assessment categories.
-pub const ASSESSMENT_CATEGORIES: &[&str] =
-    &["aptitude", "personality", "psychometric", "selection", "cognitive"];
+pub const ASSESSMENT_CATEGORIES: &[&str] = &[
+    "aptitude",
+    "personality",
+    "psychometric",
+    "selection",
+    "cognitive",
+];
 
 /// The scales an `aptitude` test measures.
 pub const APTITUDE_SCALES: &[&str] = &[
@@ -65,8 +70,7 @@ pub const COGNITIVE_SCALES: &[&str] = &[
 ];
 
 /// The scales a `selection` test measures.
-pub const SELECTION_SCALES: &[&str] =
-    &["job_simulation", "skills_assessment", "judgement_test"];
+pub const SELECTION_SCALES: &[&str] = &["job_simulation", "skills_assessment", "judgement_test"];
 
 /// Every scale, across all four categories.
 pub const ASSESSMENT_SCALES: &[&str] = &[
@@ -106,13 +110,7 @@ pub const ASSESSMENT_STATUSES: &[&str] = &[
 pub const ASSESSMENT_SUBJECTS: &[&str] = &["candidate", "employee"];
 
 /// Score bands, weakest to strongest.
-pub const SCORE_BANDS: &[&str] = &[
-    "low",
-    "below_average",
-    "average",
-    "above_average",
-    "high",
-];
+pub const SCORE_BANDS: &[&str] = &["low", "below_average", "average", "above_average", "high"];
 
 /// The scales `category` owns — the ones whose home it is. `None` for
 /// an unknown category token.
@@ -222,7 +220,11 @@ pub fn band_for_percentile(percentile: i32) -> &'static str {
 /// passed it. A scheduled, in-progress, cancelled, or explicitly
 /// expired assessment is never current.
 #[must_use]
-pub fn is_current(status: &str, expires_on: Option<chrono::NaiveDate>, as_of: chrono::NaiveDate) -> bool {
+pub fn is_current(
+    status: &str,
+    expires_on: Option<chrono::NaiveDate>,
+    as_of: chrono::NaiveDate,
+) -> bool {
     status == "completed" && expires_on.is_none_or(|expiry| as_of <= expiry)
 }
 
@@ -329,10 +331,22 @@ mod tests {
         assert!(assessment_transition("scheduled", "cancelled").is_ok());
         assert!(assessment_transition("in_progress", "cancelled").is_ok());
 
-        assert!(assessment_transition("completed", "in_progress").is_err(), "no rewind");
-        assert!(assessment_transition("expired", "completed").is_err(), "terminal");
-        assert!(assessment_transition("cancelled", "scheduled").is_err(), "terminal");
-        assert!(assessment_transition("scheduled", "sideways").is_err(), "unknown");
+        assert!(
+            assessment_transition("completed", "in_progress").is_err(),
+            "no rewind"
+        );
+        assert!(
+            assessment_transition("expired", "completed").is_err(),
+            "terminal"
+        );
+        assert!(
+            assessment_transition("cancelled", "scheduled").is_err(),
+            "terminal"
+        );
+        assert!(
+            assessment_transition("scheduled", "sideways").is_err(),
+            "unknown"
+        );
         for status in ASSESSMENT_STATUSES {
             assert!(
                 assessment_transition(status, status).is_err(),
@@ -381,8 +395,14 @@ mod tests {
     fn currency_requires_completion_and_a_live_expiry() {
         let as_of = day(2026, 7, 23);
         assert!(is_current("completed", None, as_of), "no expiry ⇒ current");
-        assert!(is_current("completed", Some(day(2026, 7, 23)), as_of), "current on the expiry date");
-        assert!(!is_current("completed", Some(day(2026, 7, 22)), as_of), "expired the day before");
+        assert!(
+            is_current("completed", Some(day(2026, 7, 23)), as_of),
+            "current on the expiry date"
+        );
+        assert!(
+            !is_current("completed", Some(day(2026, 7, 22)), as_of),
+            "expired the day before"
+        );
         for status in ["scheduled", "in_progress", "cancelled", "expired"] {
             assert!(!is_current(status, None, as_of), "{status} is not current");
         }
@@ -391,12 +411,20 @@ mod tests {
     /// The mean reports its terms and never interpolates.
     #[test]
     fn mean_reports_numerator_and_denominator() {
-        assert_eq!(mean_percentile(&[]), None, "no scores ⇒ no figure, not zero");
+        assert_eq!(
+            mean_percentile(&[]),
+            None,
+            "no scores ⇒ no figure, not zero"
+        );
         let (sum, count, mean) = mean_percentile(&[90, 70]).expect("two scores");
         assert_eq!((sum, count), (160, 2));
         assert!((mean - 80.0).abs() < f64::EPSILON, "got {mean}");
         let (sum, count, _) = mean_percentile(&[0]).expect("one score");
-        assert_eq!((sum, count), (0, 1), "a real zero is a score, not an absence");
+        assert_eq!(
+            (sum, count),
+            (0, 1),
+            "a real zero is a score, not an absence"
+        );
     }
 
     /// The gap list names exactly the category's own scales with no
@@ -426,8 +454,14 @@ mod tests {
     fn cognitive_category_scales_and_overlap() {
         for scale in COGNITIVE_SCALES {
             assert!(category_permits("cognitive", scale));
-            assert!(category_permits("psychometric", scale), "battery spans cognitive");
-            assert!(!category_permits("selection", scale), "no silent selection use");
+            assert!(
+                category_permits("psychometric", scale),
+                "battery spans cognitive"
+            );
+            assert!(
+                !category_permits("selection", scale),
+                "no silent selection use"
+            );
             assert!(!category_permits("aptitude", scale));
         }
         assert!(!category_permits("cognitive", "job_simulation"));

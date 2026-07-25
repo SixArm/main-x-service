@@ -120,8 +120,10 @@ async fn read_is_concealed_on_every_path_for_a_denied_caller() {
         let created = request
             .post("/api/cases")
             .add_header(wk, wv)
-            .json(&json!({ "title": "Sensitive investigation", "agency_id": "dwp",
-                            "case_type": "Investigation" }))
+            .json(
+                &json!({ "title": "Sensitive investigation", "agency_id": "dwp",
+                            "case_type": "Investigation" }),
+            )
             .await;
         assert_eq!(created.status_code(), 200, "write caller can create");
         let body: Value = serde_json::from_str(&created.text()).unwrap();

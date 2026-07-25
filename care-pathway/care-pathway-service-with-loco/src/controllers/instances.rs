@@ -82,9 +82,15 @@ async fn enroll(
     if !valid_subject(&payload.subject_ref) {
         return Err(refuse("subject_ref must be a person:<uuid> URN"));
     }
-    let urgency = payload.urgency.clone().unwrap_or_else(|| "routine".to_string());
+    let urgency = payload
+        .urgency
+        .clone()
+        .unwrap_or_else(|| "routine".to_string());
     if !rules::URGENCY_LEVELS.contains(&urgency.as_str()) {
-        return Err(refuse(&format!("urgency must be one of {:?}", rules::URGENCY_LEVELS)));
+        return Err(refuse(&format!(
+            "urgency must be one of {:?}",
+            rules::URGENCY_LEVELS
+        )));
     }
     // The template must exist (registry ownership; 404 otherwise).
     let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
@@ -208,12 +214,17 @@ async fn set_status(
     if let Some(outcome) = payload.outcome.as_deref()
         && !rules::OUTCOMES.contains(&outcome)
     {
-        return Err(refuse(&format!("outcome must be one of {:?}", rules::OUTCOMES)));
+        return Err(refuse(&format!(
+            "outcome must be one of {:?}",
+            rules::OUTCOMES
+        )));
     }
     let instance = find_instance(&ctx, &raw).await?;
     rules::instance_transition(&instance.status, &payload.to).map_err(|r| refuse(&r))?;
     if payload.outcome.is_some() && !rules::is_terminal(&payload.to) {
-        return Err(refuse("an outcome is only recorded when closing the instance"));
+        return Err(refuse(
+            "an outcome is only recorded when closing the instance",
+        ));
     }
     let from = instance.status.clone();
     let instance_pid = instance.pid;
@@ -276,9 +287,15 @@ async fn record_review(
     }
     .insert(&ctx.db)
     .await?;
-    Audit::record(&ctx.db, instance_pid, "instance_reviewed", caller.actor(), None)
-        .await
-        .map_err(Error::Model)?;
+    Audit::record(
+        &ctx.db,
+        instance_pid,
+        "instance_reviewed",
+        caller.actor(),
+        None,
+    )
+    .await
+    .map_err(Error::Model)?;
     format::json(updated)
 }
 
@@ -300,10 +317,15 @@ async fn set_urgency(
     Json(payload): Json<UrgencyPayload>,
 ) -> Result<Response> {
     if !rules::URGENCY_LEVELS.contains(&payload.to.as_str()) {
-        return Err(refuse(&format!("urgency must be one of {:?}", rules::URGENCY_LEVELS)));
+        return Err(refuse(&format!(
+            "urgency must be one of {:?}",
+            rules::URGENCY_LEVELS
+        )));
     }
     let instance = find_instance(&ctx, &raw).await?;
-    let from_rank = rules::URGENCY_LEVELS.iter().position(|u| *u == instance.urgency);
+    let from_rank = rules::URGENCY_LEVELS
+        .iter()
+        .position(|u| *u == instance.urgency);
     let to_rank = rules::URGENCY_LEVELS.iter().position(|u| *u == payload.to);
     let kind = match (from_rank, to_rank) {
         (Some(f), Some(t)) if t > f => "escalation",
@@ -361,9 +383,15 @@ async fn complete_step(
     active.done = ActiveValue::set(true);
     active.done_on = ActiveValue::set(Some(chrono::Utc::now().date_naive()));
     let updated = active.update(&ctx.db).await?;
-    Audit::record(&ctx.db, step_pid, "instance_step_completed", caller.actor(), None)
-        .await
-        .map_err(Error::Model)?;
+    Audit::record(
+        &ctx.db,
+        step_pid,
+        "instance_step_completed",
+        caller.actor(),
+        None,
+    )
+    .await
+    .map_err(Error::Model)?;
     format::json(updated)
 }
 
@@ -384,10 +412,15 @@ async fn add_team_member(
     Json(payload): Json<TeamPayload>,
 ) -> Result<Response> {
     if !valid_member(&payload.member_ref) {
-        return Err(refuse("member_ref must be a worker:/person:/organization: URN"));
+        return Err(refuse(
+            "member_ref must be a worker:/person:/organization: URN",
+        ));
     }
     if !rules::TEAM_ROLES.contains(&payload.role.as_str()) {
-        return Err(refuse(&format!("role must be one of {:?}", rules::TEAM_ROLES)));
+        return Err(refuse(&format!(
+            "role must be one of {:?}",
+            rules::TEAM_ROLES
+        )));
     }
     let instance = find_instance(&ctx, &raw).await?;
     let existing = instance_team::Entity::find()
@@ -397,7 +430,9 @@ async fn add_team_member(
         .one(&ctx.db)
         .await?;
     if existing.is_some() {
-        return Err(refuse("that member already holds that role on this instance"));
+        return Err(refuse(
+            "that member already holds that role on this instance",
+        ));
     }
     let row = instance_team::ActiveModel {
         pid: ActiveValue::set(Uuid::new_v4()),
@@ -438,7 +473,10 @@ async fn add_event(
     Json(payload): Json<EventPayload>,
 ) -> Result<Response> {
     if !rules::EVENT_KINDS.contains(&payload.kind.as_str()) {
-        return Err(refuse(&format!("kind must be one of {:?}", rules::EVENT_KINDS)));
+        return Err(refuse(&format!(
+            "kind must be one of {:?}",
+            rules::EVENT_KINDS
+        )));
     }
     let instance = find_instance(&ctx, &raw).await?;
     let row = instance_events::ActiveModel {
@@ -468,7 +506,8 @@ async fn caseload(State(ctx): State<AppContext>) -> Result<Response> {
         .all(&ctx.db)
         .await?;
     let templates = PathwayModel::list(&ctx.db, 1000).await?;
-    let mut setting_of: std::collections::BTreeMap<Uuid, String> = std::collections::BTreeMap::new();
+    let mut setting_of: std::collections::BTreeMap<Uuid, String> =
+        std::collections::BTreeMap::new();
     for template in &templates {
         let setting = template
             .to_pathway()
@@ -477,8 +516,10 @@ async fn caseload(State(ctx): State<AppContext>) -> Result<Response> {
             .unwrap_or_else(|| "unspecified".to_string());
         setting_of.insert(template.pid, setting);
     }
-    let mut by_setting: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
-    let mut by_urgency: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+    let mut by_setting: std::collections::BTreeMap<String, usize> =
+        std::collections::BTreeMap::new();
+    let mut by_urgency: std::collections::BTreeMap<String, usize> =
+        std::collections::BTreeMap::new();
     for instance in &instances {
         let setting = setting_of
             .get(&instance.pathway_pid)
@@ -519,18 +560,21 @@ async fn overdue_reviews(State(ctx): State<AppContext>) -> Result<Response> {
                 .next_review_on
                 .map_or(i64::MAX, |due| (today - due).num_days());
             (overdue_days > 0).then(|| {
-                (overdue_days, serde_json::json!({
-                    "pid": instance.pid,
-                    "subject_ref": instance.subject_ref,
-                    "urgency": instance.urgency,
-                    "next_review_on": instance.next_review_on,
-                    "overdue_days": if overdue_days == i64::MAX {
-                        serde_json::Value::Null
-                    } else {
-                        serde_json::json!(overdue_days)
-                    },
-                    "unscheduled": instance.next_review_on.is_none(),
-                }))
+                (
+                    overdue_days,
+                    serde_json::json!({
+                        "pid": instance.pid,
+                        "subject_ref": instance.subject_ref,
+                        "urgency": instance.urgency,
+                        "next_review_on": instance.next_review_on,
+                        "overdue_days": if overdue_days == i64::MAX {
+                            serde_json::Value::Null
+                        } else {
+                            serde_json::json!(overdue_days)
+                        },
+                        "unscheduled": instance.next_review_on.is_none(),
+                    }),
+                )
             })
         })
         .collect();
@@ -556,8 +600,10 @@ async fn cohort(State(ctx): State<AppContext>, Path(pathway): Path<String>) -> R
         .filter(pathway_instances::Column::DeletedAt.is_null())
         .all(&ctx.db)
         .await?;
-    let mut by_status: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
-    let mut by_urgency: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+    let mut by_status: std::collections::BTreeMap<String, usize> =
+        std::collections::BTreeMap::new();
+    let mut by_urgency: std::collections::BTreeMap<String, usize> =
+        std::collections::BTreeMap::new();
     for instance in &instances {
         *by_status.entry(instance.status.clone()).or_default() += 1;
         *by_urgency.entry(instance.urgency.clone()).or_default() += 1;
@@ -598,7 +644,10 @@ async fn care_team_load(State(ctx): State<AppContext>) -> Result<Response> {
     // member → (open instance set, roles)
     let mut per_member: std::collections::BTreeMap<
         String,
-        (std::collections::HashSet<Uuid>, std::collections::BTreeSet<String>),
+        (
+            std::collections::HashSet<Uuid>,
+            std::collections::BTreeSet<String>,
+        ),
     > = std::collections::BTreeMap::new();
     for row in &team {
         if !open.contains(&row.instance_pid) {
@@ -664,15 +713,23 @@ async fn record_measure(
         value_text: ActiveValue::set(payload.value_text.clone()),
         unit: ActiveValue::set(payload.unit.clone()),
         recorded_on: ActiveValue::set(
-            payload.recorded_on.unwrap_or_else(|| chrono::Utc::now().date_naive()),
+            payload
+                .recorded_on
+                .unwrap_or_else(|| chrono::Utc::now().date_naive()),
         ),
         ..Default::default()
     }
     .insert(&ctx.db)
     .await?;
-    Audit::record(&ctx.db, instance.pid, "instance_measure_recorded", caller.actor(), None)
-        .await
-        .map_err(Error::Model)?;
+    Audit::record(
+        &ctx.db,
+        instance.pid,
+        "instance_measure_recorded",
+        caller.actor(),
+        None,
+    )
+    .await
+    .map_err(Error::Model)?;
     format::json(row)
 }
 
@@ -697,7 +754,10 @@ async fn outcomes(State(ctx): State<AppContext>, Path(pathway): Path<String>) ->
     for instance in &instances {
         if rules::is_terminal(&instance.status) {
             closed += 1;
-            let key = instance.outcome.clone().unwrap_or_else(|| "not_recorded".to_string());
+            let key = instance
+                .outcome
+                .clone()
+                .unwrap_or_else(|| "not_recorded".to_string());
             *outcome_dist.entry(key).or_default() += 1;
         }
     }
@@ -718,7 +778,9 @@ async fn outcomes(State(ctx): State<AppContext>, Path(pathway): Path<String>) ->
         for measure in &measures {
             names.insert(measure.name.clone());
             let key = (measure.name.clone(), measure.instance_pid);
-            let entry = latest.entry(key).or_insert((measure.recorded_on, measure.value_numeric));
+            let entry = latest
+                .entry(key)
+                .or_insert((measure.recorded_on, measure.value_numeric));
             if measure.recorded_on >= entry.0 {
                 *entry = (measure.recorded_on, measure.value_numeric);
             }

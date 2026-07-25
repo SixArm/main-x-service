@@ -30,7 +30,9 @@ pub const ADJUSTMENT_STATUSES: &[&str] =
 /// A human-readable refusal naming the legal moves.
 pub fn transition(current: &str, to: &str) -> Result<(), String> {
     if !ADJUSTMENT_STATUSES.contains(&to) {
-        return Err(format!("unknown status `{to}` (statuses: {ADJUSTMENT_STATUSES:?})"));
+        return Err(format!(
+            "unknown status `{to}` (statuses: {ADJUSTMENT_STATUSES:?})"
+        ));
     }
     let ok = matches!(
         (current, to),
@@ -56,10 +58,16 @@ mod tests {
     fn categories_are_practical_not_clinical() {
         assert!(ADJUSTMENT_CATEGORIES.contains(&"quieter_workspace"));
         assert!(ADJUSTMENT_CATEGORIES.contains(&"written_instructions"));
-        assert!(ADJUSTMENT_CATEGORIES.contains(&"other"), "never a closed gate");
+        assert!(
+            ADJUSTMENT_CATEGORIES.contains(&"other"),
+            "never a closed gate"
+        );
         for category in ADJUSTMENT_CATEGORIES {
             for clinical in ["adhd", "autis", "dyslex", "diagnos", "condition", "medical"] {
-                assert!(!category.contains(clinical), "{category:?} must stay practical");
+                assert!(
+                    !category.contains(clinical),
+                    "{category:?} must stay practical"
+                );
             }
         }
     }
@@ -72,7 +80,10 @@ mod tests {
         assert!(transition("agreed", "in_place").is_ok());
         assert!(transition("agreed", "withdrawn").is_ok());
         assert!(transition("requested", "in_place").is_err(), "agree first");
-        assert!(transition("declined", "agreed").is_err(), "declined is terminal; ask anew");
+        assert!(
+            transition("declined", "agreed").is_err(),
+            "declined is terminal; ask anew"
+        );
         assert!(transition("in_place", "withdrawn").is_err(), "terminal");
         assert!(transition("agreed", "sideways").is_err(), "unknown");
     }

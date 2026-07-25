@@ -202,6 +202,9 @@ mod tests {
     /// A non-UUID pid is rejected, never panics.
     #[test]
     fn from_envelope_rejects_a_non_uuid_pid() {
-        assert!(OutboxInsert::from_envelope(&an_envelope("created", "not-a-uuid"), an_instant()).is_err());
+        assert!(
+            OutboxInsert::from_envelope(&an_envelope("created", "not-a-uuid"), an_instant())
+                .is_err()
+        );
     }
 }

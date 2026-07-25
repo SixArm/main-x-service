@@ -19,15 +19,19 @@ async fn engagement_round_trip() {
         // ── Accounts + contacts.
         let account: Value = request
             .post("/api/accounts")
-            .json(&json!({ "organization_ref": format!("organization:{}", uuid::Uuid::new_v4()),
-                            "display_name": "Meridian University" }))
+            .json(
+                &json!({ "organization_ref": format!("organization:{}", uuid::Uuid::new_v4()),
+                            "display_name": "Meridian University" }),
+            )
             .await
             .json();
         let account_pid = account["pid"].as_str().unwrap().to_string();
         let contact: Value = request
             .post("/api/contacts")
-            .json(&json!({ "person_ref": a_person(), "display_name": "Prof Reyes",
-                            "account_pid": account_pid }))
+            .json(
+                &json!({ "person_ref": a_person(), "display_name": "Prof Reyes",
+                            "account_pid": account_pid }),
+            )
             .await
             .json();
         let contact_pid = contact["pid"].as_str().unwrap().to_string();
@@ -71,9 +75,11 @@ async fn engagement_round_trip() {
         assert_eq!(
             request
                 .post("/api/activities")
-                .json(&json!({ "subject_kind": "contact", "subject_pid": contact_pid,
+                .json(
+                    &json!({ "subject_kind": "contact", "subject_pid": contact_pid,
                                 "kind": "meeting", "summary": "Kickoff",
-                                "sentiment": "sideways" }))
+                                "sentiment": "sideways" })
+                )
                 .await
                 .status_code(),
             422,
@@ -81,16 +87,20 @@ async fn engagement_round_trip() {
         );
         request
             .post("/api/activities")
-            .json(&json!({ "subject_kind": "contact", "subject_pid": contact_pid,
+            .json(
+                &json!({ "subject_kind": "contact", "subject_pid": contact_pid,
                             "kind": "meeting", "summary": "Kickoff",
-                            "actor_ref": a_worker(), "sentiment": "positive" }))
+                            "actor_ref": a_worker(), "sentiment": "positive" }),
+            )
             .await
             .assert_status_ok();
         request
             .post("/api/activities")
-            .json(&json!({ "subject_kind": "contact", "subject_pid": contact_pid,
+            .json(
+                &json!({ "subject_kind": "contact", "subject_pid": contact_pid,
                             "kind": "task", "summary": "renewal: MoU 2027",
-                            "due_on": "2026-08-15" }))
+                            "due_on": "2026-08-15" }),
+            )
             .await
             .assert_status_ok();
 
@@ -101,7 +111,10 @@ async fn engagement_round_trip() {
         // since creation is 0 today, so assert the shape instead.
         let cadence: Value = request.get("/api/insights/cadence?days=1").await.json();
         assert_eq!(cadence["untouched_contacts"].as_array().unwrap().len(), 0);
-        assert_eq!(cadence["contacts_without_next_touch"], 0, "the renewal task counts");
+        assert_eq!(
+            cadence["contacts_without_next_touch"], 0,
+            "the renewal task counts"
+        );
 
         // ── Engagement workload: kinds + recorded sentiment counted.
         let engagement: Value = request.get("/api/insights/engagement").await.json();
@@ -111,9 +124,15 @@ async fn engagement_round_trip() {
         assert_eq!(engagement["sentiment"]["unrecorded"], 1);
 
         // ── Followups kind filter (the renewals convention).
-        let renewals: Value = request.get("/api/insights/followups?kind=task").await.json();
+        let renewals: Value = request
+            .get("/api/insights/followups?kind=task")
+            .await
+            .json();
         assert_eq!(renewals["upcoming_30d"].as_array().unwrap().len(), 1);
-        let calls: Value = request.get("/api/insights/followups?kind=call").await.json();
+        let calls: Value = request
+            .get("/api/insights/followups?kind=call")
+            .await
+            .json();
         assert_eq!(calls["upcoming_30d"].as_array().unwrap().len(), 0);
 
         // ── Funnel over a seeded pipeline: two deals created, one
@@ -177,9 +196,15 @@ async fn engagement_round_trip() {
             .json(&json!({ "joined_on": "2024-01-01", "renewal_on": "2026-08-01" }))
             .await
             .assert_status_ok();
-        let memberships: Value = request.get("/api/insights/memberships?days=30").await.json();
+        let memberships: Value = request
+            .get("/api/insights/memberships?days=30")
+            .await
+            .json();
         assert_eq!(memberships["renewals_due"].as_array().unwrap().len(), 1);
-        assert_eq!(memberships["renewals_due"][0]["account"], "Meridian University");
+        assert_eq!(
+            memberships["renewals_due"][0]["account"],
+            "Meridian University"
+        );
 
         // ── Working group: roster + derived feed.
         let group: Value = request
@@ -208,22 +233,33 @@ async fn engagement_round_trip() {
 
         // ── Stakeholder register + grid.
         let stakeholders: Value = request.get("/api/insights/stakeholders").await.json();
-        assert_eq!(stakeholders["by_role"]["partner"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            stakeholders["by_role"]["partner"].as_array().unwrap().len(),
+            1
+        );
         assert_eq!(stakeholders["grid"]["p4i5"], 1);
         assert_eq!(stakeholders["account_roles"][0]["role"], "partner");
 
         // ── Member health + consent-by-account.
         let members: Value = request.get("/api/insights/members?days=365").await.json();
-        let row = members["accounts"].as_array().unwrap().iter()
+        let row = members["accounts"]
+            .as_array()
+            .unwrap()
+            .iter()
             .find(|a| a["display_name"] == "Meridian University")
-            .expect("account row").clone();
+            .expect("account row")
+            .clone();
         assert_eq!(row["contacts"], 1);
         assert_eq!(row["silent"], false);
         assert_eq!(row["membership"]["status"], "active");
         let consent: Value = request.get("/api/insights/consent-by-account").await.json();
-        let row = consent["accounts"].as_array().unwrap().iter()
+        let row = consent["accounts"]
+            .as_array()
+            .unwrap()
+            .iter()
             .find(|a| a["display_name"] == "Meridian University")
-            .expect("consent row").clone();
+            .expect("consent row")
+            .clone();
         assert_eq!(row["consent_coverage"]["granted"], 1);
     })
     .await;

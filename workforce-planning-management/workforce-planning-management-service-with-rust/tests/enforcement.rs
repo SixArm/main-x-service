@@ -13,12 +13,12 @@
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use ed25519_dalek::SigningKey;
-use workforce_planning_management_service::app::App;
 use loco_rs::testing::prelude::*;
 use rusty_paseto::core::{Footer, Key, Paseto, PasetoAsymmetricPrivateKey, Payload, Public, V4};
 use serde_json::{Value, json};
 use serial_test::serial;
 use sha2::{Digest, Sha256};
+use workforce_planning_management_service::app::App;
 
 const ISSUER: &str = "authentication-service";
 const AUDIENCE: &str = "main-x-service";
@@ -67,8 +67,10 @@ fn sign_as(kid: &str, sub: &str, attrs: &[(&str, &[&str])]) -> String {
 /// svc/admin everything; `payroll=true` unmasked read; `hr=true`
 /// write + masked read; `$sub` self-read unmasked; masked-read
 /// fallback for every other authenticated caller.
-const REFERENCE_POLICY_FILE: &str =
-    concat!(env!("CARGO_MANIFEST_DIR"), "/config/abac-policy.reference.json");
+const REFERENCE_POLICY_FILE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/config/abac-policy.reference.json"
+);
 
 /// The full persona matrix in one test (one boot ⇒ one set of cached
 /// `OnceLock`s): public paths stay open, missing tokens are 401, the
@@ -171,7 +173,10 @@ async fn enforcement_personas_gate_and_mask() {
             response.json()
         };
         assert_eq!(theirs["department"], "engineering");
-        assert!(theirs["salary_minor"].is_null(), "masked read hides the salary");
+        assert!(
+            theirs["salary_minor"].is_null(),
+            "masked read hides the salary"
+        );
         assert!(theirs["salary_currency"].is_null());
 
         // Payslips inherit the employee masking: build a run as the
@@ -228,7 +233,12 @@ async fn enforcement_personas_gate_and_mask() {
             assert_eq!(response.status_code(), 200);
             response.json()
         };
-        assert!(my_slips.as_array().unwrap()[0]["gross_minor"].as_i64().unwrap() > 0);
+        assert!(
+            my_slips.as_array().unwrap()[0]["gross_minor"]
+                .as_i64()
+                .unwrap()
+                > 0
+        );
 
         // The payroll persona reads the employee unmasked.
         let payroll_view: Value = {
@@ -239,7 +249,10 @@ async fn enforcement_personas_gate_and_mask() {
             assert_eq!(response.status_code(), 200);
             response.json()
         };
-        assert_eq!(payroll_view["salary_minor"], 3_600_000, "payroll sees salary");
+        assert_eq!(
+            payroll_view["salary_minor"], 3_600_000,
+            "payroll sees salary"
+        );
         // HR reads masked (salary stays payroll + self).
         let hr_view: Value = {
             let response = request
@@ -259,7 +272,10 @@ async fn enforcement_personas_gate_and_mask() {
             .add_header("authorization", bearer(&me))
             .await;
         assert_eq!(my_export.status_code(), 200);
-        assert_eq!(my_export.json::<Value>()["employee"]["salary_minor"], 3_600_000);
+        assert_eq!(
+            my_export.json::<Value>()["employee"]["salary_minor"],
+            3_600_000
+        );
         assert_eq!(
             request
                 .get(&format!("/api/employees/{employee_pid}/subject-access"))
@@ -338,40 +354,72 @@ async fn enforcement_personas_gate_and_mask() {
         let a_pid = appraisal["pid"].as_str().unwrap().to_string();
         for (n, rater) in rater_pids.iter().enumerate() {
             let group = if n == 0 { "manager" } else { "peer" };
-            with_auth(request.post(&format!("/api/appraisals/{a_pid}/nominations")), &machine)
-                .json(&json!({ "rater_pid": rater, "group": group }))
-                .await
-                .assert_status_ok();
-        }
-        with_auth(request.post(&format!("/api/appraisals/{a_pid}/status")), &machine)
-            .json(&json!({ "to": "collecting" }))
+            with_auth(
+                request.post(&format!("/api/appraisals/{a_pid}/nominations")),
+                &machine,
+            )
+            .json(&json!({ "rater_pid": rater, "group": group }))
             .await
             .assert_status_ok();
-        with_auth(request.post(&format!("/api/appraisals/{a_pid}/responses")), &machine)
-            .json(&json!({ "rater_pid": rater_pids[0],
+        }
+        with_auth(
+            request.post(&format!("/api/appraisals/{a_pid}/status")),
+            &machine,
+        )
+        .json(&json!({ "to": "collecting" }))
+        .await
+        .assert_status_ok();
+        with_auth(
+            request.post(&format!("/api/appraisals/{a_pid}/responses")),
+            &machine,
+        )
+        .json(&json!({ "rater_pid": rater_pids[0],
                            "scores": { "communication": 4 },
                            "comment": "Delegate more." }))
-            .await
-            .assert_status_ok();
-        with_auth(request.post(&format!("/api/appraisals/{a_pid}/status")), &machine)
-            .json(&json!({ "to": "shared" }))
-            .await
-            .assert_status_ok();
-        let full_report: Value =
-            with_auth(request.get(&format!("/api/appraisals/{a_pid}/report")), &payroll)
-                .await
-                .json();
-        let manager_group = full_report["groups"].as_array().unwrap()
-            .iter().find(|g| g["group"] == "manager").unwrap().clone();
-        assert_eq!(manager_group["comments"][0], "Delegate more.", "unmasked read sees words");
-        let masked_report: Value =
-            with_auth(request.get(&format!("/api/appraisals/{a_pid}/report")), &other)
-                .await
-                .json();
-        let masked_manager = masked_report["groups"].as_array().unwrap()
-            .iter().find(|g| g["group"] == "manager").unwrap().clone();
+        .await
+        .assert_status_ok();
+        with_auth(
+            request.post(&format!("/api/appraisals/{a_pid}/status")),
+            &machine,
+        )
+        .json(&json!({ "to": "shared" }))
+        .await
+        .assert_status_ok();
+        let full_report: Value = with_auth(
+            request.get(&format!("/api/appraisals/{a_pid}/report")),
+            &payroll,
+        )
+        .await
+        .json();
+        let manager_group = full_report["groups"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|g| g["group"] == "manager")
+            .unwrap()
+            .clone();
+        assert_eq!(
+            manager_group["comments"][0], "Delegate more.",
+            "unmasked read sees words"
+        );
+        let masked_report: Value = with_auth(
+            request.get(&format!("/api/appraisals/{a_pid}/report")),
+            &other,
+        )
+        .await
+        .json();
+        let masked_manager = masked_report["groups"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|g| g["group"] == "manager")
+            .unwrap()
+            .clone();
         assert_eq!(masked_manager["comments_withheld"], true);
-        assert!(masked_manager["comments"].is_null(), "masked read loses the words");
+        assert!(
+            masked_manager["comments"].is_null(),
+            "masked read loses the words"
+        );
         assert_eq!(
             masked_manager["competencies"]["communication"]["mean"], 4.0,
             "masked read keeps the numbers"

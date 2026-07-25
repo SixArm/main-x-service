@@ -9,8 +9,8 @@
 
 #![no_main]
 
+use event_matcher::{Event, MatchConfig, MatchingEngine};
 use libfuzzer_sys::fuzz_target;
-use event_matcher::{MatchConfig, MatchingEngine, Event};
 
 fuzz_target!(|data: &[u8]| {
     // Only well-formed JSON tuples reach the engine; malformed input is a

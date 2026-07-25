@@ -109,7 +109,11 @@ const fn default_fte() -> i32 {
 fn validate_employee(p: &EmployeePayload) -> Vec<String> {
     let mut problems = Problems::new();
     problems.require_ref("person_ref", entity_ref::EntityType::Person, &p.person_ref);
-    problems.ref_opt("worker_ref", entity_ref::EntityType::Worker, p.worker_ref.as_deref());
+    problems.ref_opt(
+        "worker_ref",
+        entity_ref::EntityType::Worker,
+        p.worker_ref.as_deref(),
+    );
     problems.require_ref(
         "organization_ref",
         entity_ref::EntityType::Organization,
@@ -117,7 +121,11 @@ fn validate_employee(p: &EmployeePayload) -> Vec<String> {
     );
     problems.require_text("employee_number", &p.employee_number);
     problems.require_text("display_name", &p.display_name);
-    problems.require_token("employment_type", tokens::EMPLOYMENT_TYPES, &p.employment_type);
+    problems.require_token(
+        "employment_type",
+        tokens::EMPLOYMENT_TYPES,
+        &p.employment_type,
+    );
     problems.require_text("department", &p.department);
     problems.require_text("job_title", &p.job_title);
     if !(1..=100).contains(&p.fte_percent) {
@@ -309,13 +317,18 @@ async fn update_employee(
         problems.require_text("department", dept);
     }
     if let Some(fte) = payload.fte_percent
-        && !(1..=100).contains(&fte) {
-            problems.push(format!("fte_percent {fte} out of range 1-100"));
-        }
+        && !(1..=100).contains(&fte)
+    {
+        problems.push(format!("fte_percent {fte} out of range 1-100"));
+    }
     if payload.salary_minor.is_some_and(|s| s < 0) {
         problems.push("salary_minor must be non-negative".to_string());
     }
-    problems.ref_opt("worker_ref", entity_ref::EntityType::Worker, payload.worker_ref.as_deref());
+    problems.ref_opt(
+        "worker_ref",
+        entity_ref::EntityType::Worker,
+        payload.worker_ref.as_deref(),
+    );
     ensure_valid(&problems.into_vec())?;
     if let Some(manager) = payload.manager_pid {
         records::find_employee(&ctx.db, manager).await?;
@@ -362,7 +375,16 @@ async fn update_employee(
         Some(serde_json::json!({ "department": row.department })),
     )
     .await?;
-    streaming::emit_on(&txn, "employee", "updated", &row.pid.to_string(), &row.employee_number, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "employee",
+        "updated",
+        &row.pid.to_string(),
+        &row.employee_number,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(auth::mask_employee(row))
 }
@@ -388,8 +410,13 @@ async fn change_status(
         &auth::employee_resource_attrs(&employee),
     )
     .map_err(record_rejection)?;
-    lifecycle::check("employee", lifecycle::EMPLOYEE, &employee.status, &payload.to)
-        .map_err(|e| unprocessable(&e))?;
+    lifecycle::check(
+        "employee",
+        lifecycle::EMPLOYEE,
+        &employee.status,
+        &payload.to,
+    )
+    .map_err(|e| unprocessable(&e))?;
     if employee.status == "onboarding" && payload.to == "active" {
         let open = onboarding_items::Entity::find()
             .filter(onboarding_items::Column::EmployeePid.eq(employee.pid))
@@ -472,7 +499,16 @@ async fn delete_employee(
     active.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
     active.update(&txn).await?;
     Audit::record(&txn, "employee", pid, "deleted", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "employee", "deleted", &pid.to_string(), &number, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "employee",
+        "deleted",
+        &pid.to_string(),
+        &number,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::empty_json()
 }
@@ -499,7 +535,11 @@ fn build_org_node(
     } else {
         children
             .get(&Some(node.pid))
-            .map(|kids| kids.iter().map(|k| build_org_node(k, children, depth + 1)).collect())
+            .map(|kids| {
+                kids.iter()
+                    .map(|k| build_org_node(k, children, depth + 1))
+                    .collect()
+            })
             .unwrap_or_default()
     };
     OrgNode {
@@ -535,7 +575,11 @@ async fn org_chart(
     }
     let roots: Vec<OrgNode> = children
         .get(&None)
-        .map(|top| top.iter().map(|n| build_org_node(n, &children, 0)).collect())
+        .map(|top| {
+            top.iter()
+                .map(|n| build_org_node(n, &children, 0))
+                .collect()
+        })
         .unwrap_or_default();
     format::json(roots)
 }
@@ -570,10 +614,29 @@ async fn create_plan(
     }
     .insert(&txn)
     .await?;
-    Audit::record(&txn, "benefit_plan", row.pid, "created", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "benefit_plan", "created", &row.pid.to_string(), &row.name, caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "benefit_plan",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "benefit_plan",
+        "created",
+        &row.pid.to_string(),
+        &row.name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/benefit-plans`.
@@ -623,10 +686,29 @@ async fn enroll(
     }
     .insert(&txn)
     .await?;
-    Audit::record(&txn, "benefit_enrollment", row.pid, "created", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "benefit_enrollment", "benefit_enrolled", &row.pid.to_string(), &plan.name, caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "benefit_enrollment",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "benefit_enrollment",
+        "benefit_enrolled",
+        &row.pid.to_string(),
+        &plan.name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/employees/{pid}/benefit-enrollments`.
@@ -658,8 +740,25 @@ async fn unenroll(
     let mut active: benefit_enrollments::ActiveModel = row.into();
     active.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
     active.update(&txn).await?;
-    Audit::record(&txn, "benefit_enrollment", pid, "deleted", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "benefit_enrollment", "deleted", &pid.to_string(), "", caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "benefit_enrollment",
+        pid,
+        "deleted",
+        caller.actor(),
+        None,
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "benefit_enrollment",
+        "deleted",
+        &pid.to_string(),
+        "",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::empty_json()
 }
@@ -678,6 +777,9 @@ pub fn routes() -> Routes {
         .add("/benefit-plans", post(create_plan))
         .add("/benefit-plans", get(list_plans))
         .add("/employees/{pid}/benefit-enrollments", post(enroll))
-        .add("/employees/{pid}/benefit-enrollments", get(list_enrollments))
+        .add(
+            "/employees/{pid}/benefit-enrollments",
+            get(list_enrollments),
+        )
         .add("/benefit-enrollments/{pid}", delete(unenroll))
 }

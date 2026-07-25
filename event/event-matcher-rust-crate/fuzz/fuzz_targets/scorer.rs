@@ -8,8 +8,8 @@
 
 #![no_main]
 
-use libfuzzer_sys::fuzz_target;
 use event_matcher::Scorer;
+use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
     // Split at the first NUL so a single blob yields two independent

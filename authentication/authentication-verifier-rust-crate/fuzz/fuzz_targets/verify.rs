@@ -13,9 +13,9 @@
 
 #![no_main]
 
+use authentication_verifier::Verifier;
 use libfuzzer_sys::fuzz_target;
 use std::sync::OnceLock;
-use authentication_verifier::Verifier;
 
 fn verifier() -> &'static Verifier {
     static V: OnceLock<Verifier> = OnceLock::new();

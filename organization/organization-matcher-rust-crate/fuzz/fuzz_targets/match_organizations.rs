@@ -21,7 +21,10 @@ fuzz_target!(|data: &[u8]| {
 
     let engine = MatchingEngine::new(MatchConfig::default());
     // Run both orderings so either argument position is exercised.
-    for result in [engine.match_organizations(&a, &b), engine.match_organizations(&b, &a)] {
+    for result in [
+        engine.match_organizations(&a, &b),
+        engine.match_organizations(&b, &a),
+    ] {
         assert!(
             result.score.is_finite(),
             "score must be finite, got {}",

@@ -77,10 +77,19 @@ async fn create_assessment(
         .insert(&txn)
         .await?;
     }
-    Audit::record(&txn, "ergonomic_assessment", assessment.pid, "created", caller.actor(), None)
-        .await?;
+    Audit::record(
+        &txn,
+        "ergonomic_assessment",
+        assessment.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: assessment.pid.to_string() })
+    format::json(PidRef {
+        pid: assessment.pid.to_string(),
+    })
 }
 
 /// `GET /api/employees/{pid}/ergonomic-assessments` — the employee's
@@ -153,7 +162,9 @@ async fn answer_item(
         .await?
         .ok_or(Error::NotFound)?;
     if assessment.status != "open" {
-        return Err(unprocessable("a completed assessment is a record; open a new one"));
+        return Err(unprocessable(
+            "a completed assessment is a record; open a new one",
+        ));
     }
     let item_pid = item.pid;
     let mut active: ergonomic_items::ActiveModel = item.into();
@@ -237,15 +248,18 @@ async fn issues(State(ctx): State<AppContext>) -> Result<Response> {
     let mut by_department: std::collections::BTreeMap<String, usize> =
         std::collections::BTreeMap::new();
     for item in &items {
-        let Some(assessment) = assessments.iter().find(|a| a.pid == item.assessment_pid)
+        let Some(assessment) = assessments.iter().find(|a| a.pid == item.assessment_pid) else {
+            continue;
+        };
+        let Some(employee) = employee_rows
+            .iter()
+            .find(|e| e.pid == assessment.employee_pid)
         else {
             continue;
         };
-        let Some(employee) = employee_rows.iter().find(|e| e.pid == assessment.employee_pid)
-        else {
-            continue;
-        };
-        *by_department.entry(employee.department.clone()).or_default() += 1;
+        *by_department
+            .entry(employee.department.clone())
+            .or_default() += 1;
         listed.push(serde_json::json!({
             "department": employee.department,
             "employee_pid": employee.pid,
@@ -270,9 +284,18 @@ async fn issues(State(ctx): State<AppContext>) -> Result<Response> {
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api")
-        .add("/employees/{pid}/ergonomic-assessments", post(create_assessment))
-        .add("/employees/{pid}/ergonomic-assessments", get(list_assessments))
+        .add(
+            "/employees/{pid}/ergonomic-assessments",
+            post(create_assessment),
+        )
+        .add(
+            "/employees/{pid}/ergonomic-assessments",
+            get(list_assessments),
+        )
         .add("/ergonomic-items/{pid}", put(answer_item))
-        .add("/ergonomic-assessments/{pid}/complete", post(complete_assessment))
+        .add(
+            "/ergonomic-assessments/{pid}/complete",
+            post(complete_assessment),
+        )
         .add("/ergonomics/issues", get(issues))
 }

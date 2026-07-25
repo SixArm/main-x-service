@@ -43,10 +43,22 @@ mod tests {
     /// currency mismatch refuses to compare.
     #[test]
     fn flags_and_currency_guard() {
-        assert_eq!(compare(90, "GBP", 100, 200, "GBP"), Some(BenchmarkFlag::BelowMin));
-        assert_eq!(compare(100, "GBP", 100, 200, "GBP"), Some(BenchmarkFlag::Within));
-        assert_eq!(compare(200, "GBP", 100, 200, "gbp"), Some(BenchmarkFlag::Within));
-        assert_eq!(compare(201, "GBP", 100, 200, "GBP"), Some(BenchmarkFlag::AboveMax));
+        assert_eq!(
+            compare(90, "GBP", 100, 200, "GBP"),
+            Some(BenchmarkFlag::BelowMin)
+        );
+        assert_eq!(
+            compare(100, "GBP", 100, 200, "GBP"),
+            Some(BenchmarkFlag::Within)
+        );
+        assert_eq!(
+            compare(200, "GBP", 100, 200, "gbp"),
+            Some(BenchmarkFlag::Within)
+        );
+        assert_eq!(
+            compare(201, "GBP", 100, 200, "GBP"),
+            Some(BenchmarkFlag::AboveMax)
+        );
         assert_eq!(compare(150, "USD", 100, 200, "GBP"), None);
     }
 }

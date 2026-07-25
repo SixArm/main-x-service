@@ -188,7 +188,10 @@ pub async fn emit_on<C: ConnectionTrait>(
             .await
             .map_err(loco_rs::Error::Model)?;
     } else {
-        let mut events = publisher().events.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut events = publisher()
+            .events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if events.len() >= MEMORY_CAPACITY {
             events.remove(0);
         }
@@ -202,8 +205,16 @@ pub async fn emit_on<C: ConnectionTrait>(
 /// table instead — see the controller.)
 #[must_use]
 pub fn recent(limit: usize) -> Vec<EventView> {
-    let events = publisher().events.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    events.iter().rev().take(limit).map(EventView::from).collect()
+    let events = publisher()
+        .events
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    events
+        .iter()
+        .rev()
+        .take(limit)
+        .map(EventView::from)
+        .collect()
 }
 
 #[cfg(test)]
@@ -227,7 +238,14 @@ mod tests {
     /// monotonic sequence; the view projection is faithful.
     #[test]
     fn envelope_and_view_shape() {
-        let a = envelope("employee", "employee_hired", "pid-1", "E-1001", Some("u1"), None);
+        let a = envelope(
+            "employee",
+            "employee_hired",
+            "pid-1",
+            "E-1001",
+            Some("u1"),
+            None,
+        );
         let b = envelope("employee", "employee_hired", "pid-1", "E-1001", None, None);
         assert_eq!(a.schema_version, SCHEMA_VERSION);
         assert_ne!(a.event_id, b.event_id);

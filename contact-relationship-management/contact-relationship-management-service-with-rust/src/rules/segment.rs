@@ -91,7 +91,10 @@ mod tests {
         no_account.account_tier = None;
         assert!(!matches(&filter, &no_account));
         // With no tier clause the account-less contact matches.
-        let loose = Filter { statuses: vec!["active".to_string()], ..Filter::default() };
+        let loose = Filter {
+            statuses: vec!["active".to_string()],
+            ..Filter::default()
+        };
         assert!(matches(&loose, &no_account));
     }
 }

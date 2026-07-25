@@ -93,7 +93,11 @@ mod tests {
         assert_eq!(retention_days(Some("")), RETENTION_DEFAULT_DAYS);
         assert_eq!(retention_days(Some("junk")), RETENTION_DEFAULT_DAYS);
         assert_eq!(retention_days(Some("730")), 730);
-        assert_eq!(retention_days(Some("0")), RETENTION_FLOOR_DAYS, "0 would hard-delete");
+        assert_eq!(
+            retention_days(Some("0")),
+            RETENTION_FLOOR_DAYS,
+            "0 would hard-delete"
+        );
         assert_eq!(retention_days(Some("-5")), RETENTION_FLOOR_DAYS);
         assert_eq!(retention_days(Some("30")), 30);
     }

@@ -11,7 +11,9 @@ use loco_rs::prelude::*;
 use sea_orm::ConnectionTrait;
 use uuid::Uuid;
 
-use super::_entities::{bays, bed_requests, beds, infection_flags, red_green_days, sites, stays, transfers, wards};
+use super::_entities::{
+    bays, bed_requests, beds, infection_flags, red_green_days, sites, stays, transfers, wards,
+};
 
 impl ActiveModelBehavior for sites::ActiveModel {}
 impl ActiveModelBehavior for wards::ActiveModel {}
@@ -43,10 +45,7 @@ macro_rules! find_active_by_pid {
         ///
         /// [`Error::NotFound`] when absent or soft-deleted; any query
         /// error otherwise.
-        pub async fn $fn_name<C: ConnectionTrait>(
-            db: &C,
-            pid: Uuid,
-        ) -> Result<$module::Model> {
+        pub async fn $fn_name<C: ConnectionTrait>(db: &C, pid: Uuid) -> Result<$module::Model> {
             let row = $module::Entity::find()
                 .filter($module::Column::Pid.eq(pid))
                 .filter($module::Column::DeletedAt.is_null())

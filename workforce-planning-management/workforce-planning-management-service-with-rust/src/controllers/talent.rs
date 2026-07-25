@@ -135,9 +135,7 @@ async fn create_plan(
             .as_deref()
             .is_none_or(|d| d == employee.department)
     {
-        problems.push(
-            "the target role is the employee's current role; use kind `upskill` instead",
-        );
+        problems.push("the target role is the employee's current role; use kind `upskill` instead");
     }
     let mut seen: Vec<Uuid> = Vec::new();
     for (index, item) in payload.items.iter().enumerate() {
@@ -262,8 +260,7 @@ async fn list_plans(
 
 /// How the two progress readings are derived, echoed in every payload
 /// that carries them.
-const PROGRESS_DERIVATION: &str =
-    "declared progress = items marked achieved / all items (abandoned items stay in the \
+const PROGRESS_DERIVATION: &str = "declared progress = items marked achieved / all items (abandoned items stay in the \
      denominator); verified progress = items whose skill's declared proficiency has actually \
      reached the target / all items";
 
@@ -275,7 +272,10 @@ fn plan_view(
 ) -> serde_json::Value {
     let statuses: Vec<String> = items.iter().map(|i| i.status.clone()).collect();
     let (achieved, total) = rules::plan_progress(&statuses);
-    let targets: Vec<(Uuid, i32)> = items.iter().map(|i| (i.skill_pid, i.target_level)).collect();
+    let targets: Vec<(Uuid, i32)> = items
+        .iter()
+        .map(|i| (i.skill_pid, i.target_level))
+        .collect();
     let (verified, _) = rules::verified_progress(&targets, declared);
     serde_json::json!({
         "pid": plan.pid,
@@ -299,7 +299,10 @@ async fn declared_levels(ctx: &AppContext, employee_pid: Uuid) -> Result<BTreeMa
         .filter(employee_skills::Column::DeletedAt.is_null())
         .all(&ctx.db)
         .await?;
-    Ok(rows.into_iter().map(|r| (r.skill_pid, r.proficiency)).collect())
+    Ok(rows
+        .into_iter()
+        .map(|r| (r.skill_pid, r.proficiency))
+        .collect())
 }
 
 /// `POST /api/development-plans/{pid}/status` body.
@@ -711,7 +714,11 @@ async fn create_program(
         problems.push("level must be positive when given");
     }
     if let Some(provider) = payload.provider_ref.as_deref() {
-        problems.require_ref("provider_ref", entity_ref::EntityType::Organization, provider);
+        problems.require_ref(
+            "provider_ref",
+            entity_ref::EntityType::Organization,
+            provider,
+        );
     }
     ensure_valid(&problems.into_vec())?;
 
@@ -796,8 +803,7 @@ async fn list_programs(
 }
 
 /// How the conversion rate is derived, echoed wherever it is reported.
-const CONVERSION_NOTE: &str =
-    "conversion rate = placements whose outcome is `converted` / placements that have \
+const CONVERSION_NOTE: &str = "conversion rate = placements whose outcome is `converted` / placements that have \
      completed; a running placement has not had the chance to convert, so it is excluded \
      from the denominator (null until something completes)";
 
@@ -990,7 +996,11 @@ async fn placement_status(
         .map_err(|reason| unprocessable(&reason))?;
 
     let mut problems = Problems::new();
-    problems.token_opt("outcome", rules::PLACEMENT_OUTCOMES, payload.outcome.as_deref());
+    problems.token_opt(
+        "outcome",
+        rules::PLACEMENT_OUTCOMES,
+        payload.outcome.as_deref(),
+    );
     ensure_valid(&problems.into_vec())?;
 
     if payload.to == "completed" {
@@ -1064,8 +1074,7 @@ async fn list_employee_placements(
         .await?;
     let mut view = Vec::with_capacity(placements.len());
     for placement in &placements {
-        let program =
-            records::find_early_career_program(&ctx.db, placement.program_pid).await?;
+        let program = records::find_early_career_program(&ctx.db, placement.program_pid).await?;
         view.push(serde_json::json!({
             "pid": placement.pid,
             "program": { "pid": program.pid, "name": program.name, "kind": program.kind, "level": program.level },

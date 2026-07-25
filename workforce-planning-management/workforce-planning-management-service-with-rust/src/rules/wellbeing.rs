@@ -195,18 +195,40 @@ mod tests {
         let leapling = date(1960, 2, 29);
         assert_eq!(age_on(leapling, date(2026, 2, 28)), Some(65));
         assert_eq!(age_on(leapling, date(2026, 3, 1)), Some(66));
-        assert_eq!(age_on(date(2030, 1, 1), date(2026, 1, 1)), None, "future birth");
+        assert_eq!(
+            age_on(date(2030, 1, 1), date(2026, 1, 1)),
+            None,
+            "future birth"
+        );
     }
 
     /// The NHS shingles shape: 65+ matches at exactly 65, not at 64,
     /// and an **unknown age fails the banded rule** (unknown ≠ match).
     #[test]
     fn age_band_matches_and_unknown_age_fails_banded_rules() {
-        let banded = Predicates { min_age: Some(65), ..open(&[]) };
+        let banded = Predicates {
+            min_age: Some(65),
+            ..open(&[])
+        };
         let today = date(2026, 7, 24);
-        assert!(eligible(&banded, Some(65), "engineering", "Engineer", today));
-        assert!(!eligible(&banded, Some(64), "engineering", "Engineer", today));
-        assert!(!eligible(&banded, None, "engineering", "Engineer", today), "unknown age");
+        assert!(eligible(
+            &banded,
+            Some(65),
+            "engineering",
+            "Engineer",
+            today
+        ));
+        assert!(!eligible(
+            &banded,
+            Some(64),
+            "engineering",
+            "Engineer",
+            today
+        ));
+        assert!(
+            !eligible(&banded, None, "engineering", "Engineer", today),
+            "unknown age"
+        );
         // An un-banded rule ignores the unknown age entirely.
         assert!(eligible(&open(&[]), None, "engineering", "Engineer", today));
     }
@@ -218,9 +240,15 @@ mod tests {
         let wards = vec!["Ward 7".to_string(), "ICU".to_string()];
         let scoped = open(&wards);
         let today = date(2026, 7, 24);
-        assert!(eligible(&scoped, None, "ward 7", "Nurse", today), "case-insensitive");
+        assert!(
+            eligible(&scoped, None, "ward 7", "Nurse", today),
+            "case-insensitive"
+        );
         assert!(!eligible(&scoped, None, "finance", "Nurse", today));
-        let titled = Predicates { job_titles: &wards, ..open(&[]) };
+        let titled = Predicates {
+            job_titles: &wards,
+            ..open(&[])
+        };
         assert!(!eligible(&titled, None, "finance", "Accountant", today));
     }
 
@@ -245,11 +273,29 @@ mod tests {
     #[test]
     fn prompt_state_machine() {
         assert_eq!(prompt_state(1, None, false), PromptState::Prompt);
-        assert_eq!(prompt_state(2, Some("booked"), false), PromptState::Reminder);
+        assert_eq!(
+            prompt_state(2, Some("booked"), false),
+            PromptState::Reminder
+        );
         assert_eq!(prompt_state(2, Some("done"), false), PromptState::Reminder);
-        assert_eq!(prompt_state(2, Some("booked"), true), PromptState::Quiet, "one reminder only");
-        assert_eq!(prompt_state(1, Some("booked"), false), PromptState::Quiet, "single dose");
-        assert_eq!(prompt_state(2, Some("declined"), false), PromptState::Quiet, "declining is final");
-        assert_eq!(prompt_state(2, Some("dismissed"), false), PromptState::Quiet);
+        assert_eq!(
+            prompt_state(2, Some("booked"), true),
+            PromptState::Quiet,
+            "one reminder only"
+        );
+        assert_eq!(
+            prompt_state(1, Some("booked"), false),
+            PromptState::Quiet,
+            "single dose"
+        );
+        assert_eq!(
+            prompt_state(2, Some("declined"), false),
+            PromptState::Quiet,
+            "declining is final"
+        );
+        assert_eq!(
+            prompt_state(2, Some("dismissed"), false),
+            PromptState::Quiet
+        );
     }
 }

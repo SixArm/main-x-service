@@ -803,12 +803,16 @@ mod tests {
             serde_json::from_value(serde_json::json!({"status": "rejected"})).unwrap();
         assert_eq!(ok.status, ReviewDecision::Rejected);
         assert!(
-            serde_json::from_value::<ReviewDecisionRequest>(serde_json::json!({"status": "pending"}))
-                .is_err()
+            serde_json::from_value::<ReviewDecisionRequest>(
+                serde_json::json!({"status": "pending"})
+            )
+            .is_err()
         );
-        assert!(serde_json::from_value::<ReviewDecisionRequest>(
-            serde_json::json!({"status": "automerged"})
-        )
-        .is_err());
+        assert!(
+            serde_json::from_value::<ReviewDecisionRequest>(
+                serde_json::json!({"status": "automerged"})
+            )
+            .is_err()
+        );
     }
 }

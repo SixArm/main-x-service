@@ -37,10 +37,7 @@ pub const TICKET: &[(&str, &str)] = &[
 
 /// The legal article transitions (CRM-R12). Published edits bump the
 /// version in place (no status change).
-pub const ARTICLE: &[(&str, &str)] = &[
-    ("draft", "published"),
-    ("published", "archived"),
-];
+pub const ARTICLE: &[(&str, &str)] = &[("draft", "published"), ("published", "archived")];
 
 /// Whether `table` permits moving `from → to`.
 #[must_use]
@@ -69,7 +66,10 @@ mod tests {
     /// Every `(from, to)` pair uses vocabulary tokens only.
     #[test]
     fn tables_use_vocabulary_tokens_only() {
-        type Case = (&'static [(&'static str, &'static str)], &'static [&'static str]);
+        type Case = (
+            &'static [(&'static str, &'static str)],
+            &'static [&'static str],
+        );
         let cases: &[Case] = &[
             (LEAD, tokens::LEAD_STATUSES),
             (CAMPAIGN, tokens::CAMPAIGN_STATUSES),

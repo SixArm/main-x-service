@@ -176,9 +176,19 @@ async fn create_cycle(
     }
     .insert(&txn)
     .await?;
-    Audit::record(&txn, "review_cycle", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "review_cycle",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/review-cycles`.
@@ -207,7 +217,11 @@ async fn create_review(
     }
     let employee = records::find_employee(&ctx.db, payload.employee_pid).await?;
     let mut problems = Problems::new();
-    problems.require_ref("reviewer_ref", entity_ref::EntityType::Worker, &payload.reviewer_ref);
+    problems.require_ref(
+        "reviewer_ref",
+        entity_ref::EntityType::Worker,
+        &payload.reviewer_ref,
+    );
     ensure_valid(&problems.into_vec())?;
     let txn = ctx.db.begin().await?;
     let row = reviews::ActiveModel {
@@ -225,7 +239,9 @@ async fn create_review(
     .await?;
     Audit::record(&txn, "review", row.pid, "created", caller.actor(), None).await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/employees/{pid}/reviews` — an employee's reviews.
@@ -288,9 +304,10 @@ async fn update_review(
     }
     let mut problems = Problems::new();
     if let Some(rating) = payload.rating
-        && !(1..=5).contains(&rating) {
-            problems.push(format!("rating {rating} out of range 1-5"));
-        }
+        && !(1..=5).contains(&rating)
+    {
+        problems.push(format!("rating {rating} out of range 1-5"));
+    }
     problems.cap_opt("content", payload.content.as_deref());
     ensure_valid(&problems.into_vec())?;
     let txn = ctx.db.begin().await?;
@@ -341,7 +358,16 @@ async fn review_status(
         Some(serde_json::json!({ "from": from, "to": payload.to })),
     )
     .await?;
-    streaming::emit_on(&txn, "review", kind, &row.pid.to_string(), "", caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "review",
+        kind,
+        &row.pid.to_string(),
+        "",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }
@@ -358,7 +384,10 @@ async fn create_goal(
     let mut problems = Problems::new();
     problems.require_text("title", &payload.title);
     if !(1..=100).contains(&payload.weight_percent) {
-        problems.push(format!("weight_percent {} out of range 1-100", payload.weight_percent));
+        problems.push(format!(
+            "weight_percent {} out of range 1-100",
+            payload.weight_percent
+        ));
     }
     ensure_valid(&problems.into_vec())?;
     let txn = ctx.db.begin().await?;
@@ -375,7 +404,9 @@ async fn create_goal(
     .await?;
     Audit::record(&txn, "goal", row.pid, "created", caller.actor(), None).await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `PUT /api/goals/{pid}` — set the status.
@@ -427,7 +458,15 @@ async fn review_detail(
         .await?;
     // Reading a review with content is a sensitive read (WPM-D7).
     if review.content.is_some() {
-        Audit::record(&ctx.db, "review", review.pid, "review_content_read", caller.actor(), None).await?;
+        Audit::record(
+            &ctx.db,
+            "review",
+            review.pid,
+            "review_content_read",
+            caller.actor(),
+            None,
+        )
+        .await?;
     }
     format::json(serde_json::json!({
         "review": review, "goals": goal_rows, "feedback": feedback,
@@ -444,7 +483,11 @@ async fn create_feedback(
 ) -> Result<Response> {
     let review = records::find_review(&ctx.db, records::parse_pid(&pid)?).await?;
     let mut problems = Problems::new();
-    problems.require_ref("author_ref", entity_ref::EntityType::Worker, &payload.author_ref);
+    problems.require_ref(
+        "author_ref",
+        entity_ref::EntityType::Worker,
+        &payload.author_ref,
+    );
     problems.require_text("content", &payload.content);
     ensure_valid(&problems.into_vec())?;
     let txn = ctx.db.begin().await?;
@@ -458,9 +501,19 @@ async fn create_feedback(
     }
     .insert(&txn)
     .await?;
-    Audit::record(&txn, "feedback_entry", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "feedback_entry",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `POST /api/employees/{pid}/training-enrollments` — enrol against a
@@ -498,9 +551,19 @@ async fn create_training(
     }
     .insert(&txn)
     .await?;
-    Audit::record(&txn, "training_enrollment", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "training_enrollment",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/employees/{pid}/training-enrollments`.
@@ -543,8 +606,25 @@ async fn update_training(
     } else {
         "updated"
     };
-    Audit::record(&txn, "training_enrollment", row.pid, kind, caller.actor(), None).await?;
-    streaming::emit_on(&txn, "training_enrollment", kind, &row.pid.to_string(), &row.course_ref, caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "training_enrollment",
+        row.pid,
+        kind,
+        caller.actor(),
+        None,
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "training_enrollment",
+        kind,
+        &row.pid.to_string(),
+        &row.course_ref,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }
@@ -590,7 +670,10 @@ async fn create_succession(
     problems.require_text("role_title", &payload.role_title);
     problems.require_text("department", &payload.department);
     if !(1..=5).contains(&payload.criticality) {
-        problems.push(format!("criticality {} out of range 1-5", payload.criticality));
+        problems.push(format!(
+            "criticality {} out of range 1-5",
+            payload.criticality
+        ));
     }
     problems.token_opt(
         "risk_of_loss",
@@ -615,9 +698,19 @@ async fn create_succession(
     }
     .insert(&txn)
     .await?;
-    Audit::record(&txn, "succession_plan", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "succession_plan",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/succession-plans` — plans + candidates; the read is
@@ -682,9 +775,19 @@ async fn add_succession_candidate(
     }
     .insert(&txn)
     .await?;
-    Audit::record(&txn, "succession_candidate", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "succession_candidate",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/succession-plans/gaps` — critical roles (criticality ≥ 4)
@@ -842,7 +945,10 @@ pub fn routes() -> Routes {
         .add("/reviews/{pid}/goals", post(create_goal))
         .add("/goals/{pid}", put(update_goal))
         .add("/reviews/{pid}/feedback", post(create_feedback))
-        .add("/employees/{pid}/training-enrollments", post(create_training))
+        .add(
+            "/employees/{pid}/training-enrollments",
+            post(create_training),
+        )
         .add("/employees/{pid}/training-enrollments", get(list_training))
         .add("/training-enrollments/{pid}", put(update_training))
         .add("/training/expiring", get(expiring_training))
@@ -850,6 +956,12 @@ pub fn routes() -> Routes {
         .add("/succession-plans", get(list_succession))
         .add("/succession-plans/gaps", get(succession_gaps))
         .add("/succession-plans/{pid}", put(update_succession))
-        .add("/succession-plans/{pid}/candidates", post(add_succession_candidate))
-        .add("/succession-candidates/{pid}", put(update_succession_candidate))
+        .add(
+            "/succession-plans/{pid}/candidates",
+            post(add_succession_candidate),
+        )
+        .add(
+            "/succession-candidates/{pid}",
+            put(update_succession_candidate),
+        )
 }

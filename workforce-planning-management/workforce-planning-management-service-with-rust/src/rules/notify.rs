@@ -20,7 +20,10 @@ pub fn appraisal_recipients(
     rater_pids: &[Uuid],
 ) -> Vec<(Uuid, &'static str)> {
     match to {
-        "collecting" => rater_pids.iter().map(|pid| (*pid, "appraisal_request")).collect(),
+        "collecting" => rater_pids
+            .iter()
+            .map(|pid| (*pid, "appraisal_request"))
+            .collect(),
         "shared" => vec![(subject_pid, "appraisal_shared")],
         _ => Vec::new(),
     }
@@ -39,8 +42,15 @@ mod tests {
         let raters = vec![subject, peer];
         let on_collect = appraisal_recipients("collecting", subject, &raters);
         assert_eq!(on_collect.len(), 2);
-        assert!(on_collect.iter().all(|(_, kind)| *kind == "appraisal_request"));
-        assert!(on_collect.iter().any(|(pid, _)| *pid == subject), "self-assessment is a task");
+        assert!(
+            on_collect
+                .iter()
+                .all(|(_, kind)| *kind == "appraisal_request")
+        );
+        assert!(
+            on_collect.iter().any(|(pid, _)| *pid == subject),
+            "self-assessment is a task"
+        );
         let on_share = appraisal_recipients("shared", subject, &raters);
         assert_eq!(on_share, vec![(subject, "appraisal_shared")]);
         assert!(appraisal_recipients("draft", subject, &raters).is_empty());
@@ -48,6 +58,9 @@ mod tests {
 
     #[test]
     fn kinds_are_closed() {
-        assert_eq!(KINDS, &["appraisal_request", "appraisal_shared", "adjustment_update"]);
+        assert_eq!(
+            KINDS,
+            &["appraisal_request", "appraisal_shared", "adjustment_update"]
+        );
     }
 }

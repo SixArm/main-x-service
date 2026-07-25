@@ -3,10 +3,10 @@
 //! and internships (including the off-the-job hours gate), succession
 //! risk, and the workforce-intelligence views.
 
-use workforce_planning_management_service::app::App;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
+use workforce_planning_management_service::app::App;
 
 use super::{activate, an_org, seed_employee};
 
@@ -209,7 +209,10 @@ async fn pipelines_apprenticeships_and_intelligence() {
                 .await
                 .assert_status_ok();
         }
-        let ready: Value = request.get(&format!("/api/talent-pipelines/{pipeline_pid}")).await.json();
+        let ready: Value = request
+            .get(&format!("/api/talent-pipelines/{pipeline_pid}"))
+            .await
+            .json();
         assert_eq!(ready["health"]["ready"], 1);
         assert_eq!(ready["health"]["live"], 1);
         // Readiness can regress — the pipeline must be able to say so.
@@ -218,7 +221,10 @@ async fn pipelines_apprenticeships_and_intelligence() {
             .json(&json!({ "to": "developing", "readiness": "ready_1y" }))
             .await
             .assert_status_ok();
-        let regressed: Value = request.get(&format!("/api/talent-pipelines/{pipeline_pid}")).await.json();
+        let regressed: Value = request
+            .get(&format!("/api/talent-pipelines/{pipeline_pid}"))
+            .await
+            .json();
         assert_eq!(regressed["health"]["ready"], 0, "the bench shrank honestly");
 
         // ── Apprenticeship: the off-the-job hours are the gate.
@@ -244,7 +250,9 @@ async fn pipelines_apprenticeships_and_intelligence() {
         let program_pid = program["pid"].as_str().expect("program pid").to_string();
 
         let placement: Value = request
-            .post(&format!("/api/early-career-programs/{program_pid}/placements"))
+            .post(&format!(
+                "/api/early-career-programs/{program_pid}/placements"
+            ))
             .json(&json!({
                 "employee_pid": apprentice,
                 "supervisor_pid": supervisor,
@@ -252,7 +260,10 @@ async fn pipelines_apprenticeships_and_intelligence() {
             }))
             .await
             .json();
-        let placement_pid = placement["pid"].as_str().expect("placement pid").to_string();
+        let placement_pid = placement["pid"]
+            .as_str()
+            .expect("placement pid")
+            .to_string();
 
         // Hours only accrue on an active placement.
         assert_eq!(
@@ -302,19 +313,33 @@ async fn pipelines_apprenticeships_and_intelligence() {
         assert_eq!(placements["placements"][0]["off_the_job"]["met"], true);
 
         // ── Workforce intelligence.
-        let programs: Value = request.get("/api/early-career-programs?kind=apprenticeship").await.json();
+        let programs: Value = request
+            .get("/api/early-career-programs?kind=apprenticeship")
+            .await
+            .json();
         let conversion = &programs["programs"][0]["placements"]["conversion_rate"];
         assert_eq!(conversion["numerator"], 1);
         assert_eq!(conversion["denominator"], 1);
 
-        let overview: Value = request.get("/api/workforce-intelligence/overview").await.json();
+        let overview: Value = request
+            .get("/api/workforce-intelligence/overview")
+            .await
+            .json();
         assert!(
             overview["headcount"].as_u64().expect("headcount") >= 2,
             "the seeded team is counted"
         );
-        assert!(overview["by_department"]["engineering"].as_u64().expect("dept") >= 2);
+        assert!(
+            overview["by_department"]["engineering"]
+                .as_u64()
+                .expect("dept")
+                >= 2
+        );
 
-        let funnel: Value = request.get("/api/workforce-intelligence/pipelines").await.json();
+        let funnel: Value = request
+            .get("/api/workforce-intelligence/pipelines")
+            .await
+            .json();
         assert_eq!(funnel["by_purpose"]["succession"], 1);
         let apprenticeships = funnel["early_careers"]
             .as_array()
@@ -337,7 +362,10 @@ async fn pipelines_apprenticeships_and_intelligence() {
             .await
             .json();
         let plan_pid = plan["pid"].as_str().expect("plan pid").to_string();
-        let exposed: Value = request.get("/api/workforce-intelligence/succession").await.json();
+        let exposed: Value = request
+            .get("/api/workforce-intelligence/succession")
+            .await
+            .json();
         assert!(
             exposed["single_points_of_failure"]
                 .as_array()
@@ -352,8 +380,14 @@ async fn pipelines_apprenticeships_and_intelligence() {
             .json(&json!({ "employee_pid": apprentice, "readiness": "ready_2y" }))
             .await
             .json();
-        let candidate_pid = candidate["pid"].as_str().expect("candidate pid").to_string();
-        let developing: Value = request.get("/api/workforce-intelligence/succession").await.json();
+        let candidate_pid = candidate["pid"]
+            .as_str()
+            .expect("candidate pid")
+            .to_string();
+        let developing: Value = request
+            .get("/api/workforce-intelligence/succession")
+            .await
+            .json();
         assert_eq!(
             developing["by_coverage"]["developing"], 1,
             "a ready_2y bench is not cover"
@@ -364,7 +398,10 @@ async fn pipelines_apprenticeships_and_intelligence() {
             .json(&json!({ "readiness": "ready_now" }))
             .await
             .assert_status_ok();
-        let covered: Value = request.get("/api/workforce-intelligence/succession").await.json();
+        let covered: Value = request
+            .get("/api/workforce-intelligence/succession")
+            .await
+            .json();
         assert_eq!(covered["by_coverage"]["covered_now"], 1);
         assert!(
             !covered["single_points_of_failure"]

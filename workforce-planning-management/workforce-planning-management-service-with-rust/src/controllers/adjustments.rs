@@ -85,7 +85,9 @@ async fn create_request(
         Some(serde_json::json!({ "category": payload.category })),
     )
     .await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/employees/{pid}/adjustment-requests` — the employee's

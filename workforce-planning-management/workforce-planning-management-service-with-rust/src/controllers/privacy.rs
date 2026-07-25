@@ -12,12 +12,11 @@ use uuid::Uuid;
 use super::{record_rejection, unprocessable};
 use crate::auth::{self, MaybeAuthUser};
 use crate::models::_entities::{
-    adjustment_requests, appraisal_nominations, appraisal_responses, appraisals, assessments, benefit_enrollments,
-    candidates, development_plans, employee_skills, employees, entitlement_acknowledgements,
-    ergonomic_assessments, leave_entitlements, leave_requests, mentorships, notifications,
-    path_enrollments, payslips,
-    pipeline_members, program_placements, reviews, shift_assignments, time_entries,
-    training_enrollments,
+    adjustment_requests, appraisal_nominations, appraisal_responses, appraisals, assessments,
+    benefit_enrollments, candidates, development_plans, employee_skills, employees,
+    entitlement_acknowledgements, ergonomic_assessments, leave_entitlements, leave_requests,
+    mentorships, notifications, path_enrollments, payslips, pipeline_members, program_placements,
+    reviews, shift_assignments, time_entries, training_enrollments,
 };
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
@@ -129,8 +128,15 @@ async fn subject_access(
              not WPM — coordinate subject access there too (WPM-D22)",
         ],
     });
-    Audit::record(&ctx.db, "employee", epid, "subject_access_exported", caller.actor(), None)
-        .await?;
+    Audit::record(
+        &ctx.db,
+        "employee",
+        epid,
+        "subject_access_exported",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(export)
 }
 
@@ -182,14 +188,18 @@ async fn erase(
             "UPDATE mentorship_sessions SET notes = '{ERASED}' WHERE mentorship_pid IN \
              (SELECT pid FROM mentorships WHERE mentor_pid = '{epid}' OR mentee_pid = '{epid}')"
         ),
-        format!("UPDATE appraisals SET deleted_at = now() WHERE employee_pid = '{epid}' AND deleted_at IS NULL"),
+        format!(
+            "UPDATE appraisals SET deleted_at = now() WHERE employee_pid = '{epid}' AND deleted_at IS NULL"
+        ),
         format!("DELETE FROM entitlement_acknowledgements WHERE employee_pid = '{epid}'"),
         format!("DELETE FROM notifications WHERE employee_pid = '{epid}'"),
         format!(
             "UPDATE ergonomic_items SET note = NULL, deleted_at = now() WHERE assessment_pid IN \
              (SELECT pid FROM ergonomic_assessments WHERE employee_pid = '{epid}')"
         ),
-        format!("UPDATE ergonomic_assessments SET deleted_at = now() WHERE employee_pid = '{epid}' AND deleted_at IS NULL"),
+        format!(
+            "UPDATE ergonomic_assessments SET deleted_at = now() WHERE employee_pid = '{epid}' AND deleted_at IS NULL"
+        ),
         format!(
             "UPDATE adjustment_requests SET barrier = '{ERASED}', impact = '{ERASED}', \
              adjustment = '{ERASED}', decision_note = NULL, deleted_at = now() \
@@ -297,7 +307,10 @@ async fn retention_sweep(State(ctx): State<AppContext>, caller: MaybeAuthUser) -
             ))
             .await?;
         if result.rows_affected() > 0 {
-            deleted.insert((*table).to_string(), serde_json::json!(result.rows_affected()));
+            deleted.insert(
+                (*table).to_string(),
+                serde_json::json!(result.rows_affected()),
+            );
             total += result.rows_affected();
         }
     }

@@ -9,8 +9,8 @@
 
 #![no_main]
 
+use care_pathway_matcher::{CarePathway, MatchConfig, MatchingEngine};
 use libfuzzer_sys::fuzz_target;
-use care_pathway_matcher::{MatchConfig, MatchingEngine, CarePathway};
 
 fuzz_target!(|data: &[u8]| {
     // Only well-formed JSON tuples reach the engine; malformed input is a
@@ -21,7 +21,10 @@ fuzz_target!(|data: &[u8]| {
 
     let engine = MatchingEngine::new(MatchConfig::default());
     // Run both orderings so either argument position is exercised.
-    for result in [engine.match_care_pathways(&a, &b), engine.match_care_pathways(&b, &a)] {
+    for result in [
+        engine.match_care_pathways(&a, &b),
+        engine.match_care_pathways(&b, &a),
+    ] {
         assert!(
             result.score.is_finite(),
             "score must be finite, got {}",

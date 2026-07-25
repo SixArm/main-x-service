@@ -308,7 +308,10 @@ impl Model {
         let user = users::Entity::find()
             .filter(
                 query::condition()
-                    .eq(users::Column::MagicLinkToken, crate::secret_hash::hash(token))
+                    .eq(
+                        users::Column::MagicLinkToken,
+                        crate::secret_hash::hash(token),
+                    )
                     .build(),
             )
             .one(db)

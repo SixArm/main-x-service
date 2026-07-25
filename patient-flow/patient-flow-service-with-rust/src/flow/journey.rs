@@ -14,10 +14,15 @@ use super::tokens;
 ///
 /// A human-readable list of problems (empty ⇒ valid is expressed as
 /// `Ok(())`).
-pub fn validate_red_green(classification: &str, delay_reasons: &[String]) -> Result<(), Vec<String>> {
+pub fn validate_red_green(
+    classification: &str,
+    delay_reasons: &[String],
+) -> Result<(), Vec<String>> {
     let mut problems = Vec::new();
     if !tokens::is_token(tokens::RED_GREEN, classification) {
-        problems.push(format!("classification must be red or green, got {classification:?}"));
+        problems.push(format!(
+            "classification must be red or green, got {classification:?}"
+        ));
     }
     if delay_reasons.len() > 2 {
         problems.push(format!(
@@ -33,7 +38,11 @@ pub fn validate_red_green(classification: &str, delay_reasons: &[String]) -> Res
     if classification == "green" && !delay_reasons.is_empty() {
         problems.push("a green day carries no delay reasons".to_string());
     }
-    if problems.is_empty() { Ok(()) } else { Err(problems) }
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        Err(problems)
+    }
 }
 
 /// Whether a stay is a **delayed transfer of care** at `now`: it is
@@ -61,7 +70,9 @@ pub fn dtoc_days(
     now: DateTime<FixedOffset>,
 ) -> i64 {
     if is_dtoc(discharge_ready_at, discharged_at, now) {
-        discharge_ready_at.map_or(0, |ready| (now.date_naive() - ready.date_naive()).num_days())
+        discharge_ready_at.map_or(0, |ready| {
+            (now.date_naive() - ready.date_naive()).num_days()
+        })
     } else {
         0
     }
@@ -93,18 +104,26 @@ mod tests {
     use chrono::TimeZone;
 
     fn at(y: i32, m: u32, d: u32, h: u32) -> DateTime<FixedOffset> {
-        FixedOffset::east_opt(0).unwrap().with_ymd_and_hms(y, m, d, h, 0, 0).unwrap()
+        FixedOffset::east_opt(0)
+            .unwrap()
+            .with_ymd_and_hms(y, m, d, h, 0, 0)
+            .unwrap()
     }
 
     /// Red with ≤2 known reasons is valid; green with none is valid.
     #[test]
     fn red_green_valid_cases() {
         assert!(validate_red_green("red", &["awaiting_transport".to_string()]).is_ok());
-        assert!(validate_red_green(
-            "red",
-            &["awaiting_transport".to_string(), "awaiting_pharmacy".to_string()]
-        )
-        .is_ok());
+        assert!(
+            validate_red_green(
+                "red",
+                &[
+                    "awaiting_transport".to_string(),
+                    "awaiting_pharmacy".to_string()
+                ]
+            )
+            .is_ok()
+        );
         assert!(validate_red_green("red", &[]).is_ok()); // reason may be added later same-day
         assert!(validate_red_green("green", &[]).is_ok());
     }
@@ -132,7 +151,11 @@ mod tests {
         assert!(is_dtoc(ready, None, at(2026, 7, 17, 0)));
         assert!(is_dtoc(ready, None, at(2026, 7, 19, 9)));
         assert_eq!(dtoc_days(ready, None, at(2026, 7, 19, 9)), 3);
-        assert!(!is_dtoc(ready, Some(at(2026, 7, 17, 10)), at(2026, 7, 19, 9)));
+        assert!(!is_dtoc(
+            ready,
+            Some(at(2026, 7, 17, 10)),
+            at(2026, 7, 19, 9)
+        ));
         assert!(!is_dtoc(None, None, at(2026, 7, 19, 9)));
         assert_eq!(dtoc_days(ready, None, at(2026, 7, 16, 23)), 0);
     }
@@ -144,7 +167,10 @@ mod tests {
         let admitted = at(2026, 7, 10, 15);
         assert_eq!(length_of_stay_days(admitted, None, at(2026, 7, 10, 23)), 0);
         assert_eq!(length_of_stay_days(admitted, None, at(2026, 7, 17, 1)), 7);
-        assert_eq!(length_of_stay_days(admitted, Some(at(2026, 7, 12, 9)), at(2026, 7, 17, 1)), 2);
+        assert_eq!(
+            length_of_stay_days(admitted, Some(at(2026, 7, 12, 9)), at(2026, 7, 17, 1)),
+            2
+        );
         assert_eq!(length_of_stay_days(admitted, None, at(2026, 7, 9, 1)), 0);
     }
 

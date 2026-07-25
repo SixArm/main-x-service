@@ -32,8 +32,8 @@ use std::collections::BTreeMap;
 use uuid::Uuid;
 
 use crate::models::_entities::{
-    assessment_instruments, assessments, development_plans, early_career_programs,
-    employee_skills, employees, pipeline_members, program_placements, skills, succession_candidates,
+    assessment_instruments, assessments, development_plans, early_career_programs, employee_skills,
+    employees, pipeline_members, program_placements, skills, succession_candidates,
     succession_plans, talent_pipelines,
 };
 use crate::rules::assessment as assessment_rules;
@@ -66,7 +66,9 @@ async fn overview(
     axum::extract::Query(query): axum::extract::Query<AsOfQuery>,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
-    let as_of = query.as_of.unwrap_or_else(|| chrono::Utc::now().date_naive());
+    let as_of = query
+        .as_of
+        .unwrap_or_else(|| chrono::Utc::now().date_naive());
     let staff = live_employees(&ctx).await?;
 
     let mut by_department: BTreeMap<String, usize> = BTreeMap::new();
@@ -77,7 +79,9 @@ async fn overview(
     let mut span_of_control: BTreeMap<Uuid, usize> = BTreeMap::new();
 
     for employee in &staff {
-        *by_department.entry(employee.department.clone()).or_default() += 1;
+        *by_department
+            .entry(employee.department.clone())
+            .or_default() += 1;
         *by_status.entry(employee.status.clone()).or_default() += 1;
         *by_employment_type
             .entry(employee.employment_type.clone())
@@ -143,7 +147,10 @@ async fn capability(State(ctx): State<AppContext>) -> Result<Response> {
         .filter(skills::Column::DeletedAt.is_null())
         .all(&ctx.db)
         .await?;
-    let skill_name: BTreeMap<Uuid, &str> = skill_rows.iter().map(|s| (s.pid, s.name.as_str())).collect();
+    let skill_name: BTreeMap<Uuid, &str> = skill_rows
+        .iter()
+        .map(|s| (s.pid, s.name.as_str()))
+        .collect();
     let declared = employee_skills::Entity::find()
         .filter(employee_skills::Column::DeletedAt.is_null())
         .all(&ctx.db)
@@ -218,8 +225,7 @@ async fn capability(State(ctx): State<AppContext>) -> Result<Response> {
         .iter()
         .map(|i| (i.pid, i.category.as_str()))
         .collect();
-    let mut assessed_by_category: BTreeMap<&str, std::collections::HashSet<Uuid>> =
-        BTreeMap::new();
+    let mut assessed_by_category: BTreeMap<&str, std::collections::HashSet<Uuid>> = BTreeMap::new();
     for sitting in &sittings {
         if sitting.subject_kind != "employee" || sitting.status != "completed" {
             continue;

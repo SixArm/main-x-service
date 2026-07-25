@@ -20,8 +20,8 @@ use uuid::Uuid;
 
 use super::dashboards::conditional;
 use crate::models::_entities::{
-    accounts, activities, audit_logs, consent_events, contacts, deals, forecast_snapshots,
-    leads, memberships, partnerships, pipeline_stages, tickets,
+    accounts, activities, audit_logs, consent_events, contacts, deals, forecast_snapshots, leads,
+    memberships, partnerships, pipeline_stages, tickets,
 };
 use crate::models::records;
 use crate::rules::engagement as engagement_rules;
@@ -90,28 +90,34 @@ async fn stale_deals(
                 .copied()
                 .unwrap_or_else(|| deal.created_at.to_utc());
             let days_in_stage = (now - entered).num_days();
-            (days_in_stage, serde_json::json!({
-                "pid": deal.pid,
-                "name": deal.name,
-                "stage": stage_names.get(&deal.stage_pid),
-                "owner_ref": deal.owner_ref,
-                "amount_minor": deal.amount_minor,
-                "currency": deal.currency,
-                "days_in_stage": days_in_stage,
-                "stale": days_in_stage > threshold,
-            }))
+            (
+                days_in_stage,
+                serde_json::json!({
+                    "pid": deal.pid,
+                    "name": deal.name,
+                    "stage": stage_names.get(&deal.stage_pid),
+                    "owner_ref": deal.owner_ref,
+                    "amount_minor": deal.amount_minor,
+                    "currency": deal.currency,
+                    "days_in_stage": days_in_stage,
+                    "stale": days_in_stage > threshold,
+                }),
+            )
         })
         .collect();
     rows.sort_by_key(|(days, _)| std::cmp::Reverse(*days));
     let stale_count = rows.iter().filter(|(days, _)| *days > threshold).count();
-    Ok(conditional(&headers, serde_json::json!({
-        "derivation": "stage entry = newest deal_stage_changed audit, else deal creation \
-                       (never moved); stale = days_in_stage over the threshold",
-        "threshold_days": threshold,
-        "open_deals": rows.len(),
-        "stale_deals": stale_count,
-        "deals": rows.into_iter().map(|(_, v)| v).collect::<Vec<_>>(),
-    })))
+    Ok(conditional(
+        &headers,
+        serde_json::json!({
+            "derivation": "stage entry = newest deal_stage_changed audit, else deal creation \
+                           (never moved); stale = days_in_stage over the threshold",
+            "threshold_days": threshold,
+            "open_deals": rows.len(),
+            "stale_deals": stale_count,
+            "deals": rows.into_iter().map(|(_, v)| v).collect::<Vec<_>>(),
+        }),
+    ))
 }
 
 /// Query for the follow-ups view: optional activity-kind filter (the
@@ -170,16 +176,22 @@ async fn followups(
     let mut per_recorder: std::collections::BTreeMap<String, usize> =
         std::collections::BTreeMap::new();
     for activity in &rows {
-        let key = activity.actor_ref.clone().unwrap_or_else(|| "unattributed".to_string());
+        let key = activity
+            .actor_ref
+            .clone()
+            .unwrap_or_else(|| "unattributed".to_string());
         *per_recorder.entry(key).or_default() += 1;
     }
-    Ok(conditional(&headers, serde_json::json!({
-        "note": "open follow-ups only (due_on set, not done); actor_ref is the \
-                 recording actor, not necessarily an assignee",
-        "overdue": overdue.iter().map(|a| view(a)).collect::<Vec<_>>(),
-        "upcoming_30d": upcoming.iter().map(|a| view(a)).collect::<Vec<_>>(),
-        "open_by_recorder": per_recorder,
-    })))
+    Ok(conditional(
+        &headers,
+        serde_json::json!({
+            "note": "open follow-ups only (due_on set, not done); actor_ref is the \
+                     recording actor, not necessarily an assignee",
+            "overdue": overdue.iter().map(|a| view(a)).collect::<Vec<_>>(),
+            "upcoming_30d": upcoming.iter().map(|a| view(a)).collect::<Vec<_>>(),
+            "open_by_recorder": per_recorder,
+        }),
+    ))
 }
 
 /// `GET /api/insights/pipeline-hygiene?days=` — rule-disclosed
@@ -261,10 +273,13 @@ async fn pipeline_hygiene(
             }));
         }
     }
-    Ok(conditional(&headers, serde_json::json!({
-        "threshold_days": threshold,
-        "findings": findings,
-    })))
+    Ok(conditional(
+        &headers,
+        serde_json::json!({
+            "threshold_days": threshold,
+            "findings": findings,
+        }),
+    ))
 }
 
 /// A `?from=&to=` window (dates or RFC 3339; default trailing 30 days).
@@ -373,21 +388,24 @@ async fn executive(
         .filter(consent_events::Column::OccurredAt.lte(to))
         .count(&ctx.db)
         .await?;
-    Ok(conditional(&headers, serde_json::json!({
-        "window": { "from": from, "to": to },
-        "deals_won": won,
-        "deals_lost": lost,
-        "won_value_by_currency_minor": won_value,
-        "lost_reasons": lost_reasons,
-        "new_leads": new_leads,
-        "tickets_opened": tickets_opened,
-        "tickets_resolved": tickets_resolved,
-        "campaigns_started": campaigns_started,
-        "activities_logged": activities_logged,
-        "consent_withdrawals": consent_withdrawals,
-        "note": "per-currency won value is never merged or converted; \
-                 tickets_resolved / campaigns_started derive from status audits",
-    })))
+    Ok(conditional(
+        &headers,
+        serde_json::json!({
+            "window": { "from": from, "to": to },
+            "deals_won": won,
+            "deals_lost": lost,
+            "won_value_by_currency_minor": won_value,
+            "lost_reasons": lost_reasons,
+            "new_leads": new_leads,
+            "tickets_opened": tickets_opened,
+            "tickets_resolved": tickets_resolved,
+            "campaigns_started": campaigns_started,
+            "activities_logged": activities_logged,
+            "consent_withdrawals": consent_withdrawals,
+            "note": "per-currency won value is never merged or converted; \
+                     tickets_resolved / campaigns_started derive from status audits",
+        }),
+    ))
 }
 
 /// `GET /api/insights/forecast-trends` — the stored forecast-snapshot
@@ -405,10 +423,13 @@ async fn forecast_trends(State(ctx): State<AppContext>, headers: HeaderMap) -> R
         .take(200)
         .map(|row| serde_json::json!({ "taken_on": row.taken_on, "totals": row.totals }))
         .collect();
-    Ok(conditional(&headers, serde_json::json!({
-        "note": "stored snapshots only (POST /api/forecast/snapshot); no interpolated history",
-        "series": series,
-    })))
+    Ok(conditional(
+        &headers,
+        serde_json::json!({
+            "note": "stored snapshots only (POST /api/forecast/snapshot); no interpolated history",
+            "series": series,
+        }),
+    ))
 }
 
 /// `GET /api/insights/sla` — the breach register (open/pending tickets
@@ -452,15 +473,18 @@ async fn sla_register(State(ctx): State<AppContext>, headers: HeaderMap) -> Resu
         }
         if let Some((which, hours)) = worst_overdue {
             entry.1 += 1;
-            breaches.push((hours, serde_json::json!({
-                "pid": ticket.pid,
-                "title": ticket.title,
-                "priority": ticket.priority,
-                "status": ticket.status,
-                "assignee_ref": ticket.assignee_ref,
-                "breached": which,
-                "overdue_hours": hours,
-            })));
+            breaches.push((
+                hours,
+                serde_json::json!({
+                    "pid": ticket.pid,
+                    "title": ticket.title,
+                    "priority": ticket.priority,
+                    "status": ticket.status,
+                    "assignee_ref": ticket.assignee_ref,
+                    "breached": which,
+                    "overdue_hours": hours,
+                }),
+            ));
         }
     }
     breaches.sort_by_key(|(hours, _)| std::cmp::Reverse(*hours));
@@ -475,12 +499,15 @@ async fn sla_register(State(ctx): State<AppContext>, headers: HeaderMap) -> Resu
             })
         })
         .collect();
-    Ok(conditional(&headers, serde_json::json!({
-        "derivation": "breach = an open/pending ticket past a due stamp (worst deadline \
-                       reported); at_risk = a deadline within the disclosed 4h window",
-        "breaches": breaches.into_iter().map(|(_, v)| v).collect::<Vec<_>>(),
-        "workload": workload_view,
-    })))
+    Ok(conditional(
+        &headers,
+        serde_json::json!({
+            "derivation": "breach = an open/pending ticket past a due stamp (worst deadline \
+                           reported); at_risk = a deadline within the disclosed 4h window",
+            "breaches": breaches.into_iter().map(|(_, v)| v).collect::<Vec<_>>(),
+            "workload": workload_view,
+        }),
+    ))
 }
 
 /// `GET /api/insights/dpo?days=` — the data-protection view: consent
@@ -500,7 +527,9 @@ async fn dpo(
     let contact_rows: Vec<contacts::Model> = live!(contacts, &ctx.db);
     let mut coverage: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
     for contact in &contact_rows {
-        *coverage.entry(contact.marketing_consent.as_str()).or_default() += 1;
+        *coverage
+            .entry(contact.marketing_consent.as_str())
+            .or_default() += 1;
     }
     let event_rows = consent_events::Entity::find().all(&ctx.db).await?;
     let withdrawals_in_window = event_rows
@@ -515,7 +544,10 @@ async fn dpo(
     let mut by_person: std::collections::BTreeMap<&str, Vec<&contacts::Model>> =
         std::collections::BTreeMap::new();
     for contact in &contact_rows {
-        by_person.entry(contact.person_ref.as_str()).or_default().push(contact);
+        by_person
+            .entry(contact.person_ref.as_str())
+            .or_default()
+            .push(contact);
     }
     let duplicates: Vec<serde_json::Value> = by_person
         .iter()
@@ -530,17 +562,20 @@ async fn dpo(
             })
         })
         .collect();
-    Ok(conditional(&headers, serde_json::json!({
-        "note": "coverage counts each contact's current marketing_consent verbatim; \
-                 duplicates are CRM-local rows sharing one person_ref — identity \
-                 dedup stays upstream in the person service",
-        "contacts": contact_rows.len(),
-        "consent_coverage": coverage,
-        "window_days": window_days,
-        "withdrawals_in_window": withdrawals_in_window,
-        "consent_events_by_source": per_source,
-        "duplicate_person_refs": duplicates,
-    })))
+    Ok(conditional(
+        &headers,
+        serde_json::json!({
+            "note": "coverage counts each contact's current marketing_consent verbatim; \
+                     duplicates are CRM-local rows sharing one person_ref — identity \
+                     dedup stays upstream in the person service",
+            "contacts": contact_rows.len(),
+            "consent_coverage": coverage,
+            "window_days": window_days,
+            "withdrawals_in_window": withdrawals_in_window,
+            "consent_events_by_source": per_source,
+            "duplicate_person_refs": duplicates,
+        }),
+    ))
 }
 
 /// `GET /api/insights/cadence?days=` — relationship-cadence aging:
@@ -596,16 +631,20 @@ async fn cadence(
     let mut untouched_contacts: Vec<(i64, serde_json::Value)> = contact_rows
         .iter()
         .map(|contact| {
-            let days = last_contact_touch
-                .get(&contact.pid)
-                .map_or_else(|| (now - contact.created_at.to_utc()).num_days(), |at| (now - *at).num_days());
-            (days, serde_json::json!({
-                "pid": contact.pid,
-                "display_name": contact.display_name,
-                "stakeholder_role": contact.stakeholder_role,
-                "days_since_touch": days,
-                "has_next_touch": has_next_contact.contains(&contact.pid),
-            }))
+            let days = last_contact_touch.get(&contact.pid).map_or_else(
+                || (now - contact.created_at.to_utc()).num_days(),
+                |at| (now - *at).num_days(),
+            );
+            (
+                days,
+                serde_json::json!({
+                    "pid": contact.pid,
+                    "display_name": contact.display_name,
+                    "stakeholder_role": contact.stakeholder_role,
+                    "days_since_touch": days,
+                    "has_next_touch": has_next_contact.contains(&contact.pid),
+                }),
+            )
         })
         .filter(|(days, _)| *days > threshold)
         .collect();
@@ -613,15 +652,19 @@ async fn cadence(
     let mut untouched_accounts: Vec<(i64, serde_json::Value)> = account_rows
         .iter()
         .map(|account| {
-            let days = last_account_touch
-                .get(&account.pid)
-                .map_or_else(|| (now - account.created_at.to_utc()).num_days(), |at| (now - *at).num_days());
-            (days, serde_json::json!({
-                "pid": account.pid,
-                "display_name": account.display_name,
-                "stakeholder_role": account.stakeholder_role,
-                "days_since_touch": days,
-            }))
+            let days = last_account_touch.get(&account.pid).map_or_else(
+                || (now - account.created_at.to_utc()).num_days(),
+                |at| (now - *at).num_days(),
+            );
+            (
+                days,
+                serde_json::json!({
+                    "pid": account.pid,
+                    "display_name": account.display_name,
+                    "stakeholder_role": account.stakeholder_role,
+                    "days_since_touch": days,
+                }),
+            )
         })
         .filter(|(days, _)| *days > threshold)
         .collect();
@@ -630,15 +673,18 @@ async fn cadence(
         .iter()
         .filter(|c| !has_next_contact.contains(&c.pid))
         .count();
-    Ok(conditional(&headers, serde_json::json!({
-        "derivation": "touch = a recorded activity (account touch includes its \
-                       contacts' activities); never-touched rows age from creation; \
-                       no-next-touch = no open due-dated activity",
-        "threshold_days": threshold,
-        "untouched_contacts": untouched_contacts.into_iter().map(|(_, v)| v).collect::<Vec<_>>(),
-        "untouched_accounts": untouched_accounts.into_iter().map(|(_, v)| v).collect::<Vec<_>>(),
-        "contacts_without_next_touch": no_next_touch,
-    })))
+    Ok(conditional(
+        &headers,
+        serde_json::json!({
+            "derivation": "touch = a recorded activity (account touch includes its \
+                           contacts' activities); never-touched rows age from creation; \
+                           no-next-touch = no open due-dated activity",
+            "threshold_days": threshold,
+            "untouched_contacts": untouched_contacts.into_iter().map(|(_, v)| v).collect::<Vec<_>>(),
+            "untouched_accounts": untouched_accounts.into_iter().map(|(_, v)| v).collect::<Vec<_>>(),
+            "contacts_without_next_touch": no_next_touch,
+        }),
+    ))
 }
 
 /// `GET /api/insights/engagement?days=` — the engagement workload:
@@ -667,22 +713,31 @@ async fn engagement(
             continue;
         }
         total += 1;
-        let recorder = activity.actor_ref.clone().unwrap_or_else(|| "unattributed".to_string());
+        let recorder = activity
+            .actor_ref
+            .clone()
+            .unwrap_or_else(|| "unattributed".to_string());
         *per_recorder_month
             .entry(format!("{} {}", recorder, at.format("%Y-%m")))
             .or_default() += 1;
         *per_kind.entry(activity.kind.clone()).or_default() += 1;
-        let key = activity.sentiment.clone().unwrap_or_else(|| "unrecorded".to_string());
+        let key = activity
+            .sentiment
+            .clone()
+            .unwrap_or_else(|| "unrecorded".to_string());
         *sentiment.entry(key).or_default() += 1;
     }
-    Ok(conditional(&headers, serde_json::json!({
-        "window_days": window,
-        "touches": total,
-        "per_recorder_month": per_recorder_month,
-        "per_kind": per_kind,
-        "sentiment": sentiment,
-        "note": "sentiment counts recorded declarations only; unrecorded stays unrecorded",
-    })))
+    Ok(conditional(
+        &headers,
+        serde_json::json!({
+            "window_days": window,
+            "touches": total,
+            "per_recorder_month": per_recorder_month,
+            "per_kind": per_kind,
+            "sentiment": sentiment,
+            "note": "sentiment counts recorded declarations only; unrecorded stays unrecorded",
+        }),
+    ))
 }
 
 /// `GET /api/insights/funnel?pipeline=` — stage-entry counts and
@@ -707,14 +762,10 @@ async fn funnel(
         .filter(deals::Column::PipelinePid.eq(pipeline.pid))
         .all(&ctx.db)
         .await?;
-    let deal_pids: std::collections::HashSet<Uuid> =
-        pipeline_deals.iter().map(|d| d.pid).collect();
+    let deal_pids: std::collections::HashSet<Uuid> = pipeline_deals.iter().map(|d| d.pid).collect();
     let audit_rows = audit_logs::Entity::find()
         .filter(audit_logs::Column::Entity.eq("deal"))
-        .filter(
-            audit_logs::Column::Action
-                .is_in(["deal_stage_changed", "deal_won", "deal_lost"]),
-        )
+        .filter(audit_logs::Column::Action.is_in(["deal_stage_changed", "deal_won", "deal_lost"]))
         .all(&ctx.db)
         .await?;
     // Distinct deals that ever entered each stage, from to_stage.
@@ -741,7 +792,9 @@ async fn funnel(
         let count = if index == 0 {
             pipeline_deals.len()
         } else {
-            entered.get(&stage.pid).map_or(0, std::collections::HashSet::len)
+            entered
+                .get(&stage.pid)
+                .map_or(0, std::collections::HashSet::len)
         };
         let conversion = previous.map(|prev| {
             #[allow(clippy::cast_precision_loss)] // display ratio, not money math
@@ -768,13 +821,16 @@ async fn funnel(
             previous = Some(count);
         }
     }
-    Ok(conditional(&headers, serde_json::json!({
-        "pipeline": { "pid": pipeline.pid, "name": pipeline.name },
-        "derivation": "entered(first stage) = deals created into the pipeline; \
-                       entered(later stages) = distinct deals with a recorded \
-                       to_stage audit; conversion skips lost stages in the chain",
-        "stages": rows,
-    })))
+    Ok(conditional(
+        &headers,
+        serde_json::json!({
+            "pipeline": { "pid": pipeline.pid, "name": pipeline.name },
+            "derivation": "entered(first stage) = deals created into the pipeline; \
+                           entered(later stages) = distinct deals with a recorded \
+                           to_stage audit; conversion skips lost stages in the chain",
+            "stages": rows,
+        }),
+    ))
 }
 
 /// Query for the funnel: the pipeline pid.
@@ -807,8 +863,10 @@ async fn members(
     let membership_rows: Vec<memberships::Model> = live!(memberships, &ctx.db);
     let membership_of: std::collections::BTreeMap<Uuid, &memberships::Model> =
         membership_rows.iter().map(|m| (m.account_pid, m)).collect();
-    let account_of: std::collections::BTreeMap<Uuid, Option<Uuid>> =
-        contact_rows.iter().map(|c| (c.pid, c.account_pid)).collect();
+    let account_of: std::collections::BTreeMap<Uuid, Option<Uuid>> = contact_rows
+        .iter()
+        .map(|c| (c.pid, c.account_pid))
+        .collect();
     let mut last_touch: std::collections::BTreeMap<Uuid, chrono::DateTime<chrono::Utc>> =
         std::collections::BTreeMap::new();
     let mut open_followups: std::collections::BTreeMap<Uuid, usize> =
@@ -820,7 +878,9 @@ async fn members(
             "contact" => account_of.get(&activity.subject_pid).copied().flatten(),
             _ => None,
         };
-        let Some(account_pid) = account_pid else { continue };
+        let Some(account_pid) = account_pid else {
+            continue;
+        };
         let entry = last_touch.entry(account_pid).or_insert(at);
         if at > *entry {
             *entry = at;
@@ -843,9 +903,10 @@ async fn members(
             .iter()
             .filter(|c| c.account_pid == Some(account.pid))
             .count();
-        let days = last_touch
-            .get(&account.pid)
-            .map_or_else(|| (now - account.created_at.to_utc()).num_days(), |at| (now - *at).num_days());
+        let days = last_touch.get(&account.pid).map_or_else(
+            || (now - account.created_at.to_utc()).num_days(),
+            |at| (now - *at).num_days(),
+        );
         let is_silent = days > threshold;
         if is_silent {
             silent += 1;
@@ -867,16 +928,17 @@ async fn members(
             "open_tickets": open_tickets.get(&account.pid).copied().unwrap_or(0),
         }));
     }
-    rows.sort_by_key(|row| {
-        std::cmp::Reverse(row["days_since_touch"].as_i64().unwrap_or(0))
-    });
-    Ok(conditional(&headers, serde_json::json!({
-        "derivation": "account touch includes its contacts' activities; \
-                       never-touched accounts age from creation",
-        "threshold_days": threshold,
-        "accounts": rows,
-        "silent_accounts": silent,
-    })))
+    rows.sort_by_key(|row| std::cmp::Reverse(row["days_since_touch"].as_i64().unwrap_or(0)));
+    Ok(conditional(
+        &headers,
+        serde_json::json!({
+            "derivation": "account touch includes its contacts' activities; \
+                           never-touched accounts age from creation",
+            "threshold_days": threshold,
+            "accounts": rows,
+            "silent_accounts": silent,
+        }),
+    ))
 }
 
 /// `GET /api/insights/consent-by-account?days=` — the DPO consent
@@ -894,8 +956,10 @@ async fn consent_by_account(
     let account_rows: Vec<accounts::Model> = live!(accounts, &ctx.db);
     let contact_rows: Vec<contacts::Model> = live!(contacts, &ctx.db);
     let event_rows = consent_events::Entity::find().all(&ctx.db).await?;
-    let account_of: std::collections::BTreeMap<Uuid, Option<Uuid>> =
-        contact_rows.iter().map(|c| (c.pid, c.account_pid)).collect();
+    let account_of: std::collections::BTreeMap<Uuid, Option<Uuid>> = contact_rows
+        .iter()
+        .map(|c| (c.pid, c.account_pid))
+        .collect();
     let mut withdrawals: std::collections::BTreeMap<Uuid, usize> =
         std::collections::BTreeMap::new();
     for event in &event_rows {
@@ -911,8 +975,13 @@ async fn consent_by_account(
         .map(|account| {
             let mut coverage: std::collections::BTreeMap<&str, usize> =
                 std::collections::BTreeMap::new();
-            for contact in contact_rows.iter().filter(|c| c.account_pid == Some(account.pid)) {
-                *coverage.entry(contact.marketing_consent.as_str()).or_default() += 1;
+            for contact in contact_rows
+                .iter()
+                .filter(|c| c.account_pid == Some(account.pid))
+            {
+                *coverage
+                    .entry(contact.marketing_consent.as_str())
+                    .or_default() += 1;
             }
             serde_json::json!({
                 "pid": account.pid,
@@ -922,12 +991,15 @@ async fn consent_by_account(
             })
         })
         .collect();
-    Ok(conditional(&headers, serde_json::json!({
-        "window_days": window,
-        "note": "coverage counts each contact's current marketing_consent verbatim; \
-                 contacts without an account are in the estate-wide /insights/dpo view",
-        "accounts": rows,
-    })))
+    Ok(conditional(
+        &headers,
+        serde_json::json!({
+            "window_days": window,
+            "note": "coverage counts each contact's current marketing_consent verbatim; \
+                     contacts without an account are in the estate-wide /insights/dpo view",
+            "accounts": rows,
+        }),
+    ))
 }
 
 /// `GET /api/insights/stakeholders` — the declared-stakeholder
@@ -950,16 +1022,20 @@ async fn stakeholders(State(ctx): State<AppContext>, headers: HeaderMap) -> Resu
         }
     }
     let mut by_role: std::collections::BTreeMap<&str, Vec<serde_json::Value>> =
-        engagement_rules::STAKEHOLDER_ROLES.iter().map(|r| (*r, Vec::new())).collect();
+        engagement_rules::STAKEHOLDER_ROLES
+            .iter()
+            .map(|r| (*r, Vec::new()))
+            .collect();
     let mut grid: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
     let mut undeclared_contacts = 0usize;
     let mut ungridded = 0usize;
     for contact in &contact_rows {
         match contact.stakeholder_role.as_deref() {
             Some(role) => {
-                let days = last_touch
-                    .get(&contact.pid)
-                    .map_or_else(|| (now - contact.created_at.to_utc()).num_days(), |at| (now - *at).num_days());
+                let days = last_touch.get(&contact.pid).map_or_else(
+                    || (now - contact.created_at.to_utc()).num_days(),
+                    |at| (now - *at).num_days(),
+                );
                 if let Some(bucket) = by_role.get_mut(role) {
                     bucket.push(serde_json::json!({
                         "pid": contact.pid,
@@ -990,15 +1066,18 @@ async fn stakeholders(State(ctx): State<AppContext>, headers: HeaderMap) -> Resu
             })
         })
         .collect();
-    Ok(conditional(&headers, serde_json::json!({
-        "note": "roles and grid scores are declared, never inferred; the grid \
-                 covers stakeholders with both scores (key p<influence>i<interest>)",
-        "by_role": by_role,
-        "grid": grid,
-        "stakeholders_without_grid_scores": ungridded,
-        "undeclared_contacts": undeclared_contacts,
-        "account_roles": account_roles,
-    })))
+    Ok(conditional(
+        &headers,
+        serde_json::json!({
+            "note": "roles and grid scores are declared, never inferred; the grid \
+                     covers stakeholders with both scores (key p<influence>i<interest>)",
+            "by_role": by_role,
+            "grid": grid,
+            "stakeholders_without_grid_scores": ungridded,
+            "undeclared_contacts": undeclared_contacts,
+            "account_roles": account_roles,
+        }),
+    ))
 }
 
 /// `GET /api/insights/partnerships` — the innovation-partnership
@@ -1011,8 +1090,10 @@ async fn partnerships_register(
 ) -> Result<Response> {
     let rows: Vec<partnerships::Model> = live!(partnerships, &ctx.db);
     let account_rows: Vec<accounts::Model> = live!(accounts, &ctx.db);
-    let names: std::collections::BTreeMap<Uuid, &str> =
-        account_rows.iter().map(|a| (a.pid, a.display_name.as_str())).collect();
+    let names: std::collections::BTreeMap<Uuid, &str> = account_rows
+        .iter()
+        .map(|a| (a.pid, a.display_name.as_str()))
+        .collect();
     let mut by_kind: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
     let mut by_stage: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
     for row in &rows {
@@ -1033,11 +1114,14 @@ async fn partnerships_register(
             })
         })
         .collect();
-    Ok(conditional(&headers, serde_json::json!({
-        "by_kind": by_kind,
-        "by_stage": by_stage,
-        "register": register,
-    })))
+    Ok(conditional(
+        &headers,
+        serde_json::json!({
+            "by_kind": by_kind,
+            "by_stage": by_stage,
+            "register": register,
+        }),
+    ))
 }
 
 /// `GET /api/insights/memberships?days=` — membership renewals due
@@ -1053,8 +1137,10 @@ async fn memberships_view(
     let horizon = today + chrono::Days::new(u64::try_from(window).unwrap_or(90));
     let rows: Vec<memberships::Model> = live!(memberships, &ctx.db);
     let account_rows: Vec<accounts::Model> = live!(accounts, &ctx.db);
-    let names: std::collections::BTreeMap<Uuid, &str> =
-        account_rows.iter().map(|a| (a.pid, a.display_name.as_str())).collect();
+    let names: std::collections::BTreeMap<Uuid, &str> = account_rows
+        .iter()
+        .map(|a| (a.pid, a.display_name.as_str()))
+        .collect();
     let view = |m: &memberships::Model| {
         serde_json::json!({
             "pid": m.pid,
@@ -1067,19 +1153,23 @@ async fn memberships_view(
     };
     let mut renewals_due: Vec<&memberships::Model> = rows
         .iter()
-        .filter(|m| {
-            m.status == "active" && m.renewal_on.is_some_and(|d| d <= horizon)
-        })
+        .filter(|m| m.status == "active" && m.renewal_on.is_some_and(|d| d <= horizon))
         .collect();
     renewals_due.sort_by_key(|m| m.renewal_on);
-    let lapsed: Vec<serde_json::Value> =
-        rows.iter().filter(|m| m.status == "lapsed").map(view).collect();
-    Ok(conditional(&headers, serde_json::json!({
-        "window_days": window,
-        "memberships": rows.len(),
-        "renewals_due": renewals_due.iter().map(|m| view(m)).collect::<Vec<_>>(),
-        "lapsed": lapsed,
-    })))
+    let lapsed: Vec<serde_json::Value> = rows
+        .iter()
+        .filter(|m| m.status == "lapsed")
+        .map(view)
+        .collect();
+    Ok(conditional(
+        &headers,
+        serde_json::json!({
+            "window_days": window,
+            "memberships": rows.len(),
+            "renewals_due": renewals_due.iter().map(|m| view(m)).collect::<Vec<_>>(),
+            "lapsed": lapsed,
+        }),
+    ))
 }
 
 /// The insight routes (all read-only GETs).

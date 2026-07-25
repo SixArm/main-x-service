@@ -119,7 +119,9 @@ async fn create_policy(
     .await?;
     Audit::record(&txn, "sla_policy", row.pid, "created", caller.actor(), None).await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/sla-policies`.
@@ -145,7 +147,11 @@ async fn create_ticket(
     problems.require_text("title", &payload.title);
     problems.require_token("priority", tokens::PRIORITIES, &payload.priority);
     problems.require_token("channel", tokens::TICKET_CHANNELS, &payload.channel);
-    problems.ref_opt("assignee_ref", entity_ref::EntityType::Worker, payload.assignee_ref.as_deref());
+    problems.ref_opt(
+        "assignee_ref",
+        entity_ref::EntityType::Worker,
+        payload.assignee_ref.as_deref(),
+    );
     ensure_valid(&problems.into_vec())?;
     let account_pid = if let Some(contact) = payload.contact_pid {
         records::find_contact(&ctx.db, contact).await?.account_pid
@@ -167,7 +173,9 @@ async fn create_ticket(
         channel: ActiveValue::set(payload.channel.clone()),
         status: ActiveValue::set("open".to_string()),
         opened_at: ActiveValue::set(opened_at),
-        first_response_due_at: ActiveValue::set(deadlines.as_ref().map(|d| d.first_response_due_at)),
+        first_response_due_at: ActiveValue::set(
+            deadlines.as_ref().map(|d| d.first_response_due_at),
+        ),
         resolution_due_at: ActiveValue::set(deadlines.as_ref().map(|d| d.resolution_due_at)),
         first_responded_at: ActiveValue::set(None),
         resolved_at: ActiveValue::set(None),
@@ -178,10 +186,29 @@ async fn create_ticket(
     }
     .insert(&txn)
     .await?;
-    Audit::record(&txn, "ticket", row.pid, "ticket_opened", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "ticket", "ticket_opened", &row.pid.to_string(), &row.title, caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "ticket",
+        row.pid,
+        "ticket_opened",
+        caller.actor(),
+        None,
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "ticket",
+        "ticket_opened",
+        &row.pid.to_string(),
+        &row.title,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/tickets?status=` — the queue with **live** breach flags
@@ -281,7 +308,16 @@ async fn ticket_status(
         Some(serde_json::json!({ "from": from })),
     )
     .await?;
-    streaming::emit_on(&txn, "ticket", kind, &row.pid.to_string(), &title, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "ticket",
+        kind,
+        &row.pid.to_string(),
+        &title,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }
@@ -307,7 +343,8 @@ async fn ticket_priority(
     let from = ticket.priority.clone();
     let mut active: tickets::ActiveModel = ticket.into();
     active.priority = ActiveValue::set(payload.priority.clone());
-    active.first_response_due_at = ActiveValue::set(deadlines.as_ref().map(|d| d.first_response_due_at));
+    active.first_response_due_at =
+        ActiveValue::set(deadlines.as_ref().map(|d| d.first_response_due_at));
     active.resolution_due_at = ActiveValue::set(deadlines.as_ref().map(|d| d.resolution_due_at));
     let row = active.update(&txn).await?;
     Audit::record(
@@ -403,7 +440,9 @@ async fn create_article(
     .await?;
     Audit::record(&txn, "article", row.pid, "created", caller.actor(), None).await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `PUT /api/articles/{pid}` — edit; a **published** edit bumps the
@@ -462,9 +501,22 @@ async fn article_status(
     let mut active: articles::ActiveModel = article.into();
     active.status = ActiveValue::set(payload.to.clone());
     let row = active.update(&txn).await?;
-    let kind = if payload.to == "published" { "article_published" } else { "updated" };
+    let kind = if payload.to == "published" {
+        "article_published"
+    } else {
+        "updated"
+    };
     Audit::record(&txn, "article", row.pid, kind, caller.actor(), None).await?;
-    streaming::emit_on(&txn, "article", kind, &row.pid.to_string(), &row.title, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "article",
+        kind,
+        &row.pid.to_string(),
+        &row.title,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }
@@ -492,7 +544,11 @@ async fn list_articles(
         rows.into_iter()
             .filter(|a| {
                 a.title.to_ascii_lowercase().contains(&q)
-                    || a.keywords.as_deref().unwrap_or("").to_ascii_lowercase().contains(&q)
+                    || a.keywords
+                        .as_deref()
+                        .unwrap_or("")
+                        .to_ascii_lowercase()
+                        .contains(&q)
             })
             .collect()
     } else {

@@ -178,7 +178,16 @@ async fn create_lead(
     active.score = ActiveValue::set(breakdown.score);
     row = active.update(&txn).await?;
     Audit::record(&txn, "lead", row.pid, "lead_captured", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "lead", "lead_captured", &row.pid.to_string(), &row.display_name, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "lead",
+        "lead_captured",
+        &row.pid.to_string(),
+        &row.display_name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     Metrics::global().lead_captured_total.inc();
     format::json(serde_json::json!({ "pid": row.pid, "score": breakdown }))
@@ -228,10 +237,9 @@ async fn lead_status(
     if payload.to == "converted" {
         // Create or link the contact.
         if contact_pid.is_none() {
-            let person_ref = payload
-                .person_ref
-                .clone()
-                .ok_or_else(|| unprocessable("conversion requires person_ref (no linked contact)"))?;
+            let person_ref = payload.person_ref.clone().ok_or_else(|| {
+                unprocessable("conversion requires person_ref (no linked contact)")
+            })?;
             let mut problems = Problems::new();
             problems.require_ref("person_ref", entity_ref::EntityType::Person, &person_ref);
             ensure_valid(&problems.into_vec())?;
@@ -278,7 +286,9 @@ async fn lead_status(
                 currency: ActiveValue::set(deal.currency.clone()),
                 expected_close_on: ActiveValue::set(deal.expected_close_on),
                 kanban_position: ActiveValue::set(0),
-                source_campaign_pid: ActiveValue::set(deal.source_campaign_pid.or(lead.campaign_pid)),
+                source_campaign_pid: ActiveValue::set(
+                    deal.source_campaign_pid.or(lead.campaign_pid),
+                ),
                 closed_at: ActiveValue::set(None),
                 won: ActiveValue::set(false),
                 lost_reason: ActiveValue::set(None),
@@ -287,7 +297,16 @@ async fn lead_status(
             }
             .insert(&txn)
             .await?;
-            streaming::emit_on(&txn, "deal", "deal_opened", &row.pid.to_string(), &row.name, caller.actor(), None).await?;
+            streaming::emit_on(
+                &txn,
+                "deal",
+                "deal_opened",
+                &row.pid.to_string(),
+                &row.name,
+                caller.actor(),
+                None,
+            )
+            .await?;
             deal_pid = Some(row.pid);
         }
     }
@@ -295,7 +314,11 @@ async fn lead_status(
     active.status = ActiveValue::set(payload.to.clone());
     active.contact_pid = ActiveValue::set(contact_pid);
     let row = active.update(&txn).await?;
-    let kind = if payload.to == "converted" { "lead_converted" } else { "lead_status_changed" };
+    let kind = if payload.to == "converted" {
+        "lead_converted"
+    } else {
+        "lead_status_changed"
+    };
     Audit::record(
         &txn,
         "lead",
@@ -305,7 +328,16 @@ async fn lead_status(
         Some(serde_json::json!({ "from": from, "to": payload.to })),
     )
     .await?;
-    streaming::emit_on(&txn, "lead", kind, &row.pid.to_string(), &row.display_name, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "lead",
+        kind,
+        &row.pid.to_string(),
+        &row.display_name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     if payload.to == "converted" {
         Metrics::global().lead_converted_total.inc();
@@ -331,7 +363,10 @@ async fn create_pipeline(
     for stage in &payload.stages {
         problems.require_text("stages[].name", &stage.name);
         if !(0..=100).contains(&stage.probability_percent) {
-            problems.push(format!("probability {} out of range 0-100", stage.probability_percent));
+            problems.push(format!(
+                "probability {} out of range 0-100",
+                stage.probability_percent
+            ));
         }
         if stage.is_won && stage.is_lost {
             problems.push("a stage cannot be both won and lost".to_string());
@@ -364,7 +399,15 @@ async fn create_pipeline(
         .await?;
         stage_pids.push(row.pid.to_string());
     }
-    Audit::record(&txn, "pipeline", pipeline.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "pipeline",
+        pipeline.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(serde_json::json!({ "pid": pipeline.pid, "stage_pids": stage_pids }))
 }
@@ -400,7 +443,11 @@ async fn create_deal(
     let mut problems = Problems::new();
     problems.require_text("name", &payload.name);
     problems.require_text("currency", &payload.currency);
-    problems.ref_opt("owner_ref", entity_ref::EntityType::Worker, payload.owner_ref.as_deref());
+    problems.ref_opt(
+        "owner_ref",
+        entity_ref::EntityType::Worker,
+        payload.owner_ref.as_deref(),
+    );
     if payload.amount_minor < 0 {
         problems.push("amount_minor must be non-negative".to_string());
     }
@@ -439,9 +486,20 @@ async fn create_deal(
     .insert(&txn)
     .await?;
     Audit::record(&txn, "deal", row.pid, "deal_opened", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "deal", "deal_opened", &row.pid.to_string(), &row.name, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "deal",
+        "deal_opened",
+        &row.pid.to_string(),
+        &row.name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/deals?pipeline=<pid>` — the board rows (open + closed).
@@ -494,7 +552,14 @@ async fn deal_stage(
     if stage.pipeline_pid != deal.pipeline_pid {
         return Err(unprocessable("stage belongs to a different pipeline"));
     }
-    if stage.is_lost && payload.lost_reason.as_deref().unwrap_or("").trim().is_empty() {
+    if stage.is_lost
+        && payload
+            .lost_reason
+            .as_deref()
+            .unwrap_or("")
+            .trim()
+            .is_empty()
+    {
         return Err(unprocessable("a lost close requires lost_reason"));
     }
     let from_stage = deal.stage_pid;
@@ -530,7 +595,16 @@ async fn deal_stage(
         })),
     )
     .await?;
-    streaming::emit_on(&txn, "deal", kind, &row.pid.to_string(), &name, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "deal",
+        kind,
+        &row.pid.to_string(),
+        &name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     match kind {
         "deal_won" => Metrics::global().deal_won_total.inc(),
@@ -654,7 +728,15 @@ async fn forecast_snapshot(
     }
     .insert(&txn)
     .await?;
-    Audit::record(&txn, "forecast_snapshot", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "forecast_snapshot",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }

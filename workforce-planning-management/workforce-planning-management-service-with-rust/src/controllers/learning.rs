@@ -29,7 +29,9 @@ struct PidRef {
 
 impl PidRef {
     fn of(pid: Uuid) -> Self {
-        Self { pid: pid.to_string() }
+        Self {
+            pid: pid.to_string(),
+        }
     }
 }
 
@@ -144,7 +146,15 @@ async fn declare_skill(
             .await?
         }
     };
-    Audit::record(&ctx.db, "employee_skill", row.pid, "declared", caller.actor(), None).await?;
+    Audit::record(
+        &ctx.db,
+        "employee_skill",
+        row.pid,
+        "declared",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(row)
 }
 
@@ -219,7 +229,15 @@ async fn create_path(
         .insert(&txn)
         .await?;
     }
-    Audit::record(&txn, "learning_path", path.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "learning_path",
+        path.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(PidRef::of(path.pid))
 }
@@ -285,7 +303,15 @@ async fn enroll_path(
     }
     .insert(&ctx.db)
     .await?;
-    Audit::record(&ctx.db, "path_enrollment", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &ctx.db,
+        "path_enrollment",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(PidRef::of(row.pid))
 }
 
@@ -381,7 +407,15 @@ async fn create_mentorship(
     }
     .insert(&ctx.db)
     .await?;
-    Audit::record(&ctx.db, "mentorship", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &ctx.db,
+        "mentorship",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(PidRef::of(row.pid))
 }
 
@@ -455,7 +489,9 @@ async fn log_session(
         .await?
         .ok_or(Error::NotFound)?;
     if mentorship.status != "active" {
-        return Err(unprocessable("sessions can only be logged on an active mentorship"));
+        return Err(unprocessable(
+            "sessions can only be logged on an active mentorship",
+        ));
     }
     let mut problems = Problems::new();
     problems.require_text("notes", &payload.notes);
@@ -470,13 +506,24 @@ async fn log_session(
     }
     .insert(&ctx.db)
     .await?;
-    Audit::record(&ctx.db, "mentorship_session", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &ctx.db,
+        "mentorship_session",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(PidRef::of(row.pid))
 }
 
 /// `GET /api/mentorships/{pid}` — one mentorship + its session log.
 #[debug_handler]
-async fn get_mentorship(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Result<Response> {
+async fn get_mentorship(
+    State(ctx): State<AppContext>,
+    Path(pid): Path<String>,
+) -> Result<Response> {
     let mentorship = mentorships::Entity::find()
         .filter(mentorships::Column::Pid.eq(records::parse_pid(&pid)?))
         .filter(mentorships::Column::DeletedAt.is_null())
@@ -504,14 +551,18 @@ async fn skills_matrix(State(ctx): State<AppContext>) -> Result<Response> {
         .filter(employees::Column::DeletedAt.is_null())
         .all(&ctx.db)
         .await?;
-    let dept_of: std::collections::BTreeMap<Uuid, String> =
-        employee_rows.iter().map(|e| (e.pid, e.department.clone())).collect();
+    let dept_of: std::collections::BTreeMap<Uuid, String> = employee_rows
+        .iter()
+        .map(|e| (e.pid, e.department.clone()))
+        .collect();
     let skill_rows = skills::Entity::find()
         .filter(skills::Column::DeletedAt.is_null())
         .all(&ctx.db)
         .await?;
-    let skill_name: std::collections::BTreeMap<Uuid, &str> =
-        skill_rows.iter().map(|s| (s.pid, s.name.as_str())).collect();
+    let skill_name: std::collections::BTreeMap<Uuid, &str> = skill_rows
+        .iter()
+        .map(|s| (s.pid, s.name.as_str()))
+        .collect();
     let declared = employee_skills::Entity::find()
         .filter(employee_skills::Column::DeletedAt.is_null())
         .all(&ctx.db)
@@ -521,8 +572,12 @@ async fn skills_matrix(State(ctx): State<AppContext>) -> Result<Response> {
         std::collections::BTreeMap::new();
     let mut gaps: Vec<serde_json::Value> = Vec::new();
     for row in &declared {
-        let Some(department) = dept_of.get(&row.employee_pid) else { continue };
-        let cell = cells.entry((department.clone(), row.skill_pid)).or_default();
+        let Some(department) = dept_of.get(&row.employee_pid) else {
+            continue;
+        };
+        let cell = cells
+            .entry((department.clone(), row.skill_pid))
+            .or_default();
         cell.0 += 1;
         cell.1 += i64::from(row.proficiency);
         if row.target.is_some_and(|t| row.proficiency < t) {
@@ -581,8 +636,10 @@ async fn training_analytics(
         .filter(employees::Column::DeletedAt.is_null())
         .all(&ctx.db)
         .await?;
-    let dept_of: std::collections::BTreeMap<Uuid, String> =
-        employee_rows.iter().map(|e| (e.pid, e.department.clone())).collect();
+    let dept_of: std::collections::BTreeMap<Uuid, String> = employee_rows
+        .iter()
+        .map(|e| (e.pid, e.department.clone()))
+        .collect();
     let enrollments = training_enrollments::Entity::find()
         .filter(training_enrollments::Column::DeletedAt.is_null())
         .all(&ctx.db)
@@ -593,10 +650,15 @@ async fn training_analytics(
         (std::collections::BTreeMap<String, usize>, usize),
     > = std::collections::BTreeMap::new();
     for row in &enrollments {
-        let Some(department) = dept_of.get(&row.employee_pid) else { continue };
+        let Some(department) = dept_of.get(&row.employee_pid) else {
+            continue;
+        };
         let entry = per_dept.entry(department.clone()).or_default();
         *entry.0.entry(row.status.clone()).or_default() += 1;
-        if row.certificate_expires_on.is_some_and(|d| d <= horizon && d >= today) {
+        if row
+            .certificate_expires_on
+            .is_some_and(|d| d <= horizon && d >= today)
+        {
             entry.1 += 1;
         }
     }
@@ -649,24 +711,31 @@ async fn mentorship_overview(
         .filter(employees::Column::DeletedAt.is_null())
         .all(&ctx.db)
         .await?;
-    let name_of: std::collections::BTreeMap<Uuid, &str> =
-        employee_rows.iter().map(|e| (e.pid, e.display_name.as_str())).collect();
+    let name_of: std::collections::BTreeMap<Uuid, &str> = employee_rows
+        .iter()
+        .map(|e| (e.pid, e.display_name.as_str()))
+        .collect();
     let mentorship_rows = mentorships::Entity::find()
         .filter(mentorships::Column::DeletedAt.is_null())
         .all(&ctx.db)
         .await?;
-    let active: Vec<&mentorships::Model> =
-        mentorship_rows.iter().filter(|m| m.status == "active").collect();
+    let active: Vec<&mentorships::Model> = mentorship_rows
+        .iter()
+        .filter(|m| m.status == "active")
+        .collect();
     let sessions = mentorship_sessions::Entity::find().all(&ctx.db).await?;
     let mut last_session: std::collections::BTreeMap<Uuid, chrono::NaiveDate> =
         std::collections::BTreeMap::new();
     for session in &sessions {
-        let entry = last_session.entry(session.mentorship_pid).or_insert(session.held_on);
+        let entry = last_session
+            .entry(session.mentorship_pid)
+            .or_insert(session.held_on);
         if session.held_on > *entry {
             *entry = session.held_on;
         }
     }
-    let mut mentor_load: std::collections::BTreeMap<Uuid, usize> = std::collections::BTreeMap::new();
+    let mut mentor_load: std::collections::BTreeMap<Uuid, usize> =
+        std::collections::BTreeMap::new();
     let mut engaged: std::collections::HashSet<Uuid> = std::collections::HashSet::new();
     let mut stale = Vec::new();
     for mentorship in &active {

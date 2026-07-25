@@ -3,10 +3,10 @@
 //! decides with a note and notifies the employee, and the words stay
 //! on the record — in writing, in the subject-access export.
 
-use workforce_planning_management_service::app::App;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
+use workforce_planning_management_service::app::App;
 
 use super::{activate, an_org, seed_employee};
 
@@ -61,9 +61,18 @@ async fn adjustments_round_trip() {
             .json();
         assert_eq!(listed[0]["status"], "requested");
         assert_eq!(listed[0]["words_withheld"], false);
-        assert!(listed[0]["barrier"].as_str().unwrap().contains("Open-plan noise"));
+        assert!(
+            listed[0]["barrier"]
+                .as_str()
+                .unwrap()
+                .contains("Open-plan noise")
+        );
         let audits: Value = request.get("/api/audits/recent").await.json();
-        assert!(serde_json::to_string(&audits).unwrap().contains("adjustments_read"));
+        assert!(
+            serde_json::to_string(&audits)
+                .unwrap()
+                .contains("adjustments_read")
+        );
 
         // The lifecycle: agree with a practical note, then in place;
         // a declined request cannot be revived.
@@ -103,7 +112,10 @@ async fn adjustments_round_trip() {
             .collect();
         assert_eq!(updates.len(), 2, "agreed + in_place");
         let bell_raw = serde_json::to_string(&bells).unwrap();
-        assert!(!bell_raw.contains("Open-plan noise"), "no words in the bell");
+        assert!(
+            !bell_raw.contains("Open-plan noise"),
+            "no words in the bell"
+        );
 
         // Save a copy: the subject-access export carries the request
         // verbatim.

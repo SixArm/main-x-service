@@ -63,7 +63,9 @@ static WARNED: Mutex<Option<HashSet<String>>> = Mutex::new(None);
 
 /// Log the deprecation notice for `legacy`, at most once per process.
 fn warn_once(legacy: &str, current: &str) {
-    let mut guard = WARNED.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut guard = WARNED
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let seen = guard.get_or_insert_with(HashSet::new);
     if seen.insert(legacy.to_string()) {
         tracing::warn!(
@@ -162,8 +164,14 @@ mod tests {
     /// given a legacy alias.
     #[test]
     fn legacy_names_map_only_our_prefix() {
-        assert_eq!(legacy_name("WPM_REQUIRE_AUTH").as_deref(), Some("HCM_REQUIRE_AUTH"));
-        assert_eq!(legacy_name("WPM_ABAC_POLICY_FILE").as_deref(), Some("HCM_ABAC_POLICY_FILE"));
+        assert_eq!(
+            legacy_name("WPM_REQUIRE_AUTH").as_deref(),
+            Some("HCM_REQUIRE_AUTH")
+        );
+        assert_eq!(
+            legacy_name("WPM_ABAC_POLICY_FILE").as_deref(),
+            Some("HCM_ABAC_POLICY_FILE")
+        );
         assert_eq!(legacy_name("WPM_"), Some("HCM_".to_string()));
 
         assert_eq!(legacy_name("DATABASE_URL"), None);
@@ -195,7 +203,10 @@ mod tests {
             "rules": [{ "when": { "entity": ["hcm", "person"] } }]
         });
         assert!(migrate_policy_entity(&mut mixed));
-        assert_eq!(mixed["rules"][0]["when"]["entity"], json!(["wpm", "person"]));
+        assert_eq!(
+            mixed["rules"][0]["when"]["entity"],
+            json!(["wpm", "person"])
+        );
 
         // Already migrated ⇒ no change, no warning.
         assert!(!migrate_policy_entity(&mut mixed));

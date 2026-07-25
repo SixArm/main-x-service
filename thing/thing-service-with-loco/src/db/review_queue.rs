@@ -228,7 +228,9 @@ pub async fn decide<C: ConnectionTrait>(
         [id.into()],
     );
     match conn.query_one(probe).await.map_err(db_err)? {
-        Some(qr) => Ok(DecideOutcome::AlreadyDecided(qr.try_get("", "status").map_err(db_err)?)),
+        Some(qr) => Ok(DecideOutcome::AlreadyDecided(
+            qr.try_get("", "status").map_err(db_err)?,
+        )),
         None => Ok(DecideOutcome::NotFound),
     }
 }

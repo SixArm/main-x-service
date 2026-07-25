@@ -38,7 +38,9 @@ struct PidRef {
 
 impl PidRef {
     fn of(pid: Uuid) -> Self {
-        Self { pid: pid.to_string() }
+        Self {
+            pid: pid.to_string(),
+        }
     }
 }
 
@@ -141,8 +143,15 @@ async fn create_entitlement(
     }
     .insert(&ctx.db)
     .await?;
-    Audit::record(&ctx.db, "wellbeing_entitlement", row.pid, "created", caller.actor(), None)
-        .await?;
+    Audit::record(
+        &ctx.db,
+        "wellbeing_entitlement",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(PidRef::of(row.pid))
 }
 
@@ -203,8 +212,15 @@ async fn update_entitlement(
     active.active_from = ActiveValue::set(payload.active_from);
     active.active_until = ActiveValue::set(payload.active_until);
     let updated = active.update(&ctx.db).await?;
-    Audit::record(&ctx.db, "wellbeing_entitlement", row_pid, "updated", caller.actor(), None)
-        .await?;
+    Audit::record(
+        &ctx.db,
+        "wellbeing_entitlement",
+        row_pid,
+        "updated",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(updated)
 }
 
@@ -221,8 +237,15 @@ async fn delete_entitlement(
     let mut active: wellbeing_entitlements::ActiveModel = row.into();
     active.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
     active.update(&ctx.db).await?;
-    Audit::record(&ctx.db, "wellbeing_entitlement", row_pid, "deleted", caller.actor(), None)
-        .await?;
+    Audit::record(
+        &ctx.db,
+        "wellbeing_entitlement",
+        row_pid,
+        "deleted",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(serde_json::json!({ "deleted": row_pid }))
 }
 
@@ -300,7 +323,13 @@ async fn employee_prompts(
             active_from: entitlement.active_from,
             active_until: entitlement.active_until,
         };
-        if !rules::eligible(&predicates, age, &employee.department, &employee.job_title, today) {
+        if !rules::eligible(
+            &predicates,
+            age,
+            &employee.department,
+            &employee.job_title,
+            today,
+        ) {
             continue;
         }
         let ack = acks.iter().find(|a| a.entitlement_pid == entitlement.pid);
@@ -314,8 +343,10 @@ async fn employee_prompts(
             rules::PromptState::Reminder => {
                 // Serving the reminder is what "one reminder" means:
                 // stamp it so it never appears again.
-                let mut active: entitlement_acknowledgements::ActiveModel =
-                    ack.expect("reminder implies an acknowledgement").clone().into();
+                let mut active: entitlement_acknowledgements::ActiveModel = ack
+                    .expect("reminder implies an acknowledgement")
+                    .clone()
+                    .into();
                 active.reminded_on = ActiveValue::set(Some(today));
                 active.update(&ctx.db).await?;
                 "reminder"
@@ -435,7 +466,9 @@ async fn uptake(State(ctx): State<AppContext>) -> Result<Response> {
         .order_by_asc(wellbeing_entitlements::Column::Name)
         .all(&ctx.db)
         .await?;
-    let acks = entitlement_acknowledgements::Entity::find().all(&ctx.db).await?;
+    let acks = entitlement_acknowledgements::Entity::find()
+        .all(&ctx.db)
+        .await?;
     let today = chrono::Utc::now().date_naive();
     // Live (plan, employee) enrolment pairs, for the conversion terms.
     let live_enrollments: std::collections::HashSet<(Uuid, Uuid)> =
@@ -549,7 +582,15 @@ async fn create_survey(
     }
     .insert(&ctx.db)
     .await?;
-    Audit::record(&ctx.db, "pulse_survey", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &ctx.db,
+        "pulse_survey",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(PidRef::of(row.pid))
 }
 
@@ -663,11 +704,18 @@ async fn survey_results(
     let mut by_department: std::collections::BTreeMap<&str, Vec<i32>> =
         std::collections::BTreeMap::new();
     for response in &responses {
-        by_department.entry(response.department.as_str()).or_default().push(response.score);
+        by_department
+            .entry(response.department.as_str())
+            .or_default()
+            .push(response.score);
     }
     let cell_json = |cell: &pulse::Cell| match cell {
         pulse::Cell::Suppressed => serde_json::json!({ "suppressed": true }),
-        pulse::Cell::Disclosed { count, distribution, mean } => serde_json::json!({
+        pulse::Cell::Disclosed {
+            count,
+            distribution,
+            mean,
+        } => serde_json::json!({
             "suppressed": false,
             "count": count,
             "distribution": distribution,
@@ -698,10 +746,7 @@ async fn survey_results(
 }
 
 /// Find one live entitlement rule by pid, or 404.
-async fn find_entitlement(
-    ctx: &AppContext,
-    pid: &str,
-) -> Result<wellbeing_entitlements::Model> {
+async fn find_entitlement(ctx: &AppContext, pid: &str) -> Result<wellbeing_entitlements::Model> {
     wellbeing_entitlements::Entity::find()
         .filter(wellbeing_entitlements::Column::Pid.eq(records::parse_pid(pid)?))
         .filter(wellbeing_entitlements::Column::DeletedAt.is_null())
@@ -719,7 +764,10 @@ pub fn routes() -> Routes {
         .add("/wellbeing-entitlements/{pid}", put(update_entitlement))
         .add("/wellbeing-entitlements/{pid}", delete(delete_entitlement))
         .add("/employees/{pid}/wellbeing-prompts", get(employee_prompts))
-        .add("/employees/{pid}/wellbeing-acknowledgements", post(acknowledge))
+        .add(
+            "/employees/{pid}/wellbeing-acknowledgements",
+            post(acknowledge),
+        )
         .add("/wellbeing/uptake", get(uptake))
         .add("/pulse-surveys", post(create_survey))
         .add("/pulse-surveys", get(list_surveys))

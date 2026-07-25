@@ -87,8 +87,13 @@ async fn instance_layer_round_trip() {
 
         // ── Overdue reviews: next_review_on is 2020 ⇒ overdue.
         let overdue: Value = request.get("/api/instances/overdue-reviews").await.json();
-        assert!(overdue["overdue"].as_array().unwrap().iter()
-            .any(|o| o["pid"] == json!(i_pid)));
+        assert!(
+            overdue["overdue"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|o| o["pid"] == json!(i_pid))
+        );
 
         // ── Record a review ⇒ reschedules, drops off overdue.
         request
@@ -97,8 +102,14 @@ async fn instance_layer_round_trip() {
             .await
             .assert_status_ok();
         let overdue: Value = request.get("/api/instances/overdue-reviews").await.json();
-        assert!(!overdue["overdue"].as_array().unwrap().iter()
-            .any(|o| o["pid"] == json!(i_pid)), "no longer overdue");
+        assert!(
+            !overdue["overdue"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|o| o["pid"] == json!(i_pid)),
+            "no longer overdue"
+        );
 
         // ── Caseload: one open, urgent, in PrimaryCare.
         let caseload: Value = request.get("/api/instances/caseload").await.json();
@@ -108,7 +119,10 @@ async fn instance_layer_round_trip() {
         assert_eq!(caseload["urgent_or_emergency"], 1);
 
         // ── Cohort on the pathway.
-        let cohort: Value = request.get(&format!("/api/care-pathways/{pathway}/cohort")).await.json();
+        let cohort: Value = request
+            .get(&format!("/api/care-pathways/{pathway}/cohort"))
+            .await
+            .json();
         assert_eq!(cohort["instances"], 1);
         assert_eq!(cohort["by_status"]["active"], 1);
         assert_eq!(cohort["step_completion"]["done"], 1);
@@ -116,8 +130,13 @@ async fn instance_layer_round_trip() {
 
         // ── Care-team load: the GP carries one open instance.
         let load: Value = request.get("/api/instances/care-team-load").await.json();
-        let member = load["members"].as_array().unwrap().iter()
-            .find(|m| m["member_ref"] == json!(worker)).expect("gp row").clone();
+        let member = load["members"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|m| m["member_ref"] == json!(worker))
+            .expect("gp row")
+            .clone();
         assert_eq!(member["open_instances"], 1);
 
         // ── Measures: numeric HbA1c reading, then a second lower.
@@ -132,14 +151,18 @@ async fn instance_layer_round_trip() {
         );
         request
             .post(&format!("/api/instances/{i_pid}/measures"))
-            .json(&json!({ "name": "HbA1c", "value_numeric": 64.0, "unit": "mmol/mol",
-                            "recorded_on": "2026-06-01" }))
+            .json(
+                &json!({ "name": "HbA1c", "value_numeric": 64.0, "unit": "mmol/mol",
+                            "recorded_on": "2026-06-01" }),
+            )
             .await
             .assert_status_ok();
         request
             .post(&format!("/api/instances/{i_pid}/measures"))
-            .json(&json!({ "name": "HbA1c", "value_numeric": 52.0, "unit": "mmol/mol",
-                            "recorded_on": "2026-07-01" }))
+            .json(
+                &json!({ "name": "HbA1c", "value_numeric": 52.0, "unit": "mmol/mol",
+                            "recorded_on": "2026-07-01" }),
+            )
             .await
             .assert_status_ok();
         let detail: Value = request.get(&format!("/api/instances/{i_pid}")).await.json();
@@ -207,8 +230,13 @@ async fn instance_layer_round_trip() {
             .json();
         assert_eq!(outcomes["closed_instances"], 1);
         assert_eq!(outcomes["outcome_distribution"]["improved"], 1);
-        let hba1c = outcomes["measure_summary"].as_array().unwrap().iter()
-            .find(|m| m["name"] == "HbA1c").expect("HbA1c summary").clone();
+        let hba1c = outcomes["measure_summary"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|m| m["name"] == "HbA1c")
+            .expect("HbA1c summary")
+            .clone();
         assert_eq!(hba1c["instances_with_measure"], 1);
         assert!((hba1c["latest_value_average"].as_f64().unwrap() - 52.0).abs() < 1e-9);
     })

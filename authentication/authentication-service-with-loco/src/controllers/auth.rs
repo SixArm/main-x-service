@@ -739,11 +739,10 @@ pub fn routes() -> Routes {
 #[cfg(test)]
 mod tests {
     use super::{
-        choose_frontend, claims_have_admin, constant_work_hash, csrf_token_gate,
-        log_magic_link_url,
+        choose_frontend, claims_have_admin, constant_work_hash, csrf_token_gate, log_magic_link_url,
     };
-    use axum::http::StatusCode;
     use crate::auth::Claims;
+    use axum::http::StatusCode;
     use loco_rs::environment::Environment;
     use std::collections::BTreeMap;
 
@@ -756,7 +755,9 @@ mod tests {
         // A token-carrying session: correct token allows, wrong/absent 403.
         assert!(csrf_token_gate(true, false, Some("tok"), "tok").is_ok());
         assert_eq!(
-            csrf_token_gate(true, false, Some("tok"), "wrong").unwrap_err().0,
+            csrf_token_gate(true, false, Some("tok"), "wrong")
+                .unwrap_err()
+                .0,
             StatusCode::FORBIDDEN
         );
         assert_eq!(

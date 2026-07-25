@@ -33,9 +33,12 @@ const CONSTRAINT: &str = "workers_gender_check";
 const VOCABULARY: &str = "('male', 'female', 'other', 'unknown')";
 
 async fn exec(db: &DatabaseConnection, sql: &str) {
-    db.execute(Statement::from_string(db.get_database_backend(), sql.to_string()))
-        .await
-        .unwrap_or_else(|e| panic!("exec failed: {sql}\n{e}"));
+    db.execute(Statement::from_string(
+        db.get_database_backend(),
+        sql.to_string(),
+    ))
+    .await
+    .unwrap_or_else(|e| panic!("exec failed: {sql}\n{e}"));
 }
 
 /// A legacy capitalized row is normalized, and the result is provably

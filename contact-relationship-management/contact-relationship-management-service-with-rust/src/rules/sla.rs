@@ -27,7 +27,8 @@ pub struct Deadlines {
 #[must_use]
 pub fn deadlines(opened_at: DateTime<FixedOffset>, targets: Targets) -> Deadlines {
     Deadlines {
-        first_response_due_at: opened_at + Duration::minutes(i64::from(targets.first_response_minutes)),
+        first_response_due_at: opened_at
+            + Duration::minutes(i64::from(targets.first_response_minutes)),
         resolution_due_at: opened_at + Duration::minutes(i64::from(targets.resolution_minutes)),
     }
 }
@@ -75,7 +76,13 @@ mod tests {
     /// Deadlines add the policy minutes to the open time.
     #[test]
     fn deadline_derivation() {
-        let d = deadlines(at(9, 0), Targets { first_response_minutes: 60, resolution_minutes: 480 });
+        let d = deadlines(
+            at(9, 0),
+            Targets {
+                first_response_minutes: 60,
+                resolution_minutes: 480,
+            },
+        );
         assert_eq!(d.first_response_due_at, at(10, 0));
         assert_eq!(d.resolution_due_at, at(17, 0));
     }

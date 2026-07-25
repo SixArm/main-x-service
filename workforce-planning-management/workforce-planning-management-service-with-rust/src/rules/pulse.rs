@@ -93,7 +93,10 @@ mod tests {
         assert!(survey_open(from, until, date(2026, 7, 1)));
         assert!(survey_open(from, until, date(2026, 7, 31)));
         assert!(!survey_open(from, until, date(2026, 8, 1)));
-        assert!(survey_open(None, None, date(2026, 1, 1)), "unbounded is open");
+        assert!(
+            survey_open(None, None, date(2026, 1, 1)),
+            "unbounded is open"
+        );
     }
 
     /// The k-floor: 4 responses disclose nothing (not even the count);
@@ -102,7 +105,11 @@ mod tests {
     fn k_floor_suppresses_below_five() {
         assert_eq!(aggregate_cell(&[5, 5, 5, 5]), Cell::Suppressed, "4 < k");
         match aggregate_cell(&[1, 2, 3, 4, 5]) {
-            Cell::Disclosed { count, distribution, mean } => {
+            Cell::Disclosed {
+                count,
+                distribution,
+                mean,
+            } => {
                 assert_eq!(count, 5);
                 assert_eq!(distribution, [1, 1, 1, 1, 1]);
                 assert!((mean - 3.0).abs() < f64::EPSILON);
@@ -117,7 +124,11 @@ mod tests {
     #[test]
     fn aggregate_never_panics_on_bad_rows() {
         match aggregate_cell(&[0, 99, -7, 3, 3]) {
-            Cell::Disclosed { count, distribution, .. } => {
+            Cell::Disclosed {
+                count,
+                distribution,
+                ..
+            } => {
                 assert_eq!(count, 5);
                 assert_eq!(distribution.iter().sum::<usize>(), 5);
             }

@@ -172,7 +172,11 @@ mod tests {
         assert!(monthly_base_minor(-1, 100).is_err());
         assert!(monthly_base_minor(100, 0).is_err());
         assert!(monthly_base_minor(100, 101).is_err());
-        assert!(monthly_base_minor(i64::MAX, 99).unwrap_err().contains("overflow"));
+        assert!(
+            monthly_base_minor(i64::MAX, 99)
+                .unwrap_err()
+                .contains("overflow")
+        );
     }
 
     /// Overtime pay derives from the monthly rate; non-positive
@@ -228,8 +232,14 @@ mod tests {
         let slip = Payslip {
             gross_minor: 0,
             deductions: vec![
-                Deduction { label: "a".into(), amount_minor: i64::MAX },
-                Deduction { label: "b".into(), amount_minor: 1 },
+                Deduction {
+                    label: "a".into(),
+                    amount_minor: i64::MAX,
+                },
+                Deduction {
+                    label: "b".into(),
+                    amount_minor: 1,
+                },
             ],
             net_minor: 0,
         };

@@ -75,7 +75,8 @@ mod tests {
         assert_eq!(a, hash("some-random-token-value"), "must be deterministic");
         assert_eq!(a.len(), 64, "SHA-256 hex is 64 chars");
         assert!(
-            a.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
+            a.chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
             "lowercase hex only"
         );
     }

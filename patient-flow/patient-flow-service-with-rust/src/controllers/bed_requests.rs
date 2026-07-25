@@ -186,7 +186,9 @@ async fn create(
         target_ward_pid: ActiveValue::set(payload.target_ward_pid),
         specialty: ActiveValue::set(payload.specialty.clone()),
         priority: ActiveValue::set(payload.priority.clone()),
-        requirements: ActiveValue::set(serde_json::to_value(&payload.requirements).unwrap_or_default()),
+        requirements: ActiveValue::set(
+            serde_json::to_value(&payload.requirements).unwrap_or_default(),
+        ),
         status: ActiveValue::set("open".to_string()),
         allocated_bed_pid: ActiveValue::set(None),
         requested_at: ActiveValue::set(chrono::Utc::now().into()),
@@ -196,8 +198,25 @@ async fn create(
     }
     .insert(&txn)
     .await?;
-    Audit::record(&txn, "bed_request", row.pid, "created", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "bed_request", "bed_request_created", &row.pid.to_string(), &row.priority, caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "bed_request",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "bed_request",
+        "bed_request_created",
+        &row.pid.to_string(),
+        &row.priority,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     Metrics::global().bed_request_created_total.inc();
     format::json(serde_json::json!({ "pid": row.pid.to_string() }))
@@ -212,10 +231,7 @@ struct ListParams {
 }
 
 #[debug_handler]
-async fn list(
-    State(ctx): State<AppContext>,
-    Query(params): Query<ListParams>,
-) -> Result<Response> {
+async fn list(State(ctx): State<AppContext>, Query(params): Query<ListParams>) -> Result<Response> {
     let status = params.status.unwrap_or_else(|| "open".to_string());
     let rows = bed_requests::Entity::find()
         .filter(bed_requests::Column::DeletedAt.is_null())
@@ -230,7 +246,10 @@ async fn list(
         } else {
             0
         };
-        views.push(RequestView { request, eligible_beds: eligible });
+        views.push(RequestView {
+            request,
+            eligible_beds: eligible,
+        });
     }
     // Priority order: emergency, urgent, routine; then longest wait.
     let weight = |p: &str| match p {
@@ -267,9 +286,14 @@ async fn allocate(
     Json(payload): Json<AllocatePayload>,
 ) -> Result<Response> {
     if (payload.override_sex || payload.override_ward_fit)
-        && payload.override_reason.as_deref().is_none_or(|r| r.trim().is_empty())
+        && payload
+            .override_reason
+            .as_deref()
+            .is_none_or(|r| r.trim().is_empty())
     {
-        return Err(unprocessable("override_reason is required when overriding a rule"));
+        return Err(unprocessable(
+            "override_reason is required when overriding a rule",
+        ));
     }
     let request = records::find_bed_request(&ctx.db, records::parse_pid(&pid)?).await?;
     if request.status != "open" {
@@ -314,8 +338,25 @@ async fn allocate(
         "override_ward_fit": payload.override_ward_fit,
         "override_reason": payload.override_reason,
     });
-    Audit::record(&txn, "bed_request", request_pid, "bed_request_allocated", caller.actor(), Some(snapshot)).await?;
-    streaming::emit_on(&txn, "bed_request", "bed_request_allocated", &request_pid.to_string(), &row.priority, caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "bed_request",
+        request_pid,
+        "bed_request_allocated",
+        caller.actor(),
+        Some(snapshot),
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "bed_request",
+        "bed_request_allocated",
+        &request_pid.to_string(),
+        &row.priority,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }
@@ -341,18 +382,36 @@ async fn cancel(
             .one(&txn)
             .await?;
         if let Some(bed) = bed
-            && bed.state == "reserved" {
-                let outcome = super::topology::apply_transition(&bed, &Transition::Release)?;
-                super::topology::persist_outcome(&txn, bed, &outcome, caller.actor()).await?;
-            }
+            && bed.state == "reserved"
+        {
+            let outcome = super::topology::apply_transition(&bed, &Transition::Release)?;
+            super::topology::persist_outcome(&txn, bed, &outcome, caller.actor()).await?;
+        }
     }
     let request_pid = request.pid;
     let mut active: bed_requests::ActiveModel = request.into();
     active.status = ActiveValue::set("cancelled".to_string());
     active.resolved_at = ActiveValue::set(Some(chrono::Utc::now().into()));
     let row = active.update(&txn).await?;
-    Audit::record(&txn, "bed_request", request_pid, "bed_request_cancelled", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "bed_request", "bed_request_cancelled", &request_pid.to_string(), &row.priority, caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "bed_request",
+        request_pid,
+        "bed_request_cancelled",
+        caller.actor(),
+        None,
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "bed_request",
+        "bed_request_cancelled",
+        &request_pid.to_string(),
+        &row.priority,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }

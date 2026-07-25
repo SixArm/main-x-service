@@ -53,7 +53,11 @@ async fn session_secrets_are_hashed_at_rest() {
     // The CSRF token is stored hashed inside the JSONB payload.
     let stored_csrf = row.data.get("csrf").and_then(serde_json::Value::as_str);
     assert_eq!(stored_csrf, Some(secret_hash::hash(csrf).as_str()));
-    assert_ne!(stored_csrf, Some(csrf), "the plaintext csrf must not be stored");
+    assert_ne!(
+        stored_csrf,
+        Some(csrf),
+        "the plaintext csrf must not be stored"
+    );
 
     // A lookup by the *presented plaintext* id still resolves the session.
     let found = sessions::Model::find_by_jid(&boot.app_context.db, sid)

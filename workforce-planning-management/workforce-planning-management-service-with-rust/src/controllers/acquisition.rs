@@ -10,7 +10,9 @@ use uuid::Uuid;
 use super::{ensure_valid, unprocessable};
 use crate::auth::MaybeAuthUser;
 use crate::metrics::Metrics;
-use crate::models::_entities::{applications, candidates, employees, interviews, onboarding_items, requisitions};
+use crate::models::_entities::{
+    applications, candidates, employees, interviews, onboarding_items, requisitions,
+};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
 use crate::rules::{lifecycle, tokens};
@@ -145,9 +147,10 @@ async fn create_requisition(
         problems.push("headcount must be at least 1".to_string());
     }
     if let (Some(min), Some(max)) = (payload.salary_min_minor, payload.salary_max_minor)
-        && min > max {
-            problems.push("salary_min_minor exceeds salary_max_minor".to_string());
-        }
+        && min > max
+    {
+        problems.push("salary_min_minor exceeds salary_max_minor".to_string());
+    }
     ensure_valid(&problems.into_vec())?;
     let txn = ctx.db.begin().await?;
     let row = requisitions::ActiveModel {
@@ -166,10 +169,29 @@ async fn create_requisition(
     }
     .insert(&txn)
     .await?;
-    Audit::record(&txn, "requisition", row.pid, "created", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "requisition", "created", &row.pid.to_string(), &row.job_title, caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "requisition",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "requisition",
+        "created",
+        &row.pid.to_string(),
+        &row.job_title,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/requisitions` — active, filterable by `?status=`.
@@ -198,7 +220,10 @@ async fn list_requisitions(
 
 /// `GET /api/requisitions/{pid}`.
 #[debug_handler]
-async fn get_requisition(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Result<Response> {
+async fn get_requisition(
+    State(ctx): State<AppContext>,
+    Path(pid): Path<String>,
+) -> Result<Response> {
     format::json(records::find_requisition(&ctx.db, records::parse_pid(&pid)?).await?)
 }
 
@@ -220,8 +245,13 @@ async fn requisition_status(
     problems.require_token("to", tokens::REQUISITION_STATUSES, &payload.to);
     ensure_valid(&problems.into_vec())?;
     let requisition = records::find_requisition(&ctx.db, records::parse_pid(&pid)?).await?;
-    lifecycle::check("requisition", lifecycle::REQUISITION, &requisition.status, &payload.to)
-        .map_err(|e| unprocessable(&e))?;
+    lifecycle::check(
+        "requisition",
+        lifecycle::REQUISITION,
+        &requisition.status,
+        &payload.to,
+    )
+    .map_err(|e| unprocessable(&e))?;
     if payload.to == "filled" {
         let hired = applications::Entity::find()
             .filter(applications::Column::RequisitionPid.eq(requisition.pid))
@@ -259,7 +289,16 @@ async fn requisition_status(
         Some(serde_json::json!({ "from": from, "to": payload.to })),
     )
     .await?;
-    streaming::emit_on(&txn, "requisition", kind, &row.pid.to_string(), &title, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "requisition",
+        kind,
+        &row.pid.to_string(),
+        &title,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }
@@ -278,7 +317,11 @@ async fn create_candidate(
         problems.push("email must contain @".to_string());
     }
     problems.require_token("source", tokens::CANDIDATE_SOURCES, &payload.source);
-    problems.ref_opt("person_ref", entity_ref::EntityType::Person, payload.person_ref.as_deref());
+    problems.ref_opt(
+        "person_ref",
+        entity_ref::EntityType::Person,
+        payload.person_ref.as_deref(),
+    );
     ensure_valid(&problems.into_vec())?;
     let txn = ctx.db.begin().await?;
     let row = candidates::ActiveModel {
@@ -294,9 +337,20 @@ async fn create_candidate(
     .insert(&txn)
     .await?;
     Audit::record(&txn, "candidate", row.pid, "created", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "candidate", "created", &row.pid.to_string(), &row.display_name, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "candidate",
+        "created",
+        &row.pid.to_string(),
+        &row.display_name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/candidates` — the pool. Consent-expired candidates are
@@ -319,7 +373,10 @@ async fn list_candidates(
         .limit(1000)
         .all(&ctx.db)
         .await?;
-    let expired_only = params.expired.as_deref().is_some_and(|v| v == "1" || v == "true");
+    let expired_only = params
+        .expired
+        .as_deref()
+        .is_some_and(|v| v == "1" || v == "true");
     let rows: Vec<_> = rows
         .into_iter()
         .filter(|c| {
@@ -340,7 +397,10 @@ async fn create_application(
 ) -> Result<Response> {
     let requisition = records::find_requisition(&ctx.db, records::parse_pid(&pid)?).await?;
     let candidate = records::find_candidate(&ctx.db, payload.candidate_pid).await?;
-    if requisition.status == "draft" || requisition.status == "cancelled" || requisition.status == "filled" {
+    if requisition.status == "draft"
+        || requisition.status == "cancelled"
+        || requisition.status == "filled"
+    {
         return Err(unprocessable(&format!(
             "requisition is {} and not accepting applications",
             requisition.status
@@ -365,15 +425,37 @@ async fn create_application(
     }
     .insert(&txn)
     .await?;
-    Audit::record(&txn, "application", row.pid, "created", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "application", "created", &row.pid.to_string(), &candidate.display_name, caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "application",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "application",
+        "created",
+        &row.pid.to_string(),
+        &candidate.display_name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/requisitions/{pid}/applications`.
 #[debug_handler]
-async fn list_applications(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Result<Response> {
+async fn list_applications(
+    State(ctx): State<AppContext>,
+    Path(pid): Path<String>,
+) -> Result<Response> {
     let requisition = records::find_requisition(&ctx.db, records::parse_pid(&pid)?).await?;
     let rows = applications::Entity::find()
         .filter(applications::Column::RequisitionPid.eq(requisition.pid))
@@ -399,8 +481,13 @@ async fn application_stage(
     problems.require_token("to", tokens::APPLICATION_STAGES, &payload.to);
     ensure_valid(&problems.into_vec())?;
     let application = records::find_application(&ctx.db, records::parse_pid(&pid)?).await?;
-    lifecycle::check("application", lifecycle::APPLICATION, &application.stage, &payload.to)
-        .map_err(|e| unprocessable(&e))?;
+    lifecycle::check(
+        "application",
+        lifecycle::APPLICATION,
+        &application.stage,
+        &payload.to,
+    )
+    .map_err(|e| unprocessable(&e))?;
     let requisition = records::find_requisition(&ctx.db, application.requisition_pid).await?;
     let candidate = records::find_candidate(&ctx.db, application.candidate_pid).await?;
 
@@ -435,15 +522,24 @@ async fn application_stage(
             .person_ref
             .clone()
             .or_else(|| candidate.person_ref.clone())
-            .ok_or_else(|| unprocessable("hiring requires person_ref (on the payload or the candidate)"))?;
+            .ok_or_else(|| {
+                unprocessable("hiring requires person_ref (on the payload or the candidate)")
+            })?;
         let employee_number = payload
             .employee_number
             .clone()
             .ok_or_else(|| unprocessable("hiring requires employee_number"))?;
         let mut problems = Problems::new();
         problems.require_ref("person_ref", entity_ref::EntityType::Person, &person_ref);
-        let employment_type = payload.employment_type.clone().unwrap_or_else(|| "permanent".to_string());
-        problems.require_token("employment_type", tokens::EMPLOYMENT_TYPES, &employment_type);
+        let employment_type = payload
+            .employment_type
+            .clone()
+            .unwrap_or_else(|| "permanent".to_string());
+        problems.require_token(
+            "employment_type",
+            tokens::EMPLOYMENT_TYPES,
+            &employment_type,
+        );
         ensure_valid(&problems.into_vec())?;
         let employee = employees::ActiveModel {
             pid: ActiveValue::set(Uuid::new_v4()),
@@ -460,7 +556,11 @@ async fn application_stage(
             manager_pid: ActiveValue::set(None),
             salary_minor: ActiveValue::set(payload.salary_minor),
             salary_currency: ActiveValue::set(payload.salary_currency.clone()),
-            hired_on: ActiveValue::set(payload.hired_on.unwrap_or_else(|| chrono::Utc::now().date_naive())),
+            hired_on: ActiveValue::set(
+                payload
+                    .hired_on
+                    .unwrap_or_else(|| chrono::Utc::now().date_naive()),
+            ),
             terminated_on: ActiveValue::set(None),
             deleted_at: ActiveValue::set(None),
             ..Default::default()
@@ -509,7 +609,11 @@ async fn create_interview(
 ) -> Result<Response> {
     let application = records::find_application(&ctx.db, records::parse_pid(&pid)?).await?;
     let mut problems = Problems::new();
-    problems.require_ref("interviewer_ref", entity_ref::EntityType::Worker, &payload.interviewer_ref);
+    problems.require_ref(
+        "interviewer_ref",
+        entity_ref::EntityType::Worker,
+        &payload.interviewer_ref,
+    );
     problems.cap_opt("notes", payload.notes.as_deref());
     ensure_valid(&problems.into_vec())?;
     let txn = ctx.db.begin().await?;
@@ -527,12 +631,17 @@ async fn create_interview(
     .await?;
     Audit::record(&txn, "interview", row.pid, "created", caller.actor(), None).await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/applications/{pid}/interviews`.
 #[debug_handler]
-async fn list_interviews(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Result<Response> {
+async fn list_interviews(
+    State(ctx): State<AppContext>,
+    Path(pid): Path<String>,
+) -> Result<Response> {
     let application = records::find_application(&ctx.db, records::parse_pid(&pid)?).await?;
     let rows = interviews::Entity::find()
         .filter(interviews::Column::ApplicationPid.eq(application.pid))
@@ -635,7 +744,10 @@ async fn add_onboarding(
 
 /// `GET /api/employees/{pid}/onboarding`.
 #[debug_handler]
-async fn list_onboarding(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Result<Response> {
+async fn list_onboarding(
+    State(ctx): State<AppContext>,
+    Path(pid): Path<String>,
+) -> Result<Response> {
     let employee = records::find_employee(&ctx.db, records::parse_pid(&pid)?).await?;
     let rows = onboarding_items::Entity::find()
         .filter(onboarding_items::Column::EmployeePid.eq(employee.pid))

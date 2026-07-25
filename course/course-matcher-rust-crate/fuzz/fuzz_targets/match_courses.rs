@@ -9,8 +9,8 @@
 
 #![no_main]
 
+use course_matcher::{Course, MatchConfig, MatchingEngine};
 use libfuzzer_sys::fuzz_target;
-use course_matcher::{MatchConfig, MatchingEngine, Course};
 
 fuzz_target!(|data: &[u8]| {
     // Only well-formed JSON tuples reach the engine; malformed input is a

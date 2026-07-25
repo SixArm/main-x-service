@@ -48,8 +48,10 @@ pub struct RestBreach {
 /// (`end <= start`) are skipped rather than trusted.
 #[must_use]
 pub fn rest_breaches(intervals: &[(DateTime<Utc>, DateTime<Utc>)]) -> Vec<RestBreach> {
-    let mut sorted: Vec<&(DateTime<Utc>, DateTime<Utc>)> =
-        intervals.iter().filter(|(start, end)| end > start).collect();
+    let mut sorted: Vec<&(DateTime<Utc>, DateTime<Utc>)> = intervals
+        .iter()
+        .filter(|(start, end)| end > start)
+        .collect();
     sorted.sort_by_key(|(start, _)| *start);
     sorted
         .windows(2)
@@ -92,7 +94,10 @@ mod tests {
     #[test]
     fn over_average_boundary() {
         let ceiling = MAX_AVG_WEEKLY_MINUTES * REFERENCE_WEEKS;
-        assert!(!over_average(ceiling, REFERENCE_WEEKS), "exactly 48 h is not over");
+        assert!(
+            !over_average(ceiling, REFERENCE_WEEKS),
+            "exactly 48 h is not over"
+        );
         assert!(over_average(ceiling + 1, REFERENCE_WEEKS));
         assert!(!over_average(i64::MAX, 0), "no window, no flag");
     }

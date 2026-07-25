@@ -24,7 +24,9 @@ pub const MENTORSHIP_STATUSES: &[&str] = &["proposed", "active", "completed", "e
 /// A human-readable refusal naming the legal moves.
 pub fn mentorship_transition(current: &str, to: &str) -> Result<(), String> {
     if !MENTORSHIP_STATUSES.contains(&to) {
-        return Err(format!("unknown status `{to}` (statuses: {MENTORSHIP_STATUSES:?})"));
+        return Err(format!(
+            "unknown status `{to}` (statuses: {MENTORSHIP_STATUSES:?})"
+        ));
     }
     let ok = matches!(
         (current, to),
@@ -67,15 +69,32 @@ mod tests {
         assert!(mentorship_transition("proposed", "active").is_ok());
         assert!(mentorship_transition("active", "completed").is_ok());
         assert!(mentorship_transition("proposed", "ended").is_ok());
-        assert!(mentorship_transition("proposed", "completed").is_err(), "must activate first");
-        assert!(mentorship_transition("completed", "active").is_err(), "terminal");
-        assert!(mentorship_transition("active", "sideways").is_err(), "unknown");
+        assert!(
+            mentorship_transition("proposed", "completed").is_err(),
+            "must activate first"
+        );
+        assert!(
+            mentorship_transition("completed", "active").is_err(),
+            "terminal"
+        );
+        assert!(
+            mentorship_transition("active", "sideways").is_err(),
+            "unknown"
+        );
     }
 
     #[test]
     fn progress_counts_only_real_completions() {
-        let steps = vec!["course:a".to_string(), "course:b".to_string(), "course:c".to_string()];
-        let done = vec!["course:a".to_string(), "course:c".to_string(), "course:z".to_string()];
+        let steps = vec![
+            "course:a".to_string(),
+            "course:b".to_string(),
+            "course:c".to_string(),
+        ];
+        let done = vec![
+            "course:a".to_string(),
+            "course:c".to_string(),
+            "course:z".to_string(),
+        ];
         assert_eq!(path_progress(&steps, &done), (2, 3));
         assert_eq!(path_progress(&steps, &[]), (0, 3));
     }

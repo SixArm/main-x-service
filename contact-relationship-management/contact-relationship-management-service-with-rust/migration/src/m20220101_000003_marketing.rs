@@ -103,7 +103,13 @@ impl MigrationTrait for Migration {
     /// Propagates any DDL error.
     async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
         let conn = m.get_connection();
-        for table in ["nurture_enrollments", "nurture_steps", "nurture_sequences", "campaigns", "segments"] {
+        for table in [
+            "nurture_enrollments",
+            "nurture_steps",
+            "nurture_sequences",
+            "campaigns",
+            "segments",
+        ] {
             conn.execute_unprepared(&format!("DROP TABLE IF EXISTS {table}"))
                 .await?;
         }

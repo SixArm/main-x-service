@@ -23,7 +23,9 @@ use crate::auth::{self, MaybeAuthUser};
 use crate::flow::bed_state::BedState;
 use crate::flow::journey;
 use crate::metrics::Metrics;
-use crate::models::_entities::{bays, bed_requests, beds, infection_flags, red_green_days, sites, stays, wards};
+use crate::models::_entities::{
+    bays, bed_requests, beds, infection_flags, red_green_days, sites, stays, wards,
+};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
 
@@ -112,8 +114,9 @@ async fn whiteboard(
     headers: HeaderMap,
 ) -> Result<Response> {
     let ward = records::find_ward(&ctx.db, records::parse_pid(&ward_pid)?).await?;
-    let obligations = auth::authorize_record(&caller, Action::Read, &auth::ward_resource_attrs(&ward))
-        .map_err(record_rejection)?;
+    let obligations =
+        auth::authorize_record(&caller, Action::Read, &auth::ward_resource_attrs(&ward))
+            .map_err(record_rejection)?;
     let masked = obligations.iter().any(|o| o == "mask");
     let now: chrono::DateTime<chrono::FixedOffset> = chrono::Utc::now().into();
     let today = now.date_naive();
@@ -176,7 +179,8 @@ async fn whiteboard(
             ccd_met: stay.is_some_and(|s| s.ccd_met),
             discharge_pathway: stay.and_then(|s| s.discharge_pathway.clone()),
             discharge_ready: stay.is_some_and(|s| s.status == "discharge_ready"),
-            dtoc: stay.is_some_and(|s| journey::is_dtoc(s.discharge_ready_at, s.discharged_at, now)),
+            dtoc: stay
+                .is_some_and(|s| journey::is_dtoc(s.discharge_ready_at, s.discharged_at, now)),
             senior_review_today: stay
                 .and_then(|s| s.senior_review_at)
                 .is_some_and(|t| t.date_naive() == today),
@@ -303,8 +307,14 @@ async fn glance(ctx: &AppContext) -> Result<AtAGlance> {
             .filter(|b| b.ward_pid == ward.pid)
             .map(|b| b.pid)
             .collect();
-        let ward_beds: Vec<_> = bed_rows.iter().filter(|b| ward_bays.contains(&b.bay_pid)).collect();
-        let ward_stays: Vec<_> = stay_rows.iter().filter(|s| s.ward_pid == Some(ward.pid)).collect();
+        let ward_beds: Vec<_> = bed_rows
+            .iter()
+            .filter(|b| ward_bays.contains(&b.bay_pid))
+            .collect();
+        let ward_stays: Vec<_> = stay_rows
+            .iter()
+            .filter(|s| s.ward_pid == Some(ward.pid))
+            .collect();
         let count_state = |token: &str| ward_beds.iter().filter(|b| b.state == token).count();
         let closed = count_state(BedState::Closed.token());
         let total = ward_beds.len();
@@ -340,7 +350,10 @@ async fn glance(ctx: &AppContext) -> Result<AtAGlance> {
                 .iter()
                 .filter(|s| journey::edd_overdue(s.edd, today))
                 .count(),
-            discharge_ready: ward_stays.iter().filter(|s| s.status == "discharge_ready").count(),
+            discharge_ready: ward_stays
+                .iter()
+                .filter(|s| s.status == "discharge_ready")
+                .count(),
             dtoc: ward_stays
                 .iter()
                 .filter(|s| journey::is_dtoc(s.discharge_ready_at, s.discharged_at, now))
@@ -366,7 +379,11 @@ async fn glance(ctx: &AppContext) -> Result<AtAGlance> {
         rows.push(row);
     }
     let physical: Vec<_> = rows.iter().filter(|r| r.kind != "virtual").collect();
-    let virtual_census: usize = rows.iter().filter(|r| r.kind == "virtual").map(|r| r.occupied).sum();
+    let virtual_census: usize = rows
+        .iter()
+        .filter(|r| r.kind == "virtual")
+        .map(|r| r.occupied)
+        .sum();
     let available_now: usize = physical.iter().map(|r| r.available).sum();
     let predicted_discharges: usize = physical.iter().map(|r| r.expected_discharges_today).sum();
     let reserved: usize = physical.iter().map(|r| r.reserved).sum();
@@ -389,11 +406,16 @@ async fn glance(ctx: &AppContext) -> Result<AtAGlance> {
     let m = Metrics::global();
     m.beds_occupied
         .set(i64::try_from(physical.iter().map(|r| r.occupied).sum::<usize>()).unwrap_or(0));
-    m.beds_available.set(i64::try_from(available_now).unwrap_or(0));
+    m.beds_available
+        .set(i64::try_from(available_now).unwrap_or(0));
     m.dtoc_current.set(i64::try_from(dtoc_total).unwrap_or(0));
     m.bed_requests_open
         .set(i64::try_from(open_requests.len()).unwrap_or(0));
-    Ok(AtAGlance { as_of: now, wards: rows, site_tiles })
+    Ok(AtAGlance {
+        as_of: now,
+        wards: rows,
+        site_tiles,
+    })
 }
 
 /// `GET /api/at-a-glance` — per-ward rows + site tiles (conditional).
@@ -441,8 +463,9 @@ async fn locate(
         .one(&ctx.db)
         .await?
         .ok_or(Error::NotFound)?;
-    let obligations = auth::authorize_record(&caller, Action::Read, &auth::stay_resource_attrs(&stay))
-        .map_err(record_rejection)?;
+    let obligations =
+        auth::authorize_record(&caller, Action::Read, &auth::stay_resource_attrs(&stay))
+            .map_err(record_rejection)?;
     let masked = obligations.iter().any(|o| o == "mask");
     let (ward, bay, bed) = match (stay.ward_pid, stay.bed_pid) {
         (Some(ward_pid), Some(bed_pid)) => {
@@ -458,10 +481,12 @@ async fn locate(
         _ => (None, None, None),
     };
     let site = match &ward {
-        Some(w) => sites::Entity::find()
-            .filter(sites::Column::Pid.eq(w.site_pid))
-            .one(&ctx.db)
-            .await?,
+        Some(w) => {
+            sites::Entity::find()
+                .filter(sites::Column::Pid.eq(w.site_pid))
+                .one(&ctx.db)
+                .await?
+        }
         None => None,
     };
     // Locate is personal data: every read is audited (spec `audit.md`).
@@ -471,7 +496,8 @@ async fn locate(
         stay.pid,
         "locate_read",
         caller.actor(),
-        stay.ward_pid.map(|w| serde_json::json!({ "ward_pid": w.to_string() })),
+        stay.ward_pid
+            .map(|w| serde_json::json!({ "ward_pid": w.to_string() })),
     )
     .await?;
     format::json(serde_json::json!({

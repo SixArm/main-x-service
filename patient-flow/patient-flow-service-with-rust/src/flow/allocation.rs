@@ -186,15 +186,43 @@ mod tests {
     #[test]
     fn rule1_not_open() {
         for facts in [
-            BedFacts { state: BedState::Occupied, ..open_bed() },
-            BedFacts { state: BedState::Reserved, ..open_bed() },
-            BedFacts { state: BedState::AwaitingClean, ..open_bed() },
-            BedFacts { state: BedState::Closed, ..open_bed() },
-            BedFacts { ward_open: false, ..open_bed() },
-            BedFacts { ward_closed_to_admissions: true, ..open_bed() },
-            BedFacts { bay_closed_to_admissions: true, ..open_bed() },
+            BedFacts {
+                state: BedState::Occupied,
+                ..open_bed()
+            },
+            BedFacts {
+                state: BedState::Reserved,
+                ..open_bed()
+            },
+            BedFacts {
+                state: BedState::AwaitingClean,
+                ..open_bed()
+            },
+            BedFacts {
+                state: BedState::Closed,
+                ..open_bed()
+            },
+            BedFacts {
+                ward_open: false,
+                ..open_bed()
+            },
+            BedFacts {
+                ward_closed_to_admissions: true,
+                ..open_bed()
+            },
+            BedFacts {
+                bay_closed_to_admissions: true,
+                ..open_bed()
+            },
         ] {
-            let b = breaches(&facts, &no_req(), Overrides { sex: true, ward_fit: true });
+            let b = breaches(
+                &facts,
+                &no_req(),
+                Overrides {
+                    sex: true,
+                    ward_fit: true,
+                },
+            );
             assert!(b.contains(&Breach::NotOpen), "{facts:?}");
             assert!(!Breach::NotOpen.overridable());
         }
@@ -204,19 +232,43 @@ mod tests {
     /// a flexible/mixed bay, an unknown sex, or an override passes.
     #[test]
     fn rule2_sex_segregation() {
-        let male = Requirements { sex: Some("male".to_string()), ..no_req() };
-        assert!(breaches(&open_bed(), &male, Overrides::default()).contains(&Breach::SexSegregation));
+        let male = Requirements {
+            sex: Some("male".to_string()),
+            ..no_req()
+        };
+        assert!(
+            breaches(&open_bed(), &male, Overrides::default()).contains(&Breach::SexSegregation)
+        );
         assert!(Breach::SexSegregation.overridable());
         // Override passes.
-        assert!(breaches(&open_bed(), &male, Overrides { sex: true, ..Default::default() }).is_empty());
+        assert!(
+            breaches(
+                &open_bed(),
+                &male,
+                Overrides {
+                    sex: true,
+                    ..Default::default()
+                }
+            )
+            .is_empty()
+        );
         // Side room passes.
-        let side = BedFacts { side_room: true, ..open_bed() };
+        let side = BedFacts {
+            side_room: true,
+            ..open_bed()
+        };
         assert!(breaches(&side, &male, Overrides::default()).is_empty());
         // Flexible bay passes.
-        let flex = BedFacts { bay_sex_designation: "flexible".to_string(), ..open_bed() };
+        let flex = BedFacts {
+            bay_sex_designation: "flexible".to_string(),
+            ..open_bed()
+        };
         assert!(breaches(&flex, &male, Overrides::default()).is_empty());
         // Matching sex passes.
-        let female = Requirements { sex: Some("female".to_string()), ..no_req() };
+        let female = Requirements {
+            sex: Some("female".to_string()),
+            ..no_req()
+        };
         assert!(breaches(&open_bed(), &female, Overrides::default()).is_empty());
     }
 
@@ -224,13 +276,25 @@ mod tests {
     /// `side_room` demands a side room specifically; not overridable.
     #[test]
     fn rule3_isolation() {
-        let iso = Requirements { isolation: true, ..no_req() };
+        let iso = Requirements {
+            isolation: true,
+            ..no_req()
+        };
         assert!(breaches(&open_bed(), &iso, Overrides::default()).contains(&Breach::Isolation));
-        let capable = BedFacts { isolation_capable: true, ..open_bed() };
+        let capable = BedFacts {
+            isolation_capable: true,
+            ..open_bed()
+        };
         assert!(breaches(&capable, &iso, Overrides::default()).is_empty());
-        let side_req = Requirements { side_room: true, ..no_req() };
+        let side_req = Requirements {
+            side_room: true,
+            ..no_req()
+        };
         assert!(breaches(&capable, &side_req, Overrides::default()).contains(&Breach::Isolation));
-        let side = BedFacts { side_room: true, ..open_bed() };
+        let side = BedFacts {
+            side_room: true,
+            ..open_bed()
+        };
         assert!(breaches(&side, &side_req, Overrides::default()).is_empty());
         assert!(!Breach::Isolation.overridable());
     }
@@ -238,11 +302,20 @@ mod tests {
     /// Rule 4: oxygen/bariatric must match; not overridable.
     #[test]
     fn rule4_equipment() {
-        let o2 = Requirements { oxygen: true, ..no_req() };
+        let o2 = Requirements {
+            oxygen: true,
+            ..no_req()
+        };
         assert!(breaches(&open_bed(), &o2, Overrides::default()).contains(&Breach::Equipment));
-        let with_o2 = BedFacts { oxygen: true, ..open_bed() };
+        let with_o2 = BedFacts {
+            oxygen: true,
+            ..open_bed()
+        };
         assert!(breaches(&with_o2, &o2, Overrides::default()).is_empty());
-        let bar = Requirements { bariatric: true, ..no_req() };
+        let bar = Requirements {
+            bariatric: true,
+            ..no_req()
+        };
         assert!(breaches(&open_bed(), &bar, Overrides::default()).contains(&Breach::Equipment));
     }
 
@@ -250,11 +323,28 @@ mod tests {
     /// overridable; either match passes.
     #[test]
     fn rule5_ward_fit() {
-        let outlier = BedFacts { ward_matches_target: false, specialty_matches: false, ..open_bed() };
+        let outlier = BedFacts {
+            ward_matches_target: false,
+            specialty_matches: false,
+            ..open_bed()
+        };
         assert!(breaches(&outlier, &no_req(), Overrides::default()).contains(&Breach::WardFit));
         assert!(Breach::WardFit.overridable());
-        assert!(breaches(&outlier, &no_req(), Overrides { ward_fit: true, ..Default::default() }).is_empty());
-        let specialty_only = BedFacts { ward_matches_target: false, ..open_bed() };
+        assert!(
+            breaches(
+                &outlier,
+                &no_req(),
+                Overrides {
+                    ward_fit: true,
+                    ..Default::default()
+                }
+            )
+            .is_empty()
+        );
+        let specialty_only = BedFacts {
+            ward_matches_target: false,
+            ..open_bed()
+        };
         assert!(breaches(&specialty_only, &no_req(), Overrides::default()).is_empty());
     }
 
@@ -263,11 +353,20 @@ mod tests {
     #[test]
     fn ranking_conserves_side_rooms() {
         let right_ward = open_bed();
-        let right_side = BedFacts { side_room: true, ..open_bed() };
-        let other_ward = BedFacts { ward_matches_target: false, ..open_bed() };
+        let right_side = BedFacts {
+            side_room: true,
+            ..open_bed()
+        };
+        let other_ward = BedFacts {
+            ward_matches_target: false,
+            ..open_bed()
+        };
         assert!(rank_key(&right_ward, &no_req()) < rank_key(&right_side, &no_req()));
         assert!(rank_key(&right_side, &no_req()) < rank_key(&other_ward, &no_req()));
-        let iso = Requirements { isolation: true, ..no_req() };
+        let iso = Requirements {
+            isolation: true,
+            ..no_req()
+        };
         assert_eq!(rank_key(&right_side, &iso), (0, 0));
     }
 }

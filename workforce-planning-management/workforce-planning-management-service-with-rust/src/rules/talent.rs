@@ -37,8 +37,7 @@ pub const DEVELOPMENT_METHODS: &[&str] = &[
 
 /// Per-item statuses. `achieved` is the only one that counts as
 /// progress.
-pub const DEVELOPMENT_ITEM_STATUSES: &[&str] =
-    &["planned", "in_progress", "achieved", "abandoned"];
+pub const DEVELOPMENT_ITEM_STATUSES: &[&str] = &["planned", "in_progress", "achieved", "abandoned"];
 
 /// Whether a plan's target role is consistent with its kind: a
 /// `reskill` plan must name a target job title or department (that is
@@ -125,7 +124,10 @@ pub fn valid_step(current_level: i32, target_level: i32) -> Result<(), String> {
 /// abandoning work never flatters the ratio.
 #[must_use]
 pub fn plan_progress(item_statuses: &[String]) -> (usize, usize) {
-    let achieved = item_statuses.iter().filter(|s| s.as_str() == "achieved").count();
+    let achieved = item_statuses
+        .iter()
+        .filter(|s| s.as_str() == "achieved")
+        .count();
     (achieved, item_statuses.len())
 }
 
@@ -136,7 +138,10 @@ pub fn plan_progress(item_statuses: &[String]) -> (usize, usize) {
 /// This is the honest counterpart of [`plan_progress`]: marking an item
 /// `achieved` is a claim, reaching the target proficiency is evidence.
 #[must_use]
-pub fn verified_progress(targets: &[(uuid::Uuid, i32)], declared: &BTreeMap<uuid::Uuid, i32>) -> (usize, usize) {
+pub fn verified_progress(
+    targets: &[(uuid::Uuid, i32)],
+    declared: &BTreeMap<uuid::Uuid, i32>,
+) -> (usize, usize) {
     let verified = targets
         .iter()
         .filter(|(skill, target)| declared.get(skill).is_some_and(|level| level >= target))
@@ -147,12 +152,8 @@ pub fn verified_progress(targets: &[(uuid::Uuid, i32)], declared: &BTreeMap<uuid
 // ─── Talent pipelines ────────────────────────────────────────────────────────
 
 /// What a pipeline is being grown for.
-pub const PIPELINE_PURPOSES: &[&str] = &[
-    "succession",
-    "hiring",
-    "early_careers",
-    "internal_mobility",
-];
+pub const PIPELINE_PURPOSES: &[&str] =
+    &["succession", "hiring", "early_careers", "internal_mobility"];
 
 /// Pipeline member stages, in progression order.
 pub const PIPELINE_STAGES: &[&str] = &[
@@ -249,8 +250,7 @@ pub const PROGRAM_KINDS: &[&str] = &["apprenticeship", "internship", "graduate"]
 pub const PLACEMENT_STATUSES: &[&str] = &["offered", "active", "completed", "withdrawn"];
 
 /// What became of a placement.
-pub const PLACEMENT_OUTCOMES: &[&str] =
-    &["pending", "converted", "not_converted", "withdrawn"];
+pub const PLACEMENT_OUTCOMES: &[&str] = &["pending", "converted", "not_converted", "withdrawn"];
 
 /// The placement lifecycle: `offered → active → completed`, with
 /// `withdrawn` reachable from `offered` or `active`.
@@ -446,12 +446,18 @@ mod tests {
         assert!(plan_transition("active", "completed").is_ok());
         assert!(plan_transition("draft", "cancelled").is_ok());
         assert!(plan_transition("active", "cancelled").is_ok());
-        assert!(plan_transition("draft", "completed").is_err(), "must activate first");
+        assert!(
+            plan_transition("draft", "completed").is_err(),
+            "must activate first"
+        );
         assert!(plan_transition("completed", "active").is_err(), "terminal");
         assert!(plan_transition("cancelled", "draft").is_err(), "terminal");
         assert!(plan_transition("draft", "sideways").is_err(), "unknown");
         for status in DEVELOPMENT_PLAN_STATUSES {
-            assert!(plan_transition(status, status).is_err(), "{status} → {status}");
+            assert!(
+                plan_transition(status, status).is_err(),
+                "{status} → {status}"
+            );
         }
     }
 
@@ -511,10 +517,19 @@ mod tests {
             "readiness can regress; the pipeline must be able to say so"
         );
         assert!(pipeline_transition("identified", "exited").is_ok());
-        assert!(pipeline_transition("identified", "placed").is_err(), "no skipping to placed");
+        assert!(
+            pipeline_transition("identified", "placed").is_err(),
+            "no skipping to placed"
+        );
         assert!(pipeline_transition("placed", "ready").is_err(), "terminal");
-        assert!(pipeline_transition("exited", "identified").is_err(), "terminal");
-        assert!(pipeline_transition("ready", "elsewhere").is_err(), "unknown");
+        assert!(
+            pipeline_transition("exited", "identified").is_err(),
+            "terminal"
+        );
+        assert!(
+            pipeline_transition("ready", "elsewhere").is_err(),
+            "unknown"
+        );
     }
 
     /// Pipeline health separates the live pool from those who have left
@@ -550,9 +565,18 @@ mod tests {
         assert!(placement_transition("active", "completed").is_ok());
         assert!(placement_transition("offered", "withdrawn").is_ok());
         assert!(placement_transition("active", "withdrawn").is_ok());
-        assert!(placement_transition("offered", "completed").is_err(), "must start first");
-        assert!(placement_transition("completed", "active").is_err(), "terminal");
-        assert!(placement_transition("withdrawn", "offered").is_err(), "terminal");
+        assert!(
+            placement_transition("offered", "completed").is_err(),
+            "must start first"
+        );
+        assert!(
+            placement_transition("completed", "active").is_err(),
+            "terminal"
+        );
+        assert!(
+            placement_transition("withdrawn", "offered").is_err(),
+            "terminal"
+        );
     }
 
     /// An apprenticeship cannot be completed below its off-the-job
@@ -578,7 +602,11 @@ mod tests {
     /// `None` before anything completes.
     #[test]
     fn conversion_rate_divides_by_completed_only() {
-        assert_eq!(conversion_rate(&[]), None, "nothing completed ⇒ no rate, not 0%");
+        assert_eq!(
+            conversion_rate(&[]),
+            None,
+            "nothing completed ⇒ no rate, not 0%"
+        );
         let outcomes: Vec<String> = ["converted", "not_converted", "converted", "withdrawn"]
             .iter()
             .map(ToString::to_string)
@@ -592,9 +620,16 @@ mod tests {
     /// covers a role today.
     #[test]
     fn bench_coverage_is_conservative() {
-        let of = |ratings: &[&str]| -> Vec<String> { ratings.iter().map(ToString::to_string).collect() };
-        assert_eq!(bench_coverage(&of(&["ready_2y", "ready_now"])), "covered_now");
-        assert_eq!(bench_coverage(&of(&["ready_1y", "ready_2y"])), "covered_soon");
+        let of =
+            |ratings: &[&str]| -> Vec<String> { ratings.iter().map(ToString::to_string).collect() };
+        assert_eq!(
+            bench_coverage(&of(&["ready_2y", "ready_now"])),
+            "covered_now"
+        );
+        assert_eq!(
+            bench_coverage(&of(&["ready_1y", "ready_2y"])),
+            "covered_soon"
+        );
         assert_eq!(bench_coverage(&of(&["ready_2y"])), "developing");
         assert_eq!(bench_coverage(&[]), "uncovered");
     }
@@ -628,7 +663,10 @@ mod tests {
         assert!((value - 0.75).abs() < f64::EPSILON);
         let (n, d, value) = ratio(0, 5).expect("a real zero");
         assert_eq!((n, d), (0, 5));
-        assert!(value.abs() < f64::EPSILON, "0 of 5 is a fact, not an absence");
+        assert!(
+            value.abs() < f64::EPSILON,
+            "0 of 5 is a fact, not an absence"
+        );
     }
 
     /// Tenure: whole months of service, bucketed; a not-yet-started
@@ -637,10 +675,18 @@ mod tests {
     fn tenure_is_whole_months() {
         let as_of = day(2026, 7, 23);
         assert_eq!(months_of_service(day(2026, 7, 23), as_of), 0);
-        assert_eq!(months_of_service(day(2026, 6, 24), as_of), 0, "not a full month");
+        assert_eq!(
+            months_of_service(day(2026, 6, 24), as_of),
+            0,
+            "not a full month"
+        );
         assert_eq!(months_of_service(day(2026, 6, 23), as_of), 1);
         assert_eq!(months_of_service(day(2025, 7, 23), as_of), 12);
-        assert_eq!(months_of_service(day(2026, 8, 1), as_of), -1, "future start");
+        assert_eq!(
+            months_of_service(day(2026, 8, 1), as_of),
+            -1,
+            "future start"
+        );
 
         assert_eq!(tenure_bucket(-1), "not_started");
         assert_eq!(tenure_bucket(0), "under_1y");

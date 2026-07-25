@@ -27,12 +27,10 @@ pub const ACTIVITY_SUBJECTS: &[&str] = &["contact", "account", "lead", "deal", "
 pub const LEAD_SOURCES: &[&str] = &["web", "referral", "event", "import", "campaign"];
 
 /// Lead statuses (lifecycle in [`crate::rules::lifecycle`]).
-pub const LEAD_STATUSES: &[&str] =
-    &["new", "contacted", "qualified", "converted", "disqualified"];
+pub const LEAD_STATUSES: &[&str] = &["new", "contacted", "qualified", "converted", "disqualified"];
 
 /// Campaign statuses (lifecycle in [`crate::rules::lifecycle`]).
-pub const CAMPAIGN_STATUSES: &[&str] =
-    &["draft", "scheduled", "running", "completed", "cancelled"];
+pub const CAMPAIGN_STATUSES: &[&str] = &["draft", "scheduled", "running", "completed", "cancelled"];
 
 /// Nurture enrolment statuses.
 pub const ENROLLMENT_STATUSES: &[&str] = &["active", "completed", "exited"];

@@ -49,7 +49,13 @@ pub const TRANSFER_REASONS: &[&str] = &[
 ];
 
 /// Bed-request origins.
-pub const REQUEST_ORIGINS: &[&str] = &["ed", "elective", "ward_transfer", "external", "virtual_step_up"];
+pub const REQUEST_ORIGINS: &[&str] = &[
+    "ed",
+    "elective",
+    "ward_transfer",
+    "external",
+    "virtual_step_up",
+];
 
 /// Bed-request priorities.
 pub const REQUEST_PRIORITIES: &[&str] = &["emergency", "urgent", "routine"];

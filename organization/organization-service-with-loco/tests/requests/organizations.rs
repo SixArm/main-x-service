@@ -495,8 +495,7 @@ async fn deduplicate_review_queue_round_trip() {
         assert_eq!(rescan["review_items"][0]["id"], id.as_str());
 
         // The stored queue lists it.
-        let listed: serde_json::Value =
-            request.get("/api/organizations/review-queue").await.json();
+        let listed: serde_json::Value = request.get("/api/organizations/review-queue").await.json();
         assert_eq!(listed["total"], 1);
         assert_eq!(listed["items"][0]["id"], id.as_str());
 

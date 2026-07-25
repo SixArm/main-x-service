@@ -3,10 +3,10 @@
 //! report (WPM-D21: who responded is visible; what they said is only
 //! ever a group aggregate).
 
-use workforce_planning_management_service::app::App;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
+use workforce_planning_management_service::app::App;
 
 use super::{activate, an_org, seed_employee};
 
@@ -47,7 +47,10 @@ async fn appraisal_round_trip() {
 
         // The self nomination is automatic; the subject cannot be
         // re-nominated; groups are a closed set.
-        let detail: Value = request.get(&format!("/api/appraisals/{a_pid}")).await.json();
+        let detail: Value = request
+            .get(&format!("/api/appraisals/{a_pid}"))
+            .await
+            .json();
         assert_eq!(detail["nominations"].as_array().unwrap().len(), 1);
         assert_eq!(detail["nominations"][0]["group"], "self");
         assert_eq!(
@@ -116,13 +119,22 @@ async fn appraisal_round_trip() {
         let bells = manager_bell.as_array().unwrap();
         assert_eq!(bells.len(), 1);
         assert_eq!(bells[0]["kind"], "appraisal_request");
-        assert!(bells[0]["body"].as_str().unwrap().contains("Test Employee A-0"));
+        assert!(
+            bells[0]["body"]
+                .as_str()
+                .unwrap()
+                .contains("Test Employee A-0")
+        );
         let self_bell: Value = request
             .get(&format!("/api/employees/{subject}/notifications"))
             .await
             .json();
         assert!(
-            self_bell.as_array().unwrap().iter().any(|n| n["kind"] == "appraisal_request"),
+            self_bell
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|n| n["kind"] == "appraisal_request"),
             "the self-assessment is a task too"
         );
         // Mark the manager's read: it stays listed, stamped.
@@ -155,7 +167,10 @@ async fn appraisal_round_trip() {
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0]["group"], "manager");
         assert_eq!(pending[0]["subject"], "Test Employee A-0");
-        assert_eq!(pending[0]["competencies"], json!(["communication", "delivery"]));
+        assert_eq!(
+            pending[0]["competencies"],
+            json!(["communication", "delivery"])
+        );
         // A non-nominated employee has no requests.
         let none: Value = request
             .get(&format!("/api/employees/{late}/appraisal-requests"))
@@ -206,7 +221,10 @@ async fn appraisal_round_trip() {
             .get(&format!("/api/employees/{manager}/appraisal-requests"))
             .await
             .json();
-        assert!(requests.as_array().unwrap().is_empty(), "responded ⇒ no longer pending");
+        assert!(
+            requests.as_array().unwrap().is_empty(),
+            "responded ⇒ no longer pending"
+        );
 
         // Two peers respond (below the floor of 3); the subject self-rates.
         for (peer, score) in peers.iter().take(2).zip([3, 5]) {
@@ -226,18 +244,30 @@ async fn appraisal_round_trip() {
             .assert_status_ok();
 
         // The detail shows who responded — never scores or comments.
-        let detail: Value = request.get(&format!("/api/appraisals/{a_pid}")).await.json();
+        let detail: Value = request
+            .get(&format!("/api/appraisals/{a_pid}"))
+            .await
+            .json();
         let raw = serde_json::to_string(&detail).unwrap();
-        assert!(!raw.contains("delegate more"), "no rater content on the detail view");
+        assert!(
+            !raw.contains("delegate more"),
+            "no rater content on the detail view"
+        );
         assert!(!raw.contains("scores"), "no scores on the detail view");
-        let responded: usize = detail["nominations"].as_array().unwrap().iter()
+        let responded: usize = detail["nominations"]
+            .as_array()
+            .unwrap()
+            .iter()
             .filter(|n| n["responded"] == true)
             .count();
         assert_eq!(responded, 4);
 
         // The report is gated on shared.
         assert_eq!(
-            request.get(&format!("/api/appraisals/{a_pid}/report")).await.status_code(),
+            request
+                .get(&format!("/api/appraisals/{a_pid}/report"))
+                .await
+                .status_code(),
             422,
             "report only once shared"
         );
@@ -246,18 +276,30 @@ async fn appraisal_round_trip() {
             .json(&json!({ "to": "shared" }))
             .await
             .assert_status_ok();
-        let report: Value = request.get(&format!("/api/appraisals/{a_pid}/report")).await.json();
+        let report: Value = request
+            .get(&format!("/api/appraisals/{a_pid}/report"))
+            .await
+            .json();
         let groups = report["groups"].as_array().unwrap();
         // Manager (n = 1) discloses by convention, with the comment.
         let manager_group = groups.iter().find(|g| g["group"] == "manager").unwrap();
         assert_eq!(manager_group["withheld"], false);
         assert_eq!(manager_group["competencies"]["communication"]["mean"], 4.0);
-        assert_eq!(manager_group["comments"][0], "Strong quarter; delegate more.");
+        assert_eq!(
+            manager_group["comments"][0],
+            "Strong quarter; delegate more."
+        );
         // Peer (2 < 3) is withheld — count included.
         let peer_group = groups.iter().find(|g| g["group"] == "peer").unwrap();
         assert_eq!(peer_group["withheld"], true);
-        assert!(peer_group["responses"].is_null(), "withheld cell hides its count");
-        assert!(peer_group["comments"].is_null(), "withheld cell hides its comments");
+        assert!(
+            peer_group["responses"].is_null(),
+            "withheld cell hides its count"
+        );
+        assert!(
+            peer_group["comments"].is_null(),
+            "withheld cell hides its comments"
+        );
         // Self discloses.
         let self_group = groups.iter().find(|g| g["group"] == "self").unwrap();
         assert_eq!(self_group["competencies"]["delivery"]["mean"], 4.0);
@@ -289,9 +331,17 @@ async fn appraisal_round_trip() {
             .find(|n| n["kind"] == "appraisal_shared")
             .expect("subject notified on share")
             .clone();
-        assert!(shared_note["body"].as_str().unwrap().contains("report is ready"));
+        assert!(
+            shared_note["body"]
+                .as_str()
+                .unwrap()
+                .contains("report is ready")
+        );
         let bell_raw = serde_json::to_string(&subject_bell).unwrap();
-        assert!(!bell_raw.contains("delegate more"), "no rater content in notifications");
+        assert!(
+            !bell_raw.contains("delegate more"),
+            "no rater content in notifications"
+        );
 
         // The report read is audited (WPM-R10 sensitivity posture).
         let audits: Value = request.get("/api/audits/recent").await.json();

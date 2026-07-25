@@ -45,7 +45,10 @@ async fn declare_contact_stakeholder(
 ) -> Result<Response> {
     let mut problems = Problems::new();
     problems.token_opt("role", rules::STAKEHOLDER_ROLES, payload.role.as_deref());
-    for (field, score) in [("influence", payload.influence), ("interest", payload.interest)] {
+    for (field, score) in [
+        ("influence", payload.influence),
+        ("interest", payload.interest),
+    ] {
         if let Some(score) = score
             && !rules::valid_grid_score(score)
         {
@@ -146,7 +149,15 @@ async fn create_partnership(
     }
     .insert(&ctx.db)
     .await?;
-    Audit::record(&ctx.db, "partnership", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &ctx.db,
+        "partnership",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(row)
 }
 
@@ -226,7 +237,10 @@ async fn upsert_membership(
     Path(pid): Path<String>,
     Json(payload): Json<MembershipPayload>,
 ) -> Result<Response> {
-    let status = payload.status.clone().unwrap_or_else(|| "active".to_string());
+    let status = payload
+        .status
+        .clone()
+        .unwrap_or_else(|| "active".to_string());
     let mut problems = Problems::new();
     problems.require_token("status", rules::MEMBERSHIP_STATUSES, &status);
     ensure_valid(&problems.into_vec())?;
@@ -299,7 +313,15 @@ async fn create_group(
     }
     .insert(&ctx.db)
     .await?;
-    Audit::record(&ctx.db, "working_group", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &ctx.db,
+        "working_group",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(row)
 }
 
@@ -435,8 +457,14 @@ async fn find_group(ctx: &AppContext, pid: &str) -> Result<working_groups::Model
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api")
-        .add("/contacts/{pid}/stakeholder", put(declare_contact_stakeholder))
-        .add("/accounts/{pid}/stakeholder", put(declare_account_stakeholder))
+        .add(
+            "/contacts/{pid}/stakeholder",
+            put(declare_contact_stakeholder),
+        )
+        .add(
+            "/accounts/{pid}/stakeholder",
+            put(declare_account_stakeholder),
+        )
         .add("/accounts/{pid}/partnerships", post(create_partnership))
         .add("/accounts/{pid}/partnerships", get(list_partnerships))
         .add("/partnerships/{pid}/stage", post(partnership_stage))

@@ -755,7 +755,10 @@ pub async fn get_review_queue(
             let total = items.len();
             (
                 StatusCode::OK,
-                Json(ApiResponse::success(ReviewQueueListResponse { items, total })),
+                Json(ApiResponse::success(ReviewQueueListResponse {
+                    items,
+                    total,
+                })),
             )
                 .into_response()
         }
@@ -826,7 +829,6 @@ pub async fn review_decision(
             .into_response(),
     }
 }
-
 
 /// GDPR data export for one place.
 #[utoipa::path(get, path = "/api/places/{id}/export", tag = "privacy",
@@ -943,10 +945,11 @@ mod review_report_tests {
         let ok: ReviewDecisionRequest =
             serde_json::from_value(serde_json::json!({"status": "confirmed"})).unwrap();
         assert_eq!(ok.status, ReviewDecision::Confirmed);
-        assert!(serde_json::from_value::<ReviewDecisionRequest>(
-            serde_json::json!({"status": "pending"})
-        )
-        .is_err());
+        assert!(
+            serde_json::from_value::<ReviewDecisionRequest>(
+                serde_json::json!({"status": "pending"})
+            )
+            .is_err()
+        );
     }
-
 }

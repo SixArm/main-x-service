@@ -29,7 +29,10 @@ pub const MAX_COMPETENCIES: usize = 12;
 ///
 /// A human-readable refusal naming the legal moves.
 pub fn transition(current: &str, to: &str) -> Result<(), String> {
-    let ok = matches!((current, to), ("draft", "collecting") | ("collecting", "shared"));
+    let ok = matches!(
+        (current, to),
+        ("draft", "collecting") | ("collecting", "shared")
+    );
     if ok {
         Ok(())
     } else {
@@ -94,9 +97,15 @@ mod tests {
     fn lifecycle_is_one_way() {
         assert!(transition("draft", "collecting").is_ok());
         assert!(transition("collecting", "shared").is_ok());
-        assert!(transition("draft", "shared").is_err(), "no skipping collection");
+        assert!(
+            transition("draft", "shared").is_err(),
+            "no skipping collection"
+        );
         assert!(transition("shared", "collecting").is_err(), "terminal");
-        assert!(transition("collecting", "draft").is_err(), "nominations freeze");
+        assert!(
+            transition("collecting", "draft").is_err(),
+            "nominations freeze"
+        );
     }
 
     /// The WPM-D21 floor: peer/report need 3; manager/self disclose
@@ -121,17 +130,29 @@ mod tests {
             [("communication".into(), 4), ("delivery".into(), 3)].into();
         assert!(check_scores(&declared, &good).is_ok());
         let missing: BTreeMap<String, i32> = [("communication".into(), 4)].into();
-        assert!(check_scores(&declared, &missing).unwrap_err().contains("delivery"));
+        assert!(
+            check_scores(&declared, &missing)
+                .unwrap_err()
+                .contains("delivery")
+        );
         let off_scale: BTreeMap<String, i32> =
             [("communication".into(), 9), ("delivery".into(), 3)].into();
-        assert!(check_scores(&declared, &off_scale).unwrap_err().contains("1-5"));
+        assert!(
+            check_scores(&declared, &off_scale)
+                .unwrap_err()
+                .contains("1-5")
+        );
         let undeclared: BTreeMap<String, i32> = [
             ("communication".into(), 4),
             ("delivery".into(), 3),
             ("astrology".into(), 5),
         ]
         .into();
-        assert!(check_scores(&declared, &undeclared).unwrap_err().contains("astrology"));
+        assert!(
+            check_scores(&declared, &undeclared)
+                .unwrap_err()
+                .contains("astrology")
+        );
     }
 
     #[test]

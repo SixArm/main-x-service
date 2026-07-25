@@ -174,7 +174,16 @@ async fn record_consent(
         Some(serde_json::json!({ "source": payload.source })),
     )
     .await?;
-    streaming::emit_on(&txn, "contact", &kind, &contact_pid.to_string(), "", caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "contact",
+        &kind,
+        &contact_pid.to_string(),
+        "",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::empty_json()
 }
@@ -193,7 +202,15 @@ async fn consent_history(
         .order_by_asc(consent_events::Column::Id)
         .all(&ctx.db)
         .await?;
-    Audit::record(&ctx.db, "contact", contact.pid, "consent_history_read", caller.actor(), None).await?;
+    Audit::record(
+        &ctx.db,
+        "contact",
+        contact.pid,
+        "consent_history_read",
+        caller.actor(),
+        None,
+    )
+    .await?;
     format::json(rows)
 }
 
@@ -228,7 +245,9 @@ async fn create_segment(
     .await?;
     Audit::record(&txn, "segment", row.pid, "created", caller.actor(), None).await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// The contacts a segment matches right now (consent-gated).
@@ -255,10 +274,17 @@ async fn evaluate_segment(
 /// `GET /api/segments/{pid}/preview` — count + sample before
 /// scheduling (CRM-R7).
 #[debug_handler]
-async fn preview_segment(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Result<Response> {
+async fn preview_segment(
+    State(ctx): State<AppContext>,
+    Path(pid): Path<String>,
+) -> Result<Response> {
     let segment = records::find_segment(&ctx.db, records::parse_pid(&pid)?).await?;
     let matched = evaluate_segment(&ctx.db, &segment).await?;
-    let sample: Vec<_> = matched.iter().take(5).map(|c| c.display_name.clone()).collect();
+    let sample: Vec<_> = matched
+        .iter()
+        .take(5)
+        .map(|c| c.display_name.clone())
+        .collect();
     format::json(serde_json::json!({ "count": matched.len(), "sample": sample }))
 }
 
@@ -314,7 +340,9 @@ async fn create_campaign(
     .await?;
     Audit::record(&txn, "campaign", row.pid, "created", caller.actor(), None).await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/campaigns`.
@@ -340,8 +368,13 @@ async fn campaign_status(
     problems.require_token("to", tokens::CAMPAIGN_STATUSES, &payload.to);
     ensure_valid(&problems.into_vec())?;
     let campaign = records::find_campaign(&ctx.db, records::parse_pid(&pid)?).await?;
-    lifecycle::check("campaign", lifecycle::CAMPAIGN, &campaign.status, &payload.to)
-        .map_err(|e| unprocessable(&e))?;
+    lifecycle::check(
+        "campaign",
+        lifecycle::CAMPAIGN,
+        &campaign.status,
+        &payload.to,
+    )
+    .map_err(|e| unprocessable(&e))?;
     let txn = ctx.db.begin().await?;
     let from = campaign.status.clone();
     let name = campaign.name.clone();
@@ -362,7 +395,16 @@ async fn campaign_status(
         Some(serde_json::json!({ "from": from })),
     )
     .await?;
-    streaming::emit_on(&txn, "campaign", kind, &row.pid.to_string(), &name, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "campaign",
+        kind,
+        &row.pid.to_string(),
+        &name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }
@@ -432,7 +474,16 @@ async fn run_campaign(
         Some(serde_json::json!({ "recipients": recipients })),
     )
     .await?;
-    streaming::emit_on(&txn, "campaign", "campaign_completed", &campaign_pid.to_string(), &name, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "campaign",
+        "campaign_completed",
+        &campaign_pid.to_string(),
+        &name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }
@@ -441,7 +492,10 @@ async fn run_campaign(
 /// recipients → delivered → opened → clicked → leads → won revenue;
 /// ROI reports `null` on a zero cost, with absolutes alongside.
 #[debug_handler]
-async fn campaign_funnel(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Result<Response> {
+async fn campaign_funnel(
+    State(ctx): State<AppContext>,
+    Path(pid): Path<String>,
+) -> Result<Response> {
     let campaign = records::find_campaign(&ctx.db, records::parse_pid(&pid)?).await?;
     let lead_rows = crate::models::_entities::leads::Entity::find()
         .filter(crate::models::_entities::leads::Column::CampaignPid.eq(campaign.pid))
@@ -457,7 +511,8 @@ async fn campaign_funnel(State(ctx): State<AppContext>, Path(pid): Path<String>)
     // Won revenue in the campaign's currency only (per-currency
     // honesty: other currencies are listed, never summed in).
     let mut same_currency_revenue: i64 = 0;
-    let mut other_currency: std::collections::BTreeMap<String, i64> = std::collections::BTreeMap::new();
+    let mut other_currency: std::collections::BTreeMap<String, i64> =
+        std::collections::BTreeMap::new();
     for deal in &attributed_deals {
         if deal.currency.eq_ignore_ascii_case(&campaign.currency) {
             same_currency_revenue = same_currency_revenue.saturating_add(deal.amount_minor);
@@ -517,9 +572,19 @@ async fn create_sequence(
         .insert(&txn)
         .await?;
     }
-    Audit::record(&txn, "nurture_sequence", sequence.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "nurture_sequence",
+        sequence.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: sequence.pid.to_string() })
+    format::json(PidRef {
+        pid: sequence.pid.to_string(),
+    })
 }
 
 /// `POST /api/nurture-sequences/{pid}/enrollments` — enrol a
@@ -557,9 +622,19 @@ async fn enroll(
     }
     .insert(&txn)
     .await?;
-    Audit::record(&txn, "nurture_enrollment", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "nurture_enrollment",
+        row.pid,
+        "created",
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `POST /api/nurture/advance` — the **idempotent advance sweep**
@@ -630,7 +705,10 @@ async fn advance_nurture(State(ctx): State<AppContext>, caller: MaybeAuthUser) -
             kind: ActiveValue::set("email".to_string()),
             occurred_at: ActiveValue::set(now),
             actor_ref: ActiveValue::set(None),
-            summary: ActiveValue::set(format!("Nurture step {} ({})", step.position, step.template_ref)),
+            summary: ActiveValue::set(format!(
+                "Nurture step {} ({})",
+                step.position, step.template_ref
+            )),
             due_on: ActiveValue::set(None),
             done: ActiveValue::set(false),
             deleted_at: ActiveValue::set(None),

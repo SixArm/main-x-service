@@ -200,10 +200,14 @@ impl Config {
         if let Some(v) = get("DATABASE_URL") {
             config.database.url = v;
         }
-        if let Some(v) = parse_setting::<u32>("DATABASE_MAX_CONNECTIONS", get("DATABASE_MAX_CONNECTIONS"))? {
+        if let Some(v) =
+            parse_setting::<u32>("DATABASE_MAX_CONNECTIONS", get("DATABASE_MAX_CONNECTIONS"))?
+        {
             config.database.max_connections = v;
         }
-        if let Some(v) = parse_setting::<u32>("DATABASE_MIN_CONNECTIONS", get("DATABASE_MIN_CONNECTIONS"))? {
+        if let Some(v) =
+            parse_setting::<u32>("DATABASE_MIN_CONNECTIONS", get("DATABASE_MIN_CONNECTIONS"))?
+        {
             config.database.min_connections = v;
         }
 
@@ -220,7 +224,9 @@ impl Config {
         if let Some(v) = get("SEARCH_INDEX_PATH") {
             config.search.index_path = v;
         }
-        if let Some(v) = parse_setting::<usize>("SEARCH_CACHE_SIZE_MB", get("SEARCH_CACHE_SIZE_MB"))? {
+        if let Some(v) =
+            parse_setting::<usize>("SEARCH_CACHE_SIZE_MB", get("SEARCH_CACHE_SIZE_MB"))?
+        {
             config.search.cache_size_mb = v;
         }
 
@@ -291,12 +297,21 @@ mod tests {
         let config = Config::from_source(|_| None).expect("no values to parse");
 
         assert_eq!(config.database.url, defaults.database.url);
-        assert_eq!(config.database.max_connections, defaults.database.max_connections);
+        assert_eq!(
+            config.database.max_connections,
+            defaults.database.max_connections
+        );
         assert_eq!(config.server.host, defaults.server.host);
         assert_eq!(config.server.port, defaults.server.port);
         assert_eq!(config.search.index_path, defaults.search.index_path);
-        assert!((config.matching.threshold_score - defaults.matching.threshold_score).abs() < f64::EPSILON);
-        assert_eq!(config.observability.log_level, defaults.observability.log_level);
+        assert!(
+            (config.matching.threshold_score - defaults.matching.threshold_score).abs()
+                < f64::EPSILON
+        );
+        assert_eq!(
+            config.observability.log_level,
+            defaults.observability.log_level
+        );
         assert_eq!(config.streaming.topic, defaults.streaming.topic);
     }
 

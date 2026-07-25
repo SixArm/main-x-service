@@ -106,7 +106,11 @@ const fn default_true() -> bool {
 fn validate_site(p: &SitePayload) -> Vec<String> {
     let mut problems = Problems::new();
     problems.require_text("name", &p.name);
-    problems.ref_opt("place_ref", entity_ref::EntityType::Place, p.place_ref.as_deref());
+    problems.ref_opt(
+        "place_ref",
+        entity_ref::EntityType::Place,
+        p.place_ref.as_deref(),
+    );
     problems.ref_opt(
         "organization_ref",
         entity_ref::EntityType::Organization,
@@ -121,14 +125,22 @@ fn validate_ward(p: &WardPayload) -> Vec<String> {
     problems.require_text("code", &p.code);
     problems.require_token("kind", tokens::WARD_KINDS, &p.kind);
     problems.cap_opt("specialty", p.specialty.as_deref());
-    problems.ref_opt("place_ref", entity_ref::EntityType::Place, p.place_ref.as_deref());
+    problems.ref_opt(
+        "place_ref",
+        entity_ref::EntityType::Place,
+        p.place_ref.as_deref(),
+    );
     problems.into_vec()
 }
 
 fn validate_bay(p: &BayPayload) -> Vec<String> {
     let mut problems = Problems::new();
     problems.require_text("name", &p.name);
-    problems.require_token("sex_designation", tokens::SEX_DESIGNATIONS, &p.sex_designation);
+    problems.require_token(
+        "sex_designation",
+        tokens::SEX_DESIGNATIONS,
+        &p.sex_designation,
+    );
     problems.into_vec()
 }
 
@@ -158,9 +170,20 @@ async fn create_site(
     .insert(&txn)
     .await?;
     Audit::record(&txn, "site", row.pid, "created", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "site", "created", &row.pid.to_string(), &row.name, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "site",
+        "created",
+        &row.pid.to_string(),
+        &row.name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/sites` — active sites.
@@ -202,9 +225,20 @@ async fn create_ward(
     .insert(&txn)
     .await?;
     Audit::record(&txn, "ward", row.pid, "created", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "ward", "created", &row.pid.to_string(), &row.name, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "ward",
+        "created",
+        &row.pid.to_string(),
+        &row.name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/wards` — active wards.
@@ -276,8 +310,25 @@ async fn update_ward(
     }
     let row = active.update(&txn).await?;
     let snapshot = serde_json::json!({ "before": before, "ward_pid": row.pid.to_string() });
-    Audit::record(&txn, "ward", row.pid, "updated", caller.actor(), Some(snapshot)).await?;
-    streaming::emit_on(&txn, "ward", "updated", &row.pid.to_string(), &row.name, caller.actor(), None).await?;
+    Audit::record(
+        &txn,
+        "ward",
+        row.pid,
+        "updated",
+        caller.actor(),
+        Some(snapshot),
+    )
+    .await?;
+    streaming::emit_on(
+        &txn,
+        "ward",
+        "updated",
+        &row.pid.to_string(),
+        &row.name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }
@@ -305,9 +356,20 @@ async fn create_bay(
     .insert(&txn)
     .await?;
     Audit::record(&txn, "bay", row.pid, "created", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "bay", "created", &row.pid.to_string(), &row.name, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "bay",
+        "created",
+        &row.pid.to_string(),
+        &row.name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `PUT /api/bays/{pid}` — update closure / designation.
@@ -327,7 +389,11 @@ async fn update_bay(
     Json(payload): Json<BayUpdate>,
 ) -> Result<Response> {
     let mut problems = Problems::new();
-    problems.token_opt("sex_designation", tokens::SEX_DESIGNATIONS, payload.sex_designation.as_deref());
+    problems.token_opt(
+        "sex_designation",
+        tokens::SEX_DESIGNATIONS,
+        payload.sex_designation.as_deref(),
+    );
     ensure_valid(&problems.into_vec())?;
     let bay = records::find_bay(&ctx.db, records::parse_pid(&pid)?).await?;
     let txn = ctx.db.begin().await?;
@@ -348,7 +414,16 @@ async fn update_bay(
         Some(serde_json::json!({ "ward_pid": row.ward_pid.to_string() })),
     )
     .await?;
-    streaming::emit_on(&txn, "bay", "updated", &row.pid.to_string(), &row.name, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "bay",
+        "updated",
+        &row.pid.to_string(),
+        &row.name,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
     format::json(row)
 }
@@ -388,9 +463,20 @@ async fn create_bed(
     .insert(&txn)
     .await?;
     Audit::record(&txn, "bed", row.pid, "created", caller.actor(), None).await?;
-    streaming::emit_on(&txn, "bed", "created", &row.pid.to_string(), &row.number, caller.actor(), None).await?;
+    streaming::emit_on(
+        &txn,
+        "bed",
+        "created",
+        &row.pid.to_string(),
+        &row.number,
+        caller.actor(),
+        None,
+    )
+    .await?;
     txn.commit().await?;
-    format::json(PidRef { pid: row.pid.to_string() })
+    format::json(PidRef {
+        pid: row.pid.to_string(),
+    })
 }
 
 /// `GET /api/beds/{pid}`.
@@ -422,7 +508,9 @@ async fn bed_state(
         },
         "reopen" => Transition::Reopen,
         "admit" | "vacate" => {
-            return Err(unprocessable("admit/vacate are driven by the stay endpoints"));
+            return Err(unprocessable(
+                "admit/vacate are driven by the stay endpoints",
+            ));
         }
         other => return Err(unprocessable(&format!("unknown transition {other:?}"))),
     };
@@ -478,7 +566,15 @@ pub(crate) async fn persist_outcome(
         "deep_clean_required": outcome.deep_clean_required,
         "closure_reason": outcome.closure_reason,
     });
-    Audit::record(txn, "bed", pid, "bed_state_changed", actor, Some(detail.clone())).await?;
+    Audit::record(
+        txn,
+        "bed",
+        pid,
+        "bed_state_changed",
+        actor,
+        Some(detail.clone()),
+    )
+    .await?;
     streaming::emit_on(
         txn,
         "bed",
@@ -508,8 +604,16 @@ macro_rules! soft_delete_handler {
             active.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
             active.update(&txn).await?;
             Audit::record(&txn, $entity, pid, "deleted", caller.actor(), None).await?;
-            streaming::emit_on(&txn, $entity, "deleted", &pid.to_string(), "", caller.actor(), None)
-                .await?;
+            streaming::emit_on(
+                &txn,
+                $entity,
+                "deleted",
+                &pid.to_string(),
+                "",
+                caller.actor(),
+                None,
+            )
+            .await?;
             txn.commit().await?;
             format::empty_json()
         }

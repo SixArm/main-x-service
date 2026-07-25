@@ -2,10 +2,10 @@
 //! prompts (department + age band) → acknowledgements → the one
 //! multi-dose reminder → aggregate-only uptake.
 
-use workforce_planning_management_service::app::App;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
+use workforce_planning_management_service::app::App;
 
 use super::{activate, an_org, seed_employee};
 
@@ -87,7 +87,10 @@ async fn wellbeing_round_trip() {
             .filter_map(|p| p["name"].as_str())
             .collect();
         assert!(names.contains(&"Seasonal flu vaccination"));
-        assert!(!names.contains(&"Shingles vaccination"), "unknown age is not a match");
+        assert!(
+            !names.contains(&"Shingles vaccination"),
+            "unknown age is not a match"
+        );
         // The finance employee is outside the flu cohort.
         let other: Value = request
             .get(&format!("/api/employees/{second}/wellbeing-prompts"))
@@ -97,8 +100,10 @@ async fn wellbeing_round_trip() {
 
         // ── Priming the birth date (the upstream person seam) makes the
         // age-banded rule match.
-        let employee_row: Value =
-            request.get(&format!("/api/employees/{engineer}")).await.json();
+        let employee_row: Value = request
+            .get(&format!("/api/employees/{engineer}"))
+            .await
+            .json();
         let person_urn = employee_row["person_ref"].as_str().unwrap();
         workforce_planning_management_service::clients::prime_birth_date(
             person_urn,
@@ -115,12 +120,17 @@ async fn wellbeing_round_trip() {
             .iter()
             .filter_map(|p| p["name"].as_str())
             .collect();
-        assert!(names.contains(&"Shingles vaccination"), "68-year-old matches 65+");
+        assert!(
+            names.contains(&"Shingles vaccination"),
+            "68-year-old matches 65+"
+        );
 
         // ── Acknowledgements: an unknown response token is refused.
         assert_eq!(
             request
-                .post(&format!("/api/employees/{engineer}/wellbeing-acknowledgements"))
+                .post(&format!(
+                    "/api/employees/{engineer}/wellbeing-acknowledgements"
+                ))
                 .json(&json!({ "entitlement_pid": flu_pid, "response": "maybe" }))
                 .await
                 .status_code(),
@@ -129,13 +139,17 @@ async fn wellbeing_round_trip() {
         );
         // Declining shingles removes it and never re-prompts.
         request
-            .post(&format!("/api/employees/{engineer}/wellbeing-acknowledgements"))
+            .post(&format!(
+                "/api/employees/{engineer}/wellbeing-acknowledgements"
+            ))
             .json(&json!({ "entitlement_pid": shingles_pid, "response": "declined" }))
             .await
             .assert_status_ok();
         // Booking the two-dose flu course earns exactly one reminder.
         request
-            .post(&format!("/api/employees/{engineer}/wellbeing-acknowledgements"))
+            .post(&format!(
+                "/api/employees/{engineer}/wellbeing-acknowledgements"
+            ))
             .json(&json!({ "entitlement_pid": flu_pid, "response": "booked" }))
             .await
             .assert_status_ok();
@@ -144,7 +158,11 @@ async fn wellbeing_round_trip() {
             .await
             .json();
         let items = prompts["prompts"].as_array().unwrap();
-        assert_eq!(items.len(), 1, "declined is gone; flu comes back once as a reminder");
+        assert_eq!(
+            items.len(),
+            1,
+            "declined is gone; flu comes back once as a reminder"
+        );
         assert_eq!(items[0]["kind"], "reminder");
         assert_eq!(items[0]["name"], "Seasonal flu vaccination");
         // Serving it stamped it: the next fetch is quiet.
@@ -152,21 +170,36 @@ async fn wellbeing_round_trip() {
             .get(&format!("/api/employees/{engineer}/wellbeing-prompts"))
             .await
             .json();
-        assert!(prompts["prompts"].as_array().unwrap().is_empty(), "one reminder only");
+        assert!(
+            prompts["prompts"].as_array().unwrap().is_empty(),
+            "one reminder only"
+        );
 
         // ── Uptake: aggregate counts only — no individual appears.
         let uptake: Value = request.get("/api/wellbeing/uptake").await.json();
         let rows = uptake["entitlements"].as_array().unwrap();
-        let flu_row = rows.iter().find(|r| r["name"] == "Seasonal flu vaccination").unwrap();
+        let flu_row = rows
+            .iter()
+            .find(|r| r["name"] == "Seasonal flu vaccination")
+            .unwrap();
         assert_eq!(flu_row["by_response"]["booked"], 1);
         assert_eq!(flu_row["uptake_rate"]["numerator"], 1);
         assert_eq!(flu_row["uptake_rate"]["denominator"], 1);
-        let shingles_row = rows.iter().find(|r| r["name"] == "Shingles vaccination").unwrap();
+        let shingles_row = rows
+            .iter()
+            .find(|r| r["name"] == "Shingles vaccination")
+            .unwrap();
         assert_eq!(shingles_row["by_response"]["declined"], 1);
         assert_eq!(shingles_row["uptake_rate"]["value"], 0.0);
         let raw = serde_json::to_string(&uptake).unwrap();
-        assert!(!raw.contains(&engineer), "no employee pid in the aggregate view");
-        assert!(!raw.contains(person_urn), "no person URN in the aggregate view");
+        assert!(
+            !raw.contains(&engineer),
+            "no employee pid in the aggregate view"
+        );
+        assert!(
+            !raw.contains(person_urn),
+            "no person URN in the aggregate view"
+        );
 
         // ── The acknowledgement is audited (who said what, never a
         // clinical fact).
@@ -181,7 +214,11 @@ async fn wellbeing_round_trip() {
             .await
             .assert_status_ok();
         let listed: Value = request.get("/api/wellbeing-entitlements").await.json();
-        assert_eq!(listed.as_array().unwrap().len(), 1, "closed rule not listed");
+        assert_eq!(
+            listed.as_array().unwrap().len(),
+            1,
+            "closed rule not listed"
+        );
     })
     .await;
 }
@@ -215,8 +252,10 @@ async fn benefits_awareness_round_trip() {
         assert_eq!(
             request
                 .post("/api/wellbeing-entitlements")
-                .json(&json!({ "name": "Bad", "description": "x", "kind": "health",
-                               "benefit_plan_pid": plan_pid }))
+                .json(
+                    &json!({ "name": "Bad", "description": "x", "kind": "health",
+                               "benefit_plan_pid": plan_pid })
+                )
                 .await
                 .status_code(),
             422,
@@ -234,8 +273,10 @@ async fn benefits_awareness_round_trip() {
         assert_eq!(
             request
                 .post("/api/wellbeing-entitlements")
-                .json(&json!({ "name": "Bad", "description": "x", "kind": "benefit",
-                               "benefit_plan_pid": uuid::Uuid::new_v4() }))
+                .json(
+                    &json!({ "name": "Bad", "description": "x", "kind": "benefit",
+                               "benefit_plan_pid": uuid::Uuid::new_v4() })
+                )
                 .await
                 .status_code(),
             404,
@@ -282,14 +323,21 @@ async fn benefits_awareness_round_trip() {
         );
 
         // `?kind=` filters; the uptake row carries the kind.
-        let benefit_rules: Value =
-            request.get("/api/wellbeing-entitlements?kind=benefit").await.json();
+        let benefit_rules: Value = request
+            .get("/api/wellbeing-entitlements?kind=benefit")
+            .await
+            .json();
         assert_eq!(benefit_rules.as_array().unwrap().len(), 1);
-        let health_rules: Value =
-            request.get("/api/wellbeing-entitlements?kind=health").await.json();
+        let health_rules: Value = request
+            .get("/api/wellbeing-entitlements?kind=health")
+            .await
+            .json();
         assert!(health_rules.as_array().unwrap().is_empty());
         assert_eq!(
-            request.get("/api/wellbeing-entitlements?kind=voucher").await.status_code(),
+            request
+                .get("/api/wellbeing-entitlements?kind=voucher")
+                .await
+                .status_code(),
             422
         );
         let uptake: Value = request.get("/api/wellbeing/uptake").await.json();
@@ -301,12 +349,18 @@ async fn benefits_awareness_round_trip() {
             .expect("uptake row");
         assert_eq!(row["kind"], "benefit");
         assert_eq!(row["uptake_rate"]["denominator"], 0);
-        assert!(row["uptake_rate"]["value"].is_null(), "no acknowledgements ⇒ null, not 0");
+        assert!(
+            row["uptake_rate"]["value"].is_null(),
+            "no acknowledgements ⇒ null, not 0"
+        );
         assert_eq!(
             row["enrolment_conversion"]["denominator"], 0,
             "plan-linked rule carries conversion terms"
         );
-        assert!(row["enrolment_conversion"]["value"].is_null(), "null, not 0");
+        assert!(
+            row["enrolment_conversion"]["value"].is_null(),
+            "null, not 0"
+        );
 
         // ── Enrolment conversion: of the acknowledgers, how many are
         // now live-enrolled in the linked plan. The enrolled employee
@@ -315,12 +369,16 @@ async fn benefits_awareness_round_trip() {
         let second = seed_employee(&request, &org, "B-2", None).await;
         activate(&request, &second).await;
         request
-            .post(&format!("/api/employees/{employee}/wellbeing-acknowledgements"))
+            .post(&format!(
+                "/api/employees/{employee}/wellbeing-acknowledgements"
+            ))
             .json(&json!({ "entitlement_pid": rule_pid, "response": "done" }))
             .await
             .assert_status_ok();
         request
-            .post(&format!("/api/employees/{second}/wellbeing-acknowledgements"))
+            .post(&format!(
+                "/api/employees/{second}/wellbeing-acknowledgements"
+            ))
             .json(&json!({ "entitlement_pid": rule_pid, "response": "dismissed" }))
             .await
             .assert_status_ok();
@@ -347,7 +405,10 @@ async fn benefits_awareness_round_trip() {
             "no linked plan ⇒ no conversion"
         );
         let raw = serde_json::to_string(&uptake).unwrap();
-        assert!(!raw.contains(&second), "still no employee pid in the aggregate view");
+        assert!(
+            !raw.contains(&second),
+            "still no employee pid in the aggregate view"
+        );
     })
     .await;
 }
@@ -391,8 +452,12 @@ async fn pulse_round_trip() {
         let closed_pid = closed["pid"].as_str().unwrap().to_string();
         let open_pid = open["pid"].as_str().unwrap().to_string();
         let listed: Value = request.get("/api/pulse-surveys").await.json();
-        let open_states: Vec<bool> = listed.as_array().unwrap().iter()
-            .filter_map(|s| s["open"].as_bool()).collect();
+        let open_states: Vec<bool> = listed
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|s| s["open"].as_bool())
+            .collect();
         assert!(open_states.contains(&true) && open_states.contains(&false));
         assert_eq!(
             request
@@ -428,7 +493,10 @@ async fn pulse_round_trip() {
             .await
             .json();
         assert_eq!(results["overall"]["suppressed"], true);
-        assert!(results["overall"]["count"].is_null(), "count withheld below the floor");
+        assert!(
+            results["overall"]["count"].is_null(),
+            "count withheld below the floor"
+        );
         assert_eq!(results["departments"][0]["suppressed"], true);
 
         // The fifth engineer reaches the floor; finance (1 response)
@@ -448,12 +516,18 @@ async fn pulse_round_trip() {
             .await
             .json();
         let departments = results["departments"].as_array().unwrap();
-        let engineering = departments.iter().find(|d| d["department"] == "engineering").unwrap();
+        let engineering = departments
+            .iter()
+            .find(|d| d["department"] == "engineering")
+            .unwrap();
         assert_eq!(engineering["suppressed"], false);
         assert_eq!(engineering["count"], 5);
         assert_eq!(engineering["distribution"], json!([1, 1, 1, 1, 1]));
         assert_eq!(engineering["mean"], 3.0);
-        let finance = departments.iter().find(|d| d["department"] == "finance").unwrap();
+        let finance = departments
+            .iter()
+            .find(|d| d["department"] == "finance")
+            .unwrap();
         assert_eq!(finance["suppressed"], true);
         assert!(finance["count"].is_null(), "small cell withholds its count");
         // 6 total responses ≥ k ⇒ the overall block discloses.
@@ -464,10 +538,16 @@ async fn pulse_round_trip() {
         // links a response to an employee.
         let raw = serde_json::to_string(&results).unwrap();
         for employee in engineers.iter().chain([&accountant]) {
-            assert!(!raw.contains(employee.as_str()), "no employee pid in results");
+            assert!(
+                !raw.contains(employee.as_str()),
+                "no employee pid in results"
+            );
         }
         let audits: Value = request.get("/api/audits/recent").await.json();
-        let submissions: Vec<&Value> = audits.as_array().unwrap().iter()
+        let submissions: Vec<&Value> = audits
+            .as_array()
+            .unwrap()
+            .iter()
             .filter(|a| a["entity"] == "pulse_response")
             .collect();
         assert!(!submissions.is_empty(), "submissions leave an audit trail");

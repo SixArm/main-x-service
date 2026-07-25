@@ -144,7 +144,11 @@ mod tests {
         assert!(p.into_vec().is_empty());
         // Wrong type, malformed, and bad uuid each fail.
         let mut p = Problems::new();
-        p.require_ref("person_ref", EntityType::Person, &format!("worker:{}", uuid::Uuid::new_v4()));
+        p.require_ref(
+            "person_ref",
+            EntityType::Person,
+            &format!("worker:{}", uuid::Uuid::new_v4()),
+        );
         p.require_ref("person_ref", EntityType::Person, "not-a-urn");
         p.require_ref("person_ref", EntityType::Person, "person:nope");
         assert_eq!(p.into_vec().len(), 3);

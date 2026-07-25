@@ -39,12 +39,7 @@ pub(crate) fn conditional(headers: &HeaderMap, payload: serde_json::Value) -> Re
     if let Some(object) = body.as_object_mut() {
         object.insert("as_of".into(), serde_json::json!(chrono::Utc::now()));
     }
-    (
-        StatusCode::OK,
-        [(header::ETAG, tag)],
-        axum::Json(body),
-    )
-        .into_response()
+    (StatusCode::OK, [(header::ETAG, tag)], axum::Json(body)).into_response()
 }
 
 /// `GET /api/dashboards/sales` — win rate + pipeline value by stage
@@ -71,7 +66,10 @@ async fn sales_dashboard(State(ctx): State<AppContext>, headers: HeaderMap) -> R
             .or_insert_with(|| serde_json::json!({ "count": 0, "totals_minor": {} }));
         entry["count"] = serde_json::json!(entry["count"].as_i64().unwrap_or(0) + 1);
         let totals = entry["totals_minor"].as_object_mut().expect("object");
-        let current = totals.get(&deal.currency).and_then(serde_json::Value::as_i64).unwrap_or(0);
+        let current = totals
+            .get(&deal.currency)
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0);
         totals.insert(
             deal.currency.clone(),
             serde_json::json!(current.saturating_add(deal.amount_minor)),
@@ -141,8 +139,7 @@ async fn account_clv(State(ctx): State<AppContext>, Path(pid): Path<String>) -> 
         .iter()
         .map(|deal| (deal.amount_minor, deal.currency.clone()))
         .collect();
-    let totals = analytics::clv_by_currency(&inputs)
-        .map_err(|e| super::unprocessable(&e))?;
+    let totals = analytics::clv_by_currency(&inputs).map_err(|e| super::unprocessable(&e))?;
     format::json(serde_json::json!({
         "account_pid": account.pid,
         "won_deals": won.len(),

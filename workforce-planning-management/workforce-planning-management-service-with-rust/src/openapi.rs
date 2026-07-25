@@ -4,7 +4,7 @@
 //! request/response essentials; the full field-by-field shapes live in
 //! the spec (`../spec/domain-model.md`).
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// The full `OpenAPI` document, served at `/api-docs/openapi.json`.
 #[must_use]
