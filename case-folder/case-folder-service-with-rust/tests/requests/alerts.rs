@@ -6,6 +6,7 @@ use serial_test::serial;
 /// Hospital B) surfaces a geofence alert naming both buildings.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn cross_building_move_raises_geofence_alert() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -60,6 +61,7 @@ async fn cross_building_move_raises_geofence_alert() {
 /// geofence alert.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn same_building_move_raises_no_alert() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;

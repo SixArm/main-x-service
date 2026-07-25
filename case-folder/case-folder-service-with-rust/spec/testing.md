@@ -36,8 +36,15 @@ boundary-crossing rule:
 
 ## Request tests in repo (`tests/requests/*.rs`)
 
-Run with `DATABASE_URL=postgres://…/case_folder_test cargo test
---test requests`. Each test marks `#[serial]` and calls `clean_db()` at
+The 50 request tests are **`#[ignore]`-gated**, matching every sibling
+service: a plain `cargo test` reports them as ignored rather than
+failing on a machine with no `case_folder_test` database. Run them with
+
+```sh
+DATABASE_URL=postgres://…/case_folder_test cargo test -- --ignored
+```
+
+Each test marks `#[serial]` and calls `clean_db()` at
 the top (which resets all five stub services), so it starts from an
 empty world. Each test asserts a status code + JSON shape — no HTML
 markup. The table below is a representative subset of the 50 tests;
@@ -85,7 +92,9 @@ with a `Set-Cookie` that clears `cts_session` (`Max-Age=0`).
 cargo check
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
-DATABASE_URL=postgres://postgres@localhost:5432/case_folder_test cargo test
+cargo test                               # unit tests; request tests report as ignored
+DATABASE_URL=postgres://postgres@localhost:5432/case_folder_test \
+  cargo test -- --ignored                # the 50 request tests
 ```
 
 Postgres only needs to be reachable — no tables exist.
@@ -100,7 +109,8 @@ export DATABASE_URL=postgres://postgres:postgres@localhost:5432/case_folder_deve
 # Iterate
 cargo run -- start                       # dev server (JSON API on :5150)
 cargo run -- routes                      # print route table
-cargo test                               # all tests
+cargo test                               # unit tests (request tests are #[ignore]d)
+DATABASE_URL=… cargo test -- --ignored   # the DB-backed request tests
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 
@@ -114,7 +124,8 @@ cargo build --release
 1. `cargo check` is green.
 2. `cargo clippy -- -D warnings` is green.
 3. `cargo fmt --check` is green.
-4. `cargo test` is green.
+4. `cargo test` is green, and `cargo test -- --ignored` is green
+   against a reachable `case_folder_test` database.
 5. `cargo run -- start` boots and serves `GET /healthz` with HTTP 200,
    and `POST /api/folders` + `POST /api/moves` round-trip end-to-end
    (verify with `curl`).

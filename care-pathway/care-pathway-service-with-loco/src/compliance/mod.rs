@@ -23,6 +23,7 @@
 //! | Variable | Default | Meaning |
 //! |---|---|---|
 //! | `CARE_PATHWAY_AUDIT_READS` | off | Write an audit row for reads / searches / exports (HIPAA §164.312(b)). |
+//! | `CARE_PATHWAY_AUDIT_FAIL_CLOSED` | off | Refuse a read (`503`) when its audit row cannot be written, rather than serving data unaccounted for. |
 //! | `CARE_PATHWAY_DATA_RESIDENCY` | `undeclared` | The region this deployment's data is confined to (GDPR Ch. V). |
 //! | `CARE_PATHWAY_LAWFUL_BASIS` | `undeclared` | GDPR Art. 6 basis, e.g. `public_task`. |
 //! | `CARE_PATHWAY_ART9_CONDITION` | `undeclared` | GDPR Art. 9(2) condition for health data. |

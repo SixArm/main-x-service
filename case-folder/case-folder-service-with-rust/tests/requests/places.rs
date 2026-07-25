@@ -6,6 +6,7 @@ use serial_test::serial;
 /// cabinets.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn index_lists_buildings_rooms_and_cabinets() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -27,6 +28,7 @@ async fn index_lists_buildings_rooms_and_cabinets() {
 /// rooms come back empty.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn index_kind_filter_hides_other_groups() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -49,6 +51,7 @@ async fn index_kind_filter_hides_other_groups() {
 /// the folders currently filed inside it.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn show_returns_place_details_and_folders_inside_cabinet() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -77,6 +80,7 @@ async fn show_returns_place_details_and_folders_inside_cabinet() {
 /// Pins: `GET /api/places/{id}` for an unknown id returns `404`.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn show_unknown_place_returns_404() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -92,6 +96,7 @@ async fn show_unknown_place_returns_404() {
 /// Service, returning `201` + `Location` and persisting it in the stub.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn create_registers_a_new_place_in_the_main_place_service() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -126,6 +131,7 @@ async fn create_registers_a_new_place_in_the_main_place_service() {
 /// per-field `errors.name` message.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn create_with_missing_name_returns_422() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -149,6 +155,7 @@ async fn create_with_missing_name_returns_422() {
 /// opens a new one, and a building aggregates both cabinets' histories.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn cabinet_history_shows_presence_intervals() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -226,6 +233,7 @@ async fn cabinet_history_shows_presence_intervals() {
 /// Pins: `GET /api/places/{id}/history` for an unknown id returns `404`.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn history_unknown_place_returns_404() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;

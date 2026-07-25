@@ -4,6 +4,7 @@ use serial_test::serial;
 
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn list_filters_by_query() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -45,6 +46,7 @@ async fn list_filters_by_query() {
 
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn list_filters_by_nhs_number() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -72,6 +74,7 @@ async fn list_filters_by_nhs_number() {
 
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn create_folder_creates_patient_via_main_patient_service_and_returns_201() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -113,6 +116,7 @@ async fn create_folder_creates_patient_via_main_patient_service_and_returns_201(
 
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn create_folder_attaches_to_existing_main_patient_service_patient() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -137,6 +141,7 @@ async fn create_folder_attaches_to_existing_main_patient_service_patient() {
 
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn create_folder_with_invalid_nhs_returns_422() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -163,6 +168,7 @@ async fn create_folder_with_invalid_nhs_returns_422() {
 
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn show_unknown_folder_returns_404() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -178,6 +184,7 @@ async fn show_unknown_folder_returns_404() {
 
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn folder_history_lists_events_for_folder() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;

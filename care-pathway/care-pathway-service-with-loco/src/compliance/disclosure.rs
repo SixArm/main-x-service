@@ -31,10 +31,18 @@
 //! rather than recorded, it belongs in the ABAC policy as a subject
 //! attribute (`agents/share/authorization-attributes.md`), not here.
 //!
-//! Writes are **best-effort**: a failed audit insert logs and never fails
-//! the request, matching the family's audit posture. The cost is that a
-//! dropped row leaves a gap the hash chain cannot distinguish from a
-//! deletion; that trade-off is stated in the entity spec's honest limits.
+//! ## When the audit write fails
+//!
+//! A dropped audit row means data was disclosed with no record of it, and
+//! the resulting gap is indistinguishable from a deleted row when the
+//! chain is verified. Which way to fail is a deployment decision, not a
+//! library one, so it is a switch — [`fail_closed`],
+//! `CARE_PATHWAY_AUDIT_FAIL_CLOSED`:
+//!
+//! - **off (default)** — log and serve the read, preserving the family's
+//!   best-effort audit posture and today's availability profile;
+//! - **on** — refuse the read with `503`, disclosing nothing the service
+//!   cannot account for. Recommended for a HIPAA-facing deployment.
 
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
@@ -227,26 +235,74 @@ fn sanitize(raw: Option<&str>) -> Option<String> {
     (!cleaned.is_empty()).then_some(cleaned)
 }
 
+/// The audit row could not be written, and the deployment has asked to
+/// **fail closed** — the caller must refuse the read rather than serve
+/// data it cannot account for.
+///
+/// Deliberately carries no detail: the cause is already logged, and the
+/// caller's job is only to decide the HTTP status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AuditWriteRefused;
+
+/// Whether a failed **read-audit** write must refuse the read, from
+/// `CARE_PATHWAY_AUDIT_FAIL_CLOSED` (read once and cached).
+///
+/// **Default off**, so enabling read-auditing does not also change a
+/// service's availability profile. The trade-off is real in both
+/// directions and the deployment owns it:
+///
+/// - **Off (default).** A failed audit write logs and the read proceeds.
+///   Availability is preserved, but PHI was disclosed with no record of
+///   it — precisely what HIPAA §164.312(b) exists to prevent — and the
+///   gap is indistinguishable from a deleted row when the chain is
+///   verified.
+/// - **On.** A failed audit write refuses the read with `503`. Nothing is
+///   disclosed unaccounted for, at the cost of coupling read availability
+///   to the audit table.
+///
+/// A HIPAA-facing deployment should turn this **on**: an accounting of
+/// disclosures that silently omits disclosures is worse than an outage,
+/// because the outage is visible.
+///
+/// This governs **reads only**. Mutation audits are already fail-closed
+/// under `CARE_PATHWAY_EVENT_TRANSPORT=outbox`, where the audit row shares
+/// the entity mutation's transaction and a failure rolls the change back.
+#[must_use]
+pub fn fail_closed() -> bool {
+    static FAIL_CLOSED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *FAIL_CLOSED.get_or_init(|| {
+        crate::auth::parse_bool(
+            &std::env::var("CARE_PATHWAY_AUDIT_FAIL_CLOSED").unwrap_or_default(),
+        )
+    })
+}
+
 /// Record one read/disclosure audit row — a **no-op unless**
 /// `CARE_PATHWAY_AUDIT_READS` is on, so adopting this module changes
 /// nothing until a deployment opts in.
 ///
-/// Best-effort: a failure logs at `WARN` and never propagates, so auditing
-/// can never take down a read path. `entity_pid` is the record read, or
-/// [`Uuid::nil`] for a collection-level action (list / search / export),
-/// which is how a collection access is distinguished from a record access
-/// when answering §164.528 for one record.
+/// `entity_pid` is the record read, or [`Uuid::nil`] for a
+/// collection-level action (list / search / export), which is how a
+/// collection access is distinguished from a record access when answering
+/// §164.528 for one record.
+///
+/// # Errors
+///
+/// [`AuditWriteRefused`] when the write failed **and**
+/// [`fail_closed`] is on — the caller must then refuse the read. With
+/// fail-closed off (the default) a failure is logged and `Ok` is
+/// returned, preserving the previous best-effort behaviour.
 pub async fn record_access<C: ConnectionTrait>(
     db: &C,
     entity_pid: Uuid,
     action: &str,
     actor: Option<&str>,
     ctx: &AccessContext,
-) {
+) -> Result<(), AuditWriteRefused> {
     if !super::audit_reads() {
-        return;
+        return Ok(());
     }
-    if let Err(error) = AuditModel::record_with_context(
+    let Err(error) = AuditModel::record_with_context(
         db,
         entity_pid,
         action,
@@ -256,13 +312,26 @@ pub async fn record_access<C: ConnectionTrait>(
         ctx.is_disclosure(),
     )
     .await
-    {
-        tracing::warn!(
+    else {
+        return Ok(());
+    };
+    if fail_closed() {
+        tracing::error!(
             %error,
             action,
-            "failed to write read-access audit row; the chain will show a gap"
+            "read-access audit write failed and CARE_PATHWAY_AUDIT_FAIL_CLOSED is on; \
+             refusing the read rather than disclosing data unaccounted for"
         );
+        return Err(AuditWriteRefused);
     }
+    tracing::warn!(
+        %error,
+        action,
+        "failed to write read-access audit row; the read proceeds (fail-open) and the \
+         chain will show a gap indistinguishable from a deletion — set \
+         CARE_PATHWAY_AUDIT_FAIL_CLOSED to refuse instead"
+    );
+    Ok(())
 }
 
 #[cfg(test)]
@@ -386,6 +455,46 @@ mod tests {
         ] {
             assert!(json.get(key).is_some(), "{key} must be recorded");
         }
+    }
+
+    /// Both fail modes are reachable and distinct, and the default is
+    /// **fail-open** so that enabling read-auditing cannot by itself
+    /// change a deployment's availability profile.
+    #[test]
+    fn fail_closed_defaults_off() {
+        // The process env is shared across tests, so assert the parse
+        // rule the getter uses rather than mutating the environment.
+        assert!(!crate::auth::parse_bool(""), "unset means fail-open");
+        assert!(!crate::auth::parse_bool("0"));
+        assert!(crate::auth::parse_bool("1"), "opt-in turns fail-closed on");
+        assert!(crate::auth::parse_bool("true"));
+    }
+
+    /// The refusal type carries no detail — the cause is logged, and the
+    /// caller's only job is to choose a status code.
+    #[test]
+    fn refusal_is_a_bare_marker() {
+        assert_eq!(AuditWriteRefused, AuditWriteRefused);
+        assert_eq!(std::mem::size_of::<AuditWriteRefused>(), 0);
+    }
+
+    /// With read-auditing off, recording is a no-op that always succeeds
+    /// — so the fail-closed switch cannot affect a deployment that has
+    /// not opted into auditing at all.
+    #[tokio::test]
+    async fn recording_is_ok_when_auditing_is_off() {
+        if super::super::audit_reads() {
+            return; // env opted in; the DB-gated suite covers that path
+        }
+        // A connection that would fail if touched: proves the no-op path
+        // never reaches the database.
+        let db = sea_orm::DatabaseConnection::Disconnected;
+        let ctx = AccessContext::internal();
+        assert!(
+            record_access(&db, Uuid::nil(), action::READ, None, &ctx)
+                .await
+                .is_ok()
+        );
     }
 
     /// The read-audit action vocabulary is closed and distinct.

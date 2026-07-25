@@ -7,6 +7,7 @@ use serial_test::serial;
 /// with empty folders and history.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn create_and_show_volume() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -48,6 +49,7 @@ async fn create_and_show_volume() {
 /// rejected `422` with a per-field `errors.nhs_number` message.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn create_volume_for_unknown_patient_returns_422() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -67,6 +69,7 @@ async fn create_volume_for_unknown_patient_returns_422() {
 /// removing a folder empties the volume again.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn assign_and_remove_folder() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -124,6 +127,7 @@ async fn assign_and_remove_folder() {
 /// Pins: `PATCH /api/volumes/{id}` renames the volume's title.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn rename_volume() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -157,6 +161,7 @@ async fn rename_volume() {
 /// event per member folder in the Event stub.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn move_volume_relocates_every_member() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -221,6 +226,7 @@ async fn move_volume_relocates_every_member() {
 /// Pins: `GET /api/volumes/{id}` for an unknown id returns `404`.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn show_unknown_volume_returns_404() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;

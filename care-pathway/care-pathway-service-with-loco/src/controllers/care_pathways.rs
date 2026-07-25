@@ -68,6 +68,24 @@ pub fn validate(pathway: &CarePathway) -> Result<()> {
     ))
 }
 
+/// Map a refused read-audit write to `503 Service Unavailable`.
+///
+/// `503` rather than `500`: nothing is wrong with the request, and
+/// nothing was disclosed — the service is temporarily unable to account
+/// for a read, so it declines to serve one. The status is also
+/// retryable, which is the correct signal for a transient audit-store
+/// failure. Only reachable when `CARE_PATHWAY_AUDIT_FAIL_CLOSED` is on
+/// (see [`crate::compliance::disclosure::fail_closed`]).
+fn audit_unavailable(_: crate::compliance::disclosure::AuditWriteRefused) -> Error {
+    Error::CustomError(
+        StatusCode::SERVICE_UNAVAILABLE,
+        ErrorDetail::new(
+            "audit_unavailable",
+            "the access could not be recorded in the audit trail, so the read was refused",
+        ),
+    )
+}
+
 /// Whether a merge request folds a record into itself.
 ///
 /// `POST /merge` rejects this with `422` (spec §6.8): folding a record
@@ -208,7 +226,8 @@ async fn get_one(
         caller.actor(),
         &access,
     )
-    .await;
+    .await
+    .map_err(audit_unavailable)?;
     format::json(model.to_pathway()?)
 }
 
@@ -289,7 +308,8 @@ async fn list(
         caller.actor(),
         &access,
     )
-    .await;
+    .await
+    .map_err(audit_unavailable)?;
     let refs: Vec<PathwayRef> = rows.iter().map(PathwayRef::of).collect();
     format::json(refs)
 }
@@ -322,7 +342,8 @@ async fn search(
         caller.actor(),
         &access,
     )
-    .await;
+    .await
+    .map_err(audit_unavailable)?;
     let refs: Vec<PathwayRef> = rows.iter().map(PathwayRef::of).collect();
     format::json(refs)
 }

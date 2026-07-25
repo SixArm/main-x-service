@@ -162,8 +162,9 @@ cargo run -- task              # list available tasks
 cargo run -- task seed         # populate demo records across all services
 
 # Tests (use stub clients — no real services needed)
+cargo test                     # 21 unit tests; the 50 request tests report as ignored
 DATABASE_URL=postgres://postgres@localhost:5432/case_folder_test \
-  cargo test                   # 14 unit (nhs + geofence) + 50 request tests
+  cargo test -- --ignored      # the 50 request tests
 ```
 
 The request tests need a Postgres database (`case_folder_test`

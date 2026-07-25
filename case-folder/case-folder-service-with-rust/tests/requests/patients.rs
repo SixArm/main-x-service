@@ -6,6 +6,7 @@ use serial_test::serial;
 /// snapshots, reporting source `"Main Patient Service"` and folder count.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn list_returns_patients_from_folder_snapshots() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -30,6 +31,7 @@ async fn list_returns_patients_from_folder_snapshots() {
 /// `patient_service_match: true` and lists all of their folders.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn show_lists_folders_for_main_patient_service_patient() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -61,6 +63,7 @@ async fn show_lists_folders_for_main_patient_service_patient() {
 /// the snapshot-only folders still listed.
 #[tokio::test]
 #[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn show_falls_back_to_snapshot_when_main_patient_service_has_no_record() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;

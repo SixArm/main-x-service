@@ -412,10 +412,16 @@ the evidence bundle.
 - **Chain scope.** The chain attests to the **audit trail**, not to the
   `care_pathways` rows; row-level integrity hashing over the entity table
   is not built. The verification response says so.
-- **Best-effort audit writes.** A dropped read-audit row leaves a gap the
-  chain cannot distinguish from a deletion. Read-auditing keeps the
-  family's never-fail-the-request posture; the trade-off is stated rather
-  than resolved.
+- **Audit-write failure is a deployment choice, now explicit.**
+  `CARE_PATHWAY_AUDIT_FAIL_CLOSED` (**default off**) decides what happens
+  when a read-audit write fails: off logs and serves the read (the
+  family's best-effort posture, and today's availability profile); on
+  refuses it with `503`, disclosing nothing the service cannot account
+  for. A HIPAA-facing deployment should set it — an accounting of
+  disclosures that silently omits disclosures is worse than an outage,
+  because the outage is visible. Mutation audits are already fail-closed
+  under `CARE_PATHWAY_EVENT_TRANSPORT=outbox`, where the audit row shares
+  the mutation's transaction.
 - **Bulk export is in-process.** Jobs do not survive a restart, are not
   visible to another replica, are capped at 8 concurrent / 10 000
   resources / 8 MiB, and expire after 15 minutes. A truncated export
@@ -726,9 +732,13 @@ the evidence bundle.
   - [ ] Move Bulk Data `$export` onto the `bg_pg` worker + an artifact
     store, so jobs survive a restart and are visible across replicas
     (§12.5); folds into T-10.
-  - [ ] Decide whether an authentication/read audit write may still fail
-    open, given a dropped row is indistinguishable from a deletion in
-    the chain (§12.5).
+  - [x] **Decide whether a read-audit write may fail open.** **Done
+    (2026-07-25):** resolved as a deployment switch rather than a library
+    default — `CARE_PATHWAY_AUDIT_FAIL_CLOSED`, default off (behaviour
+    neutral), with fail-closed refusing the read as `503` on both the
+    native and FHIR surfaces. `record_access` now returns
+    `Result<(), AuditWriteRefused>` so the choice is explicit at every
+    call site rather than swallowed. §12.5 records the recommendation.
   - [ ] Wire `cargo deny`, `scripts/sbom.sh`, and the traceability check
     into CI, and lift the `compliance/` artefacts to the repository root
     once a second crate adopts them

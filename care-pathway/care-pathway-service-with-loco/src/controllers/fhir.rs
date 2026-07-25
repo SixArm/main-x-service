@@ -71,6 +71,19 @@ fn fhir_error(status: StatusCode, code: &str, message: impl Into<String>) -> Res
     fhir_json(status, &FhirOperationOutcome::error(code, message))
 }
 
+/// A refused read-audit write, as a FHIR `503` `OperationOutcome`.
+///
+/// Mirrors the native surface's `audit_unavailable`: nothing was
+/// disclosed, and the condition is transient and retryable. Only
+/// reachable when `CARE_PATHWAY_AUDIT_FAIL_CLOSED` is on.
+fn audit_unavailable() -> Response {
+    fhir_error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "transient",
+        "the access could not be recorded in the audit trail, so the read was refused",
+    )
+}
+
 /// Validate an inbound resource against the declared profile, its
 /// terminology bindings, and the service's own payload rules, surfacing
 /// every problem as one `OperationOutcome` issue.
@@ -125,14 +138,18 @@ async fn read(
             );
         }
     };
-    disclosure::record_access(
+    if disclosure::record_access(
         &ctx.db,
         model.pid,
         disclosure::action::FHIR_READ,
         caller.actor(),
         &access,
     )
-    .await;
+    .await
+    .is_err()
+    {
+        return audit_unavailable();
+    }
     let resource = to_fhir_plan_definition(
         &pathway,
         &model.pid.to_string(),
@@ -326,14 +343,18 @@ async fn search(
             }
         }
     }
-    disclosure::record_access(
+    if disclosure::record_access(
         &ctx.db,
         uuid::Uuid::nil(),
         disclosure::action::FHIR_SEARCH,
         caller.actor(),
         &access,
     )
-    .await;
+    .await
+    .is_err()
+    {
+        return audit_unavailable();
+    }
     fhir_json(StatusCode::OK, &FhirBundle::searchset(resources))
 }
 
@@ -541,14 +562,18 @@ async fn export_kickoff(
         .collect();
     let (ndjson, count, truncated) = bulk::to_ndjson(&resources);
     let id = bulk::register("/fhir/$export".to_string(), ndjson, count, truncated);
-    disclosure::record_access(
+    if disclosure::record_access(
         &ctx.db,
         uuid::Uuid::nil(),
         disclosure::action::EXPORT,
         caller.actor(),
         &access,
     )
-    .await;
+    .await
+    .is_err()
+    {
+        return audit_unavailable();
+    }
     Response::builder()
         .status(StatusCode::ACCEPTED)
         .header(
