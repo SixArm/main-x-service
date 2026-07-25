@@ -3,11 +3,16 @@
 A back-end **JSON API** for workforce planning management across the full
 employee lifecycle: requisitions and applicant tracking, onboarding,
 employee records and org charts, time & attendance, leave, shift
-scheduling, benefits, performance reviews, training, assessments
-(aptitude / personality / psychometric / selection), upskilling and
+scheduling with working-time guardrails, benefits, wellbeing &
+benefits-awareness prompts, the anonymous pulse, performance reviews
+and 360° multi-rater appraisals with in-app notifications, training,
+skills / learning paths / mentorships, assessments (aptitude /
+personality / psychometric / selection / cognitive), upskilling and
 reskilling plans, talent pipelines, apprenticeships and internships,
-succession planning, workforce intelligence, payroll runs with
-payslips, and salary benchmarking.
+succession planning, workforce intelligence, ergonomic (DSE)
+workstation assessments, reasonable adjustments, subject rights
+(access / erasure / retention), payroll runs with payslips, and
+salary benchmarking.
 Implemented in Rust on [Loco](https://loco.rs) (Axum + SeaORM +
 PostgreSQL). No built-in UI — the
 [Svelte sibling](../workforce-planning-management-front-end-with-svelte/)
@@ -17,11 +22,13 @@ provides the HR, manager, and employee self-service client.
 > statutory calculations are illustrative stubs; synthetic data
 > only. See [spec/regulatory](../spec/regulatory.md).
 
-**Status: implemented (WPM-T1–T17, 2026-07-18).** Builds, 71 DB-free
-unit tests + 7 request tests + the enforcement persona matrix pass
-against Postgres 18, clippy-pedantic clean, live smoke verified
-(migrate → seed → org chart → payroll → benchmarks). Remaining in
-[../spec/tasks.md](../spec/tasks.md): the front-end (WPM-T18/T19).
+**Status: implemented (WPM-T1–T36, 2026-07-18 → 2026-07-25).** 139
+DB-free unit tests + 19 request suites + the enforcement persona
+matrix (mounted on the shipped reference policy) pass against
+Postgres 18; clippy-pedantic clean. Both production gates' **code
+sides are done** (WPM-G1 reference policy + runbook; WPM-G2 subject
+rights + retention); what remains on them is operational and legal
+work — see [../spec/tasks.md](../spec/tasks.md).
 
 ## What it answers
 
@@ -42,18 +49,39 @@ against Postgres 18, clippy-pedantic clean, live smoke verified
   completion gate that refuses to say otherwise
 - _Where is the workforce thin?_ — the workforce-intelligence views,
   every rate carrying its numerator and denominator
+- _Who's eligible for the shingles jab, and did the prompts work?_ —
+  wellbeing entitlement rules + aggregate-only uptake and enrolment
+  conversion
+- _How is the team actually doing?_ — the anonymous pulse, k-floored
+  so no small cell can identify anyone
+- _What does a full circle say about this person?_ — 360° appraisals
+  with group-floored reports and rater self-service
+- _Is anyone's rota heading into unlawful territory?_ — advisory
+  48-hour and 11-hour-rest working-time flags
+- _What's wrong with the workstations?_ — DSE checklists and the
+  department issues report (equipment facts, never symptoms)
+- _What change would help you do your job?_ — reasonable-adjustment
+  requests: barrier / impact / change, no diagnosis needed or storable
+- _What do we hold about this person, and can we forget them?_ — the
+  subject-access export, erasure as anonymisation, the retention sweep
 
 ## Surface
 
 Requisitions / candidates / applications / interviews · onboarding
 items · employees + org-chart · time entries · leave entitlements +
-requests · shifts + assignments · benefit plans + enrollments ·
-review cycles / reviews / goals / feedback · training enrollments ·
-assessment instruments / sittings / results + profiles · development
-plans (upskill / reskill) · talent pipelines · early-career
-programmes + placements · succession plans · workforce intelligence ·
-payroll runs + payslips · benchmarks · audits ·
-`/events/recent` · OpenAPI + Swagger · `/metrics.prom`.
+requests · shifts + assignments · working-time guardrails · benefit
+plans + enrollments · wellbeing entitlements + acknowledgements +
+uptake · pulse surveys + k-floored results · review cycles / reviews /
+goals / feedback · 360° appraisals + nominations + responses +
+reports + rater requests · in-app notifications · training
+enrollments · skills + learning paths + mentorships · assessment
+instruments / sittings / results + profiles (5 categories incl.
+cognitive) · development plans (upskill / reskill) · talent
+pipelines · early-career programmes + placements · succession plans ·
+workforce intelligence · ergonomic assessments + items + issues ·
+adjustment requests + decisions · subject-access / erase / retention ·
+payroll runs + payslips · benchmarks · audits · `/events/recent` ·
+OpenAPI + Swagger · `/metrics.prom`.
 
 Auth enforcement defaults **off** (`WPM_REQUIRE_AUTH` is the family
 activation gate); upstream lookups default to **stub mode**; events
@@ -96,3 +124,79 @@ cargo run -- task seed        # synthetic demo org (40 employees)
 cargo run -- start            # serve on :5150
 curl "localhost:5150/api/org-chart?organization=<org-urn>" | jq .
 ```
+
+Interactive docs: `http://localhost:5150/swagger-ui/` (OpenAPI at
+`/api-docs/openapi.json`).
+
+## Tutorial — a worked tour
+
+All examples assume the server on `:5150` and `jq`. Every endpoint
+also negotiates `Accepts-version: 1.0` (optional today).
+
+**1. Hire someone.**
+
+```bash
+ORG="organization:$(uuidgen)"
+EMP=$(curl -s localhost:5150/api/employees -H 'content-type: application/json' -d '{
+  "person_ref": "person:'$(uuidgen)'", "organization_ref": "'$ORG'",
+  "employee_number": "E-1001", "display_name": "Ada Lovelace",
+  "employment_type": "permanent", "department": "engineering",
+  "job_title": "Engineer", "salary_minor": 3600000,
+  "salary_currency": "GBP", "hired_on": "2026-01-05" }' | jq -r .pid)
+curl -s localhost:5150/api/employees/$EMP/status \
+  -H 'content-type: application/json' -d '{"to":"active"}' | jq .status
+```
+
+**2. Wellbeing prompts.** A department-scoped rule; Ada sees it,
+acknowledges it, HR sees only counts:
+
+```bash
+RULE=$(curl -s localhost:5150/api/wellbeing-entitlements -H 'content-type: application/json' -d '{
+  "name": "Seasonal flu vaccination", "kind": "health",
+  "description": "Free NHS flu jab for frontline staff.",
+  "departments": ["engineering"], "doses": 2 }' | jq -r .pid)
+curl -s localhost:5150/api/employees/$EMP/wellbeing-prompts | jq '.prompts[].name'
+curl -s localhost:5150/api/employees/$EMP/wellbeing-acknowledgements \
+  -H 'content-type: application/json' \
+  -d '{"entitlement_pid":"'$RULE'","response":"booked"}' | jq .response
+curl -s localhost:5150/api/wellbeing/uptake | jq '.entitlements[0].uptake_rate'
+```
+
+**3. A 360°.** Draft → nominate 3+ raters → collect (raters are
+notified) → respond → share → the group-floored report:
+
+```bash
+A=$(curl -s localhost:5150/api/employees/$EMP/appraisals \
+  -H 'content-type: application/json' \
+  -d '{"competencies":["communication","delivery"]}' | jq -r .pid)
+# … nominate manager/peer raters (POST /api/appraisals/$A/nominations),
+# move to collecting, then each rater:
+#   POST /api/appraisals/$A/responses {"rater_pid":…,"scores":{…}}
+# and their own pending list is GET /api/employees/{pid}/appraisal-requests
+curl -s localhost:5150/api/appraisals/$A | jq '.nominations[] | {display_name, group, responded}'
+```
+
+**4. Subject rights.** Everything WPM holds, in one document, with
+its exclusions named:
+
+```bash
+curl -s localhost:5150/api/employees/$EMP/subject-access | jq 'keys, .exclusions'
+curl -s localhost:5150/api/retention | jq '{horizon_days, expired_consent_candidates}'
+```
+
+**5. Guardrails.** Advisory only — nothing is refused:
+
+```bash
+curl -s "localhost:5150/api/workforce/working-time?department=engineering" \
+  | jq '{employees_checked, flagged: [.flagged[].display_name]}'
+curl -s localhost:5150/api/ergonomics/issues | jq .by_department
+```
+
+## Auth activation (production)
+
+The shipped default is **wide open** — activation is a release gate.
+Follow the runbook in [../spec/auth.md](../spec/auth.md): mount a
+policy (start from
+[`config/abac-policy.reference.json`](config/abac-policy.reference.json)),
+point at the PASETO keys, set `WPM_REQUIRE_AUTH=1`, and verify with
+`cargo test --test enforcement -- --ignored`.

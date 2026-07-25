@@ -30,8 +30,10 @@ and `money()` are the closest source). BFF auth per
 ## Edition-specific implementation notes (as landed)
 
 - **Copy source**: the patient-flow front-end (BFF proxy, session
-  flow, SPA mode) + the PPM front-end's i18n pattern (compact 48-key
-  catalogue here).
+  flow, SPA mode) + the PPM front-end's i18n pattern (the catalogue
+  has grown to ~125 keys × 13 locales with the T20–T36 areas; the
+  parity test pins the exact set — every new key lands in all 13
+  locale blocks).
 - **Layout**: `src/lib/{i18n.svelte.ts,api/{client,types,wpm}.ts,
 components/OrgTree.svelte,server/*}`, routes per the README table;
   the proxy strips cookies, stamps `Accepts-version: 1.0`, and
@@ -49,7 +51,16 @@ components/OrgTree.svelte,server/*}`, routes per the README table;
   store, `applyDir` off — the app's own effect owns `lang`/`dir`);
   the **Lily headless** primitives are available as a dependency.
 
+- **The profile as self-service hub** (T23–T36): per-person features
+  land as panels on `/employees/[pid]` (wellbeing prompts, pulse,
+  notifications, 360s + rater requests, ergonomics, adjustments,
+  subject-access, erase) rather than as new top-level routes; new
+  top-level routes exist only for genuinely cross-person areas
+  (`/wellbeing`, `/privacy`, `/learning`, `/mentorship`).
+
 ## Delivery
 
-WPM-T18/T19 **delivered 2026-07-18** — see
-[../../spec/tasks.md](../../spec/tasks.md).
+WPM-T18/T19 **delivered 2026-07-18**; the front-end halves of
+WPM-T20–T36 **delivered 2026-07-20 → 2026-07-25** — see
+[../../spec/tasks.md](../../spec/tasks.md). Suites: 10 vitest,
+9 Playwright.

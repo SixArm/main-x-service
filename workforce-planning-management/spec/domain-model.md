@@ -12,7 +12,15 @@ Employee *──1 person-ref (+ worker-ref?, organization-ref)
 Employee 1──* TimeEntry · LeaveRequest · ShiftAssignment
 Employee 1──* BenefitEnrollment *──1 BenefitPlan
 Employee 1──* Review · Goal · FeedbackEntry · TrainingEnrollment
+Employee 1──* EmployeeSkill *──1 Skill · PathEnrollment *──1 LearningPath 1──* Step
+Mentorship (mentor × mentee) 1──* MentorshipSession
+Assessment (subject: candidate|employee) 1──* AssessmentResult; *──1 Instrument
+DevelopmentPlan 1──* Item · TalentPipeline 1──* Member · Program 1──* Placement
 SuccessionPlan 1──* SuccessionCandidate (employee pids)
+WellbeingEntitlement 1──* EntitlementAcknowledgement (employee × rule)
+PulseSurvey 1──* PulseResponse (NO author column — WPM-D20)
+Appraisal 1──* AppraisalNomination 1──0..1 AppraisalResponse (WPM-D21)
+Employee 1──* Notification · ErgonomicAssessment 1──* Item · AdjustmentRequest
 PayrollRun 1──* Payslip (one per employee per run)
 Benchmark (job_title × currency)
 ```
@@ -111,9 +119,13 @@ Benchmark (job_title × currency)
 
 - **AssessmentInstrument** — the catalog entry for a named test:
   `name`, `category` (`aptitude` \| `personality` \| `psychometric`
-  \| `selection`), `provider?`, `scales[]` (each must suit the
-  category), `duration_minutes?`, `validity_months?` (drives a
-  completed sitting's expiry).
+  \| `selection` \| `cognitive`), `provider?`, `scales[]` (each must
+  suit the category — `cognitive` carries the IQ-style index scales
+  verbal_comprehension / working_memory / processing_speed /
+  spatial_reasoning / fluid_reasoning; **no composite score exists**,
+  and `selection` instruments refuse cognitive scales — WPM-R20),
+  `duration_minutes?`, `validity_months?` (drives a completed
+  sitting's expiry).
 - **Assessment** — one administration: instrument × subject
   (`candidate` \| `employee` + pid) × optional `application_pid`,
   `status` (`scheduled → in_progress → completed → expired`, or
@@ -154,6 +166,68 @@ Benchmark (job_title × currency)
   `outcome` (`pending` \| `converted` \| `not_converted` \|
   `withdrawn`).
 
+## Learning & mentorship
+
+- **Skill** — catalog entry (`name`, `category`); **EmployeeSkill** —
+  declared proficiency 1–5 + optional target, one row per
+  employee × skill (upserted).
+- **LearningPath** — ordered `course_ref` steps; **PathEnrollment** —
+  employee × path; progress counts only **completed**
+  `TrainingEnrollment` rows per step (honest derivation).
+- **Mentorship** — mentor × mentee (`proposed → active → completed`,
+  `ended` from open states); **MentorshipSession** — dated notes on
+  an active pairing.
+
+## Wellbeing (WPM-R25/R26 — WPM-D17/D18)
+
+- **WellbeingEntitlement** — one configurable prompt rule: `kind`
+  (`health` \| `benefit`), name/description/info URL, **non-clinical
+  predicates only** (age band via the upstream person birth date —
+  unknown age fails a banded rule — departments, job titles), `doses`,
+  active window, optional `benefit_plan_pid` (benefit-kind only; a
+  plan-linked prompt goes quiet once the employee is live-enrolled —
+  derived, never stored).
+- **EntitlementAcknowledgement** — employee × rule, `response`
+  (`booked` \| `done` \| `declined` \| `dismissed`), one optional
+  reminder for multi-dose courses (`reminded_on`). A workflow fact,
+  never a vaccination status.
+- **PulseSurvey** / **PulseResponse** — anonymous by construction
+  (WPM-D20): the response row is survey + department + score (1–5) +
+  date, **no author column**; results are k-floored (k = 5, counts
+  withheld below it).
+
+## 360° appraisals (WPM-R29 — WPM-D21)
+
+- **Appraisal** — subject employee × declared `competencies[]`,
+  lifecycle `draft → collecting → shared` (one-way; nominations
+  freeze at collecting, responses close at shared).
+- **AppraisalNomination** — rater × group (`self` \| `manager` \|
+  `peer` \| `report`); self automatic; ≤ 12 raters, ≥ 3 non-self to
+  collect.
+- **AppraisalResponse** — links to its nomination (procedural
+  anonymity: once-per-rater needs the link; **no endpoint serves
+  rater-level content**); per-competency scores 1–5 + optional
+  comment. The shared-only report aggregates group × competency with
+  a floor of 3 on `peer`/`report` cells.
+
+## Notifications, ergonomics, adjustments
+
+- **Notification** (WPM-R31/D23) — employee × kind
+  (`appraisal_request` \| `appraisal_shared` \| `adjustment_update`),
+  neutral body + reference data (never scores/comments/words),
+  `read_at`. In-app only; WPM holds no contact details.
+- **ErgonomicAssessment** / **ErgonomicItem** (WPM-R32/D24) — a DSE
+  workstation checklist (default 8 items; **no symptom field**);
+  items answered `ok`/`issue` + equipment note; completion requires
+  every answer; issue-flagged items feed the rota-tier department
+  report.
+- **AdjustmentRequest** (WPM-R33/D25) — `category` (practical closed
+  set), **barrier / impact / adjustment** (all required, the
+  requester's words), lifecycle `requested → agreed \| declined \|
+  withdrawn`, `agreed → in_place \| withdrawn`; decision note + date.
+  **No diagnosis / condition / medical-evidence column exists**;
+  masked reads withhold the words; no aggregate reporting surface.
+
 ## Payroll & compensation
 
 - **PayrollRun** — `organization_ref`, `period_start`/`period_end`,
@@ -170,7 +244,21 @@ Benchmark (job_title × currency)
 ## Audit & events
 
 Every mutation writes an audit row; **sensitive reads** (employee
-record with salary, payslips, review content) are audited too.
-Events follow the family envelope with kinds such as
-`employee_hired`, `leave_approved`, `payroll_run_calculated`,
+record with salary, payslips, review content, 360 reports, adjustment
+words, unmasked assessment scores, succession) are audited too — with
+one designed exception: a **pulse submission's audit row carries no
+actor** (WPM-D20). Events follow the family envelope with kinds such
+as `employee_hired`, `leave_approved`, `payroll_run_calculated`,
 `review_shared` — see [audit.md](audit.md).
+
+## Subject rights & retention (WPM-R30 — WPM-D22)
+
+Not record types but the lifecycle over all of them: the
+**subject-access export** gathers every table keyed to one employee
+(exclusions named in the payload); **erasure anonymises** (identity
+fields scrubbed to a tombstone `person:` URN, authored free text
+scrubbed, row soft-deleted; payroll rows remain under statutory
+retention); the **retention sweep** hard-deletes soft-deleted rows
+past the floored horizon (`WPM_RETENTION_DAYS`, default 365, floor
+30) across the pinned 41-table list and scrubs expired-consent
+candidates.

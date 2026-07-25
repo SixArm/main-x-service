@@ -20,20 +20,31 @@ Loco-idiomatic layout (the patient-flow shape — the closest sibling):
 ```
 src/
 ├── app.rs                loco Hooks
-├── controllers/          acquisition, workforce, hr_core,
-│                         development, payroll, boards, audits,
-│                         docs, metrics
-├── models/               helpers + _entities/ (SeaORM)
-├── clients.rs            stub-first upstream display-name lookups
-├── rules/                pure core: pipelines (requisition,
-│                         application, review, payroll-run), leave
-│                         balances, overtime, shift conflicts,
-│                         payslip arithmetic, org-chart cycle check
+├── controllers/          acquisition, adjustments, appraisals,
+│                         assessments, audits, development, docs,
+│                         ergonomics, hr_core, intelligence,
+│                         learning, metrics, notifications, payroll,
+│                         privacy, talent, wellbeing, workforce
+├── models/               helpers (+ notifications push) + _entities/
+├── clients.rs            stub-first upstream lookups (display names,
+│                         birth dates — cached, never stored)
+├── rules/                pure core: every lifecycle machine
+│                         (requisition, application, review, payroll
+│                         run, mentorship, appraisal, adjustment,
+│                         placement, …), leave/time/scheduling
+│                         arithmetic, working-time guardrails,
+│                         wellbeing eligibility + prompt machine,
+│                         pulse k-floor, 360 group floor, assessment
+│                         category↔scale map, DSE completion gate,
+│                         erasure/retention rules, payslip
+│                         arithmetic, org-chart cycle check
 ├── auth.rs               offline PASETO + ABAC + personas + mask
 ├── streaming.rs          envelope + memory/outbox transports
 ├── validation.rs         caps + tokens + URN shapes → 422
 └── openapi.rs            OpenAPI 3 doc
-migration/                sea-orm-migration (crate root)
+migration/                sea-orm-migration (crate root, 17 sets)
+config/abac-policy.reference.json   the shipped, matrix-verified
+                                    persona policy (WPM-G1 runbook)
 ```
 
 Key decisions (numbered in [design.md](design.md)): normalized
@@ -50,6 +61,10 @@ SvelteKit 2 + Svelte 5 runes SPA + same-origin BFF proxy
 (patient-flow/PPM pattern), dependency-light, 13-locale i18n from
 the start (the PPM lesson: retrofitting costs more). Views per
 pillar: requisition/application boards, onboarding tracker, team
-calendar + rota, employee profile + org chart, review and
-enrollment panels, payroll run screen, benchmarking table, and the
-HR dashboard.
+calendar + rota + working-time and ergonomic-issue panels, the
+employee profile (a self-service hub: wellbeing prompts, pulse,
+notifications, 360s + "my 360 requests", ergonomics, reasonable
+adjustments, subject-access download, erase action) + org chart,
+review and enrollment panels, `/wellbeing` (entitlement rules,
+uptake, pulse results), `/privacy` (retention report + sweep),
+payroll run screen, benchmarking table, and the HR dashboard.

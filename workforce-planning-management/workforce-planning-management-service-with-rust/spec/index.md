@@ -23,11 +23,14 @@ tracing + OTLP, Podman.
 - **Config**: `config/{development,test,production}.yaml`;
   development and test default upstream clients to `stub` and
   `WPM_EVENT_TRANSPORT=memory`.
-- **Env vars**: `WPM_REQUIRE_AUTH`, `WPM_PASETO_KEYS[_URL]`,
-  `WPM_ABAC_POLICY[_FILE]`, `WPM_EVENT_TRANSPORT`, upstream base
-  URLs (`WPM_PERSON_SERVICE_URL`, `WPM_WORKER_SERVICE_URL`,
-  `WPM_ORGANIZATION_SERVICE_URL`, `WPM_COURSE_SERVICE_URL`),
-  `WPM_UPSTREAM_MODE` (default `stub`).
+- **Env vars**: `WPM_REQUIRE_AUTH`, `WPM_PASETO_KEYS[_URL]`
+  (+ `_REFRESH_SECS`), `WPM_ABAC_POLICY[_FILE]`,
+  `WPM_EVENT_TRANSPORT`, `WPM_RETENTION_DAYS` (default 365, floor
+  30), upstream base URLs (`WPM_PERSON_SERVICE_URL`,
+  `WPM_WORKER_SERVICE_URL`, `WPM_ORGANIZATION_SERVICE_URL`,
+  `WPM_COURSE_SERVICE_URL`), `WPM_UPSTREAM_MODE` (default `stub`).
+  Legacy `HCM_*` spellings still read with a deprecation warning
+  (`src/compat.rs`).
 - **Identifiers**: public UUID `pid` on every owned record; EntityRef
   URNs for all upstream references; employee number unique per
   organization.
@@ -36,11 +39,14 @@ tracing + OTLP, Podman.
 
 ## Edition-specific implementation notes (as landed)
 
-- **Layout**: `src/{app,auth,clients,metrics,openapi,streaming,
-validation,version}.rs`, `src/rules/` (pure core), `src/models/`
-  (+`_entities/`), `src/controllers/{hr_core,acquisition,workforce,
-development,payroll,audits,docs,metrics}.rs`, `src/tasks/seed.rs`,
-  crate-root `migration/` (7 migrations, explicit SQL).
+- **Layout**: `src/{app,auth,clients,compat,metrics,openapi,
+streaming,validation,version}.rs`, `src/rules/` (pure core, one
+  module per subsystem), `src/models/` (+`_entities/`, the
+  notifications `push` helper), 18 controllers
+  (`src/controllers/`), `src/tasks/seed.rs`, crate-root
+  `migration/` (17 migration sets, explicit SQL);
+  `config/abac-policy.reference.json` is the shipped persona policy
+  the enforcement matrix mounts (WPM-G1).
 - **Masking**: `mask_employee` clears `salary_minor`+currency;
   `mask_payslip` zeroes amounts and drops the deduction lines;
   payslip reads authorize against the **owning employee's** resource
@@ -53,11 +59,24 @@ development,payroll,audits,docs,metrics}.rs`, `src/tasks/seed.rs`,
   costs join only in the payslip currency; stub tax = 20% over a
   monthly allowance (documented demo stub).
 - **Enforcement tests** live in `tests/enforcement.rs` (own process,
-  OnceLock lesson); request tests in `tests/requests/` are
-  `#[ignore]`d — run with `cargo test -- --ignored`.
+  OnceLock lesson) and mount the shipped reference policy file;
+  request tests in `tests/requests/` are `#[ignore]`d — run with
+  `cargo test -- --ignored`.
+- **Privacy mechanics**: erasure = in-place scrub + tombstone
+  `person:` URN + soft-delete (raw-SQL statements share one
+  transaction, counts in the audit snapshot); the retention sweep
+  iterates the pinned `SOFT_DELETED_TABLES` list (41); pulse
+  submissions audit **without** an actor; subject access refuses
+  masked callers (a full export cannot be "masked").
+- **Lifecycle gotcha**: `active → terminated` routes via
+  `offboarding` (the erasure tests pin it).
 
 ## Delivery
 
-The queue is [../../spec/tasks.md](../../spec/tasks.md): WPM-T1–T17
-**delivered 2026-07-18**. Tests per
-[../../spec/testing.md](../../spec/testing.md).
+The queue is [../../spec/tasks.md](../../spec/tasks.md):
+WPM-T1–T19 **delivered 2026-07-18**; the wellbeing / 360 / privacy /
+ergonomics / adjustments rounds (WPM-T20–T36) **delivered
+2026-07-20 → 2026-07-25**; both production gates' code sides are
+done (WPM-G1/G2 `[~]` — operational/legal work remains). Tests per
+[../../spec/testing.md](../../spec/testing.md): 139 unit + 19
+request suites + the enforcement matrix.

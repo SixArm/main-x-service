@@ -7,12 +7,18 @@ subproject. Read this **before** opening a PR.
 
 A **SvelteKit browser client** for the
 [Loco JSON API sibling](../workforce-planning-management-service-with-rust/):
-requisition and application boards, the onboarding tracker, team
-calendar and rota, employee profiles and the org chart, review and
-training panels, the payroll run screen, benchmarking, and the HR
-dashboard — plus the employee **self-service** views (my record, my
-payslips, my leave). The Svelte app owns no data; every page
-round-trips through the API.
+requisition and application boards, the onboarding tracker, the rota
+with working-time and ergonomic-issue panels, employee profiles and
+the org chart, review and training panels, `/wellbeing` (entitlement
+rules, uptake, pulse results), `/learning` and `/mentorship`,
+`/privacy` (retention report + sweep), the payroll run screen,
+benchmarking, and the HR dashboard. The **employee profile is the
+self-service hub**: my record / payslips / leave / reviews, wellbeing
+prompts, the pulse card, notifications, 360° panels and "my 360
+requests", the ergonomics checklist, reasonable adjustments,
+subject-access download, and the erase action. The Svelte app owns no
+data; every page round-trips through the API, and masked fields
+render as first-class masked states, never errors or fake zeros.
 
 > ⚠️ Demo software, not a production HR system. See
 > [regulatory](../spec/regulatory.md).
@@ -23,7 +29,8 @@ round-trips through the API.
    [`../spec/`](../spec/index.md) is the single source of truth —
    especially [auth](../spec/auth.md) (personas + masking) and
    [architecture](../spec/architecture.md). Task queue:
-   [`../spec/tasks.md`](../spec/tasks.md) (WPM-T18/T19).
+   [`../spec/tasks.md`](../spec/tasks.md) (WPM-T18/T19 + the
+   front-end halves of T20–T36).
 2. **Family front-end conventions.** SvelteKit 2, **Svelte 5 runes
    only** (no legacy stores/`$:`), TypeScript strict, SPA mode.
    Drift between front-ends is accepted — copy-adapt from a sibling

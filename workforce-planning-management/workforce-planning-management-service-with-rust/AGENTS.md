@@ -9,12 +9,17 @@ A **back-end JSON API**, written in Rust on [Loco](https://loco.rs)
 (Axum + SeaORM + PostgreSQL), for workforce planning management: employee
 records and the employment lifecycle, the applicant-tracking
 pipeline and onboarding checklists, time & attendance, leave, shift
-scheduling, benefits, performance reviews, training enrollments,
-assessments (aptitude / personality / psychometric / selection),
+scheduling with working-time guardrails, benefits, wellbeing &
+benefits-awareness prompts, the anonymous pulse, performance reviews
+and 360° multi-rater appraisals with in-app notifications, training
+enrollments, skills / learning paths / mentorships, assessments
+(aptitude / personality / psychometric / selection / cognitive),
 upskilling and reskilling plans, talent pipelines, apprenticeships
 and internships, succession plans with bench strength, workforce
-intelligence, payroll runs with payslips, and salary
-benchmarking. There is no built-in UI — the
+intelligence, ergonomic (DSE) workstation assessments, reasonable
+adjustments, subject rights (access / erasure / retention), payroll
+runs with payslips, and salary benchmarking. There is no built-in
+UI — the
 [Svelte sibling](../workforce-planning-management-front-end-with-svelte/)
 is the HR / manager / self-service client.
 
@@ -52,15 +57,23 @@ duplicated demographics. See the cross-cutting spec's
 4. **Money discipline.** Minor units (`i64`) + ISO-4217 everywhere;
    overflow refused; `net = gross − Σ deductions` enforced before
    persist. No floats.
-5. **Sensitive data.** Salary, payslips, review content, and
-   succession plans are masked under the ABAC `mask` obligation and
-   their reads are **audited** ([auth](../spec/auth.md),
+5. **Sensitive data.** Salary, payslips, review content, 360
+   reports, assessment scores, adjustment words, and succession
+   plans are masked under the ABAC `mask` obligation and their reads
+   are **audited** ([auth](../spec/auth.md),
    [audit](../spec/audit.md)). Never log them.
-6. **Known family gotchas.** loco `create_table` pluralizes table
+6. **Unrepresentability is load-bearing** (WPM-D17/D20/D24/D25): no
+   health cohort, symptom, diagnosis, or pulse-author column exists
+   — do not add one, and do not add aggregate surfaces over
+   adjustment requests. What must not be stored gets no column.
+7. **Known family gotchas.** loco `create_table` pluralizes table
    names (use already-plural names / explicit SQL);
    `ModelError::EntityNotFound` is NOT mapped to 404 (return
    `Error::NotFound` at `find_by_pid` call sites); enforcement tests
-   need their own test binary (OnceLock caching).
+   need their own test binary (OnceLock caching); a new
+   soft-deleting table must join `rules::privacy::
+   SOFT_DELETED_TABLES` (the sweep-list pin fails otherwise);
+   `active → terminated` routes via `offboarding`.
 
 ## Running
 

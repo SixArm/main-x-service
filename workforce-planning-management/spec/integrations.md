@@ -13,7 +13,11 @@ URNs** and never duplicates upstream records.
 
 Client modules follow the stub-first pattern (patient-flow
 `clients.rs`): display-name lookups are read-only, cached,
-best-effort, and never block writes.
+best-effort, and never block writes. The wellbeing engine adds a
+second best-effort person lookup — the **birth date** (for age-banded
+entitlement rules, WPM-R25): cached, used only to derive a whole-year
+age, **never stored** in a WPM table; an unknown birth date honestly
+fails an age-banded rule rather than guessing.
 
 ## The `employed_by` edge
 

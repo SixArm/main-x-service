@@ -19,8 +19,23 @@
 - **Payroll & compensation** — payroll runs producing payslips
   (gross/deductions/net, minor units), salary benchmarks and
   under/over-market flags.
+- **Wellbeing & benefits awareness** — configurable entitlement
+  prompts (health cohorts + plan-linked benefit signposting),
+  acknowledgements, aggregate-only uptake + enrolment conversion,
+  the anonymous k-floored pulse.
+- **Working-time guardrails** — advisory 48-hour-average and 11-hour
+  rest-gap flags derived from time and rota data (never blocking).
+- **360° appraisals** — multi-rater feedback with group-floored
+  reports, rater self-service, and in-app notifications.
+- **Ergonomic (DSE) assessments** — workstation checklists and a
+  department issues report (equipment facts only).
+- **Reasonable adjustments** — barrier-based requests and a decision
+  lifecycle; no diagnosis required or storable.
+- **Subject rights & retention** — subject-access export, erasure as
+  anonymisation, retention report + sweep.
 - **Self-service + ABAC personas** — employee / manager / HR /
-  payroll scopes as policy; salary + payslip masking.
+  payroll scopes as policy; salary + payslip masking; the shipped
+  reference policy + activation runbook ([auth.md](auth.md)).
 - **Audit + events** — family conventions; sensitive reads audited.
 
 ## Out of scope (v1, some on the [roadmap](roadmap.md))
@@ -33,6 +48,13 @@
   status + payslips.
 - Learning content authoring — course-service owns courses.
 - Union/CBA rule engines; multi-country labor-law engines.
+- Outbound notification channels (email/push/chat) — WPM holds no
+  contact details; notifications are in-app (WPM-D23).
+- Clinical and occupational-health records — no vaccination status,
+  symptom, diagnosis, or condition is storable (WPM-D17/D24/D25);
+  OH referral outcomes stay with occupational health.
+- Aggregate reporting over adjustment requests — **refused by
+  design**, not deferred (WPM-D25).
 
 ## Boundary with the family
 

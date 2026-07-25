@@ -20,11 +20,18 @@ adds **strategic workforce optimization and talent development**:
 1. **Talent acquisition & onboarding** — requisitions, an applicant
    tracking pipeline, a candidate pool, digitized onboarding.
 2. **Workforce management** — time & attendance, absence/leave,
-   shift scheduling.
+   shift scheduling, advisory working-time guardrails.
 3. **HR service delivery** — the employee record as the single source
-   of employment truth, org charts, self-service, benefits.
-4. **Talent management & development** — performance reviews,
-   training via the family's course registry, succession planning.
+   of employment truth, org charts, self-service, benefits, wellbeing
+   & benefits-awareness prompts, the anonymous pulse, ergonomic (DSE)
+   assessments, reasonable adjustments, in-app notifications, and
+   subject rights (access / erasure / retention).
+4. **Talent management & development** — performance reviews, 360°
+   multi-rater appraisals, training via the family's course registry,
+   assessments (aptitude / personality / psychometric / selection /
+   cognitive), skills & learning paths, mentorships, development
+   plans, talent pipelines, early careers, succession, workforce
+   intelligence.
 5. **Payroll & compensation** — payroll runs, payslips, salary
    benchmarking.
 
@@ -54,18 +61,18 @@ identities by `EntityRef` URN, never duplicating them.
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | [purpose.md](purpose.md)                           | Problem statement, goals, the five pillars                                                |
 | [scope.md](scope.md)                               | In/out of scope; the boundary with the identity services                                  |
-| [domain-model.md](domain-model.md)                 | Employee, Requisition, Application, TimeEntry, LeaveRequest, Shift, Review, PayrollRun, … |
+| [domain-model.md](domain-model.md)                 | Employee, Requisition, Application, TimeEntry, LeaveRequest, Shift, Review, Appraisal, PayrollRun, … |
 | [talent-acquisition.md](talent-acquisition.md)     | Pillar 1: ATS pipeline, candidate pool, onboarding checklists                             |
-| [workforce-management.md](workforce-management.md) | Pillar 2: time & attendance, absence, scheduling                                          |
-| [hr-core.md](hr-core.md)                           | Pillar 3: the employee record, org chart, self-service, benefits                          |
-| [talent-development.md](talent-development.md)     | Pillar 4: reviews, LMS via course-service, succession                                     |
+| [workforce-management.md](workforce-management.md) | Pillar 2: time & attendance, absence, scheduling, working-time guardrails                 |
+| [hr-core.md](hr-core.md)                           | Pillar 3: the employee record, org chart, self-service, benefits, wellbeing, adjustments  |
+| [talent-development.md](talent-development.md)     | Pillar 4: reviews, 360°s, LMS via course-service, assessments, succession                 |
 | [payroll-compensation.md](payroll-compensation.md) | Pillar 5: payroll runs, payslips, benchmarking                                            |
 | [integrations.md](integrations.md)                 | Upstream family services; EntityRef URNs; `employed_by` links                             |
 | [auth.md](auth.md)                                 | SSO, ABAC personas (employee / manager / HR / payroll), masking                           |
 | [audit.md](audit.md)                               | Audit trail, events, sensitive-read logging                                               |
 | [architecture.md](architecture.md)                 | Editions, layering, pure-core rules, persistence                                          |
 | [testing.md](testing.md)                           | Test strategy per edition                                                                 |
-| [regulatory.md](regulatory.md)                     | Demo status; UK GDPR / employment-records posture                                         |
+| [regulatory.md](regulatory.md)                     | Demo status; UK GDPR / employment-records posture; subject rights (WPM-R30)               |
 | [roadmap.md](roadmap.md)                           | Beyond the v1 queue                                                                       |
 | [glossary.md](glossary.md)                         | ATS, FTE, LMS, requisition, accrual, …                                                    |
 
@@ -82,6 +89,14 @@ Three lock-step files drive delivery:
 A change starts in `requirements.md`, is shaped in `design.md`, is
 queued in `tasks.md`, and only then lands as code in a subproject.
 **No code lands without the spec describing it.**
+
+The load-bearing design thread (decisions WPM-D17–D25): **what must
+not be stored gets no column** (no health cohort, no symptom, no
+diagnosis, no pulse author), **what must not be disclosed gets no
+endpoint** (no rater-level 360 content, no per-adjustment reporting),
+and **every limit is stated in the payload rather than hidden**
+(derivation strings, named exclusions, `null`-not-zero rates,
+k-floors that withhold their counts).
 
 ## References
 

@@ -37,6 +37,9 @@ retire, organized as five pillars:
   unpaid) with entitlements, accrual balances, and approval flow.
 - **Scheduling** — shift plans per team/location, assignment against
   availability, and conflict/limit checks.
+- **Working-time guardrails** — advisory 48-hour-average and 11-hour
+  rest-gap flags (UK WTR shape) derived from recorded time and the
+  rota, planned shifts included; flags, never blocks.
 
 ### 3. HR service delivery & admin
 
@@ -48,21 +51,33 @@ retire, organized as five pillars:
   enforced as ABAC policy, not code.
 - **Benefits administration** — plans (health, pension, perks) and
   per-employee enrollments with effective dates.
+- **Wellbeing & benefits awareness** — configurable, non-clinical
+  entitlement prompts (NHS-style vaccination cohorts; plan-linked
+  benefit signposting that goes quiet on enrolment), aggregate-only
+  uptake and conversion, and the anonymous k-floored pulse.
+- **Ergonomics & adjustments** — DSE workstation assessments
+  (equipment facts, never symptoms) and barrier-based reasonable
+  adjustments (no diagnosis required — or storable).
+- **Notifications & subject rights** — in-app, reference-only
+  notifications; subject-access export, erasure as anonymisation,
+  and the retention sweep.
 
 ### 4. Talent management & development
 
 - **Performance reviews** — cycles, per-employee goals, continuous
   feedback entries, and appraisals with calibrated ratings.
+- **360° appraisals** — multi-rater feedback (manager, peers,
+  reports, self) per declared competency, with group-floored
+  reports, rater self-service, and in-app notifications;
+  development-facing, never a pay input.
 - **Learning (LMS)** — training enrollments referencing the family's
   [course-service](../../course/course-service-with-loco/) courses
   and instances (compliance courses, certifications with expiry).
-- **Assessments** — aptitude, personality, psychometric, and
-  selection tests (numerical and verbal reasoning, problem-solving and
-  logical thinking; work style, team compatibility, introversion /
-  extraversion; behavioural styles, emotional intelligence, cognitive
-  ability; job simulations, skills assessments, judgement tests) with
-  per-scale results, score bands, validity, and a derived profile.
-  Reported, never prescriptive: WPM does not rank or recommend.
+- **Assessments** — aptitude, personality, psychometric, selection,
+  and cognitive (IQ-style index) tests with per-scale results, score
+  bands, validity, and a derived profile. Reported, never
+  prescriptive: WPM does not rank or recommend, no composite IQ
+  exists, and cognitive scales are refused on selection instruments.
 - **Succession planning** — key positions, incumbents with a risk of
   loss, a readiness-rated bench, and the single points of failure that
   fall out of criticality × risk.
@@ -97,6 +112,8 @@ retire, organized as five pillars:
 | Self-service without over-exposure | ABAC personas (employee/manager/HR/payroll) + masking on salary and payslip fields |
 | Payroll correctness | pure-core arithmetic in minor units, overflow-refusing, reconciled to time/leave records |
 | Compliance posture | every mutation and sensitive read audited; retention rules documented |
+| Privacy by unrepresentability | what must not be stored gets no column: no health cohort, symptom, diagnosis, or pulse author (WPM-D17/D20/D24/D25) |
+| Subject rights honoured honestly | one-document export with named exclusions; erasure as anonymisation; floored retention sweep (WPM-D22) |
 
 ## Non-goals
 

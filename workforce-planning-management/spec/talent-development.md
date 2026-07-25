@@ -69,12 +69,17 @@ optionally tied to an application), and per-scale **results**.
 |---|---|---|
 | `aptitude` | how a person performs at tasks and reacts to situations | numerical reasoning, verbal reasoning, problem solving, logical thinking |
 | `personality` | behavioural style and working qualities | work style, team compatibility, introversion/extraversion |
-| `psychometric` | **spans aptitude and personality** | behavioural style, emotional intelligence, cognitive ability — *plus* every aptitude and personality scale |
+| `psychometric` | **spans aptitude, personality, and cognitive** | behavioural style, emotional intelligence, cognitive ability — *plus* every aptitude, personality, and cognitive scale |
 | `selection` | suitability for a role during hiring | job simulation, skills assessment, judgement test |
+| `cognitive` | IQ-style index measurement (WPM-R20) | verbal comprehension, working memory, processing speed, spatial reasoning, fluid reasoning |
 
 A result whose scale is outside its assessment's category is a `422`.
-Psychometric is the one deliberate overlap, because a psychometric
-test covers aptitude *and* personality by definition.
+Psychometric is the one deliberate overlap, because a full battery
+covers aptitude, personality, *and* cognition by definition. Two
+cognitive-specific guardrails: **no composite "IQ number" exists**
+(per-scale readings only), and `selection` instruments **refuse**
+cognitive scales — an IQ scale cannot ride into hiring unreviewed;
+equality-law review before any selection use is a deployment duty.
 
 **Scores are integers**: percentiles are 0–100 and raw scores are
 whole points out of a whole maximum. A percentile derives a **band**
@@ -95,6 +100,31 @@ percentiles, and narratives do not), and unmasked reads of scored
 results are audited. The aggregate analytics
 (`GET /api/assessments/analytics`) report counts and band
 distributions only — no individual's score appears.
+
+## 360° multi-rater appraisals
+
+Alongside the manager-led review cycles, a **360° appraisal**
+(WPM-R29) gathers a full circle: manager, peers, direct reports, and
+a self-assessment, per declared competency. The lifecycle is one-way
+(`draft → collecting → shared`), collection requires at least three
+non-self raters (≤ 12 total), responses are once-per-rater and
+`$sub`-owned, and every rater gets an in-app request notification
+(WPM-R31). Rater anonymity is **procedural** (WPM-D21): who responded
+is visible (chasing is half the process), what they said is only ever
+a group × competency aggregate — `peer`/`report` cells below three
+responses are withheld, count included; `manager` and `self` disclose
+at one by convention. The shared-only report pools comments per group
+(alphabetised; withheld from masked readers), its reads are audited,
+and it is development-facing — never a payroll or benchmarking input.
+
+## Skills, learning paths, and mentorship
+
+The skills catalog + declared per-employee proficiencies (1–5, with
+optional targets) feed the skills matrix and gap views; **learning
+paths** are ordered course sequences whose per-member progress counts
+only completed training enrolments; **mentorships** pair employees
+(`proposed → active → completed`) with a session log, surfaced in the
+mentorship overview (load, unmatched, stale pairings).
 
 ## Upskilling and reskilling plans
 

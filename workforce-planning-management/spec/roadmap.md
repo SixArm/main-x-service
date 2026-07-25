@@ -20,3 +20,13 @@ Beyond the v1 queue ([tasks.md](tasks.md)):
 - **WPM ↔ PPM bridge** — allocations in
   project-portfolio-management referencing WPM employees for
   capacity-vs-contract checks.
+- **Outbound notification delivery** — email/push over the upstream
+  person service's contact details (in-app is v1; WPM-D23 keeps
+  contact details out of WPM).
+- **Adjustment review cadence** — periodic "is it still working?"
+  check-ins on in-place adjustments (the lifecycle currently ends at
+  `in_place`).
+- **DSE re-assessment scheduling** — due-date driven re-assessment
+  prompts (workstation moves, annual cycles).
+- **360 → development-plan linking** — graft a shared report's
+  competency gaps into WPM-R21 plan items.

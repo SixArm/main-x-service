@@ -31,6 +31,16 @@ refuses **double-booking** (overlapping assignments) and
 under-filled shifts. Views: a week board per department (shifts ×
 assignees, gaps highlighted) and a per-employee rota.
 
+## Working-time guardrails (WPM-R27 — WPM-D19)
+
+Advisory Working Time Regulations signals derived entirely from data
+this pillar already holds (`GET /api/workforce/working-time`): the
+**17-week / 48-hour average** over *recorded* (not merely approved)
+minutes, with WPM-D16 terms, and **11-hour rest-gap** breaches across
+recent *and planned* shift assignments (±28 days). Flags only —
+nothing is refused; the regulations' opt-outs and compensatory-rest
+rules are a deployment's call. Visibility equals the rota's.
+
 ## Rules summary (pure core, exhaustively unit-tested)
 
 | Rule | Outcome |
@@ -41,3 +51,5 @@ assignees, gaps highlighted) and a per-employee rota.
 | overlapping shift assignments | 422 |
 | assignment over approved leave | 422 |
 | overtime derivation | minutes beyond contracted day, per entry date |
+| 17-week average > 48 h (recorded minutes) | advisory flag, exact integer boundary |
+| consecutive assignments < 11 h apart | advisory rest-gap flag (overlap clamps to 0) |
