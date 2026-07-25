@@ -30,7 +30,7 @@ project-portfolio-management front-end's Kanban board, i18n, and
 
 ## Edition-specific implementation notes (as landed)
 
-- **Copy source**: the HCM front-end (BFF proxy, session seam, SPA
+- **Copy source**: the WPM front-end (BFF proxy, session seam, SPA
   mode, i18n pattern; 45-key catalogue here).
 - **Deal board**: stage columns from the pipeline's stage rows;
   the forward-move button drives `POST /deals/{pid}/stage` (a lost

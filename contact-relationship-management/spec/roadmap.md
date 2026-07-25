@@ -16,7 +16,7 @@ Beyond the v1 queue ([tasks.md](tasks.md)):
 - **Quotas & territories; commission views.**
 - **CLV refinement** — margin, discounting, churn-adjusted models
   over the v1 revenue sum.
-- **Cross-app bridges** — HCM (rep identity/teams from employee
+- **Cross-app bridges** — WPM (rep identity/teams from employee
   records), PPM (post-sale delivery projects opened from won
   deals).
 - **FX normalization** for mixed-currency roll-ups (rate source +

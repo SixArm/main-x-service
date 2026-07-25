@@ -8,6 +8,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Changed — `Config::from_env` gained a testable seam and more variables (2026-07-23)
+
+- The env overlay moved into a pure `Config::from_source(lookup)`;
+  `from_env` is now a two-line delegation to it. This makes the
+  variable-to-field mapping unit-testable without mutating the process
+  environment — which matters because `std::env::set_var` is `unsafe`
+  in the 2024 edition (this crate forbids `unsafe`) and process env is
+  global state that makes parallel tests flaky.
+- Added variables: `SEARCH_CACHE_SIZE_MB`, `STREAMING_BROKER_URL`,
+  `STREAMING_TOPIC` (the previously-unreachable config fields).
+- A blank or whitespace-only value now counts as **unset** rather than
+  overwriting the default with an empty string, and typed values
+  tolerate surrounding whitespace (a `.env` line like `SERVER_PORT = 9090 `).
+- Pinned by five unit tests; behaviour is otherwise unchanged.
+
 ### Added — stored review queue + decision endpoints (2026-07-19)
 
 - `review_queue` table (migration `m20260719_000001_create_review_queue`):

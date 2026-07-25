@@ -127,7 +127,13 @@
       "Bash(pnpm run *)",
       "Bash(pnpm test *)",
       "Bash(perl -ni -e 'print unless m{^\\\\| \\\\[Plan Service\\\\]\\\\\\(plan/plan-service-with-loco/\\\\\\)} || m{^\\\\| \\\\[Plan Matcher\\\\]\\\\\\(plan/plan-matcher-rust-crate/\\\\\\)} || m{^\\\\| \\\\[plan-front-end-with-svelte\\\\]\\\\\\(plan/plan-front-end-with-svelte/\\\\\\)}' AGENTS.md)",
-      "Bash(perl -ni -e 'print unless m{^\\\\| \\\\[plan-service\\\\]\\\\\\(\\\\.\\\\./\\\\.\\\\./plan/plan-service-with-loco\\\\\\)} || m{^\\\\| \\\\[plan-matcher\\\\]\\\\\\(\\\\.\\\\./\\\\.\\\\./plan/plan-matcher-rust-crate\\\\\\)} || m{^\\\\| \\\\[plan-front-end-with-svelte\\\\]\\\\\\(\\\\.\\\\./\\\\.\\\\./plan/plan-front-end-with-svelte\\\\\\)}' agents/share/overview.md)"
+      "Bash(perl -ni -e 'print unless m{^\\\\| \\\\[plan-service\\\\]\\\\\\(\\\\.\\\\./\\\\.\\\\./plan/plan-service-with-loco\\\\\\)} || m{^\\\\| \\\\[plan-matcher\\\\]\\\\\\(\\\\.\\\\./\\\\.\\\\./plan/plan-matcher-rust-crate\\\\\\)} || m{^\\\\| \\\\[plan-front-end-with-svelte\\\\]\\\\\\(\\\\.\\\\./\\\\.\\\\./plan/plan-front-end-with-svelte\\\\\\)}' agents/share/overview.md)",
+      "Bash(echo \"---exit: $?\")",
+      "Bash(psql -U loco -l)",
+      "Bash(find /Users/jph/git/sixarm/main-x-service/workforce-planning-management/workforce-planning-management-front-end-with-svelte/src -name *.test.ts -o -name *.spec.ts)",
+      "Bash(pnpm exec *)",
+      "Bash(xargs ls -la)",
+      "Bash(sort -k2)"
     ]
   }
 }

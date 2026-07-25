@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - 2026-07-18 — CRM-T1–T16 implementation round: full Loco service
-  (copy-adapted from the HCM service). 6 migrations / 19 tables,
+  (copy-adapted from the WPM service). 6 migrations / 19 tables,
   pure `rules/` core (lifecycle machines, deterministic lead scoring
   with breakdown, forecast/ROI/CLV/win-rate with per-currency
   honesty, SLA derivation, consent-gated segment evaluation), five

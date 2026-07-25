@@ -24,14 +24,14 @@ loco-rs = { version = "0.16" }
 loco-rs = { workspace = true  }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
-tokio = { version = "1.52", default-features = false, features = [
+tokio = { version = "1.53", default-features = false, features = [
   "rt-multi-thread",
 ] }
 async-trait = { version = "0.1" }
 axum = { version = "0.8" }
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-regex = { version = "1.12" }
+regex = { version = "1.13" }
 migration = { path = "migration" }
 sea-orm = { version = "1.1", features = [
   "sqlx-sqlite",
@@ -41,7 +41,7 @@ sea-orm = { version = "1.1", features = [
 ] }
 chrono = { version = "0.4" }
 validator = { version = "0.20" }
-uuid = { version = "1.23", features = ["v4", "serde"] }
+uuid = { version = "1.24", features = ["v4", "serde"] }
 include_dir = { version = "0.7" }
 mimalloc = { version = "0.1.52" }
 prometheus = { version = "0.13" }
@@ -61,9 +61,9 @@ required-features = []
 [dev-dependencies]
 loco-rs = { workspace = true, features = ["testing"] }
 # Name the `TestServer` type in shared request-test helpers.
-axum-test = { version = "17.0.1" }
+axum-test = { version = "17.3.0" }
 # `#[tokio::test]` + a local ephemeral-port HTTP listener for the boot-time key-set fetch tests.
-tokio = { version = "1.52", default-features = false, features = [
+tokio = { version = "1.53", default-features = false, features = [
   "rt-multi-thread",
   "macros",
   "net",

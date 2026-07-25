@@ -16,7 +16,7 @@ loco-rs = { version = "0.16" }
 loco-rs = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
-tokio = { version = "1.52", default-features = false, features = [
+tokio = { version = "1.53", default-features = false, features = [
   "rt-multi-thread",
 ] }
 async-trait = { version = "0.1" }
@@ -32,7 +32,7 @@ sea-orm = { version = "1.1", features = [
   "with-chrono",
 ] }
 chrono = { version = "0.4" }
-uuid = { version = "1.23", features = ["v4", "serde"] }
+uuid = { version = "1.24", features = ["v4", "serde"] }
 mimalloc = { version = "0.1.52" }
 prometheus = { version = "0.13" }
 
@@ -63,7 +63,7 @@ required-features = []
 [dev-dependencies]
 loco-rs = { workspace = true, features = ["testing"] }
 serial_test = { version = "3.5.0" }
-tokio = { version = "1.52", default-features = false, features = [
+tokio = { version = "1.53", default-features = false, features = [
   "macros",
   "rt-multi-thread",
 ] }

@@ -7,7 +7,7 @@ The **Main X Index** family of crates implements a federated identity index — 
 | Crate | Entity | Purpose |
 |-------|--------|---------|
 | [person-service](../../person/person-service-with-loco) | Person | General person identity registry |
-| [worker-service](../../worker/worker-service-with-loco) | Worker | Workforce / professional identity registry |
+| [worker-service](../../worker/worker-service-with-loco) | Worker | Workforce / professional identity registry; also records aptitude / personality / psychometric / selection assessments per worker (per-scale results, score bands, validity, derived profile, masked under ABAC) |
 | [place-service](../../place/place-service-with-loco) | Place | Geographic place registry (schema.org/Place) |
 | [thing-service](../../thing/thing-service-with-loco) | Thing | Generic thing / asset registry (schema.org/Thing) |
 | [event-service](../../event/event-service-with-loco) | Event | Time-bounded event registry (schema.org/Event) |

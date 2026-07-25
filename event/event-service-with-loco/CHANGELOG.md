@@ -8,6 +8,29 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — `Config::from_env` now loads the environment (2026-07-23)
+
+- `Config::from_env` was a stub (`// TODO: Implement environment
+  variable loading`) that returned `Config::default()` and ignored the
+  process environment entirely — so `DATABASE_URL`, `SERVER_PORT`, and
+  every other documented variable had **no effect**. It now layers the
+  environment (and a best-effort `.env`) over the defaults.
+- Variables: `DATABASE_URL`, `DATABASE_MAX_CONNECTIONS`,
+  `DATABASE_MIN_CONNECTIONS`, `SERVER_HOST`, `SERVER_PORT`,
+  `GRPC_PORT`, `SEARCH_INDEX_PATH`, `SEARCH_CACHE_SIZE_MB`,
+  `MATCHING_THRESHOLD`, `OTLP_SERVICE_NAME`, `OTLP_ENDPOINT`,
+  `RUST_LOG`, `STREAMING_BROKER_URL`, `STREAMING_TOPIC`.
+- A blank or whitespace-only value counts as **unset** (an empty
+  `SERVER_HOST` must not bind the server to nothing). A malformed typed
+  value is **refused** with `Error::Config` naming the variable and its
+  raw value, rather than silently falling back to a default the
+  operator did not ask for.
+- Pinned by five unit tests against a pure `Config::from_source` seam
+  (defaults, every variable, blank-as-unset, malformed-by-name,
+  whitespace tolerance) — no process-environment mutation, so they are
+  parallel-safe and need no `unsafe` (`std::env::set_var` is `unsafe`
+  in the 2024 edition, which this crate forbids).
+
 ### Security
 
 - **SEC-M1: input-size caps on the `Event` payload.** The validator

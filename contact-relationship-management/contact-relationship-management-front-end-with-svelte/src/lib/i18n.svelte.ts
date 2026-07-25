@@ -1,5 +1,5 @@
 // Lightweight, dependency-free i18n for the CRM SPA (family pattern,
-// copy-adapted from the HCM front-end): a per-locale strings map plus
+// copy-adapted from the WPM front-end): a per-locale strings map plus
 // a reactive `$state` current-locale (Svelte 5 runes), exposed via a
 // `t(key)` accessor. `en` is the source of truth; every locale must
 // cover the same key set (the parity test pins this). The chosen

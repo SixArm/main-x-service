@@ -242,3 +242,25 @@ clearly described manual check confirms the acceptance criterion.
     green; `cargo clippy --lib --tests` clean. Default (no
     `EVENT_EVENT_TRANSPORT=outbox` + `EVENT_EVENT_RELAY`) ⇒ no relay loop.
 
+- [x] **T-CFG — `Config::from_env` loads the environment.** *(done
+  2026-07-23)* The function was a stub that returned `Config::default()`
+  and ignored the process environment, so every documented variable
+  (`DATABASE_URL`, `SERVER_PORT`, `SEARCH_INDEX_PATH`, …) was inert —
+  the integration-test harness, which builds its state from
+  `Config::from_env()`, could never be pointed at a test database.
+  - Env → `.env` (best-effort) → default precedence, over the 14
+    variables in the `from_env` doc table (the family's 11 plus
+    `SEARCH_CACHE_SIZE_MB`, `STREAMING_BROKER_URL`, `STREAMING_TOPIC`,
+    which were previously unreachable config fields).
+  - Blank / whitespace-only ⇒ **unset** (an empty `SERVER_HOST` must
+    not bind the server to nothing); a malformed typed value ⇒
+    `Error::Config` naming the variable and its raw value, never a
+    silent default.
+  - The overlay lives in a pure `Config::from_source(lookup)` seam so
+    it is testable without mutating process env — `std::env::set_var`
+    is `unsafe` in the 2024 edition, which this crate forbids.
+  - **Acceptance:** five unit tests (defaults, every variable applied,
+    blank-as-unset, malformed-refused-by-name, whitespace tolerance)
+    green on a bare `cargo test --lib`; clippy clean. The same seam and
+    tests landed in all six `*-service-with-loco` crates that carry a
+    `Config`, so the family is uniform.

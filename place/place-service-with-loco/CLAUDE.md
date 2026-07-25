@@ -403,6 +403,12 @@ Configuration is loaded from `config/{development,test,production}.yaml`
 | `DATABASE_URL`       | Postgres connection string | per config file         |
 | `SEARCH_INDEX_PATH`  | Tantivy index directory    | `./data/search_index`   |
 | `MATCHING_THRESHOLD` | Probabilistic match cutoff | `0.85`                  |
+| `GRPC_PORT` | gRPC server port (Tonic stub) | `50051` |
+| `SEARCH_CACHE_SIZE_MB` | Tantivy cache budget in MB | `512` |
+| `OTLP_SERVICE_NAME` | service.name sent to the collector | `place-service` |
+| `OTLP_ENDPOINT` | OTLP collector endpoint | `http://localhost:4317` |
+| `STREAMING_BROKER_URL` | Event-broker connection URL | `localhost:9003` |
+| `STREAMING_TOPIC` | Topic events publish to | `place-events` |
 | `RUST_LOG`           | tracing-subscriber filter  | `info`                  |
 | `OTLP_ENDPOINT`      | OpenTelemetry collector    | `http://localhost:4317` |
 | `PLACE_EVENT_TRANSPORT` | Event transport: `memory` (default) or `outbox` (durable event bus, Phase 2 — writes an `event_outbox` row inside each write's transaction) | `memory` |

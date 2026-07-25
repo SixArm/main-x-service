@@ -89,7 +89,7 @@ code + tests in one PR.
 
 > Phases 1–6 landed 2026-07-18 in one implementation round
 > (`contact-relationship-management-service-with-rust`, copy-adapted
-> from the HCM service): 6 migrations (17 domain tables + audit +
+> from the WPM service): 6 migrations (17 domain tables + audit +
 > outbox), pure `rules/` core (lifecycle tables for lead / campaign /
 > ticket / article, deterministic scoring with per-rule breakdown +
 > linear recency decay, forecast/ROI/CLV/win-rate arithmetic with
@@ -124,7 +124,7 @@ code + tests in one PR.
   CRM-D12)
 
 > CRM-T17/T18 landed 2026-07-18: SvelteKit 2 + Svelte 5 runes SPA
-> (copy-adapted from the HCM front-end: BFF proxy + session seam)
+> (copy-adapted from the WPM front-end: BFF proxy + session seam)
 > with a 45-key × 13-locale i18n module (parity-tested, RTL ar/ur),
 > typed CRM client + honest `money()`, and views: KPI dashboard
 > (win rate with numerator/denominator, forecast per currency),

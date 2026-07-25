@@ -15,11 +15,11 @@ path = "src/bin/main.rs"
 
 [dependencies]
 # Async Runtime
-tokio = { version = "1.52", features = ["full"] }
+tokio = { version = "1.53", features = ["full"] }
 
 # Web Framework & HTTP (axum 0.8 to match loco 0.16)
 axum = { version = "0.8", features = ["macros", "multipart", "ws"] }
-hyper = { version = "1.10", features = ["full"] }
+hyper = { version = "1.11", features = ["full"] }
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "compression-full"] }
 
@@ -62,7 +62,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-opentelemetry = "0.28"
 
 # Utilities
-uuid = { version = "1.23", features = ["v4", "serde"] }
+uuid = { version = "1.24", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.3"
 thiserror = "2.0"

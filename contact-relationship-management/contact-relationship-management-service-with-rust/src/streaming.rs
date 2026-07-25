@@ -11,7 +11,7 @@
 //!   no committed change lacks its event (Phase 2). A Phase-3 relay to
 //!   Fluvio is roadmap, family-wide.
 //!
-//! Unlike the single-entity registries, HCM emits for several record
+//! Unlike the single-entity registries, WPM emits for several record
 //! kinds, so `entity` and `kind` are `String`s: `employee` /
 //! `requisition` / `application` / `leave_request` / `payroll_run` /
 //! … × `created` / `updated` / `deleted` / `employee_hired` /

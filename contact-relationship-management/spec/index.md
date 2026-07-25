@@ -26,7 +26,7 @@ renewal — organized as four modules:
    pipeline value, customer lifetime value), activity tracking.
 
 It is a **consumer application** (the case-folder / patient-flow /
-human-capital-management shape): it does not register identities
+workforce-planning-management shape): it does not register identities
 itself. A contact is a [person-service](../../person/person-service-with-loco/)
 record; an account is an
 [organization-service](../../organization/organization-service-with-loco/)
@@ -39,30 +39,30 @@ them.
 
 ## Two editions
 
-| Subproject | Role | Stack |
-|---|---|---|
-| [contact-relationship-management-service-with-rust](../contact-relationship-management-service-with-rust/) | Back-end JSON API | Rust, Loco (Axum + SeaORM), PostgreSQL |
+| Subproject                                                                                                         | Role                           | Stack                                   |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------ | --------------------------------------- |
+| [contact-relationship-management-service-with-rust](../contact-relationship-management-service-with-rust/)         | Back-end JSON API              | Rust, Loco (Axum + SeaORM), PostgreSQL  |
 | [contact-relationship-management-front-end-with-svelte](../contact-relationship-management-front-end-with-svelte/) | Sales / marketing / support UI | SvelteKit 2, Svelte 5 runes, TypeScript |
 
 ## Specification (topic files)
 
-| File | Covers |
-|---|---|
-| [purpose.md](purpose.md) | Problem statement, goals, the four modules |
-| [scope.md](scope.md) | In/out of scope; the boundary with the identity services |
-| [domain-model.md](domain-model.md) | Contact, Account, Lead, Deal, Activity, Campaign, Ticket, SlaPolicy, … |
-| [sales-automation.md](sales-automation.md) | Module 1: contacts/accounts, lead scoring, pipelines, forecasting |
-| [marketing-automation.md](marketing-automation.md) | Module 2: campaigns, segments, nurture sequences, ROI |
-| [service-support.md](service-support.md) | Module 3: tickets, knowledge base, SLA tracking |
-| [analytics-reporting.md](analytics-reporting.md) | Module 4: dashboards, KPIs, activity tracking |
-| [integrations.md](integrations.md) | Upstream family services; EntityRef URNs |
-| [auth.md](auth.md) | SSO, ABAC personas (rep / sales manager / marketing / support), masking |
-| [audit.md](audit.md) | Audit trail, events, consent history |
-| [architecture.md](architecture.md) | Editions, layering, pure-core rules, persistence |
-| [testing.md](testing.md) | Test strategy per edition |
-| [regulatory.md](regulatory.md) | Demo status; GDPR / e-privacy (marketing consent) posture |
-| [roadmap.md](roadmap.md) | Beyond the v1 queue |
-| [glossary.md](glossary.md) | SFA, MQL/SQL, drip, CLV, SLA, … |
+| File                                               | Covers                                                                  |
+| -------------------------------------------------- | ----------------------------------------------------------------------- |
+| [purpose.md](purpose.md)                           | Problem statement, goals, the four modules                              |
+| [scope.md](scope.md)                               | In/out of scope; the boundary with the identity services                |
+| [domain-model.md](domain-model.md)                 | Contact, Account, Lead, Deal, Activity, Campaign, Ticket, SlaPolicy, …  |
+| [sales-automation.md](sales-automation.md)         | Module 1: contacts/accounts, lead scoring, pipelines, forecasting       |
+| [marketing-automation.md](marketing-automation.md) | Module 2: campaigns, segments, nurture sequences, ROI                   |
+| [service-support.md](service-support.md)           | Module 3: tickets, knowledge base, SLA tracking                         |
+| [analytics-reporting.md](analytics-reporting.md)   | Module 4: dashboards, KPIs, activity tracking                           |
+| [integrations.md](integrations.md)                 | Upstream family services; EntityRef URNs                                |
+| [auth.md](auth.md)                                 | SSO, ABAC personas (rep / sales manager / marketing / support), masking |
+| [audit.md](audit.md)                               | Audit trail, events, consent history                                    |
+| [architecture.md](architecture.md)                 | Editions, layering, pure-core rules, persistence                        |
+| [testing.md](testing.md)                           | Test strategy per edition                                               |
+| [regulatory.md](regulatory.md)                     | Demo status; GDPR / e-privacy (marketing consent) posture               |
+| [roadmap.md](roadmap.md)                           | Beyond the v1 queue                                                     |
+| [glossary.md](glossary.md)                         | SFA, MQL/SQL, drip, CLV, SLA, …                                         |
 
 ## Specification-driven delivery (SDD)
 
@@ -81,7 +81,7 @@ queued in `tasks.md`, and only then lands as code in a subproject.
 ## References
 
 - Sibling consumer apps (the shape this follows):
-  [human-capital-management](../../human-capital-management/spec/index.md),
+  [workforce-planning-management](../../workforce-planning-management/spec/index.md),
   [patient-flow](../../patient-flow/spec/index.md),
   [case-folder](../../case-folder/spec/index.md),
   [project-portfolio-management](../../project-portfolio-management/spec/index.md)

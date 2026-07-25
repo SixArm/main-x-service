@@ -15,7 +15,7 @@
 
 ## Service edition
 
-Loco-idiomatic layout (the patient-flow / HCM shape):
+Loco-idiomatic layout (the patient-flow / WPM shape):
 
 ```
 src/

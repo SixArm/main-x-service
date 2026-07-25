@@ -455,6 +455,12 @@ Configuration via environment variables or `.env` file:
 | `SERVER_PORT`              | HTTP server port             | 8080           | No       |
 | `SEARCH_INDEX_PATH`        | Tantivy index directory      | ./search_index | No       |
 | `MATCHING_THRESHOLD`       | Match score threshold        | 0.7            | No       |
+| `GRPC_PORT` | gRPC server port (Tonic stub) | 50051 | No |
+| `SEARCH_CACHE_SIZE_MB` | Tantivy cache budget in MB | 512 | No |
+| `OTLP_SERVICE_NAME` | service.name sent to the collector | person-service | No |
+| `OTLP_ENDPOINT` | OTLP collector endpoint | http://localhost:4317 | No |
+| `STREAMING_BROKER_URL` | Event-broker connection URL | localhost:9003 | No |
+| `STREAMING_TOPIC` | Topic events publish to | person-events | No |
 | `MATCHING_NAME_WEIGHT`     | Name matching weight         | 0.4            | No       |
 | `MATCHING_DOB_WEIGHT`      | DOB matching weight          | 0.3            | No       |
 | `MATCHING_GENDER_WEIGHT`   | Gender matching weight       | 0.1            | No       |

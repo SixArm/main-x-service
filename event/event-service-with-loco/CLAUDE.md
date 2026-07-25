@@ -191,6 +191,12 @@ curl -X POST http://localhost:8080/api/events/match \
 | `SERVER_PORT` | `8080` | |
 | `SEARCH_INDEX_PATH` | `./data/search_index` | Tantivy index dir |
 | `MATCHING_THRESHOLD` | `0.85` | Probabilistic match cutoff |
+| `GRPC_PORT` | `50051` | gRPC server port (Tonic stub) |
+| `SEARCH_CACHE_SIZE_MB` | `512` | Tantivy cache budget in MB |
+| `OTLP_SERVICE_NAME` | `event-service` | service.name sent to the collector |
+| `OTLP_ENDPOINT` | `http://localhost:4317` | OTLP collector endpoint |
+| `STREAMING_BROKER_URL` | `localhost:9003` | Event-broker connection URL |
+| `STREAMING_TOPIC` | `event-events` | Topic events publish to |
 | `RUST_LOG` | `info` | tracing-subscriber filter |
 
 ## Testing
