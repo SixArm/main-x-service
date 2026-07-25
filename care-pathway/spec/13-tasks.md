@@ -219,3 +219,33 @@ manual check confirms it. Split tasks too big for one PR
     file re-upserts to the same state), the per-row error report, a
     keyless dedupe-to-review row (`provenance = import`), masked vs full
     export, and that a zero-row export still writes an audit record.
+
+- [x] **T-11 — Extended regulatory frameworks (§12.4).** HIPAA
+  read/disclosure auditing + tamper-evident history; GDPR/EHDS erasure
+  against the immutable chain, residency, lawful basis, purpose-of-use;
+  ONC/HTI profile + terminology validation, `$validate`, SMART
+  discovery, Bulk Data `$export`; IEC 62304 SOUP register + SBOM,
+  machine-checked requirement→test traceability, reproducible builds,
+  and a runtime posture surface.
+  - **Done (2026-07-25):** implemented in the service crate as the
+    family's reference implementation — see
+    [service spec §12](../care-pathway-service-with-loco/spec/index.md)
+    and its §13 T-11–T-14 for the per-framework breakdown, and
+    [`spec/compliance` §8](../../spec/compliance/index.md) for the
+    repository-wide status and the rollout to the other services.
+  - **Acceptance (met):** the audit chain verifies after a Postgres
+    JSONB round-trip and reports a `content` break when a row is
+    rewritten with raw SQL; erasure destroys content while the chain
+    still verifies; adding an un-annotated dependency or orphaning a
+    requirement fails the build. Full `--ignored` suite 35/35 vs
+    Postgres 18; 177 unit tests; clippy pedantic clean.
+  - **Deliberately not claimed:** ONC certification, US Core
+    conformance, SMART App Launch, medical-device qualification — see
+    [§12.5](12-compliance.md).
+- [ ] **T-12 — Compliance follow-ups.** Row-level integrity hashing over
+  the entity table; Bulk Data `$export` on the `bg_pg` worker + an
+  artifact store; the fail-open decision for audit writes; CI wiring for
+  `cargo deny` / SBOM / traceability; an Inferno-style conformance run.
+  Tracked in detail as the service spec's §13 T-15.
+  - **Acceptance:** each sub-item closed with a test, or explicitly
+    re-declared as an accepted limitation in §12.5.

@@ -87,3 +87,40 @@ with the email field).
   console log is a development affordance only).
 - **Decommissioned:** the RS256 JWT bearer credential and its
   `localStorage` storage are removed by this pivot (§1; shared §9).
+
+### Extended frameworks
+
+Four frameworks impose obligations beyond the table above. Regime detail:
+[`agents/share/compliance-for-healthcare.md`](../../agents/share/compliance-for-healthcare.md)
+§2; repository-wide status and the reference implementation:
+[`spec/compliance` §8](../../spec/compliance/index.md). This entity sits
+differently from the registries: it holds almost no data, but it **is**
+the access-control and authentication mechanism every other entity's
+compliance claim depends on — so the frameworks engage through the
+*controls* it provides, not through the data it stores.
+
+| Framework | Engagement here | What it drives |
+|---|---|---|
+| **HIPAA (US)** — §164.312(a)(1) access control, §164.312(d) person/entity authentication, §164.312(b) audit controls, §164.308(a)(1)(ii)(D) activity review | **Engaged as the mechanism.** §164.312(a)(1) and (d) are satisfied *here* on behalf of the whole family: unique user identification, verification of the entity seeking access, and — via the `sessions` idle/absolute TTLs — automatic logoff. `auth_events` is the family's authentication activity log. | **Tamper-evident history** over `auth_events` (a SHA-256 chain), because an authentication trail that can be quietly rewritten undermines every downstream registry's §164.312(b) claim; and preserving the §164.308(a)(1)(ii)(D) review path — `auth_events` must stay queryable, with the T-9 gating decision (system feed open, per-subject feed bearer-gated) revisited if a deployment's risk analysis says otherwise. |
+| **GDPR / EU EHDS** — Reg. (EU) 2025/327 | GDPR fully engaged, though over a deliberately tiny surface (email + name). EHDS engages indirectly but importantly: **health-professional identity is what gates its primary-use exchange**, so this is where an EHDS deployment would attach professional-role attributes. | Reconciling **Art. 17 erasure with the tamper-evident chain**: today's erasure (soft-delete + email tombstone + session revocation, T-9) already chose redaction over hard delete for exactly the right reason — the chain makes that choice *provably* sound, since a redacted row keeps its linkage. Plus a declared **data residency** and **lawful basis**, and — for EHDS — attribute vocabulary for professional roles routed through the existing ABAC `attrs` claim rather than a new mechanism. |
+| **ONC / HTI certification (US)** — 45 CFR Part 170 §170.315(g)(10) | **This is where SMART would live.** §170.315(g)(10) requires **SMART App Launch** — an OAuth 2.0 authorisation server with scoped access, launch contexts, refresh tokens, and a discoverable `/.well-known/smart-configuration`. This service is the family's authorisation server; the registries only *consume* its tokens. | An honest gap statement, not a claim. The family's credential is a **PASETO v4.public** token minted from a cookie session — deliberately **not** OAuth 2.0 and **not** SMART. A registry's `/fhir/.well-known/smart-configuration` therefore advertises the deployment's real authorisation server, and this service does **not** pretend to be one. Adding SMART App Launch would be a substantial new capability here (authorization endpoint, scopes, launch context, refresh) — a roadmap item, not a relabelling. |
+| **IEC 62304 / SaMD** (with ISO 14971) | Not a device. In IEC 62304 terms this is a **supporting software item** of every clinical service that depends on it — an authentication failure is a plausible contributor to a downstream clinical hazard, which is precisely why supporting items are in scope. | A **SOUP register + CycloneDX SBOM** (this crate's dependency set — `rusty_paseto`, `ed25519-dalek`, `argon2` — is the most security-critical in the family); **machine-checked requirement→test traceability** over the token, session-TTL, CSRF, anti-enumeration, and fail-closed-seed controls (SEC-A1); and **signed, reproducible builds**, which matter more here than anywhere else because this binary holds the signing key. |
+
+### Honest limits
+
+- **No SMART App Launch, and none is claimed.** The gap is real and is
+  stated as a gap. Any FHIR surface in the family that advertises SMART
+  discovery points at a deployment's own authorisation server.
+- **Not a certified health-IT module.** ONC certification targets FHIR
+  **R4 + US Core** and, for authorisation, SMART App Launch — neither of
+  which this service implements.
+- **The chain is not yet built.** `auth_events` is append-only by
+  convention (`record_best_effort` only inserts) but carries no hash
+  linkage, so tampering is currently undetectable rather than merely
+  unlikely. The reference implementation is the
+  [care-pathway service](../../care-pathway/care-pathway-service-with-loco/).
+- **Best-effort audit writes are a chain hazard.** `record_best_effort`
+  deliberately never fails a request — but a dropped row leaves a gap the
+  chain cannot distinguish from a deletion. Adopting the chain here means
+  deciding, explicitly, whether an authentication audit write may still
+  fail open.

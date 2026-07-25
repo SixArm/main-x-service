@@ -80,14 +80,20 @@ pub const ENTITY: &str = "care_pathway";
 
 /// Path suffixes of this crate's **destructive named POSTs** (per
 /// `authorization-attributes.md` §2). The list is family-wide: record
-/// **merge** (`POST /api/care-pathways/merge`) is live today;
+/// **merge** (`POST /api/care-pathways/merge`) and **GDPR Art. 17
+/// erasure** (`POST /api/care-pathways/{pid}/erase`) are live today;
 /// `/deduplicate` (batch dedup scan) and `/import` (bulk import) are
 /// declared ahead of those features landing so the guard is already
 /// correct when they do. A POST whose path ends with one of these
 /// derives [`Action::Destructive`] instead of [`Action::Write`];
 /// `POST …/check-duplicates` deliberately does not match (`ends_with`,
 /// not substring).
-pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 3] = ["/merge", "/deduplicate", "/import"];
+///
+/// `/erase` is destructive rather than a write because it is
+/// **irreversible**: unlike `DELETE /{pid}` (a reversible soft delete) it
+/// destroys the payload and redacts the audit content, so it must require
+/// `access=admin` under the default policy.
+pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 4] = ["/merge", "/deduplicate", "/import", "/erase"];
 
 /// Default issuer expected in tokens (`iss`).
 const DEFAULT_ISSUER: &str = "authentication-service";
@@ -249,15 +255,27 @@ pub fn parse_bool(value: &str) -> bool {
 }
 
 /// Paths that stay public even when enforcement is on: health/ping, the
-/// `OpenAPI` doc + Swagger UI, and the Prometheus metrics endpoint (so a
-/// scraper needs no bearer token). Everything else requires a valid bearer
-/// token.
+/// `OpenAPI` doc + Swagger UI, the Prometheus metrics endpoint (so a
+/// scraper needs no bearer token), and the two **FHIR discovery**
+/// documents. Everything else requires a valid bearer token.
+///
+/// FHIR discovery is public by design, per
+/// `agents/share/fhir.md` §8 (`/fhir/metadata` MAY be public) and the
+/// SMART App Launch specification, which requires
+/// `/.well-known/smart-configuration` to be reachable **before** a client
+/// has a credential — a discovery document behind the credential it tells
+/// you how to obtain is useless. Neither document exposes pathway data:
+/// `metadata` describes the API surface, and `smart-configuration` is
+/// emitted only when the deployment has configured an authorization server
+/// and merely names its already-public endpoints.
 fn is_public_path(path: &str) -> bool {
     path == "/_health"
         || path == "/_ping"
         || path == "/api-docs/openapi.json"
         || path.starts_with("/swagger-ui")
         || path == "/metrics.prom"
+        || path == "/fhir/metadata"
+        || path == "/fhir/.well-known/smart-configuration"
 }
 
 /// The blanket-enforcement decision: authentication, then ABAC
@@ -630,6 +648,9 @@ mod tests {
             "/swagger-ui",
             "/swagger-ui/index.html",
             "/metrics.prom",
+            // FHIR discovery — public by design (see `is_public_path`).
+            "/fhir/metadata",
+            "/fhir/.well-known/smart-configuration",
         ] {
             assert!(
                 enforce(
@@ -738,6 +759,9 @@ mod tests {
             "/api/care-pathways/merge",
             "/api/care-pathways/deduplicate",
             "/api/care-pathways/import",
+            // GDPR Art. 17 erasure is irreversible, so it is destructive
+            // rather than a write — `access=write` must not reach it.
+            "/api/care-pathways/0c4f1e2a-0000-4000-8000-000000000000/erase",
         ] {
             assert_eq!(derive_action(&Method::POST, path), Action::Destructive);
         }
@@ -855,6 +879,17 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(merge.0, StatusCode::FORBIDDEN);
+        // GDPR erasure is irreversible: a write-tier caller must not reach it.
+        let erase = enforce(
+            true,
+            &Method::POST,
+            "/api/care-pathways/1/erase",
+            &bearer(&token),
+            &verifier,
+            &policy,
+        )
+        .unwrap_err();
+        assert_eq!(erase.0, StatusCode::FORBIDDEN);
     }
 
     /// ABAC `access=admin` ⇒ DELETE and the destructive named POSTs

@@ -29,6 +29,7 @@ pub fn spec() -> Value {
 fn paths() -> Value {
     let mut paths = crud_paths();
     merge_object(&mut paths, aux_paths());
+    merge_object(&mut paths, compliance_paths());
     paths
 }
 
@@ -158,12 +159,72 @@ fn aux_paths() -> Value {
     })
 }
 
+/// The compliance-evidence paths (spec §12): posture, SBOM, audit-chain
+/// verification, the HIPAA §164.528 accounting of disclosures, and the
+/// GDPR Art. 17 erasure endpoint.
+fn compliance_paths() -> Value {
+    json!({
+            "/api/compliance": {
+                "get": {
+                    "tags": ["compliance"],
+                    "summary": "Compliance posture: software identification, controls, declarations",
+                    "description": "Build provenance, the IEC 62304 safety classification and its rationale, which controls are actually live in this process, the declared data-protection posture (residency / lawful basis / Art. 9 condition / transfer safeguard, each 'undeclared' until configured), and per-framework lists of what is implemented and what is deliberately NOT claimed.",
+                    "responses": { "200": { "description": "Posture report" } }
+                }
+            },
+            "/api/compliance/sbom": {
+                "get": {
+                    "tags": ["compliance"],
+                    "summary": "CycloneDX 1.5 software bill of materials + SOUP register",
+                    "description": "Derived at compile time from the crate's own Cargo.lock, merged with the IEC 62304 §8.1.2 annotations in compliance/soup.tsv, so it cannot drift from the running binary. Deterministic: no timestamp, no serial number.",
+                    "responses": { "200": { "description": "CycloneDX document" } }
+                }
+            },
+            "/api/compliance/audit/verify": {
+                "get": {
+                    "tags": ["compliance"],
+                    "summary": "Verify the tamper-evident audit hash chain (HIPAA §164.312(c))",
+                    "description": "Recomputes the trailing rows and reports every linkage or content break. Attests to the audit trail only, not to the care_pathways rows.",
+                    "parameters": [{ "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "default": 1000, "maximum": 10000, "minimum": 1 } }],
+                    "responses": { "200": { "description": "Chain verification report" } }
+                }
+            },
+            "/api/care-pathways/{pid}/audit/disclosures": {
+                "parameters": [{ "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                "get": {
+                    "tags": ["compliance"],
+                    "summary": "Accounting of disclosures for one care pathway (HIPAA §164.528)",
+                    "description": "Only audit rows classified as an outward disclosure, newest first. The response states whether the accounting is complete, or INCOMPLETE because CARE_PATHWAY_AUDIT_READS is off — an empty list must not be read as 'nothing was disclosed'.",
+                    "responses": { "200": { "description": "Disclosure accounting" }, "400": { "description": "pid is not a UUID" } }
+                }
+            },
+            "/api/care-pathways/{pid}/erase": {
+                "parameters": [{ "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                "post": {
+                    "tags": ["compliance"],
+                    "summary": "Erase a care pathway under GDPR Art. 17 (irreversible)",
+                    "description": "Replaces the payload with a tombstone, retires the record, destroys the content of every audit row about it, and appends a chained 'erased' accountability row — the audit chain still verifies. This is NOT the reversible soft delete (DELETE /{pid}); it is a DESTRUCTIVE action under ABAC and requires access=admin under the default policy. Idempotent: re-erasing, or erasing an already-deleted pid, still sweeps any audit content held about it.",
+                    "security": [{ "bearer": [] }],
+                    "responses": {
+                        "200": { "description": "Erasure outcome (pid, rows redacted, irreversible: true)" },
+                        "400": { "description": "pid is not a UUID" },
+                        "403": { "description": "Valid credential, but the policy denies a destructive action" }
+                    }
+                }
+            }
+    })
+}
+
 /// The `components` object of the `OpenAPI` document.
 fn components() -> Value {
     json!({
             "securitySchemes": {
-                "bearer": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT",
-                    "description": "RS256 access token from the authentication-service, verified offline against its JWKS." }
+                // The credential is PASETO v4.public, not a JWT — the
+                // RS256/JWKS model was decommissioned family-wide (see
+                // agents/share/authentication-sessions.md). `bearerFormat`
+                // is a free-text hint, so it names what is actually sent.
+                "bearer": { "type": "http", "scheme": "bearer", "bearerFormat": "PASETO v4.public",
+                    "description": "Short-lived PASETO v4.public (Ed25519) token minted by the authentication-service from a cookie session, verified offline against its published key set at /.well-known/paseto-keys. No shared secret and no introspection hop." }
             },
             "schemas": {
                 "PathwayRef": { "type": "object", "required": ["pid", "name"], "properties": {
@@ -237,6 +298,46 @@ mod tests {
         assert!(paths["/api/care-pathways/audit/recent"]["get"].is_object());
         assert!(paths["/api/care-pathways/events/recent"]["get"].is_object());
         assert!(paths["/api/care-pathways/{pid}/audit"]["get"].is_object());
+    }
+
+    /// The compliance-evidence endpoints (spec §12) are documented, so
+    /// an auditor can find them from the API doc rather than the source.
+    #[test]
+    fn spec_documents_compliance_endpoints() {
+        let s = spec();
+        let paths = &s["paths"];
+        assert!(paths["/api/compliance"]["get"].is_object());
+        assert!(paths["/api/compliance/sbom"]["get"].is_object());
+        assert!(paths["/api/compliance/audit/verify"]["get"].is_object());
+        assert!(paths["/api/care-pathways/{pid}/audit/disclosures"]["get"].is_object());
+        assert!(paths["/api/care-pathways/{pid}/erase"]["post"].is_object());
+    }
+
+    /// The erasure endpoint's documentation must say it is irreversible
+    /// and distinct from the soft delete — the single most consequential
+    /// thing a caller could misread about this API.
+    #[test]
+    fn erase_endpoint_is_documented_as_irreversible() {
+        let s = spec();
+        let op = &s["paths"]["/api/care-pathways/{pid}/erase"]["post"];
+        let summary = op["summary"].as_str().unwrap_or_default();
+        let description = op["description"].as_str().unwrap_or_default();
+        assert!(summary.to_lowercase().contains("irreversible"), "{summary}");
+        assert!(description.contains("NOT the reversible soft delete"));
+        assert!(description.contains("DESTRUCTIVE"));
+    }
+
+    /// The security scheme names the credential this family actually
+    /// uses. The RS256/JWKS model was decommissioned; a doc that still
+    /// advertised it would send an integrator down the wrong path.
+    #[test]
+    fn security_scheme_describes_paseto_not_jwt() {
+        let scheme = &spec()["components"]["securitySchemes"]["bearer"];
+        assert_eq!(scheme["bearerFormat"], "PASETO v4.public");
+        let description = scheme["description"].as_str().unwrap_or_default();
+        assert!(description.contains("PASETO"));
+        assert!(!description.contains("RS256"));
+        assert!(!description.contains("JWKS"));
     }
 
     #[test]

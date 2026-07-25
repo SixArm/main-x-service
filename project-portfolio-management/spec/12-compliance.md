@@ -70,3 +70,32 @@ is retained for governmental information governance.
 - **Explainability for accountability.** Per-component match
   breakdowns give auditors a replayable rationale for every duplicate
   decision; keep this property (NFR-8).
+
+### 12.4 Extended frameworks
+
+Four frameworks impose obligations beyond §12.2. Regime detail:
+[`agents/share/compliance-for-healthcare.md`](../../agents/share/compliance-for-healthcare.md)
+§2; repository-wide status and the reference implementation:
+[`spec/compliance` §8](../../spec/compliance/index.md). Consistent with
+§12.1 — plans are business data, and there is no patient data anywhere in
+the model — two of the four are **not engaged**, and the table says so
+rather than manufacturing relevance.
+
+| Framework | Engagement here | What it drives |
+|---|---|---|
+| **HIPAA (US)** — §164.312(b) audit controls, §164.312(c) integrity | **Not engaged** — no PHI, consistent with §12.2. | Nothing HIPAA-specific. The **tamper-evident audit chain** (a SHA-256 chain over `audit_logs`) is still adopted on governmental-information-governance and ISO/IEC 27001 grounds — the same reasoning §12.2 already uses to keep an audit-grade trail without a HIPAA trigger. |
+| **GDPR / EU EHDS** — Reg. (EU) 2025/327 | **GDPR engaged**, via the people references §12.1 names (`lead_ref`, task `assignee_ref`) and the operator identities in audit data. **EHDS not engaged** — no health data. | An **erasure path that survives immutable history** (redact content, keep chain linkage) — which here means erasing a person's assignment history without destroying the plan's own record; a declared **data residency** and **lawful basis**; and bulk export of people references beyond the region recorded as a **Ch. V transfer**, reinforcing §9.6's masked-by-default rule. |
+| **ONC / HTI certification (US)** — 45 CFR Part 170 §170.315(g)(10) | **Not engaged.** Portfolio is explicitly out of FHIR scope ([`agents/share/fhir.md`](../../agents/share/fhir.md) §3) — no meaningful resource models a plan, and the service mounts no `/fhir` surface. | Nothing. Do **not** add a FHIR surface, a profile claim, or SMART discovery to this entity; there is nothing to conform to and advertising conformance would be misleading. |
+| **IEC 62304 / SaMD** (with ISO 14971) | Not a device, and no clinical hazard. The engagement is **supply-chain and configuration evidence** on general engineering grounds. | A **SOUP register + CycloneDX SBOM**; **machine-checked requirement→test traceability**, notably over the containment cycle check and the date arithmetic (SEC-M4's overflow panic is the archetype of what traceability catches); and **signed, reproducible builds** — all feeding the ISO/IEC 27001 configuration-management controls §12.2 claims. |
+
+### 12.5 Honest limits
+
+- **Two of the four do not apply, and that is the finding** — not an
+  oversight to be filled in later. Recording "not engaged" with the
+  reason is the useful output.
+- **Read-auditing is optional here.** Without PHI, the §164.312(b)
+  argument does not carry; audit reads only if a deployment's own
+  governance rules require it.
+- **Every extended control is unimplemented in this service today.** The
+  reference implementation is the
+  [care-pathway service](../../care-pathway/care-pathway-service-with-loco/).

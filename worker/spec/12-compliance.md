@@ -56,3 +56,32 @@ fixtures only ([matcher §20](../worker-matcher-rust-crate/spec/20-security-priv
 [matcher `AGENTS/security-and-privacy.md`](../worker-matcher-rust-crate/AGENTS/security-and-privacy.md)).
 The service MUST preserve this when bridging — worker data passed to
 the matcher never gains a new egress path.
+
+### 12.5 Extended frameworks
+
+Four frameworks impose obligations beyond §12.1. Regime detail:
+[`agents/share/compliance-for-healthcare.md`](../../agents/share/compliance-for-healthcare.md)
+§2; repository-wide status and the reference implementation:
+[`spec/compliance` §8](../../spec/compliance/index.md).
+
+| Framework | Engagement here | What it drives |
+|---|---|---|
+| **HIPAA (US)** — §164.312(b) audit controls, §164.312(c) integrity, §164.312(e) transmission security, §164.528 accounting of disclosures | Engaged wherever the workforce is healthcare. Two distinct angles: worker records are personal data in their own right, **and** a worker is the *actor* in every other entity's audit trail — so this registry supplies the "who" that §164.312(b) requires everywhere else. | **Read-auditing** on `get` / `list` / `search` / `export` / FHIR reads with purpose-of-use and a disclosure flag; **tamper-evident history** (a SHA-256 chain over `audit_log`) — which matters doubly here, because an audit trail naming practitioners is the evidence a disciplinary or licensure process would rely on; and a per-subject accounting of disclosures. |
+| **GDPR / EU EHDS** — Reg. (EU) 2025/327 | Fully engaged. Worker data mixes regulated identity data with **professional-status data** (§12.3), and erasure collides with the legitimate need to retain a credential-verification history. EHDS is relevant because health-professional identity is what gates access to its primary-use exchange. | An **erasure path that survives immutable history** (redact content, keep chain linkage) — resolving §12.2's open physical-deletion question (§16 OQ-2) in favour of redaction rather than a hard purge; a declared **data residency** and **lawful basis**; and export beyond the region recorded as a **Ch. V transfer**. |
+| **ONC / HTI certification (US)** — 45 CFR Part 170 §170.315(g)(10) | Meaningful: worker maps to **`Practitioner`**, which has a US Core profile. Modulo the family's R5-vs-R4 gap (§12.6). | **Profile and terminology validation**: US Core Practitioner must-support elements (`identifier` — notably NPI with its own system URI — and `name`) and cardinalities, with identifier systems validated against their registries rather than merely non-blank; `$validate`; SMART discovery; Bulk Data `$export`. |
+| **IEC 62304 / SaMD** (with ISO 14971) | Not a device, but §12.3 already names the hazard precisely: **a merge error can attach one professional's disciplinary history to another**, and a stale credential has public-safety consequences. Those are ISO 14971 harms, which is why the evidence artefacts belong here. | A **SOUP register + CycloneDX SBOM**; **machine-checked requirement→test traceability**, so the scheme-local short-circuit rule (FR-7), the review queue, and the reversible merge snapshots (FR-14) cannot lose their verification silently; **signed, reproducible builds**; and a hazard-to-control trace covering the credential-expiry workflow (service §13 T-7) as a **safety** feature, not a convenience. |
+
+### 12.6 Honest limits
+
+- **Not a certified health-IT module.** ONC certification targets FHIR
+  **R4 + US Core**; the family serves **R5**, and worker's FHIR surface
+  is a prototype that is not yet mounted
+  ([`agents/share/fhir.md`](../../agents/share/fhir.md) §10).
+- **No hazard analysis exists.** The ISO 14971 risk file and MDCG
+  2019-11 qualification are organisational artefacts; the repository
+  supplies the controls they would cite.
+- **Every extended control is unimplemented in this service today.** The
+  reference implementation is the
+  [care-pathway service](../../care-pathway/care-pathway-service-with-loco/);
+  worker is step 3 of the rollout
+  ([`spec/compliance` §8.5](../../spec/compliance/index.md)).

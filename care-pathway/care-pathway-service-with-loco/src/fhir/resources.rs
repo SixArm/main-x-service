@@ -94,6 +94,12 @@ pub struct FhirMeta {
         default
     )]
     pub last_updated: Option<String>,
+    /// `StructureDefinition` canonicals this resource claims conformance
+    /// to — always [`crate::fhir::profile::PROFILE_URL`] on rendering. A
+    /// resource that declares no profile makes no conformance claim, which
+    /// is what ONC-style profile validation checks against.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub profile: Vec<String>,
 }
 
 /// FHIR `Identifier` — a `system|value` business identifier.

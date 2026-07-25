@@ -9,6 +9,81 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — regulatory compliance controls (2026-07-25)
+
+The family's **reference implementation** of the four control-driving
+frameworks in `agents/share/compliance-for-healthcare.md` §2 (spec §12,
+entity spec §12.4). Migration `m20260725_000007_compliance` adds
+`prev_hash` / `hash` / `context` / `disclosure` / `redacted_at` to
+`audit_logs`, all nullable or defaulted, so existing rows stay valid.
+
+- **HIPAA — tamper-evident audit history.** A SHA-256 hash chain over
+  `audit_logs`: each row binds its own content and its predecessor's
+  hash, so an insert, delete, reorder, or edit breaks verification
+  (§164.312(c)). `GET /api/compliance/audit/verify` reports the counts,
+  every break with its row id and kind, and the chain head. Appends are
+  serialised with `pg_advisory_xact_lock`; under
+  `CARE_PATHWAY_EVENT_TRANSPORT=memory` a concurrent-append fork is
+  possible and is reported (and documented) rather than hidden.
+- **HIPAA — read and disclosure auditing.** `CARE_PATHWAY_AUDIT_READS`
+  (**default off**) audits reads, searches, exports, and FHIR reads,
+  recording the caller's declared `X-Purpose-Of-Use` /
+  `X-Disclosure-Recipient` / `X-Destination-Region` alongside the
+  deployment's standing declarations.
+  `GET /api/care-pathways/{pid}/audit/disclosures` is the §164.528
+  accounting, and states whether it is complete or incomplete.
+- **GDPR Art. 17 erasure that survives the chain.**
+  `POST /api/care-pathways/{pid}/erase` tombstones the payload, redacts
+  audit content, and appends a chained `erased` row — the chain still
+  verifies, and the record that *something happened, when, and by whom*
+  survives. Irreversible, idempotent, and **destructive** under ABAC.
+- **GDPR / EHDS declarations.** Data residency, lawful basis, Art. 9(2)
+  condition, and transfer safeguard default to `undeclared`, are
+  reported at `GET /api/compliance`, and are stamped into every audit
+  row. A cross-region export is recorded as a Ch. V transfer.
+- **ONC / HTI conformance machinery.** A declared `meta.profile` on
+  every rendered resource, must-support / cardinality validation, and
+  **terminology validation against bound value sets** (ICD-10 / ICD-11 /
+  SNOMED CT); `POST /fhir/PlanDefinition/$validate`; SMART discovery at
+  `/fhir/.well-known/smart-configuration` (served only when a real
+  authorization server is configured); an extended
+  `CapabilityStatement`; and FHIR Bulk Data `$export` → status →
+  NDJSON → cancel.
+- **IEC 62304 / SaMD evidence.** `compliance/lifecycle.md` (safety
+  classification + clause→artefact index), `compliance/soup.tsv` (the
+  §8.1.2 SOUP register), a CycloneDX SBOM derived at compile time from
+  the crate's own `Cargo.lock` (`GET /api/compliance/sbom`,
+  `cargo run --bin sbom`), a machine-checked requirement→test
+  traceability matrix (`compliance/traceability.tsv` +
+  `tests/traceability.rs`), and `scripts/sbom.sh` /
+  `scripts/build-reproducible.sh`.
+- **`GET /api/compliance`** reports software identification, build
+  provenance, the live control state, the data-protection declarations,
+  and, per framework, what is **not** claimed — asserted by tests, so
+  the report cannot quietly become marketing.
+
+**Not claimed:** ONC certification (this serves FHIR R5; certification
+targets R4 + US Core, and `PlanDefinition` has no US Core profile),
+SMART App Launch itself (the credential is PASETO, not OAuth 2.0),
+medical-device qualification, or an ISO 14971 risk file. See spec
+§12.5.
+
+### Changed (2026-07-25)
+
+- `/fhir/metadata` and `/fhir/.well-known/smart-configuration` are now
+  on the blanket-guard **public** allow-list: FHIR and SMART discovery
+  must be reachable before a client holds a credential, and neither
+  document exposes pathway data.
+- `POST …/erase` joins `merge` / `deduplicate` / `import` in
+  `auth::DESTRUCTIVE_POST_SUFFIXES`, so an `access=write` caller cannot
+  reach an irreversible operation.
+- FHIR create/update now validate against the declared profile and its
+  terminology bindings in addition to the payload rules, so a code that
+  is well-formed JSON but invalid in a bound system is a `422`.
+- `validation::condition_code_issue` is a new public, index-free form of
+  the existing per-code check, so the FHIR layer can report against a
+  FHIR element path.
+
 ### Added — instance outcomes (2026-07-20)
 
 - Recorded closure `outcome` on instances + an `instance_measures`

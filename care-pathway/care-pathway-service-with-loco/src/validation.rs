@@ -209,6 +209,29 @@ fn identifier_problem(i: usize, id: &PathwayIdentifier) -> Option<String> {
     (!ok).then(|| format!("identifiers[{i}]: {:?} is not a valid {label}", id.value))
 }
 
+/// Return a problem string for one condition code, without an array
+/// index — the index-free form of [`condition_code_problem`].
+///
+/// Exposed for the FHIR terminology-binding check
+/// ([`crate::fhir::profile::validate_terminology`]), which reports against
+/// a FHIR element path rather than a `condition_codes[i]` field path, so
+/// it needs the diagnosis without this module's index prefix.
+#[must_use]
+pub fn condition_code_issue(cc: &ConditionCode) -> Option<String> {
+    let raw = cc.code.trim();
+    let (label, ok) = match &cc.system {
+        CodeSystem::Icd10 => ("ICD-10", is_valid_icd10(raw)),
+        CodeSystem::Icd11 => ("ICD-11", is_valid_icd11(raw)),
+        CodeSystem::Snomed => ("SNOMED CT", is_valid_snomed(raw)),
+        CodeSystem::Custom(system) => {
+            return raw
+                .is_empty()
+                .then(|| format!("{system} code must not be blank"));
+        }
+    };
+    (!ok).then(|| format!("{:?} is not a valid {label} code", cc.code))
+}
+
 /// Return a problem string for one `condition_codes[i]`, or `None` when it
 /// is well-formed for its declared system.
 fn condition_code_problem(i: usize, cc: &ConditionCode) -> Option<String> {

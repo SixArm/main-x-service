@@ -91,7 +91,30 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    `_merged_total`) plus `http_requests_total`. Registry in
    [`src/metrics.rs`](../src/metrics.rs); handler in
    [`src/controllers/metrics.rs`](../src/controllers/metrics.rs).
-13. Bulk import/export (deferred, §13) — async, job-based, on the loco
+13. **Compliance surface** (§12). `GET /api/compliance` — software
+   identification, build provenance, IEC 62304 safety classification,
+   the live control state, the declared data-protection posture, and
+   per-framework "not claimed" lines. `GET /api/compliance/sbom` —
+   CycloneDX 1.5 SBOM + SOUP register.
+   `GET /api/compliance/audit/verify?limit=` — re-verifies the audit
+   hash chain (default 1000 rows, capped 10 000) and reports every
+   break. `GET /api/care-pathways/{pid}/audit/disclosures` — HIPAA
+   §164.528 accounting, stating its own completeness.
+   `POST /api/care-pathways/{pid}/erase` — GDPR Art. 17 erasure
+   (**destructive** under ABAC; irreversible; idempotent).
+14. **FHIR conformance additions** (§12.3).
+   `POST /fhir/PlanDefinition/$validate` — profile + terminology +
+   payload validation without persisting (always `200` with an
+   `OperationOutcome`). `GET /fhir/.well-known/smart-configuration` —
+   SMART discovery, served **only** when the deployment configures an
+   authorization server, else `404` with an explanatory
+   `OperationOutcome`. `GET /fhir/$export` (`202` + `Content-Location`)
+   → `GET /fhir/$export-status/{id}` (manifest) →
+   `GET /fhir/$export-file/{id}/{file}` (NDJSON), with
+   `DELETE /fhir/$export-status/{id}` to cancel. `/fhir/metadata` and
+   `/fhir/.well-known/smart-configuration` are **public** under blanket
+   enforcement (discovery must precede the credential).
+15. Bulk import/export (deferred, §13) — async, job-based, on the loco
    `bg_pg` worker: `POST`/`GET /api/care-pathways/import`,
    `POST`/`GET /api/care-pathways/export`,
    `GET /api/care-pathways/bulk-jobs`. The uniform family contract
@@ -173,9 +196,22 @@ supersedes the earlier per-crate roles/RBAC sketch.
 
 PostgreSQL via SeaORM + `sea-orm-migration`. Migrations
 `m20220101_000001_care_pathways` (the `care_pathways` table),
-`m20220101_000002_audit_logs` (the CRUD `audit_logs` trail), and
-`m20220101_000003_merge_records` (record-merge history).
+`m20220101_000002_audit_logs` (the CRUD `audit_logs` trail),
+`m20220101_000003_merge_records` (record-merge history), and
+`m20260725_000007_compliance` (the `audit_logs` compliance columns —
+`prev_hash` / `hash` for the tamper-evident chain, `context` for the
+per-access purpose-of-use and standing declarations, `disclosure` for
+the §164.528 access/disclosure split, `redacted_at` for GDPR Art. 17,
+plus an `entity_pid` index). Every added column is nullable or
+defaulted, so rows written before the migration stay valid and are
+reported by chain verification as `unchained` rather than as breaks.
 `auto_migrate` on in development.
+
+**`audit_logs` is append-only, with exactly one documented exception.**
+Helpers only insert and query; the sole statement that modifies an
+existing row is `Model::redact_for_entity` (the Art. 17 erasure path),
+which destroys `snapshot` and stamps `redacted_at` while leaving `hash`
+and `prev_hash` intact so the chain still verifies.
 
 ## 11. Testing strategy
 
@@ -210,11 +246,186 @@ trail, `whoami` (no token → `401`), blanket enforcement (with
 Postgres, so they are `#[ignore]`-gated — run with
 `cargo test -- --ignored` and a `DATABASE_URL`.
 
+**Compliance tests.** DB-free unit tests cover the pure cores: the hash
+chain (determinism, per-field coverage, and the four break scenarios —
+edit, delete, reorder, redact — plus the pre-chain-rows boundary), the
+purpose-of-use vocabulary and header sanitisation, the erasure tombstone
+and context, the safety-class and cross-border logic, the SOUP/SBOM
+parsers, the bulk NDJSON and job registry, and the FHIR profile +
+terminology validators.
+[`tests/traceability.rs`](../tests/traceability.rs) additionally runs
+un-gated, failing the build when a requirement in
+[`compliance/traceability.tsv`](../compliance/traceability.tsv) names a
+test that no longer exists.
+
+`tests/requests/compliance.rs` is DB-gated and carries the checks a unit
+test **cannot** make. The load-bearing one is
+`chain_survives_a_jsonb_round_trip`: a digest computed in Rust before an
+`INSERT` must still match after Postgres has stored the snapshot as
+`jsonb` (reordering keys) and returned `created_at` as a `timestamptz`.
+`tampering_with_a_row_breaks_verification` rewrites a snapshot with raw
+SQL and asserts the chain reports a `content` break — the property the
+whole design exists to provide. The rest cover erasure (content gone,
+chain still verifying, scoped to its subject, idempotent), the
+disclosure accounting's completeness caveat, the posture and SBOM
+endpoints, `$validate`, the SMART 404, the `CapabilityStatement`, and
+the full Bulk Data kickoff → status → NDJSON → cancel flow.
+
 ## 12. Compliance
 
-Care pathways are clinical artefacts, not patient data; still, honour
-the family healthcare-compliance posture (HIPAA/NHS) for any audit and
-access controls added later.
+Care pathways are clinical artefacts, not patient data — but the audit
+trail, the instance layer, and every disclosure decision are governed
+all the same. This service is the family's **reference implementation**
+of the four control-driving frameworks in
+[`agents/share/compliance-for-healthcare.md`](../../../agents/share/compliance-for-healthcare.md)
+§2; the entity-level engagement analysis is
+[entity spec §12.4–§12.5](../../spec/12-compliance.md) and the
+repository-wide status is
+[`spec/compliance` §8](../../../spec/compliance/index.md). Code lives in
+[`src/compliance/`](../src/compliance/), [`src/fhir/profile.rs`](../src/fhir/profile.rs),
+and the crate-root [`compliance/`](../compliance/) artefacts.
+
+### 12.1 HIPAA — tamper-evident history and read/disclosure auditing
+
+- **Hash chain** ([`src/compliance/audit_chain.rs`](../src/compliance/audit_chain.rs)).
+  Each `audit_logs` row stores a SHA-256 over its own content **and its
+  predecessor's hash**, so inserting, deleting, reordering, or editing a
+  row breaks verification there and everywhere after
+  (§164.312(c)(1)–(2)). Two properties make the digest reproducible from
+  the row as Postgres returns it: time is hashed as **epoch microseconds**
+  (truncated on write, so the session time zone and subsecond precision
+  cannot change it), and JSON is hashed via `serde_json`'s serialization,
+  whose `BTreeMap` key order matches what a JSONB round-trip yields.
+  `GET /api/compliance/audit/verify` reports `intact` / `redacted` /
+  `unchained` counts, every break with its row id and kind
+  (`linkage` / `content`), and the chain **head** an operator can record
+  externally to detect wholesale truncation.
+- **Append serialisation.** `Model::record_with_context` takes
+  `pg_advisory_xact_lock` before reading the head and inserting. Under
+  `CARE_PATHWAY_EVENT_TRANSPORT=outbox` the audit row shares the entity
+  mutation's transaction, so appends are fully serialised. Under
+  `memory` the audit write is a best-effort side channel on a pooled
+  connection, where the lock is released immediately and concurrent
+  writers can fork the chain — reported as a `linkage` break. **A
+  compliance deployment should run `outbox`**; the verification
+  response's `interpretation` field names this cause explicitly so an
+  operator is not sent chasing an intrusion that was a concurrency
+  artefact.
+- **Read-auditing** ([`src/compliance/disclosure.rs`](../src/compliance/disclosure.rs)).
+  `CARE_PATHWAY_AUDIT_READS` (**default off**, so adoption is
+  behaviour-neutral) writes an audit row for `read` / `list` / `search` /
+  `export` / `fhir_read` / `fhir_search`. The caller declares context in
+  headers — `X-Purpose-Of-Use` (normalised against a closed vocabulary,
+  never echoed, so a header cannot inject text into the trail),
+  `X-Disclosure-Recipient`, `X-Destination-Region` — and the row records
+  the declaration **plus** the deployment's standing declarations, so it
+  stays interpretable years later. A collection read is recorded against
+  the nil `pid`, so it cannot corrupt any single record's accounting.
+- **Accounting of disclosures** (§164.528).
+  `GET /api/care-pathways/{pid}/audit/disclosures` returns only
+  disclosure-classified rows, and states whether the accounting is
+  complete or `INCOMPLETE` because read-auditing is off — an empty list
+  must not read as "nothing was disclosed".
+
+### 12.2 GDPR / EU EHDS — erasure, residency, lawful basis
+
+- **Erasure against the immutable chain**
+  ([`src/compliance/erasure.rs`](../src/compliance/erasure.rs)).
+  `POST /api/care-pathways/{pid}/erase` tombstones the payload (a valid,
+  data-free `CarePathway`, so read paths degrade cleanly), soft-deletes
+  the record, redacts every audit `snapshot` about it, and appends a
+  chained `erased` row. Redaction preserves each row's `hash` and
+  `prev_hash`, so the chain still verifies and still proves the events
+  occurred. `actor` and `action` survive on purpose — the controller's own
+  accountability record under Art. 17(3)(b). Irreversible and idempotent:
+  re-erasing, or erasing an already-soft-deleted `pid`, still sweeps any
+  audit content held about it, because the subject's right does not lapse
+  when the record is retired. **Destructive** under ABAC (`/erase` is in
+  `DESTRUCTIVE_POST_SUFFIXES`), so `access=write` cannot reach it.
+- **Declarations** ([`src/compliance/mod.rs`](../src/compliance/mod.rs)).
+  `CARE_PATHWAY_DATA_RESIDENCY`, `_LAWFUL_BASIS`, `_ART9_CONDITION`, and
+  `_TRANSFER_SAFEGUARD` default to `undeclared` rather than to a
+  flattering value, are reported at `GET /api/compliance`, and are
+  stamped into every audit `context`.
+- **Cross-border transfer.** An access naming a destination outside the
+  declared region is recorded as `cross_border: true`. Detection is
+  conservative — undeclared residency or an unnamed destination never
+  manufactures a transfer event. This **declares and records**; it does
+  not block. Blocking is a deployment-network decision.
+- **EHDS primary vs. secondary use.** The purpose vocabulary separates
+  care delivery (`care` / `treatment` / `payment` / `operations` /
+  `public-health`) from secondary use (`research` / `policy` /
+  `statistics`), which is also classified as a disclosure.
+
+### 12.3 ONC / HTI — profile and terminology conformance
+
+- **Profile** ([`src/fhir/profile.rs`](../src/fhir/profile.rs)). Every
+  rendered resource carries `meta.profile` = a **family-local**
+  `StructureDefinition` canonical (`urn:mxi:carepathway:…`), never a US
+  Core one — `PlanDefinition` has no US Core profile and the family
+  serves R5. `validate_profile` checks must-support elements and
+  cardinalities (`title`, `status`, `identifier.system`/`.value`,
+  `useContext`, `action.title`, `relatedArtifact.url`) and the `status`
+  required binding.
+- **Terminology.** Condition codes are validated against the value set
+  their system **binds** (ICD-10 / ICD-11 / SNOMED CT), reusing
+  `validation::condition_code_issue` — so `"code": "banana"` is an error,
+  not merely well-formed JSON. An **unbound** system warns instead of
+  failing, because the conversion contract deliberately preserves foreign
+  namespaces.
+- **`$validate`, SMART, Bulk Data.** `POST /fhir/PlanDefinition/$validate`
+  returns `200` with an `OperationOutcome` (an `information` issue when
+  clean) and persists nothing. SMART discovery is served **only** when
+  `CARE_PATHWAY_SMART_AUTHORIZATION_URL` + `_TOKEN_URL` are set, else
+  `404` explaining that this service authenticates with PASETO; the
+  `CapabilityStatement`'s `security` block appears on the same condition.
+  Bulk Data implements the IG's async shape faithfully, while the
+  execution model is in-process and bounded (§12.5).
+- **Not certification.** See §12.5.
+
+### 12.4 IEC 62304 / SaMD — lifecycle evidence
+
+Declared in [`compliance/lifecycle.md`](../compliance/lifecycle.md).
+Safety classification (`CARE_PATHWAY_SAFETY_CLASS`, default **A** for the
+template registry, with the re-classification trigger stated) and build
+provenance are reported at `GET /api/compliance`. The **SOUP register**
+([`compliance/soup.tsv`](../compliance/soup.tsv)) annotates every direct
+dependency; the **SBOM** merges it with the crate's own `Cargo.lock`,
+embedded at compile time so it cannot drift from the binary, and is
+served at `GET /api/compliance/sbom` (and by `cargo run --bin sbom`).
+Rendering is deterministic — no timestamp, no serial number — so a
+reproducible build yields a byte-identical SBOM.
+[`compliance/traceability.tsv`](../compliance/traceability.tsv) maps each
+compliance and safety-relevant requirement to the tests that verify it,
+**machine-checked** by [`tests/traceability.rs`](../tests/traceability.rs).
+[`scripts/build-reproducible.sh`](../scripts/build-reproducible.sh) pins
+the toolchain, derives `SOURCE_DATE_EPOCH` from the commit, and can build
+twice and compare hashes; [`scripts/sbom.sh`](../scripts/sbom.sh) gathers
+the evidence bundle.
+
+### 12.5 Honest limits
+
+- **Not a certified health-IT module and not a registered medical
+  device.** Neither is claimed anywhere in the code or the API. The
+  posture endpoint's per-framework `not_claimed` lists are asserted by
+  tests, so a future edit cannot quietly turn the report into marketing.
+- **Chain scope.** The chain attests to the **audit trail**, not to the
+  `care_pathways` rows; row-level integrity hashing over the entity table
+  is not built. The verification response says so.
+- **Best-effort audit writes.** A dropped read-audit row leaves a gap the
+  chain cannot distinguish from a deletion. Read-auditing keeps the
+  family's never-fail-the-request posture; the trade-off is stated rather
+  than resolved.
+- **Bulk export is in-process.** Jobs do not survive a restart, are not
+  visible to another replica, are capped at 8 concurrent / 10 000
+  resources / 8 MiB, and expire after 15 minutes. A truncated export
+  declares itself in the manifest's `error` array. Moving to `bg_pg` +
+  an artifact store is the upgrade path (§13 T-10).
+- **Signing keys are out of scope** for the build script — a deployment
+  secret, signed in the release pipeline.
+- **No ISO 14971 risk file, DPIA, Art. 30 record, EHDS data permit, or
+  Inferno run.** Organisational or infrastructure artefacts; the service
+  supplies the technical controls they cite.
 
 ## 13. Tasks (live work queue)
 
@@ -435,6 +646,94 @@ access controls added later.
   averages. The honest, record-only basis for outcome analytics.
   **Acceptance:** the extended instance round-trip green — full
   `--ignored` suite green vs Postgres 18; clippy pedantic clean.
+
+- [x] **2026-07-25 — T-11 HIPAA: tamper-evident history + read/disclosure
+  auditing.** Migration `m20260725_000007_compliance` adds
+  `prev_hash`/`hash`/`context`/`disclosure`/`redacted_at` plus an
+  `entity_pid` index. `src/compliance/audit_chain.rs` (pure SHA-256
+  chain, time hashed as epoch microseconds, JSON canonicalised so a
+  JSONB round-trip cannot change the digest, redaction-tolerant
+  verification); `src/models/audit_logs.rs` chains every append under
+  `pg_advisory_xact_lock`; `src/compliance/disclosure.rs` (purpose-of-use
+  vocabulary, header sanitisation, access-vs-disclosure classification,
+  best-effort recording gated by `CARE_PATHWAY_AUDIT_READS`, default
+  off). Read-auditing wired into `get_one` / `list` / `search` and the
+  FHIR `read` / `search`. New endpoints
+  `GET /api/compliance/audit/verify` and
+  `GET /api/care-pathways/{pid}/audit/disclosures` (which states its own
+  completeness). **Acceptance:** DB-gated
+  `chain_survives_a_jsonb_round_trip` and
+  `tampering_with_a_row_breaks_verification` green vs Postgres 18, plus
+  11 chain unit tests covering edit / delete / reorder / redact.
+
+- [x] **2026-07-25 — T-12 GDPR / EHDS: erasure, residency, lawful basis.**
+  `src/compliance/erasure.rs` — `POST /api/care-pathways/{pid}/erase`
+  tombstones the payload, soft-deletes, redacts audit content while
+  preserving chain linkage, and appends a chained `erased` row;
+  irreversible and idempotent (an unknown or already-erased `pid` still
+  sweeps its audit content). Added to `DESTRUCTIVE_POST_SUFFIXES`, so
+  `access=write` cannot reach it. Deployment declarations (residency,
+  lawful basis, Art. 9 condition, transfer safeguard) default to
+  `undeclared`, are reported at `GET /api/compliance`, and are stamped
+  into every audit `context`; an access naming a destination outside the
+  declared region is recorded as a Ch. V transfer (conservatively — never
+  asserted without both). EHDS primary/secondary use separated by the
+  purpose vocabulary. **Acceptance:**
+  `erasure_destroys_content_but_keeps_the_chain_verifiable` and
+  `erasure_is_idempotent` green vs Postgres 18.
+
+- [x] **2026-07-25 — T-13 ONC / HTI: profile + terminology conformance.**
+  `src/fhir/profile.rs` — a family-local declared profile stamped into
+  `meta.profile` on every rendered resource, must-support / cardinality
+  checks, the `status` required binding, and terminology validation
+  against the **bound** condition-code systems (unbound systems warn
+  rather than fail). `POST /fhir/PlanDefinition/$validate`;
+  `GET /fhir/.well-known/smart-configuration` served only when the
+  deployment configures an authorization server (else `404` explaining
+  the PASETO credential); `CapabilityStatement` extended with the
+  profile, the operations, and a conditional SMART `security` block;
+  FHIR Bulk Data `$export` → `$export-status/{id}` → NDJSON `$export-file`
+  + cancel (`src/compliance/bulk.rs`, in-process and bounded). Discovery
+  paths added to the public allow-list. **Acceptance:**
+  `fhir_validate_checks_profile_and_terminology`,
+  `capability_statement_declares_profile_and_operations`,
+  `smart_discovery_is_absent_unless_configured`, and
+  `bulk_export_kickoff_status_and_output` green vs Postgres 18.
+
+- [x] **2026-07-25 — T-14 IEC 62304 / SaMD: lifecycle evidence.**
+  `compliance/lifecycle.md` (development-plan record, safety
+  classification with its re-classification trigger, clause→artefact
+  index, and an explicit "what is not here"); `compliance/soup.tsv` (the
+  §8.1.2 register, one annotated row per direct dependency);
+  `src/compliance/soup.rs` merging it with the crate's own `Cargo.lock`,
+  embedded at compile time so the SBOM cannot drift, served at
+  `GET /api/compliance/sbom` and by `cargo run --bin sbom` (deterministic
+  — no timestamp, no serial number); `compliance/traceability.tsv` +
+  `tests/traceability.rs` (machine-checked requirement→test mapping,
+  un-gated); `scripts/sbom.sh` and `scripts/build-reproducible.sh`.
+  `GET /api/compliance` reports software identification, build
+  provenance, live control state, the data-protection declarations, and
+  per-framework **not-claimed** lines. **Acceptance:** adding a
+  dependency without annotating it fails the build
+  (`every_direct_dependency_is_annotated`); a renamed test orphaning a
+  requirement fails the build (`every_named_test_exists`); 572-component
+  SBOM rendered from the real lockfile with 26 annotated direct
+  dependencies.
+
+- [ ] **T-15 — Compliance follow-ups (deferred, honest).**
+  - [ ] Row-level integrity hashing over `care_pathways` (the chain
+    attests to the trail, not the entity rows — §12.5).
+  - [ ] Move Bulk Data `$export` onto the `bg_pg` worker + an artifact
+    store, so jobs survive a restart and are visible across replicas
+    (§12.5); folds into T-10.
+  - [ ] Decide whether an authentication/read audit write may still fail
+    open, given a dropped row is indistinguishable from a deletion in
+    the chain (§12.5).
+  - [ ] Wire `cargo deny`, `scripts/sbom.sh`, and the traceability check
+    into CI, and lift the `compliance/` artefacts to the repository root
+    once a second crate adopts them
+    ([`spec/compliance` §8.5](../../../spec/compliance/index.md)).
+  - [ ] Run an Inferno-style conformance suite against `/fhir`.
 
 ## 14. Implementation status
 

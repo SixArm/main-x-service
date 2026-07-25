@@ -1,0 +1,43 @@
+# SOUP register — IEC 62304 §5.3.3 / §8.1.2
+#
+# Every *direct* dependency of this crate must appear here with a purpose
+# and a safety/security relevance note. `src/compliance/soup.rs` merges
+# these annotations with the real dependency graph from Cargo.lock to
+# produce the CycloneDX SBOM at GET /api/compliance/sbom, and its unit
+# tests fail the build when a direct dependency is missing (or when an
+# entry names a package that is no longer depended on).
+#
+# Transitive dependencies are listed in the SBOM but are NOT individually
+# annotated. Stating that boundary is more honest than implying we have
+# reviewed several hundred crates.
+#
+# Format: name<TAB>purpose<TAB>safety and security relevance
+# Blank lines and lines starting with '#' are ignored.
+#
+loco-rs	Web application framework: boot, routing, config, background workers, model error types.	Safety-relevant. Owns request routing and the middleware stack, so a defect could bypass the auth/ABAC guard. Widely used, actively maintained; pinned by Cargo.lock.
+serde	Serialization framework for every wire type and the stored JSONB payload.	Safety-relevant. A mis-serialized payload could corrupt a stored pathway or an audit snapshot. De facto Rust standard; extremely widely exercised.
+serde_json	JSON encoding/decoding, and the canonical form the audit hash chain digests.	Safety-relevant. Key ordering (BTreeMap, preserve_order disabled) is load-bearing for chain verification across a JSONB round-trip.
+tokio	Async runtime.	Safety-relevant. Runtime failure means service unavailability, not data corruption. Industry standard.
+async-trait	Async methods in traits (loco Hooks, SeaORM migrations).	Not safety-relevant. Compile-time macro only, no runtime behaviour of its own.
+axum	HTTP server, extractors, and response types underneath loco.	Safety-relevant. Header and path extraction feed the auth guard and the purpose-of-use audit context.
+tracing	Structured logging and spans.	Security-relevant. The no-secrets-in-logs invariant is enforced at call sites, not by this crate.
+tracing-subscriber	Log formatting, filtering, and the JSON layer.	Security-relevant. Misconfiguration could emit more detail than intended; log level is deployment-controlled.
+regex	Pattern matching in payload validation.	Safety-relevant. Used only on length-capped input (validation::MAX_TEXT_LEN), which bounds the catastrophic-backtracking risk.
+migration	This crate's own sea-orm-migration migrator (path dependency).	Safety-relevant. Owns the schema, including the audit_logs compliance columns. First-party code, not third-party SOUP.
+sea-orm	Async ORM and query builder over PostgreSQL.	Safety-relevant. All persistence, including the audit trail and the redaction sweep, goes through it. Query construction uses its typed builders, not string concatenation.
+chrono	Timestamps, durations, and the microsecond truncation the audit chain depends on.	Safety-relevant. Chain digests bind created_at as epoch microseconds; a precision change would break verification.
+validator	Declarative validation attributes.	Not safety-relevant today: the substantive rules live in src/validation.rs, which does not use it.
+uuid	Public record identifiers (pid) and audit/export job ids.	Safety-relevant. v4 generation uses the OS RNG; a weak id would make records guessable.
+include_dir	Embeds static assets (Swagger UI) into the binary.	Not safety-relevant. Serves documentation assets only; no clinical data path.
+mimalloc	Global allocator for MUSL static builds.	Safety-relevant. An allocator defect would be a process-wide fault. Enabled only for the musl target.
+prometheus	Metrics registry and text-exposition rendering for /metrics.prom.	Not safety-relevant. Counters only; the endpoint exposes no record data.
+sha2	SHA-256 for the tamper-evident audit hash chain.	SECURITY-CRITICAL. The integrity evidence for HIPAA §164.312(c) rests entirely on this implementation. RustCrypto, widely audited, constant-time not required for a hash.
+care-pathway-matcher	Canonical matching engine; its CarePathway type is also this service's API DTO (path dependency).	Safety-relevant. A false match can conflate two distinct pathways. First-party code with its own spec, property tests, and no-IO posture.
+authentication-verifier	Offline PASETO v4.public verification and the shared ABAC policy engine (path dependency).	SECURITY-CRITICAL. Every authentication and authorization decision depends on it. First-party code with its own forgery and policy-property test suites.
+serial_test	Serialises tests that mutate process-wide environment variables.	Test-only. Not present in a release artefact.
+rstest	Parameterised test cases.	Test-only. Not present in a release artefact.
+insta	Snapshot assertions.	Test-only. Not present in a release artefact.
+ed25519-dalek	Mints throwaway Ed25519 keys so the token-verification path is tested in-process.	Test-only. Not present in a release artefact; the test seed is not a secret.
+rusty_paseto	Mints PASETO v4.public tokens in the auth unit tests.	Test-only in this crate. The production verification path lives in authentication-verifier.
+base64	Encodes test key material into the JWK-shaped key set.	Test-only. Not present in a release artefact.
+axum-test	The `TestServer` loco's testing harness hands to a request test; used by the compliance request tests.	Test-only. Not present in a release artefact.

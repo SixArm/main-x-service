@@ -38,6 +38,9 @@ include_dir = { version = "0.7" }
 mimalloc = { version = "0.1.52" }
 # Prometheus metrics registry + text-exposition rendering for /metrics.prom.
 prometheus = { version = "0.13" }
+# SHA-256 for the tamper-evident audit hash chain (HIPAA §164.312(c)).
+# See src/compliance/audit_chain.rs.
+sha2 = { version = "0.10" }
 
 # Canonical matching algorithm — embedded and used directly as the API DTO.
 care-pathway-matcher = { path = "../care-pathway-matcher-rust-crate" }
@@ -54,6 +57,10 @@ required-features = []
 
 [dev-dependencies]
 loco-rs = { workspace = true, features = ["testing"] }
+# The `TestServer` loco's testing harness hands to a request test. Named
+# explicitly so the compliance request tests can factor out helpers that
+# take one (loco re-exports the harness, not the type).
+axum-test = { version = "17.3" }
 serial_test = { version = "3.5.0" }
 rstest = { version = "0.25" }
 insta = { version = "1.48", features = ["redactions", "yaml", "filters"] }

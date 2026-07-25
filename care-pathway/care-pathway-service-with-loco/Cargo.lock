@@ -587,6 +587,7 @@ dependencies = [
  "async-trait",
  "authentication-verifier",
  "axum",
+ "axum-test",
  "base64",
  "care-pathway-matcher",
  "chrono",

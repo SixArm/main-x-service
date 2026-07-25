@@ -27,6 +27,23 @@ pub struct Model {
     pub actor: Option<String>,
     /// Post-change payload snapshot (JSON), or `None` for deletes.
     pub snapshot: Option<Json>,
+    /// Hash of the preceding chain row; `None` for the genesis row and for
+    /// rows written before the chain existed (verification reports those as
+    /// `unchained`, not as a break).
+    pub prev_hash: Option<String>,
+    /// This row's content hash — the link every successor binds to. See
+    /// [`crate::compliance::audit_chain`].
+    pub hash: Option<String>,
+    /// Request/processing context (purpose-of-use, residency, lawful basis,
+    /// disclosure recipient), as JSON.
+    pub context: Option<Json>,
+    /// Whether this access was an outward **disclosure** rather than an
+    /// internal access — the HIPAA §164.528 accounting distinction.
+    pub disclosure: bool,
+    /// When the row's content was destroyed under GDPR Art. 17. A redacted
+    /// row keeps its stored `hash` and `prev_hash`, so the chain stays
+    /// verifiable and still proves the event occurred.
+    pub redacted_at: Option<DateTimeWithTimeZone>,
 }
 
 /// `SeaORM` relations for [`Entity`] (none defined).

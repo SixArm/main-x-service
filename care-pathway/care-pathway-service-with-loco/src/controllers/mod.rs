@@ -1,6 +1,9 @@
 //! HTTP controllers for the care-pathway service.
 
 pub mod care_pathways;
+/// Compliance-evidence endpoints (`/api/compliance*`): posture, SBOM, and
+/// audit-chain verification.
+pub mod compliance;
 pub mod docs;
 /// HL7 FHIR R5 endpoints for the `PlanDefinition` resource (`/fhir/*`).
 pub mod fhir;

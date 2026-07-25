@@ -24,6 +24,11 @@
 
 pub mod app;
 pub mod auth;
+/// Regulatory-compliance controls: the tamper-evident audit chain,
+/// read/disclosure auditing, GDPR Art. 17 erasure, the SOUP/SBOM register,
+/// FHIR Bulk Data, and the runtime posture surface. The family's reference
+/// implementation — see `agents/share/compliance-for-healthcare.md` §2.
+pub mod compliance;
 pub mod controllers;
 pub mod data;
 /// HL7 FHIR R5 interop: the `PlanDefinition` resource + envelope wire

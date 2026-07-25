@@ -1,0 +1,68 @@
+# Requirement → verification traceability matrix — IEC 62304 §5.2–§5.5
+#
+# Each row states a requirement and names the tests that verify it.
+# `tests/traceability.rs` parses this file and fails when a row is
+# malformed, when a requirement names no test, or when a named test does
+# not exist anywhere in the crate — so a requirement cannot silently lose
+# its verification, and a renamed test cannot silently orphan a
+# requirement.
+#
+# Scope: the compliance requirements introduced by the four frameworks
+# (agents/share/compliance-for-healthcare.md §2) plus the pre-existing
+# requirements that are safety- or security-relevant. It is not a
+# transcription of every functional requirement in the spec; claiming
+# whole-spec traceability we do not have would defeat the purpose.
+#
+# Format: requirement_id<TAB>requirement<TAB>verified_by (comma-separated test fn names)
+#
+# ---------------------------------------------------------------- HIPAA
+HIPAA-AUDIT-1	Every audit row binds its own content, so editing a row is detectable.	row_hash_covers_every_bound_field,edited_row_is_a_content_break,tampering_with_a_row_breaks_verification
+HIPAA-AUDIT-2	Every audit row binds its predecessor, so deleting or reordering rows is detectable.	deleted_row_is_a_linkage_break,reordered_rows_are_a_linkage_break,intact_chain_verifies
+HIPAA-AUDIT-3	Chain digests are reproducible after a JSONB round-trip that reorders keys.	canonical_json_is_key_order_independent,row_hash_is_deterministic,chain_survives_a_jsonb_round_trip
+HIPAA-AUDIT-4	Introducing the chain to a populated table does not produce spurious breaks.	pre_chain_rows_are_unchained_not_broken,empty_run_verifies
+HIPAA-AUDIT-5	Chain verification is bounded so it cannot be used as a CPU denial-of-service.	verify_limit_is_bounded
+HIPAA-AUDIT-6	A verification result states what it does and does not attest to.	clean_interpretation_states_the_scope_limit,break_interpretation_names_both_causes,verify_response_flattens_the_report
+HIPAA-READ-1	Reads are auditable activity, with a closed action vocabulary.	read_actions_are_distinct
+HIPAA-READ-2	The caller's declared purpose of use is recorded, normalised, and never echoed verbatim.	known_purposes_normalize,unknown_purpose_is_not_echoed,free_text_headers_are_sanitised
+HIPAA-DISC-1	An outward disclosure is distinguishable from an internal access (§164.528).	named_recipient_is_always_a_disclosure,outward_purposes_are_disclosures,default_context_is_an_internal_access,disclosure_accounting_declares_its_completeness
+HIPAA-DISC-2	An audit row records both the caller's declaration and the standing deployment declarations.	context_json_carries_declaration_and_derivation
+# ----------------------------------------------------------- GDPR / EHDS
+GDPR-ERASE-1	Erasure destroys content while the audit chain still verifies.	redacted_row_keeps_the_chain_verifiable,erasure_destroys_content_but_keeps_the_chain_verifiable
+GDPR-ERASE-2	Redaction does not let an attacker detach a redacted row's successor.	redaction_does_not_disable_linkage_checking
+GDPR-ERASE-3	An erased record degrades cleanly: the tombstone is a valid, data-free payload.	tombstone_is_a_valid_pathway,tombstone_carries_no_data,tombstone_name_is_unmistakable
+GDPR-ERASE-4	The erasure record states its legal basis, scale, and irreversibility.	erasure_context_records_basis_and_scale,outcome_always_states_irreversibility,erasure_is_idempotent
+GDPR-ERASE-5	Erasure is destructive under ABAC, so a write-tier caller cannot reach it.	derive_action_matrix,abac_access_write_writes_but_not_destructive,abac_access_admin_allows_destructive
+GDPR-XBORD-1	A cross-border transfer is never asserted without a declared residency and destination.	cross_border_is_conservative
+EHDS-USE-1	EHDS secondary use is separable from primary care delivery.	secondary_use_is_the_ehds_subset
+# ------------------------------------------------------------- ONC / HTI
+ONC-PROF-1	Every rendered resource declares the profile it claims conformance to.	rendered_resources_declare_their_profile,profile_is_declared_without_a_last_updated,capability_statement_declares_profile_and_operations
+ONC-PROF-2	The claimed profile is family-local, not a false US Core conformance claim.	claimed_profile_is_not_a_us_core_canonical,onc_status_disclaims_certification_and_us_core
+ONC-PROF-3	Resources this service renders conform to the profile it declares.	rendered_resources_conform_to_the_profile,retired_status_is_within_the_binding
+ONC-PROF-4	Missing must-support elements and broken cardinalities are errors.	missing_title_is_an_error,empty_nested_elements_break_cardinality,wrong_resource_type_is_an_error
+ONC-PROF-5	An identifier without a namespace is rejected, so a bare value cannot become an identity.	identifier_without_a_system_is_an_error
+ONC-TERM-1	A code in a required-bound value set is validated, not merely present.	status_outside_the_binding_is_an_error,invalid_code_in_a_bound_system_is_an_error,valid_codes_in_bound_systems_pass,fhir_validate_checks_profile_and_terminology
+ONC-TERM-2	An unbound code system warns rather than failing, preserving foreign namespaces.	unbound_system_warns_but_does_not_fail
+ONC-TERM-3	Validation surfaces the service's own payload rules, not only FHIR conformance.	validate_all_includes_service_validators
+ONC-CAP-1	The CapabilityStatement's declared search parameters match the supported set.	capability_statement_search_params_are_stable,capability_statement_declares_profile_and_operations
+ONC-SMART-1	SMART discovery is emitted only when a real authorization server is configured.	smart_configuration_requires_both_endpoints,smart_oauth_extension_uri_is_the_registry_canonical,smart_discovery_is_absent_unless_configured
+ONC-SMART-2	Discovery documents stay reachable without a credential when enforcement is on.	enforce_on_allows_public_paths
+ONC-BULK-1	Bulk export output is well-formed NDJSON, one resource per line.	ndjson_is_one_document_per_line,empty_export_is_valid,bulk_export_kickoff_status_and_output
+ONC-BULK-2	A truncated export declares itself rather than presenting as a complete population.	byte_cap_truncates_and_reports,truncated_export_declares_itself_in_the_manifest,complete_export_has_no_errors
+ONC-BULK-3	The completion manifest carries the Bulk Data IG's required fields.	manifest_has_the_required_fields,bulk_export_kickoff_status_and_output
+ONC-BULK-4	Export jobs are bounded and expire, and cancelling releases the payload immediately.	registry_is_bounded,jobs_expire_after_the_ttl,cancel_releases_the_payload,jobs_round_trip_through_the_registry,bulk_export_kickoff_status_and_output
+# ------------------------------------------------------- IEC 62304 / SaMD
+IEC-CLASS-1	A safety classification is declared with its rationale, defaulting conservatively.	safety_class_parses_or_falls_back_to_a,every_safety_class_has_a_rationale
+IEC-SOUP-1	The SBOM is derived from the real dependency graph and cannot drift from the binary.	lockfile_parses_into_packages,lockfile_contains_known_dependencies,field_parser_is_exact
+IEC-SOUP-2	Every direct dependency carries a purpose and a safety-relevance note (§8.1.2).	every_direct_dependency_is_annotated,manifest_parses_direct_dependencies,annotations_are_substantive,sbom_is_served_and_annotated
+IEC-SOUP-3	The register cannot retain entries for dependencies that were removed.	register_has_no_stale_entries
+IEC-SOUP-4	The SBOM is valid CycloneDX and carries the lifecycle evidence fields.	sbom_is_well_formed_cyclonedx,sbom_metadata_carries_lifecycle_evidence
+IEC-REPRO-1	SBOM rendering is deterministic, so a reproducible build yields an identical SBOM.	sbom_rendering_is_deterministic
+IEC-REPRO-2	A release is reported as reproducible only with full build provenance.	reproducible_release_requires_full_provenance
+IEC-EVID-1	The posture report states what each framework is NOT claimed to satisfy.	every_framework_states_what_it_does_not_claim,posture_serializes_with_frameworks_and_controls,posture_reports_controls_and_disclaimers
+# ------------------------------------------ pre-existing safety-relevant
+SEC-AUTH-1	Missing or invalid credentials are 401; a valid credential denied by policy is 403.	enforce_on_protected_without_token_is_401,abac_401_versus_403_distinction
+VAL-CODE-1	Clinical codes are structurally validated against their declared coding system.	icd10_accepts_canonical_codes,icd10_rejects_malformed_codes,icd11_accepts_stem_codes,icd11_rejects_malformed_codes,snomed_accepts_valid_sctids,snomed_rejects_bad_check_digit_and_shape
+VAL-ID-1	Deterministic identifiers are validated, because a shared value short-circuits matching to 1.0.	uuid_identifiers_must_be_canonical,doi_identifiers_must_have_prefix_and_suffix,open_deterministic_schemes_only_require_non_blank
+VAL-SIZE-1	Every free-text field, array, and array entry is size-capped before storage or matching.	oversized_text_field_is_one_problem,oversized_array_is_one_problem,oversized_array_item_is_one_problem,within_caps_large_record_has_no_problems
+MERGE-1	A merge folds the duplicate into the survivor without losing data or duplicating entries.	merge_folds_duplicate_into_survivor,list_fields_union_without_duplicates,duplicate_name_becomes_an_alternate_name,transferred_snapshot_is_the_duplicate
+EVENT-1	Under the outbox transport the entity write, its event, and its audit row commit atomically.	outbox_create_and_emit_writes_entity_event_and_audit_atomically,outbox_failure_rolls_back_both_writes

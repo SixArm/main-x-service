@@ -12,6 +12,8 @@ use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::{AuthUser, MaybeAuthUser};
+use crate::compliance::disclosure::{self, AccessContext};
+use crate::compliance::erasure;
 use crate::merge::merge_pathways;
 use crate::metrics::Metrics;
 use crate::models::audit_logs::Model as AuditModel;
@@ -180,14 +182,33 @@ async fn create(
 /// `GET /api/care-pathways/{pid}` — response is the full stored
 /// [`CarePathway`]. `404` when `pid` is unknown or soft-deleted.
 ///
+/// **Audited as a read** (HIPAA §164.312(b)) when
+/// `CARE_PATHWAY_AUDIT_READS` is on, carrying the caller's declared
+/// purpose-of-use and disclosure recipient. The audit row is written only
+/// on a successful read: a `404` disclosed nothing, and recording it would
+/// pollute the §164.528 accounting with accesses that never happened.
+///
 /// # Errors
 ///
 /// `404` when no active row has that `pid`; otherwise DB/parse errors.
 #[debug_handler]
-async fn get_one(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
+async fn get_one(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
+) -> Result<Response> {
     let model = PathwayModel::find_by_pid(&ctx.db, &pid)
         .await
         .map_err(super::model_not_found)?;
+    disclosure::record_access(
+        &ctx.db,
+        model.pid,
+        disclosure::action::READ,
+        caller.actor(),
+        &access,
+    )
+    .await;
     format::json(model.to_pathway()?)
 }
 
@@ -252,8 +273,23 @@ async fn remove(
 ///
 /// Propagates DB query errors.
 #[debug_handler]
-async fn list(State(ctx): State<AppContext>) -> Result<Response> {
+async fn list(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
+) -> Result<Response> {
     let rows = PathwayModel::list(&ctx.db, LIST_CAP).await?;
+    // A collection read is recorded against the nil `pid`: it disclosed
+    // many records, not one, so attributing it to any single record would
+    // corrupt that record's §164.528 accounting.
+    disclosure::record_access(
+        &ctx.db,
+        uuid::Uuid::nil(),
+        disclosure::action::LIST,
+        caller.actor(),
+        &access,
+    )
+    .await;
     let refs: Vec<PathwayRef> = rows.iter().map(PathwayRef::of).collect();
     format::json(refs)
 }
@@ -270,6 +306,8 @@ async fn list(State(ctx): State<AppContext>) -> Result<Response> {
 async fn search(
     axum::extract::Query(params): axum::extract::Query<SearchParams>,
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> Result<Response> {
     let q = params.q.unwrap_or_default();
     // Reject an absent/blank term rather than ILIKE-ing on `%%`.
@@ -277,6 +315,14 @@ async fn search(
         return bad_request("query parameter `q` is required");
     }
     let rows = PathwayModel::search(&ctx.db, q.trim(), SEARCH_CAP).await?;
+    disclosure::record_access(
+        &ctx.db,
+        uuid::Uuid::nil(),
+        disclosure::action::SEARCH,
+        caller.actor(),
+        &access,
+    )
+    .await;
     let refs: Vec<PathwayRef> = rows.iter().map(PathwayRef::of).collect();
     format::json(refs)
 }
@@ -468,6 +514,82 @@ async fn entity_audit(Path(pid): Path<String>, State(ctx): State<AppContext>) ->
     format::json(rows)
 }
 
+/// Accounting of disclosures for one care pathway (HIPAA §164.528).
+///
+/// `GET /api/care-pathways/{pid}/audit/disclosures` — every audit row for
+/// this record that was classified as an outward **disclosure** rather
+/// than an internal access, newest first. Ordinary accesses are excluded;
+/// that distinction is the entire point of the accounting.
+///
+/// An empty array has two very different meanings — nothing was disclosed,
+/// or read-auditing was never switched on — so the response says which,
+/// rather than letting a reader assume the flattering one.
+///
+/// # Errors
+///
+/// `400` when `pid` is not a valid UUID; otherwise DB query errors.
+#[debug_handler]
+async fn entity_disclosures(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
+    let Ok(uuid) = uuid::Uuid::parse_str(&pid) else {
+        return bad_request("invalid pid");
+    };
+    let rows = AuditModel::disclosures_for_entity(&ctx.db, uuid).await?;
+    format::json(serde_json::json!({
+        "pid": pid,
+        "read_auditing_enabled": crate::compliance::audit_reads(),
+        "count": rows.len(),
+        "caveat": if crate::compliance::audit_reads() {
+            "complete for the period read-auditing has been enabled"
+        } else {
+            "INCOMPLETE — CARE_PATHWAY_AUDIT_READS is off, so read disclosures are not \
+             being recorded; only disclosure-flagged mutations appear here"
+        },
+        "disclosures": rows,
+    }))
+}
+
+/// Erase a care pathway under GDPR Art. 17.
+///
+/// `POST /api/care-pathways/{pid}/erase` — replaces the payload with a
+/// tombstone, retires the record, destroys the content of every audit row
+/// about it, and appends a chained `erased` accountability row. The audit
+/// hash chain keeps verifying, because redaction preserves each row's
+/// stored hash and linkage (see [`crate::compliance::erasure`]).
+///
+/// This is **not** the soft delete. `DELETE /{pid}` retires a record and
+/// keeps its data; this destroys the data and is irreversible — which is
+/// why it is a **destructive** action under ABAC
+/// (`auth::DESTRUCTIVE_POST_SUFFIXES`) and requires `access=admin`.
+///
+/// Idempotent: erasing an already-erased or already-deleted `pid` still
+/// sweeps any audit content held about it, because the subject's right
+/// does not lapse when the record is soft-deleted.
+///
+/// # Errors
+///
+/// `400` when `pid` is not a valid UUID; otherwise DB errors.
+#[debug_handler]
+async fn erase(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
+) -> Result<Response> {
+    let Ok(uuid) = uuid::Uuid::parse_str(&pid) else {
+        return bad_request("invalid pid");
+    };
+    let outcome = match PathwayModel::find_by_pid(&ctx.db, &pid).await {
+        Ok(model) => erasure::erase(&ctx.db, model, caller.actor(), &access).await?,
+        // No live record: still sweep the audit content held about it.
+        Err(_) => erasure::erase_audit_only(&ctx.db, uuid, caller.actor(), &access).await?,
+    };
+    Metrics::global().care_pathway_deleted_total.inc();
+    format::json(outcome)
+}
+
 /// Recent events from the active event transport.
 ///
 /// `GET /api/care-pathways/events/recent` — the last 100
@@ -523,6 +645,8 @@ pub fn routes() -> Routes {
         .add("/{pid}", put(update))
         .add("/{pid}", delete(remove))
         .add("/{pid}/audit", get(entity_audit))
+        .add("/{pid}/audit/disclosures", get(entity_disclosures))
+        .add("/{pid}/erase", post(erase))
 }
 
 /// DB-free controller-level tests. These exercise [`validate`] and the

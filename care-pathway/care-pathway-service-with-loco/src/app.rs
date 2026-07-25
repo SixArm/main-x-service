@@ -110,6 +110,7 @@ impl Hooks for App {
             .add_route(controllers::instances::routes())
             .add_route(controllers::care_pathways::routes())
             .add_route(controllers::fhir::routes())
+            .add_route(controllers::compliance::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
     }

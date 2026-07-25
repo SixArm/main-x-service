@@ -15,6 +15,8 @@
 //! inline and gathered in [`from_fhir_plan_definition`]'s doc — never
 //! silent.
 
+/// Profile + terminology conformance validation (ONC §170.315(g)(10)).
+pub mod profile;
 /// FHIR resource + envelope wire types (`PlanDefinition`,
 /// `OperationOutcome`, `Bundle`).
 pub mod resources;
@@ -286,9 +288,12 @@ pub fn to_fhir_plan_definition(
     let mut fhir = FhirPlanDefinition::new();
     fhir.id = Some(id.to_string());
     fhir.status = Some(status_for(active).to_string());
-    fhir.meta = last_updated.map(|lu| FhirMeta {
+    // `meta.profile` is always emitted — the conformance claim does not
+    // depend on whether we happen to know the row's `updated_at`.
+    fhir.meta = Some(FhirMeta {
         version_id: None,
-        last_updated: Some(lu),
+        last_updated,
+        profile: vec![profile::PROFILE_URL.to_string()],
     });
     fhir.title = Some(pathway.name.clone());
     fhir.kind = Some(FhirCodeableConcept {

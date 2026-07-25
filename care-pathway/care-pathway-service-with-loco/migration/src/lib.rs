@@ -1,9 +1,10 @@
 //! Database migrations for `care-pathway-service`.
 //!
 //! Driven by loco's CLI via [`Migrator`] (`sea-orm-migration`). The
-//! migrations create the three tables: `care_pathways` (the entity, with
-//! the `CarePathway` payload as JSONB), `audit_logs` (the CRUD trail), and
-//! `merge_records` (the merge history).
+//! migrations create the entity table `care_pathways` (with the
+//! `CarePathway` payload as JSONB), `audit_logs` (the CRUD trail, plus
+//! the compliance columns), `merge_records` (the merge history),
+//! `event_outbox` (the durable event bus), and the instance layer.
 
 // SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
 #![forbid(unsafe_code)]
@@ -15,6 +16,7 @@ mod m20220101_000003_merge_records;
 mod m20220101_000004_event_outbox;
 mod m20260720_000005_instances;
 mod m20260720_000006_outcomes;
+mod m20260725_000007_compliance;
 
 /// The migration runner this crate exposes to loco / `sea-orm-migration`.
 pub struct Migrator;
@@ -32,6 +34,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20220101_000004_event_outbox::Migration),
             Box::new(m20260720_000005_instances::Migration),
             Box::new(m20260720_000006_outcomes::Migration),
+            Box::new(m20260725_000007_compliance::Migration),
             // inject-above (do not remove this comment)
         ]
     }
