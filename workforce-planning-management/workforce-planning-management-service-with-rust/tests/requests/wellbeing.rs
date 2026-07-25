@@ -185,3 +185,123 @@ async fn wellbeing_round_trip() {
     })
     .await;
 }
+
+/// Benefits awareness (WPM-R26): a `benefit`-kind rule signposts a
+/// linked plan, goes quiet on enrolment (derived, WPM-D18), the kind
+/// gate holds, and `?kind=` filters.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn benefits_awareness_round_trip() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let org = an_org();
+        let employee = seed_employee(&request, &org, "B-1", None).await;
+        activate(&request, &employee).await;
+
+        // A real benefit plan to signpost.
+        let plan: Value = request
+            .post("/api/benefit-plans")
+            .json(&json!({
+                "name": "Cycle to work", "kind": "wellness", "provider": "CycleCo",
+                "employee_cost_minor": 0, "employer_cost_minor": 500,
+                "currency": "GBP",
+            }))
+            .await
+            .json();
+        let plan_pid = plan["pid"].as_str().unwrap().to_string();
+
+        // The kind gate: linking a plan from a health rule is refused,
+        // as is an unknown kind or a dead plan.
+        assert_eq!(
+            request
+                .post("/api/wellbeing-entitlements")
+                .json(&json!({ "name": "Bad", "description": "x", "kind": "health",
+                               "benefit_plan_pid": plan_pid }))
+                .await
+                .status_code(),
+            422,
+            "benefit_plan_pid requires kind benefit"
+        );
+        assert_eq!(
+            request
+                .post("/api/wellbeing-entitlements")
+                .json(&json!({ "name": "Bad", "description": "x", "kind": "voucher" }))
+                .await
+                .status_code(),
+            422,
+            "kind is a closed vocabulary"
+        );
+        assert_eq!(
+            request
+                .post("/api/wellbeing-entitlements")
+                .json(&json!({ "name": "Bad", "description": "x", "kind": "benefit",
+                               "benefit_plan_pid": uuid::Uuid::new_v4() }))
+                .await
+                .status_code(),
+            404,
+            "a linked plan must exist"
+        );
+
+        // A plan-linked benefit rule, open to everyone.
+        let rule: Value = request
+            .post("/api/wellbeing-entitlements")
+            .json(&json!({
+                "name": "Cycle-to-work scheme",
+                "description": "Save on a bike through salary sacrifice.",
+                "kind": "benefit",
+                "benefit_plan_pid": plan_pid,
+            }))
+            .await
+            .json();
+        let rule_pid = rule["pid"].as_str().unwrap().to_string();
+
+        // The prompt carries the kind and the plan reference.
+        let prompts: Value = request
+            .get(&format!("/api/employees/{employee}/wellbeing-prompts"))
+            .await
+            .json();
+        let items = prompts["prompts"].as_array().unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0]["entitlement_kind"], "benefit");
+        assert_eq!(items[0]["benefit_plan_pid"], plan_pid.as_str());
+
+        // Enrolling in the plan silences the prompt — derived, with no
+        // acknowledgement ever written (WPM-D18).
+        request
+            .post(&format!("/api/employees/{employee}/benefit-enrollments"))
+            .json(&json!({ "plan_pid": plan_pid, "starts_on": "2026-07-01" }))
+            .await
+            .assert_status_ok();
+        let prompts: Value = request
+            .get(&format!("/api/employees/{employee}/wellbeing-prompts"))
+            .await
+            .json();
+        assert!(
+            prompts["prompts"].as_array().unwrap().is_empty(),
+            "enrolment quietens the plan-linked prompt"
+        );
+
+        // `?kind=` filters; the uptake row carries the kind.
+        let benefit_rules: Value =
+            request.get("/api/wellbeing-entitlements?kind=benefit").await.json();
+        assert_eq!(benefit_rules.as_array().unwrap().len(), 1);
+        let health_rules: Value =
+            request.get("/api/wellbeing-entitlements?kind=health").await.json();
+        assert!(health_rules.as_array().unwrap().is_empty());
+        assert_eq!(
+            request.get("/api/wellbeing-entitlements?kind=voucher").await.status_code(),
+            422
+        );
+        let uptake: Value = request.get("/api/wellbeing/uptake").await.json();
+        let row = uptake["entitlements"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["entitlement_pid"] == rule_pid.as_str())
+            .expect("uptake row");
+        assert_eq!(row["kind"], "benefit");
+        assert_eq!(row["uptake_rate"]["denominator"], 0);
+        assert!(row["uptake_rate"]["value"].is_null(), "no acknowledgements ⇒ null, not 0");
+    })
+    .await;
+}

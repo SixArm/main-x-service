@@ -53,6 +53,8 @@ export const LEGACY_LOCALE_KEY = "mxi.hcm.locale";
 const STRINGS = {
   en: {
     "nav.wellbeing": "Wellbeing",
+    "wb.kind.health": "Health",
+    "wb.kind.benefit": "Benefit",
     "wb.prompts": "Health entitlements",
     "wb.reminder": "Reminder",
     "wb.noPrompts": "No prompts right now",
@@ -116,6 +118,8 @@ const STRINGS = {
   },
   cy: {
     "nav.wellbeing": "Llesiant",
+    "wb.kind.health": "Iechyd",
+    "wb.kind.benefit": "Budd",
     "wb.prompts": "Hawliau iechyd",
     "wb.reminder": "Nodyn atgoffa",
     "wb.noPrompts": "Dim awgrymiadau ar hyn o bryd",
@@ -179,6 +183,8 @@ const STRINGS = {
   },
   es: {
     "nav.wellbeing": "Bienestar",
+    "wb.kind.health": "Salud",
+    "wb.kind.benefit": "Beneficio",
     "wb.prompts": "Derechos de salud",
     "wb.reminder": "Recordatorio",
     "wb.noPrompts": "No hay avisos por ahora",
@@ -242,6 +248,8 @@ const STRINGS = {
   },
   fr: {
     "nav.wellbeing": "Bien-être",
+    "wb.kind.health": "Santé",
+    "wb.kind.benefit": "Avantage",
     "wb.prompts": "Droits de santé",
     "wb.reminder": "Rappel",
     "wb.noPrompts": "Aucune invitation pour le moment",
@@ -305,6 +313,8 @@ const STRINGS = {
   },
   de: {
     "nav.wellbeing": "Wohlbefinden",
+    "wb.kind.health": "Gesundheit",
+    "wb.kind.benefit": "Leistung",
     "wb.prompts": "Gesundheitsansprüche",
     "wb.reminder": "Erinnerung",
     "wb.noPrompts": "Derzeit keine Hinweise",
@@ -368,6 +378,8 @@ const STRINGS = {
   },
   ar: {
     "nav.wellbeing": "العافية",
+    "wb.kind.health": "صحة",
+    "wb.kind.benefit": "ميزة",
     "wb.prompts": "استحقاقات صحية",
     "wb.reminder": "تذكير",
     "wb.noPrompts": "لا توجد تنبيهات حالياً",
@@ -431,6 +443,8 @@ const STRINGS = {
   },
   ru: {
     "nav.wellbeing": "Благополучие",
+    "wb.kind.health": "Здоровье",
+    "wb.kind.benefit": "Льгота",
     "wb.prompts": "Права на здравоохранение",
     "wb.reminder": "Напоминание",
     "wb.noPrompts": "Пока нет уведомлений",
@@ -494,6 +508,8 @@ const STRINGS = {
   },
   hi: {
     "nav.wellbeing": "कल्याण",
+    "wb.kind.health": "स्वास्थ्य",
+    "wb.kind.benefit": "लाभ",
     "wb.prompts": "स्वास्थ्य अधिकार",
     "wb.reminder": "अनुस्मारक",
     "wb.noPrompts": "अभी कोई सूचना नहीं",
@@ -557,6 +573,8 @@ const STRINGS = {
   },
   zh: {
     "nav.wellbeing": "健康福祉",
+    "wb.kind.health": "健康",
+    "wb.kind.benefit": "福利",
     "wb.prompts": "健康权益",
     "wb.reminder": "提醒",
     "wb.noPrompts": "暂无提示",
@@ -620,6 +638,8 @@ const STRINGS = {
   },
   bn: {
     "nav.wellbeing": "সুস্থতা",
+    "wb.kind.health": "স্বাস্থ্য",
+    "wb.kind.benefit": "সুবিধা",
     "wb.prompts": "স্বাস্থ্য অধিকার",
     "wb.reminder": "অনুস্মারক",
     "wb.noPrompts": "এখন কোনো বিজ্ঞপ্তি নেই",
@@ -683,6 +703,8 @@ const STRINGS = {
   },
   pt: {
     "nav.wellbeing": "Bem-estar",
+    "wb.kind.health": "Saúde",
+    "wb.kind.benefit": "Benefício",
     "wb.prompts": "Direitos de saúde",
     "wb.reminder": "Lembrete",
     "wb.noPrompts": "Sem avisos no momento",
@@ -746,6 +768,8 @@ const STRINGS = {
   },
   id: {
     "nav.wellbeing": "Kesejahteraan",
+    "wb.kind.health": "Kesehatan",
+    "wb.kind.benefit": "Manfaat",
     "wb.prompts": "Hak kesehatan",
     "wb.reminder": "Pengingat",
     "wb.noPrompts": "Tidak ada pemberitahuan saat ini",
@@ -809,6 +833,8 @@ const STRINGS = {
   },
   ur: {
     "nav.wellbeing": "بہبود",
+    "wb.kind.health": "صحت",
+    "wb.kind.benefit": "فائدہ",
     "wb.prompts": "صحت کے حقوق",
     "wb.reminder": "یاد دہانی",
     "wb.noPrompts": "فی الحال کوئی اطلاع نہیں",

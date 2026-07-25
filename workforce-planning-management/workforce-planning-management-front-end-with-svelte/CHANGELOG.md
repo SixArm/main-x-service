@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — benefits awareness (WPM-T24 / WPM-R26, 2026-07-25)
+
+- The wellbeing engine now signposts benefits too: rule kind
+  (`health | benefit`) select on the `/wellbeing` create form, kind
+  chips on the rules table and the profile prompt card, and the prompt
+  type carries the linked benefit plan. 2 i18n keys × 13 locales
+  (parity green).
+
 ### Added — wellbeing area (WPM-T23 / WPM-R25, 2026-07-24)
 
 - Employee profile: a **Health entitlements** card listing the

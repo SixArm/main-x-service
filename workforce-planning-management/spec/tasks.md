@@ -233,3 +233,24 @@ code + tests in one PR.
       clean; svelte-check 0; vitest 10; Playwright 8; OpenAPI covers
       the five new paths. (WPM-D6, WPM-D7, WPM-D11, WPM-D16, WPM-D17;
       WPM-R25)
+
+- [x] WPM-T24 (2026-07-25) **Benefits-awareness engine.** Migration
+      `m20260725_000012_benefits_awareness` generalises
+      `wellbeing_entitlements` with a closed `kind`
+      (`health | benefit`, defaulted `health` so WPM-T23 rows are
+      untouched) and an optional `benefit_plan_pid` (validated live;
+      refused on a `health` rule). The predicate and acknowledgement
+      vocabularies are unchanged (WPM-D17). A plan-linked prompt
+      carries the plan reference, and goes **quiet automatically** for
+      an employee with a live enrolment in that plan — derived per
+      request from `benefit_enrollments`, never stored (WPM-D18);
+      enrolment stays the WPM-R9 endpoint. Rule list gains `?kind=`
+      (validated); the uptake rows carry the kind. Front-end: kind
+      select + chip on `/wellbeing`, kind chip on the profile card,
+      2 i18n keys × 13 locales. **Acceptance:** kind-vocabulary pin;
+      DB-gated `benefits_awareness_round_trip` (kind gate, dead-plan
+      404, plan-carrying prompt, enrolment-quietens pin, `?kind=`
+      filter + 422, kind in uptake with null-not-zero rate) — full
+      `--ignored` suite 13/13 vs Postgres 18 (117 unit); clippy
+      pedantic clean; svelte-check 0; vitest 10; Playwright 8.
+      (WPM-D16, WPM-D17, WPM-D18; WPM-R26)

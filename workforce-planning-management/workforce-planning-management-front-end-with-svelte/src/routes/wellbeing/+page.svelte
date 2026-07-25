@@ -21,6 +21,7 @@
 
   // Create form (kept as strings; parsed on submit).
   let name = $state("");
+  let kind = $state<"health" | "benefit">("health");
   let description = $state("");
   let infoUrl = $state("");
   let minAge = $state("");
@@ -53,6 +54,7 @@
     try {
       await createWellbeingEntitlement({
         name,
+        kind,
         description,
         info_url: infoUrl.trim() || null,
         min_age: minAge.trim() ? Number(minAge) : null,
@@ -62,6 +64,7 @@
       });
       name = description = infoUrl = minAge = maxAge = departments = "";
       doses = "1";
+      kind = "health";
       await load();
     } catch (cause) {
       actionError = cause instanceof Error ? cause.message : String(cause);
@@ -76,6 +79,10 @@
     } catch (cause) {
       actionError = cause instanceof Error ? cause.message : String(cause);
     }
+  }
+
+  function kindLabel(value: "health" | "benefit"): string {
+    return value === "benefit" ? t("wb.kind.benefit") : t("wb.kind.health");
   }
 
   function cohort(rule: WellbeingEntitlement): string {
@@ -98,7 +105,7 @@
     <tbody>
       {#each rules as rule (rule.pid)}
         <tr>
-          <td><strong>{rule.name}</strong><br /><span class="muted">{rule.description}</span></td>
+          <td><strong>{rule.name}</strong> <span class="chip">{kindLabel(rule.kind)}</span><br /><span class="muted">{rule.description}</span></td>
           <td>{cohort(rule)}</td>
           <td>×{rule.doses}</td>
           <td><button onclick={() => void close(rule.pid)}>✕</button></td>
@@ -109,6 +116,10 @@
 
   <form class="panel" onsubmit={(event) => void create(event)} data-testid="wellbeing-form">
     <input placeholder={t("common.name")} bind:value={name} required />
+    <select bind:value={kind}>
+      <option value="health">{t("wb.kind.health")}</option>
+      <option value="benefit">{t("wb.kind.benefit")}</option>
+    </select>
     <input placeholder="Description" bind:value={description} required />
     <input placeholder="Info URL" bind:value={infoUrl} />
     <input placeholder="Min age" bind:value={minAge} inputmode="numeric" />

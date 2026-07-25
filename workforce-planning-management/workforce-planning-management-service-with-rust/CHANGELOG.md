@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — benefits-awareness engine (WPM-T24 / WPM-R26, 2026-07-25)
+
+- `wellbeing_entitlements` generalises with a closed `kind`
+  (`health | benefit`; existing rows default `health`) and an optional
+  `benefit_plan_pid` (must name a live plan; refused on a `health`
+  rule). Predicate + acknowledgement vocabularies unchanged (WPM-D17).
+- A plan-linked prompt carries the plan reference and goes quiet
+  automatically for an employee with a live enrolment in that plan —
+  derived per request from `benefit_enrollments`, never stored
+  (WPM-D18); enrolment remains `POST …/benefit-enrollments`.
+- `GET /api/wellbeing-entitlements?kind=` filters (unknown kind
+  `422`); uptake rows carry the kind.
+- Tests: kind-vocabulary pin + the DB-gated
+  `benefits_awareness_round_trip` (kind gate, dead-plan 404,
+  enrolment-quietens, filter, null-not-zero rate).
+
 ### Added — wellbeing health-entitlement prompts (WPM-T23 / WPM-R25, 2026-07-24)
 
 - Migration `m20260724_000011_wellbeing`: `wellbeing_entitlements`

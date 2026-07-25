@@ -149,3 +149,15 @@ The stored artifact is the employee's **acknowledgement** of a prompt
 a vaccination status, which is clinical and stays out of WPM
 entirely. Acknowledgements are `$sub`-owned; HR sees aggregate counts
 only (WPM-D16 terms); managers see nothing.
+
+## WPM-D18 — Awareness prompts signpost; they never enrol
+
+The benefits-awareness generalisation (WPM-R26) is one engine with a
+`kind` label, not a second prompting mechanism — the predicate and
+acknowledgement vocabularies stay closed and shared. A rule tied to a
+benefit plan gains no "enrol" action: enrolment stays the WPM-R9
+endpoint with its own refusals, and the prompt merely carries the plan
+reference. The reverse dependency is **derived, never stored**: an
+employee with a live enrolment in the linked plan stops seeing the
+prompt, computed per request from `benefit_enrollments`, so awareness
+state cannot drift from enrolment truth.

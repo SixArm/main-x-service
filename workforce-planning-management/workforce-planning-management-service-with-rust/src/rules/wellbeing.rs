@@ -13,6 +13,12 @@ use chrono::{Datelike, NaiveDate};
 /// about a prompt. An HR workflow fact — never a clinical status.
 pub const RESPONSES: &[&str] = &["booked", "done", "declined", "dismissed"];
 
+/// The closed rule kinds (WPM-R26): `health` (vaccination cohorts and
+/// the like) and `benefit` (benefits awareness — EAP, eye tests,
+/// cycle-to-work). One engine, one predicate vocabulary; the kind is
+/// a label, not a second mechanism (WPM-D18).
+pub const ENTITLEMENT_KINDS: &[&str] = &["health", "benefit"];
+
 /// The most doses a course can declare (a multi-dose course drives the
 /// single optional reminder).
 pub const MAX_DOSES: i32 = 6;
@@ -159,6 +165,13 @@ mod tests {
     #[test]
     fn responses_are_a_closed_workflow_vocabulary() {
         assert_eq!(RESPONSES, &["booked", "done", "declined", "dismissed"]);
+    }
+
+    /// The kind vocabulary is closed (WPM-R26): a new prompting flavour
+    /// is a spec change, not a stray string.
+    #[test]
+    fn kinds_are_a_closed_vocabulary() {
+        assert_eq!(ENTITLEMENT_KINDS, &["health", "benefit"]);
     }
 
     #[test]

@@ -180,14 +180,14 @@ pub fn spec() -> Value {
             "/api/workforce-intelligence/succession": { "get": { "tags": ["intelligence"], "summary": "Bench strength + single points of failure (criticality × risk of loss)", "responses": ok("Succession") } },
             "/api/workforce-intelligence/pipelines": { "get": { "tags": ["intelligence"], "summary": "Pipeline funnel + early-career conversion rates", "responses": ok("Pipelines") } },
             "/api/wellbeing-entitlements": {
-                "post": { "tags": ["wellbeing"], "summary": "Add a health-entitlement rule (non-clinical predicates only: age band, departments, job titles; WPM-D17)", "responses": created },
-                "get": { "tags": ["wellbeing"], "summary": "The configured entitlement rules", "responses": ok("Entitlements") }
+                "post": { "tags": ["wellbeing"], "summary": "Add an entitlement rule (kind health|benefit; non-clinical predicates only: age band, departments, job titles; a benefit rule may link a benefit plan; WPM-D17/D18)", "responses": created },
+                "get": { "tags": ["wellbeing"], "summary": "The configured entitlement rules (?kind=health|benefit)", "responses": ok("Entitlements") }
             },
             "/api/wellbeing-entitlements/{pid}": {
                 "put": { "tags": ["wellbeing"], "summary": "Restate a rule (cohorts change year to year; acknowledgements untouched)", "responses": ok("Entitlement") },
                 "delete": { "tags": ["wellbeing"], "summary": "Soft-close a rule (history kept)", "responses": ok("Deleted") }
             },
-            "/api/employees/{pid}/wellbeing-prompts": { "get": { "tags": ["wellbeing"], "summary": "The employee's live prompts (self-service, employee-owned; one reminder max per multi-dose course; unknown age fails an age-banded rule)", "responses": ok("Prompts") } },
+            "/api/employees/{pid}/wellbeing-prompts": { "get": { "tags": ["wellbeing"], "summary": "The employee's live prompts (self-service, employee-owned; one reminder max per multi-dose course; unknown age fails an age-banded rule; a plan-linked rule is quiet once enrolled)", "responses": ok("Prompts") } },
             "/api/employees/{pid}/wellbeing-acknowledgements": { "post": { "tags": ["wellbeing"], "summary": "Acknowledge a prompt (booked|done|declined|dismissed; a workflow fact, never a vaccination status; audited)", "responses": created } },
             "/api/wellbeing/uptake": { "get": { "tags": ["wellbeing"], "summary": "HR aggregate uptake: counts by response + rate with its terms; no individual appears", "responses": ok("Uptake") } },
             "/api/audits/recent": { "get": { "tags": ["audit"], "summary": "Recent audit entries", "responses": ok("Audit entries") } },

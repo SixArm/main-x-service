@@ -20,7 +20,9 @@ use uuid::Uuid;
 
 use super::{ensure_valid, record_rejection};
 use crate::auth::{self, MaybeAuthUser};
-use crate::models::_entities::{entitlement_acknowledgements, wellbeing_entitlements};
+use crate::models::_entities::{
+    benefit_enrollments, entitlement_acknowledgements, wellbeing_entitlements,
+};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
 use crate::rules::wellbeing as rules;
@@ -46,6 +48,10 @@ impl PidRef {
 #[derive(Debug, Deserialize)]
 struct EntitlementPayload {
     name: String,
+    #[serde(default = "health_kind")]
+    kind: String,
+    #[serde(default)]
+    benefit_plan_pid: Option<Uuid>,
     description: String,
     #[serde(default)]
     info_url: Option<String>,
@@ -69,10 +75,18 @@ fn one_dose() -> i32 {
     1
 }
 
+fn health_kind() -> String {
+    "health".to_string()
+}
+
 impl EntitlementPayload {
     fn validate(&self) -> Vec<String> {
         let mut problems = Problems::new();
         problems.require_text("name", &self.name);
+        problems.require_token("kind", rules::ENTITLEMENT_KINDS, &self.kind);
+        if self.benefit_plan_pid.is_some() && self.kind != "benefit" {
+            problems.push("benefit_plan_pid requires kind `benefit`");
+        }
         problems.require_text("description", &self.description);
         problems.cap_opt("info_url", self.info_url.as_deref());
         problems.cap_list("departments", &self.departments);
@@ -103,9 +117,14 @@ async fn create_entitlement(
     Json(payload): Json<EntitlementPayload>,
 ) -> Result<Response> {
     ensure_valid(&payload.validate())?;
+    if let Some(plan_pid) = payload.benefit_plan_pid {
+        records::find_benefit_plan(&ctx.db, plan_pid).await?;
+    }
     let row = wellbeing_entitlements::ActiveModel {
         pid: ActiveValue::set(Uuid::new_v4()),
         name: ActiveValue::set(payload.name.clone()),
+        kind: ActiveValue::set(payload.kind.clone()),
+        benefit_plan_pid: ActiveValue::set(payload.benefit_plan_pid),
         description: ActiveValue::set(payload.description.clone()),
         info_url: ActiveValue::set(payload.info_url.clone()),
         min_age: ActiveValue::set(payload.min_age),
@@ -125,11 +144,28 @@ async fn create_entitlement(
     format::json(PidRef::of(row.pid))
 }
 
-/// `GET /api/wellbeing-entitlements` — the configured rules.
+/// `GET /api/wellbeing-entitlements?kind=` query.
+#[derive(Debug, Deserialize)]
+struct ListQuery {
+    kind: Option<String>,
+}
+
+/// `GET /api/wellbeing-entitlements` — the configured rules,
+/// optionally filtered by kind (`health | benefit`).
 #[debug_handler]
-async fn list_entitlements(State(ctx): State<AppContext>) -> Result<Response> {
-    let rows = wellbeing_entitlements::Entity::find()
-        .filter(wellbeing_entitlements::Column::DeletedAt.is_null())
+async fn list_entitlements(
+    axum::extract::Query(query): axum::extract::Query<ListQuery>,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
+    let mut problems = Problems::new();
+    problems.token_opt("kind", rules::ENTITLEMENT_KINDS, query.kind.as_deref());
+    ensure_valid(&problems.into_vec())?;
+    let mut find = wellbeing_entitlements::Entity::find()
+        .filter(wellbeing_entitlements::Column::DeletedAt.is_null());
+    if let Some(kind) = &query.kind {
+        find = find.filter(wellbeing_entitlements::Column::Kind.eq(kind.as_str()));
+    }
+    let rows = find
         .order_by_asc(wellbeing_entitlements::Column::Name)
         .all(&ctx.db)
         .await?;
@@ -146,10 +182,15 @@ async fn update_entitlement(
     Json(payload): Json<EntitlementPayload>,
 ) -> Result<Response> {
     ensure_valid(&payload.validate())?;
+    if let Some(plan_pid) = payload.benefit_plan_pid {
+        records::find_benefit_plan(&ctx.db, plan_pid).await?;
+    }
     let row = find_entitlement(&ctx, &pid).await?;
     let row_pid = row.pid;
     let mut active: wellbeing_entitlements::ActiveModel = row.into();
     active.name = ActiveValue::set(payload.name.clone());
+    active.kind = ActiveValue::set(payload.kind.clone());
+    active.benefit_plan_pid = ActiveValue::set(payload.benefit_plan_pid);
     active.description = ActiveValue::set(payload.description.clone());
     active.info_url = ActiveValue::set(payload.info_url.clone());
     active.min_age = ActiveValue::set(payload.min_age);
@@ -228,8 +269,25 @@ async fn employee_prompts(
         .filter(entitlement_acknowledgements::Column::EmployeePid.eq(employee.pid))
         .all(&ctx.db)
         .await?;
+    // The plans this employee is live-enrolled in: a plan-linked rule
+    // goes quiet for them — derived here, never stored (WPM-D18).
+    let enrolled_plans: Vec<Uuid> = benefit_enrollments::Entity::find()
+        .filter(benefit_enrollments::Column::EmployeePid.eq(employee.pid))
+        .filter(benefit_enrollments::Column::DeletedAt.is_null())
+        .all(&ctx.db)
+        .await?
+        .into_iter()
+        .filter(|enrollment| enrollment.ends_on.is_none_or(|end| end >= today))
+        .map(|enrollment| enrollment.plan_pid)
+        .collect();
     let mut prompts = Vec::new();
     for entitlement in &entitlements {
+        if entitlement
+            .benefit_plan_pid
+            .is_some_and(|plan| enrolled_plans.contains(&plan))
+        {
+            continue; // already enrolled — signposting is done
+        }
         let departments = string_list(&entitlement.departments);
         let job_titles = string_list(&entitlement.job_titles);
         let predicates = rules::Predicates {
@@ -264,6 +322,8 @@ async fn employee_prompts(
         };
         prompts.push(serde_json::json!({
             "kind": kind,
+            "entitlement_kind": entitlement.kind,
+            "benefit_plan_pid": entitlement.benefit_plan_pid,
             "entitlement_pid": entitlement.pid,
             "name": entitlement.name,
             "description": entitlement.description,
@@ -392,6 +452,7 @@ async fn uptake(State(ctx): State<AppContext>) -> Result<Response> {
             serde_json::json!({
                 "entitlement_pid": entitlement.pid,
                 "name": entitlement.name,
+                "kind": entitlement.kind,
                 "by_response": by_response,
                 "uptake_rate": {
                     "numerator": uptaken, "denominator": responded, "value": value,

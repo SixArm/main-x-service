@@ -287,6 +287,26 @@ care.*
 - WPM prompts and records the acknowledgement; it does not book
   appointments and stores no vaccination status or clinical record.
 
+## WPM-R26 — Benefits awareness
+
+*As an HR benefits administrator I can signpost any entitlement or
+benefit — not just health cohorts — so employees discover what they
+already have.*
+
+- The WPM-R25 entitlement rules generalise with a closed **`kind`**
+  (`health | benefit`). The predicate vocabulary is unchanged — still
+  non-clinical facts only (WPM-D17) — and the acknowledgement
+  vocabulary is unchanged.
+- A `benefit`-kind rule MAY reference an existing benefit plan
+  (`benefit_plan_pid`, validated live); the prompt then carries the
+  plan reference so self-service can link to enrolment. A `health`
+  rule may not reference a plan (kept crisp).
+- A plan-linked rule goes **quiet automatically** for an employee with
+  a live enrolment in that plan — derived per request from
+  `benefit_enrollments`, never stored ([design.md](design.md)
+  WPM-D18). WPM signposts; enrolment remains the WPM-R9 act.
+- The rule list filters by `?kind=`; the uptake view carries the kind.
+
 ## WPM-R17 — Family fixtures
 
 - OpenAPI + Swagger, `Accepts-version` negotiation, `/metrics.prom`,

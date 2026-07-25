@@ -15,6 +15,8 @@ pub struct Model {
     #[sea_orm(unique)]
     pub pid: Uuid,
     pub name: String,
+    pub kind: String,
+    pub benefit_plan_pid: Option<Uuid>,
     pub description: String,
     pub info_url: Option<String>,
     pub min_age: Option<i32>,

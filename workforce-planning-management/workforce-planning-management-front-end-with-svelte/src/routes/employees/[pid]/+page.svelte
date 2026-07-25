@@ -130,6 +130,7 @@
       {#each wellbeing as prompt (prompt.entitlement_pid)}
         <li>
           <strong>{prompt.name}</strong>
+          <span class="chip">{prompt.entitlement_kind === "benefit" ? t("wb.kind.benefit") : t("wb.kind.health")}</span>
           {#if prompt.kind === "reminder"}<span class="chip">{t("wb.reminder")}</span>{/if}
           <br />
           {prompt.description}

@@ -224,10 +224,18 @@ test("wellbeing area renders rules and aggregate-only uptake", async ({ page }) 
   await page.route("**/api/proxy/wellbeing-entitlements", (route) =>
     route.fulfill({
       json: [{
-        pid: "w1", name: "Seasonal flu vaccination",
+        pid: "w1", name: "Seasonal flu vaccination", kind: "health",
+        benefit_plan_pid: null,
         description: "Free NHS flu jab for frontline staff.",
         info_url: null, min_age: null, max_age: null,
         departments: ["engineering"], job_titles: [], doses: 2,
+        active_from: null, active_until: null,
+      }, {
+        pid: "w2", name: "Cycle-to-work scheme", kind: "benefit",
+        benefit_plan_pid: "bp1",
+        description: "Save on a bike through salary sacrifice.",
+        info_url: null, min_age: null, max_age: null,
+        departments: [], job_titles: [], doses: 1,
         active_from: null, active_until: null,
       }],
     }),
@@ -238,7 +246,7 @@ test("wellbeing area renders rules and aggregate-only uptake", async ({ page }) 
         as_of: "2026-07-24T00:00:00Z",
         derivation: "uptake = (booked + done) / all acknowledgements; counts only",
         entitlements: [{
-          entitlement_pid: "w1", name: "Seasonal flu vaccination",
+          entitlement_pid: "w1", name: "Seasonal flu vaccination", kind: "health",
           by_response: { booked: 3, done: 1, declined: 1, dismissed: 0 },
           uptake_rate: { numerator: 4, denominator: 5, value: 0.8 },
         }],
@@ -248,5 +256,7 @@ test("wellbeing area renders rules and aggregate-only uptake", async ({ page }) 
   await page.goto("/wellbeing");
   await expect(page.getByTestId("wellbeing-rules").getByText("Seasonal flu vaccination")).toBeVisible();
   await expect(page.getByTestId("wellbeing-rules").getByText("engineering")).toBeVisible();
+  await expect(page.getByTestId("wellbeing-rules").getByText("Cycle-to-work scheme")).toBeVisible();
+  await expect(page.getByTestId("wellbeing-rules").getByText("Benefit")).toBeVisible();
   await expect(page.getByTestId("wellbeing-uptake").getByText("80% (4/5)")).toBeVisible();
 });

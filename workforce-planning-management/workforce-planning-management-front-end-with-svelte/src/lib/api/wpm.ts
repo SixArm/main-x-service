@@ -304,10 +304,12 @@ export function mentorshipStatus(pid: string, to: string): Promise<unknown> {
 
 // ─── Wellbeing (health entitlements, WPM-R25) ───────────────────────
 
-/** One configurable health-entitlement rule (non-clinical predicates only). */
+/** One configurable entitlement rule (non-clinical predicates only). */
 export interface WellbeingEntitlement {
   pid: string;
   name: string;
+  kind: "health" | "benefit";
+  benefit_plan_pid: string | null;
   description: string;
   info_url: string | null;
   min_age: number | null;
@@ -322,6 +324,8 @@ export interface WellbeingEntitlement {
 /** One live prompt (or the one multi-dose reminder) for an employee. */
 export interface WellbeingPrompt {
   kind: "prompt" | "reminder";
+  entitlement_kind: "health" | "benefit";
+  benefit_plan_pid: string | null;
   entitlement_pid: string;
   name: string;
   description: string;
