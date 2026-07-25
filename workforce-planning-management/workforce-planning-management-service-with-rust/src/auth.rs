@@ -284,11 +284,9 @@ pub fn derive_action(method: &Method, path: &str) -> Action {
 #[must_use]
 pub fn policy_from_env() -> Policy {
     let source = crate::compat::env_var("WPM_ABAC_POLICY")
-        
         .filter(|v| !v.trim().is_empty())
         .or_else(|| {
             let path = crate::compat::env_var("WPM_ABAC_POLICY_FILE")
-                
                 .filter(|v| !v.trim().is_empty())?;
             match std::fs::read_to_string(path.trim()) {
                 Ok(contents) => Some(contents),

@@ -1,0 +1,137 @@
+name: CI
+
+# The repository has no root `Cargo.toml` — each crate is its own
+# workspace — so nothing here can use `--workspace` to cover the tree.
+# `scripts/ci-crates.sh` discovers the crates and feeds a job matrix, and
+# every step shells out to `scripts/ci-check.sh` so this pipeline and the
+# Woodpecker one run byte-identical commands. A check that only fails on
+# one platform is a check nobody trusts.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push supersedes an in-flight run on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Cut link time and disk use; nothing here needs a debugger.
+  CARGO_PROFILE_TEST_DEBUG: 0
+
+jobs:
+  discover:
+    name: discover crates
+    runs-on: ubuntu-latest
+    outputs:
+      crates: ${{ steps.list.outputs.crates }}
+      db-crates: ${{ steps.list.outputs.db-crates }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: |
+          echo "crates=$(scripts/ci-crates.sh --json)" >> "$GITHUB_OUTPUT"
+          # Crates enrolled for database-backed suites (see ci/db-suites.txt).
+          db=$(grep -v '^[[:space:]]*#' ci/db-suites.txt \
+               | grep -v '^[[:space:]]*$' \
+               | paste -sd, - \
+               | sed 's/[^,]*/"&"/g')
+          echo "db-crates=[$db]" >> "$GITHUB_OUTPUT"
+
+  # Formatting is cheap and needs no build, so it runs once over every
+  # crate rather than paying matrix setup 55 times.
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup component add rustfmt
+      - run: scripts/ci-check.sh fmt
+
+  check:
+    name: ${{ matrix.crate }}
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      # Report every failing crate in one run rather than stopping at the
+      # first — with 55 independent crates, fail-fast hides more than it
+      # saves.
+      fail-fast: false
+      matrix:
+        crate: ${{ fromJson(needs.discover.outputs.crates) }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup component add clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ matrix.crate }}
+          key: ${{ matrix.crate }}
+      - name: clippy (pedantic, warnings are errors)
+        run: scripts/ci-check.sh clippy '${{ matrix.crate }}'
+      - name: test
+        run: scripts/ci-check.sh test '${{ matrix.crate }}'
+
+  # The `#[ignore]`-gated suites. These are where the compliance controls
+  # are actually proven — no unit test can show that an audit digest
+  # survives a Postgres JSONB round-trip, or that a raw-SQL row edit is
+  # detected — so CI runs them against a real database.
+  test-db:
+    name: db · ${{ matrix.crate }}
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crate: ${{ fromJson(needs.discover.outputs.db-crates) }}
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: loco
+          POSTGRES_PASSWORD: loco
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_USER: loco
+      POSTGRES_PASSWORD: loco
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ matrix.crate }}
+          key: db-${{ matrix.crate }}
+      - run: scripts/ci-check.sh test-db '${{ matrix.crate }}'
+
+  # IEC 62304 / FD&C §524B supply-chain evidence. The SOUP-annotation gate
+  # and the requirement->test traceability check are ordinary tests, so
+  # `check` already enforces them; this job adds advisory/licence scanning
+  # and publishes the rendered SBOM as an artefact.
+  supply-chain:
+    name: supply chain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: install cargo-deny
+        run: cargo install cargo-deny --locked
+      - name: cargo-deny (advisories + licences)
+        run: scripts/ci-check.sh deny
+      - name: render SBOM
+        run: |
+          cd care-pathway/care-pathway-service-with-loco
+          cargo run --locked --quiet --bin sbom > "$RUNNER_TEMP/sbom.cdx.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: care-pathway-sbom
+          path: ${{ runner.temp }}/sbom.cdx.json

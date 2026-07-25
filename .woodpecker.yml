@@ -1,0 +1,69 @@
+# Codeberg CI (Woodpecker).
+#
+# `origin` pushes to both Codeberg and GitHub, so both remotes need their
+# own pipeline or one of them shows no checks at all. Every step shells out
+# to `scripts/ci-check.sh`, the same entry point `.github/workflows/ci.yml`
+# uses, so the two platforms run byte-identical commands.
+#
+# **Difference from the GitHub pipeline, stated rather than hidden:**
+# GitHub fans the 55 crates out across a job matrix built at runtime from
+# `scripts/ci-crates.sh`. Woodpecker's `matrix:` needs a *static* list,
+# which would silently drift from the tree every time a crate is added — so
+# these steps loop over the discovered crates in one job instead. Same
+# commands and same coverage; slower, and a failure report that names every
+# failing crate at the end rather than one job per crate.
+
+when:
+  - event: [push, pull_request, manual]
+
+variables:
+  # Matches rust-toolchain.toml (1.96.1); rustup honours the pin from the
+  # file, so the image tag only needs to be recent enough to bootstrap it.
+  - &rust_image 'rust:1.96-bookworm'
+
+services:
+  - name: postgres
+    image: postgres:18
+    environment:
+      POSTGRES_USER: loco
+      POSTGRES_PASSWORD: loco
+      POSTGRES_DB: postgres
+
+steps:
+  - name: rustfmt
+    image: *rust_image
+    commands:
+      - rustup component add rustfmt
+      - scripts/ci-check.sh fmt
+
+  - name: clippy
+    image: *rust_image
+    commands:
+      - rustup component add clippy
+      - scripts/ci-check.sh clippy
+
+  - name: test
+    image: *rust_image
+    commands:
+      - scripts/ci-check.sh test
+
+  # The `#[ignore]`-gated suites, against a real database. These are where
+  # the compliance controls are actually proven; see ci/db-suites.txt for
+  # why enrolment is an allowlist.
+  - name: test-db
+    image: *rust_image
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: loco
+      POSTGRES_PASSWORD: loco
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends postgresql-client
+      - until pg_isready -h postgres -U loco; do sleep 1; done
+      - scripts/ci-check.sh test-db
+
+  - name: supply-chain
+    image: *rust_image
+    commands:
+      - cargo install cargo-deny --locked
+      - scripts/ci-check.sh deny
+      - scripts/ci-check.sh evidence

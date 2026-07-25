@@ -1,0 +1,37 @@
+# Crates whose `#[ignore]`-gated (database-backed) suite runs in CI.
+#
+# `cargo test` skips these suites by design, so they only execute when CI
+# explicitly opts a crate in here and provides a Postgres database. This is
+# an **allowlist, not a denylist**, on purpose: a crate is added once its
+# `--ignored` suite has been observed green, so CI starts green and stays
+# meaningful. A denylist would have made the first CI run red and trained
+# everyone to ignore it.
+#
+# The DB-gated suites are where the compliance controls are actually
+# proven — a unit test cannot show that an audit digest survives a Postgres
+# JSONB round-trip, or that a raw-SQL row edit is detected. Running them is
+# the point of giving CI a database at all.
+#
+# Format: one crate path per line (as printed by `scripts/ci-crates.sh`).
+# Blank lines and `#` comments ignored.
+#
+# --- verified green ---------------------------------------------------
+care-pathway/care-pathway-service-with-loco
+case-folder/case-folder-service-with-rust
+workforce-planning-management/workforce-planning-management-service-with-rust
+#
+# --- not yet enrolled -------------------------------------------------
+#
+# worker/worker-service-with-loco
+#   Excluded: 5 pre-existing failures unrelated to any recent change.
+#   `tests/api_integration_test.rs` gets `422` where it expects `201` on
+#   worker create. Verified pre-existing by running the same suite at
+#   commit d25067d1 (before the compliance work) — identical failures.
+#   It also needs `./data/search_index` to exist before boot, which no
+#   fixture creates. Enrol once both are fixed.
+#
+# Every other service:
+#   Their `--ignored` suites have never been run against a database in
+#   this environment, so their state is genuinely unknown. Enrol each one
+#   after observing it green locally — do not bulk-add on the assumption
+#   that it passes.

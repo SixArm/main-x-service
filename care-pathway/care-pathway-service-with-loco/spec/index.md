@@ -768,9 +768,16 @@ the evidence bundle.
     native and FHIR surfaces. `record_access` now returns
     `Result<(), AuditWriteRefused>` so the choice is explicit at every
     call site rather than swallowed. §12.5 records the recommendation.
-  - [ ] Wire `cargo deny`, `scripts/sbom.sh`, and the traceability check
-    into CI, and lift the `compliance/` artefacts to the repository root
-    once a second crate adopts them
+  - [x] **Wire `cargo deny`, the SBOM, and the traceability check into
+    CI.** **Done (2026-07-25):** the repository had no CI at all;
+    `.github/workflows/ci.yml` + `.woodpecker.yml` now run fmt, clippy
+    (`-D warnings`), test, DB-gated test, `cargo deny` and the SBOM
+    render on both remotes, driven by `scripts/ci-check.sh` so the two
+    platforms run identical commands. The traceability and SOUP gates
+    are ordinary tests, so the `test` stage already enforces them. See
+    the repository `AGENTS.md` §Continuous integration.
+  - [ ] Lift the `compliance/` artefacts to the repository root once a
+    second crate adopts them
     ([`spec/compliance` §8.5](../../../spec/compliance/index.md)).
   - [ ] Run an Inferno-style conformance suite against `/fhir`.
 

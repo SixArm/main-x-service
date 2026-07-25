@@ -107,6 +107,41 @@ entity. They are not matcher-backed and have no front-end of their own.
 | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | [link-graph-service-with-loco](link/link-graph-service-with-loco/spec/index.md) | **Read-model aggregator** for cross-service entity linking — consumes every entity's event stream (+ the new `linked`/`unlinked` events) and serves the queryable cross-service graph (`neighbors` / `single-view` / freshness). The read side of the hybrid topology in [cross-service-linking.md](agents/share/cross-service-linking.md); each entity service owns its own link **writes** (`entity_links` + events). v1 edges: `same_identity` (person↔worker), `works_at`/`member_of` (person→org), `employed_by` (worker→org), `subject_of` (case→person). | [spec](link/link-graph-service-with-loco/spec/index.md) |
 
+## Continuous integration
+
+Both remotes run the same checks, because `origin` pushes to Codeberg
+**and** GitHub: `.github/workflows/ci.yml` and `.woodpecker.yml`. Every
+step shells out to `scripts/ci-check.sh`, so the two platforms run
+byte-identical commands — a check that only fails on one platform is a
+check nobody trusts.
+
+There is **no root `Cargo.toml`**: each crate is its own workspace, so
+nothing can use `--workspace` to cover the tree. `scripts/ci-crates.sh`
+discovers the ~55 crates and feeds them to each stage.
+
+| Stage | Command | Notes |
+|---|---|---|
+| `fmt` | `cargo fmt --check` | one pass over every crate |
+| `clippy` | `cargo clippy --all-targets -- -D warnings` | `-D warnings` is what keeps `#![warn(clippy::pedantic)]` at zero |
+| `test` | `cargo test` | DB-gated suites stay skipped |
+| `test-db` | `cargo test -- --ignored` | only crates enrolled in [`ci/db-suites.txt`](ci/db-suites.txt), against a Postgres service |
+| `deny` | `cargo deny check` | advisories + licences, where a `deny.toml` exists |
+| `evidence` | SBOM render | IEC 62304 §8.1.2 / FD&C §524B |
+
+**`ci/db-suites.txt` is an allowlist, not a denylist.** A crate joins it
+once its `--ignored` suite has been observed green, so CI starts green and
+stays meaningful; the file records why each excluded crate is excluded.
+The DB-gated suites are where the compliance controls are actually proven
+— no unit test can show that an audit digest survives a Postgres JSONB
+round-trip, or that a raw-SQL row edit is detected.
+
+Run any stage locally exactly as CI does:
+
+```sh
+scripts/ci-check.sh clippy                       # every crate
+scripts/ci-check.sh test-db care-pathway/care-pathway-service-with-loco
+```
+
 ## Shared reference docs
 
 @agents/share/index.md

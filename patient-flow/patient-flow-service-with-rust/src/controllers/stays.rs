@@ -205,6 +205,12 @@ async fn is_infectious<C: sea_orm::ConnectionTrait>(db: &C, stay_pid: Uuid) -> R
 }
 
 /// `POST /api/stays` — admit a patient into a bed.
+// One line over the pedantic limit (101/100). Admission is a single
+// transaction that validates the payload, checks bed state, writes the
+// stay, and emits its event; splitting it to save one line would scatter
+// that transaction across helpers for no readability gain. Surfaced only
+// once CI began treating clippy warnings as errors.
+#[allow(clippy::too_many_lines)]
 #[debug_handler]
 async fn admit(
     State(ctx): State<AppContext>,
