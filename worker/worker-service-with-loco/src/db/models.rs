@@ -1681,3 +1681,68 @@ pub mod entity_links {
 
     impl ActiveModelBehavior for ActiveModel {}
 }
+
+// ============================================================================
+// worker_assessments
+// ============================================================================
+
+/// `SeaORM` entity for the `worker_assessments` table — one row per
+/// administration of one assessment instrument to one worker
+/// (aptitude / personality / psychometric / selection; see
+/// [`crate::models::assessment`]). The per-scale outcomes ride in the
+/// `results` JSONB array rather than a child table: an assessment is
+/// always read and written whole. Persistence helpers (insert, list,
+/// find, update, soft-delete) live in [`crate::db::assessments`].
+///
+/// `category` and `status` store the domain enums' lowercase wire
+/// tokens, so the vocabulary can grow by data migration rather than
+/// DDL. Deletion is soft (`deleted_at`) so the audit trail stays
+/// intact.
+pub mod worker_assessments {
+    use super::{Deserialize, Serialize};
+    use sea_orm::entity::prelude::*;
+
+    /// One recorded assessment row.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+    #[sea_orm(table_name = "worker_assessments")]
+    pub struct Model {
+        /// Assessment id; application-assigned.
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        /// The assessed worker's `id`.
+        pub worker_id: Uuid,
+        /// Category wire token: `aptitude` | `personality` |
+        /// `psychometric` | `selection`.
+        pub category: String,
+        /// The instrument's name.
+        pub instrument: String,
+        /// The test publisher / administering provider.
+        pub provider: Option<String>,
+        /// Lifecycle wire token: `scheduled` | `in_progress` |
+        /// `completed` | `expired` | `cancelled`.
+        pub status: String,
+        /// The date the assessment was taken.
+        pub administered_on: Option<TimeDate>,
+        /// The date the results stop counting as current.
+        pub expires_on: Option<TimeDate>,
+        /// Who administered it.
+        pub administered_by: Option<String>,
+        /// Operator notes (sensitive — redacted under `mask`).
+        pub notes: Option<String>,
+        /// The per-scale outcomes, as a JSON array of result objects.
+        pub results: Json,
+        /// Creation timestamp.
+        pub created_at: TimeDateTimeWithTimeZone,
+        /// Last-update timestamp.
+        pub updated_at: TimeDateTimeWithTimeZone,
+        /// Soft-delete timestamp; `None` while live.
+        pub deleted_at: Option<TimeDateTimeWithTimeZone>,
+    }
+
+    /// `SeaORM` relations for the assessment entity (none defined — the
+    /// worker is referenced by id and joined in the repository layer).
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}

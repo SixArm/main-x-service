@@ -181,6 +181,46 @@ denied (the body names the deciding rule).
 | GET | `/api/workers/review-queue` | Stored review queue (filter `status`, `limit`) |
 | POST | `/api/workers/review-queue/{id}/decision` | Decide a pending review item (`confirmed` / `rejected`) |
 
+### Assessments
+
+Aptitude / personality / psychometric / selection tests recorded against
+a worker. Every route loads the worker first and authorizes at the
+**worker** level (record-level ABAC), so an assessment can never be read
+or written by a caller who could not read or write the worker itself.
+Lookups are worker-scoped: an `assessment_id` from another worker is a
+`404`. Reads honour the `mask` obligation on **every** path (bands
+survive; raw scores, percentiles, narratives, and operator notes do
+not), and every read and mutation is audited.
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| POST   | `/api/workers/{id}/assessments` | Record an administration (`201`) |
+| GET    | `/api/workers/{id}/assessments` | List live assessments |
+| GET    | `/api/workers/{id}/assessments/{assessment_id}` | Fetch one |
+| PUT    | `/api/workers/{id}/assessments/{assessment_id}` | Update (status move, scoring, corrections) |
+| DELETE | `/api/workers/{id}/assessments/{assessment_id}` | Withdraw (soft delete) |
+| GET    | `/api/workers/{id}/assessment-profile` | Derived cross-category profile |
+
+**List query parameters:** `category` (`aptitude` / `personality` /
+`psychometric` / `selection`), `status` (`scheduled` / `in_progress` /
+`completed` / `expired` / `cancelled`), `valid_on` (`YYYY-MM-DD` — keep
+only assessments current on that date). An unknown token is a `422`
+naming the closed vocabulary.
+
+**Profile query parameters:** `as_of` (`YYYY-MM-DD`, default today).
+The response reports, per category, the count recorded and current, the
+**current reading per scale** (most recently administered current
+assessment reporting it), the scales with no current reading, and —
+across current selection assessments — `selection_suitability`, the mean
+percentile. Derived from real scores only; a missing score is `null`,
+never zero. A `derivation` string in the payload states the rule.
+
+**Update semantics:** omitted fields are untouched; an explicit `null`
+on `provider` / `notes` / `administered_by` / the dates clears the
+stored value. Status changes go through the lifecycle machine (`422` on
+an illegal move, naming the current state) and the merged record is
+re-validated before persisting.
+
 ### Privacy
 
 | Method | Path                          | Description        |

@@ -334,6 +334,32 @@ CREATE TABLE worker_consents (
 CREATE INDEX idx_worker_consents_worker ON worker_consents (worker_id);
 
 -- ----------------------------------------------------------------------------
+-- Workforce assessments (aptitude / personality / psychometric / selection)
+-- Per-scale outcomes are a JSONB array: an assessment is always read and
+-- written whole, never queried field-by-field.
+-- ----------------------------------------------------------------------------
+CREATE TABLE worker_assessments (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    worker_id       UUID         NOT NULL REFERENCES workers (id) ON DELETE CASCADE,
+    category        VARCHAR(32)  NOT NULL,   -- aptitude | personality | psychometric | selection
+    instrument      VARCHAR(256) NOT NULL,
+    provider        VARCHAR(256),
+    status          VARCHAR(32)  NOT NULL DEFAULT 'scheduled',
+    administered_on DATE,
+    expires_on      DATE,
+    administered_by VARCHAR(256),
+    notes           VARCHAR(1024),
+    results         JSONB        NOT NULL DEFAULT '[]'::jsonb,
+    created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at      TIMESTAMP WITH TIME ZONE
+);
+CREATE INDEX idx_worker_assessments_worker
+    ON worker_assessments (worker_id, administered_on DESC) WHERE deleted_at IS NULL;
+CREATE INDEX idx_worker_assessments_category
+    ON worker_assessments (category) WHERE deleted_at IS NULL;
+
+-- ----------------------------------------------------------------------------
 -- Match-score history
 -- ----------------------------------------------------------------------------
 CREATE TABLE worker_match_scores (

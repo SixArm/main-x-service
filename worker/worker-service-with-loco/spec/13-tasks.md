@@ -328,3 +328,121 @@ clearly described manual check confirms the acceptance criterion.
   `cargo test --lib` + clippy pedantic clean; FE svelte-check / vitest /
   Playwright green.
 
+- [x] **T-10 — Workforce assessments (aptitude / personality /
+  psychometric / selection).** *(done 2026-07-23)* Record and serve the
+  tests a worker has taken, as a worker sub-resource. Spec: domain model
+  §5.5, functional requirements §6.9, API §9.2, persistence §10.5.
+  - [x] **Domain model** (`src/models/assessment.rs`):
+    `AssessmentCategory` (the four families) × `AssessmentScale` (the 13
+    measured dimensions) with the `permits` rule — a category accepts its
+    own scales, and `psychometric` additionally accepts aptitude and
+    personality scales, because a psychometric test covers both;
+    `ScoreBand::from_percentile` (the norm-referenced 10/30/70/90 split,
+    clamping rather than panicking out of range); the `AssessmentStatus`
+    lifecycle machine; `Assessment::is_valid_on` (completed and
+    unexpired), `mean_percentile`, and `masked`.
+  - [x] **Persistence**: the `worker_assessments` migration
+    (`m20260723_000001`, per-scale results as JSONB) + the SeaORM entity
+    + `src/db/assessments.rs` (insert / worker-scoped list + find /
+    update / soft-delete, and the row↔domain conversion — a drifted
+    stored token or malformed `results` is a mapped error, never a
+    panic).
+  - [x] **Validation** (`validate_assessment`): instrument required,
+    scale-in-category, one reading per scale, percentile ∈ [0, 100],
+    `0 ≤ raw ≤ max` with `max > 0`, expiry not before administration, a
+    completed assessment carrying its date and results, and SEC-M1 caps
+    — the full problem list in one `422`.
+  - [x] **Endpoints** (`src/api/rest/assessments.rs`, mounted on both
+    router surfaces + OpenAPI): the five CRUD routes plus the derived
+    `GET /api/workers/{id}/assessment-profile`. Worker-level ABAC on
+    every route, the `mask` obligation honoured on **every** read path
+    (single, list, and profile — invariant 5), audit rows on reads and
+    mutations, and update re-validating the *merged* record so it cannot
+    reach a state a create would refuse.
+  - **Acceptance:** 21 DB-free unit tests across the model (scale↔category
+    consistency, the psychometric overlap, band boundaries, the lifecycle
+    matrix, validity, masking, token round-trips), the persistence
+    conversion (round-trip + drift-is-an-error), and the pure API
+    derivations (filters, most-recent-current-reading, selection
+    suitability, the masked profile withholding scores, every category
+    present when empty, deterministic recency ordering) — plus five
+    validation tests and a DB-gated round-trip
+    (`round_trip_insert_find_update_delete`, `#[ignore]`, needs
+    `DATABASE_URL`). Met: `cargo test --lib` green (225 passed, 5
+    ignored); `cargo clippy --all-targets` clean; `cargo test --doc`
+    green.
+  - **Follow-ups (not queued):** front-end views for the profile, and a
+    FHIR `Observation` projection of assessment results.
+
+- [x] **BUG-1 — `workers.gender` was persisted in the wrong case.**
+  *(fixed 2026-07-23)* `src/db/repositories.rs` stored the bare `Debug`
+  form of [`Gender`](crate::models::Gender) (`"Male"`, `"Unknown"`) at
+  all three write sites (create, update, and the merge row
+  replacement), but the `workers` table's CHECK constraint admits only
+  `'male' | 'female' | 'other' | 'unknown'`
+  (`migrations/2024122800000002_create_workers/up.sql`). Against a
+  constrained schema **every create and update failed** with
+  `violates check constraint "workers_gender_check"`; the DB-gated
+  outbox tests were red for the same reason. The search index
+  (`src/search/mod.rs`) and the FHIR surface (`src/api/fhir/mod.rs`)
+  had already lowercased, so the three DB writers were the outliers —
+  and the sibling person-service had already fixed the identical bug
+  the same way, so this restores family consistency.
+  - Fix: `.to_lowercase()` on all three writers, and the read parser
+    (`from_db_models`) now lowercases before matching so rows written
+    by the old path on an unconstrained deployment still round-trip
+    instead of silently reading back as `Unknown`.
+  - **Data migration** (`m20260723_000002_normalize_worker_gender_case`,
+    added on request): `UPDATE workers SET gender = lower(gender) WHERE
+    gender <> lower(gender)` — idempotent, and a **no-op on a
+    correctly-constrained schema** (where the bad writes were rejected
+    in the first place). It exists for deployments whose `workers`
+    table was created without the constraint (hand-rolled schema, older
+    schema file, or a bulk load through another tool), where the values
+    were accepted and would now block a later ADD CONSTRAINT. Values
+    still outside the vocabulary after lowercasing (`'M'`,
+    `'not stated'`, …) are **deliberately left alone**: rewriting them
+    to `'unknown'` would destroy data only an operator can interpret,
+    so ADD CONSTRAINT fails loudly on them instead. The `up.sql`
+    carries the query that finds them. `down` is a documented no-op —
+    re-capitalizing would violate the constraint *and* corrupt rows
+    that were always lowercase.
+  - **Acceptance:** a DB-free regression pin,
+    `db::repositories::tests::gender_is_persisted_as_a_constraint_legal_token`,
+    asserts every `Gender` variant persists as a token the CHECK
+    constraint admits **and** as its serde wire token (so the DB, the
+    search index, and FHIR agree on one spelling). Verified to fail
+    against the pre-fix code. The two DB-gated outbox tests
+    (`create_enqueues_a_created_outbox_row`,
+    `merge_enqueues_merged_with_merged_from_and_deleted`) now pass
+    against Postgres 18. The data migration has its own DB-gated pin,
+    `tests/gender_normalization_db.rs` — it reproduces the affected
+    deployment (drop the constraint, plant a `'Male'` row), runs the
+    migration's **real SQL** via `include_str!` so test and migration
+    cannot drift, asserts the value is normalized, and then *proves*
+    the repair by re-adding the constraint (which only succeeds if
+    every row is legal), plus an idempotent re-run. `cargo test --lib`
+    green (226 passed); clippy `--all-targets` clean.
+
+- [x] **T-11 — `Config::from_env` loads the environment.** *(done
+  2026-07-23)* The function was a stub that returned `Config::default()`
+  and ignored the process environment, so every documented variable
+  (`DATABASE_URL`, `SERVER_PORT`, `SEARCH_INDEX_PATH`, …) was inert —
+  the integration-test harness, which builds its state from
+  `Config::from_env()`, could never be pointed at a test database.
+  - Env → `.env` (best-effort) → default precedence, over the 14
+    variables in the `from_env` doc table (the family's 11 plus
+    `SEARCH_CACHE_SIZE_MB`, `STREAMING_BROKER_URL`, `STREAMING_TOPIC`,
+    which were previously unreachable config fields).
+  - Blank / whitespace-only ⇒ **unset** (an empty `SERVER_HOST` must
+    not bind the server to nothing); a malformed typed value ⇒
+    `Error::Config` naming the variable and its raw value, never a
+    silent default.
+  - The overlay lives in a pure `Config::from_source(lookup)` seam so
+    it is testable without mutating process env — `std::env::set_var`
+    is `unsafe` in the 2024 edition, which this crate forbids.
+  - **Acceptance:** five unit tests (defaults, every variable applied,
+    blank-as-unset, malformed-refused-by-name, whitespace tolerance)
+    green on a bare `cargo test --lib`; clippy clean. The same seam and
+    tests landed in all six `*-service-with-loco` crates that carry a
+    `Config`, so the family is uniform.

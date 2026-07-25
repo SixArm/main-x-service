@@ -165,7 +165,10 @@ async fn apply_worker_row_replacement<C: ConnectionTrait>(conn: &C, worker: &Wor
             .worker_type
             .as_ref()
             .map(std::string::ToString::to_string)),
-        gender: Set(format!("{:?}", worker.gender)),
+        // Lowercased to honor the `workers_gender_check` CHECK constraint
+        // (`'male'`/`'female'`/`'other'`/`'unknown'`); the bare `Debug`
+        // form is rejected by the database.
+        gender: Set(format!("{:?}", worker.gender).to_lowercase()),
         birth_date: Set(worker.birth_date.map(date_to_time)),
         tax_id: Set(worker.tax_id.clone()),
         deceased: Set(worker.deceased),
@@ -524,9 +527,11 @@ impl SeaOrmWorkerRepository {
     /// each backing table (worker row plus name/identifier/address/contact/
     /// link rows). The first name is marked primary; the first address and
     /// contact are marked primary. Demographic/use-type enums are stored via
-    /// their `Debug` form (`format!("{:?}", …)`) while `worker_type` uses its
-    /// `Display`/`to_string`; [`from_db_models`](Self::from_db_models) parses
-    /// these string forms back. Fresh UUIDs and `now_utc()` timestamps are
+    /// their `Debug` form (`format!("{:?}", …)`) — except `gender`, which is
+    /// lowercased to honor the `workers_gender_check` CHECK constraint —
+    /// while `worker_type` uses its `Display`/`to_string`;
+    /// [`from_db_models`](Self::from_db_models) parses these string forms
+    /// back. Fresh UUIDs and `now_utc()` timestamps are
     /// assigned to child rows. This does not cover the document / emergency-
     /// contact / photo collections — those are handled by
     /// [`insert_extra_collections`].
@@ -538,7 +543,8 @@ impl SeaOrmWorkerRepository {
                 .worker_type
                 .as_ref()
                 .map(std::string::ToString::to_string)),
-            gender: Set(format!("{:?}", worker.gender)),
+            // Lowercased for the `workers_gender_check` CHECK constraint.
+            gender: Set(format!("{:?}", worker.gender).to_lowercase()),
             birth_date: Set(worker.birth_date.map(date_to_time)),
             tax_id: Set(worker.tax_id.clone()),
             deceased: Set(worker.deceased),
@@ -750,11 +756,15 @@ impl SeaOrmWorkerRepository {
     ) -> Result<Worker> {
         use crate::models::{Gender, LinkType};
 
-        // Parse gender
-        let gender = match db_worker.gender.as_str() {
-            "Male" => Gender::Male,
-            "Female" => Gender::Female,
-            "Other" => Gender::Other,
+        // Parse gender. The DB stores lowercase per the CHECK constraint
+        // ('male'/'female'/'other'/'unknown'); accept PascalCase too, so
+        // rows written by the older `format!("{:?}", …)` path (which
+        // reached deployments whose schema lacked the constraint) still
+        // round-trip instead of silently reading back as `Unknown`.
+        let gender = match db_worker.gender.to_lowercase().as_str() {
+            "male" => Gender::Male,
+            "female" => Gender::Female,
+            "other" => Gender::Other,
             _ => Gender::Unknown,
         };
 
@@ -1131,7 +1141,8 @@ impl WorkerRepository for SeaOrmWorkerRepository {
                 .worker_type
                 .as_ref()
                 .map(std::string::ToString::to_string)),
-            gender: Set(format!("{:?}", worker.gender)),
+            // Lowercased for the `workers_gender_check` CHECK constraint.
+            gender: Set(format!("{:?}", worker.gender).to_lowercase()),
             birth_date: Set(worker.birth_date.map(date_to_time)),
             tax_id: Set(worker.tax_id.clone()),
             deceased: Set(worker.deceased),
@@ -1469,6 +1480,53 @@ mod tests {
         assert_eq!(escape_like("a_b"), "a\\_b");
         // Backslash is escaped first so it can't re-enable a wildcard.
         assert_eq!(escape_like("a\\%"), "a\\\\\\%");
+    }
+
+    /// The `workers.gender` CHECK constraint's vocabulary, copied from
+    /// `migrations/2024122800000002_create_workers/up.sql`. A value
+    /// outside this set is rejected by `PostgreSQL` at insert time.
+    const DB_GENDER_TOKENS: [&str; 4] = ["male", "female", "other", "unknown"];
+
+    /// Every [`Gender`] variant is persisted as a token the
+    /// `workers_gender_check` CHECK constraint accepts.
+    ///
+    /// Regression pin: `to_active_models` (and the two sibling write
+    /// paths) previously stored the bare `Debug` form — `"Unknown"`,
+    /// `"Male"` — which `PostgreSQL` rejects, so **every** create and
+    /// update against a constrained schema failed with
+    /// `violates check constraint "workers_gender_check"`. Pure and
+    /// DB-free, so the vocabulary is pinned on a bare `cargo test --lib`
+    /// rather than only when a database happens to be reachable.
+    #[test]
+    fn gender_is_persisted_as_a_constraint_legal_token() {
+        for gender in [Gender::Male, Gender::Female, Gender::Other, Gender::Unknown] {
+            let worker = Worker::new(
+                HumanName {
+                    use_type: None,
+                    family: "Doe".into(),
+                    given: vec!["Jane".into()],
+                    prefix: vec![],
+                    suffix: vec![],
+                },
+                gender,
+            );
+            let (row, ..) = SeaOrmWorkerRepository::to_active_models(&worker);
+            let stored = row.gender.unwrap();
+            assert!(
+                DB_GENDER_TOKENS.contains(&stored.as_str()),
+                "{gender:?} persisted as {stored:?}, which the CHECK constraint \
+                 rejects (allowed: {DB_GENDER_TOKENS:?})"
+            );
+            // And it is the serde wire token, so the DB, the search index,
+            // and the FHIR surface all agree on one spelling.
+            assert_eq!(
+                stored,
+                serde_json::to_value(gender)
+                    .expect("gender serializes")
+                    .as_str()
+                    .expect("as a string")
+            );
+        }
     }
 
     use crate::db::models::event_outbox;

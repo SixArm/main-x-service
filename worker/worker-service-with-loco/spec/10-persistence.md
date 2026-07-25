@@ -8,12 +8,20 @@ PostgreSQL 18+ via SeaORM.
 `worker_contacts`, `worker_links`, `organizations`,
 `organization_addresses`, `organization_contacts`,
 `organization_identifiers`, `worker_match_scores`, `entity_links`,
-`audit_log`.
+`worker_assessments`, `review_queue`, `event_outbox`, `audit_log`.
 
 > `worker_links` holds **within-entity** links to other worker records
 > (a matcher signal). `entity_links` (§10.3) holds **cross-service**
 > outbound edges (never a matcher signal). They are separate tables by
 > the §5.1 partition rule.
+
+> **`workers.gender` casing.** The column carries a CHECK constraint
+> admitting only `'male' | 'female' | 'other' | 'unknown'`. The
+> repository writes the lowercased enum token (see §13 BUG-1); the read
+> path lowercases before parsing, so a legacy PascalCase row still
+> round-trips. `m20260723_000002_normalize_worker_gender_case` is the
+> one-way data migration that repairs such rows on a deployment whose
+> table was created without the constraint.
 
 ### 10.2 Extensions
 
@@ -114,3 +122,43 @@ national identifiers, credentials, emergency contacts — compliance §12,
   compliance event. The single-subject GDPR export is the `filter = one
   pid` special case of this machinery.
 
+### 10.5 `worker_assessments` (aptitude / personality / psychometric / selection)
+
+One row per administration of one instrument to one worker (domain model
+§5.5). The per-scale outcomes ride in a `results` JSONB array rather
+than a child table: an assessment is always read and written whole,
+never queried field-by-field, so a child table would buy nothing and
+cost a join on every read.
+
+```sql
+CREATE TABLE worker_assessments (
+    id              UUID PRIMARY KEY,
+    worker_id       UUID NOT NULL,        -- the assessed worker
+    category        VARCHAR NOT NULL,     -- aptitude | personality | psychometric | selection
+    instrument      VARCHAR NOT NULL,     -- the named test
+    provider        VARCHAR,              -- publisher / administering provider
+    status          VARCHAR NOT NULL DEFAULT 'scheduled',
+    administered_on DATE,
+    expires_on      DATE,                 -- results stop counting as current
+    administered_by VARCHAR,
+    notes           VARCHAR,              -- sensitive: redacted under `mask`
+    results         JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at      TIMESTAMPTZ           -- soft-delete (withdrawn record)
+);
+CREATE INDEX worker_assessments_worker_idx
+    ON worker_assessments (worker_id, administered_on DESC) WHERE deleted_at IS NULL;
+CREATE INDEX worker_assessments_category_idx
+    ON worker_assessments (category) WHERE deleted_at IS NULL;
+```
+
+`category` and `status` store the domain enums' lowercase wire tokens
+(as the family does elsewhere), so the vocabulary can grow by data
+migration rather than DDL. A stored token or `results` payload that has
+drifted outside the domain vocabulary is surfaced as a `500` with a
+message by `db::assessments::to_domain` — never a panic (security
+invariant 2).
+
+Migration: `m20260723_000001_create_worker_assessments`
+(`migrations/2026072300000001_create_worker_assessments/{up,down}.sql`).

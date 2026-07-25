@@ -1,0 +1,13 @@
+-- Intentionally a no-op.
+--
+-- This migration is a one-way data normalization. Re-capitalizing
+-- ('male' -> 'Male') would be wrong twice over: the lowercase form is
+-- the only one the `workers_gender_check` constraint admits, so the
+-- reverse would fail on any correctly-constrained schema; and rows that
+-- were *always* lowercase (every row written by a working deployment)
+-- are indistinguishable from the ones this migration touched, so the
+-- reverse would corrupt them.
+--
+-- Rolling back the schema past this point therefore leaves the data
+-- correctly normalized, which is safe: the read path accepts both cases.
+SELECT 1;

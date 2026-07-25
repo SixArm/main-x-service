@@ -14,6 +14,9 @@ use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+/// Workforce-assessment endpoints (aptitude / personality / psychometric
+/// / selection tests) and the derived assessment profile.
+pub mod assessments;
 /// Bearer-token authentication extractor + `whoami` endpoint + blanket
 /// auth-enforcement middleware (default-off, `WORKER_REQUIRE_AUTH`).
 pub mod auth;
@@ -58,6 +61,12 @@ pub use state::AppState;
         handlers::batch_deduplicate,
         handlers::get_review_queue,
         handlers::review_decision,
+        assessments::create_assessment,
+        assessments::list_assessments,
+        assessments::get_assessment,
+        assessments::update_assessment,
+        assessments::delete_assessment,
+        assessments::assessment_profile,
         handlers::export_worker_data,
         handlers::get_worker_masked,
         handlers::get_worker_audit_logs,
@@ -90,6 +99,12 @@ pub use state::AppState;
             crate::models::Consent,
             crate::models::ConsentType,
             crate::models::ConsentStatus,
+            crate::models::Assessment,
+            crate::models::AssessmentCategory,
+            crate::models::AssessmentScale,
+            crate::models::AssessmentStatus,
+            crate::models::AssessmentResult,
+            crate::models::ScoreBand,
             crate::api::ApiResponse::<crate::models::Worker>,
             crate::api::ApiError,
             handlers::HealthResponse,
@@ -112,6 +127,7 @@ pub use state::AppState;
         (name = "search", description = "Worker search endpoints"),
         (name = "matching", description = "Worker matcher endpoints"),
         (name = "deduplication", description = "Duplicate detection, review, and merge endpoints"),
+        (name = "assessments", description = "Aptitude, personality, psychometric, and selection tests"),
         (name = "privacy", description = "Data masking, export, and consent endpoints"),
         (name = "audit", description = "Audit log query endpoints"),
     )
@@ -184,6 +200,22 @@ pub fn create_router(state: AppState) -> Router {
             post(links::create_link).get(links::list_links),
         )
         .route("/workers/{id}/links/{link_id}", delete(links::delete_link))
+        // Workforce assessments (aptitude / personality / psychometric /
+        // selection) + the derived profile.
+        .route(
+            "/workers/{id}/assessments",
+            post(assessments::create_assessment).get(assessments::list_assessments),
+        )
+        .route(
+            "/workers/{id}/assessments/{assessment_id}",
+            get(assessments::get_assessment)
+                .put(assessments::update_assessment)
+                .delete(assessments::delete_assessment),
+        )
+        .route(
+            "/workers/{id}/assessment-profile",
+            get(assessments::assessment_profile),
+        )
         // Privacy
         .route("/workers/{id}/export", get(handlers::export_worker_data))
         .route("/workers/{id}/masked", get(handlers::get_worker_masked))
@@ -243,6 +275,21 @@ pub fn workers_routes() -> loco_rs::controller::Routes {
             post(links::create_link).get(links::list_links),
         )
         .add("/workers/{id}/links/{link_id}", delete(links::delete_link))
+        // Workforce assessments + the derived profile.
+        .add(
+            "/workers/{id}/assessments",
+            post(assessments::create_assessment).get(assessments::list_assessments),
+        )
+        .add(
+            "/workers/{id}/assessments/{assessment_id}",
+            get(assessments::get_assessment)
+                .put(assessments::update_assessment)
+                .delete(assessments::delete_assessment),
+        )
+        .add(
+            "/workers/{id}/assessment-profile",
+            get(assessments::assessment_profile),
+        )
         .add("/workers", post(handlers::create_worker))
         .add(
             "/workers/{id}",

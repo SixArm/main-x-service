@@ -19,6 +19,8 @@ use sea_orm::{Database, DatabaseConnection};
 use crate::Result;
 use crate::config::DatabaseConfig;
 
+/// Workforce-assessment persistence (`worker_assessments`).
+pub mod assessments;
 /// HIPAA-style audit-log repository ([`audit::AuditLogRepository`]).
 pub mod audit;
 /// `chrono` <-> `time` conversions at the persistence boundary.
@@ -29,9 +31,9 @@ pub mod entity_links;
 pub mod models;
 /// `event_outbox` write + relay surface for the durable event bus (Phase 2).
 pub mod outbox;
-pub mod review_queue;
 /// [`repositories::WorkerRepository`] trait and its SeaORM implementation.
 pub mod repositories;
+pub mod review_queue;
 /// Schema-definition stub retained for entity regeneration (see the module doc).
 pub mod schema;
 

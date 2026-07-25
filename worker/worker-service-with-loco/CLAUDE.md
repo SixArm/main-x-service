@@ -32,6 +32,7 @@ centralized registry of worker identities across source systems.
 - Multiple names and addresses per worker
 - Contact information management
 - Emergency contact management (name, relationship, telecom, address, primary flag)
+- Workforce assessments: aptitude (numerical / verbal reasoning, problem-solving, logical thinking), personality (work style, team compatibility, introversion/extraversion), psychometric (behavioural styles, emotional intelligence, cognitive abilities), and selection (job simulations, skills assessments, judgement tests) — per-scale results with score bands, validity/expiry, a derived per-worker profile, and masking of scores under the ABAC `mask` obligation
 - Automatic event publishing for all CRUD operations
 
 ### Worker matcher
@@ -353,6 +354,12 @@ Configuration via environment variables or `.env` file:
 | `SERVER_PORT`              | HTTP server port             | 8080           | No       |
 | `SEARCH_INDEX_PATH`        | Tantivy index directory      | ./search_index | No       |
 | `MATCHING_THRESHOLD`       | Match score threshold        | 0.7            | No       |
+| `GRPC_PORT` | gRPC server port (Tonic stub) | 50051 | No |
+| `SEARCH_CACHE_SIZE_MB` | Tantivy cache budget in MB | 512 | No |
+| `OTLP_SERVICE_NAME` | service.name sent to the collector | worker-service | No |
+| `OTLP_ENDPOINT` | OTLP collector endpoint | http://localhost:4317 | No |
+| `STREAMING_BROKER_URL` | Event-broker connection URL | localhost:9003 | No |
+| `STREAMING_TOPIC` | Topic events publish to | worker-events | No |
 | `RUST_LOG`                 | Logging level                | info           | No       |
 | `WORKER_EVENT_TRANSPORT`   | Event bus transport: `memory` or `outbox` (durable event bus Phase 2) | memory | No |
 | `WORKER_EVENT_RETENTION_DAYS` | `event_outbox` row TTL for the Phase-3 relay (roadmap) | 7 | No |

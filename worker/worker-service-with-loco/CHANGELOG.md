@@ -8,6 +8,96 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — `Config::from_env` now loads the environment (2026-07-23)
+
+- `Config::from_env` was a stub (`// TODO: Implement environment
+  variable loading`) that returned `Config::default()` and ignored the
+  process environment entirely — so `DATABASE_URL`, `SERVER_PORT`, and
+  every other documented variable had **no effect**. It now layers the
+  environment (and a best-effort `.env`) over the defaults.
+- Variables: `DATABASE_URL`, `DATABASE_MAX_CONNECTIONS`,
+  `DATABASE_MIN_CONNECTIONS`, `SERVER_HOST`, `SERVER_PORT`,
+  `GRPC_PORT`, `SEARCH_INDEX_PATH`, `SEARCH_CACHE_SIZE_MB`,
+  `MATCHING_THRESHOLD`, `OTLP_SERVICE_NAME`, `OTLP_ENDPOINT`,
+  `RUST_LOG`, `STREAMING_BROKER_URL`, `STREAMING_TOPIC`.
+- A blank or whitespace-only value counts as **unset** (an empty
+  `SERVER_HOST` must not bind the server to nothing). A malformed typed
+  value is **refused** with `Error::Config` naming the variable and its
+  raw value, rather than silently falling back to a default the
+  operator did not ask for.
+- Pinned by five unit tests against a pure `Config::from_source` seam
+  (defaults, every variable, blank-as-unset, malformed-by-name,
+  whitespace tolerance) — no process-environment mutation, so they are
+  parallel-safe and need no `unsafe` (`std::env::set_var` is `unsafe`
+  in the 2024 edition, which this crate forbids).
+
+### Fixed — `workers.gender` persisted in the wrong case (2026-07-23)
+
+- `src/db/repositories.rs` wrote the bare `Debug` form of `Gender`
+  (`"Male"`, `"Unknown"`) at all three write sites, but the `workers`
+  table's CHECK constraint admits only
+  `'male' | 'female' | 'other' | 'unknown'`. Against a constrained
+  schema **every worker create and update failed** with
+  `violates check constraint "workers_gender_check"`. Now lowercased at
+  all three writers, matching what the search index and the FHIR
+  surface already did (and what the sibling person-service already
+  fixed).
+- The read parser lowercases before matching, so rows written by the
+  old path on an unconstrained deployment still round-trip rather than
+  silently reading back as `Unknown`.
+- Pinned DB-free by
+  `db::repositories::tests::gender_is_persisted_as_a_constraint_legal_token`
+  (every variant must persist as a constraint-legal *and* serde-canonical
+  token). Unblocks the DB-gated outbox tests, which were red for this
+  reason.
+- **Data migration** `m20260723_000002_normalize_worker_gender_case`
+  lowercases any legacy capitalized rows. Idempotent, and a no-op on a
+  correctly-constrained schema (where such rows could never have been
+  written); it exists for deployments whose `workers` table lacks the
+  constraint. Values still outside the vocabulary after lowercasing are
+  deliberately left untouched rather than silently rewritten — the
+  `up.sql` carries the query to find them. `down` is a documented
+  no-op. Pinned by the DB-gated `tests/gender_normalization_db.rs`,
+  which runs the migration's real SQL and proves the repair by
+  re-adding the constraint.
+
+### Added — workforce assessments (2026-07-23)
+
+Aptitude, personality, psychometric, and selection tests recorded
+against a worker (spec §5.5 / §6.9 / §9.2 / §10.5, task T-10).
+
+- **Domain model** `src/models/assessment.rs`: `AssessmentCategory`
+  (aptitude / personality / psychometric / selection) × the 13
+  `AssessmentScale` dimensions they measure — numerical and verbal
+  reasoning, problem-solving, logical thinking; work style, team
+  compatibility, introversion/extraversion; behavioural style, emotional
+  intelligence, cognitive ability; job simulation, skills assessment,
+  judgement test. `AssessmentCategory::permits` encodes the one
+  deliberate overlap: a psychometric assessment also accepts aptitude
+  and personality scales. Plus `ScoreBand` (the norm-referenced
+  10/30/70/90 percentile split), the `AssessmentStatus` lifecycle
+  machine, `is_valid_on`, `mean_percentile`, and `masked`.
+- **`worker_assessments` table** (migration `m20260723_000001`) with the
+  per-scale outcomes as a `results` JSONB array + soft delete, and
+  `src/db/assessments.rs` (insert / worker-scoped list + find / update /
+  soft-delete; a drifted stored token or malformed payload is a mapped
+  error, never a panic).
+- **Endpoints** under `/api/workers/{id}/assessments` (create, list with
+  `?category=&status=&valid_on=`, fetch, update, withdraw) plus the
+  derived `GET /api/workers/{id}/assessment-profile` — the current
+  reading per scale in each category, the scales *not* assessed, and the
+  selection-suitability mean, all from real scores only. Mounted on both
+  router surfaces and in the OpenAPI document.
+- **Validation** (`validate_assessment`): instrument required,
+  scale-must-suit-category, one reading per scale, percentile ∈ [0, 100],
+  `0 ≤ raw ≤ max`, expiry not before administration, completion
+  requiring its date and results, plus SEC-M1 caps — reported as one
+  complete `422`.
+- **Sensitivity**: worker-level ABAC on every route; the `mask`
+  obligation honoured on **every** read path (single, list, profile —
+  bands survive, scores and narratives do not); audit rows on both reads
+  and mutations.
+
 ### Added — stored review queue + decision endpoints (2026-07-19)
 
 - `review_queue` table (migration `m20260719_000001_create_review_queue`):

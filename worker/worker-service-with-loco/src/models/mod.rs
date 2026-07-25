@@ -8,7 +8,9 @@
 //! [`document`](crate::models::document),
 //! [`emergency_contact`](crate::models::emergency_contact)), related
 //! aggregates ([`organization`](crate::models::organization),
-//! [`consent`](crate::models::consent)), and the records that drive
+//! [`consent`](crate::models::consent),
+//! [`assessment`](crate::models::assessment) — aptitude / personality /
+//! psychometric / selection tests), and the records that drive
 //! deduplication workflows ([`merge`](crate::models::merge),
 //! [`review_queue`](crate::models::review_queue)). The NHS ODS
 //! ([`ods`](crate::models::ods), [`geography`](crate::models::geography),
@@ -57,6 +59,8 @@ use serde::{Deserialize, Serialize};
 
 // Submodules: one file per cluster of related model types.
 
+/// Workforce assessments (aptitude / personality / psychometric / selection).
+pub mod assessment;
 /// NHS ODS CodeSystem lookup types (role / relationship / record-class names).
 pub mod codesystem;
 /// Consent records (type, status, validity dates) for privacy gating.
@@ -80,6 +84,9 @@ pub mod review_queue;
 /// The central [`Worker`](worker::Worker) aggregate and its name/link types.
 pub mod worker;
 
+pub use assessment::{
+    Assessment, AssessmentCategory, AssessmentResult, AssessmentScale, AssessmentStatus, ScoreBand,
+};
 pub use codesystem::{
     GeographyNameReference, OdsRecordClassReference, OdsRecordUseTypeReference,
     OdsRelationshipReference, OdsRoleReference, PractitionerRoleReference,
@@ -96,8 +103,8 @@ pub use ods::{
 };
 pub use organization::Organization;
 pub use review_queue::{
-    BatchDeduplicationRequest, BatchDeduplicationResponse, ReviewDecision,
-    ReviewDecisionRequest, ReviewQueueItem, ReviewQueueListResponse, ReviewStatus,
+    BatchDeduplicationRequest, BatchDeduplicationResponse, ReviewDecision, ReviewDecisionRequest,
+    ReviewQueueItem, ReviewQueueListResponse, ReviewStatus,
 };
 pub use worker::{HumanName, LinkType, NameUse, Worker, WorkerLink, WorkerType};
 

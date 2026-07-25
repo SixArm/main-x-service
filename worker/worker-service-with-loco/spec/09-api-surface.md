@@ -70,6 +70,56 @@ returned here. Graph traversal (`neighbors` / `single-view`) lives in the
 separate `link-graph-service-with-loco` aggregator, not this service. See
 [cross-service linking §4.1](../../../agents/share/cross-service-linking.md).
 
+### 9.2 Assessment endpoints
+
+Workforce assessments (domain model §5.5) are a **sub-resource of a
+worker**, so every request loads the worker first (`404` when unknown)
+and authorises at the *worker* level through the record-level ABAC guard
+(`authorize_record`) — reading a worker's psychometric profile is gated
+exactly like reading the worker, recording one like writing it. As
+everywhere in the family, this is a no-op while `WORKER_REQUIRE_AUTH` is
+off.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/workers/{id}/assessments` | record an administration (`201`) |
+| `GET` | `/api/workers/{id}/assessments` | list live assessments (`?category=&status=&valid_on=`) |
+| `GET` | `/api/workers/{id}/assessments/{assessment_id}` | fetch one |
+| `PUT` | `/api/workers/{id}/assessments/{assessment_id}` | update (status move, scoring, corrections) |
+| `DELETE` | `/api/workers/{id}/assessments/{assessment_id}` | withdraw (soft delete) |
+| `GET` | `/api/workers/{id}/assessment-profile` | the derived cross-category profile (`?as_of=`) |
+
+**Lookups are worker-scoped.** An `assessment_id` belonging to a
+different worker is a `404`, never a disclosure.
+
+**Update semantics.** Omitted fields are left untouched; an explicit
+`null` on `provider` / `notes` / `administered_by` / the dates *clears*
+the stored value. A `status` change must be legal for the stored status,
+and the **merged** record is re-validated before persisting — an update
+can never reach a state a create would have refused. An empty update is
+a `422`.
+
+**Profile (`assessment-profile`).** Per category: how many assessments
+are recorded, how many are current as of the date, the **current reading
+per scale** (the most recently administered current assessment that
+reports it), and which of the category's own scales have *no* current
+reading. Plus `selection_suitability` — the mean percentile of current
+selection results. Every figure is derived from real scores only: a
+missing score yields `null`, never an interpolated or zero value, and
+the payload carries a `derivation` string stating exactly how it was
+computed.
+
+**Sensitivity (§5.5).** Reads honour the ABAC `mask` obligation on
+**every** path — the single fetch, the list, and the profile: bands
+survive; raw scores, percentiles, narratives, operator notes, and the
+suitability mean do not (security invariant 5 — a bulk or aggregate read
+must never reveal more than the equivalent single read). Every
+assessment read and every mutation writes an audit row.
+
+Unknown `category` / `status` tokens (in a body or a filter) are `422`
+naming the closed vocabulary; validation failures return the full
+problem list (§5.5 invariants).
+
 
 > **2026-07-19 — stored review queue + decision endpoints.** The batch
 > scan now **persists** its candidate pairs in a `review_queue` table

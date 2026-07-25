@@ -190,6 +190,73 @@ Enum: `Male`, `Female`, `Other`, `Unknown`
 | addresses   | Vec\<Address\>      | Physical addresses       |
 | part_of     | Option\<Uuid\>      | Parent organization      |
 
+## Assessment
+
+Workforce assessment: one administration of one instrument to one worker.
+
+**File:** `src/models/assessment.rs`
+
+| Field           | Type                     | Description                                                     |
+| --------------- | ------------------------ | --------------------------------------------------------------- |
+| id              | Uuid                     | Assessment ID                                                    |
+| worker_id       | Uuid                     | The assessed worker                                              |
+| category        | AssessmentCategory       | Aptitude, Personality, Psychometric, Selection                   |
+| instrument      | String                   | The named test (required)                                        |
+| provider        | Option\<String\>         | Publisher / administering provider                               |
+| status          | AssessmentStatus         | Scheduled, InProgress, Completed, Expired, Cancelled             |
+| administered_on | Option\<NaiveDate\>      | When it was taken                                                |
+| expires_on      | Option\<NaiveDate\>      | When results stop counting as current                            |
+| administered_by | Option\<String\>         | Administering identity                                           |
+| notes           | Option\<String\>         | Operator notes (redacted under `mask`)                           |
+| results         | Vec\<AssessmentResult\>  | Per-scale outcomes                                               |
+| created_at / updated_at | DateTime\<Utc\>  | Timestamps                                                       |
+
+**Methods:**
+
+- `Assessment::new(worker_id, category, instrument) -> Self` — scheduled, fresh UUID
+- `Assessment::is_valid_on(date) -> bool` — completed and unexpired
+- `Assessment::mean_percentile() -> Option<f64>` — real scores only
+- `Assessment::masked() -> Self` — bands survive; scores / narratives / notes do not
+
+### AssessmentCategory → AssessmentScale
+
+| Category | Scales it owns |
+| --- | --- |
+| `aptitude` | `numerical_reasoning`, `verbal_reasoning`, `problem_solving`, `logical_thinking` |
+| `personality` | `work_style`, `team_compatibility`, `introversion_extraversion` |
+| `psychometric` | `behavioural_style`, `emotional_intelligence`, `cognitive_ability` |
+| `selection` | `job_simulation`, `skills_assessment`, `judgement_test` |
+
+`AssessmentCategory::permits(scale)` accepts a category's own scales —
+and, for `psychometric` only, every aptitude and personality scale too
+(a psychometric test covers both by definition). Anything else is a
+`422` from `validate_assessment`.
+
+### AssessmentResult
+
+**File:** `src/models/assessment.rs`
+
+| Field      | Type                 | Description                                  |
+| ---------- | -------------------- | -------------------------------------------- |
+| scale      | AssessmentScale      | The measured dimension                       |
+| raw_score  | Option\<f64\>        | As reported by the instrument                |
+| max_score  | Option\<f64\>        | Denominator for `raw_score`                  |
+| percentile | Option\<f64\>        | Norm-referenced, `[0, 100]`                  |
+| band       | Option\<ScoreBand\>  | Explicit band when the instrument reports one |
+| narrative  | Option\<String\>     | Free-text interpretation                     |
+
+`effective_band()` = the explicit `band`, else derived from
+`percentile`. `ScoreBand::from_percentile`: `low` < 10, `below_average`
+< 30, `average` < 70, `above_average` < 90, `high` ≥ 90.
+
+### AssessmentStatus lifecycle
+
+`scheduled → in_progress → completed → expired`; `cancelled` from any
+open state; `scheduled → completed` directly (a test recorded after the
+fact). `expired` / `cancelled` are terminal.
+`AssessmentStatus::can_transition_to` is the machine the update handler
+enforces.
+
 ## Database Models
 
 **File:** `src/db/models.rs`
@@ -207,4 +274,5 @@ SeaORM entity modules for PostgreSQL persistence:
 - `organization_contacts` — Organization contacts
 - `organization_identifiers` — Organization identifiers
 - `worker_match_scores` — Match score history
+- `worker_assessments` — Workforce assessments (per-scale results as JSONB)
 - `audit_log` — HIPAA-compliant audit trail

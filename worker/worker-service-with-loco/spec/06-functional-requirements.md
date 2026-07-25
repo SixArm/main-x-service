@@ -174,3 +174,48 @@ pinned by `tests/api_integration_test.rs::test_fhir_worker_route_is_mounted`
 asserts a FHIR `OperationOutcome`). Tracked in §13 T-9 (done
 2026-06-13).
 
+### 6.9 Assessments
+
+The service records and serves workforce **assessments** — aptitude,
+personality, psychometric, and selection tests (domain model §5.5,
+persistence §10.5, endpoints §9.2).
+
+**Categories.** Four, each with its own scales:
+
+- **Aptitude** — how a worker performs at tasks and reacts to
+  situations: numerical reasoning, verbal reasoning, problem-solving,
+  logical thinking.
+- **Personality** — behavioural style and working qualities: how they
+  work best, team compatibility, introversion/extraversion.
+- **Psychometric** — covers aptitude **and** personality: behavioural
+  styles, emotional intelligence, cognitive abilities.
+- **Selection** — used during hiring to evaluate suitability for a
+  role: job simulations, skills assessments, judgement tests.
+
+**Required behaviour.**
+
+1. Record an administration against a worker with its instrument,
+   provider, dates, and per-scale results; read, update, and withdraw
+   it (soft delete). Lookups are worker-scoped.
+2. Refuse a result whose scale is outside the assessment's category
+   (`422`) — psychometric is the one deliberate overlap, accepting
+   aptitude and personality scales as well as its own.
+3. Enforce the lifecycle `scheduled → in_progress → completed →
+   expired` (with `cancelled` from any open state, and a direct
+   `scheduled → completed` for a test recorded after the fact); refuse
+   an illegal move with a `422` naming the current state.
+4. Enforce the §5.5 invariants on create **and** on the merged record
+   of an update, returning the full problem list.
+5. Treat results as current only while the assessment is `completed`
+   and unexpired, and derive the per-worker profile — the current
+   reading per scale, what is **not** assessed, and the
+   selection-suitability mean — from real scores only, never
+   interpolated.
+6. Honour the ABAC `mask` obligation on every read path and audit every
+   assessment read and mutation (§6.6, §6.7).
+
+**Explicitly out of scope.** Assessments are not a matcher signal
+(§5.5); the service stores results, it does not administer or score
+tests, and it does not decide hiring outcomes — the suitability mean is
+a reported figure, not a recommendation.
+

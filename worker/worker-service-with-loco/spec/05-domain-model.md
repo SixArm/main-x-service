@@ -37,7 +37,8 @@ Material aspects:
 ### 5.2 Supporting types
 
 `Organization`, `MergeRequest` / `MergeResponse` / `MergeRecord`,
-`ReviewQueueItem`, `BatchDeduplicationRequest` / `Response`, `Consent`.
+`ReviewQueueItem`, `BatchDeduplicationRequest` / `Response`, `Consent`,
+`Assessment` (§5.5).
 
 ### 5.3 Invariants
 
@@ -86,3 +87,75 @@ property — it is the aggregator's view, since only the aggregator sees
 both endpoints. Withdrawing an edge is a soft delete that emits
 `unlinked`.
 
+### 5.5 `Assessment` — aptitude / personality / psychometric / selection
+
+A workforce **assessment** is one administration of one instrument (a
+named test) to one worker: `src/models/assessment.rs`, persisted in
+`worker_assessments` (§10.5), served under
+`/api/workers/{id}/assessments` (§9.2).
+
+**Categories and the scales they measure.** `AssessmentCategory` is the
+family of test; `AssessmentScale` is the dimension one result reports:
+
+| Category | Measures | Scales |
+|---|---|---|
+| `aptitude` | how a person performs at tasks and reacts to situations | `numerical_reasoning`, `verbal_reasoning`, `problem_solving`, `logical_thinking` |
+| `personality` | behavioural style and working qualities | `work_style`, `team_compatibility`, `introversion_extraversion` |
+| `psychometric` | **spans aptitude and personality** | `behavioural_style`, `emotional_intelligence`, `cognitive_ability` — **plus** every aptitude and personality scale |
+| `selection` | suitability for a role during hiring | `job_simulation`, `skills_assessment`, `judgement_test` |
+
+`AssessmentCategory::permits` is the rule: a category always accepts its
+own scales, and `psychometric` additionally accepts aptitude and
+personality scales (a psychometric test covers both by definition). A
+result on any other cross-category scale is a **`422`**, not a silently
+mis-filed row — the profile view (§9.2) is only honest if the category
+of a reading is trustworthy.
+
+**Record shape.** `id`, `worker_id`, `category`, `instrument` (required
+— results are uninterpretable without knowing which test produced
+them), optional `provider`, `status`, optional `administered_on` /
+`expires_on` / `administered_by` / `notes`, and
+`results: Vec<AssessmentResult>`.
+
+**`AssessmentResult`** carries `scale` plus every score field
+optionally: `raw_score`, `max_score`, `percentile` (`[0, 100]`), `band`,
+`narrative`. Instruments differ — some report a raw score out of a
+maximum, some a norm-referenced percentile, some only a qualitative
+profile with no score at all. `effective_band()` reads the explicit
+`band` and otherwise derives one from the percentile.
+
+**`ScoreBand`** is the coarse, shareable reading of a percentile, on the
+conventional norm-referenced split: `low` (< 10), `below_average`
+(< 30), `average` (< 70), `above_average` (< 90), `high` (≥ 90).
+
+**Lifecycle.** `scheduled → in_progress → completed → expired`, with
+`cancelled` reachable from any open state and a direct
+`scheduled → completed` for a test recorded after the fact. `expired`
+and `cancelled` are terminal. An illegal move is a `422` naming the
+current state.
+
+**Invariants.**
+
+- `instrument` is required and non-blank; every text field is
+  length-capped and `results` cardinality-capped (SEC-M1).
+- A scale appears at most once per assessment.
+- `percentile ∈ [0, 100]`; `max_score > 0`; `0 ≤ raw_score ≤ max_score`.
+- `expires_on` is not before `administered_on`.
+- A `completed` assessment carries an `administered_on` **and** at least
+  one result — otherwise "completed" would assert a scoring that never
+  happened.
+- Results count as **current** on a date iff the assessment is
+  `completed` and either has no expiry or has not passed it
+  (`Assessment::is_valid_on`).
+- Deletion is soft.
+
+**Sensitivity.** Assessment results are sensitive personal data — they
+profile cognition and behaviour. `Assessment::masked` is the redacted
+projection returned under the ABAC `mask` obligation: the scale and the
+interpreted band survive; raw scores, percentiles, narratives, and
+operator notes do not. It is applied on **every** read path (§9.2).
+
+> **Not a matcher signal.** Assessments are operational records about a
+> worker, never evidence that two records are the same worker. The
+> matching adapter MUST NEVER project `worker_assessments` into matcher
+> input — the same partition rule that governs `entity_links` (§5.1).

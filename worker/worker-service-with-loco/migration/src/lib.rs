@@ -23,6 +23,8 @@ mod m20260608_000001_add_worker_persistence_fields;
 mod m20260708_000001_create_event_outbox;
 mod m20260710_000001_create_entity_links;
 mod m20260719_000001_create_review_queue;
+mod m20260723_000001_create_worker_assessments;
+mod m20260723_000002_normalize_worker_gender_case;
 
 pub struct Migrator;
 
@@ -43,6 +45,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260708_000001_create_event_outbox::Migration),
             Box::new(m20260710_000001_create_entity_links::Migration),
             Box::new(m20260719_000001_create_review_queue::Migration),
+            Box::new(m20260723_000001_create_worker_assessments::Migration),
+            Box::new(m20260723_000002_normalize_worker_gender_case::Migration),
         ]
     }
 }

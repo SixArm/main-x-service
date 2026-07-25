@@ -45,6 +45,9 @@ The Worker Service is an identity-registry system that maintains a centralized r
 - ✅ Multiple names and addresses per worker
 - ✅ Contact information management
 - ✅ Automatic event publishing for all CRUD operations
+- ✅ Workforce assessments — aptitude, personality, psychometric, and
+  selection tests with per-scale results, score bands, expiry, and a
+  derived per-worker profile
 
 ### Worker matcher
 
@@ -99,6 +102,10 @@ The Worker Service is an identity-registry system that maintains a centralized r
   - `POST /api/workers/match` - Match worker records
   - `GET /api/workers/review-queue` - Stored dedup review queue (filter `status`, `limit`)
   - `POST /api/workers/review-queue/{id}/decision` - Decide a pending review item (`confirmed` / `rejected`)
+  - `POST /api/workers/{id}/assessments` - Record an assessment (aptitude / personality / psychometric / selection)
+  - `GET /api/workers/{id}/assessments` - List assessments (filter `category`, `status`, `valid_on`)
+  - `GET|PUT|DELETE /api/workers/{id}/assessments/{assessment_id}` - Fetch / update / withdraw one
+  - `GET /api/workers/{id}/assessment-profile` - Derived profile (current reading per scale, gaps, selection suitability)
   - `GET /api/workers/{id}/audit` - Get audit logs
   - `GET /api/audit/recent` - Recent audit activity
   - `GET /api/audit/user` - User audit logs
@@ -441,6 +448,12 @@ Configuration via environment variables or `.env` file:
 | `SERVER_PORT`              | HTTP server port             | 8080           | No       |
 | `SEARCH_INDEX_PATH`        | Tantivy index directory      | ./search_index | No       |
 | `MATCHING_THRESHOLD`       | Match score threshold        | 0.7            | No       |
+| `GRPC_PORT` | gRPC server port (Tonic stub) | 50051 | No |
+| `SEARCH_CACHE_SIZE_MB` | Tantivy cache budget in MB | 512 | No |
+| `OTLP_SERVICE_NAME` | service.name sent to the collector | worker-service | No |
+| `OTLP_ENDPOINT` | OTLP collector endpoint | http://localhost:4317 | No |
+| `STREAMING_BROKER_URL` | Event-broker connection URL | localhost:9003 | No |
+| `STREAMING_TOPIC` | Topic events publish to | worker-events | No |
 | `MATCHING_NAME_WEIGHT`     | Name matching weight         | 0.4            | No       |
 | `MATCHING_DOB_WEIGHT`      | DOB matching weight          | 0.3            | No       |
 | `MATCHING_GENDER_WEIGHT`   | Gender matching weight       | 0.1            | No       |

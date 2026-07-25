@@ -1313,13 +1313,11 @@ pub async fn review_decision(
     };
     let reviewed_by = caller.claims().map(|c| c.sub.clone());
     match crate::db::review_queue::decide(&state.db, id, token, reviewed_by.as_deref()).await {
-        Ok(crate::db::review_queue::DecideOutcome::Decided(row)) => {
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success(review_row_to_item(&row))),
-            )
-                .into_response()
-        }
+        Ok(crate::db::review_queue::DecideOutcome::Decided(row)) => (
+            StatusCode::OK,
+            Json(ApiResponse::success(review_row_to_item(&row))),
+        )
+            .into_response(),
         Ok(crate::db::review_queue::DecideOutcome::NotFound) => (
             StatusCode::NOT_FOUND,
             Json(ApiResponse::<crate::models::ReviewQueueItem>::error(
@@ -1346,7 +1344,6 @@ pub async fn review_decision(
             .into_response(),
     }
 }
-
 
 // ─── Data Export (GDPR Right of Access) ─────────────────────────────────────
 

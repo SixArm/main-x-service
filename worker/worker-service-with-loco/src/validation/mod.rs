@@ -16,6 +16,7 @@
 //! assert_eq!(normalize_phone("(555) 123-4567", "1"), "+15551234567");
 //! ```
 
+use crate::models::assessment::{Assessment, AssessmentScale, AssessmentStatus};
 use crate::models::{
     Address, ContactPoint, ContactPointSystem, EmergencyContact, HumanName, Identifier,
     IdentityDocument, Worker,
@@ -526,6 +527,155 @@ fn title_case(s: &str) -> String {
         .join(" ")
 }
 
+/// Validates a workforce [`Assessment`] and returns every problem found
+/// (empty vec means valid), mirroring [`validate_worker`]'s
+/// collect-them-all contract so the API can answer one complete `422`.
+///
+/// Rules:
+///
+/// - `instrument` is required (a nameless test cannot be interpreted)
+///   and every text field is length-capped (SEC-M1 input-size caps).
+/// - Each result's `scale` must be **permitted by the assessment's
+///   category** ([`AssessmentCategory::permits`]) — psychometric spans
+///   aptitude and personality; the other categories accept only their
+///   own scales. This is the rule that stops a mis-filed result from
+///   silently polluting the profile view.
+/// - A scale may appear at most once per assessment.
+/// - `percentile` is within `[0, 100]`; `raw_score` is non-negative and
+///   not above `max_score`; `max_score` is positive.
+/// - `expires_on` is not before `administered_on`.
+/// - A [`Completed`](crate::models::AssessmentStatus::Completed)
+///   assessment carries an `administered_on` date and at least one
+///   result — otherwise "completed" would assert a scoring that never
+///   happened.
+///
+/// # Examples
+///
+/// ```
+/// use worker_service::models::assessment::{
+///     Assessment, AssessmentCategory, AssessmentResult, AssessmentScale,
+/// };
+/// use worker_service::validation::validate_assessment;
+/// use uuid::Uuid;
+///
+/// let mut a = Assessment::new(Uuid::new_v4(), AssessmentCategory::Aptitude, "SHL Verify");
+/// a.results.push(AssessmentResult::percentile(AssessmentScale::NumericalReasoning, 80.0));
+/// assert!(validate_assessment(&a).is_empty());
+///
+/// // A personality scale does not belong on an aptitude assessment.
+/// a.results.push(AssessmentResult::percentile(AssessmentScale::WorkStyle, 50.0));
+/// assert_eq!(validate_assessment(&a).len(), 1);
+/// ```
+#[must_use]
+pub fn validate_assessment(assessment: &Assessment) -> Vec<ValidationError> {
+    let mut errors = Vec::new();
+
+    // Required: the instrument's name. Results are meaningless without
+    // knowing which test produced them.
+    if assessment.instrument.trim().is_empty() {
+        errors.push(ValidationError {
+            field: "instrument".into(),
+            message: "Instrument name is required".into(),
+        });
+    }
+    cap_text(&mut errors, "instrument", &assessment.instrument);
+    cap_opt_text(&mut errors, "provider", assessment.provider.as_ref());
+    cap_opt_text(
+        &mut errors,
+        "administered_by",
+        assessment.administered_by.as_ref(),
+    );
+    cap_opt_text(&mut errors, "notes", assessment.notes.as_ref());
+    cap_array(&mut errors, "results", assessment.results.len());
+
+    // Expiry cannot precede administration.
+    if let (Some(administered), Some(expires)) = (assessment.administered_on, assessment.expires_on)
+        && expires < administered
+    {
+        errors.push(ValidationError {
+            field: "expires_on".into(),
+            message: "Expiry date cannot be before the administration date".into(),
+        });
+    }
+
+    // A completed assessment must actually carry its scoring.
+    if assessment.status == AssessmentStatus::Completed {
+        if assessment.administered_on.is_none() {
+            errors.push(ValidationError {
+                field: "administered_on".into(),
+                message: "A completed assessment requires an administration date".into(),
+            });
+        }
+        if assessment.results.is_empty() {
+            errors.push(ValidationError {
+                field: "results".into(),
+                message: "A completed assessment requires at least one result".into(),
+            });
+        }
+    }
+
+    let mut seen: Vec<AssessmentScale> = Vec::new();
+    for (index, result) in assessment.results.iter().enumerate() {
+        // The scale must be in scope for this category.
+        if !assessment.category.permits(result.scale) {
+            errors.push(ValidationError {
+                field: format!("results[{index}].scale"),
+                message: format!(
+                    "Scale '{}' is not measured by a '{}' assessment",
+                    result.scale, assessment.category
+                ),
+            });
+        }
+        // One reading per scale.
+        if seen.contains(&result.scale) {
+            errors.push(ValidationError {
+                field: format!("results[{index}].scale"),
+                message: format!("Scale '{}' is reported more than once", result.scale),
+            });
+        } else {
+            seen.push(result.scale);
+        }
+        // Percentiles are norm-referenced: [0, 100].
+        if let Some(percentile) = result.percentile
+            && !(0.0..=100.0).contains(&percentile)
+        {
+            errors.push(ValidationError {
+                field: format!("results[{index}].percentile"),
+                message: "Percentile must be between 0 and 100".into(),
+            });
+        }
+        if let Some(max) = result.max_score
+            && max <= 0.0
+        {
+            errors.push(ValidationError {
+                field: format!("results[{index}].max_score"),
+                message: "Maximum score must be greater than zero".into(),
+            });
+        }
+        if let Some(raw) = result.raw_score {
+            if raw < 0.0 {
+                errors.push(ValidationError {
+                    field: format!("results[{index}].raw_score"),
+                    message: "Raw score cannot be negative".into(),
+                });
+            }
+            if let Some(max) = result.max_score
+                && raw > max
+            {
+                errors.push(ValidationError {
+                    field: format!("results[{index}].raw_score"),
+                    message: "Raw score cannot exceed the maximum score".into(),
+                });
+            }
+        }
+        if let Some(narrative) = &result.narrative {
+            cap_item(&mut errors, "results.narrative", index, narrative);
+        }
+    }
+
+    errors
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -945,6 +1095,167 @@ mod tests {
         assert!(
             errors.is_empty(),
             "A within-caps record should produce no errors, got {errors:?}"
+        );
+    }
+
+    // ─── Assessment validation ──────────────────────────────────────────────
+
+    use crate::models::assessment::{Assessment, AssessmentCategory, AssessmentResult};
+
+    /// A completed assessment with an in-scope, well-scored result is
+    /// valid.
+    #[test]
+    fn test_valid_assessment() {
+        let mut a = Assessment::new(
+            uuid::Uuid::new_v4(),
+            AssessmentCategory::Aptitude,
+            "SHL Verify G+",
+        );
+        a.status = AssessmentStatus::Completed;
+        a.administered_on = chrono::NaiveDate::from_ymd_opt(2026, 5, 4);
+        a.expires_on = chrono::NaiveDate::from_ymd_opt(2028, 5, 4);
+        a.results.push(AssessmentResult::percentile(
+            AssessmentScale::NumericalReasoning,
+            74.5,
+        ));
+        let errors = validate_assessment(&a);
+        assert!(
+            errors.is_empty(),
+            "expected a valid assessment, got {errors:?}"
+        );
+    }
+
+    /// A scale outside the category's scope is rejected, naming the
+    /// offending index — the rule that keeps the profile view honest.
+    #[test]
+    fn test_assessment_scale_must_suit_the_category() {
+        let mut a = Assessment::new(
+            uuid::Uuid::new_v4(),
+            AssessmentCategory::Personality,
+            "Big Five Inventory",
+        );
+        a.results.push(AssessmentResult::percentile(
+            AssessmentScale::NumericalReasoning,
+            50.0,
+        ));
+        let errors = validate_assessment(&a);
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].field, "results[0].scale");
+        assert!(errors[0].message.contains("numerical_reasoning"));
+
+        // The same result is fine on a psychometric assessment, which
+        // spans aptitude and personality.
+        let mut psycho = Assessment::new(
+            uuid::Uuid::new_v4(),
+            AssessmentCategory::Psychometric,
+            "Battery",
+        );
+        psycho.results.push(AssessmentResult::percentile(
+            AssessmentScale::NumericalReasoning,
+            50.0,
+        ));
+        assert!(validate_assessment(&psycho).is_empty());
+    }
+
+    /// Out-of-range percentiles, negative or over-maximum raw scores, a
+    /// non-positive maximum, and a repeated scale are each reported.
+    #[test]
+    fn test_assessment_score_rules() {
+        let mut a = Assessment::new(
+            uuid::Uuid::new_v4(),
+            AssessmentCategory::Selection,
+            "Assessment centre",
+        );
+        a.results.push(AssessmentResult {
+            scale: AssessmentScale::JobSimulation,
+            raw_score: Some(-1.0),
+            max_score: Some(0.0),
+            percentile: Some(101.0),
+            band: None,
+            narrative: None,
+        });
+        // The same scale twice.
+        a.results.push(AssessmentResult::percentile(
+            AssessmentScale::JobSimulation,
+            50.0,
+        ));
+        // Raw above the maximum.
+        a.results.push(AssessmentResult {
+            scale: AssessmentScale::SkillsAssessment,
+            raw_score: Some(12.0),
+            max_score: Some(10.0),
+            percentile: None,
+            band: None,
+            narrative: None,
+        });
+
+        let fields: Vec<String> = validate_assessment(&a)
+            .into_iter()
+            .map(|e| e.field)
+            .collect();
+        for expected in [
+            "results[0].percentile",
+            "results[0].max_score",
+            "results[0].raw_score",
+            "results[1].scale",
+            "results[2].raw_score",
+        ] {
+            assert!(
+                fields.iter().any(|f| f == expected),
+                "missing {expected} in {fields:?}"
+            );
+        }
+    }
+
+    /// A completed assessment must carry its administration date and at
+    /// least one result; an expiry cannot precede administration.
+    #[test]
+    fn test_assessment_completion_and_date_rules() {
+        let mut a = Assessment::new(
+            uuid::Uuid::new_v4(),
+            AssessmentCategory::Psychometric,
+            "Hogan HPI",
+        );
+        a.status = AssessmentStatus::Completed;
+        let errors = validate_assessment(&a);
+        assert!(errors.iter().any(|e| e.field == "administered_on"));
+        assert!(errors.iter().any(|e| e.field == "results"));
+
+        // A scheduled assessment with neither is fine — nothing is
+        // asserted about scoring yet.
+        a.status = AssessmentStatus::Scheduled;
+        assert!(validate_assessment(&a).is_empty());
+
+        // Expiry before administration is refused.
+        a.administered_on = chrono::NaiveDate::from_ymd_opt(2026, 5, 4);
+        a.expires_on = chrono::NaiveDate::from_ymd_opt(2026, 1, 1);
+        let errors = validate_assessment(&a);
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].field, "expires_on");
+    }
+
+    /// SEC-M1: assessment text fields and the result array are capped.
+    #[test]
+    fn test_assessment_caps() {
+        let mut a = Assessment::new(
+            uuid::Uuid::new_v4(),
+            AssessmentCategory::Aptitude,
+            "x".repeat(MAX_TEXT_LEN + 1),
+        );
+        a.notes = Some("n".repeat(MAX_TEXT_LEN + 1));
+        a.results =
+            vec![AssessmentResult::new(AssessmentScale::NumericalReasoning); MAX_ARRAY_LEN + 1];
+        let errors = validate_assessment(&a);
+        assert!(errors.iter().any(|e| e.field == "instrument"));
+        assert!(errors.iter().any(|e| e.field == "notes"));
+        assert!(errors.iter().any(|e| e.field == "results"));
+
+        // A blank instrument name is required, not merely capped.
+        let blank = Assessment::new(uuid::Uuid::new_v4(), AssessmentCategory::Aptitude, "   ");
+        assert!(
+            validate_assessment(&blank)
+                .iter()
+                .any(|e| e.field == "instrument" && e.message.contains("required"))
         );
     }
 }
