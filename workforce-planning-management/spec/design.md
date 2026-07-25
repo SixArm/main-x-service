@@ -174,3 +174,23 @@ honesty rules as every derived view apply: WPM-D16 terms on the
 average, recorded (not merely approved) time in the numerator — a
 safety signal must not wait for a manager's approval — and the
 derivation named in the payload.
+
+## WPM-D20 — Pulse responses are anonymous by construction, k-floored on read
+
+A pulse answer is only honest if it cannot come back to the author, so
+anonymity is structural, not procedural: the response row has **no
+author column** — not a nullable one, not a hash. A hashed author
+would be pseudonymous (linkable by anyone holding the table), and a
+"we promise not to look" column is not a control. Two consequences are
+accepted and stated rather than hidden: duplicate submissions cannot
+be prevented (the results view counts *responses*, never
+*respondents*, and its derivation says so), and the submission audit
+row carries **no actor** — the WPM-R16 audit invariant records that a
+submission happened, not who made it, because an actor-stamped row
+would silently defeat the whole design. On the read side a
+**k-anonymity floor (k = 5)** guards the small-cell attack: a
+department with fewer than 5 responses would make answers guessable by
+elimination, so the cell is marked suppressed and its statistics —
+including its response count — are withheld; the overall block obeys
+the same floor. The floor is a constant in the pure rules, not
+configuration: a deployment that could quietly set k = 1 has no floor.

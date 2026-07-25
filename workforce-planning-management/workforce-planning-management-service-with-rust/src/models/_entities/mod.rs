@@ -29,6 +29,8 @@ pub mod onboarding_items;
 pub mod path_enrollments;
 pub mod payroll_runs;
 pub mod payslips;
+pub mod pulse_responses;
+pub mod pulse_surveys;
 pub mod requisitions;
 pub mod review_cycles;
 pub mod reviews;

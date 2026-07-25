@@ -351,3 +351,132 @@ async fn benefits_awareness_round_trip() {
     })
     .await;
 }
+
+/// The anonymous pulse (WPM-R28): submission is validated and
+/// window-gated, the stored/served data carries no author (WPM-D20),
+/// and the k = 5 floor suppresses small cells — count withheld.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn pulse_round_trip() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let org = an_org();
+        // Five engineering employees (the k floor) + one in finance.
+        let mut engineers = Vec::new();
+        for n in 0..5 {
+            let pid = seed_employee(&request, &org, &format!("P-{n}"), None).await;
+            activate(&request, &pid).await;
+            engineers.push(pid);
+        }
+        let accountant = seed_employee(&request, &org, "P-9", None).await;
+        activate(&request, &accountant).await;
+        request
+            .put(&format!("/api/employees/{accountant}"))
+            .json(&json!({ "department": "finance" }))
+            .await
+            .assert_status_ok();
+
+        // A closed survey refuses submissions; an open one accepts.
+        let closed: Value = request
+            .post("/api/pulse-surveys")
+            .json(&json!({ "name": "Last quarter", "question": "How was Q2?",
+                           "active_until": "2026-06-30" }))
+            .await
+            .json();
+        let open: Value = request
+            .post("/api/pulse-surveys")
+            .json(&json!({ "name": "July pulse", "question": "How are you doing this week?" }))
+            .await
+            .json();
+        let closed_pid = closed["pid"].as_str().unwrap().to_string();
+        let open_pid = open["pid"].as_str().unwrap().to_string();
+        let listed: Value = request.get("/api/pulse-surveys").await.json();
+        let open_states: Vec<bool> = listed.as_array().unwrap().iter()
+            .filter_map(|s| s["open"].as_bool()).collect();
+        assert!(open_states.contains(&true) && open_states.contains(&false));
+        assert_eq!(
+            request
+                .post(&format!("/api/pulse-surveys/{closed_pid}/responses"))
+                .json(&json!({ "employee_pid": engineers[0], "score": 3 }))
+                .await
+                .status_code(),
+            422,
+            "a closed survey refuses"
+        );
+        assert_eq!(
+            request
+                .post(&format!("/api/pulse-surveys/{open_pid}/responses"))
+                .json(&json!({ "employee_pid": engineers[0], "score": 6 }))
+                .await
+                .status_code(),
+            422,
+            "score is 1-5"
+        );
+
+        // Four engineering responses: overall AND the cell stay
+        // suppressed — count withheld, not shown as a small number.
+        for (employee, score) in engineers.iter().take(4).zip([2, 3, 4, 5]) {
+            let response: Value = request
+                .post(&format!("/api/pulse-surveys/{open_pid}/responses"))
+                .json(&json!({ "employee_pid": employee, "score": score }))
+                .await
+                .json();
+            assert_eq!(response, json!({ "submitted": true }), "no handle returned");
+        }
+        let results: Value = request
+            .get(&format!("/api/pulse-surveys/{open_pid}/results"))
+            .await
+            .json();
+        assert_eq!(results["overall"]["suppressed"], true);
+        assert!(results["overall"]["count"].is_null(), "count withheld below the floor");
+        assert_eq!(results["departments"][0]["suppressed"], true);
+
+        // The fifth engineer reaches the floor; finance (1 response)
+        // stays suppressed while engineering discloses.
+        request
+            .post(&format!("/api/pulse-surveys/{open_pid}/responses"))
+            .json(&json!({ "employee_pid": engineers[4], "score": 1 }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/pulse-surveys/{open_pid}/responses"))
+            .json(&json!({ "employee_pid": accountant, "score": 5 }))
+            .await
+            .assert_status_ok();
+        let results: Value = request
+            .get(&format!("/api/pulse-surveys/{open_pid}/results"))
+            .await
+            .json();
+        let departments = results["departments"].as_array().unwrap();
+        let engineering = departments.iter().find(|d| d["department"] == "engineering").unwrap();
+        assert_eq!(engineering["suppressed"], false);
+        assert_eq!(engineering["count"], 5);
+        assert_eq!(engineering["distribution"], json!([1, 1, 1, 1, 1]));
+        assert_eq!(engineering["mean"], 3.0);
+        let finance = departments.iter().find(|d| d["department"] == "finance").unwrap();
+        assert_eq!(finance["suppressed"], true);
+        assert!(finance["count"].is_null(), "small cell withholds its count");
+        // 6 total responses ≥ k ⇒ the overall block discloses.
+        assert_eq!(results["overall"]["suppressed"], false);
+        assert_eq!(results["overall"]["count"], 6);
+
+        // No author anywhere: neither the results nor the audit trail
+        // links a response to an employee.
+        let raw = serde_json::to_string(&results).unwrap();
+        for employee in engineers.iter().chain([&accountant]) {
+            assert!(!raw.contains(employee.as_str()), "no employee pid in results");
+        }
+        let audits: Value = request.get("/api/audits/recent").await.json();
+        let submissions: Vec<&Value> = audits.as_array().unwrap().iter()
+            .filter(|a| a["entity"] == "pulse_response")
+            .collect();
+        assert!(!submissions.is_empty(), "submissions leave an audit trail");
+        for entry in submissions {
+            assert!(
+                entry["actor"].is_null(),
+                "a pulse submission's audit row is actor-less (WPM-D20)"
+            );
+        }
+    })
+    .await;
+}

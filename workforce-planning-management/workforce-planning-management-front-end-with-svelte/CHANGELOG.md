@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — wellbeing pulse (WPM-T27 / WPM-R28, 2026-07-25)
+
+- Employee profile: a pulse card listing open surveys with 1–5 score
+  buttons and an anonymous-thanks state. `/wellbeing`: k-floored
+  results blocks per survey (overall + per-department cells, the
+  suppressed state shown as "Hidden below 5 responses", derivation
+  line). 5 i18n keys × 13 locales (parity green).
+
 ### Added — working-time panel (WPM-T26 / WPM-R27, 2026-07-25)
 
 - `/workforce` gains a Working-time panel: flagged employees with the

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — anonymous wellbeing pulse (WPM-T27 / WPM-R28, 2026-07-25)
+
+- Surveys (`/api/pulse-surveys`: name, one question, active window)
+  and anonymous 1–5 responses. **Anonymous by construction**
+  (WPM-D20): the stored row is survey + department + score + date —
+  no author column exists; the submission audit row is actor-less; no
+  handle is returned to the submitter. Submitting is `$sub`-owned and
+  window-gated (`422` on a closed survey).
+- `GET /api/pulse-surveys/{pid}/results` — k-floored aggregate
+  (k = 5, a pure-rules constant): per-department + overall cells,
+  each suppressed (count withheld) or disclosed (count, distribution,
+  mean); counts are responses, never respondents, and the derivation
+  says so.
+
 ### Added — working-time guardrails (WPM-T26 / WPM-R27, 2026-07-25)
 
 - `GET /api/workforce/working-time?department=&as_of=` — advisory

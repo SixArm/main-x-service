@@ -6,16 +6,20 @@
   import {
     createWellbeingEntitlement,
     deleteWellbeingEntitlement,
+    listPulseSurveys,
     listWellbeingEntitlements,
+    pulseResults,
     wellbeingUptake,
     type WellbeingEntitlement,
   } from "$lib/api/wpm";
   import { t } from "$lib/i18n.svelte";
 
   type Uptake = Awaited<ReturnType<typeof wellbeingUptake>>;
+  type PulseResult = Awaited<ReturnType<typeof pulseResults>>;
 
   let rules = $state<WellbeingEntitlement[]>([]);
   let uptake = $state<Uptake | null>(null);
+  let pulse = $state<PulseResult[]>([]);
   let error = $state<string | null>(null);
   let actionError = $state<string | null>(null);
 
@@ -32,6 +36,8 @@
   async function load() {
     try {
       [rules, uptake] = await Promise.all([listWellbeingEntitlements(), wellbeingUptake()]);
+      const surveys = await listPulseSurveys();
+      pulse = await Promise.all(surveys.map((survey) => pulseResults(survey.pid)));
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
     }
@@ -85,6 +91,11 @@
     return value === "benefit" ? t("wb.kind.benefit") : t("wb.kind.health");
   }
 
+  function cell(value: PulseResult["overall"]): string {
+    if (value.suppressed) return t("wb.pulseSuppressed");
+    return `${t("wb.pulseMean")} ${value.mean?.toFixed(1)} · ${value.count} ${t("wb.pulseResponses")}`;
+  }
+
   function cohort(rule: WellbeingEntitlement): string {
     const parts: string[] = [];
     if (rule.min_age !== null || rule.max_age !== null)
@@ -131,6 +142,27 @@
       <p class="error" data-testid="action-error">{actionError}</p>
     {/if}
   </form>
+
+  {#if pulse.length}
+    <h2>{t("wb.pulse")}</h2>
+    {#each pulse as result (result.survey.pid)}
+      <div class="panel" data-testid="pulse-results">
+        <strong>{result.survey.name}</strong> — {result.survey.question}<br />
+        <span data-testid="pulse-overall">{cell(result.overall)}</span>
+        <table>
+          <tbody>
+            {#each result.departments as department (department.department)}
+              <tr>
+                <td>{department.department}</td>
+                <td>{cell(department)}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+        <p class="muted">{result.derivation}</p>
+      </div>
+    {/each}
+  {/if}
 
   {#if uptake}
     <h2>{t("wb.uptake")}</h2>

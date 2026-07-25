@@ -21,10 +21,12 @@ use uuid::Uuid;
 use super::{ensure_valid, record_rejection};
 use crate::auth::{self, MaybeAuthUser};
 use crate::models::_entities::{
-    benefit_enrollments, entitlement_acknowledgements, wellbeing_entitlements,
+    benefit_enrollments, entitlement_acknowledgements, pulse_responses, pulse_surveys,
+    wellbeing_entitlements,
 };
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
+use crate::rules::pulse;
 use crate::rules::wellbeing as rules;
 use crate::validation::Problems;
 
@@ -504,6 +506,197 @@ async fn uptake(State(ctx): State<AppContext>) -> Result<Response> {
     }))
 }
 
+// ─── Wellbeing pulse (anonymous, WPM-R28) ───────────────────────────────────
+
+/// `POST /api/pulse-surveys` body.
+#[derive(Debug, Deserialize)]
+struct SurveyPayload {
+    name: String,
+    question: String,
+    #[serde(default)]
+    active_from: Option<chrono::NaiveDate>,
+    #[serde(default)]
+    active_until: Option<chrono::NaiveDate>,
+}
+
+/// `POST /api/pulse-surveys` — open a pulse survey (HR configuration;
+/// audited normally — the survey is not sensitive, the answers are).
+#[debug_handler]
+async fn create_survey(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Json(payload): Json<SurveyPayload>,
+) -> Result<Response> {
+    let mut problems = Problems::new();
+    problems.require_text("name", &payload.name);
+    problems.cap_text("name", &payload.name);
+    problems.require_text("question", &payload.question);
+    problems.cap_text("question", &payload.question);
+    if let (Some(from), Some(until)) = (payload.active_from, payload.active_until)
+        && from > until
+    {
+        problems.push("active_from must not be after active_until");
+    }
+    ensure_valid(&problems.into_vec())?;
+    let row = pulse_surveys::ActiveModel {
+        pid: ActiveValue::set(Uuid::new_v4()),
+        name: ActiveValue::set(payload.name.clone()),
+        question: ActiveValue::set(payload.question.clone()),
+        active_from: ActiveValue::set(payload.active_from),
+        active_until: ActiveValue::set(payload.active_until),
+        deleted_at: ActiveValue::set(None),
+        ..Default::default()
+    }
+    .insert(&ctx.db)
+    .await?;
+    Audit::record(&ctx.db, "pulse_survey", row.pid, "created", caller.actor(), None).await?;
+    format::json(PidRef::of(row.pid))
+}
+
+/// `GET /api/pulse-surveys` — the surveys, with their open state.
+#[debug_handler]
+async fn list_surveys(State(ctx): State<AppContext>) -> Result<Response> {
+    let today = chrono::Utc::now().date_naive();
+    let rows = pulse_surveys::Entity::find()
+        .filter(pulse_surveys::Column::DeletedAt.is_null())
+        .order_by_asc(pulse_surveys::Column::Name)
+        .all(&ctx.db)
+        .await?;
+    let view: Vec<serde_json::Value> = rows
+        .iter()
+        .map(|survey| {
+            serde_json::json!({
+                "pid": survey.pid,
+                "name": survey.name,
+                "question": survey.question,
+                "active_from": survey.active_from,
+                "active_until": survey.active_until,
+                "open": pulse::survey_open(survey.active_from, survey.active_until, today),
+            })
+        })
+        .collect();
+    format::json(view)
+}
+
+/// `POST /api/pulse-surveys/{pid}/responses` body. The employee names
+/// themself so the department can be derived and ownership enforced —
+/// then the identity is dropped: the stored row has no author.
+#[derive(Debug, Deserialize)]
+struct PulseResponsePayload {
+    employee_pid: Uuid,
+    score: i32,
+}
+
+/// `POST /api/pulse-surveys/{pid}/responses` — submit one anonymous
+/// score. The row stores survey + department + score + date only
+/// (WPM-D20); the audit row records that a submission happened with
+/// **no actor**; the response body returns no handle to the row.
+#[debug_handler]
+async fn submit_response(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path(pid): Path<String>,
+    Json(payload): Json<PulseResponsePayload>,
+) -> Result<Response> {
+    let mut problems = Problems::new();
+    if !pulse::valid_score(payload.score) {
+        problems.push(format!(
+            "score must be between {} and {}",
+            pulse::SCORE_MIN,
+            pulse::SCORE_MAX
+        ));
+    }
+    ensure_valid(&problems.into_vec())?;
+    let survey = pulse_surveys::Entity::find()
+        .filter(pulse_surveys::Column::Pid.eq(records::parse_pid(&pid)?))
+        .filter(pulse_surveys::Column::DeletedAt.is_null())
+        .one(&ctx.db)
+        .await?
+        .ok_or(Error::NotFound)?;
+    let today = chrono::Utc::now().date_naive();
+    if !pulse::survey_open(survey.active_from, survey.active_until, today) {
+        return Err(super::unprocessable("this survey is not open"));
+    }
+    let employee = records::find_employee(&ctx.db, payload.employee_pid).await?;
+    auth::authorize_record(
+        &caller,
+        authentication_verifier::Action::Write,
+        &auth::employee_resource_attrs(&employee),
+    )
+    .map_err(record_rejection)?;
+    let row = pulse_responses::ActiveModel {
+        pid: ActiveValue::set(Uuid::new_v4()),
+        survey_pid: ActiveValue::set(survey.pid),
+        department: ActiveValue::set(employee.department.clone()),
+        score: ActiveValue::set(payload.score),
+        submitted_on: ActiveValue::set(today),
+        ..Default::default()
+    }
+    .insert(&ctx.db)
+    .await?;
+    // Deliberately actor-less (WPM-D20): the trail records that a
+    // submission happened, never who made it.
+    Audit::record(&ctx.db, "pulse_response", row.pid, "submitted", None, None).await?;
+    format::json(serde_json::json!({ "submitted": true }))
+}
+
+/// `GET /api/pulse-surveys/{pid}/results` — the k-floored aggregate
+/// (WPM-D20): per-department cells and the overall block, each either
+/// suppressed (below k = 5; count withheld too) or disclosed
+/// (count, 1–5 distribution, mean). Counts are *responses*, never
+/// *respondents* — no author link exists to dedupe on.
+#[debug_handler]
+async fn survey_results(
+    State(ctx): State<AppContext>,
+    Path(pid): Path<String>,
+) -> Result<Response> {
+    let survey = pulse_surveys::Entity::find()
+        .filter(pulse_surveys::Column::Pid.eq(records::parse_pid(&pid)?))
+        .filter(pulse_surveys::Column::DeletedAt.is_null())
+        .one(&ctx.db)
+        .await?
+        .ok_or(Error::NotFound)?;
+    let responses = pulse_responses::Entity::find()
+        .filter(pulse_responses::Column::SurveyPid.eq(survey.pid))
+        .all(&ctx.db)
+        .await?;
+    let mut by_department: std::collections::BTreeMap<&str, Vec<i32>> =
+        std::collections::BTreeMap::new();
+    for response in &responses {
+        by_department.entry(response.department.as_str()).or_default().push(response.score);
+    }
+    let cell_json = |cell: &pulse::Cell| match cell {
+        pulse::Cell::Suppressed => serde_json::json!({ "suppressed": true }),
+        pulse::Cell::Disclosed { count, distribution, mean } => serde_json::json!({
+            "suppressed": false,
+            "count": count,
+            "distribution": distribution,
+            "mean": mean,
+        }),
+    };
+    let departments: Vec<serde_json::Value> = by_department
+        .iter()
+        .map(|(department, scores)| {
+            let mut cell = cell_json(&pulse::aggregate_cell(scores));
+            cell["department"] = serde_json::json!(department);
+            cell
+        })
+        .collect();
+    let all_scores: Vec<i32> = responses.iter().map(|r| r.score).collect();
+    format::json(serde_json::json!({
+        "as_of": chrono::Utc::now(),
+        "survey": { "pid": survey.pid, "name": survey.name, "question": survey.question },
+        "overall": cell_json(&pulse::aggregate_cell(&all_scores)),
+        "departments": departments,
+        "derivation": format!(
+            "anonymous by construction — responses store no author, so counts are \
+             responses, not respondents; any cell (department or overall) with fewer \
+             than {} responses is suppressed, count withheld",
+            pulse::K_ANONYMITY
+        ),
+    }))
+}
+
 /// Find one live entitlement rule by pid, or 404.
 async fn find_entitlement(
     ctx: &AppContext,
@@ -528,4 +721,8 @@ pub fn routes() -> Routes {
         .add("/employees/{pid}/wellbeing-prompts", get(employee_prompts))
         .add("/employees/{pid}/wellbeing-acknowledgements", post(acknowledge))
         .add("/wellbeing/uptake", get(uptake))
+        .add("/pulse-surveys", post(create_survey))
+        .add("/pulse-surveys", get(list_surveys))
+        .add("/pulse-surveys/{pid}/responses", post(submit_response))
+        .add("/pulse-surveys/{pid}/results", get(survey_results))
 }

@@ -334,6 +334,27 @@ patterns.*
   entries): the flagged list names employees exactly as the rota does;
   no salary-grade masking applies and no new persona is introduced.
 
+## WPM-R28 — Wellbeing pulse (anonymous)
+
+*As an HR lead I can run a periodic anonymous pulse so the
+organisation hears how people are doing without anyone's answer being
+attributable.*
+
+- A pulse survey has a name, one question, and an active window; an
+  eligible employee submits one score on a closed 1–5 scale.
+- **Anonymous by construction** ([design.md](design.md) WPM-D20): the
+  stored response carries the survey, the employee's *department*, the
+  score, and the date — **no author column exists**, and the
+  submission's audit row records no actor. Because no author link is
+  stored, duplicate submissions are technically possible; the results
+  view therefore counts *responses*, never *respondents*, and says so.
+- Results are aggregate-only with a **k-anonymity floor of 5**: a
+  department cell with fewer than 5 responses is suppressed (marked,
+  its statistics withheld), and the overall block is suppressed below
+  the same floor. Means carry WPM-D16 terms (`null`, never `0`).
+- Submitting requires the caller to be the employee (`$sub` ownership
+  when enforcement is on); a survey outside its window refuses `422`.
+
 ## WPM-R17 — Family fixtures
 
 - OpenAPI + Swagger, `Accepts-version` negotiation, `/metrics.prom`,

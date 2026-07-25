@@ -79,6 +79,8 @@ describe("api path map", () => {
     await wpm.employeeWellbeingPrompts("p1");
     await wpm.wellbeingUptake();
     await wpm.workingTime("engineering");
+    await wpm.listPulseSurveys();
+    await wpm.pulseResults("s1");
     expect(calls).toEqual([
       "/api/proxy/employees?department=engineering",
       "/api/proxy/employees/p1",
@@ -97,6 +99,8 @@ describe("api path map", () => {
       "/api/proxy/employees/p1/wellbeing-prompts",
       "/api/proxy/wellbeing/uptake",
       "/api/proxy/workforce/working-time?department=engineering",
+      "/api/proxy/pulse-surveys",
+      "/api/proxy/pulse-surveys/s1/results",
     ]);
     vi.unstubAllGlobals();
   });

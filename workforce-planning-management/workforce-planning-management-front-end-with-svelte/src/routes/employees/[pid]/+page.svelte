@@ -10,9 +10,12 @@
     listEntitlements,
     listLeaveRequests,
     listOnboarding,
+    listPulseSurveys,
     listReviews,
     listTraining,
     money,
+    submitPulse,
+    type PulseSurvey,
     type WellbeingPrompt,
   } from "$lib/api/wpm";
   import { i18n, t } from "$lib/i18n.svelte";
@@ -34,6 +37,8 @@
   let reviews = $state<Review[]>([]);
   let training = $state<TrainingEnrollment[]>([]);
   let wellbeing = $state<WellbeingPrompt[]>([]);
+  let pulseSurveys = $state<PulseSurvey[]>([]);
+  let pulseThanks = $state<Set<string>>(new Set());
   let error = $state<string | null>(null);
   let actionError = $state<string | null>(null);
 
@@ -53,6 +58,7 @@
         employeeWellbeingPrompts(pid),
       ]);
       wellbeing = prompts.prompts;
+      pulseSurveys = (await listPulseSurveys()).filter((s) => s.open);
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
     }
@@ -90,6 +96,16 @@
     try {
       await acknowledgeWellbeing(pid, entitlementPid, response);
       await load();
+    } catch (cause) {
+      actionError = cause instanceof Error ? cause.message : String(cause);
+    }
+  }
+
+  async function sendPulse(surveyPid: string, score: number) {
+    actionError = null;
+    try {
+      await submitPulse(surveyPid, pid, score);
+      pulseThanks = new Set([...pulseThanks, surveyPid]);
     } catch (cause) {
       actionError = cause instanceof Error ? cause.message : String(cause);
     }
@@ -142,6 +158,25 @@
           <button onclick={() => void respond(prompt.entitlement_pid, "done")}>{t("wb.done")}</button>
           <button onclick={() => void respond(prompt.entitlement_pid, "declined")}>{t("wb.declined")}</button>
           <button onclick={() => void respond(prompt.entitlement_pid, "dismissed")}>{t("wb.dismissed")}</button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+
+  {#if pulseSurveys.length}
+    <h2>{t("wb.pulse")}</h2>
+    <ul class="panel" data-testid="pulse-surveys">
+      {#each pulseSurveys as survey (survey.pid)}
+        <li>
+          <strong>{survey.name}</strong><br />
+          {survey.question}<br />
+          {#if pulseThanks.has(survey.pid)}
+            <span class="muted">{t("wb.pulseThanks")}</span>
+          {:else}
+            {#each [1, 2, 3, 4, 5] as score (score)}
+              <button onclick={() => void sendPulse(survey.pid, score)}>{score}</button>
+            {/each}
+          {/if}
         </li>
       {/each}
     </ul>

@@ -25,6 +25,8 @@ pub use super::leave_requests::Entity as LeaveRequests;
 pub use super::onboarding_items::Entity as OnboardingItems;
 pub use super::payroll_runs::Entity as PayrollRuns;
 pub use super::payslips::Entity as Payslips;
+pub use super::pulse_responses::Entity as PulseResponses;
+pub use super::pulse_surveys::Entity as PulseSurveys;
 pub use super::requisitions::Entity as Requisitions;
 pub use super::review_cycles::Entity as ReviewCycles;
 pub use super::reviews::Entity as Reviews;

@@ -398,6 +398,55 @@ export function acknowledgeWellbeing(
   });
 }
 
+/** One anonymous pulse survey. */
+export interface PulseSurvey {
+  pid: string;
+  name: string;
+  question: string;
+  active_from: string | null;
+  active_until: string | null;
+  open: boolean;
+}
+
+/** One k-floored result cell: suppressed, or disclosed with stats. */
+export interface PulseCell {
+  suppressed: boolean;
+  count?: number;
+  distribution?: number[];
+  mean?: number;
+}
+
+/** The pulse surveys with their open state. */
+export function listPulseSurveys(init?: FetchLike): Promise<PulseSurvey[]> {
+  return api("/pulse-surveys", init);
+}
+
+/** Submit one anonymous 1–5 score (no handle comes back). */
+export function submitPulse(
+  surveyPid: string,
+  employeePid: string,
+  score: number,
+): Promise<{ submitted: boolean }> {
+  return api(`/pulse-surveys/${surveyPid}/responses`, {
+    method: "POST",
+    body: { employee_pid: employeePid, score },
+  });
+}
+
+/** The k-floored aggregate results for one survey. */
+export function pulseResults(
+  surveyPid: string,
+  init?: FetchLike,
+): Promise<{
+  as_of: string;
+  survey: { pid: string; name: string; question: string };
+  overall: PulseCell;
+  departments: Array<PulseCell & { department: string }>;
+  derivation: string;
+}> {
+  return api(`/pulse-surveys/${surveyPid}/results`, init);
+}
+
 /** HR aggregate uptake: counts only, no individuals. */
 export function wellbeingUptake(init?: FetchLike): Promise<{
   as_of: string;

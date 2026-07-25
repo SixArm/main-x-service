@@ -289,3 +289,28 @@ code + tests in one PR.
       unflagged, department scoping) — full `--ignored` suite 14/14
       vs Postgres 18 (120 unit); clippy pedantic clean; svelte-check
       0; vitest 10; Playwright 8. (WPM-D16, WPM-D19; WPM-R27)
+
+- [x] WPM-T27 (2026-07-25) **Anonymous wellbeing pulse.** Migration
+      `m20260725_000013_pulse` (`pulse_surveys` + `pulse_responses` —
+      the response row has **no author column**, by design).
+      `rules/pulse.rs` (pure): the 1–5 scale, the inclusive survey
+      window, and the k-floored aggregation (`K_ANONYMITY = 5`, a
+      constant not configuration; a suppressed cell withholds its
+      count; clamped, panic-free). Endpoints: survey create/list,
+      `POST /api/pulse-surveys/{pid}/responses` ($sub-owned submit;
+      identity used to derive the department and enforce ownership,
+      then dropped; **actor-less** audit row; no handle returned;
+      window-gated `422`), and `GET …/results` (per-department +
+      overall cells, suppressed or disclosed with count/distribution/
+      mean; derivation states counts are responses, not respondents —
+      new WPM-D20). Front-end: pulse submit card (1–5 + thanks state)
+      on the profile, k-floored results blocks on `/wellbeing`;
+      5 i18n keys × 13 locales. **Acceptance:** 4 pure pins (scale,
+      window, k-floor incl. count-withholding, bad-row clamping) +
+      the DB-gated `pulse_round_trip` (closed-survey 422, bad-score
+      422, 4-response suppression, 5th response discloses, small
+      finance cell stays suppressed with count withheld, no employee
+      pid anywhere in results, actor-less audit rows) — full
+      `--ignored` suite 15/15 vs Postgres 18 (124 unit); clippy
+      pedantic clean; svelte-check 0; vitest 10; Playwright 8.
+      (WPM-D16, WPM-D20; WPM-R28)

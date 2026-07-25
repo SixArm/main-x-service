@@ -259,6 +259,29 @@ test("wellbeing area renders rules and aggregate-only uptake", async ({ page }) 
       },
     }),
   );
+  await page.route("**/api/proxy/pulse-surveys", (route) =>
+    route.fulfill({
+      json: [{
+        pid: "s1", name: "July pulse", question: "How are you doing this week?",
+        active_from: null, active_until: null, open: true,
+      }],
+    }),
+  );
+  await page.route("**/api/proxy/pulse-surveys/s1/results", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-25T00:00:00Z",
+        survey: { pid: "s1", name: "July pulse", question: "How are you doing this week?" },
+        overall: { suppressed: false, count: 6, distribution: [1, 1, 1, 1, 2], mean: 3.5 },
+        departments: [
+          { department: "engineering", suppressed: false, count: 5,
+            distribution: [1, 1, 1, 1, 1], mean: 3.0 },
+          { department: "finance", suppressed: true },
+        ],
+        derivation: "anonymous by construction; cells under 5 responses are suppressed",
+      },
+    }),
+  );
   await page.goto("/wellbeing");
   await expect(page.getByTestId("wellbeing-rules").getByText("Seasonal flu vaccination")).toBeVisible();
   await expect(page.getByTestId("wellbeing-rules").getByText("engineering")).toBeVisible();
@@ -267,4 +290,6 @@ test("wellbeing area renders rules and aggregate-only uptake", async ({ page }) 
   await expect(page.getByTestId("wellbeing-uptake").getByText("80% (4/5)")).toBeVisible();
   await expect(page.getByTestId("wellbeing-uptake").getByText(/Enrolled after prompt/)).toBeVisible();
   await expect(page.getByTestId("wellbeing-uptake").getByText(/50% \(2\/4\)/).first()).toBeVisible();
+  await expect(page.getByTestId("pulse-overall")).toContainText("3.5");
+  await expect(page.getByTestId("pulse-results").getByText("Hidden below 5 responses")).toBeVisible();
 });

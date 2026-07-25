@@ -12,6 +12,7 @@ pub mod lifecycle;
 pub mod org;
 pub mod payroll;
 pub mod talent;
+pub mod pulse;
 pub mod tokens;
 pub mod wellbeing;
 pub mod workforce;

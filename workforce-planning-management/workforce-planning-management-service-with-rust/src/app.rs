@@ -125,6 +125,8 @@ impl Hooks for App {
         truncate_table(&ctx.db, AuditLogs).await?;
         truncate_table(&ctx.db, EntitlementAcknowledgements).await?;
         truncate_table(&ctx.db, WellbeingEntitlements).await?;
+        truncate_table(&ctx.db, PulseResponses).await?;
+        truncate_table(&ctx.db, PulseSurveys).await?;
         truncate_table(&ctx.db, ProgramPlacements).await?;
         truncate_table(&ctx.db, EarlyCareerPrograms).await?;
         truncate_table(&ctx.db, PipelineMembers).await?;
