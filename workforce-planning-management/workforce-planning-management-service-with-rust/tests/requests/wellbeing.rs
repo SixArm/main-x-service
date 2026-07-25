@@ -302,6 +302,52 @@ async fn benefits_awareness_round_trip() {
         assert_eq!(row["kind"], "benefit");
         assert_eq!(row["uptake_rate"]["denominator"], 0);
         assert!(row["uptake_rate"]["value"].is_null(), "no acknowledgements ⇒ null, not 0");
+        assert_eq!(
+            row["enrolment_conversion"]["denominator"], 0,
+            "plan-linked rule carries conversion terms"
+        );
+        assert!(row["enrolment_conversion"]["value"].is_null(), "null, not 0");
+
+        // ── Enrolment conversion: of the acknowledgers, how many are
+        // now live-enrolled in the linked plan. The enrolled employee
+        // acknowledges `done`; a second employee dismisses and does
+        // not enrol ⇒ 1/2. A health rule carries no conversion.
+        let second = seed_employee(&request, &org, "B-2", None).await;
+        activate(&request, &second).await;
+        request
+            .post(&format!("/api/employees/{employee}/wellbeing-acknowledgements"))
+            .json(&json!({ "entitlement_pid": rule_pid, "response": "done" }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/employees/{second}/wellbeing-acknowledgements"))
+            .json(&json!({ "entitlement_pid": rule_pid, "response": "dismissed" }))
+            .await
+            .assert_status_ok();
+        let health: Value = request
+            .post("/api/wellbeing-entitlements")
+            .json(&json!({ "name": "Flu", "description": "x" }))
+            .await
+            .json();
+        let uptake: Value = request.get("/api/wellbeing/uptake").await.json();
+        let rows = uptake["entitlements"].as_array().unwrap();
+        let row = rows
+            .iter()
+            .find(|r| r["entitlement_pid"] == rule_pid.as_str())
+            .expect("uptake row");
+        assert_eq!(row["enrolment_conversion"]["numerator"], 1);
+        assert_eq!(row["enrolment_conversion"]["denominator"], 2);
+        assert_eq!(row["enrolment_conversion"]["value"], 0.5);
+        let health_row = rows
+            .iter()
+            .find(|r| r["entitlement_pid"] == health["pid"])
+            .expect("health row");
+        assert!(
+            health_row["enrolment_conversion"].is_null(),
+            "no linked plan ⇒ no conversion"
+        );
+        let raw = serde_json::to_string(&uptake).unwrap();
+        assert!(!raw.contains(&second), "still no employee pid in the aggregate view");
     })
     .await;
 }

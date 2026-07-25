@@ -249,6 +249,12 @@ test("wellbeing area renders rules and aggregate-only uptake", async ({ page }) 
           entitlement_pid: "w1", name: "Seasonal flu vaccination", kind: "health",
           by_response: { booked: 3, done: 1, declined: 1, dismissed: 0 },
           uptake_rate: { numerator: 4, denominator: 5, value: 0.8 },
+          enrolment_conversion: null,
+        }, {
+          entitlement_pid: "w2", name: "Cycle-to-work scheme", kind: "benefit",
+          by_response: { booked: 0, done: 2, declined: 0, dismissed: 2 },
+          uptake_rate: { numerator: 2, denominator: 4, value: 0.5 },
+          enrolment_conversion: { numerator: 2, denominator: 4, value: 0.5 },
         }],
       },
     }),
@@ -259,4 +265,6 @@ test("wellbeing area renders rules and aggregate-only uptake", async ({ page }) 
   await expect(page.getByTestId("wellbeing-rules").getByText("Cycle-to-work scheme")).toBeVisible();
   await expect(page.getByTestId("wellbeing-rules").getByText("Benefit")).toBeVisible();
   await expect(page.getByTestId("wellbeing-uptake").getByText("80% (4/5)")).toBeVisible();
+  await expect(page.getByTestId("wellbeing-uptake").getByText(/Enrolled after prompt/)).toBeVisible();
+  await expect(page.getByTestId("wellbeing-uptake").getByText(/50% \(2\/4\)/).first()).toBeVisible();
 });

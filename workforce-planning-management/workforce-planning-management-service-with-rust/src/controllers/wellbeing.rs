@@ -420,9 +420,12 @@ async fn acknowledge(
 
 /// `GET /api/wellbeing/uptake` — HR's view is **aggregate counts
 /// only** (WPM-R25): per entitlement, the acknowledgement counts by
-/// response and the uptake rate with its terms (WPM-D16). No employee
-/// appears in the payload, and there is deliberately no per-manager or
-/// per-employee variant of this view.
+/// response and the uptake rate with its terms (WPM-D16). A
+/// plan-linked rule additionally reports **enrolment conversion** —
+/// of the distinct employees who acknowledged, how many now hold a
+/// live enrolment in the linked plan (derived per request, never
+/// stored; WPM-D18). No employee appears in the payload, and there is
+/// deliberately no per-manager or per-employee variant of this view.
 #[debug_handler]
 async fn uptake(State(ctx): State<AppContext>) -> Result<Response> {
     let entitlements = wellbeing_entitlements::Entity::find()
@@ -431,16 +434,45 @@ async fn uptake(State(ctx): State<AppContext>) -> Result<Response> {
         .all(&ctx.db)
         .await?;
     let acks = entitlement_acknowledgements::Entity::find().all(&ctx.db).await?;
+    let today = chrono::Utc::now().date_naive();
+    // Live (plan, employee) enrolment pairs, for the conversion terms.
+    let live_enrollments: std::collections::HashSet<(Uuid, Uuid)> =
+        benefit_enrollments::Entity::find()
+            .filter(benefit_enrollments::Column::DeletedAt.is_null())
+            .all(&ctx.db)
+            .await?
+            .into_iter()
+            .filter(|enrollment| enrollment.ends_on.is_none_or(|end| end >= today))
+            .map(|enrollment| (enrollment.plan_pid, enrollment.employee_pid))
+            .collect();
     let view: Vec<serde_json::Value> = entitlements
         .iter()
         .map(|entitlement| {
             let mut by_response: std::collections::BTreeMap<&str, usize> =
                 rules::RESPONSES.iter().map(|r| (*r, 0)).collect();
+            let mut acknowledgers: std::collections::HashSet<Uuid> =
+                std::collections::HashSet::new();
             for ack in acks.iter().filter(|a| a.entitlement_pid == entitlement.pid) {
                 if let Some(count) = by_response.get_mut(ack.response.as_str()) {
                     *count += 1;
                 }
+                acknowledgers.insert(ack.employee_pid);
             }
+            #[allow(clippy::cast_precision_loss)] // display ratio
+            let conversion = entitlement.benefit_plan_pid.map(|plan| {
+                let enrolled = acknowledgers
+                    .iter()
+                    .filter(|employee| live_enrollments.contains(&(plan, **employee)))
+                    .count();
+                let value = if acknowledgers.is_empty() {
+                    serde_json::Value::Null
+                } else {
+                    serde_json::json!(enrolled as f64 / acknowledgers.len() as f64)
+                };
+                serde_json::json!({
+                    "numerator": enrolled, "denominator": acknowledgers.len(), "value": value,
+                })
+            });
             let uptaken = by_response["booked"] + by_response["done"];
             let responded: usize = by_response.values().sum();
             #[allow(clippy::cast_precision_loss)] // display ratio
@@ -457,12 +489,15 @@ async fn uptake(State(ctx): State<AppContext>) -> Result<Response> {
                 "uptake_rate": {
                     "numerator": uptaken, "denominator": responded, "value": value,
                 },
+                "enrolment_conversion": conversion,
             })
         })
         .collect();
     format::json(serde_json::json!({
         "as_of": chrono::Utc::now(),
-        "derivation": "uptake = (booked + done) / all acknowledgements; counts only — \
+        "derivation": "uptake = (booked + done) / all acknowledgements; enrolment \
+                       conversion (plan-linked rules) = acknowledgers now live-enrolled \
+                       in the linked plan / distinct acknowledgers; counts only — \
                        responses are self-reported workflow facts, not clinical records, \
                        and no individual appears in this view",
         "entitlements": view,

@@ -150,6 +150,14 @@
                 ? "—"
                 : `${Math.round(row.uptake_rate.value * 100)}% (${row.uptake_rate.numerator}/${row.uptake_rate.denominator})`}
             </td>
+            <td>
+              {#if row.enrolment_conversion}
+                {t("wb.conversion")}:
+                {row.enrolment_conversion.value === null
+                  ? "—"
+                  : `${Math.round(row.enrolment_conversion.value * 100)}% (${row.enrolment_conversion.numerator}/${row.enrolment_conversion.denominator})`}
+              {/if}
+            </td>
           </tr>
         {/each}
       </tbody>

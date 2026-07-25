@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — enrolment conversion on the uptake table (WPM-T25 / WPM-R26, 2026-07-25)
+
+- The `/wellbeing` uptake table shows "Enrolled after prompt" for
+  plan-linked rules (rate with its terms; em dash when nobody has
+  acknowledged). 1 i18n key × 13 locales (parity green).
+
 ### Added — benefits awareness (WPM-T24 / WPM-R26, 2026-07-25)
 
 - The wellbeing engine now signposts benefits too: rule kind

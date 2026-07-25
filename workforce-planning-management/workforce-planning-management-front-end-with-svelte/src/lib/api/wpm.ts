@@ -378,8 +378,14 @@ export function wellbeingUptake(init?: FetchLike): Promise<{
   entitlements: Array<{
     entitlement_pid: string;
     name: string;
+    kind: "health" | "benefit";
     by_response: Record<string, number>;
     uptake_rate: { numerator: number; denominator: number; value: number | null };
+    enrolment_conversion: {
+      numerator: number;
+      denominator: number;
+      value: number | null;
+    } | null;
   }>;
 }> {
   return api("/wellbeing/uptake", init);

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — enrolment conversion in the uptake view (WPM-T25 / WPM-R26, 2026-07-25)
+
+- `GET /api/wellbeing/uptake` rows for plan-linked rules gain
+  `enrolment_conversion`: distinct acknowledgers now live-enrolled in
+  the linked plan / distinct acknowledgers, with WPM-D16 terms
+  (`null`, never `0`); `null` for rules with no linked plan; derived
+  per request, never stored (WPM-D18); still aggregate-only.
+
 ### Added — benefits-awareness engine (WPM-T24 / WPM-R26, 2026-07-25)
 
 - `wellbeing_entitlements` generalises with a closed `kind`

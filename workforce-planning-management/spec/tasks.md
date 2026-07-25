@@ -254,3 +254,18 @@ code + tests in one PR.
       `--ignored` suite 13/13 vs Postgres 18 (117 unit); clippy
       pedantic clean; svelte-check 0; vitest 10; Playwright 8.
       (WPM-D16, WPM-D17, WPM-D18; WPM-R26)
+
+- [x] WPM-T25 (2026-07-25) **Enrolment conversion in the uptake view.**
+      For a plan-linked rule, `GET /api/wellbeing/uptake` also reports
+      `enrolment_conversion` — of the **distinct** employees who
+      acknowledged the prompt, how many now hold a live enrolment in
+      the linked plan — WPM-D16 terms (`null`, never `0`, with nobody
+      acknowledged), derived per request from `benefit_enrollments`
+      and never stored (WPM-D18); `null` for a rule with no linked
+      plan; the derivation string names both formulas. Front-end: a
+      conversion cell on the `/wellbeing` uptake table, 1 i18n key ×
+      13 locales. **Acceptance:** DB-gated pins (1/2 conversion after
+      one acknowledger enrols, health-rule `null`, empty-denominator
+      `null`, still no employee pid in the payload) — full suite
+      13/13 vs Postgres 18; clippy pedantic clean; svelte-check 0;
+      vitest 10; Playwright 8. (WPM-D16, WPM-D18; WPM-R26)

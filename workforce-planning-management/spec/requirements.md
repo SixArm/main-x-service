@@ -306,6 +306,11 @@ already have.*
   `benefit_enrollments`, never stored ([design.md](design.md)
   WPM-D18). WPM signposts; enrolment remains the WPM-R9 act.
 - The rule list filters by `?kind=`; the uptake view carries the kind.
+- For a plan-linked rule the uptake view also reports **enrolment
+  conversion** — of the distinct employees who acknowledged the
+  prompt, how many now hold a live enrolment in the linked plan —
+  aggregate counts only with WPM-D16 terms (`null`, never `0`, when
+  nobody has acknowledged), derived per request, never stored.
 
 ## WPM-R17 — Family fixtures
 
