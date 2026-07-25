@@ -22,6 +22,10 @@
 
 pub mod app;
 pub mod auth;
+/// Regulatory-compliance controls: the tamper-evident audit chain and
+/// read/disclosure auditing, adopted from the care-pathway reference
+/// implementation (`spec/compliance` §8.5 step 3).
+pub mod compliance;
 pub mod controllers;
 pub mod data;
 /// HL7 FHIR R5 interop — the `Task` resource mapping (best-effort) over

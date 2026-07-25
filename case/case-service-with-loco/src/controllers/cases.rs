@@ -12,6 +12,7 @@ use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::{AuthUser, MaybeAuthUser};
+use crate::compliance::disclosure::{self, AccessContext};
 use crate::merge::merge_cases;
 use crate::metrics::Metrics;
 use crate::models::audit_logs::Model as AuditModel;
@@ -212,6 +213,7 @@ async fn get_one(
     Path(pid): Path<String>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> Result<Response> {
     let model = CaseModel::find_by_pid(&ctx.db, &pid)
         .await
@@ -223,6 +225,18 @@ async fn get_one(
         &crate::auth::case_resource_attrs(&case),
     )
     .map_err(record_rejection)?;
+    // Audited only once authorization has allowed the read: a denied
+    // request disclosed nothing, and recording it would pollute the
+    // §164.528 accounting with accesses that never happened.
+    disclosure::record_access(
+        &ctx.db,
+        model.pid,
+        disclosure::action::READ,
+        caller.actor(),
+        &access,
+    )
+    .await
+    .map_err(audit_unavailable)?;
     // mask-on-allow: honour a `mask` obligation by redacting the record.
     if obligations.iter().any(|o| o == "mask") {
         format::json(mask_case(&case))
@@ -310,8 +324,24 @@ async fn remove(
 ///
 /// A DB error when the query fails.
 #[debug_handler]
-async fn list(State(ctx): State<AppContext>, caller: MaybeAuthUser) -> Result<Response> {
+async fn list(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
+) -> Result<Response> {
     let rows = CaseModel::list(&ctx.db, 100).await?;
+    // A collection read is recorded against the nil `pid`: it disclosed
+    // many records, not one, so attributing it to any single case would
+    // corrupt that case's §164.528 accounting.
+    disclosure::record_access(
+        &ctx.db,
+        uuid::Uuid::nil(),
+        disclosure::action::LIST,
+        caller.actor(),
+        &access,
+    )
+    .await
+    .map_err(audit_unavailable)?;
     // SEC-G3: drop rows the caller may not read, so the list never leaks the
     // existence (pid + title) of a concealed case. No-op when enforcement off.
     let refs: Vec<CaseRef> = rows
@@ -340,12 +370,22 @@ async fn search(
     axum::extract::Query(params): axum::extract::Query<SearchParams>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> Result<Response> {
     let q = params.q.unwrap_or_default();
     if q.trim().is_empty() {
         return bad_request("query parameter `q` is required");
     }
     let rows = CaseModel::search(&ctx.db, q.trim(), 50).await?;
+    disclosure::record_access(
+        &ctx.db,
+        uuid::Uuid::nil(),
+        disclosure::action::SEARCH,
+        caller.actor(),
+        &access,
+    )
+    .await
+    .map_err(audit_unavailable)?;
     // SEC-G3: drop rows the caller may not read (same concealment as `list`).
     let refs: Vec<CaseRef> = rows
         .iter()
@@ -568,6 +608,124 @@ async fn whoami(AuthUser(claims): AuthUser) -> Result<Response> {
     format::json(claims)
 }
 
+/// Verify the tamper-evident audit hash chain.
+///
+/// `GET /api/cases/audit/verify?limit=1000` — recomputes the trailing
+/// rows and reports every linkage or content break (HIPAA §164.312(c)).
+/// Attests to the audit trail only, not to the `cases` rows.
+///
+/// # Errors
+///
+/// Propagates DB query errors.
+#[debug_handler]
+async fn verify_audit_chain(
+    axum::extract::Query(params): axum::extract::Query<VerifyParams>,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
+    let limit = params.limit();
+    let report = AuditModel::verify_chain(&ctx.db, limit).await?;
+    format::json(serde_json::json!({
+        "limit": limit,
+        "verified": report.verified,
+        "rows": report.rows,
+        "intact": report.intact,
+        "redacted": report.redacted,
+        "unchained": report.unchained,
+        "head": report.head,
+        "breaks": report.breaks,
+        "interpretation": if report.verified {
+            "no break detected in the verified window; this attests to the audit trail only, \
+             not to the cases rows"
+        } else {
+            "a break means rows were inserted, deleted, reordered, or edited since they were \
+             written — investigate the named ids; under CASE_EVENT_TRANSPORT=memory a linkage \
+             break may instead mean two concurrent audit writes raced"
+        },
+    }))
+}
+
+/// Accounting of disclosures for one case (HIPAA §164.528).
+///
+/// `GET /api/cases/{pid}/audit/disclosures` — every audit row for this
+/// case classified as an outward **disclosure** rather than an internal
+/// access, newest first.
+///
+/// Gated by the same record-level authorization as reading the case:
+/// learning who a case was disclosed to reveals that the case exists, so
+/// the accounting cannot be more open than the record it describes
+/// (`agents/share/cross-service-linking.md` §10).
+///
+/// # Errors
+///
+/// `400` when `pid` is not a UUID; `403` when the policy denies reading
+/// this case; `404` when it is unknown.
+#[debug_handler]
+async fn entity_disclosures(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+) -> Result<Response> {
+    let Ok(uuid) = uuid::Uuid::parse_str(&pid) else {
+        return bad_request("invalid pid");
+    };
+    // Concealment first: an unauthorised caller must not learn that the
+    // case exists by asking for its disclosure history.
+    let model = CaseModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(super::model_not_found)?;
+    let case = model.to_case()?;
+    crate::auth::authorize_record(
+        &caller,
+        Action::Read,
+        &crate::auth::case_resource_attrs(&case),
+    )
+    .map_err(record_rejection)?;
+    let rows = AuditModel::disclosures_for_entity(&ctx.db, uuid).await?;
+    format::json(serde_json::json!({
+        "pid": pid,
+        "read_auditing_enabled": crate::compliance::audit_reads(),
+        "count": rows.len(),
+        "caveat": if crate::compliance::audit_reads() {
+            "complete for the period read-auditing has been enabled"
+        } else {
+            "INCOMPLETE — CASE_AUDIT_READS is off, so read disclosures are not being \
+             recorded; only disclosure-flagged mutations appear here"
+        },
+        "disclosures": rows,
+    }))
+}
+
+/// Query string for the chain-verification endpoint.
+#[derive(Debug, serde::Deserialize)]
+struct VerifyParams {
+    /// How many trailing rows to verify; clamped to `[1, 10_000]`.
+    limit: Option<u64>,
+}
+
+impl VerifyParams {
+    /// The effective row limit. Verification is O(rows) with a SHA-256
+    /// each, so an unbounded `limit` is a CPU denial-of-service.
+    fn limit(&self) -> u64 {
+        self.limit.unwrap_or(1000).clamp(1, 10_000)
+    }
+}
+
+/// Map a refused read-audit write to `503 Service Unavailable`.
+///
+/// `503` rather than `500`: nothing is wrong with the request, and
+/// nothing was disclosed — the service is temporarily unable to account
+/// for a read of personal data, so it declines to serve one. Only
+/// reachable when `CASE_AUDIT_FAIL_CLOSED` is on.
+fn audit_unavailable(_: disclosure::AuditWriteRefused) -> Error {
+    Error::CustomError(
+        StatusCode::SERVICE_UNAVAILABLE,
+        ErrorDetail::new(
+            "audit_unavailable",
+            "the access could not be recorded in the audit trail, so the read was refused",
+        ),
+    )
+}
+
 /// Build the `/api/cases` route table (CRUD + match +
 /// check-duplicates + merge + audit / event + whoami endpoints).
 ///
@@ -586,11 +744,13 @@ pub fn routes() -> Routes {
         .add("/merges/recent", get(recent_merges))
         .add("/whoami", get(whoami))
         .add("/audit/recent", get(recent_audit))
+        .add("/audit/verify", get(verify_audit_chain))
         .add("/events/recent", get(recent_events))
         .add("/{pid}", get(get_one))
         .add("/{pid}", put(update))
         .add("/{pid}", delete(remove))
         .add("/{pid}/audit", get(entity_audit))
+        .add("/{pid}/audit/disclosures", get(entity_disclosures))
 }
 
 #[cfg(test)]

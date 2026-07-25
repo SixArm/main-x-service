@@ -303,6 +303,15 @@ engineering practice without the device framing.
 2. **Reference implementation.** care-pathway service — all four. ✔
 3. **Copy the audit chain + read-auditing** to the personal-data services
    first (person, worker, case), where HIPAA and GDPR bite hardest.
+   **case ✔ (2026-07-25)** — chain + read/disclosure auditing +
+   `/audit/verify` + the §164.528 accounting, which is gated behind the
+   same record-level authorization as reading the case, so the
+   disclosure history cannot be more open than the record it describes.
+   case adopts the audit half only; the GDPR residency/lawful-basis
+   declarations, FHIR conformance and the SBOM bundle follow at steps
+   4–5. **person and worker are not started** — they use the older
+   `src/db/audit.rs` MPI layer with a different table shape, so the copy
+   is a port rather than a paste.
 4. **Copy the FHIR conformance machinery** to the services that already
    mount `/fhir` (organization, place, thing, person, worker, case, event).
 5. **Lift the evidence artefacts** (`compliance/`, `scripts/`) to the

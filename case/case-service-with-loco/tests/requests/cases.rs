@@ -555,3 +555,109 @@ async fn swagger_ui_is_served() {
 // `set_var` inside this shared binary is a no-op once any sibling
 // test has booted the app (the duplicate here was order-dependent and
 // failed whenever it didn't run first).
+
+/// **The audit chain, end to end against Postgres.** A digest computed in
+/// Rust before an `INSERT` must still match after Postgres has stored the
+/// snapshot as `jsonb` (which reorders keys) and returned `created_at` as
+/// a `timestamptz`. No unit test can show that; this is why the check is
+/// DB-gated.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn audit_chain_survives_a_jsonb_round_trip() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request.post("/api/cases").json(&housing_case()).await;
+        assert_eq!(created.status_code(), 200);
+        let pid = created.json::<Value>()["pid"]
+            .as_str()
+            .expect("pid")
+            .to_string();
+
+        let mut changed = housing_case();
+        changed["keywords"] = json!(["housing", "appeal", "tribunal"]);
+        request
+            .put(&format!("/api/cases/{pid}"))
+            .json(&changed)
+            .await;
+
+        let report: Value = request.get("/api/cases/audit/verify").await.json();
+        assert_eq!(
+            report["verified"], true,
+            "the chain must verify after a Postgres round-trip: {report}"
+        );
+        assert!(report["rows"].as_u64().unwrap_or(0) >= 2, "{report}");
+        assert_eq!(report["breaks"].as_array().map(Vec::len), Some(0));
+        assert!(report["head"].is_string());
+    })
+    .await;
+}
+
+/// Rewriting an audit row with raw SQL is reported as a `content` break —
+/// the property the chain exists to provide. Case data is personal data,
+/// so a silently editable trail is the worst failure mode here.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn tampering_with_an_audit_row_breaks_verification() {
+    request::<App, _, _>(|request, ctx| async move {
+        request.post("/api/cases").json(&housing_case()).await;
+        let report: Value = request.get("/api/cases/audit/verify").await.json();
+        assert_eq!(report["verified"], true, "{report}");
+
+        use sea_orm::ConnectionTrait as _;
+        ctx.db
+            .execute_unprepared(
+                r#"UPDATE audit_logs SET snapshot = jsonb_set(snapshot, '{title}', '"Tampered"')
+                   WHERE snapshot IS NOT NULL AND redacted_at IS NULL"#,
+            )
+            .await
+            .expect("tamper");
+
+        let report: Value = request.get("/api/cases/audit/verify").await.json();
+        assert_eq!(
+            report["verified"], false,
+            "an edited audit row must break verification: {report}"
+        );
+        assert!(
+            report["breaks"]
+                .as_array()
+                .is_some_and(|b| b.iter().any(|x| x["kind"] == "content")),
+            "{report}"
+        );
+    })
+    .await;
+}
+
+/// The §164.528 accounting declares its own completeness rather than
+/// returning a reassuring empty list when read-auditing is off.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn disclosure_accounting_declares_its_completeness() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request.post("/api/cases").json(&housing_case()).await;
+        let pid = created.json::<Value>()["pid"]
+            .as_str()
+            .expect("pid")
+            .to_string();
+
+        request
+            .get(&format!("/api/cases/{pid}"))
+            .add_header("x-purpose-of-use", "research")
+            .add_header("x-disclosure-recipient", "University of Example")
+            .await;
+
+        let body: Value = request
+            .get(&format!("/api/cases/{pid}/audit/disclosures"))
+            .await
+            .json();
+        assert_eq!(body["pid"], pid);
+        let caveat = body["caveat"].as_str().unwrap_or_default();
+        if body["read_auditing_enabled"].as_bool().unwrap_or(false) {
+            assert!(caveat.contains("complete for the period"));
+        } else {
+            assert!(caveat.contains("INCOMPLETE"), "{caveat}");
+        }
+    })
+    .await;
+}

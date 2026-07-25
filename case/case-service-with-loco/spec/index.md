@@ -453,6 +453,53 @@ Cases can hold government and personal data; honour the family
 compliance posture (HIPAA/NHS/GDPR) for any audit and access controls
 added later. Subjects are stored as opaque identifiers, not embedded PII.
 
+### 12.0 Tamper-evident audit history and read/disclosure auditing
+
+Adopted 2026-07-25 from the family reference implementation in the
+care-pathway service, per
+[`spec/compliance` §8.5](../../../spec/compliance/index.md) step 3 — the
+personal-data services take the audit chain first, because **case data is
+personal data** and a case record is *about* someone.
+
+- **Hash chain** ([`src/compliance/audit_chain.rs`](../src/compliance/audit_chain.rs)).
+  Migration `m20260726_000006_compliance` adds `prev_hash` / `hash` /
+  `context` / `disclosure` / `redacted_at` to `audit_logs`. Each row binds
+  its own content **and its predecessor's hash**, so inserting, deleting,
+  reordering or editing a row breaks verification there and after
+  (HIPAA §164.312(c)). `GET /api/cases/audit/verify` reports the counts,
+  every break with its row id and kind, and the chain head. Appends take
+  `pg_advisory_xact_lock`; under `CASE_EVENT_TRANSPORT=outbox` they are
+  fully serialised, and under `memory` a concurrent-append fork is
+  possible and is reported rather than hidden.
+- **Read/disclosure auditing** ([`src/compliance/disclosure.rs`](../src/compliance/disclosure.rs)).
+  `CASE_AUDIT_READS` (**default off**) audits `get` / `list` / `search`.
+  The caller declares context in `X-Purpose-Of-Use` and
+  `X-Disclosure-Recipient` (normalised against a closed vocabulary, never
+  echoed). On `GET /api/cases/{pid}` the audit row is written **after**
+  the record-level authorization decision, so a denied request — which
+  disclosed nothing — never enters the accounting. Collection reads are
+  recorded against the nil `pid` so they cannot corrupt any single case's
+  accounting.
+- **Accounting of disclosures** (§164.528).
+  `GET /api/cases/{pid}/audit/disclosures` is gated behind the **same
+  record-level authorization as reading the case**: learning who a case
+  was disclosed to reveals that the case exists, so the accounting cannot
+  be more open than the record it describes (linking doc §10). It states
+  whether it is complete or `INCOMPLETE` because read-auditing is off.
+- **Fail-open vs fail-closed.** `CASE_AUDIT_FAIL_CLOSED` (**default
+  off**) decides what happens when an audit write fails: off logs and
+  serves the read; on refuses it with `503`, disclosing nothing the
+  service cannot account for. A deployment holding real case data should
+  set it, along with `CASE_AUDIT_READS` and `CASE_REQUIRE_AUTH`.
+
+**Not yet adopted** (steps 4–5): the GDPR residency / lawful-basis /
+Art. 9 declarations, GDPR Art. 17 erasure by redaction, row-level record
+integrity hashing, the FHIR conformance machinery, and the SOUP/SBOM
+evidence bundle. The context recorded on an audit row therefore carries
+the caller's declaration only — it does **not** claim a residency or
+lawful basis this deployment has not declared. §13 T-10 (masking +
+Art. 15 export) remains the higher-priority gap for this service.
+
 ### 12.1 Cross-service `case ↔ person` link governance
 
 The `subject_of` / `about` edge (§8.6) is the **highest-governance** v1

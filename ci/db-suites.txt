@@ -17,6 +17,7 @@
 #
 # --- verified green ---------------------------------------------------
 care-pathway/care-pathway-service-with-loco
+case/case-service-with-loco
 case-folder/case-folder-service-with-rust
 workforce-planning-management/workforce-planning-management-service-with-rust
 #
