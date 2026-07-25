@@ -433,6 +433,61 @@ async fn report(
     }))
 }
 
+/// `GET /api/employees/{pid}/appraisal-requests` — the rater's own
+/// pending requests: `collecting` appraisals where they are nominated
+/// and have not yet responded, with the subject, group, and declared
+/// competencies. `$sub`-owned; discloses only what the rater already
+/// knows (that they were invited).
+#[debug_handler]
+async fn rater_requests(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path(pid): Path<String>,
+) -> Result<Response> {
+    let rater = records::find_employee(&ctx.db, records::parse_pid(&pid)?).await?;
+    auth::authorize_record(
+        &caller,
+        authentication_verifier::Action::Read,
+        &auth::employee_resource_attrs(&rater),
+    )
+    .map_err(record_rejection)?;
+    let nominations = appraisal_nominations::Entity::find()
+        .filter(appraisal_nominations::Column::RaterPid.eq(rater.pid))
+        .order_by_asc(appraisal_nominations::Column::Id)
+        .all(&ctx.db)
+        .await?;
+    let mut requests = Vec::new();
+    for nomination in &nominations {
+        let appraisal = appraisals::Entity::find()
+            .filter(appraisals::Column::Pid.eq(nomination.appraisal_pid))
+            .filter(appraisals::Column::DeletedAt.is_null())
+            .filter(appraisals::Column::Status.eq("collecting"))
+            .one(&ctx.db)
+            .await?;
+        let Some(appraisal) = appraisal else { continue };
+        let responded = appraisal_responses::Entity::find()
+            .filter(appraisal_responses::Column::NominationPid.eq(nomination.pid))
+            .one(&ctx.db)
+            .await?
+            .is_some();
+        if responded {
+            continue;
+        }
+        let subject = employees::Entity::find()
+            .filter(employees::Column::Pid.eq(appraisal.employee_pid))
+            .one(&ctx.db)
+            .await?;
+        requests.push(serde_json::json!({
+            "appraisal_pid": appraisal.pid,
+            "subject_pid": appraisal.employee_pid,
+            "subject": subject.map(|s| s.display_name),
+            "group": nomination.rater_group,
+            "competencies": appraisal.competencies,
+        }));
+    }
+    format::json(requests)
+}
+
 /// Find one live appraisal by pid, or 404.
 async fn find_appraisal(ctx: &AppContext, pid: &str) -> Result<appraisals::Model> {
     appraisals::Entity::find()
@@ -449,6 +504,7 @@ pub fn routes() -> Routes {
         .prefix("/api")
         .add("/employees/{pid}/appraisals", post(create_appraisal))
         .add("/employees/{pid}/appraisals", get(list_appraisals))
+        .add("/employees/{pid}/appraisal-requests", get(rater_requests))
         .add("/appraisals/{pid}", get(get_appraisal))
         .add("/appraisals/{pid}/nominations", post(nominate))
         .add("/appraisals/{pid}/status", post(appraisal_status))

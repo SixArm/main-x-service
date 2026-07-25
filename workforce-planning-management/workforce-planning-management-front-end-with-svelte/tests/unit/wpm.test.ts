@@ -82,6 +82,7 @@ describe("api path map", () => {
     await wpm.listPulseSurveys();
     await wpm.pulseResults("s1");
     await wpm.listAppraisals("p1");
+    await wpm.appraisalRequests("p1");
     await wpm.getAppraisal("a1");
     await wpm.appraisalReport("a1");
     expect(calls).toEqual([
@@ -105,6 +106,7 @@ describe("api path map", () => {
       "/api/proxy/pulse-surveys",
       "/api/proxy/pulse-surveys/s1/results",
       "/api/proxy/employees/p1/appraisals",
+      "/api/proxy/employees/p1/appraisal-requests",
       "/api/proxy/appraisals/a1",
       "/api/proxy/appraisals/a1/report",
     ]);

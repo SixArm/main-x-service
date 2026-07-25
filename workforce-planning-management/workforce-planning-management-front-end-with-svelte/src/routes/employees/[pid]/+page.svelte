@@ -3,6 +3,7 @@
   import {
     acknowledgeWellbeing,
     appraisalReport,
+    appraisalRequests,
     appraisalStatus,
     changeStatus,
     completeItem,
@@ -23,6 +24,7 @@
     nominateRater,
     respondAppraisal,
     submitPulse,
+    type AppraisalRequest,
     type AppraisalSummary,
     type PulseSurvey,
     type WellbeingPrompt,
@@ -49,6 +51,10 @@
   let pulseSurveys = $state<PulseSurvey[]>([]);
   let pulseThanks = $state<Set<string>>(new Set());
   let appraisals = $state<AppraisalSummary[]>([]);
+  let myRequests = $state<AppraisalRequest[]>([]);
+  let requestScores = $state<Record<string, number>>({});
+  let requestComment = $state("");
+  let openRequest = $state<string | null>(null);
   let openAppraisal = $state<Awaited<ReturnType<typeof getAppraisal>> | null>(null);
   let openReport = $state<Awaited<ReturnType<typeof appraisalReport>> | null>(null);
   let colleagues = $state<Employee[]>([]);
@@ -78,6 +84,7 @@
       wellbeing = prompts.prompts;
       pulseSurveys = (await listPulseSurveys()).filter((s) => s.open);
       appraisals = await listAppraisals(pid);
+      myRequests = await appraisalRequests(pid);
       if (openAppraisal) await toggleAppraisal(openAppraisal.pid, true);
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
@@ -282,6 +289,45 @@
       {/each}
     </tbody>
   </table>
+
+  {#if myRequests.length}
+    <h2>{t("ap.requests")}</h2>
+    <ul class="panel" data-testid="appraisal-requests">
+      {#each myRequests as request (request.appraisal_pid)}
+        <li>
+          <strong>{request.subject ?? request.subject_pid.slice(0, 8)}</strong>
+          <span class="chip">{request.group}</span>
+          {#if openRequest === request.appraisal_pid}
+            {#each request.competencies as competency (competency)}
+              <label>
+                {competency}
+                <select bind:value={requestScores[competency]}>
+                  {#each [1, 2, 3, 4, 5] as score (score)}
+                    <option value={score}>{score}</option>
+                  {/each}
+                </select>
+              </label>
+            {/each}
+            <input placeholder="…" bind:value={requestComment} />
+            <button
+              onclick={() => void act(async () => {
+                await respondAppraisal(request.appraisal_pid, pid, requestScores, requestComment.trim() || undefined);
+                openRequest = null;
+              })}
+            >{t("ap.respond")}</button>
+          {:else}
+            <button
+              onclick={() => {
+                openRequest = request.appraisal_pid;
+                requestScores = Object.fromEntries(request.competencies.map((c) => [c, 3]));
+                requestComment = "";
+              }}
+            >{t("ap.respond")}</button>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  {/if}
 
   <h2>{t("ap.title")}</h2>
   <div class="panel" data-testid="appraisals">

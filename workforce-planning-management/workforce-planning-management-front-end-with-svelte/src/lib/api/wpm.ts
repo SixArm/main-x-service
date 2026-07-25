@@ -414,6 +414,20 @@ export function respondAppraisal(
   });
 }
 
+/** One pending 360 request for a rater. */
+export interface AppraisalRequest {
+  appraisal_pid: string;
+  subject_pid: string;
+  subject: string | null;
+  group: string;
+  competencies: string[];
+}
+
+/** The rater's own pending 360 requests ($sub-owned). */
+export function appraisalRequests(pid: string, init?: FetchLike): Promise<AppraisalRequest[]> {
+  return api(`/employees/${pid}/appraisal-requests`, init);
+}
+
 /** The group-floored report (shared appraisals only). */
 export function appraisalReport(pid: string, init?: FetchLike): Promise<{
   appraisal: { pid: string; employee_pid: string; competencies: string[]; shared_on: string | null };

@@ -119,6 +119,24 @@ async fn appraisal_round_trip() {
             "nominations frozen"
         );
 
+        // The rater's self-service view: the manager sees one pending
+        // request naming the subject, group, and competencies.
+        let requests: Value = request
+            .get(&format!("/api/employees/{manager}/appraisal-requests"))
+            .await
+            .json();
+        let pending = requests.as_array().unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0]["group"], "manager");
+        assert_eq!(pending[0]["subject"], "Test Employee A-0");
+        assert_eq!(pending[0]["competencies"], json!(["communication", "delivery"]));
+        // A non-nominated employee has no requests.
+        let none: Value = request
+            .get(&format!("/api/employees/{late}/appraisal-requests"))
+            .await
+            .json();
+        assert!(none.as_array().unwrap().is_empty());
+
         // Responses: incomplete or off-scale scores refused; only
         // nominated raters; once per rater.
         assert_eq!(
@@ -157,6 +175,13 @@ async fn appraisal_round_trip() {
             422,
             "once per rater"
         );
+        // Responding clears the rater's pending request.
+        let requests: Value = request
+            .get(&format!("/api/employees/{manager}/appraisal-requests"))
+            .await
+            .json();
+        assert!(requests.as_array().unwrap().is_empty(), "responded ⇒ no longer pending");
+
         // Two peers respond (below the floor of 3); the subject self-rates.
         for (peer, score) in peers.iter().take(2).zip([3, 5]) {
             request

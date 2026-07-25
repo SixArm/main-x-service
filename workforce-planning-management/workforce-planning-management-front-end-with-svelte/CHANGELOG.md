@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — "My 360 requests" (WPM-T29 / WPM-R29, 2026-07-25)
+
+- Employee profile: a rater-side panel listing pending 360 requests
+  (subject + group) with inline per-competency scoring and a comment;
+  responding clears the request. 1 i18n key × 13 locales.
+
 ### Added — 360° appraisals panel (WPM-T28 / WPM-R29, 2026-07-25)
 
 - Employee profile: a 360° panel — create a draft (default

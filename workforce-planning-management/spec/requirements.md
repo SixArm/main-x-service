@@ -386,6 +386,11 @@ peers, direct reports, and themself — not one boss.*
   the subject's own) — see [design.md](design.md) WPM-D21.
 - Development-facing, not pay-facing: the report is not an input to
   payroll or benchmarking, and nothing in it feeds WPM-R13/R14.
+- **Rater self-service**: an employee can list their own pending
+  requests (`collecting` appraisals where they are nominated and have
+  not yet responded — subject, group, competencies; `$sub`-owned) and
+  respond from there. The view discloses only what the rater already
+  knows: that they were invited.
 
 ## WPM-R17 — Family fixtures
 

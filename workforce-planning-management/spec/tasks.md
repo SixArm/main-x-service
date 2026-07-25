@@ -347,3 +347,16 @@ code + tests in one PR.
       read) — full `--ignored` suite 16/16 vs Postgres 18 (128 unit);
       clippy pedantic clean; svelte-check 0; vitest 10; Playwright 8.
       (WPM-D3, WPM-D7, WPM-D21; WPM-R29)
+
+- [x] WPM-T29 (2026-07-25) **Rater self-service for 360s.**
+      `GET /api/employees/{pid}/appraisal-requests` — the rater's own
+      pending requests: `collecting` appraisals where they are
+      nominated and unanswered, with subject / group / competencies
+      (`$sub`-owned; discloses only that they were invited). Front-end:
+      a "My 360 requests" panel on the profile with inline scoring +
+      comment (responding clears the request). **Acceptance:** the
+      round-trip pins one pending request naming subject/group/
+      competencies, an empty list for the non-nominated, and
+      responded ⇒ no longer pending — suite 16/16 vs Postgres 18
+      (128 unit); clippy pedantic clean; svelte-check 0; vitest 10;
+      Playwright 8. (WPM-D21; WPM-R29)

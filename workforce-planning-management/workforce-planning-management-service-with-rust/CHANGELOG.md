@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — rater self-service for 360s (WPM-T29 / WPM-R29, 2026-07-25)
+
+- `GET /api/employees/{pid}/appraisal-requests` — the rater's own
+  pending requests (`collecting`, nominated, not yet responded) with
+  subject, group, and competencies; `$sub`-owned; responding clears
+  the request. Discloses only what the rater already knows.
+
 ### Added — 360° appraisals (WPM-T28 / WPM-R29, 2026-07-25)
 
 - Multi-rater appraisals around a subject employee: declared
