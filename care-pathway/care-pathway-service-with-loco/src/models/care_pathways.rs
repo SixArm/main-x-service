@@ -2,7 +2,10 @@
 //! `care_pathway_matcher::CarePathway` payload.
 
 use care_pathway_matcher::CarePathway as MatchPathway;
+use chrono::SubsecRound as _;
 use loco_rs::prelude::*;
+
+use crate::compliance::record_integrity;
 use sea_orm::sea_query::Expr;
 use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect};
@@ -39,9 +42,19 @@ impl Model {
     /// When serialization or the insert fails.
     pub async fn create<C: ConnectionTrait>(db: &C, pathway: &MatchPathway) -> ModelResult<Self> {
         let data = serde_json::to_value(pathway).map_err(|e| ModelError::Any(e.into()))?;
+        let pid = Uuid::new_v4();
         let model = care_pathways::ActiveModel {
-            pid: ActiveValue::set(Uuid::new_v4()),
+            pid: ActiveValue::set(pid),
             name: ActiveValue::set(pathway.name.clone()),
+            content_hash: ActiveValue::set(Some(record_integrity::record_hash(
+                &record_integrity::RecordInput {
+                    pid,
+                    name: &pathway.name,
+                    data: &data,
+                    active: true,
+                    deleted_at_micros: None,
+                },
+            ))),
             data: ActiveValue::set(data),
             active: ActiveValue::set(true),
             deleted_at: ActiveValue::set(None),
@@ -104,6 +117,44 @@ impl Model {
     }
 }
 
+impl Model {
+    /// The newest `limit` rows **including soft-deleted and erased ones**,
+    /// for row-level integrity verification.
+    ///
+    /// Unlike [`Model::list`], this deliberately does not filter on
+    /// `deleted_at`: a retired row is exactly where an out-of-band edit is
+    /// least likely to be noticed, so it is the row most worth checking.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn recent_for_integrity(
+        db: &DatabaseConnection,
+        limit: u64,
+    ) -> ModelResult<Vec<Self>> {
+        let rows = care_pathways::Entity::find()
+            .order_by_desc(care_pathways::Column::Id)
+            .limit(limit)
+            .all(db)
+            .await?;
+        Ok(rows)
+    }
+
+    /// Verify the newest `limit` records by recomputing each content hash.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn verify_records(
+        db: &DatabaseConnection,
+        limit: u64,
+    ) -> ModelResult<record_integrity::RecordIntegrityReport> {
+        Ok(record_integrity::verify(
+            &Self::recent_for_integrity(db, limit).await?,
+        ))
+    }
+}
+
 /// Escape `LIKE`/`ILIKE` wildcards so a user query matches literally.
 fn escape_like(q: &str) -> String {
     q.replace('\\', "\\\\")
@@ -126,6 +177,20 @@ impl ActiveModel {
         pathway: &MatchPathway,
     ) -> ModelResult<Model> {
         let data = serde_json::to_value(pathway).map_err(|e| ModelError::Any(e.into()))?;
+        // The lifecycle fields are untouched by an update, so read them
+        // back off the active model to hash the row as it will land.
+        let pid = *self.pid.as_ref();
+        let active = *self.active.as_ref();
+        let deleted_at_micros = self.deleted_at.as_ref().map(|d| d.timestamp_micros());
+        self.content_hash = ActiveValue::set(Some(record_integrity::record_hash(
+            &record_integrity::RecordInput {
+                pid,
+                name: &pathway.name,
+                data: &data,
+                active,
+                deleted_at_micros,
+            },
+        )));
         self.name = ActiveValue::set(pathway.name.clone());
         self.data = ActiveValue::set(data);
         self.update(db).await.map_err(ModelError::from)
@@ -140,8 +205,21 @@ impl ActiveModel {
     ///
     /// When the update fails.
     pub async fn soft_delete<C: ConnectionTrait>(mut self, db: &C) -> ModelResult<Model> {
+        // Truncated to microseconds so the value hashed here is the value
+        // Postgres returns (see `compliance::record_integrity`).
+        let deleted_at: chrono::DateTime<chrono::FixedOffset> =
+            chrono::Utc::now().trunc_subsecs(6).into();
+        self.content_hash = ActiveValue::set(Some(record_integrity::record_hash(
+            &record_integrity::RecordInput {
+                pid: *self.pid.as_ref(),
+                name: self.name.as_ref(),
+                data: self.data.as_ref(),
+                active: false,
+                deleted_at_micros: Some(deleted_at.timestamp_micros()),
+            },
+        )));
         self.active = ActiveValue::set(false);
-        self.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
+        self.deleted_at = ActiveValue::set(Some(deleted_at));
         self.update(db).await.map_err(ModelError::from)
     }
 }

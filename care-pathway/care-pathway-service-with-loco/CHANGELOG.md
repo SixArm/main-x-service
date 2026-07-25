@@ -9,6 +9,34 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — row-level record integrity (2026-07-25)
+
+- Every `care_pathways` row now carries a `content_hash` — SHA-256 over
+  its `pid`, `name`, payload, `active` flag and `deleted_at` —
+  recomputed on **every** write (migration
+  `m20260726_000008_record_integrity`). Set inside the model write
+  helpers and the erasure path, so no caller can omit it.
+  `GET /api/compliance/records/verify` recomputes and names any row
+  changed outside the service.
+- This closes the gap the audit chain deliberately left: the chain
+  attests to the **trail**, this attests to the **records**. Neither
+  subsumes the other, and the remaining gap — a row deleted outright in
+  SQL — is covered by the chain, because a legitimate delete writes to
+  it.
+- `created_at` / `updated_at` are excluded from the digest on purpose:
+  they are ORM- and database-set, so binding them would produce false
+  mismatches. Stated in spec §12.1 rather than left implicit.
+
+### Changed — audit-write failure is now a deployment choice (2026-07-25)
+
+- `CARE_PATHWAY_AUDIT_FAIL_CLOSED` (**default off**) decides what
+  happens when a read-audit write fails: off logs and serves the read
+  (previous behaviour); on refuses it with `503` on both the native and
+  FHIR surfaces, disclosing nothing the service cannot account for.
+- `record_access` returns `Result<(), AuditWriteRefused>`, so the choice
+  is explicit at every call site instead of swallowed in the helper.
+  Mutation audits were already fail-closed under the `outbox` transport.
+
 ### Added — regulatory compliance controls (2026-07-25)
 
 The family's **reference implementation** of the four control-driving

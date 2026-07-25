@@ -24,6 +24,7 @@ mod m20220101_000004_event_outbox;
 mod m20260720_000005_instances;
 mod m20260720_000006_outcomes;
 mod m20260725_000007_compliance;
+mod m20260726_000008_record_integrity;
 
 /// The migration runner this crate exposes to loco / `sea-orm-migration`.
 pub struct Migrator;
@@ -42,6 +43,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260720_000005_instances::Migration),
             Box::new(m20260720_000006_outcomes::Migration),
             Box::new(m20260725_000007_compliance::Migration),
+            Box::new(m20260726_000008_record_integrity::Migration),
             // inject-above (do not remove this comment)
         ]
     }

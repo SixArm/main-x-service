@@ -6,6 +6,7 @@
 //! | `GET /api/compliance` | Software identification, build provenance, IEC 62304 safety classification, which controls are **actually live**, the declared data-protection posture, and — deliberately — what each framework is **not** claimed to satisfy. |
 //! | `GET /api/compliance/sbom` | `CycloneDX` 1.5 SBOM + SOUP register (IEC 62304 §8.1.2, FD&C §524B). |
 //! | `GET /api/compliance/audit/verify` | Tamper-evidence: re-verifies the audit hash chain and reports every break (HIPAA §164.312(c)). |
+//! | `GET /api/compliance/records/verify` | Row-level integrity: recomputes each record's content hash and names any row changed outside the service. |
 //!
 //! These sit under `/api/*`, so they are behind the blanket auth + ABAC
 //! guard when `CARE_PATHWAY_REQUIRE_AUTH` is on. They are **reads**, so
@@ -19,6 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::compliance::{Posture, soup};
 use crate::models::audit_logs::Model as AuditModel;
+use crate::models::care_pathways::Model as PathwayModel;
 
 /// Default number of trailing audit rows verified in one call.
 pub const VERIFY_DEFAULT_LIMIT: u64 = 1000;
@@ -123,6 +125,57 @@ async fn verify_audit_chain(
     })
 }
 
+/// What a clean record verification does — and does **not** — attest to.
+const RECORDS_CLEAN: &str = "no record was modified outside the service in the verified window; this attests to row \
+     content, not to rows that were deleted outright — the audit chain covers those";
+
+/// What a record mismatch means.
+const RECORDS_MISMATCHED: &str = "a mismatch means the row was changed without going through the service — investigate the \
+     named records; a legitimate write always rehashes";
+
+/// The record-verification response.
+#[derive(Debug, Serialize)]
+struct RecordVerifyResponse {
+    /// Records requested for verification.
+    limit: u64,
+    /// The verification report.
+    #[serde(flatten)]
+    report: crate::compliance::record_integrity::RecordIntegrityReport,
+    /// What the result means, so an operator need not find the spec first.
+    interpretation: &'static str,
+}
+
+/// Verify row-level record integrity.
+///
+/// `GET /api/compliance/records/verify?limit=1000` — recomputes each
+/// record's content hash and reports every row that was changed outside
+/// the service. Complements the audit-chain check: that one proves the
+/// trail was not rewritten, this one proves the records were not.
+///
+/// Soft-deleted and erased rows are included deliberately — a retired row
+/// is where an edit is least likely to be noticed.
+///
+/// # Errors
+///
+/// Propagates DB query errors.
+#[debug_handler]
+async fn verify_records(
+    Query(params): Query<VerifyParams>,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
+    let limit = params.limit();
+    let report = PathwayModel::verify_records(&ctx.db, limit).await?;
+    format::json(RecordVerifyResponse {
+        limit,
+        interpretation: if report.verified {
+            RECORDS_CLEAN
+        } else {
+            RECORDS_MISMATCHED
+        },
+        report,
+    })
+}
+
 /// Compliance-evidence routes, mounted under `/api/compliance`.
 pub fn routes() -> Routes {
     Routes::new()
@@ -130,6 +183,7 @@ pub fn routes() -> Routes {
         .add("/", get(posture))
         .add("/sbom", get(sbom))
         .add("/audit/verify", get(verify_audit_chain))
+        .add("/records/verify", get(verify_records))
 }
 
 #[cfg(test)]

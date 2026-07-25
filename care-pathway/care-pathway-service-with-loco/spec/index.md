@@ -327,6 +327,25 @@ and the crate-root [`compliance/`](../compliance/) artefacts.
   complete or `INCOMPLETE` because read-auditing is off — an empty list
   must not read as "nothing was disclosed".
 
+**Row-level integrity** ([`src/compliance/record_integrity.rs`](../src/compliance/record_integrity.rs)).
+The chain covers the trail; this covers the records. Every
+`care_pathways` row carries a `content_hash` — SHA-256 over its `pid`,
+`name`, payload, `active` flag and `deleted_at` — recomputed on **every**
+write. Because the hash is set inside the three model helpers
+(`create` / `update_data` / `soft_delete`) plus the erasure path, no
+caller can forget it. `GET /api/compliance/records/verify` recomputes and
+names any row changed outside the service.
+
+It is **not** a chain: entity rows are mutable by design, so this detects
+out-of-band *modification*, not deletion or reordering — the audit chain
+covers those, and neither control subsumes the other. `created_at` /
+`updated_at` are deliberately **excluded** from the digest: they are set
+by the ORM and the database rather than by this code, so binding them
+would produce false mismatches. An attacker who alters only a timestamp
+is not detected; anything that changes what the record *says* is. Rows
+predating the column verify as `unhashed` rather than as mismatches, and
+are rehashed on their next write.
+
 ### 12.2 GDPR / EU EHDS — erasure, residency, lawful basis
 
 - **Erasure against the immutable chain**
@@ -409,9 +428,12 @@ the evidence bundle.
   device.** Neither is claimed anywhere in the code or the API. The
   posture endpoint's per-framework `not_claimed` lists are asserted by
   tests, so a future edit cannot quietly turn the report into marketing.
-- **Chain scope.** The chain attests to the **audit trail**, not to the
-  `care_pathways` rows; row-level integrity hashing over the entity table
-  is not built. The verification response says so.
+- **Chain scope, now narrowed.** The chain attests to the **audit
+  trail**; row-level integrity is a separate, complementary control
+  (§12.1). Between them the remaining gap is a row **deleted outright**
+  in SQL: the content hash cannot see a row that is not there, and only
+  the audit chain — which a legitimate delete writes to — covers that.
+  Both verification responses say what they do and do not attest to.
 - **Audit-write failure is a deployment choice, now explicit.**
   `CARE_PATHWAY_AUDIT_FAIL_CLOSED` (**default off**) decides what happens
   when a read-audit write fails: off logs and serves the read (the
@@ -727,8 +749,15 @@ the evidence bundle.
   dependencies.
 
 - [ ] **T-15 — Compliance follow-ups (deferred, honest).**
-  - [ ] Row-level integrity hashing over `care_pathways` (the chain
-    attests to the trail, not the entity rows — §12.5).
+  - [x] **Row-level integrity hashing over `care_pathways`.** **Done
+    (2026-07-25):** migration `m20260726_000008_record_integrity` adds
+    `content_hash`; `src/compliance/record_integrity.rs` holds the pure
+    hash + verify; the digest is set inside the model write helpers and
+    the erasure path so no caller can omit it;
+    `GET /api/compliance/records/verify` reports mismatches. Pinned by 11
+    unit tests and, DB-gated, by `out_of_band_record_edit_is_detected`
+    (raw-SQL edit is caught) and `every_write_path_rehashes`
+    (create/update/delete/merge/erase all stay verifiable).
   - [ ] Move Bulk Data `$export` onto the `bg_pg` worker + an artifact
     store, so jobs survive a restart and are visible across replicas
     (§12.5); folds into T-10.

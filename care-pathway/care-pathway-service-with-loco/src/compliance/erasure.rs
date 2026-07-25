@@ -26,6 +26,7 @@
 //! payload, and no snapshot of it remains.
 
 use care_pathway_matcher::CarePathway;
+use chrono::SubsecRound as _;
 use loco_rs::prelude::ModelResult;
 use sea_orm::{ActiveModelTrait, ActiveValue, ConnectionTrait, IntoActiveModel};
 use serde::Serialize;
@@ -93,14 +94,28 @@ pub async fn erase<C: ConnectionTrait>(
     let pid = model.pid;
     let was_active = model.active;
 
-    // 1. Tombstone the payload and retire the record.
+    // 1. Tombstone the payload and retire the record. The content hash is
+    //    recomputed over the tombstone, so an erased row still verifies
+    //    under `record_integrity` — erasure is a legitimate write, not a
+    //    reason for the row to look tampered with.
     let payload =
         serde_json::to_value(tombstone()).map_err(|e| loco_rs::model::ModelError::Any(e.into()))?;
+    let deleted_at: chrono::DateTime<chrono::FixedOffset> =
+        chrono::Utc::now().trunc_subsecs(6).into();
     let mut active = model.into_active_model();
+    active.content_hash = ActiveValue::set(Some(super::record_integrity::record_hash(
+        &super::record_integrity::RecordInput {
+            pid,
+            name: TOMBSTONE_NAME,
+            data: &payload,
+            active: false,
+            deleted_at_micros: Some(deleted_at.timestamp_micros()),
+        },
+    )));
     active.name = ActiveValue::set(TOMBSTONE_NAME.to_string());
     active.data = ActiveValue::set(payload);
     active.active = ActiveValue::set(false);
-    active.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
+    active.deleted_at = ActiveValue::set(Some(deleted_at));
     active.update(db).await?;
 
     // 2. Destroy the audit content, keeping the chain linkage.

@@ -307,6 +307,100 @@ async fn disclosure_accounting_declares_its_completeness() {
     .await;
 }
 
+/// Fetch the record-integrity report.
+async fn verify_records(request: &TestServer) -> Value {
+    let response = request.get("/api/compliance/records/verify").await;
+    assert_eq!(response.status_code(), 200);
+    response.json()
+}
+
+/// **Row-level integrity, end to end.** Records written through the
+/// service verify; a row rewritten with raw SQL does not. This is the
+/// control that closes the gap the audit chain leaves open — the chain
+/// attests to the trail, this attests to the rows.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn out_of_band_record_edit_is_detected() {
+    request::<App, _, _>(|request, ctx| async move {
+        let pid = create(&request, &rich_pathway()).await;
+        create(&request, &rich_pathway()).await;
+
+        // Every write path rehashes, so an untouched set verifies.
+        let report = verify_records(&request).await;
+        assert_eq!(report["verified"], true, "{report}");
+        assert_eq!(report["intact"], 2);
+        assert_eq!(report["unhashed"], 0, "every write must set a hash");
+
+        // Now edit a stored payload behind the service's back.
+        use sea_orm::ConnectionTrait as _;
+        ctx.db
+            .execute_unprepared(&format!(
+                "UPDATE care_pathways SET data = jsonb_set(data, '{{name}}', '\"Tampered\"') \
+                 WHERE pid = '{pid}'"
+            ))
+            .await
+            .expect("tamper");
+
+        let report = verify_records(&request).await;
+        assert_eq!(
+            report["verified"], false,
+            "an out-of-band edit must be detected: {report}"
+        );
+        assert_eq!(report["mismatched"].as_array().map(Vec::len), Some(1));
+        assert_eq!(report["mismatched"][0]["pid"], pid);
+        assert_eq!(report["intact"], 1, "the untouched record still verifies");
+    })
+    .await;
+}
+
+/// Update, soft-delete, merge and erase all rehash, so a record that has
+/// been through the full lifecycle still verifies. A control that flagged
+/// legitimate writes would be worse than useless.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn every_write_path_rehashes() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let updated_pid = create(&request, &rich_pathway()).await;
+        let mut changed = rich_pathway();
+        changed["keywords"] = json!(["stroke", "thrombolysis"]);
+        request
+            .put(&format!("/api/care-pathways/{updated_pid}"))
+            .json(&changed)
+            .await;
+
+        let deleted_pid = create(&request, &rich_pathway()).await;
+        request
+            .delete(&format!("/api/care-pathways/{deleted_pid}"))
+            .await;
+
+        let erased_pid = create(&request, &rich_pathway()).await;
+        request
+            .post(&format!("/api/care-pathways/{erased_pid}/erase"))
+            .await;
+
+        let merged_main = create(&request, &rich_pathway()).await;
+        let merged_dup = create(&request, &rich_pathway()).await;
+        request
+            .post("/api/care-pathways/merge")
+            .json(&json!({ "main_pid": merged_main, "duplicate_pid": merged_dup }))
+            .await;
+
+        let report = verify_records(&request).await;
+        assert_eq!(
+            report["verified"], true,
+            "create/update/delete/merge/erase must all rehash: {report}"
+        );
+        assert_eq!(report["unhashed"], 0);
+        assert!(
+            report["records"].as_u64().unwrap_or(0) >= 5,
+            "soft-deleted and erased rows must be verified too: {report}"
+        );
+    })
+    .await;
+}
+
 /// The posture endpoint reports the running configuration and states, per
 /// framework, what is **not** claimed.
 #[tokio::test]

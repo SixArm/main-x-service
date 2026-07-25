@@ -27,6 +27,11 @@ pub struct Model {
     pub active: bool,
     /// Soft-delete timestamp; `None` while active.
     pub deleted_at: Option<DateTimeWithTimeZone>,
+    /// SHA-256 over the row's content and lifecycle state, recomputed on
+    /// every write. `None` for rows predating the column — verification
+    /// reports those as `unhashed`, not as mismatches. See
+    /// [`crate::compliance::record_integrity`].
+    pub content_hash: Option<String>,
 }
 
 /// `SeaORM` relations for [`Entity`] (none defined).

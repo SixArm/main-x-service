@@ -46,6 +46,8 @@ pub mod bulk;
 pub mod disclosure;
 /// GDPR Art. 17 erasure that survives the immutable chain (redaction).
 pub mod erasure;
+/// Row-level integrity hashing over the `care_pathways` table.
+pub mod record_integrity;
 /// SOUP register (IEC 62304 §8.1.2) and CycloneDX SBOM assembly.
 pub mod soup;
 

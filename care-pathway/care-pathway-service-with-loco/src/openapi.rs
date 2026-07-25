@@ -180,6 +180,15 @@ fn compliance_paths() -> Value {
                     "responses": { "200": { "description": "CycloneDX document" } }
                 }
             },
+            "/api/compliance/records/verify": {
+                "get": {
+                    "tags": ["compliance"],
+                    "summary": "Verify row-level record integrity",
+                    "description": "Recomputes each care-pathway row's content hash and names any row changed outside the service. Complements the audit-chain check: that one proves the trail was not rewritten, this proves the records were not. Soft-deleted and erased rows are included deliberately.",
+                    "parameters": [{ "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "default": 1000, "maximum": 10000, "minimum": 1 } }],
+                    "responses": { "200": { "description": "Record integrity report" } }
+                }
+            },
             "/api/compliance/audit/verify": {
                 "get": {
                     "tags": ["compliance"],

@@ -39,6 +39,7 @@ specific condition over a defined episode.
 | GET | `/api/compliance` | Posture: build provenance, IEC 62304 safety class, live controls, data-protection declarations, and per-framework **not-claimed** lines |
 | GET | `/api/compliance/sbom` | CycloneDX 1.5 SBOM + SOUP register (from this binary's own `Cargo.lock`) |
 | GET | `/api/compliance/audit/verify` | Verify the tamper-evident audit hash chain (HIPAA §164.312(c)) |
+| GET | `/api/compliance/records/verify` | Verify row-level record integrity — detects an entity row edited outside the service |
 | GET | `/api/care-pathways/{pid}/audit/disclosures` | Accounting of disclosures (HIPAA §164.528) |
 | POST | `/api/care-pathways/{pid}/erase` | GDPR Art. 17 erasure — **irreversible**, destructive under ABAC |
 
