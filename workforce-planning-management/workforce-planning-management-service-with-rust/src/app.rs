@@ -92,6 +92,7 @@ impl Hooks for App {
             .add_route(controllers::intelligence::routes())
             .add_route(controllers::payroll::routes())
             .add_route(controllers::wellbeing::routes())
+            .add_route(controllers::appraisals::routes())
             .add_route(controllers::audits::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
@@ -127,6 +128,9 @@ impl Hooks for App {
         truncate_table(&ctx.db, WellbeingEntitlements).await?;
         truncate_table(&ctx.db, PulseResponses).await?;
         truncate_table(&ctx.db, PulseSurveys).await?;
+        truncate_table(&ctx.db, AppraisalResponses).await?;
+        truncate_table(&ctx.db, AppraisalNominations).await?;
+        truncate_table(&ctx.db, Appraisals).await?;
         truncate_table(&ctx.db, ProgramPlacements).await?;
         truncate_table(&ctx.db, EarlyCareerPrograms).await?;
         truncate_table(&ctx.db, PipelineMembers).await?;

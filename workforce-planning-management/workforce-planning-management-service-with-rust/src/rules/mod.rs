@@ -4,6 +4,7 @@
 //! exhaustively unit-tested. Controllers wire these; they never
 //! re-implement them.
 
+pub mod appraisal;
 pub mod assessment;
 pub mod benchmark;
 pub mod learning;

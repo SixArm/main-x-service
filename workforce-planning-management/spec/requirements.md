@@ -355,6 +355,38 @@ attributable.*
 - Submitting requires the caller to be the employee (`$sub` ownership
   when enforcement is on); a survey outside its window refuses `422`.
 
+## WPM-R29 — 360° appraisals
+
+*As an HR lead I can run a multi-rater (360°) appraisal so an
+employee's development picture comes from a full circle — manager,
+peers, direct reports, and themself — not one boss.*
+
+- An appraisal belongs to a subject employee and declares its
+  **competencies** (a capped list of short labels) at creation; a
+  **self** nomination for the subject is created automatically.
+- **Nominations** name the raters (employees) and their **group** —
+  `self | manager | peer | report` (external raters are deferred: WPM
+  has no identity for them). One nomination per rater; at most 12
+  raters; only the subject may be `self`.
+- Lifecycle `draft → collecting → shared` (pure core): moving to
+  `collecting` requires at least **3 non-self nominations**;
+  nominations are frozen once collecting.
+- A **response** is one rater's per-competency scores (1–5, every
+  declared competency required) plus an optional comment — accepted
+  only while `collecting`, only from a nominated rater, once per
+  rater (`$sub` ownership when enforcement is on). Who has responded
+  is visible (chasing non-responders is the point); **what** they said
+  never is, per rater.
+- The **report** (readable once `shared`; reads audited like review
+  content) aggregates per group × competency (count + mean) and pools
+  comments per group, with a **group floor of 3** for `peer` and
+  `report` — below it the group's cell and comments are withheld,
+  count included. `manager` and `self` disclose at n = 1 **by
+  convention** (a manager's feedback is accountable; the self view is
+  the subject's own) — see [design.md](design.md) WPM-D21.
+- Development-facing, not pay-facing: the report is not an input to
+  payroll or benchmarking, and nothing in it feeds WPM-R13/R14.
+
 ## WPM-R17 — Family fixtures
 
 - OpenAPI + Swagger, `Accepts-version` negotiation, `/metrics.prom`,

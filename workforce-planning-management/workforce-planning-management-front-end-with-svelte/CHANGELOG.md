@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — 360° appraisals panel (WPM-T28 / WPM-R29, 2026-07-25)
+
+- Employee profile: a 360° panel — create a draft (default
+  competencies), nominate raters by group, drive the lifecycle,
+  submit per-competency responses for nominated raters, and read the
+  group-floored report (withheld cells shown as "Withheld below 3
+  responses"). 8 i18n keys × 13 locales (parity green).
+
 ### Added — wellbeing pulse (WPM-T27 / WPM-R28, 2026-07-25)
 
 - Employee profile: a pulse card listing open surveys with 1–5 score

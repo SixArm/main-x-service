@@ -314,3 +314,36 @@ code + tests in one PR.
       `--ignored` suite 15/15 vs Postgres 18 (124 unit); clippy
       pedantic clean; svelte-check 0; vitest 10; Playwright 8.
       (WPM-D16, WPM-D20; WPM-R28)
+
+- [x] WPM-T28 (2026-07-25) **360° appraisals.** Migration
+      `m20260725_000014_appraisals` (`appraisals` + nominations +
+      responses; the response row links to its nomination **by
+      design** — procedural anonymity, new WPM-D21). `rules/
+      appraisal.rs` (pure): the one-way lifecycle
+      (draft → collecting → shared), the group vocabulary
+      (`self | manager | peer | report`; external deferred), rater
+      bounds (≤ 12; ≥ 3 non-self to collect), score-completeness
+      (every declared competency, 1–5, nothing undeclared), the
+      WPM-D21 group floor (`peer`/`report` disclose at 3;
+      `manager`/`self` at 1 by convention), and the count-carrying
+      mean (empty ⇒ `None`, never 0).
+      `controllers/appraisals.rs`: create (auto self nomination, in
+      one tx), nominate (draft-only, frozen at collecting), status
+      gates, `$sub`-owned once-per-rater responses (collecting only),
+      the detail view (who responded, never what), and the shared-only
+      **report** (group × competency count + mean, group-pooled
+      comments sorted alphabetically so ordering reveals no
+      submission sequence, withheld cells hide their count; reads
+      audited per the WPM-R10 posture; development-facing, not a
+      payroll input). Front-end: a 360° panel on the employee profile
+      (create / nominate / lifecycle / respond / report), 8 i18n keys
+      × 13 locales. **Acceptance:** 4 pure pins (lifecycle, floor
+      matrix, score matrix, count-carrying mean) + the DB-gated
+      `appraisal_round_trip` (auto-self, closed groups, subject-only-
+      self, min-rater gate, frozen nominations, completeness 422s,
+      once-per-rater, no rater content on the detail view,
+      shared-only report, manager-discloses-at-1, peer-withheld-at-2
+      with count hidden, responses closed once shared, audited report
+      read) — full `--ignored` suite 16/16 vs Postgres 18 (128 unit);
+      clippy pedantic clean; svelte-check 0; vitest 10; Playwright 8.
+      (WPM-D3, WPM-D7, WPM-D21; WPM-R29)

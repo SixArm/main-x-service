@@ -194,3 +194,24 @@ elimination, so the cell is marked suppressed and its statistics —
 including its response count — are withheld; the overall block obeys
 the same floor. The floor is a constant in the pure rules, not
 configuration: a deployment that could quietly set k = 1 has no floor.
+
+## WPM-D21 — 360° rater anonymity is procedural, not structural — and says so
+
+The pulse (WPM-D20) achieves anonymity by storing no author. A 360°
+appraisal cannot: it must enforce **one response per invited rater**,
+show **who has not yet responded** (chasing is half the process), and
+scope responses to a nomination's group — all of which require the
+response row to link to the nomination. So the guarantee is different
+in kind and stated plainly: the link **exists in the store** but no
+API surface ever discloses rater-level content — the detail view
+shows *who* responded, never *what*; the report shows only group ×
+competency aggregates and group-pooled comments. The small-group
+attack is answered with a **group floor of 3** (a pure-rules
+constant) on `peer` and `report` cells — count withheld below it,
+same posture as WPM-D20 — while `manager` and `self` disclose at
+n = 1 by convention: a manager's feedback is accountable feedback,
+and the self view is the subject's own words. Choosing the pulse's
+structural anonymity here would have quietly traded away response
+enforcement and completion tracking; choosing silence about the
+stored link would have overclaimed. Neither is acceptable — the
+trade-off is the design.

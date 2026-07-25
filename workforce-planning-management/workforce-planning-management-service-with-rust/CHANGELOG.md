@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — 360° appraisals (WPM-T28 / WPM-R29, 2026-07-25)
+
+- Multi-rater appraisals around a subject employee: declared
+  competencies, nominations by group (`self | manager | peer |
+  report`; self automatic; ≤ 12 raters; ≥ 3 non-self to start
+  collecting), a one-way lifecycle (draft → collecting → shared;
+  nominations freeze, responses close at shared), and `$sub`-owned
+  once-per-rater responses (every declared competency scored 1–5).
+- Rater anonymity is **procedural** (new WPM-D21): the store links a
+  response to its nomination (once-per-rater + completion tracking
+  need it) but no endpoint serves rater-level content — the detail
+  view shows who responded, the shared-only report shows group ×
+  competency count + mean and group-pooled alphabetised comments,
+  with `peer`/`report` cells withheld below 3 responses (count
+  included); `manager`/`self` disclose at 1 by convention. Report
+  reads audited; development-facing, not a payroll input.
+
 ### Added — anonymous wellbeing pulse (WPM-T27 / WPM-R28, 2026-07-25)
 
 - Surveys (`/api/pulse-surveys`: name, one question, active window)

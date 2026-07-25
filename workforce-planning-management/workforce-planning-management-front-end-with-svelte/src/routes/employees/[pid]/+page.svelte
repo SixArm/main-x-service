@@ -2,11 +2,17 @@
   import { page } from "$app/state";
   import {
     acknowledgeWellbeing,
+    appraisalReport,
+    appraisalStatus,
     changeStatus,
     completeItem,
+    createAppraisal,
     employeePayslips,
     employeeWellbeingPrompts,
+    getAppraisal,
     getEmployee,
+    listAppraisals,
+    listEmployees,
     listEntitlements,
     listLeaveRequests,
     listOnboarding,
@@ -14,7 +20,10 @@
     listReviews,
     listTraining,
     money,
+    nominateRater,
+    respondAppraisal,
     submitPulse,
+    type AppraisalSummary,
     type PulseSurvey,
     type WellbeingPrompt,
   } from "$lib/api/wpm";
@@ -39,6 +48,15 @@
   let wellbeing = $state<WellbeingPrompt[]>([]);
   let pulseSurveys = $state<PulseSurvey[]>([]);
   let pulseThanks = $state<Set<string>>(new Set());
+  let appraisals = $state<AppraisalSummary[]>([]);
+  let openAppraisal = $state<Awaited<ReturnType<typeof getAppraisal>> | null>(null);
+  let openReport = $state<Awaited<ReturnType<typeof appraisalReport>> | null>(null);
+  let colleagues = $state<Employee[]>([]);
+  let nomineePid = $state("");
+  let nomineeGroup = $state<"manager" | "peer" | "report">("peer");
+  let raterPid = $state("");
+  let raterScores = $state<Record<string, number>>({});
+  let raterComment = $state("");
   let error = $state<string | null>(null);
   let actionError = $state<string | null>(null);
 
@@ -59,6 +77,8 @@
       ]);
       wellbeing = prompts.prompts;
       pulseSurveys = (await listPulseSurveys()).filter((s) => s.open);
+      appraisals = await listAppraisals(pid);
+      if (openAppraisal) await toggleAppraisal(openAppraisal.pid, true);
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
     }
@@ -106,6 +126,34 @@
     try {
       await submitPulse(surveyPid, pid, score);
       pulseThanks = new Set([...pulseThanks, surveyPid]);
+    } catch (cause) {
+      actionError = cause instanceof Error ? cause.message : String(cause);
+    }
+  }
+
+  async function toggleAppraisal(appraisalPid: string, keepOpen = false) {
+    actionError = null;
+    if (!keepOpen && openAppraisal?.pid === appraisalPid) {
+      openAppraisal = null;
+      openReport = null;
+      return;
+    }
+    try {
+      openAppraisal = await getAppraisal(appraisalPid);
+      openReport =
+        openAppraisal.status === "shared" ? await appraisalReport(appraisalPid) : null;
+      if (!colleagues.length) colleagues = await listEmployees();
+      raterScores = Object.fromEntries(openAppraisal.competencies.map((c) => [c, 3]));
+    } catch (cause) {
+      actionError = cause instanceof Error ? cause.message : String(cause);
+    }
+  }
+
+  async function act(action: () => Promise<unknown>) {
+    actionError = null;
+    try {
+      await action();
+      await load();
     } catch (cause) {
       actionError = cause instanceof Error ? cause.message : String(cause);
     }
@@ -234,6 +282,96 @@
       {/each}
     </tbody>
   </table>
+
+  <h2>{t("ap.title")}</h2>
+  <div class="panel" data-testid="appraisals">
+    <button onclick={() => void act(() => createAppraisal(pid, ["communication", "collaboration", "delivery"]))}>
+      {t("ap.new")}
+    </button>
+    {#each appraisals as appraisal (appraisal.pid)}
+      <div>
+        <button onclick={() => void toggleAppraisal(appraisal.pid)}>
+          <span class="chip">{appraisal.status}</span>
+          {appraisal.competencies.join(" · ")}
+          ({appraisal.responded}/{appraisal.nominated})
+        </button>
+        {#if appraisal.status === "draft"}
+          <button onclick={() => void act(() => appraisalStatus(appraisal.pid, "collecting"))}>{t("ap.start")}</button>
+        {:else if appraisal.status === "collecting"}
+          <button onclick={() => void act(() => appraisalStatus(appraisal.pid, "shared"))}>{t("ap.share")}</button>
+        {/if}
+        {#if openAppraisal?.pid === appraisal.pid}
+          <ul>
+            {#each openAppraisal.nominations as nomination (nomination.pid)}
+              <li>
+                {nomination.display_name ?? nomination.rater_pid.slice(0, 8)}
+                <span class="chip">{nomination.group}</span>
+                {#if nomination.responded}✓{/if}
+              </li>
+            {/each}
+          </ul>
+          {#if openAppraisal.status === "draft"}
+            <select bind:value={nomineePid}>
+              <option value="">—</option>
+              {#each colleagues.filter((c) => c.pid !== pid) as colleague (colleague.pid)}
+                <option value={colleague.pid}>{colleague.display_name}</option>
+              {/each}
+            </select>
+            <select bind:value={nomineeGroup}>
+              <option value="manager">manager</option>
+              <option value="peer">peer</option>
+              <option value="report">report</option>
+            </select>
+            <button
+              disabled={!nomineePid}
+              onclick={() => void act(() => nominateRater(appraisal.pid, nomineePid, nomineeGroup))}
+            >{t("ap.nominate")}</button>
+          {:else if openAppraisal.status === "collecting"}
+            <select bind:value={raterPid}>
+              <option value="">—</option>
+              {#each openAppraisal.nominations.filter((n) => !n.responded) as nomination (nomination.pid)}
+                <option value={nomination.rater_pid}>{nomination.display_name ?? nomination.rater_pid.slice(0, 8)}</option>
+              {/each}
+            </select>
+            {#each openAppraisal.competencies as competency (competency)}
+              <label>
+                {competency}
+                <select bind:value={raterScores[competency]}>
+                  {#each [1, 2, 3, 4, 5] as score (score)}
+                    <option value={score}>{score}</option>
+                  {/each}
+                </select>
+              </label>
+            {/each}
+            <input placeholder="…" bind:value={raterComment} />
+            <button
+              disabled={!raterPid}
+              onclick={() => void act(() => respondAppraisal(appraisal.pid, raterPid, raterScores, raterComment.trim() || undefined))}
+            >{t("ap.respond")}</button>
+          {/if}
+          {#if openReport}
+            <h3>{t("ap.report")}</h3>
+            {#each openReport.groups as group (group.group)}
+              <div>
+                <strong>{group.group}</strong>
+                {#if group.withheld}
+                  <span class="muted">{t("ap.withheld")}</span>
+                {:else}
+                  {#each Object.entries(group.competencies ?? {}) as [competency, cell] (competency)}
+                    <span class="chip">{competency}: {cell.mean.toFixed(1)} (n={cell.count})</span>
+                  {/each}
+                  {#each group.comments ?? [] as comment (comment)}
+                    <p class="muted">“{comment}”</p>
+                  {/each}
+                {/if}
+              </div>
+            {/each}
+            <p class="muted">{openReport.derivation}</p>
+          {/if}
+        {/if}
+      </div>
+    {/each}
+  </div>
 
   <h2>{t("emp.reviews")}</h2>
   <table>

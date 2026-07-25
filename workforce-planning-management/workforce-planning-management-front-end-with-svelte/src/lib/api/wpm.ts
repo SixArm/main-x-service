@@ -329,6 +329,100 @@ export function workingTime(
   return api(`/workforce/working-time${qs}`, init);
 }
 
+// ─── 360° appraisals (WPM-R29) ──────────────────────────────────────
+
+/** One appraisal summary row (counts, never content). */
+export interface AppraisalSummary {
+  pid: string;
+  status: "draft" | "collecting" | "shared";
+  competencies: string[];
+  shared_on: string | null;
+  nominated: number;
+  responded: number;
+}
+
+/** One nomination on the detail view: who (and whether they responded). */
+export interface AppraisalNomination {
+  pid: string;
+  rater_pid: string;
+  display_name: string | null;
+  group: "self" | "manager" | "peer" | "report";
+  responded: boolean;
+}
+
+/** One group block on the report: withheld, or disclosed aggregates. */
+export interface AppraisalGroup {
+  group: string;
+  withheld: boolean;
+  responses?: number;
+  competencies?: Record<string, { count: number; mean: number }>;
+  comments?: string[];
+}
+
+/** The subject's appraisals. */
+export function listAppraisals(pid: string, init?: FetchLike): Promise<AppraisalSummary[]> {
+  return api(`/employees/${pid}/appraisals`, init);
+}
+
+/** Open a draft 360 (self nomination is automatic). */
+export function createAppraisal(
+  pid: string,
+  competencies: string[],
+): Promise<{ pid: string }> {
+  return api(`/employees/${pid}/appraisals`, { method: "POST", body: { competencies } });
+}
+
+/** One appraisal + its nominations (who responded, never what). */
+export function getAppraisal(pid: string, init?: FetchLike): Promise<{
+  pid: string;
+  employee_pid: string;
+  status: string;
+  competencies: string[];
+  shared_on: string | null;
+  nominations: AppraisalNomination[];
+}> {
+  return api(`/appraisals/${pid}`, init);
+}
+
+/** Invite a rater (draft only). */
+export function nominateRater(
+  appraisalPid: string,
+  raterPid: string,
+  group: "manager" | "peer" | "report",
+): Promise<{ pid: string }> {
+  return api(`/appraisals/${appraisalPid}/nominations`, {
+    method: "POST",
+    body: { rater_pid: raterPid, group },
+  });
+}
+
+/** Move the appraisal lifecycle (draft → collecting → shared). */
+export function appraisalStatus(pid: string, to: string): Promise<unknown> {
+  return api(`/appraisals/${pid}/status`, { method: "POST", body: { to } });
+}
+
+/** Submit one rater's response (every declared competency, 1–5). */
+export function respondAppraisal(
+  appraisalPid: string,
+  raterPid: string,
+  scores: Record<string, number>,
+  comment?: string,
+): Promise<{ submitted: boolean }> {
+  return api(`/appraisals/${appraisalPid}/responses`, {
+    method: "POST",
+    body: { rater_pid: raterPid, scores, comment },
+  });
+}
+
+/** The group-floored report (shared appraisals only). */
+export function appraisalReport(pid: string, init?: FetchLike): Promise<{
+  appraisal: { pid: string; employee_pid: string; competencies: string[]; shared_on: string | null };
+  groups: AppraisalGroup[];
+  derivation: string;
+}> {
+  return api(`/appraisals/${pid}/report`, init);
+}
+
 // ─── Wellbeing (health entitlements, WPM-R25) ───────────────────────
 
 /** One configurable entitlement rule (non-clinical predicates only). */

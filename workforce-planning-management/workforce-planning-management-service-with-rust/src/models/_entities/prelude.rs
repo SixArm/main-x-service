@@ -1,6 +1,9 @@
 //! Re-exports of every entity for `use ..._entities::prelude::*`.
 
 pub use super::applications::Entity as Applications;
+pub use super::appraisal_nominations::Entity as AppraisalNominations;
+pub use super::appraisal_responses::Entity as AppraisalResponses;
+pub use super::appraisals::Entity as Appraisals;
 pub use super::assessment_instruments::Entity as AssessmentInstruments;
 pub use super::assessment_results::Entity as AssessmentResults;
 pub use super::assessments::Entity as Assessments;
