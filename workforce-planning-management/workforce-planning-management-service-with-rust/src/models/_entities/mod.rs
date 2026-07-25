@@ -28,6 +28,7 @@ pub mod leave_entitlements;
 pub mod leave_requests;
 pub mod mentorship_sessions;
 pub mod mentorships;
+pub mod notifications;
 pub mod onboarding_items;
 pub mod path_enrollments;
 pub mod payroll_runs;

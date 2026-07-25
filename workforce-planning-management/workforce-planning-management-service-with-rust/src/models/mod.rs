@@ -10,4 +10,5 @@
 pub mod _entities;
 pub mod audit_logs;
 pub mod event_outbox;
+pub mod notifications;
 pub mod records;

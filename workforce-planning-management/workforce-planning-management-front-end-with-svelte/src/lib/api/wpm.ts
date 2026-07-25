@@ -329,6 +329,28 @@ export function workingTime(
   return api(`/workforce/working-time${qs}`, init);
 }
 
+// ─── Notifications (WPM-R31) ────────────────────────────────────────
+
+/** One in-app notification (reference-only body, WPM-D23). */
+export interface Notification {
+  pid: string;
+  kind: string;
+  body: string;
+  data: Record<string, unknown>;
+  created_at: string;
+  read_at: string | null;
+}
+
+/** The employee's notifications, unread first ($sub-owned). */
+export function listNotifications(pid: string, init?: FetchLike): Promise<Notification[]> {
+  return api(`/employees/${pid}/notifications`, init);
+}
+
+/** Mark one notification read (owner-only). */
+export function markNotificationRead(pid: string): Promise<Notification> {
+  return api(`/notifications/${pid}/read`, { method: "POST" });
+}
+
 // ─── Subject rights & retention (WPM-R30) ───────────────────────────
 
 /** The retention report: what the next sweep would remove. */

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — notifications panel (WPM-T33 / WPM-R31, 2026-07-25)
+
+- Employee profile: an in-app Notifications panel (unread first) with
+  mark-read. 2 i18n keys × 13 locales.
+
 ### Added — privacy area (WPM-T32 / WPM-R30, 2026-07-25)
 
 - `/privacy`: the retention report (horizon, per-table past-horizon

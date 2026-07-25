@@ -425,6 +425,29 @@ pretending WPM can do things it cannot.*
   jurisdiction-correct payroll tables, equality-law review of scoring
   ([regulatory.md](regulatory.md)).
 
+## WPM-R31 — 360° notifications
+
+*As a rater I find out that my feedback is wanted; as a subject I find
+out my report is ready — without leaving the app.*
+
+- **In-app notifications**, written by WPM's own lifecycle
+  transitions ([design.md](design.md) WPM-D23): moving an appraisal to
+  `collecting` notifies **every rater** (self included — the
+  self-assessment is a task too); moving to `shared` notifies the
+  subject.
+- A notification carries a kind (`appraisal_request` |
+  `appraisal_shared`), a neutral body, and reference data (the
+  appraisal, the subject's name for a request) — **never** scores or
+  comments (the WPM-D21 posture extends to notifications).
+- `GET /api/employees/{pid}/notifications` (`$sub`-owned; unread
+  first) and `POST /api/notifications/{pid}/read` (owner-only).
+- Erasure deletes the employee's notifications; the subject-access
+  export includes them.
+- Out of scope, stated: outbound delivery (email/push). WPM holds no
+  contact details — identities are URNs — so external channels are a
+  deployment integration over the upstream person service, not a WPM
+  feature.
+
 ## WPM-R17 — Family fixtures
 
 - OpenAPI + Swagger, `Accepts-version` negotiation, `/metrics.prom`,

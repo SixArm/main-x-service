@@ -17,16 +17,19 @@
     listEmployees,
     listEntitlements,
     listLeaveRequests,
+    listNotifications,
     listOnboarding,
     listPulseSurveys,
     listReviews,
     listTraining,
+    markNotificationRead,
     money,
     nominateRater,
     respondAppraisal,
     submitPulse,
     type AppraisalRequest,
     type AppraisalSummary,
+    type Notification,
     type PulseSurvey,
     type WellbeingPrompt,
   } from "$lib/api/wpm";
@@ -53,6 +56,7 @@
   let pulseThanks = $state<Set<string>>(new Set());
   let appraisals = $state<AppraisalSummary[]>([]);
   let myRequests = $state<AppraisalRequest[]>([]);
+  let notifications = $state<Notification[]>([]);
   let requestScores = $state<Record<string, number>>({});
   let requestComment = $state("");
   let openRequest = $state<string | null>(null);
@@ -86,6 +90,7 @@
       pulseSurveys = (await listPulseSurveys()).filter((s) => s.open);
       appraisals = await listAppraisals(pid);
       myRequests = await appraisalRequests(pid);
+      notifications = await listNotifications(pid);
       if (openAppraisal) await toggleAppraisal(openAppraisal.pid, true);
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
@@ -308,6 +313,24 @@
       {/each}
     </tbody>
   </table>
+
+  {#if notifications.length}
+    <h2>{t("emp.notifications")}</h2>
+    <ul class="panel" data-testid="notifications">
+      {#each notifications as notification (notification.pid)}
+        <li>
+          {notification.body}
+          {#if notification.read_at === null}
+            <button onclick={() => void act(() => markNotificationRead(notification.pid))}>
+              {t("notif.markRead")}
+            </button>
+          {:else}
+            <span class="muted">✓</span>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  {/if}
 
   {#if myRequests.length}
     <h2>{t("ap.requests")}</h2>

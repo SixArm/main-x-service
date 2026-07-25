@@ -439,3 +439,25 @@ code + tests in one PR.
       locales. **Acceptance:** svelte-check 0; vitest 10 (path map
       extended); Playwright 9 (new stubbed `/privacy` spec: report
       renders, sweep posts and shows counts). (WPM-R30)
+
+- [x] WPM-T33 (2026-07-25) **360° notifications.** Migration
+      `m20260725_000015_notifications` (`notifications`: employee,
+      kind, neutral body, reference data, `read_at`). `rules/notify.rs`
+      (pure): the closed kinds and the fan-out — `collecting` ⇒ every
+      rater (self included; the self-assessment is a task),
+      `shared` ⇒ the subject. The appraisal status handler pushes the
+      rows (reference-only bodies — never scores or comments; the
+      WPM-D21 guarantee survives the bell, new WPM-D23);
+      `GET /api/employees/{pid}/notifications` (unread first,
+      `$sub`-owned) + `POST /api/notifications/{pid}/read`
+      (owner-only). Erasure deletes the employee's notifications
+      (`notifications_deleted` in the audit snapshot); the
+      subject-access export includes them. Outbound channels are
+      stated out of scope — WPM holds no contact details. Front-end:
+      a Notifications panel on the profile with mark-read; 2 i18n
+      keys × 13 locales. **Acceptance:** fan-out pure pins; the 360
+      round-trip pins rater + self request bells, the subject's
+      shared bell, no rater content in any bell, and mark-read —
+      suite 17/17 vs Postgres 18 (133 unit); clippy pedantic clean;
+      svelte-check 0; vitest 10; Playwright 9. (WPM-D21, WPM-D23;
+      WPM-R31)

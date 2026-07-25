@@ -19,8 +19,10 @@ use super::{ensure_valid, record_rejection, unprocessable};
 use crate::auth::{self, MaybeAuthUser};
 use crate::models::_entities::{appraisal_nominations, appraisal_responses, appraisals, employees};
 use crate::models::audit_logs::Model as Audit;
+use crate::models::notifications::Model as Notification;
 use crate::models::records;
 use crate::rules::appraisal as rules;
+use crate::rules::notify;
 use crate::validation::Problems;
 
 /// A `{pid}` reference response.
@@ -224,6 +226,38 @@ async fn appraisal_status(
         active.shared_on = ActiveValue::set(Some(chrono::Utc::now().date_naive()));
     }
     let updated = active.update(&ctx.db).await?;
+    // Fan out the in-app notifications (WPM-R31): collecting tells
+    // every rater; shared tells the subject. Reference-only bodies —
+    // never scores or comments (WPM-D23).
+    let rater_pids: Vec<Uuid> = appraisal_nominations::Entity::find()
+        .filter(appraisal_nominations::Column::AppraisalPid.eq(row_pid))
+        .all(&ctx.db)
+        .await?
+        .iter()
+        .map(|n| n.rater_pid)
+        .collect();
+    let subject = employees::Entity::find()
+        .filter(employees::Column::Pid.eq(updated.employee_pid))
+        .one(&ctx.db)
+        .await?;
+    let subject_name = subject.map_or_else(String::new, |s| s.display_name);
+    for (recipient, kind) in
+        notify::appraisal_recipients(&payload.to, updated.employee_pid, &rater_pids)
+    {
+        let body = if kind == "appraisal_shared" {
+            "Your 360\u{b0} report is ready".to_string()
+        } else {
+            format!("360\u{b0} feedback requested for {subject_name}")
+        };
+        Notification::push(
+            &ctx.db,
+            recipient,
+            kind,
+            &body,
+            serde_json::json!({ "appraisal_pid": row_pid }),
+        )
+        .await?;
+    }
     Audit::record(
         &ctx.db,
         "appraisal",

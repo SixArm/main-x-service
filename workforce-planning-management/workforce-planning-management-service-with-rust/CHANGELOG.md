@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — 360° notifications (WPM-T33 / WPM-R31, 2026-07-25)
+
+- In-app notifications (new WPM-D23: in-app, reference-only,
+  event-born — WPM holds no contact details, so outbound channels are
+  a deployment integration, stated not simulated). Moving an
+  appraisal to `collecting` notifies every rater (self included);
+  `shared` notifies the subject. Bodies carry a neutral line and the
+  appraisal reference — never scores or comments.
+- `GET /api/employees/{pid}/notifications` (unread first,
+  `$sub`-owned) + `POST /api/notifications/{pid}/read` (owner-only).
+  Erasure deletes them; the subject-access export includes them.
+
 ### Added — auth activation surface (WPM-T31 / WPM-G1, 2026-07-25)
 
 - `config/abac-policy.reference.json` — the `auth.md` personas as a

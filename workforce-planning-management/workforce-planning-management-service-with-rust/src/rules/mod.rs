@@ -9,6 +9,7 @@ pub mod assessment;
 pub mod benchmark;
 pub mod learning;
 pub mod leave;
+pub mod notify;
 pub mod lifecycle;
 pub mod org;
 pub mod payroll;

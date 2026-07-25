@@ -107,6 +107,32 @@ async fn appraisal_round_trip() {
             .json(&json!({ "to": "collecting" }))
             .await
             .assert_status_ok();
+        // Moving to collecting notified every rater — self included —
+        // with a reference-only body (WPM-R31/D23).
+        let manager_bell: Value = request
+            .get(&format!("/api/employees/{manager}/notifications"))
+            .await
+            .json();
+        let bells = manager_bell.as_array().unwrap();
+        assert_eq!(bells.len(), 1);
+        assert_eq!(bells[0]["kind"], "appraisal_request");
+        assert!(bells[0]["body"].as_str().unwrap().contains("Test Employee A-0"));
+        let self_bell: Value = request
+            .get(&format!("/api/employees/{subject}/notifications"))
+            .await
+            .json();
+        assert!(
+            self_bell.as_array().unwrap().iter().any(|n| n["kind"] == "appraisal_request"),
+            "the self-assessment is a task too"
+        );
+        // Mark the manager's read: it stays listed, stamped.
+        let bell_pid = bells[0]["pid"].as_str().unwrap();
+        let read: Value = request
+            .post(&format!("/api/notifications/{bell_pid}/read"))
+            .await
+            .json();
+        assert!(read["read_at"].is_string());
+
         // Nominations freeze once collecting.
         let late = seed_employee(&request, &org, "A-L", None).await;
         assert_eq!(
@@ -249,6 +275,23 @@ async fn appraisal_round_trip() {
         );
         // (The floor transition is pinned in the pure rules; end-to-end
         // the shared gate correctly freezes late responses.)
+
+        // Sharing notified the subject — and the notification carries
+        // no rater content (WPM-D21 survives the bell).
+        let subject_bell: Value = request
+            .get(&format!("/api/employees/{subject}/notifications"))
+            .await
+            .json();
+        let shared_note = subject_bell
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|n| n["kind"] == "appraisal_shared")
+            .expect("subject notified on share")
+            .clone();
+        assert!(shared_note["body"].as_str().unwrap().contains("report is ready"));
+        let bell_raw = serde_json::to_string(&subject_bell).unwrap();
+        assert!(!bell_raw.contains("delegate more"), "no rater content in notifications");
 
         // The report read is audited (WPM-R10 sensitivity posture).
         let audits: Value = request.get("/api/audits/recent").await.json();

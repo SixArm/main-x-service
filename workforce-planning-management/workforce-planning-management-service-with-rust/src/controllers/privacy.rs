@@ -14,8 +14,9 @@ use crate::auth::{self, MaybeAuthUser};
 use crate::models::_entities::{
     appraisal_nominations, appraisal_responses, appraisals, assessments, benefit_enrollments,
     candidates, development_plans, employee_skills, employees, entitlement_acknowledgements,
-    leave_entitlements, leave_requests, mentorships, path_enrollments, payslips, pipeline_members,
-    program_placements, reviews, shift_assignments, time_entries, training_enrollments,
+    leave_entitlements, leave_requests, mentorships, notifications, path_enrollments, payslips,
+    pipeline_members, program_placements, reviews, shift_assignments, time_entries,
+    training_enrollments,
 };
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
@@ -110,6 +111,7 @@ async fn subject_access(
         "payslips": rows_for!(db, payslips, EmployeePid, epid),
         "wellbeing_acknowledgements":
             rows_for!(db, entitlement_acknowledgements, EmployeePid, epid),
+        "notifications": rows_for!(db, notifications, EmployeePid, epid),
         "assessments": rows_for!(db, assessments, SubjectPid, epid),
         "pipeline_memberships": rows_for!(db, pipeline_members, SubjectPid, epid),
         "mentorships": mentorship_rows,
@@ -179,6 +181,7 @@ async fn erase(
         ),
         format!("UPDATE appraisals SET deleted_at = now() WHERE employee_pid = '{epid}' AND deleted_at IS NULL"),
         format!("DELETE FROM entitlement_acknowledgements WHERE employee_pid = '{epid}'"),
+        format!("DELETE FROM notifications WHERE employee_pid = '{epid}'"),
     ];
     let mut affected = Vec::new();
     for statement in &statements {
@@ -197,6 +200,7 @@ async fn erase(
             "session_notes_scrubbed": affected[2],
             "appraisals_closed": affected[3],
             "acknowledgements_deleted": affected[4],
+            "notifications_deleted": affected[5],
         })),
     )
     .await?;

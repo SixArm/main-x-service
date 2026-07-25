@@ -237,3 +237,21 @@ refused honestly: WPM cannot erase what the upstream identity
 services hold — the export and erasure cover WPM's own store, and
 coordination with person/worker services is the deployment's duty
 (stated, not simulated).
+
+## WPM-D23 — Notifications are in-app, reference-only, and event-born
+
+WPM stores no email address or phone number — identities are URNs and
+demographics stay upstream — so a "send an email" feature would
+either invent a contact-details store (violating the scope boundary)
+or silently do nothing. Notifications are therefore **in-app**: rows
+written by WPM's own lifecycle transitions in the same handler that
+makes the change, listed on the employee's own surface
+(`$sub`-owned), marked read by their owner. Two rules keep them
+safe: they are **reference-only** — a kind, a neutral body, and pids/
+names, never scores, comments, salary, or any masked-tier value
+(a notification list is a read path like any other, and the WPM-D21
+"no rater-level content on any endpoint" guarantee must survive it) —
+and they are **owned data**, so erasure deletes them and the
+subject-access export includes them. Outbound channels (email, push,
+chat) are a deployment integration over the upstream person service's
+contact details, deliberately out of WPM.

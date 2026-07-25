@@ -207,6 +207,8 @@ pub fn spec() -> Value {
             "/api/appraisals/{pid}/status": { "post": { "tags": ["appraisals"], "summary": "draft -> collecting (needs >= 3 non-self raters) -> shared (stamps shared_on)", "responses": transition } },
             "/api/appraisals/{pid}/responses": { "post": { "tags": ["appraisals"], "summary": "One rater's response: collecting only, nominated only, once per rater, every declared competency scored 1-5 ($sub-owned)", "responses": created } },
             "/api/appraisals/{pid}/report": { "get": { "tags": ["appraisals"], "summary": "Group-floored report (shared only; reads audited): group x competency count+mean, pooled comments; peer/report cells under 3 responses withheld, count included", "responses": ok("Report") } },
+            "/api/employees/{pid}/notifications": { "get": { "tags": ["notifications"], "summary": "The employee's in-app notifications, unread first ($sub-owned; reference-only bodies, WPM-D23)", "responses": ok("Notifications") } },
+            "/api/notifications/{pid}/read": { "post": { "tags": ["notifications"], "summary": "Mark one notification read (owner-only)", "responses": ok("Notification") } },
             "/api/employees/{pid}/subject-access": { "get": { "tags": ["privacy"], "summary": "Subject-access export: everything WPM holds for this employee, exclusions named (audited; $sub/HR)", "responses": ok("Export") } },
             "/api/employees/{pid}/erase": { "post": { "tags": ["privacy"], "summary": "Erasure-as-anonymisation (WPM-D22): scrub identity + authored text, close appraisals; payroll rows remain; refused while employment is open (destructive)", "responses": transition } },
             "/api/retention": { "get": { "tags": ["privacy"], "summary": "Retention report: soft-deleted rows past the horizon per table + expired-consent candidates (WPM_RETENTION_DAYS, floor 30)", "responses": ok("Report") } },
@@ -257,6 +259,8 @@ mod tests {
             "/api/employees/{pid}/subject-access",
             "/api/employees/{pid}/erase",
             "/api/retention/sweep",
+            "/api/employees/{pid}/notifications",
+            "/api/notifications/{pid}/read",
         ] {
             assert!(paths.contains_key(p), "missing {p}");
         }

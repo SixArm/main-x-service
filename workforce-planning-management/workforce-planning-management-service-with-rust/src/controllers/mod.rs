@@ -15,6 +15,7 @@ pub mod hr_core;
 pub mod intelligence;
 pub mod learning;
 pub mod metrics;
+pub mod notifications;
 pub mod payroll;
 pub mod privacy;
 pub mod talent;
