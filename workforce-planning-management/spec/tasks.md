@@ -137,8 +137,13 @@ code + tests in one PR.
 
 ## Production gates (before any non-demo exposure)
 
-- [ ] WPM-G1 Activate `WPM_REQUIRE_AUTH` + mount a real ABAC policy;
+- [~] WPM-G1 Activate `WPM_REQUIRE_AUTH` + mount a real ABAC policy;
       verify the persona matrix against the deployment's attributes.
+      **Code side landed as WPM-T31 (2026-07-25)** — the shipped
+      reference policy, the activation runbook (spec `auth.md`), and
+      the enforcement matrix verifying the reference file itself.
+      The remaining act — setting the flag and attributes on a real
+      deployment — is operational by design.
 - [~] WPM-G2 Retention schedules + subject-access/erasure flows;
       jurisdiction-correct payroll tables; equality-law review of any
       scoring ([regulatory.md](regulatory.md)). **Code side landed as
@@ -397,3 +402,28 @@ code + tests in one PR.
       full `--ignored` suite 17/17 vs Postgres 18 (131 unit); clippy
       pedantic clean; svelte-check 0; vitest 10; Playwright 8.
       (WPM-D7, WPM-D22; WPM-R30, WPM-G2)
+
+- [x] WPM-T31 (2026-07-25) **Auth activation surface (the code side
+      of WPM-G1).** Ships
+      `config/abac-policy.reference.json` — the spec `auth.md`
+      personas as policy: svc/admin everything; `payroll=true`
+      unmasked read; `hr=true` write + **masked** read (salary stays
+      payroll + self); `resource.person = $sub` self-read unmasked;
+      masked-read fallback — plus the **activation runbook** in
+      `auth.md` (mount → keys → flag → verify; known engine limits
+      stated: self-service writes need a coarse write allow;
+      manager scoping is per-department). Two masking gaps found and
+      fixed during verification: `subject-access` now **refuses** a
+      masked caller (`403` — a full export cannot be "masked"), and
+      the 360 report withholds comments (review-content tier) from
+      masked callers while keeping the numeric aggregates. The
+      enforcement binary now mounts **the shipped reference file
+      itself** (`WPM_ABAC_POLICY_FILE`) and extends the matrix:
+      payroll-unmasked vs hr-masked reads, subject-access self-200 /
+      masked-403, `/erase`+`/sweep` destructive (hr 403; svc sweep
+      200; svc erase of an **active** employment still 422 — the
+      lawful basis holds regardless of privilege), and the
+      masked-report comment withholding. **Acceptance:** enforcement
+      matrix green first run; full `--ignored` suite 17/17 + 131 unit
+      vs Postgres 18; clippy pedantic clean. (WPM-D6, WPM-D7,
+      WPM-D21, WPM-D22; WPM-R15, WPM-G1)

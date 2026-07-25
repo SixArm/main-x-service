@@ -362,12 +362,15 @@ async fn report(
         return Err(unprocessable("the report is readable once shared"));
     }
     let subject = records::find_employee(&ctx.db, appraisal.employee_pid).await?;
-    auth::authorize_record(
+    let obligations = auth::authorize_record(
         &caller,
         authentication_verifier::Action::Read,
         &auth::employee_resource_attrs(&subject),
     )
     .map_err(record_rejection)?;
+    // Comments are review-content tier (spec auth.md): a masked read
+    // keeps the numeric aggregates but the words are withheld.
+    let comments_masked = obligations.iter().any(|o| o == "mask");
     let declared: Vec<String> =
         serde_json::from_value(appraisal.competencies.clone()).unwrap_or_default();
     let responses = appraisal_responses::Entity::find()
@@ -412,7 +415,10 @@ async fn report(
             "withheld": false,
             "responses": group_responses.len(),
             "competencies": competencies,
-            "comments": comments,
+            "comments": if comments_masked { serde_json::Value::Null } else {
+                serde_json::json!(comments)
+            },
+            "comments_withheld": comments_masked,
         }));
     }
     Audit::record(&ctx.db, "appraisal", appraisal.pid, "report_read", caller.actor(), None)

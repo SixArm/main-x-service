@@ -61,21 +61,14 @@ fn sign_as(kid: &str, sub: &str, attrs: &[(&str, &[&str])]) -> String {
     builder.try_sign(&private).expect("sign")
 }
 
-/// The deployment policy for the matrix (spec `auth.md` personas):
-/// machine peers do everything; `access=write` writes; an employee
-/// reads their **own** record unmasked via the `$sub` ownership
-/// template; everyone else authenticated gets a **masked** read.
-fn test_policy() -> String {
-    json!({ "rules": [
-        { "effect": "allow",
-          "actions": ["read", "write", "delete", "destructive"],
-          "when": { "svc": ["true"] } },
-        { "effect": "allow", "actions": ["write"], "when": { "access": ["write"] } },
-        { "effect": "allow", "actions": ["read"], "when": { "resource.person": ["$sub"] } },
-        { "effect": "allow", "actions": ["read"], "when": {}, "obligations": ["mask"] }
-    ] })
-    .to_string()
-}
+/// The matrix runs against **the shipped reference policy file**
+/// (`config/abac-policy.reference.json`, WPM-G1) — so what the
+/// runbook tells a deployment to mount is exactly what is verified:
+/// svc/admin everything; `payroll=true` unmasked read; `hr=true`
+/// write + masked read; `$sub` self-read unmasked; masked-read
+/// fallback for every other authenticated caller.
+const REFERENCE_POLICY_FILE: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/config/abac-policy.reference.json");
 
 /// The full persona matrix in one test (one boot ⇒ one set of cached
 /// `OnceLock`s): public paths stay open, missing tokens are 401, the
@@ -92,12 +85,13 @@ async fn enforcement_personas_gate_and_mask() {
     unsafe {
         std::env::set_var("WPM_REQUIRE_AUTH", "1");
         std::env::set_var("WPM_PASETO_KEYS", keys.to_string());
-        std::env::set_var("WPM_ABAC_POLICY", test_policy());
+        std::env::set_var("WPM_ABAC_POLICY_FILE", REFERENCE_POLICY_FILE);
     }
     let my_person = uuid::Uuid::new_v4();
     let me = sign_as(&kid, &my_person.to_string(), &[]);
     let other = sign_as(&kid, &uuid::Uuid::new_v4().to_string(), &[]);
-    let writer = sign_as(&kid, "hr-user", &[("access", &["write"])]);
+    let writer = sign_as(&kid, "hr-user", &[("hr", &["true"])]);
+    let payroll = sign_as(&kid, "payroll-user", &[("payroll", &["true"])]);
     let machine = sign_as(&kid, "svc-user", &[("svc", &["true"])]);
 
     request::<App, _, _>(|request, _ctx| async move {
@@ -235,6 +229,153 @@ async fn enforcement_personas_gate_and_mask() {
             response.json()
         };
         assert!(my_slips.as_array().unwrap()[0]["gross_minor"].as_i64().unwrap() > 0);
+
+        // The payroll persona reads the employee unmasked.
+        let payroll_view: Value = {
+            let response = request
+                .get(&format!("/api/employees/{employee_pid}"))
+                .add_header("authorization", bearer(&payroll))
+                .await;
+            assert_eq!(response.status_code(), 200);
+            response.json()
+        };
+        assert_eq!(payroll_view["salary_minor"], 3_600_000, "payroll sees salary");
+        // HR reads masked (salary stays payroll + self).
+        let hr_view: Value = {
+            let response = request
+                .get(&format!("/api/employees/{employee_pid}"))
+                .add_header("authorization", bearer(&writer))
+                .await;
+            assert_eq!(response.status_code(), 200);
+            response.json()
+        };
+        assert!(hr_view["salary_minor"].is_null(), "hr read is masked");
+
+        // Subject access (WPM-R30): the subject exports unmasked; a
+        // masked caller is refused outright — a full export cannot be
+        // "masked".
+        let my_export = request
+            .get(&format!("/api/employees/{employee_pid}/subject-access"))
+            .add_header("authorization", bearer(&me))
+            .await;
+        assert_eq!(my_export.status_code(), 200);
+        assert_eq!(my_export.json::<Value>()["employee"]["salary_minor"], 3_600_000);
+        assert_eq!(
+            request
+                .get(&format!("/api/employees/{employee_pid}/subject-access"))
+                .add_header("authorization", bearer(&other))
+                .await
+                .status_code(),
+            403,
+            "masked callers cannot receive the export"
+        );
+
+        // Erasure and the sweep are destructive: hr (write) is 403;
+        // even the machine peer cannot erase an ACTIVE employment
+        // (the lawful basis holds regardless of privilege).
+        assert_eq!(
+            request
+                .post(&format!("/api/employees/{employee_pid}/erase"))
+                .add_header("authorization", bearer(&writer))
+                .await
+                .status_code(),
+            403,
+            "write is not destructive"
+        );
+        assert_eq!(
+            request
+                .post(&format!("/api/employees/{employee_pid}/erase"))
+                .add_header("authorization", bearer(&machine))
+                .await
+                .status_code(),
+            422,
+            "active employment refuses erasure even for svc"
+        );
+        assert_eq!(
+            request
+                .post("/api/retention/sweep")
+                .add_header("authorization", bearer(&writer))
+                .await
+                .status_code(),
+            403
+        );
+        assert_eq!(
+            request
+                .post("/api/retention/sweep")
+                .add_header("authorization", bearer(&machine))
+                .await
+                .status_code(),
+            200
+        );
+
+        // 360 report under mask (WPM-R29): comments are review-content
+        // tier — a masked caller keeps the numbers, loses the words.
+        let with_auth = |builder: axum_test::TestRequest, token: &str| {
+            builder.add_header("authorization", format!("Bearer {token}"))
+        };
+        let mut rater_pids = Vec::new();
+        for n in 0..3 {
+            let rater = with_auth(request.post("/api/employees"), &machine)
+                .json(&json!({
+                    "person_ref": format!("person:{}", uuid::Uuid::new_v4()),
+                    "organization_ref": org,
+                    "employee_number": format!("E-90{n}"),
+                    "display_name": format!("Rater {n}"),
+                    "employment_type": "permanent", "department": "engineering",
+                    "job_title": "Engineer", "hired_on": "2026-01-05",
+                }))
+                .await
+                .json::<Value>();
+            rater_pids.push(rater["pid"].as_str().unwrap().to_string());
+        }
+        let appraisal = with_auth(
+            request.post(&format!("/api/employees/{employee_pid}/appraisals")),
+            &machine,
+        )
+        .json(&json!({ "competencies": ["communication"] }))
+        .await
+        .json::<Value>();
+        let a_pid = appraisal["pid"].as_str().unwrap().to_string();
+        for (n, rater) in rater_pids.iter().enumerate() {
+            let group = if n == 0 { "manager" } else { "peer" };
+            with_auth(request.post(&format!("/api/appraisals/{a_pid}/nominations")), &machine)
+                .json(&json!({ "rater_pid": rater, "group": group }))
+                .await
+                .assert_status_ok();
+        }
+        with_auth(request.post(&format!("/api/appraisals/{a_pid}/status")), &machine)
+            .json(&json!({ "to": "collecting" }))
+            .await
+            .assert_status_ok();
+        with_auth(request.post(&format!("/api/appraisals/{a_pid}/responses")), &machine)
+            .json(&json!({ "rater_pid": rater_pids[0],
+                           "scores": { "communication": 4 },
+                           "comment": "Delegate more." }))
+            .await
+            .assert_status_ok();
+        with_auth(request.post(&format!("/api/appraisals/{a_pid}/status")), &machine)
+            .json(&json!({ "to": "shared" }))
+            .await
+            .assert_status_ok();
+        let full_report: Value =
+            with_auth(request.get(&format!("/api/appraisals/{a_pid}/report")), &payroll)
+                .await
+                .json();
+        let manager_group = full_report["groups"].as_array().unwrap()
+            .iter().find(|g| g["group"] == "manager").unwrap().clone();
+        assert_eq!(manager_group["comments"][0], "Delegate more.", "unmasked read sees words");
+        let masked_report: Value =
+            with_auth(request.get(&format!("/api/appraisals/{a_pid}/report")), &other)
+                .await
+                .json();
+        let masked_manager = masked_report["groups"].as_array().unwrap()
+            .iter().find(|g| g["group"] == "manager").unwrap().clone();
+        assert_eq!(masked_manager["comments_withheld"], true);
+        assert!(masked_manager["comments"].is_null(), "masked read loses the words");
+        assert_eq!(
+            masked_manager["competencies"]["communication"]["mean"], 4.0,
+            "masked read keeps the numbers"
+        );
 
         // Writer may not delete; the machine peer may.
         assert_eq!(

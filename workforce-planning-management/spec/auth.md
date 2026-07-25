@@ -40,3 +40,39 @@ applied to HR.
 
 Every read of a highest/high-tier record is **audited** (see
 [audit.md](audit.md)).
+
+## Activation runbook (WPM-G1)
+
+The shipped default is **wide open** (family posture,
+`agents/share/security.md` §4). Activation is a release gate, not a
+config tweak:
+
+1. **Mount a policy.** Start from the shipped reference,
+   [`config/abac-policy.reference.json`](../workforce-planning-management-service-with-rust/config/abac-policy.reference.json)
+   — svc/admin do everything, `payroll=true` reads unmasked,
+   `hr=true` writes and reads **masked** (salary stays payroll+self),
+   `resource.person = $sub` reads the own record unmasked, and every
+   other authenticated caller gets the masked-read fallback. Point
+   `WPM_ABAC_POLICY_FILE` at your copy (it hot-reloads on change) or
+   inline it via `WPM_ABAC_POLICY`.
+2. **Point at the keys.** `WPM_PASETO_KEYS_URL` (boot-fetched +
+   refreshed) or `WPM_PASETO_KEYS`; set `WPM_TOKEN_ISSUER` /
+   `WPM_TOKEN_AUDIENCE` if they differ from the defaults.
+3. **Flip the flag.** `WPM_REQUIRE_AUTH=1` (read once at boot —
+   restart to change).
+4. **Verify.** `cargo test --test enforcement -- --ignored` runs the
+   persona matrix against the reference policy shape: public paths
+   open; 401 without a token; masked vs self vs payroll reads;
+   destructive ops (`delete`, `/erase`, `/sweep`) admin-only; the
+   subject-access export refused to masked callers; 360 report
+   comments withheld from masked callers.
+
+Known engine limits a deployment must plan around (stated, not
+hidden): employee **self-service writes** need a coarse `write` allow
+to pass the blanket guard (the guard evaluates without record
+attributes), so grant them via a subject attribute (e.g.
+`access=write` for staff) and rely on the record-level `$sub` checks
+on ownership-enforcing handlers; department-scoped manager rules are
+written per department (`{"manager": ["true"],
+"resource.department": ["engineering"]}`) because subject-vs-resource
+attribute equality has no template.

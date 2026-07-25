@@ -54,12 +54,24 @@ async fn subject_access(
     Path(pid): Path<String>,
 ) -> Result<Response> {
     let employee = records::find_employee(&ctx.db, records::parse_pid(&pid)?).await?;
-    auth::authorize_record(
+    let obligations = auth::authorize_record(
         &caller,
         authentication_verifier::Action::Read,
         &auth::employee_resource_attrs(&employee),
     )
     .map_err(record_rejection)?;
+    // A masked read of a *full export* would be a contradiction — the
+    // export exists to disclose everything. Refuse rather than leak:
+    // subject access is for the subject (`$sub`) and unmasked-read
+    // personas (payroll/admin/svc), never the masked fallback.
+    if obligations.iter().any(|o| o == "mask") {
+        return Err(record_rejection((
+            axum::http::StatusCode::FORBIDDEN,
+            "subject access requires an unmasked read (the export discloses \
+             salary and payslips; masked callers cannot receive it)"
+                .to_string(),
+        )));
+    }
     let db = &ctx.db;
     let epid = employee.pid;
     // 360°: appraisals about them, nominations naming them as rater,

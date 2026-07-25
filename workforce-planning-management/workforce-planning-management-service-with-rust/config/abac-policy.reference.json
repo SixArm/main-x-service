@@ -1,0 +1,32 @@
+{
+  "rules": [
+    { "effect": "allow",
+      "actions": ["read", "write", "delete", "destructive"],
+      "when": { "svc": ["true"] } },
+
+    { "effect": "allow",
+      "actions": ["read", "write", "delete", "destructive"],
+      "when": { "access": ["admin"] } },
+
+    { "effect": "allow",
+      "actions": ["read"],
+      "when": { "payroll": ["true"] } },
+
+    { "effect": "allow",
+      "actions": ["write"],
+      "when": { "hr": ["true"] } },
+    { "effect": "allow",
+      "actions": ["read"],
+      "when": { "hr": ["true"] },
+      "obligations": ["mask"] },
+
+    { "effect": "allow",
+      "actions": ["read"],
+      "when": { "resource.person": ["$sub"] } },
+
+    { "effect": "allow",
+      "actions": ["read"],
+      "when": {},
+      "obligations": ["mask"] }
+  ]
+}

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — auth activation surface (WPM-T31 / WPM-G1, 2026-07-25)
+
+- `config/abac-policy.reference.json` — the `auth.md` personas as a
+  shipped, verified policy: svc/admin everything, payroll unmasked
+  read, HR write + masked read, `$sub` self-read, masked fallback.
+  The enforcement binary now mounts **this file** via
+  `WPM_ABAC_POLICY_FILE`, so the runbook and the verification cannot
+  drift. Activation runbook added to spec `auth.md` (with the engine's
+  known limits stated).
+- **Fixed** two masking gaps found during verification:
+  `GET …/subject-access` refused (`403`) to masked callers — a full
+  export cannot be "masked"; the 360 report withholds comments
+  (review-content tier) from masked callers while keeping the numeric
+  aggregates (`comments_withheld` flag).
+- Matrix extensions: payroll vs HR read masking, subject-access
+  self/masked split, `/erase` + `/sweep` destructive gating, and
+  svc-erase of an active employment still refused (the lawful basis
+  holds regardless of privilege).
+
 ### Added — subject rights & retention (WPM-T30 / WPM-R30, 2026-07-25)
 
 - `GET /api/employees/{pid}/subject-access` — everything WPM holds for
