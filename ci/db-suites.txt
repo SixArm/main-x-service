@@ -31,6 +31,20 @@ workforce-planning-management/workforce-planning-management-service-with-rust
 #   It also needs `./data/search_index` to exist before boot, which no
 #   fixture creates. Enrol once both are fixed.
 #
+# person/person-service-with-loco
+#   Excluded despite carrying the audit chain (2026-07-26). Its own
+#   compliance pins — `db::audit::chain_tests::*` — pass against Postgres,
+#   but the crate's wider `--ignored` suite cannot run here because its
+#   migrations do not apply to a fresh database. Two pre-existing defects,
+#   both verified present before any of this work:
+#     1. `2024122800000005_add_indexes_and_triggers/up.sql` builds a
+#        `gin_trgm_ops` index on `patient_names.given`, which is `text[]`
+#        (the operator class only accepts `text`/`varchar`), and creates
+#        the `pg_trgm` extension *after* first using it.
+#     2. The rename migration leaves `person_names` without the
+#        `person_id` column the repository code inserts into.
+#   Enrol once a fresh-database migrate succeeds end to end.
+#
 # Every other service:
 #   Their `--ignored` suites have never been run against a database in
 #   this environment, so their state is genuinely unknown. Enrol each one

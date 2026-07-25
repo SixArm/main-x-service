@@ -309,9 +309,16 @@ engineering practice without the device framing.
    disclosure history cannot be more open than the record it describes.
    case adopts the audit half only; the GDPR residency/lawful-basis
    declarations, FHIR conformance and the SBOM bundle follow at steps
-   4–5. **person and worker are not started** — they use the older
-   `src/db/audit.rs` MPI layer with a different table shape, so the copy
-   is a port rather than a paste.
+   4–5. **person ✔ (2026-07-26, audit chain only)** — ported rather than
+   copied: person's `audit_log` has a UUID primary key, so the chain
+   orders on a new `seq BIGSERIAL` rather than the PK, and the digest
+   binds the old/new value pair plus request provenance
+   (`ip_address`, `user_agent`) so *who* acted cannot be rewritten
+   while *what* they did stays intact. Read/disclosure auditing is
+   **not** yet wired into person's read paths. Person is not enrolled
+   in CI's DB suites: two pre-existing migration defects stop its
+   schema applying to a fresh database (see `ci/db-suites.txt`).
+   **worker is not started.**
 4. **Copy the FHIR conformance machinery** to the services that already
    mount `/fhir` (organization, place, thing, person, worker, case, event).
 5. **Lift the evidence artefacts** (`compliance/`, `scripts/`) to the

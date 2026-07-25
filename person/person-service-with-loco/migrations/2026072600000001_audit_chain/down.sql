@@ -1,0 +1,7 @@
+DROP INDEX IF EXISTS audit_log_seq_idx;
+ALTER TABLE audit_log DROP COLUMN IF EXISTS redacted_at;
+ALTER TABLE audit_log DROP COLUMN IF EXISTS disclosure;
+ALTER TABLE audit_log DROP COLUMN IF EXISTS context;
+ALTER TABLE audit_log DROP COLUMN IF EXISTS hash;
+ALTER TABLE audit_log DROP COLUMN IF EXISTS prev_hash;
+ALTER TABLE audit_log DROP COLUMN IF EXISTS seq;

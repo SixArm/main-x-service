@@ -23,6 +23,7 @@ mod m20260708_000001_create_event_outbox;
 mod m20260710_000001_create_entity_links;
 mod m20260710_000002_create_bulk_jobs;
 mod m20260719_000001_create_review_queue;
+mod m20260726_000001_audit_chain;
 
 /// The migration runner this crate exposes to loco / `sea-orm-migration`.
 pub struct Migrator;
@@ -42,6 +43,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260710_000001_create_entity_links::Migration),
             Box::new(m20260710_000002_create_bulk_jobs::Migration),
             Box::new(m20260719_000001_create_review_queue::Migration),
+            Box::new(m20260726_000001_audit_chain::Migration),
         ]
     }
 }

@@ -1540,6 +1540,65 @@ pub async fn get_person_audit_logs(
     }
 }
 
+/// Verify the tamper-evident audit hash chain.
+///
+/// `GET /api/audit/verify?limit=1000` — recomputes the trailing rows and
+/// reports every linkage or content break (HIPAA §164.312(c)).
+///
+/// Attests to the **audit trail** only, not to the `persons` rows; the
+/// response says so, because the difference matters to whoever reads it.
+#[utoipa::path(
+    get,
+    path = "/api/audit/verify",
+    tag = "audit",
+    params(AuditLogQuery),
+    responses(
+        (status = 200, description = "Chain verification report"),
+        (status = 500, description = "Database error")
+    )
+)]
+pub async fn verify_audit_chain(
+    State(state): State<AppState>,
+    Query(params): Query<AuditLogQuery>,
+) -> impl IntoResponse {
+    // Verification is O(rows) with a SHA-256 each, so an unbounded limit
+    // is a CPU denial-of-service (the SEC-M1 bound-every-input rule).
+    let limit = u64::try_from(params.limit).unwrap_or(1000).clamp(1, 10_000);
+    match state.audit_log.verify_chain(limit).await {
+        Ok(report) => {
+            let interpretation = if report.verified {
+                "no break detected in the verified window; this attests to the audit trail \
+                 only, not to the person records"
+            } else {
+                "a break means rows were inserted, deleted, reordered, or edited since they \
+                 were written — investigate the named seq/id; a concurrent audit write on a \
+                 pooled connection can also fork the chain, which reports as a linkage break"
+            };
+            (
+                StatusCode::OK,
+                Json(ApiResponse::success(serde_json::json!({
+                    "limit": limit,
+                    "verified": report.verified,
+                    "rows": report.rows,
+                    "intact": report.intact,
+                    "redacted": report.redacted,
+                    "unchained": report.unchained,
+                    "head": report.head,
+                    "breaks": report.breaks,
+                    "interpretation": interpretation,
+                }))),
+            )
+        }
+        Err(e) => {
+            let error = ApiResponse::<serde_json::Value>::error(
+                "DATABASE_ERROR",
+                format!("Failed to verify the audit chain: {e}"),
+            );
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+        }
+    }
+}
+
 /// Get recent audit logs
 #[utoipa::path(
     get,

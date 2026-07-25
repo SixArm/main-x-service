@@ -27,6 +27,10 @@ pub mod api;
 pub mod app;
 /// Bulk import/export — async `bg_pg` jobs, JSONL codec, artifact store.
 pub mod bulk;
+/// Regulatory-compliance controls: the tamper-evident audit chain,
+/// adopted from the care-pathway reference implementation
+/// (`spec/compliance` §8.5 step 3).
+pub mod compliance;
 /// Configuration structs and environment/`.env` loading.
 pub mod config;
 /// PostgreSQL persistence: SeaORM entities, repositories, audit log.

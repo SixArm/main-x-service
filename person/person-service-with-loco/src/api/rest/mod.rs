@@ -62,6 +62,7 @@ pub use state::AppState;
         handlers::get_person_masked,
         handlers::get_person_audit_logs,
         handlers::get_recent_audit_logs,
+        handlers::verify_audit_chain,
         handlers::get_user_audit_logs,
         crate::bulk::handlers::import_person,
         crate::bulk::handlers::export_person,
@@ -177,6 +178,7 @@ pub fn create_router(state: AppState) -> Router {
         // Audit
         .route("/persons/{id}/audit", get(handlers::get_person_audit_logs))
         .route("/audit/recent", get(handlers::get_recent_audit_logs))
+        .route("/audit/verify", get(handlers::verify_audit_chain))
         .route("/audit/user", get(handlers::get_user_audit_logs))
         .with_state(state.clone());
 
@@ -272,6 +274,7 @@ pub fn persons_routes() -> loco_rs::controller::Routes {
         .add("/persons/{id}/masked", get(handlers::get_person_masked))
         .add("/persons/{id}/audit", get(handlers::get_person_audit_logs))
         .add("/audit/recent", get(handlers::get_recent_audit_logs))
+        .add("/audit/verify", get(handlers::verify_audit_chain))
         .add("/audit/user", get(handlers::get_user_audit_logs))
 }
 

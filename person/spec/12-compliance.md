@@ -47,6 +47,45 @@ and
 - Data-residency / cross-border transfer policy for a multi-region
   deployment is undecided (§16 EOQ-4).
 
+### 12.4b Tamper-evident audit history (delivered 2026-07-26)
+
+The audit chain from [`spec/compliance` §8.5](../../spec/compliance/index.md)
+step 3, ported from the care-pathway reference implementation. Migration
+`m20260726_000001_audit_chain` adds `seq` / `prev_hash` / `hash` /
+`context` / `disclosure` / `redacted_at` to `audit_log`; every write
+through `AuditLogRepository::log_action_on` — the single choke point all
+audit writes already funnel through — is chained under
+`pg_advisory_xact_lock`; `GET /api/audit/verify` reports linkage and
+content breaks (HIPAA §164.312(c)).
+
+**Ported, not copied.** Person's `audit_log` predates the loco-style
+services, so two things differ from the reference:
+
+- **Order comes from a new `seq BIGSERIAL`, not the primary key.** The PK
+  is an application-assigned UUID, which carries no insertion order, and
+  a chain needs a total order to mean anything. `timestamp` alone is not
+  enough — two rows can share a microsecond and the tie-break would be
+  arbitrary.
+- **The digest binds request provenance** (`user_id`, `ip_address`,
+  `user_agent`) alongside the old/new value pair, so an attacker cannot
+  rewrite *who* acted while leaving *what* they did intact.
+
+**Still open.** Read/disclosure auditing is **not** yet wired into
+person's read paths (`get` / `list` / `search` / `check-duplicates`), so
+the §164.528 accounting §12.5 calls for is not yet answerable — only
+mutations are recorded. GDPR Art. 17 erasure by redaction and row-level
+record integrity also remain.
+
+**Known blocker.** Person's migrations do not apply to a fresh database:
+`2024122800000005` builds a `gin_trgm_ops` index on `patient_names.given`,
+which is `text[]` (and creates `pg_trgm` *after* first using it), and the
+rename migration leaves `person_names` without the `person_id` column the
+repository writes to. Both predate this work. The chain's own pins
+(`db::audit::chain_tests::*`) verify against Postgres regardless, because
+`audit_log` has no foreign keys to the person tables — but the crate
+cannot join CI's DB suites until the schema applies cleanly
+([`ci/db-suites.txt`](../../ci/db-suites.txt)).
+
 ### 12.5 Extended frameworks
 
 Four frameworks impose obligations beyond §12.1. Regime detail:
