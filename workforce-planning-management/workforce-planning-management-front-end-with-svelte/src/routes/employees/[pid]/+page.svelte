@@ -1,8 +1,12 @@
 <script lang="ts">
   import { page } from "$app/state";
   import {
+    ADJUSTMENT_CATEGORIES,
     acknowledgeWellbeing,
     answerErgonomicItem,
+    createAdjustmentRequest,
+    decideAdjustment,
+    listAdjustmentRequests,
     appraisalReport,
     appraisalRequests,
     appraisalStatus,
@@ -31,6 +35,7 @@
     nominateRater,
     respondAppraisal,
     submitPulse,
+    type AdjustmentRequest,
     type AppraisalRequest,
     type AppraisalSummary,
     type ErgonomicAssessment,
@@ -64,6 +69,11 @@
   let notifications = $state<Notification[]>([]);
   let ergonomics = $state<ErgonomicAssessment[]>([]);
   let workstation = $state("");
+  let adjustments = $state<AdjustmentRequest[]>([]);
+  let adjCategory = $state("quieter_workspace");
+  let adjBarrier = $state("");
+  let adjImpact = $state("");
+  let adjChange = $state("");
   let requestScores = $state<Record<string, number>>({});
   let requestComment = $state("");
   let openRequest = $state<string | null>(null);
@@ -99,6 +109,7 @@
       myRequests = await appraisalRequests(pid);
       notifications = await listNotifications(pid);
       ergonomics = await listErgonomicAssessments(pid);
+      adjustments = await listAdjustmentRequests(pid);
       if (openAppraisal) await toggleAppraisal(openAppraisal.pid, true);
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
@@ -467,6 +478,54 @@
         {/if}
       </div>
     {/each}
+  </div>
+
+  <h2>{t("adj.title")}</h2>
+  <div class="panel" data-testid="adjustments">
+    <p class="muted">{t("adj.hint")}</p>
+    <select bind:value={adjCategory}>
+      {#each ADJUSTMENT_CATEGORIES as category (category)}
+        <option value={category}>{category.replaceAll("_", " ")}</option>
+      {/each}
+    </select>
+    <input placeholder={t("adj.barrier")} bind:value={adjBarrier} />
+    <input placeholder={t("adj.impact")} bind:value={adjImpact} />
+    <input placeholder={t("adj.change")} bind:value={adjChange} />
+    <button
+      disabled={!adjBarrier.trim() || !adjImpact.trim() || !adjChange.trim()}
+      onclick={() => void act(async () => {
+        await createAdjustmentRequest(pid, {
+          category: adjCategory,
+          barrier: adjBarrier.trim(),
+          impact: adjImpact.trim(),
+          adjustment: adjChange.trim(),
+        });
+        adjBarrier = adjImpact = adjChange = "";
+      })}
+    >{t("adj.new")}</button>
+    <ul>
+      {#each adjustments as request (request.pid)}
+        <li>
+          <span class="chip">{request.category.replaceAll("_", " ")}</span>
+          <span class="chip">{request.status}</span>
+          {#if !request.words_withheld}
+            <br />{request.barrier} → {request.adjustment}
+            {#if request.decision_note}<br /><span class="muted">{request.decision_note}</span>{/if}
+          {/if}
+          {#if request.status === "requested"}
+            <button
+              onclick={() => {
+                const note = window.prompt(t("adj.note")) ?? "";
+                void act(() => decideAdjustment(request.pid, "agreed", note.trim() || undefined));
+              }}
+            >{t("adj.agree")}</button>
+            <button onclick={() => void act(() => decideAdjustment(request.pid, "declined"))}>{t("adj.decline")}</button>
+          {:else if request.status === "agreed"}
+            <button onclick={() => void act(() => decideAdjustment(request.pid, "in_place"))}>{t("adj.inPlace")}</button>
+          {/if}
+        </li>
+      {/each}
+    </ul>
   </div>
 
   <h2>{t("erg.title")}</h2>

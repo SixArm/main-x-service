@@ -12,7 +12,7 @@ use uuid::Uuid;
 use super::{record_rejection, unprocessable};
 use crate::auth::{self, MaybeAuthUser};
 use crate::models::_entities::{
-    appraisal_nominations, appraisal_responses, appraisals, assessments, benefit_enrollments,
+    adjustment_requests, appraisal_nominations, appraisal_responses, appraisals, assessments, benefit_enrollments,
     candidates, development_plans, employee_skills, employees, entitlement_acknowledgements,
     ergonomic_assessments, leave_entitlements, leave_requests, mentorships, notifications,
     path_enrollments, payslips,
@@ -114,6 +114,7 @@ async fn subject_access(
             rows_for!(db, entitlement_acknowledgements, EmployeePid, epid),
         "notifications": rows_for!(db, notifications, EmployeePid, epid),
         "ergonomic_assessments": rows_for!(db, ergonomic_assessments, EmployeePid, epid),
+        "adjustment_requests": rows_for!(db, adjustment_requests, EmployeePid, epid),
         "assessments": rows_for!(db, assessments, SubjectPid, epid),
         "pipeline_memberships": rows_for!(db, pipeline_members, SubjectPid, epid),
         "mentorships": mentorship_rows,
@@ -189,6 +190,11 @@ async fn erase(
              (SELECT pid FROM ergonomic_assessments WHERE employee_pid = '{epid}')"
         ),
         format!("UPDATE ergonomic_assessments SET deleted_at = now() WHERE employee_pid = '{epid}' AND deleted_at IS NULL"),
+        format!(
+            "UPDATE adjustment_requests SET barrier = '{ERASED}', impact = '{ERASED}', \
+             adjustment = '{ERASED}', decision_note = NULL, deleted_at = now() \
+             WHERE employee_pid = '{epid}' AND deleted_at IS NULL"
+        ),
     ];
     let mut affected = Vec::new();
     for statement in &statements {
@@ -210,6 +216,7 @@ async fn erase(
             "notifications_deleted": affected[5],
             "ergonomic_items_scrubbed": affected[6],
             "ergonomic_assessments_closed": affected[7],
+            "adjustment_requests_scrubbed": affected[8],
         })),
     )
     .await?;

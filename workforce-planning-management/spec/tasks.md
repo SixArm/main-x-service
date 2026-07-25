@@ -500,3 +500,33 @@ code + tests in one PR.
       existing exhaustiveness pins re-derive over the widened
       vocabulary — 137 unit green; clippy pedantic clean. (WPM-D13;
       WPM-R20)
+
+- [x] WPM-T36 (2026-07-25) **Reasonable adjustments
+      (neurodiversity-inclusive).** Migration
+      `m20260725_000017_adjustments` (`adjustment_requests`: category,
+      barrier, impact, adjustment, decision note — **no diagnosis,
+      condition, or medical-evidence column exists**, new WPM-D25).
+      `rules/adjustments.rs` (pure): the practical suggestion
+      categories (a test pins no entry names a condition) and the
+      lifecycle (`requested → agreed|declined|withdrawn`;
+      `agreed → in_place|withdrawn`; declined is terminal — ask anew,
+      each ask stays on the record). `controllers/adjustments.rs`:
+      create (`$sub`-owned; all three texts required; the audit row
+      records the category, never the words), list (content-tier:
+      masked reads keep category + status and withhold the words;
+      unmasked reads audited), decide (practical note, audited,
+      in-app `adjustment_update` notification carrying category +
+      state only). Erasure scrubs the words + soft-deletes; subject
+      access includes requests verbatim ("save a copy"); the table
+      joins the sweep (41, pinned). **No aggregate reporting surface
+      exists** — stated in WPM-R33. Front-end: a Reasonable-
+      adjustments panel on the profile with the barrier/impact/change
+      prompts and decision actions; 10 i18n keys × 13 locales.
+      **Acceptance:** 2 pure pins + the DB-gated
+      `adjustments_round_trip` (barrier required, closed practical
+      categories, audited unmasked read, agree-with-note → in-place,
+      declined-terminal via the machine pin, two notification bells
+      with no words, export carries the words verbatim) — suite 19/19
+      vs Postgres 18 (139 unit; the assessment category pin updated
+      to 5); clippy pedantic clean; svelte-check 0; vitest 10;
+      Playwright 9. (WPM-D23, WPM-D25; WPM-R33)

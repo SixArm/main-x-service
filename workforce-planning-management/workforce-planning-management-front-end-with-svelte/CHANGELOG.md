@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — reasonable adjustments panel (WPM-T36 / WPM-R33, 2026-07-25)
+
+- Employee profile: a Reasonable-adjustments panel — the
+  barrier / impact / change prompts ("You do not need a diagnosis to
+  ask"), practical category select, request list with status chips,
+  and agree (with practical note) / decline / in-place actions.
+  10 i18n keys × 13 locales.
+
 ### Added — ergonomics area (WPM-T34 / WPM-R32, 2026-07-25)
 
 - Employee profile: a DSE assessments panel (open with the default

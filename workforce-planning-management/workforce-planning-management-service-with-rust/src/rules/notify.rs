@@ -5,7 +5,7 @@
 use uuid::Uuid;
 
 /// The closed notification kinds.
-pub const KINDS: &[&str] = &["appraisal_request", "appraisal_shared"];
+pub const KINDS: &[&str] = &["appraisal_request", "appraisal_shared", "adjustment_update"];
 
 /// Recipients of an appraisal lifecycle move:
 /// - `collecting` ⇒ **every** rater (self included — the
@@ -48,6 +48,6 @@ mod tests {
 
     #[test]
     fn kinds_are_closed() {
-        assert_eq!(KINDS, &["appraisal_request", "appraisal_shared"]);
+        assert_eq!(KINDS, &["appraisal_request", "appraisal_shared", "adjustment_update"]);
     }
 }

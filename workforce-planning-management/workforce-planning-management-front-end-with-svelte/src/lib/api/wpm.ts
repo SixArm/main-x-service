@@ -329,6 +329,52 @@ export function workingTime(
   return api(`/workforce/working-time${qs}`, init);
 }
 
+// ─── Reasonable adjustments (WPM-R33) ───────────────────────────────
+
+/** The closed suggestion categories (navigation, never a label). */
+export const ADJUSTMENT_CATEGORIES = [
+  "written_instructions", "agendas_in_advance", "quieter_workspace",
+  "flexible_breaks", "clear_priorities", "equipment", "schedule", "other",
+] as const;
+
+/** One adjustment request (words may be withheld on masked reads). */
+export interface AdjustmentRequest {
+  pid: string;
+  category: string;
+  status: "requested" | "agreed" | "declined" | "in_place" | "withdrawn";
+  barrier?: string;
+  impact?: string;
+  adjustment?: string;
+  decision_note?: string | null;
+  decided_on: string | null;
+  words_withheld: boolean;
+}
+
+/** The employee's adjustment requests ($sub-owned). */
+export function listAdjustmentRequests(
+  pid: string,
+  init?: FetchLike,
+): Promise<AdjustmentRequest[]> {
+  return api(`/employees/${pid}/adjustment-requests`, init);
+}
+
+/** Ask for a change: barrier + impact + change, all required. */
+export function createAdjustmentRequest(
+  pid: string,
+  body: { category: string; barrier: string; impact: string; adjustment: string },
+): Promise<{ pid: string }> {
+  return api(`/employees/${pid}/adjustment-requests`, { method: "POST", body });
+}
+
+/** Decide a request (agreed | declined | in_place | withdrawn). */
+export function decideAdjustment(
+  pid: string,
+  to: string,
+  note?: string,
+): Promise<AdjustmentRequest> {
+  return api(`/adjustment-requests/${pid}/status`, { method: "POST", body: { to, note } });
+}
+
 // ─── Ergonomic (DSE) assessments (WPM-R32) ──────────────────────────
 
 /** One DSE checklist item (equipment note only — WPM-D24). */

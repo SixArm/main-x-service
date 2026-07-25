@@ -213,8 +213,9 @@ async fn assessment_round_trip() {
             profile["selection_suitability"].is_null(),
             "no selection sitting ⇒ no suitability figure, not zero"
         );
-        // Every category appears, even with nothing recorded.
-        assert_eq!(profile["categories"].as_array().expect("categories").len(), 4);
+        // Every category appears, even with nothing recorded
+        // (five since the cognitive category landed, WPM-T35).
+        assert_eq!(profile["categories"].as_array().expect("categories").len(), 5);
 
         // ── Aggregate analytics carry no individual score.
         let analytics: Value = request.get("/api/assessments/analytics").await.json();

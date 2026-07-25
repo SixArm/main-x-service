@@ -1,5 +1,6 @@
 //! `SeaORM` entity definitions, one module per table.
 
+pub mod adjustment_requests;
 pub mod applications;
 pub mod appraisal_nominations;
 pub mod appraisal_responses;

@@ -96,6 +96,7 @@ impl Hooks for App {
             .add_route(controllers::privacy::routes())
             .add_route(controllers::notifications::routes())
             .add_route(controllers::ergonomics::routes())
+            .add_route(controllers::adjustments::routes())
             .add_route(controllers::audits::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
@@ -135,6 +136,7 @@ impl Hooks for App {
         truncate_table(&ctx.db, AppraisalNominations).await?;
         truncate_table(&ctx.db, Appraisals).await?;
         truncate_table(&ctx.db, Notifications).await?;
+        truncate_table(&ctx.db, AdjustmentRequests).await?;
         truncate_table(&ctx.db, ErgonomicItems).await?;
         truncate_table(&ctx.db, ErgonomicAssessments).await?;
         truncate_table(&ctx.db, ProgramPlacements).await?;

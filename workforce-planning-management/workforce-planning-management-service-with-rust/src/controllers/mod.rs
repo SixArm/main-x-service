@@ -6,6 +6,7 @@ use loco_rs::controller::ErrorDetail;
 use loco_rs::prelude::*;
 
 pub mod acquisition;
+pub mod adjustments;
 pub mod appraisals;
 pub mod assessments;
 pub mod audits;

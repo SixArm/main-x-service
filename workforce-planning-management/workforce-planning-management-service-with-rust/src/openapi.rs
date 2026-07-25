@@ -207,6 +207,11 @@ pub fn spec() -> Value {
             "/api/appraisals/{pid}/status": { "post": { "tags": ["appraisals"], "summary": "draft -> collecting (needs >= 3 non-self raters) -> shared (stamps shared_on)", "responses": transition } },
             "/api/appraisals/{pid}/responses": { "post": { "tags": ["appraisals"], "summary": "One rater's response: collecting only, nominated only, once per rater, every declared competency scored 1-5 ($sub-owned)", "responses": created } },
             "/api/appraisals/{pid}/report": { "get": { "tags": ["appraisals"], "summary": "Group-floored report (shared only; reads audited): group x competency count+mean, pooled comments; peer/report cells under 3 responses withheld, count included", "responses": ok("Report") } },
+            "/api/employees/{pid}/adjustment-requests": {
+                "post": { "tags": ["adjustments"], "summary": "Ask for a reasonable adjustment: barrier + impact + change, all required; no diagnosis field exists (WPM-D25)", "responses": created },
+                "get": { "tags": ["adjustments"], "summary": "The employee's requests ($sub-owned; masked reads withhold the words; unmasked reads audited)", "responses": ok("Requests") }
+            },
+            "/api/adjustment-requests/{pid}/status": { "post": { "tags": ["adjustments"], "summary": "Decide: requested -> agreed|declined|withdrawn; agreed -> in_place|withdrawn (practical note; audited; employee notified in-app)", "responses": transition } },
             "/api/employees/{pid}/ergonomic-assessments": {
                 "post": { "tags": ["ergonomics"], "summary": "Open a DSE workstation assessment (default checklist when no items given; workstation, never the body -- WPM-D24)", "responses": created },
                 "get": { "tags": ["ergonomics"], "summary": "The employee's assessments with items and open-issue counts", "responses": ok("Assessments") }
@@ -270,6 +275,8 @@ mod tests {
             "/api/notifications/{pid}/read",
             "/api/employees/{pid}/ergonomic-assessments",
             "/api/ergonomics/issues",
+            "/api/employees/{pid}/adjustment-requests",
+            "/api/adjustment-requests/{pid}/status",
         ] {
             assert!(paths.contains_key(p), "missing {p}");
         }

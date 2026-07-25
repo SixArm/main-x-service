@@ -445,9 +445,10 @@ out my report is ready — without leaving the app.*
   self-assessment is a task too); moving to `shared` notifies the
   subject.
 - A notification carries a kind (`appraisal_request` |
-  `appraisal_shared`), a neutral body, and reference data (the
-  appraisal, the subject's name for a request) — **never** scores or
-  comments (the WPM-D21 posture extends to notifications).
+  `appraisal_shared` | `adjustment_update`), a neutral body, and
+  reference data (the appraisal, the subject's name for a request) —
+  **never** scores, comments, or the words of an adjustment request
+  (the WPM-D21 posture extends to notifications).
 - `GET /api/employees/{pid}/notifications` (`$sub`-owned; unread
   first) and `POST /api/notifications/{pid}/read` (owner-only).
 - Erasure deletes the employee's notifications; the subject-access
@@ -480,6 +481,37 @@ recorded and fixed — without WPM becoming a health record.*
 - Erasure soft-deletes the employee's assessments and scrubs item
   notes; the subject-access export includes them; both tables join
   the retention sweep.
+
+## WPM-R33 — Reasonable adjustments (neurodiversity-inclusive)
+
+*As an employee I can ask for changes that help me do my job — a
+quieter place, written instructions, agendas in advance, flexible
+breaks, clear priorities — without arriving with a diagnosis letter;
+as a manager/HR I can agree them and put them in place.*
+
+- A request records **the useful bit and nothing else**: the
+  **barrier** faced, the **impact** on the work, and the **change**
+  that would reduce it — all three required, in the requester's own
+  words, in writing. A closed suggestion `category`
+  (`written_instructions | agendas_in_advance | quieter_workspace |
+  flexible_breaks | clear_priorities | equipment | schedule | other`)
+  aids reporting-free navigation.
+- **No diagnosis field exists** ([design.md](design.md) WPM-D25 —
+  the WPM-D17/D24 unrepresentability move): no condition, no
+  neurodiversity label, no medical-evidence flag. A diagnosis is
+  never required to ask, and WPM has nowhere to put one.
+- Lifecycle `requested → agreed | declined | withdrawn`;
+  `agreed → in_place | withdrawn` (pure core; decisions carry an
+  optional practical note and are audited; the employee is notified
+  in-app on every decision).
+- Content is high-tier: a masked read keeps category + status and
+  **withholds the words** (barrier/impact/adjustment/note); reads are
+  audited. `$sub`-owned for the employee's own requests.
+- "Save a copy": the subject-access export includes every request
+  verbatim; erasure scrubs the words and soft-deletes the rows; the
+  table joins the retention sweep. No aggregate reporting surface
+  exists in v1 — a per-department "adjustments count" would invite
+  exactly the inference this design refuses.
 
 ## WPM-R17 — Family fixtures
 

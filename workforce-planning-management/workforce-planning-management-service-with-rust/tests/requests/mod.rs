@@ -5,6 +5,7 @@
 //! [`assessments`], and the talent-strategy surface (development plans,
 //! pipelines, early careers, workforce intelligence) in [`talent`].
 
+mod adjustments;
 mod appraisals;
 mod assessments;
 mod ergonomics;

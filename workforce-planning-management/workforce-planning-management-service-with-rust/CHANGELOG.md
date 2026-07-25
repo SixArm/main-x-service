@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — reasonable adjustments (WPM-T36 / WPM-R33, 2026-07-25)
+
+- Neurodiversity-inclusive adjustment requests (new WPM-D25): the
+  **barrier** faced, its **impact** on the work, and the **change**
+  that would reduce it — all required, in the requester's own words.
+  **No diagnosis, condition, or medical-evidence column exists**: a
+  diagnosis is never required to ask, and the schema has nowhere to
+  put one. Practical suggestion categories (quieter workspace,
+  written instructions, agendas in advance, flexible breaks, clear
+  priorities, equipment, schedule, other).
+- Lifecycle `requested → agreed|declined|withdrawn`;
+  `agreed → in_place|withdrawn`; decisions carry a practical note,
+  are audited, and notify the employee in-app (category + state,
+  never the words). Content-tier masking: masked reads withhold the
+  words; unmasked reads audited. Erasure scrubs; subject access
+  includes requests verbatim; the sweep list grows to 41. No
+  aggregate reporting surface exists, deliberately.
+
 ### Added — ergonomic (DSE) assessments + cognitive testing (WPM-T34/T35, 2026-07-25)
 
 - **Ergonomics (WPM-R32, new WPM-D24)**: workstation assessments with
