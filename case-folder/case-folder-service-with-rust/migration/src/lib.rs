@@ -1,5 +1,7 @@
 // SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
 #![allow(elided_lifetimes_in_paths, clippy::wildcard_imports)]
 //! Database migrations crate.
 //!
@@ -10,7 +12,7 @@
 
 pub use sea_orm_migration::prelude::*;
 
-/// The SeaORM migrator for this crate. Exists to satisfy Loco; it owns
+/// The `SeaORM` migrator for this crate. Exists to satisfy Loco; it owns
 /// no migrations because there are no local tables.
 pub struct Migrator;
 

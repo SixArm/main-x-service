@@ -7,7 +7,7 @@
 //!
 //! Written as explicit SQL rather than the loco `create_table` helper:
 //! the helper **pluralizes** table names (`event_outbox` →
-//! `event_outboxes`), which would break the SeaORM entity
+//! `event_outboxes`), which would break the `SeaORM` entity
 //! (`table_name = "event_outbox"`) and the index DDL below. The same
 //! fix was applied family-wide 2026-07-18 (case, care-pathway,
 //! organization, portfolio).

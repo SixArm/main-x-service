@@ -28,11 +28,23 @@ static TEST_CLIENT: Mutex<Option<Arc<dyn Client>>> = Mutex::new(None);
 /// Replace the live Main Patient Service client with a test double for
 /// the rest of the process. Calling this after a request is in flight is
 /// fine — the next request will pick up the override.
+///
+/// # Panics
+///
+/// If the override slot's mutex is poisoned — i.e. a previous holder
+/// panicked while swapping the client. Test-harness wiring only, so a
+/// poisoned slot means the test run is already unsound.
 pub fn set_test_client(client: Arc<dyn Client>) {
     *TEST_CLIENT.lock().unwrap() = Some(client);
 }
 
 /// Remove any test override and revert to the HTTP client.
+///
+/// # Panics
+///
+/// If the override slot's mutex is poisoned — i.e. a previous holder
+/// panicked while swapping the client. Test-harness wiring only, so a
+/// poisoned slot means the test run is already unsound.
 pub fn clear_test_client() {
     *TEST_CLIENT.lock().unwrap() = None;
 }
@@ -46,7 +58,7 @@ struct RoutingClient {
 
 impl RoutingClient {
     /// Return the current test override (cloned `Arc`) if one is set.
-    fn pick(&self) -> Option<Arc<dyn Client>> {
+    fn pick() -> Option<Arc<dyn Client>> {
         TEST_CLIENT.lock().unwrap().clone()
     }
 }
@@ -58,7 +70,7 @@ impl Client for RoutingClient {
         &self,
         nhs_number: &str,
     ) -> std::result::Result<Option<Patient>, Error> {
-        if let Some(test) = self.pick() {
+        if let Some(test) = Self::pick() {
             test.find_by_nhs_number(nhs_number).await
         } else {
             self.fallback.find_by_nhs_number(nhs_number).await
@@ -67,7 +79,7 @@ impl Client for RoutingClient {
 
     /// Look up a patient by id; override else HTTP fallback.
     async fn find_by_id(&self, id: Uuid) -> std::result::Result<Option<Patient>, Error> {
-        if let Some(test) = self.pick() {
+        if let Some(test) = Self::pick() {
             test.find_by_id(id).await
         } else {
             self.fallback.find_by_id(id).await
@@ -76,7 +88,7 @@ impl Client for RoutingClient {
 
     /// Create a patient; override else HTTP fallback.
     async fn create(&self, input: CreatePatient) -> std::result::Result<Patient, Error> {
-        if let Some(test) = self.pick() {
+        if let Some(test) = Self::pick() {
             test.create(input).await
         } else {
             self.fallback.create(input).await

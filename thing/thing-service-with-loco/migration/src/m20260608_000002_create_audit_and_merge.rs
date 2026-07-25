@@ -12,7 +12,7 @@ pub struct Migration;
 
 impl MigrationName for Migration {
     /// Stable migration name — also the key recorded in `seaql_migrations`.
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "m20260608_000002_create_audit_and_merge"
     }
 }

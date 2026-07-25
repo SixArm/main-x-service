@@ -70,6 +70,9 @@ impl From<Error> for loco_rs::Error {
 }
 
 #[async_trait]
+/// The patient-identity operations this crate needs from the upstream
+/// main-patient-service. A trait so tests can substitute a fake without a
+/// live HTTP dependency.
 pub trait Client: Send + Sync {
     /// Look up a patient by NHS Number. Returns `Ok(None)` when the
     /// service confirms there is no matching record.

@@ -19,11 +19,23 @@ use crate::main_event_service::{Client, Error, MoveEvent, RecordMove, http::Http
 static TEST_CLIENT: Mutex<Option<Arc<dyn Client>>> = Mutex::new(None);
 
 /// Install a test double as the override. The next request picks it up.
+///
+/// # Panics
+///
+/// If the override slot's mutex is poisoned — i.e. a previous holder
+/// panicked while swapping the client. Test-harness wiring only, so a
+/// poisoned slot means the test run is already unsound.
 pub fn set_test_client(client: Arc<dyn Client>) {
     *TEST_CLIENT.lock().unwrap() = Some(client);
 }
 
 /// Remove any test override and revert to the HTTP fallback.
+///
+/// # Panics
+///
+/// If the override slot's mutex is poisoned — i.e. a previous holder
+/// panicked while swapping the client. Test-harness wiring only, so a
+/// poisoned slot means the test run is already unsound.
 pub fn clear_test_client() {
     *TEST_CLIENT.lock().unwrap() = None;
 }
@@ -37,7 +49,7 @@ struct RoutingClient {
 
 impl RoutingClient {
     /// Return the current test override (cloned `Arc`) if one is set.
-    fn pick(&self) -> Option<Arc<dyn Client>> {
+    fn pick() -> Option<Arc<dyn Client>> {
         TEST_CLIENT.lock().unwrap().clone()
     }
 }
@@ -46,7 +58,7 @@ impl RoutingClient {
 impl Client for RoutingClient {
     /// Record a move event; delegates to the override else the HTTP fallback.
     async fn record(&self, input: RecordMove) -> std::result::Result<MoveEvent, Error> {
-        match self.pick() {
+        match Self::pick() {
             Some(t) => t.record(input).await,
             None => self.fallback.record(input).await,
         }
@@ -54,7 +66,7 @@ impl Client for RoutingClient {
 
     /// List every move event; delegates to the override else the HTTP fallback.
     async fn list_all(&self) -> std::result::Result<Vec<MoveEvent>, Error> {
-        match self.pick() {
+        match Self::pick() {
             Some(t) => t.list_all().await,
             None => self.fallback.list_all().await,
         }
@@ -62,7 +74,7 @@ impl Client for RoutingClient {
 
     /// List the `limit` most recent move events; override else HTTP fallback.
     async fn list_recent(&self, limit: u32) -> std::result::Result<Vec<MoveEvent>, Error> {
-        match self.pick() {
+        match Self::pick() {
             Some(t) => t.list_recent(limit).await,
             None => self.fallback.list_recent(limit).await,
         }
@@ -70,7 +82,7 @@ impl Client for RoutingClient {
 
     /// List move events for one folder; override else HTTP fallback.
     async fn list_for_folder(&self, folder_id: Uuid) -> std::result::Result<Vec<MoveEvent>, Error> {
-        match self.pick() {
+        match Self::pick() {
             Some(t) => t.list_for_folder(folder_id).await,
             None => self.fallback.list_for_folder(folder_id).await,
         }
@@ -81,7 +93,7 @@ impl Client for RoutingClient {
         &self,
         patient_id: Uuid,
     ) -> std::result::Result<Vec<MoveEvent>, Error> {
-        match self.pick() {
+        match Self::pick() {
             Some(t) => t.list_for_patient(patient_id).await,
             None => self.fallback.list_for_patient(patient_id).await,
         }

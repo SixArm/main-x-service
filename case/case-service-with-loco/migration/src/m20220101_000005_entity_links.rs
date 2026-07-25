@@ -7,7 +7,7 @@
 //! a `linked` event; it never calls the target service, and verification
 //! is the read-model aggregator's concern.
 
-use loco_rs::schema::*;
+use loco_rs::schema::{create_table, drop_table, ColType};
 use sea_orm_migration::prelude::*;
 
 /// The `entity_links`-table migration. `DeriveMigrationName` derives the

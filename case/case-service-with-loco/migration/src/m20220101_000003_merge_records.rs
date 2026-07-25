@@ -2,7 +2,7 @@
 //! history. One row per merge: which duplicate folded into which
 //! survivor, by whom, why, and a snapshot of the transferred payload.
 
-use loco_rs::schema::*;
+use loco_rs::schema::{create_table, drop_table, ColType};
 use sea_orm_migration::prelude::*;
 
 /// The `merge_records`-table migration. `DeriveMigrationName` derives the

@@ -7,6 +7,8 @@
 
 // SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
 #![allow(elided_lifetimes_in_paths)]
 pub use sea_orm_migration::prelude::*;
 
@@ -26,6 +28,7 @@ mod m20260719_000001_create_review_queue;
 mod m20260723_000001_create_worker_assessments;
 mod m20260723_000002_normalize_worker_gender_case;
 
+/// The migration runner this crate exposes to loco / `sea-orm-migration`.
 pub struct Migrator;
 
 #[async_trait::async_trait]

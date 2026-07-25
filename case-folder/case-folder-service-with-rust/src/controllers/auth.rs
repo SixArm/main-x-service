@@ -144,7 +144,7 @@ pub async fn request_link(
 ///
 /// Status codes:
 /// - `200` — magic token valid; an **opaque server-side session** is
-///   established and its id attached as the HttpOnly session cookie, and
+///   established and its id attached as the `HttpOnly` session cookie, and
 ///   the signed-in user is returned.
 /// - `401` — the magic token is missing, invalid, or expired.
 ///
@@ -156,9 +156,8 @@ pub async fn verify(
     Json(params): Json<VerifyParams>,
 ) -> Response {
     let token = params.token.unwrap_or_default();
-    let identity = match auth.verify_magic_token(token.trim()) {
-        Ok(identity) => identity,
-        Err(_) => return responses::unauthorized("Invalid or expired sign-in link."),
+    let Ok(identity) = auth.verify_magic_token(token.trim()) else {
+        return responses::unauthorized("Invalid or expired sign-in link.");
     };
     // Establish an opaque server-side session (not a token) and carry its
     // id in the HttpOnly cookie.

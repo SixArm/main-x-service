@@ -84,15 +84,12 @@ pub async fn index(
         _ => None,
     };
 
-    let (buildings, rooms, cabinets) = match (
+    let (Ok(buildings), Ok(rooms), Ok(cabinets)) = (
         mps.search(&q, Some(PlaceType::HOSPITAL)).await,
         mps.search(&q, Some(PlaceType::RECORDS_ROOM)).await,
         mps.search(&q, Some(PlaceType::FILE_CABINET)).await,
-    ) {
-        (Ok(b), Ok(r), Ok(c)) => (b, r, c),
-        _ => {
-            return responses::service_unavailable("Main Place Service unreachable");
-        }
+    ) else {
+        return responses::service_unavailable("Main Place Service unreachable");
     };
 
     let buildings_by_id: HashMap<Uuid, &crate::main_place_service::Place> =
@@ -409,7 +406,6 @@ pub async fn history(
         .unwrap_or_default();
 
     let covered: Vec<Uuid> = match place.place_type.as_deref() {
-        Some(PlaceType::FILE_CABINET) => vec![place.id],
         Some(PlaceType::RECORDS_ROOM) => cabinets
             .iter()
             .filter(|c| c.contained_in_place == Some(place.id))
@@ -425,12 +421,13 @@ pub async fn history(
                 .iter()
                 .filter(|c| {
                     c.contained_in_place
-                        .map(|rid| room_ids.contains(&rid))
-                        .unwrap_or(false)
+                        .is_some_and(|rid| room_ids.contains(&rid))
                 })
                 .map(|c| c.id)
                 .collect()
         }
+        // A file cabinet covers only itself — as does any other or
+        // unrecognised place type.
         _ => vec![place.id],
     };
     let covered_set: HashSet<Uuid> = covered.iter().copied().collect();

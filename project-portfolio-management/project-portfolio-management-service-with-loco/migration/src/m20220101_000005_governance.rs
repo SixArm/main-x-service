@@ -6,7 +6,7 @@
 //! units** (`*_minor`) plus an ISO-4217 currency code — exact, no
 //! floats, no decimal dependency.
 
-use loco_rs::schema::*;
+use loco_rs::schema::{create_table, drop_table, ColType};
 use sea_orm_migration::prelude::*;
 
 /// The governance-tables migration (name derived from the module).

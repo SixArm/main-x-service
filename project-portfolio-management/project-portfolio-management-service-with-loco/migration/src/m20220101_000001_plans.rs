@@ -11,7 +11,7 @@
 //! child kinds (project / product / program), enabling cheap roll-up of
 //! a portfolio's children.
 
-use loco_rs::schema::*;
+use loco_rs::schema::{create_table, drop_table, ColType};
 use sea_orm_migration::prelude::*;
 
 /// The `plans`-table migration. `DeriveMigrationName` derives the

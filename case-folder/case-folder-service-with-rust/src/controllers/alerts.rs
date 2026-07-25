@@ -75,13 +75,12 @@ pub async fn index(
     Extension(places): Extension<Arc<dyn MainPlaceServiceClient>>,
     Extension(events): Extension<Arc<dyn MainEventServiceClient>>,
 ) -> Response {
-    let (buildings, rooms, cabinets) = match (
+    let (Ok(buildings), Ok(rooms), Ok(cabinets)) = (
         places.search("", Some(PlaceType::HOSPITAL)).await,
         places.search("", Some(PlaceType::RECORDS_ROOM)).await,
         places.search("", Some(PlaceType::FILE_CABINET)).await,
-    ) {
-        (Ok(b), Ok(r), Ok(c)) => (b, r, c),
-        _ => return responses::service_unavailable("Main Place Service unreachable"),
+    ) else {
+        return responses::service_unavailable("Main Place Service unreachable");
     };
 
     let moves = match events.list_all().await {

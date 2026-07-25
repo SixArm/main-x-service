@@ -91,16 +91,15 @@ pub async fn index(
         vec![]
     });
 
-    let (buildings, rooms, cabinets) = match (
+    let (buildings, rooms, cabinets) = if let (Ok(b), Ok(r), Ok(c)) = (
         places.search("", Some(PlaceType::HOSPITAL)).await,
         places.search("", Some(PlaceType::RECORDS_ROOM)).await,
         places.search("", Some(PlaceType::FILE_CABINET)).await,
     ) {
-        (Ok(b), Ok(r), Ok(c)) => (b, r, c),
-        _ => {
-            tracing::warn!("Main Place Service unreachable; place counts will be 0");
-            (vec![], vec![], vec![])
-        }
+        (b, r, c)
+    } else {
+        tracing::warn!("Main Place Service unreachable; place counts will be 0");
+        (vec![], vec![], vec![])
     };
 
     let latest_by_folder = latest_move_per_folder(&history);
@@ -144,6 +143,7 @@ pub async fn index(
 
 /// Build a `folder_id → latest MoveEvent` map for cheap status lookup.
 /// Shared with `controllers::folders::index`.
+#[must_use]
 pub fn latest_move_per_folder(
     history: &[crate::main_event_service::MoveEvent],
 ) -> HashMap<Uuid, &crate::main_event_service::MoveEvent> {

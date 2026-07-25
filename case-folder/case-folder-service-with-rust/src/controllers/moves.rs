@@ -83,8 +83,7 @@ pub async fn index(
                 || m.moved_by.to_lowercase().contains(&q_lc)
                 || m.worker_role_snapshot
                     .as_deref()
-                    .map(|r| r.to_lowercase().contains(&q_lc))
-                    .unwrap_or(false)
+                    .is_some_and(|r| r.to_lowercase().contains(&q_lc))
         })
         .map(responses::move_event)
         .collect();
@@ -138,26 +137,24 @@ pub async fn create(
     Json(input): Json<CreateMoveInput>,
 ) -> Response {
     let mut errors: HashMap<String, String> = HashMap::new();
-    let folder_id = match Uuid::parse_str(&input.folder_id) {
-        Ok(id) => id,
-        Err(_) => {
-            errors.insert("folder_id".into(), "Provide a valid folder UUID.".into());
-            return responses::unprocessable(errors);
-        }
+    let Ok(folder_id) = Uuid::parse_str(&input.folder_id) else {
+        errors.insert("folder_id".into(), "Provide a valid folder UUID.".into());
+        return responses::unprocessable(errors);
     };
     // `null`/empty destination means "in transit"; otherwise parse it.
     let to_cabinet_id = match input.to_cabinet_id.as_deref() {
         None | Some("") => None,
-        Some(s) => match Uuid::parse_str(s) {
-            Ok(u) => Some(u),
-            Err(_) => {
+        Some(s) => {
+            if let Ok(u) = Uuid::parse_str(s) {
+                Some(u)
+            } else {
                 errors.insert(
                     "to_cabinet_id".into(),
                     "Provide a valid cabinet UUID, or null/omit to mark in transit.".into(),
                 );
                 return responses::unprocessable(errors);
             }
-        },
+        }
     };
     let worker_id = input
         .worker_id

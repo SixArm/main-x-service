@@ -19,11 +19,23 @@ use crate::main_worker_service::{Client, Error, Worker, http::HttpClient};
 static TEST_CLIENT: Mutex<Option<Arc<dyn Client>>> = Mutex::new(None);
 
 /// Install a test double as the override. The next request picks it up.
+///
+/// # Panics
+///
+/// If the override slot's mutex is poisoned — i.e. a previous holder
+/// panicked while swapping the client. Test-harness wiring only, so a
+/// poisoned slot means the test run is already unsound.
 pub fn set_test_client(client: Arc<dyn Client>) {
     *TEST_CLIENT.lock().unwrap() = Some(client);
 }
 
 /// Remove any test override and revert to the HTTP fallback.
+///
+/// # Panics
+///
+/// If the override slot's mutex is poisoned — i.e. a previous holder
+/// panicked while swapping the client. Test-harness wiring only, so a
+/// poisoned slot means the test run is already unsound.
 pub fn clear_test_client() {
     *TEST_CLIENT.lock().unwrap() = None;
 }
@@ -37,7 +49,7 @@ struct RoutingClient {
 
 impl RoutingClient {
     /// Return the current test override (cloned `Arc`) if one is set.
-    fn pick(&self) -> Option<Arc<dyn Client>> {
+    fn pick() -> Option<Arc<dyn Client>> {
         TEST_CLIENT.lock().unwrap().clone()
     }
 }
@@ -46,7 +58,7 @@ impl RoutingClient {
 impl Client for RoutingClient {
     /// Search workers (staff directory); override else HTTP fallback.
     async fn search(&self, query: &str) -> std::result::Result<Vec<Worker>, Error> {
-        if let Some(test) = self.pick() {
+        if let Some(test) = Self::pick() {
             test.search(query).await
         } else {
             self.fallback.search(query).await
@@ -55,7 +67,7 @@ impl Client for RoutingClient {
 
     /// Look up a worker by id; override else HTTP fallback.
     async fn find_by_id(&self, id: Uuid) -> std::result::Result<Option<Worker>, Error> {
-        if let Some(test) = self.pick() {
+        if let Some(test) = Self::pick() {
             test.find_by_id(id).await
         } else {
             self.fallback.find_by_id(id).await

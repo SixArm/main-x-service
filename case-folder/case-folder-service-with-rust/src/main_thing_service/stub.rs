@@ -19,6 +19,7 @@ pub struct StubClient {
 
 impl StubClient {
     /// Creates an empty stub.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

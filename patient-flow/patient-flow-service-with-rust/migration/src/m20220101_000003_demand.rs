@@ -2,7 +2,7 @@
 //! queue the allocator serves), `red_green_days` (the per-stay-per-day
 //! journey journal), and `infection_flags` (per-stay IPC precautions).
 
-use loco_rs::schema::*;
+use loco_rs::schema::{create_table, drop_table, ColType};
 use sea_orm_migration::prelude::*;
 
 /// The demand-tables migration (name derived from the module path).

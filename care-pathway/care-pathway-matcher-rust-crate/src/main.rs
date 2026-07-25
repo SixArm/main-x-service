@@ -1,9 +1,13 @@
 //! Demo binary — a runnable walkthrough of the `care-pathway-matcher`
-//! public API. Not part of the SemVer surface.
+//! public API. Not part of the `SemVer` surface.
 
+// Always start with high quality coding conventions
+// (`agents/share/rust-loco-stack.md`).
 // SEC-I3: this demo has no reason to reach for `unsafe`; forbid it so the
 // crate's binary target matches the `#![forbid(unsafe_code)]` on its lib.
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
 
 // On MUSL static builds, swap the default allocator for mimalloc, which
 // is markedly faster than the musl libc allocator. Gated to `musl` so

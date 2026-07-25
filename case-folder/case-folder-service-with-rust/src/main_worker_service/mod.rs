@@ -56,6 +56,9 @@ impl From<Error> for loco_rs::Error {
 }
 
 #[async_trait]
+/// The worker-identity operations this crate needs from the upstream
+/// main-worker-service. A trait so tests can substitute a fake without a
+/// live HTTP dependency.
 pub trait Client: Send + Sync {
     /// Free-text search by name. Returns matching workers (capped by the
     /// upstream service's `limit` query param — we default to 25).

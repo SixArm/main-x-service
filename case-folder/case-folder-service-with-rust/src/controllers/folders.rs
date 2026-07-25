@@ -140,6 +140,18 @@ pub struct CreateFolderInput {
 /// title, missing new-patient name/date-of-birth, or a volume that
 /// belongs to a different patient; `503 Service Unavailable` when the
 /// Main Patient Service is unreachable.
+///
+/// # Panics
+///
+/// Never in practice: the one `unwrap` is on `date_of_birth` for the
+/// new-patient branch, which the `dob.is_none()` guard above has
+/// already turned into a `422`. It is unwrapped rather than restructured
+/// to keep the validation errors aggregated into one response.
+// A create that validates six fields, mints or finds a patient, and
+// then creates the folder is long because it aggregates *all*
+// validation errors into one 422 rather than failing on the first.
+// Splitting it would scatter that aggregation across helpers.
+#[allow(clippy::too_many_lines)]
 #[debug_handler]
 pub async fn create(
     Extension(patients): Extension<Arc<dyn MainPatientServiceClient>>,

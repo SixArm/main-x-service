@@ -11,6 +11,11 @@ use crate::auth::Identity;
 /// failures are logged, never surfaced to the caller, so we don't leak
 /// whether an email matched a known identity.
 pub trait Mailer: Send + Sync {
+    /// Deliver a magic-link sign-in email to `to`.
+    ///
+    /// Infallible by contract: an implementation logs a delivery
+    /// failure rather than returning it, so a caller cannot learn
+    /// whether `to` matched a known identity (anti-enumeration).
     fn send_magic_link(&self, to: &Identity, link: &str);
 }
 

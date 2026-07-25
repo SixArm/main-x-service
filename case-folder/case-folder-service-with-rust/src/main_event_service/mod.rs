@@ -128,6 +128,9 @@ impl From<Error> for loco_rs::Error {
 }
 
 #[async_trait]
+/// The move-event operations this crate needs from the upstream
+/// main-event-service. A trait so tests can substitute a fake without a
+/// live HTTP dependency.
 pub trait Client: Send + Sync {
     /// Record a folder move. Returns the persisted event with its
     /// freshly-assigned UUID and `moved_at` timestamp.

@@ -1,5 +1,5 @@
 //! Migration: create the `employees` table — the single source of
-//! employment truth (WPM-R7). Identities are EntityRef URNs; the
+//! employment truth (WPM-R7). Identities are `EntityRef` URNs; the
 //! employee number is unique per organization; salary is minor units
 //! (sensitive — masked at the read surface).
 //!

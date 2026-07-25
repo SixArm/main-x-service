@@ -106,7 +106,7 @@ impl ThingDto {
     /// case-file Thing. Parses the `KEY_*` keywords and picks the NHS
     /// Number from the identifiers; a missing patient UUID falls back to nil.
     fn into_folder(self) -> Option<Folder> {
-        if !is_case_file(&self.thing_type) {
+        if !is_case_file(self.thing_type.as_ref()) {
             return None;
         }
         let (patient_id, patient_name, cabinet_path, volume_id, volume_title) =
@@ -135,7 +135,7 @@ impl ThingDto {
     /// volume Thing. Reuses the keyword parser (ignoring the volume-membership
     /// keywords, which don't apply to a volume itself).
     fn into_volume(self) -> Option<Volume> {
-        if !is_volume(&self.thing_type) {
+        if !is_volume(self.thing_type.as_ref()) {
             return None;
         }
         let (patient_id, patient_name, cabinet_path, _, _) = parse_thing_keywords(&self.keywords);
@@ -200,14 +200,13 @@ fn parse_thing_keywords(keywords: &[String]) -> ParsedThingKeywords {
 /// Returns `true` when `thing_type` marks the Thing as a volume. Handles
 /// both the bare-string (`"Volume"`) and tagged-enum (`{"Other": "Volume"}`)
 /// JSON forms.
-fn is_volume(value: &Option<serde_json::Value>) -> bool {
+fn is_volume(value: Option<&serde_json::Value>) -> bool {
     match value {
         Some(serde_json::Value::String(s)) => s == VOLUME_TYPE,
         Some(serde_json::Value::Object(map)) => map
             .get("Other")
             .and_then(|v| v.as_str())
-            .map(|s| s == VOLUME_TYPE)
-            .unwrap_or(false),
+            .is_some_and(|s| s == VOLUME_TYPE),
         _ => false,
     }
 }
@@ -215,14 +214,13 @@ fn is_volume(value: &Option<serde_json::Value>) -> bool {
 /// Returns `true` when `thing_type` marks the Thing as a case-file
 /// folder. Handles both the bare-string (`"CaseFile"`) and tagged-enum
 /// (`{"Other": "CaseFile"}`) JSON forms.
-fn is_case_file(value: &Option<serde_json::Value>) -> bool {
+fn is_case_file(value: Option<&serde_json::Value>) -> bool {
     match value {
         Some(serde_json::Value::String(s)) => s == CASE_FILE_TYPE,
         Some(serde_json::Value::Object(map)) => map
             .get("Other")
             .and_then(|v| v.as_str())
-            .map(|s| s == CASE_FILE_TYPE)
-            .unwrap_or(false),
+            .is_some_and(|s| s == CASE_FILE_TYPE),
         _ => false,
     }
 }
@@ -235,8 +233,7 @@ fn identifier_is_nhs_number(property_id: &serde_json::Value) -> bool {
         serde_json::Value::Object(map) => map
             .get("Custom")
             .and_then(|v| v.as_str())
-            .map(|s| s == NHS_PROPERTY_ID)
-            .unwrap_or(false),
+            .is_some_and(|s| s == NHS_PROPERTY_ID),
         serde_json::Value::String(s) => s == NHS_PROPERTY_ID,
         _ => false,
     }

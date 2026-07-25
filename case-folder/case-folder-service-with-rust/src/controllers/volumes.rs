@@ -297,12 +297,11 @@ pub async fn rename(
         errors.insert("title".into(), "Volume title is required.".into());
         return responses::unprocessable(errors);
     }
-    let volume = match things
+    let Ok(volume) = things
         .rename_volume(id, input.title.trim().to_string())
         .await
-    {
-        Ok(v) => v,
-        Err(_) => return responses::not_found("Volume not found"),
+    else {
+        return responses::not_found("Volume not found");
     };
     Json(volume_show(things.as_ref(), events.as_ref(), &volume).await).into_response()
 }
@@ -340,13 +339,10 @@ pub async fn add_folder(
             return responses::service_unavailable(format!("Main Thing Service unreachable: {e}"));
         }
     };
-    let folder_id = match Uuid::parse_str(&input.folder_id) {
-        Ok(u) => u,
-        Err(_) => {
-            let mut errors = HashMap::new();
-            errors.insert("folder_id".into(), "Provide a valid folder UUID.".into());
-            return responses::unprocessable(errors);
-        }
+    let Ok(folder_id) = Uuid::parse_str(&input.folder_id) else {
+        let mut errors = HashMap::new();
+        errors.insert("folder_id".into(), "Provide a valid folder UUID.".into());
+        return responses::unprocessable(errors);
     };
     let folder = match things.find_by_id(folder_id).await {
         Ok(Some(f)) => f,
@@ -459,9 +455,10 @@ pub async fn move_volume(
 
     let to_cabinet_id = match input.to_cabinet_id.as_deref() {
         None | Some("") => None,
-        Some(s) => match Uuid::parse_str(s) {
-            Ok(u) => Some(u),
-            Err(_) => {
+        Some(s) => {
+            if let Ok(u) = Uuid::parse_str(s) {
+                Some(u)
+            } else {
                 let mut errors = HashMap::new();
                 errors.insert(
                     "to_cabinet_id".into(),
@@ -469,7 +466,7 @@ pub async fn move_volume(
                 );
                 return responses::unprocessable(errors);
             }
-        },
+        }
     };
     let to_cabinet_label = match to_cabinet_id {
         Some(c) => match label_path(places.as_ref(), c).await {

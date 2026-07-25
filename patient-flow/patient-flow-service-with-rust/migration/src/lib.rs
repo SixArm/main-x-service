@@ -3,12 +3,14 @@
 //! The [`Migrator`] runs the ordered list below at boot (or via
 //! `cargo loco db migrate`): the physical topology (sites → wards →
 //! bays → beds), the inpatient stays + transfers, the demand-side
-//! tables (bed requests, Red2Green journal, infection flags), then the
+//! tables (bed requests, `Red2Green` journal, infection flags), then the
 //! `audit_logs` and `event_outbox` side tables. Stay data is personal
 //! data, so the audit trail is the who/what/when record over every
 //! change.
 
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
 #![allow(elided_lifetimes_in_paths)]
 pub use sea_orm_migration::prelude::*;
 mod m20220101_000001_topology;

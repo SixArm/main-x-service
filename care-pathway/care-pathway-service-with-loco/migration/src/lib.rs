@@ -6,8 +6,15 @@
 //! the compliance columns), `merge_records` (the merge history),
 //! `event_outbox` (the durable event bus), and the instance layer.
 
+// Always start with high quality coding conventions
+// (`agents/share/rust-loco-stack.md`).
 // SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
+// `sea_orm_migration::prelude::*` brings in types whose signatures elide
+// lifetimes in paths; the lint fires on the macro-generated code rather
+// than on anything written here.
 #![allow(elided_lifetimes_in_paths)]
 pub use sea_orm_migration::prelude::*;
 mod m20220101_000001_care_pathways;

@@ -13,7 +13,7 @@ pub struct Migration;
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
-    /// Create the table + the kind/taken_at index.
+    /// Create the table + the `kind/taken_at` index.
     ///
     /// # Errors
     ///

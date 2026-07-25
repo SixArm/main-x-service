@@ -8,6 +8,8 @@
 //! `audit_logs` and `event_outbox` side tables.
 
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
 #![allow(elided_lifetimes_in_paths)]
 pub use sea_orm_migration::prelude::*;
 mod m20220101_000001_relationships;

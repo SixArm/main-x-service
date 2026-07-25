@@ -19,8 +19,9 @@
 ///
 /// # Returns
 /// A `String` of just the digit characters, in their original order.
+#[must_use]
 pub fn normalise_nhs_number(raw: &str) -> String {
-    raw.chars().filter(|c| c.is_ascii_digit()).collect()
+    raw.chars().filter(char::is_ascii_digit).collect()
 }
 
 /// Format an NHS Number into the canonical `XXX XXX XXXX` grouping.
@@ -40,6 +41,7 @@ pub fn normalise_nhs_number(raw: &str) -> String {
 /// # Returns
 /// The space-grouped form. Never panics: the `len()` match guarantees
 /// every byte-slice index below is within bounds.
+#[must_use]
 pub fn format_nhs_number(raw: &str) -> String {
     let digits = normalise_nhs_number(raw);
     // Cap at ten digits; an NHS Number is never longer.
@@ -84,6 +86,7 @@ pub fn format_nhs_number(raw: &str) -> String {
 /// # Returns
 /// `true` if `raw` is a structurally valid NHS Number, else `false`.
 /// Never panics: length is checked before any indexing.
+#[must_use]
 pub fn is_valid_nhs_number(raw: &str) -> bool {
     let digits = normalise_nhs_number(raw);
     if digits.len() != 10 {
@@ -91,11 +94,12 @@ pub fn is_valid_nhs_number(raw: &str) -> bool {
     }
     // Read one decimal digit by index. `saturating_sub(b'0')` is safe
     // because `normalise_nhs_number` guarantees every byte is `0'..='9'`.
-    let digit = |i: usize| -> u32 { digits.as_bytes()[i].saturating_sub(b'0') as u32 };
+    let digit = |i: usize| -> u32 { u32::from(digits.as_bytes()[i].saturating_sub(b'0')) };
     let mut total: u32 = 0;
-    // Weighted sum over the first nine digits; weight = 10 - i (10..=2).
-    for i in 0..9 {
-        total += digit(i) * (10 - i as u32);
+    // Weighted sum over the first nine digits; weights run 10, 9, … 2.
+    // Zipping the weights in directly avoids an index-to-weight cast.
+    for (i, weight) in (2..=10u32).rev().enumerate() {
+        total += digit(i) * weight;
     }
     let remainder = total % 11;
     let check = 11 - remainder;

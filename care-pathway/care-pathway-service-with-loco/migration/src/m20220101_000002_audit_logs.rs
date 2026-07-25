@@ -1,7 +1,7 @@
 //! Migration: create the `audit_logs` table — one row per CRUD/merge
 //! action on a care pathway (who / what / when, plus a payload snapshot).
 
-use loco_rs::schema::*;
+use loco_rs::schema::{ColType, create_table, drop_table};
 use sea_orm_migration::prelude::*;
 
 /// The `audit_logs` table migration (name derived from the file name).

@@ -49,6 +49,7 @@ pub struct Patient {
 /// # Parameters
 /// - `p`: the upstream patient record.
 /// - `folder_count`: how many folders this patient has.
+#[must_use]
 pub fn patient(p: &main_patient_service::Patient, folder_count: usize) -> Patient {
     Patient {
         id: p.id,
@@ -96,6 +97,7 @@ pub struct Place {
 ///
 /// # Parameters
 /// - `place_type`: the upstream place-type string, if present.
+#[must_use]
 pub fn place_kind_for(place_type: Option<&str>) -> &'static str {
     match place_type {
         Some(main_place_service::PlaceType::HOSPITAL) => "building",
@@ -114,6 +116,7 @@ pub fn place_kind_for(place_type: Option<&str>) -> &'static str {
 /// # Parameters
 /// - `p`: the upstream place record.
 /// - `container_path`: pre-computed containment breadcrumb.
+#[must_use]
 pub fn place(p: &main_place_service::Place, container_path: String) -> Place {
     Place {
         id: p.id,
@@ -189,16 +192,19 @@ pub struct Folder {
 /// - `f`: the upstream folder record.
 /// - `cabinet_label`: human-readable label for the folder's cabinet.
 /// - `latest_move`: the most recent move event for this folder, if any.
+#[must_use]
 pub fn folder(
     f: &main_thing_service::Folder,
     cabinet_label: String,
     latest_move: Option<&main_event_service::MoveEvent>,
 ) -> Folder {
     let status = match latest_move {
+        // A recorded move wins; otherwise fall back to the folder's own
+        // cabinet. Both guards are checked before the shared in-transit
+        // arm, so ordering carries the logic.
         Some(ev) if ev.to_cabinet_id.is_some() => STATUS_IN_CABINET,
-        Some(_) => STATUS_IN_TRANSIT,
         None if f.cabinet_id.is_some() => STATUS_IN_CABINET,
-        None => STATUS_IN_TRANSIT,
+        Some(_) | None => STATUS_IN_TRANSIT,
     };
     let last_moved_at = latest_move.map(|e| e.moved_at.to_rfc3339());
     Folder {
@@ -255,6 +261,7 @@ pub struct Volume {
 /// - `v`: the upstream volume record.
 /// - `cabinet_label`: human-readable label for the volume's cabinet.
 /// - `folder_count`: number of folders in the volume.
+#[must_use]
 pub fn volume(
     v: &main_thing_service::Volume,
     cabinet_label: String,
@@ -323,6 +330,7 @@ pub struct Move {
 ///
 /// # Parameters
 /// - `m`: the upstream move-event record.
+#[must_use]
 pub fn move_event(m: &main_event_service::MoveEvent) -> Move {
     Move {
         id: m.id,
@@ -362,6 +370,7 @@ pub struct Worker {
 ///
 /// # Parameters
 /// - `w`: the upstream worker record.
+#[must_use]
 pub fn worker(w: &main_worker_service::Worker) -> Worker {
     Worker {
         id: w.id,
@@ -387,6 +396,7 @@ pub struct List<T: Serialize> {
 
 impl<T: Serialize> List<T> {
     /// Wrap `items` in a list envelope with no associated query.
+    #[must_use]
     pub fn new(items: Vec<T>) -> Self {
         Self { items, query: None }
     }
@@ -450,6 +460,12 @@ pub fn not_found(message: impl Into<String>) -> Response {
 ///
 /// # Parameters
 /// - `errors`: map of field name to validation message.
+// Generalising over `BuildHasher` would have to propagate into
+// `ValidationBody`, which is a serialized wire type. This is a service
+// crate with one in-tree caller, not a library, so the concrete
+// `HashMap` stays.
+#[allow(clippy::implicit_hasher)]
+#[must_use]
 pub fn unprocessable(errors: HashMap<String, String>) -> Response {
     (
         StatusCode::UNPROCESSABLE_ENTITY,

@@ -3,7 +3,7 @@
 //! are denormalised for lookup and listing, and `active` / `deleted_at`
 //! drive soft-delete.
 
-use loco_rs::schema::*;
+use loco_rs::schema::{ColType, create_table, drop_table};
 use sea_orm_migration::prelude::*;
 
 /// The `care_pathways` table migration (name derived from the file name).

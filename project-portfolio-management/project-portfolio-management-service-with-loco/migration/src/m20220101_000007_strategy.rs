@@ -4,7 +4,7 @@
 //! alignment), and `benefits` (value realization). Money stays
 //! integer minor units + ISO-4217 (the Phase-A posture).
 
-use loco_rs::schema::*;
+use loco_rs::schema::{create_table, drop_table, ColType};
 use sea_orm_migration::prelude::*;
 
 /// The strategy-tables migration (name derived from the module).

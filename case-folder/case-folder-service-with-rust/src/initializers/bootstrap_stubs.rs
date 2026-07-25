@@ -46,7 +46,7 @@ pub struct StubsInitializer;
 fn enabled() -> bool {
     matches!(
         std::env::var("USE_UPSTREAM_STUBS").as_deref(),
-        Ok("1") | Ok("true") | Ok("TRUE") | Ok("yes")
+        Ok("1" | "true" | "TRUE" | "yes")
     )
 }
 
@@ -144,7 +144,7 @@ async fn seed_demo_volume(things: &ThingStub) {
     let Some(first) = alice.first() else {
         return;
     };
-    let volume = match things
+    let Ok(volume) = things
         .create_volume(NewVolume {
             patient_id: first.patient_id,
             nhs_number_snapshot: first.nhs_number_snapshot.clone(),
@@ -154,9 +154,8 @@ async fn seed_demo_volume(things: &ThingStub) {
             cabinet_path_snapshot: first.cabinet_path_snapshot.clone(),
         })
         .await
-    {
-        Ok(v) => v,
-        Err(_) => return,
+    else {
+        return;
     };
     for f in alice {
         let _ = things

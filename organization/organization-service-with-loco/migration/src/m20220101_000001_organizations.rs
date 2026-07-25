@@ -2,7 +2,7 @@
 //! store. The full `Organization` payload lives in the `data` JSONB
 //! column; `pid` and `name` are denormalised for lookup and search.
 
-use loco_rs::schema::*;
+use loco_rs::schema::{ColType, create_table, drop_table};
 use sea_orm_migration::prelude::*;
 
 /// The `organizations` table migration (name derived from the module).

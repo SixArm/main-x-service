@@ -2,7 +2,7 @@
 //! (which duplicate folded into which survivor, by whom, with a snapshot
 //! of the transferred payload).
 
-use loco_rs::schema::*;
+use loco_rs::schema::{ColType, create_table, drop_table};
 use sea_orm_migration::prelude::*;
 
 /// The `merge_records` table migration (name derived from the file name).

@@ -150,6 +150,9 @@ impl From<Error> for loco_rs::Error {
 }
 
 #[async_trait]
+/// The folder (`Thing`) operations this crate needs from the upstream
+/// main-thing-service. A trait so tests can substitute a fake without a
+/// live HTTP dependency.
 pub trait Client: Send + Sync {
     /// Free-text search by folder title, patient name, or NHS Number.
     /// Empty `query` returns all folders.

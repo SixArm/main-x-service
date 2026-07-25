@@ -104,6 +104,9 @@ impl From<Error> for loco_rs::Error {
 }
 
 #[async_trait]
+/// The place-hierarchy operations this crate needs from the upstream
+/// main-place-service. A trait so tests can substitute a fake without a
+/// live HTTP dependency.
 pub trait Client: Send + Sync {
     /// Free-text name search, optionally filtered by `place_type`.
     ///

@@ -27,6 +27,8 @@
 // SEC-I3: this service has no reason to reach for `unsafe`; forbid it
 // outright to match the family's other crate roots.
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
 
 /// Loco application wiring: the `App` struct and its `Hooks`
 /// implementation (boot, initializer order, route mounting, tasks).

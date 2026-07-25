@@ -2,7 +2,7 @@
 //! case records. The full `case_matcher::Case` payload is stored as JSONB
 //! in `data`; `pid` and `title` are denormalised for lookup and listing.
 
-use loco_rs::schema::*;
+use loco_rs::schema::{create_table, drop_table, ColType};
 use sea_orm_migration::prelude::*;
 
 /// The `cases`-table migration. `DeriveMigrationName` derives the name

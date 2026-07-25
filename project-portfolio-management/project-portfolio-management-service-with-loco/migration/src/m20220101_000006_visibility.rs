@@ -5,7 +5,7 @@
 //! derived read over these plus the Phase-A governance tables — no
 //! table of its own.
 
-use loco_rs::schema::*;
+use loco_rs::schema::{create_table, drop_table, ColType};
 use sea_orm_migration::prelude::*;
 
 /// The visibility-tables migration (name derived from the module).

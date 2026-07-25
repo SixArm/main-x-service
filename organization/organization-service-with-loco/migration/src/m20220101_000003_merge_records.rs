@@ -2,7 +2,7 @@
 //! merge, capturing the survivor, the merged-away duplicate, an optional
 //! reason/actor, and a snapshot of the duplicate's transferred payload.
 
-use loco_rs::schema::*;
+use loco_rs::schema::{ColType, create_table, drop_table};
 use sea_orm_migration::prelude::*;
 
 /// The `merge_records` table migration (name derived from the module).

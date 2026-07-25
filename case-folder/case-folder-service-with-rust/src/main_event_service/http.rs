@@ -90,14 +90,13 @@ struct EventDto {
 /// Returns `true` when `event_type` marks the event as a folder move.
 /// Handles both the bare-string (`"FolderMove"`) and tagged-enum
 /// (`{"Other": "FolderMove"}`) JSON forms the upstream service may emit.
-fn is_folder_move(value: &Option<serde_json::Value>) -> bool {
+fn is_folder_move(value: Option<&serde_json::Value>) -> bool {
     match value {
         Some(serde_json::Value::String(s)) => s == EVENT_TYPE,
         Some(serde_json::Value::Object(map)) => map
             .get("Other")
             .and_then(|v| v.as_str())
-            .map(|s| s == EVENT_TYPE)
-            .unwrap_or(false),
+            .is_some_and(|s| s == EVENT_TYPE),
         _ => false,
     }
 }
@@ -107,7 +106,7 @@ impl EventDto {
     /// event is not a folder move. Parses the `KEY_*`-prefixed keywords
     /// back into typed fields; missing UUID keywords fall back to nil.
     fn into_move_event(self) -> Option<MoveEvent> {
-        if !is_folder_move(&self.event_type) {
+        if !is_folder_move(self.event_type.as_ref()) {
             return None;
         }
         let moved_at = self.start_date.unwrap_or_else(Utc::now);

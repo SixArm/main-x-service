@@ -139,51 +139,48 @@ pub async fn show(
         }
     };
 
-    let body = match &patient {
+    let body = if let Some(p) = &patient {
         // Patient Service hit: enrich with folders + merged history.
-        Some(p) => {
-            let folders = things.list_for_patient(p.id).await.unwrap_or_default();
-            let history = events.list_for_patient(p.id).await.unwrap_or_default();
-            let latest = latest_move_per_folder(&history);
-            let folder_items: Vec<_> = folders
-                .iter()
-                .map(|f| {
-                    let label = f
-                        .cabinet_path_snapshot
-                        .clone()
-                        .unwrap_or_else(|| "In transit".to_string());
-                    responses::folder(f, label, latest.get(&f.id).copied())
-                })
-                .collect();
-            let move_items: Vec<_> = history.iter().map(responses::move_event).collect();
-            PatientShow {
-                patient: Some(responses::patient(p, folders.len())),
-                folders: folder_items,
-                history: move_items,
-                nhs_number: nhs_display,
-                patient_service_match: true,
-            }
+        let folders = things.list_for_patient(p.id).await.unwrap_or_default();
+        let history = events.list_for_patient(p.id).await.unwrap_or_default();
+        let latest = latest_move_per_folder(&history);
+        let folder_items: Vec<_> = folders
+            .iter()
+            .map(|f| {
+                let label = f
+                    .cabinet_path_snapshot
+                    .clone()
+                    .unwrap_or_else(|| "In transit".to_string());
+                responses::folder(f, label, latest.get(&f.id).copied())
+            })
+            .collect();
+        let move_items: Vec<_> = history.iter().map(responses::move_event).collect();
+        PatientShow {
+            patient: Some(responses::patient(p, folders.len())),
+            folders: folder_items,
+            history: move_items,
+            nhs_number: nhs_display,
+            patient_service_match: true,
         }
+    } else {
         // Fallback: no Patient Service record, use folder snapshots.
-        None => {
-            let folders = things.list_for_nhs_number(&nhs).await.unwrap_or_default();
-            let folder_items: Vec<_> = folders
-                .iter()
-                .map(|f| {
-                    let label = f
-                        .cabinet_path_snapshot
-                        .clone()
-                        .unwrap_or_else(|| "In transit".to_string());
-                    responses::folder(f, label, None)
-                })
-                .collect();
-            PatientShow {
-                patient: None,
-                folders: folder_items,
-                history: vec![],
-                nhs_number: nhs_display,
-                patient_service_match: false,
-            }
+        let folders = things.list_for_nhs_number(&nhs).await.unwrap_or_default();
+        let folder_items: Vec<_> = folders
+            .iter()
+            .map(|f| {
+                let label = f
+                    .cabinet_path_snapshot
+                    .clone()
+                    .unwrap_or_else(|| "In transit".to_string());
+                responses::folder(f, label, None)
+            })
+            .collect();
+        PatientShow {
+            patient: None,
+            folders: folder_items,
+            history: vec![],
+            nhs_number: nhs_display,
+            patient_service_match: false,
         }
     };
 

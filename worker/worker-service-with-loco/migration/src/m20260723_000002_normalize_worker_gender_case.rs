@@ -16,7 +16,7 @@ use sea_orm_migration::sea_orm::ConnectionTrait;
 pub struct Migration;
 
 impl MigrationName for Migration {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "m20260723_000002_normalize_worker_gender_case"
     }
 }

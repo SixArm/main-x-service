@@ -67,6 +67,13 @@ impl Task for Seed {
 /// clients pointed at the real services; the `bootstrap_stubs`
 /// initializer uses it against in-process stubs for offline / e2e
 /// runs.
+///
+/// # Errors
+///
+/// Propagates the first failure from seeding folders, volumes, or
+/// moves. Place seeding is deliberately *not* fatal — an unreachable
+/// Place service falls back to placeholder cabinets so the rest of the
+/// demo data still loads.
 pub async fn run_seed(
     place_client: &dyn MainPlaceServiceClient,
     thing_client: &dyn MainThingServiceClient,
@@ -133,6 +140,9 @@ impl CabinetsSeed {
 ///
 /// Propagates any [`main_place_service::Error`] from the underlying
 /// search/create calls (e.g. the Place service being unreachable).
+// Seeding is a flat script of literal demo data: the length is the
+// number of fixture rows, not branching complexity.
+#[allow(clippy::too_many_lines)]
 async fn seed_places(
     client: &dyn MainPlaceServiceClient,
 ) -> std::result::Result<CabinetsSeed, main_place_service::Error> {
@@ -328,6 +338,8 @@ async fn ensure_place(
 ///
 /// Returns `Err` only on a hard failure of the overall Loco task; the
 /// per-service calls are best-effort and do not abort seeding.
+// As above: a flat script of literal demo fixtures.
+#[allow(clippy::too_many_lines)]
 async fn seed_folders_and_moves(
     patient_client: &dyn main_patient_service::Client,
     thing_client: &dyn MainThingServiceClient,

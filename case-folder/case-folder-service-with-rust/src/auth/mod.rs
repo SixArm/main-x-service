@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use uuid::Uuid;
 
-/// Name of the HttpOnly session cookie.
+/// Name of the `HttpOnly` session cookie.
 pub const SESSION_COOKIE: &str = "cts_session";
 
 /// `aud` claim value for short-lived magic-link (sign-in) tokens. The
@@ -101,7 +101,7 @@ pub struct AuthConfig {
     /// Lifetime of a magic-link token, in seconds (default 600 = 10 min).
     #[serde(default = "default_magic_ttl")]
     pub magic_link_ttl_seconds: i64,
-    /// Lifetime of a session token, in seconds (default 86_400 = 1 day).
+    /// Lifetime of a session token, in seconds (default `86_400` = 1 day).
     #[serde(default = "default_session_ttl")]
     pub session_ttl_seconds: i64,
     /// When true, protected routes demand a valid session cookie/bearer.
@@ -126,7 +126,7 @@ pub struct AuthConfig {
 fn default_magic_ttl() -> i64 {
     600
 }
-/// Default session TTL: 86_400 seconds (24 hours).
+/// Default session TTL: `86_400` seconds (24 hours).
 fn default_session_ttl() -> i64 {
     86_400
 }
@@ -155,6 +155,7 @@ impl Default for AuthConfig {
 impl AuthConfig {
     /// True when no usable signing secret was configured — the caller
     /// should warn loudly (production must set `AUTH_SECRET`).
+    #[must_use]
     pub fn secret_is_insecure(&self) -> bool {
         self.secret.trim().is_empty()
     }
@@ -190,6 +191,7 @@ impl AuthState {
     /// # Parameters
     /// - `config`: the deserialized `settings.auth` block.
     /// - `mailer`: magic-link delivery backend.
+    #[must_use]
     pub fn new(config: AuthConfig, mailer: Box<dyn Mailer>) -> Self {
         let encoding = EncodingKey::from_secret(config.secret.as_bytes());
         let decoding = DecodingKey::from_secret(config.secret.as_bytes());
@@ -252,8 +254,13 @@ impl AuthState {
             name: identity.name.clone(),
             role: identity.role.clone(),
             aud: aud.to_string(),
-            iat: iat.max(0) as usize,
-            exp: (iat + ttl).max(0) as usize,
+            // JWT numeric dates are seconds since the epoch. `usize` is the
+            // shape `jsonwebtoken` expects, but the conversion is fallible
+            // on a 32-bit target (and for a negative clock), so it is
+            // checked rather than cast: refusing to mint a token beats
+            // minting one with a truncated `exp` that never expires.
+            iat: usize::try_from(iat.max(0)).map_err(|_| AuthError::Token)?,
+            exp: usize::try_from(iat.saturating_add(ttl).max(0)).map_err(|_| AuthError::Token)?,
         };
         encode(&Header::new(Algorithm::HS256), &claims, &self.encoding)
             .map_err(|_| AuthError::Token)
@@ -297,12 +304,15 @@ impl AuthState {
 
     /// Establish a new opaque server-side session for `identity` and return
     /// its session id (the value placed in the `cts_session` cookie). The id
-    /// is unguessable (UUIDv4) and is **not** a token — it carries no claims
+    /// is unguessable (`UUIDv4`) and is **not** a token — it carries no claims
     /// and is meaningless without the server-side store.
     pub fn create_session(&self, identity: &Identity) -> String {
         let sid = Uuid::new_v4().to_string();
         let expires_at = Self::now() + self.config.session_ttl_seconds;
-        let mut store = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
+        let mut store = self
+            .sessions
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         // Opportunistically drop expired entries so the map can't grow
         // unbounded across the process lifetime.
         let now = Self::now();
@@ -320,7 +330,10 @@ impl AuthState {
     /// Resolve the identity for an opaque session id, or `None` when the id
     /// is unknown or the session has expired (expired entries are evicted).
     pub fn session_identity(&self, sid: &str) -> Option<Identity> {
-        let mut store = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
+        let mut store = self
+            .sessions
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         match store.get(sid) {
             Some(entry) if entry.expires_at > Self::now() => Some(entry.identity.clone()),
             Some(_) => {
@@ -334,7 +347,10 @@ impl AuthState {
     /// Revoke an opaque session (sign-out). Idempotent — revoking an absent
     /// session is a no-op.
     pub fn revoke_session(&self, sid: &str) {
-        let mut store = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
+        let mut store = self
+            .sessions
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         store.remove(sid);
     }
 
