@@ -12,11 +12,11 @@ use super::{ensure_valid, unprocessable};
 use crate::auth::MaybeAuthUser;
 use crate::metrics::Metrics;
 use crate::models::_entities::{
-    leave_entitlements, leave_requests, shift_assignments, shifts, time_entries,
+    employees, leave_entitlements, leave_requests, shift_assignments, shifts, time_entries,
 };
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
-use crate::rules::{leave, lifecycle, tokens, workforce};
+use crate::rules::{leave, lifecycle, tokens, workforce, working_time};
 use crate::streaming;
 use crate::validation::Problems;
 
@@ -588,6 +588,127 @@ async fn unassign_shift(
     format::empty_json()
 }
 
+/// `GET /api/workforce/working-time?department=&as_of=` query.
+#[derive(Debug, Deserialize)]
+struct WorkingTimeQuery {
+    department: Option<String>,
+    as_of: Option<chrono::NaiveDate>,
+}
+
+/// How far the rest-gap check looks around `as_of` (days, each way) —
+/// recent turnarounds and the *planned* rota alike.
+const REST_WINDOW_DAYS: i64 = 28;
+
+/// One shift's `(starts, ends)` in UTC, for the rest-gap check.
+type ShiftInterval = (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>);
+
+/// `GET /api/workforce/working-time` — the advisory working-time
+/// guardrails (WPM-R27): per employee, the 17-week average of
+/// **recorded** minutes (all non-deleted entries — a safety signal
+/// does not wait for approval) with WPM-D16 terms and the 48-hour
+/// flag, plus 11-hour rest-gap breaches across recent and planned
+/// shift assignments. Flags only — nothing is refused (WPM-D19).
+/// Visibility equals the rota's: flagged employees are named.
+#[debug_handler]
+async fn working_time(
+    axum::extract::Query(query): axum::extract::Query<WorkingTimeQuery>,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
+    let as_of = query.as_of.unwrap_or_else(|| chrono::Utc::now().date_naive());
+    let window_start = as_of - chrono::Duration::weeks(working_time::REFERENCE_WEEKS);
+    let mut employee_find =
+        employees::Entity::find().filter(employees::Column::DeletedAt.is_null());
+    if let Some(department) = &query.department {
+        employee_find = employee_find.filter(employees::Column::Department.eq(department.as_str()));
+    }
+    let employee_rows = employee_find.all(&ctx.db).await?;
+    // Recorded minutes per employee over the reference window.
+    let entries = time_entries::Entity::find()
+        .filter(time_entries::Column::DeletedAt.is_null())
+        .filter(time_entries::Column::WorkedOn.gt(window_start))
+        .filter(time_entries::Column::WorkedOn.lte(as_of))
+        .all(&ctx.db)
+        .await?;
+    let mut minutes_of: std::collections::BTreeMap<Uuid, i64> = std::collections::BTreeMap::new();
+    for entry in &entries {
+        *minutes_of.entry(entry.employee_pid).or_default() += i64::from(entry.minutes);
+    }
+    // Shift intervals per employee around `as_of` (recent + planned).
+    let rest_start = as_of - chrono::Duration::days(REST_WINDOW_DAYS);
+    let rest_end = as_of + chrono::Duration::days(REST_WINDOW_DAYS);
+    let shift_rows = shifts::Entity::find()
+        .filter(shifts::Column::DeletedAt.is_null())
+        .all(&ctx.db)
+        .await?;
+    let window_shifts: std::collections::BTreeMap<Uuid, ShiftInterval> = shift_rows
+            .iter()
+            .filter(|shift| {
+                let start = shift.starts_at.date_naive();
+                start >= rest_start && start <= rest_end
+            })
+            .map(|shift| {
+                (
+                    shift.pid,
+                    (
+                        shift.starts_at.with_timezone(&chrono::Utc),
+                        shift.ends_at.with_timezone(&chrono::Utc),
+                    ),
+                )
+            })
+            .collect();
+    let assignments = shift_assignments::Entity::find()
+        .filter(shift_assignments::Column::DeletedAt.is_null())
+        .all(&ctx.db)
+        .await?;
+    let mut intervals_of: std::collections::BTreeMap<Uuid, Vec<ShiftInterval>> =
+        std::collections::BTreeMap::new();
+    for assignment in &assignments {
+        if let Some(interval) = window_shifts.get(&assignment.shift_pid) {
+            intervals_of.entry(assignment.employee_pid).or_default().push(*interval);
+        }
+    }
+    let mut flagged = Vec::new();
+    for employee in &employee_rows {
+        let total_minutes = minutes_of.get(&employee.pid).copied().unwrap_or(0);
+        let over = working_time::over_average(total_minutes, working_time::REFERENCE_WEEKS);
+        let breaches = intervals_of
+            .get(&employee.pid)
+            .map(|intervals| working_time::rest_breaches(intervals))
+            .unwrap_or_default();
+        if !over && breaches.is_empty() {
+            continue;
+        }
+        flagged.push(serde_json::json!({
+            "employee_pid": employee.pid,
+            "display_name": employee.display_name,
+            "department": employee.department,
+            "average_weekly": {
+                "numerator_minutes": total_minutes,
+                "denominator_weeks": working_time::REFERENCE_WEEKS,
+                "value_minutes_per_week":
+                    working_time::weekly_average(total_minutes, working_time::REFERENCE_WEEKS),
+            },
+            "over_48h": over,
+            "rest_breaches": breaches.iter().map(|breach| serde_json::json!({
+                "prev_end": breach.prev_end,
+                "next_start": breach.next_start,
+                "gap_minutes": breach.gap_minutes,
+            })).collect::<Vec<_>>(),
+        }));
+    }
+    format::json(serde_json::json!({
+        "as_of": as_of,
+        "reference_weeks": working_time::REFERENCE_WEEKS,
+        "rest_window_days": REST_WINDOW_DAYS,
+        "employees_checked": employee_rows.len(),
+        "flagged": flagged,
+        "derivation": "advisory only, nothing is refused (WPM-D19); average = all \
+                       recorded (not merely approved) minutes over the trailing 17 \
+                       weeks; rest breaches = consecutive shift assignments (recent \
+                       and planned, ±28 days) under 11 hours apart",
+    }))
+}
+
 /// The workforce routes.
 pub fn routes() -> Routes {
     Routes::new()
@@ -604,6 +725,7 @@ pub fn routes() -> Routes {
         .add("/leave-requests/{pid}/cancel", post(cancel_leave))
         .add("/shifts", post(create_shift))
         .add("/shifts", get(list_shifts))
+        .add("/workforce/working-time", get(working_time))
         .add("/shifts/{pid}/assignments", post(assign_shift))
         .add("/shift-assignments/{pid}", delete(unassign_shift))
 }

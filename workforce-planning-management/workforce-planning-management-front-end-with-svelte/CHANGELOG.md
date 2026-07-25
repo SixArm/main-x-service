@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — working-time panel (WPM-T26 / WPM-R27, 2026-07-25)
+
+- `/workforce` gains a Working-time panel: flagged employees with the
+  over-48h average chip (hours/week) and 11-hour rest-gap breach
+  chips, the derivation line, and an explicit all-clear state. 4 i18n
+  keys × 13 locales (parity green).
+
 ### Added — enrolment conversion on the uptake table (WPM-T25 / WPM-R26, 2026-07-25)
 
 - The `/wellbeing` uptake table shows "Enrolled after prompt" for

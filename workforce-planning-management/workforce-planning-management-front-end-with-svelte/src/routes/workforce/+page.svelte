@@ -1,12 +1,14 @@
 <script lang="ts">
-  import { decideLeave, listEmployees, listLeaveRequests, listShifts } from "$lib/api/wpm";
+  import { decideLeave, listEmployees, listLeaveRequests, listShifts, workingTime } from "$lib/api/wpm";
   import { t } from "$lib/i18n.svelte";
   import type { Employee, LeaveRequest } from "$lib/api/types";
 
   type ShiftRow = Awaited<ReturnType<typeof listShifts>>[number];
+  type WorkingTimeSignals = Awaited<ReturnType<typeof workingTime>>;
 
   let pending = $state<(LeaveRequest & { employee?: Employee })[] | null>(null);
   let shifts = $state<ShiftRow[]>([]);
+  let signals = $state<WorkingTimeSignals | null>(null);
   let error = $state<string | null>(null);
   let actionError = $state<string | null>(null);
 
@@ -22,6 +24,7 @@
         .filter((r) => r.status === "requested")
         .map((r) => ({ ...r, employee: byPid.get(r.employee_pid) }));
       shifts = await listShifts();
+      signals = await workingTime();
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
     }
@@ -81,4 +84,33 @@
       {/each}
     </tbody>
   </table>
+
+  {#if signals}
+    <h2>{t("wf.workingTime")}</h2>
+    <p class="muted">{signals.derivation}</p>
+    {#if signals.flagged.length === 0}
+      <p data-testid="working-time-clear">{t("wf.allClear")}</p>
+    {:else}
+      <table data-testid="working-time">
+        <tbody>
+          {#each signals.flagged as flag (flag.employee_pid)}
+            <tr>
+              <td>{flag.display_name} <span class="muted">({flag.department})</span></td>
+              <td>
+                {#if flag.over_48h}
+                  <span class="chip">{t("wf.over48")}</span>
+                  {Math.round((flag.average_weekly.value_minutes_per_week ?? 0) / 60)}h/wk
+                {/if}
+              </td>
+              <td>
+                {#each flag.rest_breaches as breach (breach.prev_end)}
+                  <span class="chip">{t("wf.restBreach")}: {Math.floor(breach.gap_minutes / 60)}h{breach.gap_minutes % 60 ? ` ${breach.gap_minutes % 60}m` : ""}</span>
+                {/each}
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+  {/if}
 {/if}

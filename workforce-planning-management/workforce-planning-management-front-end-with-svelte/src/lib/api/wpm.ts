@@ -302,6 +302,33 @@ export function mentorshipStatus(pid: string, to: string): Promise<unknown> {
   return api(`/mentorships/${pid}/status`, { method: "POST", body: { to } });
 }
 
+/** The advisory working-time guardrail signals (WPM-R27; flags only). */
+export function workingTime(
+  department?: string,
+  init?: FetchLike,
+): Promise<{
+  as_of: string;
+  reference_weeks: number;
+  rest_window_days: number;
+  employees_checked: number;
+  derivation: string;
+  flagged: Array<{
+    employee_pid: string;
+    display_name: string;
+    department: string;
+    average_weekly: {
+      numerator_minutes: number;
+      denominator_weeks: number;
+      value_minutes_per_week: number | null;
+    };
+    over_48h: boolean;
+    rest_breaches: Array<{ prev_end: string; next_start: string; gap_minutes: number }>;
+  }>;
+}> {
+  const qs = department ? `?department=${encodeURIComponent(department)}` : "";
+  return api(`/workforce/working-time${qs}`, init);
+}
+
 // ─── Wellbeing (health entitlements, WPM-R25) ───────────────────────
 
 /** One configurable entitlement rule (non-clinical predicates only). */

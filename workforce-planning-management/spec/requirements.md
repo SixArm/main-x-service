@@ -312,6 +312,28 @@ already have.*
   aggregate counts only with WPM-D16 terms (`null`, never `0`, when
   nobody has acknowledged), derived per request, never stored.
 
+## WPM-R27 — Working-time guardrails
+
+*As a rota planner I can see advisory working-time signals so rotas
+and recorded time don't quietly drift into unsafe or unlawful
+patterns.*
+
+- Derived **entirely from data WPM already holds** — time entries and
+  the shift rota; no new stored state. Signals (UK Working Time
+  Regulations shapes, advisory):
+  - **48-hour average** — average weekly recorded minutes over the
+    17-week reference window, with WPM-D16 terms; flagged when the
+    average exceeds 48 h. All recorded (non-deleted) time counts, not
+    just approved — a safety signal must not wait for approval.
+  - **11-hour daily rest** — consecutive shift assignments (recent and
+    planned) with less than 11 h between them.
+- **Advisory, never blocking** ([design.md](design.md) WPM-D19): the
+  view flags; it refuses nothing, and assignment/time endpoints are
+  unchanged.
+- Visibility equals the underlying workforce data (the rota and time
+  entries): the flagged list names employees exactly as the rota does;
+  no salary-grade masking applies and no new persona is introduced.
+
 ## WPM-R17 — Family fixtures
 
 - OpenAPI + Swagger, `Accepts-version` negotiation, `/metrics.prom`,

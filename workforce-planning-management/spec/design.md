@@ -161,3 +161,16 @@ reference. The reverse dependency is **derived, never stored**: an
 employee with a live enrolment in the linked plan stops seeing the
 prompt, computed per request from `benefit_enrollments`, so awareness
 state cannot drift from enrolment truth.
+
+## WPM-D19 — Working-time guardrails advise; they never block
+
+The WPM-R27 signals surface in a read-only view and gate nothing: a
+shift assignment that would breach the 11-hour rest gap, or a week
+that pushes the 17-week average over 48 hours, is **flagged, not
+refused**. Blocking would encode legal judgement WPM cannot make — the
+regulations carry opt-outs, sector carve-outs, and compensatory-rest
+rules that are a deployment's call, not the platform's. The same
+honesty rules as every derived view apply: WPM-D16 terms on the
+average, recorded (not merely approved) time in the numerator — a
+safety signal must not wait for a manager's approval — and the
+derivation named in the payload.

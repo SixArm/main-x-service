@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — working-time guardrails (WPM-T26 / WPM-R27, 2026-07-25)
+
+- `GET /api/workforce/working-time?department=&as_of=` — advisory
+  Working Time Regulations signals derived entirely from data WPM
+  already holds: the 17-week average of **recorded** (not merely
+  approved) minutes with WPM-D16 terms and the 48-hour flag (integer
+  boundary comparison), plus 11-hour rest-gap breaches across recent
+  and planned shift assignments (±28 days). Flags only — nothing is
+  refused (new WPM-D19); visibility equals the rota's.
+- `rules/working_time.rs` (pure): panic-free average/boundary/rest-gap
+  arithmetic; overlaps clamp to 0, malformed intervals are skipped.
+
 ### Added — enrolment conversion in the uptake view (WPM-T25 / WPM-R26, 2026-07-25)
 
 - `GET /api/wellbeing/uptake` rows for plan-linked rules gain

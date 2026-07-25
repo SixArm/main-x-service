@@ -94,6 +94,7 @@ pub fn spec() -> Value {
                 "get": { "tags": ["workforce"], "summary": "The rota (?department=&date=; assignments attached)", "responses": ok("Shifts") }
             },
             "/api/shifts/{pid}/assignments": { "post": { "tags": ["workforce"], "summary": "Assign (double-booking and leave-conflict refused)", "responses": created } },
+            "/api/workforce/working-time": { "get": { "tags": ["workforce"], "summary": "Advisory working-time guardrails (?department=&as_of=): 17-week 48h average over recorded minutes + 11h rest-gap breaches across recent and planned assignments; flags only, nothing refused (WPM-D19)", "responses": ok("Signals") } },
             "/api/shift-assignments/{pid}": { "delete": { "tags": ["workforce"], "summary": "Unassign (soft delete)", "responses": ok("Deleted") } },
             "/api/review-cycles": {
                 "post": { "tags": ["development"], "summary": "Open a review cycle", "responses": created },
@@ -227,6 +228,7 @@ mod tests {
             "/api/employees/{pid}/wellbeing-prompts",
             "/api/employees/{pid}/wellbeing-acknowledgements",
             "/api/wellbeing/uptake",
+            "/api/workforce/working-time",
         ] {
             assert!(paths.contains_key(p), "missing {p}");
         }

@@ -269,3 +269,23 @@ code + tests in one PR.
       `null`, still no employee pid in the payload) — full suite
       13/13 vs Postgres 18; clippy pedantic clean; svelte-check 0;
       vitest 10; Playwright 8. (WPM-D16, WPM-D18; WPM-R26)
+
+- [x] WPM-T26 (2026-07-25) **Working-time guardrails.** No new stored
+      state: `rules/working_time.rs` (pure — 17-week/48-hour average
+      as an integer boundary comparison with WPM-D16 terms, 11-hour
+      rest-gap detection over sorted shift intervals with overlap
+      clamping and malformed-interval skipping; leap-safe, panic-free)
+      + `GET /api/workforce/working-time?department=&as_of=` in the
+      workforce controller: per-employee flags over **recorded** (not
+      merely approved) minutes in the trailing 17 weeks and rest-gap
+      breaches across recent **and planned** assignments (±28 days).
+      Advisory only — nothing is refused (new WPM-D19); visibility
+      equals the rota's. Front-end: a Working-time panel on
+      `/workforce` (flags + all-clear state), 4 i18n keys × 13
+      locales. **Acceptance:** 3 pure pins (terms incl. null-not-zero,
+      exact 48 h boundary, rest-gap matrix) + the DB-gated
+      `working_time_guardrails` request test (over-average flag with
+      its terms, 10 h turnaround = one 600-min breach, modest week
+      unflagged, department scoping) — full `--ignored` suite 14/14
+      vs Postgres 18 (120 unit); clippy pedantic clean; svelte-check
+      0; vitest 10; Playwright 8. (WPM-D16, WPM-D19; WPM-R27)

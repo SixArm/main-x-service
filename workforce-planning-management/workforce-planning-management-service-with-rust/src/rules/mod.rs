@@ -15,3 +15,4 @@ pub mod talent;
 pub mod tokens;
 pub mod wellbeing;
 pub mod workforce;
+pub mod working_time;

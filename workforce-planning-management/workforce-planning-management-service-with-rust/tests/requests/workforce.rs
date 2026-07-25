@@ -213,3 +213,85 @@ async fn shift_conflicts() {
     })
     .await;
 }
+
+/// Working-time guardrails (WPM-R27): the 17-week 48-hour average over
+/// recorded minutes and the 11-hour rest gap flag — advisory only, and
+/// scoped by the department filter.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn working_time_guardrails() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let org = an_org();
+        let heavy = seed_employee(&request, &org, "WT-1", None).await;
+        activate(&request, &heavy).await;
+        let light = seed_employee(&request, &org, "WT-2", None).await;
+        activate(&request, &light).await;
+
+        // 35 recorded 24-hour days inside the 17-week window ending
+        // 2026-07-10 — 50 400 min, over the 48 960-min ceiling. Unapproved
+        // on purpose: a safety signal must not wait for approval.
+        let mut day = chrono::NaiveDate::from_ymd_opt(2026, 4, 1).unwrap();
+        for _ in 0..35 {
+            request
+                .post(&format!("/api/employees/{heavy}/time-entries"))
+                .json(&json!({ "worked_on": day, "minutes": 1440 }))
+                .await
+                .assert_status_ok();
+            day += chrono::Duration::days(1);
+        }
+        // The light employee records one modest day.
+        request
+            .post(&format!("/api/employees/{light}/time-entries"))
+            .json(&json!({ "worked_on": "2026-07-01", "minutes": 480 }))
+            .await
+            .assert_status_ok();
+
+        // A 10-hour turnaround: 14:00-22:00 then 08:00-16:00 next day.
+        for (starts, ends) in [
+            ("2026-07-05T14:00:00Z", "2026-07-05T22:00:00Z"),
+            ("2026-07-06T08:00:00Z", "2026-07-06T16:00:00Z"),
+        ] {
+            let shift: Value = request
+                .post("/api/shifts")
+                .json(&json!({ "department": "engineering", "starts_at": starts,
+                               "ends_at": ends, "required_headcount": 1 }))
+                .await
+                .json();
+            let shift_pid = shift["pid"].as_str().unwrap();
+            request
+                .post(&format!("/api/shifts/{shift_pid}/assignments"))
+                .json(&json!({ "employee_pid": heavy }))
+                .await
+                .assert_status_ok();
+        }
+
+        let signals: Value = request
+            .get("/api/workforce/working-time?as_of=2026-07-10")
+            .await
+            .json();
+        assert!(signals["employees_checked"].as_u64().unwrap() >= 2);
+        let flagged = signals["flagged"].as_array().unwrap();
+        let row = flagged
+            .iter()
+            .find(|f| f["employee_pid"] == heavy.as_str())
+            .expect("heavy worker flagged");
+        assert_eq!(row["over_48h"], true);
+        assert_eq!(row["average_weekly"]["numerator_minutes"], 50_400);
+        assert_eq!(row["average_weekly"]["denominator_weeks"], 17);
+        assert_eq!(row["rest_breaches"].as_array().unwrap().len(), 1);
+        assert_eq!(row["rest_breaches"][0]["gap_minutes"], 600);
+        assert!(
+            !flagged.iter().any(|f| f["employee_pid"] == light.as_str()),
+            "a modest week is not flagged"
+        );
+        // The department filter scopes the check.
+        let scoped: Value = request
+            .get("/api/workforce/working-time?department=finance&as_of=2026-07-10")
+            .await
+            .json();
+        assert_eq!(scoped["employees_checked"], 0);
+        assert!(scoped["flagged"].as_array().unwrap().is_empty());
+    })
+    .await;
+}
