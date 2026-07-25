@@ -329,6 +329,34 @@ export function workingTime(
   return api(`/workforce/working-time${qs}`, init);
 }
 
+// ─── Subject rights & retention (WPM-R30) ───────────────────────────
+
+/** The retention report: what the next sweep would remove. */
+export function retentionReport(init?: FetchLike): Promise<{
+  as_of: string;
+  horizon_days: number;
+  soft_deleted_past_horizon: Record<string, number>;
+  expired_consent_candidates: number;
+  derivation: string;
+}> {
+  return api("/retention", init);
+}
+
+/** Run the retention sweep (destructive; admin under enforcement). */
+export function retentionSweep(): Promise<{
+  horizon_days: number;
+  deleted: Record<string, number>;
+  rows_deleted: number;
+  candidates_scrubbed: number;
+}> {
+  return api("/retention/sweep", { method: "POST" });
+}
+
+/** Erase (anonymise) a terminated/retired employee (destructive). */
+export function eraseEmployee(pid: string): Promise<{ erased: string; note: string }> {
+  return api(`/employees/${pid}/erase`, { method: "POST" });
+}
+
 // ─── 360° appraisals (WPM-R29) ──────────────────────────────────────
 
 /** One appraisal summary row (counts, never content). */

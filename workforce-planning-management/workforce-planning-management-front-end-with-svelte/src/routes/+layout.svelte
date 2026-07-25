@@ -69,6 +69,7 @@
   <a href="/learning">{t("nav.learning")}</a>
   <a href="/mentorship">{t("nav.mentorship")}</a>
   <a href="/wellbeing">{t("nav.wellbeing")}</a>
+  <a href="/privacy">{t("nav.privacy")}</a>
   <a href="/payroll">{t("nav.payroll")}</a>
   <a href="/benchmarks">{t("nav.benchmarks")}</a>
   <span class="spacer"></span>

@@ -293,3 +293,33 @@ test("wellbeing area renders rules and aggregate-only uptake", async ({ page }) 
   await expect(page.getByTestId("pulse-overall")).toContainText("3.5");
   await expect(page.getByTestId("pulse-results").getByText("Hidden below 5 responses")).toBeVisible();
 });
+
+test("privacy area renders the retention report and runs the sweep", async ({ page }) => {
+  await page.route("**/api/proxy/retention", (route) =>
+    route.fulfill({
+      json: {
+        as_of: "2026-07-25T00:00:00Z",
+        horizon_days: 365,
+        soft_deleted_past_horizon: { employees: 2, time_entries: 14 },
+        expired_consent_candidates: 3,
+        derivation: "soft-deleted rows older than the horizon are hard-deleted by the sweep",
+      },
+    }),
+  );
+  await page.route("**/api/proxy/retention/sweep", (route) =>
+    route.fulfill({
+      json: {
+        horizon_days: 365,
+        deleted: { employees: 2, time_entries: 14 },
+        rows_deleted: 16,
+        candidates_scrubbed: 3,
+      },
+    }),
+  );
+  await page.goto("/privacy");
+  const report = page.getByTestId("retention-report");
+  await expect(report.getByText("365")).toBeVisible();
+  await expect(report.getByText("time_entries")).toBeVisible();
+  await page.getByTestId("run-sweep").click();
+  await expect(page.getByTestId("sweep-result")).toContainText("16 rows deleted");
+});

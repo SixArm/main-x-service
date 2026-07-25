@@ -9,6 +9,7 @@
     completeItem,
     createAppraisal,
     employeePayslips,
+    eraseEmployee,
     employeeWellbeingPrompts,
     getAppraisal,
     getEmployee,
@@ -197,6 +198,19 @@
       <a href={`/api/proxy/employees/${pid}/subject-access`} target="_blank" rel="noreferrer" data-testid="subject-access">
         {t("emp.subjectAccess")}
       </a>
+      {#if employee.status === "terminated" || employee.status === "retired"}
+        <button
+          data-testid="erase"
+          onclick={() => {
+            if (window.confirm(t("emp.erase") + "?")) {
+              void act(async () => {
+                await eraseEmployee(pid);
+                window.location.assign("/employees");
+              });
+            }
+          }}
+        >{t("emp.erase")}</button>
+      {/if}
     </p>
   </div>
 

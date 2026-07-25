@@ -427,3 +427,15 @@ code + tests in one PR.
       matrix green first run; full `--ignored` suite 17/17 + 131 unit
       vs Postgres 18; clippy pedantic clean. (WPM-D6, WPM-D7,
       WPM-D21, WPM-D22; WPM-R15, WPM-G1)
+
+- [x] WPM-T32 (2026-07-25) **Privacy front-end.** The Svelte app
+      gains the ops surface for WPM-R30: a `/privacy` page (retention
+      report — horizon, per-table past-horizon counts, expired-consent
+      candidates, derivation — with the sweep button and its result
+      counts) and an **Erase (anonymise)** action on the employee
+      profile, shown only for `terminated`/`retired` employees,
+      confirm-gated, navigating away after the record 404s. Three
+      client functions with a path pin; nav link; 8 i18n keys × 13
+      locales. **Acceptance:** svelte-check 0; vitest 10 (path map
+      extended); Playwright 9 (new stubbed `/privacy` spec: report
+      renders, sweep posts and shows counts). (WPM-R30)

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — privacy area (WPM-T32 / WPM-R30, 2026-07-25)
+
+- `/privacy`: the retention report (horizon, per-table past-horizon
+  counts, expired-consent candidates, derivation) with the sweep
+  button and its result counts.
+- Employee profile: an **Erase (anonymise)** action for terminated /
+  retired employees (confirm-gated; the record 404s afterwards, so
+  the page navigates back to the list). 8 i18n keys × 13 locales.
+
 ### Added — subject-access download (WPM-T30 / WPM-R30, 2026-07-25)
 
 - Employee profile: a "Download my data" link opening the audited
