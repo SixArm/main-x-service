@@ -49,6 +49,21 @@ db_name_for() {
   printf 'ci_%s' "$(printf '%s' "$1" | tr '/-' '__' | cut -c1-55)"
 }
 
+# `--locked` only where a lockfile is actually committed.
+#
+# The `fuzz` sub-crates gitignore their `Cargo.lock`, so on a fresh CI
+# checkout there is nothing to lock against and `--locked` fails outright
+# ("the lock file needs to be updated but --locked was passed"). Passing it
+# unconditionally would have made CI red on its first run for every fuzz
+# crate. Where a lockfile *is* committed, `--locked` is what stops a
+# dependency drifting silently between a local run and CI.
+locked_flag() {
+  local crate="$1"
+  if git ls-files --error-unmatch "${crate}/Cargo.lock" >/dev/null 2>&1; then
+    printf -- '--locked'
+  fi
+}
+
 run_stage() {
   local crate="$1"
   case "${STAGE}" in
@@ -58,10 +73,10 @@ run_stage() {
     clippy)
       # `-D warnings` turns the crate-root `#![warn(clippy::pedantic)]`
       # into a hard failure, which is the only way the lint stays at zero.
-      ( cd "${crate}" && cargo clippy --all-targets --locked -- -D warnings )
+      ( cd "${crate}" && cargo clippy --all-targets $(locked_flag "${crate}") -- -D warnings )
       ;;
     test)
-      ( cd "${crate}" && cargo test --locked )
+      ( cd "${crate}" && cargo test $(locked_flag "${crate}") )
       ;;
     test-db)
       if ! enrolled_for_db "${crate}"; then
@@ -75,7 +90,7 @@ run_stage() {
         -U "${PG_USER}" "${db}" 2>/dev/null || true
       ( cd "${crate}" \
         && DATABASE_URL="postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${db}" \
-           cargo test --locked -- --ignored )
+           cargo test $(locked_flag "${crate}") -- --ignored )
       ;;
     deny)
       if [[ ! -f "${crate}/deny.toml" ]]; then
@@ -94,7 +109,7 @@ run_stage() {
       # The traceability check and the SOUP-annotation gate are ordinary
       # tests, so `test` already runs them. What this stage adds is the
       # rendered SBOM, kept as a build artefact.
-      ( cd "${crate}" && cargo run --locked --quiet --bin sbom > /tmp/sbom.json \
+      ( cd "${crate}" && cargo run $(locked_flag "${crate}") --quiet --bin sbom > /tmp/sbom.json \
         && echo "  SBOM: $(wc -c < /tmp/sbom.json) bytes" )
       ;;
     *)
