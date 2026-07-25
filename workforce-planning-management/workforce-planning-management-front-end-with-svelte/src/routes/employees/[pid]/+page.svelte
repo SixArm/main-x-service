@@ -193,6 +193,11 @@
     {#if actionError}
       <p class="error" data-testid="action-error">{actionError}</p>
     {/if}
+    <p>
+      <a href={`/api/proxy/employees/${pid}/subject-access`} target="_blank" rel="noreferrer" data-testid="subject-access">
+        {t("emp.subjectAccess")}
+      </a>
+    </p>
   </div>
 
   {#if wellbeing.length}

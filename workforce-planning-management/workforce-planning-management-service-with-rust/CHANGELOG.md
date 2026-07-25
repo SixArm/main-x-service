@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — subject rights & retention (WPM-T30 / WPM-R30, 2026-07-25)
+
+- `GET /api/employees/{pid}/subject-access` — everything WPM holds for
+  one employee in a single audited JSON document, with exclusions
+  named rather than hidden (pulse responses are structurally
+  impossible to attribute; other raters' 360 content is third-party;
+  upstream identity records are the deployment's coordination duty).
+- `POST /api/employees/{pid}/erase` — erasure **as anonymisation**
+  (new WPM-D22): identity fields scrubbed (tombstone `person:` URN),
+  authored free text scrubbed, appraisals-as-subject closed,
+  acknowledgements deleted, row soft-deleted; payroll/financial rows
+  remain under statutory retention keyed to a pid that identifies no
+  one. Refused while employment is open. Audited with counts.
+- `GET /api/retention` + `POST /api/retention/sweep` — soft-deleted
+  rows past the horizon are hard-deleted across all 38 soft-deleting
+  tables and expired-consent candidates are scrubbed;
+  `WPM_RETENTION_DAYS` defaults 365 and **floors at 30** (a zero
+  horizon would turn soft-delete into hard-delete).
+- `/erase` and `/sweep` are destructive-classified
+  (`DESTRUCTIVE_POST_SUFFIXES` grew to 5) ⇒ `access=admin` under
+  enforcement. Closes the code side of gate WPM-G2.
+
 ### Added — rater self-service for 360s (WPM-T29 / WPM-R29, 2026-07-25)
 
 - `GET /api/employees/{pid}/appraisal-requests` — the rater's own

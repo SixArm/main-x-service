@@ -16,6 +16,7 @@ pub mod intelligence;
 pub mod learning;
 pub mod metrics;
 pub mod payroll;
+pub mod privacy;
 pub mod talent;
 pub mod wellbeing;
 pub mod workforce;

@@ -10,6 +10,7 @@ mod assessments;
 mod hr;
 mod learning;
 mod payroll;
+mod privacy;
 mod talent;
 mod wellbeing;
 mod workforce;

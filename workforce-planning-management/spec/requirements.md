@@ -392,6 +392,39 @@ peers, direct reports, and themself — not one boss.*
   respond from there. The view discloses only what the rater already
   knows: that they were invited.
 
+## WPM-R30 — Subject rights & retention
+
+*As a data-protection officer I can answer a subject-access request,
+honour an erasure request, and run the retention schedule — without
+pretending WPM can do things it cannot.*
+
+- **Subject access** — `GET /api/employees/{pid}/subject-access`
+  returns everything WPM holds keyed to that employee, in one JSON
+  document (`$sub`-owned / HR per policy; the export itself is
+  audited). Named exclusions, stated in the payload: pulse responses
+  (structurally impossible — no author link exists, WPM-D20) and
+  other raters' 360° content about the subject (third-party data; the
+  shared report aggregate stands in).
+- **Erasure** — `POST /api/employees/{pid}/erase` (destructive-
+  classified) **anonymises rather than deletes**
+  ([design.md](design.md) WPM-D22): identity fields are scrubbed and
+  the record soft-deleted, free text they authored is scrubbed, their
+  appraisals-as-subject are closed, while payroll/financial rows
+  remain (statutory retention) keyed to a pid that no longer
+  identifies anyone. Refused (`422`) while the employee is not
+  `terminated`/`retired` — an active employment relationship is the
+  lawful basis for the data.
+- **Retention** — `GET /api/retention` reports, per table, the
+  soft-deleted rows older than the horizon and the expired-consent
+  candidates; `POST /api/retention/sweep` (destructive-classified)
+  hard-deletes those rows and scrubs expired candidates. The horizon
+  is `WPM_RETENTION_DAYS` (default 365, floor 30 — a sweep that could
+  run at 0 days would turn soft-delete into hard-delete); the sweep
+  is audited with its counts.
+- Out of code scope, still gate WPM-G2: lawful-basis mapping,
+  jurisdiction-correct payroll tables, equality-law review of scoring
+  ([regulatory.md](regulatory.md)).
+
 ## WPM-R17 — Family fixtures
 
 - OpenAPI + Swagger, `Accepts-version` negotiation, `/metrics.prom`,

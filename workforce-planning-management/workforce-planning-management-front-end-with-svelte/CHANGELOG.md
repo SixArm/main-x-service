@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — subject-access download (WPM-T30 / WPM-R30, 2026-07-25)
+
+- Employee profile: a "Download my data" link opening the audited
+  subject-access JSON export. 1 i18n key × 13 locales.
+
 ### Added — "My 360 requests" (WPM-T29 / WPM-R29, 2026-07-25)
 
 - Employee profile: a rater-side panel listing pending 360 requests

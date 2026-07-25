@@ -93,6 +93,7 @@ impl Hooks for App {
             .add_route(controllers::payroll::routes())
             .add_route(controllers::wellbeing::routes())
             .add_route(controllers::appraisals::routes())
+            .add_route(controllers::privacy::routes())
             .add_route(controllers::audits::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())

@@ -207,6 +207,10 @@ pub fn spec() -> Value {
             "/api/appraisals/{pid}/status": { "post": { "tags": ["appraisals"], "summary": "draft -> collecting (needs >= 3 non-self raters) -> shared (stamps shared_on)", "responses": transition } },
             "/api/appraisals/{pid}/responses": { "post": { "tags": ["appraisals"], "summary": "One rater's response: collecting only, nominated only, once per rater, every declared competency scored 1-5 ($sub-owned)", "responses": created } },
             "/api/appraisals/{pid}/report": { "get": { "tags": ["appraisals"], "summary": "Group-floored report (shared only; reads audited): group x competency count+mean, pooled comments; peer/report cells under 3 responses withheld, count included", "responses": ok("Report") } },
+            "/api/employees/{pid}/subject-access": { "get": { "tags": ["privacy"], "summary": "Subject-access export: everything WPM holds for this employee, exclusions named (audited; $sub/HR)", "responses": ok("Export") } },
+            "/api/employees/{pid}/erase": { "post": { "tags": ["privacy"], "summary": "Erasure-as-anonymisation (WPM-D22): scrub identity + authored text, close appraisals; payroll rows remain; refused while employment is open (destructive)", "responses": transition } },
+            "/api/retention": { "get": { "tags": ["privacy"], "summary": "Retention report: soft-deleted rows past the horizon per table + expired-consent candidates (WPM_RETENTION_DAYS, floor 30)", "responses": ok("Report") } },
+            "/api/retention/sweep": { "post": { "tags": ["privacy"], "summary": "Hard-delete soft-deleted rows past the horizon; scrub expired-consent candidates (destructive; audited with counts)", "responses": ok("Counts") } },
             "/api/audits/recent": { "get": { "tags": ["audit"], "summary": "Recent audit entries", "responses": ok("Audit entries") } },
             "/api/audits": { "get": { "tags": ["audit"], "summary": "Department-scoped trail (?department=&since=)", "responses": ok("Audit entries") } },
             "/api/audits/{entity_pid}": { "get": { "tags": ["audit"], "summary": "One record's audit trail", "responses": ok("Audit entries") } },
@@ -250,6 +254,9 @@ mod tests {
             "/api/employees/{pid}/appraisals",
             "/api/appraisals/{pid}/responses",
             "/api/appraisals/{pid}/report",
+            "/api/employees/{pid}/subject-access",
+            "/api/employees/{pid}/erase",
+            "/api/retention/sweep",
         ] {
             assert!(paths.contains_key(p), "missing {p}");
         }

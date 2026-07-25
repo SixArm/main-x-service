@@ -88,13 +88,16 @@ use crate::models::_entities::{employees, payslips};
 pub const ENTITY: &str = "wpm";
 
 /// Path suffixes of this crate's **destructive named POSTs** (per
-/// `authorization-attributes.md` §2, fixed family-wide): record merge
-/// (`POST /api/wards/merge`, live today), batch deduplicate, and bulk
-/// import — the latter two listed ahead of the corresponding features
-/// (dedup scan and bulk import are §13 work), so the guard is already
-/// correct when they land. A POST whose path ends with one of these
-/// derives [`Action::Destructive`] instead of [`Action::Write`].
-pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 3] = ["/merge", "/deduplicate", "/import"];
+/// `authorization-attributes.md` §2): the family-wide trio — record
+/// merge, batch deduplicate, bulk import (listed ahead of the
+/// corresponding features so the guard is already correct when they
+/// land) — plus WPM's subject-rights operations (WPM-R30): employee
+/// **erasure** and the retention **sweep**, both of which destroy or
+/// irreversibly anonymise data and so must require `access=admin`.
+/// A POST whose path ends with one of these derives
+/// [`Action::Destructive`] instead of [`Action::Write`].
+pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 5] =
+    ["/merge", "/deduplicate", "/import", "/erase", "/sweep"];
 
 /// Default issuer expected in tokens (`iss`).
 const DEFAULT_ISSUER: &str = "authentication-service";
@@ -1051,6 +1054,8 @@ mod tests {
             "/api/wards/merge",
             "/api/wards/deduplicate",
             "/api/wards/import",
+            "/api/employees/0c4f1e2a-0000-4000-8000-000000000001/erase",
+            "/api/retention/sweep",
         ] {
             assert_eq!(derive_action(&Method::POST, path), Action::Destructive);
         }

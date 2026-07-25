@@ -215,3 +215,25 @@ structural anonymity here would have quietly traded away response
 enforcement and completion tracking; choosing silence about the
 stored link would have overclaimed. Neither is acceptable — the
 trade-off is the design.
+
+## WPM-D22 — Erasure anonymises; retention deletes; neither pretends
+
+Two different rights, two different mechanics. **Erasure** cannot be
+deletion in an HR system: payroll and right-to-work records carry
+multi-year statutory duties, so deleting them to honour one right
+would breach another. Erasure therefore **anonymises**: identity
+fields are scrubbed in place (display name, the `person:`/`worker:`
+URN links, salary), authored free text is scrubbed, the subject's
+appraisals are closed, and the employee row is soft-deleted — while
+payslips and payroll rows survive, keyed to an internal pid that no
+longer resolves to a person. It is refused while employment is
+active: the relationship is the lawful basis. **Retention** is the
+opposite mechanic: soft-deleted rows past the horizon are
+hard-deleted, and expired-consent candidates are scrubbed — the
+candidate pool's duty is to *lose* data. The horizon has a floor
+(30 days) precisely because a configurable horizon of zero would
+silently turn every soft-delete into a hard-delete. And one thing is
+refused honestly: WPM cannot erase what the upstream identity
+services hold — the export and erasure cover WPM's own store, and
+coordination with person/worker services is the deployment's duty
+(stated, not simulated).

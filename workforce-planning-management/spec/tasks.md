@@ -139,9 +139,13 @@ code + tests in one PR.
 
 - [ ] WPM-G1 Activate `WPM_REQUIRE_AUTH` + mount a real ABAC policy;
       verify the persona matrix against the deployment's attributes.
-- [ ] WPM-G2 Retention schedules + subject-access/erasure flows;
+- [~] WPM-G2 Retention schedules + subject-access/erasure flows;
       jurisdiction-correct payroll tables; equality-law review of any
-      scoring ([regulatory.md](regulatory.md)).
+      scoring ([regulatory.md](regulatory.md)). **Code side landed as
+      WPM-T30 (2026-07-25)**; the remaining items — lawful-basis
+      mapping, jurisdiction payroll tables, equality-law review, and
+      coordination of subject rights with the upstream identity
+      services — are operational/legal work, not code.
 
 - [x] WPM-T20 (2026-07-20) **Learning & development.** Migration
       `m20260720_000008_learning` (skills catalog + declared
@@ -360,3 +364,36 @@ code + tests in one PR.
       responded ⇒ no longer pending — suite 16/16 vs Postgres 18
       (128 unit); clippy pedantic clean; svelte-check 0; vitest 10;
       Playwright 8. (WPM-D21; WPM-R29)
+
+- [x] WPM-T30 (2026-07-25) **Subject rights & retention (the code
+      side of WPM-G2).** `rules/privacy.rs` (pure): `erasable`
+      (terminated/retired only — the open relationship is the lawful
+      basis), the floored retention horizon (`WPM_RETENTION_DAYS`,
+      default 365, **floor 30** — a zero horizon would turn soft-
+      delete into hard-delete), and the 38-table sweep list (sorted,
+      deduped, pinned). `controllers/privacy.rs`:
+      `GET /api/employees/{pid}/subject-access` (one audited JSON
+      document across every table keyed to the employee, including
+      their authored 360 responses; **exclusions named in the
+      payload** — pulse responses are structurally impossible, other
+      raters' 360 content is third-party, upstream identity records
+      are the deployment's coordination duty);
+      `POST …/erase` (anonymise per WPM-D22: identity fields scrubbed
+      + tombstone `person:` URN, salary nulled, row soft-deleted,
+      authored notes/comments/session-notes scrubbed, appraisals-as-
+      subject closed, acknowledgements deleted — payroll rows remain;
+      refused `422` on an open employment; audited with counts);
+      `GET /api/retention` + `POST /api/retention/sweep` (hard-delete
+      past-horizon soft-deletes, scrub expired-consent candidates;
+      audited with counts). `/erase` and `/sweep` join
+      `DESTRUCTIVE_POST_SUFFIXES` (⇒ `access=admin` under
+      enforcement). Front-end: a "Download my data" link on the
+      profile (1 i18n key × 13 locales). **Acceptance:** 3 pure pins
+      (erasable matrix, horizon default/floor, sweep-list soundness) +
+      the DB-gated `subject_rights_round_trip` (export gathers the
+      footprint + names exclusions + audited; erase refused while
+      active, then anonymises via offboarding→terminated with counts
+      in the audit snapshot; report floored; empty sweep audited) —
+      full `--ignored` suite 17/17 vs Postgres 18 (131 unit); clippy
+      pedantic clean; svelte-check 0; vitest 10; Playwright 8.
+      (WPM-D7, WPM-D22; WPM-R30, WPM-G2)
