@@ -91,6 +91,21 @@ and row-level record integrity. The rows are being recorded and are
 queryable through the existing audit endpoints; the dedicated
 disclosure-only view is not built.
 
+**Open finding — audit rows written by database triggers are outside the
+chain.** Migration `2024122800000005` installs `audit_patients_changes`
+and `audit_organizations_changes`, `AFTER INSERT OR UPDATE OR DELETE`
+triggers that `INSERT INTO audit_log` themselves. A trigger has neither
+the application's hashing nor its advisory lock, so those rows carry a
+NULL `hash` and verification skips them — 16 of 28 rows on a
+representative run. Coverage is therefore partial; the trigger rows
+duplicate events the application already records, without any request
+provenance; and because verification tolerates unchained rows, an
+inserted row with a NULL `hash` does not register as a break. The
+verification report exposes `unchained` so the gap stays visible. The
+worker service shares the defect, and resolving it is a design decision
+rather than a mechanical fix — see
+[`spec/compliance` §8.5](../../spec/compliance/index.md).
+
 **Blocker cleared (2026-07-26).** Person is now enrolled in CI's DB
 suites ([`ci/db-suites.txt`](../../ci/db-suites.txt)): its whole
 `--ignored` suite runs against Postgres on every CI run, so the audit

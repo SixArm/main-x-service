@@ -317,9 +317,11 @@ engineering practice without the device framing.
    while *what* they did stays intact. Read/disclosure auditing covers
    `get` / `masked` / `search` / `export`; the dedicated §164.528
    accounting endpoint is not yet built.
-   **worker ✔ (2026-07-26, chain only)** — same port as person, whose
-   `audit_log` it shares; read/disclosure auditing exists but is not
-   yet wired into its read handlers.
+   **worker ✔ (2026-07-26, chain + read/disclosure auditing +
+   `/audit/verify`)** — same port as person, whose `audit_log` it
+   shares; read auditing covers `get` / `masked` / `search` / `export`,
+   and the verification endpoint is mounted and pinned by an
+   end-to-end test.
    Both are now **enrolled in CI's DB suites** (2026-07-26), so their
    chains are verified against Postgres on every run. Getting there
    meant fixing pre-existing defects that had nothing to do with
@@ -341,6 +343,27 @@ engineering practice without the device framing.
    **Step 3 is therefore complete for `case`, and partial for person
    and worker** — chains everywhere, read-auditing on person, the
    §164.528 endpoints only on care-pathway and case.
+> **Open finding (2026-07-26) — trigger-written audit rows are outside
+> the chain, in both person and worker.** Migration `2024122800000005`
+> in each crate installs `AFTER INSERT OR UPDATE OR DELETE` triggers
+> (`audit_patients_changes` / `audit_workers_changes`, plus
+> `audit_organizations_changes`) that `INSERT INTO audit_log`
+> themselves. A trigger has neither the application's hashing nor its
+> advisory lock, so those rows carry a NULL `hash` and verification
+> skips them — 16 of 28 rows on a person run, 11 of 20 on a worker run.
+> Coverage is therefore partial, the trigger rows duplicate events the
+> application already records (without any request provenance), and
+> because verification tolerates unchained rows, an inserted row with a
+> NULL `hash` does not register as a break. The verification report
+> exposes `unchained` so the gap stays visible. Resolving it is a design
+> decision rather than a mechanical fix: the triggers do cover row-level
+> changes the application does not audit separately — a soft delete
+> reaches the trigger as an `UPDATE` while the application records a
+> `DELETE` — so dropping them loses coverage while keeping them leaves
+> the chain partial. It needs one change across both services, deciding
+> deliberately which writer is authoritative. The loco-idiomatic
+> services (care-pathway, case) have no such triggers and are unaffected.
+
 4. **Copy the FHIR conformance machinery** to the services that already
    mount `/fhir` (organization, place, thing, person, worker, case, event).
 5. **Lift the evidence artefacts** (`compliance/`, `scripts/`) to the

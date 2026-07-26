@@ -512,6 +512,13 @@ mod chain_tests {
         let report = repo.verify_chain(1000).await.expect("verify");
         assert!(!report.verified, "an edited row must break verification");
         assert!(report.breaks.iter().any(|b| b.kind == "content"));
+        // Leave no deliberately-corrupted trail behind. These two tests
+        // are the only ones that damage the chain on purpose, and the
+        // database is shared with every other DB-gated target in the
+        // crate — a tampered row left here surfaced later as a `content`
+        // break in the integration suite's `/api/audit/verify` test,
+        // which looked like a product defect and was not.
+        clear(&db).await;
     }
 
     /// Deleting a row breaks its successor's linkage — the property an
@@ -542,6 +549,13 @@ mod chain_tests {
         let report = repo.verify_chain(1000).await.expect("verify");
         assert!(!report.verified, "a deleted row must break the chain");
         assert!(report.breaks.iter().any(|b| b.kind == "linkage"));
+        // Leave no deliberately-corrupted trail behind. These two tests
+        // are the only ones that damage the chain on purpose, and the
+        // database is shared with every other DB-gated target in the
+        // crate — a tampered row left here surfaced later as a `content`
+        // break in the integration suite's `/api/audit/verify` test,
+        // which looked like a product defect and was not.
+        clear(&db).await;
     }
 
     /// A read/disclosure access is chained like any other row, and

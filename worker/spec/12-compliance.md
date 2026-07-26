@@ -78,12 +78,62 @@ so *who* acted cannot be rewritten while *what* they did stays intact.
 Order comes from a new `seq BIGSERIAL` rather than the primary key, which
 is an application-assigned UUID and carries no insertion order.
 
-**Still open.** Read/disclosure auditing exists in
-`src/compliance/disclosure.rs` and the repository's `log_access`, but is
-**not yet wired into worker's read handlers**, so the §164.528 accounting
-is not yet answerable — only mutations are recorded. The chain
-verification endpoint, GDPR Art. 17 erasure by redaction, and row-level
-record integrity also remain.
+**Read auditing wired (2026-07-26).** `disclosure::record_access` now
+runs on all four read paths — `GET /api/workers/{id}`, its `/masked`
+view, `GET /api/workers/search`, and the Art. 15 `/export` — so a read
+of a practitioner record is accounted for, not just a mutation. Three
+properties carried over from the person service deliberately:
+
+- A read is recorded **after** record-level authorization allows it. A
+  denied request disclosed nothing, and recording it would pollute the
+  §164.528 accounting with accesses that never happened.
+- A **search** is recorded against the nil id: it disclosed many records
+  rather than one, and attributing it to any single worker would corrupt
+  that worker's accounting.
+- A **masked** read is recorded as `read`, the same action person uses
+  for its masked view. The accounting does not currently distinguish
+  masked from full; inventing a worker-only action would only put the
+  two services out of step. Worth revisiting family-wide.
+
+Read auditing is gated behind `WORKER_AUDIT_READS` (default off, as
+across the family); with `WORKER_AUDIT_FAIL_CLOSED` on, a failed audit
+write refuses the read with `503 AUDIT_UNAVAILABLE` rather than
+disclosing data it cannot account for.
+
+**Chain verification endpoint (2026-07-26).** `GET /api/audit/verify`
+recomputes the trailing window and reports every linkage or content
+break, with an `interpretation` string stating plainly that it attests
+to the **audit trail** and not to the worker records.
+
+**Open finding — audit rows written by database triggers are outside the
+chain.** Migration `2024122800000005` installs `audit_workers_changes`
+and `audit_organizations_changes`, `AFTER INSERT OR UPDATE OR DELETE`
+triggers that `INSERT INTO audit_log` themselves. A trigger cannot
+compute the chain — it has neither the application's hashing nor its
+advisory lock — so those rows land with a NULL `hash`, and verification
+skips them. On a representative run 11 of 20 rows were unchained. Two
+consequences, both real:
+
+1. **Coverage is partial.** Roughly half the trail is not tamper-evident,
+   and the triggers duplicate events the application already records
+   with full request provenance (the trigger rows have no `user_id`,
+   `ip_address`, or `user_agent`).
+2. **Forgery is not excluded.** Because verification tolerates unchained
+   rows, an inserted row with a NULL `hash` does not register as a break.
+
+The verification report surfaces `unchained` precisely so this is
+visible rather than rounded away, and the endpoint test pins that it
+keeps being reported. The **person service has the same triggers**
+(`audit_patients_changes`, `audit_organizations_changes`) and the same
+gap. Resolving it is a design decision, not a mechanical fix: the
+triggers cover row-level changes the application does not audit
+separately (a soft delete reaches the trigger as an `UPDATE` while the
+application records a `DELETE`), so dropping them loses coverage, while
+keeping them leaves the chain partial. Deferred to a dedicated change
+across both services.
+
+**Still open.** GDPR Art. 17 erasure by redaction and row-level record
+integrity.
 
 **Blocker cleared (2026-07-26).** Worker is now enrolled in CI's DB
 suites ([`ci/db-suites.txt`](../../ci/db-suites.txt)). Three pre-existing

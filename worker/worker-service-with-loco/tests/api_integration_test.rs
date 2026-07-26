@@ -436,3 +436,91 @@ async fn test_fhir_worker_not_found_returns_operation_outcome() {
     let body_str = String::from_utf8(body.to_vec()).unwrap();
     assert!(body_str.contains("OperationOutcome"));
 }
+
+/// `GET /api/audit/verify` recomputes the audit hash chain and reports a
+/// verified window (HIPAA §164.312(c)).
+///
+/// This drives the mounted route, so it pins the wiring — the handler
+/// existing but never reachable was the previous state. The chain covers
+/// whatever `audit_log` holds, so the assertion is that verification
+/// *runs and reports*, and that a create performed in this test is inside
+/// a window it reports as intact.
+///
+/// Note the limits of this test: it does not exercise **read**-auditing,
+/// because that is gated behind `WORKER_AUDIT_READS`, which is cached in a
+/// `OnceLock` and defaults off across the whole family. Turning it on from
+/// a test would mean mutating the process environment, which is `unsafe`
+/// in this edition and racy under a parallel harness. The read path is
+/// covered instead at the repository level by
+/// `db::audit::chain_tests::read_access_is_chained_and_flagged_as_a_disclosure`.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn test_audit_verify_reports_an_intact_chain() {
+    let app = common::create_test_router().await;
+
+    // Write something auditable first, so the window is not vacuously empty.
+    let worker_json = json!({
+        "name": { "family": common::unique_worker_name("AuditVerify"), "given": ["Chain"] },
+        "gender": "unknown"
+    });
+    let created = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/workers")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&worker_json).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(created.status(), StatusCode::CREATED);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/audit/verify?limit=1000")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert!(parsed.success);
+    let report = parsed.data.expect("a verification report");
+
+    assert!(
+        report["verified"].as_bool().unwrap(),
+        "the chain must verify: {report}"
+    );
+    assert!(
+        report["rows"].as_u64().unwrap() >= 1,
+        "the create above must be inside the verified window: {report}"
+    );
+    // `unchained` is deliberately *not* asserted to be zero. The
+    // `audit_workers_changes` / `audit_organizations_changes` database
+    // triggers (migration 2024122800000005) INSERT into `audit_log`
+    // themselves, and a trigger cannot compute the chain — it has no
+    // access to the application's hashing or its advisory lock. Those
+    // rows therefore land with a NULL `hash`, and verification skips
+    // them. The report must keep *surfacing* the count so the gap stays
+    // visible rather than being quietly rounded to "verified".
+    assert!(
+        report["unchained"].is_u64(),
+        "the report must state how many rows are outside the chain: {report}"
+    );
+    // The response must say what it does and does not attest to — the
+    // distinction is the whole point of publishing it.
+    assert!(
+        report["interpretation"]
+            .as_str()
+            .unwrap()
+            .contains("not to the worker records")
+    );
+}

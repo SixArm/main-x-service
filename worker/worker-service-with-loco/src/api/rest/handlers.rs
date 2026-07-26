@@ -28,6 +28,7 @@ use authentication_verifier::Action;
 use super::auth::{MaybeAuthUser, authorize_record, worker_resource_attrs};
 use super::state::AppState;
 use crate::api::ApiResponse;
+use crate::compliance::disclosure::{self, AccessContext};
 use crate::models::Worker;
 
 /// Body of the `/api/health` response: a fixed liveness probe payload.
@@ -206,6 +207,7 @@ pub async fn get_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> impl IntoResponse {
     match state.worker_repository.get_by_id(&id).await {
         Ok(Some(worker)) => {
@@ -213,6 +215,23 @@ pub async fn get_worker(
             // honour a `mask` obligation by masking.
             match authorize_record(&caller, Action::Read, &worker_resource_attrs(&worker)) {
                 Ok(obligations) => {
+                    // Audited only once authorization has allowed the read:
+                    // a denied request disclosed nothing, and recording it
+                    // would pollute the §164.528 accounting with accesses
+                    // that never happened.
+                    if disclosure::record_access(
+                        &state.audit_log,
+                        "worker",
+                        id,
+                        disclosure::action::READ,
+                        caller.claims().map(|c| c.sub.as_str()),
+                        &access,
+                    )
+                    .await
+                    .is_err()
+                    {
+                        return audit_unavailable::<Worker>();
+                    }
                     let body = if obligations.iter().any(|o| o == "mask") {
                         crate::privacy::mask_worker(&worker)
                     } else {
@@ -466,9 +485,28 @@ pub struct SearchResponse {
 pub async fn search_workers(
     State(state): State<AppState>,
     Query(params): Query<SearchQuery>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> impl IntoResponse {
     // Cap the page size so a client cannot request an unbounded result set.
     let limit = params.limit.min(100);
+
+    // A search is a collection read: recorded against the nil id, because
+    // it disclosed many records rather than one, and attributing it to any
+    // single worker would corrupt that worker's §164.528 accounting.
+    if disclosure::record_access(
+        &state.audit_log,
+        "worker",
+        Uuid::nil(),
+        disclosure::action::SEARCH,
+        caller.claims().map(|c| c.sub.as_str()),
+        &access,
+    )
+    .await
+    .is_err()
+    {
+        return audit_unavailable::<SearchResponse>();
+    }
 
     // Ask the index for `offset + limit` ids: the engine returns ranked ids
     // from the top, and we apply the offset ourselves below by skip/take.
@@ -1365,9 +1403,27 @@ pub async fn review_decision(
 pub async fn export_worker_data(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> impl IntoResponse {
     match state.worker_repository.get_by_id(&id).await {
         Ok(Some(worker)) => {
+            // An Art. 15 export hands over the whole record — the single
+            // most consequential read this service serves, so it is
+            // audited whatever the caller declared.
+            if disclosure::record_access(
+                &state.audit_log,
+                "worker",
+                id,
+                disclosure::action::EXPORT,
+                caller.claims().map(|c| c.sub.as_str()),
+                &access,
+            )
+            .await
+            .is_err()
+            {
+                return audit_unavailable::<serde_json::Value>();
+            }
             let export = crate::privacy::export_worker_data(&worker);
             (StatusCode::OK, Json(ApiResponse::success(export)))
         }
@@ -1406,9 +1462,30 @@ pub async fn export_worker_data(
 pub async fn get_worker_masked(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> impl IntoResponse {
     match state.worker_repository.get_by_id(&id).await {
         Ok(Some(worker)) => {
+            // A masked read is still a disclosure: the caller learns the
+            // record exists and reads most of it. Recorded as `read`, the
+            // same action the person service uses for its masked view —
+            // the accounting does not currently distinguish masked from
+            // full, and inventing a worker-only action would only put the
+            // two services out of step.
+            if disclosure::record_access(
+                &state.audit_log,
+                "worker",
+                id,
+                disclosure::action::READ,
+                caller.claims().map(|c| c.sub.as_str()),
+                &access,
+            )
+            .await
+            .is_err()
+            {
+                return audit_unavailable::<Worker>();
+            }
             let masked = crate::privacy::mask_worker(&worker);
             (StatusCode::OK, Json(ApiResponse::success(masked)))
         }
@@ -1515,6 +1592,81 @@ pub async fn get_recent_audit_logs(
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
     }
+}
+
+/// Verify the tamper-evident audit hash chain.
+///
+/// `GET /api/audit/verify?limit=1000` — recomputes the trailing rows and
+/// reports every linkage or content break (HIPAA §164.312(c)).
+///
+/// Attests to the **audit trail** only, not to the `workers` rows; the
+/// response says so, because the difference matters to whoever reads it.
+#[utoipa::path(
+    get,
+    path = "/api/audit/verify",
+    tag = "audit",
+    params(AuditLogQuery),
+    responses(
+        (status = 200, description = "Chain verification report"),
+        (status = 500, description = "Database error")
+    )
+)]
+pub async fn verify_audit_chain(
+    State(state): State<AppState>,
+    Query(params): Query<AuditLogQuery>,
+) -> impl IntoResponse {
+    // Verification is O(rows) with a SHA-256 each, so an unbounded limit
+    // is a CPU denial-of-service (the SEC-M1 bound-every-input rule).
+    let limit = u64::try_from(params.limit).unwrap_or(1000).clamp(1, 10_000);
+    match state.audit_log.verify_chain(limit).await {
+        Ok(report) => {
+            let interpretation = if report.verified {
+                "no break detected in the verified window; this attests to the audit trail \
+                 only, not to the worker records"
+            } else {
+                "a break means rows were inserted, deleted, reordered, or edited since they \
+                 were written — investigate the named seq/id; a concurrent audit write on a \
+                 pooled connection can also fork the chain, which reports as a linkage break"
+            };
+            (
+                StatusCode::OK,
+                Json(ApiResponse::success(serde_json::json!({
+                    "limit": limit,
+                    "verified": report.verified,
+                    "rows": report.rows,
+                    "intact": report.intact,
+                    "redacted": report.redacted,
+                    "unchained": report.unchained,
+                    "head": report.head,
+                    "breaks": report.breaks,
+                    "interpretation": interpretation,
+                }))),
+            )
+        }
+        Err(e) => {
+            let error = ApiResponse::<serde_json::Value>::error(
+                "DATABASE_ERROR",
+                format!("Failed to verify the audit chain: {e}"),
+            );
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+        }
+    }
+}
+
+/// A refused read-audit write, as a `503 Service Unavailable` response.
+///
+/// `503` rather than `500`: nothing is wrong with the request, and nothing
+/// was disclosed — the service is temporarily unable to account for a read
+/// of personal data, so it declines to serve one, and the status is
+/// retryable. Only reachable when `WORKER_AUDIT_FAIL_CLOSED` is on.
+fn audit_unavailable<T: serde::Serialize>() -> (StatusCode, Json<ApiResponse<T>>) {
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(ApiResponse::error(
+            "AUDIT_UNAVAILABLE",
+            "the access could not be recorded in the audit trail, so the read was refused",
+        )),
+    )
 }
 
 /// Query parameters for the by-user audit endpoint.
