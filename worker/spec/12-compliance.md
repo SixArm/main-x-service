@@ -281,8 +281,9 @@ chain still verifies and the redactions are *counted*, not hidden. If it
 ever fails, the two obligations have stopped being simultaneously
 satisfiable and the design is broken, not the test.
 
-**Still open.** GDPR Art. 17 erasure by redaction and row-level record
-integrity.
+**Still open.** Row-level record integrity. (Art. 17 erasure was open
+when this paragraph was first written and landed on 2026-07-26 — see the
+section below.)
 
 **Blocker cleared (2026-07-26).** Worker is now enrolled in CI's DB
 suites ([`ci/db-suites.txt`](../../ci/db-suites.txt)). Three pre-existing

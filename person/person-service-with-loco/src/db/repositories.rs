@@ -126,9 +126,33 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
 async fn apply_update_rows<C: ConnectionTrait>(conn: &C, person: &Person) -> Result<()> {
     // Update the parent `persons` row (only scalar fields; `..Default`
     // leaves created_* untouched).
+    // The row's existing soft-delete stamp is bound into the digest, so
+    // it has to be read before rehashing. `..Default::default()` below
+    // leaves the column itself untouched, which is why the value must come
+    // from the database rather than from the domain model (which does not
+    // carry it).
+    //
+    // Note the absence of compiler help here: because this initializer
+    // uses `..Default::default()`, adding `content_hash` to the entity did
+    // *not* break this function the way it broke `to_active_models`. A
+    // write path that forgets to rehash produces a row that verification
+    // reports as tampered — a false positive on an integrity control,
+    // which is worse than no control at all. The DB-gated tests exercise
+    // create / update / merge / delete / erase for exactly this reason.
+    let existing_deleted_at = persons::Entity::find_by_id(person.id)
+        .one(conn)
+        .await?
+        .and_then(|row| row.deleted_at)
+        .map(|d| d.unix_timestamp_nanos() / 1_000);
+    let content_hash = crate::compliance::record_integrity::hash_with_deleted_at(
+        person,
+        existing_deleted_at.and_then(|m| i64::try_from(m).ok()),
+    )?;
+
     let update_model = persons::ActiveModel {
         id: Set(person.id),
         active: Set(person.active),
+        content_hash: Set(Some(content_hash)),
         // DB CHECK constraint enforces lowercase ('male'/'female'/'other'/'unknown');
         // Gender's serde rename_all="lowercase" produces the same shape.
         gender: Set(format!("{:?}", person.gender).to_lowercase()),
@@ -182,7 +206,7 @@ async fn apply_update_rows<C: ConnectionTrait>(conn: &C, person: &Person) -> Res
 
     // Re-insert associated child rows.
     let (_, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
-        SeaOrmPersonRepository::to_active_models(person);
+        SeaOrmPersonRepository::to_active_models(person)?;
     for name in new_names {
         name.insert(conn).await?;
     }
@@ -206,11 +230,31 @@ async fn apply_update_rows<C: ConnectionTrait>(conn: &C, person: &Person) -> Res
 /// `deleted_by` and leaving every other column (and the child rows) in
 /// place. Factored from [`PersonRepository::delete`]'s soft-delete so
 /// [`PersonRepository::merge`] can reuse it on its own transaction.
-async fn apply_soft_delete_row<C: ConnectionTrait>(conn: &C, id: &Uuid) -> Result<()> {
+async fn apply_soft_delete_row<C: ConnectionTrait>(
+    conn: &C,
+    id: &Uuid,
+    person: Option<&Person>,
+) -> Result<()> {
+    let deleted_at = OffsetDateTime::now_utc();
+    // A soft delete changes the record's lifecycle state, which the digest
+    // binds — so it must be rehashed, or every deleted record would read
+    // as tampered. `person` is the assembled record the caller already
+    // loaded for the audit trail; when it is absent (the row was gone
+    // before we looked) there is nothing to rehash and the column is left
+    // as it was.
+    let content_hash = person
+        .map(|p| {
+            crate::compliance::record_integrity::hash_with_deleted_at(
+                p,
+                i64::try_from(deleted_at.unix_timestamp_nanos() / 1_000).ok(),
+            )
+        })
+        .transpose()?;
     let row = persons::ActiveModel {
         id: Set(*id),
-        deleted_at: Set(Some(OffsetDateTime::now_utc())),
+        deleted_at: Set(Some(deleted_at)),
         deleted_by: Set(Some("system".to_string())),
+        content_hash: content_hash.map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h))),
         ..Default::default()
     };
     row.update(conn).await?;
@@ -463,7 +507,7 @@ impl SeaOrmPersonRepository {
         names
     }
 
-    fn to_active_models(person: &Person) -> PersonActiveModels {
+    fn to_active_models(person: &Person) -> Result<PersonActiveModels> {
         let new_person = persons::ActiveModel {
             id: Set(person.id),
             active: Set(person.active),
@@ -483,6 +527,11 @@ impl SeaOrmPersonRepository {
             updated_by: Set(None),
             deleted_at: Set(None),
             deleted_by: Set(None),
+            // A new record is live, so the digest binds `deleted_at` as
+            // `None`.
+            content_hash: Set(Some(crate::compliance::record_integrity::hash_of_live(
+                person,
+            )?)),
         };
 
         let names = Self::name_active_models(person);
@@ -556,7 +605,7 @@ impl SeaOrmPersonRepository {
             })
             .collect();
 
-        (new_person, names, identifiers, addresses, contacts, links)
+        Ok((new_person, names, identifiers, addresses, contacts, links))
     }
 
     /// Rebuild a domain [`HumanName`] from a stored `person_names` row,
@@ -884,7 +933,7 @@ impl PersonRepository for SeaOrmPersonRepository {
         let txn = self.db.begin().await?;
 
         let (new_person, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
-            Self::to_active_models(person);
+            Self::to_active_models(person)?;
 
         // Insert person
         let db_person = new_person.insert(&txn).await?;
@@ -1088,8 +1137,11 @@ impl PersonRepository for SeaOrmPersonRepository {
         // Apply the survivor's parent + child rows (shared with `update`).
         apply_update_rows(&txn, survivor).await?;
 
-        // Soft-delete the duplicate (shared with `delete`).
-        apply_soft_delete_row(&txn, duplicate_id).await?;
+        // Soft-delete the duplicate (shared with `delete`). The
+        // pre-image loaded above for the audit trail doubles as the record
+        // to rehash, so the duplicate's tombstone carries a correct digest
+        // instead of reading as tampered.
+        apply_soft_delete_row(&txn, duplicate_id, old_duplicate.as_ref()).await?;
 
         // Durable event bus (Phase 2): a `Merged` outbox row for the
         // survivor (carrying the duplicate's pid via `merged_from`, so a
@@ -1181,13 +1233,13 @@ impl PersonRepository for SeaOrmPersonRepository {
         // the memory transport keeps the plain, tx-free update.
         if self.transport.is_outbox() {
             let txn = self.db.begin().await?;
-            apply_soft_delete_row(&txn, id).await?;
+            apply_soft_delete_row(&txn, id, old_person.as_ref()).await?;
             if let Some(old) = old_person.as_ref() {
                 self.enqueue_outbox(&txn, old, EventKind::Deleted).await?;
             }
             txn.commit().await?;
         } else {
-            apply_soft_delete_row(&self.db, id).await?;
+            apply_soft_delete_row(&self.db, id, old_person.as_ref()).await?;
         }
 
         // Publish event

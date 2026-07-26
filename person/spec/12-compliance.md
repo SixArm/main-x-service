@@ -167,11 +167,52 @@ chain still verifies and the redactions are *counted*, not hidden. If it
 ever fails, the two obligations have stopped being simultaneously
 satisfiable and the design is broken, not the test.
 
-**Still open.** The §164.528 *accounting endpoint* itself (`GET
-/api/persons/{id}/audit/disclosures`), GDPR Art. 17 erasure by redaction,
-and row-level record integrity. The rows are being recorded and are
-queryable through the existing audit endpoints; the dedicated
-disclosure-only view is not built.
+**Still open.** Nothing from the original list. (The §164.528 accounting
+endpoint, Art. 17 erasure, and row-level record integrity were all open
+when this paragraph was first written; all three landed on 2026-07-26 —
+see the sections below.)
+
+**Row-level record integrity (delivered 2026-07-26).**
+`persons.content_hash` carries a SHA-256 over the record, recomputed on
+every write, and `GET /api/records/verify` recomputes and reports
+mismatches. This is the **complement** to `/api/audit/verify`, not a
+duplicate: the chain proves the *trail* was not rewritten, this proves the
+*records* were not edited out of band. An attacker with SQL access who
+edits a stored identifier and writes no audit row defeats the first
+control and is caught by this one. It is also the gap the dropped database
+triggers gestured at without ever closing.
+
+**The digest covers the assembled record, not the `persons` row.** This is
+the one substantive difference from the care-pathway reference, which
+stores its whole payload in a single JSONB column. A person is
+relational, and the data worth tampering with — a surname, a national
+identifier, a home address — lives in the child tables. Hashing only the
+parent row would have repeated the exact narrowness that made the triggers
+worthless. `created_at` / `updated_at` are excluded because the ORM and
+the database set them, so binding them would produce false mismatches; the
+honest cost is that an attacker who alters only a timestamp is not caught
+here.
+
+**Existing rows are not back-filled.** Computing a hash from the current
+content would assert that the current content is authentic — precisely the
+claim the hash exists to test — so a back-fill would certify whatever an
+attacker had already changed. Unhashed rows report as `unhashed`, never as
+verified, and are hashed on their next write.
+
+**The failure mode this feature has is a false accusation**, not a missed
+one: a write path that forgets to rehash produces a mismatch on an
+untouched record, which is worse than having no control. Only `create`
+gets compiler help (its initializer names every column); `update`,
+`merge`, and `delete` build their `ActiveModel` with
+`..Default::default()` and would compile happily with a stale digest. A
+DB-gated test therefore exercises create / update / merge / delete /
+erase and asserts every record still verifies — **verified to fail** when
+the rehash is removed from the update path, and guarded against passing
+vacuously (if nothing were hashed, everything would count as `unhashed`
+and the report would still read as verified). Erasure clears the hash
+rather than recomputing one, because the child rows are gone by then and
+there is no longer a record to hash; the chained `erased` audit row is the
+stronger evidence anyway.
 
 **Resolved (2026-07-26): the database audit triggers are dropped.**
 `m20260726_000003_drop_audit_triggers` removes `audit_patients_changes` and
