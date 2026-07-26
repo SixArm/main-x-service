@@ -197,7 +197,7 @@ pub async fn get_person(
                     // with accesses that never happened.
                     if disclosure::record_access(
                         &state.audit_log,
-                        "person",
+                        "Person",
                         id,
                         disclosure::action::READ,
                         caller.claims().map(|c| c.sub.as_str()),
@@ -522,7 +522,7 @@ pub async fn search_persons(
     // single person would corrupt that person's §164.528 accounting.
     if disclosure::record_access(
         &state.audit_log,
-        "person",
+        "Person",
         Uuid::nil(),
         disclosure::action::SEARCH,
         caller.claims().map(|c| c.sub.as_str()),
@@ -1472,7 +1472,7 @@ pub async fn export_person_data(
             // audited whatever the caller declared.
             if disclosure::record_access(
                 &state.audit_log,
-                "person",
+                "Person",
                 id,
                 disclosure::action::EXPORT,
                 caller.claims().map(|c| c.sub.as_str()),
@@ -1529,7 +1529,7 @@ pub async fn get_person_masked(
             // not just full disclosure.
             if disclosure::record_access(
                 &state.audit_log,
-                "person",
+                "Person",
                 id,
                 disclosure::action::READ,
                 caller.claims().map(|c| c.sub.as_str()),
@@ -1609,6 +1609,110 @@ pub async fn get_person_audit_logs(
             );
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
+    }
+}
+
+/// Accounting of disclosures for one person (HIPAA §164.528).
+///
+/// `GET /api/persons/{id}/audit/disclosures` — every audit row for this
+/// person classified as an outward **disclosure** rather than an internal
+/// access, newest first.
+///
+/// Gated by the same record-level authorization as reading the record:
+/// learning who a record was disclosed to reveals that the record
+/// exists, so the accounting cannot be more open than the record it
+/// describes.
+///
+/// The response states whether read-auditing is switched on. Without
+/// that caveat the endpoint is actively misleading: with
+/// `PERSON_AUDIT_READS` off an empty list means "reads are not being
+/// recorded", not "this record was never disclosed", and §164.528 is a
+/// question a patient is entitled to a truthful answer to.
+#[utoipa::path(
+    get,
+    path = "/api/persons/{id}/audit/disclosures",
+    tag = "audit",
+    params(
+        ("id" = Uuid, Path, description = "Person UUID"),
+        AuditLogQuery
+    ),
+    responses(
+        (status = 200, description = "Accounting of disclosures"),
+        (status = 403, description = "Policy denied reading this record"),
+        (status = 404, description = "Person not found"),
+        (status = 500, description = "Database error")
+    )
+)]
+pub async fn get_person_disclosures(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Query(params): Query<AuditLogQuery>,
+    caller: MaybeAuthUser,
+) -> impl IntoResponse {
+    let limit = params.limit.min(500);
+
+    // Concealment first: an unauthorised caller must not learn the record
+    // exists by asking for its disclosure history.
+    let record = match state.person_repository.get_by_id(&id).await {
+        Ok(Some(record)) => record,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(ApiResponse::<serde_json::Value>::error(
+                    "NOT_FOUND",
+                    format!("Person with id '{id}' not found"),
+                )),
+            );
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse::<serde_json::Value>::error(
+                    "DATABASE_ERROR",
+                    format!("Failed to retrieve person: {e}"),
+                )),
+            );
+        }
+    };
+    if let Err((status, reason)) =
+        authorize_record(&caller, Action::Read, &person_resource_attrs(&record))
+    {
+        return (
+            status,
+            Json(ApiResponse::<serde_json::Value>::error("FORBIDDEN", reason)),
+        );
+    }
+
+    match state
+        .audit_log
+        .disclosures_for_entity(id, u64::try_from(limit).unwrap_or(0))
+        .await
+    {
+        Ok(rows) => {
+            let auditing = crate::compliance::audit_reads();
+            (
+                StatusCode::OK,
+                Json(ApiResponse::success(serde_json::json!({
+                    "id": id,
+                    "read_auditing_enabled": auditing,
+                    "count": rows.len(),
+                    "caveat": if auditing {
+                        "complete for the period read-auditing has been enabled"
+                    } else {
+                        "INCOMPLETE — PERSON_AUDIT_READS is off, so read disclosures are not \
+                         being recorded; only disclosure-flagged mutations appear here"
+                    },
+                    "disclosures": rows,
+                }))),
+            )
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<serde_json::Value>::error(
+                "DATABASE_ERROR",
+                format!("Failed to retrieve the accounting of disclosures: {e}"),
+            )),
+        ),
     }
 }
 

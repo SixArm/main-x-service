@@ -221,6 +221,10 @@ pub fn create_router(state: AppState) -> Router {
         .route("/workers/{id}/masked", get(handlers::get_worker_masked))
         // Audit
         .route("/workers/{id}/audit", get(handlers::get_worker_audit_logs))
+        .route(
+            "/workers/{id}/audit/disclosures",
+            get(handlers::get_worker_disclosures),
+        )
         .route("/audit/recent", get(handlers::get_recent_audit_logs))
         .route("/audit/user", get(handlers::get_user_audit_logs))
         .route("/audit/verify", get(handlers::verify_audit_chain))
@@ -314,6 +318,10 @@ pub fn workers_routes() -> loco_rs::controller::Routes {
         .add("/workers/{id}/export", get(handlers::export_worker_data))
         .add("/workers/{id}/masked", get(handlers::get_worker_masked))
         .add("/workers/{id}/audit", get(handlers::get_worker_audit_logs))
+        .add(
+            "/workers/{id}/audit/disclosures",
+            get(handlers::get_worker_disclosures),
+        )
         .add("/audit/recent", get(handlers::get_recent_audit_logs))
         .add("/audit/user", get(handlers::get_user_audit_logs))
         .add("/audit/verify", get(handlers::verify_audit_chain))

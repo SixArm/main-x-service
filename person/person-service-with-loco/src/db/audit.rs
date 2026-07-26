@@ -441,6 +441,40 @@ impl AuditLogRepository {
         Ok(logs)
     }
 
+    /// Every audit row for one entity flagged as an outward
+    /// **disclosure**, newest first — the HIPAA §164.528 accounting.
+    ///
+    /// Two `entity_type` spellings are accepted deliberately. Mutation
+    /// rows have always been written as `"Person"`, while the
+    /// read-auditing path introduced with the audit chain wrote
+    /// `"person"`. A query for one spelling silently returned none of
+    /// the other's rows, so an accounting built on it would have looked
+    /// empty while disclosures were being recorded all along. New rows
+    /// use `"Person"` throughout; the lower-case spelling stays in the
+    /// filter so rows already written are not orphaned. The `IN` keeps
+    /// the `(entity_type, entity_id)` index usable, which a
+    /// case-insensitive comparison would not.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the query fails.
+    pub async fn disclosures_for_entity(
+        &self,
+        entity_id: Uuid,
+        limit: u64,
+    ) -> Result<Vec<audit_log::Model>> {
+        let logs = audit_log::Entity::find()
+            .filter(audit_log::Column::EntityType.is_in(["Person", "person"]))
+            .filter(audit_log::Column::EntityId.eq(entity_id))
+            .filter(audit_log::Column::Disclosure.eq(true))
+            .order_by_desc(audit_log::Column::Timestamp)
+            .limit(limit)
+            .all(&self.db)
+            .await?;
+
+        Ok(logs)
+    }
+
     /// Return the `limit` most recent audit rows system-wide.
     ///
     /// # Errors

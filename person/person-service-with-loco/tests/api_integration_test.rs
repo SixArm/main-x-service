@@ -457,3 +457,137 @@ async fn test_merge_into_self_is_rejected() {
         "expected the self-merge rejection reason, got: {body_str}"
     );
 }
+
+/// `GET /api/persons/{id}/audit/disclosures` answers the HIPAA
+/// §164.528 accounting question, and — critically — says whether it can
+/// answer it at all.
+///
+/// The caveat is the load-bearing assertion. `PERSON_AUDIT_READS`
+/// defaults off across the family, so an empty accounting means "reads
+/// are not being recorded", not "this record was never disclosed". An
+/// endpoint that returned `[]` without saying so would give a false
+/// answer to a question a data subject is legally entitled to have
+/// answered truthfully.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn test_disclosure_accounting_states_whether_it_is_complete() {
+    let app = common::create_test_router().await;
+
+    let payload = json!({
+        // A UUID rather than the shared timestamped helper: that helper
+        // produces names sharing a long prefix across runs, which the
+        // matcher scores as a duplicate and rejects with `409`.
+        "name": {
+            "family": format!("Acct{}", uuid::Uuid::new_v4().simple()),
+            "given": ["Disclosure"]
+        },
+        "gender": "unknown"
+    });
+    let created = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/persons")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(created.status(), StatusCode::CREATED);
+    let body = axum::body::to_bytes(created.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let created: ApiResponse<Person> = serde_json::from_slice(&body).unwrap();
+    let id = created.data.expect("created record").id;
+
+    // Perform an actual disclosing read: naming a recipient is what makes
+    // an access a §164.528 *disclosure* rather than an internal access, so
+    // without this the accounting would be trivially empty and the test
+    // would pin nothing.
+    let read = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/persons/{id}"))
+                .header("x-purpose-of-use", "treatment")
+                .header("x-disclosure-recipient", "referring-clinic")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(read.status(), StatusCode::OK);
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/persons/{id}/audit/disclosures"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    let report = parsed.data.expect("an accounting");
+
+    assert_eq!(report["id"].as_str().unwrap(), id.to_string());
+    assert!(report["disclosures"].is_array());
+    assert_eq!(
+        report["count"].as_u64().unwrap(),
+        report["disclosures"].as_array().unwrap().len() as u64
+    );
+
+    let enabled = report["read_auditing_enabled"].as_bool().unwrap();
+    let caveat = report["caveat"].as_str().unwrap();
+    if enabled {
+        assert!(caveat.contains("complete"), "caveat: {caveat}");
+        // With auditing on, the disclosing read above must appear, and it
+        // must carry what §164.528 asks for: to whom, and why.
+        let first = &report["disclosures"][0];
+        assert!(first["disclosure"].as_bool().unwrap());
+        assert_eq!(
+            first["context"]["recipient"].as_str().unwrap(),
+            "referring-clinic"
+        );
+        assert_eq!(
+            first["context"]["purpose_of_use"].as_str().unwrap(),
+            "treatment"
+        );
+    } else {
+        assert!(
+            caveat.contains("INCOMPLETE") && caveat.contains("PERSON_AUDIT_READS"),
+            "an accounting that cannot see reads must say so, and name the switch: {caveat}"
+        );
+    }
+}
+
+/// The accounting of an unknown record is `404`, not an empty accounting.
+///
+/// An empty list would tell an unauthenticated prober that the id is
+/// valid but never disclosed; `404` says only that there is nothing to
+/// answer about.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn test_disclosure_accounting_for_unknown_record_is_not_found() {
+    let app = common::create_test_router().await;
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/api/persons/{}/audit/disclosures",
+                    uuid::Uuid::new_v4()
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}

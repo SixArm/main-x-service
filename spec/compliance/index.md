@@ -315,13 +315,16 @@ engineering practice without the device framing.
    binds the old/new value pair plus request provenance
    (`ip_address`, `user_agent`) so *who* acted cannot be rewritten
    while *what* they did stays intact. Read/disclosure auditing covers
-   `get` / `masked` / `search` / `export`; the dedicated §164.528
-   accounting endpoint is not yet built.
+   `get` / `masked` / `search` / `export`, and the dedicated §164.528
+   accounting endpoint (`GET /api/persons/{id}/audit/disclosures`) is
+   built, gated by the same record-level authorization as reading the
+   record.
    **worker ✔ (2026-07-26, chain + read/disclosure auditing +
    `/audit/verify`)** — same port as person, whose `audit_log` it
    shares; read auditing covers `get` / `masked` / `search` / `export`,
    and the verification endpoint is mounted and pinned by an
-   end-to-end test.
+   end-to-end test; it carries the same §164.528 accounting endpoint as
+   person (`GET /api/workers/{id}/audit/disclosures`).
    Both are now **enrolled in CI's DB suites** (2026-07-26), so their
    chains are verified against Postgres on every run. Getting there
    meant fixing pre-existing defects that had nothing to do with
@@ -363,6 +366,21 @@ engineering practice without the device framing.
 > the chain partial. It needs one change across both services, deciding
 > deliberately which writer is authoritative. The loco-idiomatic
 > services (care-pathway, case) have no such triggers and are unaffected.
+
+> **Fixed (2026-07-26) — the `entity_type` vocabulary had split in
+> person and worker.** Mutation rows were written as `"Person"` /
+> `"Worker"`, but the read-auditing path added with the audit chain
+> wrote `"person"` / `"worker"`. Every per-entity audit query filters on
+> one spelling, so it silently returned none of the other's rows: an
+> accounting of disclosures would have read as empty while disclosures
+> were being recorded, and the pre-existing `GET
+> /api/<plural>/{id}/audit` endpoint has been missing read rows since
+> read-auditing landed. New rows use the capitalised spelling
+> throughout, and the queries accept both via `IN` so rows already
+> written are not orphaned — `IN` also keeps the `(entity_type,
+> entity_id)` index usable, which a case-insensitive comparison would
+> not. A third spelling (`"patient"`, written by the pre-rename trigger)
+> remains, as part of the trigger finding above.
 
 4. **Copy the FHIR conformance machinery** to the services that already
    mount `/fhir` (organization, place, thing, person, worker, case, event).

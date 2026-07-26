@@ -132,6 +132,37 @@ application records a `DELETE`), so dropping them loses coverage, while
 keeping them leaves the chain partial. Deferred to a dedicated change
 across both services.
 
+**§164.528 accounting of disclosures (delivered 2026-07-26).**
+`GET /api/workers/{{id}}/audit/disclosures` returns every audit row for
+one record flagged as an outward **disclosure** rather than an internal
+access, newest first. Gated by the same record-level authorization as
+reading the record: learning who a record was disclosed to reveals that
+the record exists, so the accounting cannot be more open than the record
+it describes. An unknown id is `404`, not an empty accounting — an empty
+list would tell a prober that the id is valid but never disclosed.
+
+The response carries `read_auditing_enabled` and a `caveat`. This is not
+decoration. `WORKER_AUDIT_READS` defaults off across the family, so an
+empty accounting means "reads are not being recorded", not "this record
+was never disclosed" — and §164.528 is a question a data subject is
+entitled to a truthful answer to. Returning `[]` without saying so would
+be a false answer. A test pins that the caveat names the switch.
+
+**Defect found and fixed while building it: the entity-type vocabulary
+had split.** Mutation rows have always been written with
+`entity_type = "Worker"`, but the read-auditing path added with the
+audit chain wrote `"worker"`. Every per-entity audit query filters on
+one spelling, so it silently returned none of the other's rows: the
+accounting would have read as empty while disclosures were being
+recorded all along, and the existing `GET /api/workers/{{id}}/audit`
+endpoint has been missing read rows since read-auditing landed. New rows
+use `"Worker"` throughout; the queries accept both spellings via `IN`
+so rows already written are not orphaned, and `IN` keeps the
+`(entity_type, entity_id)` index usable where a case-insensitive
+comparison would not. (A third spelling exists in the database —
+the triggers write `"worker"` — which is the separate open finding
+above.)
+
 **Still open.** GDPR Art. 17 erasure by redaction and row-level record
 integrity.
 
