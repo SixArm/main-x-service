@@ -146,6 +146,36 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
     Ok(())
 }
 
+/// The content hash a record should carry after an in-place update.
+///
+/// Reads the row's existing soft-delete stamp, which the digest binds and
+/// which an `..Default::default()` update leaves untouched, so it cannot
+/// come from the domain model (which does not carry it).
+///
+/// Extracted because both `apply_worker_row_replacement` and the `update`
+/// implementation need it — this crate writes the parent row in two
+/// places, pre-existing drift that is at least not duplicated further
+/// here.
+///
+/// Note the absence of compiler help at either call site: both build their
+/// `ActiveModel` with `..Default::default()`, so adding `content_hash` to
+/// the entity did not break them the way it broke the create path. A write
+/// that forgets to rehash produces a *false* tamper report, which is worse
+/// than no control at all; the DB-gated tests exercise every path for
+/// exactly this reason.
+///
+/// # Errors
+///
+/// Returns an error if the lookup fails or the record cannot be hashed.
+async fn content_hash_for_update<C: ConnectionTrait>(conn: &C, worker: &Worker) -> Result<String> {
+    let existing_deleted_at = workers::Entity::find_by_id(worker.id)
+        .one(conn)
+        .await?
+        .and_then(|row| row.deleted_at)
+        .and_then(|d| i64::try_from(d.unix_timestamp_nanos() / 1_000).ok());
+    crate::compliance::record_integrity::hash_with_deleted_at(worker, existing_deleted_at)
+}
+
 /// Apply a worker's parent-row update and wholesale child-row replacement on
 /// `conn`: update the `workers` row (stamping `updated_at`), delete every
 /// child row for the worker, then re-insert them from the domain model.
@@ -158,9 +188,12 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
 ///
 /// Returns an error if any update/delete/insert query fails.
 async fn apply_worker_row_replacement<C: ConnectionTrait>(conn: &C, worker: &Worker) -> Result<()> {
+    let content_hash = content_hash_for_update(conn, worker).await?;
+
     let update_model = workers::ActiveModel {
         id: Set(worker.id),
         active: Set(worker.active),
+        content_hash: Set(Some(content_hash)),
         worker_type: Set(worker
             .worker_type
             .as_ref()
@@ -216,7 +249,7 @@ async fn apply_worker_row_replacement<C: ConnectionTrait>(conn: &C, worker: &Wor
         .await?;
 
     let (_, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
-        SeaOrmWorkerRepository::to_active_models(worker);
+        SeaOrmWorkerRepository::to_active_models(worker)?;
     for name in new_names {
         name.insert(conn).await?;
     }
@@ -535,10 +568,15 @@ impl SeaOrmWorkerRepository {
     /// assigned to child rows. This does not cover the document / emergency-
     /// contact / photo collections — those are handled by
     /// [`insert_extra_collections`].
-    fn to_active_models(worker: &Worker) -> WorkerActiveModels {
+    fn to_active_models(worker: &Worker) -> Result<WorkerActiveModels> {
         let new_worker = workers::ActiveModel {
             id: Set(worker.id),
             active: Set(worker.active),
+            // A new record is live, so the digest binds `deleted_at` as
+            // `None`.
+            content_hash: Set(Some(crate::compliance::record_integrity::hash_of_live(
+                worker,
+            )?)),
             worker_type: Set(worker
                 .worker_type
                 .as_ref()
@@ -631,7 +669,7 @@ impl SeaOrmWorkerRepository {
             })
             .collect();
 
-        (new_worker, names, identifiers, addresses, contacts, links)
+        Ok((new_worker, names, identifiers, addresses, contacts, links))
     }
 
     /// Maps one `worker_names` row back into a domain [`HumanName`], parsing
@@ -1018,7 +1056,7 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         let txn = self.db.begin().await?;
 
         let (new_worker, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
-            Self::to_active_models(worker);
+            Self::to_active_models(worker)?;
 
         // Insert worker
         let db_worker = new_worker.insert(&txn).await?;
@@ -1133,10 +1171,14 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         // rows" within a single transaction.
         let txn = self.db.begin().await?;
 
-        // Update worker
+        // Update worker. This duplicates `apply_worker_row_replacement`
+        // above rather than calling it — pre-existing drift, left alone
+        // here beyond adding the rehash it also needs.
+        let content_hash = content_hash_for_update(&txn, worker).await?;
         let update_model = workers::ActiveModel {
             id: Set(worker.id),
             active: Set(worker.active),
+            content_hash: Set(Some(content_hash)),
             worker_type: Set(worker
                 .worker_type
                 .as_ref()
@@ -1198,7 +1240,7 @@ impl WorkerRepository for SeaOrmWorkerRepository {
 
         // Re-insert associated data
         let (_, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
-            Self::to_active_models(worker);
+            Self::to_active_models(worker)?;
 
         for name in new_names {
             name.insert(&txn).await?;
@@ -1270,10 +1312,21 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         apply_worker_row_replacement(&txn, survivor).await?;
 
         // Soft-delete the duplicate on the same transaction.
+        // A soft delete changes the lifecycle state the digest binds, so
+        // it must be rehashed or every deleted record would read as
+        // tampered. The pre-image loaded above for the audit trail doubles
+        // as the record to hash.
+        let deleted_at = OffsetDateTime::now_utc();
+        let deleted_micros = i64::try_from(deleted_at.unix_timestamp_nanos() / 1_000).ok();
+        let tombstone_hash = old_duplicate
+            .as_ref()
+            .map(|w| crate::compliance::record_integrity::hash_with_deleted_at(w, deleted_micros))
+            .transpose()?;
         let dup_delete = workers::ActiveModel {
             id: Set(*duplicate_id),
-            deleted_at: Set(Some(OffsetDateTime::now_utc())),
+            deleted_at: Set(Some(deleted_at)),
             deleted_by: Set(Some("system".to_string())),
+            content_hash: tombstone_hash.map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h))),
             ..Default::default()
         };
         dup_delete.update(&txn).await?;
@@ -1350,10 +1403,21 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         let old_worker = self.get_by_id(id).await?;
 
         // Soft delete: stamp deleted_at/deleted_by rather than removing rows.
+        // A soft delete changes the lifecycle state the digest binds, so
+        // it must be rehashed or every deleted record would read as
+        // tampered. The pre-image loaded above for the audit trail doubles
+        // as the record to hash.
+        let deleted_at = OffsetDateTime::now_utc();
+        let deleted_micros = i64::try_from(deleted_at.unix_timestamp_nanos() / 1_000).ok();
+        let tombstone_hash = old_worker
+            .as_ref()
+            .map(|w| crate::compliance::record_integrity::hash_with_deleted_at(w, deleted_micros))
+            .transpose()?;
         let update_model = workers::ActiveModel {
             id: Set(*id),
-            deleted_at: Set(Some(OffsetDateTime::now_utc())),
+            deleted_at: Set(Some(deleted_at)),
             deleted_by: Set(Some("system".to_string())),
+            content_hash: tombstone_hash.map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h))),
             ..Default::default()
         };
         // Unlike create/update, the soft-delete is a single row update with no
@@ -1510,7 +1574,7 @@ mod tests {
                 },
                 gender,
             );
-            let (row, ..) = SeaOrmWorkerRepository::to_active_models(&worker);
+            let (row, ..) = SeaOrmWorkerRepository::to_active_models(&worker).expect("hashable");
             let stored = row.gender.unwrap();
             assert!(
                 DB_GENDER_TOKENS.contains(&stored.as_str()),

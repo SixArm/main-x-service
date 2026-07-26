@@ -82,6 +82,12 @@ pub mod workers {
         pub deleted_at: Option<TimeDateTimeWithTimeZone>,
         /// Actor who soft-deleted the row.
         pub deleted_by: Option<String>,
+        /// SHA-256 over the assembled record, for out-of-band tamper
+        /// detection (`crate::compliance::record_integrity`). `None` on
+        /// rows written before the column existed; never back-filled,
+        /// because a back-fill would certify whatever the current content
+        /// happens to be — which is the claim the hash exists to test.
+        pub content_hash: Option<String>,
     }
 
     /// Foreign-key relations for this entity. Workers own several child

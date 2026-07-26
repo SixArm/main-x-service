@@ -229,6 +229,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/audit/recent", get(handlers::get_recent_audit_logs))
         .route("/audit/user", get(handlers::get_user_audit_logs))
         .route("/audit/verify", get(handlers::verify_audit_chain))
+        .route("/records/verify", get(handlers::verify_record_integrity))
         .with_state(state);
 
     let router = Router::new()
@@ -327,6 +328,7 @@ pub fn workers_routes() -> loco_rs::controller::Routes {
         .add("/audit/recent", get(handlers::get_recent_audit_logs))
         .add("/audit/user", get(handlers::get_user_audit_logs))
         .add("/audit/verify", get(handlers::verify_audit_chain))
+        .add("/records/verify", get(handlers::verify_record_integrity))
 }
 
 /// Root-level Prometheus scrape route (`GET /metrics.prom`).

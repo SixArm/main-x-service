@@ -1147,3 +1147,225 @@ async fn test_entity_audit_covers_every_entity_type_spelling() {
         rows.len()
     );
 }
+
+/// Row-level record integrity: **every** write path leaves the record's
+/// content hash matching its content.
+///
+/// This is the test the feature lives or dies by. The hash is only useful
+/// if a mismatch means tampering — so a write path that forgets to rehash
+/// produces a false accusation, which is worse than having no control at
+/// all. The compiler catches only one of the four paths (`create`, whose
+/// initializer names every column); `update`, `merge`, and `delete` build
+/// their `ActiveModel` with `..Default::default()` and compile happily
+/// while silently leaving a stale digest. So each is exercised here.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn test_every_write_path_rehashes_the_record() {
+    let app = common::create_test_router().await;
+
+    let create = |suffix: &str| {
+        json!({
+            "name": {
+                "family": format!("Integ{}{}", suffix, uuid::Uuid::new_v4().simple()),
+                "given": ["Hash"]
+            },
+            "gender": "female",
+            "tax_id": "AB123456C"
+        })
+    };
+
+    // 1. create
+    let id = create_worker(&app, &create("Create")).await;
+    assert_records_verify(&app, "after create").await;
+
+    // 2. update
+    let mut updated = create("Update");
+    updated["id"] = json!(id);
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/workers/{id}"))
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&updated).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(
+        response.status().is_success(),
+        "update failed: {:?}",
+        response.status()
+    );
+    assert_records_verify(&app, "after update").await;
+
+    // 3. delete (soft) — changes the lifecycle state the digest binds
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/workers/{id}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(response.status().is_success() || response.status() == StatusCode::NO_CONTENT);
+    assert_records_verify(&app, "after soft delete").await;
+
+    // 4. erase — clears the hash rather than recomputing one over a
+    //    half-destroyed record, so it must report as a gap, never a
+    //    mismatch.
+    let erased = create_worker(&app, &create("Erase")).await;
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/workers/{erased}/erase"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_records_verify(&app, "after erasure").await;
+}
+
+/// An out-of-band SQL edit to a **child table** is detected.
+///
+/// This is the gap the dropped database triggers never closed. The edit
+/// writes no audit row, so the audit chain still verifies — and it touches
+/// `worker_identifiers`, not `workers`, so a digest over the parent row
+/// alone would not have noticed either.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn test_out_of_band_sql_edit_to_a_child_table_is_detected() {
+    use sea_orm::ConnectionTrait as _;
+
+    let app = common::create_test_router().await;
+    let payload = json!({
+        "name": {
+            "family": format!("Tamper{}", uuid::Uuid::new_v4().simple()),
+            "given": ["Detect"]
+        },
+        "gender": "male",
+        "identifiers": [{
+            "identifier_type": "SSN",
+            "system": "http://hl7.org/fhir/sid/us-ssn",
+            "value": format!("SSN-{}", uuid::Uuid::new_v4())
+        }]
+    });
+    let id = create_worker(&app, &payload).await;
+    assert_records_verify(&app, "before tampering").await;
+
+    // Edit the stored identifier directly, writing no audit row.
+    let conn = common::db().await;
+    conn.execute(sea_orm::Statement::from_sql_and_values(
+        sea_orm::DatabaseBackend::Postgres,
+        "UPDATE worker_identifiers SET value = 'TAMPERED' WHERE worker_id = $1",
+        [id.into()],
+    ))
+    .await
+    .expect("tamper");
+
+    // The audit chain is untouched — that is the point.
+    let verify = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/audit/verify?limit=1000")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = axum::body::to_bytes(verify.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert!(
+        parsed.data.expect("chain report")["verified"]
+            .as_bool()
+            .unwrap(),
+        "the audit chain cannot see a record edit — that is why this control exists"
+    );
+
+    // Record integrity does see it, and names the record.
+    let report = record_integrity_report(&app).await;
+    assert!(
+        !report["verified"].as_bool().unwrap(),
+        "an out-of-band child-table edit must be detected: {report}"
+    );
+    let flagged: Vec<&str> = report["mismatched"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|m| m["id"].as_str())
+        .collect();
+    assert!(
+        flagged.contains(&id.to_string().as_str()),
+        "the tampered record must be named: {report}"
+    );
+}
+
+/// Create a worker through the API and return its id.
+async fn create_worker(app: &axum::Router, payload: &serde_json::Value) -> uuid::Uuid {
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/workers")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(payload).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<Worker> = serde_json::from_slice(&body).unwrap();
+    parsed.data.expect("created worker").id
+}
+
+/// Fetch the record-integrity report.
+async fn record_integrity_report(app: &axum::Router) -> serde_json::Value {
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/records/verify?limit=500")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    parsed.data.expect("an integrity report")
+}
+
+/// Assert no record reports as tampered.
+async fn assert_records_verify(app: &axum::Router, stage: &str) {
+    let report = record_integrity_report(app).await;
+    assert!(
+        report["verified"].as_bool().unwrap(),
+        "{stage}: a write path did not rehash its record — \
+         this is a false tamper report, not a real one: {report}"
+    );
+    // Guard against passing vacuously: if nothing were ever hashed, every
+    // record would count as `unhashed` and `verified` would still be true,
+    // so the assertion above would hold while the feature did nothing.
+    assert!(
+        report["intact"].as_u64().unwrap() >= 1,
+        "{stage}: no record carries a verified hash, so this proves nothing: {report}"
+    );
+}

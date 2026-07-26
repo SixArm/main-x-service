@@ -414,6 +414,23 @@ engineering practice without the device framing.
 > Tolerating the spelling on read is the only option that keeps both the
 > history and its integrity.
 
+> **Row-level record integrity reached person and worker (2026-07-26).**
+> Both now carry a `content_hash` over the record, recomputed on every
+> write, with a `GET /api/records/verify` endpoint — the complement to
+> `/api/audit/verify`, and the proper answer to the raw-SQL entity edit
+> that the dropped database triggers only pretended to witness. Unlike the
+> care-pathway reference, which hashes one JSONB column, these hash the
+> **assembled** record: a person's or worker's identifiers, names, and
+> addresses live in child tables, and a parent-row digest would have
+> repeated exactly the narrowness that made the triggers worthless.
+> Existing rows are not back-filled — computing a hash from current
+> content would certify whatever an attacker had already changed — so they
+> report as `unhashed` rather than verified. The failure mode is a false
+> accusation rather than a missed one, since a write path that forgets to
+> rehash flags an untouched record; every path is covered by a DB-gated
+> test verified to fail when a rehash is removed. One honest gap remains:
+> worker's `worker_assessments` sub-resource is outside the digest.
+
 4. **Copy the FHIR conformance machinery** to the services that already
    mount `/fhir` (organization, place, thing, person, worker, case, event).
 5. **Lift the evidence artefacts** (`compliance/`, `scripts/`) to the

@@ -29,6 +29,7 @@ mod m20260723_000001_create_worker_assessments;
 mod m20260723_000002_normalize_worker_gender_case;
 mod m20260726_000001_audit_chain;
 mod m20260726_000003_drop_audit_triggers;
+mod m20260726_000004_worker_content_hash;
 
 /// The migration runner this crate exposes to loco / `sea-orm-migration`.
 pub struct Migrator;
@@ -54,6 +55,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260723_000002_normalize_worker_gender_case::Migration),
             Box::new(m20260726_000001_audit_chain::Migration),
             Box::new(m20260726_000003_drop_audit_triggers::Migration),
+            Box::new(m20260726_000004_worker_content_hash::Migration),
         ]
     }
 }

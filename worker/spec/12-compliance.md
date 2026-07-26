@@ -281,9 +281,53 @@ chain still verifies and the redactions are *counted*, not hidden. If it
 ever fails, the two obligations have stopped being simultaneously
 satisfiable and the design is broken, not the test.
 
-**Still open.** Row-level record integrity. (Art. 17 erasure was open
-when this paragraph was first written and landed on 2026-07-26 — see the
-section below.)
+**Still open.** Extending the record digest to cover
+`worker_assessments` (see below). (Art. 17 erasure and row-level record
+integrity were open when this paragraph was first written; both landed on
+2026-07-26 — see the sections below.)
+
+**Row-level record integrity (delivered 2026-07-26).**
+`workers.content_hash` carries a SHA-256 over the record, recomputed on
+every write, and `GET /api/records/verify` recomputes and reports
+mismatches. This is the **complement** to `/api/audit/verify`, not a
+duplicate: the chain proves the *trail* was not rewritten, this proves the
+*records* were not edited out of band. An attacker with SQL access who
+edits a stored registration number and writes no audit row defeats the
+first control and is caught by this one — it is the gap the dropped
+database triggers gestured at without ever closing.
+
+**The digest covers the assembled record, not the `workers` row.** A
+worker is relational, and the data worth tampering with — a surname, a
+professional registration number — lives in the child tables, so hashing
+only the parent would have repeated the exact narrowness that made the
+triggers worthless. `created_at` / `updated_at` are excluded because the
+ORM and the database set them and binding them would produce false
+mismatches.
+
+**Honest limit: `worker_assessments` is not covered.** Assessment rows are
+reached through their own sub-resource and are not part of the assembled
+`Worker` the API serves, so they are outside this digest. That is the most
+sensitive table in the crate, so the gap is real. Closing it means
+deciding how an assessment write rehashes its parent worker — a design
+question, not an oversight — and it is recorded here rather than silently
+skipped.
+
+**Existing rows are not back-filled.** Computing a hash from the current
+content would assert that the current content is authentic — the very
+claim the hash exists to test — so a back-fill would certify whatever an
+attacker had already changed. Unhashed rows report as `unhashed`, never as
+verified.
+
+**The failure mode is a false accusation**, not a missed one: a write path
+that forgets to rehash flags an untouched record as tampered, which is
+worse than no control. This crate has **six** such paths (it writes the
+parent row in two places — pre-existing drift — plus create, both soft
+deletes, and the raw-SQL erasure), and only `create` gets compiler help.
+A DB-gated test exercises them all and is **verified to fail** when the
+update path's rehash is removed, with a vacuity guard so it cannot pass
+while nothing is hashed. Erasure clears the hash rather than recomputing
+one, since the child rows are gone by then; the chained `erased` audit row
+is the stronger evidence anyway.
 
 **Blocker cleared (2026-07-26).** Worker is now enrolled in CI's DB
 suites ([`ci/db-suites.txt`](../../ci/db-suites.txt)). Three pre-existing

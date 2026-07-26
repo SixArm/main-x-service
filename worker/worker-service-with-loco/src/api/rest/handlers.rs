@@ -1792,6 +1792,118 @@ pub async fn get_worker_disclosures(
     }
 }
 
+/// Verify row-level record integrity across a page of worker records.
+///
+/// `GET /api/records/verify?limit=100` — recomputes each record's content
+/// hash and reports every mismatch (HIPAA §164.312(c)).
+///
+/// This is the **complement** to `/api/audit/verify`, not a duplicate of
+/// it. The audit chain proves the *trail* was not rewritten; this proves
+/// the *records* were not edited out of band. An attacker with SQL access
+/// who edits a stored name or identifier and writes no audit row defeats
+/// the first control and is caught by this one.
+///
+/// Rows written before the `content_hash` column existed report as
+/// `unhashed` rather than as mismatches: adopting the control on a
+/// populated table must not produce a wall of false positives, and they
+/// are hashed on their next write. They are *not* back-filled, because
+/// computing a hash from the current content would certify whatever is
+/// there — which is the claim the hash exists to test.
+#[utoipa::path(
+    get,
+    path = "/api/records/verify",
+    tag = "audit",
+    params(AuditLogQuery),
+    responses(
+        (status = 200, description = "Record integrity report"),
+        (status = 500, description = "Database error")
+    )
+)]
+pub async fn verify_record_integrity(
+    State(state): State<AppState>,
+    Query(params): Query<AuditLogQuery>,
+) -> impl IntoResponse {
+    use sea_orm::ConnectionTrait as _;
+
+    // Verification is O(rows) with a SHA-256 and a record assembly each,
+    // so an unbounded limit is a CPU denial-of-service (SEC-M1).
+    let limit = params.limit.clamp(1, 500);
+
+    let rows = match state
+        .db
+        .query_all(sea_orm::Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Postgres,
+            "SELECT id, content_hash, deleted_at FROM workers \
+             ORDER BY updated_at DESC LIMIT $1",
+            [limit.into()],
+        ))
+        .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse::<serde_json::Value>::error(
+                    "DATABASE_ERROR",
+                    format!("Failed to read records for verification: {e}"),
+                )),
+            );
+        }
+    };
+
+    // Assemble each record so the digest covers the child tables too —
+    // which is the whole point, since a name or identifier edit lives
+    // there. One query per record, which is why the limit is capped.
+    let mut records = Vec::with_capacity(rows.len());
+    for row in rows {
+        let Ok(id) = row.try_get::<Uuid>("", "id") else {
+            continue;
+        };
+        let stored: Option<String> = row.try_get("", "content_hash").unwrap_or(None);
+        let deleted_at: Option<time::OffsetDateTime> =
+            row.try_get("", "deleted_at").unwrap_or(None);
+        let deleted_micros =
+            deleted_at.and_then(|d| i64::try_from(d.unix_timestamp_nanos() / 1_000).ok());
+        match state.worker_repository.get_by_id(&id).await {
+            Ok(Some(worker)) => records.push((worker, stored, deleted_micros)),
+            // A row that vanished between the two queries is not a
+            // mismatch; skipping it is honest, and the count reflects it.
+            Ok(None) => {}
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ApiResponse::<serde_json::Value>::error(
+                        "DATABASE_ERROR",
+                        format!("Failed to assemble record {id} for verification: {e}"),
+                    )),
+                );
+            }
+        }
+    }
+
+    let report = crate::compliance::record_integrity::verify(&records);
+    let interpretation = if report.verified {
+        "no record in the verified window differs from its stored hash; this attests to the \
+         worker records, not to the audit trail — see /api/audit/verify for that"
+    } else {
+        "a mismatch means the record's content changed without the service rehashing it — \
+         either an out-of-band SQL edit, or a write path that forgot to rehash; investigate \
+         the named ids against the audit trail"
+    };
+    (
+        StatusCode::OK,
+        Json(ApiResponse::success(serde_json::json!({
+            "limit": limit,
+            "verified": report.verified,
+            "records": report.records,
+            "intact": report.intact,
+            "unhashed": report.unhashed,
+            "mismatched": report.mismatched,
+            "interpretation": interpretation,
+        }))),
+    )
+}
+
 /// Verify the tamper-evident audit hash chain.
 ///
 /// `GET /api/audit/verify?limit=1000` — recomputes the trailing rows and

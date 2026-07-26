@@ -197,6 +197,12 @@ pub async fn erase<C: ConnectionTrait>(
 
     if found {
         // 2. Scrub the parent row's own personal fields and retire it.
+        //    `content_hash` is set to NULL rather than recomputed: the
+        //    hash covers the *assembled* record and the child rows are
+        //    deleted in step 1, so there is no longer a record to hash.
+        //    NULL is the column's existing "not hashed" value, which
+        //    verification reports as a gap rather than a mismatch, so an
+        //    erased record does not masquerade as tampered.
         //    `gender` is NOT NULL, so it takes the honest `unknown`.
         db.execute(Statement::from_sql_and_values(
             db.get_database_backend(),
@@ -207,6 +213,7 @@ pub async fn erase<C: ConnectionTrait>(
                marital_status = NULL, multiple_birth = NULL, \
                managing_organization_id = NULL, \
                created_by = NULL, updated_by = NULL, \
+               content_hash = NULL, \
                active = FALSE, deleted_at = NOW(), deleted_by = $3, \
                updated_at = NOW() \
              WHERE id = $1",
