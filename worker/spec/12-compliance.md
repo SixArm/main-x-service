@@ -85,13 +85,28 @@ is not yet answerable — only mutations are recorded. The chain
 verification endpoint, GDPR Art. 17 erasure by redaction, and row-level
 record integrity also remain.
 
-**Known blocker.** Worker's DB-gated request suite has five pre-existing
-failures unrelated to this work (`tests/api_integration_test.rs` gets
-`422` where it expects `201`, and the harness needs `./data/search_index`
-to exist), so the crate is not enrolled in CI's DB suites
-([`ci/db-suites.txt`](../../ci/db-suites.txt)). The chain's own pins
-(`db::audit::chain_tests::*`) verify against Postgres regardless, because
-`audit_log` has no foreign keys to the worker tables.
+**Blocker cleared (2026-07-26).** Worker is now enrolled in CI's DB
+suites ([`ci/db-suites.txt`](../../ci/db-suites.txt)). Three pre-existing
+defects had to be fixed first, none of them from the compliance work:
+
+- `2024122800000005` created the `pg_trgm` extension *after* the indexes
+  that use `gin_trgm_ops`, and applied that operator class to
+  `worker_names.given`, which is `text[]`. This was the root cause of
+  everything else: the block could never apply, so the **migration chain
+  stopped there** and `audit_log.seq`, `workers.worker_type`, and every
+  later column simply did not exist. Fixed in place — precisely because
+  it could never have applied, no deployment can have run past it.
+  `given` now takes the default GIN `array_ops` index; fuzzy matching
+  lives in `worker-matcher` and Tantivy, not in a SQL trigram index.
+- `Worker` and `HumanName` had lost the `#[serde(default)]` attributes
+  the person service still carries, so omitting an optional field —
+  `prefix`, `suffix`, `identifiers`, … — was rejected with `422`. This
+  was the `422`-where-`201`-expected failure. The wire contract, not the
+  test, was wrong: those fields are optional in the domain and should be
+  optional on the wire. Restored, removing the drift from person.
+- `tests/common/mod.rs` opened a Tantivy index at a path no fixture
+  created, so every integration test panicked before its first
+  assertion.
 
 ### 12.5 Extended frameworks
 

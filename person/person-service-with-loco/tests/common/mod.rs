@@ -23,6 +23,14 @@ pub async fn create_test_app_state() -> AppState {
         .await
         .expect("Failed to create database connection");
 
+    // Tantivy opens an existing directory rather than creating one, and no
+    // fixture ever made this path — so every integration test in this crate
+    // panicked with `DoesNotExist` before reaching its assertions, and the
+    // whole target could not run against a database. Creating it here keeps
+    // the path environment-driven (CI can point it anywhere) while removing
+    // the unstated precondition.
+    std::fs::create_dir_all(&config.search.index_path)
+        .expect("Failed to create the search index directory");
     let search_engine =
         SearchEngine::new(&config.search.index_path).expect("Failed to create search engine");
 

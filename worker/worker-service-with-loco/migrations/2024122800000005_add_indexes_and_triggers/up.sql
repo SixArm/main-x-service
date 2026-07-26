@@ -108,11 +108,31 @@ CREATE TRIGGER audit_organizations_changes
     EXECUTE FUNCTION audit_organization_changes();
 
 -- Full-text search support (using PostgreSQL built-in)
-CREATE INDEX idx_worker_names_family_trgm ON worker_names USING gin(family gin_trgm_ops);
-CREATE INDEX idx_worker_names_given_trgm ON worker_names USING gin(given gin_trgm_ops);
-
--- Enable pg_trgm extension for fuzzy matching
+--
+-- Two defects fixed here (2026-07-26). Both made this block fail on a
+-- fresh database, which halted the migration chain — so `audit_log.seq`,
+-- `workers.worker_type`, and everything else added later never existed,
+-- and the crate's DB-gated suite could not run at all.
+--
+--   1. `CREATE EXTENSION pg_trgm` came *after* the indexes that use
+--      `gin_trgm_ops`, so the operator class was not yet defined.
+--   2. `given` is `TEXT[]`, and `gin_trgm_ops` does not accept an array
+--      type. The right GIN index for an array is the default `array_ops`,
+--      which serves containment and overlap (`given @> ARRAY['jo']`) —
+--      the questions you can actually ask of a set of given names in SQL.
+--      An expression index over `array_to_string(given, ' ')` was tried
+--      and rejected: Postgres requires index expressions to be IMMUTABLE
+--      and `array_to_string` is not. Fuzzy given-name matching is not
+--      lost — it happens in the `worker-matcher` crate (Jaro-Winkler,
+--      Soundex) and in Tantivy, neither of which would have used a SQL
+--      trigram index.
+--
+-- Editing this file in place is safe precisely because it could never
+-- have applied: no deployment can have run past it.
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX idx_worker_names_family_trgm ON worker_names USING gin(family gin_trgm_ops);
+CREATE INDEX idx_worker_names_given_arr ON worker_names USING gin(given);
 
 -- Composite indexes for common queries
 CREATE INDEX idx_workers_active_gender ON workers(active, gender) WHERE deleted_at IS NULL;

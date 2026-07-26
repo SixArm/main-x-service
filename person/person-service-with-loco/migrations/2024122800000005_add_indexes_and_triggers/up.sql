@@ -107,12 +107,35 @@ CREATE TRIGGER audit_organizations_changes
     FOR EACH ROW
     EXECUTE FUNCTION audit_organization_changes();
 
--- Full-text search support (using PostgreSQL built-in)
-CREATE INDEX idx_patient_names_family_trgm ON patient_names USING gin(family gin_trgm_ops);
-CREATE INDEX idx_patient_names_given_trgm ON patient_names USING gin(given gin_trgm_ops);
-
--- Enable pg_trgm extension for fuzzy matching
+-- Trigram indexes for fuzzy name matching.
+--
+-- Fixed 2026-07-26. As written this block could never apply to a fresh
+-- database, so no deployment can have run past it and editing it in place
+-- is safe:
+--
+--   1. The extension was created *after* the indexes that use its
+--      operator class, so the first CREATE INDEX failed with
+--      "operator class gin_trgm_ops does not exist for access method gin".
+--   2. `given` is `TEXT[]`, and `gin_trgm_ops` accepts only text/varchar,
+--      so it failed with "does not accept data type text[]".
+--
+-- The extension now comes first. `family` is `VARCHAR`, so it keeps a
+-- real trigram index. `given` is an array, and the right GIN index for an
+-- array is the default `array_ops` — it serves containment and overlap
+-- (`given @> ARRAY['john']`), which is what you can actually ask of a set
+-- of given names in SQL.
+--
+-- An expression index over `array_to_string(given, ' ')` was tried and
+-- rejected: Postgres requires index expressions to be IMMUTABLE and
+-- `array_to_string` is not. Fuzzy given-name matching is not lost — it
+-- happens in the `person-matcher` crate (Jaro-Winkler, Soundex) and in
+-- Tantivy, neither of which would have used a SQL trigram index.
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX idx_patient_names_family_trgm
+    ON patient_names USING gin (family gin_trgm_ops);
+CREATE INDEX idx_patient_names_given_arr
+    ON patient_names USING gin (given);
 
 -- Composite indexes for common queries
 CREATE INDEX idx_patients_active_gender ON patients(active, gender) WHERE deleted_at IS NULL;

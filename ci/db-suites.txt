@@ -20,30 +20,34 @@ care-pathway/care-pathway-service-with-loco
 case/case-service-with-loco
 case-folder/case-folder-service-with-rust
 workforce-planning-management/workforce-planning-management-service-with-rust
+person/person-service-with-loco
+worker/worker-service-with-loco
+#
+# person and worker were enrolled on 2026-07-26, once the pre-existing
+# defects that had kept them out were fixed. For the record, what was
+# actually wrong — none of it was in the compliance work:
+#
+#   * Both crates' `add_indexes_and_triggers` migration created the
+#     `pg_trgm` extension *after* the indexes that use `gin_trgm_ops`, and
+#     applied that operator class to a `text[]` column, which it does not
+#     accept. The block could never apply, so on worker the whole migration
+#     chain stopped there and `audit_log.seq` / `workers.worker_type` never
+#     existed.
+#   * person's rename-to-`person` migration renamed the tables but not
+#     their `patient_id` foreign-key columns, which the SeaORM entities
+#     declare as `person_id`.
+#   * person's bulk-import advisory-lock key embedded a literal NUL as a
+#     field separator. Postgres `text` cannot hold one, so every
+#     identifier-keyed import row failed with `invalid byte sequence for
+#     encoding "UTF8": 0x00`.
+#   * Both crates' `tests/common/mod.rs` opened a Tantivy index at a path
+#     no fixture created, so every integration test panicked before its
+#     first assertion.
+#   * worker's `Worker` and `HumanName` had lost the `#[serde(default)]`
+#     attributes that person still had, so omitting an optional field —
+#     `prefix`, `identifiers`, … — was a `422`.
 #
 # --- not yet enrolled -------------------------------------------------
-#
-# worker/worker-service-with-loco
-#   Excluded: 5 pre-existing failures unrelated to any recent change.
-#   `tests/api_integration_test.rs` gets `422` where it expects `201` on
-#   worker create. Verified pre-existing by running the same suite at
-#   commit d25067d1 (before the compliance work) — identical failures.
-#   It also needs `./data/search_index` to exist before boot, which no
-#   fixture creates. Enrol once both are fixed.
-#
-# person/person-service-with-loco
-#   Excluded despite carrying the audit chain (2026-07-26). Its own
-#   compliance pins — `db::audit::chain_tests::*` — pass against Postgres,
-#   but the crate's wider `--ignored` suite cannot run here because its
-#   migrations do not apply to a fresh database. Two pre-existing defects,
-#   both verified present before any of this work:
-#     1. `2024122800000005_add_indexes_and_triggers/up.sql` builds a
-#        `gin_trgm_ops` index on `patient_names.given`, which is `text[]`
-#        (the operator class only accepts `text`/`varchar`), and creates
-#        the `pg_trgm` extension *after* first using it.
-#     2. The rename migration leaves `person_names` without the
-#        `person_id` column the repository code inserts into.
-#   Enrol once a fresh-database migrate succeeds end to end.
 #
 # Every other service:
 #   Their `--ignored` suites have never been run against a database in

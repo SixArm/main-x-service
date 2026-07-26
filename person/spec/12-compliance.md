@@ -91,15 +91,38 @@ and row-level record integrity. The rows are being recorded and are
 queryable through the existing audit endpoints; the dedicated
 disclosure-only view is not built.
 
-**Known blocker.** Person's migrations do not apply to a fresh database:
-`2024122800000005` builds a `gin_trgm_ops` index on `patient_names.given`,
-which is `text[]` (and creates `pg_trgm` *after* first using it), and the
-rename migration leaves `person_names` without the `person_id` column the
-repository writes to. Both predate this work. The chain's own pins
-(`db::audit::chain_tests::*`) verify against Postgres regardless, because
-`audit_log` has no foreign keys to the person tables — but the crate
-cannot join CI's DB suites until the schema applies cleanly
-([`ci/db-suites.txt`](../../ci/db-suites.txt)).
+**Blocker cleared (2026-07-26).** Person is now enrolled in CI's DB
+suites ([`ci/db-suites.txt`](../../ci/db-suites.txt)): its whole
+`--ignored` suite runs against Postgres on every CI run, so the audit
+chain is verified end to end rather than in isolation. Four pre-existing
+defects had to be fixed first, none of them from the compliance work:
+
+- `2024122800000005` created the `pg_trgm` extension *after* the indexes
+  that use `gin_trgm_ops`, and applied that operator class to
+  `patient_names.given`, which is `text[]` and which `gin_trgm_ops` does
+  not accept. Fixed in place — the block could never have applied, so no
+  deployment can have run past it. `given` now takes the default GIN
+  `array_ops` index (containment and overlap); an expression index over
+  `array_to_string(given, ' ')` is impossible because Postgres requires
+  index expressions to be IMMUTABLE and that function is not. No fuzzy
+  matching is lost: it happens in `person-matcher` and Tantivy.
+- The rename-to-`person` migration renamed the tables but not their
+  `patient_id` foreign-key columns, which the SeaORM entities declare as
+  `person_id`. Fixed by a **new forward migration**
+  (`m20260726_000002_rename_patient_id_columns`), not by editing the
+  original — that rename *can* have applied successfully, so its history
+  must not be rewritten. The new migration is idempotent, guarded by
+  `to_regclass` and `information_schema.columns`.
+- The bulk-import advisory-lock key (SEC-B3) embedded a literal NUL as
+  its field separator. Postgres `text` cannot hold one, so **every**
+  identifier-keyed import row failed with `invalid byte sequence for
+  encoding "UTF8": 0x00` — the lock had never worked for the stable-key
+  case it exists to serialise. The boundary is now made unambiguous by
+  length-prefixing, which is injective and uses no special bytes, and a
+  test pins that the key is valid Postgres text.
+- `tests/common/mod.rs` opened a Tantivy index at a path no fixture
+  created, so every integration test panicked before its first
+  assertion.
 
 ### 12.5 Extended frameworks
 

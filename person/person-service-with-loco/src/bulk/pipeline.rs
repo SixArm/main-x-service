@@ -176,11 +176,22 @@ async fn find_existing(
 
 /// The lock string for a [`StableKey`] — a stable, collision-resistant
 /// rendering hashed by Postgres into the advisory-lock keyspace (SEC-B3).
-/// The `\0` separator keeps `system`/`value` boundaries unambiguous.
+///
+/// The `system`/`value` boundary is made unambiguous by **length-prefixing**
+/// the system rather than by a separator byte. This is not a stylistic
+/// choice: the original rendering used a literal `\0` separator, and
+/// Postgres `text` cannot represent a NUL byte, so binding the key raised
+/// `invalid byte sequence for encoding "UTF8": 0x00` and **every**
+/// identifier-keyed import row failed with a `database` error. A separator
+/// drawn from any other character would only move the problem, since a
+/// system or value may legitimately contain it; a length prefix is
+/// injective for all inputs and contains no special bytes.
 fn stable_key_lock_string(key: &StableKey) -> String {
     match key {
         StableKey::Pid(id) => format!("person-pid:{id}"),
-        StableKey::Identifier { system, value } => format!("person-id:{system}\u{0}{value}"),
+        StableKey::Identifier { system, value } => {
+            format!("person-id:{}:{system}{value}", system.len())
+        }
     }
 }
 
@@ -438,7 +449,11 @@ mod db_tests {
             .await
             .unwrap();
         assert_eq!(first.rows_total, 3, "three record rows");
-        assert_eq!(first.rows_created, 2, "two new records");
+        assert_eq!(
+            first.rows_created, 2,
+            "two new records; errors: {:?}",
+            first.errors
+        );
         assert_eq!(first.rows_upserted, 0);
         assert_eq!(first.rows_errored, 1, "one invalid row");
         assert_eq!(first.errors.len(), 1);
@@ -601,10 +616,15 @@ mod db_tests {
 
         let mut p = person("MaskedExport");
         p.tax_id = Some("123-45-6789".to_string());
+        // The identifier value must be unique per run: `person_identifiers`
+        // carries `UNIQUE (system, value)`, so a fixed value made this test
+        // pass once and then fail on every later run against the same
+        // database. The masking assertion is about `tax_id`, which stays
+        // fixed; the identifier is incidental to it.
         p.identifiers.push(Identifier::new(
             IdentifierType::SSN,
             "http://hl7.org/fhir/sid/us-ssn".to_string(),
-            "123-45-6789".to_string(),
+            format!("SSN-{}", uuid::Uuid::new_v4()),
         ));
         let created = repo.create(&p).await.unwrap();
 
@@ -775,7 +795,7 @@ mod unit_tests {
             value: "abd".into(),
         });
         assert_ne!(a, b, "different values must yield different lock keys");
-        // The `\0` separator prevents ("sy","stemabc") aliasing ("sys","temabc").
+        // The length prefix prevents ("sy","stemabc") aliasing ("sys","temabc").
         let split_a = stable_key_lock_string(&StableKey::Identifier {
             system: "sys".into(),
             value: "temabc".into(),
@@ -785,6 +805,16 @@ mod unit_tests {
             value: "stemabc".into(),
         });
         assert_ne!(split_a, split_b, "boundary must be unambiguous");
+
+        // The key is bound as a Postgres `text` parameter, which cannot
+        // carry a NUL. A key containing one made every identifier-keyed
+        // import row fail; pin that it never comes back.
+        for key in [&by_pid, &a, &b, &split_a, &split_b] {
+            assert!(
+                !key.contains('\0'),
+                "lock key must be valid Postgres text: {key:?}"
+            );
+        }
     }
 
     /// SEC-B2: a caller-supplied export `limit` is clamped to the ceiling,

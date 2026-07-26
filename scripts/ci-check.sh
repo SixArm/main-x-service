@@ -13,8 +13,9 @@
 #   fmt         cargo fmt --check
 #   clippy      cargo clippy --all-targets -- -D warnings
 #   test        cargo test            (DB-gated suites stay skipped)
-#   test-db     cargo test -- --ignored, for crates enrolled in
-#               ci/db-suites.txt; a no-op for any other crate
+#   test-db     cargo test -- --ignored --test-threads=1, for crates
+#               enrolled in ci/db-suites.txt; a no-op for any other
+#               crate. Serial because the suites share one database.
 #   deny        cargo deny check      (where a deny.toml exists)
 #   evidence    IEC 62304 artefacts: SBOM + requirement->test traceability
 #
@@ -86,11 +87,42 @@ run_stage() {
       local db
       db="$(db_name_for "${crate}")"
       echo "  database: ${db}"
+      # Recreate from scratch. These suites assert on whole-table state
+      # (row counts, `MIN(seq)`, an entire verified audit chain), so a
+      # database left over from an earlier run is not a neutral starting
+      # point — it is the difference between a real failure and a stale
+      # one. The name is `ci_*`, owned by this script alone.
+      PGPASSWORD="${PG_PASSWORD}" dropdb --if-exists -h "${PG_HOST}" \
+        -p "${PG_PORT}" -U "${PG_USER}" "${db}"
       PGPASSWORD="${PG_PASSWORD}" createdb -h "${PG_HOST}" -p "${PG_PORT}" \
-        -U "${PG_USER}" "${db}" 2>/dev/null || true
+        -U "${PG_USER}" "${db}"
+      PGPASSWORD="${PG_PASSWORD}" psql -h "${PG_HOST}" -p "${PG_PORT}" \
+        -U "${PG_USER}" -d "${db}" -q -c \
+        'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+         CREATE EXTENSION IF NOT EXISTS citext;
+         CREATE EXTENSION IF NOT EXISTS unaccent;' || true
+      # Crates that carry hand-written SQL migrations need them applied:
+      # unlike the loco-idiomatic services, they do not migrate on boot,
+      # so their suite would otherwise run against an empty schema and
+      # fail with `relation ... does not exist`. Directory names are
+      # timestamp-prefixed, so lexicographic order is apply order.
+      if ls "${crate}"/migrations/*/up.sql >/dev/null 2>&1; then
+        local up
+        for up in $(ls "${crate}"/migrations/*/up.sql | sort); do
+          PGPASSWORD="${PG_PASSWORD}" psql -h "${PG_HOST}" -p "${PG_PORT}" \
+            -U "${PG_USER}" -d "${db}" -q -v ON_ERROR_STOP=1 -f "${up}"
+        done
+        echo "  applied $(ls "${crate}"/migrations/*/up.sql | wc -l | tr -d ' ') SQL migrations"
+      fi
+      # `--test-threads=1` is required, not a preference. Every DB-gated
+      # suite in a crate shares one database, and many assert on whole-table
+      # state: the audit-chain tests verify the *entire* `audit_log` and
+      # count its rows, so any other test writing an audit row concurrently
+      # breaks them. Running them in parallel produced failures that looked
+      # like chain defects but were only test interference.
       ( cd "${crate}" \
         && DATABASE_URL="postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${db}" \
-           cargo test $(locked_flag "${crate}") -- --ignored )
+           cargo test $(locked_flag "${crate}") -- --ignored --test-threads=1 )
       ;;
     deny)
       if [[ ! -f "${crate}/deny.toml" ]]; then

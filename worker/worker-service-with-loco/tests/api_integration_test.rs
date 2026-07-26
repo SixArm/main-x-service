@@ -78,11 +78,16 @@ async fn test_create_worker() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::CREATED);
-
+    let status = response.status();
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
+    assert_eq!(
+        status,
+        StatusCode::CREATED,
+        "body: {}",
+        String::from_utf8_lossy(&body)
+    );
 
     let api_response: ApiResponse<Worker> = serde_json::from_slice(&body).unwrap();
     assert!(api_response.success);

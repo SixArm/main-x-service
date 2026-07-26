@@ -316,13 +316,28 @@ engineering practice without the device framing.
    (`ip_address`, `user_agent`) so *who* acted cannot be rewritten
    while *what* they did stays intact. Read/disclosure auditing covers
    `get` / `masked` / `search` / `export`; the dedicated §164.528
-   accounting endpoint is not yet built. Person is not enrolled
-   in CI's DB suites: two pre-existing migration defects stop its
-   schema applying to a fresh database (see `ci/db-suites.txt`).
+   accounting endpoint is not yet built.
    **worker ✔ (2026-07-26, chain only)** — same port as person, whose
    `audit_log` it shares; read/disclosure auditing exists but is not
-   yet wired into its read handlers, and it is likewise not enrolled
-   in CI's DB suites (five pre-existing request-test failures).
+   yet wired into its read handlers.
+   Both are now **enrolled in CI's DB suites** (2026-07-26), so their
+   chains are verified against Postgres on every run. Getting there
+   meant fixing pre-existing defects that had nothing to do with
+   compliance: a migration in each crate that built a `gin_trgm_ops`
+   index on a `text[]` column and created `pg_trgm` after first using
+   it (on worker this halted the whole migration chain, so `audit_log.seq`
+   never existed); person's rename migration leaving `patient_id` columns
+   the entities call `person_id`; a NUL byte in person's bulk-import
+   advisory-lock key, which Postgres `text` cannot carry, so every
+   identifier-keyed import row had always failed; a Tantivy index path no
+   fixture created in both crates; and worker's loss of the
+   `#[serde(default)]` attributes person still had, which turned an
+   omitted optional field into a `422`. CI's DB stage now also drops and
+   recreates each database and applies the crate's SQL migrations before
+   running, and runs `--test-threads=1` — these suites assert on
+   whole-table state (an entire verified `audit_log`, its row count, its
+   `MIN(seq)`), so a leftover database or a concurrent writer produces
+   failures that look like chain defects but are not.
    **Step 3 is therefore complete for `case`, and partial for person
    and worker** — chains everywhere, read-auditing on person, the
    §164.528 endpoints only on care-pathway and case.

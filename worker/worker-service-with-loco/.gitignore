@@ -30,3 +30,7 @@ Cargo.lock
 
 # Test artifacts
 /test-results/
+
+# Stray index directory from an older `.env` default; the code default is
+# `./data/search_index`, which `/data/` already covers.
+/search_index/
