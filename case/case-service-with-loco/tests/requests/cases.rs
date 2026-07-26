@@ -661,3 +661,108 @@ async fn disclosure_accounting_declares_its_completeness() {
     })
     .await;
 }
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// GDPR Art. 17 erasure: the payload is destroyed, every audit row about
+// the case is redacted, and — the load-bearing property — the tamper-
+// evident hash chain still verifies afterwards.
+//
+// That last assertion is the whole reason erasure is implemented as
+// redaction rather than deletion. Deleting the audit rows would honour
+// Art. 17 and destroy §164.312(c) integrity; refusing the erasure would
+// do the reverse. Redaction destroys the content while preserving each
+// row's `hash` and `prev_hash`, so linkage still checks across it. If
+// this test ever fails, the two obligations have stopped being
+// simultaneously satisfiable and the design is broken — not the test.
+async fn erasure_destroys_content_and_the_chain_still_verifies() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request.post("/api/cases").json(&housing_case()).await;
+        let body: Value = created.json();
+        let pid = body["pid"].as_str().expect("pid").to_string();
+
+        // Read it once, so there is audit content to destroy.
+        request.get(&format!("/api/cases/{pid}")).await;
+
+        let erased = request.post(&format!("/api/cases/{pid}/erase")).await;
+        assert_eq!(erased.status_code(), 200);
+        let outcome: Value = erased.json();
+        assert_eq!(outcome["pid"].as_str().unwrap(), pid);
+        assert!(outcome["payload_erased"].as_bool().unwrap());
+        assert!(
+            outcome["irreversible"].as_bool().unwrap(),
+            "the response must not let a caller mistake this for a soft delete"
+        );
+        assert!(
+            outcome["audit_rows_redacted"].as_u64().unwrap() >= 1,
+            "the create above must have left audit content to redact: {outcome}"
+        );
+
+        // The payload is gone. The identifier deliberately is not, so a
+        // reference from another service resolves to "erased" rather than
+        // dangling.
+        let after = request.get(&format!("/api/cases/{pid}")).await;
+        if after.status_code() == 200 {
+            let case: Value = after.json();
+            assert_eq!(case["title"].as_str().unwrap(), "(erased)");
+            assert!(
+                case["case_number"].is_null(),
+                "case number survived: {case}"
+            );
+            assert!(
+                case["subjects"].as_array().is_none_or(Vec::is_empty),
+                "subjects survived: {case}"
+            );
+        }
+
+        // The chain still verifies across the redacted rows.
+        let verify = request.get("/api/cases/audit/verify?limit=1000").await;
+        assert_eq!(verify.status_code(), 200);
+        let report: Value = verify.json();
+        assert!(
+            report["verified"].as_bool().unwrap(),
+            "redaction must preserve linkage: {report}"
+        );
+        assert!(
+            report["redacted"].as_u64().unwrap() >= 1,
+            "the redacted rows must be counted, not hidden: {report}"
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Erasure is idempotent, and erasing an unknown or already-erased pid is
+// still a valid request rather than a `404`.
+//
+// A subject's right to erasure does not lapse because the record was
+// already soft-deleted — the audit content held about it is still
+// personal data. Returning `404` would also confirm to a prober which
+// pids are unknown.
+async fn erasure_is_idempotent_and_answers_for_an_unknown_pid() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request.post("/api/cases").json(&housing_case()).await;
+        let body: Value = created.json();
+        let pid = body["pid"].as_str().expect("pid").to_string();
+
+        let first = request.post(&format!("/api/cases/{pid}/erase")).await;
+        assert_eq!(first.status_code(), 200);
+
+        let second = request.post(&format!("/api/cases/{pid}/erase")).await;
+        assert_eq!(second.status_code(), 200, "re-erasing must be safe");
+        let outcome: Value = second.json();
+        assert!(outcome["irreversible"].as_bool().unwrap());
+
+        let unknown = uuid::Uuid::new_v4();
+        let response = request.post(&format!("/api/cases/{unknown}/erase")).await;
+        assert_eq!(
+            response.status_code(),
+            200,
+            "an unknown pid must not be distinguishable from a known one"
+        );
+    })
+    .await;
+}

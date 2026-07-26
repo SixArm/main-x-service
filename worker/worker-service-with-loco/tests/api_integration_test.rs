@@ -658,3 +658,327 @@ async fn test_disclosure_accounting_for_unknown_record_is_not_found() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
+
+/// GDPR Art. 17 erasure destroys the personal data across every table
+/// that holds it, and the tamper-evident hash chain still verifies.
+///
+/// The chain assertion is the load-bearing one. Erasure is implemented as
+/// redaction rather than deletion precisely so that Art. 17 and HIPAA
+/// §164.312(c) can both be satisfied: deleting the audit rows would
+/// honour one and destroy the other. If this ever fails, the two
+/// obligations have stopped being simultaneously satisfiable and the
+/// design is broken — not the test.
+///
+/// The child-table assertions matter because a worker is relational.
+/// Unlike care-pathway and case, where the whole payload is one JSONB
+/// column, a worker's identifiers, addresses, and contacts live in
+/// separate tables — so an erasure that only touched the parent row would
+/// look successful while leaving the actual personal data in place. The
+/// test therefore checks the data is gone through the API rather than
+/// trusting the reported counts.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn test_erasure_destroys_personal_data_and_the_chain_still_verifies() {
+    let app = common::create_test_router().await;
+
+    let payload = json!({
+        "name": {
+            "family": format!("Erase{}", uuid::Uuid::new_v4().simple()),
+            "given": ["Right", "ToBeForgotten"]
+        },
+        "gender": "female",
+        "birth_date": "1985-03-02",
+        "tax_id": "AB123456C",
+        "identifiers": [{
+            "identifier_type": "SSN",
+            "system": "http://hl7.org/fhir/sid/us-ssn",
+            "value": format!("SSN-{}", uuid::Uuid::new_v4())
+        }],
+        "addresses": [{
+            "line1": "12 Erasure Way",
+            "city": "Leeds",
+            "postal_code": "LS1 1AA",
+            "country": "GB"
+        }]
+    });
+    let created = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/workers")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(created.status(), StatusCode::CREATED);
+    let body = axum::body::to_bytes(created.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let created: ApiResponse<Worker> = serde_json::from_slice(&body).unwrap();
+    let worker = created.data.expect("created worker");
+    let id = worker.id;
+    assert!(
+        !worker.identifiers.is_empty(),
+        "fixture must have data to erase"
+    );
+    assert!(!worker.addresses.is_empty());
+
+    attach_and_verify_assessment(&app, id).await;
+
+    let outcome = erase_and_read_outcome(&app, id).await;
+    assert_erasure_outcome(&outcome);
+
+    assert_worker_data_destroyed(id).await;
+
+    assert_chain_verifies_with_redactions(app).await;
+}
+
+/// The chain still verifies across the redacted rows, and the redactions
+/// are counted rather than hidden.
+///
+/// Split out of the test above so each stays under the line limit, and
+/// because this is the single assertion the whole redaction design exists
+/// to make true.
+async fn assert_chain_verifies_with_redactions(app: axum::Router) {
+    let verify = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/audit/verify?limit=1000")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(verify.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(verify.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    let report = parsed.data.expect("a verification report");
+    assert!(
+        report["verified"].as_bool().unwrap(),
+        "redaction must preserve linkage: {report}"
+    );
+    assert!(
+        report["redacted"].as_u64().unwrap() >= 1,
+        "the redacted rows must be counted, not hidden: {report}"
+    );
+}
+
+/// Erasing an unknown id is a valid request, not a `404`.
+///
+/// A `404` would confirm to a prober which ids are unknown, and a
+/// subject's right to erasure does not lapse merely because no live
+/// record remains — audit content held about the id is still personal
+/// data.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn test_erasure_of_an_unknown_id_is_answered_not_refused() {
+    let app = common::create_test_router().await;
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/workers/{}/erase", uuid::Uuid::new_v4()))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    let outcome = parsed.data.expect("an erasure outcome");
+    assert!(!outcome["payload_erased"].as_bool().unwrap());
+    assert!(outcome["irreversible"].as_bool().unwrap());
+}
+
+/// Ground truth for a worker erasure, in SQL rather than through the API.
+///
+/// Erasure soft-deletes the worker, so every worker-scoped endpoint
+/// afterwards returns `404` — including the assessments list. A `404`
+/// proves only that the route is unreachable, not that the rows are gone,
+/// and "unreachable" is exactly the weaker claim erasure is not allowed
+/// to settle for. This assertion previously read the `data` key of a
+/// response that is a bare array, so it counted `null` as zero and passed
+/// over an intact psychometric profile.
+async fn assert_worker_data_destroyed(id: uuid::Uuid) {
+    let conn = common::db().await;
+
+    for (table, label) in [
+        ("worker_identifiers", "identifiers"),
+        ("worker_addresses", "addresses"),
+        ("worker_contacts", "contacts"),
+        ("worker_documents", "documents"),
+        ("worker_photos", "photos"),
+        // The one this service has and person does not, and the most
+        // sensitive: aptitude / personality / psychometric scores.
+        ("worker_assessments", "psychometric assessments"),
+    ] {
+        let sql = format!("SELECT count(*) AS n FROM {table} WHERE worker_id = $1");
+        assert_eq!(
+            common::count_rows(&conn, &sql, id).await,
+            0,
+            "{label} survived erasure"
+        );
+    }
+
+    assert_eq!(
+        common::count_rows(
+            &conn,
+            "SELECT count(*) AS n FROM worker_names WHERE worker_id = $1 AND family = '(erased)'",
+            id
+        )
+        .await,
+        1,
+        "the tombstone name must be present"
+    );
+    assert_eq!(
+        common::count_rows(
+            &conn,
+            "SELECT count(*) AS n FROM worker_names WHERE worker_id = $1",
+            id
+        )
+        .await,
+        1,
+        "a real name survived alongside the tombstone"
+    );
+
+    assert_eq!(
+        common::count_rows(
+            &conn,
+            "SELECT count(*) AS n FROM workers WHERE id = $1 \
+             AND tax_id IS NULL AND birth_date IS NULL AND worker_type IS NULL \
+             AND gender = 'unknown' AND active = FALSE AND deleted_at IS NOT NULL",
+            id
+        )
+        .await,
+        1,
+        "the workers row was not fully scrubbed and retired"
+    );
+}
+
+/// Attach a completed psychometric assessment and pin that it is listable.
+///
+/// Split out to keep the erasure test under the line limit, and separated
+/// from the erasure assertions on purpose: if the fixture never lands, the
+/// "no assessments afterwards" assertion passes vacuously, so the setup
+/// carries its own verification.
+///
+/// This is the table worker has and person does not, and the most
+/// sensitive data this service holds — an erasure that swept names and
+/// addresses but left a psychometric profile keyed to the worker id would
+/// miss what a subject is most likely asking about.
+async fn attach_and_verify_assessment(app: &axum::Router, id: uuid::Uuid) {
+    let assessment = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/workers/{id}/assessments"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&json!({
+                        "category": "psychometric",
+                        "instrument": "Erasure Inventory",
+                        "provider": "Test Publisher",
+                        "status": "completed",
+                        "administered_on": "2026-01-15",
+                        "results": [{
+                            "scale": "numerical_reasoning",
+                            "raw_score": 41.0,
+                            "max_score": 50.0,
+                            "percentile": 82.0,
+                            "narrative": "strong under time pressure"
+                        }]
+                    }))
+                    .unwrap(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = assessment.status();
+    let body = axum::body::to_bytes(assessment.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    assert!(
+        status.is_success(),
+        "the assessment fixture must be created, or the erasure assertion is vacuous: {status:?} {}",
+        String::from_utf8_lossy(&body)
+    );
+
+    // Pin that the assessment is really there before the erasure, so the
+    // "zero assessments afterwards" assertion below cannot pass vacuously
+    // because the fixture never landed or the list endpoint 404s.
+    let before = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/workers/{id}/assessments"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(before.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(before.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let listed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    // The assessments endpoint returns a bare JSON array, not the
+    // `{data: …}` envelope the other worker endpoints use. Reading
+    // `["data"]` yields `null`, which counts as zero — which is exactly
+    // how the post-erasure assertion below passed vacuously until this
+    // pre-check was added.
+    assert_eq!(
+        listed
+            .as_array()
+            .expect("the assessments endpoint returns a bare array")
+            .len(),
+        1,
+        "the assessment fixture must be listable before erasure: {listed}"
+    );
+}
+
+/// Issue the erasure and return its reported outcome.
+async fn erase_and_read_outcome(app: &axum::Router, id: uuid::Uuid) -> serde_json::Value {
+    let erased = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/workers/{id}/erase"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(erased.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(erased.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    parsed.data.expect("an erasure outcome")
+}
+
+/// What the service *claims* it did. Checked separately from
+/// [`assert_worker_data_destroyed`], which checks what actually happened —
+/// a self-reported count is not evidence.
+fn assert_erasure_outcome(outcome: &serde_json::Value) {
+    assert!(outcome["irreversible"].as_bool().unwrap());
+    assert!(outcome["payload_erased"].as_bool().unwrap());
+    assert!(
+        outcome["child_rows_deleted"].as_u64().unwrap() >= 4,
+        "at least the name, identifier, address, and assessment rows: {outcome}"
+    );
+    assert!(
+        outcome["audit_rows_redacted"].as_u64().unwrap() >= 1,
+        "the create above left audit content to redact: {outcome}"
+    );
+}

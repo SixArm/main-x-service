@@ -1594,6 +1594,100 @@ pub async fn get_recent_audit_logs(
     }
 }
 
+/// Erase a worker under GDPR Art. 17.
+///
+/// `POST /api/workers/{id}/erase` — destroys the worker's child rows
+/// (names, identifiers, addresses, contacts, documents, emergency
+/// contacts, photos, links, match scores), scrubs the parent row's own
+/// personal fields, retires the record, withdraws its cross-service
+/// links, destroys the content of every audit row about it, and appends a
+/// chained `erased` accountability row. The audit hash chain keeps
+/// verifying, because redaction preserves each row's stored hash and
+/// linkage (see [`crate::compliance::erasure`]).
+///
+/// This is **not** the soft delete. `DELETE /{id}` retires a record and
+/// keeps its data; this destroys the data and is irreversible — which is
+/// why it is a **destructive** action under ABAC
+/// ([`super::auth::DESTRUCTIVE_POST_SUFFIXES`]) and requires
+/// `access=admin`.
+///
+/// Runs in a transaction. The child deletes, the parent scrub, and the
+/// tombstone-name insert are separate statements, and a failure between
+/// them would leave a record with no names and un-scrubbed demographics —
+/// worse than either outcome on its own.
+///
+/// Idempotent, and answers for an unknown id rather than `404`: a
+/// subject's right to erasure does not lapse once the record is
+/// soft-deleted (the audit content held about it is still personal data),
+/// and a `404` would confirm to a prober which ids are unknown.
+#[utoipa::path(
+    post,
+    path = "/api/workers/{id}/erase",
+    tag = "privacy",
+    params(("id" = Uuid, Path, description = "Worker UUID")),
+    responses(
+        (status = 200, description = "Erasure outcome"),
+        (status = 403, description = "Policy denied this destructive action"),
+        (status = 500, description = "Database error")
+    )
+)]
+pub async fn erase_worker(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
+) -> impl IntoResponse {
+    use sea_orm::TransactionTrait as _;
+
+    let actor = caller.claims().map(|c| c.sub.as_str());
+    let txn = match state.db.begin().await {
+        Ok(txn) => txn,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse::<serde_json::Value>::error(
+                    "DATABASE_ERROR",
+                    format!("Failed to start the erasure transaction: {e}"),
+                )),
+            );
+        }
+    };
+    let outcome =
+        match crate::compliance::erasure::erase(&txn, id, actor, &access, &state.audit_log).await {
+            Ok(outcome) => outcome,
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ApiResponse::<serde_json::Value>::error(
+                        "DATABASE_ERROR",
+                        format!("Failed to erase: {e}"),
+                    )),
+                );
+            }
+        };
+    if let Err(e) = txn.commit().await {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<serde_json::Value>::error(
+                "DATABASE_ERROR",
+                format!("Failed to commit the erasure: {e}"),
+            )),
+        );
+    }
+
+    // The search index holds a copy of the personal data, so an erasure
+    // that leaves it indexed has not erased anything a search can reach.
+    // A failure here is logged rather than fatal: the durable data is
+    // already gone and the transaction has committed, so refusing the
+    // response would misreport a completed erasure as a failure.
+    if let Err(e) = state.search_engine.delete_worker(&id.to_string()) {
+        tracing::error!(%e, worker_id = %id, "erased the record but failed to drop it from the search index");
+    }
+
+    let value = serde_json::to_value(&outcome).unwrap_or_else(|_| serde_json::json!({}));
+    (StatusCode::OK, Json(ApiResponse::success(value)))
+}
+
 /// Accounting of disclosures for one worker (HIPAA §164.528).
 ///
 /// `GET /api/workers/{id}/audit/disclosures` — every audit row for this

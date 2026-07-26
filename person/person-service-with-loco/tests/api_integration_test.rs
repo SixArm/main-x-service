@@ -591,3 +591,229 @@ async fn test_disclosure_accounting_for_unknown_record_is_not_found() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
+
+/// GDPR Art. 17 erasure destroys the personal data across every table
+/// that holds it, and the tamper-evident hash chain still verifies.
+///
+/// The chain assertion is the load-bearing one. Erasure is implemented as
+/// redaction rather than deletion precisely so that Art. 17 and HIPAA
+/// §164.312(c) can both be satisfied: deleting the audit rows would
+/// honour one and destroy the other. If this ever fails, the two
+/// obligations have stopped being simultaneously satisfiable and the
+/// design is broken — not the test.
+///
+/// The child-table assertions matter because a person is relational.
+/// Unlike care-pathway and case, where the whole payload is one JSONB
+/// column, a person's identifiers, addresses, and contacts live in
+/// separate tables — so an erasure that only touched the parent row would
+/// look successful while leaving the actual personal data in place. The
+/// test therefore checks the data is gone through the API rather than
+/// trusting the reported counts.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn test_erasure_destroys_personal_data_and_the_chain_still_verifies() {
+    let app = common::create_test_router().await;
+
+    let payload = json!({
+        "name": {
+            "family": format!("Erase{}", uuid::Uuid::new_v4().simple()),
+            "given": ["Right", "ToBeForgotten"]
+        },
+        "gender": "female",
+        "birth_date": "1985-03-02",
+        "tax_id": "AB123456C",
+        "identifiers": [{
+            "identifier_type": "SSN",
+            "system": "http://hl7.org/fhir/sid/us-ssn",
+            "value": format!("SSN-{}", uuid::Uuid::new_v4())
+        }],
+        "addresses": [{
+            "line1": "12 Erasure Way",
+            "city": "Leeds",
+            "postal_code": "LS1 1AA",
+            "country": "GB"
+        }]
+    });
+    let created = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/persons")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(created.status(), StatusCode::CREATED);
+    let body = axum::body::to_bytes(created.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let created: ApiResponse<Person> = serde_json::from_slice(&body).unwrap();
+    let person = created.data.expect("created person");
+    let id = person.id;
+    assert!(
+        !person.identifiers.is_empty(),
+        "fixture must have data to erase"
+    );
+    assert!(!person.addresses.is_empty());
+
+    let erased = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/persons/{id}/erase"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(erased.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(erased.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    let outcome = parsed.data.expect("an erasure outcome");
+    assert!(outcome["irreversible"].as_bool().unwrap());
+    assert!(outcome["payload_erased"].as_bool().unwrap());
+    assert!(
+        outcome["child_rows_deleted"].as_u64().unwrap() >= 3,
+        "at least the name, identifier, and address rows: {outcome}"
+    );
+    assert!(
+        outcome["audit_rows_redacted"].as_u64().unwrap() >= 1,
+        "the create above left audit content to redact: {outcome}"
+    );
+
+    assert_person_data_destroyed(id).await;
+
+    assert_chain_verifies_with_redactions(app).await;
+}
+
+/// The chain still verifies across the redacted rows, and the redactions
+/// are counted rather than hidden.
+///
+/// Split out of the test above so each stays under the line limit, and
+/// because this is the single assertion the whole redaction design exists
+/// to make true.
+async fn assert_chain_verifies_with_redactions(app: axum::Router) {
+    let verify = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/audit/verify?limit=1000")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(verify.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(verify.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    let report = parsed.data.expect("a verification report");
+    assert!(
+        report["verified"].as_bool().unwrap(),
+        "redaction must preserve linkage: {report}"
+    );
+    assert!(
+        report["redacted"].as_u64().unwrap() >= 1,
+        "the redacted rows must be counted, not hidden: {report}"
+    );
+}
+
+/// Erasing an unknown id is a valid request, not a `404`.
+///
+/// A `404` would confirm to a prober which ids are unknown, and a
+/// subject's right to erasure does not lapse merely because no live
+/// record remains — audit content held about the id is still personal
+/// data.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn test_erasure_of_an_unknown_id_is_answered_not_refused() {
+    let app = common::create_test_router().await;
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/persons/{}/erase", uuid::Uuid::new_v4()))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    let outcome = parsed.data.expect("an erasure outcome");
+    assert!(!outcome["payload_erased"].as_bool().unwrap());
+    assert!(outcome["irreversible"].as_bool().unwrap());
+}
+
+/// Ground truth for a person erasure, in SQL rather than through the API.
+///
+/// Erasure soft-deletes the record, so a subsequent `GET` may return
+/// `404` — and an assertion guarded by "if the read succeeded" would then
+/// pass without checking anything at all. A `404` proves the record is
+/// unreachable, not that the data is gone, and "unreachable" is exactly
+/// the weaker claim erasure is not allowed to settle for.
+async fn assert_person_data_destroyed(id: uuid::Uuid) {
+    let conn = common::db().await;
+
+    for (table, label) in [
+        ("person_identifiers", "identifiers"),
+        ("person_addresses", "addresses"),
+        ("person_contacts", "contacts"),
+        ("person_documents", "documents"),
+        ("person_photos", "photos"),
+    ] {
+        let sql = format!("SELECT count(*) AS n FROM {table} WHERE person_id = $1");
+        assert_eq!(
+            common::count_rows(&conn, &sql, id).await,
+            0,
+            "{label} survived erasure"
+        );
+    }
+
+    // Exactly one name row remains, and it is the tombstone: read paths
+    // assume a person has at least one name, so leaving none would make an
+    // erased record a landmine rather than a clean degradation.
+    assert_eq!(
+        common::count_rows(
+            &conn,
+            "SELECT count(*) AS n FROM person_names WHERE person_id = $1 AND family = '(erased)'",
+            id
+        )
+        .await,
+        1,
+        "the tombstone name must be present"
+    );
+    assert_eq!(
+        common::count_rows(
+            &conn,
+            "SELECT count(*) AS n FROM person_names WHERE person_id = $1",
+            id
+        )
+        .await,
+        1,
+        "a real name survived alongside the tombstone"
+    );
+
+    // The parent row itself is scrubbed and retired.
+    assert_eq!(
+        common::count_rows(
+            &conn,
+            "SELECT count(*) AS n FROM persons WHERE id = $1 \
+             AND tax_id IS NULL AND birth_date IS NULL AND gender = 'unknown' \
+             AND active = FALSE AND deleted_at IS NOT NULL",
+            id
+        )
+        .await,
+        1,
+        "the persons row was not fully scrubbed and retired"
+    );
+}

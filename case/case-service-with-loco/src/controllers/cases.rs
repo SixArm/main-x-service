@@ -695,6 +695,58 @@ async fn entity_disclosures(
     }))
 }
 
+/// Erase a case under GDPR Art. 17.
+///
+/// `POST /api/cases/{pid}/erase` — replaces the payload with a tombstone,
+/// retires the record, withdraws its cross-service links, destroys the
+/// content of every audit row about it, and appends a chained `erased`
+/// accountability row. The audit hash chain keeps verifying, because
+/// redaction preserves each row's stored hash and linkage (see
+/// [`crate::compliance::erasure`]).
+///
+/// This is **not** the soft delete. `DELETE /{pid}` retires a record and
+/// keeps its data; this destroys the data and is irreversible — which is
+/// why it is a **destructive** action under ABAC
+/// ([`crate::auth::DESTRUCTIVE_POST_SUFFIXES`]) and requires
+/// `access=admin`.
+///
+/// The link withdrawal is what makes this meaningful for a case rather
+/// than merely correct. A `subject_of` edge asserts that a named person
+/// is the subject of a benefits, legal, or investigative proceeding
+/// (`agents/share/cross-service-linking.md` §10). Tombstoning the payload
+/// while leaving that edge standing would erase the details and keep the
+/// accusation — the opposite of what the subject asked for.
+///
+/// Idempotent: erasing an already-erased or already-deleted `pid` still
+/// sweeps any audit content and links held about it, because the
+/// subject's right does not lapse when the record is soft-deleted.
+///
+/// # Errors
+///
+/// `400` when `pid` is not a valid UUID; otherwise DB errors.
+#[debug_handler]
+async fn erase(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
+) -> Result<Response> {
+    let Ok(uuid) = uuid::Uuid::parse_str(&pid) else {
+        return bad_request("invalid pid");
+    };
+    let outcome = match CaseModel::find_by_pid(&ctx.db, &pid).await {
+        Ok(model) => {
+            crate::compliance::erasure::erase(&ctx.db, model, caller.actor(), &access).await?
+        }
+        // No live record: still sweep the audit content held about it.
+        Err(_) => {
+            crate::compliance::erasure::erase_audit_only(&ctx.db, uuid, caller.actor(), &access)
+                .await?
+        }
+    };
+    format::json(outcome)
+}
+
 /// Query string for the chain-verification endpoint.
 #[derive(Debug, serde::Deserialize)]
 struct VerifyParams {
@@ -751,6 +803,7 @@ pub fn routes() -> Routes {
         .add("/{pid}", delete(remove))
         .add("/{pid}/audit", get(entity_audit))
         .add("/{pid}/audit/disclosures", get(entity_disclosures))
+        .add("/{pid}/erase", post(erase))
 }
 
 #[cfg(test)]

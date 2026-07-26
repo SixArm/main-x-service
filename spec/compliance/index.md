@@ -343,9 +343,22 @@ engineering practice without the device framing.
    whole-table state (an entire verified `audit_log`, its row count, its
    `MIN(seq)`), so a leftover database or a concurrent writer produces
    failures that look like chain defects but are not.
-   **Step 3 is therefore complete for `case`, and partial for person
-   and worker** — chains everywhere, read-auditing on person, the
-   §164.528 endpoints only on care-pathway and case.
+   **Step 3 is now complete for all three.** As of 2026-07-26 case,
+   person, and worker each carry the chain, read/disclosure auditing,
+   `/audit/verify`, the §164.528 accounting endpoint, and **GDPR Art. 17
+   erasure by redaction** — the audit trail's content is destroyed while
+   each row's `hash` and `prev_hash` survive, so the chain keeps
+   verifying and Art. 17 and §164.312(c) are satisfied together rather
+   than traded off. Two entity-specific extensions were needed beyond
+   the care-pathway reference: **case** also withdraws its cross-service
+   links, because a surviving `subject_of` edge would erase the details
+   of a proceeding while preserving the accusation; and **person and
+   worker**, being relational rather than single-JSONB, delete their
+   child rows and scrub the parent (worker including
+   `worker_assessments`, the psychometric results that are the most
+   sensitive data it holds) inside one transaction, writing back a
+   single tombstone name so an erased record degrades cleanly instead of
+   breaking every read path that assumes a name exists.
 > **Open finding (2026-07-26) — trigger-written audit rows are outside
 > the chain, in both person and worker.** Migration `2024122800000005`
 > in each crate installs `AFTER INSERT OR UPDATE OR DELETE` triggers

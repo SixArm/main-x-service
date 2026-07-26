@@ -116,6 +116,59 @@ comparison would not. (A third spelling exists in the database —
 the triggers write `"patient"` — which is the separate open finding
 above.)
 
+**GDPR Art. 17 erasure (delivered 2026-07-26).**
+`POST /api/persons/{{id}}/erase` destroys the record's personal data
+and appends a chained `erased` accountability row. It is a **destructive**
+action under ABAC (`DESTRUCTIVE_POST_SUFFIXES`), so it requires
+`access=admin` — and it is **not** the soft delete: `DELETE /{{id}}`
+retires a record and keeps its data, this destroys the data and is
+irreversible. The response says `irreversible: true` so a caller cannot
+confuse the two.
+
+The collision this resolves is real: honouring Art. 17 by deleting audit
+rows would destroy the §164.312(c) integrity the chain exists to provide,
+and refusing the erasure to protect the chain would breach Art. 17.
+**Redaction** satisfies both — each audit row's snapshot is destroyed and
+`redacted_at` stamped while its `hash` and `prev_hash` are left intact, so
+verification still checks linkage across it and the chain as a whole keeps
+verifying. What survives is the *fact* that a record existed and was
+erased, by whom and when: the controller's own accountability record under
+the Art. 17(3)(b) carve-out, holding nothing about the subject.
+
+Erasing an unknown or already-erased id is answered, not refused. A
+subject's right does not lapse once the record is soft-deleted — the audit
+content held about it is still personal data — and a `404` would confirm
+to a prober which ids are unknown.
+
+**How this differs from the care-pathway reference.** care-pathway and
+case store their whole payload as one JSONB column, so erasure there is a
+single `UPDATE` replacing it with a tombstone. A person is
+**relational** — names, identifiers, addresses, contacts, documents,
+emergency contacts (and their telecom rows), photos, links, and match scores each live
+in their own table, and the parent row itself carries `gender`,
+`birth_date`, `tax_id`, `deceased_datetime`, and `marital_status`. Tombstoning one column would leave the
+actual personal data untouched in ten others. So the child rows are
+**deleted** outright and the parent row's own personal fields
+**scrubbed**; deletion is right for the children because nothing hashes or
+links them, so their absence breaks no integrity property, while a
+retained-but-blanked row would still leak how many addresses or
+identifiers a subject had. One tombstone name row is written back, because
+the read paths assume a person has at least one name and a record with
+none would be a landmine rather than a clean degradation. The whole
+sequence runs in one transaction: a failure between the child deletes and
+the parent scrub would leave a record with no names and un-scrubbed
+demographics — worse than either outcome alone.
+
+The test asserts the destruction **in SQL, not through the API**. Erasure
+soft-deletes the record, so a later `GET` returns `404`, and an assertion
+guarded by "if the read succeeded" would pass without checking anything.
+A `404` proves the record is unreachable, not that the data is gone.
+
+A DB-gated test pins the load-bearing property: after an erasure the
+chain still verifies and the redactions are *counted*, not hidden. If it
+ever fails, the two obligations have stopped being simultaneously
+satisfiable and the design is broken, not the test.
+
 **Still open.** The §164.528 *accounting endpoint* itself (`GET
 /api/persons/{id}/audit/disclosures`), GDPR Art. 17 erasure by redaction,
 and row-level record integrity. The rows are being recorded and are

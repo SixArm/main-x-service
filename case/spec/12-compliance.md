@@ -87,6 +87,48 @@ on person itself — and harder than on any other sibling, given the
 | **ONC / HTI certification (US)** — 45 CFR Part 170 §170.315(g)(10) | **Weak.** Case maps to `Task` — a best-effort mapping with no US Core profile ([`agents/share/fhir.md`](../../agents/share/fhir.md) §3). There is no certification target here. | The conformance *machinery* only: a declared `meta.profile`, structural validation, **terminology validation** of `status` / `intent` / `priority` against their bound value sets, and `$validate`. Bulk Data `$export` is available but, on this entity, is a **mass disclosure of personal data** and must inherit the §8 masking and audit rules of [`bulk-import-export.md`](../../agents/share/bulk-import-export.md) — plus the `subject` reference concealment. |
 | **IEC 62304 / SaMD** (with ISO 14971) | Not a device. The engagement is **supply-chain and configuration evidence**, plus one real harm: a false merge attaches one person's case history to another — a consequential error in benefits, immigration, or criminal-matter contexts. | A **SOUP register + CycloneDX SBOM**; **machine-checked requirement→test traceability**, notably over the deterministic short-circuit rules and the record-level ABAC / masking-obligation paths, where a silent regression is a disclosure; and **signed, reproducible builds**. |
 
+### 12.4b GDPR Art. 17 erasure (delivered 2026-07-26)
+
+`POST /api/cases/{pid}/erase` destroys the case's personal data and
+appends a chained `erased` accountability row. It is a **destructive**
+action under ABAC ([`crate::auth::DESTRUCTIVE_POST_SUFFIXES`]), so it
+requires `access=admin` — and it is **not** the soft delete: `DELETE
+/{pid}` retires a record and keeps its data, this destroys the data and is
+irreversible. The response says `irreversible: true` so a caller cannot
+confuse the two.
+
+The collision this resolves is real: honouring Art. 17 by deleting audit
+rows would destroy the §164.312(c) integrity the chain exists to provide,
+and refusing the erasure to protect the chain would breach Art. 17.
+**Redaction** satisfies both — each audit row's snapshot is destroyed and
+`redacted_at` stamped while its `hash` and `prev_hash` are left intact, so
+verification still checks linkage across it and the chain as a whole keeps
+verifying. What survives is the *fact* that a case existed and was erased,
+by whom and when: the controller's own accountability record under the
+Art. 17(3)(b) carve-out, holding nothing about the subject.
+
+**The cross-service links are withdrawn too**, which is what makes this
+meaningful for a case rather than merely correct. A `subject_of` edge
+asserts that a named person is the subject of a benefits, legal, or
+investigative proceeding — the family's highest-governance link
+([`agents/share/cross-service-linking.md`](../../agents/share/cross-service-linking.md)
+§10). Tombstoning the payload while leaving that edge standing would erase
+the details and keep the accusation, the opposite of what the subject
+asked for. The links are **soft**-deleted rather than dropped: the link
+aggregator reconciles against this table, and a row that vanishes without
+trace is indistinguishable from one that was never written, which would
+let a dropped event resurrect the edge.
+
+Erasing an unknown or already-erased pid is answered, not refused. A
+subject's right does not lapse once the record is soft-deleted — the audit
+content held about it is still personal data — and a `404` would confirm
+to a prober which pids are unknown.
+
+DB-gated tests pin the load-bearing property: after an erasure the chain
+still verifies and the redactions are *counted*, not hidden. If that ever
+fails, the two obligations have stopped being simultaneously satisfiable
+and the design is broken, not the test.
+
 ### 12.5 Honest limits
 
 - **Masking and GDPR export are still not built** (§12.3), and that gap
@@ -101,8 +143,13 @@ on person itself — and harder than on any other sibling, given the
   masking profile, the elevated-authorisation gate, and the per-export
   audit that [`bulk-import-export.md`](../../agents/share/bulk-import-export.md)
   §8 requires. Do not ship it before those.
-- **Every extended control is unimplemented in this service today.** The
-  reference implementation is the
+- **The audit half of the extended controls is implemented; the rest is
+  not.** Delivered: the tamper-evident chain, read/disclosure auditing,
+  `/audit/verify`, the §164.528 accounting, and (2026-07-26) Art. 17
+  erasure by redaction including link withdrawal (§12.4b). Still absent:
+  the GDPR residency and lawful-basis declarations, FHIR profile and
+  terminology validation, and the SOUP/SBOM evidence bundle. The
+  reference implementation remains the
   [care-pathway service](../../care-pathway/care-pathway-service-with-loco/);
   case is step 3 of the rollout
   ([`spec/compliance` §8.5](../../spec/compliance/index.md)).

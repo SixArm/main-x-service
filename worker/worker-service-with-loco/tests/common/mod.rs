@@ -81,3 +81,37 @@ pub fn unique_worker_name(suffix: &str) -> String {
     let timestamp = chrono::Utc::now().timestamp_micros();
     format!("TestWorker{suffix}_{timestamp}")
 }
+
+/// A direct database connection, for assertions that must not go through
+/// the API.
+///
+/// GDPR Art. 17 erasure soft-deletes the worker, so every worker-scoped
+/// endpoint afterwards returns `404` — including the assessments list. A
+/// `404` proves only that the route is unreachable, not that the rows are
+/// gone, and "the data is unreachable" is exactly the weaker claim
+/// erasure is not allowed to settle for. Ground truth needs SQL.
+pub async fn db() -> sea_orm::DatabaseConnection {
+    let config = Config::from_env().expect("Failed to load test config");
+    create_connection(&config.database)
+        .await
+        .expect("Failed to create database connection")
+}
+
+/// Count rows from a `SELECT count(*) AS n … WHERE <col> = $1` query.
+///
+/// Lives here rather than nested inside a test so it is defined before
+/// use (clippy's `items_after_statements`) and is shared by every
+/// ground-truth assertion.
+pub async fn count_rows(conn: &sea_orm::DatabaseConnection, sql: &str, id: uuid::Uuid) -> i64 {
+    use sea_orm::ConnectionTrait as _;
+    conn.query_one(sea_orm::Statement::from_sql_and_values(
+        sea_orm::DatabaseBackend::Postgres,
+        sql,
+        [id.into()],
+    ))
+    .await
+    .expect("count query")
+    .expect("one row")
+    .try_get::<i64>("", "n")
+    .expect("n")
+}

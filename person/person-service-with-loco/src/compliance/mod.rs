@@ -34,6 +34,9 @@ pub mod audit_chain;
 /// Read/disclosure auditing: purpose-of-use capture and access records.
 pub mod disclosure;
 
+/// GDPR Art. 17 erasure by redaction (see the module docs).
+pub mod erasure;
+
 use std::sync::OnceLock;
 
 /// Whether read-auditing is on, from `PERSON_AUDIT_READS` (read once and

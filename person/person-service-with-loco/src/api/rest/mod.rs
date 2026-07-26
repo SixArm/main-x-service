@@ -177,6 +177,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/persons/{id}/masked", get(handlers::get_person_masked))
         // Audit
         .route("/persons/{id}/audit", get(handlers::get_person_audit_logs))
+        .route("/persons/{id}/erase", post(handlers::erase_person))
         .route(
             "/persons/{id}/audit/disclosures",
             get(handlers::get_person_disclosures),
@@ -277,6 +278,7 @@ pub fn persons_routes() -> loco_rs::controller::Routes {
         .add("/persons/{id}/export", get(handlers::export_person_data))
         .add("/persons/{id}/masked", get(handlers::get_person_masked))
         .add("/persons/{id}/audit", get(handlers::get_person_audit_logs))
+        .add("/persons/{id}/erase", post(handlers::erase_person))
         .add(
             "/persons/{id}/audit/disclosures",
             get(handlers::get_person_disclosures),

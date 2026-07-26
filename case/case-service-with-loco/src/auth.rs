@@ -94,7 +94,7 @@ pub const ENTITY: &str = "case";
 /// (dedup scan and bulk import are §13 work), so the guard is already
 /// correct when they land. A POST whose path ends with one of these
 /// derives [`Action::Destructive`] instead of [`Action::Write`].
-pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 3] = ["/merge", "/deduplicate", "/import"];
+pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 4] = ["/merge", "/deduplicate", "/import", "/erase"];
 
 /// Default issuer expected in tokens (`iss`).
 const DEFAULT_ISSUER: &str = "authentication-service";

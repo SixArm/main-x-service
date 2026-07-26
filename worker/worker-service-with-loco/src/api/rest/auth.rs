@@ -69,7 +69,7 @@ pub const ENTITY: &str = "worker";
 /// deduplicate today, bulk import when the bulk-import feature lands.
 /// A POST whose path ends with one of these derives
 /// [`Action::Destructive`] instead of [`Action::Write`].
-pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 3] = ["/merge", "/deduplicate", "/import"];
+pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 4] = ["/merge", "/deduplicate", "/import", "/erase"];
 
 /// Exact-match paths that stay public even when blanket enforcement is
 /// on: loco's default health probes (`/_health`, `/_ping`), this crate's

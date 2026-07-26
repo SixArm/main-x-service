@@ -14,7 +14,7 @@ use serde_json::Value as JsonValue;
 use uuid::Uuid;
 
 use super::models::audit_log;
-use sea_orm::ConnectionTrait as _;
+use sea_orm::ConnectionTrait;
 
 use crate::Result;
 use crate::compliance::audit_chain;
@@ -209,6 +209,90 @@ impl AuditLogRepository {
         .await
     }
 
+    /// Redact every audit row about one entity: destroy the value
+    /// snapshots and stamp `redacted_at`, **keeping `hash` and
+    /// `prev_hash`**. Returns how many rows were redacted.
+    ///
+    /// Keeping the digests is the whole design. Deleting the rows would
+    /// honour GDPR Art. 17 and destroy HIPAA §164.312(c) integrity;
+    /// refusing the erasure would do the reverse. Redaction destroys the
+    /// content while leaving each row's stored hash and linkage in place,
+    /// so [`audit_chain::verify`] still checks across it and the chain as
+    /// a whole keeps verifying. `redacted_at` is what tells a reader that
+    /// the missing content was erased on purpose rather than lost.
+    ///
+    /// Already-redacted rows are skipped, so re-running an erasure does
+    /// not restamp them with a later time and misreport when the data
+    /// actually went.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the update fails.
+    pub async fn redact_for_entity<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        entity_id: Uuid,
+    ) -> Result<u64> {
+        let now = audit_chain::trunc_micros(time::OffsetDateTime::now_utc());
+        let result = audit_log::Entity::update_many()
+            .col_expr(
+                audit_log::Column::OldValues,
+                sea_orm::sea_query::Expr::value(sea_orm::Value::Json(None)),
+            )
+            .col_expr(
+                audit_log::Column::NewValues,
+                sea_orm::sea_query::Expr::value(sea_orm::Value::Json(None)),
+            )
+            .col_expr(
+                audit_log::Column::RedactedAt,
+                sea_orm::sea_query::Expr::value(now),
+            )
+            .filter(audit_log::Column::EntityId.eq(entity_id))
+            .filter(audit_log::Column::RedactedAt.is_null())
+            .exec(conn)
+            .await?;
+        Ok(result.rows_affected)
+    }
+
+    /// Append the chained `erased` accountability row for a GDPR Art. 17
+    /// erasure.
+    ///
+    /// Deliberately carries no value snapshot: it records *that* a record
+    /// was erased, by whom, and when — the controller's own accountability
+    /// record under the Art. 17(3)(b) legal-obligation carve-out — and
+    /// nothing about the data subject. It is therefore never itself
+    /// redacted.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the insert fails.
+    pub async fn log_erasure<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        entity_id: Uuid,
+        actor: Option<&str>,
+        context: JsonValue,
+        disclosure: bool,
+    ) -> Result<()> {
+        let audit_actor = AuditActor {
+            user_id: actor,
+            ip_address: None,
+            user_agent: None,
+        };
+        self.log_chained_on(
+            conn,
+            crate::compliance::erasure::ACTION_ERASED,
+            "Worker",
+            entity_id,
+            None,
+            None,
+            &audit_actor,
+            Some(context),
+            disclosure,
+        )
+        .await
+    }
+
     /// The chained insert both write paths share.
     ///
     /// Every row binds its own content and its predecessor's hash, so the
@@ -226,15 +310,49 @@ impl AuditLogRepository {
         context: Option<JsonValue>,
         disclosure: bool,
     ) -> Result<()> {
+        self.log_chained_on(
+            &self.db,
+            action,
+            entity_type,
+            entity_id,
+            old_values,
+            new_values,
+            actor,
+            context,
+            disclosure,
+        )
+        .await
+    }
+
+    /// The connection-generic chained insert.
+    ///
+    /// Split out from [`Self::log_chained`] so an audit row can be written
+    /// **inside a caller's transaction** — GDPR Art. 17 erasure needs the
+    /// redaction sweep and its `erased` accountability row to commit
+    /// together with the data destruction, and a row written on
+    /// `self.db` would land outside that transaction and survive a
+    /// rollback that undid the erasure it claims to record.
+    #[allow(clippy::too_many_arguments)]
+    async fn log_chained_on<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        action: &str,
+        entity_type: &str,
+        entity_id: Uuid,
+        old_values: Option<JsonValue>,
+        new_values: Option<JsonValue>,
+        actor: &AuditActor<'_>,
+        context: Option<JsonValue>,
+        disclosure: bool,
+    ) -> Result<()> {
         // Serialise the read-head/append pair so two concurrent writers
         // cannot claim the same predecessor and fork the chain.
-        if self.db.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
-            self.db
-                .execute(sea_orm::Statement::from_string(
-                    sea_orm::DatabaseBackend::Postgres,
-                    format!("SELECT pg_advisory_xact_lock({CHAIN_LOCK_KEY})"),
-                ))
-                .await?;
+        if conn.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
+            conn.execute(sea_orm::Statement::from_string(
+                sea_orm::DatabaseBackend::Postgres,
+                format!("SELECT pg_advisory_xact_lock({CHAIN_LOCK_KEY})"),
+            ))
+            .await?;
         }
         let prev_hash = self.chain_head().await?;
 
@@ -278,7 +396,7 @@ impl AuditLogRepository {
             seq: sea_orm::ActiveValue::NotSet,
         };
 
-        new_audit.insert(&self.db).await?;
+        new_audit.insert(conn).await?;
 
         Ok(())
     }
