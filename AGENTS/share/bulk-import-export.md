@@ -245,8 +245,36 @@ adds one section + a §13 task declaring only what differs:
 
 ## 12. Open questions
 
-- **Artifact store** — S3-compatible in deployment, local fs in dev; config
-  shape (mirror the event-bus/auth env-var pattern). Confirm the dev default.
+- ~~**Artifact store**~~ — RESOLVED (2026-07-26), implemented in
+  care-pathway (`src/bulk/store.rs`) as the reference. `ArtifactStore` is
+  an **async** trait with two backends selected by
+  `<ENTITY>_BULK_ARTIFACT_BACKEND` (`local`, the default, or `s3`):
+  - **local** — writes under `<ENTITY>_BULK_ARTIFACT_DIR` (system temp dir
+    when unset), returns `file://` references confined to that base
+    (SEC-B4), and reports `presigned_get` as `None` because a `file://`
+    path is not fetchable by a remote client.
+  - **s3** — any S3-compatible store (AWS, `MinIO`, Ceph RGW, R2) via
+    `<ENTITY>_BULK_S3_{BUCKET,ENDPOINT,REGION,FORCE_PATH_STYLE}`, with
+    `presigned_get` issuing the short-lived download URL §3 requires
+    (TTL clamped to one hour). Credentials come from the standard AWS
+    chain, not bespoke variables, so existing secret management applies
+    and no long-lived key is minted for this service alone. Path-style
+    addressing defaults **on** because the common self-hosted targets
+    require it and virtual-hosted style against them fails with a DNS
+    error that reads like a network fault.
+
+  Three decisions worth not re-litigating. The trait is **async**: an
+  object store is inherently async, and bridging it under a sync
+  signature blocks a Tokio worker on every artifact write — a stalled
+  runtime under load, not an error any test would surface. The SDK is
+  **optional behind a cargo feature**, so the default dependency tree is
+  unchanged for deployments using local storage. And the SDK is used
+  **instead of hand-rolled SigV4**: signing is security-relevant code
+  that cannot be verified without a live endpoint or the published AWS
+  vectors, and unverified signing code that looks finished is the worse
+  risk. Asking for `s3` in a binary built without the feature is an
+  **error, not a fallback** — silently writing clinical export artifacts
+  to an ephemeral container disk would lose data and appear to work.
 - **Parquet import** — export-only in v1, or both? (Lean: export-only;
   import is roadmap.)
 - **File-size ceiling** — max upload before requiring chunked / presigned

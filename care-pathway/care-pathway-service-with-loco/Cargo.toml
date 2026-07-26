@@ -50,10 +50,36 @@ care-pathway-matcher = { path = "../care-pathway-matcher-rust-crate" }
 # key-set fetch (`CARE_PATHWAY_PASETO_KEYS_URL`; see src/auth.rs).
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
 
+# S3-compatible artifact storage for bulk jobs (optional).
+#
+# The maintained AWS SDK rather than hand-rolled SigV4 signing: signing is
+# security-relevant code, and there is no way to verify a hand-rolled
+# implementation in this repository's test environment without a live
+# endpoint. Optional so the default dependency tree — and the default
+# build time — is unchanged for deployments using the local backend.
+aws-config = { version = "1", optional = true, default-features = false, features = [
+  "behavior-version-latest",
+  "rt-tokio",
+  "rustls",
+] }
+aws-sdk-s3 = { version = "1", optional = true, default-features = false, features = [
+  "behavior-version-latest",
+  "rt-tokio",
+  "rustls",
+  "sigv4a",
+] }
+aws-credential-types = { version = "1", optional = true }
+
 [[bin]]
 name = "care-pathway-service"
 path = "src/bin/main.rs"
 required-features = []
+
+[features]
+# S3-compatible artifact storage. Off by default: the local-filesystem
+# backend covers dev and test, and the SDK is a large dependency tree no
+# deployment should pay for unless it uses it.
+s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-credential-types"]
 
 [dev-dependencies]
 # Temp dirs for the artifact-store tests (SEC-B4 confinement).

@@ -26,7 +26,6 @@ use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::bulk::store::{ArtifactStore, LocalFsArtifactStore};
 use crate::compliance::bulk;
 use crate::fhir::to_fhir_plan_definition;
 use crate::models::bulk_jobs::Model as JobModel;
@@ -93,9 +92,20 @@ impl BackgroundWorker<BulkExportArgs> for BulkExportWorker {
             .collect();
         let (ndjson, count, truncated) = bulk::to_ndjson(&resources);
 
-        let store = LocalFsArtifactStore::from_env();
+        // The configured backend (local filesystem, or an S3-compatible
+        // object store under the `s3` feature). A configuration error is
+        // recorded on the job rather than propagated: a client polling
+        // must get a definite answer, not a job stuck in `running`.
+        let store = match crate::bulk::store::from_env().await {
+            Ok(store) => store,
+            Err(error) => {
+                tracing::error!(job_id = %args.job_id, %error, "no usable artifact store");
+                job.fail(&self.ctx.db, &error.to_string()).await?;
+                return Ok(());
+            }
+        };
         let key = format!("exports/{}/PlanDefinition.ndjson", job.id);
-        match store.put(&key, ndjson.as_bytes()) {
+        match store.put(&key, ndjson.as_bytes()).await {
             Ok(reference) => {
                 let rows_written = i64::try_from(count).unwrap_or(i64::MAX);
                 job.complete(&self.ctx.db, &reference, rows_written).await?;

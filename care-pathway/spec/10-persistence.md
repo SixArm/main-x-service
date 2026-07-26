@@ -73,8 +73,22 @@ counts, `actor`, artifact URLs, and `expires_at` TTL), with
 `UNIQUE (entity, kind, idempotency_key)` so a retried submit maps to the
 same job. Jobs run on the loco `bg_pg` worker; artifacts (uploaded source,
 export output, error report) live in the config-driven artifact store
-(S3-compatible in deployment, local fs in dev), referenced by short-lived
-access-controlled URLs.
+(`src/bulk/store.rs`), selected by `CARE_PATHWAY_BULK_ARTIFACT_BACKEND`:
+`local` (the default — `file://` references confined to
+`CARE_PATHWAY_BULK_ARTIFACT_DIR`) or `s3` (any S3-compatible store, behind
+the optional `s3` cargo feature, issuing presigned download URLs capped at
+one hour). Requesting `s3` from a binary built without the feature is an
+error rather than a silent fall back to local disk. See
+[`agents/share/bulk-import-export.md`](../../agents/share/bulk-import-export.md)
+§12 for the full contract and the reasoning.
+
+**Honest limit.** The S3 backend's key-safety and reference-parsing rules
+are unit-tested, but a `put`/`get` round trip through a signed request
+needs a live endpoint, which CI does not have. That round trip is covered
+by an `#[ignore]`d opt-in test (`s3_round_trip_against_a_live_endpoint`)
+runnable against `MinIO`; until someone runs it against a real store, the
+S3 path is verified by the compiler and the parsing tests, not by
+end-to-end evidence.
 
 Care-pathway-specific notes:
 

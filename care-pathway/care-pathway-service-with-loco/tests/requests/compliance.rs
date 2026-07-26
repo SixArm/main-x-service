@@ -797,6 +797,7 @@ async fn export_state_is_durable_not_in_process() {
         use care_pathway_service::bulk::store::{ArtifactStore, LocalFsArtifactStore};
         let bytes = LocalFsArtifactStore::from_env()
             .get(&reference)
+            .await
             .expect("artifact is readable from the store");
         let text = String::from_utf8(bytes).expect("utf-8");
         assert_eq!(text.lines().count(), 1);

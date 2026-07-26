@@ -25,7 +25,6 @@ use loco_rs::prelude::{delete, get, post, put};
 use serde::Serialize;
 
 use crate::auth::MaybeAuthUser;
-use crate::bulk::store::{ArtifactStore, LocalFsArtifactStore};
 use crate::compliance::disclosure::{self, AccessContext};
 use crate::compliance::{bulk, smart};
 use crate::fhir::profile;
@@ -718,7 +717,20 @@ async fn export_file(
             format!("export job {id} has no output"),
         );
     };
-    match LocalFsArtifactStore::from_env().get(reference) {
+    // The configured backend, so a deployment using an object store
+    // serves its own artifacts rather than looking for them on the local
+    // disk of whichever replica happens to take the download request.
+    let store = match crate::bulk::store::from_env().await {
+        Ok(store) => store,
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
+    };
+    match store.get(reference).await {
         Ok(bytes) => Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, bulk::NDJSON_CONTENT_TYPE)
