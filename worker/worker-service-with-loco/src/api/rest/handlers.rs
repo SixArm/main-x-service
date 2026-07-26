@@ -1823,7 +1823,7 @@ pub async fn verify_record_integrity(
     State(state): State<AppState>,
     Query(params): Query<AuditLogQuery>,
 ) -> impl IntoResponse {
-    use sea_orm::ConnectionTrait as _;
+    use sea_orm::{ConnectionTrait as _, EntityTrait as _, QuerySelect as _};
 
     // Verification is O(rows) with a SHA-256 and a record assembly each,
     // so an unbounded limit is a CPU denial-of-service (SEC-M1).
@@ -1881,10 +1881,39 @@ pub async fn verify_record_integrity(
         }
     }
 
-    let report = crate::compliance::record_integrity::verify(&records);
+    let mut report = crate::compliance::record_integrity::verify(&records);
+
+    // Assessments carry their own digest (see `assessment_hash`), so they
+    // are verified alongside and folded into the same report — a caller
+    // asking "is this service's data intact?" should not have to know the
+    // answer lives in two places.
+    match crate::db::models::worker_assessments::Entity::find()
+        .limit(u64::try_from(limit).unwrap_or(500))
+        .all(&state.db)
+        .await
+    {
+        Ok(rows) => {
+            let assessments = crate::compliance::record_integrity::verify_assessments(&rows);
+            report.records += assessments.records;
+            report.intact += assessments.intact;
+            report.unhashed += assessments.unhashed;
+            report.mismatched.extend(assessments.mismatched);
+            report.verified = report.mismatched.is_empty();
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse::<serde_json::Value>::error(
+                    "DATABASE_ERROR",
+                    format!("Failed to read assessments for verification: {e}"),
+                )),
+            );
+        }
+    }
     let interpretation = if report.verified {
-        "no record in the verified window differs from its stored hash; this attests to the \
-         worker records, not to the audit trail — see /api/audit/verify for that"
+        "no record in the verified window differs from its stored hash; covers workers and \
+         their assessments, and attests to the records rather than to the audit trail — \
+         see /api/audit/verify for that"
     } else {
         "a mismatch means the record's content changed without the service rehashing it — \
          either an out-of-band SQL edit, or a write path that forgot to rehash; investigate \

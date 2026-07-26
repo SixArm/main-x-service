@@ -281,8 +281,7 @@ chain still verifies and the redactions are *counted*, not hidden. If it
 ever fails, the two obligations have stopped being simultaneously
 satisfiable and the design is broken, not the test.
 
-**Still open.** Extending the record digest to cover
-`worker_assessments` (see below). (Art. 17 erasure and row-level record
+**Still open.** Nothing from the original list. (Art. 17 erasure and row-level record
 integrity were open when this paragraph was first written; both landed on
 2026-07-26 — see the sections below.)
 
@@ -304,13 +303,36 @@ triggers worthless. `created_at` / `updated_at` are excluded because the
 ORM and the database set them and binding them would produce false
 mismatches.
 
-**Honest limit: `worker_assessments` is not covered.** Assessment rows are
-reached through their own sub-resource and are not part of the assembled
-`Worker` the API serves, so they are outside this digest. That is the most
-sensitive table in the crate, so the gap is real. Closing it means
-deciding how an assessment write rehashes its parent worker — a design
-question, not an oversight — and it is recorded here rather than silently
-skipped.
+**`worker_assessments` is covered too, by its own digest (2026-07-26).**
+This was recorded as an honest gap when the worker hash landed, and closed
+the same day. Assessment rows are the most sensitive data the crate holds
+— aptitude, personality and psychometric results with scores and score
+bands — and they sit outside `workers.content_hash` because they are not
+part of the assembled `Worker` the API serves.
+
+They carry their **own** hash rather than being folded into the worker's,
+for two reasons. An assessment is written through its own endpoints on its
+own lifecycle, so folding it in would make every assessment write load and
+rehash the whole worker — coupling a sub-resource to its parent and adding
+a read to every write. And a per-row hash names *which* assessment was
+tampered with, where a parent digest could only say "something about this
+worker changed" — a materially worse answer for the table where a changed
+score band is the entire point. `worker_id` is bound into the digest, so
+re-parenting an assessment is detected rather than invisible.
+
+The hash is stamped **after** the write rather than computed inline, which
+keeps one rule: the digest is always taken over the row as stored, so it
+cannot disagree with what a verifier reads back. The cost is a second
+`UPDATE` per write — acceptable on a low-volume sub-resource, and what
+makes the invariant hold by construction instead of by remembering to
+mirror every field. `GET /api/records/verify` folds both digests into one
+report, because a caller asking "is this service's data intact?" should
+not have to know the answer lives in two places.
+
+A DB-gated test edits a stored percentile directly in SQL and asserts the
+audit chain still verifies (it writes no audit row) while record integrity
+catches it — **verified to fail** when the assessment hashing is removed,
+where the tampered row passes through as `unhashed`.
 
 **Existing rows are not back-filled.** Computing a hash from the current
 content would assert that the current content is authentic — the very

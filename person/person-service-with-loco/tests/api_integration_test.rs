@@ -1144,6 +1144,10 @@ async fn test_out_of_band_sql_edit_to_a_child_table_is_detected() {
         flagged.contains(&id.to_string().as_str()),
         "the tampered record must be named: {report}"
     );
+
+    // Leave no deliberately-corrupted record behind: the database is
+    // shared with every other DB-gated target in this crate.
+    common::purge_record(&conn, id).await;
 }
 
 /// Create a person through the API and return its id.

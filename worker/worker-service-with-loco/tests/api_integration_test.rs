@@ -1309,6 +1309,10 @@ async fn test_out_of_band_sql_edit_to_a_child_table_is_detected() {
         flagged.contains(&id.to_string().as_str()),
         "the tampered record must be named: {report}"
     );
+
+    // Leave no deliberately-corrupted record behind: the database is
+    // shared with every other DB-gated target in this crate.
+    common::purge_record(&conn, id).await;
 }
 
 /// Create a worker through the API and return its id.
@@ -1368,4 +1372,79 @@ async fn assert_records_verify(app: &axum::Router, stage: &str) {
         report["intact"].as_u64().unwrap() >= 1,
         "{stage}: no record carries a verified hash, so this proves nothing: {report}"
     );
+}
+
+/// An out-of-band SQL edit to a **psychometric score** is detected.
+///
+/// `worker_assessments` is the most sensitive table this service holds and
+/// was, until now, the one place record integrity did not reach: it is not
+/// part of the assembled `Worker`, so `workers.content_hash` never covered
+/// it. A changed score band is exactly the edit someone would want to make
+/// and exactly the one nothing would have caught.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn test_out_of_band_edit_to_an_assessment_score_is_detected() {
+    use sea_orm::ConnectionTrait as _;
+
+    let app = common::create_test_router().await;
+    let id = create_worker(
+        &app,
+        &json!({
+            "name": {
+                "family": format!("Score{}", uuid::Uuid::new_v4().simple()),
+                "given": ["Tamper"]
+            },
+            "gender": "unknown"
+        }),
+    )
+    .await;
+    attach_and_verify_assessment(&app, id).await;
+    assert_records_verify(&app, "before tampering with a score").await;
+
+    // Raise the percentile directly in SQL, writing no audit row.
+    let conn = common::db().await;
+    let affected = conn
+        .execute(sea_orm::Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Postgres,
+            "UPDATE worker_assessments \
+             SET results = jsonb_set(results, '{0,percentile}', '99.0') \
+             WHERE worker_id = $1",
+            [id.into()],
+        ))
+        .await
+        .expect("tamper")
+        .rows_affected();
+    assert_eq!(affected, 1, "the fixture assessment must have been edited");
+
+    // The audit chain cannot see it — that is why this control exists.
+    let verify = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/audit/verify?limit=1000")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = axum::body::to_bytes(verify.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert!(
+        parsed.data.expect("chain report")["verified"]
+            .as_bool()
+            .unwrap(),
+        "an assessment edit writes no audit row, so the chain still verifies"
+    );
+
+    // Record integrity does see it.
+    let report = record_integrity_report(&app).await;
+    assert!(
+        !report["verified"].as_bool().unwrap(),
+        "an edited psychometric score must be detected: {report}"
+    );
+
+    // Leave no deliberately-corrupted record behind.
+    common::purge_record(&conn, id).await;
 }

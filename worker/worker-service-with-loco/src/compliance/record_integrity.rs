@@ -241,6 +241,90 @@ pub fn verify(rows: &[(Worker, Option<String>, Option<i64>)]) -> RecordIntegrity
     report
 }
 
+/// Hash-format version for an assessment row, distinct from the worker's
+/// so the two digests can never be confused for one another.
+pub const ASSESSMENT_HASH_VERSION: &str = "wa-r1";
+
+/// Compute an assessment row's content hash as lowercase hex.
+///
+/// Assessments carry their **own** hash rather than folding into the
+/// worker's, for two reasons. An assessment is written through its own
+/// endpoints on its own lifecycle, so folding it in would make every
+/// assessment write load and rehash the whole worker — coupling a
+/// sub-resource to its parent, and adding a read to every write. And a
+/// per-row hash names *which* assessment was tampered with, where a parent
+/// digest could only say "something about this worker changed" — a
+/// materially worse answer for the table where a changed score band is the
+/// whole point.
+///
+/// `worker_id` is bound, so moving an assessment to a different worker is
+/// detected rather than being invisible re-parenting.
+///
+/// As elsewhere, `created_at` / `updated_at` are excluded: the ORM and the
+/// database set them, so binding them would produce false mismatches.
+#[must_use]
+pub fn assessment_hash(row: &crate::db::models::worker_assessments::Model) -> String {
+    let mut hasher = Sha256::new();
+    let mut field = |value: &str| {
+        hasher.update(value.as_bytes());
+        hasher.update([SEP as u8]);
+    };
+    field(ASSESSMENT_HASH_VERSION);
+    field(&row.id.to_string());
+    field(&row.worker_id.to_string());
+    field(&row.category);
+    field(&row.instrument);
+    field(row.provider.as_deref().unwrap_or_default());
+    field(&row.status);
+    field(
+        &row.administered_on
+            .map_or_else(String::new, |d| d.to_string()),
+    );
+    field(&row.expires_on.map_or_else(String::new, |d| d.to_string()));
+    field(row.administered_by.as_deref().unwrap_or_default());
+    field(row.notes.as_deref().unwrap_or_default());
+    // The scores themselves — the reason this table is worth protecting.
+    field(&serde_json::to_string(&row.results).unwrap_or_default());
+    field(&row.deleted_at.map_or_else(String::new, |d| {
+        (d.unix_timestamp_nanos() / 1_000).to_string()
+    }));
+
+    let mut out = String::with_capacity(64);
+    for byte in hasher.finalize() {
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
+}
+
+/// Verify a set of assessment rows by recomputing each content hash.
+#[must_use]
+pub fn verify_assessments(
+    rows: &[crate::db::models::worker_assessments::Model],
+) -> RecordIntegrityReport {
+    let mut report = RecordIntegrityReport {
+        records: rows.len(),
+        intact: 0,
+        unhashed: 0,
+        mismatched: Vec::new(),
+        verified: true,
+    };
+    for row in rows {
+        let Some(stored) = row.content_hash.as_deref() else {
+            report.unhashed += 1;
+            continue;
+        };
+        if stored == assessment_hash(row) {
+            report.intact += 1;
+        } else {
+            report.mismatched.push(RecordMismatch {
+                id: row.id.to_string(),
+            });
+        }
+    }
+    report.verified = report.mismatched.is_empty();
+    report
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

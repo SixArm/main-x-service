@@ -102,6 +102,10 @@ fn from_domain(a: &Assessment) -> Result<row::ActiveModel> {
         created_at: ActiveValue::set(ts_to_offset(a.created_at)),
         updated_at: ActiveValue::set(ts_to_offset(a.updated_at)),
         deleted_at: ActiveValue::set(None),
+        // Set below, once the row exists in its final form: the digest
+        // covers the stored row, and building it from the domain value
+        // twice would risk the two drifting.
+        content_hash: ActiveValue::set(None),
     })
 }
 
@@ -116,7 +120,35 @@ fn from_domain(a: &Assessment) -> Result<row::ActiveModel> {
 /// [`crate::Error::Internal`] when the results cannot be serialized.
 pub async fn insert<C: ConnectionTrait>(db: &C, assessment: &Assessment) -> Result<row::Model> {
     let stored = from_domain(assessment)?.insert(db).await?;
-    Ok(stored)
+    stamp_hash(db, stored).await
+}
+
+/// Recompute and store a row's content hash, returning the stored row.
+///
+/// Applied after every write. Assessments are the crate's most sensitive
+/// table — aptitude, personality and psychometric results — and are
+/// outside `workers.content_hash`, which covers only the assembled
+/// `Worker`. Without this they would be the one place an out-of-band SQL
+/// edit went undetected.
+///
+/// Stamping *after* the write, rather than computing the digest inline,
+/// keeps one rule: the hash is always taken over the row as stored, so it
+/// cannot disagree with what a verifier later reads back. The cost is a
+/// second UPDATE per write, which is acceptable on a low-volume
+/// sub-resource and is what makes the invariant hold by construction
+/// rather than by remembering to mirror every field.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] when the update fails.
+async fn stamp_hash<C: ConnectionTrait>(db: &C, stored: row::Model) -> Result<row::Model> {
+    let hash = crate::compliance::record_integrity::assessment_hash(&stored);
+    if stored.content_hash.as_deref() == Some(hash.as_str()) {
+        return Ok(stored);
+    }
+    let mut active: row::ActiveModel = stored.into();
+    active.content_hash = ActiveValue::set(Some(hash));
+    Ok(active.update(db).await?)
 }
 
 /// One worker's **live** assessments, most recently administered first
@@ -243,7 +275,7 @@ pub async fn update<C: ConnectionTrait>(
     }
     active.updated_at = ActiveValue::set(OffsetDateTime::now_utc());
     let updated = active.update(db).await?;
-    Ok(updated)
+    stamp_hash(db, updated).await
 }
 
 /// Soft-delete (withdraw) an assessment: stamp `deleted_at = now()`.
@@ -257,7 +289,9 @@ pub async fn soft_delete<C: ConnectionTrait>(db: &C, stored: row::Model) -> Resu
     active.deleted_at = ActiveValue::set(Some(OffsetDateTime::now_utc()));
     active.updated_at = ActiveValue::set(OffsetDateTime::now_utc());
     let updated = active.update(db).await?;
-    Ok(updated)
+    // A withdrawal changes `deleted_at`, which the digest binds, so it
+    // rehashes like any other write.
+    stamp_hash(db, updated).await
 }
 
 #[cfg(test)]
@@ -283,6 +317,8 @@ mod tests {
             created_at: ts_to_offset(assessment.created_at),
             updated_at: ts_to_offset(assessment.updated_at),
             deleted_at: None,
+            // As a freshly inserted row, before `stamp_hash` runs.
+            content_hash: None,
         }
     }
 

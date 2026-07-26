@@ -85,3 +85,31 @@ pub async fn count_rows(conn: &sea_orm::DatabaseConnection, sql: &str, id: uuid:
     .try_get::<i64>("", "n")
     .expect("n")
 }
+
+/// Hard-delete a record and everything hanging off it.
+///
+/// Used by the tamper tests, which deliberately corrupt a record to prove
+/// detection works and must not leave that corruption behind. The database
+/// is shared by every DB-gated target in the crate, so a tampered row left
+/// in place surfaces later as a failure in an unrelated test — which is
+/// exactly what happened before this existed, and reads as a product
+/// defect rather than test residue.
+///
+/// A hard delete, not the API's soft delete: the point is to remove the
+/// evidence, and a soft-deleted row still carries its mismatched hash.
+pub async fn purge_record(conn: &sea_orm::DatabaseConnection, id: uuid::Uuid) {
+    use sea_orm::ConnectionTrait as _;
+    for sql in [
+        // Deleting the parent cascades to the child tables that declare
+        // a foreign key; any table that does not is listed above.
+        "DELETE FROM persons WHERE id = $1",
+    ] {
+        conn.execute(sea_orm::Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Postgres,
+            sql,
+            [id.into()],
+        ))
+        .await
+        .expect("purge test record");
+    }
+}

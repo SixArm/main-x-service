@@ -1759,6 +1759,12 @@ pub mod worker_assessments {
         pub updated_at: TimeDateTimeWithTimeZone,
         /// Soft-delete timestamp; `None` while live.
         pub deleted_at: Option<TimeDateTimeWithTimeZone>,
+        /// SHA-256 over this assessment row
+        /// (`crate::compliance::record_integrity`). `None` on rows written
+        /// before the column existed; never back-filled, because a
+        /// back-fill would certify whatever the current content happens to
+        /// be — the claim the hash exists to test.
+        pub content_hash: Option<String>,
     }
 
     /// `SeaORM` relations for the assessment entity (none defined — the
