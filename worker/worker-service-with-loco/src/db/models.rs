@@ -819,6 +819,22 @@ pub mod audit_log {
         pub ip_address: Option<String>,
         /// Originating user agent.
         pub user_agent: Option<String>,
+        /// Monotonic append order. The primary key is an app-assigned
+        /// UUID, which gives no insertion order, and a hash chain needs a
+        /// total order — so a `BIGSERIAL` supplies it.
+        pub seq: i64,
+        /// Hash of the preceding chain row; `None` for the genesis row and
+        /// for rows written before the chain existed.
+        pub prev_hash: Option<String>,
+        /// This row's content hash — the link every successor binds to.
+        pub hash: Option<String>,
+        /// Request/processing context (purpose-of-use, disclosure recipient).
+        pub context: Option<serde_json::Value>,
+        /// Whether this access was an outward **disclosure** rather than an
+        /// internal access — the HIPAA §164.528 accounting distinction.
+        pub disclosure: bool,
+        /// When the row's content was destroyed under GDPR Art. 17.
+        pub redacted_at: Option<TimeDateTimeWithTimeZone>,
     }
 
     /// Foreign-key relations for this entity (empty when it has none).

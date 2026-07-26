@@ -66,6 +66,10 @@
 pub mod api;
 /// Loco application hooks (boot, routes, migrations).
 pub mod app;
+/// Regulatory-compliance controls: the tamper-evident audit chain and
+/// read/disclosure auditing, adopted from the care-pathway reference
+/// implementation (`spec/compliance` §8.5 step 3).
+pub mod compliance;
 /// Configuration structs and environment loading.
 pub mod config;
 /// PostgreSQL persistence: SeaORM entities, repositories, audit log.

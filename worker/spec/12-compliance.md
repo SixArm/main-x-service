@@ -57,6 +57,42 @@ fixtures only ([matcher §20](../worker-matcher-rust-crate/spec/20-security-priv
 The service MUST preserve this when bridging — worker data passed to
 the matcher never gains a new egress path.
 
+### 12.4b Tamper-evident audit history (delivered 2026-07-26)
+
+The audit chain from [`spec/compliance` §8.5](../../spec/compliance/index.md)
+step 3, ported from the care-pathway reference implementation via person
+(worker's `audit_log` is identically shaped). Migration
+`m20260726_000001_audit_chain` adds `seq` / `prev_hash` / `hash` /
+`context` / `disclosure` / `redacted_at`; every write goes through one
+chained insert under `pg_advisory_xact_lock` (HIPAA §164.312(c)).
+
+**Why this matters more here than the table shape suggests.** §12.3
+already names the hazard: a merge error can attach one professional's
+**disciplinary history** to another, and credential status has
+public-safety consequences. An audit trail naming practitioners is the
+evidence a disciplinary or licensure process would rely on — so its
+integrity is not a filing detail. The digest binds request provenance
+(`user_id`, `ip_address`, `user_agent`) alongside the old/new value pair,
+so *who* acted cannot be rewritten while *what* they did stays intact.
+
+Order comes from a new `seq BIGSERIAL` rather than the primary key, which
+is an application-assigned UUID and carries no insertion order.
+
+**Still open.** Read/disclosure auditing exists in
+`src/compliance/disclosure.rs` and the repository's `log_access`, but is
+**not yet wired into worker's read handlers**, so the §164.528 accounting
+is not yet answerable — only mutations are recorded. The chain
+verification endpoint, GDPR Art. 17 erasure by redaction, and row-level
+record integrity also remain.
+
+**Known blocker.** Worker's DB-gated request suite has five pre-existing
+failures unrelated to this work (`tests/api_integration_test.rs` gets
+`422` where it expects `201`, and the harness needs `./data/search_index`
+to exist), so the crate is not enrolled in CI's DB suites
+([`ci/db-suites.txt`](../../ci/db-suites.txt)). The chain's own pins
+(`db::audit::chain_tests::*`) verify against Postgres regardless, because
+`audit_log` has no foreign keys to the worker tables.
+
 ### 12.5 Extended frameworks
 
 Four frameworks impose obligations beyond §12.1. Regime detail:

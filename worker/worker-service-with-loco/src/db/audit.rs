@@ -14,7 +14,13 @@ use serde_json::Value as JsonValue;
 use uuid::Uuid;
 
 use super::models::audit_log;
+use sea_orm::ConnectionTrait as _;
+
 use crate::Result;
+use crate::compliance::audit_chain;
+
+/// Postgres advisory-lock key serialising chain appends.
+const CHAIN_LOCK_KEY: i64 = 0x6D78_695F_776B_7272; // "mxi_wkrr"
 
 /// Actor metadata recorded alongside an audit entry, borrowed for the duration
 /// of the write. Groups the user/IP/user-agent triple so the `log_*` helpers
@@ -157,11 +163,104 @@ impl AuditLogRepository {
         new_values: Option<JsonValue>,
         actor: &AuditActor<'_>,
     ) -> Result<()> {
-        // Build the row: server-assigned UUID + server clock; the JSON
-        // snapshots and actor metadata pass through verbatim.
+        self.log_chained(
+            action,
+            entity_type,
+            entity_id,
+            old_values,
+            new_values,
+            actor,
+            None,
+            false,
+        )
+        .await
+    }
+
+    /// Record one **read/disclosure** access (HIPAA §164.312(b),
+    /// §164.528), carrying the caller's declared purpose-of-use context
+    /// and whether the access was an outward disclosure.
+    ///
+    /// Separate from the mutation path because the two differ in what
+    /// they mean, not just in their arguments: a mutation records a
+    /// change, an access records that data was *seen*. Only the latter
+    /// can be a disclosure.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the audit row insert fails.
+    pub async fn log_access(
+        &self,
+        entity_type: &str,
+        entity_id: Uuid,
+        action: &str,
+        actor: &AuditActor<'_>,
+        access: &crate::compliance::disclosure::AccessContext,
+    ) -> Result<()> {
+        self.log_chained(
+            action,
+            entity_type,
+            entity_id,
+            None,
+            None,
+            actor,
+            Some(access.to_json()),
+            access.is_disclosure(),
+        )
+        .await
+    }
+
+    /// The chained insert both write paths share.
+    ///
+    /// Every row binds its own content and its predecessor's hash, so the
+    /// trail can prove it was not rewritten (HIPAA §164.312(c)); see
+    /// [`crate::compliance::audit_chain`].
+    #[allow(clippy::too_many_arguments)]
+    async fn log_chained(
+        &self,
+        action: &str,
+        entity_type: &str,
+        entity_id: Uuid,
+        old_values: Option<JsonValue>,
+        new_values: Option<JsonValue>,
+        actor: &AuditActor<'_>,
+        context: Option<JsonValue>,
+        disclosure: bool,
+    ) -> Result<()> {
+        // Serialise the read-head/append pair so two concurrent writers
+        // cannot claim the same predecessor and fork the chain.
+        if self.db.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
+            self.db
+                .execute(sea_orm::Statement::from_string(
+                    sea_orm::DatabaseBackend::Postgres,
+                    format!("SELECT pg_advisory_xact_lock({CHAIN_LOCK_KEY})"),
+                ))
+                .await?;
+        }
+        let prev_hash = self.chain_head().await?;
+
+        let id = Uuid::new_v4();
+        // Truncated to microseconds so the value hashed here is the value
+        // Postgres returns (see `compliance::audit_chain`).
+        let timestamp = audit_chain::trunc_micros(time::OffsetDateTime::now_utc());
+        let hash = audit_chain::row_hash(&audit_chain::ChainInput {
+            prev_hash: prev_hash.as_deref(),
+            id,
+            timestamp_micros: audit_chain::micros(timestamp),
+            user_id: actor.user_id,
+            action,
+            entity_type,
+            entity_id,
+            old_values: old_values.as_ref(),
+            new_values: new_values.as_ref(),
+            ip_address: actor.ip_address,
+            user_agent: actor.user_agent,
+            context: context.as_ref(),
+            disclosure,
+        });
+
         let new_audit = audit_log::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            timestamp: Set(time::OffsetDateTime::now_utc()),
+            id: Set(id),
+            timestamp: Set(timestamp),
             user_id: Set(actor.user_id.map(String::from)),
             action: Set(action.to_string()),
             entity_type: Set(entity_type.to_string()),
@@ -170,11 +269,57 @@ impl AuditLogRepository {
             new_values: Set(new_values),
             ip_address: Set(actor.ip_address.map(String::from)),
             user_agent: Set(actor.user_agent.map(String::from)),
+            prev_hash: Set(prev_hash),
+            hash: Set(Some(hash)),
+            context: Set(context),
+            disclosure: Set(disclosure),
+            redacted_at: Set(None),
+            // `seq` is a BIGSERIAL: let Postgres assign the append order.
+            seq: sea_orm::ActiveValue::NotSet,
         };
 
         new_audit.insert(&self.db).await?;
 
         Ok(())
+    }
+
+    /// The current chain head: the most recent row's `hash`, or `None`
+    /// when the trail is empty (or its last row predates the chain).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the query fails.
+    pub async fn chain_head(&self) -> Result<Option<String>> {
+        let last = audit_log::Entity::find()
+            .order_by_desc(audit_log::Column::Seq)
+            .one(&self.db)
+            .await?;
+        Ok(last.and_then(|row| row.hash))
+    }
+
+    /// The newest `limit` rows in **ascending `seq` order** — the shape
+    /// [`audit_chain::verify`] expects.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the query fails.
+    pub async fn chain_tail(&self, limit: u64) -> Result<Vec<audit_log::Model>> {
+        let mut rows = audit_log::Entity::find()
+            .order_by_desc(audit_log::Column::Seq)
+            .limit(limit)
+            .all(&self.db)
+            .await?;
+        rows.reverse();
+        Ok(rows)
+    }
+
+    /// Verify the newest `limit` rows of the chain.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the query fails.
+    pub async fn verify_chain(&self, limit: u64) -> Result<audit_chain::ChainReport> {
+        Ok(audit_chain::verify(&self.chain_tail(limit).await?))
     }
 
     /// Returns up to `limit` audit entries for one entity, newest first.
@@ -237,5 +382,230 @@ impl AuditLogRepository {
             .await?;
 
         Ok(logs)
+    }
+}
+
+/// Database-backed pins for the tamper-evident audit chain
+/// ([`crate::compliance::audit_chain`]).
+///
+/// These need a migrated `PostgreSQL` via `DATABASE_URL` and are
+/// `#[ignore]`d, matching this crate's other DB tests. They exist because
+/// the chain's riskiest property cannot be checked without a database: a
+/// digest computed in Rust before an `INSERT` must still match after
+/// Postgres has stored the snapshots as `jsonb` (which reorders object
+/// keys) and returned `timestamp` as a `timestamptz`.
+///
+/// They touch only `audit_log`, deliberately — it has no foreign keys to
+/// the worker tables, so these pins stay green independently of the rest
+/// of the schema.
+#[cfg(test)]
+mod chain_tests {
+    use super::AuditLogRepository;
+    use crate::compliance::audit_chain;
+    use crate::db::audit::AuditActor;
+    use sea_orm::{ConnectionTrait, Statement};
+    use serial_test::serial;
+    use uuid::Uuid;
+
+    async fn connect() -> sea_orm::DatabaseConnection {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        sea_orm::Database::connect(&url)
+            .await
+            .expect("connect to DATABASE_URL")
+    }
+
+    /// Remove every audit row, so a run starts from an empty chain.
+    async fn clear(db: &sea_orm::DatabaseConnection) {
+        db.execute(Statement::from_string(
+            sea_orm::DatabaseBackend::Postgres,
+            "DELETE FROM audit_log".to_string(),
+        ))
+        .await
+        .expect("clear audit_log");
+    }
+
+    fn ctx() -> AuditActor<'static> {
+        AuditActor {
+            user_id: Some("alice"),
+            ip_address: Some("203.0.113.7"),
+            user_agent: Some("curl/8"),
+        }
+    }
+
+    /// **The load-bearing pin.** Rows written through the repository
+    /// verify after a full Postgres round-trip — `jsonb` key reordering
+    /// and `timestamptz` conversion included.
+    #[tokio::test]
+    #[serial]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn chain_survives_a_jsonb_round_trip() {
+        let db = connect().await;
+        clear(&db).await;
+        let repo = AuditLogRepository::new(db.clone());
+        let entity = Uuid::new_v4();
+
+        // Deliberately key-disordered payloads: Postgres will reorder them.
+        repo.log_create(
+            "worker",
+            entity,
+            serde_json::json!({ "z_last": 1, "a_first": 2, "nested": { "y": 1, "x": 2 } }),
+            &ctx(),
+        )
+        .await
+        .expect("log create");
+        repo.log_update(
+            "worker",
+            entity,
+            serde_json::json!({ "a_first": 2 }),
+            serde_json::json!({ "a_first": 3, "z_last": 1 }),
+            &ctx(),
+        )
+        .await
+        .expect("log update");
+        repo.log_delete(
+            "worker",
+            entity,
+            serde_json::json!({ "a_first": 3 }),
+            &ctx(),
+        )
+        .await
+        .expect("log delete");
+
+        let report = repo.verify_chain(1000).await.expect("verify");
+        assert!(report.verified, "chain must verify: {:?}", report.breaks);
+        assert_eq!(report.rows, 3);
+        assert_eq!(report.intact, 3);
+        assert_eq!(report.unchained, 0, "every write must be chained");
+        assert!(report.head.is_some());
+    }
+
+    /// Rewriting a row with raw SQL is reported as a `content` break — the
+    /// property the chain exists to provide.
+    #[tokio::test]
+    #[serial]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn tampering_with_a_row_breaks_verification() {
+        let db = connect().await;
+        clear(&db).await;
+        let repo = AuditLogRepository::new(db.clone());
+        let entity = Uuid::new_v4();
+        repo.log_create(
+            "worker",
+            entity,
+            serde_json::json!({ "family_name": "Smith" }),
+            &ctx(),
+        )
+        .await
+        .expect("log create");
+        assert!(repo.verify_chain(1000).await.expect("verify").verified);
+
+        db.execute(Statement::from_string(
+            sea_orm::DatabaseBackend::Postgres,
+            r#"UPDATE audit_log
+               SET new_values = jsonb_set(new_values, '{family_name}', '"Tampered"')
+               WHERE new_values IS NOT NULL"#
+                .to_string(),
+        ))
+        .await
+        .expect("tamper");
+
+        let report = repo.verify_chain(1000).await.expect("verify");
+        assert!(!report.verified, "an edited row must break verification");
+        assert!(report.breaks.iter().any(|b| b.kind == "content"));
+    }
+
+    /// Deleting a row breaks its successor's linkage — the property an
+    /// append-only convention alone cannot provide, and the reason the
+    /// chain binds a predecessor at all.
+    #[tokio::test]
+    #[serial]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn deleting_a_row_breaks_linkage() {
+        let db = connect().await;
+        clear(&db).await;
+        let repo = AuditLogRepository::new(db.clone());
+        let entity = Uuid::new_v4();
+        for i in 0..3 {
+            repo.log_create("worker", entity, serde_json::json!({ "n": i }), &ctx())
+                .await
+                .expect("log create");
+        }
+        assert!(repo.verify_chain(1000).await.expect("verify").verified);
+
+        db.execute(Statement::from_string(
+            sea_orm::DatabaseBackend::Postgres,
+            "DELETE FROM audit_log WHERE seq = (SELECT MIN(seq) + 1 FROM audit_log)".to_string(),
+        ))
+        .await
+        .expect("delete a row");
+
+        let report = repo.verify_chain(1000).await.expect("verify");
+        assert!(!report.verified, "a deleted row must break the chain");
+        assert!(report.breaks.iter().any(|b| b.kind == "linkage"));
+    }
+
+    /// A read/disclosure access is chained like any other row, and
+    /// carries the caller's declared purpose and recipient in `context`
+    /// with `disclosure` set — the §164.528 distinction, persisted.
+    #[tokio::test]
+    #[serial]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn read_access_is_chained_and_flagged_as_a_disclosure() {
+        use crate::compliance::disclosure::AccessContext;
+
+        let db = connect().await;
+        clear(&db).await;
+        let repo = AuditLogRepository::new(db.clone());
+        let entity = Uuid::new_v4();
+
+        // A research read released to a named recipient: a disclosure.
+        let outward = AccessContext::from_parts(Some("research"), Some("University"), None);
+        repo.log_access("worker", entity, "read", &ctx(), &outward)
+            .await
+            .expect("log access");
+        // A care read with no recipient: an internal access.
+        let internal = AccessContext::from_parts(Some("care"), None, None);
+        repo.log_access("worker", entity, "read", &ctx(), &internal)
+            .await
+            .expect("log access");
+
+        let rows = repo.chain_tail(10).await.expect("tail");
+        assert_eq!(rows.len(), 2);
+        assert!(rows[0].disclosure, "a named recipient is a disclosure");
+        assert!(!rows[1].disclosure, "a care read is an internal access");
+        assert_eq!(
+            rows[0]
+                .context
+                .as_ref()
+                .and_then(|c| c["purpose_of_use"].as_str()),
+            Some("research"),
+            "the declared purpose is persisted"
+        );
+
+        // Chaining the access rows must not weaken the chain.
+        let report = repo.verify_chain(1000).await.expect("verify");
+        assert!(report.verified, "{:?}", report.breaks);
+        assert_eq!(report.intact, 2);
+    }
+
+    /// The stored timestamp round-trips at exactly microsecond precision,
+    /// which is what makes the digest reproducible.
+    #[tokio::test]
+    #[serial]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn stored_timestamp_is_microsecond_exact() {
+        let db = connect().await;
+        clear(&db).await;
+        let repo = AuditLogRepository::new(db.clone());
+        repo.log_create("worker", Uuid::new_v4(), serde_json::json!({}), &ctx())
+            .await
+            .expect("log create");
+        let rows = repo.chain_tail(1).await.expect("tail");
+        let stored = rows.first().expect("one row").timestamp;
+        assert_eq!(
+            audit_chain::trunc_micros(stored),
+            stored,
+            "Postgres returned sub-microsecond precision the writer did not truncate"
+        );
     }
 }

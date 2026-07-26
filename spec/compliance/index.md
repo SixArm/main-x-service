@@ -319,7 +319,13 @@ engineering practice without the device framing.
    accounting endpoint is not yet built. Person is not enrolled
    in CI's DB suites: two pre-existing migration defects stop its
    schema applying to a fresh database (see `ci/db-suites.txt`).
-   **worker is not started.**
+   **worker ✔ (2026-07-26, chain only)** — same port as person, whose
+   `audit_log` it shares; read/disclosure auditing exists but is not
+   yet wired into its read handlers, and it is likewise not enrolled
+   in CI's DB suites (five pre-existing request-test failures).
+   **Step 3 is therefore complete for `case`, and partial for person
+   and worker** — chains everywhere, read-auditing on person, the
+   §164.528 endpoints only on care-pathway and case.
 4. **Copy the FHIR conformance machinery** to the services that already
    mount `/fhir` (organization, place, thing, person, worker, case, event).
 5. **Lift the evidence artefacts** (`compliance/`, `scripts/`) to the

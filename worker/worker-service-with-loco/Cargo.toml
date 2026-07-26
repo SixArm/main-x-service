@@ -96,7 +96,15 @@ authentication-verifier = { path = "../../authentication/authentication-verifier
 entity-ref = { path = "../../link/entity-ref-rust-crate" }
 mimalloc = "0.1.52"
 
+# SHA-256 for the tamper-evident audit hash chain (HIPAA §164.312(c)).
+# See src/compliance/audit_chain.rs.
+sha2 = "0.10"
+
 [dev-dependencies]
+# Serialises the DB-gated audit-chain tests: they each truncate
+# `audit_log`, so running them concurrently would have one test wipe
+# another's chain mid-append.
+serial_test = "3.5"
 # Testing
 assertables = "10"
 tokio-test = "0.4"
