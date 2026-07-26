@@ -15,19 +15,46 @@
 //! | Framework | Module |
 //! |---|---|
 //! | **HIPAA** — audit controls, integrity | [`audit_chain`] |
+//! | **HIPAA** — read/disclosure auditing (§164.312(b), §164.528) | [`disclosure`] |
 //!
-//! **Not yet adopted** (§8.5 steps 4–5): read/disclosure auditing across
-//! the `list` / `search` / `check-duplicates` paths, the GDPR residency
-//! and lawful-basis declarations, Art. 17 erasure by redaction, and
-//! row-level record integrity. This module ships the integrity half
-//! first; claiming the rest before the code exists would be worse than
-//! shipping it in two steps.
+//! **Not yet adopted** (§8.5 steps 4–5): the GDPR residency and
+//! lawful-basis declarations, Art. 17 erasure by redaction, and row-level
+//! record integrity. Claiming those before the code exists would be worse
+//! than shipping in steps.
 //!
 //! ## Configuration
 //!
 //! | Variable | Default | Meaning |
 //! |---|---|---|
-//! | `PERSON_AUDIT_FAIL_CLOSED` | off | Refuse a write when its audit row cannot be chained, rather than proceeding unaccounted for. |
+//! | `PERSON_AUDIT_READS` | off | Write an audit row for reads / searches / exports (HIPAA §164.312(b)). |
+//! | `PERSON_AUDIT_FAIL_CLOSED` | off | Refuse a read (`503`) when its audit row cannot be written, rather than serving data unaccounted for. |
 
 /// Tamper-evident audit history: the SHA-256 hash chain over `audit_log`.
 pub mod audit_chain;
+/// Read/disclosure auditing: purpose-of-use capture and access records.
+pub mod disclosure;
+
+use std::sync::OnceLock;
+
+/// Whether read-auditing is on, from `PERSON_AUDIT_READS` (read once and
+/// cached).
+///
+/// **Default off**, so adopting this module is behaviour-neutral. Person
+/// holds personal — often special-category — data, so a deployment
+/// serving real records should turn it on together with
+/// `PERSON_REQUIRE_AUTH`: without a verified caller the rows carry no
+/// actor and the §164.528 accounting is close to worthless.
+#[must_use]
+pub fn audit_reads() -> bool {
+    static AUDIT_READS: OnceLock<bool> = OnceLock::new();
+    *AUDIT_READS.get_or_init(|| {
+        matches!(
+            std::env::var("PERSON_AUDIT_READS")
+                .unwrap_or_default()
+                .trim()
+                .to_ascii_lowercase()
+                .as_str(),
+            "1" | "true" | "yes" | "on"
+        )
+    })
+}

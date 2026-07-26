@@ -70,11 +70,26 @@ services, so two things differ from the reference:
   `user_agent`) alongside the old/new value pair, so an attacker cannot
   rewrite *who* acted while leaving *what* they did intact.
 
-**Still open.** Read/disclosure auditing is **not** yet wired into
-person's read paths (`get` / `list` / `search` / `check-duplicates`), so
-the §164.528 accounting §12.5 calls for is not yet answerable — only
-mutations are recorded. GDPR Art. 17 erasure by redaction and row-level
-record integrity also remain.
+**Read/disclosure auditing (delivered).** `PERSON_AUDIT_READS`
+(**default off**) audits `get` / `masked` / `search` / `export`. The
+caller declares context in `X-Purpose-Of-Use` and
+`X-Disclosure-Recipient` (normalised against a closed vocabulary, never
+echoed), and it is persisted in the row's `context` with the §164.528
+`disclosure` flag. On `GET /api/persons/{id}` the row is written **after**
+the record-level authorization decision, so a denied request — which
+disclosed nothing — never enters the accounting. A **masked** read is
+still audited: §164.312(b) records activity, not just full disclosure.
+An Art. 15 **export** is always audited, whatever the caller declared,
+because it hands over the whole record. `search` is recorded against the
+nil id, since it disclosed many records rather than one.
+`PERSON_AUDIT_FAIL_CLOSED` (**default off**) decides whether a failed
+audit write refuses the read with `503` or is logged.
+
+**Still open.** The §164.528 *accounting endpoint* itself (`GET
+/api/persons/{id}/audit/disclosures`), GDPR Art. 17 erasure by redaction,
+and row-level record integrity. The rows are being recorded and are
+queryable through the existing audit endpoints; the dedicated
+disclosure-only view is not built.
 
 **Known blocker.** Person's migrations do not apply to a fresh database:
 `2024122800000005` builds a `gin_trgm_ops` index on `patient_names.given`,

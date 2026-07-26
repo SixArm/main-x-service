@@ -23,6 +23,7 @@ use authentication_verifier::Action;
 use super::auth::{MaybeAuthUser, authorize_record, person_resource_attrs, read_visibility};
 use super::state::AppState;
 use crate::api::ApiResponse;
+use crate::compliance::disclosure::{self, AccessContext};
 use crate::models::Person;
 
 /// Body returned by the health-check endpoint.
@@ -182,6 +183,7 @@ pub async fn get_person(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> impl IntoResponse {
     match state.person_repository.get_by_id(&id).await {
         Ok(Some(person)) => {
@@ -189,6 +191,23 @@ pub async fn get_person(
             // attributes; honour a `mask` obligation by masking.
             match authorize_record(&caller, Action::Read, &person_resource_attrs(&person)) {
                 Ok(obligations) => {
+                    // Audited only once authorization has allowed the
+                    // read: a denied request disclosed nothing, and
+                    // recording it would pollute the §164.528 accounting
+                    // with accesses that never happened.
+                    if disclosure::record_access(
+                        &state.audit_log,
+                        "person",
+                        id,
+                        disclosure::action::READ,
+                        caller.claims().map(|c| c.sub.as_str()),
+                        &access,
+                    )
+                    .await
+                    .is_err()
+                    {
+                        return audit_unavailable::<Person>();
+                    }
                     let body = if obligations.iter().any(|o| o == "mask") {
                         crate::privacy::mask_person(&person)
                     } else {
@@ -481,6 +500,7 @@ pub async fn search_persons(
     State(state): State<AppState>,
     Query(params): Query<SearchQuery>,
     caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> impl IntoResponse {
     // Limit to max 100 results
     let limit = params.limit.min(100);
@@ -495,6 +515,23 @@ pub async fn search_persons(
             format!("offset must not exceed {MAX_SEARCH_OFFSET}; narrow the query instead"),
         );
         return (StatusCode::BAD_REQUEST, Json(error));
+    }
+
+    // A search is a collection read: recorded against the nil id, because
+    // it disclosed many records rather than one, and attributing it to any
+    // single person would corrupt that person's §164.528 accounting.
+    if disclosure::record_access(
+        &state.audit_log,
+        "person",
+        Uuid::nil(),
+        disclosure::action::SEARCH,
+        caller.claims().map(|c| c.sub.as_str()),
+        &access,
+    )
+    .await
+    .is_err()
+    {
+        return audit_unavailable::<SearchResponse>();
     }
 
     // Perform search using search engine
@@ -1425,9 +1462,27 @@ pub async fn review_decision(
 pub async fn export_person_data(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> impl IntoResponse {
     match state.person_repository.get_by_id(&id).await {
         Ok(Some(person)) => {
+            // An Art. 15 export hands over the whole record — the single
+            // most consequential read this service serves, so it is
+            // audited whatever the caller declared.
+            if disclosure::record_access(
+                &state.audit_log,
+                "person",
+                id,
+                disclosure::action::EXPORT,
+                caller.claims().map(|c| c.sub.as_str()),
+                &access,
+            )
+            .await
+            .is_err()
+            {
+                return audit_unavailable::<serde_json::Value>();
+            }
             let export = crate::privacy::export_person_data(&person);
             (StatusCode::OK, Json(ApiResponse::success(export)))
         }
@@ -1465,9 +1520,26 @@ pub async fn export_person_data(
 pub async fn get_person_masked(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> impl IntoResponse {
     match state.person_repository.get_by_id(&id).await {
         Ok(Some(person)) => {
+            // A masked read is still a read: §164.312(b) records activity,
+            // not just full disclosure.
+            if disclosure::record_access(
+                &state.audit_log,
+                "person",
+                id,
+                disclosure::action::READ,
+                caller.claims().map(|c| c.sub.as_str()),
+                &access,
+            )
+            .await
+            .is_err()
+            {
+                return audit_unavailable::<Person>();
+            }
             let masked = crate::privacy::mask_person(&person);
             (StatusCode::OK, Json(ApiResponse::success(masked)))
         }
@@ -1597,6 +1669,22 @@ pub async fn verify_audit_chain(
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
         }
     }
+}
+
+/// A refused read-audit write, as a `503 Service Unavailable` response.
+///
+/// `503` rather than `500`: nothing is wrong with the request, and nothing
+/// was disclosed — the service is temporarily unable to account for a read
+/// of personal data, so it declines to serve one, and the status is
+/// retryable. Only reachable when `PERSON_AUDIT_FAIL_CLOSED` is on.
+fn audit_unavailable<T: serde::Serialize>() -> (StatusCode, Json<ApiResponse<T>>) {
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(ApiResponse::error(
+            "AUDIT_UNAVAILABLE",
+            "the access could not be recorded in the audit trail, so the read was refused",
+        )),
+    )
 }
 
 /// Get recent audit logs

@@ -197,6 +197,68 @@ impl AuditLogRepository {
         new_values: Option<JsonValue>,
         ctx: &AuditContext,
     ) -> Result<()> {
+        self.log_chained(
+            conn,
+            action,
+            entity_type,
+            entity_id,
+            old_values,
+            new_values,
+            ctx,
+            None,
+            false,
+        )
+        .await
+    }
+
+    /// Record one **read/disclosure** access (HIPAA §164.312(b),
+    /// §164.528), carrying the caller's declared purpose-of-use context
+    /// and whether the access was an outward disclosure.
+    ///
+    /// Separate from [`Self::log_action_on`] because the two differ in
+    /// what they mean, not just in their arguments: a mutation records a
+    /// change, an access records that data was *seen*. Only the latter
+    /// can be a disclosure.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the audit row insert fails.
+    pub async fn log_access(
+        &self,
+        entity_type: &str,
+        entity_id: Uuid,
+        action: &str,
+        ctx: &AuditContext,
+        access: &crate::compliance::disclosure::AccessContext,
+    ) -> Result<()> {
+        self.log_chained(
+            &self.db,
+            action,
+            entity_type,
+            entity_id,
+            None,
+            None,
+            ctx,
+            Some(access.to_json()),
+            access.is_disclosure(),
+        )
+        .await
+    }
+
+    /// The chained insert both write paths share.
+    #[allow(clippy::too_many_arguments)]
+    async fn log_chained<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        action: &str,
+        entity_type: &str,
+        entity_id: Uuid,
+        old_values: Option<JsonValue>,
+        new_values: Option<JsonValue>,
+        ctx: &AuditContext,
+        context: Option<JsonValue>,
+        disclosure: bool,
+    ) -> Result<()> {
         // Serialise the read-head/append pair so two concurrent writers
         // cannot claim the same predecessor and fork the chain. Held to
         // the end of the enclosing transaction, so an audit row written
@@ -229,8 +291,8 @@ impl AuditLogRepository {
             new_values: new_values.as_ref(),
             ip_address: ctx.ip_address.as_deref(),
             user_agent: ctx.user_agent.as_deref(),
-            context: None,
-            disclosure: false,
+            context: context.as_ref(),
+            disclosure,
         });
 
         let new_audit = audit_log::ActiveModel {
@@ -246,8 +308,8 @@ impl AuditLogRepository {
             user_agent: Set(ctx.user_agent.clone()),
             prev_hash: Set(prev_hash),
             hash: Set(Some(hash)),
-            context: Set(None),
-            disclosure: Set(false),
+            context: Set(context),
+            disclosure: Set(disclosure),
             redacted_at: Set(None),
             // `seq` is a BIGSERIAL: let Postgres assign the append order.
             seq: sea_orm::ActiveValue::NotSet,
@@ -572,6 +634,50 @@ mod chain_tests {
         let report = repo.verify_chain(1000).await.expect("verify");
         assert!(!report.verified, "a deleted row must break the chain");
         assert!(report.breaks.iter().any(|b| b.kind == "linkage"));
+    }
+
+    /// A read/disclosure access is chained like any other row, and
+    /// carries the caller's declared purpose and recipient in `context`
+    /// with `disclosure` set — the §164.528 distinction, persisted.
+    #[tokio::test]
+    #[serial]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn read_access_is_chained_and_flagged_as_a_disclosure() {
+        use crate::compliance::disclosure::AccessContext;
+
+        let db = connect().await;
+        clear(&db).await;
+        let repo = AuditLogRepository::new(db.clone());
+        let entity = Uuid::new_v4();
+
+        // A research read released to a named recipient: a disclosure.
+        let outward = AccessContext::from_parts(Some("research"), Some("University"), None);
+        repo.log_access("person", entity, "read", &ctx(), &outward)
+            .await
+            .expect("log access");
+        // A care read with no recipient: an internal access.
+        let internal = AccessContext::from_parts(Some("care"), None, None);
+        repo.log_access("person", entity, "read", &ctx(), &internal)
+            .await
+            .expect("log access");
+
+        let rows = repo.chain_tail(10).await.expect("tail");
+        assert_eq!(rows.len(), 2);
+        assert!(rows[0].disclosure, "a named recipient is a disclosure");
+        assert!(!rows[1].disclosure, "a care read is an internal access");
+        assert_eq!(
+            rows[0]
+                .context
+                .as_ref()
+                .and_then(|c| c["purpose_of_use"].as_str()),
+            Some("research"),
+            "the declared purpose is persisted"
+        );
+
+        // Chaining the access rows must not weaken the chain.
+        let report = repo.verify_chain(1000).await.expect("verify");
+        assert!(report.verified, "{:?}", report.breaks);
+        assert_eq!(report.intact, 2);
     }
 
     /// The stored timestamp round-trips at exactly microsecond precision,
