@@ -41,6 +41,48 @@ pub struct AuditLogRepository {
     db: DatabaseConnection,
 }
 
+/// The `entity_type` spellings that mean "worker", newest first in
+/// preference order.
+///
+/// One list, because a per-entity audit query that filters on a single
+/// spelling silently drops the rows written under another — and a silently
+/// short audit answer is worse than an error, since nothing about the
+/// response says it is incomplete.
+///
+/// - `"Worker"` — the canonical spelling. Repository mutations have always
+///   used it, and every writer uses it now.
+/// - `"worker"` — two writers used it: the read-auditing path between the
+///   audit chain landing and 2026-07-26, and the `audit_workers_changes`
+///   database trigger. A query for one spelling returned none of the
+///   other's rows, so the per-entity audit endpoint silently omitted
+///   every read, and an accounting of disclosures built on it would have
+///   looked empty while disclosures were being recorded. The trigger is
+///   dropped by `m20260726_000003_drop_audit_triggers`, but its rows
+///   remain and are still part of the record.
+///
+/// Historical rows are **not** rewritten to the canonical spelling.
+/// `entity_type` is bound into the audit chain's row digest, so an
+/// `UPDATE` normalising it would make every affected chained row fail
+/// verification — the chain would correctly report that someone had
+/// edited the audit trail, because someone had. Tolerating the spelling on
+/// read is the only option that keeps both the history and its integrity.
+pub const ENTITY_TYPE_SPELLINGS: [&str; 2] = ["Worker", "worker"];
+
+/// Expand `entity_type` to every spelling that means the same entity.
+///
+/// Only the canonical entity name expands; anything else (for example
+/// `"WorkerBulkExport"`, which the bulk pipeline audits under its own
+/// type) is returned unchanged, so this cannot silently widen an unrelated
+/// query.
+#[must_use]
+pub fn entity_type_spellings(entity_type: &str) -> Vec<&str> {
+    if entity_type == "Worker" {
+        ENTITY_TYPE_SPELLINGS.to_vec()
+    } else {
+        vec![entity_type]
+    }
+}
+
 impl AuditLogRepository {
     /// Wraps an existing database connection in an audit repository.
     #[must_use]
@@ -455,7 +497,7 @@ impl AuditLogRepository {
         limit: u64,
     ) -> Result<Vec<audit_log::Model>> {
         let logs = audit_log::Entity::find()
-            .filter(audit_log::Column::EntityType.eq(entity_type))
+            .filter(audit_log::Column::EntityType.is_in(entity_type_spellings(entity_type)))
             .filter(audit_log::Column::EntityId.eq(entity_id))
             .order_by_desc(audit_log::Column::Timestamp)
             .limit(limit)
@@ -468,16 +510,8 @@ impl AuditLogRepository {
     /// Every audit row for one entity flagged as an outward
     /// **disclosure**, newest first — the HIPAA §164.528 accounting.
     ///
-    /// Two `entity_type` spellings are accepted deliberately. Mutation
-    /// rows have always been written as `"Worker"`, while the
-    /// read-auditing path introduced with the audit chain wrote
-    /// `"worker"`. A query for one spelling silently returned none of the
-    /// other's rows, so an accounting built on it would have looked empty
-    /// while disclosures were being recorded all along. New rows use
-    /// `"Worker"` throughout; the lower-case spelling stays in the filter
-    /// so rows already written are not orphaned. The `IN` keeps the
-    /// `(entity_type, entity_id)` index usable, which a case-insensitive
-    /// comparison would not.
+    /// Accepts every spelling in [`ENTITY_TYPE_SPELLINGS`], so the
+    /// accounting cannot silently omit rows written under an older one.
     ///
     /// # Errors
     ///
@@ -488,7 +522,7 @@ impl AuditLogRepository {
         limit: u64,
     ) -> Result<Vec<audit_log::Model>> {
         let logs = audit_log::Entity::find()
-            .filter(audit_log::Column::EntityType.is_in(["Worker", "worker"]))
+            .filter(audit_log::Column::EntityType.is_in(ENTITY_TYPE_SPELLINGS))
             .filter(audit_log::Column::EntityId.eq(entity_id))
             .filter(audit_log::Column::Disclosure.eq(true))
             .order_by_desc(audit_log::Column::Timestamp)
@@ -552,6 +586,40 @@ impl AuditLogRepository {
 /// of the schema.
 #[cfg(test)]
 mod chain_tests {
+    /// The canonical name expands to every historical spelling, so a
+    /// per-entity audit query cannot silently drop rows written under an
+    /// older one.
+    #[test]
+    fn canonical_entity_type_expands_to_every_spelling() {
+        let spellings = super::entity_type_spellings("Worker");
+        assert!(spellings.contains(&"Worker"), "the canonical spelling");
+        assert_eq!(
+            spellings.len(),
+            super::ENTITY_TYPE_SPELLINGS.len(),
+            "the expansion must be the full list, not a subset"
+        );
+        // Used by both the old read-auditing path and the trigger.
+        assert!(spellings.contains(&"worker"));
+    }
+
+    /// Anything that is not the canonical entity name is returned
+    /// unchanged, so this cannot widen an unrelated query — the bulk
+    /// pipeline audits under its own `WorkerBulkExport` type.
+    #[test]
+    fn other_entity_types_are_not_widened() {
+        assert_eq!(
+            super::entity_type_spellings("WorkerBulkExport"),
+            vec!["WorkerBulkExport"]
+        );
+        assert_eq!(
+            super::entity_type_spellings("organization"),
+            vec!["organization"]
+        );
+        // Case matters: the lower-case spelling is a *legacy value*, not a
+        // second canonical name, so asking for it must not expand.
+        assert_eq!(super::entity_type_spellings("worker"), vec!["worker"]);
+    }
+
     use super::AuditLogRepository;
     use crate::compliance::audit_chain;
     use crate::db::audit::AuditActor;

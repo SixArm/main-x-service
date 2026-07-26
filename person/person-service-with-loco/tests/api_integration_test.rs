@@ -817,3 +817,168 @@ async fn assert_person_data_destroyed(id: uuid::Uuid) {
         "the persons row was not fully scrubbed and retired"
     );
 }
+
+/// After `m20260726_000003_drop_audit_triggers`, **no writer produces an
+/// unchained audit row**: a full create/update/delete cycle leaves every
+/// row carrying a chain digest.
+///
+/// This is the pin for the trigger removal. The
+/// `audit_patients_changes` / `audit_organizations_changes` triggers
+/// wrote into `audit_log` from the database, where the application's
+/// hashing and advisory lock are unreachable, so their rows landed with a
+/// NULL `hash`. Verification skipped them, which meant an inserted row
+/// with a NULL `hash` did not register as a break and a trigger row could
+/// be deleted without breaking linkage either — roughly half the trail
+/// was a log rather than evidence.
+///
+/// Asserted on a **fresh** database, which is what CI provides: rows
+/// written before the migration keep their NULL `hash` deliberately
+/// (deleting them would destroy history, and they carry no digest to
+/// invalidate), so this assertion is about writers, not about history.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn test_no_writer_produces_unchained_audit_rows() {
+    let app = common::create_test_router().await;
+
+    let payload = json!({
+        "name": {
+            "family": format!("Chained{}", uuid::Uuid::new_v4().simple()),
+            "given": ["No", "Triggers"]
+        },
+        "gender": "unknown"
+    });
+    let created = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/persons")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(created.status(), StatusCode::CREATED);
+    let body = axum::body::to_bytes(created.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let created: ApiResponse<Person> = serde_json::from_slice(&body).unwrap();
+    let id = created.data.expect("created record").id;
+
+    // A delete exercises the third trigger branch (`TG_OP = 'DELETE'`,
+    // which a soft delete reached as an UPDATE).
+    let deleted = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/persons/{id}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(deleted.status().is_success() || deleted.status() == StatusCode::NO_CONTENT);
+
+    // Ground truth: no row anywhere in the trail lacks a digest.
+    let conn = common::db().await;
+    let unchained = common::count_rows(
+        &conn,
+        "SELECT count(*) AS n FROM audit_log WHERE hash IS NULL AND $1 IS NOT NULL",
+        id,
+    )
+    .await;
+    assert_eq!(
+        unchained, 0,
+        "a writer is still appending unchained audit rows; \
+     the database triggers should have been dropped"
+    );
+
+    // And the trigger's own entity_type must be absent: nothing writes it.
+    let legacy = common::count_rows(
+        &conn,
+        "SELECT count(*) AS n FROM audit_log WHERE entity_type = 'patient' \
+     AND $1 IS NOT NULL",
+        id,
+    )
+    .await;
+    assert_eq!(legacy, 0, "the dropped trigger is still writing rows");
+}
+
+/// The per-entity audit endpoint returns the record's rows, including the
+/// **read** rows the disclosure path writes.
+///
+/// Before 2026-07-26 the two writers disagreed on `entity_type` — mutations
+/// wrote `"Person"`, read-auditing wrote `"person"` — and this endpoint
+/// filtered on one spelling, so it silently omitted every read. A short
+/// audit answer is worse than an error: nothing in the response says it is
+/// incomplete.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn test_entity_audit_covers_every_entity_type_spelling() {
+    let app = common::create_test_router().await;
+
+    let payload = json!({
+        "name": {
+            "family": format!("Spelling{}", uuid::Uuid::new_v4().simple()),
+            "given": ["Audit"]
+        },
+        "gender": "unknown"
+    });
+    let created = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/persons")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(created.status(), StatusCode::CREATED);
+    let body = axum::body::to_bytes(created.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let created: ApiResponse<Person> = serde_json::from_slice(&body).unwrap();
+    let id = created.data.expect("created record").id;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/persons/{id}/audit"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<Vec<serde_json::Value>> = serde_json::from_slice(&body).unwrap();
+    let rows = parsed.data.expect("audit rows");
+    assert!(
+        !rows.is_empty(),
+        "the create must appear in this record's audit history"
+    );
+
+    // Whatever spelling a row carries, the endpoint must have returned it:
+    // compare against the database rather than trusting the filter.
+    let conn = common::db().await;
+    let total = common::count_rows(
+        &conn,
+        "SELECT count(*) AS n FROM audit_log WHERE entity_id = $1",
+        id,
+    )
+    .await;
+    assert_eq!(
+        i64::try_from(rows.len()).expect("row count fits in i64"),
+        total,
+        "the endpoint returned {} of {total} audit rows for this record — \
+     a spelling is being filtered out",
+        rows.len()
+    );
+}

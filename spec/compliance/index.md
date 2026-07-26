@@ -359,26 +359,35 @@ engineering practice without the device framing.
    sensitive data it holds) inside one transaction, writing back a
    single tombstone name so an erased record degrades cleanly instead of
    breaking every read path that assumes a name exists.
-> **Open finding (2026-07-26) — trigger-written audit rows are outside
-> the chain, in both person and worker.** Migration `2024122800000005`
-> in each crate installs `AFTER INSERT OR UPDATE OR DELETE` triggers
-> (`audit_patients_changes` / `audit_workers_changes`, plus
-> `audit_organizations_changes`) that `INSERT INTO audit_log`
-> themselves. A trigger has neither the application's hashing nor its
-> advisory lock, so those rows carry a NULL `hash` and verification
-> skips them — 16 of 28 rows on a person run, 11 of 20 on a worker run.
-> Coverage is therefore partial, the trigger rows duplicate events the
-> application already records (without any request provenance), and
-> because verification tolerates unchained rows, an inserted row with a
-> NULL `hash` does not register as a break. The verification report
-> exposes `unchained` so the gap stays visible. Resolving it is a design
-> decision rather than a mechanical fix: the triggers do cover row-level
-> changes the application does not audit separately — a soft delete
-> reaches the trigger as an `UPDATE` while the application records a
-> `DELETE` — so dropping them loses coverage while keeping them leaves
-> the chain partial. It needs one change across both services, deciding
-> deliberately which writer is authoritative. The loco-idiomatic
-> services (care-pathway, case) have no such triggers and are unaffected.
+> **Resolved (2026-07-26) — the database audit triggers are dropped in
+> person and worker.** `m20260726_000003_drop_audit_triggers` removes
+> `audit_patients_changes` / `audit_workers_changes` and
+> `audit_organizations_changes`, which appended rows to `audit_log` from
+> the database — where the application's hashing and advisory lock are
+> unreachable — so those rows carried a NULL `hash` and verification
+> skipped them (16 of 28 rows on a person run). They went rather than
+> stayed because they were **a log, not evidence**: a tolerated unchained
+> row can be inserted without registering as a break and deleted without
+> breaking linkage, so a trigger row was as forgeable as the edit it
+> claimed to witness. They also carried **worse provenance** than the
+> application's own row (`user_id` from the row's `created_by` column
+> rather than the authenticated caller; no `ip_address` or `user_agent`),
+> **duplicated** what the repository already chains in the same
+> transaction, and were **narrower than they looked** — they existed only
+> on the parent tables, never on the child tables where most personal data
+> lives, which corrects the earlier claim here that they covered changes
+> the application did not audit separately. The genuine gap they gesture
+> at — a **raw-SQL edit to an entity row**, invisible to any
+> application-level audit — is properly served by row-level **record
+> integrity** (a per-row content hash, as in care-pathway's
+> `src/compliance/record_integrity.rs`), which remains open for person and
+> worker. Existing trigger rows are left in place: deleting them would
+> destroy history, and rewriting them would achieve nothing since they
+> carry no digest to invalidate. The verify report keeps reporting
+> `unchained` so the historical gap stays visible, and a DB-gated test
+> pins that on a fresh database a full CRUD cycle leaves **zero**
+> unchained rows — verified to fail when the triggers are restored. The
+> loco-idiomatic services (care-pathway, case) never had such triggers.
 
 > **Fixed (2026-07-26) — the `entity_type` vocabulary had split in
 > person and worker.** Mutation rows were written as `"Person"` /
@@ -392,8 +401,18 @@ engineering practice without the device framing.
 > throughout, and the queries accept both via `IN` so rows already
 > written are not orphaned — `IN` also keeps the `(entity_type,
 > entity_id)` index usable, which a case-insensitive comparison would
-> not. A third spelling (`"patient"`, written by the pre-rename trigger)
-> remains, as part of the trigger finding above.
+> not. Reads go through **one shared list** per crate
+> (`ENTITY_TYPE_SPELLINGS` / `entity_type_spellings`), applied to both
+> `get_logs_for_entity` and `disclosures_for_entity` so the two cannot
+> drift apart again, and covering the trigger spellings (`"patient"` /
+> `"worker"`) as well. Only the canonical name expands, so an unrelated
+> type such as `"PersonBulkExport"` is not silently widened. Historical
+> rows are deliberately **not** rewritten: `entity_type` is bound into the
+> chain's row digest, so an `UPDATE` normalising it would make every
+> affected chained row fail verification — the chain would correctly
+> report that someone had edited the audit trail, because someone had.
+> Tolerating the spelling on read is the only option that keeps both the
+> history and its integrity.
 
 4. **Copy the FHIR conformance machinery** to the services that already
    mount `/fhir` (organization, place, thing, person, worker, case, event).

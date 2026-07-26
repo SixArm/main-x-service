@@ -105,16 +105,73 @@ recomputes the trailing window and reports every linkage or content
 break, with an `interpretation` string stating plainly that it attests
 to the **audit trail** and not to the worker records.
 
-**Open finding — audit rows written by database triggers are outside the
-chain.** Migration `2024122800000005` installs `audit_workers_changes`
-and `audit_organizations_changes`, `AFTER INSERT OR UPDATE OR DELETE`
-triggers that `INSERT INTO audit_log` themselves. A trigger cannot
-compute the chain — it has neither the application's hashing nor its
-advisory lock — so those rows land with a NULL `hash`, and verification
-skips them. On a representative run 11 of 20 rows were unchained. Two
-consequences, both real:
+**Resolved (2026-07-26): the database audit triggers are dropped.**
+`m20260726_000003_drop_audit_triggers` removes `audit_workers_changes` and
+`audit_organizations_changes`. They appended rows to `audit_log` from the
+database, where the application's hashing and advisory lock are
+unreachable, so those rows carried a NULL `hash` and verification skipped
+them — roughly half the trail. Four reasons they went rather than stayed:
 
-1. **Coverage is partial.** Roughly half the trail is not tamper-evident,
+1. **They were a log, not evidence.** Because verification tolerates an
+   unchained row, one could be *inserted* without registering as a break,
+   and *deleted* without breaking linkage either. A trigger row was as
+   forgeable as the edit it claimed to witness.
+2. **Worse provenance than the application's own row.** The trigger set
+   `user_id` from the row's `created_by` / `updated_by` column rather than
+   the authenticated caller, and could not populate `ip_address` or
+   `user_agent` at all. The repository writes all three, and binds them
+   into the digest.
+3. **Pure duplication.** Every event a trigger caught, the repository
+   already audits — and chains — in the same transaction.
+4. **Narrower than they looked.** This corrects an earlier claim in this
+   section. The triggers existed only on the parent `workers` and
+   `organizations` tables, **not** on the child tables where most personal
+   data lives (names, identifiers, addresses, contacts, documents). They
+   never covered a change to any of those, so "they cover row-level
+   changes the application does not audit separately" was too generous.
+
+The genuine gap a trigger gestures at — detecting a **raw-SQL edit to an
+entity row**, which no application-level audit can see — is properly
+served by **row-level record integrity**: a per-row content hash, as in
+the care-pathway service's `src/compliance/record_integrity.rs`. That
+remains open for this crate (below), and an unchained trigger row was
+never a substitute for it.
+
+Rows already written by the triggers are **left in place**. Deleting them
+would destroy audit history, and rewriting their `entity_type` would
+achieve nothing since they carry no digest to invalidate. The verification
+report keeps reporting `unchained` so the historical gap stays visible
+rather than being quietly rounded away, and a DB-gated test pins that on a
+fresh database a full create/update/delete cycle now leaves **zero**
+unchained rows — verified to fail when the triggers are restored.
+
+**Resolved (2026-07-26): the `entity_type` vocabulary.** Mutations wrote
+`"Worker"` while the read-auditing path wrote `"worker"`, and the
+triggers wrote `"worker"`. Every per-entity audit query filtered on a
+single spelling, so it silently dropped the others' rows: the per-entity
+audit endpoint omitted every read, and an accounting of disclosures built
+on it would have looked empty while disclosures were being recorded. A
+short audit answer is worse than an error, because nothing in the response
+says it is incomplete.
+
+All writers now use `"Worker"`. Reads go through one shared list
+(`ENTITY_TYPE_SPELLINGS` / `entity_type_spellings`) applied to **both**
+`get_logs_for_entity` and `disclosures_for_entity`, so the two cannot
+drift apart again; only the canonical name expands, so an unrelated type
+such as `"WorkerBulkExport"` is not silently widened. The `IN` keeps the
+`(entity_type, entity_id)` index usable, which a case-insensitive
+comparison would not.
+
+Historical rows are **not** rewritten to the canonical spelling.
+`entity_type` is bound into the chain's row digest, so an `UPDATE`
+normalising it would make every affected chained row fail verification —
+the chain would correctly report that someone had edited the audit trail,
+because someone had. Tolerating the spelling on read is the only option
+that keeps both the history and its integrity. A test pins that the
+endpoint returns every row the database holds for a record, and it fails
+if the filter narrows.
+
+**Coverage is partial.** Roughly half the trail is not tamper-evident,
    and the triggers duplicate events the application already records
    with full request provenance (the trigger rows have no `user_id`,
    `ip_address`, or `user_agent`).
@@ -159,9 +216,7 @@ endpoint has been missing read rows since read-auditing landed. New rows
 use `"Worker"` throughout; the queries accept both spellings via `IN`
 so rows already written are not orphaned, and `IN` keeps the
 `(entity_type, entity_id)` index usable where a case-insensitive
-comparison would not. (A third spelling exists in the database —
-the triggers write `"worker"` — which is the separate open finding
-above.)
+comparison would not. (See the entity-type resolution above for the full spelling story.)
 
 **GDPR Art. 17 erasure (delivered 2026-07-26).**
 `POST /api/workers/{{id}}/erase` destroys the record's personal data
