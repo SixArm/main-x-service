@@ -41,3 +41,4 @@ ed25519-dalek	Mints throwaway Ed25519 keys so the token-verification path is tes
 rusty_paseto	Mints PASETO v4.public tokens in the auth unit tests.	Test-only in this crate. The production verification path lives in authentication-verifier.
 base64	Encodes test key material into the JWK-shaped key set.	Test-only. Not present in a release artefact.
 axum-test	The `TestServer` loco's testing harness hands to a request test; used by the compliance request tests.	Test-only. Not present in a release artefact.
+tempfile	Temporary directories for the artifact-store tests (SEC-B4 path-confinement pins).	Test-only. Not present in a release artefact.

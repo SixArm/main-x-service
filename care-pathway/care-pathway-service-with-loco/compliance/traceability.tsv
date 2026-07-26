@@ -47,9 +47,10 @@ ONC-CAP-1	The CapabilityStatement's declared search parameters match the support
 ONC-SMART-1	SMART discovery is emitted only when a real authorization server is configured.	smart_configuration_requires_both_endpoints,smart_oauth_extension_uri_is_the_registry_canonical,smart_discovery_is_absent_unless_configured
 ONC-SMART-2	Discovery documents stay reachable without a credential when enforcement is on.	enforce_on_allows_public_paths
 ONC-BULK-1	Bulk export output is well-formed NDJSON, one resource per line.	ndjson_is_one_document_per_line,empty_export_is_valid,bulk_export_kickoff_status_and_output
-ONC-BULK-2	A truncated export declares itself rather than presenting as a complete population.	byte_cap_truncates_and_reports,truncated_export_declares_itself_in_the_manifest,complete_export_has_no_errors
-ONC-BULK-3	The completion manifest carries the Bulk Data IG's required fields.	manifest_has_the_required_fields,bulk_export_kickoff_status_and_output
-ONC-BULK-4	Export jobs are bounded and expire, and cancelling releases the payload immediately.	registry_is_bounded,jobs_expire_after_the_ttl,cancel_releases_the_payload,jobs_round_trip_through_the_registry,bulk_export_kickoff_status_and_output
+ONC-BULK-2	A truncated export declares itself rather than presenting as a complete population.	byte_cap_truncates_and_reports,resource_cap_truncates_and_reports,unserializable_resource_is_skipped_not_fatal
+ONC-BULK-3	The completion manifest carries the Bulk Data IG's required fields.	bulk_export_kickoff_status_and_output,queued_export_reports_progress_not_a_manifest
+ONC-BULK-4	Export state is durable and bounded: it survives the process, expires, and cancelling releases the output at once.	export_state_is_durable_not_in_process,cancelling_an_export_makes_its_output_unreachable,terminal_states_are_exactly_the_finished_ones,status_tokens_are_stable
+ONC-BULK-5	Export artifacts are confined to the store base: a crafted file:// reference cannot read outside it (SEC-B4).	put_then_get_round_trips,is_safe_key_rejects_traversal_and_absolute,put_rejects_an_unsafe_key,get_refuses_a_reference_outside_the_base,get_missing_artifact_errors
 # ------------------------------------------------------- IEC 62304 / SaMD
 IEC-CLASS-1	A safety classification is declared with its rationale, defaulting conservatively.	safety_class_parses_or_falls_back_to_a,every_safety_class_has_a_rationale
 IEC-SOUP-1	The SBOM is derived from the real dependency graph and cannot drift from the binary.	lockfile_parses_into_packages,lockfile_contains_known_dependencies,field_parser_is_exact

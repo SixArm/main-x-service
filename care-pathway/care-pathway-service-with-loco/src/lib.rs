@@ -28,6 +28,8 @@ pub mod auth;
 /// read/disclosure auditing, GDPR Art. 17 erasure, the SOUP/SBOM register,
 /// FHIR Bulk Data, and the runtime posture surface. The family's reference
 /// implementation — see `agents/share/compliance-for-healthcare.md` §2.
+/// Bulk operations: durable `bulk_jobs` state and artifact storage.
+pub mod bulk;
 pub mod compliance;
 pub mod controllers;
 pub mod data;

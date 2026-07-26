@@ -19,11 +19,13 @@ use axum::{
     response::Response,
 };
 use loco_rs::app::AppContext;
+use loco_rs::bgworker::BackgroundWorker as _;
 use loco_rs::controller::Routes;
 use loco_rs::prelude::{delete, get, post, put};
 use serde::Serialize;
 
 use crate::auth::MaybeAuthUser;
+use crate::bulk::store::{ArtifactStore, LocalFsArtifactStore};
 use crate::compliance::disclosure::{self, AccessContext};
 use crate::compliance::{bulk, smart};
 use crate::fhir::profile;
@@ -31,8 +33,10 @@ use crate::fhir::resources::{FhirBundle, FhirOperationOutcome, FhirPlanDefinitio
 use crate::fhir::search::FhirPlanSearchParams;
 use crate::fhir::{from_fhir_plan_definition, status_for, to_fhir_plan_definition};
 use crate::metrics::Metrics;
+use crate::models::bulk_jobs::{self, Model as JobModel};
 use crate::models::care_pathways::Model as PathwayModel;
 use crate::streaming;
+use crate::workers::bulk_export::{BulkExportArgs, BulkExportWorker};
 
 /// Max active rows scanned per FHIR search (in-memory filter, mirroring the
 /// native `check-duplicates` scan model; beyond this, candidates are
@@ -538,8 +542,21 @@ async fn export_kickoff(
     caller: MaybeAuthUser,
     access: AccessContext,
 ) -> Response {
-    let rows = match PathwayModel::list(&ctx.db, bulk::MAX_RESOURCES as u64).await {
-        Ok(rows) => rows,
+    // Submit a durable job and return immediately. The materialisation
+    // happens on `bg_pg` (see `crate::workers::bulk_export`), so a large
+    // export neither blocks this request nor lives only in this process.
+    let job = match JobModel::submit(
+        &ctx.db,
+        "care_pathway",
+        bulk_jobs::kind::EXPORT,
+        "ndjson",
+        serde_json::json!({ "_type": "PlanDefinition", "_outputFormat": bulk::NDJSON_CONTENT_TYPE }),
+        caller.actor(),
+        None,
+    )
+    .await
+    {
+        Ok(job) => job,
         Err(e) => {
             return fhir_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -548,20 +565,10 @@ async fn export_kickoff(
             );
         }
     };
-    let resources: Vec<FhirPlanDefinition> = rows
-        .iter()
-        .filter_map(|model| {
-            let pathway = model.to_pathway().ok()?;
-            Some(to_fhir_plan_definition(
-                &pathway,
-                &model.pid.to_string(),
-                model.active,
-                Some(model.updated_at.to_rfc3339()),
-            ))
-        })
-        .collect();
-    let (ndjson, count, truncated) = bulk::to_ndjson(&resources);
-    let id = bulk::register("/fhir/$export".to_string(), ndjson, count, truncated);
+
+    // A bulk export is a mass read, audited with the caller's access
+    // context exactly as a single read is — at kickoff, because that is
+    // where the caller and their declared purpose are known.
     if disclosure::record_access(
         &ctx.db,
         uuid::Uuid::nil(),
@@ -574,11 +581,23 @@ async fn export_kickoff(
     {
         return audit_unavailable();
     }
+
+    if let Err(e) = BulkExportWorker::perform_later(&ctx, BulkExportArgs { job_id: job.id }).await {
+        // The row exists but nothing will pick it up; say so rather than
+        // leaving a job queued for ever.
+        let _ = job.fail(&ctx.db, &format!("failed to enqueue: {e}")).await;
+        return fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            format!("failed to enqueue the export: {e}"),
+        );
+    }
+
     Response::builder()
         .status(StatusCode::ACCEPTED)
         .header(
             header::CONTENT_LOCATION,
-            format!("/fhir/$export-status/{id}"),
+            format!("/fhir/$export-status/{}", job.id),
         )
         .header(header::CONTENT_TYPE, "application/fhir+json")
         .body(Body::empty())
@@ -595,22 +614,47 @@ async fn export_kickoff(
 ///
 /// `200` with the completion manifest, or `404` when the job is unknown,
 /// expired, or was cancelled.
-async fn export_status(Path(id): Path<String>) -> Response {
-    let Some(job) = uuid::Uuid::parse_str(&id).ok().and_then(bulk::get) else {
+async fn export_status(Path(id): Path<String>, State(ctx): State<AppContext>) -> Response {
+    let Some(job) = lookup_job(&ctx, &id).await else {
         return fhir_error(
             StatusCode::NOT_FOUND,
             "not-found",
             format!("export job {id} is unknown or has expired"),
         );
     };
-    if job.status == bulk::ExportStatus::Cancelled {
-        return fhir_error(
+    match job.status.as_str() {
+        bulk_jobs::status::QUEUED | bulk_jobs::status::RUNNING => {
+            // The IG's in-progress response: `202` with `X-Progress`, so a
+            // client polls rather than treating it as an error.
+            Response::builder()
+                .status(StatusCode::ACCEPTED)
+                .header("X-Progress", job.status.clone())
+                .header(header::CONTENT_TYPE, "application/fhir+json")
+                .body(Body::empty())
+                .unwrap_or_else(|_| {
+                    fhir_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "exception",
+                        "failed to build the status response",
+                    )
+                })
+        }
+        bulk_jobs::status::COMPLETED => fhir_json(StatusCode::OK, &export_manifest(&job)),
+        bulk_jobs::status::FAILED => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            job.error
+                .clone()
+                .unwrap_or_else(|| "the export failed".to_string()),
+        ),
+        // Cancelled, or anything unrecognised: gone as far as a client is
+        // concerned.
+        _ => fhir_error(
             StatusCode::NOT_FOUND,
             "not-found",
             format!("export job {id} was cancelled"),
-        );
+        ),
     }
-    fhir_json(StatusCode::OK, &job.manifest("/fhir"))
 }
 
 /// `DELETE /fhir/$export-status/{id}` — cancel an export.
@@ -618,16 +662,28 @@ async fn export_status(Path(id): Path<String>) -> Response {
 /// `202` on success (the IG's response for an accepted cancellation);
 /// `404` when the job is unknown or already expired. Cancelling releases
 /// the payload immediately rather than waiting for the TTL.
-async fn export_cancel(Path(id): Path<String>) -> Response {
-    let cancelled = uuid::Uuid::parse_str(&id).is_ok_and(bulk::cancel);
-    if cancelled {
-        fhir_response(StatusCode::ACCEPTED, Vec::new(), None)
-    } else {
-        fhir_error(
+async fn export_cancel(Path(id): Path<String>, State(ctx): State<AppContext>) -> Response {
+    let Some(job) = lookup_job(&ctx, &id).await else {
+        return fhir_error(
             StatusCode::NOT_FOUND,
             "not-found",
             format!("export job {id} is unknown or has expired"),
-        )
+        );
+    };
+    if crate::models::bulk_jobs::is_terminal(&job.status) {
+        return fhir_error(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            format!("export job {id} has already finished"),
+        );
+    }
+    match job.cancel(&ctx.db).await {
+        Ok(_) => fhir_response(StatusCode::ACCEPTED, Vec::new(), None),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        ),
     }
 }
 
@@ -635,36 +691,83 @@ async fn export_cancel(Path(id): Path<String>) -> Response {
 ///
 /// Serves `PlanDefinition.ndjson` (the resources) or `error.ndjson` (the
 /// truncation `OperationOutcome`), both as `application/fhir+ndjson`.
-async fn export_file(Path((id, file)): Path<(String, String)>) -> Response {
-    let Some(job) = uuid::Uuid::parse_str(&id).ok().and_then(bulk::get) else {
+async fn export_file(
+    Path((id, file)): Path<(String, String)>,
+    State(ctx): State<AppContext>,
+) -> Response {
+    let Some(job) = lookup_job(&ctx, &id).await else {
         return fhir_error(
             StatusCode::NOT_FOUND,
             "not-found",
             format!("export job {id} is unknown or has expired"),
         );
     };
-    let body = match file.as_str() {
-        "PlanDefinition.ndjson" => job.ndjson.clone(),
-        "error.ndjson" => job.error_ndjson(),
-        other => {
-            return fhir_error(
-                StatusCode::NOT_FOUND,
-                "not-found",
-                format!("export job {id} has no output file {other}"),
-            );
-        }
+    if file != "PlanDefinition.ndjson" {
+        return fhir_error(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            format!("export job {id} has no output file {file}"),
+        );
+    }
+    // A cancelled job drops its `result_url`, so its bytes stop being
+    // reachable immediately rather than at the retention TTL.
+    let Some(reference) = job.result_url.as_deref() else {
+        return fhir_error(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            format!("export job {id} has no output"),
+        );
     };
-    Response::builder()
-        .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, bulk::NDJSON_CONTENT_TYPE)
-        .body(Body::from(body))
-        .unwrap_or_else(|_| {
-            fhir_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "exception",
-                "failed to build the NDJSON response",
-            )
-        })
+    match LocalFsArtifactStore::from_env().get(reference) {
+        Ok(bytes) => Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, bulk::NDJSON_CONTENT_TYPE)
+            .body(Body::from(bytes))
+            .unwrap_or_else(|_| {
+                fhir_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "exception",
+                    "failed to build the NDJSON response",
+                )
+            }),
+        Err(e) => fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            e.to_string(),
+        ),
+    }
+}
+
+/// Look up a live (non-expired) export job by its path segment.
+///
+/// An unparseable id and an expired job are the same answer — `None` —
+/// because a client should not be able to tell a malformed id from one
+/// that has aged out.
+async fn lookup_job(ctx: &AppContext, id: &str) -> Option<crate::models::bulk_jobs::Model> {
+    let uuid = uuid::Uuid::parse_str(id).ok()?;
+    let job = JobModel::find_by_id(&ctx.db, uuid).await.ok()??;
+    (!job.is_expired(chrono::Utc::now())).then_some(job)
+}
+
+/// The Bulk Data completion manifest for a finished job.
+///
+/// `requiresAccessToken` reports whether this deployment actually
+/// enforces authentication rather than asserting `true`: with
+/// `CARE_PATHWAY_REQUIRE_AUTH` off the output really is reachable without
+/// a token, and claiming otherwise would mislead the client about its
+/// obligations.
+fn export_manifest(job: &crate::models::bulk_jobs::Model) -> serde_json::Value {
+    serde_json::json!({
+        "transactionTime": job.updated_at.to_rfc3339(),
+        "request": "/fhir/$export",
+        "requiresAccessToken": crate::auth::require_auth(),
+        "output": [{
+            "type": "PlanDefinition",
+            "url": format!("/fhir/$export-file/{}/PlanDefinition.ndjson", job.id),
+            "count": job.rows_processed,
+        }],
+        "error": [],
+    })
 }
 
 /// All FHIR routes, mounted under `/fhir`: the `PlanDefinition` resource

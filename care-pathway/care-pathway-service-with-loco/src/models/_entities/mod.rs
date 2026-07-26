@@ -1,6 +1,7 @@
 //! `SeaORM` Entities.
 
 pub mod audit_logs;
+pub mod bulk_jobs;
 pub mod care_pathways;
 pub mod event_outbox;
 pub mod instance_events;

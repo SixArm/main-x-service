@@ -9,7 +9,7 @@
 //! | **HIPAA** — audit controls, integrity, accounting of disclosures | [`audit_chain`] (tamper-evident history), [`disclosure`] (read-auditing) |
 //! | **GDPR / EU EHDS** — erasure vs. immutable history, residency, lawful basis | [`erasure`], [`Posture`] (this module) |
 //! | **ONC / HTI** — profile & terminology conformance, SMART, Bulk Data | [`crate::fhir::profile`], [`bulk`], [`crate::controllers::fhir`] |
-//! | **IEC 62304 / SaMD** — lifecycle, SOUP/SBOM, traceability, reproducible builds | [`soup`], `compliance/` at the crate root, `tests/traceability.rs` |
+//! | **IEC 62304 / `SaMD`** — lifecycle, SOUP/SBOM, traceability, reproducible builds | [`soup`], `compliance/` at the crate root, `tests/traceability.rs` |
 //!
 //! ## Configuration
 //!

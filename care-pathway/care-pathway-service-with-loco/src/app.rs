@@ -28,7 +28,7 @@ use crate::{
     auth, controllers,
     models::_entities::{audit_logs, care_pathways, merge_records},
     tasks,
-    workers::downloader::DownloadWorker,
+    workers::{bulk_export::BulkExportWorker, downloader::DownloadWorker},
 };
 
 /// Blanket `/api/*` auth-enforcement middleware. Reads the flag,
@@ -153,6 +153,7 @@ impl Hooks for App {
     /// Propagates queue-registration errors.
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
         queue.register(DownloadWorker::build(ctx)).await?;
+        queue.register(BulkExportWorker::build(ctx)).await?;
         Ok(())
     }
 

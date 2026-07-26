@@ -571,13 +571,17 @@ async fn capability_statement_declares_profile_and_operations() {
     .await;
 }
 
-/// The Bulk Data flow works end to end: kickoff → status manifest →
-/// NDJSON output.
+/// The Bulk Data flow works end to end: kickoff → poll → NDJSON.
+///
+/// The export is now genuinely asynchronous — kickoff enqueues a
+/// `bulk_jobs` row on `bg_pg` and returns `202` — so the test polls the
+/// status endpoint the way a real Bulk Data client does, instead of
+/// assuming the manifest is ready on the first request.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn bulk_export_kickoff_status_and_output() {
-    request::<App, _, _>(|request, _ctx| async move {
+    request::<App, _, _>(|request, ctx| async move {
         create(&request, &rich_pathway()).await;
         create(&request, &rich_pathway()).await;
 
@@ -591,8 +595,29 @@ async fn bulk_export_kickoff_status_and_output() {
             .to_string();
         assert!(location.starts_with("/fhir/$export-status/"), "{location}");
 
+        // The job is durable: it exists as a row, not just in this process.
+        let job_id = location
+            .rsplit('/')
+            .next()
+            .and_then(|s| uuid::Uuid::parse_str(s).ok())
+            .expect("job id in Content-Location");
+        let job = care_pathway_service::models::bulk_jobs::Model::find_by_id(&ctx.db, job_id)
+            .await
+            .expect("query")
+            .expect("the job row exists");
+        assert_eq!(job.kind, "export");
+        assert_eq!(job.format, "ndjson");
+
+        // `config/test.yaml` runs workers in `ForegroundBlocking` mode, so
+        // `perform_later` has already materialised the export by the time
+        // kickoff returned. In production (`BackgroundQueue`) the same
+        // call enqueues and this poll would first see `202`.
         let status = request.get(&location).await;
-        assert_eq!(status.status_code(), 200);
+        assert_eq!(
+            status.status_code(),
+            200,
+            "completed job returns a manifest"
+        );
         let manifest: Value = status.json();
         assert!(manifest["transactionTime"].is_string());
         assert_eq!(manifest["output"][0]["type"], "PlanDefinition");
@@ -616,10 +641,6 @@ async fn bulk_export_kickoff_status_and_output() {
             );
         }
 
-        // Cancelling releases the payload and makes the job unreachable.
-        assert_eq!(request.delete(&location).await.status_code(), 202);
-        assert_eq!(request.get(&location).await.status_code(), 404);
-
         // An unknown job id is a 404, not a panic.
         let unknown = uuid::Uuid::new_v4();
         assert_eq!(
@@ -629,6 +650,157 @@ async fn bulk_export_kickoff_status_and_output() {
                 .status_code(),
             404
         );
+    })
+    .await;
+}
+
+/// A **queued** job reports `202` with `X-Progress` — the IG's
+/// in-progress response — so a client polls rather than treating it as an
+/// error.
+///
+/// The job is created directly rather than through `$export`, because
+/// `config/test.yaml` runs workers in `ForegroundBlocking` mode: a
+/// kickoff there is already complete before it returns, so the queued
+/// state is unobservable through the API in this environment. Testing the
+/// endpoint's contract against a known-queued row checks the thing that
+/// actually matters, instead of a worker mode.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn queued_export_reports_progress_not_a_manifest() {
+    request::<App, _, _>(|request, ctx| async move {
+        let job = care_pathway_service::models::bulk_jobs::Model::submit(
+            &ctx.db,
+            "care_pathway",
+            "export",
+            "ndjson",
+            serde_json::json!({}),
+            None,
+            None,
+        )
+        .await
+        .expect("submit");
+        assert_eq!(job.status, "queued");
+
+        let status = request
+            .get(&format!("/fhir/$export-status/{}", job.id))
+            .await;
+        assert_eq!(status.status_code(), 202, "a queued job is not complete");
+        assert_eq!(
+            status
+                .headers()
+                .get("x-progress")
+                .and_then(|v| v.to_str().ok()),
+            Some("queued"),
+            "the IG's X-Progress header must say where the job is"
+        );
+    })
+    .await;
+}
+
+/// Cancelling a live job drops its output reference immediately, so a
+/// cancelled export stops serving clinical data rather than waiting for
+/// its TTL — and a job that already finished cannot be cancelled.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn cancelling_an_export_makes_its_output_unreachable() {
+    request::<App, _, _>(|request, ctx| async move {
+        // A live (queued) job, created directly for the reason above.
+        let job = care_pathway_service::models::bulk_jobs::Model::submit(
+            &ctx.db,
+            "care_pathway",
+            "export",
+            "ndjson",
+            serde_json::json!({}),
+            None,
+            None,
+        )
+        .await
+        .expect("submit");
+        let location = format!("/fhir/$export-status/{}", job.id);
+
+        assert_eq!(request.delete(&location).await.status_code(), 202);
+        assert_eq!(
+            request.get(&location).await.status_code(),
+            404,
+            "a cancelled job is gone as far as a client is concerned"
+        );
+        assert_eq!(
+            request
+                .get(&format!(
+                    "/fhir/$export-file/{}/PlanDefinition.ndjson",
+                    job.id
+                ))
+                .await
+                .status_code(),
+            404,
+            "and its bytes stop being reachable at once"
+        );
+
+        // A finished job cannot be cancelled — its result is already out.
+        create(&request, &rich_pathway()).await;
+        let done = request.get("/fhir/$export").await;
+        let done_location = done
+            .headers()
+            .get("content-location")
+            .and_then(|v| v.to_str().ok())
+            .expect("Content-Location")
+            .to_string();
+        assert_eq!(
+            request.delete(&done_location).await.status_code(),
+            404,
+            "cancelling a completed job is not meaningful"
+        );
+    })
+    .await;
+}
+
+/// The export survives the process: the job is a Postgres row and the
+/// output is an artifact, not memory. This is the whole point of moving
+/// off the in-process registry — a poll from another replica, or after a
+/// restart, must still answer.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn export_state_is_durable_not_in_process() {
+    request::<App, _, _>(|request, ctx| async move {
+        create(&request, &rich_pathway()).await;
+        let location = request
+            .get("/fhir/$export")
+            .await
+            .headers()
+            .get("content-location")
+            .and_then(|v| v.to_str().ok())
+            .expect("Content-Location")
+            .to_string();
+        let job_id = location
+            .rsplit('/')
+            .next()
+            .and_then(|s| uuid::Uuid::parse_str(s).ok())
+            .expect("job id");
+
+        // Read the state straight from the database, bypassing the
+        // service entirely — which is exactly what a second replica does.
+        let row = care_pathway_service::models::bulk_jobs::Model::find_by_id(&ctx.db, job_id)
+            .await
+            .expect("query")
+            .expect("the job is a durable row");
+        assert_eq!(row.status, "completed");
+        assert_eq!(row.rows_processed, 1);
+        let reference = row
+            .result_url
+            .expect("a completed job references its artifact");
+
+        // And the bytes are in the artifact store, retrievable without
+        // any in-process state.
+        use care_pathway_service::bulk::store::{ArtifactStore, LocalFsArtifactStore};
+        let bytes = LocalFsArtifactStore::from_env()
+            .get(&reference)
+            .expect("artifact is readable from the store");
+        let text = String::from_utf8(bytes).expect("utf-8");
+        assert_eq!(text.lines().count(), 1);
+        assert!(text.contains("PlanDefinition"));
     })
     .await;
 }

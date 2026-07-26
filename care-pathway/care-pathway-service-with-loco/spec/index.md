@@ -444,11 +444,17 @@ the evidence bundle.
   because the outage is visible. Mutation audits are already fail-closed
   under `CARE_PATHWAY_EVENT_TRANSPORT=outbox`, where the audit row shares
   the mutation's transaction.
-- **Bulk export is in-process.** Jobs do not survive a restart, are not
-  visible to another replica, are capped at 8 concurrent / 10 000
-  resources / 8 MiB, and expire after 15 minutes. A truncated export
-  declares itself in the manifest's `error` array. Moving to `bg_pg` +
-  an artifact store is the upgrade path (§13 T-10).
+- **Bulk export is durable** (since 2026-07-26). Job state is a
+  `bulk_jobs` row, the work runs on the `bg_pg` worker queue, and the
+  output NDJSON goes to an artifact store — so a poll from any replica,
+  at any point in the retention window, answers correctly. Remaining
+  bounds, which are caps rather than defects: 10 000 resources / 8 MiB
+  per export, a 15-minute retention TTL, and a **local-filesystem**
+  artifact backend (`CARE_PATHWAY_BULK_ARTIFACT_DIR`) — the S3-compatible
+  backend with short-lived access-controlled URLs is a later step, as it
+  is for person. Cancelling drops the output reference at once rather
+  than at TTL, so a cancelled export stops serving clinical data
+  immediately.
 - **Signing keys are out of scope** for the build script — a deployment
   secret, signed in the release pipeline.
 - **No ISO 14971 risk file, DPIA, Art. 30 record, EHDS data permit, or
@@ -758,9 +764,20 @@ the evidence bundle.
     unit tests and, DB-gated, by `out_of_band_record_edit_is_detected`
     (raw-SQL edit is caught) and `every_write_path_rehashes`
     (create/update/delete/merge/erase all stay verifiable).
-  - [ ] Move Bulk Data `$export` onto the `bg_pg` worker + an artifact
-    store, so jobs survive a restart and are visible across replicas
-    (§12.5); folds into T-10.
+  - [x] **Move Bulk Data `$export` onto the `bg_pg` worker + an artifact
+    store.** **Done (2026-07-26):** migration
+    `m20260726_000009_bulk_jobs` creates the family `bulk_jobs` table
+    (shared doc §3, matching person's so the two do not drift);
+    `src/models/bulk_jobs.rs` owns the queued→running→terminal lifecycle;
+    `src/workers/bulk_export.rs` materialises the NDJSON off the request
+    path; `src/bulk/store.rs` is the `ArtifactStore` trait plus its
+    local-filesystem dev backend, ported from person including its
+    SEC-B4 path confinement. The four `$export` endpoints read the row
+    rather than a process-local registry, so a queued job now really does
+    return `202` + `X-Progress`. Pinned by four DB-gated tests, including
+    `export_state_is_durable_not_in_process`, which reads the job and its
+    artifact straight from the database and store — the way a second
+    replica would.
   - [x] **Decide whether a read-audit write may fail open.** **Done
     (2026-07-25):** resolved as a deployment switch rather than a library
     default — `CARE_PATHWAY_AUDIT_FAIL_CLOSED`, default off (behaviour

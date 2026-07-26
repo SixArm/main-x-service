@@ -56,6 +56,8 @@ path = "src/bin/main.rs"
 required-features = []
 
 [dev-dependencies]
+# Temp dirs for the artifact-store tests (SEC-B4 confinement).
+tempfile = "3"
 loco-rs = { workspace = true, features = ["testing"] }
 # The `TestServer` loco's testing harness hands to a request test. Named
 # explicitly so the compliance request tests can factor out helpers that
