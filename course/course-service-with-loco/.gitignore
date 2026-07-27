@@ -7,3 +7,9 @@ target
 search_index/
 data/
 test-results/
+
+# Commit the lockfile: this crate builds a deployable binary, so the
+# exact resolved graph is part of the release. Without it a rebuild
+# resolves different versions and the SBOM describes a graph nobody
+# can reconstruct.
+!Cargo.lock

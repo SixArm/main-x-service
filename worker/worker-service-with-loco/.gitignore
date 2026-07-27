@@ -2,7 +2,6 @@
 /target/
 **/*.rs.bk
 *.pdb
-Cargo.lock
 
 # Environment
 .env
@@ -34,3 +33,9 @@ Cargo.lock
 # Stray index directory from an older `.env` default; the code default is
 # `./data/search_index`, which `/data/` already covers.
 /search_index/
+
+# Commit the lockfile: this crate builds a deployable binary, so the
+# exact resolved graph is part of the release. Without it a rebuild
+# resolves different versions and the SBOM describes a graph nobody
+# can reconstruct.
+!Cargo.lock

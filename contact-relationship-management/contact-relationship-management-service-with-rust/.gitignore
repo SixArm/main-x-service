@@ -1,10 +1,3 @@
-target/
-**/*.rs.bk
-Cargo.lock.bak
-.DS_Store
-*.env
-.envrc
-
 # Commit the lockfile: this crate builds a deployable binary, so the
 # exact resolved graph is part of the release. Without it a rebuild
 # resolves different versions and the SBOM describes a graph nobody
