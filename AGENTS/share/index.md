@@ -69,6 +69,7 @@ Per-crate `spec.md`:
 | [authentication-sessions.md](authentication-sessions.md)         | Cookie sessions (Postgres) + PASETO v4 cross-service tokens + BFF front-end (supersedes the RS256-JWT model) |
 | [jwt-enforcement.md](jwt-enforcement.md)                         | Blanket `/api/*` auth enforcement (coordinated; credential now PASETO/session) |
 | [authorization-attributes.md](authorization-attributes.md)       | ABAC: `attrs` claim + policy language + default policy (read allow / mutation deny), 401/403 split, sourcing |
+| [runbooks/integrity-activation.md](runbooks/integrity-activation.md) | Runbook: activating the integrity/audit controls (they are all default-off), verifying each took effect, checkpoint storage, MAC-key rotation |
 | [security.md](security.md)                                       | Security audit summary, cross-cutting invariants, the `<ENTITY>_REQUIRE_AUTH` activation gate, secret-handling, threat model |
 | [rust-loco-stack.md](rust-loco-stack.md)                         | Stack for Rust, Loco (database, search, …)             |
 | [loco.md](loco.md)                                               | Loco framework (backend-only conventions)              |

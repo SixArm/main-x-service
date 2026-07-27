@@ -323,6 +323,13 @@ algorithms" below for why both are kept.
 
 #### The digests
 
+> **Everything in this section is default-off.** A deployment that sets
+> nothing writes the digests and runs none of the rest: no auth on the
+> audit endpoints, no read auditing, no keyed MAC, no external witness.
+> Turning it on — in an order that matters — is
+> [`agents/share/runbooks/integrity-activation.md`](../../agents/share/runbooks/integrity-activation.md).
+
+
 | Digest | Covers | Detects | Blind to |
 |---|---|---|---|
 | **Audit chain** (`audit_log.hash` / `prev_hash`) | Every audit row, linked to its predecessor | Edits, insertions, deletions and reordering **in the trail** | Changes to person rows that write no audit row |
