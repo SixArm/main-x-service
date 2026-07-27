@@ -140,6 +140,8 @@ impl Hooks for App {
 
     #[allow(unused_variables)]
     fn register_tasks(tasks: &mut Tasks) {
+        tasks.register(crate::tasks::integrity_key::IntegrityKey);
+        tasks.register(crate::tasks::integrity_resign::IntegrityResign);
         // tasks-inject (do not remove)
     }
     async fn truncate(ctx: &AppContext) -> Result<()> {

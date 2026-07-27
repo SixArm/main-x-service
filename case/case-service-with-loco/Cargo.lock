@@ -592,6 +592,7 @@ dependencies = [
  "chrono",
  "ed25519-dalek",
  "entity-ref",
+ "getrandom 0.2.17",
  "hkdf",
  "hmac",
  "include_dir",

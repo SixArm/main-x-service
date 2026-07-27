@@ -160,7 +160,10 @@ impl Hooks for App {
     }
 
     /// CLI-task registration hook. No custom tasks are registered.
-    fn register_tasks(_tasks: &mut Tasks) {}
+    fn register_tasks(tasks: &mut Tasks) {
+        tasks.register(crate::tasks::integrity_key::IntegrityKey);
+        tasks.register(crate::tasks::integrity_resign::IntegrityResign);
+    }
 
     /// Test-support hook to truncate tables between test runs. No-op here.
     ///

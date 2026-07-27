@@ -5,9 +5,9 @@ logger:
   format: json
 
 server:
-  port: "{{ get_env(name=\"PORT\", default=\"8080\") }}"
+  port: {{ get_env(name="PORT", default="8080") }}
   binding: 0.0.0.0
-  host: "{{ get_env(name=\"HOST\", default=\"http://localhost\") }}"
+  host: {{ get_env(name="HOST", default="http://localhost") }}
   middlewares:
     compression:
       enable: true
@@ -24,10 +24,17 @@ workers:
 
 mailer:
   smtp:
+    # Disabled: these services send no mail. The host/port below are
+    # still required — loco's config schema has them as non-optional
+    # fields on the smtp struct, so omitting them fails to parse even
+    # when `enable` is false, which is what stopped the CLI booting.
     enable: false
+    host: localhost
+    port: 1025
+    secure: false
 
 database:
-  uri: "{{ get_env(name=\"DATABASE_URL\") }}"
+  uri: {{ get_env(name="DATABASE_URL") }}
   enable_logging: false
   connect_timeout: 500
   idle_timeout: 500
@@ -39,12 +46,12 @@ database:
 
 queue:
   kind: Postgres
-  uri: "{{ get_env(name=\"DATABASE_URL\") }}"
+  uri: {{ get_env(name="DATABASE_URL") }}
   dangerously_flush: false
 
 auth:
   jwt:
-    secret: "{{ get_env(name=\"JWT_SECRET\") }}"
+    secret: {{ get_env(name="JWT_SECRET") }}
     expiration: 604800
 
 

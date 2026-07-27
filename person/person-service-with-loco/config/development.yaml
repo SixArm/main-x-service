@@ -14,10 +14,17 @@ workers:
 
 mailer:
   smtp:
+    # Disabled: these services send no mail. The host/port below are
+    # still required — loco's config schema has them as non-optional
+    # fields on the smtp struct, so omitting them fails to parse even
+    # when `enable` is false, which is what stopped the CLI booting.
     enable: false
+    host: localhost
+    port: 1025
+    secure: false
 
 database:
-  uri: "{{ get_env(name=\"DATABASE_URL\", default=\"postgres://localhost/person_service_development\") }}"
+  uri: {{ get_env(name="DATABASE_URL", default="postgres://localhost/person_service_development") }}
   enable_logging: true
   connect_timeout: 500
   idle_timeout: 500
@@ -29,7 +36,7 @@ database:
 
 queue:
   kind: Postgres
-  uri: "{{ get_env(name=\"DATABASE_URL\", default=\"postgres://localhost/person_service_development\") }}"
+  uri: {{ get_env(name="DATABASE_URL", default="postgres://localhost/person_service_development") }}
   dangerously_flush: false
 
 auth:

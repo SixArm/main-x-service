@@ -13,7 +13,7 @@ workers:
   mode: ForegroundBlocking
 
 database:
-  uri: "{{ get_env(name=\"DATABASE_URL\", default=\"postgres://localhost/worker_service_test\") }}"
+  uri: {{ get_env(name="DATABASE_URL", default="postgres://localhost/worker_service_test") }}
   enable_logging: false
   connect_timeout: 500
   idle_timeout: 500

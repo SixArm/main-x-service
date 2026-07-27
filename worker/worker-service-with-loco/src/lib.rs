@@ -92,6 +92,8 @@ pub mod relay;
 pub mod search;
 /// Event streaming: producers and consumers for CRUD events.
 pub mod streaming;
+/// CLI tasks (loco extension point).
+pub mod tasks;
 /// Data-quality validation and normalization.
 pub mod validation;
 

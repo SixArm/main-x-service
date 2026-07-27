@@ -53,6 +53,8 @@ pub mod relay;
 pub mod search;
 /// Event streaming (PersonEvent, producers, consumers).
 pub mod streaming;
+/// CLI tasks (loco extension point).
+pub mod tasks;
 /// Data-quality validation, normalization, and standardization.
 pub mod validation;
 

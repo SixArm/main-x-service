@@ -90,6 +90,8 @@ hkdf = { version = "0.12" }
 # Wipes the root key from memory once the domain subkeys are derived, so
 # it does not survive in core dumps or swap.
 zeroize = { version = "1" }
+# OS entropy for the integrity_key task.
+getrandom = { version = "0.2" }
 
 # Sibling matcher crate (canonical reference algorithm; reached via adapter)
 person-matcher = { version = "0.6.1", path = "../person-matcher-rust-crate" }
