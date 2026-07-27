@@ -152,6 +152,88 @@ implementation changes from RS256-JWT to **PASETO v4.public**:
 - It mirrors the same `Claims` struct and verifies `kid`/`iss`/`aud`/`exp`.
 - Published to crates.io; embedded by each service's `src/auth.rs`.
 
+## 5.1 Post-quantum posture and algorithm agility
+
+**The token signature is this system's only Shor-vulnerable component.**
+Worth stating precisely, because the surrounding pieces are often assumed
+to share the exposure and do not:
+
+- **Sessions** are opaque high-entropy ids (§3). No cryptographic
+  assumption, so nothing for a quantum adversary to break.
+- **The audit chain and record digests** are hash-based
+  (`spec/12-compliance.md` §12.4z). Grover costs a square root, not the
+  whole thing; there is no Shor-style break for hashes.
+- **Cross-service tokens** are PASETO v4.public, signed with **Ed25519**.
+  Shor breaks elliptic-curve signatures outright. This is the piece.
+
+**The urgency is lower than for encryption, for a specific reason.**
+There is no harvest-now-forge-later threat against a signature: capturing
+a token today gains an attacker nothing, because nobody will verify a
+2026 token in 2035. An adversary who breaks Ed25519 forges tokens *then*,
+not retroactively. With a ~5-minute lifetime the exposure window is five
+minutes on the day it happens.
+
+This is the opposite of the argument for storing a second **hash** now
+(§12.4z): a digest attests only to content hashed at write time, so the
+option to add one expires. A signature carries no such deadline. The
+right posture here is therefore **be ready to switch**, not switch now.
+
+### Being ready
+
+The verifier dispatches on each key's declared algorithm rather than
+assuming Ed25519 (`authentication-verifier`):
+
+- Keys are held as an enum, so **verification cannot fall through to a
+  default**. An unrecognised key lands in a variant carrying no key
+  material, and adding an algorithm breaks the match until it is handled
+  deliberately.
+- A key set may advertise algorithms this build does not implement. Those
+  keys are **kept, not dropped**, so a token naming one is refused with
+  `UnsupportedAlgorithm` — which tells an operator to upgrade the binary,
+  where the previous `UnknownKid` invited a key-set refetch that would
+  never have helped.
+- `key_count()` counts only *usable* keys, so a health check cannot be
+  reassured by keys it cannot verify with; `unsupported_key_count()` and
+  `algorithms()` expose a rollout in progress.
+- A duplicate `kid` is rejected rather than last-wins, so the verifier's
+  answer cannot depend on JSON array order.
+
+Together these make adopting a second algorithm a **key rotation** —
+issuer publishes both, verifiers upgrade, old keys withdraw — rather than
+a coordinated code migration.
+
+### When the time comes
+
+There is **no post-quantum PASETO**: v4 is current and there is no v5.
+Defining a private version would forfeit the reason to use PASETO at all,
+which is that it is a vetted, misuse-resistant spec rather than a
+construction kit. The realistic paths, in preference order:
+
+1. **Hybrid Ed25519 + ML-DSA-44** (FIPS 204). Survives both a quantum
+   break and a flaw in a young lattice scheme. Cost: ~3.5 KB tokens
+   against ~250 B today, on every inter-service call — material, but
+   inside the ~8 KB header budget typical servers allow.
+2. **COSE/CWT with ML-DSA** if the envelope has to change anyway: it has
+   registered algorithm identifiers, where a bespoke PASETO variant has
+   none.
+3. **FN-DSA-512** (Falcon) if size dominates — ~1.1 KB tokens — but FIPS
+   206 was still draft when this was written, and its signing path is
+   side-channel hazardous. Verification is not, and this family has one
+   issuer and many verifiers, so the hazard is containable.
+
+**SLH-DSA** (SPHINCS+) is the most conservative choice and the wrong one
+here: at ~7.9 KB per signature it does not fit an `Authorization` header.
+It *is* the right choice for anything long-lived and file-shaped — signed
+release artifacts or SBOMs (`scripts/build-reproducible.sh`), which
+unlike tokens **do** have to verify years later and so do carry the
+retroactive-verification problem.
+
+Two options are deliberately not on the list. **v4.local** (symmetric,
+genuinely quantum-resistant) reintroduces the shared secret §2 exists to
+avoid, and **opaque tokens with introspection** removes the exposure by
+removing offline verification — the property this whole design is built
+around.
+
 ## 6. Front-end — the BFF pattern (no token in the browser)
 
 The SvelteKit front-ends are independent SPAs per entity. To honour

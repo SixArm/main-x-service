@@ -207,6 +207,24 @@ pub enum VerifyError {
     /// policy: wrong `iss`, wrong `aud`, expired `exp`, or unmet `nbf`.
     #[error("claim rejected: {0}")]
     Claim(String),
+    /// The token's `kid` selected a key whose algorithm this build does
+    /// not implement.
+    ///
+    /// Distinct from [`UnknownKid`](VerifyError::UnknownKid) on purpose.
+    /// Both reject the token, but they mean different things to whoever
+    /// is on call: `UnknownKid` says "I hold no key for this signer" and
+    /// invites a key-set refetch; this says "I hold the key and cannot
+    /// use it", which a refetch will never fix. It is the expected error
+    /// during a partial algorithm rollout — the issuer has moved ahead of
+    /// this verifier, and this binary needs upgrading.
+    #[error("key {kid:?} uses unsupported algorithm {algorithm:?}")]
+    UnsupportedAlgorithm {
+        /// The `kid` that selected the key.
+        kid: String,
+        /// The algorithm label as advertised in the key set.
+        algorithm: String,
+    },
+
     /// Fetching the key set over HTTP failed (only with the `fetch`
     /// feature): transport error, non-2xx status, or undecodable body.
     #[cfg(feature = "fetch")]
@@ -214,7 +232,91 @@ pub enum VerifyError {
     Fetch(String),
 }
 
-/// A set of Ed25519 verification keys (indexed by `kid`) plus the issuer /
+/// One published verification key, tagged with the algorithm it is for.
+///
+/// Modelled as an enum rather than a byte string plus an algorithm field
+/// so that **verification cannot fall through to a default**. Adding a
+/// variant forces every match to be revisited; an unrecognised key can
+/// only ever land in [`Unsupported`](VerificationKey::Unsupported), which
+/// has no key material and therefore no path to an accept.
+#[derive(Debug, Clone)]
+enum VerificationKey {
+    /// Ed25519 raw public key — the algorithm PASETO `v4.public` uses.
+    Ed25519(Box<[u8; 32]>),
+    /// A key this build does not implement, retained only so the verifier
+    /// can say *why* it is refusing rather than reporting the `kid` as
+    /// unknown. Carries no key material.
+    Unsupported {
+        /// Algorithm label from the key set, for the error message.
+        label: String,
+    },
+}
+
+impl VerificationKey {
+    /// Parse one JWK-shaped entry.
+    ///
+    /// Returns `None` when the entry cannot be indexed at all (no `kid`),
+    /// since such a key could never be selected.
+    fn from_jwk(jwk: &serde_json::Value) -> Result<Option<(String, Self)>, VerifyError> {
+        let Some(kid) = jwk.get("kid").and_then(serde_json::Value::as_str) else {
+            // An entry with no `kid` is unselectable. For a supported
+            // algorithm that is a malformed key set; for one we do not
+            // implement it is simply not our business.
+            if is_ed25519(jwk) {
+                return Err(VerifyError::Keys("ed25519 jwk missing \"kid\"".to_string()));
+            }
+            return Ok(None);
+        };
+        if !is_ed25519(jwk) {
+            return Ok(Some((
+                kid.to_string(),
+                Self::Unsupported {
+                    label: algorithm_label(jwk),
+                },
+            )));
+        }
+        let x = jwk
+            .get("x")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| VerifyError::Keys(format!("jwk {kid} missing \"x\"")))?;
+        let bytes = URL_SAFE_NO_PAD
+            .decode(x)
+            .map_err(|err| VerifyError::Keys(format!("jwk {kid}: bad base64url x: {err}")))?;
+        let key: [u8; 32] = bytes
+            .as_slice()
+            .try_into()
+            .map_err(|_| VerifyError::Keys(format!("jwk {kid}: x is not 32 bytes")))?;
+        Ok(Some((kid.to_string(), Self::Ed25519(Box::new(key)))))
+    }
+}
+
+/// Whether a JWK entry declares the one algorithm this build implements.
+fn is_ed25519(jwk: &serde_json::Value) -> bool {
+    jwk.get("kty").and_then(serde_json::Value::as_str) == Some("OKP")
+        && jwk.get("crv").and_then(serde_json::Value::as_str) == Some("Ed25519")
+}
+
+/// A human-readable label for an algorithm this build does not implement.
+///
+/// Deliberately assembled from whatever the entry advertises rather than
+/// matched against a fixed list of future algorithms: the JOSE/COSE
+/// registrations for post-quantum signatures were still settling when
+/// this was written, and guessing at names here would age badly. The
+/// label exists to be read in a log line, not to be matched on.
+fn algorithm_label(jwk: &serde_json::Value) -> String {
+    let field = |name: &str| {
+        jwk.get(name)
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("?")
+            .to_string()
+    };
+    match jwk.get("alg").and_then(serde_json::Value::as_str) {
+        Some(alg) => format!("{}/{alg}", field("kty")),
+        None => format!("{}/{}", field("kty"), field("crv")),
+    }
+}
+
+/// A set of published verification keys (indexed by `kid`) plus the issuer /
 /// audience policy applied to every token. Construct once at boot, then
 /// share behind an `Arc` and call [`verify`](Verifier::verify) per
 /// request — verification is read-only and allocation-light.
@@ -223,10 +325,14 @@ pub enum VerifyError {
 /// each token's footer; the verifier indexes its keys by exactly that
 /// `kid`, so key selection at verify time is a direct map lookup.
 pub struct Verifier {
-    /// Ed25519 public keys (raw 32 bytes) keyed by their `kid`. Populated
+    /// Published keys by `kid`, each tagged with its algorithm. Populated
     /// at construction; never mutated, so a `Verifier` is safe to share
     /// immutably across threads.
-    keys: HashMap<String, [u8; 32]>,
+    ///
+    /// Keys for algorithms this build does not implement are **kept**
+    /// rather than dropped, so a token naming one is refused with a
+    /// diagnosis instead of being reported as an unknown `kid`.
+    keys: HashMap<String, VerificationKey>,
     /// Expected issuer (`iss`) enforced on every token.
     issuer: String,
     /// Expected audience (`aud`) enforced on every token.
@@ -270,34 +376,22 @@ impl Verifier {
             .and_then(serde_json::Value::as_array)
             .ok_or_else(|| VerifyError::Keys("missing \"keys\" array".to_string()))?;
 
-        let mut keys = HashMap::new();
+        let mut keys: HashMap<String, VerificationKey> = HashMap::new();
         for jwk in entries {
-            // Ed25519 only: silently skip any other key type so a key set
-            // may legitimately advertise keys this verifier does not use.
-            let kty = jwk.get("kty").and_then(serde_json::Value::as_str);
-            let crv = jwk.get("crv").and_then(serde_json::Value::as_str);
-            if kty != Some("OKP") || crv != Some("Ed25519") {
+            let Some((kid, key)) = VerificationKey::from_jwk(jwk)? else {
                 continue;
+            };
+            // A repeated `kid` is a malformed key set, not a last-wins
+            // merge. Silently overwriting would let a key set that
+            // advertises the same id twice — say, mid-rotation across two
+            // algorithms — resolve differently depending on array order,
+            // and a verifier whose answer depends on JSON ordering is not
+            // one anybody should trust.
+            if keys.insert(kid.clone(), key).is_some() {
+                return Err(VerifyError::Keys(format!(
+                    "duplicate kid {kid:?} in key set"
+                )));
             }
-            // For an Ed25519 key the `kid` (lookup key) and `x` (the
-            // 32-byte public key, base64url) are both required; a missing
-            // field is a malformed key set, not a skippable entry.
-            let kid = jwk
-                .get("kid")
-                .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| VerifyError::Keys("ed25519 jwk missing \"kid\"".to_string()))?;
-            let x = jwk
-                .get("x")
-                .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| VerifyError::Keys(format!("jwk {kid} missing \"x\"")))?;
-            let bytes = URL_SAFE_NO_PAD
-                .decode(x)
-                .map_err(|err| VerifyError::Keys(format!("jwk {kid}: bad base64url x: {err}")))?;
-            let key: [u8; 32] = bytes
-                .as_slice()
-                .try_into()
-                .map_err(|_| VerifyError::Keys(format!("jwk {kid}: x is not 32 bytes")))?;
-            keys.insert(kid.to_string(), key);
         }
 
         Ok(Self {
@@ -307,14 +401,54 @@ impl Verifier {
         })
     }
 
-    /// Number of Ed25519 verification keys loaded.
+    /// Number of **usable** verification keys loaded.
     ///
-    /// A count of zero means no token can ever verify (every
-    /// [`verify`](Self::verify) call returns [`VerifyError::UnknownKid`]),
-    /// which usually signals a key set that failed to load.
+    /// Counts only keys whose algorithm this build implements, so a
+    /// health check reading this cannot be reassured by a key set full of
+    /// keys it cannot verify with. A count of zero means no token can
+    /// verify, which usually signals a key set that failed to load — or,
+    /// now, an issuer that has moved entirely to an algorithm this binary
+    /// does not support.
     #[must_use]
     pub fn key_count(&self) -> usize {
-        self.keys.len()
+        self.keys
+            .values()
+            .filter(|k| matches!(k, VerificationKey::Ed25519(_)))
+            .count()
+    }
+
+    /// Number of loaded keys whose algorithm this build does **not**
+    /// implement.
+    ///
+    /// Non-zero means the issuer publishes keys this binary cannot use.
+    /// That is normal and expected mid-rollout — the issuer adds the new
+    /// algorithm before every verifier understands it — and is the signal
+    /// to upgrade verifiers before the old keys are withdrawn. Worth
+    /// exporting as a metric for exactly that reason.
+    #[must_use]
+    pub fn unsupported_key_count(&self) -> usize {
+        self.keys
+            .values()
+            .filter(|k| matches!(k, VerificationKey::Unsupported { .. }))
+            .count()
+    }
+
+    /// The algorithm labels this verifier holds keys for, usable or not,
+    /// sorted and deduplicated — for logging what a key set actually
+    /// advertises.
+    #[must_use]
+    pub fn algorithms(&self) -> Vec<String> {
+        let mut out: Vec<String> = self
+            .keys
+            .values()
+            .map(|k| match k {
+                VerificationKey::Ed25519(_) => "OKP/Ed25519".to_string(),
+                VerificationKey::Unsupported { label } => label.clone(),
+            })
+            .collect();
+        out.sort_unstable();
+        out.dedup();
+        out
     }
 
     /// Verify a PASETO `v4.public` bearer token: select the key by the
@@ -368,11 +502,24 @@ impl Verifier {
             .ok_or(VerifyError::MissingKid)?;
         // 3. Select the published key for this `kid`. A miss means we hold
         //    no key for this signer (stale cache, wrong issuer, or forgery).
-        let key_bytes = self
+        let selected = self
             .keys
             .get(kid)
             .ok_or_else(|| VerifyError::UnknownKid(kid.to_string()))?;
-        let key = Key::<32>::from(key_bytes);
+        // Dispatch on the key's declared algorithm. The match is
+        // exhaustive over `VerificationKey`, so a future algorithm cannot
+        // silently reach the Ed25519 path: adding a variant breaks this
+        // compile until it is handled deliberately.
+        let key_bytes = match selected {
+            VerificationKey::Ed25519(bytes) => bytes,
+            VerificationKey::Unsupported { label } => {
+                return Err(VerifyError::UnsupportedAlgorithm {
+                    kid: kid.to_string(),
+                    algorithm: label.clone(),
+                });
+            }
+        };
+        let key = Key::<32>::from(key_bytes.as_ref());
         let public_key = PasetoAsymmetricPublicKey::<V4, Public>::from(&key);
         // 4. Verify the Ed25519 signature over (header, payload, footer).
         let payload = Paseto::<V4, Public>::try_verify(
@@ -1034,5 +1181,138 @@ mod tests {
         assert!(!url_scheme_is_permitted("http://10.0.0.5/keys"));
         assert!(!url_scheme_is_permitted("ftp://x"));
         assert!(!url_scheme_is_permitted("not a url"));
+    }
+
+    // ─── Algorithm agility ──────────────────────────────────────────────
+    //
+    // The system's only Shor-vulnerable component is this signature: the
+    // audit digests are hash-based, and sessions are opaque ids. When the
+    // issuer eventually adds a post-quantum algorithm it will publish both
+    // key types for a while, so a verifier must (a) keep working off the
+    // Ed25519 keys, and (b) refuse a token naming the new algorithm with
+    // an error that tells an operator to upgrade rather than to refetch.
+
+    // A key set advertising a post-quantum key alongside the Ed25519 one.
+    // The exact `kty` / `alg` spelling is invented: the JOSE registrations
+    // were still settling when this was written, and the verifier is built
+    // not to care — it matches only what it supports and labels the rest.
+    fn mixed_keys() -> serde_json::Value {
+        let public = signing_key().verifying_key().to_bytes();
+        let x = URL_SAFE_NO_PAD.encode(public);
+        serde_json::json!({
+            "keys": [
+                { "kty": "OKP", "crv": "Ed25519", "use": "sig", "kid": KID, "x": x },
+                { "kty": "AKP", "alg": "ML-DSA-44", "use": "sig", "kid": "pq-1",
+                  "pub": "irrelevant-to-this-build" }
+            ]
+        })
+    }
+
+    /// A key set carrying an algorithm this build does not implement still
+    /// verifies tokens signed with the one it does. This is the property
+    /// that lets an issuer roll a new algorithm out ahead of its verifiers.
+    #[test]
+    fn unknown_algorithm_in_the_key_set_does_not_break_ed25519() {
+        let verifier =
+            Verifier::from_paseto_keys_value(&mixed_keys(), ISSUER, AUDIENCE).expect("keys");
+        assert_eq!(verifier.key_count(), 1, "one usable key");
+        assert_eq!(verifier.unsupported_key_count(), 1);
+        let claims = verifier.verify(&sign(KID, &claims(3600))).expect("verify");
+        assert_eq!(claims.iss, ISSUER);
+    }
+
+    /// A token naming a key this build cannot use is refused **as such** —
+    /// not as an unknown `kid`.
+    ///
+    /// Both reject, so this is not a security fix; it is a diagnosis fix,
+    /// and the distinction is the point. `UnknownKid` invites an operator
+    /// to refetch the key set, which during an algorithm rollout will
+    /// cheerfully return the same key and the same failure forever. The
+    /// error has to say "upgrade this binary" instead.
+    #[test]
+    fn token_naming_an_unsupported_algorithm_reports_the_algorithm() {
+        let verifier =
+            Verifier::from_paseto_keys_value(&mixed_keys(), ISSUER, AUDIENCE).expect("keys");
+        // Signed with the Ed25519 test key but footered with the PQ kid:
+        // enough to select the key, which is all this test needs.
+        let err = verifier
+            .verify(&sign("pq-1", &claims(3600)))
+            .expect_err("must refuse");
+        match err {
+            VerifyError::UnsupportedAlgorithm { kid, algorithm } => {
+                assert_eq!(kid, "pq-1");
+                assert_eq!(algorithm, "AKP/ML-DSA-44", "the label must be actionable");
+            }
+            other => panic!("expected UnsupportedAlgorithm, got {other:?}"),
+        }
+    }
+
+    /// **Fail closed.** An unsupported key carries no material and cannot
+    /// reach the signature check, so a token cannot be accepted by
+    /// selecting it — even when signed with a key the verifier does hold.
+    ///
+    /// Without the enum this is exactly the bug that would appear: store a
+    /// byte string plus an algorithm tag, forget one branch, and a
+    /// "post-quantum" key verifies as Ed25519.
+    #[test]
+    fn an_unsupported_key_can_never_produce_an_accept() {
+        let verifier =
+            Verifier::from_paseto_keys_value(&mixed_keys(), ISSUER, AUDIENCE).expect("keys");
+        for offset in [3600, -3600] {
+            assert!(
+                verifier.verify(&sign("pq-1", &claims(offset))).is_err(),
+                "no token selecting an unsupported key may verify"
+            );
+        }
+    }
+
+    /// A repeated `kid` is a malformed key set, not a last-wins merge.
+    ///
+    /// Silently overwriting would make the verifier's answer depend on
+    /// JSON array order — the failure would surface as intermittent auth
+    /// errors after a rotation, which is close to undiagnosable.
+    #[test]
+    fn duplicate_kid_is_rejected_rather_than_resolved_by_order() {
+        let public = signing_key().verifying_key().to_bytes();
+        let x = URL_SAFE_NO_PAD.encode(public);
+        let doc = serde_json::json!({
+            "keys": [
+                { "kty": "OKP", "crv": "Ed25519", "kid": KID, "x": x },
+                { "kty": "AKP", "alg": "ML-DSA-44", "kid": KID }
+            ]
+        });
+        let result = Verifier::from_paseto_keys_value(&doc, ISSUER, AUDIENCE);
+        let Err(err) = result else {
+            panic!("duplicate kid must fail");
+        };
+        assert!(matches!(err, VerifyError::Keys(m) if m.contains("duplicate kid")));
+    }
+
+    /// An unsupported entry with no `kid` is skipped rather than fatal: it
+    /// could never be selected, so it is not this verifier's problem. A
+    /// *supported* entry missing its `kid` is still a malformed key set.
+    #[test]
+    fn unselectable_unsupported_entry_is_skipped_not_fatal() {
+        let doc = serde_json::json!({
+            "keys": [{ "kty": "AKP", "alg": "ML-DSA-44" }]
+        });
+        let verifier = Verifier::from_paseto_keys_value(&doc, ISSUER, AUDIENCE).expect("keys");
+        assert_eq!(verifier.key_count(), 0);
+        assert_eq!(verifier.unsupported_key_count(), 0);
+
+        let bad = serde_json::json!({
+            "keys": [{ "kty": "OKP", "crv": "Ed25519", "x": "AAAA" }]
+        });
+        assert!(Verifier::from_paseto_keys_value(&bad, ISSUER, AUDIENCE).is_err());
+    }
+
+    /// `algorithms()` reports what the key set actually advertises, so a
+    /// service can log it at boot and an operator can see a rollout
+    /// arriving before it breaks anything.
+    #[test]
+    fn algorithms_reports_what_is_published() {
+        let verifier =
+            Verifier::from_paseto_keys_value(&mixed_keys(), ISSUER, AUDIENCE).expect("keys");
+        assert_eq!(verifier.algorithms(), vec!["AKP/ML-DSA-44", "OKP/Ed25519"]);
     }
 }
