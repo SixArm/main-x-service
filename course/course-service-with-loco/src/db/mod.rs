@@ -471,6 +471,18 @@ async fn apply_course_soft_delete<C: ConnectionTrait>(conn: &C, id: Uuid) -> Res
         active: Set(false),
         deleted_at: Set(Some(now)),
         updated_at: Set(now),
+        // Clear the digests rather than leave ones that no longer
+        // describe the row. This is a partial update — the record is not
+        // loaded here, and reassembling it would add several queries to a
+        // path `merge` also uses — so recomputing is not available.
+        //
+        // The consequence is stated rather than hidden: a soft-deleted
+        // course reports as `unhashed`, not as verified and not as
+        // tampered. That is the honest reading, and it avoids the worse
+        // outcome of every soft delete surfacing as a false finding.
+        content_hash: Set(None),
+        content_hash_sha3: Set(None),
+        content_mac: Set(None),
         ..Default::default()
     };
     active.update(conn).await.map_err(|e| map_db(&e))?;
@@ -489,8 +501,23 @@ fn schedule_start(i: &CourseInstance) -> Option<chrono::DateTime<chrono::Utc>> {
 /// stamped to now; on insert the model's own timestamp is kept.
 fn to_course_active(course: &Course, is_update: bool) -> Result<courses::ActiveModel> {
     let now = OffsetDateTime::now_utc();
+    // All three digests from one call over the **assembled** record, so
+    // the child collections are covered too. Computed here rather than
+    // stamped afterwards, so one statement writes the row and its
+    // integrity values together — and every full write builds its active
+    // model through this function.
+    let digests = crate::compliance::record_integrity::digests(
+        &crate::compliance::record_integrity::RecordInput {
+            id: course.id,
+            course,
+            active: course.active,
+        },
+    );
     Ok(courses::ActiveModel {
         id: Set(course.id),
+        content_hash: Set(Some(digests.sha256)),
+        content_hash_sha3: Set(Some(digests.sha3)),
+        content_mac: Set(digests.mac),
         name: Set(course.name.clone()),
         description: Set(course.description.clone()),
         disambiguating_description: Set(course.disambiguating_description.clone()),

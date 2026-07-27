@@ -16,6 +16,8 @@
 
 pub mod api;
 pub mod app;
+/// Compliance controls: row-level integrity and keyed MACs.
+pub mod compliance;
 pub mod config;
 pub mod db;
 pub mod error;

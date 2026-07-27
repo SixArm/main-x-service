@@ -18,6 +18,7 @@ mod m20260604_000003_create_course_instances;
 mod m20260604_000004_create_audit_and_review;
 mod m20260608_000001_normalize_course_collections;
 mod m20260708_000001_create_course_outbox;
+mod m20260728_000001_add_integrity_digests;
 
 /// The migration runner this crate exposes to loco / `sea-orm-migration`.
 pub struct Migrator;
@@ -32,6 +33,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260604_000004_create_audit_and_review::Migration),
             Box::new(m20260608_000001_normalize_course_collections::Migration),
             Box::new(m20260708_000001_create_course_outbox::Migration),
+            Box::new(m20260728_000001_add_integrity_digests::Migration),
         ]
     }
 }
