@@ -373,10 +373,36 @@ pub const ASSESSMENT_HASH_VERSION: &str = "wa-r1";
 /// database set them, so binding them would produce false mismatches.
 #[must_use]
 pub fn assessment_hash(row: &crate::db::models::worker_assessments::Model) -> String {
-    let mut hasher = Sha256::new();
+    let mut out = String::with_capacity(64);
+    for byte in Sha256::digest(assessment_preimage(row)) {
+        // Infallible: writing to a `String` never fails.
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
+}
+
+/// The same assessment row's digest under **BLAKE3**, over the
+/// byte-identical pre-image.
+#[must_use]
+pub fn assessment_hash_blake3(row: &crate::db::models::worker_assessments::Model) -> String {
+    blake3::hash(&assessment_preimage(row)).to_hex().to_string()
+}
+
+/// Both assessment digests, as `(SHA-256, BLAKE3)`.
+///
+/// Taken from one call so neither can be stamped without the other.
+#[must_use]
+pub fn assessment_digests(row: &crate::db::models::worker_assessments::Model) -> (String, String) {
+    (assessment_hash(row), assessment_hash_blake3(row))
+}
+
+/// The assessment digest pre-image, built once and hashed by each
+/// algorithm.
+fn assessment_preimage(row: &crate::db::models::worker_assessments::Model) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(256);
     let mut field = |value: &str| {
-        hasher.update(value.as_bytes());
-        hasher.update([SEP as u8]);
+        buf.extend_from_slice(value.as_bytes());
+        buf.push(SEP as u8);
     };
     field(ASSESSMENT_HASH_VERSION);
     field(&row.id.to_string());
@@ -398,11 +424,7 @@ pub fn assessment_hash(row: &crate::db::models::worker_assessments::Model) -> St
         (d.unix_timestamp_nanos() / 1_000).to_string()
     }));
 
-    let mut out = String::with_capacity(64);
-    for byte in hasher.finalize() {
-        let _ = write!(out, "{byte:02x}");
-    }
-    out
+    buf
 }
 
 /// Verify a set of assessment rows by recomputing each content hash.
@@ -414,11 +436,8 @@ pub fn verify_assessments(
         records: rows.len(),
         intact: 0,
         unhashed: 0,
-        // Assessments carry a single SHA-256 digest: they were adopted
-        // after the record hash and before the second algorithm, and
-        // extending them is a follow-up rather than part of this change.
         blake3_intact: 0,
-        blake3_unhashed: rows.len(),
+        blake3_unhashed: 0,
         mismatched: Vec::new(),
         verified: true,
     };
@@ -427,9 +446,26 @@ pub fn verify_assessments(
             report.unhashed += 1;
             continue;
         };
-        if stored == assessment_hash(row) {
+        let (sha, b3) = assessment_digests(row);
+        let sha_ok = stored == sha;
+        if sha_ok {
             report.intact += 1;
-        } else {
+        }
+        let b3_ok = match row.content_hash_blake3.as_deref() {
+            None => {
+                report.blake3_unhashed += 1;
+                true
+            }
+            Some(s) => {
+                let ok = s == b3;
+                if ok {
+                    report.blake3_intact += 1;
+                }
+                ok
+            }
+        };
+        // One entry per assessment, not one per algorithm.
+        if !sha_ok || !b3_ok {
             report.mismatched.push(RecordMismatch {
                 id: row.id.to_string(),
             });

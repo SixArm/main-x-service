@@ -356,26 +356,63 @@ Because both digests cover the same pre-image, they are built by one
 `preimage()` function and hashed separately. Adding a third algorithm
 changes only how the bytes are digested, never what is covered.
 
-**A correction on post-quantum, since this document is read by people
-making risk decisions.** BLAKE3 is *not* meaningfully more quantum-
-resistant than SHA-256 at the same output length, and this spec does not
-claim it is. Grover's algorithm gives a quadratic speedup on preimage
-search, reducing a 256-bit digest to roughly 128-bit preimage security —
-**identically for both functions**, because the effect depends on the
-output length, not the internal design. Collision resistance under
-quantum search (BHT) is likewise a wash, and widely judged impractical
-because of its memory requirements. Neither function is known to be
-broken by a quantum adversary in any way the other is not.
+##### Quantum resistance
 
-What BLAKE3 genuinely contributes on that axis is **optionality**: it is
-an XOF, so if a future risk assessment wants more Grover margin, it emits
-a 512-bit digest natively and at the same speed. SHA-256 cannot — that
-would mean adopting SHA-512 and a new column. Keeping BLAKE3 now makes
-that a configuration change later rather than a migration.
+**These digests are quantum-resistant, and that is a property of the
+choice to build integrity on hashes at all.** It is worth stating
+positively, because it is the strongest post-quantum claim this service
+can make and it holds today:
 
-The honest summary: **SHA-256 for conservatism and auditor familiarity,
-BLAKE3 for speed and for the agility to survive a future break in either
-— not because either is quantum-safe on its own.**
+- **There is no Shor-style break for hash functions.** Shor's algorithm
+  destroys the hardness assumptions behind RSA, Diffie-Hellman and
+  elliptic curves — factoring and discrete logs — and nothing analogous
+  applies to a well-constructed hash. A hash-based integrity control does
+  not become *forgeable* on the day a cryptographically relevant quantum
+  computer exists; it only loses margin.
+- **Grover's algorithm costs a square root, not the whole thing.** It
+  reduces preimage search on an *n*-bit digest from 2ⁿ to about 2^(n/2),
+  so a 256-bit digest retains roughly **128-bit preimage security**
+  against a quantum adversary. That is the level NIST's post-quantum
+  category 1 is defined against (the cost of an exhaustive AES-128 key
+  search), so both digests here remain in the range treated as adequate.
+  Grover also parallelises poorly, which erodes the attack further in
+  practice.
+- **Collision resistance under quantum search is not the weak link
+  either.** The BHT algorithm's ~2^(n/3) bound needs quantum-accessible
+  memory at a scale nobody credible projects, and the consensus estimate
+  for realistic models is far closer to the classical birthday bound.
+- **Both algorithms inherit this equally.** SHA-256 and BLAKE3 are both
+  256-bit, so Grover treats them identically — the effect depends on
+  output length, not internal design. Neither is more quantum-resistant
+  than the other here, and this spec does not claim otherwise; what it
+  claims is that **both are quantum-resistant**, which is the useful
+  statement.
+
+**BLAKE3 is what makes the next step cheap.** If a future risk assessment
+wants a higher NIST category rather than the current margin, BLAKE3 is an
+extendable-output function: it emits a **512-bit** digest natively, at the
+same speed, restoring ~256-bit preimage security under Grover. SHA-256
+cannot be stretched — that path means adopting SHA-512 and a new column
+and a new format version. Having BLAKE3 in place already turns a
+migration into a parameter change.
+
+> **Where the real post-quantum exposure in this system actually is.**
+> Not here. The integrity controls described above are hash-based and
+> therefore already post-quantum in the sense that matters. The
+> **authentication** path is not: cross-service tokens are PASETO
+> v4.public, signed with **Ed25519**, and Shor's algorithm breaks
+> elliptic-curve signatures outright rather than merely halving their
+> strength. A quantum adversary able to run Shor could forge tokens; it
+> could not forge these digests. Any post-quantum programme for this
+> family should therefore start at
+> [`authentication-sessions.md`](../../agents/share/authentication-sessions.md),
+> not at the audit chain. Recording that here is the point of writing
+> this section down — a reader who takes "we hash with BLAKE3" as their
+> post-quantum answer has been pointed at the wrong subsystem.
+
+The summary: **SHA-256 for conservatism and auditor familiarity, BLAKE3
+for speed, a longer digest on demand, and the agility to survive a future
+weakness in either.**
 
 ##### What verification reports
 

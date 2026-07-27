@@ -31,3 +31,7 @@
 ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS prev_hash_blake3 TEXT;
 ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS hash_blake3 TEXT;
 ALTER TABLE workers ADD COLUMN IF NOT EXISTS content_hash_blake3 TEXT;
+
+-- Assessments carry their own digest (they are not part of the
+-- assembled Worker), so they need their own BLAKE3 companion too.
+ALTER TABLE worker_assessments ADD COLUMN IF NOT EXISTS content_hash_blake3 TEXT;

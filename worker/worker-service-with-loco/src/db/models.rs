@@ -1775,6 +1775,10 @@ pub mod worker_assessments {
         /// back-fill would certify whatever the current content happens to
         /// be — the claim the hash exists to test.
         pub content_hash: Option<String>,
+        /// BLAKE3 digest over the same pre-image as `content_hash`.
+        /// `None` on rows written before the second algorithm was
+        /// adopted; never back-filled.
+        pub content_hash_blake3: Option<String>,
     }
 
     /// `SeaORM` relations for the assessment entity (none defined — the
