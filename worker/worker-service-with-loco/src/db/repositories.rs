@@ -153,14 +153,14 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
 /// that a second digest would have doubled.
 fn worker_update_model(
     worker: &Worker,
-    content_hash: String,
-    content_hash_blake3: String,
+    digests: crate::compliance::record_integrity::Digests,
 ) -> workers::ActiveModel {
     workers::ActiveModel {
         id: Set(worker.id),
         active: Set(worker.active),
-        content_hash: Set(Some(content_hash)),
-        content_hash_blake3: Set(Some(content_hash_blake3)),
+        content_hash: Set(Some(digests.sha256)),
+        content_hash_blake3: Set(Some(digests.blake3)),
+        content_hash_sha3: Set(Some(digests.sha3)),
         worker_type: Set(worker
             .worker_type
             .as_ref()
@@ -204,7 +204,7 @@ fn worker_update_model(
 async fn content_hash_for_update<C: ConnectionTrait>(
     conn: &C,
     worker: &Worker,
-) -> Result<(String, String)> {
+) -> Result<crate::compliance::record_integrity::Digests> {
     let existing_deleted_at = workers::Entity::find_by_id(worker.id)
         .one(conn)
         .await?
@@ -225,9 +225,9 @@ async fn content_hash_for_update<C: ConnectionTrait>(
 ///
 /// Returns an error if any update/delete/insert query fails.
 async fn apply_worker_row_replacement<C: ConnectionTrait>(conn: &C, worker: &Worker) -> Result<()> {
-    let (content_hash, content_hash_blake3) = content_hash_for_update(conn, worker).await?;
+    let d = content_hash_for_update(conn, worker).await?;
 
-    let update_model = worker_update_model(worker, content_hash, content_hash_blake3);
+    let update_model = worker_update_model(worker, d);
     update_model.update(conn).await?;
 
     worker_names::Entity::delete_many()
@@ -586,14 +586,15 @@ impl SeaOrmWorkerRepository {
     fn to_active_models(worker: &Worker) -> Result<WorkerActiveModels> {
         // Both digests from one call, so neither can be stamped without
         // the other (see `record_integrity::digests`).
-        let (sha, b3) = crate::compliance::record_integrity::digests_of_live(worker)?;
+        let d = crate::compliance::record_integrity::digests_of_live(worker)?;
         let new_worker = workers::ActiveModel {
             id: Set(worker.id),
             active: Set(worker.active),
             // A new record is live, so the digest binds `deleted_at` as
             // `None`.
-            content_hash: Set(Some(sha)),
-            content_hash_blake3: Set(Some(b3)),
+            content_hash: Set(Some(d.sha256)),
+            content_hash_blake3: Set(Some(d.blake3)),
+            content_hash_sha3: Set(Some(d.sha3)),
             worker_type: Set(worker
                 .worker_type
                 .as_ref()
@@ -1191,8 +1192,8 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         // Update worker. This duplicates `apply_worker_row_replacement`
         // above rather than calling it — pre-existing drift, left alone
         // here beyond adding the rehash it also needs.
-        let (content_hash, content_hash_blake3) = content_hash_for_update(&txn, worker).await?;
-        let update_model = worker_update_model(worker, content_hash, content_hash_blake3);
+        let d = content_hash_for_update(&txn, worker).await?;
+        let update_model = worker_update_model(worker, d);
         update_model.update(&txn).await?;
 
         // Delete existing associated data
@@ -1327,9 +1328,17 @@ impl WorkerRepository for SeaOrmWorkerRepository {
             deleted_by: Set(Some("system".to_string())),
             content_hash: tombstone_hash
                 .as_ref()
-                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.0.clone()))),
+                .map_or(sea_orm::ActiveValue::NotSet, |h| {
+                    Set(Some(h.sha256.clone()))
+                }),
             content_hash_blake3: tombstone_hash
-                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.1))),
+                .as_ref()
+                .map_or(sea_orm::ActiveValue::NotSet, |h| {
+                    Set(Some(h.blake3.clone()))
+                }),
+            content_hash_sha3: tombstone_hash
+                .as_ref()
+                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.sha3.clone()))),
             ..Default::default()
         };
         dup_delete.update(&txn).await?;
@@ -1424,9 +1433,17 @@ impl WorkerRepository for SeaOrmWorkerRepository {
             deleted_by: Set(Some("system".to_string())),
             content_hash: tombstone_hash
                 .as_ref()
-                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.0.clone()))),
+                .map_or(sea_orm::ActiveValue::NotSet, |h| {
+                    Set(Some(h.sha256.clone()))
+                }),
             content_hash_blake3: tombstone_hash
-                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.1))),
+                .as_ref()
+                .map_or(sea_orm::ActiveValue::NotSet, |h| {
+                    Set(Some(h.blake3.clone()))
+                }),
+            content_hash_sha3: tombstone_hash
+                .as_ref()
+                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.sha3.clone()))),
             ..Default::default()
         };
         // Unlike create/update, the soft-delete is a single row update with no

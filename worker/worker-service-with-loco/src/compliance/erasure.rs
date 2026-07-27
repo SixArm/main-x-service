@@ -124,6 +124,53 @@ pub struct ErasureOutcome {
     pub irreversible: bool,
 }
 
+/// Delete every row hanging off a worker, returning how many went.
+///
+/// Split out so [`erase`] stays readable now that it also clears three
+/// digest columns. The table list is the security boundary — a table
+/// missing from it is personal data that survives an erasure — so it
+/// lives next to the constant that defines it.
+///
+/// # Errors
+///
+/// Propagates any delete error.
+async fn destroy_child_rows<C: ConnectionTrait>(db: &C, id: Uuid) -> crate::Result<u64> {
+    // These *are* the personal data; nothing hashes or links them, so
+    // deletion breaks no integrity property.
+    let mut deleted = 0;
+    for table in CHILD_TABLES {
+        let result = db
+            .execute(Statement::from_sql_and_values(
+                db.get_database_backend(),
+                format!("DELETE FROM {table} WHERE worker_id = $1"),
+                [id.into()],
+            ))
+            .await?;
+        deleted += result.rows_affected();
+    }
+    // Emergency-contact telecom rows hang off the emergency contacts, not
+    // off the worker, so they are swept through their parent first.
+    let telecom = db
+        .execute(Statement::from_sql_and_values(
+            db.get_database_backend(),
+            "DELETE FROM worker_emergency_contact_telecom WHERE emergency_contact_id IN \
+             (SELECT id FROM worker_emergency_contacts WHERE worker_id = $1)",
+            [id.into()],
+        ))
+        .await?;
+    deleted += telecom.rows_affected();
+    let contacts = db
+        .execute(Statement::from_sql_and_values(
+            db.get_database_backend(),
+            "DELETE FROM worker_emergency_contacts WHERE worker_id = $1",
+            [id.into()],
+        ))
+        .await?;
+    deleted += contacts.rows_affected();
+
+    Ok(deleted)
+}
+
 /// Erase one worker: destroy the child rows, scrub the parent row, write
 /// back a tombstone name, withdraw cross-service links, redact the audit
 /// content, and append a chained `erased` audit row.
@@ -162,38 +209,7 @@ pub async fn erase<C: ConnectionTrait>(
     };
     let found = existing.is_some();
 
-    // 1. Destroy the child rows. These *are* the personal data; nothing
-    //    hashes or links them, so deletion breaks no integrity property.
-    let mut child_rows_deleted = 0;
-    for table in CHILD_TABLES {
-        let result = db
-            .execute(Statement::from_sql_and_values(
-                db.get_database_backend(),
-                format!("DELETE FROM {table} WHERE worker_id = $1"),
-                [id.into()],
-            ))
-            .await?;
-        child_rows_deleted += result.rows_affected();
-    }
-    // Emergency-contact telecom rows hang off the emergency contacts, not
-    // off the worker, so they are swept through their parent first.
-    let telecom = db
-        .execute(Statement::from_sql_and_values(
-            db.get_database_backend(),
-            "DELETE FROM worker_emergency_contact_telecom WHERE emergency_contact_id IN \
-             (SELECT id FROM worker_emergency_contacts WHERE worker_id = $1)",
-            [id.into()],
-        ))
-        .await?;
-    child_rows_deleted += telecom.rows_affected();
-    let contacts = db
-        .execute(Statement::from_sql_and_values(
-            db.get_database_backend(),
-            "DELETE FROM worker_emergency_contacts WHERE worker_id = $1",
-            [id.into()],
-        ))
-        .await?;
-    child_rows_deleted += contacts.rows_affected();
+    let child_rows_deleted = destroy_child_rows(db, id).await?;
 
     if found {
         // 2. Scrub the parent row's own personal fields and retire it.
@@ -214,6 +230,7 @@ pub async fn erase<C: ConnectionTrait>(
                managing_organization_id = NULL, \
                created_by = NULL, updated_by = NULL, \
                content_hash = NULL, content_hash_blake3 = NULL, \
+               content_hash_sha3 = NULL, \
                active = FALSE, deleted_at = NOW(), deleted_by = $3, \
                updated_at = NOW() \
              WHERE id = $1",

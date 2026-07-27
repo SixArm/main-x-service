@@ -107,6 +107,7 @@ fn model_from_domain(a: &Assessment) -> Result<row::Model> {
         deleted_at: None,
         content_hash: None,
         content_hash_blake3: None,
+        content_hash_sha3: None,
     })
 }
 
@@ -152,9 +153,10 @@ async fn write_hashed<C: ConnectionTrait>(
     mut row: row::Model,
     insert: bool,
 ) -> Result<row::Model> {
-    let (sha, b3) = crate::compliance::record_integrity::assessment_digests(&row);
-    row.content_hash = Some(sha);
-    row.content_hash_blake3 = Some(b3);
+    let d = crate::compliance::record_integrity::assessment_digests(&row);
+    row.content_hash = Some(d.sha256);
+    row.content_hash_blake3 = Some(d.blake3);
+    row.content_hash_sha3 = Some(d.sha3);
     let active: row::ActiveModel = row.into();
     let active = active.reset_all();
     Ok(if insert {
@@ -341,6 +343,7 @@ mod tests {
             // Unhashed: `write_hashed` fills both in as it writes.
             content_hash: None,
             content_hash_blake3: None,
+            content_hash_sha3: None,
         }
     }
 

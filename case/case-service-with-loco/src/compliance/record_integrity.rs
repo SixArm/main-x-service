@@ -94,6 +94,18 @@ pub fn record_hash_blake3(input: &RecordInput<'_>) -> String {
     blake3::hash(&pre).to_hex().to_string()
 }
 
+/// The same record's digest under **SHA-3** (SHA3-256).
+#[must_use]
+pub fn record_hash_sha3(input: &RecordInput<'_>) -> String {
+    use sha3::Digest as _;
+    let mut out = String::with_capacity(64);
+    for byte in sha3::Sha3_256::digest(preimage(input)) {
+        // Infallible: writing to a `String` never fails.
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
+}
+
 /// The digest pre-image: the version tag, then every bound field, each
 /// followed by the unit separator.
 ///
@@ -125,9 +137,28 @@ fn preimage(input: &RecordInput<'_>) -> Vec<u8> {
 /// stale digest that verification reports as tampering on an untouched
 /// record — a false accusation, and the likeliest way this breaks.
 /// Returning a tuple makes the omission impossible to express.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Digests {
+    /// FIPS 180-4 SHA-256.
+    pub sha256: String,
+    /// BLAKE3.
+    pub blake3: String,
+    /// FIPS 202 SHA3-256.
+    pub sha3: String,
+}
+
+/// Every digest for one record, computed from one pre-image.
+///
+/// A **named struct rather than a tuple**: with three algorithms `.0`/
+/// `.1`/`.2` is a latent bug, since putting the SHA-3 digest in the
+/// BLAKE3 column type-checks and fails only at the next verification.
 #[must_use]
-pub fn digests(input: &RecordInput<'_>) -> (String, String) {
-    (record_hash(input), record_hash_blake3(input))
+pub fn digests(input: &RecordInput<'_>) -> Digests {
+    Digests {
+        sha256: record_hash(input),
+        blake3: record_hash_blake3(input),
+        sha3: record_hash_sha3(input),
+    }
 }
 
 /// Borrow a stored row's fields as a [`RecordInput`].
@@ -152,6 +183,12 @@ pub fn hash_of(row: &cases::Model) -> String {
 #[must_use]
 pub fn hash_of_blake3(row: &cases::Model) -> String {
     record_hash_blake3(&input_for(row))
+}
+
+/// The SHA-3 digest a stored row *should* carry.
+#[must_use]
+pub fn hash_of_sha3(row: &cases::Model) -> String {
+    record_hash_sha3(&input_for(row))
 }
 
 /// One record whose stored hash does not match its content.
@@ -270,9 +307,11 @@ mod tests {
             deleted_at: None,
             content_hash: None,
             content_hash_blake3: None,
+            content_hash_sha3: None,
         };
         model.content_hash = Some(hash_of(&model));
         model.content_hash_blake3 = Some(hash_of_blake3(&model));
+        model.content_hash_sha3 = Some(hash_of_sha3(&model));
         model
     }
 
@@ -378,6 +417,7 @@ mod tests {
         // this control would otherwise report as tampering.
         r.content_hash = Some(hash_of(&r));
         r.content_hash_blake3 = Some(hash_of_blake3(&r));
+        r.content_hash_sha3 = Some(hash_of_sha3(&r));
         assert!(verify(std::slice::from_ref(&r)).verified);
         // Now resurrect it behind the service's back.
         r.active = true;

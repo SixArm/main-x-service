@@ -51,8 +51,9 @@ impl Model {
             title: ActiveValue::set(case.title.clone()),
             // A new record is live, so the digest binds `deleted_at` as
             // `None`.
-            content_hash: ActiveValue::set(Some(digests.0.clone())),
-            content_hash_blake3: ActiveValue::set(Some(digests.1.clone())),
+            content_hash: ActiveValue::set(Some(digests.sha256.clone())),
+            content_hash_blake3: ActiveValue::set(Some(digests.blake3.clone())),
+            content_hash_sha3: ActiveValue::set(Some(digests.sha3.clone())),
             data: ActiveValue::set(data),
             active: ActiveValue::set(true),
             deleted_at: ActiveValue::set(None),
@@ -177,15 +178,16 @@ impl ActiveModel {
         let pid = *self.pid.as_ref();
         let active = *self.active.as_ref();
         let deleted_at_micros = self.deleted_at.as_ref().map(|d| d.timestamp_micros());
-        let (sha, b3) = record_integrity::digests(&record_integrity::RecordInput {
+        let d = record_integrity::digests(&record_integrity::RecordInput {
             pid,
             title: &case.title,
             data: &data,
             active,
             deleted_at_micros,
         });
-        self.content_hash = ActiveValue::set(Some(sha));
-        self.content_hash_blake3 = ActiveValue::set(Some(b3));
+        self.content_hash = ActiveValue::set(Some(d.sha256));
+        self.content_hash_blake3 = ActiveValue::set(Some(d.blake3));
+        self.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
         self.title = ActiveValue::set(case.title.clone());
         self.data = ActiveValue::set(data);
         self.update(db).await.map_err(ModelError::from)
@@ -207,15 +209,16 @@ impl ActiveModel {
         // A soft delete changes the lifecycle state the digest binds, so
         // the row rehashes — otherwise every deleted case would read as
         // tampered.
-        let (sha, b3) = record_integrity::digests(&record_integrity::RecordInput {
+        let d = record_integrity::digests(&record_integrity::RecordInput {
             pid: *self.pid.as_ref(),
             title: self.title.as_ref(),
             data: self.data.as_ref(),
             active: false,
             deleted_at_micros: Some(deleted_at.timestamp_micros()),
         });
-        self.content_hash = ActiveValue::set(Some(sha));
-        self.content_hash_blake3 = ActiveValue::set(Some(b3));
+        self.content_hash = ActiveValue::set(Some(d.sha256));
+        self.content_hash_blake3 = ActiveValue::set(Some(d.blake3));
+        self.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
         self.active = ActiveValue::set(false);
         self.deleted_at = ActiveValue::set(Some(deleted_at));
         self.update(db).await.map_err(ModelError::from)

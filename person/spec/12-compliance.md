@@ -317,8 +317,8 @@ defects had to be fixed first, none of them from the compliance work:
 
 Everything this service hashes, how each digest is built, and — the part
 that matters when a report says something is wrong — what each one does
-and does not prove. Every digest is computed under **both SHA-256 and
-BLAKE3** over the same pre-image, rendered lowercase hex; see "Two
+and does not prove. Every digest is computed under **SHA-256, BLAKE3 and SHA-3**
+over the same pre-image, rendered lowercase hex; see "Two
 algorithms" below for why both are kept.
 
 #### The digests
@@ -332,17 +332,46 @@ They are **complementary, and neither subsumes the other.** The chain
 covers the *trail*; it cannot see an edit to an entity row, because a
 change made without writing an audit row leaves the chain intact. The record hash covers the *records*; it cannot see a row deleted outright in SQL, because a legitimate delete writes an audit row and an illegitimate one breaks the chain — which is the chain's job.
 
-#### Two algorithms: SHA-256 and BLAKE3
+#### Three algorithms: SHA-256, BLAKE3 and SHA-3
 
-Every digest above is computed **twice**, over a byte-identical
-pre-image, and both results are stored:
+Every digest above is computed **three times**, over a byte-identical
+pre-image, and all three results are stored:
 
 | | Why it is kept |
 |---|---|
 | **SHA-256** | The conservative choice. FIPS 180-4, NIST-approved, two decades of cryptanalysis, and the digest a compliance reviewer expects to see named — some regimes name it explicitly. It is not going anywhere. |
 | **BLAKE3** | Several times faster (SIMD, and a parallel tree structure that scales with cores), which matters because every write on a hot path pays for a digest. It is also an extendable-output function, so a longer digest is available later at the same speed. |
+| **SHA-3** (SHA3-256) | The **structurally independent** one. FIPS 202, so it carries the same NIST standing as SHA-256 — but where SHA-256 is Merkle–Damgård with a Davies–Meyer compression function, SHA-3 is a **sponge**. NIST standardised it precisely so an approved alternative would exist that shares no design lineage with SHA-2. |
 
-**The real reason for keeping both is algorithm agility**, and it has a
+**Which one to rely on, if you have to pick.**
+
+- **Strict NIST/FIPS compliance: use SHA-3 (or SHA-256).** Both are
+  FIPS-approved — SHA-256 under FIPS 180-4, SHA-3 under FIPS 202 — so
+  either satisfies a regime that requires an approved hash. **BLAKE3 is
+  not FIPS-approved**, and a deployment under strict FIPS rules must not
+  count it as the control of record. It is kept here for speed and for
+  the third independent opinion, not to satisfy an auditor.
+- Of the two approved options, **SHA-3 is the one to name in a control
+  document going forward.** It is the newer standard, and NIST published
+  it specifically so that an approved hash would exist which is *not* a
+  SHA-2 variant — which is the whole point of holding it here.
+- **Verification requires no choice at all.** All three digests are
+  recomputed on every check and reported separately, so a reader may rely
+  on whichever their regime recognises and ignore the others. Nothing in
+  the report privileges one algorithm.
+
+**Why three, and the cost.** The value is *design-family diversity*, not
+digest length. SHA-256 is Merkle–Damgård, BLAKE3 is an ARX tree, SHA-3 is
+a sponge — so the kind of cryptanalytic advance that took MD5 and SHA-1
+(both Merkle–Damgård) would not transfer across all three. Two digests
+from the same family would buy much less. The cost is honest and worth
+stating: three passes over the pre-image on every write, three columns per
+hashed table, and SHA-3 is the slowest of the three in software, lacking
+the dedicated CPU instructions SHA-256 enjoys. Returns diminish after the
+second algorithm; the third is bought for structural independence and for
+FIPS standing, not for margin.
+
+**The real reason for keeping more than one is algorithm agility**, and it has a
 deadline. A stored digest can only ever attest to the content that was
 hashed *at the time of writing*. If SHA-256 were weakened in five years,
 re-hashing the existing history under a replacement would prove nothing:
@@ -381,12 +410,13 @@ can make and it holds today:
   either.** The BHT algorithm's ~2^(n/3) bound needs quantum-accessible
   memory at a scale nobody credible projects, and the consensus estimate
   for realistic models is far closer to the classical birthday bound.
-- **Both algorithms inherit this equally.** SHA-256 and BLAKE3 are both
-  256-bit, so Grover treats them identically — the effect depends on
-  output length, not internal design. Neither is more quantum-resistant
-  than the other here, and this spec does not claim otherwise; what it
-  claims is that **both are quantum-resistant**, which is the useful
-  statement.
+- **All three inherit this equally.** SHA-256, BLAKE3 and SHA3-256 are
+  all 256-bit, so Grover treats them identically — the effect depends on
+  output length, not internal design. None is more quantum-resistant than
+  the others here, and this spec does not claim otherwise; what it claims
+  is that **all three are quantum-resistant**, which is the useful
+  statement. (Structural diversity buys resistance to *classical*
+  cryptanalysis, not to Grover.)
 
 **BLAKE3 is what makes the next step cheap.** If a future risk assessment
 wants a higher NIST category rather than the current margin, BLAKE3 is an
@@ -410,9 +440,10 @@ migration into a parameter change.
 > this section down — a reader who takes "we hash with BLAKE3" as their
 > post-quantum answer has been pointed at the wrong subsystem.
 
-The summary: **SHA-256 for conservatism and auditor familiarity, BLAKE3
-for speed, a longer digest on demand, and the agility to survive a future
-weakness in either.**
+The summary: **SHA-256 for conservatism and auditor familiarity, SHA-3
+for FIPS standing without SHA-2's design lineage, and BLAKE3 for speed
+and a longer digest on demand — three unrelated constructions, so no
+single cryptanalytic result takes them all.**
 
 ##### What verification reports
 

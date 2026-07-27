@@ -210,6 +210,7 @@ pub async fn erase<C: ConnectionTrait>(
                managing_organization_id = NULL, \
                created_by = NULL, updated_by = NULL, \
                content_hash = NULL, content_hash_blake3 = NULL, \
+               content_hash_sha3 = NULL, \
                active = FALSE, deleted_at = NOW(), deleted_by = $3, \
                updated_at = NOW() \
              WHERE id = $1",
