@@ -805,3 +805,123 @@ async fn export_state_is_durable_not_in_process() {
     })
     .await;
 }
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// **The external witness.** Deleting audit rows wholesale is invisible to
+// the chain — remove the tail and no successor is left to break, so the
+// shortened chain verifies perfectly. A checkpoint recorded off-box is
+// what catches it.
+//
+// This test is the argument in executable form: take a checkpoint, delete
+// the rows it witnessed, confirm the chain still says "verified", and
+// confirm the checkpoint says otherwise.
+async fn a_recorded_checkpoint_detects_wholesale_deletion() {
+    request::<App, _, _>(|request, ctx| async move {
+        use sea_orm::ConnectionTrait as _;
+
+        // Some history to witness.
+        for i in 0..3 {
+            let mut body = rich_pathway();
+            body["name"] = serde_json::json!(format!("Checkpoint subject {i}"));
+            request.post("/api/care-pathways").json(&body).await;
+        }
+
+        let taken = request.get("/api/compliance/checkpoint").await;
+        assert_eq!(
+            taken.status_code(),
+            200,
+            "a chain with rows yields a checkpoint"
+        );
+        let checkpoint: serde_json::Value = taken.json();
+        assert!(checkpoint["head"].as_str().is_some_and(|h| !h.is_empty()));
+
+        // Honoured before anything is touched.
+        let before = request
+            .post("/api/compliance/checkpoint/verify")
+            .json(&checkpoint)
+            .await;
+        assert_eq!(before.json::<serde_json::Value>()["honoured"], true);
+
+        // Now delete the trail wholesale, as an attacker with SQL access
+        // would. No audit row is written; nothing in-band records it.
+        ctx.db
+            .execute(sea_orm::Statement::from_string(
+                sea_orm::DatabaseBackend::Postgres,
+                "DELETE FROM audit_logs".to_string(),
+            ))
+            .await
+            .expect("delete the trail");
+
+        // The chain's own verification is perfectly happy: there is
+        // nothing left to contradict. This is the blind spot.
+        let chain = request.get("/api/compliance/audit/verify?limit=1000").await;
+        assert_eq!(
+            chain.json::<serde_json::Value>()["verified"],
+            true,
+            "an emptied chain verifies vacuously — which is exactly why the witness exists"
+        );
+
+        // The checkpoint is not fooled.
+        let after = request
+            .post("/api/compliance/checkpoint/verify")
+            .json(&checkpoint)
+            .await;
+        let report: serde_json::Value = after.json();
+        assert_eq!(
+            report["honoured"], false,
+            "deletion must be detected: {report}"
+        );
+        assert_eq!(
+            report["verdict"]["verdict"], "anchor_missing",
+            "and named as a deletion, not as a content change: {report}"
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// A checkpoint that has itself been altered cannot be used to accuse the
+// chain: the verdict says the *witness* failed, not the data.
+//
+// Without this distinction, an attacker who could edit the stored
+// checkpoint would be able to manufacture an apparent tampering incident
+// — or, worse, an investigation would start in the wrong place.
+async fn an_altered_checkpoint_accuses_itself_not_the_chain() {
+    request::<App, _, _>(|request, _ctx| async move {
+        request
+            .post("/api/care-pathways")
+            .json(&rich_pathway())
+            .await;
+        let taken = request.get("/api/compliance/checkpoint").await;
+        let mut checkpoint: serde_json::Value = taken.json();
+
+        // Only meaningful when a key is configured; without one the
+        // checkpoint carries no MAC and this is not the property under
+        // test.
+        if checkpoint["mac"].is_null() {
+            return;
+        }
+        // Alter it to a value that is certainly different from whatever
+        // was recorded. An earlier version of this test set it to `1`,
+        // which happened to be the real count — so the "alteration" was a
+        // no-op and the test passed while proving nothing.
+        let recorded = checkpoint["rows_at_or_before"].as_u64().expect("a count");
+        checkpoint["rows_at_or_before"] = serde_json::json!(recorded + 1_000);
+
+        let response = request
+            .post("/api/compliance/checkpoint/verify")
+            .json(&checkpoint)
+            .await;
+        let report: serde_json::Value = response.json();
+        assert_eq!(report["honoured"], false, "report: {report}");
+        assert_eq!(
+            report["verdict"]["verdict"], "checkpoint_not_authentic",
+            "the witness is what failed, not the chain: {report}"
+        );
+    })
+    .await;
+}

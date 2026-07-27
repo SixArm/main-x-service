@@ -43,6 +43,10 @@ pub mod audit_chain;
 /// FHIR Bulk Data Access (`$export`) job registry and NDJSON assembly.
 pub mod bulk;
 /// Read/disclosure auditing: purpose-of-use capture and access records.
+/// External witness: signed chain checkpoints kept off-box, so wholesale
+/// deletion is detectable (see the module docs).
+pub mod checkpoint;
+
 pub mod disclosure;
 /// GDPR Art. 17 erasure that survives the immutable chain (redaction).
 pub mod erasure;

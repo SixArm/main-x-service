@@ -321,6 +321,56 @@ A missing or malformed key disables MAC writing and logs it rather than
 blocking boot, matching the ABAC-policy and PASETO-key loaders; the
 consequence is visible, because `mac_absent` then climbs in every report.
 
+#### The external witness: checkpoints kept off-box
+
+The MAC stops a row being **forged**. It says nothing about a row that is
+simply **gone**, and neither does the chain: deletion from the *middle* of
+a run breaks the successor's linkage, but deleting the **tail** leaves no
+successor to break, so the shortened chain verifies perfectly. Delete
+everything and it verifies vacuously. A DB-gated test states this
+plainly — it empties `audit_logs`, confirms `/audit/verify` still reports
+`verified: true`, and then catches the deletion by other means.
+
+Truncation is invisible from inside the data. Detecting it needs
+something the attacker cannot reach.
+
+`GET /api/compliance/checkpoint` returns a **checkpoint**: "at position
+*N* the chain head was *H*, and *C* rows stood at or before *N*", MAC'd so
+it cannot be rewritten by someone holding only the database. The operator
+takes one periodically and stores it **outside this database**. Each is
+also emitted as an `INFO` log line on the `audit_checkpoint` target, so a
+deployment that already ships logs off the host has a witness without
+building anything else.
+
+`POST /api/compliance/checkpoint/verify` takes one back and answers
+whether the chain still honours it:
+
+| Verdict | Meaning |
+|---|---|
+| `honoured` | the anchor is present, unchanged, with at least as much history behind it |
+| `anchor_missing` | **rows were deleted** — the witnessed row is gone |
+| `head_changed` | the anchor survived but its content changed |
+| `rows_deleted` | the anchor survived but history *behind* it shrank |
+| `checkpoint_not_authentic` | the **witness** was altered; nothing is concluded about the chain |
+| `checkpoint_unverifiable` | the checkpoint names a key this service cannot check |
+
+The row count is carried for a specific reason: without it, an attacker
+could delete history freely as long as they left the newest row alone.
+
+**The storage is the control, not this code.** A checkpoint kept in this
+database is worthless — an attacker who can delete audit rows can delete
+the checkpoint in the same transaction, and its MAC prevents forgery, not
+deletion, which is the entire problem. This service only makes the value
+cheap to produce, cheap to compare, and unforgeable in transit. Where it
+is kept is a deployment decision and the one that determines whether any
+of this works.
+
+**A tampered witness accuses itself.** The checkpoint's own MAC is checked
+before the chain is consulted, and a failure reports
+`checkpoint_not_authentic` rather than blaming the data. Without that
+distinction an altered checkpoint would manufacture an apparent tampering
+incident and send an investigation to the wrong subsystem.
+
 #### Where the digests are computed: Rust, never the database
 
 **Decision (2026-07-27): every digest is computed in the service, in
@@ -380,9 +430,9 @@ from the wrong backup, an attacker who does not know the digest columns
 exist. Two things would raise that bar, and neither involves moving
 computation into the database:
 
-- **An external witness.** The chain head is reported by
-  `/audit/verify`; recording it off-box makes a wholesale rewrite
-  detectable, because the attacker cannot reach the copy.
+- **An external witness** — **built, 2026-07-27**; see "The external
+  witness" above. Recording a signed checkpoint off-box makes wholesale
+  deletion detectable, because the attacker cannot reach the copy.
 - **A keyed digest (HMAC)** with a key the database does not hold —
   **built, 2026-07-27**; see "The keyed MAC" above. It is the *opposite*
   direction from database-side hashing, which is why that idea and this

@@ -15,9 +15,12 @@
 //! nothing here discloses pathway data.
 
 use axum::extract::Query;
+use axum::http::StatusCode;
+use axum::response::IntoResponse as _;
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::compliance::checkpoint::Checkpoint;
 use crate::compliance::{Posture, soup};
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::care_pathways::Model as PathwayModel;
@@ -177,6 +180,91 @@ async fn verify_records(
 }
 
 /// Compliance-evidence routes, mounted under `/api/compliance`.
+/// Take a chain checkpoint — the external witness against wholesale
+/// deletion.
+///
+/// `GET /api/compliance/checkpoint` returns a signed statement of the
+/// chain's current head, position and depth. **Store it outside this
+/// service's database.** A checkpoint kept alongside the data it
+/// witnesses is worthless: an attacker who can delete audit rows can
+/// delete the checkpoint in the same transaction, and its MAC prevents
+/// forgery, not deletion.
+///
+/// The checkpoint is also emitted as an `INFO` log line, so a deployment
+/// that already ships logs off the host has a witness without building
+/// anything further.
+///
+/// `204 No Content` when the chain is empty: there is nothing to witness,
+/// and returning a checkpoint that any future state satisfies would be
+/// worse than returning none.
+///
+/// # Errors
+///
+/// Propagates the query error.
+#[debug_handler]
+async fn take_checkpoint(State(ctx): State<AppContext>) -> Result<Response> {
+    let now = chrono::Utc::now().timestamp_micros();
+    let Some(checkpoint) = Checkpoint::take(&ctx.db, now).await? else {
+        return Ok((StatusCode::NO_CONTENT, ()).into_response());
+    };
+    tracing::info!(
+        target: "audit_checkpoint",
+        version = %checkpoint.version,
+        anchor_id = checkpoint.anchor_id,
+        head = %checkpoint.head,
+        rows_at_or_before = checkpoint.rows_at_or_before,
+        taken_at_micros = checkpoint.taken_at_micros,
+        mac = checkpoint.mac.as_deref().unwrap_or("none"),
+        "audit chain checkpoint"
+    );
+    format::json(checkpoint)
+}
+
+/// Check whether the chain still honours a previously recorded
+/// checkpoint.
+///
+/// `POST /api/compliance/checkpoint/verify` with a checkpoint body. This
+/// is the half that detects deletion: the chain's own verification cannot
+/// see rows removed from the tail, because nothing is left to break.
+///
+/// The checkpoint's own MAC is checked first. A witness that has been
+/// altered cannot be used to accuse the chain — reporting that as
+/// tampering would point an investigation at the wrong subsystem.
+///
+/// # Errors
+///
+/// Propagates the query error.
+#[debug_handler]
+async fn verify_checkpoint(
+    State(ctx): State<AppContext>,
+    Json(checkpoint): Json<Checkpoint>,
+) -> Result<Response> {
+    let verdict = checkpoint.verify_against(&ctx.db).await?;
+    let honoured = verdict == crate::compliance::checkpoint::CheckpointVerdict::Honoured;
+    if !honoured {
+        tracing::error!(
+            target: "audit_checkpoint",
+            anchor_id = checkpoint.anchor_id,
+            ?verdict,
+            "audit chain does not honour a recorded checkpoint"
+        );
+    }
+    format::json(serde_json::json!({
+        "honoured": honoured,
+        "verdict": verdict,
+        "interpretation": if honoured {
+            "the chain still contains the witnessed row, unchanged, with at least as much \
+             history behind it"
+        } else {
+            "the chain no longer matches what was witnessed — investigate before writing \
+             anything further, and note that a checkpoint stored in this same database \
+             proves nothing"
+        },
+    }))
+}
+
+/// Build the `/api/compliance` route table: posture, SBOM, chain and
+/// record verification, and the external-witness checkpoint endpoints.
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/compliance")
@@ -184,6 +272,8 @@ pub fn routes() -> Routes {
         .add("/sbom", get(sbom))
         .add("/audit/verify", get(verify_audit_chain))
         .add("/records/verify", get(verify_records))
+        .add("/checkpoint", get(take_checkpoint))
+        .add("/checkpoint/verify", post(verify_checkpoint))
 }
 
 #[cfg(test)]
