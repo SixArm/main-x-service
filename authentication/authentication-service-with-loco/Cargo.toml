@@ -21,6 +21,10 @@ include = ["src/**/*", "LICENSE.md", "README.md", "llms.txt", "llms.json"]
 loco-rs = { version = "0.16" }
 
 [dependencies]
+# Keyed integrity MACs with production-grade key handling — one audited
+# implementation shared by every service. Distinct from the PASETO
+# signing key: this secret never leaves the service.
+integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 loco-rs = { workspace = true  }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }

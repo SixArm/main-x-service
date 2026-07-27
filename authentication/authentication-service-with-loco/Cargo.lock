@@ -233,6 +233,7 @@ dependencies = [
  "ed25519-dalek",
  "include_dir",
  "insta",
+ "integrity-mac",
  "loco-rs",
  "mimalloc",
  "prometheus",
@@ -2058,6 +2059,17 @@ dependencies = [
  "similar",
  "strip-ansi-escapes",
  "tempfile",
+]
+
+[[package]]
+name = "integrity-mac"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.2.17",
+ "hkdf",
+ "hmac",
+ "sha2",
+ "zeroize",
 ]
 
 [[package]]

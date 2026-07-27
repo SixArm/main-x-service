@@ -18,6 +18,8 @@ pub mod app;
 /// RS256 JWT issuance, verification, JWKS publication, bearer extractor.
 pub mod auth;
 /// Loco HTTP controllers (magic-link auth + paseto-keys endpoint).
+/// Compliance controls: keyed integrity over the auth-event trail.
+pub mod compliance;
 pub mod controllers;
 /// The `__Host-mxi_session` session cookie (build / clear / parse).
 pub mod cookie;

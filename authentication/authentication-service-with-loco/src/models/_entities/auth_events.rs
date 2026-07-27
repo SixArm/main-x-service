@@ -20,6 +20,14 @@ pub struct Model {
     pub email: Option<String>,
     pub user_pid: Option<Uuid>,
     pub detail: Option<String>,
+    /// HMAC-SHA256 over this row's pre-image, as
+    /// `"<scheme>.<key id>:<hex>"`.
+    ///
+    /// Detects a row whose content was altered — notably an
+    /// `attributes_assigned` row rewritten to hide a privilege grant. It
+    /// does **not** detect a row deleted wholesale (see
+    /// `crate::compliance`).
+    pub mac: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

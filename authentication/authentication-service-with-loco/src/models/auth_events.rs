@@ -44,11 +44,31 @@ impl Model {
         user_pid: Option<Uuid>,
         detail: Option<&str>,
     ) -> ModelResult<Self> {
+        // The timestamp is part of the MAC pre-image, so it is minted here
+        // rather than defaulted by the database: the alternative —
+        // insert, then stamp — leaves a window in which the row exists
+        // unprotected.
+        let created_at: chrono::DateTime<chrono::FixedOffset> = chrono::Utc::now().into();
+        // The stored address is the normalised one, so the MAC covers
+        // what the row actually holds rather than what was passed in.
+        let email = email.map(normalise_email);
+        let detail = detail.map(ToString::to_string);
+        let mac = crate::compliance::audit_integrity::tag(
+            &crate::compliance::audit_integrity::AuditInput {
+                event,
+                email: email.as_deref(),
+                user_pid,
+                detail: detail.as_deref(),
+                created_at_micros: created_at.timestamp_micros(),
+            },
+        );
         let entry = auth_events::ActiveModel {
             event: ActiveValue::set(event.to_string()),
-            email: ActiveValue::set(email.map(normalise_email)),
+            email: ActiveValue::set(email),
             user_pid: ActiveValue::set(user_pid),
-            detail: ActiveValue::set(detail.map(ToString::to_string)),
+            detail: ActiveValue::set(detail),
+            created_at: ActiveValue::set(created_at),
+            mac: ActiveValue::set(mac),
             ..Default::default()
         }
         .insert(db)
