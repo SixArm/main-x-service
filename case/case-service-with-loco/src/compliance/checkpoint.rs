@@ -172,7 +172,7 @@ impl Checkpoint {
             taken_at_micros,
             mac: None,
         };
-        checkpoint.mac = super::mac::tag(&checkpoint.preimage());
+        checkpoint.mac = super::mac::tag(super::mac::Domain::Checkpoint, &checkpoint.preimage());
         Ok(Some(checkpoint))
     }
 
@@ -191,7 +191,11 @@ impl Checkpoint {
     ) -> loco_rs::prelude::ModelResult<CheckpointVerdict> {
         use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 
-        match super::mac::verify(self.mac.as_deref(), &self.preimage()) {
+        match super::mac::verify(
+            super::mac::Domain::Checkpoint,
+            self.mac.as_deref(),
+            &self.preimage(),
+        ) {
             // `Valid` is the expected path. `Absent` means the
             // checkpoint predates the key: still worth comparing, it just
             // carries less assurance about its own provenance. Both
@@ -200,7 +204,9 @@ impl Checkpoint {
             super::mac::MacVerdict::Invalid => {
                 return Ok(CheckpointVerdict::CheckpointNotAuthentic);
             }
-            super::mac::MacVerdict::UnknownKey(_) | super::mac::MacVerdict::Malformed => {
+            super::mac::MacVerdict::UnknownKey(_)
+            | super::mac::MacVerdict::UnknownScheme(_)
+            | super::mac::MacVerdict::Malformed => {
                 return Ok(CheckpointVerdict::CheckpointUnverifiable);
             }
         }

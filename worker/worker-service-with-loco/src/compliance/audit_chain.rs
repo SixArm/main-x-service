@@ -238,6 +238,35 @@ pub struct ChainReport {
     pub verified: bool,
 }
 
+/// Fold one MAC verdict into the report, returning whether it is a finding.
+///
+/// Only [`super::mac::MacVerdict::Invalid`] — a MAC that recomputes to a
+/// *different* value — counts against the row. Absent, unknown-key,
+/// unknown-scheme, and malformed all mean "I cannot check this", which is
+/// a different statement from "this is wrong" and leads to a different
+/// investigation: a key-distribution or binary-version problem, not
+/// tampering. They are counted and reported, never silently rounded to
+/// verified.
+fn tally_mac(report: &mut ChainReport, verdict: &super::mac::MacVerdict) -> bool {
+    match verdict {
+        super::mac::MacVerdict::Valid => {
+            report.mac_valid += 1;
+            true
+        }
+        super::mac::MacVerdict::Absent => {
+            report.mac_absent += 1;
+            true
+        }
+        super::mac::MacVerdict::UnknownKey(_)
+        | super::mac::MacVerdict::UnknownScheme(_)
+        | super::mac::MacVerdict::Malformed => {
+            report.mac_unverifiable += 1;
+            true
+        }
+        super::mac::MacVerdict::Invalid => false,
+    }
+}
+
 /// Verify a run of audit rows supplied in **ascending `seq` order**.
 #[must_use]
 pub fn verify(rows: &[audit_log::Model]) -> ChainReport {
@@ -303,24 +332,14 @@ pub fn verify(rows: &[audit_log::Model]) -> ChainReport {
             // **One** break per row, naming which digests disagreed —
             // both means the content changed, exactly one means that
             // digest column was edited or a write path stamped only one.
-            let mac_ok = match super::mac::verify(
-                row.mac.as_deref(),
-                &preimage(&input_for(row, row.prev_hash.as_deref())),
-            ) {
-                super::mac::MacVerdict::Valid => {
-                    report.mac_valid += 1;
-                    true
-                }
-                super::mac::MacVerdict::Absent => {
-                    report.mac_absent += 1;
-                    true
-                }
-                super::mac::MacVerdict::UnknownKey(_) | super::mac::MacVerdict::Malformed => {
-                    report.mac_unverifiable += 1;
-                    true
-                }
-                super::mac::MacVerdict::Invalid => false,
-            };
+            let mac_ok = tally_mac(
+                &mut report,
+                &super::mac::verify(
+                    super::mac::Domain::AuditChain,
+                    row.mac.as_deref(),
+                    &preimage(&input_for(row, row.prev_hash.as_deref())),
+                ),
+            );
             if !sha256_ok || !sha3_ok || !mac_ok {
                 // Name every algorithm that disagreed. All three means the
                 // content changed; a subset means those digest columns

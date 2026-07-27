@@ -206,7 +206,7 @@ pub fn digests(input: &RecordInput<'_>) -> crate::Result<Digests> {
     Ok(Digests {
         sha256: record_hash(input)?,
         sha3: record_hash_sha3(input)?,
-        mac: super::mac::tag(&preimage(input)?),
+        mac: super::mac::tag(super::mac::Domain::Record, &preimage(input)?),
     })
 }
 
@@ -430,7 +430,7 @@ pub fn assessment_digests(row: &crate::db::models::worker_assessments::Model) ->
     Digests {
         sha256: assessment_hash(row),
         sha3: assessment_hash_sha3(row),
-        mac: super::mac::tag(&assessment_preimage(row)),
+        mac: super::mac::tag(super::mac::Domain::Assessment, &assessment_preimage(row)),
     }
 }
 
@@ -519,8 +519,11 @@ pub fn verify_assessments(
         };
         // The keyed check — the one an adversary holding only the
         // database cannot satisfy.
-        let mac_ok = match super::mac::verify(row.content_mac.as_deref(), &assessment_preimage(row))
-        {
+        let mac_ok = match super::mac::verify(
+            super::mac::Domain::Assessment,
+            row.content_mac.as_deref(),
+            &assessment_preimage(row),
+        ) {
             super::mac::MacVerdict::Valid => {
                 report.mac_valid += 1;
                 true
@@ -529,7 +532,9 @@ pub fn verify_assessments(
                 report.mac_absent += 1;
                 true
             }
-            super::mac::MacVerdict::UnknownKey(_) | super::mac::MacVerdict::Malformed => {
+            super::mac::MacVerdict::UnknownKey(_)
+            | super::mac::MacVerdict::UnknownScheme(_)
+            | super::mac::MacVerdict::Malformed => {
                 report.mac_unverifiable += 1;
                 true
             }

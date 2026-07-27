@@ -155,7 +155,7 @@ pub fn digests(input: &RecordInput<'_>) -> Digests {
     Digests {
         sha256: record_hash(input),
         sha3: record_hash_sha3(input),
-        mac: super::mac::tag(&preimage(input)),
+        mac: super::mac::tag(super::mac::Domain::Record, &preimage(input)),
     }
 }
 

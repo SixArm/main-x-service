@@ -3256,6 +3256,7 @@ dependencies = [
  "dotenvy",
  "ed25519-dalek",
  "entity-ref",
+ "hkdf",
  "hmac",
  "loco-rs",
  "migration",
@@ -3292,6 +3293,7 @@ dependencies = [
  "utoipa",
  "utoipa-swagger-ui",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]

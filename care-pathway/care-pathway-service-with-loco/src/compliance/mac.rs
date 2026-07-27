@@ -639,7 +639,11 @@ mod tests {
         ];
         for (domain, want_subkey, want_tag) in cases {
             let subkey = derive(&root, domain);
-            let hex: String = subkey.iter().map(|b| format!("{b:02x}")).collect();
+            let hex = subkey.iter().fold(String::new(), |mut acc, b| {
+                use std::fmt::Write as _;
+                let _ = write!(acc, "{b:02x}");
+                acc
+            });
             assert_eq!(hex, want_subkey, "{domain:?} subkey drifted");
             assert_eq!(
                 raw_tag(&subkey, b"golden vector preimage"),
