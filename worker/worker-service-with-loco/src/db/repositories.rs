@@ -146,6 +146,40 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
     Ok(())
 }
 
+/// The parent-row `ActiveModel` for a worker update, digests included.
+///
+/// Shared by [`apply_worker_row_replacement`] and the `update`
+/// implementation, which previously built it twice — pre-existing drift
+/// that a second digest would have doubled.
+fn worker_update_model(
+    worker: &Worker,
+    content_hash: String,
+    content_hash_blake3: String,
+) -> workers::ActiveModel {
+    workers::ActiveModel {
+        id: Set(worker.id),
+        active: Set(worker.active),
+        content_hash: Set(Some(content_hash)),
+        content_hash_blake3: Set(Some(content_hash_blake3)),
+        worker_type: Set(worker
+            .worker_type
+            .as_ref()
+            .map(std::string::ToString::to_string)),
+        // Lowercased for the `workers_gender_check` CHECK constraint.
+        gender: Set(format!("{:?}", worker.gender).to_lowercase()),
+        birth_date: Set(worker.birth_date.map(date_to_time)),
+        tax_id: Set(worker.tax_id.clone()),
+        deceased: Set(worker.deceased),
+        deceased_datetime: Set(worker.deceased_datetime.map(ts_to_offset)),
+        marital_status: Set(worker.marital_status.clone()),
+        multiple_birth: Set(worker.multiple_birth),
+        managing_organization_id: Set(worker.managing_organization),
+        updated_at: Set(OffsetDateTime::now_utc()),
+        updated_by: Set(None),
+        ..Default::default()
+    }
+}
+
 /// The content hash a record should carry after an in-place update.
 ///
 /// Reads the row's existing soft-delete stamp, which the digest binds and
@@ -167,13 +201,16 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
 /// # Errors
 ///
 /// Returns an error if the lookup fails or the record cannot be hashed.
-async fn content_hash_for_update<C: ConnectionTrait>(conn: &C, worker: &Worker) -> Result<String> {
+async fn content_hash_for_update<C: ConnectionTrait>(
+    conn: &C,
+    worker: &Worker,
+) -> Result<(String, String)> {
     let existing_deleted_at = workers::Entity::find_by_id(worker.id)
         .one(conn)
         .await?
         .and_then(|row| row.deleted_at)
         .and_then(|d| i64::try_from(d.unix_timestamp_nanos() / 1_000).ok());
-    crate::compliance::record_integrity::hash_with_deleted_at(worker, existing_deleted_at)
+    crate::compliance::record_integrity::digests_with_deleted_at(worker, existing_deleted_at)
 }
 
 /// Apply a worker's parent-row update and wholesale child-row replacement on
@@ -188,31 +225,9 @@ async fn content_hash_for_update<C: ConnectionTrait>(conn: &C, worker: &Worker) 
 ///
 /// Returns an error if any update/delete/insert query fails.
 async fn apply_worker_row_replacement<C: ConnectionTrait>(conn: &C, worker: &Worker) -> Result<()> {
-    let content_hash = content_hash_for_update(conn, worker).await?;
+    let (content_hash, content_hash_blake3) = content_hash_for_update(conn, worker).await?;
 
-    let update_model = workers::ActiveModel {
-        id: Set(worker.id),
-        active: Set(worker.active),
-        content_hash: Set(Some(content_hash)),
-        worker_type: Set(worker
-            .worker_type
-            .as_ref()
-            .map(std::string::ToString::to_string)),
-        // Lowercased to honor the `workers_gender_check` CHECK constraint
-        // (`'male'`/`'female'`/`'other'`/`'unknown'`); the bare `Debug`
-        // form is rejected by the database.
-        gender: Set(format!("{:?}", worker.gender).to_lowercase()),
-        birth_date: Set(worker.birth_date.map(date_to_time)),
-        tax_id: Set(worker.tax_id.clone()),
-        deceased: Set(worker.deceased),
-        deceased_datetime: Set(worker.deceased_datetime.map(ts_to_offset)),
-        marital_status: Set(worker.marital_status.clone()),
-        multiple_birth: Set(worker.multiple_birth),
-        managing_organization_id: Set(worker.managing_organization),
-        updated_at: Set(OffsetDateTime::now_utc()),
-        updated_by: Set(None),
-        ..Default::default()
-    };
+    let update_model = worker_update_model(worker, content_hash, content_hash_blake3);
     update_model.update(conn).await?;
 
     worker_names::Entity::delete_many()
@@ -569,16 +584,16 @@ impl SeaOrmWorkerRepository {
     /// contact / photo collections — those are handled by
     /// [`insert_extra_collections`].
     fn to_active_models(worker: &Worker) -> Result<WorkerActiveModels> {
-        // Both digests from one call, so neither can be stamped
-        // without the other (see `record_integrity::digests`).
-        let digests = crate::compliance::record_integrity::digests_of_live(worker)?;
+        // Both digests from one call, so neither can be stamped without
+        // the other (see `record_integrity::digests`).
+        let (sha, b3) = crate::compliance::record_integrity::digests_of_live(worker)?;
         let new_worker = workers::ActiveModel {
             id: Set(worker.id),
             active: Set(worker.active),
             // A new record is live, so the digest binds `deleted_at` as
             // `None`.
-            content_hash: Set(Some(digests.0.clone())),
-            content_hash_blake3: Set(Some(digests.1.clone())),
+            content_hash: Set(Some(sha)),
+            content_hash_blake3: Set(Some(b3)),
             worker_type: Set(worker
                 .worker_type
                 .as_ref()
@@ -1176,28 +1191,8 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         // Update worker. This duplicates `apply_worker_row_replacement`
         // above rather than calling it — pre-existing drift, left alone
         // here beyond adding the rehash it also needs.
-        let content_hash = content_hash_for_update(&txn, worker).await?;
-        let update_model = workers::ActiveModel {
-            id: Set(worker.id),
-            active: Set(worker.active),
-            content_hash: Set(Some(content_hash)),
-            worker_type: Set(worker
-                .worker_type
-                .as_ref()
-                .map(std::string::ToString::to_string)),
-            // Lowercased for the `workers_gender_check` CHECK constraint.
-            gender: Set(format!("{:?}", worker.gender).to_lowercase()),
-            birth_date: Set(worker.birth_date.map(date_to_time)),
-            tax_id: Set(worker.tax_id.clone()),
-            deceased: Set(worker.deceased),
-            deceased_datetime: Set(worker.deceased_datetime.map(ts_to_offset)),
-            marital_status: Set(worker.marital_status.clone()),
-            multiple_birth: Set(worker.multiple_birth),
-            managing_organization_id: Set(worker.managing_organization),
-            updated_at: Set(OffsetDateTime::now_utc()),
-            updated_by: Set(None),
-            ..Default::default()
-        };
+        let (content_hash, content_hash_blake3) = content_hash_for_update(&txn, worker).await?;
+        let update_model = worker_update_model(worker, content_hash, content_hash_blake3);
         update_model.update(&txn).await?;
 
         // Delete existing associated data
@@ -1322,13 +1317,19 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         let deleted_micros = i64::try_from(deleted_at.unix_timestamp_nanos() / 1_000).ok();
         let tombstone_hash = old_duplicate
             .as_ref()
-            .map(|w| crate::compliance::record_integrity::hash_with_deleted_at(w, deleted_micros))
+            .map(|w| {
+                crate::compliance::record_integrity::digests_with_deleted_at(w, deleted_micros)
+            })
             .transpose()?;
         let dup_delete = workers::ActiveModel {
             id: Set(*duplicate_id),
             deleted_at: Set(Some(deleted_at)),
             deleted_by: Set(Some("system".to_string())),
-            content_hash: tombstone_hash.map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h))),
+            content_hash: tombstone_hash
+                .as_ref()
+                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.0.clone()))),
+            content_hash_blake3: tombstone_hash
+                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.1))),
             ..Default::default()
         };
         dup_delete.update(&txn).await?;
@@ -1413,13 +1414,19 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         let deleted_micros = i64::try_from(deleted_at.unix_timestamp_nanos() / 1_000).ok();
         let tombstone_hash = old_worker
             .as_ref()
-            .map(|w| crate::compliance::record_integrity::hash_with_deleted_at(w, deleted_micros))
+            .map(|w| {
+                crate::compliance::record_integrity::digests_with_deleted_at(w, deleted_micros)
+            })
             .transpose()?;
         let update_model = workers::ActiveModel {
             id: Set(*id),
             deleted_at: Set(Some(deleted_at)),
             deleted_by: Set(Some("system".to_string())),
-            content_hash: tombstone_hash.map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h))),
+            content_hash: tombstone_hash
+                .as_ref()
+                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.0.clone()))),
+            content_hash_blake3: tombstone_hash
+                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.1))),
             ..Default::default()
         };
         // Unlike create/update, the soft-delete is a single row update with no

@@ -37,20 +37,22 @@ impl Model {
     pub async fn create<C: ConnectionTrait>(db: &C, case: &MatchCase) -> ModelResult<Self> {
         let data = serde_json::to_value(case).map_err(|e| ModelError::Any(e.into()))?;
         let pid = Uuid::new_v4();
+        // Both digests from one call, so neither can be stamped without
+        // the other (see `record_integrity::digests`).
+        let digests = record_integrity::digests(&record_integrity::RecordInput {
+            pid,
+            title: &case.title,
+            data: &data,
+            active: true,
+            deleted_at_micros: None,
+        });
         let model = cases::ActiveModel {
             pid: ActiveValue::set(pid),
             title: ActiveValue::set(case.title.clone()),
             // A new record is live, so the digest binds `deleted_at` as
             // `None`.
-            content_hash: ActiveValue::set(Some(record_integrity::record_hash(
-                &record_integrity::RecordInput {
-                    pid,
-                    title: &case.title,
-                    data: &data,
-                    active: true,
-                    deleted_at_micros: None,
-                },
-            ))),
+            content_hash: ActiveValue::set(Some(digests.0.clone())),
+            content_hash_blake3: ActiveValue::set(Some(digests.1.clone())),
             data: ActiveValue::set(data),
             active: ActiveValue::set(true),
             deleted_at: ActiveValue::set(None),
@@ -175,15 +177,15 @@ impl ActiveModel {
         let pid = *self.pid.as_ref();
         let active = *self.active.as_ref();
         let deleted_at_micros = self.deleted_at.as_ref().map(|d| d.timestamp_micros());
-        self.content_hash = ActiveValue::set(Some(record_integrity::record_hash(
-            &record_integrity::RecordInput {
-                pid,
-                title: &case.title,
-                data: &data,
-                active,
-                deleted_at_micros,
-            },
-        )));
+        let (sha, b3) = record_integrity::digests(&record_integrity::RecordInput {
+            pid,
+            title: &case.title,
+            data: &data,
+            active,
+            deleted_at_micros,
+        });
+        self.content_hash = ActiveValue::set(Some(sha));
+        self.content_hash_blake3 = ActiveValue::set(Some(b3));
         self.title = ActiveValue::set(case.title.clone());
         self.data = ActiveValue::set(data);
         self.update(db).await.map_err(ModelError::from)
@@ -205,15 +207,15 @@ impl ActiveModel {
         // A soft delete changes the lifecycle state the digest binds, so
         // the row rehashes — otherwise every deleted case would read as
         // tampered.
-        self.content_hash = ActiveValue::set(Some(record_integrity::record_hash(
-            &record_integrity::RecordInput {
-                pid: *self.pid.as_ref(),
-                title: self.title.as_ref(),
-                data: self.data.as_ref(),
-                active: false,
-                deleted_at_micros: Some(deleted_at.timestamp_micros()),
-            },
-        )));
+        let (sha, b3) = record_integrity::digests(&record_integrity::RecordInput {
+            pid: *self.pid.as_ref(),
+            title: self.title.as_ref(),
+            data: self.data.as_ref(),
+            active: false,
+            deleted_at_micros: Some(deleted_at.timestamp_micros()),
+        });
+        self.content_hash = ActiveValue::set(Some(sha));
+        self.content_hash_blake3 = ActiveValue::set(Some(b3));
         self.active = ActiveValue::set(false);
         self.deleted_at = ActiveValue::set(Some(deleted_at));
         self.update(db).await.map_err(ModelError::from)

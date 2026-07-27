@@ -253,6 +253,13 @@ pub fn hash_with_deleted_at(
     })
 }
 
+/// One row as verification sees it: the assembled record, its stored
+/// SHA-256 digest, its stored BLAKE3 digest, and its soft-delete stamp.
+///
+/// Either digest may be `None` on a row written before that column
+/// existed — reported as unhashed, never as a mismatch.
+pub type StoredRecord = (Worker, Option<String>, Option<String>, Option<i64>);
+
 /// One record whose stored hash does not match its content.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct RecordMismatch {
@@ -272,6 +279,11 @@ pub struct RecordIntegrityReport {
     /// — adopting the control on a populated table must not produce a wall
     /// of false positives. They are rehashed on their next write.
     pub unhashed: usize,
+    /// Records whose **BLAKE3** digest was recomputed and matched.
+    pub blake3_intact: usize,
+    /// Records carrying no BLAKE3 digest — written before the second
+    /// algorithm was adopted. Treated exactly as `unhashed`.
+    pub blake3_unhashed: usize,
     /// Every mismatch found.
     pub mismatched: Vec<RecordMismatch>,
     /// `true` when no mismatch was found.
@@ -283,28 +295,55 @@ pub struct RecordIntegrityReport {
 /// Each element pairs the assembled record with the hash and `deleted_at`
 /// its row actually stores.
 #[must_use]
-pub fn verify(rows: &[(Worker, Option<String>, Option<i64>)]) -> RecordIntegrityReport {
+pub fn verify(rows: &[StoredRecord]) -> RecordIntegrityReport {
     let mut report = RecordIntegrityReport {
         records: rows.len(),
         intact: 0,
         unhashed: 0,
+        blake3_intact: 0,
+        blake3_unhashed: 0,
         mismatched: Vec::new(),
         verified: true,
     };
-    for (worker, stored, deleted_at) in rows {
+    for (worker, stored, stored_b3, deleted_at) in rows {
         let Some(stored) = stored.as_deref() else {
             report.unhashed += 1;
             continue;
         };
-        match hash_with_deleted_at(worker, *deleted_at) {
-            Ok(computed) if computed == stored => report.intact += 1,
-            Ok(_) => report.mismatched.push(RecordMismatch {
-                id: worker.id.to_string(),
-            }),
+        // Both digests are recomputed from one call, so they always
+        // describe the same content.
+        let Ok((sha, b3)) = digests_with_deleted_at(worker, *deleted_at) else {
             // Unhashable rather than mismatched: we cannot tell tampering
             // from a serialization failure, and reporting a false positive
             // on an integrity control is worse than reporting a gap.
-            Err(_) => report.unhashed += 1,
+            report.unhashed += 1;
+            continue;
+        };
+        let sha_ok = sha == stored;
+        if sha_ok {
+            report.intact += 1;
+        }
+        // BLAKE3 is verified independently over the same content, so a
+        // future weakness in either function leaves the other still able
+        // to attest to the history already stored.
+        let b3_ok = match stored_b3.as_deref() {
+            None => {
+                report.blake3_unhashed += 1;
+                true
+            }
+            Some(s) => {
+                let ok = s == b3;
+                if ok {
+                    report.blake3_intact += 1;
+                }
+                ok
+            }
+        };
+        // One entry per record, not one per algorithm.
+        if !sha_ok || !b3_ok {
+            report.mismatched.push(RecordMismatch {
+                id: worker.id.to_string(),
+            });
         }
     }
     report.verified = report.mismatched.is_empty();
@@ -375,6 +414,11 @@ pub fn verify_assessments(
         records: rows.len(),
         intact: 0,
         unhashed: 0,
+        // Assessments carry a single SHA-256 digest: they were adopted
+        // after the record hash and before the second algorithm, and
+        // extending them is a follow-up rather than part of this change.
+        blake3_intact: 0,
+        blake3_unhashed: rows.len(),
         mismatched: Vec::new(),
         verified: true,
     };
@@ -506,7 +550,8 @@ mod tests {
     #[test]
     fn rows_without_a_stored_hash_are_not_mismatches() {
         let p = worker("Legacy");
-        let report = verify(&[(p, None, None)]);
+        // No digest of either kind — a row predating both columns.
+        let report = verify(&[(p, None, None, None)]);
         assert_eq!(report.unhashed, 1);
         assert_eq!(report.intact, 0);
         assert!(report.mismatched.is_empty());
@@ -522,7 +567,10 @@ mod tests {
         let mut edited = p.clone();
         edited.tax_id = Some("injected".to_string());
 
-        let report = verify(&[(edited.clone(), Some(stored), None)]);
+        // Both digests stored, both stale after the edit.
+        let (sha, b3) = digests_of_live(&p).unwrap();
+        let _ = sha;
+        let report = verify(&[(edited.clone(), Some(stored), Some(b3), None)]);
         assert!(!report.verified);
         assert_eq!(report.mismatched.len(), 1);
         assert_eq!(report.mismatched[0].id, edited.id.to_string());
@@ -530,7 +578,9 @@ mod tests {
         // And an untouched row alongside it still verifies.
         let good = worker("Fine");
         let good_hash = hash_of_live(&good).unwrap();
-        let report = verify(&[(good, Some(good_hash), None)]);
+        let (good_sha, good_b3) = digests_of_live(&good).unwrap();
+        let _ = good_hash;
+        let report = verify(&[(good, Some(good_sha), Some(good_b3), None)]);
         assert!(report.verified);
         assert_eq!(report.intact, 1);
     }

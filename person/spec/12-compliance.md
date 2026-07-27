@@ -317,7 +317,9 @@ defects had to be fixed first, none of them from the compliance work:
 
 Everything this service hashes, how each digest is built, and — the part
 that matters when a report says something is wrong — what each one does
-and does not prove. All digests are **SHA-256**, rendered lowercase hex.
+and does not prove. Every digest is computed under **both SHA-256 and
+BLAKE3** over the same pre-image, rendered lowercase hex; see "Two
+algorithms" below for why both are kept.
 
 #### The digests
 
@@ -329,6 +331,69 @@ and does not prove. All digests are **SHA-256**, rendered lowercase hex.
 They are **complementary, and neither subsumes the other.** The chain
 covers the *trail*; it cannot see an edit to an entity row, because a
 change made without writing an audit row leaves the chain intact. The record hash covers the *records*; it cannot see a row deleted outright in SQL, because a legitimate delete writes an audit row and an illegitimate one breaks the chain — which is the chain's job.
+
+#### Two algorithms: SHA-256 and BLAKE3
+
+Every digest above is computed **twice**, over a byte-identical
+pre-image, and both results are stored:
+
+| | Why it is kept |
+|---|---|
+| **SHA-256** | The conservative choice. FIPS 180-4, NIST-approved, two decades of cryptanalysis, and the digest a compliance reviewer expects to see named — some regimes name it explicitly. It is not going anywhere. |
+| **BLAKE3** | Several times faster (SIMD, and a parallel tree structure that scales with cores), which matters because every write on a hot path pays for a digest. It is also an extendable-output function, so a longer digest is available later at the same speed. |
+
+**The real reason for keeping both is algorithm agility**, and it has a
+deadline. A stored digest can only ever attest to the content that was
+hashed *at the time of writing*. If SHA-256 were weakened in five years,
+re-hashing the existing history under a replacement would prove nothing:
+it would compute digests from whatever the rows contain *then*, certifying
+content that may already have been altered — the same argument that
+forbids back-filling (above). The second digest therefore has to be
+written **now**, alongside the first, or the option is gone forever. That
+is why this is not deferred until a weakness appears.
+
+Because both digests cover the same pre-image, they are built by one
+`preimage()` function and hashed separately. Adding a third algorithm
+changes only how the bytes are digested, never what is covered.
+
+**A correction on post-quantum, since this document is read by people
+making risk decisions.** BLAKE3 is *not* meaningfully more quantum-
+resistant than SHA-256 at the same output length, and this spec does not
+claim it is. Grover's algorithm gives a quadratic speedup on preimage
+search, reducing a 256-bit digest to roughly 128-bit preimage security —
+**identically for both functions**, because the effect depends on the
+output length, not the internal design. Collision resistance under
+quantum search (BHT) is likewise a wash, and widely judged impractical
+because of its memory requirements. Neither function is known to be
+broken by a quantum adversary in any way the other is not.
+
+What BLAKE3 genuinely contributes on that axis is **optionality**: it is
+an XOF, so if a future risk assessment wants more Grover margin, it emits
+a 512-bit digest natively and at the same speed. SHA-256 cannot — that
+would mean adopting SHA-512 and a new column. Keeping BLAKE3 now makes
+that a configuration change later rather than a migration.
+
+The honest summary: **SHA-256 for conservatism and auditor familiarity,
+BLAKE3 for speed and for the agility to survive a future break in either
+— not because either is quantum-safe on its own.**
+
+##### What verification reports
+
+Each report carries per-algorithm counters (`intact` / `blake3_intact`,
+`unchained` / `blake3_unhashed`), and a tampered row is reported **once**,
+naming which digests disagreed. That naming is diagnostic rather than
+cosmetic:
+
+- **both disagree** — the row's content changed.
+- **exactly one disagrees** — the content is intact and a *digest column*
+  was edited, or a write path stamped one digest and not the other. The
+  second reading is the likelier one, and is why every write takes both
+  digests from a single call that cannot express stamping only one.
+
+Rows written before the second algorithm was adopted carry no BLAKE3
+digest. They are counted as `blake3_unhashed` — never as a mismatch, and
+never as verified — exactly as a missing SHA-256 digest is treated.
+
 
 #### How a pre-image is built
 

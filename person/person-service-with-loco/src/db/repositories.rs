@@ -144,15 +144,17 @@ async fn apply_update_rows<C: ConnectionTrait>(conn: &C, person: &Person) -> Res
         .await?
         .and_then(|row| row.deleted_at)
         .map(|d| d.unix_timestamp_nanos() / 1_000);
-    let content_hash = crate::compliance::record_integrity::hash_with_deleted_at(
-        person,
-        existing_deleted_at.and_then(|m| i64::try_from(m).ok()),
-    )?;
+    let (content_hash, content_hash_blake3) =
+        crate::compliance::record_integrity::digests_with_deleted_at(
+            person,
+            existing_deleted_at.and_then(|m| i64::try_from(m).ok()),
+        )?;
 
     let update_model = persons::ActiveModel {
         id: Set(person.id),
         active: Set(person.active),
         content_hash: Set(Some(content_hash)),
+        content_hash_blake3: Set(Some(content_hash_blake3)),
         // DB CHECK constraint enforces lowercase ('male'/'female'/'other'/'unknown');
         // Gender's serde rename_all="lowercase" produces the same shape.
         gender: Set(format!("{:?}", person.gender).to_lowercase()),
@@ -244,7 +246,7 @@ async fn apply_soft_delete_row<C: ConnectionTrait>(
     // as it was.
     let content_hash = person
         .map(|p| {
-            crate::compliance::record_integrity::hash_with_deleted_at(
+            crate::compliance::record_integrity::digests_with_deleted_at(
                 p,
                 i64::try_from(deleted_at.unix_timestamp_nanos() / 1_000).ok(),
             )
@@ -254,7 +256,10 @@ async fn apply_soft_delete_row<C: ConnectionTrait>(
         id: Set(*id),
         deleted_at: Set(Some(deleted_at)),
         deleted_by: Set(Some("system".to_string())),
-        content_hash: content_hash.map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h))),
+        content_hash: content_hash
+            .as_ref()
+            .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.0.clone()))),
+        content_hash_blake3: content_hash.map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.1))),
         ..Default::default()
     };
     row.update(conn).await?;

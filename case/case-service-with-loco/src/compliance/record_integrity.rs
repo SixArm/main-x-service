@@ -118,6 +118,18 @@ fn preimage(input: &RecordInput<'_>) -> Vec<u8> {
     buf
 }
 
+/// Both digests for one record, as `(SHA-256, BLAKE3)`.
+///
+/// Every write path takes the pair from here rather than calling the two
+/// functions separately. Stamping one and forgetting the other leaves a
+/// stale digest that verification reports as tampering on an untouched
+/// record — a false accusation, and the likeliest way this breaks.
+/// Returning a tuple makes the omission impossible to express.
+#[must_use]
+pub fn digests(input: &RecordInput<'_>) -> (String, String) {
+    (record_hash(input), record_hash_blake3(input))
+}
+
 /// Borrow a stored row's fields as a [`RecordInput`].
 #[must_use]
 pub fn input_for(row: &cases::Model) -> RecordInput<'_> {
@@ -134,6 +146,12 @@ pub fn input_for(row: &cases::Model) -> RecordInput<'_> {
 #[must_use]
 pub fn hash_of(row: &cases::Model) -> String {
     record_hash(&input_for(row))
+}
+
+/// The BLAKE3 digest a stored row *should* carry.
+#[must_use]
+pub fn hash_of_blake3(row: &cases::Model) -> String {
+    record_hash_blake3(&input_for(row))
 }
 
 /// One record whose stored hash does not match its content.
@@ -158,6 +176,11 @@ pub struct RecordIntegrityReport {
     /// control on a populated table must not produce a wall of false
     /// positives. They are rehashed on their next write.
     pub unhashed: usize,
+    /// Records whose **BLAKE3** digest was recomputed and matched.
+    pub blake3_intact: usize,
+    /// Records carrying no BLAKE3 digest — written before the second
+    /// algorithm was adopted. Treated exactly as `unhashed`.
+    pub blake3_unhashed: usize,
     /// Every mismatch found.
     pub mismatched: Vec<RecordMismatch>,
     /// `true` when no mismatch was found.
@@ -171,6 +194,8 @@ pub fn verify(rows: &[cases::Model]) -> RecordIntegrityReport {
         records: rows.len(),
         intact: 0,
         unhashed: 0,
+        blake3_intact: 0,
+        blake3_unhashed: 0,
         mismatched: Vec::new(),
         verified: true,
     };
@@ -179,9 +204,29 @@ pub fn verify(rows: &[cases::Model]) -> RecordIntegrityReport {
             report.unhashed += 1;
             continue;
         };
-        if stored == hash_of(row) {
+        let sha_ok = stored == hash_of(row);
+        if sha_ok {
             report.intact += 1;
-        } else {
+        }
+        // BLAKE3 is verified independently over the same content, so a
+        // future weakness in either function leaves the other still able
+        // to attest to the history already stored.
+        let b3_ok = match row.content_hash_blake3.as_deref() {
+            None => {
+                report.blake3_unhashed += 1;
+                true
+            }
+            Some(stored_b3) => {
+                let ok = stored_b3 == hash_of_blake3(row);
+                if ok {
+                    report.blake3_intact += 1;
+                }
+                ok
+            }
+        };
+        // One entry per record, not one per algorithm: a tampered record
+        // is a single incident.
+        if !sha_ok || !b3_ok {
             report.mismatched.push(RecordMismatch {
                 pid: row.pid.to_string(),
                 title: row.title.clone(),
@@ -227,6 +272,7 @@ mod tests {
             content_hash_blake3: None,
         };
         model.content_hash = Some(hash_of(&model));
+        model.content_hash_blake3 = Some(hash_of_blake3(&model));
         model
     }
 
@@ -327,7 +373,11 @@ mod tests {
         let mut r = row(1, "A");
         r.active = false;
         r.deleted_at = Some(at(1_800_000_000_000_000));
-        r.content_hash = Some(hash_of(&r)); // legitimately soft-deleted
+        // Restamp *both* digests: a legitimate write always sets the pair
+        // (see `digests`), and setting only one is the stale-digest defect
+        // this control would otherwise report as tampering.
+        r.content_hash = Some(hash_of(&r));
+        r.content_hash_blake3 = Some(hash_of_blake3(&r));
         assert!(verify(std::slice::from_ref(&r)).verified);
         // Now resurrect it behind the service's back.
         r.active = true;

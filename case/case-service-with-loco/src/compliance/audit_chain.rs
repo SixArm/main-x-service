@@ -192,6 +192,11 @@ pub struct ChainReport {
     /// neither verified nor counted as breaks, and they reset the linkage
     /// expectation for the row that follows.
     pub unchained: usize,
+    /// Rows whose **BLAKE3** digest was recomputed and matched.
+    pub blake3_intact: usize,
+    /// Rows carrying no BLAKE3 digest — written before the second
+    /// algorithm was adopted. Neither verified nor a break.
+    pub blake3_unhashed: usize,
     /// Every break found, in `id` order. Empty ⇒ the run verifies.
     pub breaks: Vec<ChainBreak>,
     /// The hash of the last chained row examined — the chain head an
@@ -215,6 +220,8 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
         intact: 0,
         redacted: 0,
         unchained: 0,
+        blake3_intact: 0,
+        blake3_unhashed: 0,
         breaks: Vec::new(),
         head: None,
         verified: true,
@@ -245,14 +252,41 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
         if row.redacted_at.is_some() {
             report.redacted += 1;
         } else {
-            let recomputed = row_hash(&input_for(row, row.prev_hash.as_deref()));
-            if recomputed == stored {
+            let sha_ok = row_hash(&input_for(row, row.prev_hash.as_deref())) == stored;
+            if sha_ok {
                 report.intact += 1;
-            } else {
+            }
+            // BLAKE3 is verified independently: its digest binds the
+            // BLAKE3 predecessor, so neither algorithm's linkage rests on
+            // the other's collision resistance.
+            let b3_ok = match row.hash_blake3.as_deref() {
+                None => {
+                    report.blake3_unhashed += 1;
+                    true
+                }
+                Some(stored_b3) => {
+                    let ok = row_hash_blake3(&input_for(row, row.prev_hash_blake3.as_deref()))
+                        == stored_b3;
+                    if ok {
+                        report.blake3_intact += 1;
+                    }
+                    ok
+                }
+            };
+            // **One** break per row, naming which digests disagreed.
+            // Which ones is diagnostic: both means the content changed,
+            // exactly one means that digest column was edited or a write
+            // path stamped only one.
+            if !sha_ok || !b3_ok {
+                let which = match (sha_ok, b3_ok) {
+                    (false, false) => "SHA-256 and BLAKE3",
+                    (false, true) => "SHA-256 (BLAKE3 still matches — suspect the hash column)",
+                    _ => "BLAKE3 (SHA-256 still matches — suspect the hash column)",
+                };
                 report.breaks.push(ChainBreak {
                     id: row.id,
                     kind: "content",
-                    detail: "row content does not match its stored hash".to_string(),
+                    detail: format!("row content does not match its stored {which} hash"),
                 });
             }
         }

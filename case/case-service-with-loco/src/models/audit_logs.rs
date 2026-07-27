@@ -98,10 +98,13 @@ impl Model {
             ))
             .await?;
         }
-        let prev_hash = Self::head(db).await?;
+        let (prev_hash, prev_hash_blake3) = Self::heads(db).await?;
         let created_at: chrono::DateTime<chrono::FixedOffset> =
             chrono::Utc::now().trunc_subsecs(6).into();
-        let hash = audit_chain::row_hash(&ChainInput {
+        // One input, re-pointed at each algorithm's own predecessor:
+        // the digests cover byte-identical content while the chains stay
+        // independent.
+        let mut input = ChainInput {
             prev_hash: prev_hash.as_deref(),
             entity_pid,
             action,
@@ -110,7 +113,10 @@ impl Model {
             snapshot: snapshot.as_ref(),
             context: context.as_ref(),
             disclosure,
-        });
+        };
+        let hash = audit_chain::row_hash(&input);
+        input.prev_hash = prev_hash_blake3.as_deref();
+        let hash_blake3 = audit_chain::row_hash_blake3(&input);
         let entry = audit_logs::ActiveModel {
             created_at: ActiveValue::set(created_at),
             updated_at: ActiveValue::set(created_at),
@@ -120,6 +126,8 @@ impl Model {
             snapshot: ActiveValue::set(snapshot),
             prev_hash: ActiveValue::set(prev_hash),
             hash: ActiveValue::set(Some(hash)),
+            prev_hash_blake3: ActiveValue::set(prev_hash_blake3),
+            hash_blake3: ActiveValue::set(Some(hash_blake3)),
             context: ActiveValue::set(context),
             disclosure: ActiveValue::set(disclosure),
             redacted_at: ActiveValue::set(None),
@@ -128,6 +136,30 @@ impl Model {
         .insert(db)
         .await?;
         Ok(entry)
+    }
+
+    /// Both chain heads — `(SHA-256, BLAKE3)` — from the same row.
+    ///
+    /// Read together so an append binds each algorithm's *own*
+    /// predecessor. Binding the SHA-256 head into the BLAKE3 digest would
+    /// make the second chain's linkage rest on SHA-256's collision
+    /// resistance, which is the dependency keeping two algorithms is
+    /// meant to avoid.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn heads<C: ConnectionTrait>(
+        db: &C,
+    ) -> ModelResult<(Option<String>, Option<String>)> {
+        let last = audit_logs::Entity::find()
+            .order_by_desc(audit_logs::Column::Id)
+            .one(db)
+            .await?;
+        Ok(match last {
+            Some(row) => (row.hash, row.hash_blake3),
+            None => (None, None),
+        })
     }
 
     /// The current chain head: the most recent row's `hash`, or `None`
