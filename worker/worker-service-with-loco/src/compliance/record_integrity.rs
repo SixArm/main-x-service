@@ -258,6 +258,20 @@ pub fn digests_with_deleted_at(
     })
 }
 
+/// The MAC pre-image for a record, so verification MACs exactly the bytes
+/// the write path did.
+///
+/// # Errors
+///
+/// As [`record_hash`], when the record cannot be serialized.
+pub fn preimage_for(worker: &Worker, deleted_at_micros: Option<i64>) -> crate::Result<Vec<u8>> {
+    preimage(&RecordInput {
+        id: worker.id,
+        worker,
+        deleted_at_micros,
+    })
+}
+
 /// Compute the hash a live (not soft-deleted) record should carry.
 ///
 /// # Errors
@@ -287,12 +301,31 @@ pub fn hash_with_deleted_at(
     })
 }
 
-/// One row as verification sees it: the assembled record, its stored
-/// SHA-256 digest, its stored SHA-3 digest, and its soft-delete stamp.
+/// One row as verification sees it: the assembled record, every digest
+/// its row stores, and its soft-delete stamp.
 ///
-/// Either digest may be `None` on a row written before that column
-/// existed — reported as unhashed, never as a mismatch.
-pub type StoredRecord = (Worker, Option<String>, Option<String>, Option<i64>);
+/// **A named struct, not a tuple**, for the same reason [`Digests`] is
+/// one: with three stored values, `.0`/`.1`/`.2` is a latent bug, and a
+/// four-element tuple is how the MAC came to be written on every create
+/// and then never verified — it simply had nowhere to go, and nothing
+/// pointed that out.
+///
+/// Any digest may be `None` on a row written before that column existed —
+/// reported as unhashed or absent, never as a mismatch.
+#[derive(Debug, Clone)]
+pub struct StoredRecord {
+    /// The assembled domain record, including its child tables.
+    pub worker: Worker,
+    /// The stored SHA-256 content hash.
+    pub sha256: Option<String>,
+    /// The stored SHA-3 content hash.
+    pub sha3: Option<String>,
+    /// The stored keyed MAC — the only one of the three an adversary
+    /// holding just the database cannot recompute.
+    pub mac: Option<String>,
+    /// The row's soft-delete stamp, in epoch microseconds.
+    pub deleted_at_micros: Option<i64>,
+}
 
 /// One record whose stored hash does not match its content.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -349,14 +382,15 @@ pub fn verify(rows: &[StoredRecord]) -> RecordIntegrityReport {
         mismatched: Vec::new(),
         verified: true,
     };
-    for (worker, stored, stored_sha3, deleted_at) in rows {
-        let Some(stored) = stored.as_deref() else {
+    for row in rows {
+        let (worker, deleted_at) = (&row.worker, row.deleted_at_micros);
+        let Some(stored) = row.sha256.as_deref() else {
             report.unhashed += 1;
             continue;
         };
         // Both digests are recomputed from one call, so they always
         // describe the same content.
-        let Ok(d) = digests_with_deleted_at(worker, *deleted_at) else {
+        let Ok(d) = digests_with_deleted_at(worker, deleted_at) else {
             // Unhashable rather than mismatched: we cannot tell tampering
             // from a serialization failure, and reporting a false positive
             // on an integrity control is worse than reporting a gap.
@@ -367,7 +401,7 @@ pub fn verify(rows: &[StoredRecord]) -> RecordIntegrityReport {
         if sha256_ok {
             report.intact += 1;
         }
-        let sha3_ok = match stored_sha3.as_deref() {
+        let sha3_ok = match row.sha3.as_deref() {
             None => {
                 report.sha3_unhashed += 1;
                 true
@@ -380,8 +414,36 @@ pub fn verify(rows: &[StoredRecord]) -> RecordIntegrityReport {
                 ok
             }
         };
+        // The keyed MAC is the only one of the three an adversary holding
+        // just the database cannot recompute: the digests are unkeyed and
+        // their pre-image format is published, so checking them alone
+        // catches careless edits and not deliberate ones.
+        let mac_ok = match preimage_for(&row.worker, deleted_at) {
+            // Same conservative call as an unhashable record: we cannot
+            // tell tampering from a serialization failure.
+            Err(_) => true,
+            Ok(bytes) => {
+                match super::mac::verify(super::mac::Domain::Record, row.mac.as_deref(), &bytes) {
+                    super::mac::MacVerdict::Valid => {
+                        report.mac_valid += 1;
+                        true
+                    }
+                    super::mac::MacVerdict::Absent => {
+                        report.mac_absent += 1;
+                        true
+                    }
+                    super::mac::MacVerdict::UnknownKey(_)
+                    | super::mac::MacVerdict::UnknownScheme(_)
+                    | super::mac::MacVerdict::Malformed => {
+                        report.mac_unverifiable += 1;
+                        true
+                    }
+                    super::mac::MacVerdict::Invalid => false,
+                }
+            }
+        };
         // One entry per record, not one per algorithm.
-        if !sha256_ok || !sha3_ok {
+        if !sha256_ok || !sha3_ok || !mac_ok {
             report.mismatched.push(RecordMismatch {
                 id: worker.id.to_string(),
             });
@@ -553,6 +615,52 @@ pub fn verify_assessments(
 
 #[cfg(test)]
 mod tests {
+    /// **The MAC is read, not merely written.** This is the test whose
+    /// absence let the gap in: `content_mac` was computed and stored on
+    /// every write, and `verify` never looked at it. The report even
+    /// carried `mac_valid` / `mac_absent` / `mac_unverifiable` counters
+    /// that could not move off zero, so a caller reading the response saw
+    /// what looked like "no MACs present" while every row had one.
+    ///
+    /// It mattered because the MAC is the *only* one of the three stored
+    /// values an adversary holding just the database cannot recompute —
+    /// the digests are unkeyed and their pre-image format is published.
+    /// The one column that defends against a deliberate edit was the one
+    /// not being checked.
+    #[test]
+    fn the_stored_mac_is_verified_not_merely_written() {
+        let subject = worker("Verified");
+        let d = digests_of_live(&subject).expect("digests");
+
+        let report = verify(&[StoredRecord {
+            worker: subject.clone(),
+            sha256: Some(d.sha256.clone()),
+            sha3: Some(d.sha3.clone()),
+            // A MAC naming a key this process does not hold.
+            mac: Some("d1.k9:00ff".to_string()),
+            deleted_at_micros: None,
+        }]);
+        assert_eq!(
+            report.mac_unverifiable, 1,
+            "the MAC column must reach the verifier; it did not, before this"
+        );
+        assert!(
+            report.verified,
+            "an unknown key is a configuration problem, not tampering"
+        );
+
+        // With no MAC stored at all, `absent` — never a mismatch.
+        let report = verify(&[StoredRecord {
+            worker: subject,
+            sha256: Some(d.sha256),
+            sha3: Some(d.sha3),
+            mac: None,
+            deleted_at_micros: None,
+        }]);
+        assert_eq!(report.mac_absent, 1);
+        assert!(report.verified);
+    }
+
     /// As `audit_chain::spec_documents_this_version_tag`: the tag is
     /// published in `spec/12-compliance.md` §12.4z, and changing it
     /// invalidates every stored digest.
@@ -663,7 +771,13 @@ mod tests {
     fn rows_without_a_stored_hash_are_not_mismatches() {
         let p = worker("Legacy");
         // No digest of either kind — a row predating both columns.
-        let report = verify(&[(p, None, None, None)]);
+        let report = verify(&[StoredRecord {
+            worker: p,
+            sha256: None,
+            sha3: None,
+            mac: None,
+            deleted_at_micros: None,
+        }]);
         assert_eq!(report.unhashed, 1);
         assert_eq!(report.intact, 0);
         assert!(report.mismatched.is_empty());
@@ -681,7 +795,13 @@ mod tests {
 
         // Both digests stored, both stale after the edit.
         let d = digests_of_live(&p).unwrap();
-        let report = verify(&[(edited.clone(), Some(stored), Some(d.sha3), None)]);
+        let report = verify(&[StoredRecord {
+            worker: edited.clone(),
+            sha256: Some(stored),
+            sha3: Some(d.sha3),
+            mac: None,
+            deleted_at_micros: None,
+        }]);
         assert!(!report.verified);
         assert_eq!(report.mismatched.len(), 1);
         assert_eq!(report.mismatched[0].id, edited.id.to_string());
@@ -691,7 +811,13 @@ mod tests {
         let good_hash = hash_of_live(&good).unwrap();
         let g = digests_of_live(&good).unwrap();
         let _ = good_hash;
-        let report = verify(&[(good, Some(g.sha256), Some(g.sha3), None)]);
+        let report = verify(&[StoredRecord {
+            worker: good,
+            sha256: Some(g.sha256),
+            sha3: Some(g.sha3),
+            mac: None,
+            deleted_at_micros: None,
+        }]);
         assert!(report.verified);
         assert_eq!(report.intact, 1);
     }

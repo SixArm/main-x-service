@@ -205,6 +205,18 @@ pub struct RecordIntegrityReport {
     /// control on a populated table must not produce a wall of false
     /// positives. They are rehashed on their next write.
     pub unhashed: usize,
+    /// Records whose **SHA-3** digest was recomputed and matched.
+    pub sha3_intact: usize,
+    /// Records carrying no SHA-3 digest — written before the second
+    /// algorithm was adopted. Neither verified nor a break.
+    pub sha3_unhashed: usize,
+    /// Records whose **keyed MAC** was recomputed and matched — the only
+    /// counter an adversary holding just the database cannot inflate.
+    pub mac_valid: usize,
+    /// Records carrying no MAC (written before a key was configured).
+    pub mac_absent: usize,
+    /// Records whose MAC names a key or scheme this service cannot check.
+    pub mac_unverifiable: usize,
     /// Every mismatch found.
     pub mismatched: Vec<RecordMismatch>,
     /// `true` when no mismatch was found.
@@ -218,6 +230,11 @@ pub fn verify(rows: &[cases::Model]) -> RecordIntegrityReport {
         records: rows.len(),
         intact: 0,
         unhashed: 0,
+        sha3_intact: 0,
+        sha3_unhashed: 0,
+        mac_valid: 0,
+        mac_absent: 0,
+        mac_unverifiable: 0,
         mismatched: Vec::new(),
         verified: true,
     };
@@ -226,13 +243,54 @@ pub fn verify(rows: &[cases::Model]) -> RecordIntegrityReport {
             report.unhashed += 1;
             continue;
         };
-        let sha_ok = stored == hash_of(row);
-        if sha_ok {
+        // All three digests come from one call over one pre-image, so
+        // they always describe the same content.
+        let computed = digests(&input_for(row));
+        let sha256_ok = stored == computed.sha256;
+        if sha256_ok {
             report.intact += 1;
         }
+        let sha3_ok = match row.content_hash_sha3.as_deref() {
+            None => {
+                report.sha3_unhashed += 1;
+                true
+            }
+            Some(s) => {
+                let ok = s == computed.sha3;
+                if ok {
+                    report.sha3_intact += 1;
+                }
+                ok
+            }
+        };
+        // The keyed MAC is the only one of the three an adversary holding
+        // just the database cannot recompute: the digests are unkeyed and
+        // their pre-image format is published, so checking them alone
+        // catches careless edits and not deliberate ones.
+        let mac_ok = match super::mac::verify(
+            super::mac::Domain::Record,
+            row.content_mac.as_deref(),
+            &preimage(&input_for(row)),
+        ) {
+            super::mac::MacVerdict::Valid => {
+                report.mac_valid += 1;
+                true
+            }
+            super::mac::MacVerdict::Absent => {
+                report.mac_absent += 1;
+                true
+            }
+            super::mac::MacVerdict::UnknownKey(_)
+            | super::mac::MacVerdict::UnknownScheme(_)
+            | super::mac::MacVerdict::Malformed => {
+                report.mac_unverifiable += 1;
+                true
+            }
+            super::mac::MacVerdict::Invalid => false,
+        };
         // One entry per record, not one per algorithm: a tampered record
         // is a single incident.
-        if !sha_ok {
+        if !sha256_ok || !sha3_ok || !mac_ok {
             report.mismatched.push(RecordMismatch {
                 pid: row.pid.to_string(),
                 title: row.title.clone(),
@@ -282,6 +340,75 @@ mod tests {
         model.content_hash = Some(hash_of(&model));
         model.content_hash_sha3 = Some(hash_of_sha3(&model));
         model
+    }
+
+    /// **Every stored digest is actually read.** This is the test whose
+    /// absence let the gap in: `verify` checked only `content_hash`,
+    /// while `content_hash_sha3` and `content_mac` were written on every
+    /// create and never looked at again. Two of the three integrity
+    /// columns were decorative.
+    ///
+    /// The MAC is the one that mattered. The digests are unkeyed and
+    /// their pre-image format is published, so an adversary who can write
+    /// SQL recomputes them freely — the MAC is the only column they
+    /// cannot forge, and it was the one not being checked.
+    #[test]
+    fn every_stored_digest_is_verified_not_merely_written() {
+        let mut model = row(1, "Benefits appeal");
+
+        // A tampered row whose SHA-256 was recomputed by the attacker —
+        // exactly what someone holding the database can do.
+        model.title = "Altered".to_string();
+        model.data = serde_json::json!({ "title": "Altered", "keywords": ["a", "b"] });
+        model.content_hash = Some(hash_of(&model));
+        // ...but they left the SHA-3 column alone.
+        let report = verify(std::slice::from_ref(&model));
+        assert_eq!(
+            report.mismatched.len(),
+            1,
+            "a stale SHA-3 digest must be caught; it was not, before this"
+        );
+        assert!(!report.verified);
+
+        // With every digest recomputed the row passes, because with no
+        // MAC key configured the MAC is `absent` rather than a mismatch.
+        model.content_hash_sha3 = Some(hash_of_sha3(&model));
+        let report = verify(std::slice::from_ref(&model));
+        assert!(report.verified, "all digests consistent");
+        assert_eq!(report.mac_absent, 1, "no key in unit tests");
+    }
+
+    /// A row carrying a MAC that cannot be checked is reported as
+    /// unverifiable, never as a mismatch — "I cannot check this" and
+    /// "this is wrong" lead to different investigations.
+    #[test]
+    fn an_uncheckable_mac_is_not_a_mismatch() {
+        let mut model = row(2, "Housing case");
+        model.content_mac = Some("d1.k9:00ff".to_string());
+
+        let report = verify(std::slice::from_ref(&model));
+        assert_eq!(report.mac_unverifiable, 1);
+        assert_eq!(report.mac_valid, 0);
+        assert!(
+            report.verified,
+            "an unknown key is a configuration problem, not tampering"
+        );
+    }
+
+    /// The counters add up, so a caller can tell a fully-verified run
+    /// from one where most rows were simply skipped.
+    #[test]
+    fn the_counters_account_for_every_row() {
+        let rows = vec![row(3, "A"), row(4, "B"), row(5, "C")];
+        let report = verify(&rows);
+        assert_eq!(report.records, 3);
+        assert_eq!(report.intact, 3);
+        assert_eq!(report.sha3_intact, 3);
+        assert_eq!(report.mac_absent, 3);
+        assert_eq!(
+            report.mac_valid + report.mac_absent + report.mac_unverifiable,
+            3
+        );
     }
 
     /// The digest is deterministic and SHA-256 shaped.

@@ -1792,6 +1792,25 @@ pub async fn get_worker_disclosures(
     }
 }
 
+/// Pull the three stored digest columns and the soft-delete stamp off a
+/// raw verification row.
+///
+/// Split out of `verify_record_integrity` to keep it under the line
+/// limit; the columns travel together because they describe one row's
+/// stored integrity state.
+fn stored_digests(
+    row: &sea_orm::QueryResult,
+) -> (Option<String>, Option<String>, Option<String>, Option<i64>) {
+    let get = |name: &str| -> Option<String> { row.try_get("", name).unwrap_or(None) };
+    let deleted_at: Option<time::OffsetDateTime> = row.try_get("", "deleted_at").unwrap_or(None);
+    (
+        get("content_hash"),
+        get("content_hash_sha3"),
+        get("content_mac"),
+        deleted_at.and_then(|d| i64::try_from(d.unix_timestamp_nanos() / 1_000).ok()),
+    )
+}
+
 /// Verify row-level record integrity across a page of worker records.
 ///
 /// `GET /api/records/verify?limit=100` — recomputes each record's content
@@ -1833,7 +1852,7 @@ pub async fn verify_record_integrity(
         .db
         .query_all(sea_orm::Statement::from_sql_and_values(
             sea_orm::DatabaseBackend::Postgres,
-            "SELECT id, content_hash, content_hash_sha3, deleted_at \
+            "SELECT id, content_hash, content_hash_sha3, content_mac, deleted_at \
              FROM workers \
              ORDER BY updated_at DESC LIMIT $1",
             [limit.into()],
@@ -1860,15 +1879,16 @@ pub async fn verify_record_integrity(
         let Ok(id) = row.try_get::<Uuid>("", "id") else {
             continue;
         };
-        let stored: Option<String> = row.try_get("", "content_hash").unwrap_or(None);
-        let stored_sha3: Option<String> = row.try_get("", "content_hash_sha3").unwrap_or(None);
-        let deleted_at: Option<time::OffsetDateTime> =
-            row.try_get("", "deleted_at").unwrap_or(None);
-        let deleted_micros =
-            deleted_at.and_then(|d| i64::try_from(d.unix_timestamp_nanos() / 1_000).ok());
+        let stored = stored_digests(&row);
         match state.worker_repository.get_by_id(&id).await {
             Ok(Some(worker)) => {
-                records.push((worker, stored, stored_sha3, deleted_micros));
+                records.push(crate::compliance::record_integrity::StoredRecord {
+                    worker,
+                    sha256: stored.0,
+                    sha3: stored.1,
+                    mac: stored.2,
+                    deleted_at_micros: stored.3,
+                });
             }
             // A row that vanished between the two queries is not a
             // mismatch; skipping it is honest, and the count reflects it.

@@ -1851,7 +1851,7 @@ pub async fn verify_record_integrity(
         .db
         .query_all(sea_orm::Statement::from_sql_and_values(
             sea_orm::DatabaseBackend::Postgres,
-            "SELECT id, content_hash, content_hash_sha3, deleted_at \
+            "SELECT id, content_hash, content_hash_sha3, content_mac, deleted_at \
              FROM persons \
              ORDER BY updated_at DESC LIMIT $1",
             [limit.into()],
@@ -1880,13 +1880,20 @@ pub async fn verify_record_integrity(
         };
         let stored: Option<String> = row.try_get("", "content_hash").unwrap_or(None);
         let stored_sha3: Option<String> = row.try_get("", "content_hash_sha3").unwrap_or(None);
+        let stored_mac: Option<String> = row.try_get("", "content_mac").unwrap_or(None);
         let deleted_at: Option<time::OffsetDateTime> =
             row.try_get("", "deleted_at").unwrap_or(None);
         let deleted_micros =
             deleted_at.and_then(|d| i64::try_from(d.unix_timestamp_nanos() / 1_000).ok());
         match state.person_repository.get_by_id(&id).await {
             Ok(Some(person)) => {
-                records.push((person, stored, stored_sha3, deleted_micros));
+                records.push(crate::compliance::record_integrity::StoredRecord {
+                    person,
+                    sha256: stored,
+                    sha3: stored_sha3,
+                    mac: stored_mac,
+                    deleted_at_micros: deleted_micros,
+                });
             }
             // A row that vanished between the two queries is not a
             // mismatch; skipping it is honest, and the count reflects it.
