@@ -438,8 +438,26 @@ pub async fn count_active(db: &DatabaseConnection) -> Result<u64> {
 
 /// Build the `things` scalar active model from a domain [`Thing`].
 fn to_active(thing: &Thing) -> things::ActiveModel {
+    // All three digests from one call over the **assembled** record, so
+    // the child collections are covered too — an identifier is exactly
+    // the kind of field worth editing quietly, and it does not live in
+    // this row. Computed here rather than stamped afterwards, so one
+    // statement writes the row and its integrity values together.
+    //
+    // Both `create` and `update` build their active model here, so this
+    // is the single place a write path could forget to re-digest.
+    let digests = crate::compliance::record_integrity::digests(
+        &crate::compliance::record_integrity::RecordInput {
+            id: thing.id,
+            thing,
+            is_deleted: thing.is_deleted,
+        },
+    );
     things::ActiveModel {
         id: Set(thing.id),
+        content_hash: Set(Some(digests.sha256)),
+        content_hash_sha3: Set(Some(digests.sha3)),
+        content_mac: Set(digests.mac),
         name: Set(thing.name.clone()),
         description: Set(thing.description.clone()),
         disambiguating_description: Set(thing.disambiguating_description.clone()),

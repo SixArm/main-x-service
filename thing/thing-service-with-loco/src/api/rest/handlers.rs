@@ -937,6 +937,86 @@ pub async fn audit_recent(
     }
 }
 
+/// Default rows examined by the integrity endpoints.
+pub const VERIFY_DEFAULT_LIMIT: u64 = 200;
+
+/// Hard cap on rows examined in one call.
+///
+/// Record verification assembles each row through the repository — one
+/// query per row — so an unbounded limit is a denial-of-service on a
+/// large table (the SEC-M1 bound-every-input invariant). The cap is
+/// lower than the sibling loco services' because their rows are a single
+/// JSONB read and these are not.
+pub const VERIFY_MAX_LIMIT: u64 = 1000;
+
+/// Verify row-level record integrity.
+///
+/// `GET /api/records/verify?limit=200` — reassembles each record and
+/// recomputes its three digests, naming any row that differs.
+pub async fn verify_record_integrity(
+    State(state): State<AppState>,
+    Query(params): Query<AuditQuery>,
+) -> impl IntoResponse {
+    use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
+
+    let limit = params
+        .limit
+        .unwrap_or(VERIFY_DEFAULT_LIMIT)
+        .clamp(1, VERIFY_MAX_LIMIT);
+    let rows = match crate::db::models::things::Entity::find()
+        .order_by_desc(crate::db::models::things::Column::UpdatedAt)
+        .limit(limit)
+        .all(&state.db)
+        .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse::<serde_json::Value>::error(
+                    "DATABASE_ERROR",
+                    format!("Failed to read records for verification: {e}"),
+                )),
+            )
+                .into_response();
+        }
+    };
+
+    // Assemble each record so the digest covers the child tables too —
+    // which is the whole point, since an identifier edit lives there.
+    let mut records = Vec::with_capacity(rows.len());
+    for row in rows {
+        match state.thing_repository.get_by_id(&row.id).await {
+            Ok(Some(thing)) => records.push(crate::compliance::record_integrity::StoredRecord {
+                thing,
+                sha256: row.content_hash,
+                sha3: row.content_hash_sha3,
+                mac: row.content_mac,
+                is_deleted: row.is_deleted,
+            }),
+            // A row that vanished between the two queries, or is
+            // soft-deleted (the getter hides those), is skipped rather
+            // than reported: neither is a finding.
+            Ok(None) => {}
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ApiResponse::<serde_json::Value>::error(
+                        "DATABASE_ERROR",
+                        format!("Failed to assemble a record for verification: {e}"),
+                    )),
+                )
+                    .into_response();
+            }
+        }
+    }
+    (
+        StatusCode::OK,
+        Json(crate::compliance::record_integrity::verify(&records)),
+    )
+        .into_response()
+}
+
 #[cfg(test)]
 mod review_report_tests {
     use super::*;

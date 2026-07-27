@@ -53,11 +53,13 @@
 pub mod api;
 /// Loco application hooks (boot, routes, migrations).
 pub mod app;
+/// PostgreSQL persistence: connection pool, repository, audit log.
+/// Compliance controls: row-level integrity and keyed MACs.
+pub mod compliance;
 /// Service configuration loaded from the environment.
 pub mod config;
 /// Loco-idiomatic controllers (the mounted HL7 FHIR R5 surface).
 pub mod controllers;
-/// PostgreSQL persistence: connection pool, repository, audit log.
 pub mod db;
 /// Crate-level error type and result alias.
 pub mod error;

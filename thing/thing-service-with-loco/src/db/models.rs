@@ -41,6 +41,16 @@ pub mod things {
         pub potential_action: Option<String>,
         /// Soft-delete flag.
         pub is_deleted: bool,
+        /// SHA-256 (FIPS 180-4) over the assembled record's pre-image.
+        ///
+        /// `None` on a row written before the column existed — reported
+        /// as unhashed, never as a mismatch, and never back-filled.
+        pub content_hash: Option<String>,
+        /// SHA3-256 (FIPS 202) over the same pre-image.
+        pub content_hash_sha3: Option<String>,
+        /// HMAC-SHA256 over the same pre-image — the only one of the
+        /// three an adversary holding just this database cannot forge.
+        pub content_mac: Option<String>,
         /// Soft-delete timestamp.
         pub deleted_at: Option<TimeDateTimeWithTimeZone>,
         /// Creation timestamp.
@@ -369,6 +379,12 @@ pub mod audit_log {
         pub new_values: Option<Json>,
         /// When the action occurred.
         pub created_at: TimeDateTimeWithTimeZone,
+        /// HMAC-SHA256 over this audit row's pre-image.
+        ///
+        /// Detects a row whose content was altered. It does **not**
+        /// detect a row deleted wholesale — that needs the hash chain
+        /// this service does not yet have (see `crate::compliance`).
+        pub mac: Option<String>,
     }
 
     /// No outbound relations.

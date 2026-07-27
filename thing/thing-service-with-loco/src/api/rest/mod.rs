@@ -111,6 +111,10 @@ pub fn create_router(state: AppState) -> Router {
         .route("/things/{id}/masked", get(handlers::masked_thing))
         .route("/things/{id}/audit", get(handlers::audit_for_thing))
         .route("/audit/recent", get(handlers::audit_recent))
+        // Integrity verification. Guarded like everything else under
+        // `/api`, and a read, so the default ABAC policy admits any
+        // authenticated caller.
+        .route("/records/verify", get(handlers::verify_record_integrity))
         .with_state(state.clone());
 
     Router::new()
