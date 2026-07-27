@@ -766,3 +766,129 @@ async fn erasure_is_idempotent_and_answers_for_an_unknown_pid() {
     })
     .await;
 }
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Row-level record integrity: every write path leaves the record's content
+// hash matching its content, and an out-of-band SQL edit is caught.
+//
+// This closes the gap this service carried alone among the four with an
+// audit chain: an attacker editing a stored case and writing no audit row
+// left the chain verifying and nothing else looking.
+//
+// The write-path half matters more than the tamper half. A path that
+// forgets to rehash flags an *untouched* record as tampered — a false
+// accusation, which is worse than no control at all — and `create` is the
+// only path the compiler helps with, since `update_data`, `soft_delete`
+// and the erasure all build their `ActiveModel` from `..Default` or an
+// existing row and compile happily with a stale digest.
+async fn record_integrity_covers_every_write_path_and_catches_tampering() {
+    request::<App, _, _>(|request, ctx| async move {
+        use sea_orm::ConnectionTrait as _;
+
+        async fn verify(request: &loco_rs::TestServer) -> Value {
+            let response = request.get("/api/cases/records/verify?limit=500").await;
+            assert_eq!(response.status_code(), 200);
+            response.json()
+        }
+
+        // create
+        let created = request.post("/api/cases").json(&housing_case()).await;
+        let pid = created.json::<Value>()["pid"].as_str().unwrap().to_string();
+        let report = verify(&request).await;
+        assert!(
+            report["verified"].as_bool().unwrap(),
+            "after create: {report}"
+        );
+        assert!(
+            report["intact"].as_u64().unwrap() >= 1,
+            "nothing is hashed, so this proves nothing: {report}"
+        );
+
+        // update
+        let mut changed = housing_case();
+        changed["title"] = json!("Housing benefit appeal (amended)");
+        let updated = request
+            .put(&format!("/api/cases/{pid}"))
+            .json(&changed)
+            .await;
+        assert_eq!(updated.status_code(), 200);
+        let report = verify(&request).await;
+        assert!(
+            report["verified"].as_bool().unwrap(),
+            "after update: {report}"
+        );
+
+        // soft delete
+        request.delete(&format!("/api/cases/{pid}")).await;
+        let report = verify(&request).await;
+        assert!(
+            report["verified"].as_bool().unwrap(),
+            "after soft delete: {report}"
+        );
+
+        // erase — the tombstone is rehashed rather than cleared, because a
+        // case's whole payload is one column and so an erased record is
+        // still a complete record.
+        let erased = request.post("/api/cases").json(&housing_case()).await;
+        let erased_pid = erased.json::<Value>()["pid"].as_str().unwrap().to_string();
+        request
+            .post(&format!("/api/cases/{erased_pid}/erase"))
+            .await;
+        let report = verify(&request).await;
+        assert!(
+            report["verified"].as_bool().unwrap(),
+            "after erasure: {report}"
+        );
+
+        // Now tamper: edit a stored case directly, writing no audit row.
+        let victim = request.post("/api/cases").json(&housing_case()).await;
+        let victim_pid = victim.json::<Value>()["pid"].as_str().unwrap().to_string();
+        ctx.db
+            .execute(sea_orm::Statement::from_sql_and_values(
+                sea_orm::DatabaseBackend::Postgres,
+                "UPDATE cases SET data = jsonb_set(data, '{case_number}', '\"HB-9999-9999\"') \
+                 WHERE pid = $1::uuid",
+                [victim_pid.clone().into()],
+            ))
+            .await
+            .expect("tamper");
+
+        // The audit chain cannot see it — which is why this control exists.
+        let chain = request.get("/api/cases/audit/verify?limit=1000").await;
+        assert!(
+            chain.json::<Value>()["verified"].as_bool().unwrap(),
+            "a record edit writes no audit row, so the chain still verifies"
+        );
+
+        // Record integrity does, and names the case.
+        let report = verify(&request).await;
+        assert!(
+            !report["verified"].as_bool().unwrap(),
+            "an out-of-band edit must be detected: {report}"
+        );
+        let flagged: Vec<&str> = report["mismatched"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|m| m["pid"].as_str())
+            .collect();
+        assert!(
+            flagged.contains(&victim_pid.as_str()),
+            "the tampered case must be named: {report}"
+        );
+
+        // Leave no corrupted record behind: the database is shared with
+        // every other DB-gated target in this crate.
+        ctx.db
+            .execute(sea_orm::Statement::from_sql_and_values(
+                sea_orm::DatabaseBackend::Postgres,
+                "DELETE FROM cases WHERE pid = $1::uuid",
+                [victim_pid.into()],
+            ))
+            .await
+            .expect("purge");
+    })
+    .await;
+}

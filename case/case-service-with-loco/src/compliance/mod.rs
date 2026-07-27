@@ -39,6 +39,9 @@ pub mod disclosure;
 /// GDPR Art. 17 erasure by redaction (see the module docs).
 pub mod erasure;
 
+/// Row-level record integrity hashing (see the module docs).
+pub mod record_integrity;
+
 use std::sync::OnceLock;
 
 /// Whether read-auditing is on, from `CASE_AUDIT_READS` (read once and

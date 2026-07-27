@@ -140,10 +140,11 @@ and does not prove. All digests are **SHA-256**, rendered lowercase hex.
 | Digest | Covers | Detects | Blind to |
 |---|---|---|---|
 | **Audit chain** (`audit_logs.hash` / `prev_hash`) | Every audit row, linked to its predecessor | Edits, insertions, deletions and reordering **in the trail** | Changes to case rows that write no audit row |
+| **Record content hash** (`cases.content_hash`) | One case row's content and lifecycle state | Out-of-band SQL edits **to a record** | Deletion of a whole row; timestamp-only edits |
 
 They are **complementary, and neither subsumes the other.** The chain
 covers the *trail*; it cannot see an edit to an entity row, because a
-change made without writing an audit row leaves the chain intact. There is **no record content hash on this service yet**: an out-of-band SQL edit to a stored case, made without writing an audit row, is currently undetectable. person, worker and care-pathway carry one; adopting it here is open work.
+change made without writing an audit row leaves the chain intact. The record hash covers the *rows*; it cannot see a row deleted outright in SQL, because a legitimate delete writes an audit row and an illegitimate one breaks the chain — which is the chain's job.
 
 #### How a pre-image is built
 
@@ -249,6 +250,43 @@ test pins that redaction cannot be used to detach the following row.
 
 **Version tag: `v1`.** Shared with the care-pathway service, whose chain format is identical — the tag names the *format*, not the crate.
 
+#### The record content hash
+
+Each `cases` row carries `content_hash`, recomputed on **every** write.
+
+Fields bound, in order: **version, pid, title, data (JSON), active,
+deleted_at (µs)**.
+
+The whole payload is one JSONB `data` column, so hashing "the record" is
+hashing one field — the relational services (person, worker) must assemble
+theirs from child tables first.
+
+**Excluded: `created_at` / `updated_at`.** The ORM and the database set
+them, so binding them would make the digest depend on values the writer
+does not control, producing mismatches on rows nobody touched. An attacker
+who alters *only* a timestamp is not caught here; anything that changes
+what the record says is.
+
+**The failure mode is a false accusation, not a missed one.** A write path
+that forgets to rehash flags an *untouched* record as tampered, which is
+worse than having no control. Only `create` gets compiler help — the other
+three (`update_data`, `soft_delete`, and the Art. 17 erasure) build their
+`ActiveModel` from `..Default::default()` or an existing row and compile
+happily with a stale digest. A DB-gated test therefore drives all four and
+asserts every record still verifies, and was **confirmed to fail** when
+the rehash is removed from the update path.
+
+**Erasure recomputes the digest over the tombstone rather than clearing
+it.** A case's whole payload is one column, so an erased record is still a
+*complete* record and can be hashed — it keeps verifying instead of
+dropping into the `unhashed` bucket. (person and worker null theirs
+instead, because their child rows are deleted by then and no assembled
+record remains to hash.)
+
+**Version tag: `c-r1`.**
+
+Verified by `GET /api/cases/records/verify`.
+
 ### 12.5 Honest limits
 
 - **Masking and GDPR export are still not built** (§12.3), and that gap
@@ -265,8 +303,9 @@ test pins that redaction cannot be used to detach the following row.
   §8 requires. Do not ship it before those.
 - **The audit half of the extended controls is implemented; the rest is
   not.** Delivered: the tamper-evident chain, read/disclosure auditing,
-  `/audit/verify`, the §164.528 accounting, and (2026-07-26) Art. 17
-  erasure by redaction including link withdrawal (§12.4b). Still absent:
+  `/audit/verify`, the §164.528 accounting, Art. 17 erasure by redaction
+  including link withdrawal (§12.4b), and row-level record integrity
+  (`cases.content_hash` + `/api/cases/records/verify`, 2026-07-27). Still absent:
   the GDPR residency and lawful-basis declarations, FHIR profile and
   terminology validation, and the SOUP/SBOM evidence bundle. The
   reference implementation remains the

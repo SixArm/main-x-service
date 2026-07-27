@@ -117,6 +117,23 @@ pub async fn erase<C: ConnectionTrait>(
     let deleted_at: chrono::DateTime<chrono::FixedOffset> =
         chrono::Utc::now().trunc_subsecs(6).into();
     let mut active = model.into_active_model();
+    // The tombstone is recomputed into the digest, not cleared. This
+    // service stores its whole payload in one JSONB column, so an erased
+    // record is still a *complete* record and can be hashed — an erased
+    // case therefore keeps verifying rather than dropping into the
+    // `unhashed` bucket. (person and worker null theirs instead, because
+    // their child rows are deleted by then and no assembled record
+    // remains to hash.) Erasure is a legitimate write, not a reason for
+    // the row to look tampered with.
+    active.content_hash = ActiveValue::set(Some(super::record_integrity::record_hash(
+        &super::record_integrity::RecordInput {
+            pid,
+            title: TOMBSTONE_TITLE,
+            data: &payload,
+            active: false,
+            deleted_at_micros: Some(deleted_at.timestamp_micros()),
+        },
+    )));
     active.title = ActiveValue::set(TOMBSTONE_TITLE.to_string());
     active.data = ActiveValue::set(payload);
     active.active = ActiveValue::set(false);

@@ -428,7 +428,10 @@ engineering practice without the device framing.
 > report as `unhashed` rather than verified. The failure mode is a false
 > accusation rather than a missed one, since a write path that forgets to
 > rehash flags an untouched record; every path is covered by a DB-gated
-> test verified to fail when a rehash is removed. worker's
+> test verified to fail when a rehash is removed. **case adopted it on
+> 2026-07-27**, closing the last gap among the four chain-carrying
+> services — until then an out-of-band edit to a stored case was
+> undetectable there. worker's
 > `worker_assessments` sub-resource carries its own digest rather than
 > being folded into the parent's — an assessment is written through its
 > own endpoints, and a per-row hash names *which* assessment was tampered

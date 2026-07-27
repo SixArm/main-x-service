@@ -1,7 +1,10 @@
 //! `cases` model — CRUD over the stored `case_matcher::Case` payload.
 
 use case_matcher::Case as MatchCase;
+use chrono::SubsecRound as _;
 use loco_rs::prelude::*;
+
+use crate::compliance::record_integrity;
 use sea_orm::sea_query::Expr;
 use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect};
@@ -33,9 +36,21 @@ impl Model {
     /// When serialization or the insert fails.
     pub async fn create<C: ConnectionTrait>(db: &C, case: &MatchCase) -> ModelResult<Self> {
         let data = serde_json::to_value(case).map_err(|e| ModelError::Any(e.into()))?;
+        let pid = Uuid::new_v4();
         let model = cases::ActiveModel {
-            pid: ActiveValue::set(Uuid::new_v4()),
+            pid: ActiveValue::set(pid),
             title: ActiveValue::set(case.title.clone()),
+            // A new record is live, so the digest binds `deleted_at` as
+            // `None`.
+            content_hash: ActiveValue::set(Some(record_integrity::record_hash(
+                &record_integrity::RecordInput {
+                    pid,
+                    title: &case.title,
+                    data: &data,
+                    active: true,
+                    deleted_at_micros: None,
+                },
+            ))),
             data: ActiveValue::set(data),
             active: ActiveValue::set(true),
             deleted_at: ActiveValue::set(None),
@@ -96,6 +111,41 @@ impl Model {
             .await?;
         Ok(rows)
     }
+
+    /// The most recently updated `limit` cases, **including soft-deleted
+    /// and erased rows**, for integrity verification.
+    ///
+    /// Deliberately not filtered to live rows: a retired or erased case
+    /// still carries a digest, and an attacker editing a row nobody reads
+    /// any more is exactly the case worth catching.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn recent_for_integrity<C: ConnectionTrait>(
+        db: &C,
+        limit: u64,
+    ) -> ModelResult<Vec<Model>> {
+        Ok(cases::Entity::find()
+            .order_by_desc(cases::Column::UpdatedAt)
+            .limit(limit)
+            .all(db)
+            .await?)
+    }
+
+    /// Recompute every recent record's content hash and report mismatches.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn verify_records(
+        db: &DatabaseConnection,
+        limit: u64,
+    ) -> ModelResult<record_integrity::RecordIntegrityReport> {
+        Ok(record_integrity::verify(
+            &Self::recent_for_integrity(db, limit).await?,
+        ))
+    }
 }
 
 /// Escape `LIKE`/`ILIKE` wildcards so a user query matches literally.
@@ -120,6 +170,20 @@ impl ActiveModel {
         case: &MatchCase,
     ) -> ModelResult<Model> {
         let data = serde_json::to_value(case).map_err(|e| ModelError::Any(e.into()))?;
+        // The lifecycle fields are untouched by an update, so read them
+        // back off the active model to hash the row as it will land.
+        let pid = *self.pid.as_ref();
+        let active = *self.active.as_ref();
+        let deleted_at_micros = self.deleted_at.as_ref().map(|d| d.timestamp_micros());
+        self.content_hash = ActiveValue::set(Some(record_integrity::record_hash(
+            &record_integrity::RecordInput {
+                pid,
+                title: &case.title,
+                data: &data,
+                active,
+                deleted_at_micros,
+            },
+        )));
         self.title = ActiveValue::set(case.title.clone());
         self.data = ActiveValue::set(data);
         self.update(db).await.map_err(ModelError::from)
@@ -134,8 +198,24 @@ impl ActiveModel {
     ///
     /// When the update fails.
     pub async fn soft_delete<C: ConnectionTrait>(mut self, db: &C) -> ModelResult<Model> {
+        // Truncated to microseconds so the value hashed here is the value
+        // Postgres returns (see `compliance::record_integrity`).
+        let deleted_at: chrono::DateTime<chrono::FixedOffset> =
+            chrono::Utc::now().trunc_subsecs(6).into();
+        // A soft delete changes the lifecycle state the digest binds, so
+        // the row rehashes — otherwise every deleted case would read as
+        // tampered.
+        self.content_hash = ActiveValue::set(Some(record_integrity::record_hash(
+            &record_integrity::RecordInput {
+                pid: *self.pid.as_ref(),
+                title: self.title.as_ref(),
+                data: self.data.as_ref(),
+                active: false,
+                deleted_at_micros: Some(deleted_at.timestamp_micros()),
+            },
+        )));
         self.active = ActiveValue::set(false);
-        self.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
+        self.deleted_at = ActiveValue::set(Some(deleted_at));
         self.update(db).await.map_err(ModelError::from)
     }
 }

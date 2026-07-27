@@ -747,6 +747,48 @@ async fn erase(
     format::json(outcome)
 }
 
+/// Verify row-level record integrity across recent case records.
+///
+/// `GET /api/cases/records/verify?limit=1000` — recomputes each record's
+/// content hash and names any row changed outside the service.
+///
+/// The **complement** to `/api/cases/audit/verify`, not a duplicate: the
+/// chain proves the trail was not rewritten, this proves the records were
+/// not edited out of band. An attacker with SQL access who edits a stored
+/// case and writes no audit row defeats the first and is caught by this.
+///
+/// Rows written before the `content_hash` column existed report as
+/// `unhashed` — neither verified nor a mismatch — so adopting the control
+/// on a populated table does not produce a wall of false positives.
+///
+/// # Errors
+///
+/// Propagates the query error.
+#[debug_handler]
+async fn verify_records(
+    Query(params): Query<VerifyParams>,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
+    let limit = params.limit();
+    let report = CaseModel::verify_records(&ctx.db, limit).await?;
+    format::json(serde_json::json!({
+        "limit": limit,
+        "verified": report.verified,
+        "records": report.records,
+        "intact": report.intact,
+        "unhashed": report.unhashed,
+        "mismatched": report.mismatched,
+        "interpretation": if report.verified {
+            "no record in the verified window differs from its stored hash; this attests to \
+             the case records, not to the audit trail — see /api/cases/audit/verify for that"
+        } else {
+            "a mismatch means the record's content changed without the service rehashing it — \
+             either an out-of-band SQL edit, or a write path that forgot to rehash; \
+             investigate the named pids against the audit trail"
+        },
+    }))
+}
+
 /// Query string for the chain-verification endpoint.
 #[derive(Debug, serde::Deserialize)]
 struct VerifyParams {
@@ -797,6 +839,7 @@ pub fn routes() -> Routes {
         .add("/whoami", get(whoami))
         .add("/audit/recent", get(recent_audit))
         .add("/audit/verify", get(verify_audit_chain))
+        .add("/records/verify", get(verify_records))
         .add("/events/recent", get(recent_events))
         .add("/{pid}", get(get_one))
         .add("/{pid}", put(update))
