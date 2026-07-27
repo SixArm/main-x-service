@@ -320,14 +320,33 @@ worker changed" — a materially worse answer for the table where a changed
 score band is the entire point. `worker_id` is bound into the digest, so
 re-parenting an assessment is detected rather than invisible.
 
-The hash is stamped **after** the write rather than computed inline, which
-keeps one rule: the digest is always taken over the row as stored, so it
-cannot disagree with what a verifier reads back. The cost is a second
-`UPDATE` per write — acceptable on a low-volume sub-resource, and what
-makes the invariant hold by construction instead of by remembering to
-mirror every field. `GET /api/records/verify` folds both digests into one
-report, because a caller asking "is this service's data intact?" should
-not have to know the answer lives in two places.
+The hash is computed and written in **one statement**. The rule it keeps
+is that the digest and the stored row are the same object: an update is
+applied to a `Model`, that `Model` is hashed, the digest is set on it, and
+every field is marked dirty so the whole row is written. There is no
+parallel hash-input structure that could drift out of step with the
+columns actually persisted — which is the failure this design exists to
+prevent, since a digest describing something other than the stored row
+produces false tamper reports.
+
+An earlier form wrote the row and then stamped the hash in a second
+`UPDATE`, on the theory that hashing the row *as stored* was stronger.
+It was not: the second statement hashed a value that had itself already
+round-tripped once, so it narrowed the window without closing it. The
+residual risk either way is a database-side normalisation of a hashed
+column — JSONB key ordering or number formatting in `results` is the
+realistic candidate — and only reading the row back can detect that. So
+the guarantee comes from a round-trip test
+(`stored_row_hash_survives_a_jsonb_round_trip`, which exercises whole,
+repeating and fractional percentiles across insert, update and
+withdrawal), exactly as the audit chain's
+`chain_survives_a_jsonb_round_trip` does for the same reason. Measured
+with a probe trigger: insert + update + withdraw now issue three
+statements where the two-phase form issued six.
+
+`GET /api/records/verify` folds both digests into one report, because a
+caller asking "is this service's data intact?" should not have to know the
+answer lives in two places.
 
 A DB-gated test edits a stored percentile directly in SQL and asserts the
 audit chain still verifies (it writes no audit row) while record integrity

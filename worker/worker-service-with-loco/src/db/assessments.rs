@@ -19,8 +19,7 @@
 //! invariant 2: never panic on stored/untrusted input).
 
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter,
-    QueryOrder,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder,
 };
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -77,35 +76,36 @@ pub fn to_domain(m: &row::Model) -> Result<Assessment> {
     })
 }
 
-/// Build the insertable active model for a domain [`Assessment`].
+/// A domain [`Assessment`] as the row that will be stored.
+///
+/// Returns a `Model`, not an `ActiveModel`, so the caller can hash exactly
+/// the value it is about to write. `content_hash` is left `None` here and
+/// filled in by [`write_hashed`], which is the single place a digest is
+/// ever computed.
 ///
 /// # Errors
 ///
 /// Returns [`crate::Error::Internal`] when the results cannot be
-/// serialized to JSON (unreachable for the domain type, mapped rather
-/// than unwrapped).
-fn from_domain(a: &Assessment) -> Result<row::ActiveModel> {
+/// serialized.
+fn model_from_domain(a: &Assessment) -> Result<row::Model> {
     let results = serde_json::to_value(&a.results)
         .map_err(|e| crate::Error::Internal(format!("cannot serialize assessment results: {e}")))?;
-    Ok(row::ActiveModel {
-        id: ActiveValue::set(a.id),
-        worker_id: ActiveValue::set(a.worker_id),
-        category: ActiveValue::set(a.category.as_str().to_string()),
-        instrument: ActiveValue::set(a.instrument.clone()),
-        provider: ActiveValue::set(a.provider.clone()),
-        status: ActiveValue::set(a.status.as_str().to_string()),
-        administered_on: ActiveValue::set(a.administered_on.map(date_to_time)),
-        expires_on: ActiveValue::set(a.expires_on.map(date_to_time)),
-        administered_by: ActiveValue::set(a.administered_by.clone()),
-        notes: ActiveValue::set(a.notes.clone()),
-        results: ActiveValue::set(results),
-        created_at: ActiveValue::set(ts_to_offset(a.created_at)),
-        updated_at: ActiveValue::set(ts_to_offset(a.updated_at)),
-        deleted_at: ActiveValue::set(None),
-        // Set below, once the row exists in its final form: the digest
-        // covers the stored row, and building it from the domain value
-        // twice would risk the two drifting.
-        content_hash: ActiveValue::set(None),
+    Ok(row::Model {
+        id: a.id,
+        worker_id: a.worker_id,
+        category: a.category.as_str().to_string(),
+        instrument: a.instrument.clone(),
+        provider: a.provider.clone(),
+        status: a.status.as_str().to_string(),
+        administered_on: a.administered_on.map(date_to_time),
+        expires_on: a.expires_on.map(date_to_time),
+        administered_by: a.administered_by.clone(),
+        notes: a.notes.clone(),
+        results,
+        created_at: ts_to_offset(a.created_at),
+        updated_at: ts_to_offset(a.updated_at),
+        deleted_at: None,
+        content_hash: None,
     })
 }
 
@@ -119,36 +119,46 @@ fn from_domain(a: &Assessment) -> Result<row::ActiveModel> {
 /// Returns [`crate::Error::Database`] when the insert fails, or
 /// [`crate::Error::Internal`] when the results cannot be serialized.
 pub async fn insert<C: ConnectionTrait>(db: &C, assessment: &Assessment) -> Result<row::Model> {
-    let stored = from_domain(assessment)?.insert(db).await?;
-    stamp_hash(db, stored).await
+    write_hashed(db, model_from_domain(assessment)?, true).await
 }
 
-/// Recompute and store a row's content hash, returning the stored row.
+/// Write a row, hashing it as part of the same statement.
 ///
-/// Applied after every write. Assessments are the crate's most sensitive
-/// table — aptitude, personality and psychometric results — and are
-/// outside `workers.content_hash`, which covers only the assembled
-/// `Worker`. Without this they would be the one place an out-of-band SQL
-/// edit went undetected.
+/// The digest is taken over `row` and then stored **on** `row`, so the
+/// hash input and the written value are the same object — there is no
+/// parallel hash-input structure that could drift out of step with the
+/// columns actually persisted. Every field is marked dirty
+/// ([`reset_all`](sea_orm::ActiveModelTrait::reset_all)), because a
+/// `Model` converts to an `ActiveModel` whose fields are all `Unchanged`
+/// and would otherwise write nothing.
 ///
-/// Stamping *after* the write, rather than computing the digest inline,
-/// keeps one rule: the hash is always taken over the row as stored, so it
-/// cannot disagree with what a verifier later reads back. The cost is a
-/// second UPDATE per write, which is acceptable on a low-volume
-/// sub-resource and is what makes the invariant hold by construction
-/// rather than by remembering to mirror every field.
+/// This is one statement, matching how the audit chain hashes its rows
+/// before insert. The earlier implementation wrote the row and then
+/// stamped the hash in a second `UPDATE` to guarantee the digest covered
+/// the row *as stored*; that guarantee now comes from the round-trip test
+/// (`stored_row_hash_survives_a_jsonb_round_trip`) instead, which is what
+/// the audit chain already relies on for the same reason. The remaining
+/// risk either way is a database-side normalisation of a hashed column —
+/// JSONB key order or number formatting in `results` — and a test that
+/// reads the row back is the only thing that can actually detect it. A
+/// second `UPDATE` merely narrowed the window; it did not close it.
 ///
 /// # Errors
 ///
-/// Returns [`crate::Error::Database`] when the update fails.
-async fn stamp_hash<C: ConnectionTrait>(db: &C, stored: row::Model) -> Result<row::Model> {
-    let hash = crate::compliance::record_integrity::assessment_hash(&stored);
-    if stored.content_hash.as_deref() == Some(hash.as_str()) {
-        return Ok(stored);
-    }
-    let mut active: row::ActiveModel = stored.into();
-    active.content_hash = ActiveValue::set(Some(hash));
-    Ok(active.update(db).await?)
+/// Returns [`crate::Error::Database`] when the write fails.
+async fn write_hashed<C: ConnectionTrait>(
+    db: &C,
+    mut row: row::Model,
+    insert: bool,
+) -> Result<row::Model> {
+    row.content_hash = Some(crate::compliance::record_integrity::assessment_hash(&row));
+    let active: row::ActiveModel = row.into();
+    let active = active.reset_all();
+    Ok(if insert {
+        active.insert(db).await?
+    } else {
+        active.update(db).await?
+    })
 }
 
 /// One worker's **live** assessments, most recently administered first
@@ -245,37 +255,46 @@ pub async fn update<C: ConnectionTrait>(
     stored: row::Model,
     change: &AssessmentUpdate,
 ) -> Result<row::Model> {
-    let mut active: row::ActiveModel = stored.into();
+    write_hashed(db, apply_change(stored, change)?, false).await
+}
+
+/// Apply an update to a stored row, returning the row as it will be
+/// persisted.
+///
+/// Pure, and returns a `Model` rather than mutating an `ActiveModel`, so
+/// the same value can be both hashed and written. Doing it the other way
+/// round — setting `ActiveModel` fields and separately assembling a hash
+/// input — is what would let the digest describe something other than the
+/// stored row.
+fn apply_change(mut row: row::Model, change: &AssessmentUpdate) -> Result<row::Model> {
     if let Some(status) = change.status {
-        active.status = ActiveValue::set(status.as_str().to_string());
+        row.status = status.as_str().to_string();
     }
     if let Some(instrument) = &change.instrument {
-        active.instrument = ActiveValue::set(instrument.clone());
+        row.instrument.clone_from(instrument);
     }
     if let Some(provider) = &change.provider {
-        active.provider = ActiveValue::set(provider.clone());
+        row.provider.clone_from(provider);
     }
     if let Some(administered_on) = change.administered_on {
-        active.administered_on = ActiveValue::set(administered_on.map(date_to_time));
+        row.administered_on = administered_on.map(date_to_time);
     }
     if let Some(expires_on) = change.expires_on {
-        active.expires_on = ActiveValue::set(expires_on.map(date_to_time));
+        row.expires_on = expires_on.map(date_to_time);
     }
     if let Some(administered_by) = &change.administered_by {
-        active.administered_by = ActiveValue::set(administered_by.clone());
+        row.administered_by.clone_from(administered_by);
     }
     if let Some(notes) = &change.notes {
-        active.notes = ActiveValue::set(notes.clone());
+        row.notes.clone_from(notes);
     }
     if let Some(results) = &change.results {
-        let json = serde_json::to_value(results).map_err(|e| {
+        row.results = serde_json::to_value(results).map_err(|e| {
             crate::Error::Internal(format!("cannot serialize assessment results: {e}"))
         })?;
-        active.results = ActiveValue::set(json);
     }
-    active.updated_at = ActiveValue::set(OffsetDateTime::now_utc());
-    let updated = active.update(db).await?;
-    stamp_hash(db, updated).await
+    row.updated_at = OffsetDateTime::now_utc();
+    Ok(row)
 }
 
 /// Soft-delete (withdraw) an assessment: stamp `deleted_at = now()`.
@@ -284,14 +303,13 @@ pub async fn update<C: ConnectionTrait>(
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] when the update fails.
-pub async fn soft_delete<C: ConnectionTrait>(db: &C, stored: row::Model) -> Result<row::Model> {
-    let mut active: row::ActiveModel = stored.into();
-    active.deleted_at = ActiveValue::set(Some(OffsetDateTime::now_utc()));
-    active.updated_at = ActiveValue::set(OffsetDateTime::now_utc());
-    let updated = active.update(db).await?;
-    // A withdrawal changes `deleted_at`, which the digest binds, so it
-    // rehashes like any other write.
-    stamp_hash(db, updated).await
+pub async fn soft_delete<C: ConnectionTrait>(db: &C, mut stored: row::Model) -> Result<row::Model> {
+    // A withdrawal changes `deleted_at`, which the digest binds, so the
+    // row rehashes like any other write.
+    let now = OffsetDateTime::now_utc();
+    stored.deleted_at = Some(now);
+    stored.updated_at = now;
+    write_hashed(db, stored, false).await
 }
 
 #[cfg(test)]
@@ -317,7 +335,7 @@ mod tests {
             created_at: ts_to_offset(assessment.created_at),
             updated_at: ts_to_offset(assessment.updated_at),
             deleted_at: None,
-            // As a freshly inserted row, before `stamp_hash` runs.
+            // Unhashed: `write_hashed` fills this in as it writes.
             content_hash: None,
         }
     }
@@ -401,6 +419,103 @@ mod tests {
             ..Default::default()
         };
         assert!(!clear.is_empty());
+    }
+
+    /// **The load-bearing pin for the single-write design.** A row's
+    /// stored hash still verifies after a full Postgres round trip.
+    ///
+    /// The digest is computed in the same statement that writes the row,
+    /// so it describes the value *sent* to Postgres. If Postgres then
+    /// normalises a hashed column on the way in — JSONB key ordering or
+    /// number formatting in `results` is the realistic candidate — the
+    /// value read back would hash differently and every untouched
+    /// assessment would report as tampered. Nothing but reading the row
+    /// back can detect that.
+    ///
+    /// This is the same property, and the same reasoning, as the audit
+    /// chain's `chain_survives_a_jsonb_round_trip`. It is what allows one
+    /// write instead of write-then-stamp: the earlier two-statement form
+    /// narrowed this window but never closed it, because the second
+    /// statement hashed a value that had itself already round-tripped
+    /// once.
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL to a migrated Postgres"]
+    async fn stored_row_hash_survives_a_jsonb_round_trip() {
+        use crate::compliance::record_integrity::{assessment_hash, verify_assessments};
+
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
+        let db = sea_orm::Database::connect(&url).await.expect("connect");
+        let worker_id = Uuid::new_v4();
+
+        // Awkward numbers on purpose: a whole float, a repeating decimal,
+        // and a value with more precision than the band logic needs. These
+        // are what a naive JSONB normalisation would round or reformat.
+        let mut assessment =
+            Assessment::new(worker_id, AssessmentCategory::Psychometric, "Round Trip");
+        assessment.results = vec![
+            AssessmentResult::percentile(AssessmentScale::NumericalReasoning, 100.0),
+            AssessmentResult::percentile(AssessmentScale::VerbalReasoning, 33.333_333_333_333_336),
+            AssessmentResult::percentile(AssessmentScale::ProblemSolving, 0.5),
+        ];
+
+        let inserted = insert(&db, &assessment).await.expect("insert");
+        let stored_hash = inserted
+            .content_hash
+            .clone()
+            .expect("the insert stamped a hash");
+
+        // Read the row back through Postgres and rehash it.
+        let read_back = find(&db, worker_id, assessment.id)
+            .await
+            .expect("find")
+            .expect("present");
+        assert_eq!(
+            assessment_hash(&read_back),
+            stored_hash,
+            "Postgres returned a value that hashes differently from the one written — \
+             every untouched assessment would report as tampered"
+        );
+        assert!(verify_assessments(&[read_back]).verified);
+
+        // The same must hold after an update, whose results go through a
+        // second serialization.
+        let found = find(&db, worker_id, assessment.id)
+            .await
+            .expect("find")
+            .expect("present");
+        let updated = update(
+            &db,
+            found,
+            &AssessmentUpdate {
+                results: Some(vec![AssessmentResult::percentile(
+                    AssessmentScale::LogicalThinking,
+                    66.666_666_666_666_67,
+                )]),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("update");
+        let read_back = find(&db, worker_id, assessment.id)
+            .await
+            .expect("find")
+            .expect("present");
+        assert_eq!(
+            read_back.content_hash, updated.content_hash,
+            "the update's hash must match what the database stored"
+        );
+        assert!(verify_assessments(&[read_back]).verified);
+
+        // And after a soft delete, which changes a bound field.
+        let found = find(&db, worker_id, assessment.id)
+            .await
+            .expect("find")
+            .expect("present");
+        let deleted = soft_delete(&db, found).await.expect("soft delete");
+        assert!(
+            verify_assessments(&[deleted]).verified,
+            "a withdrawn assessment must still verify"
+        );
     }
 
     /// DB-gated round-trip against a real Postgres (set `DATABASE_URL`):
