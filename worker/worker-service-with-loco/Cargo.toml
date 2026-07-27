@@ -99,10 +99,10 @@ mimalloc = "0.1.52"
 # SHA-256 for the tamper-evident audit hash chain (HIPAA §164.312(c)).
 # See src/compliance/audit_chain.rs.
 sha2 = "0.10"
-# Third integrity digest. SHA-3 (FIPS 202) is a **sponge** construction,
-# structurally unrelated to SHA-256's Merkle-Damgard and to BLAKE3's ARX
-# tree, so a cryptanalytic advance against one design family does not
-# transfer. See spec/12-compliance.md §12.4z.
+# Second integrity digest. SHA-3 (FIPS 202) is a **sponge** construction,
+# structurally unrelated to SHA-256's Merkle-Damgard chaining, so a
+# cryptanalytic advance against one design family does not transfer to
+# it. See spec/12-compliance.md §12.4z.
 sha3 = "0.10"
 # Keyed integrity (HMAC-SHA256, FIPS 198-1) over the same pre-image, with
 # a key the database never holds — see spec/12-compliance.md §12.4z. The

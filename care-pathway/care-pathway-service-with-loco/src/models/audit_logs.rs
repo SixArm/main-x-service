@@ -158,10 +158,10 @@ impl Model {
         Ok(Self::heads(db).await?.0)
     }
 
-    /// Both chain heads — `(SHA-256, BLAKE3)` — from the same row.
+    /// Both chain heads — `(SHA-256, SHA-3)` — from the same row.
     ///
     /// Read together so an append binds each algorithm's *own*
-    /// predecessor. Binding the SHA-256 head into the BLAKE3 digest would
+    /// predecessor. Binding the SHA-256 head into the SHA-3 digest would
     /// make the second chain's linkage rest on SHA-256's collision
     /// resistance, which is exactly the dependency keeping two algorithms
     /// is meant to avoid.

@@ -401,7 +401,7 @@ impl AuditLogRepository {
             .await?;
         }
         // Both chain heads from the same row, so each algorithm binds
-        // its *own* predecessor. Binding the SHA-256 head into the BLAKE3
+        // its *own* predecessor. Binding the SHA-256 head into the SHA-3
         // digest would make the second chain's linkage rest on SHA-256's
         // collision resistance — the dependency two algorithms exist to
         // avoid.
@@ -462,7 +462,7 @@ impl AuditLogRepository {
         Ok(())
     }
 
-    /// Both chain heads — `(SHA-256, BLAKE3)` — from the same row.
+    /// Both chain heads — `(SHA-256, SHA-3)` — from the same row.
     ///
     /// Read together so an append binds each algorithm's own predecessor.
     ///

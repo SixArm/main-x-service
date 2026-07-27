@@ -157,7 +157,7 @@ pub fn hash_of_sha3(row: &care_pathways::Model) -> String {
 ///
 /// A **named struct rather than a tuple**: with two algorithms `.0`/`.1`
 /// was survivable, with three it is a latent bug, because putting the
-/// SHA-3 digest in the BLAKE3 column type-checks perfectly and fails only
+/// SHA-3 digest in the SHA-256 column type-checks perfectly and fails only
 /// at the next verification. Named fields make that mistake impossible to
 /// write.
 #[derive(Debug, Clone, PartialEq, Eq)]

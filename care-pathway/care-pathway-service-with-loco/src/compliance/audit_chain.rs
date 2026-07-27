@@ -89,10 +89,9 @@ pub fn row_hash(input: &ChainInput<'_>) -> String {
 
 /// The same row's digest under **SHA-3** (SHA3-256).
 ///
-/// Third sibling of [`row_hash`] and [`row_hash_blake3`], over the
-/// byte-identical pre-image. SHA-3 is a sponge construction, unrelated to
-/// SHA-256's Merkle-Damgard chaining and to BLAKE3's ARX tree, so the
-/// three span three distinct design families.
+/// Sibling of [`row_hash`], over the byte-identical pre-image. SHA-3 is
+/// a sponge construction, unrelated to SHA-256's Merkle-Damgard
+/// chaining, so the two span two distinct design families.
 #[must_use]
 pub fn row_hash_sha3(input: &ChainInput<'_>) -> String {
     use sha3::Digest as _;
@@ -486,8 +485,8 @@ mod tests {
     }
 
     /// Build a chained row the way the writer does, binding an explicit
-    /// BLAKE3 predecessor so the fixture builds *both* chains — otherwise
-    /// every test row would be `blake3_unhashed` and the second algorithm
+    /// SHA-3 predecessor so the fixture builds *both* chains — otherwise
+    /// every test row would be `sha3_unhashed` and the second algorithm
     /// would go untested.
     fn row_with(
         id: i32,

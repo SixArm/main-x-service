@@ -191,7 +191,7 @@ pub(crate) fn preimage(input: &RecordInput<'_>) -> crate::Result<Vec<u8>> {
     Ok(buf)
 }
 
-/// Both digests for one record, as `(SHA-256, BLAKE3)`.
+/// Both digests for one record, as `(SHA-256, SHA-3)`.
 ///
 /// Every write path takes the pair from here rather than calling the two
 /// functions separately. Stamping one and forgetting the other leaves a
@@ -214,7 +214,7 @@ pub fn digests(input: &RecordInput<'_>) -> crate::Result<Digests> {
 ///
 /// A **named struct rather than a tuple**: with two algorithms `.0`/`.1`
 /// was survivable, with three it is a latent bug, because putting the
-/// SHA-3 digest in the BLAKE3 column type-checks perfectly and fails only
+/// SHA-3 digest in the SHA-256 column type-checks perfectly and fails only
 /// at the next verification — as a false tamper report on an untouched
 /// record. Named fields make that unwriteable.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -288,7 +288,7 @@ pub fn hash_with_deleted_at(
 }
 
 /// One row as verification sees it: the assembled record, its stored
-/// SHA-256 digest, its stored BLAKE3 digest, and its soft-delete stamp.
+/// SHA-256 digest, its stored SHA-3 digest, and its soft-delete stamp.
 ///
 /// Either digest may be `None` on a row written before that column
 /// existed — reported as unhashed, never as a mismatch.
@@ -422,7 +422,7 @@ pub fn assessment_hash(row: &crate::db::models::worker_assessments::Model) -> St
     out
 }
 
-/// Both assessment digests, as `(SHA-256, BLAKE3)`.
+/// Both assessment digests, as `(SHA-256, SHA-3)`.
 ///
 /// Taken from one call so neither can be stamped without the other.
 #[must_use]

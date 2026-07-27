@@ -89,9 +89,9 @@ pub fn row_hash(input: &ChainInput<'_>) -> String {
 
 /// The same row's digest under **SHA-3** (SHA3-256).
 ///
-/// Third sibling over the byte-identical pre-image. SHA-3 is a sponge
-/// construction, unrelated to SHA-256's Merkle-Damgard chaining and to
-/// BLAKE3's ARX tree, so the three span three distinct design families.
+/// Sibling over the byte-identical pre-image. SHA-3 is a sponge
+/// construction, unrelated to SHA-256's Merkle-Damgard chaining, so the
+/// two span two distinct design families.
 #[must_use]
 pub fn row_hash_sha3(input: &ChainInput<'_>) -> String {
     use sha3::Digest as _;
@@ -401,8 +401,8 @@ mod tests {
             snapshot,
             prev_hash: prev.map(ToString::to_string),
             hash: None,
-            // The fixture builds *both* chains: with no BLAKE3 digest
-            // every row would be `blake3_unhashed` and the second
+            // The fixture builds *both* chains: with no SHA-3 digest
+            // every row would be `sha3_unhashed` and the second
             // algorithm would go untested.
             prev_hash_sha3: prev.map(ToString::to_string),
             hash_sha3: None,

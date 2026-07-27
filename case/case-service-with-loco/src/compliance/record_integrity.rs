@@ -126,7 +126,7 @@ pub(crate) fn preimage(input: &RecordInput<'_>) -> Vec<u8> {
     buf
 }
 
-/// Both digests for one record, as `(SHA-256, BLAKE3)`.
+/// Both digests for one record, as `(SHA-256, SHA-3)`.
 ///
 /// Every write path takes the pair from here rather than calling the two
 /// functions separately. Stamping one and forgetting the other leaves a
@@ -147,9 +147,9 @@ pub struct Digests {
 
 /// Every digest for one record, computed from one pre-image.
 ///
-/// A **named struct rather than a tuple**: with three algorithms `.0`/
+/// A **named struct rather than a tuple**: with several algorithms `.0`/
 /// `.1`/`.2` is a latent bug, since putting the SHA-3 digest in the
-/// BLAKE3 column type-checks and fails only at the next verification.
+/// SHA-256 column type-checks and fails only at the next verification.
 #[must_use]
 pub fn digests(input: &RecordInput<'_>) -> Digests {
     Digests {
