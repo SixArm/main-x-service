@@ -22,6 +22,8 @@ pub mod app;
 /// Bearer-token (RS256 JWT) verification extractors for the REST surface.
 pub mod auth;
 /// REST controllers: organization CRUD, matching, audit, and the docs endpoints.
+/// Compliance controls: row-level integrity and keyed MACs.
+pub mod compliance;
 pub mod controllers;
 
 /// HL7 FHIR R5 interop (`Organization` resource) — conversions, wire

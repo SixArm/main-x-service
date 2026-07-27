@@ -33,6 +33,13 @@ pub struct Model {
     /// Optional JSON snapshot of the record's payload at action time
     /// (`None` for deletes, where there is nothing to snapshot).
     pub snapshot: Option<Json>,
+    /// HMAC-SHA256 over this audit row's pre-image, as
+    /// `"<scheme>.<key id>:<hex>"`.
+    ///
+    /// Detects an audit row whose *content* was edited. It does not
+    /// detect a row deleted wholesale — that needs the hash chain this
+    /// service does not yet have (see `crate::compliance`).
+    pub mac: Option<String>,
 }
 
 /// `SeaORM` relation enum for `audit_logs`. Audit rows reference an

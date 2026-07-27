@@ -40,12 +40,33 @@ impl Model {
     /// When serialization or the insert fails.
     pub async fn create<C: ConnectionTrait>(db: &C, org: &MatchOrg) -> ModelResult<Self> {
         let data = serde_json::to_value(org).map_err(|e| ModelError::Any(e.into()))?;
+        // Mint the public id here (not a DB default) so it is known
+        // before the insert, returned to the caller, and bound into the
+        // digests below.
+        let pid = Uuid::new_v4();
+        // All three digests from one call, so none can be stamped
+        // without the others (see `record_integrity::digests`). Computed
+        // inline rather than stamped afterwards, so one statement writes
+        // the row and its integrity values together — there is no window
+        // in which a row exists unhashed.
+        let digests = crate::compliance::record_integrity::digests(
+            &crate::compliance::record_integrity::RecordInput {
+                pid,
+                name: &org.name,
+                data: &data,
+                active: true,
+                deleted_at_micros: None,
+            },
+        );
         let model = organizations::ActiveModel {
-            // Mint the public id here (not a DB default) so it is known
-            // before the insert and returned to the caller.
-            pid: ActiveValue::set(Uuid::new_v4()),
+            pid: ActiveValue::set(pid),
             // Denormalise the name for fast list/search.
             name: ActiveValue::set(org.name.clone()),
+            // A new record is live, so the digests bind `deleted_at` as
+            // `None`.
+            content_hash: ActiveValue::set(Some(digests.sha256.clone())),
+            content_hash_sha3: ActiveValue::set(Some(digests.sha3.clone())),
+            content_mac: ActiveValue::set(digests.mac.clone()),
             data: ActiveValue::set(data),
             active: ActiveValue::set(true),
             deleted_at: ActiveValue::set(None),
@@ -128,8 +149,23 @@ impl ActiveModel {
         org: &MatchOrg,
     ) -> ModelResult<Model> {
         let data = serde_json::to_value(org).map_err(|e| ModelError::Any(e.into()))?;
+        // Re-digest over the *new* content. Leaving the old digests would
+        // report every legitimate edit as tampering, which is as damaging
+        // as missing a real one.
+        let d = crate::compliance::record_integrity::digests(
+            &crate::compliance::record_integrity::RecordInput {
+                pid: self.pid.as_ref().to_owned(),
+                name: &org.name,
+                data: &data,
+                active: *self.active.as_ref(),
+                deleted_at_micros: deleted_at_micros(self.deleted_at.as_ref().as_ref()),
+            },
+        );
         self.name = ActiveValue::set(org.name.clone());
         self.data = ActiveValue::set(data);
+        self.content_hash = ActiveValue::set(Some(d.sha256));
+        self.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
+        self.content_mac = ActiveValue::set(d.mac);
         self.update(db).await.map_err(ModelError::from)
     }
 
@@ -145,9 +181,35 @@ impl ActiveModel {
         self.active = ActiveValue::set(false);
         // `chrono` is the family-standard timestamp type (`SeaORM`'s type
         // for this column); this is a soft-delete stamp, not domain time.
-        self.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
+        let stamp: chrono::DateTime<chrono::FixedOffset> = chrono::Utc::now().into();
+        self.deleted_at = ActiveValue::set(Some(stamp));
+        // `active` and `deleted_at` are both in the pre-image, so a
+        // soft delete changes the digest. Not re-digesting here would
+        // make every soft-deleted row look tampered with.
+        let d = crate::compliance::record_integrity::digests(
+            &crate::compliance::record_integrity::RecordInput {
+                pid: self.pid.as_ref().to_owned(),
+                name: self.name.as_ref(),
+                data: self.data.as_ref(),
+                active: false,
+                deleted_at_micros: deleted_at_micros(Some(&stamp)),
+            },
+        );
+        self.content_hash = ActiveValue::set(Some(d.sha256));
+        self.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
+        self.content_mac = ActiveValue::set(d.mac);
         self.update(db).await.map_err(ModelError::from)
     }
+}
+
+/// A soft-delete stamp as epoch microseconds, the form the digest
+/// pre-image binds.
+///
+/// Microseconds because that is what Postgres stores; binding a finer
+/// precision than the column keeps would make a row's digest fail to
+/// reproduce after a round-trip.
+fn deleted_at_micros(stamp: Option<&chrono::DateTime<chrono::FixedOffset>>) -> Option<i64> {
+    stamp.map(chrono::DateTime::timestamp_micros)
 }
 
 /// Escape `LIKE`/`ILIKE` wildcards in a user query so it matches
