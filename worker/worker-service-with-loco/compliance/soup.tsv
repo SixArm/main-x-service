@@ -1,0 +1,74 @@
+# SOUP register — IEC 62304 §5.3.3 / §8.1.2, ISO/IEC 27001 A.8 supply chain
+#
+# Every *direct* dependency of this crate must appear here with a purpose
+# and a safety/security relevance note. `src/compliance/soup.rs` merges
+# these annotations with the real dependency graph from Cargo.lock to
+# produce the CycloneDX SBOM at GET /api/compliance/sbom, and its unit
+# tests fail the build when a direct dependency is missing (or when an
+# entry names a package that is no longer depended on).
+#
+# Scope note: this service is a **workforce identity registry**. It
+# holds personal data and serves a FHIR `Practitioner` representation,
+# and it additionally stores aptitude / personality / psychometric /
+# selection assessment results per worker — employment-consequential
+# data whose disclosure can cost someone a job. It is not a medical
+# device: no output drives an individual's treatment (the qualification
+# caveat in agents/share/compliance-for-healthcare.md §2.4). It
+# therefore carries no IEC 62304 safety classification, and
+# GET /api/compliance says so rather than leaving it inferred.
+#
+# "Safety relevance" below means relevance to the correctness and
+# confidentiality of personal data, not to physical safety.
+#
+# Transitive dependencies are listed in the SBOM but are NOT individually
+# annotated. Stating that boundary is more honest than implying we have
+# reviewed several hundred crates.
+#
+# Format: name<TAB>purpose<TAB>safety and security relevance
+# Blank lines and lines starting with '#' are ignored.
+#
+tokio	Async runtime.	Availability-relevant. Runtime failure means unavailability, not disclosure. Industry standard.
+axum	HTTP server, extractors, routing, and response types.	SECURITY-RELEVANT. Header and path extraction feed the auth guard and the disclosure-audit context; a routing defect could reach a handler the guard believed it had covered.
+tower	Middleware composition for the service stack.	Security-relevant. The blanket auth guard is a layer in this stack; ordering determines whether it runs before a handler.
+tower-http	CORS, compression, and tracing layers.	Security-relevant. CORS configuration decides which origins may make credentialed calls to this API.
+serde	Serialization framework for every wire type and stored payload.	Security-relevant. A mis-serialized payload could corrupt a stored person record or an audit snapshot.
+serde_json	JSON encoding/decoding, and the canonical form the audit hash chain digests.	SECURITY-CRITICAL. Key ordering (BTreeMap; preserve_order disabled) is load-bearing for chain verification across a JSONB round-trip. A reordering would report untouched rows as tampered — a false accusation is as damaging as a missed one.
+sea-orm	Async ORM and query builder over PostgreSQL.	SECURITY-CRITICAL. All persistence, including the audit trail, the erasure sweep, and record-level authorization reads. Query construction uses its typed builders, not string concatenation, which is what keeps SQL injection out of the search paths.
+bigdecimal	Exact decimal values in the persistence layer (src/db/models.rs).	Not security-relevant. Arbitrary-precision arithmetic avoids float rounding in stored numerics; no identity or authorization decision depends on it.
+loco-rs	Web application framework: boot, routing, config, background workers, model error types.	SECURITY-RELEVANT. Owns the boot sequence and the middleware stack, so a defect could bypass the auth/ABAC guard.
+migration	This crate's own sea-orm-migration migrator (path dependency).	Security-relevant. Owns the schema, including the audit_logs compliance columns and entity_links. First-party code, not third-party SOUP.
+tantivy	Embedded full-text search index over worker records.	SECURITY-RELEVANT. Holds a searchable copy of personal data outside PostgreSQL, so it is a second place masking and retention must be honoured — an erased record still present in the index is a live disclosure. Query paths take length-capped input (SEC-M1).
+tonic	gRPC transport for the (currently stubbed) RPC surface.	Security-relevant when enabled. The stub in src/api/grpc/mod.rs defines no live service today; if it is completed it becomes a second API surface that must carry the same guard as REST.
+utoipa	OpenAPI 3 document generation from handler annotations.	Not security-relevant. Produces documentation; the served document names endpoints but discloses no record data.
+utoipa-swagger-ui	Serves the Swagger UI assets.	Not security-relevant. Static documentation assets. The UI path is on the guard's public allow-list by design.
+opentelemetry	Metrics and trace API (src/observability).	Security-relevant. Span and metric attributes must not carry personal data or credentials; that is enforced at call sites, not by this crate.
+opentelemetry-otlp	OTLP exporter for traces and metrics.	SECURITY-RELEVANT. Ships telemetry off-box to a collector, so anything mistakenly placed in a span attribute leaves the trust boundary through it.
+opentelemetry_sdk	Tracer/meter provider implementation and batching.	Security-relevant. Same disclosure surface as the exporter it feeds.
+opentelemetry-semantic-conventions	Standard attribute-name constants.	Not security-relevant. Constants only.
+tracing	Structured logging and spans, including the audit_checkpoint witness lines.	SECURITY-RELEVANT. The no-secrets-in-logs invariant is enforced at call sites, not by this crate. Checkpoint witness lines are emitted here, so a log pipeline that drops them silently removes the external-witness control.
+tracing-subscriber	Log formatting, filtering, and the JSON layer.	Security-relevant. Misconfiguration could emit more detail than intended; log level is deployment-controlled.
+tracing-opentelemetry	Bridges tracing spans into OpenTelemetry.	Security-relevant. Carries span fields across into exported telemetry, extending the log-hygiene requirement to the OTLP path.
+uuid	Public record identifiers (pid) and EntityRef ids.	SECURITY-RELEVANT. v4 generation uses the OS RNG; a guessable pid would weaken the record-level authorization posture, since an id is the only thing standing between a caller and an object reference.
+chrono	Timestamps and the microsecond truncation the audit chain depends on.	SECURITY-CRITICAL. Chain digests bind created_at as epoch microseconds; a precision change would break verification of every existing row.
+time	Timestamps in the relay and bulk job paths.	Security-relevant. Second time crate alongside chrono, a wart worth removing; both feed timestamps that appear in audit and outbox rows.
+thiserror	Typed error enums (src/error.rs).	Security-relevant. Error variants determine the HTTP status a failure maps to, including the 401/403 split that must not leak whether a record exists.
+dotenvy	Loads .env in development (src/config).	Security-relevant. Reads configuration including secret material in dev; production configuration comes from the environment, not a file.
+async-trait	Async methods in traits (repository and matcher seams).	Not security-relevant. Compile-time macro only, no runtime behaviour of its own.
+strsim	Jaro-Winkler and Levenshtein string similarity (src/matching/algorithms.rs).	SECURITY-CRITICAL. Drives probabilistic identity matching. A false match merges two workers' records, including their assessment results — a confidentiality failure, not merely a data-quality one. Input is length-capped (SEC-M1) because the algorithms are O(n·m).
+prometheus	Metrics registry and text-exposition rendering for /metrics.prom.	Not security-relevant. Counters only; the endpoint exposes no record data and is on the public allow-list for scrapers.
+sha2	SHA-256 for the tamper-evident audit hash chain, record content hashes, and the worker_assessments digests.	SECURITY-CRITICAL. The integrity evidence for HIPAA §164.312(c) rests on this implementation. RustCrypto, widely audited; constant-time is not required for an unkeyed hash.
+sha3	Second integrity digest alongside SHA-256 for the audit chain and record hashes.	SECURITY-CRITICAL. Kept for structural diversity: SHA-3 is a sponge construction, unrelated to SHA-256's Merkle-Damgard chaining, so a cryptanalytic advance against one design family does not transfer. FIPS 202, so it carries NIST standing while being structurally independent of SHA-2. RustCrypto, same maintainers as sha2.
+hmac	Keyed integrity (HMAC-SHA256, FIPS 198-1) over the audit-chain and record pre-images, with a key the database never holds.	SECURITY-CRITICAL. The only integrity control here an adversary holding the database alone cannot forge: the SHA-256 and SHA-3 digests are unkeyed and their pre-image format is published, so a SQL-capable attacker can recompute them. Uses constant-time verification (Mac::verify_slice) — a timing oracle would let an attacker recover a valid tag byte by byte without the key.
+worker-matcher	Canonical matching engine and domain types (path dependency).	SECURITY-CRITICAL. A false match conflates two workers, merging one person's employment and assessment history into another's. First-party code with its own spec, property tests, and no-IO posture.
+entity-ref	Cross-service EntityRef URN and EdgeKind registry for the same_identity (worker to person) edge (path dependency).	SECURITY-RELEVANT. Edge-kind validation is what stops an arbitrary edge type being written into entity_links; the URN format is what the link-graph aggregator resolves. Worker's symmetric write side is still a follow-up, so today this is contract only.
+authentication-verifier	Offline PASETO v4.public verification and the shared ABAC policy engine (path dependency).	SECURITY-CRITICAL. Every authentication and authorization decision depends on it, including record-level checks and masking obligations. First-party code with its own forgery and policy-property test suites.
+mimalloc	Global allocator for MUSL static builds.	Availability-relevant. An allocator defect would be a process-wide fault. Enabled only for the musl target, through a cfg-gated global allocator.
+serial_test	Serialises tests that mutate process-wide environment variables.	Test-only. Not present in a release artefact.
+assertables	Richer assertion macros.	Test-only. Not present in a release artefact.
+tokio-test	Async test utilities.	Test-only. Not present in a release artefact.
+mockall	Mock implementations of the repository and matcher traits.	Test-only. Not present in a release artefact.
+tempfile	Temporary directories for the Tantivy index tests.	Test-only. Not present in a release artefact.
+ed25519-dalek	Mints throwaway Ed25519 keys so the token-verification path is tested in-process.	Test-only. Not present in a release artefact; the test seed is not a secret.
+rusty_paseto	Mints PASETO v4.public tokens in the auth unit tests.	Test-only in this crate. The production verification path lives in authentication-verifier.
+base64	Encodes test key material into the JWK-shaped key set.	Test-only. Not present in a release artefact.
+criterion	Statistical benchmarking of the matching and search paths.	Test-only. Not present in a release artefact.

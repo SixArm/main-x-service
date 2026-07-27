@@ -235,6 +235,12 @@ pub fn create_router(state: AppState) -> Router {
             post(handlers::verify_audit_checkpoint),
         )
         .route("/records/verify", get(handlers::verify_record_integrity))
+        // Compliance evidence. Guarded like everything else under `/api`:
+        // the SBOM names every dependency version in the running binary,
+        // which is what an attacker needs to match a deployment against
+        // published advisories.
+        .route("/compliance", get(handlers::compliance_identification))
+        .route("/compliance/sbom", get(handlers::compliance_sbom))
         .with_state(state);
 
     let router = Router::new()
@@ -339,6 +345,8 @@ pub fn workers_routes() -> loco_rs::controller::Routes {
             post(handlers::verify_audit_checkpoint),
         )
         .add("/records/verify", get(handlers::verify_record_integrity))
+        .add("/compliance", get(handlers::compliance_identification))
+        .add("/compliance/sbom", get(handlers::compliance_sbom))
 }
 
 /// Root-level Prometheus scrape route (`GET /metrics.prom`).

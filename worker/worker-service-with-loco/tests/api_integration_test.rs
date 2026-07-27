@@ -1448,3 +1448,68 @@ async fn test_out_of_band_edit_to_an_assessment_score_is_detected() {
     // Leave no deliberately-corrupted record behind.
     common::purge_record(&conn, id).await;
 }
+
+/// `GET /api/compliance` is mounted and reports build provenance.
+///
+/// Mounted, not merely compiled — and worth pinning here in particular:
+/// this crate is mid-conversion and registers its routes twice, once as
+/// an axum `Router` and once as a loco `Routes`, so a handler added to
+/// only one of them compiles and serves 404 from the other.
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn test_compliance_identification_is_mounted() {
+    let app = common::create_test_router().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/compliance")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+
+    assert!(body_str.contains("worker-service"));
+    // The absent medical-device classification is stated, not implied.
+    assert!(body_str.contains("IEC 62304"));
+}
+
+/// `GET /api/compliance/sbom` serves a `CycloneDX` document covering the
+/// real dependency graph, with SOUP annotations attached.
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn test_compliance_sbom_is_mounted() {
+    let app = common::create_test_router().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/compliance/sbom")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+
+    assert!(body_str.contains("CycloneDX"));
+    assert!(body_str.contains("pkg:cargo/"));
+    // A SOUP annotation reached the wire, so the register is actually
+    // merged in rather than the SBOM being a bare lockfile dump.
+    assert!(body_str.contains("mxi:soup"));
+    assert!(body_str.contains("SECURITY-CRITICAL"));
+}
