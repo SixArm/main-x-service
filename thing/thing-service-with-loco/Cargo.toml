@@ -19,7 +19,6 @@ tokio = { version = "1.53", features = ["full"] }
 
 # Web Framework & HTTP (axum 0.8 to match loco 0.16)
 axum = { version = "0.8", features = ["macros", "multipart", "ws"] }
-hyper = { version = "1.11", features = ["full"] }
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "compression-full"] }
 
@@ -29,7 +28,6 @@ serde_json = "1.0"
 
 # Database (PostgreSQL ORM)
 sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-uuid", "with-json"] }
-sea-orm-migration = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls"] }
 bigdecimal = { version = "0.4", features = ["serde"] }
 
 # Web Framework (Loco conventions; web/template tier removed)
@@ -41,15 +39,12 @@ tantivy = "0.22"
 
 # gRPC
 tonic = { version = "0.12", features = ["transport", "codegen", "prost"] }
-prost = "0.13"
 
 # OpenAPI Documentation
 utoipa = { version = "5.5", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
-openapiv3 = "2.2"
 
 # Data Streaming
-fluvio = "0.23"
 
 # OpenTelemetry (Observability)
 opentelemetry = { version = "0.27", features = ["trace", "metrics", "logs"] }
@@ -65,14 +60,11 @@ uuid = { version = "1.24", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.3"
 thiserror = "2.0"
-anyhow = "1.0"
-validator = { version = "0.19", features = ["derive"] }
 dotenvy = "0.15"
 async-trait = "0.1"
 
 # Fuzzy Matching & String Processing
 strsim = "0.11"
-fuzzy-matcher = "0.3"
 
 # Prometheus metrics (text exposition for /metrics.prom)
 prometheus = "0.13"
@@ -81,7 +73,6 @@ prometheus = "0.13"
 thing-matcher = "0.6.1"
 
 # Security
-argon2 = "0.5"
 # Offline PASETO v4.public verification of authentication-service tokens
 # against its published Ed25519 key set (`/.well-known/paseto-keys`) — no
 # shared secret, no per-request introspection hop (local path — the
