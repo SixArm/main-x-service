@@ -103,15 +103,16 @@ pub async fn erase<C: ConnectionTrait>(
     let deleted_at: chrono::DateTime<chrono::FixedOffset> =
         chrono::Utc::now().trunc_subsecs(6).into();
     let mut active = model.into_active_model();
-    let (sha, b3) = super::record_integrity::digests(&super::record_integrity::RecordInput {
+    let d = super::record_integrity::digests(&super::record_integrity::RecordInput {
         pid,
         name: TOMBSTONE_NAME,
         data: &payload,
         active: false,
         deleted_at_micros: Some(deleted_at.timestamp_micros()),
     });
-    active.content_hash = ActiveValue::set(Some(sha));
-    active.content_hash_blake3 = ActiveValue::set(Some(b3));
+    active.content_hash = ActiveValue::set(Some(d.sha256));
+    active.content_hash_blake3 = ActiveValue::set(Some(d.blake3));
+    active.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
     active.name = ActiveValue::set(TOMBSTONE_NAME.to_string());
     active.data = ActiveValue::set(payload);
     active.active = ActiveValue::set(false);

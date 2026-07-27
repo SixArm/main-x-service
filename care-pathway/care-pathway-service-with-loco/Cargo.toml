@@ -45,6 +45,11 @@ sha2 = { version = "0.10" }
 # §12.4z. Not a replacement: SHA-256 stays as the conservative,
 # FIPS-approved digest, and BLAKE3 adds speed and algorithm agility.
 blake3 = { version = "1" }
+# Third integrity digest. SHA-3 (FIPS 202) is a **sponge** construction,
+# structurally unrelated to SHA-256's Merkle-Damgard and to BLAKE3's ARX
+# tree, so a cryptanalytic advance against one design family does not
+# transfer to it. See spec/12-compliance.md §12.4z.
+sha3 = { version = "0.10" }
 
 # Canonical matching algorithm — embedded and used directly as the API DTO.
 care-pathway-matcher = { path = "../care-pathway-matcher-rust-crate" }

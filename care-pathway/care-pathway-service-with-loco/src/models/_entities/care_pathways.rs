@@ -35,6 +35,8 @@ pub struct Model {
     /// BLAKE3 digest over the same pre-image as `content_hash`. `None` on
     /// rows written before the second algorithm was adopted.
     pub content_hash_blake3: Option<String>,
+    /// SHA-3 digest over the same pre-image as `content_hash`.
+    pub content_hash_sha3: Option<String>,
 }
 
 /// `SeaORM` relations for [`Entity`] (none defined).

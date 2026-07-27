@@ -103,6 +103,18 @@ pub fn row_hash_blake3(input: &ChainInput<'_>) -> String {
     blake3::hash(&preimage(input)).to_hex().to_string()
 }
 
+/// The same row's digest under **SHA-3** (SHA3-256).
+///
+/// Third sibling of [`row_hash`] and [`row_hash_blake3`], over the
+/// byte-identical pre-image. SHA-3 is a sponge construction, unrelated to
+/// SHA-256's Merkle-Damgard chaining and to BLAKE3's ARX tree, so the
+/// three span three distinct design families.
+#[must_use]
+pub fn row_hash_sha3(input: &ChainInput<'_>) -> String {
+    use sha3::Digest as _;
+    to_hex(&sha3::Sha3_256::digest(preimage(input)))
+}
+
 /// The digest pre-image: version tag, then every bound field, each
 /// followed by the unit separator.
 ///
@@ -198,6 +210,11 @@ pub struct ChainReport {
     /// algorithm was adopted. Neither verified nor a break, exactly as
     /// `unchained` treats a missing SHA-256 digest.
     pub blake3_unhashed: usize,
+    /// Rows whose **SHA-3** digest was recomputed and matched.
+    pub sha3_intact: usize,
+    /// Rows carrying no SHA-3 digest — written before the third algorithm
+    /// was adopted. Neither verified nor a break.
+    pub sha3_unhashed: usize,
     /// Every break found, in `id` order. Empty ⇒ the run verifies.
     pub breaks: Vec<ChainBreak>,
     /// The hash of the last chained row examined — the chain head an
@@ -223,6 +240,8 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
         unchained: 0,
         blake3_intact: 0,
         blake3_unhashed: 0,
+        sha3_intact: 0,
+        sha3_unhashed: 0,
         breaks: Vec::new(),
         head: None,
         verified: true,
@@ -253,8 +272,8 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
         if row.redacted_at.is_some() {
             report.redacted += 1;
         } else {
-            let sha_ok = row_hash(&input_for(row, row.prev_hash.as_deref())) == stored;
-            if sha_ok {
+            let sha256_ok = row_hash(&input_for(row, row.prev_hash.as_deref())) == stored;
+            if sha256_ok {
                 report.intact += 1;
             }
             // BLAKE3 is verified independently: its digest binds the
@@ -262,7 +281,7 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
             // the other's collision resistance. A row predating the second
             // algorithm carries no BLAKE3 digest and is counted, not
             // failed.
-            let b3_ok = match row.hash_blake3.as_deref() {
+            let blake3_ok = match row.hash_blake3.as_deref() {
                 None => {
                     report.blake3_unhashed += 1;
                     true
@@ -276,22 +295,54 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
                     ok
                 }
             };
+            let sha3_ok = match row.hash_sha3.as_deref() {
+                None => {
+                    report.sha3_unhashed += 1;
+                    true
+                }
+                Some(stored_sha3) => {
+                    let ok = row_hash_sha3(&input_for(row, row.prev_hash_sha3.as_deref()))
+                        == stored_sha3;
+                    if ok {
+                        report.sha3_intact += 1;
+                    }
+                    ok
+                }
+            };
             // **One** break per row, naming which digests disagreed —
             // reporting the same tampered row twice would double-count it
             // and make the break list read as two separate incidents.
             // Which algorithms disagree is itself diagnostic: both means
             // the content changed, exactly one means that digest column
             // was edited or a hashing path is inconsistent.
-            if !sha_ok || !b3_ok {
-                let which = match (sha_ok, b3_ok) {
-                    (false, false) => "SHA-256 and BLAKE3",
-                    (false, true) => "SHA-256 (BLAKE3 still matches — suspect the hash column)",
-                    _ => "BLAKE3 (SHA-256 still matches — suspect the hash column)",
+            if !sha256_ok || !blake3_ok || !sha3_ok {
+                // Name every algorithm that disagreed. All three means the
+                // content changed; a subset means those digest columns
+                // were edited, or a write path stamped some and not
+                // others — different incidents needing different fixes.
+                let mut disagreed = Vec::new();
+                if !sha256_ok {
+                    disagreed.push("SHA-256");
+                }
+                if !blake3_ok {
+                    disagreed.push("BLAKE3");
+                }
+                if !sha3_ok {
+                    disagreed.push("SHA-3");
+                }
+                let agreed = 3 - disagreed.len();
+                let hint = if agreed == 0 {
+                    " (all digests disagree — the content changed)"
+                } else {
+                    " (the other digests still match — suspect those hash columns)"
                 };
                 report.breaks.push(ChainBreak {
                     id: row.id,
                     kind: "content",
-                    detail: format!("row content does not match its stored {which} hash"),
+                    detail: format!(
+                        "row content does not match its stored {} hash{hint}",
+                        disagreed.join(" and ")
+                    ),
                 });
             }
         }
@@ -392,6 +443,10 @@ mod tests {
             row_hash_blake3(&input),
             "406eaf9a72824b01fb69d0699933b9838ce5390319f9fa685a22855497b7c4f8"
         );
+        assert_eq!(
+            row_hash_sha3(&input),
+            "32e550558df063509903945a05fc56903cc12bf12d9dfe9e5e567988d07d6c72"
+        );
     }
 
     /// The version tag is published in this entity's
@@ -439,12 +494,15 @@ mod tests {
             hash: None,
             prev_hash_blake3: prev_b3.map(ToString::to_string),
             hash_blake3: None,
+            prev_hash_sha3: prev_b3.map(ToString::to_string),
+            hash_sha3: None,
             context: None,
             disclosure: false,
             redacted_at: None,
         };
         model.hash = Some(row_hash(&input_for(&model, prev)));
         model.hash_blake3 = Some(row_hash_blake3(&input_for(&model, prev_b3)));
+        model.hash_sha3 = Some(row_hash_sha3(&input_for(&model, prev_b3)));
         model
     }
 

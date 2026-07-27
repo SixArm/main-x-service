@@ -88,6 +88,18 @@ pub fn record_hash_blake3(input: &RecordInput<'_>) -> String {
     blake3::hash(&preimage(input)).to_hex().to_string()
 }
 
+/// The same record's digest under **SHA-3** (SHA3-256).
+#[must_use]
+pub fn record_hash_sha3(input: &RecordInput<'_>) -> String {
+    use sha3::Digest as _;
+    let mut out = String::with_capacity(64);
+    for byte in sha3::Sha3_256::digest(preimage(input)) {
+        // Infallible: writing to a `String` never fails.
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
+}
+
 /// The digest pre-image, built once and hashed by each algorithm so they
 /// cannot come to cover different content.
 fn preimage(input: &RecordInput<'_>) -> Vec<u8> {
@@ -133,16 +145,43 @@ pub fn hash_of_blake3(row: &care_pathways::Model) -> String {
     record_hash_blake3(&input_for(row))
 }
 
-/// Both digests for one record, as `(SHA-256, BLAKE3)`.
+/// The SHA-3 digest a stored row *should* carry.
+#[must_use]
+pub fn hash_of_sha3(row: &care_pathways::Model) -> String {
+    record_hash_sha3(&input_for(row))
+}
+
+/// Every digest for one record.
 ///
-/// Every write path takes the pair from here rather than calling the two
-/// functions separately. Stamping one and forgetting the other leaves a
+/// Write paths take the whole set from here rather than calling the hash
+/// functions separately. Stamping one and forgetting another leaves a
 /// stale digest that verification reports as tampering on an untouched
 /// record — a false accusation, and the likeliest way this feature
-/// breaks. Returning a tuple makes the omission impossible to express.
+/// breaks.
+///
+/// A **named struct rather than a tuple**: with two algorithms `.0`/`.1`
+/// was survivable, with three it is a latent bug, because putting the
+/// SHA-3 digest in the BLAKE3 column type-checks perfectly and fails only
+/// at the next verification. Named fields make that mistake impossible to
+/// write.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Digests {
+    /// FIPS 180-4 SHA-256.
+    pub sha256: String,
+    /// BLAKE3.
+    pub blake3: String,
+    /// FIPS 202 SHA3-256.
+    pub sha3: String,
+}
+
+/// Every digest for one record, computed from one pre-image.
 #[must_use]
-pub fn digests(input: &RecordInput<'_>) -> (String, String) {
-    (record_hash(input), record_hash_blake3(input))
+pub fn digests(input: &RecordInput<'_>) -> Digests {
+    Digests {
+        sha256: record_hash(input),
+        blake3: record_hash_blake3(input),
+        sha3: record_hash_sha3(input),
+    }
 }
 
 /// One record whose stored hash does not match its content.
@@ -172,6 +211,11 @@ pub struct RecordIntegrityReport {
     /// Records carrying no BLAKE3 digest — written before the second
     /// algorithm was adopted. Treated exactly as `unhashed`.
     pub blake3_unhashed: usize,
+    /// Records whose **SHA-3** digest was recomputed and matched.
+    pub sha3_intact: usize,
+    /// Records carrying no SHA-3 digest — written before the third
+    /// algorithm was adopted. Treated exactly as `unhashed`.
+    pub sha3_unhashed: usize,
     /// Every mismatch found.
     pub mismatched: Vec<RecordMismatch>,
     /// `true` when no mismatch was found.
@@ -187,6 +231,8 @@ pub fn verify(rows: &[care_pathways::Model]) -> RecordIntegrityReport {
         unhashed: 0,
         blake3_intact: 0,
         blake3_unhashed: 0,
+        sha3_intact: 0,
+        sha3_unhashed: 0,
         mismatched: Vec::new(),
         verified: true,
     };
@@ -195,14 +241,14 @@ pub fn verify(rows: &[care_pathways::Model]) -> RecordIntegrityReport {
             report.unhashed += 1;
             continue;
         };
-        let sha_ok = stored == hash_of(row);
-        if sha_ok {
+        let sha256_ok = stored == hash_of(row);
+        if sha256_ok {
             report.intact += 1;
         }
         // BLAKE3 is verified independently over the same content, so a
         // future weakness in either function leaves the other still able
         // to attest to the history already stored.
-        let b3_ok = match row.content_hash_blake3.as_deref() {
+        let blake3_ok = match row.content_hash_blake3.as_deref() {
             None => {
                 report.blake3_unhashed += 1;
                 true
@@ -215,9 +261,20 @@ pub fn verify(rows: &[care_pathways::Model]) -> RecordIntegrityReport {
                 ok
             }
         };
+        let sha3_ok = match row.content_hash_sha3.as_deref() {
+            None => {
+                report.sha3_unhashed += 1;
+                true
+            }
+            Some(stored_sha3) if stored_sha3 == hash_of_sha3(row) => {
+                report.sha3_intact += 1;
+                true
+            }
+            Some(_) => false,
+        };
         // One entry per record, not one per algorithm: a tampered record
         // is a single incident.
-        if !sha_ok || !b3_ok {
+        if !sha256_ok || !blake3_ok || !sha3_ok {
             report.mismatched.push(RecordMismatch {
                 pid: row.pid.to_string(),
                 name: row.name.clone(),
@@ -261,9 +318,11 @@ mod tests {
             deleted_at: None,
             content_hash: None,
             content_hash_blake3: None,
+            content_hash_sha3: None,
         };
         model.content_hash = Some(hash_of(&model));
         model.content_hash_blake3 = Some(hash_of_blake3(&model));
+        model.content_hash_sha3 = Some(hash_of_sha3(&model));
         model
     }
 
@@ -369,6 +428,7 @@ mod tests {
         // this control would otherwise report as tampering.
         r.content_hash = Some(hash_of(&r));
         r.content_hash_blake3 = Some(hash_of_blake3(&r));
+        r.content_hash_sha3 = Some(hash_of_sha3(&r));
         assert!(verify(std::slice::from_ref(&r)).verified);
         // Now resurrect it behind the service's back.
         r.active = true;

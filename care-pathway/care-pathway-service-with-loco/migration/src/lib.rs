@@ -27,6 +27,7 @@ mod m20260725_000007_compliance;
 mod m20260726_000008_record_integrity;
 mod m20260726_000009_bulk_jobs;
 mod m20260727_000010_blake3_digests;
+mod m20260727_000011_sha3_digests;
 
 /// The migration runner this crate exposes to loco / `sea-orm-migration`.
 pub struct Migrator;
@@ -48,6 +49,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260726_000008_record_integrity::Migration),
             Box::new(m20260726_000009_bulk_jobs::Migration),
             Box::new(m20260727_000010_blake3_digests::Migration),
+            Box::new(m20260727_000011_sha3_digests::Migration),
             // inject-above (do not remove this comment)
         ]
     }

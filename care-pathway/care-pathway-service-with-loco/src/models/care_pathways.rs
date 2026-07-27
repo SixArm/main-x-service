@@ -55,8 +55,9 @@ impl Model {
         let model = care_pathways::ActiveModel {
             pid: ActiveValue::set(pid),
             name: ActiveValue::set(pathway.name.clone()),
-            content_hash: ActiveValue::set(Some(digests.0.clone())),
-            content_hash_blake3: ActiveValue::set(Some(digests.1.clone())),
+            content_hash: ActiveValue::set(Some(digests.sha256.clone())),
+            content_hash_blake3: ActiveValue::set(Some(digests.blake3.clone())),
+            content_hash_sha3: ActiveValue::set(Some(digests.sha3.clone())),
             data: ActiveValue::set(data),
             active: ActiveValue::set(true),
             deleted_at: ActiveValue::set(None),
@@ -184,15 +185,16 @@ impl ActiveModel {
         let pid = *self.pid.as_ref();
         let active = *self.active.as_ref();
         let deleted_at_micros = self.deleted_at.as_ref().map(|d| d.timestamp_micros());
-        let (sha, b3) = record_integrity::digests(&record_integrity::RecordInput {
+        let d = record_integrity::digests(&record_integrity::RecordInput {
             pid,
             name: &pathway.name,
             data: &data,
             active,
             deleted_at_micros,
         });
-        self.content_hash = ActiveValue::set(Some(sha));
-        self.content_hash_blake3 = ActiveValue::set(Some(b3));
+        self.content_hash = ActiveValue::set(Some(d.sha256));
+        self.content_hash_blake3 = ActiveValue::set(Some(d.blake3));
+        self.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
         self.name = ActiveValue::set(pathway.name.clone());
         self.data = ActiveValue::set(data);
         self.update(db).await.map_err(ModelError::from)
@@ -211,15 +213,16 @@ impl ActiveModel {
         // Postgres returns (see `compliance::record_integrity`).
         let deleted_at: chrono::DateTime<chrono::FixedOffset> =
             chrono::Utc::now().trunc_subsecs(6).into();
-        let (sha, b3) = record_integrity::digests(&record_integrity::RecordInput {
+        let d = record_integrity::digests(&record_integrity::RecordInput {
             pid: *self.pid.as_ref(),
             name: self.name.as_ref(),
             data: self.data.as_ref(),
             active: false,
             deleted_at_micros: Some(deleted_at.timestamp_micros()),
         });
-        self.content_hash = ActiveValue::set(Some(sha));
-        self.content_hash_blake3 = ActiveValue::set(Some(b3));
+        self.content_hash = ActiveValue::set(Some(d.sha256));
+        self.content_hash_blake3 = ActiveValue::set(Some(d.blake3));
+        self.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
         self.active = ActiveValue::set(false);
         self.deleted_at = ActiveValue::set(Some(deleted_at));
         self.update(db).await.map_err(ModelError::from)
