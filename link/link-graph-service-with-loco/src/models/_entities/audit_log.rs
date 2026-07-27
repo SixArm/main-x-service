@@ -29,6 +29,13 @@ pub struct Model {
     pub user_ip: Option<String>,
     /// Caller `User-Agent` (best-effort).
     pub user_agent: Option<String>,
+    /// HMAC-SHA256 over this row's pre-image, as
+    /// `"<scheme>.<key id>:<hex>"`.
+    ///
+    /// Detects a row whose content was altered. It does **not** detect a
+    /// row deleted wholesale — that needs the hash chain this service
+    /// does not have (see `crate::compliance`).
+    pub mac: Option<String>,
 }
 
 /// `SeaORM` relations for [`Entity`] (none defined).

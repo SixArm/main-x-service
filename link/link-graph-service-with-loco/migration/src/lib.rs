@@ -19,6 +19,7 @@ mod m20260709_000001_edges;
 mod m20260709_000002_entity_presence;
 mod m20260709_000003_consumer_offsets;
 mod m20260709_000004_audit_log;
+mod m20260728_000001_add_audit_mac;
 
 /// The migration runner this crate exposes to loco / `sea-orm-migration`.
 pub struct Migrator;
@@ -32,6 +33,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260709_000002_entity_presence::Migration),
             Box::new(m20260709_000003_consumer_offsets::Migration),
             Box::new(m20260709_000004_audit_log::Migration),
+            Box::new(m20260728_000001_add_audit_mac::Migration),
             // inject-above (do not remove this comment)
         ]
     }

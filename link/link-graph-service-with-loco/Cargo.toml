@@ -13,6 +13,9 @@ default-run = "link-graph-service"
 loco-rs = { version = "0.16" }
 
 [dependencies]
+# Keyed integrity MACs with production-grade key handling — one audited
+# implementation shared by every service, rather than a copy per crate.
+integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 loco-rs = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
