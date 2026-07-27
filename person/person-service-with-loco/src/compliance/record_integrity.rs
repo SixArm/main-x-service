@@ -171,6 +171,50 @@ fn preimage(input: &RecordInput<'_>) -> crate::Result<Vec<u8>> {
     Ok(buf)
 }
 
+/// Both digests for one record, as `(SHA-256, BLAKE3)`.
+///
+/// Every write path takes the pair from here rather than calling the two
+/// functions separately. Stamping one and forgetting the other leaves a
+/// stale digest that verification reports as tampering on an untouched
+/// record — a false accusation, and the likeliest way this breaks.
+/// Returning a tuple makes the omission impossible to express.
+///
+/// # Errors
+///
+/// As [`record_hash`].
+pub fn digests(input: &RecordInput<'_>) -> crate::Result<(String, String)> {
+    Ok((record_hash(input)?, record_hash_blake3(input)?))
+}
+
+/// Both digests for a live record.
+///
+/// # Errors
+///
+/// As [`record_hash`].
+pub fn digests_of_live(person: &Person) -> crate::Result<(String, String)> {
+    digests(&RecordInput {
+        id: person.id,
+        person,
+        deleted_at_micros: None,
+    })
+}
+
+/// Both digests for a record with a soft-delete stamp.
+///
+/// # Errors
+///
+/// As [`record_hash`].
+pub fn digests_with_deleted_at(
+    person: &Person,
+    deleted_at_micros: Option<i64>,
+) -> crate::Result<(String, String)> {
+    digests(&RecordInput {
+        id: person.id,
+        person,
+        deleted_at_micros,
+    })
+}
+
 /// Compute the hash a live (not soft-deleted) record should carry.
 ///
 /// # Errors

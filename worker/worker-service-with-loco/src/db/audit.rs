@@ -396,13 +396,18 @@ impl AuditLogRepository {
             ))
             .await?;
         }
-        let prev_hash = self.chain_head().await?;
+        // Both chain heads from the same row, so each algorithm binds
+        // its *own* predecessor. Binding the SHA-256 head into the BLAKE3
+        // digest would make the second chain's linkage rest on SHA-256's
+        // collision resistance — the dependency two algorithms exist to
+        // avoid.
+        let (prev_hash, prev_hash_blake3) = Self::chain_heads(conn).await?;
 
         let id = Uuid::new_v4();
         // Truncated to microseconds so the value hashed here is the value
         // Postgres returns (see `compliance::audit_chain`).
         let timestamp = audit_chain::trunc_micros(time::OffsetDateTime::now_utc());
-        let hash = audit_chain::row_hash(&audit_chain::ChainInput {
+        let mut chain_input = audit_chain::ChainInput {
             prev_hash: prev_hash.as_deref(),
             id,
             timestamp_micros: audit_chain::micros(timestamp),
@@ -416,7 +421,10 @@ impl AuditLogRepository {
             user_agent: actor.user_agent,
             context: context.as_ref(),
             disclosure,
-        });
+        };
+        let hash = audit_chain::row_hash(&chain_input);
+        chain_input.prev_hash = prev_hash_blake3.as_deref();
+        let hash_blake3 = audit_chain::row_hash_blake3(&chain_input);
 
         let new_audit = audit_log::ActiveModel {
             id: Set(id),
@@ -430,6 +438,8 @@ impl AuditLogRepository {
             ip_address: Set(actor.ip_address.map(String::from)),
             user_agent: Set(actor.user_agent.map(String::from)),
             prev_hash: Set(prev_hash),
+            prev_hash_blake3: Set(prev_hash_blake3),
+            hash_blake3: Set(Some(hash_blake3)),
             hash: Set(Some(hash)),
             context: Set(context),
             disclosure: Set(disclosure),
@@ -443,8 +453,29 @@ impl AuditLogRepository {
         Ok(())
     }
 
-    /// The current chain head: the most recent row's `hash`, or `None`
-    /// when the trail is empty (or its last row predates the chain).
+    /// Both chain heads — `(SHA-256, BLAKE3)` — from the same row.
+    ///
+    /// Read together so an append binds each algorithm's own predecessor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query fails.
+    pub async fn chain_heads<C: ConnectionTrait>(
+        conn: &C,
+    ) -> Result<(Option<String>, Option<String>)> {
+        let last = audit_log::Entity::find()
+            .order_by_desc(audit_log::Column::Seq)
+            .one(conn)
+            .await?;
+        Ok(match last {
+            Some(row) => (row.hash, row.hash_blake3),
+            None => (None, None),
+        })
+    }
+
+    /// The current SHA-256 chain head: the most recent row's `hash`, or
+    /// `None` when the trail is empty (or its last row predates the
+    /// chain).
     ///
     /// # Errors
     ///

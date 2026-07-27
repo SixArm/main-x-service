@@ -31,6 +31,7 @@ mod m20260726_000001_audit_chain;
 mod m20260726_000003_drop_audit_triggers;
 mod m20260726_000004_worker_content_hash;
 mod m20260726_000005_assessment_content_hash;
+mod m20260727_000006_blake3_digests;
 
 /// The migration runner this crate exposes to loco / `sea-orm-migration`.
 pub struct Migrator;
@@ -58,6 +59,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260726_000003_drop_audit_triggers::Migration),
             Box::new(m20260726_000004_worker_content_hash::Migration),
             Box::new(m20260726_000005_assessment_content_hash::Migration),
+            Box::new(m20260727_000006_blake3_digests::Migration),
         ]
     }
 }

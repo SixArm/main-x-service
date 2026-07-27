@@ -224,6 +224,7 @@ mod tests {
             active: true,
             deleted_at: None,
             content_hash: None,
+            content_hash_blake3: None,
         };
         model.content_hash = Some(hash_of(&model));
         model

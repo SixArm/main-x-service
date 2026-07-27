@@ -358,11 +358,17 @@ mod tests {
             seq,
             prev_hash: prev.map(ToString::to_string),
             hash: None,
+            // The fixture builds *both* chains: with no BLAKE3 digest
+            // every row would be `blake3_unhashed` and the second
+            // algorithm would go untested.
+            prev_hash_blake3: prev.map(ToString::to_string),
+            hash_blake3: None,
             context: None,
             disclosure: false,
             redacted_at: None,
         };
         model.hash = Some(row_hash(&input_for(&model, prev)));
+        model.hash_blake3 = Some(row_hash_blake3(&input_for(&model, prev)));
         model
     }
 

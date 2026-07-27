@@ -27,6 +27,7 @@ mod m20260726_000001_audit_chain;
 mod m20260726_000002_rename_patient_id_columns;
 mod m20260726_000003_drop_audit_triggers;
 mod m20260726_000004_person_content_hash;
+mod m20260727_000005_blake3_digests;
 
 /// The migration runner this crate exposes to loco / `sea-orm-migration`.
 pub struct Migrator;
@@ -50,6 +51,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260726_000002_rename_patient_id_columns::Migration),
             Box::new(m20260726_000003_drop_audit_triggers::Migration),
             Box::new(m20260726_000004_person_content_hash::Migration),
+            Box::new(m20260727_000005_blake3_digests::Migration),
         ]
     }
 }

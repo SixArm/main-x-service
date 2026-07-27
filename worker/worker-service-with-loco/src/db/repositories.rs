@@ -569,14 +569,16 @@ impl SeaOrmWorkerRepository {
     /// contact / photo collections — those are handled by
     /// [`insert_extra_collections`].
     fn to_active_models(worker: &Worker) -> Result<WorkerActiveModels> {
+        // Both digests from one call, so neither can be stamped
+        // without the other (see `record_integrity::digests`).
+        let digests = crate::compliance::record_integrity::digests_of_live(worker)?;
         let new_worker = workers::ActiveModel {
             id: Set(worker.id),
             active: Set(worker.active),
             // A new record is live, so the digest binds `deleted_at` as
             // `None`.
-            content_hash: Set(Some(crate::compliance::record_integrity::hash_of_live(
-                worker,
-            )?)),
+            content_hash: Set(Some(digests.0.clone())),
+            content_hash_blake3: Set(Some(digests.1.clone())),
             worker_type: Set(worker
                 .worker_type
                 .as_ref()
