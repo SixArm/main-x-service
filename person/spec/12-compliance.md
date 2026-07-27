@@ -86,7 +86,7 @@ nil id, since it disclosed many records rather than one.
 audit write refuses the read with `503` or is logged.
 
 **§164.528 accounting of disclosures (delivered 2026-07-26).**
-`GET /api/persons/{{id}}/audit/disclosures` returns every audit row for
+`GET /api/persons/{id}/audit/disclosures` returns every audit row for
 one record flagged as an outward **disclosure** rather than an internal
 access, newest first. Gated by the same record-level authorization as
 reading the record: learning who a record was disclosed to reveals that
@@ -107,7 +107,7 @@ had split.** Mutation rows have always been written with
 audit chain wrote `"person"`. Every per-entity audit query filters on
 one spelling, so it silently returned none of the other's rows: the
 accounting would have read as empty while disclosures were being
-recorded all along, and the existing `GET /api/persons/{{id}}/audit`
+recorded all along, and the existing `GET /api/persons/{id}/audit`
 endpoint has been missing read rows since read-auditing landed. New rows
 use `"Person"` throughout; the queries accept both spellings via `IN`
 so rows already written are not orphaned, and `IN` keeps the
@@ -115,10 +115,10 @@ so rows already written are not orphaned, and `IN` keeps the
 comparison would not. (See the entity-type resolution above for the full spelling story.)
 
 **GDPR Art. 17 erasure (delivered 2026-07-26).**
-`POST /api/persons/{{id}}/erase` destroys the record's personal data
+`POST /api/persons/{id}/erase` destroys the record's personal data
 and appends a chained `erased` accountability row. It is a **destructive**
 action under ABAC (`DESTRUCTIVE_POST_SUFFIXES`), so it requires
-`access=admin` — and it is **not** the soft delete: `DELETE /{{id}}`
+`access=admin` — and it is **not** the soft delete: `DELETE /{id}`
 retires a record and keeps its data, this destroys the data and is
 irreversible. The response says `irreversible: true` so a caller cannot
 confuse the two.
