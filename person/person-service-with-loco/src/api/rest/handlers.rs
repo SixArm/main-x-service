@@ -1926,6 +1926,111 @@ pub async fn verify_record_integrity(
     )
 }
 
+/// Take a chain checkpoint — the external witness against wholesale
+/// deletion.
+///
+/// `GET /api/audit/checkpoint` returns a signed statement of the chain's
+/// current head, position and depth. **Store it outside this service's
+/// database.** A checkpoint kept alongside the data it witnesses is
+/// worthless: whoever can delete audit rows can delete the checkpoint in
+/// the same transaction, and its MAC prevents forgery, not deletion.
+///
+/// It is also emitted as an `INFO` log line on the `audit_checkpoint`
+/// target, so a deployment that already ships logs off the host has a
+/// witness without building anything further.
+///
+/// `204` when the chain is empty: there is nothing to witness, and a
+/// checkpoint any future state satisfies would be worse than none.
+#[utoipa::path(
+    get,
+    path = "/api/audit/checkpoint",
+    tag = "audit",
+    responses(
+        (status = 200, description = "A signed chain checkpoint"),
+        (status = 204, description = "The chain is empty"),
+        (status = 500, description = "Database error")
+    )
+)]
+pub async fn take_audit_checkpoint(State(state): State<AppState>) -> impl IntoResponse {
+    let now = chrono::Utc::now().timestamp_micros();
+    match crate::compliance::checkpoint::Checkpoint::take(&state.db, now).await {
+        Ok(None) => (
+            StatusCode::NO_CONTENT,
+            Json(ApiResponse::<serde_json::Value>::success(
+                serde_json::Value::Null,
+            )),
+        ),
+        Ok(Some(checkpoint)) => {
+            tracing::info!(
+                target: "audit_checkpoint",
+                version = %checkpoint.version,
+                anchor_id = checkpoint.anchor_id,
+                head = %checkpoint.head,
+                rows_at_or_before = checkpoint.rows_at_or_before,
+                taken_at_micros = checkpoint.taken_at_micros,
+                mac = checkpoint.mac.as_deref().unwrap_or("none"),
+                "audit chain checkpoint"
+            );
+            let value = serde_json::to_value(&checkpoint).unwrap_or(serde_json::Value::Null);
+            (StatusCode::OK, Json(ApiResponse::success(value)))
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::error(
+                "DATABASE_ERROR",
+                format!("Failed to take a checkpoint: {e}"),
+            )),
+        ),
+    }
+}
+
+/// Check whether the chain still honours a recorded checkpoint.
+///
+/// `POST /api/audit/checkpoint/verify`. This is the half that detects
+/// deletion: the chain cannot see rows removed from its tail, because
+/// nothing is left to break.
+#[utoipa::path(
+    post,
+    path = "/api/audit/checkpoint/verify",
+    tag = "audit",
+    responses(
+        (status = 200, description = "Whether the chain honours the checkpoint"),
+        (status = 500, description = "Database error")
+    )
+)]
+pub async fn verify_audit_checkpoint(
+    State(state): State<AppState>,
+    Json(checkpoint): Json<crate::compliance::checkpoint::Checkpoint>,
+) -> impl IntoResponse {
+    match checkpoint.verify_against(&state.db).await {
+        Ok(verdict) => {
+            let honoured = verdict == crate::compliance::checkpoint::CheckpointVerdict::Honoured;
+            if !honoured {
+                tracing::error!(
+                    target: "audit_checkpoint",
+                    anchor_id = checkpoint.anchor_id,
+                    ?verdict,
+                    "audit chain does not honour a recorded checkpoint"
+                );
+            }
+            (
+                StatusCode::OK,
+                Json(ApiResponse::success(serde_json::json!({
+                    "honoured": honoured,
+                    "verdict": verdict,
+                }))),
+            )
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::error(
+                "DATABASE_ERROR",
+                format!("Failed to verify the checkpoint: {e}"),
+            )),
+        ),
+    }
+}
+
 /// Verify the tamper-evident audit hash chain.
 ///
 /// `GET /api/audit/verify?limit=1000` — recomputes the trailing rows and

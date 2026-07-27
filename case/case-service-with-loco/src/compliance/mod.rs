@@ -34,6 +34,10 @@
 /// Tamper-evident audit history: the SHA-256 hash chain over `audit_logs`.
 pub mod audit_chain;
 /// Read/disclosure auditing: purpose-of-use capture and access records.
+/// External witness: signed chain checkpoints kept off-box, so wholesale
+/// deletion is detectable (see the module docs).
+pub mod checkpoint;
+
 pub mod disclosure;
 
 /// GDPR Art. 17 erasure by redaction (see the module docs).

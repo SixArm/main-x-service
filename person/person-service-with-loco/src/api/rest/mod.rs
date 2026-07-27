@@ -184,6 +184,11 @@ pub fn create_router(state: AppState) -> Router {
         )
         .route("/audit/recent", get(handlers::get_recent_audit_logs))
         .route("/audit/verify", get(handlers::verify_audit_chain))
+        .route("/audit/checkpoint", get(handlers::take_audit_checkpoint))
+        .route(
+            "/audit/checkpoint/verify",
+            post(handlers::verify_audit_checkpoint),
+        )
         .route("/records/verify", get(handlers::verify_record_integrity))
         .route("/audit/user", get(handlers::get_user_audit_logs))
         .with_state(state.clone());
@@ -286,6 +291,11 @@ pub fn persons_routes() -> loco_rs::controller::Routes {
         )
         .add("/audit/recent", get(handlers::get_recent_audit_logs))
         .add("/audit/verify", get(handlers::verify_audit_chain))
+        .add("/audit/checkpoint", get(handlers::take_audit_checkpoint))
+        .add(
+            "/audit/checkpoint/verify",
+            post(handlers::verify_audit_checkpoint),
+        )
         .add("/records/verify", get(handlers::verify_record_integrity))
         .add("/audit/user", get(handlers::get_user_audit_logs))
 }

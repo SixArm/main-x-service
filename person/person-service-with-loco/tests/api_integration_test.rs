@@ -1208,3 +1208,100 @@ async fn assert_records_verify(app: &axum::Router, stage: &str) {
         "{stage}: no record carries a verified hash, so this proves nothing: {report}"
     );
 }
+
+/// **The external witness.** Deleting audit rows wholesale is invisible
+/// to the chain — remove the tail and no successor is left to break, so
+/// the shortened chain verifies perfectly. A checkpoint recorded off-box
+/// is what catches it.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn test_a_recorded_checkpoint_detects_wholesale_deletion() {
+    use sea_orm::ConnectionTrait as _;
+
+    let app = common::create_test_router().await;
+    create_person(
+        &app,
+        &json!({
+            "name": {
+                "family": format!("Witness{}", uuid::Uuid::new_v4().simple()),
+                "given": ["Checkpoint"]
+            },
+            "gender": "unknown"
+        }),
+    )
+    .await;
+
+    let taken = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/audit/checkpoint")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(taken.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(taken.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    let checkpoint = parsed.data.expect("a checkpoint");
+
+    // Delete the trail as an attacker with SQL access would. No audit row
+    // is written; nothing in-band records it.
+    let conn = common::db().await;
+    conn.execute(sea_orm::Statement::from_string(
+        sea_orm::DatabaseBackend::Postgres,
+        "DELETE FROM audit_log".to_string(),
+    ))
+    .await
+    .expect("delete the trail");
+
+    // The chain's own verification is perfectly happy — the blind spot.
+    let chain = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/audit/verify?limit=1000")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = axum::body::to_bytes(chain.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert!(
+        parsed.data.expect("report")["verified"].as_bool().unwrap(),
+        "an emptied chain verifies vacuously — which is why the witness exists"
+    );
+
+    // The checkpoint is not fooled.
+    let checked = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/audit/checkpoint/verify")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&checkpoint).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(checked.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(checked.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    let report = parsed.data.expect("a verdict");
+    assert_eq!(
+        report["honoured"], false,
+        "wholesale deletion must be detected: {report}"
+    );
+    assert_eq!(
+        report["verdict"]["verdict"], "anchor_missing",
+        "and named as a deletion, not a content change: {report}"
+    );
+}

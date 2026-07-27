@@ -6,9 +6,12 @@
 
 use authentication_verifier::Action;
 use axum::http::StatusCode;
+use axum::response::IntoResponse as _;
 use case_matcher::{Case, MatchConfig, MatchingEngine};
 use loco_rs::controller::ErrorDetail;
 use loco_rs::prelude::*;
+
+use crate::compliance::checkpoint::Checkpoint;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::{AuthUser, MaybeAuthUser};
@@ -789,6 +792,71 @@ async fn verify_records(
     }))
 }
 
+/// Take a chain checkpoint — the external witness against wholesale
+/// deletion.
+///
+/// `GET /api/cases/checkpoint` returns a signed statement of the chain's
+/// current head, position and depth. **Store it outside this service's
+/// database.** A checkpoint kept alongside the data it witnesses is
+/// worthless: whoever can delete audit rows can delete the checkpoint in
+/// the same transaction, and its MAC prevents forgery, not deletion.
+///
+/// It is also emitted as an `INFO` log line on the `audit_checkpoint`
+/// target, so a deployment that already ships logs off the host has a
+/// witness without building anything further.
+///
+/// `204` when the chain is empty: there is nothing to witness, and a
+/// checkpoint any future state satisfies would be worse than none.
+///
+/// # Errors
+///
+/// Propagates the query error.
+#[debug_handler]
+async fn take_checkpoint(State(ctx): State<AppContext>) -> Result<Response> {
+    let now = chrono::Utc::now().timestamp_micros();
+    let Some(checkpoint) = Checkpoint::take(&ctx.db, now).await? else {
+        return Ok((StatusCode::NO_CONTENT, ()).into_response());
+    };
+    tracing::info!(
+        target: "audit_checkpoint",
+        version = %checkpoint.version,
+        anchor_id = checkpoint.anchor_id,
+        head = %checkpoint.head,
+        rows_at_or_before = checkpoint.rows_at_or_before,
+        taken_at_micros = checkpoint.taken_at_micros,
+        mac = checkpoint.mac.as_deref().unwrap_or("none"),
+        "audit chain checkpoint"
+    );
+    format::json(checkpoint)
+}
+
+/// Check whether the chain still honours a recorded checkpoint.
+///
+/// `POST /api/cases/checkpoint/verify`. This is the half that detects
+/// deletion: the chain cannot see rows removed from its tail, because
+/// nothing is left to break.
+///
+/// # Errors
+///
+/// Propagates the query error.
+#[debug_handler]
+async fn verify_checkpoint(
+    State(ctx): State<AppContext>,
+    Json(checkpoint): Json<Checkpoint>,
+) -> Result<Response> {
+    let verdict = checkpoint.verify_against(&ctx.db).await?;
+    let honoured = verdict == crate::compliance::checkpoint::CheckpointVerdict::Honoured;
+    if !honoured {
+        tracing::error!(
+            target: "audit_checkpoint",
+            anchor_id = checkpoint.anchor_id,
+            ?verdict,
+            "audit chain does not honour a recorded checkpoint"
+        );
+    }
+    format::json(serde_json::json!({ "honoured": honoured, "verdict": verdict }))
+}
+
 /// Query string for the chain-verification endpoint.
 #[derive(Debug, serde::Deserialize)]
 struct VerifyParams {
@@ -840,6 +908,8 @@ pub fn routes() -> Routes {
         .add("/audit/recent", get(recent_audit))
         .add("/audit/verify", get(verify_audit_chain))
         .add("/records/verify", get(verify_records))
+        .add("/checkpoint", get(take_checkpoint))
+        .add("/checkpoint/verify", post(verify_checkpoint))
         .add("/events/recent", get(recent_events))
         .add("/{pid}", get(get_one))
         .add("/{pid}", put(update))

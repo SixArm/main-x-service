@@ -337,10 +337,18 @@ something the attacker cannot reach.
 `GET /api/compliance/checkpoint` returns a **checkpoint**: "at position
 *N* the chain head was *H*, and *C* rows stood at or before *N*", MAC'd so
 it cannot be rewritten by someone holding only the database. The operator
-takes one periodically and stores it **outside this database**. Each is
-also emitted as an `INFO` log line on the `audit_checkpoint` target, so a
-deployment that already ships logs off the host has a witness without
-building anything else.
+takes one periodically and stores it **outside this database**.
+
+**Checkpoints are also emitted as `INFO` log lines on an
+`audit_checkpoint` target, so a deployment already shipping logs has a
+witness for free.** This is worth calling out separately because it is
+the cheapest correct deployment of the control: no scheduler, no object
+store, no second system to build or operate. If logs leave the host — to
+a log aggregator, a SIEM, a retention bucket — then an off-box record of
+the chain's state already exists, and honouring a checkpoint later is a
+matter of pulling one line back out. A deployment that ships logs and
+does nothing further still gets the deletion detection; one that stores
+checkpoints only in this database gets none of it.
 
 `POST /api/compliance/checkpoint/verify` takes one back and answers
 whether the chain still honours it:
