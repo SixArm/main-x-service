@@ -32,6 +32,9 @@ pub struct Model {
     /// reports those as `unhashed`, not as mismatches. See
     /// [`crate::compliance::record_integrity`].
     pub content_hash: Option<String>,
+    /// BLAKE3 digest over the same pre-image as `content_hash`. `None` on
+    /// rows written before the second algorithm was adopted.
+    pub content_hash_blake3: Option<String>,
 }
 
 /// `SeaORM` relations for [`Entity`] (none defined).

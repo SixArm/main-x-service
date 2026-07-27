@@ -31,9 +31,15 @@ pub struct Model {
     /// rows written before the chain existed (verification reports those as
     /// `unchained`, not as a break).
     pub prev_hash: Option<String>,
+    /// BLAKE3 digest of the preceding chain row (`None` for the genesis
+    /// row, or a row predating the second algorithm).
+    pub prev_hash_blake3: Option<String>,
     /// This row's content hash — the link every successor binds to. See
     /// [`crate::compliance::audit_chain`].
     pub hash: Option<String>,
+    /// This row's BLAKE3 digest — the parallel chain's link. `None` on
+    /// rows written before the second algorithm was adopted.
+    pub hash_blake3: Option<String>,
     /// Request/processing context (purpose-of-use, residency, lawful basis,
     /// disclosure recipient), as JSON.
     pub context: Option<Json>,

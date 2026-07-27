@@ -84,10 +84,35 @@ pub struct ChainInput<'a> {
 /// Compute a row's chain hash as lowercase hex.
 #[must_use]
 pub fn row_hash(input: &ChainInput<'_>) -> String {
-    let mut hasher = Sha256::new();
+    to_hex(&Sha256::digest(preimage(input)))
+}
+
+/// The same row's digest under **BLAKE3**.
+///
+/// Computed over the byte-identical pre-image as [`row_hash`], so the two
+/// digests can never describe different content — the reason [`preimage`]
+/// is a separate function rather than each algorithm assembling its own
+/// field list.
+///
+/// For the chain, callers pass the **BLAKE3** predecessor in
+/// `prev_hash`, so the two chains link independently: neither depends on
+/// the other's collision resistance. See `spec/12-compliance.md` §12.4z
+/// for why both algorithms are kept.
+#[must_use]
+pub fn row_hash_blake3(input: &ChainInput<'_>) -> String {
+    blake3::hash(&preimage(input)).to_hex().to_string()
+}
+
+/// The digest pre-image: version tag, then every bound field, each
+/// followed by the unit separator.
+///
+/// Built once and hashed by each algorithm, so adding an algorithm cannot
+/// accidentally change *what* is covered — only how it is digested.
+fn preimage(input: &ChainInput<'_>) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(256);
     let mut field = |value: &str| {
-        hasher.update(value.as_bytes());
-        hasher.update([SEP as u8]);
+        buf.extend_from_slice(value.as_bytes());
+        buf.push(SEP as u8);
     };
     field(CHAIN_VERSION);
     field(input.prev_hash.unwrap_or(""));
@@ -98,7 +123,7 @@ pub fn row_hash(input: &ChainInput<'_>) -> String {
     field(&canonical_json(input.snapshot));
     field(&canonical_json(input.context));
     field(if input.disclosure { "1" } else { "0" });
-    to_hex(&hasher.finalize())
+    buf
 }
 
 /// Canonical serialization of an optional JSON value: the empty string for
@@ -167,6 +192,12 @@ pub struct ChainReport {
     /// neither verified nor counted as breaks, and they reset the linkage
     /// expectation for the row that follows.
     pub unchained: usize,
+    /// Rows whose **BLAKE3** digest was recomputed and matched.
+    pub blake3_intact: usize,
+    /// Rows carrying no BLAKE3 digest — written before the second
+    /// algorithm was adopted. Neither verified nor a break, exactly as
+    /// `unchained` treats a missing SHA-256 digest.
+    pub blake3_unhashed: usize,
     /// Every break found, in `id` order. Empty ⇒ the run verifies.
     pub breaks: Vec<ChainBreak>,
     /// The hash of the last chained row examined — the chain head an
@@ -190,6 +221,8 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
         intact: 0,
         redacted: 0,
         unchained: 0,
+        blake3_intact: 0,
+        blake3_unhashed: 0,
         breaks: Vec::new(),
         head: None,
         verified: true,
@@ -220,14 +253,45 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
         if row.redacted_at.is_some() {
             report.redacted += 1;
         } else {
-            let recomputed = row_hash(&input_for(row, row.prev_hash.as_deref()));
-            if recomputed == stored {
+            let sha_ok = row_hash(&input_for(row, row.prev_hash.as_deref())) == stored;
+            if sha_ok {
                 report.intact += 1;
-            } else {
+            }
+            // BLAKE3 is verified independently: its digest binds the
+            // BLAKE3 predecessor, so neither algorithm's linkage rests on
+            // the other's collision resistance. A row predating the second
+            // algorithm carries no BLAKE3 digest and is counted, not
+            // failed.
+            let b3_ok = match row.hash_blake3.as_deref() {
+                None => {
+                    report.blake3_unhashed += 1;
+                    true
+                }
+                Some(stored_b3) => {
+                    let ok = row_hash_blake3(&input_for(row, row.prev_hash_blake3.as_deref()))
+                        == stored_b3;
+                    if ok {
+                        report.blake3_intact += 1;
+                    }
+                    ok
+                }
+            };
+            // **One** break per row, naming which digests disagreed —
+            // reporting the same tampered row twice would double-count it
+            // and make the break list read as two separate incidents.
+            // Which algorithms disagree is itself diagnostic: both means
+            // the content changed, exactly one means that digest column
+            // was edited or a hashing path is inconsistent.
+            if !sha_ok || !b3_ok {
+                let which = match (sha_ok, b3_ok) {
+                    (false, false) => "SHA-256 and BLAKE3",
+                    (false, true) => "SHA-256 (BLAKE3 still matches — suspect the hash column)",
+                    _ => "BLAKE3 (SHA-256 still matches — suspect the hash column)",
+                };
                 report.breaks.push(ChainBreak {
                     id: row.id,
                     kind: "content",
-                    detail: "row content does not match its stored hash".to_string(),
+                    detail: format!("row content does not match its stored {which} hash"),
                 });
             }
         }
@@ -240,6 +304,96 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
 
 #[cfg(test)]
 mod tests {
+    /// The two chains are **independent**: the BLAKE3 digest binds the
+    /// BLAKE3 predecessor, not the SHA-256 one.
+    ///
+    /// This is the property that makes keeping two algorithms worth the
+    /// columns. Had the BLAKE3 digest been taken over a pre-image binding
+    /// the *SHA-256* predecessor — the obvious shortcut, since it needs
+    /// only one pre-image — then forging a predecessor with a colliding
+    /// SHA-256 hash would leave the successor's pre-image unchanged and
+    /// *both* digests still valid. The second algorithm would inherit the
+    /// first's weakness and attest to nothing.
+    #[test]
+    fn the_blake3_chain_does_not_depend_on_the_sha256_chain() {
+        let rows = chain(3);
+        // Same content, same position, different BLAKE3 predecessor ⇒
+        // different BLAKE3 digest. If the BLAKE3 digest bound the SHA-256
+        // predecessor instead, these would be equal.
+        let a = row_with(2, rows[0].hash.as_deref(), Some("aaaa"), "created", None);
+        let b = row_with(2, rows[0].hash.as_deref(), Some("bbbb"), "created", None);
+        assert_eq!(a.hash, b.hash, "the SHA-256 digest is unaffected");
+        assert_ne!(
+            a.hash_blake3, b.hash_blake3,
+            "the BLAKE3 digest must bind its own predecessor"
+        );
+    }
+
+    /// A row predating the second algorithm is counted, not failed — the
+    /// same tolerance the chain already extends to pre-chain rows.
+    #[test]
+    fn rows_without_a_blake3_digest_are_counted_not_broken() {
+        let mut rows = chain(2);
+        rows[1].hash_blake3 = None;
+        let report = verify(&rows);
+        assert!(report.verified, "{:?}", report.breaks);
+        assert_eq!(report.blake3_unhashed, 1);
+        assert_eq!(report.blake3_intact, 1);
+    }
+
+    /// Editing content breaks **both** digests, and is reported once.
+    #[test]
+    fn tampering_breaks_both_digests_but_reports_one_incident() {
+        let mut rows = chain(3);
+        rows[1].snapshot = Some(serde_json::json!({ "name": "Tampered" }));
+        let report = verify(&rows);
+        assert!(!report.verified);
+        let content: Vec<&ChainBreak> = report
+            .breaks
+            .iter()
+            .filter(|b| b.kind == "content")
+            .collect();
+        assert_eq!(content.len(), 1, "one incident, not one per algorithm");
+        assert!(
+            content[0].detail.contains("SHA-256 and BLAKE3"),
+            "the report must name both: {}",
+            content[0].detail
+        );
+    }
+
+    /// **Golden vectors.** A fixed input hashes to these exact digests.
+    ///
+    /// Every other test in this module recomputes with the same code, so
+    /// they stay green even if the pre-image changes — and a changed
+    /// pre-image silently invalidates every digest already stored, which
+    /// is indistinguishable from mass tampering. These constants are the
+    /// only thing standing between a refactor and that outcome.
+    ///
+    /// If this test fails, the hash format changed. That is a breaking
+    /// change to stored data: bump the version tag deliberately and plan
+    /// the migration — do not update the constants to match.
+    #[test]
+    fn golden_vectors_pin_the_wire_format() {
+        let input = ChainInput {
+            prev_hash: Some("0123456789abcdef"),
+            entity_pid: Uuid::from_u128(42),
+            action: "created",
+            actor: Some("alice"),
+            created_at_micros: 1_700_000_000_000_000,
+            snapshot: None,
+            context: None,
+            disclosure: false,
+        };
+        assert_eq!(
+            row_hash(&input),
+            "14f23b709d100add4394c8f6ee792260a0023dfa1c59af7dc6dd1faadc92c56d"
+        );
+        assert_eq!(
+            row_hash_blake3(&input),
+            "406eaf9a72824b01fb69d0699933b9838ce5390319f9fa685a22855497b7c4f8"
+        );
+    }
+
     /// The version tag is published in this entity's
     /// `spec/12-compliance.md` §12.4z hashing reference, and a reader
     /// verifying a digest by hand relies on it. Changing the constant
@@ -262,11 +416,14 @@ mod tests {
             .into()
     }
 
-    /// Build a chained row the way the writer does: hash over the row's own
-    /// content plus `prev`.
-    fn row(
+    /// Build a chained row the way the writer does, binding an explicit
+    /// BLAKE3 predecessor so the fixture builds *both* chains — otherwise
+    /// every test row would be `blake3_unhashed` and the second algorithm
+    /// would go untested.
+    fn row_with(
         id: i32,
         prev: Option<&str>,
+        prev_b3: Option<&str>,
         action: &str,
         snapshot: Option<serde_json::Value>,
     ) -> audit_logs::Model {
@@ -280,11 +437,14 @@ mod tests {
             snapshot,
             prev_hash: prev.map(ToString::to_string),
             hash: None,
+            prev_hash_blake3: prev_b3.map(ToString::to_string),
+            hash_blake3: None,
             context: None,
             disclosure: false,
             redacted_at: None,
         };
         model.hash = Some(row_hash(&input_for(&model, prev)));
+        model.hash_blake3 = Some(row_hash_blake3(&input_for(&model, prev_b3)));
         model
     }
 
@@ -293,9 +453,11 @@ mod tests {
         let mut rows: Vec<audit_logs::Model> = Vec::new();
         for id in 1..=n {
             let prev = rows.last().and_then(|r| r.hash.clone());
-            rows.push(row(
+            let prev_b3 = rows.last().and_then(|r| r.hash_blake3.clone());
+            rows.push(row_with(
                 id,
                 prev.as_deref(),
+                prev_b3.as_deref(),
                 "created",
                 Some(serde_json::json!({ "name": format!("pathway {id}") })),
             ));
