@@ -592,6 +592,7 @@ dependencies = [
  "chrono",
  "ed25519-dalek",
  "entity-ref",
+ "hmac",
  "include_dir",
  "insta",
  "loco-rs",

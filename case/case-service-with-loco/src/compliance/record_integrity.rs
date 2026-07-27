@@ -107,7 +107,7 @@ pub fn record_hash_sha3(input: &RecordInput<'_>) -> String {
 ///
 /// Built once and hashed by each algorithm, so adding an algorithm cannot
 /// change *what* is covered — only how it is digested.
-fn preimage(input: &RecordInput<'_>) -> Vec<u8> {
+pub(crate) fn preimage(input: &RecordInput<'_>) -> Vec<u8> {
     let mut buf = Vec::with_capacity(256);
     let mut field = |value: &str| {
         buf.extend_from_slice(value.as_bytes());
@@ -139,6 +139,10 @@ pub struct Digests {
     pub sha256: String,
     /// FIPS 202 SHA3-256.
     pub sha3: String,
+    /// HMAC-SHA256 as `"<key id>:<hex>"`, or `None` when no key is
+    /// configured. Unlike the digests this is **not** recomputable by
+    /// someone holding only the database.
+    pub mac: Option<String>,
 }
 
 /// Every digest for one record, computed from one pre-image.
@@ -151,6 +155,7 @@ pub fn digests(input: &RecordInput<'_>) -> Digests {
     Digests {
         sha256: record_hash(input),
         sha3: record_hash_sha3(input),
+        mac: super::mac::tag(&preimage(input)),
     }
 }
 
@@ -271,6 +276,8 @@ mod tests {
             deleted_at: None,
             content_hash: None,
             content_hash_sha3: None,
+            // No key in unit tests; reported `mac_absent`.
+            content_mac: None,
         };
         model.content_hash = Some(hash_of(&model));
         model.content_hash_sha3 = Some(hash_of_sha3(&model));

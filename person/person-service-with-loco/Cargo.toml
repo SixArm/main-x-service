@@ -85,6 +85,11 @@ sha2 = "0.10"
 # tree, so a cryptanalytic advance against one design family does not
 # transfer. See spec/12-compliance.md §12.4z.
 sha3 = "0.10"
+# Keyed integrity (HMAC-SHA256, FIPS 198-1) over the same pre-image, with
+# a key the database never holds — see spec/12-compliance.md §12.4z. The
+# unkeyed digests are forgeable by anyone who can write SQL, since their
+# format is published; this is what raises the bar above that.
+hmac = "0.12"
 
 # Sibling matcher crate (canonical reference algorithm; reached via adapter)
 person-matcher = { version = "0.6.1", path = "../person-matcher-rust-crate" }

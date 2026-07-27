@@ -429,6 +429,10 @@ impl AuditLogRepository {
         let hash = audit_chain::row_hash(&chain_input);
         chain_input.prev_hash = prev_hash_sha3.as_deref();
         let hash_sha3 = audit_chain::row_hash_sha3(&chain_input);
+        // Keyed over the SHA-256 pre-image, so the MAC binds the same
+        // chain position the primary digest does.
+        chain_input.prev_hash = prev_hash.as_deref();
+        let mac = crate::compliance::mac::tag(&audit_chain::preimage(&chain_input));
 
         let new_audit = audit_log::ActiveModel {
             id: Set(id),
@@ -444,6 +448,7 @@ impl AuditLogRepository {
             prev_hash: Set(prev_hash),
             prev_hash_sha3: Set(prev_hash_sha3),
             hash_sha3: Set(Some(hash_sha3)),
+            mac: Set(mac),
             hash: Set(Some(hash)),
             context: Set(context),
             disclosure: Set(disclosure),

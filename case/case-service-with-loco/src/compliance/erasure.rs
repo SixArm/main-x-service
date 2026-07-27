@@ -134,6 +134,7 @@ pub async fn erase<C: ConnectionTrait>(
     });
     active.content_hash = ActiveValue::set(Some(d.sha256));
     active.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
+    active.content_mac = ActiveValue::set(d.mac);
     active.title = ActiveValue::set(TOMBSTONE_TITLE.to_string());
     active.data = ActiveValue::set(payload);
     active.active = ActiveValue::set(false);

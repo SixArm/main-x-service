@@ -37,6 +37,9 @@ pub mod disclosure;
 /// GDPR Art. 17 erasure by redaction (see the module docs).
 pub mod erasure;
 
+/// Keyed integrity (HMAC) with a key the database never holds.
+pub mod mac;
+
 /// Row-level record integrity hashing (see the module docs).
 pub mod record_integrity;
 

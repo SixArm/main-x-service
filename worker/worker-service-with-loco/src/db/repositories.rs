@@ -160,6 +160,7 @@ fn worker_update_model(
         active: Set(worker.active),
         content_hash: Set(Some(digests.sha256)),
         content_hash_sha3: Set(Some(digests.sha3)),
+        content_mac: Set(digests.mac),
         worker_type: Set(worker
             .worker_type
             .as_ref()
@@ -593,6 +594,7 @@ impl SeaOrmWorkerRepository {
             // `None`.
             content_hash: Set(Some(d.sha256)),
             content_hash_sha3: Set(Some(d.sha3)),
+            content_mac: Set(d.mac),
             worker_type: Set(worker
                 .worker_type
                 .as_ref()
@@ -1332,6 +1334,9 @@ impl WorkerRepository for SeaOrmWorkerRepository {
             content_hash_sha3: tombstone_hash
                 .as_ref()
                 .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.sha3.clone()))),
+            content_mac: tombstone_hash
+                .as_ref()
+                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(h.mac.clone())),
             ..Default::default()
         };
         dup_delete.update(&txn).await?;
@@ -1432,6 +1437,9 @@ impl WorkerRepository for SeaOrmWorkerRepository {
             content_hash_sha3: tombstone_hash
                 .as_ref()
                 .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.sha3.clone()))),
+            content_mac: tombstone_hash
+                .as_ref()
+                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(h.mac.clone())),
             ..Default::default()
         };
         // Unlike create/update, the soft-delete is a single row update with no

@@ -103,7 +103,7 @@ pub fn row_hash_sha3(input: &ChainInput<'_>) -> String {
 ///
 /// Built once and hashed by each algorithm, so adding an algorithm cannot
 /// change *what* is covered — only how it is digested.
-fn preimage(input: &ChainInput<'_>) -> Vec<u8> {
+pub(crate) fn preimage(input: &ChainInput<'_>) -> Vec<u8> {
     let mut buf = Vec::with_capacity(256);
     let mut field = |value: &str| {
         buf.extend_from_slice(value.as_bytes());
@@ -192,6 +192,13 @@ pub struct ChainReport {
     /// Rows carrying no SHA-3 digest — written before the third algorithm
     /// was adopted. Neither verified nor a break.
     pub sha3_unhashed: usize,
+    /// Rows whose **keyed MAC** was recomputed and matched — the only
+    /// counter an adversary holding just the database cannot inflate.
+    pub mac_valid: usize,
+    /// Rows carrying no MAC (written before a key was configured).
+    pub mac_absent: usize,
+    /// Rows whose MAC names a key this service does not hold.
+    pub mac_unverifiable: usize,
     /// Every break found, in `id` order. Empty ⇒ the run verifies.
     pub breaks: Vec<ChainBreak>,
     /// The hash of the last chained row examined — the chain head an
@@ -217,6 +224,9 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
         unchained: 0,
         sha3_intact: 0,
         sha3_unhashed: 0,
+        mac_valid: 0,
+        mac_absent: 0,
+        mac_unverifiable: 0,
         breaks: Vec::new(),
         head: None,
         verified: true,
@@ -269,7 +279,27 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
             // Which ones is diagnostic: both means the content changed,
             // exactly one means that digest column was edited or a write
             // path stamped only one.
-            if !sha256_ok || !sha3_ok {
+            // The keyed check: a mismatch here means the content changed
+            // and whoever changed it did not hold the key.
+            let mac_ok = match super::mac::verify(
+                row.mac.as_deref(),
+                &preimage(&input_for(row, row.prev_hash.as_deref())),
+            ) {
+                super::mac::MacVerdict::Valid => {
+                    report.mac_valid += 1;
+                    true
+                }
+                super::mac::MacVerdict::Absent => {
+                    report.mac_absent += 1;
+                    true
+                }
+                super::mac::MacVerdict::UnknownKey(_) | super::mac::MacVerdict::Malformed => {
+                    report.mac_unverifiable += 1;
+                    true
+                }
+                super::mac::MacVerdict::Invalid => false,
+            };
+            if !sha256_ok || !sha3_ok || !mac_ok {
                 // Name every algorithm that disagreed. All three means the
                 // content changed; a subset means those digest columns
                 // were edited, or a write path stamped some and not
@@ -280,6 +310,9 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
                 }
                 if !sha3_ok {
                     disagreed.push("SHA-3");
+                }
+                if !mac_ok {
+                    disagreed.push("the keyed MAC");
                 }
                 let which = disagreed.join(" and ");
                 report.breaks.push(ChainBreak {
@@ -373,6 +406,8 @@ mod tests {
             // algorithm would go untested.
             prev_hash_sha3: prev.map(ToString::to_string),
             hash_sha3: None,
+            // No key in unit tests: reported `mac_absent`, not a mismatch.
+            mac: None,
             context: None,
             disclosure: false,
             redacted_at: None,

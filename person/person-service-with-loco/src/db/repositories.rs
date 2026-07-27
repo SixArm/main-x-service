@@ -154,6 +154,7 @@ async fn apply_update_rows<C: ConnectionTrait>(conn: &C, person: &Person) -> Res
         active: Set(person.active),
         content_hash: Set(Some(d.sha256)),
         content_hash_sha3: Set(Some(d.sha3)),
+        content_mac: Set(d.mac),
         // DB CHECK constraint enforces lowercase ('male'/'female'/'other'/'unknown');
         // Gender's serde rename_all="lowercase" produces the same shape.
         gender: Set(format!("{:?}", person.gender).to_lowercase()),
@@ -539,6 +540,7 @@ impl SeaOrmPersonRepository {
             // `None`.
             content_hash: Set(Some(digests.sha256.clone())),
             content_hash_sha3: Set(Some(digests.sha3.clone())),
+            content_mac: Set(digests.mac.clone()),
         };
 
         let names = Self::name_active_models(person);

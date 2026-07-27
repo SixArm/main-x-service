@@ -22,6 +22,7 @@ mod m20260727_000007_case_content_hash;
 mod m20260727_000008_blake3_digests;
 mod m20260727_000009_sha3_digests;
 mod m20260727_000010_drop_blake3;
+mod m20260727_000011_integrity_mac;
 
 /// The crate's migrator: drives the ordered migration set for the loco
 /// CLI / boot-time migration.
@@ -44,6 +45,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260727_000008_blake3_digests::Migration),
             Box::new(m20260727_000009_sha3_digests::Migration),
             Box::new(m20260727_000010_drop_blake3::Migration),
+            Box::new(m20260727_000011_integrity_mac::Migration),
             // inject-above (do not remove this comment)
         ]
     }

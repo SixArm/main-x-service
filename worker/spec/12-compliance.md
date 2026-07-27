@@ -598,6 +598,61 @@ that can catch a normalisation this code did not anticipate, which is why
 they are `--ignored`-gated rather than absent: they need a real Postgres,
 and a unit test cannot stand in for one.
 
+#### The keyed MAC: a key the database never holds
+
+The two digests above are **unkeyed**, and their pre-image format is
+published in this section. An adversary who can write SQL can therefore
+defeat them: edit the row, recompute both digests, update both columns.
+What the digests actually detect is *careless or unaware* modification —
+a bug, a manual fix, a restore from the wrong backup, an attacker who
+does not know the columns exist.
+
+An **HMAC-SHA256** (FIPS 198-1) over the same pre-image raises that bar to
+a secret. The key lives in the service environment
+(`<ENTITY>_INTEGRITY_MAC_KEY`) and is **never written to the database**,
+so an adversary holding only the data — a stolen backup, a read replica, a
+SQL-injection foothold, a DBA without application-server access — cannot
+forge one. A unit test states the property directly: the unkeyed digests
+are reproducible by anyone, the MAC is not.
+
+**What it does not defend against, stated plainly.** An adversary holding
+*both* the database and the service environment has the key and can forge
+freely. This is defence against **database-only** compromise — the common
+case, and worth having — not against full host compromise, which nothing
+stored beside the data could resist. It is also void if the key is put
+anywhere the database can reach: a config table, a connection string, a
+`pgcrypto` call. **The separation is the control.** `pgcrypto` offers
+`hmac()`, and using it would place the key exactly where the adversary
+already is.
+
+**Key identity and rotation.** A stored MAC is prefixed with its key id —
+`k1:9f86d0…`. Without that, rotating the key would invalidate every
+historical row at once, which is indistinguishable from mass tampering and
+is the same trap as silently changing a hash format. Retired keys stay
+available for verification (`<ENTITY>_INTEGRITY_MAC_KEYS_RETIRED`), so
+rotation is additive rather than a flag day.
+
+**Absent or unknown key.** No key configured means no MAC is written, and
+those rows report `mac_absent`. A row naming a key this service does not
+hold reports `mac_unverifiable` — **not** a mismatch, because "I cannot
+check this" and "this is wrong" lead to different investigations, and
+reporting a key-distribution problem as tampering would waste an incident
+response. Only a MAC that recomputes to a *different* value is a finding.
+
+**Operational notes.** The key must be at least 32 bytes; a shorter one is
+refused rather than used, since a placeholder that reaches production
+would produce MACs an attacker could reproduce by guessing. Verification
+is constant-time (`Mac::verify_slice`) — a timing oracle would let an
+attacker with write access recover a valid tag byte by byte without ever
+holding the key. The key is never logged, only its length on rejection.
+A missing or malformed key disables MAC writing and logs it rather than
+blocking boot, matching the ABAC-policy and PASETO-key loaders; the
+consequence is visible, because `mac_absent` then climbs in every report.
+
+`worker_assessments` carries a MAC too — it is the crate's most sensitive
+table, so leaving the likeliest tampering target on unkeyed digests alone
+would have defeated the point.
+
 #### Where the digests are computed: Rust, never the database
 
 **Decision (2026-07-27): every digest is computed in the service, in
@@ -660,10 +715,10 @@ computation into the database:
 - **An external witness.** The chain head is reported by
   `/audit/verify`; recording it off-box makes a wholesale rewrite
   detectable, because the attacker cannot reach the copy.
-- **A keyed digest (HMAC)** with a key the database does not hold. That
-  is the real answer to a SQL-capable adversary, and it is the *opposite*
-  direction from database-side hashing: `pgcrypto` offers `hmac()`, but
-  storing the key where the attacker already is defeats it.
+- **A keyed digest (HMAC)** with a key the database does not hold —
+  **built, 2026-07-27**; see "The keyed MAC" above. It is the *opposite*
+  direction from database-side hashing, which is why that idea and this
+  one cannot both be right.
 
 **Where the database would genuinely help** is *verification* rather than
 computation — a SQL-side bulk check would avoid loading every row into the

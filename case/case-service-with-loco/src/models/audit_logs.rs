@@ -117,6 +117,10 @@ impl Model {
         let hash = audit_chain::row_hash(&input);
         input.prev_hash = prev_hash_sha3.as_deref();
         let hash_sha3 = audit_chain::row_hash_sha3(&input);
+        // Keyed over the SHA-256 pre-image, so the MAC binds the same
+        // chain position the primary digest does.
+        input.prev_hash = prev_hash.as_deref();
+        let mac = crate::compliance::mac::tag(&audit_chain::preimage(&input));
         let entry = audit_logs::ActiveModel {
             created_at: ActiveValue::set(created_at),
             updated_at: ActiveValue::set(created_at),
@@ -128,6 +132,7 @@ impl Model {
             hash: ActiveValue::set(Some(hash)),
             prev_hash_sha3: ActiveValue::set(prev_hash_sha3),
             hash_sha3: ActiveValue::set(Some(hash_sha3)),
+            mac: ActiveValue::set(mac),
             context: ActiveValue::set(context),
             disclosure: ActiveValue::set(disclosure),
             redacted_at: ActiveValue::set(None),

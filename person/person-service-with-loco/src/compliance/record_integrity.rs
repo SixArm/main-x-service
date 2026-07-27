@@ -159,7 +159,7 @@ pub fn record_hash_sha3(input: &RecordInput<'_>) -> crate::Result<String> {
 /// # Errors
 ///
 /// As the public hash functions.
-fn preimage(input: &RecordInput<'_>) -> crate::Result<Vec<u8>> {
+pub(crate) fn preimage(input: &RecordInput<'_>) -> crate::Result<Vec<u8>> {
     let json = canonical_json(input.person).ok_or_else(|| {
         crate::Error::Internal(format!(
             "person {} cannot be serialized for its content hash",
@@ -197,6 +197,7 @@ pub fn digests(input: &RecordInput<'_>) -> crate::Result<Digests> {
     Ok(Digests {
         sha256: record_hash(input)?,
         sha3: record_hash_sha3(input)?,
+        mac: super::mac::tag(&preimage(input)?),
     })
 }
 
@@ -213,6 +214,10 @@ pub struct Digests {
     pub sha256: String,
     /// FIPS 202 SHA3-256.
     pub sha3: String,
+    /// HMAC-SHA256 as `"<key id>:<hex>"`, or `None` when no key is
+    /// configured. Unlike the digests this is **not** recomputable by
+    /// someone holding only the database.
+    pub mac: Option<String>,
 }
 
 /// Both digests for a live record.
@@ -303,6 +308,14 @@ pub struct RecordIntegrityReport {
     pub sha3_intact: usize,
     /// Records carrying no SHA-3 digest. Treated exactly as `unhashed`.
     pub sha3_unhashed: usize,
+    /// Records whose **keyed MAC** was recomputed and matched — the only
+    /// counter an adversary holding just the database cannot inflate.
+    pub mac_valid: usize,
+    /// Records carrying no MAC (written before a key was configured).
+    pub mac_absent: usize,
+    /// Records whose MAC names a key this service does not hold, so it can
+    /// be neither confirmed nor refuted. **Not** a mismatch.
+    pub mac_unverifiable: usize,
     /// Every mismatch found.
     pub mismatched: Vec<RecordMismatch>,
     /// `true` when no mismatch was found.
@@ -321,6 +334,9 @@ pub fn verify(rows: &[StoredRecord]) -> RecordIntegrityReport {
         unhashed: 0,
         sha3_intact: 0,
         sha3_unhashed: 0,
+        mac_valid: 0,
+        mac_absent: 0,
+        mac_unverifiable: 0,
         mismatched: Vec::new(),
         verified: true,
     };

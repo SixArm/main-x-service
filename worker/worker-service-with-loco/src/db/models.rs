@@ -90,6 +90,9 @@ pub mod workers {
         pub content_hash: Option<String>,
         /// SHA-3 digest over the same pre-image as `content_hash`.
         pub content_hash_sha3: Option<String>,
+        /// HMAC over the same pre-image, as `"<key id>:<hex>"`. Unlike
+        /// the digests, not recomputable from the database alone.
+        pub content_mac: Option<String>,
     }
 
     /// Foreign-key relations for this entity. Workers own several child
@@ -840,6 +843,8 @@ pub mod audit_log {
         pub hash: Option<String>,
         /// This row's SHA-3 digest — the third parallel chain's link.
         pub hash_sha3: Option<String>,
+        /// HMAC over this row's pre-image, as `"<key id>:<hex>"`.
+        pub mac: Option<String>,
         /// Request/processing context (purpose-of-use, disclosure recipient).
         pub context: Option<serde_json::Value>,
         /// Whether this access was an outward **disclosure** rather than an
@@ -1773,6 +1778,9 @@ pub mod worker_assessments {
         pub content_hash: Option<String>,
         /// SHA-3 digest over the same pre-image as `content_hash`.
         pub content_hash_sha3: Option<String>,
+        /// HMAC over the same pre-image, as `"<key id>:<hex>"`. Unlike
+        /// the digests, not recomputable from the database alone.
+        pub content_mac: Option<String>,
     }
 
     /// `SeaORM` relations for the assessment entity (none defined — the
