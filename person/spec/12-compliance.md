@@ -511,6 +511,79 @@ that can catch a normalisation this code did not anticipate, which is why
 they are `--ignored`-gated rather than absent: they need a real Postgres,
 and a unit test cannot stand in for one.
 
+#### Where the digests are computed: Rust, never the database
+
+**Decision (2026-07-27): every digest is computed in the service, in
+Rust. None is computed by Postgres.** Recorded here because the opposite
+is an obvious-looking idea that would quietly destroy the control.
+
+**Not for lack of database support.** Postgres can do both of these: a
+core `sha256()` needs no extension at all, and `pgcrypto`'s
+`digest(data, 'sha3-256')` works on PG 18 (OpenSSL-backed) — both
+verified against this project's own database, not assumed. `pgcrypto` is
+already installed in several of these schemas for `gen_random_uuid()`.
+So this is a deliberate choice made *against* an available capability,
+not a workaround for a missing one. Anyone who rediscovers that Postgres
+can hash should read on rather than conclude the decision rested on a
+false premise.
+
+**The decisive reason: it would turn the database into a forgery oracle.**
+These digests are **unkeyed**, and the pre-image format is published in
+this very section. If Postgres computed them — in a trigger, or a
+`GENERATED ALWAYS AS ... STORED` column — then *every* write would produce
+a correct digest as a side effect, including a raw `UPDATE` from an
+attacker with SQL access. Tamper detection would not merely weaken; it
+would invert, because the mechanism meant to witness the change would be
+driven by the change itself.
+
+This is the same reasoning that removed the database audit triggers
+(`m20260726_000003_drop_audit_triggers`): a witness that fires on the
+attacker's own write attests to nothing. Having reached that conclusion
+once, it would be strange to reintroduce the same defect one layer down.
+
+Three further costs, in descending order:
+
+1. **Byte-exactness across two implementations.** The pre-image would have
+   to be rebuilt in SQL — `concat_ws(chr(31), …)` with identical
+   NULL-versus-empty handling and identical JSON canonicalisation. It
+   would not match: Postgres renders `jsonb::text` with spacing after
+   `:` and `,` that `serde_json` does not emit. The divergence is silent
+   and total, and the golden vectors exist precisely because this class
+   of mismatch is invisible until something fails to verify.
+2. **It would pin the digests to a Postgres version.** Any change to
+   `jsonb` rendering or numeric formatting across a major upgrade would
+   invalidate every stored digest — and the no-back-fill rule (above)
+   means there would be no legitimate way to repair them.
+3. **It would end offline verification.** The digest functions are pure
+   Rust over a documented format, so a third party can recompute one
+   without this service — the SHA-256 and SHA-3 golden vectors in
+   `audit_chain.rs` were each cross-checked against an independent Python
+   implementation. Computing in the database makes independent
+   verification require a Postgres instance.
+
+**What this decision does *not* fix, stated plainly.** An attacker with
+SQL write access can still defeat the record hash today, because the
+format is public and unkeyed: edit the row, recompute both digests,
+update both columns. What the control actually buys is detection of
+**careless or unaware** modification — a bug, a manual fix, a restore
+from the wrong backup, an attacker who does not know the digest columns
+exist. Two things would raise that bar, and neither involves moving
+computation into the database:
+
+- **An external witness.** The chain head is reported by
+  `/audit/verify`; recording it off-box makes a wholesale rewrite
+  detectable, because the attacker cannot reach the copy.
+- **A keyed digest (HMAC)** with a key the database does not hold. That
+  is the real answer to a SQL-capable adversary, and it is the *opposite*
+  direction from database-side hashing: `pgcrypto` offers `hmac()`, but
+  storing the key where the attacker already is defeats it.
+
+**Where the database would genuinely help** is *verification* rather than
+computation — a SQL-side bulk check would avoid loading every row into the
+service. That remains open, and it inherits cost (1) in full: the SQL
+would have to rebuild the pre-image byte-for-byte, so it would need the
+same golden vectors before anyone could trust it.
+
 #### Adoption on a populated table
 
 A row with **no stored digest is reported as `unhashed`, never as a

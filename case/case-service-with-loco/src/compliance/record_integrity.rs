@@ -38,6 +38,16 @@
 //! hashed as epoch microseconds (so writers must truncate before storing),
 //! and JSON is hashed as `serde_json`'s serialization, whose `BTreeMap`
 //! key order matches what a JSONB round-trip returns.
+//! ## Computed here, not in the database
+//!
+//! Deliberately, and not for lack of database support: Postgres can
+//! compute both digests (`sha256()` is core, `pgcrypto` does
+//! `sha3-256`). A database-side digest would be recomputed by *any*
+//! write, including a raw SQL edit by an attacker — the mechanism meant
+//! to witness the change would be driven by the change itself, which is
+//! the defect that removed the database audit triggers. See
+//! `spec/12-compliance.md` §12.4z, "Where the digests are computed".
+//!
 
 use std::fmt::Write as _;
 

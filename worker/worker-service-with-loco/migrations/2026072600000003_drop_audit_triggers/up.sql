@@ -45,3 +45,10 @@ DROP TRIGGER IF EXISTS audit_workers_changes ON workers;
 DROP TRIGGER IF EXISTS audit_organizations_changes ON organizations;
 DROP FUNCTION IF EXISTS audit_worker_changes();
 DROP FUNCTION IF EXISTS audit_organization_changes();
+
+-- Related decision, same reasoning one layer down: the integrity digests
+-- (audit chain, record content hash) are computed in Rust and never by
+-- Postgres, even though pgcrypto can compute both SHA-256 and SHA-3. A
+-- database-side digest would be produced by the attacker's own write,
+-- which is exactly the defect these triggers had. See
+-- spec/12-compliance.md 12.4z, "Where the digests are computed".

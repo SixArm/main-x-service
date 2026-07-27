@@ -104,7 +104,7 @@ pub fn row_hash_sha3(input: &ChainInput<'_>) -> String {
 ///
 /// Built once and hashed by each algorithm, so adding an algorithm cannot
 /// accidentally change *what* is covered — only how it is digested.
-fn preimage(input: &ChainInput<'_>) -> Vec<u8> {
+pub(crate) fn preimage(input: &ChainInput<'_>) -> Vec<u8> {
     let mut buf = Vec::with_capacity(256);
     let mut field = |value: &str| {
         buf.extend_from_slice(value.as_bytes());
@@ -193,6 +193,13 @@ pub struct ChainReport {
     /// Rows carrying no SHA-3 digest — written before the third algorithm
     /// was adopted. Neither verified nor a break.
     pub sha3_unhashed: usize,
+    /// Rows whose **keyed MAC** was recomputed and matched — the only
+    /// counter an adversary holding just the database cannot inflate.
+    pub mac_valid: usize,
+    /// Rows carrying no MAC (written before a key was configured).
+    pub mac_absent: usize,
+    /// Rows whose MAC names a key this service does not hold.
+    pub mac_unverifiable: usize,
     /// Every break found, in `id` order. Empty ⇒ the run verifies.
     pub breaks: Vec<ChainBreak>,
     /// The hash of the last chained row examined — the chain head an
@@ -210,6 +217,80 @@ pub struct ChainReport {
 /// linkage expectation, so introducing the chain to an existing table does
 /// not produce a spurious break at the boundary.
 #[must_use]
+/// Recompute every digest and the MAC for one row, updating the report's
+/// counters and returning which checks passed.
+///
+/// Split out of [`verify`] to keep it readable: the loop is otherwise a
+/// hundred lines of three near-identical arms, and the differences
+/// between them — which counter, which predecessor, which verdict is
+/// tolerated — are exactly what a reader needs to see.
+/// Recompute every digest and the MAC for one row, updating the report's
+/// counters and returning which checks passed.
+///
+/// Split out of [`verify`] to keep it readable: the loop is otherwise a
+/// hundred lines of three near-identical arms, and the differences
+/// between them — which counter, which predecessor, which verdict is
+/// tolerated — are exactly what a reader needs to see.
+fn check_row(
+    row: &audit_logs::Model,
+    stored: &str,
+    report: &mut ChainReport,
+) -> (bool, bool, bool) {
+    let sha256_ok = row_hash(&input_for(row, row.prev_hash.as_deref())) == stored;
+    if sha256_ok {
+        report.intact += 1;
+    }
+    let sha3_ok = match row.hash_sha3.as_deref() {
+        None => {
+            report.sha3_unhashed += 1;
+            true
+        }
+        Some(stored_sha3) => {
+            let ok = row_hash_sha3(&input_for(row, row.prev_hash_sha3.as_deref())) == stored_sha3;
+            if ok {
+                report.sha3_intact += 1;
+            }
+            ok
+        }
+    };
+    // **One** break per row, naming which digests disagreed —
+    // reporting the same tampered row twice would double-count it
+    // and make the break list read as two separate incidents.
+    // Which algorithms disagree is itself diagnostic: both means
+    // the content changed, exactly one means that digest column
+    // was edited or a hashing path is inconsistent.
+    // The keyed check: a mismatch here means the content changed
+    // and whoever changed it did not hold the key.
+    let mac_ok = match super::mac::verify(
+        row.mac.as_deref(),
+        &preimage(&input_for(row, row.prev_hash.as_deref())),
+    ) {
+        super::mac::MacVerdict::Valid => {
+            report.mac_valid += 1;
+            true
+        }
+        super::mac::MacVerdict::Absent => {
+            report.mac_absent += 1;
+            true
+        }
+        super::mac::MacVerdict::UnknownKey(_) | super::mac::MacVerdict::Malformed => {
+            report.mac_unverifiable += 1;
+            true
+        }
+        super::mac::MacVerdict::Invalid => false,
+    };
+    (sha256_ok, sha3_ok, mac_ok)
+}
+
+/// Verify a run of audit rows supplied in **ascending `id` order**.
+///
+/// Each chained row must (a) carry its predecessor's stored hash and
+/// (b) — unless redacted — hash to its stored value, under every
+/// algorithm it carries. A row with no stored hash predates the chain: it
+/// is counted as `unchained` and clears the linkage expectation, so
+/// introducing the chain to an existing table does not produce a spurious
+/// break at the boundary.
+#[must_use]
 pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
     let mut report = ChainReport {
         rows: rows.len(),
@@ -218,6 +299,9 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
         unchained: 0,
         sha3_intact: 0,
         sha3_unhashed: 0,
+        mac_valid: 0,
+        mac_absent: 0,
+        mac_unverifiable: 0,
         breaks: Vec::new(),
         head: None,
         verified: true,
@@ -248,31 +332,8 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
         if row.redacted_at.is_some() {
             report.redacted += 1;
         } else {
-            let sha256_ok = row_hash(&input_for(row, row.prev_hash.as_deref())) == stored;
-            if sha256_ok {
-                report.intact += 1;
-            }
-            let sha3_ok = match row.hash_sha3.as_deref() {
-                None => {
-                    report.sha3_unhashed += 1;
-                    true
-                }
-                Some(stored_sha3) => {
-                    let ok = row_hash_sha3(&input_for(row, row.prev_hash_sha3.as_deref()))
-                        == stored_sha3;
-                    if ok {
-                        report.sha3_intact += 1;
-                    }
-                    ok
-                }
-            };
-            // **One** break per row, naming which digests disagreed —
-            // reporting the same tampered row twice would double-count it
-            // and make the break list read as two separate incidents.
-            // Which algorithms disagree is itself diagnostic: both means
-            // the content changed, exactly one means that digest column
-            // was edited or a hashing path is inconsistent.
-            if !sha256_ok || !sha3_ok {
+            let (sha256_ok, sha3_ok, mac_ok) = check_row(row, stored, &mut report);
+            if !sha256_ok || !sha3_ok || !mac_ok {
                 // Name every algorithm that disagreed. All three means the
                 // content changed; a subset means those digest columns
                 // were edited, or a write path stamped some and not
@@ -283,6 +344,9 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
                 }
                 if !sha3_ok {
                     disagreed.push("SHA-3");
+                }
+                if !mac_ok {
+                    disagreed.push("the keyed MAC");
                 }
                 let agreed = 3 - disagreed.len();
                 let hint = if agreed == 0 {
@@ -444,6 +508,9 @@ mod tests {
             hash: None,
             prev_hash_sha3: prev_sha3.map(ToString::to_string),
             hash_sha3: None,
+            // No key in unit tests: the MAC is absent, which verification
+            // reports as `mac_absent` rather than as a mismatch.
+            mac: None,
             context: None,
             disclosure: false,
             redacted_at: None,

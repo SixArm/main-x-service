@@ -38,6 +38,8 @@ pub struct Model {
     pub hash: Option<String>,
     /// This row's SHA-3 digest — the third parallel chain's link.
     pub hash_sha3: Option<String>,
+    /// HMAC over this row's pre-image, as `"<key id>:<hex>"`.
+    pub mac: Option<String>,
     /// Request/processing context (purpose-of-use, residency, lawful basis,
     /// disclosure recipient), as JSON.
     pub context: Option<Json>,

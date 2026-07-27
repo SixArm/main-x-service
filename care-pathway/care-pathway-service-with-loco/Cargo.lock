@@ -1066,6 +1066,7 @@ dependencies = [
  "care-pathway-matcher",
  "chrono",
  "ed25519-dalek",
+ "hmac 0.12.1",
  "include_dir",
  "insta",
  "loco-rs",

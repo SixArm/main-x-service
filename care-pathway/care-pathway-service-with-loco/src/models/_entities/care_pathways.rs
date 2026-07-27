@@ -34,6 +34,9 @@ pub struct Model {
     pub content_hash: Option<String>,
     /// SHA-3 digest over the same pre-image as `content_hash`.
     pub content_hash_sha3: Option<String>,
+    /// HMAC over the same pre-image, as `"<key id>:<hex>"`. Unlike the
+    /// digests, not recomputable from the database alone.
+    pub content_mac: Option<String>,
 }
 
 /// `SeaORM` relations for [`Entity`] (none defined).

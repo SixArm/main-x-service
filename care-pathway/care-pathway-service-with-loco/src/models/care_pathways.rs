@@ -57,6 +57,7 @@ impl Model {
             name: ActiveValue::set(pathway.name.clone()),
             content_hash: ActiveValue::set(Some(digests.sha256.clone())),
             content_hash_sha3: ActiveValue::set(Some(digests.sha3.clone())),
+            content_mac: ActiveValue::set(digests.mac.clone()),
             data: ActiveValue::set(data),
             active: ActiveValue::set(true),
             deleted_at: ActiveValue::set(None),
@@ -193,6 +194,7 @@ impl ActiveModel {
         });
         self.content_hash = ActiveValue::set(Some(d.sha256));
         self.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
+        self.content_mac = ActiveValue::set(d.mac);
         self.name = ActiveValue::set(pathway.name.clone());
         self.data = ActiveValue::set(data);
         self.update(db).await.map_err(ModelError::from)
@@ -220,6 +222,7 @@ impl ActiveModel {
         });
         self.content_hash = ActiveValue::set(Some(d.sha256));
         self.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
+        self.content_mac = ActiveValue::set(d.mac);
         self.active = ActiveValue::set(false);
         self.deleted_at = ActiveValue::set(Some(deleted_at));
         self.update(db).await.map_err(ModelError::from)

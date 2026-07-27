@@ -56,6 +56,16 @@
 //! illegitimate one breaks the chain. The two controls are complementary,
 //! and neither subsumes the other.
 //!
+//! ## Computed here, not in the database
+//!
+//! Deliberately, and not for lack of database support: Postgres can
+//! compute both digests (`sha256()` is core, `pgcrypto` does
+//! `sha3-256`). A database-side digest would be recomputed by *any*
+//! write, including a raw SQL edit by an attacker — the mechanism meant
+//! to witness the change would be driven by the change itself, which is
+//! the defect that removed the database audit triggers. See
+//! `spec/12-compliance.md` §12.4z, "Where the digests are computed".
+//!
 //! ## Reproducibility
 //!
 //! The same two rules as the audit chain: time is hashed as epoch

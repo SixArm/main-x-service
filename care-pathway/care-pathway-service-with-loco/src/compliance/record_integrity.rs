@@ -38,6 +38,16 @@
 //! hashed as epoch microseconds (so writers must truncate before storing),
 //! and JSON is hashed as `serde_json`'s serialization, whose `BTreeMap`
 //! key order matches what a JSONB round-trip returns.
+//! ## Computed here, not in the database
+//!
+//! Deliberately, and not for lack of database support: Postgres can
+//! compute both digests (`sha256()` is core, `pgcrypto` does
+//! `sha3-256`). A database-side digest would be recomputed by *any*
+//! write, including a raw SQL edit by an attacker — the mechanism meant
+//! to witness the change would be driven by the change itself, which is
+//! the defect that removed the database audit triggers. See
+//! `spec/12-compliance.md` §12.4z, "Where the digests are computed".
+//!
 
 use std::fmt::Write as _;
 
@@ -94,7 +104,7 @@ pub fn record_hash_sha3(input: &RecordInput<'_>) -> String {
 
 /// The digest pre-image, built once and hashed by each algorithm so they
 /// cannot come to cover different content.
-fn preimage(input: &RecordInput<'_>) -> Vec<u8> {
+pub(crate) fn preimage(input: &RecordInput<'_>) -> Vec<u8> {
     let mut buf = Vec::with_capacity(256);
     let mut field = |value: &str| {
         buf.extend_from_slice(value.as_bytes());
@@ -156,6 +166,10 @@ pub struct Digests {
     pub sha256: String,
     /// FIPS 202 SHA3-256.
     pub sha3: String,
+    /// HMAC-SHA256 as `"<key id>:<hex>"`, or `None` when no key is
+    /// configured. Unlike the digests this is **not** recomputable by
+    /// someone holding only the database.
+    pub mac: Option<String>,
 }
 
 /// Every digest for one record, computed from one pre-image.
@@ -164,6 +178,7 @@ pub fn digests(input: &RecordInput<'_>) -> Digests {
     Digests {
         sha256: record_hash(input),
         sha3: record_hash_sha3(input),
+        mac: super::mac::tag(&preimage(input)),
     }
 }
 
@@ -194,6 +209,15 @@ pub struct RecordIntegrityReport {
     /// Records carrying no SHA-3 digest — written before the third
     /// algorithm was adopted. Treated exactly as `unhashed`.
     pub sha3_unhashed: usize,
+    /// Records whose **keyed MAC** was recomputed and matched. This is
+    /// the only counter an adversary holding just the database cannot
+    /// inflate.
+    pub mac_valid: usize,
+    /// Records carrying no MAC — written before a key was configured.
+    pub mac_absent: usize,
+    /// Records whose MAC names a key this service does not hold, so it
+    /// can be neither confirmed nor refuted. **Not** a mismatch.
+    pub mac_unverifiable: usize,
     /// Every mismatch found.
     pub mismatched: Vec<RecordMismatch>,
     /// `true` when no mismatch was found.
@@ -209,6 +233,9 @@ pub fn verify(rows: &[care_pathways::Model]) -> RecordIntegrityReport {
         unhashed: 0,
         sha3_intact: 0,
         sha3_unhashed: 0,
+        mac_valid: 0,
+        mac_absent: 0,
+        mac_unverifiable: 0,
         mismatched: Vec::new(),
         verified: true,
     };
@@ -232,9 +259,27 @@ pub fn verify(rows: &[care_pathways::Model]) -> RecordIntegrityReport {
             }
             Some(_) => false,
         };
+        // The keyed check. A mismatch here is the strong signal: the
+        // content changed and whoever changed it did not hold the key.
+        let mac_ok =
+            match super::mac::verify(row.content_mac.as_deref(), &preimage(&input_for(row))) {
+                super::mac::MacVerdict::Valid => {
+                    report.mac_valid += 1;
+                    true
+                }
+                super::mac::MacVerdict::Absent => {
+                    report.mac_absent += 1;
+                    true
+                }
+                super::mac::MacVerdict::UnknownKey(_) | super::mac::MacVerdict::Malformed => {
+                    report.mac_unverifiable += 1;
+                    true
+                }
+                super::mac::MacVerdict::Invalid => false,
+            };
         // One entry per record, not one per algorithm: a tampered record
         // is a single incident.
-        if !sha256_ok || !sha3_ok {
+        if !sha256_ok || !sha3_ok || !mac_ok {
             report.mismatched.push(RecordMismatch {
                 pid: row.pid.to_string(),
                 name: row.name.clone(),
@@ -278,6 +323,8 @@ mod tests {
             deleted_at: None,
             content_hash: None,
             content_hash_sha3: None,
+            // No key in unit tests; see `mac::verify`.
+            content_mac: None,
         };
         model.content_hash = Some(hash_of(&model));
         model.content_hash_sha3 = Some(hash_of_sha3(&model));

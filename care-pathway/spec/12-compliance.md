@@ -270,6 +270,130 @@ that can catch a normalisation this code did not anticipate, which is why
 they are `--ignored`-gated rather than absent: they need a real Postgres,
 and a unit test cannot stand in for one.
 
+#### The keyed MAC: a key the database never holds
+
+The two digests above are **unkeyed**, and their pre-image format is
+published in this section. An adversary who can write SQL can therefore
+defeat them: edit the row, recompute both digests, update both columns.
+What the digests actually detect is *careless or unaware* modification —
+a bug, a manual fix, a restore from the wrong backup, an attacker who
+does not know the columns exist.
+
+An **HMAC-SHA256** (FIPS 198-1) over the same pre-image raises that bar to
+a secret. The key lives in the service environment
+(`<ENTITY>_INTEGRITY_MAC_KEY`) and is **never written to the database**,
+so an adversary holding only the data — a stolen backup, a read replica, a
+SQL-injection foothold, a DBA without application-server access — cannot
+forge one. A unit test states the property directly: the unkeyed digests
+are reproducible by anyone, the MAC is not.
+
+**What it does not defend against, stated plainly.** An adversary holding
+*both* the database and the service environment has the key and can forge
+freely. This is defence against **database-only** compromise — the common
+case, and worth having — not against full host compromise, which nothing
+stored beside the data could resist. It is also void if the key is put
+anywhere the database can reach: a config table, a connection string, a
+`pgcrypto` call. **The separation is the control.** `pgcrypto` offers
+`hmac()`, and using it would place the key exactly where the adversary
+already is.
+
+**Key identity and rotation.** A stored MAC is prefixed with its key id —
+`k1:9f86d0…`. Without that, rotating the key would invalidate every
+historical row at once, which is indistinguishable from mass tampering and
+is the same trap as silently changing a hash format. Retired keys stay
+available for verification (`<ENTITY>_INTEGRITY_MAC_KEYS_RETIRED`), so
+rotation is additive rather than a flag day.
+
+**Absent or unknown key.** No key configured means no MAC is written, and
+those rows report `mac_absent`. A row naming a key this service does not
+hold reports `mac_unverifiable` — **not** a mismatch, because "I cannot
+check this" and "this is wrong" lead to different investigations, and
+reporting a key-distribution problem as tampering would waste an incident
+response. Only a MAC that recomputes to a *different* value is a finding.
+
+**Operational notes.** The key must be at least 32 bytes; a shorter one is
+refused rather than used, since a placeholder that reaches production
+would produce MACs an attacker could reproduce by guessing. Verification
+is constant-time (`Mac::verify_slice`) — a timing oracle would let an
+attacker with write access recover a valid tag byte by byte without ever
+holding the key. The key is never logged, only its length on rejection.
+A missing or malformed key disables MAC writing and logs it rather than
+blocking boot, matching the ABAC-policy and PASETO-key loaders; the
+consequence is visible, because `mac_absent` then climbs in every report.
+
+#### Where the digests are computed: Rust, never the database
+
+**Decision (2026-07-27): every digest is computed in the service, in
+Rust. None is computed by Postgres.** Recorded here because the opposite
+is an obvious-looking idea that would quietly destroy the control.
+
+**Not for lack of database support.** Postgres can do both of these: a
+core `sha256()` needs no extension at all, and `pgcrypto`'s
+`digest(data, 'sha3-256')` works on PG 18 (OpenSSL-backed) — both
+verified against this project's own database, not assumed. `pgcrypto` is
+already installed in several of these schemas for `gen_random_uuid()`.
+So this is a deliberate choice made *against* an available capability,
+not a workaround for a missing one. Anyone who rediscovers that Postgres
+can hash should read on rather than conclude the decision rested on a
+false premise.
+
+**The decisive reason: it would turn the database into a forgery oracle.**
+These digests are **unkeyed**, and the pre-image format is published in
+this very section. If Postgres computed them — in a trigger, or a
+`GENERATED ALWAYS AS ... STORED` column — then *every* write would produce
+a correct digest as a side effect, including a raw `UPDATE` from an
+attacker with SQL access. Tamper detection would not merely weaken; it
+would invert, because the mechanism meant to witness the change would be
+driven by the change itself.
+
+This is the same reasoning that removed the database audit triggers
+(`m20260726_000003_drop_audit_triggers`): a witness that fires on the
+attacker's own write attests to nothing. Having reached that conclusion
+once, it would be strange to reintroduce the same defect one layer down.
+
+Three further costs, in descending order:
+
+1. **Byte-exactness across two implementations.** The pre-image would have
+   to be rebuilt in SQL — `concat_ws(chr(31), …)` with identical
+   NULL-versus-empty handling and identical JSON canonicalisation. It
+   would not match: Postgres renders `jsonb::text` with spacing after
+   `:` and `,` that `serde_json` does not emit. The divergence is silent
+   and total, and the golden vectors exist precisely because this class
+   of mismatch is invisible until something fails to verify.
+2. **It would pin the digests to a Postgres version.** Any change to
+   `jsonb` rendering or numeric formatting across a major upgrade would
+   invalidate every stored digest — and the no-back-fill rule (above)
+   means there would be no legitimate way to repair them.
+3. **It would end offline verification.** The digest functions are pure
+   Rust over a documented format, so a third party can recompute one
+   without this service — the SHA-256 and SHA-3 golden vectors in
+   `audit_chain.rs` were each cross-checked against an independent Python
+   implementation. Computing in the database makes independent
+   verification require a Postgres instance.
+
+**What this decision does *not* fix, stated plainly.** An attacker with
+SQL write access can still defeat the record hash today, because the
+format is public and unkeyed: edit the row, recompute both digests,
+update both columns. What the control actually buys is detection of
+**careless or unaware** modification — a bug, a manual fix, a restore
+from the wrong backup, an attacker who does not know the digest columns
+exist. Two things would raise that bar, and neither involves moving
+computation into the database:
+
+- **An external witness.** The chain head is reported by
+  `/audit/verify`; recording it off-box makes a wholesale rewrite
+  detectable, because the attacker cannot reach the copy.
+- **A keyed digest (HMAC)** with a key the database does not hold —
+  **built, 2026-07-27**; see "The keyed MAC" above. It is the *opposite*
+  direction from database-side hashing, which is why that idea and this
+  one cannot both be right.
+
+**Where the database would genuinely help** is *verification* rather than
+computation — a SQL-side bulk check would avoid loading every row into the
+service. That remains open, and it inherits cost (1) in full: the SQL
+would have to rebuild the pre-image byte-for-byte, so it would need the
+same golden vectors before anyone could trust it.
+
 #### Adoption on a populated table
 
 A row with **no stored digest is reported as `unhashed`, never as a

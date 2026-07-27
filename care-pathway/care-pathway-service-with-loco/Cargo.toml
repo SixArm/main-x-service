@@ -46,6 +46,12 @@ sha2 = { version = "0.10" }
 # tree, so a cryptanalytic advance against one design family does not
 # transfer to it. See spec/12-compliance.md §12.4z.
 sha3 = { version = "0.10" }
+# Keyed integrity (HMAC-SHA256, FIPS 198-1) over the same pre-image, with
+# a key the database never holds — see spec/12-compliance.md §12.4z. This
+# is what raises tamper detection above "careless modification": the
+# unkeyed digests are forgeable by anyone who can write SQL, since their
+# format is published.
+hmac = { version = "0.12" }
 
 # Canonical matching algorithm — embedded and used directly as the API DTO.
 care-pathway-matcher = { path = "../care-pathway-matcher-rust-crate" }
