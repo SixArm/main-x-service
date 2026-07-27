@@ -73,6 +73,164 @@ live in the service spec
 | **ONC / HTI certification (US)** — 45 CFR Part 170 §170.315(g)(10) | Partial by construction: the service serves FHIR **R5** `PlanDefinition`, which has **no US Core profile**, so certification itself is out of reach (§12.5). The conformance machinery is not. | **Profile and terminology validation** — a declared `meta.profile`, must-support and cardinality checks, and condition codes validated against the value set their element is *bound* to (ICD-10 / ICD-11 / SNOMED CT) rather than merely being well-formed — plus `$validate`, SMART discovery, and Bulk Data `$export`. |
 | **IEC 62304 / SaMD** (with ISO 14971, EU MDR Rule 11) | The template registry alone is not a device; the **instance layer crosses the line**, because tracking an individual patient's progress through a pathway informs care decisions. This entity therefore declares a safety classification and carries the evidence artefacts. | A **SOUP register + CycloneDX SBOM** from the real dependency graph; **machine-checked requirement→test traceability**; **signed, reproducible builds** with recorded provenance; and a runtime software-identification surface stating version, build, classification, and which controls are live. |
 
+### 12.4z Hashing reference
+
+Everything this service hashes, how each digest is built, and — the part
+that matters when a report says something is wrong — what each one does
+and does not prove. All digests are **SHA-256**, rendered lowercase hex.
+
+#### The digests
+
+| Digest | Covers | Detects | Blind to |
+|---|---|---|---|
+| **Audit chain** (`audit_logs.hash` / `prev_hash`) | Every audit row, linked to its predecessor | Edits, insertions, deletions and reordering **in the trail** | Changes to care-pathway rows that write no audit row |
+| **Record content hash** (`care_pathways.content_hash`) | One pathway row's content and lifecycle state | Out-of-band SQL edits **to a record** | Deletion of a whole row; timestamp-only edits |
+
+They are **complementary, and neither subsumes the other.** The chain
+covers the *trail*; it cannot see an edit to an entity row, because a
+change made without writing an audit row leaves the chain intact. The record hash covers the *rows*; it cannot see a row deleted outright in SQL, because a legitimate delete writes an audit row and an illegitimate one breaks the chain — which is the chain's job.
+
+#### How a pre-image is built
+
+Every digest is the SHA-256 of a **field-separated pre-image**, built the
+same way:
+
+```text
+SHA256( version ␟ field₁ ␟ field₂ ␟ … ␟ fieldₙ ␟ )
+```
+
+- **`␟` is ASCII 31 (unit separator)**, appended after *every* field
+  including the last. A separator that cannot occur in the data is what
+  stops two different records producing the same pre-image: without it,
+  `("ab", "c")` and `("a", "bc")` would concatenate identically.
+- **The version tag is the first field.** It is bound *into* the digest,
+  not stored beside it, so changing the hashed field set later cannot be
+  mistaken for tampering — every old row simply fails against the new
+  format, loudly, instead of silently comparing equal.
+- **Absent values hash as the empty string**, so `None` and `Some("")`
+  are indistinguishable. This is a deliberate, small loss: it keeps the
+  pre-image a plain string join rather than a length-prefixed encoding.
+- **Booleans hash as `"1"` / `"0"`.**
+
+#### Reproducibility — the two rules that make it survive Postgres
+
+A digest is worthless if the value it was computed over is not the value
+that comes back out of the database. Two normalisations exist for exactly
+that reason, and both have caused real failures elsewhere:
+
+1. **Time is hashed as epoch microseconds, truncated before storing.**
+   Postgres `timestamptz` holds microsecond precision; Rust's clock offers
+   nanoseconds. Hashing an untruncated instant produces a digest over a
+   value the database will never return. Writers call `trunc_micros`
+   before storing, so the hashed value and the stored value are the same
+   instant.
+2. **JSON is hashed as `serde_json`'s serialization of the parsed value**,
+   never as the caller's raw text. `serde_json`'s object representation is
+   a `BTreeMap`, so keys come out sorted — which is what a JSONB round
+   trip also returns. `{"b":2,"a":1}` and `{"a":1,"b":2}` therefore hash
+   identically, as they must, since Postgres will return whichever it
+   likes.
+
+Both rules are pinned by DB-gated tests that write through the real
+repository and verify after a round trip. Those tests are the only thing
+that can catch a normalisation this code did not anticipate, which is why
+they are `--ignored`-gated rather than absent: they need a real Postgres,
+and a unit test cannot stand in for one.
+
+#### Adoption on a populated table
+
+A row with **no stored digest is reported as `unhashed`, never as a
+mismatch, and never as verified.** Two consequences worth being explicit
+about:
+
+- Turning the control on does not produce a wall of false positives on
+  rows that predate it.
+- `verified: true` alongside a non-zero `unhashed` count means "nothing
+  detected", not "everything is intact". The counts are reported
+  separately so the difference stays visible.
+
+Existing rows are **not back-filled**. Computing a digest from current
+content asserts that the current content is authentic — precisely the
+claim the digest exists to test — so a back-fill would certify whatever
+an attacker had already changed. Rows are hashed on their next write.
+
+#### The audit chain
+
+Each audit row binds its predecessor's digest, so the rows form a chain:
+
+```text
+row₁.hash = H(version, "",         row₁ fields…)
+row₂.hash = H(version, row₁.hash,  row₂ fields…)
+row₃.hash = H(version, row₂.hash,  row₃ fields…)
+```
+
+Fields bound, in order: **`version, prev_hash, entity_pid, action, actor, created_at (µs), snapshot (JSON), context (JSON), disclosure`**.
+
+Verification (`GET /api/compliance/audit/verify`) walks the trailing window and reports
+two distinct break kinds, because they mean different things:
+
+- **`content`** — the row's stored digest does not match a recomputation.
+  The row was *edited*.
+- **`linkage`** — the row's `prev_hash` does not match its predecessor's
+  digest. A row was *inserted, deleted, or reordered*.
+
+This is what an append-only convention alone cannot give you: deleting a
+row is invisible unless something downstream depends on it.
+
+**Concurrency.** Reading the head and appending must be atomic, or two
+writers claim the same predecessor and fork the chain — which surfaces as
+a `linkage` break that looks like tampering but is not. A Postgres
+advisory lock (`pg_advisory_xact_lock(0x6D78_695F_6175_6469)`) serialises the pair,
+held to the end of the enclosing transaction. On a pooled connection with
+no surrounding transaction each statement is its own transaction, so a
+fork remains possible in principle; verification reports it rather than
+hiding it.
+
+**Redaction (GDPR Art. 17).** An erased row keeps its `hash` and
+`prev_hash` and loses its content, with `redacted_at` stamped.
+Verification then **skips the content check and still enforces linkage**,
+so erasure and integrity hold simultaneously rather than trading off. A
+test pins that redaction cannot be used to detach the following row.
+
+**Version tag: `v1`.**
+
+#### The record content hash
+
+Each `care_pathways` row carries `content_hash`, recomputed on **every** write.
+
+Fields bound, in order: **`version, pid, name, data (JSON), active, deleted_at (µs)`**.
+
+The whole payload is one JSONB `data` column, so hashing "the record" is hashing one field. The relational services (person, worker) must assemble theirs first — see their specs.
+
+**Excluded: `created_at` / `updated_at`.** The ORM and the database set
+them, so binding them would make the digest depend on values the writer
+does not control — producing mismatches on rows nobody touched. The cost
+is stated plainly: an attacker who alters *only* a timestamp is not caught
+here. Anything that changes what the record says is.
+
+**The failure mode is a false accusation, not a missed one.** A write path
+that forgets to rehash flags an *untouched* record as tampered, which is
+worse than having no control at all. That shapes how it is tested: rather
+than testing that tampering is caught (necessary but easy), the suite
+drives every write path — create, update, merge, delete, erase — and
+asserts every record still verifies afterwards. Those tests were each
+confirmed to fail when a rehash is removed, so they are known to be load-
+bearing rather than decorative.
+
+**Erasure clears the digest rather than recomputing one.** After an Art. 17
+erasure the child rows are gone, so there is no assembled record left to
+hash; a recomputation would certify a half-destroyed state. `NULL` puts
+the row in the `unhashed` bucket, so an erased record reads as a gap, not
+as tampering. The chained `erased` audit row is the stronger evidence.
+
+**Version tag: `r1`.**
+
+Verified by `GET /api/compliance/records/verify`. Both verification
+endpoints on this service sit under `/api/compliance` alongside the SBOM
+and posture endpoints, not under `/api/care-pathways` — unlike case,
+person and worker, whose chain endpoints hang off their entity or root
+prefix.
+
 ### 12.5 Honest limits
 
 - **Not a certified health-IT module.** ONC certification targets FHIR

@@ -263,6 +263,17 @@ pub fn verify(rows: &[audit_log::Model]) -> ChainReport {
 
 #[cfg(test)]
 mod tests {
+    /// The version tag is published in this entity's
+    /// `spec/12-compliance.md` §12.4z hashing reference, and a reader
+    /// verifying a digest by hand relies on it. Changing the constant
+    /// without changing the spec makes that reference silently wrong —
+    /// and changing it at all invalidates every stored digest, so this
+    /// pin exists to make the decision deliberate rather than incidental.
+    #[test]
+    fn spec_documents_this_version_tag() {
+        assert_eq!(super::CHAIN_VERSION, "p1");
+    }
+
     use super::*;
 
     /// A fixed instant so digests in these tests are stable.

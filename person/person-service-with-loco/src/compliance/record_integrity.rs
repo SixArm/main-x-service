@@ -234,6 +234,14 @@ pub fn verify(rows: &[(Person, Option<String>, Option<i64>)]) -> RecordIntegrity
 
 #[cfg(test)]
 mod tests {
+    /// As `audit_chain::spec_documents_this_version_tag`: the tag is
+    /// published in `spec/12-compliance.md` §12.4z, and changing it
+    /// invalidates every stored digest.
+    #[test]
+    fn spec_documents_this_version_tag() {
+        assert_eq!(super::RECORD_HASH_VERSION, "p-r1");
+    }
+
     use super::*;
     use crate::models::{Gender, HumanName, Identifier, IdentifierType};
 

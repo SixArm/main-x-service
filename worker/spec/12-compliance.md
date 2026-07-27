@@ -393,6 +393,207 @@ defects had to be fixed first, none of them from the compliance work:
   created, so every integration test panicked before its first
   assertion.
 
+### 12.4z Hashing reference
+
+Everything this service hashes, how each digest is built, and — the part
+that matters when a report says something is wrong — what each one does
+and does not prove. All digests are **SHA-256**, rendered lowercase hex.
+
+#### The digests
+
+| Digest | Covers | Detects | Blind to |
+|---|---|---|---|
+| **Audit chain** (`audit_log.hash` / `prev_hash`) | Every audit row, linked to its predecessor | Edits, insertions, deletions and reordering **in the trail** | Changes to worker rows that write no audit row |
+| **Record content hash** (`workers.content_hash`) | One worker's **assembled** record — parent row *and* child tables | Out-of-band SQL edits **to a record**, including names, identifiers and addresses | Deletion of a whole row; timestamp-only edits |
+| **Assessment hash** (`worker_assessments.content_hash`) | One assessment row, scores included | Out-of-band SQL edits to a **psychometric result** | Deletion of a whole assessment row |
+
+They are **complementary, and neither subsumes the other.** The chain
+covers the *trail*; it cannot see an edit to an entity row, because a
+change made without writing an audit row leaves the chain intact. The record hash covers the *records*; it cannot see a row deleted outright in SQL, because a legitimate delete writes an audit row and an illegitimate one breaks the chain — which is the chain's job.
+
+#### How a pre-image is built
+
+Every digest is the SHA-256 of a **field-separated pre-image**, built the
+same way:
+
+```text
+SHA256( version ␟ field₁ ␟ field₂ ␟ … ␟ fieldₙ ␟ )
+```
+
+- **`␟` is ASCII 31 (unit separator)**, appended after *every* field
+  including the last. A separator that cannot occur in the data is what
+  stops two different records producing the same pre-image: without it,
+  `("ab", "c")` and `("a", "bc")` would concatenate identically.
+- **The version tag is the first field.** It is bound *into* the digest,
+  not stored beside it, so changing the hashed field set later cannot be
+  mistaken for tampering — every old row simply fails against the new
+  format, loudly, instead of silently comparing equal.
+- **Absent values hash as the empty string**, so `None` and `Some("")`
+  are indistinguishable. This is a deliberate, small loss: it keeps the
+  pre-image a plain string join rather than a length-prefixed encoding.
+- **Booleans hash as `"1"` / `"0"`.**
+
+#### Reproducibility — the two rules that make it survive Postgres
+
+A digest is worthless if the value it was computed over is not the value
+that comes back out of the database. Two normalisations exist for exactly
+that reason, and both have caused real failures elsewhere:
+
+1. **Time is hashed as epoch microseconds, truncated before storing.**
+   Postgres `timestamptz` holds microsecond precision; Rust's clock offers
+   nanoseconds. Hashing an untruncated instant produces a digest over a
+   value the database will never return. Writers call `trunc_micros`
+   before storing, so the hashed value and the stored value are the same
+   instant.
+2. **JSON is hashed as `serde_json`'s serialization of the parsed value**,
+   never as the caller's raw text. `serde_json`'s object representation is
+   a `BTreeMap`, so keys come out sorted — which is what a JSONB round
+   trip also returns. `{"b":2,"a":1}` and `{"a":1,"b":2}` therefore hash
+   identically, as they must, since Postgres will return whichever it
+   likes.
+
+Both rules are pinned by DB-gated tests that write through the real
+repository and verify after a round trip. Those tests are the only thing
+that can catch a normalisation this code did not anticipate, which is why
+they are `--ignored`-gated rather than absent: they need a real Postgres,
+and a unit test cannot stand in for one.
+
+#### Adoption on a populated table
+
+A row with **no stored digest is reported as `unhashed`, never as a
+mismatch, and never as verified.** Two consequences worth being explicit
+about:
+
+- Turning the control on does not produce a wall of false positives on
+  rows that predate it.
+- `verified: true` alongside a non-zero `unhashed` count means "nothing
+  detected", not "everything is intact". The counts are reported
+  separately so the difference stays visible.
+
+Existing rows are **not back-filled**. Computing a digest from current
+content asserts that the current content is authentic — precisely the
+claim the digest exists to test — so a back-fill would certify whatever
+an attacker had already changed. Rows are hashed on their next write.
+
+#### The audit chain
+
+Each audit row binds its predecessor's digest, so the rows form a chain:
+
+```text
+row₁.hash = H(version, "",         row₁ fields…)
+row₂.hash = H(version, row₁.hash,  row₂ fields…)
+row₃.hash = H(version, row₂.hash,  row₃ fields…)
+```
+
+Fields bound, in order: **`version, prev_hash, id, timestamp (µs), user_id, action, entity_type, entity_id, old_values (JSON), new_values (JSON), ip_address, user_agent, context (JSON), disclosure`**.
+
+Verification (`GET /api/audit/verify`) walks the trailing window and reports
+two distinct break kinds, because they mean different things:
+
+- **`content`** — the row's stored digest does not match a recomputation.
+  The row was *edited*.
+- **`linkage`** — the row's `prev_hash` does not match its predecessor's
+  digest. A row was *inserted, deleted, or reordered*.
+
+This is what an append-only convention alone cannot give you: deleting a
+row is invisible unless something downstream depends on it.
+
+**Concurrency.** Reading the head and appending must be atomic, or two
+writers claim the same predecessor and fork the chain — which surfaces as
+a `linkage` break that looks like tampering but is not. A Postgres
+advisory lock (`pg_advisory_xact_lock(0x6D78_695F_776B_7272)`) serialises the pair,
+held to the end of the enclosing transaction. On a pooled connection with
+no surrounding transaction each statement is its own transaction, so a
+fork remains possible in principle; verification reports it rather than
+hiding it.
+
+**Redaction (GDPR Art. 17).** An erased row keeps its `hash` and
+`prev_hash` and loses its content, with `redacted_at` stamped.
+Verification then **skips the content check and still enforces linkage**,
+so erasure and integrity hold simultaneously rather than trading off. A
+test pins that redaction cannot be used to detach the following row.
+
+**Version tag: `p1`.** Shared with the person service, whose chain format is byte-identical — the tag names the *format*, not the crate, and the `p` prefix is a legacy of the port rather than a claim about persons. Renaming it would invalidate every stored digest, so it stays.
+
+#### The record content hash
+
+Each `workers` row carries `content_hash`, recomputed on **every** write.
+
+Fields bound, in order: **`version, id, the assembled record (JSON, minus `created_at`/`updated_at`), deleted_at (µs)`**.
+
+**The digest covers the assembled record, not the `workers` row.** A worker
+is relational — names, identifiers, addresses, contacts, documents and
+links live in their own tables — and that is where the data worth
+tampering with lives: a surname, a professional registration number. A
+parent-row digest would have covered the shell and missed the contents,
+repeating the precise narrowness that made the dropped database audit
+triggers worthless.
+
+`deleted_at` is bound **separately**, because the domain model does not
+carry it and because a soft delete stamps `deleted_at` *without* clearing
+`active` — so a digest over `active` alone could not tell a live record
+from a deleted one.
+
+**Excluded: `created_at` / `updated_at`.** The ORM and the database set
+them, so binding them would make the digest depend on values the writer
+does not control — producing mismatches on rows nobody touched. The cost
+is stated plainly: an attacker who alters *only* a timestamp is not caught
+here. Anything that changes what the record says is.
+
+**The failure mode is a false accusation, not a missed one.** A write path
+that forgets to rehash flags an *untouched* record as tampered, which is
+worse than having no control at all. That shapes how it is tested: rather
+than testing that tampering is caught (necessary but easy), the suite
+drives every write path — create, update, merge, delete, erase — and
+asserts every record still verifies afterwards. Those tests were each
+confirmed to fail when a rehash is removed, so they are known to be load-
+bearing rather than decorative.
+
+**Erasure clears the digest rather than recomputing one.** After an Art. 17
+erasure the child rows are gone, so there is no assembled record left to
+hash; a recomputation would certify a half-destroyed state. `NULL` puts
+the row in the `unhashed` bucket, so an erased record reads as a gap, not
+as tampering. The chained `erased` audit row is the stronger evidence.
+
+**Version tag: `w-r1`.**
+
+Verified by `GET /api/records/verify`.
+
+#### The assessment hash
+
+`worker_assessments` rows carry their own `content_hash`, because they are
+**not part of the assembled `Worker`** and so fall outside
+`workers.content_hash`. They are also the most sensitive data this service
+holds — aptitude, personality and psychometric results with scores and
+score bands — so leaving them uncovered would have left the likeliest
+tampering target as the one blind spot.
+
+Fields bound, in order: **version, id, worker_id, category, instrument,
+provider, status, administered_on, expires_on, administered_by, notes,
+results (JSON — the scores), deleted_at (µs)**.
+
+**Why a separate digest rather than folding into the worker's.** An
+assessment is written through its own endpoints on its own lifecycle, so
+folding it in would make every assessment write load and rehash the whole
+worker — coupling a sub-resource to its parent and adding a read to every
+write. And a per-row digest names *which* assessment was tampered with,
+where a parent digest could only report that something about the worker
+changed. `worker_id` is bound, so re-parenting an assessment is detected
+rather than invisible.
+
+**One statement, not two.** The digest is computed and stored in the same
+write: an update is applied to a `Model`, that `Model` is hashed, the
+digest is set on it, and every field is marked dirty so the whole row goes
+out at once. The hash input and the written value are the same object, so
+no parallel structure can drift out of step with the persisted columns.
+An earlier form wrote the row and then stamped the digest in a second
+`UPDATE`, on the theory that hashing the row *as stored* was stronger; it
+was not, since that second statement hashed a value that had itself
+already round-tripped once. It narrowed the window without closing it.
+The guarantee comes from the round-trip test instead.
+
+**Version tag: `wa-r1`.**
+
 ### 12.5 Extended frameworks
 
 Four frameworks impose obligations beyond §12.1. Regime detail:

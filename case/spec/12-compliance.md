@@ -129,6 +129,126 @@ still verifies and the redactions are *counted*, not hidden. If that ever
 fails, the two obligations have stopped being simultaneously satisfiable
 and the design is broken, not the test.
 
+### 12.4z Hashing reference
+
+Everything this service hashes, how each digest is built, and — the part
+that matters when a report says something is wrong — what each one does
+and does not prove. All digests are **SHA-256**, rendered lowercase hex.
+
+#### The digests
+
+| Digest | Covers | Detects | Blind to |
+|---|---|---|---|
+| **Audit chain** (`audit_logs.hash` / `prev_hash`) | Every audit row, linked to its predecessor | Edits, insertions, deletions and reordering **in the trail** | Changes to case rows that write no audit row |
+
+They are **complementary, and neither subsumes the other.** The chain
+covers the *trail*; it cannot see an edit to an entity row, because a
+change made without writing an audit row leaves the chain intact. There is **no record content hash on this service yet**: an out-of-band SQL edit to a stored case, made without writing an audit row, is currently undetectable. person, worker and care-pathway carry one; adopting it here is open work.
+
+#### How a pre-image is built
+
+Every digest is the SHA-256 of a **field-separated pre-image**, built the
+same way:
+
+```text
+SHA256( version ␟ field₁ ␟ field₂ ␟ … ␟ fieldₙ ␟ )
+```
+
+- **`␟` is ASCII 31 (unit separator)**, appended after *every* field
+  including the last. A separator that cannot occur in the data is what
+  stops two different records producing the same pre-image: without it,
+  `("ab", "c")` and `("a", "bc")` would concatenate identically.
+- **The version tag is the first field.** It is bound *into* the digest,
+  not stored beside it, so changing the hashed field set later cannot be
+  mistaken for tampering — every old row simply fails against the new
+  format, loudly, instead of silently comparing equal.
+- **Absent values hash as the empty string**, so `None` and `Some("")`
+  are indistinguishable. This is a deliberate, small loss: it keeps the
+  pre-image a plain string join rather than a length-prefixed encoding.
+- **Booleans hash as `"1"` / `"0"`.**
+
+#### Reproducibility — the two rules that make it survive Postgres
+
+A digest is worthless if the value it was computed over is not the value
+that comes back out of the database. Two normalisations exist for exactly
+that reason, and both have caused real failures elsewhere:
+
+1. **Time is hashed as epoch microseconds, truncated before storing.**
+   Postgres `timestamptz` holds microsecond precision; Rust's clock offers
+   nanoseconds. Hashing an untruncated instant produces a digest over a
+   value the database will never return. Writers call `trunc_micros`
+   before storing, so the hashed value and the stored value are the same
+   instant.
+2. **JSON is hashed as `serde_json`'s serialization of the parsed value**,
+   never as the caller's raw text. `serde_json`'s object representation is
+   a `BTreeMap`, so keys come out sorted — which is what a JSONB round
+   trip also returns. `{"b":2,"a":1}` and `{"a":1,"b":2}` therefore hash
+   identically, as they must, since Postgres will return whichever it
+   likes.
+
+Both rules are pinned by DB-gated tests that write through the real
+repository and verify after a round trip. Those tests are the only thing
+that can catch a normalisation this code did not anticipate, which is why
+they are `--ignored`-gated rather than absent: they need a real Postgres,
+and a unit test cannot stand in for one.
+
+#### Adoption on a populated table
+
+A row with **no stored digest is reported as `unhashed`, never as a
+mismatch, and never as verified.** Two consequences worth being explicit
+about:
+
+- Turning the control on does not produce a wall of false positives on
+  rows that predate it.
+- `verified: true` alongside a non-zero `unhashed` count means "nothing
+  detected", not "everything is intact". The counts are reported
+  separately so the difference stays visible.
+
+Existing rows are **not back-filled**. Computing a digest from current
+content asserts that the current content is authentic — precisely the
+claim the digest exists to test — so a back-fill would certify whatever
+an attacker had already changed. Rows are hashed on their next write.
+
+#### The audit chain
+
+Each audit row binds its predecessor's digest, so the rows form a chain:
+
+```text
+row₁.hash = H(version, "",         row₁ fields…)
+row₂.hash = H(version, row₁.hash,  row₂ fields…)
+row₃.hash = H(version, row₂.hash,  row₃ fields…)
+```
+
+Fields bound, in order: **`version, prev_hash, entity_pid, action, actor, created_at (µs), snapshot (JSON), context (JSON), disclosure`**.
+
+Verification (`GET /api/cases/audit/verify`) walks the trailing window and reports
+two distinct break kinds, because they mean different things:
+
+- **`content`** — the row's stored digest does not match a recomputation.
+  The row was *edited*.
+- **`linkage`** — the row's `prev_hash` does not match its predecessor's
+  digest. A row was *inserted, deleted, or reordered*.
+
+This is what an append-only convention alone cannot give you: deleting a
+row is invisible unless something downstream depends on it.
+
+**Concurrency.** Reading the head and appending must be atomic, or two
+writers claim the same predecessor and fork the chain — which surfaces as
+a `linkage` break that looks like tampering but is not. A Postgres
+advisory lock (`pg_advisory_xact_lock(0x6D78_695F_6175_6469)`) serialises the pair,
+held to the end of the enclosing transaction. On a pooled connection with
+no surrounding transaction each statement is its own transaction, so a
+fork remains possible in principle; verification reports it rather than
+hiding it.
+
+**Redaction (GDPR Art. 17).** An erased row keeps its `hash` and
+`prev_hash` and loses its content, with `redacted_at` stamped.
+Verification then **skips the content check and still enforces linkage**,
+so erasure and integrity hold simultaneously rather than trading off. A
+test pins that redaction cannot be used to detach the following row.
+
+**Version tag: `v1`.** Shared with the care-pathway service, whose chain format is identical — the tag names the *format*, not the crate.
+
 ### 12.5 Honest limits
 
 - **Masking and GDPR export are still not built** (§12.3), and that gap
