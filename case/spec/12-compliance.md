@@ -425,6 +425,92 @@ is the same trap as silently changing a hash format. Retired keys stay
 available for verification (`<ENTITY>_INTEGRITY_MAC_KEYS_RETIRED`), so
 rotation is additive rather than a flag day.
 
+**Where this code lives (2026-07-27).** The cryptography is **not** in
+this crate. It lives once, in
+[`integrity/integrity-mac-rust-crate`](../../integrity/integrity-mac-rust-crate),
+and every service binds to it — the same call the family made for
+`authentication-verifier`, on the same grounds.
+
+The reason is specific rather than stylistic. Copy-with-drift is the
+family's normal posture for DTOs and scaffolding, and it is wrong here:
+a latent defect in the sibling `soup.rs` (a test matching the substring
+`timestamp` rather than the JSON field) survived in three copies and
+surfaced only when a fourth crate happened to use the word in prose. A
+key-handling defect that survived that way would not announce itself at
+all — it would make MACs forgeable while every test stayed green.
+
+What remains per-service is what is genuinely local: a `Domain` enum, so
+every call site stays exhaustively checked by the compiler, and the
+process key set loaded from this service's own environment variables.
+The shared crate takes a `&str` domain because the sets differ — worker
+has `assessment` — and an enum there would have to know all of them.
+
+Extraction is **byte-compatible**: the shared crate carries the same
+golden vectors, cross-checked against an independent HKDF-SHA256
+implementation, so every MAC already stored in a database still
+verifies.
+
+**Domain separation: one configured key is several keys (2026-07-27).**
+The configured value is a **root** key and never MACs anything directly.
+Each purpose derives its own subkey with **HKDF-SHA256** (RFC 5869) under
+an `info` string binding the service name and the domain:
+
+```text
+mxi/case-service/audit-chain/d1
+mxi/case-service/record/d1
+mxi/case-service/checkpoint/d1
+```
+
+This closes a gap that was real rather than theoretical. Before it, the
+only thing keeping the three domains apart was the leading **version tag**
+in each pre-image — a field that exists for versioning, not separation.
+Two consequences followed:
+
+- **Cross-domain.** Renaming the record pre-image's tag to a value the
+  chain already used would silently make a record tag verify as a chain
+  tag. `v1` is an obvious name for both, so this was one plausible edit
+  away.
+- **Cross-service.** The tags are *identical across crates* —
+  care-pathway and case both used `v1` for the chain, and every crate
+  uses `cp1` for checkpoints — and no pre-image names its own crate. A
+  single MAC key shared across a cluster, which is the obvious way to
+  deploy one, therefore let a tag from one service verify against an
+  identically-shaped row in another.
+
+Deriving per (service, domain) removes the reliance entirely: a tag
+cannot transfer even if two pre-images are byte-identical. Tests pin all
+three properties, and the derivation itself is pinned by **golden vectors
+cross-checked against an independent HKDF implementation**, because
+changing the info string or the scheme is a migration, not a refactor.
+
+**Legacy MACs still verify.** A stored value with no scheme prefix
+(`k1:…`) predates derivation and is checked against the raw root key, so
+adopting this does not turn existing rows into a wall of false
+accusations. A value naming a scheme this binary does not implement
+reports `mac_unverifiable`, not a mismatch — it means the binary is older
+than the row, and the fix is to upgrade the binary rather than to
+investigate the data.
+
+**Where the key comes from.** Two sources, in precedence order:
+
+| Source | Use |
+|---|---|
+| `<ENTITY>_INTEGRITY_MAC_KEY_FILE` | **Production.** A path whose contents are the hex key — a Kubernetes secret volume, a Docker secret, a file the orchestrator mounts. A trailing newline is stripped, so a file written by `echo` works. |
+| `<ENTITY>_INTEGRITY_MAC_KEY` | **Development.** The hex key inline. The weaker option: environment variables are inherited by every child process, appear in crash dumps and `/proc/<pid>/environ`, and are visible to anything that can introspect the container. |
+
+Setting both is a configuration error worth surfacing, so the file wins
+and the collision is logged. An **unreadable** key file disables MACs
+rather than falling back to the environment variable: a deployment that
+mounted a secret and got the path wrong should see MACs stop, not
+silently continue under a stale key it believed it had replaced.
+
+**Key material lifetime.** The root key is zeroized as soon as the
+subkeys are derived, so it does not sit in the process image for the
+service's lifetime. Stated precisely rather than oversold: this does not
+defend against reading a live process, which holds the subkeys anyway.
+What it removes is the *root* key — the one that compromises every domain
+and every future domain — from core dumps, swap, and post-mortem images.
+
 **Absent or unknown key.** No key configured means no MAC is written, and
 those rows report `mac_absent`. A row naming a key this service does not
 hold reports `mac_unverifiable` — **not** a mismatch, because "I cannot
