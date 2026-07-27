@@ -261,6 +261,7 @@ fn check_row(
     // The keyed check: a mismatch here means the content changed
     // and whoever changed it did not hold the key.
     let mac_ok = match super::mac::verify(
+        super::mac::Domain::AuditChain,
         row.mac.as_deref(),
         &preimage(&input_for(row, row.prev_hash.as_deref())),
     ) {
@@ -272,7 +273,9 @@ fn check_row(
             report.mac_absent += 1;
             true
         }
-        super::mac::MacVerdict::UnknownKey(_) | super::mac::MacVerdict::Malformed => {
+        super::mac::MacVerdict::UnknownKey(_)
+        | super::mac::MacVerdict::UnknownScheme(_)
+        | super::mac::MacVerdict::Malformed => {
             report.mac_unverifiable += 1;
             true
         }

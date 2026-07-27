@@ -178,7 +178,7 @@ pub fn digests(input: &RecordInput<'_>) -> Digests {
     Digests {
         sha256: record_hash(input),
         sha3: record_hash_sha3(input),
-        mac: super::mac::tag(&preimage(input)),
+        mac: super::mac::tag(super::mac::Domain::Record, &preimage(input)),
     }
 }
 
@@ -261,22 +261,27 @@ pub fn verify(rows: &[care_pathways::Model]) -> RecordIntegrityReport {
         };
         // The keyed check. A mismatch here is the strong signal: the
         // content changed and whoever changed it did not hold the key.
-        let mac_ok =
-            match super::mac::verify(row.content_mac.as_deref(), &preimage(&input_for(row))) {
-                super::mac::MacVerdict::Valid => {
-                    report.mac_valid += 1;
-                    true
-                }
-                super::mac::MacVerdict::Absent => {
-                    report.mac_absent += 1;
-                    true
-                }
-                super::mac::MacVerdict::UnknownKey(_) | super::mac::MacVerdict::Malformed => {
-                    report.mac_unverifiable += 1;
-                    true
-                }
-                super::mac::MacVerdict::Invalid => false,
-            };
+        let mac_ok = match super::mac::verify(
+            super::mac::Domain::Record,
+            row.content_mac.as_deref(),
+            &preimage(&input_for(row)),
+        ) {
+            super::mac::MacVerdict::Valid => {
+                report.mac_valid += 1;
+                true
+            }
+            super::mac::MacVerdict::Absent => {
+                report.mac_absent += 1;
+                true
+            }
+            super::mac::MacVerdict::UnknownKey(_)
+            | super::mac::MacVerdict::UnknownScheme(_)
+            | super::mac::MacVerdict::Malformed => {
+                report.mac_unverifiable += 1;
+                true
+            }
+            super::mac::MacVerdict::Invalid => false,
+        };
         // One entry per record, not one per algorithm: a tampered record
         // is a single incident.
         if !sha256_ok || !sha3_ok || !mac_ok {

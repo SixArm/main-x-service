@@ -52,6 +52,14 @@ sha3 = { version = "0.10" }
 # unkeyed digests are forgeable by anyone who can write SQL, since their
 # format is published.
 hmac = { version = "0.12" }
+# HKDF-SHA256 (RFC 5869) derives a per-(service, domain) subkey from the
+# configured MAC root key, so a tag cannot transfer between purposes, or
+# between two services sharing one cluster-wide key. See
+# src/compliance/mac.rs and spec/12-compliance.md §12.4z.
+hkdf = { version = "0.12" }
+# Wipes the root key from memory once the domain subkeys are derived, so
+# it does not survive in core dumps or swap.
+zeroize = { version = "1" }
 
 # Canonical matching algorithm — embedded and used directly as the API DTO.
 care-pathway-matcher = { path = "../care-pathway-matcher-rust-crate" }

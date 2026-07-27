@@ -304,12 +304,74 @@ anywhere the database can reach: a config table, a connection string, a
 `hmac()`, and using it would place the key exactly where the adversary
 already is.
 
-**Key identity and rotation.** A stored MAC is prefixed with its key id —
-`k1:9f86d0…`. Without that, rotating the key would invalidate every
-historical row at once, which is indistinguishable from mass tampering and
-is the same trap as silently changing a hash format. Retired keys stay
-available for verification (`<ENTITY>_INTEGRITY_MAC_KEYS_RETIRED`), so
-rotation is additive rather than a flag day.
+**Key identity and rotation.** A stored MAC is prefixed with its scheme
+and key id — `d1.k1:9f86d0…`. Without the key id, rotating the key would
+invalidate every historical row at once, which is indistinguishable from
+mass tampering and is the same trap as silently changing a hash format.
+Retired keys stay available for verification
+(`<ENTITY>_INTEGRITY_MAC_KEYS_RETIRED`), so rotation is additive rather
+than a flag day.
+
+**Domain separation: one configured key is several keys (2026-07-27).**
+The configured value is a **root** key and never MACs anything directly.
+Each purpose derives its own subkey with **HKDF-SHA256** (RFC 5869) under
+an `info` string binding the service name and the domain:
+
+```text
+mxi/care-pathway-service/audit-chain/d1
+mxi/care-pathway-service/record/d1
+mxi/care-pathway-service/checkpoint/d1
+```
+
+This closes a gap that was real rather than theoretical. Before it, the
+only thing keeping the three domains apart was the leading **version tag**
+in each pre-image — a field that exists for versioning, not separation.
+Two consequences followed:
+
+- **Cross-domain.** Renaming the record pre-image's tag to a value the
+  chain already used would silently make a record tag verify as a chain
+  tag. `v1` is an obvious name for both, so this was one plausible edit
+  away.
+- **Cross-service.** The tags are *identical across crates* —
+  care-pathway and case both used `v1` for the chain, and every crate
+  uses `cp1` for checkpoints — and no pre-image names its own crate. A
+  single MAC key shared across a cluster, which is the obvious way to
+  deploy one, therefore let a tag from one service verify against an
+  identically-shaped row in another.
+
+Deriving per (service, domain) removes the reliance entirely: a tag
+cannot transfer even if two pre-images are byte-identical. Tests pin all
+three properties, and the derivation itself is pinned by **golden vectors
+cross-checked against an independent HKDF implementation**, because
+changing the info string or the scheme is a migration, not a refactor.
+
+**Legacy MACs still verify.** A stored value with no scheme prefix
+(`k1:…`) predates derivation and is checked against the raw root key, so
+adopting this does not turn existing rows into a wall of false
+accusations. A value naming a scheme this binary does not implement
+reports `mac_unverifiable`, not a mismatch — it means the binary is older
+than the row, and the fix is to upgrade the binary rather than to
+investigate the data.
+
+**Where the key comes from.** Two sources, in precedence order:
+
+| Source | Use |
+|---|---|
+| `<ENTITY>_INTEGRITY_MAC_KEY_FILE` | **Production.** A path whose contents are the hex key — a Kubernetes secret volume, a Docker secret, a file the orchestrator mounts. A trailing newline is stripped, so a file written by `echo` works. |
+| `<ENTITY>_INTEGRITY_MAC_KEY` | **Development.** The hex key inline. The weaker option: environment variables are inherited by every child process, appear in crash dumps and `/proc/<pid>/environ`, and are visible to anything that can introspect the container. |
+
+Setting both is a configuration error worth surfacing, so the file wins
+and the collision is logged. An **unreadable** key file disables MACs
+rather than falling back to the environment variable: a deployment that
+mounted a secret and got the path wrong should see MACs stop, not
+silently continue under a stale key it believed it had replaced.
+
+**Key material lifetime.** The root key is zeroized as soon as the
+subkeys are derived, so it does not sit in the process image for the
+service's lifetime. Stated precisely rather than oversold: this does not
+defend against reading a live process, which holds the subkeys anyway.
+What it removes is the *root* key — the one that compromises every domain
+and every future domain — from core dumps, swap, and post-mortem images.
 
 **Absent or unknown key.** No key configured means no MAC is written, and
 those rows report `mac_absent`. A row naming a key this service does not
@@ -318,9 +380,21 @@ check this" and "this is wrong" lead to different investigations, and
 reporting a key-distribution problem as tampering would waste an incident
 response. Only a MAC that recomputes to a *different* value is a finding.
 
-**Operational notes.** The key must be at least 32 bytes; a shorter one is
-refused rather than used, since a placeholder that reaches production
-would produce MACs an attacker could reproduce by guessing. Verification
+**Operational notes.** The key must be at least 32 bytes, and a
+**placeholder is refused** even at full length. A length floor alone
+accepts 32 zero bytes, `0101…`, or a row of one repeated character —
+values that appear in examples, get pasted into a deployment, and pass
+every check. Keys with fewer than 8 distinct bytes are rejected. This is
+not an entropy estimator and does not pretend to be: it catches the
+specific failure of a placeholder reaching production, and says nothing
+about a poorly-generated key that happens to look varied. It is the same
+fail-closed posture SEC-A1 applied to the token signing seed.
+
+The placeholder rule deliberately applies only to the **active** key, not
+to retired ones. A retired key exists to verify history that was already
+written; refusing it would convert "this row is unchanged since it was
+MACed" into "I cannot check this", losing information without gaining
+security. Verification
 is constant-time (`Mac::verify_slice`) — a timing oracle would let an
 attacker with write access recover a valid tag byte by byte without ever
 holding the key. The key is never logged, only its length on rejection.
