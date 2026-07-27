@@ -35,3 +35,8 @@
 # resolves different versions and the SBOM describes a graph nobody
 # can reconstruct.
 !Cargo.lock
+
+# ...but not a sub-crate's lockfile. The service's own Cargo.lock is
+# the resolved graph for the binary; these are build artifacts of
+# path dependencies built standalone.
+migration/Cargo.lock
