@@ -48,10 +48,6 @@ prometheus = { version = "0.13" }
 # SHA-256 for the tamper-evident audit hash chain (HIPAA §164.312(c)).
 # Also a dev-dependency below, for the in-process token tests.
 sha2 = { version = "0.10" }
-# Second integrity digest alongside SHA-256 — see spec/12-compliance.md
-# §12.4z. Not a replacement: SHA-256 stays as the conservative,
-# FIPS-approved digest, and BLAKE3 adds speed and algorithm agility.
-blake3 = { version = "1" }
 # Third integrity digest. SHA-3 (FIPS 202) is a **sponge** construction,
 # structurally unrelated to SHA-256's Merkle-Damgard and to BLAKE3's ARX
 # tree, so a cryptanalytic advance against one design family does not

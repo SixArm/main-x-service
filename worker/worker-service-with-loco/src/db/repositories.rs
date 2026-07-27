@@ -159,7 +159,6 @@ fn worker_update_model(
         id: Set(worker.id),
         active: Set(worker.active),
         content_hash: Set(Some(digests.sha256)),
-        content_hash_blake3: Set(Some(digests.blake3)),
         content_hash_sha3: Set(Some(digests.sha3)),
         worker_type: Set(worker
             .worker_type
@@ -593,7 +592,6 @@ impl SeaOrmWorkerRepository {
             // A new record is live, so the digest binds `deleted_at` as
             // `None`.
             content_hash: Set(Some(d.sha256)),
-            content_hash_blake3: Set(Some(d.blake3)),
             content_hash_sha3: Set(Some(d.sha3)),
             worker_type: Set(worker
                 .worker_type
@@ -1331,11 +1329,6 @@ impl WorkerRepository for SeaOrmWorkerRepository {
                 .map_or(sea_orm::ActiveValue::NotSet, |h| {
                     Set(Some(h.sha256.clone()))
                 }),
-            content_hash_blake3: tombstone_hash
-                .as_ref()
-                .map_or(sea_orm::ActiveValue::NotSet, |h| {
-                    Set(Some(h.blake3.clone()))
-                }),
             content_hash_sha3: tombstone_hash
                 .as_ref()
                 .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.sha3.clone()))),
@@ -1435,11 +1428,6 @@ impl WorkerRepository for SeaOrmWorkerRepository {
                 .as_ref()
                 .map_or(sea_orm::ActiveValue::NotSet, |h| {
                     Set(Some(h.sha256.clone()))
-                }),
-            content_hash_blake3: tombstone_hash
-                .as_ref()
-                .map_or(sea_orm::ActiveValue::NotSet, |h| {
-                    Set(Some(h.blake3.clone()))
                 }),
             content_hash_sha3: tombstone_hash
                 .as_ref()

@@ -88,10 +88,6 @@ pub mod workers {
         /// because a back-fill would certify whatever the current content
         /// happens to be — which is the claim the hash exists to test.
         pub content_hash: Option<String>,
-        /// BLAKE3 digest over the same pre-image as `content_hash`.
-        /// `None` on rows written before the second algorithm was
-        /// adopted; never back-filled.
-        pub content_hash_blake3: Option<String>,
         /// SHA-3 digest over the same pre-image as `content_hash`.
         pub content_hash_sha3: Option<String>,
     }
@@ -838,16 +834,10 @@ pub mod audit_log {
         /// Hash of the preceding chain row; `None` for the genesis row and
         /// for rows written before the chain existed.
         pub prev_hash: Option<String>,
-        /// BLAKE3 digest of the preceding chain row (`None` for the
-        /// genesis row, or a row predating the second algorithm).
-        pub prev_hash_blake3: Option<String>,
         /// SHA-3 digest of the preceding chain row.
         pub prev_hash_sha3: Option<String>,
         /// This row's content hash — the link every successor binds to.
         pub hash: Option<String>,
-        /// This row's BLAKE3 digest — the parallel chain's link. `None`
-        /// on rows written before the second algorithm was adopted.
-        pub hash_blake3: Option<String>,
         /// This row's SHA-3 digest — the third parallel chain's link.
         pub hash_sha3: Option<String>,
         /// Request/processing context (purpose-of-use, disclosure recipient).
@@ -1781,10 +1771,6 @@ pub mod worker_assessments {
         /// back-fill would certify whatever the current content happens to
         /// be — the claim the hash exists to test.
         pub content_hash: Option<String>,
-        /// BLAKE3 digest over the same pre-image as `content_hash`.
-        /// `None` on rows written before the second algorithm was
-        /// adopted; never back-filled.
-        pub content_hash_blake3: Option<String>,
         /// SHA-3 digest over the same pre-image as `content_hash`.
         pub content_hash_sha3: Option<String>,
     }

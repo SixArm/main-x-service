@@ -80,14 +80,6 @@ pub fn record_hash(input: &RecordInput<'_>) -> String {
     out
 }
 
-/// The same record's digest under **BLAKE3**, over the byte-identical
-/// pre-image as [`record_hash`] — see `spec/12-compliance.md` §12.4z for
-/// why both algorithms are kept.
-#[must_use]
-pub fn record_hash_blake3(input: &RecordInput<'_>) -> String {
-    blake3::hash(&preimage(input)).to_hex().to_string()
-}
-
 /// The same record's digest under **SHA-3** (SHA3-256).
 #[must_use]
 pub fn record_hash_sha3(input: &RecordInput<'_>) -> String {
@@ -139,12 +131,6 @@ pub fn hash_of(row: &care_pathways::Model) -> String {
     record_hash(&input_for(row))
 }
 
-/// The BLAKE3 digest a stored row *should* carry.
-#[must_use]
-pub fn hash_of_blake3(row: &care_pathways::Model) -> String {
-    record_hash_blake3(&input_for(row))
-}
-
 /// The SHA-3 digest a stored row *should* carry.
 #[must_use]
 pub fn hash_of_sha3(row: &care_pathways::Model) -> String {
@@ -168,8 +154,6 @@ pub fn hash_of_sha3(row: &care_pathways::Model) -> String {
 pub struct Digests {
     /// FIPS 180-4 SHA-256.
     pub sha256: String,
-    /// BLAKE3.
-    pub blake3: String,
     /// FIPS 202 SHA3-256.
     pub sha3: String,
 }
@@ -179,7 +163,6 @@ pub struct Digests {
 pub fn digests(input: &RecordInput<'_>) -> Digests {
     Digests {
         sha256: record_hash(input),
-        blake3: record_hash_blake3(input),
         sha3: record_hash_sha3(input),
     }
 }
@@ -206,11 +189,6 @@ pub struct RecordIntegrityReport {
     /// control on a populated table must not produce a wall of false
     /// positives. They are rehashed on their next write.
     pub unhashed: usize,
-    /// Records whose **BLAKE3** digest was recomputed and matched.
-    pub blake3_intact: usize,
-    /// Records carrying no BLAKE3 digest — written before the second
-    /// algorithm was adopted. Treated exactly as `unhashed`.
-    pub blake3_unhashed: usize,
     /// Records whose **SHA-3** digest was recomputed and matched.
     pub sha3_intact: usize,
     /// Records carrying no SHA-3 digest — written before the third
@@ -229,8 +207,6 @@ pub fn verify(rows: &[care_pathways::Model]) -> RecordIntegrityReport {
         records: rows.len(),
         intact: 0,
         unhashed: 0,
-        blake3_intact: 0,
-        blake3_unhashed: 0,
         sha3_intact: 0,
         sha3_unhashed: 0,
         mismatched: Vec::new(),
@@ -245,22 +221,6 @@ pub fn verify(rows: &[care_pathways::Model]) -> RecordIntegrityReport {
         if sha256_ok {
             report.intact += 1;
         }
-        // BLAKE3 is verified independently over the same content, so a
-        // future weakness in either function leaves the other still able
-        // to attest to the history already stored.
-        let blake3_ok = match row.content_hash_blake3.as_deref() {
-            None => {
-                report.blake3_unhashed += 1;
-                true
-            }
-            Some(stored_b3) => {
-                let ok = stored_b3 == hash_of_blake3(row);
-                if ok {
-                    report.blake3_intact += 1;
-                }
-                ok
-            }
-        };
         let sha3_ok = match row.content_hash_sha3.as_deref() {
             None => {
                 report.sha3_unhashed += 1;
@@ -274,7 +234,7 @@ pub fn verify(rows: &[care_pathways::Model]) -> RecordIntegrityReport {
         };
         // One entry per record, not one per algorithm: a tampered record
         // is a single incident.
-        if !sha256_ok || !blake3_ok || !sha3_ok {
+        if !sha256_ok || !sha3_ok {
             report.mismatched.push(RecordMismatch {
                 pid: row.pid.to_string(),
                 name: row.name.clone(),
@@ -317,11 +277,9 @@ mod tests {
             active: true,
             deleted_at: None,
             content_hash: None,
-            content_hash_blake3: None,
             content_hash_sha3: None,
         };
         model.content_hash = Some(hash_of(&model));
-        model.content_hash_blake3 = Some(hash_of_blake3(&model));
         model.content_hash_sha3 = Some(hash_of_sha3(&model));
         model
     }
@@ -427,7 +385,6 @@ mod tests {
         // (see `digests`), and setting only one is the stale-digest defect
         // this control would otherwise report as tampering.
         r.content_hash = Some(hash_of(&r));
-        r.content_hash_blake3 = Some(hash_of_blake3(&r));
         r.content_hash_sha3 = Some(hash_of_sha3(&r));
         assert!(verify(std::slice::from_ref(&r)).verified);
         // Now resurrect it behind the service's back.

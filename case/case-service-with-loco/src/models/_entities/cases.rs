@@ -33,9 +33,6 @@ pub struct Model {
     /// back-filled, because a back-fill would certify whatever the current
     /// content happens to be — the claim the hash exists to test.
     pub content_hash: Option<String>,
-    /// BLAKE3 digest over the same pre-image as `content_hash`. `None` on
-    /// rows written before the second algorithm was adopted.
-    pub content_hash_blake3: Option<String>,
     /// SHA-3 digest over the same pre-image as `content_hash`.
     pub content_hash_sha3: Option<String>,
 }

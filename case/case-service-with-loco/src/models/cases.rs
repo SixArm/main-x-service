@@ -52,7 +52,6 @@ impl Model {
             // A new record is live, so the digest binds `deleted_at` as
             // `None`.
             content_hash: ActiveValue::set(Some(digests.sha256.clone())),
-            content_hash_blake3: ActiveValue::set(Some(digests.blake3.clone())),
             content_hash_sha3: ActiveValue::set(Some(digests.sha3.clone())),
             data: ActiveValue::set(data),
             active: ActiveValue::set(true),
@@ -186,7 +185,6 @@ impl ActiveModel {
             deleted_at_micros,
         });
         self.content_hash = ActiveValue::set(Some(d.sha256));
-        self.content_hash_blake3 = ActiveValue::set(Some(d.blake3));
         self.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
         self.title = ActiveValue::set(case.title.clone());
         self.data = ActiveValue::set(data);
@@ -217,7 +215,6 @@ impl ActiveModel {
             deleted_at_micros: Some(deleted_at.timestamp_micros()),
         });
         self.content_hash = ActiveValue::set(Some(d.sha256));
-        self.content_hash_blake3 = ActiveValue::set(Some(d.blake3));
         self.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
         self.active = ActiveValue::set(false);
         self.deleted_at = ActiveValue::set(Some(deleted_at));

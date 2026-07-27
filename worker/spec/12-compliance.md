@@ -397,8 +397,8 @@ defects had to be fixed first, none of them from the compliance work:
 
 Everything this service hashes, how each digest is built, and — the part
 that matters when a report says something is wrong — what each one does
-and does not prove. Every digest is computed under **SHA-256, BLAKE3 and SHA-3**
-over the same pre-image, rendered lowercase hex; see "Two
+and does not prove. Every digest is computed under **both SHA-256 and SHA-3** over the
+same pre-image, rendered lowercase hex; see "Two
 algorithms" below for why both are kept.
 
 #### The digests
@@ -413,54 +413,55 @@ They are **complementary, and neither subsumes the other.** The chain
 covers the *trail*; it cannot see an edit to an entity row, because a
 change made without writing an audit row leaves the chain intact. The record hash covers the *records*; it cannot see a row deleted outright in SQL, because a legitimate delete writes an audit row and an illegitimate one breaks the chain — which is the chain's job.
 
-#### Three algorithms: SHA-256, BLAKE3 and SHA-3
+#### Two algorithms: SHA-256 and SHA-3
 
-Every digest above is computed **three times**, over a byte-identical
-pre-image, and all three results are stored:
+Every digest above is computed **twice**, over a byte-identical
+pre-image, and both results are stored:
 
 | | Why it is kept |
 |---|---|
-| **SHA-256** | The conservative choice. FIPS 180-4, NIST-approved, two decades of cryptanalysis, and the digest a compliance reviewer expects to see named — some regimes name it explicitly. It is not going anywhere. |
-| **BLAKE3** | Several times faster (SIMD, and a parallel tree structure that scales with cores), which matters because every write on a hot path pays for a digest. It is also an extendable-output function, so a longer digest is available later at the same speed. |
-| **SHA-3** (SHA3-256) | The **structurally independent** one. FIPS 202, so it carries the same NIST standing as SHA-256 — but where SHA-256 is Merkle–Damgård with a Davies–Meyer compression function, SHA-3 is a **sponge**. NIST standardised it precisely so an approved alternative would exist that shares no design lineage with SHA-2. |
+| **SHA-256** | FIPS 180-4, NIST-approved, two decades of cryptanalysis, and the digest a compliance reviewer expects to see named. |
+| **SHA-3** (SHA3-256) | FIPS 202, so it carries the same NIST standing — but where SHA-256 is Merkle–Damgård with a Davies–Meyer compression function, SHA-3 is a **sponge**. NIST standardised it precisely so an approved alternative would exist sharing no design lineage with SHA-2. |
 
-**Which one to rely on, if you have to pick.**
+**Both are FIPS/NIST approved**, which is the deciding property. A digest
+that cannot be named in a control document contributes nothing an auditor
+may rely on, whatever its other merits — so this pair, and only this pair,
+is kept.
 
-- **Strict NIST/FIPS compliance: use SHA-3 (or SHA-256).** Both are
-  FIPS-approved — SHA-256 under FIPS 180-4, SHA-3 under FIPS 202 — so
-  either satisfies a regime that requires an approved hash. **BLAKE3 is
-  not FIPS-approved**, and a deployment under strict FIPS rules must not
-  count it as the control of record. It is kept here for speed and for
-  the third independent opinion, not to satisfy an auditor.
-- Of the two approved options, **SHA-3 is the one to name in a control
-  document going forward.** It is the newer standard, and NIST published
-  it specifically so that an approved hash would exist which is *not* a
-  SHA-2 variant — which is the whole point of holding it here.
-- **Verification requires no choice at all.** All three digests are
-  recomputed on every check and reported separately, so a reader may rely
-  on whichever their regime recognises and ignore the others. Nothing in
-  the report privileges one algorithm.
+> **BLAKE3 was here, and was removed (2026-07-27).** It was added for
+> speed and for a third design family, and dropped once the FIPS question
+> was put plainly: it is **not** NIST-approved, so it could never be the
+> control of record in these services. It cost a column and a hash pass on
+> every write while being unusable for the purpose the digests exist to
+> serve. The columns were dropped rather than left unmaintained — a digest
+> column nothing updates reads as coverage that does not exist.
+>
+> Losing it costs less than it appears. The **structural-diversity**
+> argument survives intact, because Merkle–Damgård against sponge is
+> exactly the pairing that argument wants: two unrelated constructions, so
+> the kind of cryptanalytic advance that took MD5 and SHA-1 (both
+> Merkle–Damgård) cannot take both. BLAKE3's ARX tree was a third family,
+> but a third family you may not cite is not worth a column.
+>
+> What is genuinely lost is speed — BLAKE3 is much the fastest of the
+> three — and the extendable-output property that would have made a
+> 512-bit digest cheap if quantum margin were ever wanted. Neither is a
+> compliance property; if either becomes the binding constraint, the
+> decision is worth revisiting on its own terms.
 
-**Why three, and the cost.** The value is *design-family diversity*, not
-digest length. SHA-256 is Merkle–Damgård, BLAKE3 is an ARX tree, SHA-3 is
-a sponge — so the kind of cryptanalytic advance that took MD5 and SHA-1
-(both Merkle–Damgård) would not transfer across all three. Two digests
-from the same family would buy much less. The cost is honest and worth
-stating: three passes over the pre-image on every write, three columns per
-hashed table, and SHA-3 is the slowest of the three in software, lacking
-the dedicated CPU instructions SHA-256 enjoys. Returns diminish after the
-second algorithm; the third is bought for structural independence and for
-FIPS standing, not for margin.
+**Why more than one at all, and the cost.** Holding two independent
+digests is **algorithm agility**, and it has a deadline. A digest attests
+only to the content hashed *at the time of writing*. If SHA-256 were
+weakened in five years, re-hashing the existing history under a
+replacement would prove nothing: it would compute digests from whatever
+the rows contain *then*, certifying content that may already have been
+altered — the same argument that forbids back-filling (above). The second
+digest therefore has to be written **now**, or the option is gone forever.
+That is why this is not deferred until a weakness appears.
 
-**The real reason for keeping more than one is algorithm agility**, and it has a
-deadline. A stored digest can only ever attest to the content that was
-hashed *at the time of writing*. If SHA-256 were weakened in five years,
-re-hashing the existing history under a replacement would prove nothing:
-it would compute digests from whatever the rows contain *then*, certifying
-content that may already have been altered — the same argument that
-forbids back-filling (above). The second digest therefore has to be
-written **now**, alongside the first, or the option is gone forever. That
-is why this is not deferred until a weakness appears.
+The cost is honest: two passes over the pre-image on every write, and two
+columns per hashed table. SHA-3 is the slower of the two in software,
+lacking the dedicated CPU instructions SHA-256 enjoys.
 
 Because both digests cover the same pre-image, they are built by one
 `preimage()` function and hashed separately. Adding a third algorithm
@@ -491,21 +492,20 @@ can make and it holds today:
   either.** The BHT algorithm's ~2^(n/3) bound needs quantum-accessible
   memory at a scale nobody credible projects, and the consensus estimate
   for realistic models is far closer to the classical birthday bound.
-- **All three inherit this equally.** SHA-256, BLAKE3 and SHA3-256 are
-  all 256-bit, so Grover treats them identically — the effect depends on
-  output length, not internal design. None is more quantum-resistant than
-  the others here, and this spec does not claim otherwise; what it claims
-  is that **all three are quantum-resistant**, which is the useful
-  statement. (Structural diversity buys resistance to *classical*
-  cryptanalysis, not to Grover.)
+- **Both inherit this equally.** SHA-256 and SHA3-256 are both 256-bit,
+  so Grover treats them identically — the effect depends on output
+  length, not internal design. Neither is more quantum-resistant than the
+  other, and this spec does not claim otherwise; what it claims is that
+  **both are quantum-resistant**, which is the useful statement.
+  (Structural diversity buys resistance to *classical* cryptanalysis, not
+  to Grover.)
 
-**BLAKE3 is what makes the next step cheap.** If a future risk assessment
-wants a higher NIST category rather than the current margin, BLAKE3 is an
-extendable-output function: it emits a **512-bit** digest natively, at the
-same speed, restoring ~256-bit preimage security under Grover. SHA-256
-cannot be stretched — that path means adopting SHA-512 and a new column
-and a new format version. Having BLAKE3 in place already turns a
-migration into a parameter change.
+**The 512-bit path, if it is ever wanted.** Neither of these is an
+extendable-output function, so raising the digest length means adopting
+SHA-512 (FIPS 180-4) or SHA3-512 (FIPS 202) — both approved, both a new
+column and a new format version rather than a parameter change. That is a
+real cost of dropping BLAKE3, whose XOF would have made it free; it is
+also not a cost anyone should pay before a risk assessment asks for it.
 
 > **Where the real post-quantum exposure in this system actually is.**
 > Not here. The integrity controls described above are hash-based and
@@ -518,18 +518,19 @@ migration into a parameter change.
 > family should therefore start at
 > [`authentication-sessions.md`](../../agents/share/authentication-sessions.md),
 > not at the audit chain. Recording that here is the point of writing
-> this section down — a reader who takes "we hash with BLAKE3" as their
-> post-quantum answer has been pointed at the wrong subsystem.
+> this section down — a reader who takes "our digests are
+> quantum-resistant" as their post-quantum answer has been pointed at
+> the wrong subsystem.
 
 The summary: **SHA-256 for conservatism and auditor familiarity, SHA-3
-for FIPS standing without SHA-2's design lineage, and BLAKE3 for speed
-and a longer digest on demand — three unrelated constructions, so no
-single cryptanalytic result takes them all.**
+for FIPS standing without SHA-2's design lineage — two approved,
+structurally unrelated constructions, so no single cryptanalytic result
+takes both.**
 
 ##### What verification reports
 
-Each report carries per-algorithm counters (`intact` / `blake3_intact`,
-`unchained` / `blake3_unhashed`), and a tampered row is reported **once**,
+Each report carries per-algorithm counters (`intact` / `sha3_intact`,
+`unchained` / `sha3_unhashed`), and a tampered row is reported **once**,
 naming which digests disagreed. That naming is diagnostic rather than
 cosmetic:
 
@@ -539,8 +540,8 @@ cosmetic:
   second reading is the likelier one, and is why every write takes both
   digests from a single call that cannot express stamping only one.
 
-Rows written before the second algorithm was adopted carry no BLAKE3
-digest. They are counted as `blake3_unhashed` — never as a mismatch, and
+Rows written before the second algorithm was adopted carry no SHA-3
+digest. They are counted as `sha3_unhashed` — never as a mismatch, and
 never as verified — exactly as a missing SHA-256 digest is treated.
 
 

@@ -133,21 +133,6 @@ pub fn record_hash(input: &RecordInput<'_>) -> crate::Result<String> {
     Ok(out)
 }
 
-/// The same digest under **BLAKE3**, over the byte-identical pre-image.
-///
-/// Covers exactly the same content as the SHA-256 digest.
-///
-/// See `spec/12-compliance.md` §12.4z for why both algorithms are kept:
-/// SHA-256 for conservatism and auditor familiarity, BLAKE3 for speed and
-/// for the agility to survive a future weakness in either.
-/// # Errors
-///
-/// As the SHA-256 variant.
-pub fn record_hash_blake3(input: &RecordInput<'_>) -> crate::Result<String> {
-    let pre = preimage(input)?;
-    Ok(blake3::hash(&pre).to_hex().to_string())
-}
-
 /// The same record's digest under **SHA-3** (SHA3-256).
 ///
 /// # Errors
@@ -210,7 +195,6 @@ fn preimage(input: &RecordInput<'_>) -> crate::Result<Vec<u8>> {
 pub fn digests(input: &RecordInput<'_>) -> crate::Result<Digests> {
     Ok(Digests {
         sha256: record_hash(input)?,
-        blake3: record_hash_blake3(input)?,
         sha3: record_hash_sha3(input)?,
     })
 }
@@ -226,8 +210,6 @@ pub fn digests(input: &RecordInput<'_>) -> crate::Result<Digests> {
 pub struct Digests {
     /// FIPS 180-4 SHA-256.
     pub sha256: String,
-    /// BLAKE3.
-    pub blake3: String,
     /// FIPS 202 SHA3-256.
     pub sha3: String,
 }
@@ -295,13 +277,7 @@ pub fn hash_with_deleted_at(
 ///
 /// Either digest may be `None` on a row written before that column
 /// existed — reported as unhashed, never as a mismatch.
-pub type StoredRecord = (
-    Worker,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    Option<i64>,
-);
+pub type StoredRecord = (Worker, Option<String>, Option<String>, Option<i64>);
 
 /// One record whose stored hash does not match its content.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -322,11 +298,6 @@ pub struct RecordIntegrityReport {
     /// — adopting the control on a populated table must not produce a wall
     /// of false positives. They are rehashed on their next write.
     pub unhashed: usize,
-    /// Records whose **BLAKE3** digest was recomputed and matched.
-    pub blake3_intact: usize,
-    /// Records carrying no BLAKE3 digest — written before the second
-    /// algorithm was adopted. Treated exactly as `unhashed`.
-    pub blake3_unhashed: usize,
     /// Records whose **SHA-3** digest was recomputed and matched.
     pub sha3_intact: usize,
     /// Records carrying no SHA-3 digest. Treated exactly as `unhashed`.
@@ -347,14 +318,12 @@ pub fn verify(rows: &[StoredRecord]) -> RecordIntegrityReport {
         records: rows.len(),
         intact: 0,
         unhashed: 0,
-        blake3_intact: 0,
-        blake3_unhashed: 0,
         sha3_intact: 0,
         sha3_unhashed: 0,
         mismatched: Vec::new(),
         verified: true,
     };
-    for (worker, stored, stored_b3, stored_sha3, deleted_at) in rows {
+    for (worker, stored, stored_sha3, deleted_at) in rows {
         let Some(stored) = stored.as_deref() else {
             report.unhashed += 1;
             continue;
@@ -372,22 +341,6 @@ pub fn verify(rows: &[StoredRecord]) -> RecordIntegrityReport {
         if sha256_ok {
             report.intact += 1;
         }
-        // BLAKE3 is verified independently over the same content, so a
-        // future weakness in either function leaves the other still able
-        // to attest to the history already stored.
-        let blake3_ok = match stored_b3.as_deref() {
-            None => {
-                report.blake3_unhashed += 1;
-                true
-            }
-            Some(s) => {
-                let ok = s == d.blake3;
-                if ok {
-                    report.blake3_intact += 1;
-                }
-                ok
-            }
-        };
         let sha3_ok = match stored_sha3.as_deref() {
             None => {
                 report.sha3_unhashed += 1;
@@ -402,7 +355,7 @@ pub fn verify(rows: &[StoredRecord]) -> RecordIntegrityReport {
             }
         };
         // One entry per record, not one per algorithm.
-        if !sha256_ok || !blake3_ok || !sha3_ok {
+        if !sha256_ok || !sha3_ok {
             report.mismatched.push(RecordMismatch {
                 id: worker.id.to_string(),
             });
@@ -443,13 +396,6 @@ pub fn assessment_hash(row: &crate::db::models::worker_assessments::Model) -> St
     out
 }
 
-/// The same assessment row's digest under **BLAKE3**, over the
-/// byte-identical pre-image.
-#[must_use]
-pub fn assessment_hash_blake3(row: &crate::db::models::worker_assessments::Model) -> String {
-    blake3::hash(&assessment_preimage(row)).to_hex().to_string()
-}
-
 /// Both assessment digests, as `(SHA-256, BLAKE3)`.
 ///
 /// Taken from one call so neither can be stamped without the other.
@@ -457,7 +403,6 @@ pub fn assessment_hash_blake3(row: &crate::db::models::worker_assessments::Model
 pub fn assessment_digests(row: &crate::db::models::worker_assessments::Model) -> Digests {
     Digests {
         sha256: assessment_hash(row),
-        blake3: assessment_hash_blake3(row),
         sha3: assessment_hash_sha3(row),
     }
 }
@@ -514,8 +459,6 @@ pub fn verify_assessments(
         records: rows.len(),
         intact: 0,
         unhashed: 0,
-        blake3_intact: 0,
-        blake3_unhashed: 0,
         sha3_intact: 0,
         sha3_unhashed: 0,
         mismatched: Vec::new(),
@@ -531,19 +474,6 @@ pub fn verify_assessments(
         if sha256_ok {
             report.intact += 1;
         }
-        let blake3_ok = match row.content_hash_blake3.as_deref() {
-            None => {
-                report.blake3_unhashed += 1;
-                true
-            }
-            Some(s) => {
-                let ok = s == d.blake3;
-                if ok {
-                    report.blake3_intact += 1;
-                }
-                ok
-            }
-        };
         let sha3_ok = match row.content_hash_sha3.as_deref() {
             None => {
                 report.sha3_unhashed += 1;
@@ -558,7 +488,7 @@ pub fn verify_assessments(
             }
         };
         // One entry per assessment, not one per algorithm.
-        if !sha256_ok || !blake3_ok || !sha3_ok {
+        if !sha256_ok || !sha3_ok {
             report.mismatched.push(RecordMismatch {
                 id: row.id.to_string(),
             });
@@ -680,7 +610,7 @@ mod tests {
     fn rows_without_a_stored_hash_are_not_mismatches() {
         let p = worker("Legacy");
         // No digest of either kind — a row predating both columns.
-        let report = verify(&[(p, None, None, None, None)]);
+        let report = verify(&[(p, None, None, None)]);
         assert_eq!(report.unhashed, 1);
         assert_eq!(report.intact, 0);
         assert!(report.mismatched.is_empty());
@@ -698,13 +628,7 @@ mod tests {
 
         // Both digests stored, both stale after the edit.
         let d = digests_of_live(&p).unwrap();
-        let report = verify(&[(
-            edited.clone(),
-            Some(stored),
-            Some(d.blake3),
-            Some(d.sha3),
-            None,
-        )]);
+        let report = verify(&[(edited.clone(), Some(stored), Some(d.sha3), None)]);
         assert!(!report.verified);
         assert_eq!(report.mismatched.len(), 1);
         assert_eq!(report.mismatched[0].id, edited.id.to_string());
@@ -714,7 +638,7 @@ mod tests {
         let good_hash = hash_of_live(&good).unwrap();
         let g = digests_of_live(&good).unwrap();
         let _ = good_hash;
-        let report = verify(&[(good, Some(g.sha256), Some(g.blake3), Some(g.sha3), None)]);
+        let report = verify(&[(good, Some(g.sha256), Some(g.sha3), None)]);
         assert!(report.verified);
         assert_eq!(report.intact, 1);
     }

@@ -1833,7 +1833,7 @@ pub async fn verify_record_integrity(
         .db
         .query_all(sea_orm::Statement::from_sql_and_values(
             sea_orm::DatabaseBackend::Postgres,
-            "SELECT id, content_hash, content_hash_blake3, content_hash_sha3, deleted_at \
+            "SELECT id, content_hash, content_hash_sha3, deleted_at \
              FROM workers \
              ORDER BY updated_at DESC LIMIT $1",
             [limit.into()],
@@ -1861,7 +1861,6 @@ pub async fn verify_record_integrity(
             continue;
         };
         let stored: Option<String> = row.try_get("", "content_hash").unwrap_or(None);
-        let stored_b3: Option<String> = row.try_get("", "content_hash_blake3").unwrap_or(None);
         let stored_sha3: Option<String> = row.try_get("", "content_hash_sha3").unwrap_or(None);
         let deleted_at: Option<time::OffsetDateTime> =
             row.try_get("", "deleted_at").unwrap_or(None);
@@ -1869,7 +1868,7 @@ pub async fn verify_record_integrity(
             deleted_at.and_then(|d| i64::try_from(d.unix_timestamp_nanos() / 1_000).ok());
         match state.worker_repository.get_by_id(&id).await {
             Ok(Some(worker)) => {
-                records.push((worker, stored, stored_b3, stored_sha3, deleted_micros));
+                records.push((worker, stored, stored_sha3, deleted_micros));
             }
             // A row that vanished between the two queries is not a
             // mismatch; skipping it is honest, and the count reflects it.

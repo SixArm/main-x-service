@@ -98,7 +98,7 @@ impl Model {
             ))
             .await?;
         }
-        let (prev_hash, prev_hash_blake3, prev_hash_sha3) = Self::heads(db).await?;
+        let (prev_hash, prev_hash_sha3) = Self::heads(db).await?;
         let created_at: chrono::DateTime<chrono::FixedOffset> =
             chrono::Utc::now().trunc_subsecs(6).into();
         // One input, re-pointed at each algorithm's own predecessor:
@@ -115,8 +115,6 @@ impl Model {
             disclosure,
         };
         let hash = audit_chain::row_hash(&input);
-        input.prev_hash = prev_hash_blake3.as_deref();
-        let hash_blake3 = audit_chain::row_hash_blake3(&input);
         input.prev_hash = prev_hash_sha3.as_deref();
         let hash_sha3 = audit_chain::row_hash_sha3(&input);
         let entry = audit_logs::ActiveModel {
@@ -128,8 +126,6 @@ impl Model {
             snapshot: ActiveValue::set(snapshot),
             prev_hash: ActiveValue::set(prev_hash),
             hash: ActiveValue::set(Some(hash)),
-            prev_hash_blake3: ActiveValue::set(prev_hash_blake3),
-            hash_blake3: ActiveValue::set(Some(hash_blake3)),
             prev_hash_sha3: ActiveValue::set(prev_hash_sha3),
             hash_sha3: ActiveValue::set(Some(hash_sha3)),
             context: ActiveValue::set(context),
@@ -155,14 +151,14 @@ impl Model {
     /// When the query fails.
     pub async fn heads<C: ConnectionTrait>(
         db: &C,
-    ) -> ModelResult<(Option<String>, Option<String>, Option<String>)> {
+    ) -> ModelResult<(Option<String>, Option<String>)> {
         let last = audit_logs::Entity::find()
             .order_by_desc(audit_logs::Column::Id)
             .one(db)
             .await?;
         Ok(match last {
-            Some(row) => (row.hash, row.hash_blake3, row.hash_sha3),
-            None => (None, None, None),
+            Some(row) => (row.hash, row.hash_sha3),
+            None => (None, None),
         })
     }
 

@@ -153,7 +153,6 @@ async fn apply_update_rows<C: ConnectionTrait>(conn: &C, person: &Person) -> Res
         id: Set(person.id),
         active: Set(person.active),
         content_hash: Set(Some(d.sha256)),
-        content_hash_blake3: Set(Some(d.blake3)),
         content_hash_sha3: Set(Some(d.sha3)),
         // DB CHECK constraint enforces lowercase ('male'/'female'/'other'/'unknown');
         // Gender's serde rename_all="lowercase" produces the same shape.
@@ -261,9 +260,6 @@ async fn apply_soft_delete_row<C: ConnectionTrait>(
             .map_or(sea_orm::ActiveValue::NotSet, |h| {
                 Set(Some(h.sha256.clone()))
             }),
-        content_hash_blake3: content_hash.map_or(sea_orm::ActiveValue::NotSet, |h| {
-            Set(Some(h.blake3.clone()))
-        }),
         ..Default::default()
     };
     row.update(conn).await?;
@@ -542,7 +538,6 @@ impl SeaOrmPersonRepository {
             // A new record is live, so the digest binds `deleted_at` as
             // `None`.
             content_hash: Set(Some(digests.sha256.clone())),
-            content_hash_blake3: Set(Some(digests.blake3.clone())),
             content_hash_sha3: Set(Some(digests.sha3.clone())),
         };
 

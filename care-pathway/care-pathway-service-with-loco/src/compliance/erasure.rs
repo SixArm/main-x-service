@@ -111,7 +111,6 @@ pub async fn erase<C: ConnectionTrait>(
         deleted_at_micros: Some(deleted_at.timestamp_micros()),
     });
     active.content_hash = ActiveValue::set(Some(d.sha256));
-    active.content_hash_blake3 = ActiveValue::set(Some(d.blake3));
     active.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
     active.name = ActiveValue::set(TOMBSTONE_NAME.to_string());
     active.data = ActiveValue::set(payload);

@@ -405,7 +405,7 @@ impl AuditLogRepository {
         // digest would make the second chain's linkage rest on SHA-256's
         // collision resistance — the dependency two algorithms exist to
         // avoid.
-        let (prev_hash, prev_hash_blake3, prev_hash_sha3) = Self::chain_heads(conn).await?;
+        let (prev_hash, prev_hash_sha3) = Self::chain_heads(conn).await?;
 
         let id = Uuid::new_v4();
         // Truncated to microseconds so the value hashed here is the value
@@ -427,8 +427,6 @@ impl AuditLogRepository {
             disclosure,
         };
         let hash = audit_chain::row_hash(&chain_input);
-        chain_input.prev_hash = prev_hash_blake3.as_deref();
-        let hash_blake3 = audit_chain::row_hash_blake3(&chain_input);
         chain_input.prev_hash = prev_hash_sha3.as_deref();
         let hash_sha3 = audit_chain::row_hash_sha3(&chain_input);
 
@@ -444,8 +442,6 @@ impl AuditLogRepository {
             ip_address: Set(ctx.ip_address.clone()),
             user_agent: Set(ctx.user_agent.clone()),
             prev_hash: Set(prev_hash),
-            prev_hash_blake3: Set(prev_hash_blake3),
-            hash_blake3: Set(Some(hash_blake3)),
             prev_hash_sha3: Set(prev_hash_sha3),
             hash_sha3: Set(Some(hash_sha3)),
             hash: Set(Some(hash)),
@@ -470,14 +466,14 @@ impl AuditLogRepository {
     /// Returns [`crate::Error::Database`] if the query fails.
     pub async fn chain_heads<C: ConnectionTrait>(
         conn: &C,
-    ) -> Result<(Option<String>, Option<String>, Option<String>)> {
+    ) -> Result<(Option<String>, Option<String>)> {
         let last = audit_log::Entity::find()
             .order_by_desc(audit_log::Column::Seq)
             .one(conn)
             .await?;
         Ok(match last {
-            Some(row) => (row.hash, row.hash_blake3, row.hash_sha3),
-            None => (None, None, None),
+            Some(row) => (row.hash, row.hash_sha3),
+            None => (None, None),
         })
     }
 
