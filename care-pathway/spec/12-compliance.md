@@ -312,6 +312,31 @@ Retired keys stay available for verification
 (`<ENTITY>_INTEGRITY_MAC_KEYS_RETIRED`), so rotation is additive rather
 than a flag day.
 
+**Where this code lives (2026-07-27).** The cryptography is **not** in
+this crate. It lives once, in
+[`integrity/integrity-mac-rust-crate`](../../integrity/integrity-mac-rust-crate),
+and every service binds to it — the same call the family made for
+`authentication-verifier`, on the same grounds.
+
+The reason is specific rather than stylistic. Copy-with-drift is the
+family's normal posture for DTOs and scaffolding, and it is wrong here:
+a latent defect in the sibling `soup.rs` (a test matching the substring
+`timestamp` rather than the JSON field) survived in three copies and
+surfaced only when a fourth crate happened to use the word in prose. A
+key-handling defect that survived that way would not announce itself at
+all — it would make MACs forgeable while every test stayed green.
+
+What remains per-service is what is genuinely local: a `Domain` enum, so
+every call site stays exhaustively checked by the compiler, and the
+process key set loaded from this service's own environment variables.
+The shared crate takes a `&str` domain because the sets differ — worker
+has `assessment` — and an enum there would have to know all of them.
+
+Extraction is **byte-compatible**: the shared crate carries the same
+golden vectors, cross-checked against an independent HKDF-SHA256
+implementation, so every MAC already stored in a database still
+verifies.
+
 **Domain separation: one configured key is several keys (2026-07-27).**
 The configured value is a **root** key and never MACs anything directly.
 Each purpose derives its own subkey with **HKDF-SHA256** (RFC 5869) under

@@ -141,6 +141,15 @@ climbing *now*, something is writing audit rows outside the repository —
 the database audit triggers were removed for exactly this reason
 (`m20260726_000003_drop_audit_triggers`).
 
+## Where the key handling lives
+
+The cryptography — HKDF domain separation, key sourcing, zeroization,
+placeholder refusal, generation — is one shared crate,
+[`integrity/integrity-mac-rust-crate`](../../../integrity/integrity-mac-rust-crate),
+not a copy per service. If you are changing key behaviour, change it
+there; each service holds only its own `Domain` enum and its own
+environment variables.
+
 ## Generating the key
 
 ```sh

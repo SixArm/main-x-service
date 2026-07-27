@@ -359,7 +359,7 @@ mod tests {
             "axum",
             "sha2",
             "sha3",
-            "hmac",
+            "integrity-mac",
             "case-matcher",
         ] {
             assert!(
@@ -379,7 +379,7 @@ mod tests {
             "serde",
             "sha2",
             "sha3",
-            "hmac",
+            "integrity-mac",
             "case-matcher",
             "entity-ref",
         ] {

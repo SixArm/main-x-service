@@ -365,7 +365,7 @@ mod tests {
             "axum",
             "sha2",
             "sha3",
-            "hmac",
+            "integrity-mac",
             "person-matcher",
             "tantivy",
         ] {
@@ -386,7 +386,7 @@ mod tests {
             "serde",
             "sha2",
             "sha3",
-            "hmac",
+            "integrity-mac",
             "person-matcher",
             "entity-ref",
             "tantivy",

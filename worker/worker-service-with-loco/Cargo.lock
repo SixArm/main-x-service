@@ -2205,6 +2205,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "integrity-mac"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.2.17",
+ "hkdf",
+ "hmac",
+ "sha2 0.10.9",
+ "zeroize",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6500,9 +6511,7 @@ dependencies = [
  "dotenvy",
  "ed25519-dalek",
  "entity-ref",
- "getrandom 0.2.17",
- "hkdf",
- "hmac",
+ "integrity-mac",
  "loco-rs",
  "migration",
  "mimalloc",
@@ -6537,7 +6546,6 @@ dependencies = [
  "utoipa-swagger-ui",
  "uuid",
  "worker-matcher",
- "zeroize",
 ]
 
 [[package]]
