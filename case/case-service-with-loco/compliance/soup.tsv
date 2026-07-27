@@ -1,0 +1,55 @@
+# SOUP register — IEC 62304 §5.3.3 / §8.1.2, ISO/IEC 27001 A.8 supply chain
+#
+# Every *direct* dependency of this crate must appear here with a purpose
+# and a safety/security relevance note. `src/compliance/soup.rs` merges
+# these annotations with the real dependency graph from Cargo.lock to
+# produce the CycloneDX SBOM at GET /api/compliance/sbom, and its unit
+# tests fail the build when a direct dependency is missing (or when an
+# entry names a package that is no longer depended on).
+#
+# Scope note: this service is a **governmental** case registry (benefits,
+# legal, social services, complaints, appeals, investigations). It is not
+# health software and carries no IEC 62304 safety classification — see
+# spec/12-compliance.md. The register is kept because a dependency
+# inventory with a stated purpose per item is worth having on its own
+# merits, and because ISO/IEC 27001 supply-chain and configuration
+# management want exactly this artefact. "Safety-relevant" below means
+# relevant to the correctness and confidentiality of case data, not to
+# physical safety.
+#
+# Transitive dependencies are listed in the SBOM but are NOT individually
+# annotated. Stating that boundary is more honest than implying we have
+# reviewed several hundred crates.
+#
+# Format: name<TAB>purpose<TAB>safety and security relevance
+# Blank lines and lines starting with '#' are ignored.
+#
+loco-rs	Web application framework: boot, routing, config, background workers, model error types.	Security-relevant. Owns request routing and the middleware stack, so a defect could bypass the auth/ABAC guard that gates every case read.
+serde	Serialization framework for every wire type and the stored JSONB payload.	Security-relevant. A mis-serialized payload could corrupt a stored case or an audit snapshot.
+serde_json	JSON encoding/decoding, and the canonical form the audit hash chain digests.	Security-relevant. Key ordering (BTreeMap, preserve_order disabled) is load-bearing for chain verification across a JSONB round-trip; a reordering would report untouched rows as tampered.
+tokio	Async runtime.	Availability-relevant. Runtime failure means service unavailability, not data disclosure. Industry standard.
+async-trait	Async methods in traits (loco Hooks, SeaORM migrations).	Not security-relevant. Compile-time macro only, no runtime behaviour of its own.
+axum	HTTP server, extractors, and response types underneath loco.	Security-relevant. Header and path extraction feed the auth guard and the purpose-of-use disclosure context.
+tracing	Structured logging and spans, including the audit_checkpoint witness lines.	Security-relevant. The no-secrets-in-logs invariant is enforced at call sites, not by this crate.
+tracing-subscriber	Log formatting, filtering, and the JSON layer.	Security-relevant. Misconfiguration could emit more case detail than intended; log level is deployment-controlled.
+regex	Pattern matching in payload validation.	Security-relevant. Used only on length-capped input (SEC-M1 caps), which bounds the catastrophic-backtracking risk.
+migration	This crate's own sea-orm-migration migrator (path dependency).	Security-relevant. Owns the schema, including the audit_logs compliance columns and entity_links. First-party code, not third-party SOUP.
+sea-orm	Async ORM and query builder over PostgreSQL.	Security-relevant. All persistence, including the audit trail and the record-level ABAC reads, goes through it. Query construction uses its typed builders, not string concatenation.
+chrono	Timestamps, durations, and the microsecond truncation the audit chain depends on.	Security-relevant. Chain digests bind created_at as epoch microseconds; a precision change would break verification of existing rows.
+validator	Declarative validation attributes.	Not security-relevant today: the substantive rules live in src/validation.rs, which does not use it.
+uuid	Public record identifiers (pid) and EntityRef ids.	Security-relevant. v4 generation uses the OS RNG; a guessable case id would weaken the IDOR posture that record-level ABAC otherwise enforces.
+include_dir	Embeds static assets (Swagger UI) into the binary.	Not security-relevant. Serves documentation assets only; no case-data path.
+mimalloc	Global allocator for MUSL static builds.	Availability-relevant. An allocator defect would be a process-wide fault. Enabled only for the musl target.
+prometheus	Metrics registry and text-exposition rendering for /metrics.prom.	Not security-relevant. Counters only; the endpoint exposes no case data.
+sha2	SHA-256 for the tamper-evident audit hash chain and record content hashes.	SECURITY-CRITICAL. The integrity evidence rests on this implementation. RustCrypto, widely audited; constant-time is not required for an unkeyed hash.
+sha3	Second integrity digest alongside SHA-256 for the audit chain and record hashes.	SECURITY-CRITICAL. Kept for structural diversity: SHA-3 is a sponge construction, unrelated to SHA-256's Merkle-Damgard chaining, so a cryptanalytic advance against one design family does not transfer. FIPS 202, so it carries NIST standing while being structurally independent of SHA-2. RustCrypto, same maintainers as sha2.
+hmac	Keyed integrity (HMAC-SHA256, FIPS 198-1) over the audit-chain and record pre-images, with a key the database never holds.	SECURITY-CRITICAL. The only integrity control here an adversary holding the database alone cannot forge: the SHA-256 and SHA-3 digests are unkeyed and their pre-image format is published, so a SQL-capable attacker can recompute them. Uses constant-time verification (Mac::verify_slice) — a timing oracle would let an attacker recover a valid tag byte by byte without the key.
+case-matcher	Canonical matching engine; its Case type is also this service's API DTO (path dependency).	Security-relevant. A false match can conflate two distinct cases, merging one subject's record into another's — a confidentiality failure, not just a data-quality one. First-party code with its own spec and property tests.
+entity-ref	Cross-service EntityRef URN and EdgeKind registry for the subject_of (case → person) edge (path dependency).	SECURITY-CRITICAL. The subject_of edge asserts that a named person is the subject of a government case — the highest-sensitivity fact this service holds (cross-service-linking.md §10). Edge-kind validation here is what stops an arbitrary edge type being written.
+authentication-verifier	Offline PASETO v4.public verification and the shared ABAC policy engine (path dependency).	SECURITY-CRITICAL. Every authentication and authorization decision depends on it, including the record-level checks and masking obligations that gate case reads. First-party code with its own forgery and policy-property test suites.
+serial_test	Serialises tests that mutate process-wide environment variables.	Test-only. Not present in a release artefact.
+rstest	Parameterised test cases.	Test-only. Not present in a release artefact.
+insta	Snapshot assertions.	Test-only. Not present in a release artefact.
+ed25519-dalek	Mints throwaway Ed25519 keys so the token-verification path is tested in-process.	Test-only. Not present in a release artefact; the test seed is not a secret.
+rusty_paseto	Mints PASETO v4.public tokens in the auth unit tests.	Test-only in this crate. The production verification path lives in authentication-verifier.
+base64	Encodes test key material into the JWK-shaped key set.	Test-only. Not present in a release artefact.

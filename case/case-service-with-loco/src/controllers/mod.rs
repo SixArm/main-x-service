@@ -1,6 +1,8 @@
 //! HTTP controllers for the case service.
 
 pub mod cases;
+/// Compliance evidence: service identification and the CycloneDX SBOM.
+pub mod compliance;
 pub mod docs;
 pub mod fhir;
 pub mod links;
