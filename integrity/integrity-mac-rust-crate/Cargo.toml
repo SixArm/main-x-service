@@ -1,0 +1,28 @@
+[package]
+name = "integrity-mac"
+version = "0.1.0"
+edition = "2024"
+authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
+description = "Keyed integrity MACs (HMAC-SHA256) with HKDF domain separation and production-grade key handling for the Main X Index family"
+license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
+repository = "https://github.com/sixarm/main-x-service/tree/main/integrity/integrity-mac-rust-crate"
+keywords = ["integrity", "hmac", "hkdf", "tamper-evidence", "audit"]
+categories = ["cryptography"]
+
+[lib]
+name = "integrity_mac"
+path = "src/lib.rs"
+
+[dependencies]
+# HMAC-SHA256 (FIPS 198-1) — the keyed digest itself.
+hmac = "0.12"
+sha2 = "0.10"
+# HKDF-SHA256 (RFC 5869) — per-(service, domain) subkey derivation.
+hkdf = "0.12"
+# Wipes the root key once the subkeys are derived.
+zeroize = "1"
+# OS entropy for key generation.
+getrandom = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

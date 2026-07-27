@@ -1066,11 +1066,9 @@ dependencies = [
  "care-pathway-matcher",
  "chrono",
  "ed25519-dalek",
- "getrandom 0.2.17",
- "hkdf",
- "hmac 0.12.1",
  "include_dir",
  "insta",
+ "integrity-mac",
  "loco-rs",
  "migration",
  "mimalloc",
@@ -1090,7 +1088,6 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "validator",
- "zeroize",
 ]
 
 [[package]]
@@ -2858,6 +2855,17 @@ dependencies = [
  "similar",
  "strip-ansi-escapes",
  "tempfile",
+]
+
+[[package]]
+name = "integrity-mac"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.2.17",
+ "hkdf",
+ "hmac 0.12.1",
+ "sha2 0.10.9",
+ "zeroize",
 ]
 
 [[package]]
