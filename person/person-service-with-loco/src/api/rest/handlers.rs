@@ -2183,11 +2183,94 @@ pub async fn get_user_audit_logs(
     }
 }
 
+/// The service-identification document served at `GET /api/compliance`.
+///
+/// Software identification and build provenance — the runtime surface an
+/// assessment reads instead of reconstructing the deployment's
+/// configuration by hand.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ComplianceIdentification {
+    /// Service name.
+    pub service: &'static str,
+    /// Build provenance.
+    pub build: crate::compliance::Build,
+    /// Whether the artefact carries reproducible-release evidence.
+    pub reproducible_release: bool,
+    /// What this service does **not** claim, stated so an assessment does
+    /// not have to infer it from silence.
+    pub not_claimed: Vec<&'static str>,
+}
+
+impl ComplianceIdentification {
+    /// Read the current identification.
+    #[must_use]
+    pub fn current() -> Self {
+        let build = crate::compliance::Build::current();
+        Self {
+            service: env!("CARGO_PKG_NAME"),
+            build,
+            reproducible_release: build.is_reproducible_release(),
+            not_claimed: vec![
+                "IEC 62304 safety classification: serving a FHIR Patient representation \
+                 does not make this a medical device. No output drives an individual's \
+                 treatment and no patient's clinical progress is tracked here \
+                 (compliance-for-healthcare.md §2.4).",
+                "Certified health-IT module: the family serves FHIR R5 against an ONC \
+                 certification targeting R4 + US Core.",
+            ],
+        }
+    }
+}
+
+/// Service identification and build provenance.
+///
+/// `GET /api/compliance`
+pub async fn compliance_identification() -> impl IntoResponse {
+    (StatusCode::OK, Json(ComplianceIdentification::current()))
+}
+
+/// The `CycloneDX` SBOM and SOUP register.
+///
+/// `GET /api/compliance/sbom` — derived from the crate's own `Cargo.lock`
+/// at compile time, so it cannot drift from the running binary.
+///
+/// Deliberately **not** on the guard's public allow-list: it names the
+/// exact version of every dependency in the running binary, which is what
+/// an attacker needs to match this deployment against published
+/// advisories. Publishing it is an operator's explicit decision.
+pub async fn compliance_sbom() -> impl IntoResponse {
+    (StatusCode::OK, Json(crate::compliance::soup::sbom()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        MAX_SEARCH_OFFSET, ResultDisposition, search_offset_within_bound, search_result_disposition,
+        ComplianceIdentification, MAX_SEARCH_OFFSET, ResultDisposition, search_offset_within_bound,
+        search_result_disposition,
     };
+
+    /// The identification names the service and carries build provenance.
+    #[test]
+    fn compliance_identification_carries_provenance() {
+        let id = ComplianceIdentification::current();
+        assert_eq!(id.service, "person-service");
+        assert!(!id.build.version.is_empty());
+    }
+
+    /// What is *not* claimed is stated explicitly. An assessment reading
+    /// this endpoint should not have to infer the absence of a
+    /// medical-device classification from its absence in the JSON —
+    /// especially here, where the crate does serve FHIR `Patient` and the
+    /// inference could easily run the other way.
+    #[test]
+    fn compliance_identification_states_what_is_not_claimed() {
+        let id = ComplianceIdentification::current();
+        assert!(
+            id.not_claimed.iter().any(|c| c.contains("IEC 62304")),
+            "the absent safety classification must be stated, not merely omitted"
+        );
+        assert!(id.not_claimed.iter().any(|c| c.contains("R4 + US Core")));
+    }
 
     /// SEC-G7: a pagination offset at or under the cap is accepted; anything
     /// past it (up to `usize::MAX`) is rejected, so the search engine is

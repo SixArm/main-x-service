@@ -446,9 +446,19 @@ mod tests {
         let first = serde_json::to_string(&sbom()).expect("serialize");
         let second = serde_json::to_string(&sbom()).expect("serialize");
         assert_eq!(first, second);
+        // Match the JSON *keys*, not the word anywhere in the document:
+        // `timestamp` and `serialNumber` are the two optional CycloneDX
+        // fields that would vary between builds. A bare substring test
+        // also fires on any dependency annotation that happens to use the
+        // word — which it did, the first time a register described a
+        // crate as providing "timestamps".
         assert!(
-            !first.contains("timestamp") && !first.contains("serialNumber"),
-            "a timestamp or serial number would break reproducibility"
+            !first.contains("\"timestamp\":"),
+            "a CycloneDX timestamp field would break reproducibility"
+        );
+        assert!(
+            !first.contains("\"serialNumber\":"),
+            "a random serial number would break reproducibility"
         );
     }
 

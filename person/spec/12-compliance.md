@@ -313,6 +313,83 @@ defects had to be fixed first, none of them from the compliance work:
   created, so every integration test panicked before its first
   assertion.
 
+### 12.4y SOUP register and SBOM (delivered 2026-07-27)
+
+Every direct dependency is recorded in
+`person-service-with-loco/compliance/soup.tsv` with a purpose and a
+relevance note, and served as a **CycloneDX 1.5** SBOM at
+`GET /api/compliance/sbom`.
+
+**Why a person registry keeps one.** IEC 62304 §5.3.3/§8.1.2 calls
+third-party code *SOUP* and wants each item identified and justified;
+the FDA makes the machine-readable half a premarket requirement (FD&C
+§524B). Neither reaches this service. Person holds personal data and
+serves a FHIR `Patient` representation, but it is not a medical device:
+no output drives an individual's treatment and no patient's clinical
+progress is tracked here (the qualification caveat in
+[`compliance-for-healthcare.md`](../../agents/share/compliance-for-healthcare.md)
+§2.4). Because the `Patient` surface makes the wrong inference easy,
+`GET /api/compliance` states the absent classification explicitly
+rather than leaving it to silence. The register is kept for two reasons
+that stand without the device framing:
+
+- **ISO/IEC 27001 A.8** wants supply-chain and configuration-management
+  evidence in exactly this shape.
+- An inventory stating *why* each dependency is present is what makes a
+  published advisory actionable in an afternoon rather than a research
+  project. "Is this service affected by an advisory in `sha3`?" is
+  answerable from the register; "is it affected by something in one of
+  four hundred transitive crates?" is not.
+
+**"Safety relevance" here means** relevance to the correctness and
+confidentiality of personal data, not to physical safety.
+
+**No drift, by construction.** The component list is derived at compile
+time from the crate's own `Cargo.lock` via `include_str!`, so it is
+exactly the graph the binary was built from. What is hand-maintained is
+the *annotation*, and a unit test fails the build when a direct
+dependency has no register entry — or when an entry names a package no
+longer depended on. This was verified to bite rather than assumed:
+removing the `hmac` row makes
+`every_direct_dependency_is_annotated` fail by name.
+
+**The boundary is stated, not blurred.** Transitive dependencies appear
+in the SBOM but are **not** individually annotated. Claiming otherwise
+would imply a review of several hundred crates that did not happen.
+
+**A register that had to be written found nine dependencies with no
+purpose.** `argon2`, `anyhow`, `fuzzy-matcher`, `hyper`, `openapiv3`,
+`prost`, and `validator` were declared and entirely unreferenced;
+`fluvio` and `sea-orm-migration` followed. They were removed rather than
+annotated — a register cannot state the purpose of a dependency that has
+none, and `argon2` in a service that handles no passwords is exactly the
+kind of dependency that justifies itself by being present. The resolved
+graph went from 737 packages to 651.
+
+**The lockfile is now committed.** The SBOM embeds `Cargo.lock` at
+compile time, so it was describing a graph that was not in version
+control: person's lockfile was gitignored. Tracking it is what makes the
+SBOM reconstructible rather than merely accurate at the moment it was
+built.
+
+**Determinism.** The rendered SBOM carries no timestamp and no random
+serial number, so two builds of the same source produce byte-identical
+output. CycloneDX makes both fields optional for this reason.
+
+**The SBOM is guarded, not public.** It names the exact version of every
+dependency in the running binary — precisely what an attacker needs to
+match a deployment against published advisories. It sits behind the
+blanket guard (the allow-list is deny-unless-public and does not include
+it). Publishing it is an operator's explicit decision, not a default.
+
+**Build provenance.** `GET /api/compliance` reports the crate version,
+the source commit (`BUILD_SHA` / `GITHUB_SHA` at compile time),
+`SOURCE_DATE_EPOCH`, and whether the artefact carries
+reproducible-release evidence — a known commit, a pinned epoch, and a
+non-debug profile, all three required. A debug build reports `false`,
+which is pinned by a test: a flag that answered `true` unconditionally
+would be worse than not having one.
+
 ### 12.4z Hashing reference
 
 Everything this service hashes, how each digest is built, and — the part

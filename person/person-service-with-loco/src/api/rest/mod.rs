@@ -191,6 +191,12 @@ pub fn create_router(state: AppState) -> Router {
         )
         .route("/records/verify", get(handlers::verify_record_integrity))
         .route("/audit/user", get(handlers::get_user_audit_logs))
+        // Compliance evidence. Guarded like everything else under `/api`:
+        // the SBOM names every dependency version in the running binary,
+        // which is exactly what an attacker needs to match a deployment
+        // against published advisories.
+        .route("/compliance", get(handlers::compliance_identification))
+        .route("/compliance/sbom", get(handlers::compliance_sbom))
         .with_state(state.clone());
 
     // FHIR R5 surface (`/fhir/Patient{,/{id}}`, `/fhir/Person{,/{id}}`

@@ -4,19 +4,25 @@
 //! Unknown Provenance* — and requires each one to be identified, versioned,
 //! and justified.
 //!
-//! ## Why a governmental case registry keeps one
+//! ## Why a person registry keeps one
 //!
-//! This service is **not** health software and carries no medical-device
-//! safety classification (see `spec/12-compliance.md`); the FD&C §524B
-//! premarket SBOM requirement does not reach it. The register is kept
-//! anyway, for two reasons that stand on their own: ISO/IEC 27001 A.8
-//! wants supply-chain and configuration-management evidence in exactly
-//! this shape, and an inventory that states *why* each dependency is
-//! present is the artefact that makes a vulnerability advisory
-//! actionable instead of a research project.
+//! This service holds personal data and serves a FHIR `Patient`
+//! representation, but it is **not** a medical device: no output drives
+//! an individual's treatment (the qualification caveat in
+//! `agents/share/compliance-for-healthcare.md` §2.4). It therefore
+//! carries no IEC 62304 safety classification, and `GET /api/compliance`
+//! says so rather than leaving it inferred from silence.
+//!
+//! The register is kept for reasons that stand without the device
+//! framing: ISO/IEC 27001 A.8 wants supply-chain and
+//! configuration-management evidence in exactly this shape, and an
+//! inventory that states *why* each dependency is present is the
+//! artefact that makes a vulnerability advisory actionable instead of a
+//! research project.
 //!
 //! "Safety relevance" in the register therefore means relevance to the
-//! correctness and confidentiality of case data, not to physical safety.
+//! correctness and confidentiality of personal data, not to physical
+//! safety.
 //!
 //! ## No drift, by construction
 //!
@@ -304,13 +310,13 @@ pub fn sbom() -> Sbom {
                 name: env!("CARGO_PKG_NAME").to_string(),
                 version: build.version.to_string(),
                 purl: format!("pkg:cargo/{}@{}", env!("CARGO_PKG_NAME"), build.version),
-                description: Some("Governmental case registry service".to_string()),
+                description: Some("Person identity registry service".to_string()),
                 properties: Vec::new(),
             },
             properties: vec![
-                // No `iec62304-safety-class` property: a medical-device
-                // classification on a benefits/legal case registry would
-                // be a claim we cannot substantiate.
+                // No `iec62304-safety-class` property: serving FHIR
+                // Patient does not make this a medical device, and
+                // claiming a classification would overstate the case.
                 SbomProperty::new("build-commit", build.commit),
                 SbomProperty::new(
                     "source-date-epoch",
@@ -360,7 +366,8 @@ mod tests {
             "sha2",
             "sha3",
             "hmac",
-            "case-matcher",
+            "person-matcher",
+            "tantivy",
         ] {
             assert!(
                 packages.iter().any(|(n, _)| n == expected),
@@ -380,8 +387,9 @@ mod tests {
             "sha2",
             "sha3",
             "hmac",
-            "case-matcher",
+            "person-matcher",
             "entity-ref",
+            "tantivy",
         ] {
             assert!(direct.contains(&expected.to_string()), "{expected} missing");
         }
@@ -466,11 +474,12 @@ mod tests {
         ] {
             assert!(names.contains(&expected), "{expected} missing");
         }
-        // Deliberately absent: this service is not health software, so a
-        // medical-device safety class would be an unsupportable claim.
+        // Deliberately absent: a person registry does not drive anyone's
+        // treatment, so a medical-device safety class would be an
+        // unsupportable claim even though the crate serves FHIR Patient.
         assert!(
             !names.contains(&"mxi:iec62304-safety-class"),
-            "a governmental case registry must not declare a device safety class"
+            "a person registry must not declare a device safety class"
         );
     }
 
