@@ -157,17 +157,39 @@ impl AuditLogRepository {
         new_values: Option<JsonValue>,
         ctx: &AuditContext,
     ) -> Result<()> {
+        let entity_type: String = entity_type.into();
+        let action: String = action.into();
+        // The timestamp is part of the MAC pre-image, so it is minted
+        // here rather than defaulted by the database: the alternative —
+        // insert, then stamp — leaves a window in which the row exists
+        // unprotected.
+        let created_at = time::OffsetDateTime::now_utc();
+        let mac = crate::compliance::audit_integrity::tag(
+            &crate::compliance::audit_integrity::AuditInput {
+                entity_type: &entity_type,
+                entity_id,
+                action: &action,
+                user_id: ctx.user_id.as_deref(),
+                user_ip_address: ctx.ip_address.as_deref(),
+                user_agent: ctx.user_agent.as_deref(),
+                old_values: old_values.as_ref(),
+                new_values: new_values.as_ref(),
+                created_at_micros: i64::try_from(created_at.unix_timestamp_nanos() / 1_000)
+                    .unwrap_or(0),
+            },
+        );
         let row = audit_log::ActiveModel {
             id: Set(Uuid::new_v4()),
-            entity_type: Set(entity_type.into()),
+            entity_type: Set(entity_type),
             entity_id: Set(entity_id),
-            action: Set(action.into()),
+            action: Set(action),
             user_id: Set(ctx.user_id.clone()),
             user_ip_address: Set(ctx.ip_address.clone()),
             user_agent: Set(ctx.user_agent.clone()),
             old_values: Set(old_values),
             new_values: Set(new_values),
-            created_at: Set(time::OffsetDateTime::now_utc()),
+            created_at: Set(created_at),
+            mac: Set(mac),
         };
         row.insert(&self.db)
             .await

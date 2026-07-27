@@ -145,6 +145,9 @@ pub fn create_router(state: AppState) -> Router {
         .route("/places/{id}/masked", get(handlers::masked_place))
         .route("/places/{id}/audit", get(handlers::audit_for_place))
         .route("/audit/recent", get(handlers::audit_recent))
+        // Integrity verification. Guarded like everything else
+        // under `/api`, and a read.
+        .route("/records/verify", get(handlers::verify_record_integrity))
         .with_state(state);
 
     Router::new()

@@ -49,6 +49,8 @@
 
 pub mod api;
 pub mod app;
+/// Compliance controls: row-level integrity and keyed MACs.
+pub mod compliance;
 pub mod config;
 /// Loco-idiomatic controllers (the mounted FHIR R5 surface).
 pub mod controllers;

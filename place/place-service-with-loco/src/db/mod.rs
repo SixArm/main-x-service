@@ -465,8 +465,24 @@ fn to_active(place: &Place) -> places::ActiveModel {
         }
         None => (None, None),
     };
+    // All three digests from one call over the **assembled** record, so
+    // the child collections (addresses, coordinates, identifiers) are
+    // covered too. Computed here rather than stamped afterwards, so one
+    // statement writes the row and its integrity values together — and
+    // both `create` and `update` build their active model through this
+    // function, so it is the single place a write path could forget.
+    let digests = crate::compliance::record_integrity::digests(
+        &crate::compliance::record_integrity::RecordInput {
+            id: place.id,
+            place,
+            is_deleted: place.is_deleted,
+        },
+    );
     places::ActiveModel {
         id: Set(place.id),
+        content_hash: Set(Some(digests.sha256)),
+        content_hash_sha3: Set(Some(digests.sha3)),
+        content_mac: Set(digests.mac),
         name: Set(place.name.clone()),
         alternate_name: Set(place.alternate_name.clone()),
         description: Set(place.description.clone()),
