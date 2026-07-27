@@ -1066,6 +1066,7 @@ dependencies = [
  "care-pathway-matcher",
  "chrono",
  "ed25519-dalek",
+ "getrandom 0.2.17",
  "hkdf",
  "hmac 0.12.1",
  "include_dir",

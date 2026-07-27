@@ -141,6 +141,36 @@ climbing *now*, something is writing audit rows outside the repository —
 the database audit triggers were removed for exactly this reason
 (`m20260726_000003_drop_audit_triggers`).
 
+## Generating the key
+
+```sh
+# 32 bytes from the OS CSPRNG, hex on stdout and nowhere else
+cargo loco task integrity_key
+
+# straight into a secret mount, created mode 0600, refuses to clobber
+cargo loco task integrity_key op:generate out:/run/secrets/mac.key
+
+# check a candidate before deploying it
+cargo loco task integrity_key op:check key:<hex>
+
+# what this process actually loaded (never the key itself)
+cargo loco task integrity_key op:status
+```
+
+Prefer `<E>_INTEGRITY_MAC_KEY_FILE` pointing at a mounted secret over
+`<E>_INTEGRITY_MAC_KEY`. An environment variable is inherited by every
+child process, lands in crash dumps and `/proc/<pid>/environ`, and is
+visible to anything that can introspect the container. If both are set
+the file wins and the collision is logged; an **unreadable** file
+disables MACs rather than falling back, so a mistyped path is loud
+rather than silently leaving you on the key you thought you replaced.
+
+`op:check` applies exactly the rules the loader applies, so it cannot
+bless a key the service then refuses. It catches the paste errors that
+otherwise produce something key-shaped that silently disables MACs: an
+`0x` prefix, an odd length, a stray quote, a short key, or a placeholder
+like 32 zero bytes.
+
 ## Rotating the MAC key
 
 1. Generate a new key; give it a new id.
@@ -151,6 +181,50 @@ the database audit triggers were removed for exactly this reason
 4. Verify: `mac_valid` still climbing, `mac_unverifiable` flat. Old rows
    verify under the retired key; new rows carry the new id.
 
-Never remove a retired key while rows still name it — that converts
-verifiable history into `mac_unverifiable`. There is no way to re-MAC old
-rows honestly, for the same reason there is no way to back-fill a digest.
+At this point rotation is complete but the old key can never be thrown
+away: existing rows still name it. Step 5 is what closes that.
+
+## Re-signing history so the old key can be destroyed
+
+```sh
+# what would change — writes nothing
+cargo loco task integrity_resign
+
+# do it
+cargo loco task integrity_resign op:apply
+cargo loco task integrity_resign op:apply target:records limit:5000
+```
+
+Both the old and new keys must be loaded (the old one in
+`<E>_INTEGRITY_MAC_KEYS_RETIRED`) — the task verifies under the old key
+and re-signs under the new one, so it needs both.
+
+**A row is re-signed only when its existing MAC verifies.** Everything
+else is refused and counted:
+
+| Counter | Meaning | What to do |
+|---|---|---|
+| `resigned` | Verified under a held key, re-signed under the active one | nothing; re-run to continue after an interruption |
+| `already_current` | Already under the active key and scheme | nothing |
+| `refused_unverified` | **The MAC did not verify** | **Investigate. This is a tampering finding.** |
+| `refused_unverifiable` | Names a key or scheme this build cannot check | load the old key, or upgrade the binary |
+| `refused_absent` | No MAC to re-sign | expected for rows written before the key was configured |
+
+`refused_unverified` is the one that matters. Re-signing such a row would
+compute a *valid* MAC over tampered content — laundering the tampering
+into an assertion of integrity and destroying the only evidence it
+happened. The task refuses, keeps the original MAC, and names the row.
+
+**Do not destroy the retired key while `refused_unverified` is non-zero.**
+Dropping it converts that finding into `refused_unverifiable` — "cannot
+check" instead of "this is wrong" — and you lose the ability to reproduce
+what the row's MAC was. That is the evidence. Investigate first.
+
+The old key is safe to destroy when a full pass reports `resigned: 0`,
+`refused_unverified: 0`, and `refused_unverifiable: 0`.
+
+Rows with **no** MAC are deliberately never back-filled. Stamping one
+would make a later verifier read `Valid` and conclude the row is
+unchanged since it was MACed — about a row that never was. That is the
+same reason a digest is never back-filled: adopting a control must not
+manufacture assurance about history it was not present for.

@@ -161,6 +161,8 @@ impl Hooks for App {
     /// `cargo loco generate task` can splice new tasks in).
     #[allow(unused_variables)]
     fn register_tasks(tasks: &mut Tasks) {
+        tasks.register(crate::tasks::integrity_key::IntegrityKey);
+        tasks.register(crate::tasks::integrity_resign::IntegrityResign);
         // tasks-inject (do not remove)
     }
     /// Truncate all tables for the loco test harness, in

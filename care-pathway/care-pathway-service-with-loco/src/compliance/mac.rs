@@ -358,6 +358,37 @@ fn resolve_root_key(from_env: Option<String>, path: Option<&str>) -> Option<Stri
     }
 }
 
+/// Assess a hex-encoded candidate key against the rules the loader
+/// applies, without loading it.
+///
+/// Shared with the `integrity_key` CLI task so an operator's pre-flight
+/// check and the service's own acceptance cannot disagree. A checker that
+/// blessed a key the loader then refused would be worse than no checker.
+#[must_use]
+pub fn assess_key_hex(candidate: &str) -> crate::tasks::integrity_key::Assessment {
+    use crate::tasks::integrity_key::Assessment;
+
+    let Some(key) = decode_hex(candidate) else {
+        return Assessment::NotHex;
+    };
+    if key.len() < MIN_KEY_LEN {
+        return Assessment::TooShort { bytes: key.len() };
+    }
+    if is_placeholder(&key) {
+        let mut seen = [false; 256];
+        let distinct = key
+            .iter()
+            .filter(|&&b| {
+                let first = !seen[b as usize];
+                seen[b as usize] = true;
+                first
+            })
+            .count();
+        return Assessment::Placeholder { distinct };
+    }
+    Assessment::Usable { bytes: key.len() }
+}
+
 /// Load the key set once per process.
 ///
 /// A configuration error disables MAC writing and is logged; it does not
@@ -440,6 +471,16 @@ pub fn is_enabled() -> bool {
 #[must_use]
 pub fn active_key_id() -> Option<&'static str> {
     keys().active.as_ref().map(|(id, _)| id.as_str())
+}
+
+/// The prefix new MACs are written with: `"<scheme>.<key id>:"`.
+///
+/// Exposed so the re-signing task can tell an already-current row from
+/// one still under a retired key without re-deriving the format, which
+/// would be a second place for it to drift.
+#[must_use]
+pub fn active_prefix() -> Option<String> {
+    active_key_id().map(|id| format!("{SCHEME}.{id}:"))
 }
 
 /// Compute the stored MAC for a pre-image: `"<key id>:<hex>"`.
