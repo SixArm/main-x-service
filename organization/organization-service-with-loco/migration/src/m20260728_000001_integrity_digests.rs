@@ -41,6 +41,10 @@ pub struct Migration;
 enum AuditLogs {
     /// The table itself.
     Table,
+    /// SHA-256 over this row's pre-image.
+    Hash,
+    /// SHA3-256 over the same pre-image.
+    HashSha3,
     /// HMAC over this row's pre-image, as `"<scheme>.<key id>:<hex>"`.
     Mac,
 }
@@ -69,6 +73,8 @@ impl MigrationTrait for Migration {
         m.alter_table(
             Table::alter()
                 .table(AuditLogs::Table)
+                .add_column_if_not_exists(ColumnDef::new(AuditLogs::Hash).string().null())
+                .add_column_if_not_exists(ColumnDef::new(AuditLogs::HashSha3).string().null())
                 .add_column_if_not_exists(ColumnDef::new(AuditLogs::Mac).string().null())
                 .to_owned(),
         )
@@ -100,6 +106,8 @@ impl MigrationTrait for Migration {
         m.alter_table(
             Table::alter()
                 .table(AuditLogs::Table)
+                .drop_column(AuditLogs::Hash)
+                .drop_column(AuditLogs::HashSha3)
                 .drop_column(AuditLogs::Mac)
                 .to_owned(),
         )
