@@ -281,11 +281,33 @@ Inferno-style suite against us.
 | Obligation | Control | Where | Status |
 |---|---|---|---|
 | §5.1 development plan + declared **safety classification** | Classification declared per service and reported at runtime | `compliance/lifecycle.md`, `GET /api/compliance` | care-pathway ✔ |
-| §5.3.3 / §8.1.2 **SOUP register** | Every third-party dependency listed with identity, version, purpose, and its safety-relevant notes | `compliance/soup.md`, served at `GET /api/compliance/sbom` | care-pathway ✔ |
-| Supply-chain evidence / SBOM | CycloneDX SBOM generated from the real dependency graph; advisory + licence gating already in place | `scripts/sbom.sh`, `deny.toml` (`cargo-deny`, SEC-I1); CI stages in `.github/workflows/ci.yml` + `.woodpecker.yml` | care-pathway ✔; **CI wired** (fmt / clippy / test / test-db / deny / SBOM on both remotes) |
+| §5.3.3 / §8.1.2 **SOUP register** | Every third-party dependency listed with identity, version, purpose, and its safety-relevant notes. A unit test fails the build when a direct dependency is unannotated, or when an entry names a package no longer depended on — verified to bite, not assumed | `compliance/soup.tsv`, served at `GET /api/compliance/sbom` | care-pathway, **case, person, worker ✔ (2026-07-27)** |
+| Supply-chain evidence / SBOM | CycloneDX SBOM generated from the real dependency graph (embedded from the crate's own `Cargo.lock` at compile time, so it cannot drift from the binary); advisory + licence gating already in place | `scripts/sbom.sh`, `deny.toml` (`cargo-deny`, SEC-I1); CI stages in `.github/workflows/ci.yml` + `.woodpecker.yml` | care-pathway, **case, person, worker ✔**; **CI wired** (fmt / clippy / test / test-db / deny / SBOM on both remotes) |
 | §5.2–5.5 **traceability requirement → test** | A checked-in matrix mapping every functional requirement to the tests that verify it, **machine-checked** so a requirement cannot silently lose its verification | `compliance/traceability.tsv`, enforced by `tests/traceability.rs` | care-pathway ✔ |
 | §8 configuration management — reconstructible releases | Pinned toolchain, `SOURCE_DATE_EPOCH`, recorded commit + build inputs, optional signing | `scripts/build-reproducible.sh`; build provenance at `GET /api/compliance` | care-pathway ✔ (script + provenance); **signing key custody is deployment-side** |
 | §7 risk management (ISO 14971), §9 problem resolution | Hazard analysis, risk controls, and the defect-to-fix trail are **organisational-process artefacts** the operating organisation maintains. | — | **organisational** (§6.3) |
+
+**No device classification outside care-pathway.** case, person, and
+worker carry the register and the SBOM but deliberately **omit** the
+IEC 62304 safety classification, and each asserts its absence in a test.
+A governmental case registry is not health software; a person or
+workforce registry serving FHIR `Patient` / `Practitioner` still drives
+nobody's treatment (§8.4's qualification caveat). Because those FHIR
+surfaces make the wrong inference easy, `GET /api/compliance` on each
+states what is *not* claimed rather than leaving it to silence. What
+justifies the register there is ISO/IEC 27001 A.8 supply-chain evidence
+and the plain operational value of knowing why each dependency is
+present.
+
+**Writing the registers found unused dependencies.** A register demands
+a stated purpose per item, and nine had none across the copy-adapted
+services: `argon2` (a password-hashing library in services that handle
+no passwords), `anyhow`, `fuzzy-matcher`, `hyper`, `openapiv3`, `prost`,
+`validator`, `fluvio`, and `sea-orm-migration`. They were removed rather
+than annotated, taking roughly 85 packages out of each affected crate's
+graph. Nine deployable services were also committing no `Cargo.lock`,
+which would have made their SBOMs describe a graph nobody could
+reconstruct; those are now tracked.
 
 **Device-qualification caveat.** A registry of pathway *templates* is
 generally not a medical device. The line is crossed when a deployment
@@ -441,6 +463,20 @@ engineering practice without the device framing.
    mount `/fhir` (organization, place, thing, person, worker, case, event).
 5. **Lift the evidence artefacts** (`compliance/`, `scripts/`) to the
    repository root once a second crate needs them, and wire SBOM + `cargo
-   deny` + the traceability check into CI.
+   deny` + the traceability check into CI. **Partially superseded
+   (2026-07-27):** three more crates now need them and the SOUP half was
+   **copied, not lifted**. That was deliberate. The register itself
+   (`compliance/soup.tsv`) is inherently per-crate — the annotations are
+   the point, and they differ by what each service does with the
+   dependency — so only `src/compliance/soup.rs` is duplicated
+   machinery, at roughly 480 lines. Copy-with-drift is the family's
+   standing posture for exactly this shape (`mxi-events`, `EntityRef`,
+   the front-ends), and the copies have already diverged usefully: only
+   care-pathway declares a safety class. The cost is real and was paid
+   once already — a test that matched the substring `timestamp` rather
+   than the JSON field was latent in all three copies and only surfaced
+   when a fourth register happened to use the word in prose. If a fifth
+   crate needs it, lift `soup.rs` (and the `traceability.rs` harness)
+   rather than copying a fourth time.
 </content>
 </invoke>
