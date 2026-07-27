@@ -48,6 +48,7 @@ and published to crates.io for downstream consumers.
 | Crate | Entity | Purpose |
 |-------|--------|---------|
 | [authentication-verifier](../../authentication/authentication-verifier-rust-crate) | User | Peer-side **offline PASETO v4.public (Ed25519) verification** for the [authentication-service](../../authentication/authentication-service-with-loco). Fetches/holds the service's published keys from `/.well-known/paseto-keys` (`Verifier::from_paseto_keys_value` / `from_paseto_keys_url` behind the `fetch` feature), mirrors the `Claims` shape, and verifies `kid` / `iss` / `aud` / `exp` with no shared secret and no introspection hop. Published to crates.io as `authentication-verifier` (0.2); embedded by the sibling services' `src/auth.rs`. |
+| [integrity-mac](../../integrity/integrity-mac-rust-crate) | — | Keyed integrity MACs (HMAC-SHA256) with HKDF domain separation and production-grade key handling — one audited implementation embedded by every service with a tamper-evidence tier (person, worker, care-pathway, case). The MAC is the only stored integrity value an adversary holding just the database cannot forge, since the SHA-256 and SHA-3 pre-image formats are published. |
 
 ### Cross-cutting services
 
