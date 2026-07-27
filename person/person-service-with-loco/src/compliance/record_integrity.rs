@@ -116,17 +116,49 @@ fn canonical_json(person: &Person) -> Option<String> {
 /// placeholder would make two unrelated records share a hash, so a record
 /// that cannot be hashed must not be written.
 pub fn record_hash(input: &RecordInput<'_>) -> crate::Result<String> {
+    let mut out = String::with_capacity(64);
+    for byte in Sha256::digest(preimage(input)?) {
+        // Infallible: writing to a `String` never fails.
+        let _ = write!(out, "{byte:02x}");
+    }
+    Ok(out)
+}
+
+/// The same digest under **BLAKE3**, over the byte-identical pre-image.
+///
+/// Covers exactly the same content as the SHA-256 digest.
+///
+/// See `spec/12-compliance.md` §12.4z for why both algorithms are kept:
+/// SHA-256 for conservatism and auditor familiarity, BLAKE3 for speed and
+/// for the agility to survive a future weakness in either.
+/// # Errors
+///
+/// As the SHA-256 variant.
+pub fn record_hash_blake3(input: &RecordInput<'_>) -> crate::Result<String> {
+    let pre = preimage(input)?;
+    Ok(blake3::hash(&pre).to_hex().to_string())
+}
+
+/// The digest pre-image: the version tag, then every bound field, each
+/// followed by the unit separator.
+///
+/// Built once and hashed by each algorithm, so adding an algorithm cannot
+/// change *what* is covered — only how it is digested.
+///
+/// # Errors
+///
+/// As the public hash functions.
+fn preimage(input: &RecordInput<'_>) -> crate::Result<Vec<u8>> {
     let json = canonical_json(input.person).ok_or_else(|| {
         crate::Error::Internal(format!(
             "person {} cannot be serialized for its content hash",
             input.id
         ))
     })?;
-
-    let mut hasher = Sha256::new();
+    let mut buf = Vec::with_capacity(256);
     let mut field = |value: &str| {
-        hasher.update(value.as_bytes());
-        hasher.update([SEP as u8]);
+        buf.extend_from_slice(value.as_bytes());
+        buf.push(SEP as u8);
     };
     field(RECORD_HASH_VERSION);
     field(&input.id.to_string());
@@ -136,13 +168,7 @@ pub fn record_hash(input: &RecordInput<'_>) -> crate::Result<String> {
             .deleted_at_micros
             .map_or_else(String::new, |m| m.to_string()),
     );
-
-    let mut out = String::with_capacity(64);
-    for byte in hasher.finalize() {
-        // Infallible: writing to a `String` never fails.
-        let _ = write!(out, "{byte:02x}");
-    }
-    Ok(out)
+    Ok(buf)
 }
 
 /// Compute the hash a live (not soft-deleted) record should carry.

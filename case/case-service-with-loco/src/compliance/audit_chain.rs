@@ -84,10 +84,35 @@ pub struct ChainInput<'a> {
 /// Compute a row's chain hash as lowercase hex.
 #[must_use]
 pub fn row_hash(input: &ChainInput<'_>) -> String {
-    let mut hasher = Sha256::new();
+    to_hex(&Sha256::digest(preimage(input)))
+}
+
+/// The same digest under **BLAKE3**, over the byte-identical pre-image.
+///
+/// For the chain, callers pass the **BLAKE3** predecessor in
+/// `prev_hash`, so the two chains link independently: neither depends on
+/// the other's collision resistance.
+///
+/// See `spec/12-compliance.md` §12.4z for why both algorithms are kept:
+/// SHA-256 for conservatism and auditor familiarity, BLAKE3 for speed and
+/// for the agility to survive a future weakness in either.
+///
+#[must_use]
+pub fn row_hash_blake3(input: &ChainInput<'_>) -> String {
+    let pre = preimage(input);
+    blake3::hash(&pre).to_hex().to_string()
+}
+
+/// The digest pre-image: the version tag, then every bound field, each
+/// followed by the unit separator.
+///
+/// Built once and hashed by each algorithm, so adding an algorithm cannot
+/// change *what* is covered — only how it is digested.
+fn preimage(input: &ChainInput<'_>) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(256);
     let mut field = |value: &str| {
-        hasher.update(value.as_bytes());
-        hasher.update([SEP as u8]);
+        buf.extend_from_slice(value.as_bytes());
+        buf.push(SEP as u8);
     };
     field(CHAIN_VERSION);
     field(input.prev_hash.unwrap_or(""));
@@ -98,7 +123,7 @@ pub fn row_hash(input: &ChainInput<'_>) -> String {
     field(&canonical_json(input.snapshot));
     field(&canonical_json(input.context));
     field(if input.disclosure { "1" } else { "0" });
-    to_hex(&hasher.finalize())
+    buf
 }
 
 /// Canonical serialization of an optional JSON value: the empty string for
@@ -240,6 +265,36 @@ pub fn verify(rows: &[audit_logs::Model]) -> ChainReport {
 
 #[cfg(test)]
 mod tests {
+    /// **Golden vector.** A fixed input hashes to this exact digest.
+    ///
+    /// Every other test recomputes with the same code, so they stay green
+    /// even if the pre-image changes — and a changed pre-image silently
+    /// invalidates every digest already stored, which is
+    /// indistinguishable from mass tampering. This constant, cross-checked
+    /// against an independent implementation of the format documented in
+    /// `spec/12-compliance.md` §12.4z, is the only thing standing between
+    /// a refactor and that outcome.
+    ///
+    /// If this fails, the hash format changed: bump the version tag
+    /// deliberately and plan the migration — do not update the constant.
+    #[test]
+    fn golden_vector_pins_the_wire_format() {
+        let input = ChainInput {
+            prev_hash: Some("0123456789abcdef"),
+            entity_pid: Uuid::from_u128(42),
+            action: "created",
+            actor: Some("alice"),
+            created_at_micros: 1_700_000_000_000_000,
+            snapshot: None,
+            context: None,
+            disclosure: false,
+        };
+        assert_eq!(
+            row_hash(&input),
+            "14f23b709d100add4394c8f6ee792260a0023dfa1c59af7dc6dd1faadc92c56d"
+        );
+    }
+
     /// The version tag is published in this entity's
     /// `spec/12-compliance.md` §12.4z hashing reference, and a reader
     /// verifying a digest by hand relies on it. Changing the constant

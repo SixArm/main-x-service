@@ -72,10 +72,38 @@ pub struct RecordInput<'a> {
 /// Compute a record's content hash as lowercase hex.
 #[must_use]
 pub fn record_hash(input: &RecordInput<'_>) -> String {
-    let mut hasher = Sha256::new();
+    let mut out = String::with_capacity(64);
+    for byte in Sha256::digest(preimage(input)) {
+        // Infallible: writing to a `String` never fails.
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
+}
+
+/// The same digest under **BLAKE3**, over the byte-identical pre-image.
+///
+/// Covers exactly the same content as the SHA-256 digest.
+///
+/// See `spec/12-compliance.md` §12.4z for why both algorithms are kept:
+/// SHA-256 for conservatism and auditor familiarity, BLAKE3 for speed and
+/// for the agility to survive a future weakness in either.
+///
+#[must_use]
+pub fn record_hash_blake3(input: &RecordInput<'_>) -> String {
+    let pre = preimage(input);
+    blake3::hash(&pre).to_hex().to_string()
+}
+
+/// The digest pre-image: the version tag, then every bound field, each
+/// followed by the unit separator.
+///
+/// Built once and hashed by each algorithm, so adding an algorithm cannot
+/// change *what* is covered — only how it is digested.
+fn preimage(input: &RecordInput<'_>) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(256);
     let mut field = |value: &str| {
-        hasher.update(value.as_bytes());
-        hasher.update([SEP as u8]);
+        buf.extend_from_slice(value.as_bytes());
+        buf.push(SEP as u8);
     };
     field(RECORD_HASH_VERSION);
     field(&input.pid.to_string());
@@ -87,12 +115,7 @@ pub fn record_hash(input: &RecordInput<'_>) -> String {
             .deleted_at_micros
             .map_or_else(String::new, |m| m.to_string()),
     );
-    let mut out = String::with_capacity(64);
-    for byte in hasher.finalize() {
-        // Infallible: writing to a `String` never fails.
-        let _ = write!(out, "{byte:02x}");
-    }
-    out
+    buf
 }
 
 /// Borrow a stored row's fields as a [`RecordInput`].
