@@ -19,6 +19,13 @@ pub struct Model {
     pub action: String,
     pub actor: Option<String>,
     pub snapshot: Option<Json>,
+    /// HMAC-SHA256 over this audit row's pre-image, as
+    /// `"<scheme>.<key id>:<hex>"`.
+    ///
+    /// Detects an audit row whose *content* was edited. It does not
+    /// detect a row deleted wholesale — that needs the hash chain this
+    /// service does not yet have (see `crate::compliance`).
+    pub mac: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

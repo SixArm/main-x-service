@@ -57,12 +57,34 @@ impl Model {
     /// When serialization or the insert fails.
     pub async fn create<C: ConnectionTrait>(db: &C, pl: &MatchPlan) -> ModelResult<Self> {
         let data = serde_json::to_value(pl).map_err(|e| ModelError::Any(e.into()))?;
+        // Mint the pid before the insert so it is known to the digests.
+        let pid = Uuid::new_v4();
+        let kind = kind_of(pl);
+        let parent_pid = parent_pid_of(pl);
+        // All three digests from one call, computed inline rather than
+        // stamped afterwards: one statement writes the row and its
+        // integrity values, so no row ever exists unhashed.
+        let digests = crate::compliance::record_integrity::digests(
+            &crate::compliance::record_integrity::RecordInput {
+                pid,
+                name: &pl.name,
+                kind: kind.as_deref(),
+                parent_pid,
+                stage: None,
+                data: &data,
+                active: true,
+                deleted_at_micros: None,
+            },
+        );
         let model = plans::ActiveModel {
-            pid: ActiveValue::set(Uuid::new_v4()),
-            kind: ActiveValue::set(kind_of(pl)),
+            pid: ActiveValue::set(pid),
+            kind: ActiveValue::set(kind),
             name: ActiveValue::set(pl.name.clone()),
+            content_hash: ActiveValue::set(Some(digests.sha256.clone())),
+            content_hash_sha3: ActiveValue::set(Some(digests.sha3.clone())),
+            content_mac: ActiveValue::set(digests.mac.clone()),
             data: ActiveValue::set(data),
-            parent_pid: ActiveValue::set(parent_pid_of(pl)),
+            parent_pid: ActiveValue::set(parent_pid),
             active: ActiveValue::set(true),
             deleted_at: ActiveValue::set(None),
             ..Default::default()
@@ -200,10 +222,33 @@ impl ActiveModel {
         pl: &MatchPlan,
     ) -> ModelResult<Model> {
         let data = serde_json::to_value(pl).map_err(|e| ModelError::Any(e.into()))?;
+        let kind = kind_of(pl);
+        let parent_pid = parent_pid_of(pl);
+        // Re-digest over the *new* content: leaving the old digests would
+        // report every legitimate edit as tampering.
+        let d = crate::compliance::record_integrity::digests(
+            &crate::compliance::record_integrity::RecordInput {
+                pid: self.pid.as_ref().to_owned(),
+                name: &pl.name,
+                kind: kind.as_deref(),
+                parent_pid,
+                stage: self.stage.as_ref().as_deref(),
+                data: &data,
+                active: *self.active.as_ref(),
+                deleted_at_micros: self
+                    .deleted_at
+                    .as_ref()
+                    .as_ref()
+                    .map(chrono::DateTime::timestamp_micros),
+            },
+        );
         self.name = ActiveValue::set(pl.name.clone());
-        self.kind = ActiveValue::set(kind_of(pl));
+        self.kind = ActiveValue::set(kind);
         self.data = ActiveValue::set(data);
-        self.parent_pid = ActiveValue::set(parent_pid_of(pl));
+        self.parent_pid = ActiveValue::set(parent_pid);
+        self.content_hash = ActiveValue::set(Some(d.sha256));
+        self.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
+        self.content_mac = ActiveValue::set(d.mac);
         self.update(db).await.map_err(ModelError::from)
     }
 
@@ -217,7 +262,26 @@ impl ActiveModel {
     /// When the update fails.
     pub async fn soft_delete<C: ConnectionTrait>(mut self, db: &C) -> ModelResult<Model> {
         self.active = ActiveValue::set(false);
-        self.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
+        let stamp: chrono::DateTime<chrono::FixedOffset> = chrono::Utc::now().into();
+        self.deleted_at = ActiveValue::set(Some(stamp));
+        // `active` and `deleted_at` are both in the pre-image, so a soft
+        // delete changes the digest; not re-digesting would make every
+        // soft-deleted row look tampered with.
+        let d = crate::compliance::record_integrity::digests(
+            &crate::compliance::record_integrity::RecordInput {
+                pid: self.pid.as_ref().to_owned(),
+                name: self.name.as_ref(),
+                kind: self.kind.as_ref().as_deref(),
+                parent_pid: *self.parent_pid.as_ref(),
+                stage: self.stage.as_ref().as_deref(),
+                data: self.data.as_ref(),
+                active: false,
+                deleted_at_micros: Some(stamp.timestamp_micros()),
+            },
+        );
+        self.content_hash = ActiveValue::set(Some(d.sha256));
+        self.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
+        self.content_mac = ActiveValue::set(d.mac);
         self.update(db).await.map_err(ModelError::from)
     }
 }

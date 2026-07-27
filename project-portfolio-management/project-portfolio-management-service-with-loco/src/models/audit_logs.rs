@@ -29,11 +29,27 @@ impl Model {
         actor: Option<&str>,
         snapshot: Option<serde_json::Value>,
     ) -> ModelResult<Self> {
+        // Set `created_at` explicitly rather than letting the database
+        // default it: the timestamp is part of the MAC pre-image, so it
+        // must be known before the insert. The alternative — insert, then
+        // stamp — leaves a window in which the row exists unprotected.
+        let created_at: chrono::DateTime<chrono::FixedOffset> = chrono::Utc::now().into();
+        let mac = crate::compliance::audit_integrity::tag(
+            &crate::compliance::audit_integrity::AuditInput {
+                entity_pid,
+                action,
+                actor,
+                snapshot: snapshot.as_ref(),
+                created_at_micros: created_at.timestamp_micros(),
+            },
+        );
         let entry = audit_logs::ActiveModel {
             entity_pid: ActiveValue::set(entity_pid),
             action: ActiveValue::set(action.to_string()),
             actor: ActiveValue::set(actor.map(ToString::to_string)),
             snapshot: ActiveValue::set(snapshot),
+            created_at: ActiveValue::set(created_at),
+            mac: ActiveValue::set(mac),
             ..Default::default()
         }
         .insert(db)

@@ -95,6 +95,7 @@ impl Hooks for App {
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::plans::routes())
+            .add_route(controllers::compliance::routes())
             .add_route(controllers::governance::routes())
             .add_route(controllers::visibility::routes())
             .add_route(controllers::insights::routes())

@@ -30,6 +30,8 @@ pub mod auth;
 pub mod automation;
 /// Pure collaborative-review + assignee-workload rules.
 pub mod collaboration;
+/// Compliance controls: row-level integrity and keyed MACs.
+pub mod compliance;
 pub mod controllers;
 pub mod data;
 /// Pure rules for the engineering-team features (tasks / burndown / MoSCoW).

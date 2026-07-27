@@ -2,6 +2,8 @@
 
 pub mod automation;
 pub mod collaboration;
+/// Integrity-verification endpoints.
+pub mod compliance;
 pub mod docs;
 pub mod engineering;
 pub mod governance;

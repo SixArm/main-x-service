@@ -42,6 +42,21 @@ pub struct Model {
     pub stage: Option<String>,
     /// Soft-delete timestamp; `None` while active.
     pub deleted_at: Option<DateTimeWithTimeZone>,
+    /// SHA-256 (FIPS 180-4) over this row's integrity pre-image.
+    ///
+    /// `None` on a row written before the column existed — reported as
+    /// unhashed, never as a mismatch, and never back-filled.
+    pub content_hash: Option<String>,
+    /// SHA3-256 (FIPS 202) over the same pre-image. A sponge, unrelated
+    /// to SHA-256's Merkle-Damgard chaining, so a cryptanalytic advance
+    /// against one design family does not transfer.
+    pub content_hash_sha3: Option<String>,
+    /// HMAC-SHA256 over the same pre-image, as `"<scheme>.<key id>:<hex>"`.
+    ///
+    /// The only one of the three an adversary holding just this database
+    /// cannot recompute: the digests are unkeyed and their pre-image
+    /// format is published.
+    pub content_mac: Option<String>,
 }
 
 /// `SeaORM` relations for [`Entity`] (none defined).
