@@ -160,9 +160,28 @@ impl AuditLogRepository {
         // UTC timestamp from the `time` crate (the column type is
         // `OffsetDateTime`). `old_values`/`new_values` map straight to
         // the JSONB columns.
+        // The timestamp is part of the MAC pre-image, so it is minted here
+        // and reused, rather than being generated twice or defaulted by
+        // the database — the alternative (insert, then stamp) leaves a
+        // window in which the row exists unprotected.
+        let timestamp = time::OffsetDateTime::now_utc();
+        let mac = crate::compliance::audit_integrity::tag(
+            &crate::compliance::audit_integrity::AuditInput {
+                entity_type,
+                entity_id,
+                action,
+                user_id: context.user_id.as_deref(),
+                ip_address: context.ip_address.as_deref(),
+                user_agent: context.user_agent.as_deref(),
+                old_values: old_values.as_ref(),
+                new_values: new_values.as_ref(),
+                created_at_micros: i64::try_from(timestamp.unix_timestamp_nanos() / 1_000)
+                    .unwrap_or(0),
+            },
+        );
         let new_audit = audit_log::ActiveModel {
             id: Set(Uuid::new_v4()),
-            timestamp: Set(time::OffsetDateTime::now_utc()),
+            timestamp: Set(timestamp),
             user_id: Set(context.user_id.clone()),
             action: Set(action.to_string()),
             entity_type: Set(entity_type.to_string()),
@@ -171,6 +190,7 @@ impl AuditLogRepository {
             new_values: Set(new_values),
             ip_address: Set(context.ip_address.clone()),
             user_agent: Set(context.user_agent.clone()),
+            mac: Set(mac),
         };
 
         new_audit.insert(&self.db).await?;

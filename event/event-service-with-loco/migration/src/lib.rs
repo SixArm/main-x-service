@@ -19,6 +19,7 @@ mod m20260530_000003_create_event_related_tables;
 mod m20260530_000005_add_indexes_and_triggers;
 mod m20260608_000001_normalize_event_text_values;
 mod m20260708_000001_create_event_outbox;
+mod m20260728_000001_add_integrity_digests;
 
 /// The migration runner this crate exposes to loco / `sea-orm-migration`.
 pub struct Migrator;
@@ -34,6 +35,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260530_000005_add_indexes_and_triggers::Migration),
             Box::new(m20260608_000001_normalize_event_text_values::Migration),
             Box::new(m20260708_000001_create_event_outbox::Migration),
+            Box::new(m20260728_000001_add_integrity_digests::Migration),
         ]
     }
 }

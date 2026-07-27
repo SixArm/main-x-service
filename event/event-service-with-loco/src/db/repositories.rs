@@ -287,8 +287,24 @@ struct LoadedChildRows {
 /// Build the parent `events` [`ActiveModel`](events::ActiveModel) for a
 /// fresh insert, stamping `created_at`/`updated_at` to `now`.
 fn event_active_model(event: &Event, now: OffsetDateTime) -> events::ActiveModel {
+    // All three digests from one call over the **assembled** record, so
+    // the child collections (offers, participants, locations) are covered
+    // too. Computed here rather than stamped afterwards, so one statement
+    // writes the row and its integrity values together — and every write
+    // path builds its active model through this function, so it is the
+    // single place one could forget to re-digest.
+    let digests = crate::compliance::record_integrity::digests(
+        &crate::compliance::record_integrity::RecordInput {
+            id: event.id,
+            event,
+            active: event.active,
+        },
+    );
     events::ActiveModel {
         id: Set(event.id),
+        content_hash: Set(Some(digests.sha256)),
+        content_hash_sha3: Set(Some(digests.sha3)),
+        content_mac: Set(digests.mac),
         active: Set(event.active),
         name: Set(event.name.clone()),
         description: Set(event.description.clone()),

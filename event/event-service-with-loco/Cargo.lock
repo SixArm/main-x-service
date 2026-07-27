@@ -1395,6 +1395,7 @@ dependencies = [
  "dotenvy",
  "ed25519-dalek",
  "event-matcher",
+ "integrity-mac",
  "loco-rs",
  "migration",
  "mimalloc",
@@ -1408,6 +1409,8 @@ dependencies = [
  "sea-orm",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
+ "sha3",
  "strsim",
  "tantivy",
  "tempfile",
@@ -2258,6 +2261,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "integrity-mac"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.2.17",
+ "hkdf",
+ "hmac",
+ "sha2 0.10.9",
+ "zeroize",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2374,6 +2388,15 @@ dependencies = [
  "serde",
  "serde_json",
  "simple_asn1",
+]
+
+[[package]]
+name = "keccak"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb26cec98cce3a3d96cbb7bced3c4b16e3d13f27ec56dbd62cbc8f39cfb9d653"
+dependencies = [
+ "cpufeatures 0.2.17",
 ]
 
 [[package]]
@@ -4520,6 +4543,16 @@ dependencies = [
  "cfg-if",
  "cpufeatures 0.3.0",
  "digest 0.11.3",
+]
+
+[[package]]
+name = "sha3"
+version = "0.10.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77fd7028345d415a4034cf8777cd4f8ab1851274233b45f84e3d955502d93874"
+dependencies = [
+ "digest 0.10.7",
+ "keccak",
 ]
 
 [[package]]
