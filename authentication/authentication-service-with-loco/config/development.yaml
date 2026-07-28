@@ -47,7 +47,14 @@ queue:
 # the auth controller, so no SMTP server is needed locally.
 mailer:
   smtp:
+    # Disabled: these services send no mail. The host/port below are
+    # still required — loco's config schema has them as non-optional
+    # fields on the smtp struct, so omitting them fails to parse even
+    # when `enable` is false, which stops the CLI booting entirely.
     enable: false
+    host: localhost
+    port: 1025
+    secure: false
     host: localhost
     port: 1025
     secure: false

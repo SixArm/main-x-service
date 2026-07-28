@@ -146,6 +146,15 @@ pub fn tag(input: &AuditInput<'_>) -> Option<String> {
 pub struct AuditIntegrityReport {
     /// Rows examined.
     pub rows: usize,
+    /// Rows whose SHA-256 was recomputed and matched.
+    pub intact: usize,
+    /// Rows carrying no SHA-256 digest — written before the column
+    /// existed. Neither verified nor a break.
+    pub unhashed: usize,
+    /// Rows whose SHA-3 was recomputed and matched.
+    pub sha3_intact: usize,
+    /// Rows carrying no SHA-3 digest.
+    pub sha3_unhashed: usize,
     /// Rows whose MAC matched.
     pub mac_valid: usize,
     /// Rows carrying no MAC.
@@ -166,6 +175,88 @@ pub const CAVEAT: &str = "A verified result attests that no examined row's conte
      without the key. It does NOT attest that no row was deleted: nothing in a row can \
      prove its own continued existence. Detecting deletion requires a hash chain and \
      external-witness checkpoints, which this service does not yet have.";
+
+/// Borrow a stored row as an [`AuditInput`].
+#[must_use]
+pub fn input_for(row: &crate::db::models::audit_log::Model) -> AuditInput<'_> {
+    AuditInput {
+        entity_type: row.entity_type.as_str(),
+        entity_id: row.entity_id,
+        action: row.action.as_str(),
+        user_id: row.user_id.as_deref(),
+        user_ip_address: row.user_ip_address.as_deref(),
+        user_agent: row.user_agent.as_deref(),
+        old_values: row.old_values.as_ref(),
+        new_values: row.new_values.as_ref(),
+        created_at_micros: i64::try_from(row.created_at.unix_timestamp_nanos() / 1_000)
+            .unwrap_or(0),
+    }
+}
+
+/// Verify a run of audit rows by recomputing every stored digest.
+///
+/// **Every stored value is read**, not just the MAC. The unkeyed digests
+/// are checked first because they are present even when no key is
+/// configured — on a default deployment they are the only integrity these
+/// rows have, and checking only the MAC would report such a deployment as
+/// entirely unverified when it is not.
+#[must_use]
+pub fn verify(rows: &[crate::db::models::audit_log::Model]) -> AuditIntegrityReport {
+    let mut report = AuditIntegrityReport {
+        rows: rows.len(),
+        intact: 0,
+        unhashed: 0,
+        sha3_intact: 0,
+        sha3_unhashed: 0,
+        mac_valid: 0,
+        mac_absent: 0,
+        mac_unverifiable: 0,
+        mismatched: Vec::new(),
+        verified: true,
+        caveat: CAVEAT,
+    };
+    for row in rows {
+        let input = input_for(row);
+        let computed = digests(&input);
+        let mut broken = false;
+
+        match row.hash.as_deref() {
+            None => report.unhashed += 1,
+            Some(stored) => {
+                if stored == computed.sha256 {
+                    report.intact += 1;
+                } else {
+                    broken = true;
+                }
+            }
+        }
+        match row.hash_sha3.as_deref() {
+            None => report.sha3_unhashed += 1,
+            Some(stored) => {
+                if stored == computed.sha3 {
+                    report.sha3_intact += 1;
+                } else {
+                    broken = true;
+                }
+            }
+        }
+        match mac::verify(Domain::AuditRow, row.mac.as_deref(), &preimage(&input)) {
+            mac::MacVerdict::Valid => report.mac_valid += 1,
+            mac::MacVerdict::Absent => report.mac_absent += 1,
+            mac::MacVerdict::UnknownKey(_)
+            | mac::MacVerdict::UnknownScheme(_)
+            | mac::MacVerdict::Malformed => report.mac_unverifiable += 1,
+            mac::MacVerdict::Invalid => broken = true,
+        }
+        // One entry per row, not one per algorithm: a tampered row is a
+        // single incident.
+        if broken {
+            report.mismatched.push(row.id.to_string());
+        }
+    }
+    report.verified = report.mismatched.is_empty();
+    report
+}
 
 #[cfg(test)]
 mod tests {

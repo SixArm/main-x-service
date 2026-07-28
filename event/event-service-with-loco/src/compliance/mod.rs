@@ -17,9 +17,9 @@
 //! (`prev_hash`/`hash`) and take external-witness checkpoints, which
 //! together detect deletion and reordering. This service has neither, so
 //! state the limit plainly: a MAC proves a row's *content* is unchanged
-//! since it was written, and says noevent about a row that was **deleted
+//! since it was written, and says nothing about a row that was **deleted
 //! wholesale**. Adding the chain is a separate, larger control and is not
-//! claimed by anyevent in this module.
+//! claimed by anything in this module.
 //!
 //! ## Default off
 //!

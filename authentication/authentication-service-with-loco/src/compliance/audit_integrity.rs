@@ -120,6 +120,118 @@ pub fn tag(input: &AuditInput<'_>) -> Option<String> {
     mac::tag(Domain::AuditRow, &preimage(input))
 }
 
+/// Borrow a stored row as an [`AuditInput`].
+#[must_use]
+pub fn input_for(row: &crate::models::_entities::auth_events::Model) -> AuditInput<'_> {
+    AuditInput {
+        event: row.event.as_str(),
+        email: row.email.as_deref(),
+        user_pid: row.user_pid,
+        detail: row.detail.as_deref(),
+        created_at_micros: row.created_at.timestamp_micros(),
+    }
+}
+
+/// The outcome of verifying a run of audit rows.
+#[derive(Debug, Clone, serde::Serialize, PartialEq, Eq)]
+pub struct AuditIntegrityReport {
+    /// Rows examined.
+    pub rows: usize,
+    /// Rows whose SHA-256 was recomputed and matched.
+    pub intact: usize,
+    /// Rows carrying no SHA-256 digest — written before the column
+    /// existed. Neither verified nor a break.
+    pub unhashed: usize,
+    /// Rows whose SHA-3 was recomputed and matched.
+    pub sha3_intact: usize,
+    /// Rows carrying no SHA-3 digest.
+    pub sha3_unhashed: usize,
+    /// Rows whose MAC was recomputed and matched.
+    pub mac_valid: usize,
+    /// Rows carrying no MAC — written before a key was configured.
+    pub mac_absent: usize,
+    /// Rows naming a key or scheme this service cannot check.
+    pub mac_unverifiable: usize,
+    /// Rows whose content did not match what was stored.
+    pub mismatched: Vec<i32>,
+    /// `true` when no mismatch was found.
+    pub verified: bool,
+    /// What this result does and does not attest to, carried in the
+    /// response so a reader cannot mistake it for full tamper-evidence.
+    pub caveat: &'static str,
+}
+
+/// The caveat every report carries.
+const CAVEAT: &str = "A verified result attests that no examined row's content was altered \
+     without the key. It does NOT attest that no row was deleted: nothing in a row can \
+     prove its own continued existence. Detecting deletion requires a hash chain and \
+     external-witness checkpoints, which this service does not have.";
+
+/// Verify a run of audit rows by recomputing every stored digest.
+///
+/// **Every stored value is read**, not just the MAC. The unkeyed digests
+/// are checked first because they are present even when no key is
+/// configured — on a default deployment they are the only integrity these
+/// rows have, and checking only the MAC would report such a deployment as
+/// entirely unverified when it is not.
+#[must_use]
+pub fn verify(rows: &[crate::models::_entities::auth_events::Model]) -> AuditIntegrityReport {
+    let mut report = AuditIntegrityReport {
+        rows: rows.len(),
+        intact: 0,
+        unhashed: 0,
+        sha3_intact: 0,
+        sha3_unhashed: 0,
+        mac_valid: 0,
+        mac_absent: 0,
+        mac_unverifiable: 0,
+        mismatched: Vec::new(),
+        verified: true,
+        caveat: CAVEAT,
+    };
+    for row in rows {
+        let input = input_for(row);
+        let computed = digests(&input);
+        let mut broken = false;
+
+        match row.hash.as_deref() {
+            None => report.unhashed += 1,
+            Some(stored) => {
+                if stored == computed.sha256 {
+                    report.intact += 1;
+                } else {
+                    broken = true;
+                }
+            }
+        }
+        match row.hash_sha3.as_deref() {
+            None => report.sha3_unhashed += 1,
+            Some(stored) => {
+                if stored == computed.sha3 {
+                    report.sha3_intact += 1;
+                } else {
+                    broken = true;
+                }
+            }
+        }
+        match mac::verify(Domain::AuditRow, row.mac.as_deref(), &preimage(&input)) {
+            mac::MacVerdict::Valid => report.mac_valid += 1,
+            mac::MacVerdict::Absent => report.mac_absent += 1,
+            mac::MacVerdict::UnknownKey(_)
+            | mac::MacVerdict::UnknownScheme(_)
+            | mac::MacVerdict::Malformed => report.mac_unverifiable += 1,
+            mac::MacVerdict::Invalid => broken = true,
+        }
+        // One entry per row, not one per algorithm: a tampered row is a
+        // single incident.
+        if broken {
+            report.mismatched.push(row.id);
+        }
+    }
+    report.verified = report.mismatched.is_empty();
+    report
+}
+
 #[cfg(test)]
 mod tests {
     use super::{AUDIT_MAC_VERSION, AuditInput, preimage};

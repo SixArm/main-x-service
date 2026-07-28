@@ -1472,6 +1472,122 @@ fn error_response(e: &crate::Error) -> axum::response::Response {
     (status, Json(body)).into_response()
 }
 
+/// Verify audit-row integrity.
+///
+/// `GET /api/audit/verify?limit=200` — recomputes each audit row's
+/// SHA-256, SHA-3, and MAC, naming any row whose content was altered.
+///
+/// The unkeyed digests are checked too, not just the MAC: they are
+/// written even when no key is configured, so on a default deployment
+/// they are the only integrity these rows have.
+pub async fn verify_audit_integrity(
+    State(state): State<AppState>,
+    Query(params): Query<AuditQuery>,
+) -> impl IntoResponse {
+    use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
+
+    // course's AuditQuery.limit is a plain u64 with a serde default, not
+    // an Option, so it only needs clamping.
+    let limit = params.limit.clamp(1, VERIFY_MAX_LIMIT);
+    match crate::db::models::audit_log::Entity::find()
+        .order_by_desc(crate::db::models::audit_log::Column::Id)
+        .limit(limit)
+        .all(&state.db)
+        .await
+    {
+        Ok(rows) => (
+            StatusCode::OK,
+            Json(crate::compliance::audit_integrity::verify(&rows)),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<serde_json::Value>::error(
+                "DATABASE_ERROR",
+                format!("Failed to read audit rows for verification: {e}"),
+            )),
+        )
+            .into_response(),
+    }
+}
+
+/// Default rows examined by the integrity endpoints.
+pub const VERIFY_DEFAULT_LIMIT: u64 = 200;
+
+/// Hard cap on rows examined in one call.
+///
+/// Record verification assembles each row through the repository — one
+/// query per row — so an unbounded limit is a denial-of-service on a
+/// large table (the SEC-M1 bound-every-input invariant).
+pub const VERIFY_MAX_LIMIT: u64 = 1000;
+
+/// Verify row-level record integrity.
+///
+/// `GET /api/records/verify?limit=200` — reassembles each record and
+/// recomputes its SHA-256, SHA-3, and MAC, naming any row that differs.
+pub async fn verify_record_integrity(
+    State(state): State<AppState>,
+    Query(params): Query<AuditQuery>,
+) -> impl IntoResponse {
+    use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
+
+    let limit = params.limit.clamp(1, VERIFY_MAX_LIMIT);
+    let rows = match crate::db::models::courses::Entity::find()
+        .order_by_desc(crate::db::models::courses::Column::UpdatedAt)
+        .limit(limit)
+        .all(&state.db)
+        .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse::<serde_json::Value>::error(
+                    "DATABASE_ERROR",
+                    format!("Failed to read records for verification: {e}"),
+                )),
+            )
+                .into_response();
+        }
+    };
+
+    // Assemble each record so the digest covers the child tables too —
+    // which is the point, since an identifier edit lives there.
+    let mut records = Vec::with_capacity(rows.len());
+    for row in rows {
+        match state.course_repository.get_by_id(&row.id).await {
+            Ok(Some(course)) => {
+                records.push(crate::compliance::record_integrity::StoredRecord {
+                    course,
+                    sha256: row.content_hash,
+                    sha3: row.content_hash_sha3,
+                    mac: row.content_mac,
+                    active: row.active,
+                });
+            }
+            // A row that vanished between the two queries, or that the
+            // getter hides, is skipped rather than reported: neither is a
+            // finding.
+            Ok(None) => {}
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ApiResponse::<serde_json::Value>::error(
+                        "DATABASE_ERROR",
+                        format!("Failed to assemble a record for verification: {e}"),
+                    )),
+                )
+                    .into_response();
+            }
+        }
+    }
+    (
+        StatusCode::OK,
+        Json(crate::compliance::record_integrity::verify(&records)),
+    )
+        .into_response()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

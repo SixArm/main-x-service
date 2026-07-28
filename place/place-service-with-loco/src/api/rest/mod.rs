@@ -148,6 +148,7 @@ pub fn create_router(state: AppState) -> Router {
         // Integrity verification. Guarded like everything else
         // under `/api`, and a read.
         .route("/records/verify", get(handlers::verify_record_integrity))
+        .route("/audit/verify", get(handlers::verify_audit_integrity))
         .with_state(state);
 
     Router::new()
@@ -197,6 +198,11 @@ pub fn places_routes() -> loco_rs::controller::Routes {
         .add("/places/{id}/masked", get(handlers::masked_place))
         .add("/places/{id}/audit", get(handlers::audit_for_place))
         .add("/audit/recent", get(handlers::audit_recent))
+        // Both registration surfaces carry these: this crate is
+        // mid-conversion and a handler added to only one compiles
+        // cleanly while serving 404 from the other.
+        .add("/records/verify", get(handlers::verify_record_integrity))
+        .add("/audit/verify", get(handlers::verify_audit_integrity))
 }
 
 /// Root-level Prometheus scrape route (`GET /metrics.prom`).

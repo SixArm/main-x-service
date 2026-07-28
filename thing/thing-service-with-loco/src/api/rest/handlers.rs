@@ -1017,6 +1017,46 @@ pub async fn verify_record_integrity(
         .into_response()
 }
 
+/// Verify audit-row integrity.
+///
+/// `GET /api/audit/verify?limit=200` — recomputes each audit row's
+/// SHA-256, SHA-3, and MAC, naming any row whose content was altered.
+///
+/// The unkeyed digests are checked too, not just the MAC: they are
+/// written even when no key is configured, so on a default deployment
+/// they are the only integrity these rows have.
+pub async fn verify_audit_integrity(
+    State(state): State<AppState>,
+    Query(params): Query<AuditQuery>,
+) -> impl IntoResponse {
+    use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
+
+    let limit = params
+        .limit
+        .unwrap_or(VERIFY_DEFAULT_LIMIT)
+        .clamp(1, VERIFY_MAX_LIMIT);
+    match crate::db::models::audit_log::Entity::find()
+        .order_by_desc(crate::db::models::audit_log::Column::Id)
+        .limit(limit)
+        .all(&state.db)
+        .await
+    {
+        Ok(rows) => (
+            StatusCode::OK,
+            Json(crate::compliance::audit_integrity::verify(&rows)),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<serde_json::Value>::error(
+                "DATABASE_ERROR",
+                format!("Failed to read audit rows for verification: {e}"),
+            )),
+        )
+            .into_response(),
+    }
+}
+
 #[cfg(test)]
 mod review_report_tests {
     use super::*;

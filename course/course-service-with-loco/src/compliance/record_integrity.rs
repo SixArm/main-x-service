@@ -138,7 +138,7 @@ fn to_hex(bytes: &[u8]) -> String {
 /// A named struct rather than a tuple, for the reason the family learned
 /// the hard way: a four-element tuple is how a MAC came to be written on
 /// every record in three sibling services and then never verified — it
-/// simply had nowhere to go, and nocourse pointed that out.
+/// simply had nowhere to go, and nothing pointed that out.
 #[derive(Debug, Clone)]
 pub struct StoredRecord {
     /// The assembled domain record.

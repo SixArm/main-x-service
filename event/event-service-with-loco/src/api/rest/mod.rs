@@ -169,6 +169,11 @@ pub fn create_router(state: AppState) -> Router {
         // Audit
         .route("/events/{id}/audit", get(handlers::get_event_audit_logs))
         .route("/audit/recent", get(handlers::get_recent_audit_logs))
+        // Integrity verification. Guarded like everything else under
+        // `/api`, and reads, so the default ABAC policy admits any
+        // authenticated caller.
+        .route("/records/verify", get(handlers::verify_record_integrity))
+        .route("/audit/verify", get(handlers::verify_audit_integrity))
         .route("/audit/user", get(handlers::get_user_audit_logs))
         .with_state(state.clone());
 
@@ -228,6 +233,11 @@ pub fn events_routes() -> loco_rs::controller::Routes {
         .add("/events/{id}/masked", get(handlers::get_event_masked))
         .add("/events/{id}/audit", get(handlers::get_event_audit_logs))
         .add("/audit/recent", get(handlers::get_recent_audit_logs))
+        // Both registration surfaces carry these: this crate is
+        // mid-conversion and a handler added to only one compiles
+        // cleanly while serving 404 from the other.
+        .add("/records/verify", get(handlers::verify_record_integrity))
+        .add("/audit/verify", get(handlers::verify_audit_integrity))
         .add("/audit/user", get(handlers::get_user_audit_logs))
 }
 

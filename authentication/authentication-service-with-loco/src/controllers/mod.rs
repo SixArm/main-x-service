@@ -4,12 +4,14 @@
 //! mounts. The surface is deliberately small: passwordless magic-link
 //! auth, the public JWKS, and the `OpenAPI`/Swagger docs.
 
-/// Admin surface: ABAC attribute assignment over HTTP
-/// (`/api/auth/admin/users/{pid}/attributes`), gated by `access=admin`.
 pub mod admin;
 /// Passwordless magic-link auth (signup / request / redeem / me /
 /// signout / audit + GDPR account routes), mounted under `/api/auth`.
 pub mod auth;
+/// Admin surface: ABAC attribute assignment over HTTP
+/// (`/api/auth/admin/users/{pid}/attributes`), gated by `access=admin`.
+/// Integrity-verification endpoint for the audit trail.
+pub mod compliance;
 /// `OpenAPI` JSON document + Swagger UI page (CDN assets).
 pub mod docs;
 /// Prometheus metrics (`/metrics.prom`), mounted at the root.

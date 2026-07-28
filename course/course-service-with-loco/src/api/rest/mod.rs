@@ -153,6 +153,11 @@ pub fn create_router(state: AppState) -> Router {
         // Audit (T-9, FR-14 + FR-17).
         .route("/courses/{id}/audit", get(handlers::audit_for_course))
         .route("/audit/recent", get(handlers::audit_recent))
+        // Integrity verification. Guarded like everything else under
+        // `/api`, and reads, so the default ABAC policy admits any
+        // authenticated caller.
+        .route("/records/verify", get(handlers::verify_record_integrity))
+        .route("/audit/verify", get(handlers::verify_audit_integrity))
         .with_state(state.clone());
 
     Router::new()
@@ -218,6 +223,11 @@ pub fn courses_routes() -> loco_rs::controller::Routes {
         .add("/courses/{id}/masked", get(handlers::masked_course))
         .add("/courses/{id}/audit", get(handlers::audit_for_course))
         .add("/audit/recent", get(handlers::audit_recent))
+        // Both registration surfaces carry these: this crate is
+        // mid-conversion and a handler added to only one compiles
+        // cleanly while serving 404 from the other.
+        .add("/records/verify", get(handlers::verify_record_integrity))
+        .add("/audit/verify", get(handlers::verify_audit_integrity))
 }
 
 /// Native loco controller route for the Prometheus metrics endpoint,

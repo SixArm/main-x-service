@@ -115,6 +115,7 @@ pub fn create_router(state: AppState) -> Router {
         // `/api`, and a read, so the default ABAC policy admits any
         // authenticated caller.
         .route("/records/verify", get(handlers::verify_record_integrity))
+        .route("/audit/verify", get(handlers::verify_audit_integrity))
         .with_state(state.clone());
 
     Router::new()
@@ -161,6 +162,11 @@ pub fn things_routes() -> loco_rs::controller::Routes {
         .add("/things/{id}/masked", get(handlers::masked_thing))
         .add("/things/{id}/audit", get(handlers::audit_for_thing))
         .add("/audit/recent", get(handlers::audit_recent))
+        // Both registration surfaces carry these: this crate is
+        // mid-conversion and a handler added to only one compiles
+        // cleanly while serving 404 from the other.
+        .add("/records/verify", get(handlers::verify_record_integrity))
+        .add("/audit/verify", get(handlers::verify_audit_integrity))
 }
 
 /// Root-level Prometheus scrape route (`GET /metrics.prom`).

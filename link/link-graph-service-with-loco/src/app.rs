@@ -103,6 +103,7 @@ impl Hooks for App {
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes()
             .add_route(controllers::graph::routes())
+            .add_route(controllers::compliance::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
     }
