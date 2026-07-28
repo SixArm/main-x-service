@@ -4,4 +4,6 @@ ALTER TABLE things
     DROP COLUMN IF EXISTS content_mac;
 
 ALTER TABLE audit_log
+    DROP COLUMN IF EXISTS hash,
+    DROP COLUMN IF EXISTS hash_sha3,
     DROP COLUMN IF EXISTS mac;

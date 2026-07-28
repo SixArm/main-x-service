@@ -253,7 +253,10 @@ mod tests {
             email: Some("alice@example.com".to_string()),
             user_pid: Some(pid),
             detail: Some("created".to_string()),
-            // No key in unit tests: reported absent, not a mismatch.
+            // No digests on a hand-built fixture: reported unhashed and
+            // mac-absent, never as mismatches.
+            hash: None,
+            hash_sha3: None,
             mac: None,
         }];
 

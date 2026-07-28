@@ -96,6 +96,52 @@ fn canonical_json(value: Option<&serde_json::Value>) -> String {
     }
 }
 
+/// Every digest for one audit row, computed from one pre-image.
+///
+/// A **named struct rather than a tuple**: with three values `.0`/`.1`/
+/// `.2` is a latent bug, since putting the SHA-3 digest in the SHA-256
+/// column type-checks and fails only at the next verification.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Digests {
+    /// FIPS 180-4 SHA-256. Written unconditionally.
+    pub sha256: String,
+    /// FIPS 202 SHA3-256. Written unconditionally.
+    pub sha3: String,
+    /// HMAC-SHA256, or `None` when no key is configured.
+    pub mac: Option<String>,
+}
+
+/// All three digests from one call, so none can be stamped without the
+/// others.
+///
+/// The two unkeyed digests are written **unconditionally**; only the MAC
+/// depends on a key. That matters because the MAC is default-off: without
+/// these, an audit row on a deployment that has not yet configured a key
+/// would carry no integrity at all.
+#[must_use]
+pub fn digests(input: &AuditInput<'_>) -> Digests {
+    use sha2::Digest as _;
+
+    let bytes = preimage(input);
+    Digests {
+        sha256: to_hex(&sha2::Sha256::digest(&bytes)),
+        // Fully qualified: `sha2::Digest` and `sha3::Digest` are distinct
+        // traits with the same method name, so importing both is
+        // ambiguous.
+        sha3: to_hex(&<sha3::Sha3_256 as sha3::Digest>::digest(&bytes)),
+        mac: mac::tag(Domain::AuditRow, &bytes),
+    }
+}
+
+/// Lowercase hex.
+fn to_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    bytes.iter().fold(String::new(), |mut acc, b| {
+        let _ = write!(acc, "{b:02x}");
+        acc
+    })
+}
+
 /// The MAC for an audit row, or `None` when no key is configured.
 #[must_use]
 pub fn tag(input: &AuditInput<'_>) -> Option<String> {
@@ -119,6 +165,15 @@ pub fn input_for(row: &crate::models::_entities::audit_logs::Model) -> AuditInpu
 pub struct AuditIntegrityReport {
     /// Rows examined.
     pub rows: usize,
+    /// Rows whose SHA-256 was recomputed and matched.
+    pub intact: usize,
+    /// Rows carrying no SHA-256 digest — written before the column
+    /// existed. Neither verified nor a break.
+    pub unhashed: usize,
+    /// Rows whose SHA-3 was recomputed and matched.
+    pub sha3_intact: usize,
+    /// Rows carrying no SHA-3 digest.
+    pub sha3_unhashed: usize,
     /// Rows whose MAC was recomputed and matched.
     pub mac_valid: usize,
     /// Rows carrying no MAC — written before a key was configured.
@@ -146,6 +201,10 @@ const CAVEAT: &str = "A verified result attests that no examined row's content w
 pub fn verify(rows: &[crate::models::_entities::audit_logs::Model]) -> AuditIntegrityReport {
     let mut report = AuditIntegrityReport {
         rows: rows.len(),
+        intact: 0,
+        unhashed: 0,
+        sha3_intact: 0,
+        sha3_unhashed: 0,
         mac_valid: 0,
         mac_absent: 0,
         mac_unverifiable: 0,
@@ -154,17 +213,45 @@ pub fn verify(rows: &[crate::models::_entities::audit_logs::Model]) -> AuditInte
         caveat: CAVEAT,
     };
     for row in rows {
-        match mac::verify(
-            Domain::AuditRow,
-            row.mac.as_deref(),
-            &preimage(&input_for(row)),
-        ) {
+        let input = input_for(row);
+        let computed = digests(&input);
+        let mut broken = false;
+
+        // The unkeyed digests are checked first because they are present
+        // even when no MAC key is configured — on a default deployment
+        // they are the only integrity these rows have.
+        match row.hash.as_deref() {
+            None => report.unhashed += 1,
+            Some(stored) => {
+                if stored == computed.sha256 {
+                    report.intact += 1;
+                } else {
+                    broken = true;
+                }
+            }
+        }
+        match row.hash_sha3.as_deref() {
+            None => report.sha3_unhashed += 1,
+            Some(stored) => {
+                if stored == computed.sha3 {
+                    report.sha3_intact += 1;
+                } else {
+                    broken = true;
+                }
+            }
+        }
+        match mac::verify(Domain::AuditRow, row.mac.as_deref(), &preimage(&input)) {
             mac::MacVerdict::Valid => report.mac_valid += 1,
             mac::MacVerdict::Absent => report.mac_absent += 1,
             mac::MacVerdict::UnknownKey(_)
             | mac::MacVerdict::UnknownScheme(_)
             | mac::MacVerdict::Malformed => report.mac_unverifiable += 1,
-            mac::MacVerdict::Invalid => report.mismatched.push(row.id),
+            mac::MacVerdict::Invalid => broken = true,
+        }
+        // One entry per row, not one per algorithm: a tampered row is a
+        // single incident.
+        if broken {
+            report.mismatched.push(row.id);
         }
     }
     report.verified = report.mismatched.is_empty();

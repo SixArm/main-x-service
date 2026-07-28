@@ -53,7 +53,10 @@ impl Model {
         // what the row actually holds rather than what was passed in.
         let email = email.map(normalise_email);
         let detail = detail.map(ToString::to_string);
-        let mac = crate::compliance::audit_integrity::tag(
+        // All three digests from one call, so none can be stamped
+        // without the others. The two unkeyed ones are written
+        // unconditionally; only the MAC depends on a configured key.
+        let digests = crate::compliance::audit_integrity::digests(
             &crate::compliance::audit_integrity::AuditInput {
                 event,
                 email: email.as_deref(),
@@ -68,7 +71,9 @@ impl Model {
             user_pid: ActiveValue::set(user_pid),
             detail: ActiveValue::set(detail),
             created_at: ActiveValue::set(created_at),
-            mac: ActiveValue::set(mac),
+            hash: ActiveValue::set(Some(digests.sha256)),
+            hash_sha3: ActiveValue::set(Some(digests.sha3)),
+            mac: ActiveValue::set(digests.mac),
             ..Default::default()
         }
         .insert(db)

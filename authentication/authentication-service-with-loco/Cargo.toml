@@ -25,6 +25,11 @@ loco-rs = { version = "0.16" }
 # implementation shared by every service. Distinct from the PASETO
 # signing key: this secret never leaves the service.
 integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
+# Unkeyed content digests over the audit pre-image, written even when
+# no MAC key is configured — a sponge and a Merkle-Damgard chain, so
+# an advance against one design family does not transfer.
+sha2 = { version = "0.10" }
+sha3 = { version = "0.10" }
 loco-rs = { workspace = true  }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
@@ -57,7 +62,6 @@ include_dir = { version = "0.7" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
 ed25519-dalek = { version = "2.2" }
 base64 = { version = "0.22" }
-sha2 = { version = "0.10" }
 # Prometheus text-exposition metrics served at GET /metrics.prom, for
 # parity with the older Axum services in the family.
 prometheus = { version = "0.13" }

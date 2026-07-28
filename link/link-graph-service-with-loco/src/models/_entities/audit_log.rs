@@ -29,6 +29,17 @@ pub struct Model {
     pub user_ip: Option<String>,
     /// Caller `User-Agent` (best-effort).
     pub user_agent: Option<String>,
+    /// SHA-256 (FIPS 180-4) over this audit row's pre-image.
+    ///
+    /// Unkeyed, so anyone holding the database can recompute it — what it
+    /// catches is careless or unaware modification. Written
+    /// unconditionally, unlike the MAC, which needs a key: with no key
+    /// configured these two digests are the row's only integrity.
+    pub hash: Option<String>,
+    /// SHA3-256 (FIPS 202) over the same pre-image. A sponge, unrelated
+    /// to SHA-256's Merkle-Damgard chaining, so a cryptanalytic advance
+    /// against one design family does not transfer.
+    pub hash_sha3: Option<String>,
     /// HMAC-SHA256 over this row's pre-image, as
     /// `"<scheme>.<key id>:<hex>"`.
     ///

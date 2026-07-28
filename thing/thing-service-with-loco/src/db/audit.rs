@@ -167,7 +167,10 @@ impl AuditLogRepository {
         // insert, then stamp — leaves a window in which the row exists
         // unprotected.
         let created_at = time::OffsetDateTime::now_utc();
-        let mac = crate::compliance::audit_integrity::tag(
+        // All three digests from one call, so none can be stamped
+        // without the others. The two unkeyed ones are written
+        // unconditionally; only the MAC depends on a configured key.
+        let digests = crate::compliance::audit_integrity::digests(
             &crate::compliance::audit_integrity::AuditInput {
                 entity_type: &entity_type,
                 entity_id,
@@ -192,7 +195,9 @@ impl AuditLogRepository {
             old_values: Set(old_values),
             new_values: Set(new_values),
             created_at: Set(created_at),
-            mac: Set(mac),
+            hash: Set(Some(digests.sha256)),
+            hash_sha3: Set(Some(digests.sha3)),
+            mac: Set(digests.mac),
         };
         row.insert(&self.db)
             .await

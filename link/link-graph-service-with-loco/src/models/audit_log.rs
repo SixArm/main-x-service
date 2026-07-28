@@ -51,7 +51,10 @@ impl Model {
         let edge_kind = edge_kind.to_string();
         let from_ref = from_ref.to_string();
         let to_ref = to_ref.to_string();
-        let mac = crate::compliance::audit_integrity::tag(
+        // All three digests from one call, so none can be stamped
+        // without the others. The two unkeyed ones are written
+        // unconditionally; only the MAC depends on a configured key.
+        let digests = crate::compliance::audit_integrity::digests(
             &crate::compliance::audit_integrity::AuditInput {
                 actor: ctx.actor,
                 action: &action,
@@ -73,7 +76,9 @@ impl Model {
             occurred_at: ActiveValue::set(occurred_at),
             user_ip: ActiveValue::set(ctx.user_ip.map(ToString::to_string)),
             user_agent: ActiveValue::set(ctx.user_agent.map(ToString::to_string)),
-            mac: ActiveValue::set(mac),
+            hash: ActiveValue::set(Some(digests.sha256)),
+            hash_sha3: ActiveValue::set(Some(digests.sha3)),
+            mac: ActiveValue::set(digests.mac),
         };
         Entity::insert(am).exec(db).await?;
         Ok(())

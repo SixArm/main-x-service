@@ -89,6 +89,52 @@ fn canonical_json(value: Option<&serde_json::Value>) -> String {
     }
 }
 
+/// Every digest for one audit row, computed from one pre-image.
+///
+/// A **named struct rather than a tuple**: with three values `.0`/`.1`/
+/// `.2` is a latent bug, since putting the SHA-3 digest in the SHA-256
+/// column type-checks and fails only at the next verification.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Digests {
+    /// FIPS 180-4 SHA-256. Written unconditionally.
+    pub sha256: String,
+    /// FIPS 202 SHA3-256. Written unconditionally.
+    pub sha3: String,
+    /// HMAC-SHA256, or `None` when no key is configured.
+    pub mac: Option<String>,
+}
+
+/// All three digests from one call, so none can be stamped without the
+/// others.
+///
+/// The two unkeyed digests are written **unconditionally**; only the MAC
+/// depends on a key. That matters because the MAC is default-off: without
+/// these, an audit row on a deployment that has not yet configured a key
+/// would carry no integrity at all.
+#[must_use]
+pub fn digests(input: &AuditInput<'_>) -> Digests {
+    use sha2::Digest as _;
+
+    let bytes = preimage(input);
+    Digests {
+        sha256: to_hex(&sha2::Sha256::digest(&bytes)),
+        // Fully qualified: `sha2::Digest` and `sha3::Digest` are distinct
+        // traits with the same method name, so importing both is
+        // ambiguous.
+        sha3: to_hex(&<sha3::Sha3_256 as sha3::Digest>::digest(&bytes)),
+        mac: mac::tag(Domain::AuditRow, &bytes),
+    }
+}
+
+/// Lowercase hex.
+fn to_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    bytes.iter().fold(String::new(), |mut acc, b| {
+        let _ = write!(acc, "{b:02x}");
+        acc
+    })
+}
+
 /// The MAC for an audit row, or `None` when no key is configured.
 #[must_use]
 pub fn tag(input: &AuditInput<'_>) -> Option<String> {

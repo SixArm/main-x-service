@@ -34,7 +34,10 @@ impl Model {
         // must be known before the insert. The alternative — insert, then
         // stamp — leaves a window in which the row exists unprotected.
         let created_at: chrono::DateTime<chrono::FixedOffset> = chrono::Utc::now().into();
-        let mac = crate::compliance::audit_integrity::tag(
+        // All three digests from one call, so none can be stamped
+        // without the others. The two unkeyed ones are written
+        // unconditionally; only the MAC depends on a configured key.
+        let digests = crate::compliance::audit_integrity::digests(
             &crate::compliance::audit_integrity::AuditInput {
                 entity_pid,
                 action,
@@ -49,7 +52,9 @@ impl Model {
             actor: ActiveValue::set(actor.map(ToString::to_string)),
             snapshot: ActiveValue::set(snapshot),
             created_at: ActiveValue::set(created_at),
-            mac: ActiveValue::set(mac),
+            hash: ActiveValue::set(Some(digests.sha256)),
+            hash_sha3: ActiveValue::set(Some(digests.sha3)),
+            mac: ActiveValue::set(digests.mac),
             ..Default::default()
         }
         .insert(db)

@@ -34,6 +34,8 @@ impl MigrationTrait for Migration {
                  ADD COLUMN IF NOT EXISTS content_hash_sha3 TEXT,
                  ADD COLUMN IF NOT EXISTS content_mac TEXT;
              ALTER TABLE audit_log
+                 ADD COLUMN IF NOT EXISTS hash TEXT,
+                 ADD COLUMN IF NOT EXISTS hash_sha3 TEXT,
                  ADD COLUMN IF NOT EXISTS mac TEXT;",
         )
         .await?;
@@ -53,6 +55,8 @@ impl MigrationTrait for Migration {
                  DROP COLUMN IF EXISTS content_hash_sha3,
                  DROP COLUMN IF EXISTS content_mac;
              ALTER TABLE audit_log
+                 DROP COLUMN IF EXISTS hash,
+                 DROP COLUMN IF EXISTS hash_sha3,
                  DROP COLUMN IF EXISTS mac;",
         )
         .await?;

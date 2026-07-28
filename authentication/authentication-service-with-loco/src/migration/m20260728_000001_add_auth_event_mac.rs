@@ -23,6 +23,10 @@ pub struct Migration;
 enum AuthEvents {
     /// The table itself.
     Table,
+    /// SHA-256 over this row's pre-image.
+    Hash,
+    /// SHA3-256 over the same pre-image.
+    HashSha3,
     /// HMAC over this row's pre-image, as `"<scheme>.<key id>:<hex>"`.
     Mac,
 }
@@ -38,6 +42,8 @@ impl MigrationTrait for Migration {
         m.alter_table(
             Table::alter()
                 .table(AuthEvents::Table)
+                .add_column_if_not_exists(ColumnDef::new(AuthEvents::Hash).string().null())
+                .add_column_if_not_exists(ColumnDef::new(AuthEvents::HashSha3).string().null())
                 .add_column_if_not_exists(ColumnDef::new(AuthEvents::Mac).string().null())
                 .to_owned(),
         )
@@ -54,6 +60,8 @@ impl MigrationTrait for Migration {
         m.alter_table(
             Table::alter()
                 .table(AuthEvents::Table)
+                .drop_column(AuthEvents::Hash)
+                .drop_column(AuthEvents::HashSha3)
                 .drop_column(AuthEvents::Mac)
                 .to_owned(),
         )
