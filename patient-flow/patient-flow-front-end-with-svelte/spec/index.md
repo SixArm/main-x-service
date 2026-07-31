@@ -39,10 +39,10 @@ closest source). BFF auth per [../../spec/auth.md](../../spec/auth.md).
 - **Copy source**: the case front-end (dependency-light, no data
   grid) rather than portfolio — a whiteboard is custom CSS cards,
   not a grid. Runtime dependencies are the Lily Design System only
-  (headless primitives + the ThemeSelect / LocaleSelect helpers,
+  (headless primitives + the ThemePicker / LocalePicker helpers,
   `file:` deps on the sibling design-system repo, 2026-07-19); the
   theme stylesheets are served from `static/assets/themes` (a
-  symlink to the shared design-system themes). LocaleSelect owns
+  symlink to the shared design-system themes). LocalePicker owns
   `lang`/`dir` (RTL for ar/ur) and persists the choice — there is
   no translation catalogue yet, so it is the i18n-ready seam.
 - **Layout**: `src/lib/api/{types,client,flow}.ts`,

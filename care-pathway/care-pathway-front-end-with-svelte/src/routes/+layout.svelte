@@ -19,13 +19,13 @@
     import type { Snippet } from "svelte";
     import type { LayoutData } from "./$types";
     import { i18n, t, LOCALE_LABELS, isRtl } from "$lib/i18n.svelte";
-    import { ThemeSelect } from "lily-design-system-svelte-theme-select";
-    import { LocaleSelect } from "lily-design-system-svelte-locale-select";
+    import { ThemePicker } from "lily-design-system-svelte-theme-picker";
+    import { LocalePicker } from "lily-design-system-svelte-locale-picker";
 
     // Lily theme catalogue offered in the theme select (incl.
     // NHS England/Scotland/Wales patient & practitioner themes). Each slug
     // has a Lily stylesheet at `static/assets/themes/<slug>.css` (a symlink
-    // to the shared design-system themes) that ThemeSelect swaps in.
+    // to the shared design-system themes) that ThemePicker swaps in.
     const THEMES = [
         "abyss", "acid", "aqua", "autumn", "black", "bumblebee", "business",
         "caramellatte", "cmyk", "coffee", "corporate", "cupcake", "cyberpunk",
@@ -113,23 +113,23 @@
                     </li>
                 {/each}
             </ul>
-            <!-- Theme switcher: Lily ThemeSelect swaps the active theme
+            <!-- Theme switcher: Lily ThemePicker swaps the active theme
                  stylesheet (from static/assets/themes/<slug>.css) and persists
                  the choice. The app's design tokens bridge onto the theme's
                  `--color-*` tokens in app.css, so this restyles the whole UI. -->
-            <ThemeSelect
+            <ThemePicker
                 label={t("chrome.theme")}
                 themesUrl="/assets/themes/"
                 themes={THEMES}
                 themeLabels={THEME_LABELS}
                 storageKey="lily-theme"
             />
-            <!-- Locale switcher: the Lily LocaleSelect. The i18n store
+            <!-- Locale switcher: the Lily LocalePicker. The i18n store
                  stays the single source of truth; the select reflects
                  value={i18n.locale} and writes back via onChange. -->
             <label class="locale">
                 <span class="locale-label">{t("chrome.language")}</span>
-                <LocaleSelect
+                <LocalePicker
                     label={t("chrome.language")}
                     locales={[...i18n.locales]}
                     localeLabels={LOCALE_LABELS}
@@ -308,7 +308,7 @@
         font-weight: 600;
     }
     /* Theme select sits in the dropdown panel like the other chrome controls. */
-    .primary-nav :global(.theme-select) {
+    .primary-nav :global(.theme-picker) {
         font: inherit;
         padding: 0.35rem 0.5rem;
         border-radius: 6px;

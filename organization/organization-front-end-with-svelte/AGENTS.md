@@ -19,7 +19,7 @@ service REST API, whose request/response body is the
 3. **TypeScript strict** (`noUncheckedIndexedAccess`).
 4. **Dependency-light where possible.** `@svar-ui/svelte-grid` (the
    `/organizations` index grid), `@svar-ui/svelte-kanban` (the `/review`
-   board), and Lily Design System (`ThemeSelect`/`LocaleSelect` in the
+   board), and Lily Design System (`ThemePicker`/`LocalePicker` in the
    layout chrome) are real, used dependencies; forms stay plain inputs +
    the `app.css` utilities. (Drift between front-ends is accepted
    family-wide.)

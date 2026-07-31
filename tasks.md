@@ -790,35 +790,47 @@ committing (see plan.md §4).
 
 ## Found 2026-07-31 (during the doc harmonization pass)
 
-- [ ] **FE-LILY-RENAME (M)** — Lily renamed its two helper packages
-  upstream: `lily-design-system-svelte-locale-select` →
-  `-locale-picker` and `-theme-select` → `-theme-picker`, with the
-  components likewise `LocaleSelect`/`ThemeSelect` →
-  `LocalePicker`/`ThemePicker`. **All 15 existing front-ends still
-  declare the old `file:` paths, which no longer exist on disk**, so
-  `pnpm install` in any of them fails with
-  `ERR_PNPM_LINKED_PKG_DIR_NOT_FOUND`.
+- [x] **FE-LILY-RENAME (M)** *(done 2026-07-31)* — Lily renamed its
+  two helper packages upstream: `-locale-select` → `-locale-picker`
+  and `-theme-select` → `-theme-picker`, components likewise
+  `LocaleSelect`/`ThemeSelect` → `LocalePicker`/`ThemePicker`. All 15
+  older front-ends declared the old `file:` paths, which no longer
+  exist, so a fresh `pnpm install` failed in every one of them. They
+  built only because pnpm's store still held a copy.
 
-  The breakage is **latent, not active**: each app's `node_modules`
-  still holds a real copy from the last install, so they build and
-  `svelte-check` clean today (verified on person). What is broken is a
-  fresh clone or any re-install.
+  **All 16 front-ends are now on the pickers** (the 15 plus the CMS
+  client, which was already there). Verified: `pnpm install` resolves
+  the new packages everywhere with no stale `-select` directory left;
+  `svelte-check` clean in all 16; **467 unit tests** pass; all 16
+  build; **15 of 16 Playwright suites pass** — case-folder's is
+  skipped for the pre-existing reason that its pre-flight needs the
+  live Rust backend.
 
-  It is **not** a pure rename, which is why this is a tracked task
-  rather than a `sed` in a docs pass. The prop contracts are unchanged
-  (`label`/`locales`/`localeLabels`/`value`/`applyDir`/`onChange`;
-  `label`/`themesUrl`/`themes`/`storageKey`), but the **DOM changed**:
-  the picker renders a button plus a `ul` listbox
-  (`.locale-picker-button`, `.locale-picker-list`, …) where the old
-  component rendered a `<select>`. So each front-end also needs:
-  - its `:global(select)` chrome CSS repointed at the button class;
-  - its Playwright selectors updated — four specs currently drive
-    `nav.top select.locale-select`, which will match nothing.
+  It was not a pure rename, as expected. Three things had to change
+  beyond the identifiers:
+  - **Chrome CSS.** The old component rendered a `<select>` inside a
+    `.theme-select` / `.locale-select` root. The picker renders a
+    button plus a `ul` listbox, so every `:global(select)`,
+    `:global(.theme-select)` and `:global(.locale-select)` rule was
+    styling nothing. Repointed at `.theme-picker-button` /
+    `.locale-picker-button` in 11 layouts.
+  - **Playwright.** Two suites drove `select.locale-select` with
+    `.selectOption()`, which cannot operate a listbox. Both now use a
+    `chooseLocale` helper.
+  - **case-folder's tracked `package-lock.json`** carried the old
+    paths alongside its `pnpm-lock.yaml`.
 
-  Doing this blind across 15 apps would turn 15 working apps into 15
-  apps needing per-app verification. Recommended approach: migrate one
-  (person is the chrome exemplar), confirm `pnpm install` + `check` +
-  `test` + Playwright, then apply the learned diff app by app.
-
-  `content-management-system-front-end-with-svelte` is already on the
-  new packages and is the reference for what the result looks like.
+  Two findings worth keeping, both discovered by running the thing
+  rather than reading it:
+  - The options carry **no `lang` attribute** and the **theme picker
+    renders `li[role="option"]` too**, so a bare
+    `li[role="option"][lang="de"]` selector matches nothing while
+    `li[role="option"]` matches 58 elements. The list must be scoped
+    (`ul.locale-picker-list`) and the option matched by its label.
+  - **The picker stays open after a selection.** Its `choose()` calls
+    `closeList()`, but the browser state is still `aria-expanded=true`
+    with the list visible. A test that clicks the button again to
+    make a second choice therefore *closes* it. The helper opens only
+    when collapsed. This looks like an upstream Lily bug and is worth
+    reporting there; nothing in this repo depends on the current
+    behaviour either way.

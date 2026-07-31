@@ -11,7 +11,7 @@
 | Audit view | ✅ |
 | Match check | ✅ |
 | Merge UI | ✅ |
-| Theme + locale switchers (FR-11 / FR-12) | ✅ (Lily `ThemeSelect` + `LocaleSelect` in the layout shell) |
+| Theme + locale switchers (FR-11 / FR-12) | ✅ (Lily `ThemePicker` + `LocalePicker` in the layout shell) |
 | Unit tests | ✅ (`client.test.ts` + `persons.test.ts` + `person-form-validation.test.ts`) |
 | E2E smoke | ✅ (`tests/e2e/persons.spec.ts`) |
 | `pnpm install` verified | ✅ (`node_modules` present) |

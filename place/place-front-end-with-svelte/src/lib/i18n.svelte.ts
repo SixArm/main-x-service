@@ -9,7 +9,7 @@
 // Russian (`ru`), Hindi (`hi`), Mandarin Chinese (`zh`), Bengali (`bn`),
 // Portuguese (`pt`), Indonesian (`id`), Urdu (`ur`, RTL). Unknown
 // key/locale falls back to `en`. The chosen locale persists to
-// localStorage; selecting a locale in the top-bar LocaleSelect re-renders
+// localStorage; selecting a locale in the top-bar LocalePicker re-renders
 // the whole UI.
 
 import { browser } from "$app/environment";

@@ -27,8 +27,8 @@ The persistent layout sidebar (every route) also carries a Lily **theme switcher
 - **SVAR Svelte DataGrid** (`wx-svelte-grid`, `wx-svelte-core`)
 - **Lily Design System** (all consumed via `file:` dependencies):
   - `lily-design-system-svelte-headless` — accessibility primitives
-  - `lily-design-system-svelte-theme-select` — `ThemeSelect` (live in the layout shell)
-  - `lily-design-system-svelte-locale-select` — `LocaleSelect` (live in the layout shell)
+  - `lily-design-system-svelte-theme-picker` — `ThemePicker` (live in the layout shell)
+  - `lily-design-system-svelte-locale-picker` — `LocalePicker` (live in the layout shell)
 - **TypeScript** strict mode
 - **Vitest** for unit tests, **Playwright** for e2e
 
@@ -165,18 +165,18 @@ Three Lily packages are consumed via `file:` dependencies (see `package.json`):
 
 | Package | Used for | Status |
 | --- | --- | --- |
-| `lily-design-system-svelte-theme-select` | `ThemeSelect` in the layout sidebar (theme switcher, FR-11) | **Live** |
-| `lily-design-system-svelte-locale-select` | `LocaleSelect` in the layout sidebar (locale switcher, FR-12) | **Live** |
+| `lily-design-system-svelte-theme-picker` | `ThemePicker` in the layout sidebar (theme switcher, FR-11) | **Live** |
+| `lily-design-system-svelte-locale-picker` | `LocalePicker` in the layout sidebar (locale switcher, FR-12) | **Live** |
 | `lily-design-system-svelte-headless` | accessibility primitives (focus trap, listbox, combobox, dialog) | Headless package wired; richer primitives (Dialog/Combobox/Banner) tracked in spec §13 T-14 |
 
-`src/routes/+layout.svelte` imports and renders the `ThemeSelect` and
-`LocaleSelect`; their selections persist to `localStorage` under
+`src/routes/+layout.svelte` imports and renders the `ThemePicker` and
+`LocalePicker`; their selections persist to `localStorage` under
 `lily-theme` / `lily-locale`. Forms still use styled native HTML controls;
 deeper headless primitives are swapped in as the design system stabilises.
 
 ```svelte
-import ThemeSelect from "lily-design-system-svelte-theme-select/ThemeSelect.svelte";
-import LocaleSelect from "lily-design-system-svelte-locale-select/LocaleSelect.svelte";
+import ThemePicker from "lily-design-system-svelte-theme-picker/ThemePicker.svelte";
+import LocalePicker from "lily-design-system-svelte-locale-picker/LocalePicker.svelte";
 ```
 
 ## SVAR DataGrid

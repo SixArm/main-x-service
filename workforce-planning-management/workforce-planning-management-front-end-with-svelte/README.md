@@ -23,7 +23,7 @@ start: `pnpm install && pnpm dev` (expects the Loco sibling on
 
 SvelteKit 2 · Svelte 5 runes · TypeScript strict · SPA mode with a
 same-origin BFF proxy (session cookie → short-lived PASETO; no token
-in browser JS) · 13-locale i18n · Lily Design System (headless + ThemeSelect + LocaleSelect) · vitest + Playwright
+in browser JS) · 13-locale i18n · Lily Design System (headless + ThemePicker + LocalePicker) · vitest + Playwright
 (`page.route`-stubbed).
 
 ## Views

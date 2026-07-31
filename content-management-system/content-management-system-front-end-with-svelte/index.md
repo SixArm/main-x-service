@@ -147,9 +147,11 @@ catch-all added last shadows every specific stub.
 ## Known gotchas
 
 - Lily renamed its helper packages `*-select` → `*-picker`
-  (`LocalePicker` / `ThemePicker`). The sibling front-ends still
-  declare the old `file:` paths, so copy-adapting one of their
-  `package.json` files **fails to install**.
+  (`LocalePicker` / `ThemePicker`), and the DOM changed with it: a
+  button plus a `ul` listbox, not a `<select>`. All 16 front-ends were
+  migrated on 2026-07-31, so copy-adapting a sibling is safe again —
+  but style `.locale-picker-button`, not `select`, and drive the
+  listbox by clicking rather than with `selectOption`.
 - `browser` being true does not mean `localStorage` works (Safari
   private mode throws). The i18n holder guards both read and write,
   because it runs in a module-level constructor: an unguarded access

@@ -23,8 +23,8 @@ export default defineConfig({
             '$app/state': fileURLToPath(new URL('./src/lib/test-support/app-state.ts', import.meta.url)),
             '$app/navigation': fileURLToPath(new URL('./src/lib/test-support/app-navigation.ts', import.meta.url)),
             '$app/environment': fileURLToPath(new URL('./src/lib/test-support/app-environment.ts', import.meta.url)),
-            'lily-design-system-svelte-theme-select': fileURLToPath(new URL('./src/lib/test-support/StubComponent.svelte', import.meta.url)),
-            'lily-design-system-svelte-locale-select': fileURLToPath(new URL('./src/lib/test-support/StubComponent.svelte', import.meta.url))
+            'lily-design-system-svelte-theme-picker': fileURLToPath(new URL('./src/lib/test-support/StubComponent.svelte', import.meta.url)),
+            'lily-design-system-svelte-locale-picker': fileURLToPath(new URL('./src/lib/test-support/StubComponent.svelte', import.meta.url))
         },
         ...(process.env.VITEST ? { conditions: ['browser'] } : {})
     }

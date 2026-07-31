@@ -169,16 +169,16 @@ here:
   persistent side-navigation column.
 - The nav has a single **Plans** destination (no collection switcher). A
   chrome utility area in the top bar carries the **theme selector**
-  (`lily-design-system-svelte-theme-select`) and the **locale selector**
-  (`lily-design-system-svelte-locale-select`), plus the session affordance
+  (`lily-design-system-svelte-theme-picker`) and the **locale selector**
+  (`lily-design-system-svelte-locale-picker`), plus the session affordance
   (Sign in / Sign out).
 
 ### Theming
 
 The app uses the **full shared Lily/DaisyUI theme catalogue** for
 parity with the rest of the family. Selecting a theme via
-`ThemeSelect` changes the whole site look: it manages exactly one
-`<link rel="stylesheet" data-lily-theme-select="theme">` in
+`ThemePicker` changes the whole site look: it manages exactly one
+`<link rel="stylesheet" data-lily-theme-picker="theme">` in
 `document.head`, mutating its `href` and the `data-theme` attribute on
 `<html>`. The choice persists to `localStorage` (key `portfolio:theme`).
 Theme stylesheets are served from `static/assets/themes/` (a symlink
@@ -186,7 +186,7 @@ to the shared design-system themes).
 
 ### Locale / i18n
 
-`LocaleSelect` (`lily-design-system-svelte-locale-select`) sets `lang`
+`LocalePicker` (`lily-design-system-svelte-locale-picker`) sets `lang`
 and `dir` on `<html>` and switches the active translation catalogue, so
 selecting a locale changes the displayed language. Supported locales
 (13): `en`, `cy`, `es`, `fr`, `de`, `ar`, `ru`, `hi`, `zh`, `bn`, `pt`,

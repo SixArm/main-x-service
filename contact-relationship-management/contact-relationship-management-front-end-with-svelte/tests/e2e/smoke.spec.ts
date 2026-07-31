@@ -2,7 +2,7 @@
 // the stubs mirror the service contract; any unstubbed /api/proxy
 // call 404s loudly, so contract drift fails the suite.
 
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const STAGES = [
   { pid: "s1", name: "Qualification", position: 0, probability_percent: 10, is_won: false, is_lost: false },
@@ -45,6 +45,29 @@ test.beforeEach(async ({ page }) => {
     }),
   );
 });
+
+
+/**
+ * Choose a locale from the Lily locale picker.
+ *
+ * Three things make this more than a `selectOption`:
+ * the picker renders a button plus a `ul` listbox rather than a
+ * `<select>`; the theme picker on the same page renders
+ * `li[role="option"]` too, so the list has to be scoped; and the
+ * picker is **left open after a selection** (its `choose` calls
+ * `closeList`, but the state observed in the browser is still
+ * expanded), so clicking the button unconditionally would close it
+ * instead of opening it. Open only when collapsed.
+ */
+async function chooseLocale(page: Page, label: string) {
+  const button = page.locator("nav.top .locale-picker-button");
+  const list = page.locator("ul.locale-picker-list");
+  if ((await button.getAttribute("aria-expanded")) !== "true") {
+    await button.click();
+  }
+  await expect(list).toBeVisible();
+  await list.locator('li[role="option"]').filter({ hasText: label }).first().click();
+}
 
 test("dashboard renders honest KPIs from the stubbed API", async ({ page }) => {
   await page.goto("/");
@@ -140,9 +163,9 @@ test("ticket queue flags breaches; locale switch retranslates + flips RTL", asyn
   await page.goto("/tickets");
   await expect(page.getByTestId("breached")).toBeVisible();
   await expect(page.locator("nav.top")).toContainText("Tickets");
-  await page.locator("nav.top select.locale-select").selectOption("de");
+  await chooseLocale(page, "Deutsch");
   await expect(page.locator("nav.top")).toContainText("Kontakte");
-  await page.locator("nav.top select.locale-select").selectOption("ar");
+  await chooseLocale(page, "العربية");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
 });
 

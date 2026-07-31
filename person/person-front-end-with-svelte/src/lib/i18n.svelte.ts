@@ -73,7 +73,7 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 
 /**
  * localStorage key under which the chosen UI locale is persisted. Exported
- * so the LocaleSelect can share it — making the i18n store the single source
+ * so the LocalePicker can share it — making the i18n store the single source
  * of truth for the chosen locale (no second `lily-locale` key to drift).
  */
 export const LOCALE_KEY = "mxi.person.locale";

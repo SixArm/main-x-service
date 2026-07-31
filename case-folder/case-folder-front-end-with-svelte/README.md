@@ -74,8 +74,8 @@ room.
 - [Lily Design System (Svelte headless)](https://lilydesignsystem.io)
   for accessible UI primitives, styled with NHS UK design tokens.
 - Lily Svelte helpers (`~/git/lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers`,
-  cloned alongside this repo) — `lily-design-system-svelte-locale-select` and
-  `lily-design-system-svelte-theme-select`, declared as `file:`
+  cloned alongside this repo) — `lily-design-system-svelte-locale-picker` and
+  `lily-design-system-svelte-theme-picker`, declared as `file:`
   dependencies in `package.json` (symlinked into `node_modules` by
   `npm install`; no copying, no npm publish).
 
@@ -158,7 +158,7 @@ Both pickers persist via `localStorage` (`case-folder:theme`,
 The helpers are consumed from the sibling git path
 `~/git/lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/`
 via two `file:` dependencies in `package.json`
-(`lily-design-system-svelte-theme-select`, `lily-design-system-svelte-locale-select`),
+(`lily-design-system-svelte-theme-picker`, `lily-design-system-svelte-locale-picker`),
 which `npm install` symlinks into `node_modules`, plus a Vite
 `server.fs.allow` entry that lets Vite serve the symlinked files from
 outside the project root. **The sibling repo

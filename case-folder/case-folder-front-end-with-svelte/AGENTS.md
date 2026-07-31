@@ -26,7 +26,7 @@ inferring from the code.
 | `src/lib/store/nhs.ts`                  | Modulus 11 + formatter (pre-flight only; API revalidates)       |
 | `src/lib/components/`                   | Lily headless primitives + `FolderGrid` SVAR wrapper            |
 | `src/lib/css/`                          | `nhs.css` (theme-invariant NHS tokens + components) + `app.css` |
-| `static/assets/themes/`                 | Symlink to the shared Lily theme catalogue, swapped at runtime by `ThemeSelect` |
+| `static/assets/themes/`                 | Symlink to the shared Lily theme catalogue, swapped at runtime by `ThemePicker` |
 | `svelte.config.js`                      | SvelteKit config (Lily helpers are `file:` deps, not aliased)   |
 | `vite.config.ts`                        | `server.fs.allow` for the same sibling repo path                |
 
@@ -92,8 +92,8 @@ component to add styles; extend the CSS instead.
 
 ### 8a. Lily helpers come from the sibling repo
 
-`lily-design-system-svelte-locale-select` and
-`lily-design-system-svelte-theme-select` are declared as **`file:`
+`lily-design-system-svelte-locale-picker` and
+`lily-design-system-svelte-theme-picker` are declared as **`file:`
 dependencies** in `package.json` pointing at the sibling repo
 (`~/git/lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/`),
 and imported by their package names. `npm install` symlinks them into
@@ -204,8 +204,8 @@ Both required green:
   — the JSON API back-end this client talks to. **Start the API
   before running the dev server.**
 - `~/git/lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/`
-  — source of the `lily-design-system-svelte-locale-select` and
-  `lily-design-system-svelte-theme-select` `file:` dependencies.
+  — source of the `lily-design-system-svelte-locale-picker` and
+  `lily-design-system-svelte-theme-picker` `file:` dependencies.
   **Must be cloned next to this repo** under `~/git/lilydesignsystem/`
   for dev/build to succeed.
 - The five upstream Main-X-Services live under

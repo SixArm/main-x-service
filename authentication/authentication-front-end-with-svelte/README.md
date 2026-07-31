@@ -45,8 +45,8 @@ exchanges the token server-side; the auth service sets the
 
 The UI is bilingual: **English** (`en`) and **Welsh / Cymraeg** (`cy`) —
 the latter a deliberate UK public-sector Welsh-language-duty choice. Pick
-a language via the Lily `LocaleSelect` in the top-bar layout (a Lily
-`ThemeSelect` sits beside it for theme choice); the locale persists to
+a language via the Lily `LocalePicker` in the top-bar layout (a Lily
+`ThemePicker` sits beside it for theme choice); the locale persists to
 `localStorage["mxi.auth.locale"]` and re-renders every string live. It is
 also sent as a `locale` hint on sign-up / sign-in so the **magic-link
 email** arrives in the same language. There is no i18n library — just a

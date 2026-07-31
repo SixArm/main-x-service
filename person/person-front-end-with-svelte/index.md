@@ -29,7 +29,7 @@ is [`spec.md`](spec/index.md); deep references live in [`AGENTS/`](AGENTS/).
 
 The SPA mounts at `/`. All operator workflows live under `/persons`. The
 persistent layout sidebar (every route) also carries a Lily **theme
-switcher** (`ThemeSelect`, FR-11) and **locale switcher** (`LocaleSelect`,
+switcher** (`ThemePicker`, FR-11) and **locale switcher** (`LocalePicker`,
 FR-12); both persist their selection to `localStorage`.
 
 | Path | Purpose |

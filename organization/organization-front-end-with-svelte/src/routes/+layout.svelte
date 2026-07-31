@@ -20,13 +20,13 @@
     import type { Snippet } from "svelte";
     import type { LayoutData } from "./$types";
     import { i18n, t, isRtl, LOCALE_LABELS, type StringKey } from "$lib/i18n.svelte";
-    import { ThemeSelect } from "lily-design-system-svelte-theme-select";
-    import { LocaleSelect } from "lily-design-system-svelte-locale-select";
+    import { ThemePicker } from "lily-design-system-svelte-theme-picker";
+    import { LocalePicker } from "lily-design-system-svelte-locale-picker";
 
     // Lily theme catalogue offered in the theme select (incl.
     // NHS England/Scotland/Wales patient & practitioner themes). Each slug
     // has a Lily stylesheet at `static/assets/themes/<slug>.css` (a symlink
-    // to the shared design-system themes) that ThemeSelect swaps in.
+    // to the shared design-system themes) that ThemePicker swaps in.
     const THEMES = [
         "abyss", "acid", "aqua", "autumn", "black", "bumblebee", "business",
         "caramellatte", "cmyk", "coffee", "corporate", "cupcake", "cyberpunk",
@@ -113,7 +113,7 @@
                     </li>
                 {/each}
             </ul>
-            <ThemeSelect
+            <ThemePicker
                 label={t("chrome.theme")}
                 themesUrl="/assets/themes/"
                 themes={THEMES}
@@ -122,7 +122,7 @@
             />
             <label class="locale">
                 <span>{t("chrome.language")}</span>
-                <LocaleSelect
+                <LocalePicker
                     label={t("chrome.language")}
                     locales={[...i18n.locales]}
                     localeLabels={LOCALE_LABELS}
@@ -242,14 +242,14 @@
         width: 100%;
         padding: 1.5rem 2rem;
     }
-    .primary-nav :global(.theme-select) {
+    .primary-nav :global(.theme-picker) {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 0.4rem;
         font-size: 0.85rem;
     }
-    .primary-nav :global(.theme-select select) {
+    .primary-nav :global(.theme-picker-button) {
         padding: 0.3rem 0.4rem;
         font-size: 0.85rem;
         color: var(--mxi-color-fg);

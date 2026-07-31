@@ -17,7 +17,7 @@
 //
 // The i18n store is the SINGLE SOURCE OF TRUTH for the locale: it owns
 // persistence and is reflected onto `<html lang>` / `<html dir>` by the
-// root layout. The Lily LocaleSelect just calls `i18n.set` and reflects
+// root layout. The Lily LocalePicker just calls `i18n.set` and reflects
 // `value={i18n.locale}` (with `applyDir={false}` so the layout effect owns
 // `dir` consistently).
 
@@ -86,7 +86,7 @@ export function isRtl(locale: string): boolean {
 
 /**
  * localStorage key under which the chosen UI locale is persisted. Exported
- * so the LocaleSelect can share it — the i18n store is the single source of
+ * so the LocalePicker can share it — the i18n store is the single source of
  * truth for the chosen locale, and the select persists to the same key.
  */
 export const LOCALE_KEY = "mxi.case-folder.locale";

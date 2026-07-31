@@ -45,9 +45,9 @@ components/OrgTree.svelte,server/*}`, routes per the README table;
   mirroring the service contract (unstubbed calls 404 loudly).
 
 - **Lily Design System** (2026-07-19): the chrome uses the Lily
-  **ThemeSelect** (45-theme catalogue incl. the NHS design-system
+  **ThemePicker** (45-theme catalogue incl. the NHS design-system
   themes; stylesheets via the `static/assets/themes` symlink; choice
-  persisted to `mxi.wpm.theme`) and **LocaleSelect** (wired to the i18n
+  persisted to `mxi.wpm.theme`) and **LocalePicker** (wired to the i18n
   store, `applyDir` off — the app's own effect owns `lang`/`dir`);
   the **Lily headless** primitives are available as a dependency.
 

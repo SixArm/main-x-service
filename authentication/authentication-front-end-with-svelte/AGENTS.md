@@ -35,7 +35,7 @@ service so the magic-link email language matches.
    render client-side, but any auth-bearing fetch goes through the BFF.
 3. **TypeScript strict** (with `noUncheckedIndexedAccess`).
 4. **Minimal deps.** Unlike the data-heavy sibling front-ends, this UI
-   uses no data grid. Lily `ThemeSelect`/`LocaleSelect` ARE used in the
+   uses no data grid. Lily `ThemePicker`/`LocalePicker` ARE used in the
    layout (theme + locale chrome); the SVAR packages are declared in
    `package.json` but currently **unused in `src/`**. Add nothing further
    unless a real need appears (drift is accepted family-wide).

@@ -112,7 +112,7 @@ The Lily file: dependency resolves to `~/git/lilydesignsystem/lily-design-system
 import Button from "lily-design-system-svelte-headless/src/lib/components/Button/Button.svelte";
 ```
 
-Lily's `ThemeSelect` and `LocaleSelect` components are live in `src/routes/+layout.svelte` — theme choice persists via ThemeSelect's own storage key, and LocaleSelect drives the i18n store (which sets `lang`/`dir` on `<html>`).
+Lily's `ThemePicker` and `LocalePicker` components are live in `src/routes/+layout.svelte` — theme choice persists via ThemePicker's own storage key, and LocalePicker drives the i18n store (which sets `lang`/`dir` on `<html>`).
 
 ## SVAR DataGrid
 

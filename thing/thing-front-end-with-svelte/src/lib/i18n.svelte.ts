@@ -73,7 +73,7 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 
 /**
  * localStorage key under which the chosen UI locale is persisted. Exported
- * so the layout's LocaleSelect can share the same key — making the i18n
+ * so the layout's LocalePicker can share the same key — making the i18n
  * store the single source of truth for the chosen locale (no drift between
  * the store's persisted value and the picker's).
  */

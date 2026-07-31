@@ -1,15 +1,15 @@
 <script lang="ts">
   import "../app.css";
   import { LOCALE_LABELS, i18n, isRtl, t } from "$lib/i18n.svelte";
-  import { LocaleSelect } from "lily-design-system-svelte-locale-select";
-  import { ThemeSelect } from "lily-design-system-svelte-theme-select";
+  import { LocalePicker } from "lily-design-system-svelte-locale-picker";
+  import { ThemePicker } from "lily-design-system-svelte-theme-picker";
 
   let { children } = $props();
 
   // Lily theme catalogue offered in the theme select (DaisyUI-style
   // slugs plus government/NHS design-system themes). Each slug has a
   // stylesheet at `static/assets/themes/<slug>.css` (a symlink to the
-  // shared design-system themes) that ThemeSelect swaps in; labels are
+  // shared design-system themes) that ThemePicker swaps in; labels are
   // title-cased from the slug by the component.
   const THEMES = [
     "abyss", "acid", "adobe-spectrum", "aqua", "autumn", "black",
@@ -52,7 +52,7 @@
   <span class="spacer"></span>
   <label class="locale">
     <span class="visually-hidden">{t("chrome.language")}</span>
-    <LocaleSelect
+    <LocalePicker
       label={t("chrome.language")}
       locales={[...i18n.locales]}
       localeLabels={LOCALE_LABELS}
@@ -61,7 +61,7 @@
       onChange={(code) => i18n.set(code)}
     />
   </label>
-  <ThemeSelect
+  <ThemePicker
     label="Theme"
     themesUrl="/assets/themes/"
     themes={THEMES}
@@ -79,7 +79,7 @@
     flex: 1;
   }
   .locale :global(select),
-  nav.top :global(select.theme-select) {
+  nav.top :global(.theme-picker-button) {
     font: inherit;
     padding: 0.15rem 0.3rem;
     max-width: 11rem;

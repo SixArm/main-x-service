@@ -39,7 +39,7 @@ the closest sources). BFF auth per
   `as_of`; `null` ratios show a no-data state.
 - **13-locale i18n from the start** with the parity test; RTL
   (ar / ur) handled by the app's own `lang`/`dir` effect
-  (`applyDir` off on Lily's `LocaleSelect`, the family workaround).
+  (`applyDir` off on Lily's `LocalePicker`, the family workaround).
 
 ## Delivery
 

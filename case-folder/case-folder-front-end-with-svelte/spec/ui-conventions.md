@@ -16,7 +16,7 @@
 - **Success after a write** is announced with `Alert type="success"`.
 - **Skip link** is the first focusable element on every page.
 - **Chrome utility row** above the site `<Header>` carries the Lily
-  `LocaleSelect` and `ThemeSelect`. Both persist to `localStorage` under
+  `LocalePicker` and `ThemePicker`. Both persist to `localStorage` under
   `case-folder:locale` and `case-folder:theme`.
 
 ## Navigation & layout
@@ -40,8 +40,8 @@ stylesheets are served from `static/assets/themes/`, a **symlink** to the
 shared design-system themes (`~/git/lilydesignsystem/lily-design-system/themes`).
 The default is `united-kingdom-national-health-service-england-for-practitioners`.
 
-`ThemeSelect` (from `lily-design-system-svelte-theme-select`) manages exactly one
-`<link rel="stylesheet" data-lily-theme-select="theme">` in
+`ThemePicker` (from `lily-design-system-svelte-theme-picker`) manages exactly one
+`<link rel="stylesheet" data-lily-theme-picker="theme">` in
 `document.head` and toggles the active theme by mutating its `href`
 (`/assets/themes/<slug>.css`) and the `data-theme` attribute on `<html>`.
 
@@ -55,8 +55,8 @@ To add a theme: add it upstream in the shared design-system themes repo and
 extend the `themes` array in `+layout.svelte`. (The previous app-local
 `static/themes/nhs*.css` files were dropped in favour of the shared catalogue.)
 
-**Lily helpers come from the sibling repo.** `lily-design-system-svelte-locale-select` and
-`lily-design-system-svelte-theme-select` are declared as `file:` dependencies in
+**Lily helpers come from the sibling repo.** `lily-design-system-svelte-locale-picker` and
+`lily-design-system-svelte-theme-picker` are declared as `file:` dependencies in
 `package.json` pointing at the sibling helper repo at
 `~/git/lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/`;
 `npm install` symlinks them into `node_modules` and they are imported by
@@ -65,7 +65,7 @@ don't add a fallback path — fail loudly if the sibling is missing.
 
 ## Locale
 
-`LocaleSelect` (from `lily-design-system-svelte-locale-select`) sets `lang` and `dir` on
+`LocalePicker` (from `lily-design-system-svelte-locale-picker`) sets `lang` and `dir` on
 `<html>`. Available locales: `en` (default), `cy` (Cymraeg), `gd`
 (Gàidhlig). All three are LTR; `dir` will become meaningful if an RTL
 locale (e.g. `ar`, `ur`) is added later — the helper detects RTL

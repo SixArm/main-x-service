@@ -2,7 +2,7 @@
   /* Design tokens, mapped onto the Lily theme tokens (`--color-*`) that the
        active theme stylesheet defines, with the original values as fallbacks
        for first paint (before a theme loads). This is what makes selecting a
-       theme in ThemeSelect restyle the whole app, not just Lily components. */
+       theme in ThemePicker restyle the whole app, not just Lily components. */
   --mxi-color-bg: var(--color-base-100, #fafafa);
   --mxi-color-fg: var(--color-base-content, #111827);
   --mxi-color-muted: color-mix(

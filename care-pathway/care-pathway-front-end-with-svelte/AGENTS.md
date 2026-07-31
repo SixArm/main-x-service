@@ -21,7 +21,7 @@ service REST API, whose request/response body is the
 4. **Deps in real use.** All four SVAR components are used: DataGrid +
    FilterBar (`/` registry), Kanban (`/board` instance lifecycle), and
    Gantt (`/gantt` instance timeline + `/sequence` intervention sequence); plus Lily
-   `ThemeSelect`/`LocaleSelect` (in the layout). Forms remain plain
+   `ThemePicker`/`LocalePicker` (in the layout). Forms remain plain
    inputs + the `app.css` utilities.
 5. **No envelope.** The service is loco.rs and returns **raw JSON**;
    `src/lib/api/client.ts` is the lean wrapper (get/post/put/delete).

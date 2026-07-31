@@ -67,9 +67,9 @@ Global navigation is a full-width **top navigation bar** with a
 full-width). The nav has a single **Plans** destination (no collection
 switcher). The chrome area carries:
 
-- a **theme selector** (`lily-design-system-svelte-theme-select`) —
+- a **theme selector** (`lily-design-system-svelte-theme-picker`) —
   selecting a theme restyles the whole site (full shared catalogue);
-- a **locale selector** (`lily-design-system-svelte-locale-select`) —
+- a **locale selector** (`lily-design-system-svelte-locale-picker`) —
   13 locales (`en`, `cy`, `es`, `fr`, `de`, `ar`, `ru`, `hi`, `zh`,
   `bn`, `pt`, `id`, `ur`); selecting one switches the language; `ar` /
   `ur` render RTL;

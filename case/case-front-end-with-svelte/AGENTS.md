@@ -18,7 +18,7 @@ service REST API, whose request/response body is the
 2. **SPA.** `+layout.ts` sets `ssr = false` / `prerender = false`.
 3. **TypeScript strict** (`noUncheckedIndexedAccess`).
 4. **Deps in real use.** SVAR DataGrid + FilterBar (`/cases` index),
-   SVAR Kanban (`/board`), and Lily `ThemeSelect`/`LocaleSelect` (in the
+   SVAR Kanban (`/board`), and Lily `ThemePicker`/`LocalePicker` (in the
    layout) are used dependencies; forms remain plain inputs + the
    `app.css` utilities.
 5. **No envelope.** The service is loco.rs and returns **raw JSON**;

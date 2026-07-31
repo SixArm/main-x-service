@@ -30,8 +30,8 @@
     import Footer from '$lib/components/Footer/Footer.svelte';
     import NavigationMenu from '$lib/components/NavigationMenu/NavigationMenu.svelte';
 
-    import LocaleSelect from 'lily-design-system-svelte-locale-select';
-    import ThemeSelect from 'lily-design-system-svelte-theme-select';
+    import LocalePicker from 'lily-design-system-svelte-locale-picker';
+    import ThemePicker from 'lily-design-system-svelte-theme-picker';
 
     import { cache } from '$lib/store/cache.svelte';
     import { api } from '$lib/api/client';
@@ -54,7 +54,7 @@
     // The i18n store is the single source of truth for the locale: this
     // effect mirrors the chosen locale onto <html lang>/<html dir> (rtl for
     // ar/ur, ltr otherwise). SSR-guarded so a load-time render never touches
-    // the DOM. The Lily LocaleSelect only calls i18n.set + reflects value.
+    // the DOM. The Lily LocalePicker only calls i18n.set + reflects value.
     $effect(() => {
         if (!browser) return;
         const locale = i18n.locale;
@@ -93,14 +93,14 @@
         { href: '/reports', key: 'nav.reports' }
     ];
 
-    // The Lily LocaleSelect renders these 13 codes; its labels come from the
+    // The Lily LocalePicker renders these 13 codes; its labels come from the
     // shared LOCALE_LABELS table (each written in its own language).
     const locales = [...i18n.locales];
 
     // Full Lily/DaisyUI theme catalogue (copied verbatim from the sibling
     // course-front-end-with-svelte for family parity). Each slug has a Lily
     // stylesheet at `static/assets/themes/<slug>.css` (a symlink to the shared
-    // design-system themes) that ThemeSelect swaps in. Includes the NHS
+    // design-system themes) that ThemePicker swaps in. Includes the NHS
     // England/Scotland/Wales patient & practitioner themes; the
     // practitioner-facing English theme is the sensible NHS default.
     const themes = [
@@ -154,7 +154,7 @@
 
 <div class="utility-row">
     <div class="page-wrapper">
-        <LocaleSelect
+        <LocalePicker
             label={t('chrome.language')}
             {locales}
             localeLabels={LOCALE_LABELS}
@@ -164,7 +164,7 @@
             onChange={(locale) => i18n.set(locale)}
             class="utility-row-picker"
         />
-        <ThemeSelect
+        <ThemePicker
             label={t('chrome.theme')}
             themesUrl="/assets/themes/"
             {themes}

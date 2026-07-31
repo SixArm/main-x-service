@@ -115,7 +115,7 @@ The Lily file: dependency resolves to `~/git/lilydesignsystem/lily-design-system
 import Button from "lily-design-system-svelte-headless/src/lib/components/Button/Button.svelte";
 ```
 
-The Lily **theme selector** (45 shared themes at `/assets/themes/`) and **locale selector** (13 locales) are wired live in the layout shell — `src/routes/+layout.svelte` imports and renders `ThemeSelect` and `LocaleSelect`. Lily Headless is available for further primitives as the design system stabilises.
+The Lily **theme selector** (45 shared themes at `/assets/themes/`) and **locale selector** (13 locales) are wired live in the layout shell — `src/routes/+layout.svelte` imports and renders `ThemePicker` and `LocalePicker`. Lily Headless is available for further primitives as the design system stabilises.
 
 ## SVAR DataGrid
 

@@ -14,14 +14,14 @@
     import { enhance } from "$app/forms";
     import type { Snippet } from "svelte";
     import type { LayoutData } from "./$types";
-    import { ThemeSelect } from "lily-design-system-svelte-theme-select";
+    import { ThemePicker } from "lily-design-system-svelte-theme-picker";
 
-    // Theme ids offered by the Lily ThemeSelect (DaisyUI themes plus the
+    // Theme ids offered by the Lily ThemePicker (DaisyUI themes plus the
     // bespoke NHS England/Scotland/Wales patient & practitioner themes).
     // Lily theme catalogue offered in the theme select (incl.
     // NHS England/Scotland/Wales patient & practitioner themes). Each slug
     // has a Lily stylesheet at `static/assets/themes/<slug>.css` (a symlink
-    // to the shared design-system themes) that ThemeSelect swaps in.
+    // to the shared design-system themes) that ThemePicker swaps in.
     const THEMES = [
         "abyss", "acid", "aqua", "autumn", "black", "bumblebee", "business",
         "caramellatte", "cmyk", "coffee", "corporate", "cupcake", "cyberpunk",
@@ -59,13 +59,13 @@
         "united-kingdom-national-health-service-wales-for-practitioners": "United Kingdom National Health Service Wales for Practitioners",
     };
 
-    import { LocaleSelect } from "lily-design-system-svelte-locale-select";
+    import { LocalePicker } from "lily-design-system-svelte-locale-picker";
     import { browser } from "$app/environment";
     import { i18n, isRtl, LOCALE_KEY, LOCALE_LABELS, t } from "$lib/i18n.svelte.js";
 
     // All supported locales, sourced from the i18n store so the picker can
     // never drift from the catalog. The i18n store (`$lib/i18n.svelte.ts`)
-    // is the single source of truth; the LocaleSelect is initialised from it
+    // is the single source of truth; the LocalePicker is initialised from it
     // and writes back via its onChange callback.
     const LOCALES = [...i18n.locales];
 
@@ -134,14 +134,14 @@
                 {/each}
             </ul>
             <div class="chrome">
-                <ThemeSelect
+                <ThemePicker
                     label={t("nav.theme")}
                     themesUrl="/assets/themes/"
                     themes={THEMES}
                     themeLabels={THEME_LABELS}
                     storageKey="lily-theme"
                 />
-                <LocaleSelect
+                <LocalePicker
                     label={t("nav.language")}
                     locales={LOCALES}
                     localeLabels={LOCALE_LABELS}
@@ -269,8 +269,8 @@
         padding-top: 0.5rem;
         border-top: 1px solid var(--mxi-color-border);
     }
-    .chrome :global(.theme-select),
-    .chrome :global(.locale-select) {
+    .chrome :global(.theme-picker-button),
+    .chrome :global(.locale-picker-button) {
         padding: 0.375rem 0.5rem;
         font-size: 0.875rem;
         color: var(--mxi-color-fg);

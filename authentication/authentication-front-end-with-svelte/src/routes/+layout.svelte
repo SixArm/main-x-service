@@ -21,13 +21,13 @@
     import { i18n, t, isRtl, LOCALE_LABELS, type StringKey } from "$lib/i18n.svelte";
     import type { Snippet } from "svelte";
     import type { LayoutData } from "./$types";
-    import { ThemeSelect } from "lily-design-system-svelte-theme-select";
-    import { LocaleSelect } from "lily-design-system-svelte-locale-select";
+    import { ThemePicker } from "lily-design-system-svelte-theme-picker";
+    import { LocalePicker } from "lily-design-system-svelte-locale-picker";
 
     // Lily theme catalogue offered in the theme select (incl.
     // NHS England/Scotland/Wales patient & practitioner themes). Each slug
     // has a Lily stylesheet at `static/assets/themes/<slug>.css` (a symlink
-    // to the shared design-system themes) that ThemeSelect swaps in.
+    // to the shared design-system themes) that ThemePicker swaps in.
     const THEMES = [
         "abyss", "acid", "aqua", "autumn", "black", "bumblebee", "business",
         "caramellatte", "cmyk", "coffee", "corporate", "cupcake", "cyberpunk",
@@ -119,7 +119,7 @@
                 {/each}
             </ul>
             <div class="chrome">
-                <ThemeSelect
+                <ThemePicker
                     label={t("nav.theme")}
                     themesUrl="/assets/themes/"
                     themes={THEMES}
@@ -128,7 +128,7 @@
                 />
                 <label class="locale">
                     <span>{t("nav.locale")}</span>
-                    <LocaleSelect
+                    <LocalePicker
                         label={t("nav.locale")}
                         locales={[...i18n.locales]}
                         localeLabels={LOCALE_LABELS}
@@ -248,7 +248,7 @@
         align-items: stretch;
         gap: 0.75rem;
     }
-    .chrome :global(.theme-select) {
+    .chrome :global(.theme-picker-button) {
         padding: 0.375rem 0.5rem;
         font-size: 0.875rem;
         color: var(--mxi-color-fg);

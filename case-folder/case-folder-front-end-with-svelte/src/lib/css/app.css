@@ -17,7 +17,7 @@
     padding-bottom: var(--nhs-space-2);
 }
 
-/* Lily LocaleSelect / ThemeSelect render native <select> dropdowns; style
+/* Lily LocalePicker / ThemePicker render native <select> dropdowns; style
    them as normal NHS selects. (The previous rules here were for the old
    radio-group picker — border:0/padding:0/flex — which left the <select>
    borderless, cramped, and too small.) */

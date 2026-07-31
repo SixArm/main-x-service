@@ -9,7 +9,7 @@
 | Build tool           | Vite                                                            | `^6.2.0`                  |
 | Package manager      | npm — **canonical**; `package-lock.json` committed (no `pnpm-*`) |                          |
 | Headless UI          | [Lily Design System](https://lilydesignsystem.io) Svelte headless |                        |
-| Lily helpers         | `lily-design-system-svelte-locale-select`, `lily-design-system-svelte-theme-select` (`file:` deps, symlinked from the sibling git path) | source |
+| Lily helpers         | `lily-design-system-svelte-locale-picker`, `lily-design-system-svelte-theme-picker` (`file:` deps, symlinked from the sibling git path) | source |
 | Data grid            | SVAR Svelte (`wx-svelte-grid` + `Willow` theme)                 | `^2.1.0`                  |
 | Styling              | Plain CSS + NHS UK tokens, runtime theme swap via `:root[data-theme]` | —                   |
 | State                | Rune-based reactive cache, one module singleton                 |                           |

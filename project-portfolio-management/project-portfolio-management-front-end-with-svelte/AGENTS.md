@@ -80,10 +80,10 @@ of the matching surface (except goal titles).
 - The main content area is **full-width**.
 - The nav has a single **Plans** destination (no collection switcher).
 - The chrome area carries the **theme selector**
-  (`lily-design-system-svelte-theme-select` — full shared catalogue;
+  (`lily-design-system-svelte-theme-picker` — full shared catalogue;
   selecting a theme restyles the whole site; persists to
   `localStorage["portfolio:theme"]`), the **locale selector**
-  (`lily-design-system-svelte-locale-select` — 13 locales; selecting
+  (`lily-design-system-svelte-locale-picker` — 13 locales; selecting
   one switches the language; `ar` / `ur` are RTL; persists to
   `localStorage["portfolio:locale"]`), and the session affordance (Sign
   in / Sign out; the browser holds no token — see **Auth** below).

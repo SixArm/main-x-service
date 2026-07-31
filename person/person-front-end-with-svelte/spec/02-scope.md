@@ -11,10 +11,10 @@
 - Match check page (score a hypothetical record against the index).
 - Merge UI (preview + execute).
 - Per-record audit log view.
-- Theme switcher in the layout shell (Lily `ThemeSelect`, persisted to
+- Theme switcher in the layout shell (Lily `ThemePicker`, persisted to
   `localStorage` under `lily-theme`; DaisyUI themes plus the bespoke NHS
   England / Scotland / Wales patient & practitioner themes).
-- Locale switcher in the layout shell (Lily `LocaleSelect`, persisted to
+- Locale switcher in the layout shell (Lily `LocalePicker`, persisted to
   `localStorage` under `lily-locale`, with navigator detection). This is
   the locale *picker* only; message catalogues / translated copy remain
   out of scope (see §2.2).
