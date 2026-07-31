@@ -26,10 +26,11 @@ duplicates with the canonical organization-matcher. Built on loco.rs.
 
 ## 2. Scope
 
-MVP: CRUD + matching. Out of scope for the MVP (deferred, §13): full-text
-search, streaming, audit, privacy/GDPR export, OpenAPI, gRPC, rich
-validation. Authentication is out of scope here — provided by the
-central authentication-service.
+MVP: CRUD + matching. Since delivered beyond the MVP (§13): full-text
+search (Tantivy), streaming, audit, OpenAPI. Still out of scope
+(deferred, §13): privacy/GDPR export, gRPC, richer validation.
+Authentication is out of scope here — provided by the central
+authentication-service.
 
 ## 3. Stakeholders and users
 
@@ -70,6 +71,12 @@ are never fed to the matcher. See §8 and
    candidates}` set (no persistence).
 7. `POST /api/organizations/check-duplicates` — match a query against
    stored organizations; return the ones above threshold, ranked.
+   Candidates are **blocked via the search index** (fuzzy name + exact
+   identifier + phonetic routes, capped at 200 candidates), not scanned
+   from the table: a duplicate's reachability depends on its similarity,
+   not on how recently it was inserted. `503` when the index is
+   unavailable — answering "no duplicates" from a broken index would let
+   a caller create a duplicate believing it had been checked.
 8. `POST /api/organizations/deduplicate` — batch-scan the stored
    records pairwise (up to the §6 R-DUP scan cap) and **persist** likely
    duplicates in the stored `review_queue` (normalized-pair upsert:
@@ -86,7 +93,17 @@ are never fed to the matcher. See §8 and
     first-writer-wins in SQL (`404` unknown id, `422` already decided).
     The reviewer identity is the verified bearer `sub` when present, and
     each decision writes a `review_decision` audit row.
-11. `GET /metrics.prom` — Prometheus metrics in text-exposition format
+11. `GET /api/organizations/search?q=…[&fuzzy=true][&phonetic=true]` —
+    **Tantivy full-text search**, ranked by relevance, capped at 50.
+    Indexed fields: `name`, `legal_name`, `alternate_names`, identifier
+    values, `keywords`, the flattened postal address, and `url`;
+    `jurisdiction` is indexed for exact filtering (unused today).
+    `fuzzy` gives typo tolerance (Levenshtein ≤ 2 per token) and
+    `phonetic` matches Soundex codes; `phonetic` takes precedence when
+    both are set. Blank/missing `q` → `400`; index unavailable → `503`.
+    A query Tantivy's parser rejects falls back to an OR over its
+    tokens rather than erroring.
+12. `GET /metrics.prom` — Prometheus metrics in text-exposition format
    (`text/plain; version=0.0.4`). Mounted at the application **root**
    (not under `/api`), public even under blanket auth enforcement.
 
@@ -109,6 +126,8 @@ embedded library; soft-delete with audit-friendly timestamps.
 | `ORGANIZATION_EVENT_TRANSPORT` | `memory` | Durable event-bus transport ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §7). `memory` ⇒ the process-wide ring buffer (Phase 1; no DB, no tx — today's behaviour). `outbox` ⇒ the transactional outbox (Phase 2): every CRUD/merge handler writes one `event_outbox` row **on the same transaction** as the entity mutation, so the change and its event commit or roll back together. Unrecognised value ⇒ `memory` (fail-safe). Read once at boot and cached. |
 | `ORGANIZATION_EVENT_RELAY` | off | Phase-3 relay switch. Truthy (`1`/`true`/`yes`/`on`) **and** `EVENT_TRANSPORT=outbox` ⇒ `App::after_routes` spawns the background relay loop (`src/relay.rs`: drain `event_outbox` → `EventSink` → `mark_published`, + periodic retention purge). Off by default ⇒ no loop. |
 | `ORGANIZATION_EVENT_RELAY_INTERVAL_SECS` | `5` | Relay drain-loop tick interval (floored at 1). |
+| `ORGANIZATION_SEARCH_INDEX_PATH` | `data/search-index` | Directory holding the Tantivy full-text index (`src/search/`), created if absent. The index is a **derived artifact**: Postgres remains the source of truth and every hit is resolved against it, so a stale index degrades (a missing hit) rather than corrupts (it can never resurrect a deleted record). If the directory cannot be opened, search and `check-duplicates` return `503` rather than an empty result. An **empty index over a non-empty table triggers a background rebuild at boot**, so an upgrade or a lost volume self-heals; `cargo loco task search_reindex` rebuilds on demand. |
+| `ORGANIZATION_SEARCH_BOOT_REINDEX` | unset ⇒ **on** | Boot-time self-heal: when the index is empty **and** the table is not, rebuild in the background (`App::after_routes`). Falsy (`0`/`false`/`no`/`off`) ⇒ skip, for a deployment large enough to want the rebuild scheduled by hand. Anything else (including an unrecognised value) leaves it on, because the failure it prevents is silent. |
 | `ORGANIZATION_EVENT_RETENTION_DAYS` | `7` | Outbox row TTL. **Enforced** by the Phase-3 relay's periodic `purge_published` (deletes `published_at < now() - INTERVAL '<n> days'`) when the relay runs ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §3). |
 
 ## 8. Architecture
@@ -209,8 +228,9 @@ counter increment in `metrics::tests`, streaming, and `auth::tests` —
 on+protected without/expired/tampered ⇒ `401`, on+protected+valid ⇒
 ok). Request-level tests (`tests/requests/organizations.rs`): boot the
 real app via loco's `testing` harness and cover create round-trip,
-blank-name `422` (create + update), unknown-pid `404`, search,
-check-duplicates, merge, `whoami` `401`, the blanket-enforcement
+blank-name `422` (create + update), unknown-pid `404`, search
+(keyword hit; index follows update + delete; fuzzy / phonetic modes),
+check-duplicates (including identifier-only blocking), merge, `whoami` `401`, the blanket-enforcement
 gate (with `ORGANIZATION_REQUIRE_AUTH=1` set in-test, un-authed `GET
 /api/organizations` ⇒ `401` while `GET /api-docs/openapi.json` ⇒
 `200`; `#[serial]` for env-var ordering), the audit endpoints
@@ -295,7 +315,9 @@ personal data — honour GDPR when the privacy layer lands (§13).
   behind a `fluvio` cargo feature + `ORGANIZATION_FLUVIO_ENDPOINT`/
   `ORGANIZATION_EVENT_TOPIC`) — the trait is the seam, so the drain loop is
   unchanged when it lands ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §5, §8).
-- [x] Name search (Postgres `ILIKE`) + OpenAPI/Swagger.
+- [x] Name search + OpenAPI/Swagger. *(Postgres `ILIKE`; superseded by
+  the Tantivy item below, which removed the `ILIKE` query and its
+  `escape_like` guard rather than leaving them dormant.)*
 - [x] Prometheus metrics — `GET /metrics.prom` (root, public) serves a
   process-wide `prometheus::Registry` (`src/metrics.rs`, `OnceLock`)
   in text-exposition format; CRUD/merge handlers increment
@@ -303,8 +325,35 @@ personal data — honour GDPR when the privacy layer lands (§13).
   `http_requests_total` is declared for a future request middleware.
   Brings parity with the older Axum services. DB-free render test +
   OpenAPI path test; `/metrics.prom` added to `auth::is_public_path`.
-- [ ] Tantivy full-text search + fuzzy/blocking (replacing the `ILIKE`
-      search).
+- [x] **Tantivy full-text search + fuzzy/phonetic + blocking**
+  (replacing the `ILIKE` search). `src/search/{mod,index}.rs`: the
+  index schema (`pid` stored; name / legal name / alternate names /
+  phonetic codes / identifiers / keywords / address / url full-text;
+  `jurisdiction` + `active` exact), a `SearchEngine` facade
+  (`index_organization` — idempotent replace-in-place —
+  `delete_organization`, `clear`, `search`, `fuzzy_search`,
+  `phonetic_search`, `candidates`, `stats`), and a process-wide
+  `OnceLock` engine keyed on `ORGANIZATION_SEARCH_INDEX_PATH`.
+  Indexing is wired into `src/streaming.rs` (the one seam both the
+  native and FHIR controllers write through), **after** the write is
+  durable and best-effort: a failed index write is logged at `ERROR`
+  and never fails a committed request. `GET /search` gains `fuzzy` /
+  `phonetic` (§6.11); `check-duplicates` now **blocks** on the index
+  instead of scanning up to 1000 rows, so a duplicate beyond the old
+  cap is reachable. Recovery: `cargo loco task search_reindex`
+  (`src/tasks/search.rs`, paginated, clears first, skips unreadable
+  payloads) plus an automatic boot rebuild when the index is empty and
+  the table is not. Tests: 16 DB-free unit pins (exact / fuzzy /
+  phonetic retrieval, secondary fields, replace-not-duplicate, delete,
+  clear, identifier-only and fuzzy-name blocking, empty and
+  unparseable queries, zero limit, tokenise / Soundex / address
+  helpers) + 4 DB-gated request tests (keyword hit, index follows
+  update and delete, fuzzy/phonetic modes over the wire,
+  identifier-only duplicate detection).
+  - **Not** wired to Tantivy: the FHIR `GET /fhir/Organization` search,
+    which is a structured multi-parameter filter (`identifier`,
+    `address-city`, …) over a capped scan rather than a free-text
+    query. Moving it is a separate item, not a side effect of this one.
 - [ ] Per-field masking + GDPR export endpoint.
 - [x] Record merge — `POST /merge` folds a duplicate into a survivor
   (union fields, former-name alias, soft-delete, `merge_records` history
@@ -423,7 +472,9 @@ Done: loco boot; organizations table + migration; CRUD (blank name →
 `422`, unknown pid → `404`); `/match` and `/check-duplicates` embedding
 organization-matcher; audit log; in-memory event streaming (Phase 1:
 canonical `Envelope` + `EventPublisher` seam, `EventView` projection
-frozen for `/events/recent`); name search (`ILIKE`); record merge
+frozen for `/events/recent`); Tantivy full-text search (fuzzy +
+phonetic + duplicate blocking, replacing the earlier `ILIKE` name
+search); record merge
 (`/merge` + `merge_records` history); offline
 **PASETO v4.public** verification (`AuthUser`/`MaybeAuthUser`, `/whoami`,
 audit + merge `actor` from the token) per

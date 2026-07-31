@@ -43,8 +43,12 @@ pub mod openapi;
 /// Durable event bus Phase 3: the outbox relay (drain → sink → mark
 /// published) + retention purge. See [`agents/share/event-bus.md`].
 pub mod relay;
+/// Tantivy full-text search: index schema, engine, and query surface.
+pub mod search;
 /// In-memory event stream published on every CRUD action.
 pub mod streaming;
+/// CLI tasks (`cargo loco task <name>`).
+pub mod tasks;
 /// Field-level validation for incoming `Organization` payloads (→ `422`).
 pub mod validation;
 /// Header-based API versioning (`Accepts-version`) for the REST surface.

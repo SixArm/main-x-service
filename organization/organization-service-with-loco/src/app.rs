@@ -129,6 +129,11 @@ impl Hooks for App {
         // `ORGANIZATION_EVENT_RELAY` are set, so the default `memory`
         // transport never spawns it.
         crate::relay::spawn(ctx.db.clone());
+        // Rebuild the full-text index if it is empty while records exist
+        // — the upgrade path for a deployment whose data predates the
+        // index, and the recovery path for an index directory that did
+        // not survive a restart. A no-op on a normal boot.
+        crate::tasks::search::spawn_reindex_if_empty(ctx.db.clone());
         // Blanket auth enforcement, gated by `ORGANIZATION_REQUIRE_AUTH`
         // (off by default). The layer is added unconditionally; the flag
         // is read per request inside the middleware. Header-based API
@@ -155,6 +160,7 @@ impl Hooks for App {
     /// so the loco generator can splice tasks in later.
     #[allow(unused_variables)]
     fn register_tasks(tasks: &mut Tasks) {
+        tasks.register(crate::tasks::search::SearchReindex);
         // tasks-inject (do not remove)
     }
     /// Truncate all tables between tests (request-suite setup).

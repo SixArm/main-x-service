@@ -40,6 +40,7 @@ fn acme() -> serde_json::Value {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn can_create_and_round_trip() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.post("/api/organizations").json(&acme()).await;
         assert_eq!(response.status_code(), 200, "create should succeed");
@@ -66,6 +67,7 @@ async fn can_create_and_round_trip() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn blank_name_returns_422() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
             .post("/api/organizations")
@@ -81,6 +83,7 @@ async fn blank_name_returns_422() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn update_with_blank_name_returns_422() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created: serde_json::Value = request
             .post("/api/organizations")
@@ -103,6 +106,7 @@ async fn update_with_blank_name_returns_422() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn get_unknown_pid_returns_404() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
             .get("/api/organizations/00000000-0000-4000-8000-000000000000")
@@ -112,12 +116,13 @@ async fn get_unknown_pid_returns_404() {
     .await;
 }
 
-/// Case-insensitive name search finds the seeded record; blank `q`
-/// is a `400`.
+/// Full-text search finds the seeded record (case-insensitively, and
+/// across the secondary indexed fields); blank `q` is a `400`.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn can_search_by_name() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         request.post("/api/organizations").json(&acme()).await;
         request
@@ -132,8 +137,149 @@ async fn can_search_by_name() {
         assert_eq!(hits.len(), 1, "only Acme should match");
         assert_eq!(hits[0]["name"], "Acme, Inc.");
 
+        // Tantivy indexes more than the primary name: a keyword hits
+        // the same record, which the old `ILIKE name` search could not.
+        let by_keyword = request.get("/api/organizations/search?q=anvils").await;
+        let hits: serde_json::Value = by_keyword.json();
+        assert_eq!(hits.as_array().expect("array")[0]["name"], "Acme, Inc.");
+
         let blank = request.get("/api/organizations/search?q=%20").await;
         assert_eq!(blank.status_code(), 400, "blank q is a bad request");
+    })
+    .await;
+}
+
+/// The index tracks the record's lifecycle: a renamed record is found
+/// under its new name and not its old one, and a deleted record stops
+/// being a hit even though its row survives (soft delete).
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn search_index_follows_update_and_delete() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created: serde_json::Value = request
+            .post("/api/organizations")
+            .json(&json!({"name": "Initech"}))
+            .await
+            .json();
+        let pid = created["pid"].as_str().expect("pid").to_string();
+
+        let names = |body: serde_json::Value| -> Vec<String> {
+            body.as_array()
+                .expect("array of refs")
+                .iter()
+                .map(|h| h["name"].as_str().unwrap_or_default().to_string())
+                .collect()
+        };
+
+        assert_eq!(
+            names(
+                request
+                    .get("/api/organizations/search?q=Initech")
+                    .await
+                    .json()
+            ),
+            vec!["Initech".to_string()]
+        );
+
+        request
+            .put(&format!("/api/organizations/{pid}"))
+            .json(&json!({"name": "Initrode"}))
+            .await;
+        assert_eq!(
+            names(
+                request
+                    .get("/api/organizations/search?q=Initrode")
+                    .await
+                    .json()
+            ),
+            vec!["Initrode".to_string()],
+            "the new name must be searchable"
+        );
+        assert!(
+            names(
+                request
+                    .get("/api/organizations/search?q=Initech")
+                    .await
+                    .json()
+            )
+            .is_empty(),
+            "the superseded name must stop matching"
+        );
+
+        request.delete(&format!("/api/organizations/{pid}")).await;
+        assert!(
+            names(
+                request
+                    .get("/api/organizations/search?q=Initrode")
+                    .await
+                    .json()
+            )
+            .is_empty(),
+            "a soft-deleted record must leave the index"
+        );
+    })
+    .await;
+}
+
+/// Fuzzy and phonetic retrieval are reachable from the wire, and are
+/// genuinely different from the exact search (which misses both).
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn search_supports_fuzzy_and_phonetic_modes() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        request
+            .post("/api/organizations")
+            .json(&json!({"name": "Northwind Traders"}))
+            .await;
+
+        let count = |body: serde_json::Value| body.as_array().expect("array").len();
+
+        // A typo: exact misses, fuzzy finds.
+        assert_eq!(
+            count(
+                request
+                    .get("/api/organizations/search?q=Northwnd")
+                    .await
+                    .json()
+            ),
+            0
+        );
+        assert_eq!(
+            count(
+                request
+                    .get("/api/organizations/search?q=Northwnd&fuzzy=true")
+                    .await
+                    .json()
+            ),
+            1,
+            "fuzzy must tolerate one dropped letter"
+        );
+
+        // A homophone: exact misses, phonetic finds (Traders/Traderz
+        // share the Soundex code T636).
+        assert_eq!(
+            count(
+                request
+                    .get("/api/organizations/search?q=Traderz")
+                    .await
+                    .json()
+            ),
+            0
+        );
+        assert_eq!(
+            count(
+                request
+                    .get("/api/organizations/search?q=Traderz&phonetic=true")
+                    .await
+                    .json()
+            ),
+            1,
+            "phonetic must match on sound, not spelling"
+        );
     })
     .await;
 }
@@ -144,6 +290,7 @@ async fn can_search_by_name() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn can_check_duplicates() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created: serde_json::Value = request
             .post("/api/organizations")
@@ -172,6 +319,170 @@ async fn can_check_duplicates() {
     .await;
 }
 
+/// The index is reconstructible from the database: wiping it makes
+/// search go blind, and `search_reindex` restores every active record.
+/// This is the recovery path for a lost index volume, so it is worth a
+/// real test rather than a manual runbook step.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn reindex_rebuilds_the_index_from_the_database() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, ctx| async move {
+        for name in ["Umbrella Corporation", "Tyrell Corporation"] {
+            request
+                .post("/api/organizations")
+                .json(&json!({"name": name}))
+                .await;
+        }
+        let found = |body: serde_json::Value| body.as_array().expect("array").len();
+        assert_eq!(
+            found(
+                request
+                    .get("/api/organizations/search?q=Corporation")
+                    .await
+                    .json()
+            ),
+            2
+        );
+
+        // Simulate a lost index.
+        let engine = organization_service::search::engine().expect("index available");
+        engine.clear().expect("clear");
+        assert_eq!(
+            found(
+                request
+                    .get("/api/organizations/search?q=Corporation")
+                    .await
+                    .json()
+            ),
+            0,
+            "an emptied index really does go blind"
+        );
+
+        // Page size 1 so the rebuild crosses page boundaries.
+        let report = organization_service::tasks::search::reindex(&ctx.db, 1)
+            .await
+            .expect("reindex");
+        assert_eq!(report.indexed, 2, "both active rows re-indexed");
+        assert_eq!(report.skipped, 0);
+        assert_eq!(
+            found(
+                request
+                    .get("/api/organizations/search?q=Corporation")
+                    .await
+                    .json()
+            ),
+            2,
+            "search is restored from the database alone"
+        );
+    })
+    .await;
+}
+
+/// The boot-time self-heal: an empty index over a populated table is
+/// rebuilt, so a deployment whose data predates the index (or whose
+/// index volume was lost) does not silently serve empty search results
+/// until someone runs a task by hand. A non-empty index is left alone,
+/// so a normal restart costs nothing.
+///
+/// Calls the rebuild directly rather than relying on the boot hook: the
+/// hook spawns it in the background, and awaiting a race is how a test
+/// ends up passing whether or not the code under test is there.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn boot_rebuilds_an_empty_index_over_a_populated_table() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, ctx| async move {
+        // Write straight through the model, bypassing the handler — so
+        // the row exists and was never indexed, exactly like data
+        // predating the index.
+        organization_service::models::organizations::Model::create(
+            &ctx.db,
+            &organization_matcher::Organization::new("Weyland-Yutani"),
+        )
+        .await
+        .expect("seed");
+        organization_service::search::engine()
+            .expect("index available")
+            .clear()
+            .expect("clear");
+
+        let body: serde_json::Value = request
+            .get("/api/organizations/search?q=Weyland")
+            .await
+            .json();
+        assert_eq!(
+            body.as_array().expect("array").len(),
+            0,
+            "precondition: the un-indexed record is invisible to search"
+        );
+
+        let report = organization_service::tasks::search::reindex_if_empty(&ctx.db)
+            .await
+            .expect("rebuild")
+            .expect("an empty index over a populated table must rebuild");
+        assert_eq!(report.indexed, 1);
+
+        let body: serde_json::Value = request
+            .get("/api/organizations/search?q=Weyland")
+            .await
+            .json();
+        assert_eq!(body.as_array().expect("array").len(), 1);
+
+        // Second call: the index now has documents, so it must decline
+        // rather than rebuild again (a restart must not re-scan).
+        assert!(
+            organization_service::tasks::search::reindex_if_empty(&ctx.db)
+                .await
+                .expect("second check")
+                .is_none(),
+            "a non-empty index must be left alone"
+        );
+    })
+    .await;
+}
+
+/// check-duplicates blocks on the search index rather than scanning, so
+/// this pins the case a name-only block would lose: two records sharing
+/// an LEI but nothing else. The matcher short-circuits such a pair to
+/// `1.0`, which is worthless if candidate selection never surfaces it.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn check_duplicates_blocks_on_identifier_not_only_name() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        // A valid LEI (ISO 7064 MOD 97-10), or create would be a 422.
+        let lei = json!([{"scheme": "Lei", "value": "5493001KJTIIGC8Y1R12"}]);
+        let stored: serde_json::Value = request
+            .post("/api/organizations")
+            .json(&json!({
+                "name": "Wholly Unrelated Trading Company",
+                "identifiers": lei,
+            }))
+            .await
+            .json();
+        let pid = stored["pid"].as_str().expect("pid");
+
+        let response = request
+            .post("/api/organizations/check-duplicates")
+            .json(&json!({"name": "Acme, Inc.", "identifiers": lei}))
+            .await;
+        assert_eq!(response.status_code(), 200);
+        let hits: serde_json::Value = response.json();
+        let hits = hits.as_array().expect("array of scored refs");
+        assert_eq!(hits.len(), 1, "the shared LEI must surface the record");
+        assert_eq!(hits[0]["pid"], pid);
+        assert!(
+            (hits[0]["score"].as_f64().expect("score") - 1.0).abs() < f64::EPSILON,
+            "a shared LEI is a deterministic match"
+        );
+    })
+    .await;
+}
+
 /// Merge folds a duplicate into a survivor: list fields union, the
 /// duplicate's name becomes an alternate name, the duplicate is
 /// soft-deleted, and a merge-history row + `merged` event are written.
@@ -179,6 +490,7 @@ async fn can_check_duplicates() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn merge_folds_duplicate_into_survivor() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let main: serde_json::Value = request
             .post("/api/organizations")
@@ -250,6 +562,7 @@ async fn merge_folds_duplicate_into_survivor() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn merge_with_equal_pids_is_422() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created: serde_json::Value = request
             .post("/api/organizations")
@@ -272,6 +585,7 @@ async fn merge_with_equal_pids_is_422() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn whoami_without_token_is_401() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.get("/api/organizations/whoami").await;
         assert_eq!(response.status_code(), 401, "whoami needs a bearer token");
@@ -313,6 +627,7 @@ async fn require_auth_gate_blocks_unauthed_list_but_allows_openapi() {
         );
         return;
     }
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let protected = request.get("/api/organizations").await;
         assert_eq!(
@@ -342,6 +657,7 @@ async fn require_auth_gate_blocks_unauthed_list_but_allows_openapi() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn crud_publishes_created_updated_deleted_events() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created: serde_json::Value = request
             .post("/api/organizations")
@@ -387,6 +703,7 @@ async fn crud_publishes_created_updated_deleted_events() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn audit_endpoints_record_crud_actions() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created: serde_json::Value = request
             .post("/api/organizations")
@@ -436,6 +753,7 @@ async fn audit_endpoints_record_crud_actions() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn merge_unknown_pid_is_404() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created: serde_json::Value = request
             .post("/api/organizations")
@@ -463,6 +781,7 @@ async fn merge_unknown_pid_is_404() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn deduplicate_review_queue_round_trip() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         for name in ["Acme, Inc.", "Acme Inc"] {
             let mut org = acme();

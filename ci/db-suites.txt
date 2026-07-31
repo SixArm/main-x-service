@@ -23,6 +23,18 @@ workforce-planning-management/workforce-planning-management-service-with-rust
 person/person-service-with-loco
 worker/worker-service-with-loco
 content-management-system/content-management-system-service-with-rust
+organization/organization-service-with-loco
+#
+# organization was enrolled on 2026-07-31, alongside its move from the
+# Postgres `ILIKE` name search to Tantivy (tasks.md S-1). Its 22 DB-gated
+# tests were observed green against a freshly created Postgres 18
+# database — a fresh DB specifically, because the suite's earlier passes
+# had leftover rows from previous runs, and one of the new tests was
+# found to be passing on a race rather than on the code under test. The
+# search behaviour is exactly the kind that only a database can prove:
+# that an index hit resolves to a live row, that a soft-deleted record
+# leaves the index, and that `search_reindex` rebuilds from the table
+# alone.
 #
 # content-management-system was enrolled on 2026-07-30, with its first
 # code round (CMS-T1-T4): 6 request tests + 1 enforcement binary observed

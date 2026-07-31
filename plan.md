@@ -42,7 +42,7 @@ Known gaps (verified against the tree, not memory):
 
 | Gap | Where |
 |---|---|
-| Tantivy full-text (ILIKE only) | organization, care-pathway, case, portfolio |
+| Tantivy full-text (ILIKE only) | care-pathway, case, portfolio (organization landed 2026-07-31 — the loco-adapted reference for the other three) |
 | Privacy module (masking/GDPR/consent) | organization, care-pathway, case, portfolio |
 | Fluvio: live sink + consumer | all 10 services (sink), link-graph (consumer); fluvio deps in 5 older crates are dormant |
 | Envelope `data` field + `Linked`/`Unlinked` kinds | only case has it; person's link events deferred because its envelope can't carry §4.2 data |

@@ -9,6 +9,56 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — Tantivy full-text search, fuzzy + phonetic, dedup blocking (2026-07-31)
+
+- **`src/search/`** — a Tantivy index (`index.rs`: schema + lifecycle;
+  `mod.rs`: the `SearchEngine` facade and a process-wide `OnceLock`
+  engine). Indexed: `name`, `legal_name`, `alternate_names`, Soundex
+  codes of every name token, identifier values, `keywords`, the
+  flattened postal address, `url` (full-text) plus `jurisdiction` and
+  `active` (exact). Only `pid` is stored — hits are resolved against
+  Postgres, which stays the source of truth.
+- **`GET /api/organizations/search`** is now full-text and ranked, with
+  `fuzzy=true` (Levenshtein ≤ 2) and `phonetic=true` (Soundex). Blank
+  `q` is still `400`; an unopenable index is `503` rather than an empty
+  result, so a broken index cannot masquerade as "no matches". A query
+  Tantivy's parser rejects falls back to an OR over its tokens.
+- **`POST /api/organizations/check-duplicates` now blocks on the index**
+  (fuzzy name + exact identifier + phonetic routes, ≤ 200 candidates)
+  instead of scanning up to 1000 rows. This removes the scale cliff
+  where record 1001 was unreachable however obvious a duplicate it was;
+  in particular a record sharing only an LEI, under a completely
+  different name, is now found (pinned by a request test).
+- **Indexing is wired into `src/streaming.rs`**, the single seam both
+  the native and the FHIR controllers write through: create/update
+  replace the document in place, delete and the duplicate side of a
+  merge remove it. It runs after the write is durable and is
+  best-effort — a failed index write is logged at `ERROR` and never
+  fails a request that already committed.
+- **`cargo loco task search_reindex`** (`src/tasks/search.rs`) rebuilds
+  the index from the database (paginated, clears first, skips and
+  counts unreadable payloads), and an **empty index over a populated
+  table is rebuilt automatically at boot** — so an upgrade or a lost
+  index volume self-heals. `ORGANIZATION_SEARCH_BOOT_REINDEX=0` opts
+  out.
+- New environment variables: `ORGANIZATION_SEARCH_INDEX_PATH`
+  (default `data/search-index`) and `ORGANIZATION_SEARCH_BOOT_REINDEX`
+  (default on).
+- Tests: 16 DB-free search unit pins and 6 DB-gated request tests
+  (keyword hit, index follows update + delete, fuzzy/phonetic over the
+  wire, identifier-only duplicate blocking, `search_reindex` rebuild,
+  boot self-heal). The DB-gated suite is 22 tests and green against
+  Postgres 18.
+
+### Removed
+
+- The Postgres `ILIKE '%q%'` name search (`Model::search`) and its
+  `escape_like` wildcard guard (SEC-G4). This crate now issues no
+  `LIKE` query at all, so leaving an unused escaper behind would only
+  invite a future caller to assume it was still wired in. The sibling
+  care-pathway / case services keep theirs — they still search with
+  `ILIKE`.
+
 ### Added — batch dedup + stored review queue + decision endpoints (2026-07-19)
 
 - `POST /api/organizations/deduplicate` — pairwise batch scan (up to the

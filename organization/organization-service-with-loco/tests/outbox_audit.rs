@@ -29,6 +29,16 @@ async fn outbox_create_and_emit_writes_entity_event_and_audit_atomically() {
     // edition 2024; single-threaded test setup.
     unsafe {
         std::env::set_var("ORGANIZATION_EVENT_TRANSPORT", "outbox");
+        // Keep this binary's indexing out of the working directory: the
+        // emit path also indexes, and a test should not leave an index
+        // behind in the crate. Same reasoning as `requests::mod`.
+        std::env::set_var(
+            "ORGANIZATION_SEARCH_INDEX_PATH",
+            std::env::temp_dir().join(format!(
+                "organization-service-test-index-{}",
+                std::process::id()
+            )),
+        );
     }
 
     request::<App, _, _>(|_request, ctx| async move {

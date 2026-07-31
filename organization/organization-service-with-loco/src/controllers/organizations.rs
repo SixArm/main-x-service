@@ -218,41 +218,56 @@ async fn match_against(Json(req): Json<MatchRequest>) -> Result<Response> {
     format::json(results)
 }
 
-/// Maximum number of stored organizations scanned per `check-duplicates`
-/// request.
+/// Maximum number of stored organizations scanned per **batch
+/// deduplication** request.
 ///
-/// `check-duplicates` does an in-memory full scan: it loads up to this
-/// many rows and scores the query against each. The cap bounds the
-/// request's memory and latency, but it is a known scale cliff — beyond
-/// this many active organizations the scan silently misses candidates.
-/// When the scan returns exactly this many rows the handler logs a
-/// `WARN` so the truncation is observable rather than silent. Lifting
-/// the cap requires blocking / candidate pre-selection (spec §6 R-DUP,
-/// task T-7); until then this constant is the single source of truth for
-/// the limit and is asserted by tests.
+/// `deduplicate` scores every unordered pair, so it necessarily loads
+/// rows in bulk; the cap bounds the request's memory and its quadratic
+/// pair count. Hitting it is logged at `WARN`, because pairs beyond the
+/// cap are silently missed. (`check-duplicates`, which scores one query
+/// against the store, no longer scans at all — it blocks on the search
+/// index instead; see [`CHECK_DUPLICATES_CANDIDATE_LIMIT`].)
 pub const CHECK_DUPLICATES_SCAN_CAP: u64 = 1000;
+
+/// Maximum number of **blocked candidates** `check-duplicates` scores a
+/// query against.
+///
+/// The search index supplies these — fuzzy name, exact identifier, and
+/// phonetic routes ([`crate::search::SearchEngine::candidates`]) — so
+/// this is a bound on how many *plausible* records are scored, not on
+/// how much of the table is read. That is the difference that removes
+/// the old scale cliff: with a full scan, record 1001 was unreachable no
+/// matter how obvious a duplicate it was; with blocking, reachability
+/// depends on similarity rather than on insertion order.
+pub const CHECK_DUPLICATES_CANDIDATE_LIMIT: usize = 200;
 
 /// Find stored organizations that match the query above the threshold.
 ///
 /// `POST /api/organizations/check-duplicates`. Body: an `Organization`.
-/// Loads up to [`CHECK_DUPLICATES_SCAN_CAP`] active rows and scores each
-/// against the query, returning `200` with the matching [`ScoredRef`]s
-/// sorted by descending score. An in-memory full scan (no blocking yet),
-/// so it logs a `WARN` when it hits the cap (results may be truncated).
+/// Retrieves up to [`CHECK_DUPLICATES_CANDIDATE_LIMIT`] blocked
+/// candidates from the search index, scores each against the query with
+/// the matcher, and returns `200` with the matching [`ScoredRef`]s
+/// sorted by descending score.
 #[debug_handler]
 async fn check_duplicates(
     State(ctx): State<AppContext>,
     Json(query): Json<Organization>,
 ) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
-    let rows = OrgModel::list(&ctx.db, CHECK_DUPLICATES_SCAN_CAP).await?;
-    if rows.len() as u64 == CHECK_DUPLICATES_SCAN_CAP {
-        tracing::warn!(
-            cap = CHECK_DUPLICATES_SCAN_CAP,
-            "check-duplicates scan hit the row cap; results may be truncated \
-             (silent miss of candidates beyond the cap). See task T-7."
-        );
-    }
+    // Blocking, not scanning. An unavailable index is surfaced rather
+    // than silently answering "no duplicates" — that answer would let a
+    // caller create a duplicate believing it had been checked.
+    let Some(index) = crate::search::engine() else {
+        return Err(Error::CustomError(
+            StatusCode::SERVICE_UNAVAILABLE,
+            ErrorDetail::new(
+                "search_unavailable",
+                "the search index is unavailable, so duplicates cannot be checked",
+            ),
+        ));
+    };
+    let hits = index.candidates(&query, CHECK_DUPLICATES_CANDIDATE_LIMIT)?;
+    let rows = OrgModel::find_by_pids(&ctx.db, &parse_pids(&hits)).await?;
     let mut hits: Vec<ScoredRef> = Vec::new();
     for row in &rows {
         let candidate = row.to_org()?;
@@ -401,7 +416,8 @@ async fn deduplicate(
         tracing::warn!(
             cap = CHECK_DUPLICATES_SCAN_CAP,
             "deduplicate scan hit the row cap; pairs beyond the cap are \
-             silently missed. See task T-7."
+             silently missed. Batch dedup is inherently a bulk scan; run \
+             it more often, or narrow the corpus."
         );
     }
     let orgs: Vec<(uuid::Uuid, Organization)> = rows
@@ -559,30 +575,81 @@ async fn review_decision(
     }
 }
 
-/// Query string for the name-search endpoint: the optional `q` term.
+/// Query string for the search endpoint: the `q` term plus the optional
+/// retrieval-mode flags.
 #[derive(Debug, Deserialize)]
 struct SearchParams {
-    /// The case-insensitive substring to search names for.
+    /// The full-text query.
     q: Option<String>,
+    /// Typo-tolerant retrieval (Levenshtein distance ≤ 2) instead of
+    /// exact term matching.
+    #[serde(default)]
+    fuzzy: bool,
+    /// Phonetic (Soundex) retrieval — names that *sound* alike.
+    #[serde(default)]
+    phonetic: bool,
 }
 
-/// Case-insensitive name search: `GET /api/organizations/search?q=acme`.
+/// Maximum results returned by `GET /search`. Unchanged from the `ILIKE`
+/// era, so the wire contract is the same size.
+pub const SEARCH_LIMIT: usize = 50;
+
+/// Full-text search: `GET /api/organizations/search?q=acme[&fuzzy][&phonetic]`.
 ///
-/// Returns `200` with up to 50 matching `OrgRef`s (`ILIKE '%q%'` over
-/// active rows). A missing or blank `q` is `400` — an empty search would
+/// Tantivy-backed (spec §13): tokenised full-text over name, legal name,
+/// alternate names, identifier values, keywords, address, and URL, with
+/// `fuzzy=true` for typo tolerance and `phonetic=true` for Soundex.
+/// Returns `200` with up to [`SEARCH_LIMIT`] `OrgRef`s, ranked by
+/// relevance. A missing or blank `q` is `400` — an empty search would
 /// match everything, which is treated as a malformed request.
+///
+/// Hits are resolved against Postgres, which is the source of truth, so
+/// an index entry for a deleted record cannot surface here.
 #[debug_handler]
 async fn search(
     axum::extract::Query(params): axum::extract::Query<SearchParams>,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
     let q = params.q.unwrap_or_default();
-    if q.trim().is_empty() {
+    let q = q.trim();
+    if q.is_empty() {
         return bad_request("query parameter `q` is required");
     }
-    let rows = OrgModel::search(&ctx.db, q.trim(), 50).await?;
+    // An unavailable index is reported, never disguised as "no matches":
+    // an operator must be able to tell a broken index from an empty one.
+    let Some(engine) = crate::search::engine() else {
+        return Err(Error::CustomError(
+            StatusCode::SERVICE_UNAVAILABLE,
+            ErrorDetail::new("search_unavailable", "the search index is unavailable"),
+        ));
+    };
+    let pids = if params.phonetic {
+        engine.phonetic_search(q, SEARCH_LIMIT)?
+    } else if params.fuzzy {
+        engine.fuzzy_search(q, SEARCH_LIMIT)?
+    } else {
+        engine.search(q, SEARCH_LIMIT)?
+    };
+    let rows = OrgModel::find_by_pids(&ctx.db, &parse_pids(&pids)).await?;
     let refs: Vec<OrgRef> = rows.iter().map(OrgRef::of).collect();
     format::json(refs)
+}
+
+/// Parse index hits into UUIDs, dropping any that will not parse.
+///
+/// A malformed stored id can only come from a corrupted index, and the
+/// right response is to ignore that hit rather than fail a search that
+/// has other perfectly good results.
+fn parse_pids(hits: &[String]) -> Vec<uuid::Uuid> {
+    hits.iter()
+        .filter_map(|s| match uuid::Uuid::parse_str(s) {
+            Ok(id) => Some(id),
+            Err(err) => {
+                tracing::warn!(hit = %s, error = %err, "index hit is not a UUID; ignoring");
+                None
+            }
+        })
+        .collect()
 }
 
 /// Merge a confirmed-duplicate organization into a surviving (main)
@@ -760,15 +827,41 @@ mod tests {
         assert!(validate(&org).is_ok());
     }
 
-    /// DB-free pin for task T-7 (observable cap): the `check-duplicates`
-    /// scan cap is the named constant the handler queries with, so a
-    /// scan returning exactly this many rows is the truncation trigger.
-    /// Pinning the value here keeps the constant the single source of
-    /// truth (request-level truncation behaviour is exercised by the
-    /// Postgres-gated suite).
+    /// DB-free pin: the batch-dedup scan cap is the named constant the
+    /// handler queries with, so a scan returning exactly this many rows
+    /// is the truncation trigger. Pinning the value keeps the constant
+    /// the single source of truth (request-level truncation behaviour is
+    /// exercised by the Postgres-gated suite).
     #[test]
-    fn check_duplicates_scan_cap_is_pinned() {
+    fn deduplicate_scan_cap_is_pinned() {
         assert_eq!(CHECK_DUPLICATES_SCAN_CAP, 1000);
+    }
+
+    /// The blocked-candidate limit is a *candidate* bound, not a table
+    /// scan: it must stay well under the batch cap, or blocking would be
+    /// no cheaper than the scan it replaced.
+    #[test]
+    fn check_duplicates_candidate_limit_is_pinned() {
+        assert_eq!(CHECK_DUPLICATES_CANDIDATE_LIMIT, 200);
+        assert!(
+            (CHECK_DUPLICATES_CANDIDATE_LIMIT as u64) < CHECK_DUPLICATES_SCAN_CAP,
+            "blocking must consider fewer records than a full scan"
+        );
+    }
+
+    /// The search result cap is the documented wire contract.
+    #[test]
+    fn search_limit_is_pinned() {
+        assert_eq!(SEARCH_LIMIT, 50);
+    }
+
+    /// A corrupt (non-UUID) index hit is dropped rather than failing the
+    /// whole search.
+    #[test]
+    fn parse_pids_drops_unparseable_hits() {
+        let good = uuid::Uuid::new_v4();
+        let parsed = parse_pids(&[good.to_string(), "not-a-uuid".to_string()]);
+        assert_eq!(parsed, vec![good]);
     }
 
     /// Review statuses serialize as the family's lowercase wire tokens,

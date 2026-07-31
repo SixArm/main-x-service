@@ -32,7 +32,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 |---|---|---|
 | POST | `/api/organizations` | Create (body: `Organization`) → `{pid, name}` |
 | GET | `/api/organizations` | List active (capped 100) |
-| GET | `/api/organizations/search?q=` | Case-insensitive name search |
+| GET | `/api/organizations/search?q=[&fuzzy][&phonetic]` | Tantivy full-text search (name, legal name, alternate names, identifiers, keywords, address, url); `fuzzy` = typo-tolerant, `phonetic` = Soundex |
 | GET | `/api/organizations/{pid}` | Fetch the stored `Organization` |
 | PUT | `/api/organizations/{pid}` | Replace payload |
 | DELETE | `/api/organizations/{pid}` | Soft-delete |
@@ -60,9 +60,15 @@ CRUD + matching + **name search** + **record merge** + **audit log** +
 **request-level tests** (Postgres, `#[ignore]`-gated) are wired. The
 wire format is snake_case (`legal_name`, `same_as`, …) and validation
 failures return `422`. Blanket `/api/*` auth enforcement is implemented
-(`auth::enforce`, default-off via `ORGANIZATION_REQUIRE_AUTH`). Still
-deferred (spec §13): Tantivy full-text (this uses Postgres `ILIKE`),
-per-field privacy/GDPR export, richer validation. The published-Ed25519-key
+(`auth::enforce`, default-off via `ORGANIZATION_REQUIRE_AUTH`).
+**Tantivy full-text search** (`src/search/`) replaced the Postgres
+`ILIKE` name search: fuzzy + phonetic retrieval, and `check-duplicates`
+blocks on the index rather than scanning. The index is derived — every
+hit is resolved against Postgres — and rebuildable via
+`cargo loco task search_reindex` (plus an automatic boot rebuild when it
+is empty and the table is not). Still deferred (spec §13): per-field
+privacy/GDPR export, richer validation, and moving the structured FHIR
+search onto the index. The published-Ed25519-key
 set is fetched over HTTP once at boot when `ORGANIZATION_PASETO_KEYS_URL`
 is set (fetched set wins; warn + env fallback via
 `ORGANIZATION_PASETO_KEYS` otherwise — the service always boots); a
@@ -94,7 +100,9 @@ changed. See
 src/
 ├── app.rs                 loco Hooks (routes, truncate)
 ├── bin/main.rs            loco CLI entrypoint
-├── controllers/organizations.rs   CRUD + match + check-duplicates
+├── controllers/organizations.rs   CRUD + match + check-duplicates + search
+├── search/                Tantivy index (index.rs schema, mod.rs engine)
+├── tasks/search.rs        `search_reindex` + boot self-heal
 ├── controllers/metrics.rs  GET /metrics.prom (root, public)
 ├── metrics.rs              process-wide Prometheus registry (OnceLock)
 ├── models/

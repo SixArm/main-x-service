@@ -81,16 +81,50 @@
 
 ## Phase 2 — Capability completion (four newest loco services)
 
-- [ ] **S-1 (L)** Tantivy full-text search in **organization**.
-  Reference: any older service's `src/search/` (index, query, engine
-  wrapper) — but adapt the index lifecycle to loco (index path from
-  config; index writes after create/update/delete/merge; rebuild task).
-  Replace ILIKE search handler; add fuzzy + phonetic per
-  `agents/share/search.md`; keep the REST contract (`?q=`).
-  Also wire **search-blocked candidate selection** into
-  check-duplicates (drop the scan-cap warning path).
-  *Verify:* green gate; DB-gated search round-trip test; spec §13 +
-  CHANGELOG; H-2 matrix updated.
+- [x] **S-1 (L)** Tantivy full-text search in **organization**.
+  *(done 2026-07-31)* `src/search/{index,mod}.rs` — schema (`pid`
+  stored; name / legal name / alternate names / Soundex codes /
+  identifiers / keywords / flattened address / url full-text;
+  `jurisdiction` + `active` exact) and a `SearchEngine` facade behind a
+  process-wide `OnceLock` keyed on `ORGANIZATION_SEARCH_INDEX_PATH`
+  (default `data/search-index`). Index writes are wired into
+  `src/streaming.rs` — the single seam both the native and the FHIR
+  controllers write through — after the DB write is durable and
+  best-effort (a failed index write is logged at `ERROR`, never fails a
+  committed request). `GET /search` keeps `?q=` and gains
+  `fuzzy` / `phonetic`; `check-duplicates` now **blocks** on the index
+  (≤ 200 candidates) instead of scanning 1000 rows, so a duplicate's
+  reachability depends on similarity, not insertion order. Rebuild:
+  `cargo loco task search_reindex` plus an automatic boot rebuild when
+  the index is empty and the table is not
+  (`ORGANIZATION_SEARCH_BOOT_REINDEX=0` opts out).
+  *Verified:* `cargo fmt --check` + `clippy --all-targets -D warnings`
+  clean; **127** DB-free tests; **22** DB-gated tests green vs
+  Postgres 18. The new DB-gated tests were mutation-checked (disabling
+  indexing fails 6 of them), which is how the first version of the
+  boot-rebuild test was caught passing vacuously — it raced the boot
+  hook's own background rebuild, so the rebuild is now split into an
+  awaitable `reindex_if_empty` (tested directly) and a thin `spawn_`
+  wrapper the request suite switches off.
+
+  Three decisions worth not re-litigating:
+  - **The index is a candidate generator, never a source of truth.**
+    Every hit is resolved against Postgres and soft-deleted rows do not
+    resolve, so a stale index degrades (a missing hit) rather than
+    corrupts (it can never resurrect or leak a deleted record).
+  - **A broken index is `503`, not an empty result.** Especially on
+    `check-duplicates`: answering "no duplicates" from an unopenable
+    index would let a caller create a duplicate believing it had been
+    checked.
+  - **The `ILIKE` search and its `escape_like` guard were deleted, not
+    left dormant.** The crate now issues no `LIKE` query, and an
+    escaper with no caller invites a future caller to assume it is
+    still wired in. care-pathway / case keep theirs — they still use
+    `ILIKE`.
+
+  Not done here: the FHIR `GET /fhir/Organization` search is a
+  structured multi-parameter filter over a capped scan, not a free-text
+  query; moving it onto the index is a separate item.
 
 - [ ] **S-2 (L)** Tantivy in **care-pathway** (as S-1). Depends: S-1
   (copy its loco-adapted pattern, not the pre-loco one).

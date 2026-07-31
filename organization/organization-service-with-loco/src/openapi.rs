@@ -67,10 +67,18 @@ fn crud_paths() -> Value {
             "/api/organizations/search": {
                 "get": {
                     "tags": ["search"],
-                    "summary": "Case-insensitive name search",
-                    "parameters": [{ "name": "q", "in": "query", "required": true, "schema": { "type": "string" } }],
-                    "responses": { "200": { "description": "Matches",
-                        "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/OrgRef" } } } } } }
+                    "summary": "Full-text search (Tantivy) over name, legal name, alternate names, identifiers, keywords, address, and URL",
+                    "parameters": [
+                        { "name": "q", "in": "query", "required": true, "schema": { "type": "string" } },
+                        { "name": "fuzzy", "in": "query", "required": false, "description": "Typo-tolerant retrieval (Levenshtein distance <= 2)", "schema": { "type": "boolean", "default": false } },
+                        { "name": "phonetic", "in": "query", "required": false, "description": "Phonetic (Soundex) retrieval; takes precedence over `fuzzy`", "schema": { "type": "boolean", "default": false } }
+                    ],
+                    "responses": {
+                        "200": { "description": "Matches, ranked by relevance (max 50)",
+                            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/OrgRef" } } } } },
+                        "400": { "description": "Missing or blank `q`" },
+                        "503": { "description": "The search index is unavailable" }
+                    }
                 }
             },
             "/api/organizations/match": {
@@ -84,10 +92,13 @@ fn crud_paths() -> Value {
             "/api/organizations/check-duplicates": {
                 "post": {
                     "tags": ["matching"],
-                    "summary": "Match a query against stored organizations",
+                    "summary": "Match a query against stored organizations (candidates blocked via the search index)",
                     "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Organization" } } } },
-                    "responses": { "200": { "description": "Scored matches",
-                        "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ScoredRef" } } } } } }
+                    "responses": {
+                        "200": { "description": "Scored matches",
+                            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ScoredRef" } } } } },
+                        "503": { "description": "The search index is unavailable, so duplicates cannot be checked" }
+                    }
                 }
             },
             "/api/organizations/deduplicate": {

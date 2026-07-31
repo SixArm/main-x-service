@@ -3,8 +3,6 @@
 
 use loco_rs::prelude::*;
 use organization_matcher::Organization as MatchOrg;
-use sea_orm::sea_query::Expr;
-use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
@@ -97,24 +95,37 @@ impl Model {
         org.ok_or_else(|| ModelError::EntityNotFound)
     }
 
-    /// Case-insensitive substring search on the denormalised `name`,
-    /// over active rows. (Postgres `ILIKE '%q%'`.) The query is wildcard-
-    /// escaped via [`escape_like`] so `%`/`_`/`\` in user input match
-    /// literally rather than acting as `LIKE` metacharacters.
+    /// Fetch the active rows for a list of public ids, **preserving the
+    /// order of `pids`**.
+    ///
+    /// The order matters: the caller is a search or blocking query whose
+    /// hits are already ranked by relevance, and re-sorting them by row
+    /// id would throw that ranking away. Ids that do not resolve (unknown
+    /// or soft-deleted — a stale index entry) are simply absent, which is
+    /// what keeps a drifted index from resurrecting a deleted record.
     ///
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn search(db: &DatabaseConnection, q: &str, limit: u64) -> ModelResult<Vec<Self>> {
-        let pattern = format!("%{}%", escape_like(q));
+    pub async fn find_by_pids(db: &DatabaseConnection, pids: &[Uuid]) -> ModelResult<Vec<Self>> {
+        if pids.is_empty() {
+            return Ok(Vec::new());
+        }
         let rows = organizations::Entity::find()
+            .filter(organizations::Column::Pid.is_in(pids.iter().copied()))
             .filter(organizations::Column::DeletedAt.is_null())
-            .filter(Expr::col(organizations::Column::Name).ilike(pattern))
-            .order_by_desc(organizations::Column::Id)
-            .limit(limit)
             .all(db)
             .await?;
-        Ok(rows)
+        // Re-order to match `pids` (the SQL `IN` result order is
+        // unspecified). Linear in `pids` × `rows`, both bounded by the
+        // caller's result limit.
+        let mut ordered = Vec::with_capacity(rows.len());
+        for pid in pids {
+            if let Some(row) = rows.iter().find(|r| r.pid == *pid) {
+                ordered.push(row.clone());
+            }
+        }
+        Ok(ordered)
     }
 
     /// List active organizations (most-recent first), capped at `limit`.
@@ -212,28 +223,13 @@ fn deleted_at_micros(stamp: Option<&chrono::DateTime<chrono::FixedOffset>>) -> O
     stamp.map(chrono::DateTime::timestamp_micros)
 }
 
-/// Escape `LIKE`/`ILIKE` wildcards in a user query so it matches
-/// literally: backslash first (so it can't re-enable a wildcard), then `%`
-/// and `_`. Used by [`Model::search`] to keep `name` search robust against
-/// metacharacter injection. Mirrors the sibling care-pathway / case services.
-fn escape_like(q: &str) -> String {
-    q.replace('\\', "\\\\")
-        .replace('%', "\\%")
-        .replace('_', "\\_")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::escape_like;
-
-    /// `escape_like` neutralises `%`, `_`, and `\` so a user query matches
-    /// literally rather than as `ILIKE` metacharacters.
-    #[test]
-    fn escape_like_neutralises_wildcards() {
-        assert_eq!(escape_like("acme"), "acme");
-        assert_eq!(escape_like("100%"), "100\\%");
-        assert_eq!(escape_like("a_b"), "a\\_b");
-        // Backslash is escaped first so it can't re-enable a wildcard.
-        assert_eq!(escape_like("a\\%"), "a\\\\\\%");
-    }
-}
+// The `ILIKE '%q%'` name search (and its `escape_like` wildcard guard,
+// SEC-G4) lived here until search moved to Tantivy (spec §13). Both were
+// removed rather than left dormant: this crate now issues no `LIKE`
+// query at all, so an escaper with no caller would only invite a future
+// caller to assume it was still wired in. The sibling care-pathway /
+// case services keep theirs, because they still search with `ILIKE`.
+//
+// This module's remaining behaviour is all database access, exercised by
+// the Postgres-gated suite (`tests/requests/organizations.rs`); there is
+// no pure logic left here to unit-test.
