@@ -1,0 +1,46 @@
+{
+  "name": "content-management-system-front-end-with-svelte",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SvelteKit authoring/editorial front-end for the Content Management System Service (Main X Index): content types, block authoring, revisions, assets, workflow, localization, delivery preview, insights.",
+  "license": "MIT OR Apache-2.0",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "format": "prettier --write src",
+    "lint": "prettier --check src"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@sveltejs/adapter-auto": "^4.0.0",
+    "@sveltejs/kit": "^2.55.0",
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "@testing-library/svelte": "^5.3.1",
+    "@types/node": "^22.0.0",
+    "jsdom": "^26.1.0",
+    "prettier": "^3.3.0",
+    "prettier-plugin-svelte": "^3.3.0",
+    "svelte": "^5.53.0",
+    "svelte-check": "^4.2.0",
+    "typescript": "^5.8.0",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "dependencies": {
+    "@svar-ui/svelte-grid": "^2.7.1",
+    "lily-design-system-svelte-headless": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless",
+    "lily-design-system-svelte-locale-picker": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-picker",
+    "lily-design-system-svelte-theme-picker": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-picker"
+  }
+}

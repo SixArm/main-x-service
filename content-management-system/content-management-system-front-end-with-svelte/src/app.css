@@ -1,0 +1,258 @@
+/* Content Management System authoring UI — self-contained styles, no
+   framework.
+
+   The load-bearing vocabulary here is **editorial state**: whether a
+   page is live, and whether the draft has moved past what readers see.
+   That distinction is the single thing an author most often gets wrong,
+   so it gets the colour; everything else stays quiet. */
+
+:root {
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --ink: #1a2330;
+  --muted: #5b6774;
+  --line: #dde2e8;
+  --accent: #1b5fae;
+  /* Editorial states */
+  --state-draft: #5b6774;
+  --state-in-review: #b57e10;
+  --state-approved: #0e7f8a;
+  --state-published: #1d8a4e;
+  --state-archived: #8a1d2d;
+  /* Advisory */
+  --stale: #c05621;
+  --finding: #8a1d2d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 3rem;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin: 0.5rem 0 1rem;
+}
+h2 {
+  font-size: 1.1rem;
+  margin: 1.25rem 0 0.5rem;
+}
+
+/* Top navigation */
+nav.top {
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  padding: 0.6rem 1.25rem;
+  display: flex;
+  gap: 1.1rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+nav.top .brand {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Panels & tables */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+th,
+td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Stat tiles */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.tile {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.7rem 0.9rem;
+}
+.tile .value {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+.tile .label {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* Chips */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.chip {
+  font-size: 0.72rem;
+  border-radius: 999px;
+  padding: 0.05rem 0.55rem;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--bg);
+  white-space: nowrap;
+}
+.chip.warn {
+  border-color: var(--state-awaiting);
+  color: var(--state-awaiting);
+  background: #fdf3ec;
+}
+.chip.danger {
+  border-color: var(--state-closed);
+  color: var(--state-closed);
+  background: #fbeef0;
+}
+.chip.ok {
+  border-color: var(--state-available);
+  color: var(--state-available);
+  background: #eef7f1;
+}
+/* Forms & buttons */
+button,
+.btn {
+  font: inherit;
+  font-size: 0.85rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 6px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  color: var(--ink);
+}
+button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+input,
+select {
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  background: #fff;
+}
+form.row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.error {
+  color: var(--state-closed);
+  font-size: 0.88rem;
+}
+.muted {
+  color: var(--muted);
+}
+
+/* ---- editorial state ---------------------------------------------
+   A state badge names its state in words as well as colour: colour
+   alone fails for a colour-blind editor and in a printout, and this is
+   the one distinction the UI cannot afford to lose. */
+
+.state {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.7rem;
+  font-size: 0.78rem;
+  color: #fff;
+  white-space: nowrap;
+}
+.state.draft {
+  background: var(--state-draft);
+}
+.state.in_review {
+  background: var(--state-in-review);
+}
+.state.approved {
+  background: var(--state-approved);
+}
+.state.published {
+  background: var(--state-published);
+}
+.state.archived {
+  background: var(--state-archived);
+}
+
+/* "The draft has moved past what is live" — advisory, not an error. */
+.ahead {
+  color: var(--stale);
+  font-size: 0.85rem;
+}
+
+/* A derived view says when it was derived. Never omitted: a number
+   without an `as_of` invites a reader to assume it is live. */
+.as-of {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+/* A rule that produced a finding travels with the finding. */
+.rule {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  color: var(--finding);
+}
+
+/* No data is not zero. */
+.no-data {
+  color: var(--muted);
+  font-style: italic;
+}

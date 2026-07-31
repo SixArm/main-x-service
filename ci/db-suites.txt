@@ -22,6 +22,16 @@ case-folder/case-folder-service-with-rust
 workforce-planning-management/workforce-planning-management-service-with-rust
 person/person-service-with-loco
 worker/worker-service-with-loco
+content-management-system/content-management-system-service-with-rust
+#
+# content-management-system was enrolled on 2026-07-30, with its first
+# code round (CMS-T1-T4): 6 request tests + 1 enforcement binary observed
+# green against Postgres 18 locally before being added here, per the
+# allowlist rule above. Its DB-gated suite is where the declaration
+# layer's real guarantees are proven — that a key clash is a 409 rather
+# than a second site, that a delete refuses while children exist, that a
+# visibility flip writes its own audit action, and that an unconfirmed
+# breaking schema edit is refused.
 #
 # person and worker were enrolled on 2026-07-26, once the pre-existing
 # defects that had kept them out were fixed. For the record, what was
