@@ -216,9 +216,8 @@ person-service-with-loco/
 ├── migrations/            # Database migrations
 ├── tests/                 # Integration tests
 ├── Dockerfile             # Production container
-├── Dockerfile.test        # Test container
 ├── docker-compose.yml     # Development environment
-├── docker-compose.test.yml # Test environment
+├── compose.test.yaml      # Test database (Podman)
 ├── DEPLOY.md             # Deployment guide
 └── README.md             # Project documentation
 ```
@@ -375,7 +374,7 @@ cargo test --lib -- --nocapture               # With output
 
 ```bash
 cargo test --test api_integration_test        # All integration tests
-podman compose -f docker-compose.test.yml up  # Run with Podman
+scripts/test-db.sh up person/person-service-with-loco   # containerised Postgres (Podman)
 ```
 
 ### Test Coverage
@@ -392,7 +391,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment guide.
 
 ```bash
 podman compose up -d                                    # Development
-podman compose -f docker-compose.test.yml up            # Testing
+scripts/test-db.sh up person/person-service-with-loco   # test database
 podman build -t person-server:v1.0.0 . && podman run ...  # Production
 ```
 

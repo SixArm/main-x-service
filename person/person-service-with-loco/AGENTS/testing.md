@@ -40,7 +40,7 @@ cargo test --lib -- --nocapture               # With stdout output
 
 Run with: `cargo test --test api_integration_test`
 
-**Requires:** PostgreSQL database running (see docker-compose.test.yml)
+**Requires:** PostgreSQL running — `scripts/test-db.sh up person/person-service-with-loco` starts the containerised one (`compose.test.yaml`).
 
 Integration tests are in `tests/` and test full HTTP request/response cycles against real dependencies.
 
@@ -54,8 +54,9 @@ Integration tests are in `tests/` and test full HTTP request/response cycles aga
 ### Running Integration Tests
 
 ```bash
-# With Podman (recognises docker-compose.yml as-is)
-podman compose -f docker-compose.test.yml up
+# Containerised Postgres (Podman), then the suite as CI runs it
+scripts/test-db.sh up person/person-service-with-loco
+scripts/ci-check.sh test-db person/person-service-with-loco
 
 # Locally (requires running PostgreSQL)
 DATABASE_URL=postgres://user:pass@localhost/person_service_test cargo test --test api_integration_test

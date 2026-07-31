@@ -174,6 +174,27 @@ scripts/ci-check.sh clippy                       # every crate
 scripts/ci-check.sh test-db care-pathway/care-pathway-service-with-loco
 ```
 
+### The local test database
+
+`test-db` needs a Postgres, so **every service crate carries a
+`compose.test.yaml`** — one `postgres:18-alpine` container with the same
+superuser (`loco`/`loco`), port (5432), database name, and extensions CI
+provides, and its data directory on tmpfs so every start is a clean
+initdb. Podman, not Docker.
+
+```sh
+scripts/test-db.sh up   <crate>   # start it, wait until healthy
+scripts/ci-check.sh test-db <crate>
+scripts/test-db.sh down <crate>   # also: psql · logs · url · status · down-all
+```
+
+Two at once want the same port, so move one:
+`TEST_DB_PORT=5433 scripts/test-db.sh up <crate>`.
+
+`test-db` is a no-op for a crate not in [`ci/db-suites.txt`](ci/db-suites.txt);
+`DB_SUITES_FORCE=1` runs it anyway, which is how a crate gets **observed**
+green before being added to that allowlist.
+
 ## Shared reference docs
 
 @agents/share/index.md

@@ -208,14 +208,15 @@ podman compose down
 ### Testing Environment
 
 ```bash
-# Run all tests with Podman Compose
-podman compose -f docker-compose.test.yml up --build
+# Start the containerised Postgres (Podman)
+scripts/test-db.sh up worker/worker-service-with-loco
 
-# View test results
-podman compose -f docker-compose.test.yml logs test-runner
+# Run the DB-gated suite exactly as CI does
+scripts/ci-check.sh test-db worker/worker-service-with-loco
 
-# Clean up
-podman compose -f docker-compose.test.yml down -v
+# Watch the database log / clean up
+scripts/test-db.sh logs worker/worker-service-with-loco
+scripts/test-db.sh down worker/worker-service-with-loco
 ```
 
 ### Production Deployment
@@ -490,7 +491,7 @@ cargo test --test api_integration_test
 cargo test --test api_integration_test test_create_worker
 
 # Run with Podman (recommended)
-podman compose -f docker-compose.test.yml up --build
+scripts/test-db.sh up worker/worker-service-with-loco --build
 ```
 
 ### Test Coverage
@@ -515,7 +516,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment guide.
 podman compose up -d
 
 # Testing
-podman compose -f docker-compose.test.yml up
+scripts/test-db.sh up worker/worker-service-with-loco
 
 # Production build
 podman build -t worker-server:v1.0.0 .
@@ -613,9 +614,8 @@ worker-service-with-loco/
 ├── migrations/            # Database migrations
 ├── tests/                 # Integration tests
 ├── Dockerfile             # Production container
-├── Dockerfile.test        # Test container
 ├── docker-compose.yml     # Development environment
-├── docker-compose.test.yml # Test environment
+├── compose.test.yaml      # Test database (Podman)
 ├── DEPLOY.md             # Deployment guide
 └── README.md             # This file
 ```

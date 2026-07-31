@@ -33,10 +33,11 @@ for the live count):
 DATABASE_URL=postgres://… cargo test --test api_integration_test
 ```
 
-Or via Podman Compose:
+Or against the containerised Postgres (Podman):
 
 ```bash
-podman compose -f docker-compose.test.yml up
+scripts/test-db.sh up event/event-service-with-loco
+scripts/ci-check.sh test-db event/event-service-with-loco
 ```
 
 Current tests:

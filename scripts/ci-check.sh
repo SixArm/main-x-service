@@ -16,6 +16,14 @@
 #   test-db     cargo test -- --ignored --test-threads=1, for crates
 #               enrolled in ci/db-suites.txt; a no-op for any other
 #               crate. Serial because the suites share one database.
+#               Set DB_SUITES_FORCE=1 to run an unenrolled crate anyway —
+#               that is how a crate gets *observed* green before being
+#               added to the allowlist. Never set it in CI: the point of
+#               the allowlist is that CI starts green and stays meaningful.
+#
+# A local Postgres for any of this: scripts/test-db.sh up <crate-path>
+# starts the container declared by <crate-path>/compose.test.yaml, with
+# the same user/port CI provides.
 #   deny        cargo deny check      (where a deny.toml exists)
 #   evidence    IEC 62304 artefacts: SBOM + requirement->test traceability
 #
@@ -81,8 +89,13 @@ run_stage() {
       ;;
     test-db)
       if ! enrolled_for_db "${crate}"; then
-        echo "  (not enrolled for DB-gated tests — see ci/db-suites.txt)"
-        return 0
+        if [[ "${DB_SUITES_FORCE:-}" == "1" ]]; then
+          echo "  (not enrolled — running anyway because DB_SUITES_FORCE=1)"
+        else
+          echo "  (not enrolled for DB-gated tests — see ci/db-suites.txt;"
+          echo "   to try it locally: DB_SUITES_FORCE=1 $0 test-db ${crate})"
+          return 0
+        fi
       fi
       local db
       db="$(db_name_for "${crate}")"

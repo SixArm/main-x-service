@@ -15,6 +15,16 @@
 # Format: one crate path per line (as printed by `scripts/ci-crates.sh`).
 # Blank lines and `#` comments ignored.
 #
+# To observe a crate green before enrolling it, start its containerised
+# Postgres and force the stage past this allowlist:
+#
+#   scripts/test-db.sh up <crate>
+#   DB_SUITES_FORCE=1 scripts/ci-check.sh test-db <crate>
+#   scripts/test-db.sh down <crate>
+#
+# `DB_SUITES_FORCE` is a local affordance only — setting it in CI would
+# defeat the reason this file exists.
+#
 # --- verified green ---------------------------------------------------
 care-pathway/care-pathway-service-with-loco
 case/case-service-with-loco

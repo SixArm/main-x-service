@@ -152,8 +152,20 @@ the builder stage and are discarded.
 
 ### Compose for dev / test / prod
 
-Each service ships a `docker-compose.yml` (dev) and
-`docker-compose.test.yml` (test), bringing up:
+**Test (every service crate, uniform).** `compose.test.yaml` brings up
+one container — `postgres:18-alpine`, superuser `loco`/`loco` on port
+5432, the database that crate's `config/test.yaml` names, the shared
+extension init from `ci/postgres-init/`, and PGDATA on **tmpfs** so each
+`up` starts from a clean initdb. It is deliberately the same shape CI
+provides (`.github/workflows/ci.yml` `test-db`), so a suite that passes
+locally passes there for the same reasons. Driven by
+`scripts/test-db.sh {up|down|psql|logs|url|status|down-all}`; the tests
+themselves run on the host, not in a container. There is no `restart`
+policy and no named volume, because nothing about a test database should
+survive it.
+
+**Dev (four older crates only: person, worker, event, course).**
+`docker-compose.yml` brings up:
 
 - **`postgres`** — `postgres:18-alpine`, `restart: unless-stopped`, with
   its own `pg_isready` healthcheck, on a named volume.
@@ -163,6 +175,10 @@ Each service ships a `docker-compose.yml` (dev) and
   healthcheck.
 - **pgAdmin** (optional, `--profile tools`) — DB administration UI, off
   by default.
+
+These four are the only crates with a dev compose file, and they still
+carry the Docker-era filename; the family-wide dev/prod compose is
+[`tasks.md`](../../tasks.md) DEP-1.
 
 Production uses a built-and-tagged image
 (`podman build -t <service>:vX.Y.Z .` then `podman run`), an externally

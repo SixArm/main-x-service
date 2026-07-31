@@ -168,15 +168,19 @@ podman compose --env-file .env.production up -d
 Run the full test suite using Podman Compose:
 
 ```bash
-# Build test image and run tests
-podman compose -f docker-compose.test.yml up --build
+# Start this service's throwaway Postgres (compose.test.yaml)
+scripts/test-db.sh up worker/worker-service-with-loco
 
-# View test results
-podman compose -f docker-compose.test.yml logs test-runner
+# Run the DB-gated suite exactly as CI does
+scripts/ci-check.sh test-db worker/worker-service-with-loco
 
-# Clean up test containers
-podman compose -f docker-compose.test.yml down -v
+# Clean up
+scripts/test-db.sh down worker/worker-service-with-loco
 ```
+
+Tests run on the host, against a containerised database. The container
+mirrors what CI provides — Postgres 18, superuser `loco`/`loco`, port
+5432 — so a suite that passes here passes there for the same reasons.
 
 ### Expected Test Output
 

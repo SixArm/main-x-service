@@ -1,0 +1,55 @@
+# Postgres for this service's DB-gated test suite.
+#
+#   scripts/test-db.sh up   place/place-service-with-loco
+#   scripts/ci-check.sh test-db place/place-service-with-loco
+#   scripts/test-db.sh down place/place-service-with-loco
+#
+# Podman, not Docker (agents/share/rust-loco-stack.md). The file is plain
+# Compose spec, so `podman compose -f compose.test.yaml up -d` drives it
+# directly if you would rather not use the script.
+#
+# The connection details deliberately match what CI provides
+# (.github/workflows/ci.yml `test-db`): superuser `loco`/`loco` on 5432.
+# A database a test passes against locally but CI cannot reproduce is
+# worse than no local database.
+services:
+  postgres:
+    # Fully qualified: podman refuses a short name (or prompts for a
+    # registry), which would hang an unattended run.
+    image: docker.io/library/postgres:18-alpine
+    container_name: mxi-place-test-db
+    environment:
+      POSTGRES_USER: loco
+      POSTGRES_PASSWORD: loco
+      # Matches config/test.yaml, so a bare `cargo test -- --ignored`
+      # finds its database. `scripts/ci-check.sh test-db` ignores this and
+      # creates its own `ci_*` database per crate instead.
+      POSTGRES_DB: place_service_test
+      # Note: this crate's schema comes from hand-written migrations/*.sql,
+      # which nothing applies on boot. `scripts/ci-check.sh test-db` applies
+      # them (to its own `ci_*` database); a bare `cargo test -- --ignored`
+      # against the database below would find an empty schema.
+    ports:
+      # Override to run two services' databases side by side:
+      #   TEST_DB_PORT=5433 scripts/test-db.sh up <crate>
+      - "${TEST_DB_PORT:-5432}:5432"
+    volumes:
+      # One shared init script rather than a copy per service; it enables
+      # the extensions in template1, so every database created later
+      # inherits them.
+      - ../../ci/postgres-init:/docker-entrypoint-initdb.d:ro,z
+    tmpfs:
+      # PGDATA lives under /var/lib/postgresql in the 18 image
+      # (/var/lib/postgresql/18/docker — *not* the /var/lib/postgresql/data
+      # of earlier majors, which is why an earlier tmpfs mount at that path
+      # silently did nothing). In RAM: a test database is disposable, and
+      # every `up` should start from a clean initdb.
+      - /var/lib/postgresql
+    healthcheck:
+      # `scripts/test-db.sh up` waits on this, so a test run cannot start
+      # against a database that is still initialising.
+      test: ["CMD-SHELL", "pg_isready -U loco -d place_service_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s

@@ -290,6 +290,11 @@
 - [ ] **FE-4 (M)** Duplicate review-queue screen (services exposing the
   review API; start with person).
 
+> Note: the **test** database side of this is already done — every
+> service crate carries a `compose.test.yaml` driven by
+> `scripts/test-db.sh` (see DEP-0 below). DEP-1 is the *demo/dev* stack:
+> services plus their databases, wired to each other.
+
 - [ ] **DEP-1 (M)** `examples/compose/`: podman-compose for (a) one
   service + postgres, (b) the full family (10 services + auth +
   link-graph + postgres), (c) the enforced variant (auth on, policies
@@ -821,6 +826,67 @@ committing (see plan.md §4).
   the flag is now set before the process's only boot, so the pin is
   order-independent. Full care-pathway DB-gated suite green (1 + 22
   + 1 across the three binaries).
+
+## Done 2026-08-01 — a containerised test database per service
+
+- [x] **DEP-0 (M)** *(done 2026-08-01)* — **`compose.test.yaml` in all 17
+  service crates**: one `postgres:18-alpine` container each (Podman, not
+  Docker), providing exactly what that crate's DB-gated suite needs and
+  matching what CI provides (`.github/workflows/ci.yml` `test-db`):
+  superuser `loco`/`loco`, port 5432, the database its `config/test.yaml`
+  names. Driven by the new **`scripts/test-db.sh`**
+  (`up`/`down`/`psql`/`logs`/`url`/`status`/`down-all`), which waits on
+  the container healthcheck instead of sleeping. Extensions come from one
+  shared init script (`ci/postgres-init/`, mounted read-only into every
+  container) that enables them in **`template1`**, so the `ci_*` databases
+  `ci-check.sh` creates per crate inherit them. PGDATA is on **tmpfs**:
+  every `up` is a fresh `initdb`, and a test database that accumulates
+  state is the difference between a real failure and a stale one.
+
+  `scripts/ci-check.sh test-db` gained **`DB_SUITES_FORCE=1`**, which runs
+  an unenrolled crate anyway — the missing half of the `ci/db-suites.txt`
+  rule that a crate is enrolled *once observed green*. Together these are
+  what unblocks enrolling the nine services still outside that allowlist.
+
+  *Verified:* all 17 compose files parse, and all 17 containers were
+  started, reported healthy, and served the 5 expected extensions. Four
+  suites were then run end to end through a container —
+  **organization 22/22, person 38/38, link-graph 16/16, place 2/2** — and
+  side-by-side operation (`TEST_DB_PORT=5434`), `status`, and `down-all`
+  were exercised.
+
+  Three findings worth keeping:
+  - **A healthy container is not a reachable one.** On macOS podman
+    publishes on IPv6 `*`, so a Postgres already holding IPv4
+    `127.0.0.1:<port>` answers `localhost` first: the container is
+    healthy, the connection succeeds, and the error is "database does not
+    exist" — which reads like a broken container. Hit while testing the
+    second-port path on this machine. `test-db.sh up` now probes the
+    published port from outside and says so.
+  - **The old `docker-compose.test.yml` files (person / worker / event)
+    were wrong in three ways** and are removed: credentials
+    (`test_user`/`test_password`) matched neither CI nor `config/test.yaml`;
+    the tmpfs mount was at `/var/lib/postgresql/data`, which the 18 image
+    does not use (PGDATA is `/var/lib/postgresql/18/docker`), so it
+    silently did nothing; and their `test-runner` service built a
+    `Dockerfile.test` pinned to Rust 1.93 against a repo pinned to 1.96.1,
+    running a `cargo test --test api_integration_test` command that no
+    longer describes the suite. The three `Dockerfile.test` files went
+    with them.
+  - **Six crates' `config/test.yaml` disagreed with everything else.**
+    person / worker / event / place / thing defaulted to
+    `postgres://localhost/<db>` (no credentials — implicitly the
+    developer's OS user), and case-folder to `postgres:postgres`. All six
+    now default to `loco:loco@localhost:5432`, so config, container, and
+    CI finally name the same connection.
+
+  **Found, not fixed** (pre-existing, unrelated to containers):
+  `authentication-service`'s DB-gated suite is **red — 16 pass, 22 fail**.
+  Every failure is `Failed to seed database: DB(Json("missing field
+  \`attributes\`"))`: `src/fixtures/users.yaml` was never updated when the
+  ABAC `users.attributes` column landed, and the column is non-nullable
+  `Json`. That is why the crate is not in `ci/db-suites.txt` — now with a
+  diagnosis rather than an unknown.
 
 ## Found 2026-07-31 (during the doc harmonization pass)
 
