@@ -787,3 +787,38 @@ committing (see plan.md §4).
   the flag is now set before the process's only boot, so the pin is
   order-independent. Full care-pathway DB-gated suite green (1 + 22
   + 1 across the three binaries).
+
+## Found 2026-07-31 (during the doc harmonization pass)
+
+- [ ] **FE-LILY-RENAME (M)** — Lily renamed its two helper packages
+  upstream: `lily-design-system-svelte-locale-select` →
+  `-locale-picker` and `-theme-select` → `-theme-picker`, with the
+  components likewise `LocaleSelect`/`ThemeSelect` →
+  `LocalePicker`/`ThemePicker`. **All 15 existing front-ends still
+  declare the old `file:` paths, which no longer exist on disk**, so
+  `pnpm install` in any of them fails with
+  `ERR_PNPM_LINKED_PKG_DIR_NOT_FOUND`.
+
+  The breakage is **latent, not active**: each app's `node_modules`
+  still holds a real copy from the last install, so they build and
+  `svelte-check` clean today (verified on person). What is broken is a
+  fresh clone or any re-install.
+
+  It is **not** a pure rename, which is why this is a tracked task
+  rather than a `sed` in a docs pass. The prop contracts are unchanged
+  (`label`/`locales`/`localeLabels`/`value`/`applyDir`/`onChange`;
+  `label`/`themesUrl`/`themes`/`storageKey`), but the **DOM changed**:
+  the picker renders a button plus a `ul` listbox
+  (`.locale-picker-button`, `.locale-picker-list`, …) where the old
+  component rendered a `<select>`. So each front-end also needs:
+  - its `:global(select)` chrome CSS repointed at the button class;
+  - its Playwright selectors updated — four specs currently drive
+    `nav.top select.locale-select`, which will match nothing.
+
+  Doing this blind across 15 apps would turn 15 working apps into 15
+  apps needing per-app verification. Recommended approach: migrate one
+  (person is the chrome exemplar), confirm `pnpm install` + `check` +
+  `test` + Playwright, then apply the learned diff app by app.
+
+  `content-management-system-front-end-with-svelte` is already on the
+  new packages and is the reference for what the result looks like.

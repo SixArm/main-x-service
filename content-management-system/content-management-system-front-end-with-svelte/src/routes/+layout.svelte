@@ -81,8 +81,11 @@
   .spacer {
     flex: 1;
   }
-  .locale :global(select),
-  nav.top :global(select.theme-picker) {
+  /* The Lily pickers render a button plus a listbox, not a `<select>`
+     — the older front-ends' `:global(select)` rules are left over from
+     the `*Select` components these replaced and match nothing. */
+  .locale :global(.locale-picker-button),
+  nav.top :global(.theme-picker-button) {
     font: inherit;
     padding: 0.15rem 0.3rem;
     max-width: 11rem;
