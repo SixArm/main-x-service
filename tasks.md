@@ -827,10 +827,41 @@ committing (see plan.md §4).
     `li[role="option"][lang="de"]` selector matches nothing while
     `li[role="option"]` matches 58 elements. The list must be scoped
     (`ul.locale-picker-list`) and the option matched by its label.
-  - **The picker stays open after a selection.** Its `choose()` calls
-    `closeList()`, but the browser state is still `aria-expanded=true`
-    with the list visible. A test that clicks the button again to
-    make a second choice therefore *closes* it. The helper opens only
-    when collapsed. This looks like an upstream Lily bug and is worth
-    reporting there; nothing in this repo depends on the current
-    behaviour either way.
+  - **The picker stays open after a pointer selection**, so a test
+    that clicks the button again to make a second choice *closes* it.
+    The helper opens only when collapsed, which is correct either way.
+    Reported upstream; Lily shipped a fix on 2026-07-31 for the
+    related **effect re-entrancy** (`onChange` writing reactive state
+    re-entered the apply effect, hitting
+    `effect_update_depth_exceeded` and freezing the component with a
+    stale `aria-expanded`). That fix is now in every front-end — see
+    FE-LILY-REFRESH — and the freeze is gone; the list still being
+    expanded after a click persists, and the helper is agnostic to
+    it.
+
+- [x] **FE-LILY-REFRESH (S)** *(done 2026-07-31)* — refreshed all 16
+  front-ends onto Lily's fixed pickers after the upstream repair of
+  the apply-effect re-entrancy (`onChange` writing reactive state
+  re-entered the effect, hitting `effect_update_depth_exceeded` and
+  freezing the listbox with a stale `aria-expanded`; the fix guards on
+  an `appliedValue` so re-applying is idempotent).
+
+  Two mechanical notes for the next time upstream changes:
+
+  - **`dist/` is what consumers get.** The package `exports` point at
+    `./dist/index.js`, and the fix landed in the package-root source
+    only, so the front-ends would have kept the old behaviour. Run
+    `npm run build` in `lily-design-system-svelte-helpers` first;
+    upstream's own suite (211 tests) passing does not mean `dist` was
+    rebuilt.
+  - **`pnpm install --force` is not always enough** for a `file:`
+    dependency: pnpm reuses the content-addressed store entry, and
+    three apps kept the stale copy until `node_modules` was removed
+    and reinstalled. Verify by diffing the installed
+    `dist/LocalePicker.svelte` against upstream's rather than trusting
+    the install to have done it.
+
+  Verified: all 16 installed copies byte-identical to upstream's
+  `dist` for both pickers; `svelte-check` clean; 467 unit tests pass;
+  15/16 Playwright suites pass (case-folder needs its live backend);
+  no `effect_update_depth_exceeded` in the browser.

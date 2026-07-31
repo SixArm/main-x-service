@@ -51,13 +51,15 @@ test.beforeEach(async ({ page }) => {
  * Choose a locale from the Lily locale picker.
  *
  * Three things make this more than a `selectOption`:
- * the picker renders a button plus a `ul` listbox rather than a
- * `<select>`; the theme picker on the same page renders
- * `li[role="option"]` too, so the list has to be scoped; and the
- * picker is **left open after a selection** (its `choose` calls
- * `closeList`, but the state observed in the browser is still
- * expanded), so clicking the button unconditionally would close it
- * instead of opening it. Open only when collapsed.
+ *
+ * 1. The picker renders a button plus a `ul` listbox, not a `<select>`.
+ * 2. The theme picker on the same page also renders
+ *    `li[role="option"]`, so the list has to be scoped — unscoped, the
+ *    selector matches 58 elements here.
+ * 3. The listbox is **still expanded after a pointer selection**
+ *    (verified in a browser against Lily as of 2026-07-31), so
+ *    clicking the button unconditionally would close it rather than
+ *    open it. Open only when collapsed, which is correct either way.
  */
 async function chooseLocale(page: Page, label: string) {
   const button = page.locator("nav.top .locale-picker-button");
