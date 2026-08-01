@@ -166,7 +166,7 @@
 - [ ] **P-4 (M)** Privacy in **portfolio** (lower sensitivity; masking of
   owner/person refs). Depends: P-1.
 
-- [ ] **AU-1 (M)** Roll the case-only auth hardening to **person, worker,
+- [~] **AU-1 (M)** Roll the case-only auth hardening to **person, worker,
   place, thing, event** (axum-style `src/api/rest/auth.rs`): key-rotation
   refresh loop (`ReloadableVerifier` + `spawn_key_refresh` — case
   `src/auth.rs` is the pattern), policy hot-reload
@@ -174,6 +174,33 @@
   `tests/enforcement.rs` activation proof (case's is the template; each
   runs in its own test binary).
   *Verify:* per-service green gate; jwt-enforcement.md status updated.
+
+  - [x] **person** *(done 2026-08-01)* — the axum-style reference. All
+    three parts landed and verified: fmt + clippy clean, 301 lib tests,
+    **40 DB-gated green** vs Postgres 18, and the new
+    `tests/enforcement.rs` mutation-checked (forcing the flag off fails
+    it).
+
+    The part worth copying carefully: person kept the verifier as an
+    `Arc<Verifier>` **snapshot** in `AppState`, *and* the enforcement
+    middleware took its own copy. Two snapshots means a rotation could
+    only ever update one of them, so the fix was to delete the field and
+    have the guard and both extractors read one process-wide
+    `ReloadableVerifier` per request. Any service still holding a
+    verifier in its state has the same latent split.
+
+  - [ ] **worker, place, thing, event** — **not** a find-and-replace;
+    the four have drifted into different shapes, measured 2026-08-01:
+
+    | Crate | `policy()` `OnceLock` | `Enforcement` struct | `AppState` verifier reads |
+    |---|:-:|:-:|:-:|
+    | worker | yes | no | 2 |
+    | place | no | yes | 1 |
+    | thing | no | no | 1 |
+    | event | no | no | 1 |
+
+    So each needs its own pass and its own verification; person's diff
+    is the shape to aim at, not a patch to apply.
 - [ ] **AU-2 (M)** Same for **organization, care-pathway, course,
   portfolio** (loco-style `src/auth.rs`). Depends: AU-1 (shared doc
   wording once).

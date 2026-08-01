@@ -136,7 +136,7 @@ pub struct ApiDoc;
 /// requires a restart) and a permissive CORS layer. The given
 /// [`AppState`] is moved into the router as shared state.
 pub fn create_router(state: AppState) -> Router {
-    let enforcement = auth::Enforcement::from_env(state.verifier.clone());
+    let enforcement = auth::Enforcement::from_env();
     let api_routes = Router::new()
         // Health
         .route("/health", get(handlers::health_check))

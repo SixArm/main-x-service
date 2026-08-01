@@ -24,7 +24,7 @@ use migration::Migrator;
 use std::path::Path;
 
 use crate::{
-    api::rest::{ApiDoc, AppState, auth, metrics_routes, persons_routes, state},
+    api::rest::{ApiDoc, AppState, auth, metrics_routes, persons_routes},
     config::Config,
     matching::ProbabilisticMatcher,
     search::SearchEngine,
@@ -82,13 +82,18 @@ impl Hooks for App {
         // extractor, which reads it from the shared-store `AppState`)
         // verify against the same key set. Fetch failure falls back to
         // the env path — the service always boots.
-        let verifier = std::sync::Arc::new(state::verifier_from_env_or_fetch().await);
-        let state =
-            AppState::new(ctx.db.clone(), search_engine, matcher, config).with_verifier(verifier);
+        auth::init().await;
+        // Key rotation and policy edits without a restart: both loops are
+        // no-ops unless their source is configured (`PERSON_PASETO_KEYS_URL`
+        // / `PERSON_ABAC_POLICY_FILE`).
+        auth::spawn_key_refresh();
+        auth::spawn_policy_watcher();
+        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
         // Blanket auth enforcement (default-off, `PERSON_REQUIRE_AUTH`),
         // snapshotted here at boot — changing the env var requires a
         // restart. Layered unconditionally; the flag is the only switch.
-        let enforcement = auth::Enforcement::from_env(state.verifier.clone());
+        // The verifier and policy are read live per request.
+        let enforcement = auth::Enforcement::from_env();
         ctx.shared_store.insert(state);
         // Durable event bus Phase 3: start the outbox relay loop. Gated
         // internally — a no-op unless the transport is `outbox`

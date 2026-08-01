@@ -44,9 +44,11 @@
 //! = valid credential, policy denied (body carries the deciding rule).
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 
-use authentication_verifier::{Action, Claims, Policy, Verifier};
+use authentication_verifier::{
+    Action, Claims, Policy, ReloadablePolicy, ReloadableVerifier, Verifier,
+};
 use axum::Json;
 use axum::extract::{FromRef, FromRequestParts, Request, State};
 use axum::http::request::Parts;
@@ -209,33 +211,36 @@ pub fn enforce(
     }
 }
 
-/// State for the blanket-enforcement middleware: the flag and the ABAC
-/// policy (both read once from the environment at construction) and
-/// the shared PASETO verifier. Cheap to clone (a `bool` + two `Arc`s).
-#[derive(Clone)]
+/// State for the blanket-enforcement middleware: just the flag.
+///
+/// The verifier and the policy are **not** snapshotted here. They live
+/// in the process-wide reloadable holders ([`verifier`], [`policy`]),
+/// which the middleware reads per request — otherwise a key rotation or
+/// a policy edit would reach the handlers but not the guard, which is
+/// the half-applied state worst of all. The flag stays a snapshot:
+/// turning enforcement on or off mid-flight is not something to do
+/// without a restart.
+#[derive(Clone, Copy)]
 pub struct Enforcement {
     /// Whether blanket enforcement is on (`PERSON_REQUIRE_AUTH`,
     /// snapshotted at construction — restart to change).
     pub require_auth: bool,
-    /// The PASETO `v4.public` verifier requests are checked against.
-    pub verifier: Arc<Verifier>,
-    /// ABAC policy evaluated on verified tokens (`PERSON_ABAC_POLICY` /
-    /// `PERSON_ABAC_POLICY_FILE`, snapshotted at construction —
-    /// restart to change).
-    pub policy: Arc<Policy>,
 }
 
 impl Enforcement {
-    /// Snapshot `PERSON_REQUIRE_AUTH` and the `PERSON_ABAC_POLICY` /
-    /// `PERSON_ABAC_POLICY_FILE` policy, and pair them with the given
-    /// verifier (normally `AppState::verifier`).
+    /// Snapshot `PERSON_REQUIRE_AUTH`.
     #[must_use]
-    pub fn from_env(verifier: Arc<Verifier>) -> Self {
+    pub fn from_env() -> Self {
         Self {
             require_auth: require_auth_from_env(),
-            verifier,
-            policy: Arc::new(policy_from_env()),
         }
+    }
+}
+
+impl Default for Enforcement {
+    /// Same as [`Enforcement::from_env`].
+    fn default() -> Self {
+        Self::from_env()
     }
 }
 
@@ -248,13 +253,17 @@ pub async fn require_auth_middleware(
     request: Request,
     next: Next,
 ) -> Response {
+    // Snapshots taken per request: whatever the refresh loop and the
+    // policy watcher have most recently swapped in.
+    let verifier = verifier().current();
+    let policy = policy().current();
     match enforce(
         enforcement.require_auth,
         request.method(),
         request.uri().path(),
         request.headers(),
-        &enforcement.verifier,
-        &enforcement.policy,
+        &verifier,
+        &policy,
     ) {
         Ok(()) => next.run(request).await,
         Err(rejection) => rejection.into_response(),
@@ -305,9 +314,10 @@ where
 {
     type Rejection = (StatusCode, String);
 
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let app = AppState::from_ref(state);
-        bearer_claims(&parts.headers, &app.verifier).map(AuthUser)
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        // The live holder, not an `AppState` snapshot: a rotated key set
+        // must reach the extractors and the guard together.
+        bearer_claims(&parts.headers, &verifier().current()).map(AuthUser)
     }
 }
 
@@ -332,12 +342,146 @@ where
 {
     type Rejection = std::convert::Infallible;
 
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let app = AppState::from_ref(state);
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         Ok(MaybeAuthUser(
-            bearer_claims(&parts.headers, &app.verifier).ok(),
+            bearer_claims(&parts.headers, &verifier().current()).ok(),
         ))
     }
+}
+
+/// The process-wide **hot-reloadable** token verifier.
+///
+/// Built lazily from `PERSON_PASETO_KEYS` on first use; [`init`] swaps
+/// in the boot-time fetched key set and [`spawn_key_refresh`] swaps in a
+/// re-fetched one periodically, so **a key rotation at the auth service
+/// is picked up without restarting this service**. Every verification
+/// path — the blanket guard and the `AuthUser` / `MaybeAuthUser`
+/// extractors — reads this one holder, so they can never disagree about
+/// which keys are current.
+static VERIFIER: OnceLock<ReloadableVerifier> = OnceLock::new();
+
+/// The process-wide reloadable verifier. Take a snapshot per request
+/// with `verifier().current()`.
+#[must_use]
+pub fn verifier() -> &'static ReloadableVerifier {
+    VERIFIER.get_or_init(|| ReloadableVerifier::new(super::state::verifier_from_env()))
+}
+
+/// Seed [`verifier`] before the app serves traffic (call once from
+/// boot). With `PERSON_PASETO_KEYS_URL` set, the published key set is
+/// fetched over HTTP once and swapped in; on failure — or with the URL
+/// unset — the env-built verifier stands, so the service always boots.
+pub async fn init() {
+    if std::env::var("PERSON_PASETO_KEYS_URL")
+        .ok()
+        .is_some_and(|u| !u.trim().is_empty())
+    {
+        verifier().store(super::state::verifier_from_env_or_fetch().await);
+    }
+}
+
+/// Default key-set refresh interval (seconds) when
+/// `PERSON_PASETO_KEYS_REFRESH_SECS` is unset. One hour: rotation is
+/// infrequent, so a slow poll suffices.
+const KEY_REFRESH_DEFAULT_SECS: u64 = 3600;
+
+/// Spawn the background loop that re-fetches the published key set from
+/// `PERSON_PASETO_KEYS_URL` and swaps it into the live [`verifier`].
+///
+/// A failed fetch **keeps the current key set** — a transient
+/// auth-service outage must not lock every caller out. Interval from
+/// `PERSON_PASETO_KEYS_REFRESH_SECS` (default
+/// [`KEY_REFRESH_DEFAULT_SECS`]); `0` disables the loop. A no-op when
+/// the URL is unset, since an env-supplied key set has nothing to
+/// re-fetch.
+pub fn spawn_key_refresh() {
+    let Some(url) = std::env::var("PERSON_PASETO_KEYS_URL")
+        .ok()
+        .map(|u| u.trim().to_string())
+        .filter(|u| !u.is_empty())
+    else {
+        return;
+    };
+    let secs = std::env::var("PERSON_PASETO_KEYS_REFRESH_SECS")
+        .ok()
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .unwrap_or(KEY_REFRESH_DEFAULT_SECS);
+    if secs == 0 {
+        return;
+    }
+    let issuer = super::state::env_or("PERSON_TOKEN_ISSUER", super::state::DEFAULT_ISSUER);
+    let audience = super::state::env_or("PERSON_TOKEN_AUDIENCE", super::state::DEFAULT_AUDIENCE);
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(secs));
+        ticker.tick().await; // the first tick is immediate — skip it
+        loop {
+            ticker.tick().await;
+            match Verifier::from_paseto_keys_url(&url, &issuer, &audience).await {
+                Ok(fetched) => {
+                    tracing::info!(keys = fetched.key_count(), "refreshed PASETO key set");
+                    verifier().store(fetched);
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "PASETO key-set refresh failed; keeping current keys");
+                }
+            }
+        }
+    });
+    tracing::info!(secs, "polling PERSON_PASETO_KEYS_URL for key rotation");
+}
+
+/// Re-read the ABAC policy from the environment and swap it into the
+/// live [`policy`] holder. A malformed policy falls back to the built-in
+/// default, so a bad edit can never leave the service unprotected.
+pub fn reload_policy() {
+    policy().store(policy_from_env());
+    tracing::info!("ABAC policy reloaded");
+}
+
+/// How often the policy-file watcher polls for a change (seconds).
+const POLICY_WATCH_SECS: u64 = 15;
+
+/// Spawn the background task that hot-reloads the ABAC policy when
+/// `PERSON_ABAC_POLICY_FILE` changes on disk, so an operator can edit
+/// the policy and have it take effect without a restart. Polls the
+/// file's mtime (not an OS notify — this stays dependency-light).
+///
+/// A no-op when the variable is unset: an inline `PERSON_ABAC_POLICY`
+/// (or the built-in default) has nothing to watch, and environment
+/// variables do not change under a running process.
+pub fn spawn_policy_watcher() {
+    let Some(path) = std::env::var("PERSON_ABAC_POLICY_FILE")
+        .ok()
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+    else {
+        return;
+    };
+    tokio::spawn(async move {
+        let mut last = file_mtime(&path);
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(POLICY_WATCH_SECS));
+        ticker.tick().await; // skip the immediate first tick
+        loop {
+            ticker.tick().await;
+            let now = file_mtime(&path);
+            if now != last {
+                last = now;
+                reload_policy();
+            }
+        }
+    });
+    tracing::info!(
+        secs = POLICY_WATCH_SECS,
+        "watching PERSON_ABAC_POLICY_FILE for changes"
+    );
+}
+
+/// The last-modified time of `path`, or `None` when it cannot be read
+/// (missing file, permission error, platform without mtime).
+fn file_mtime(path: &str) -> Option<std::time::SystemTime> {
+    std::fs::metadata(path)
+        .and_then(|meta| meta.modified())
+        .ok()
 }
 
 /// Whether blanket enforcement is on, cached from `PERSON_REQUIRE_AUTH`
@@ -350,13 +494,14 @@ pub fn require_auth() -> bool {
     *FLAG.get_or_init(require_auth_from_env)
 }
 
-/// The ABAC policy for handler-level record checks, cached from the
-/// environment on first use ([`policy_from_env`]) — the same policy the
-/// blanket guard loads. Read once; restart to change.
+/// The process-wide **hot-reloadable** ABAC policy — the one the
+/// blanket guard and every handler-level record check read. Take a
+/// snapshot per request with `policy().current()`; [`reload_policy`]
+/// swaps it at runtime, so a policy edit needs no restart.
 #[must_use]
-pub fn policy() -> &'static Policy {
-    static POLICY: OnceLock<Policy> = OnceLock::new();
-    POLICY.get_or_init(policy_from_env)
+pub fn policy() -> &'static ReloadablePolicy {
+    static POLICY: OnceLock<ReloadablePolicy> = OnceLock::new();
+    POLICY.get_or_init(|| ReloadablePolicy::new(policy_from_env()))
 }
 
 /// Derive the **record-level resource attributes** of a stored person
@@ -432,8 +577,13 @@ pub fn authorize_record(
     let claims = caller
         .claims()
         .ok_or((StatusCode::UNAUTHORIZED, "missing bearer token".to_string()))?;
-    let decision =
-        policy().evaluate_with_context(claims, action, ENTITY, resource, &request_env_attrs());
+    let decision = policy().current().evaluate_with_context(
+        claims,
+        action,
+        ENTITY,
+        resource,
+        &request_env_attrs(),
+    );
     if decision.allowed {
         Ok(decision.obligations)
     } else {

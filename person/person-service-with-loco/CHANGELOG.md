@@ -7,6 +7,40 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — key rotation and policy hot-reload without a restart (2026-08-01)
+
+AU-1, with this crate as the axum-style reference (case is the
+loco-style one).
+
+- **One reloadable verifier.** The PASETO verifier moved out of
+  `AppState` into a process-wide `ReloadableVerifier` that the blanket
+  guard **and** the `AuthUser` / `MaybeAuthUser` extractors read per
+  request. It used to be an `Arc<Verifier>` snapshot taken at router
+  construction and copied into the enforcement middleware — two
+  snapshots that a rotation could only ever update one of. `AppState`
+  no longer carries a verifier at all, so there is nothing to fall out
+  of step.
+- **`spawn_key_refresh`** re-fetches `PERSON_PASETO_KEYS_URL` every
+  `PERSON_PASETO_KEYS_REFRESH_SECS` (default 3600; `0` disables; a no-op
+  when the URL is unset) and swaps the result in, so a key rotation at
+  the auth service is picked up **without a restart**. A failed fetch
+  **keeps the current key set** — a transient auth-service outage must
+  not lock every caller out.
+- **`policy()` is a `ReloadablePolicy`**, with `reload_policy()` and
+  **`spawn_policy_watcher`** polling `PERSON_ABAC_POLICY_FILE`'s mtime
+  every 15 s. An operator can edit the policy file and have it take
+  effect immediately; a malformed edit falls back to the built-in
+  default rather than leaving the service unprotected.
+- **`tests/enforcement.rs`** — the activation proof, in its own binary
+  because the auth `OnceLock`s are process-wide. With
+  `PERSON_REQUIRE_AUTH=1` over the real router: public paths stay open,
+  a protected read and write without a token are `401`, a malformed
+  bearer is `401` (not a 500), a valid token with no attributes reads
+  `200` and writes `403` — the 401/403 split the ABAC contract requires
+  — and `access=write` creates. Mutation-checked: forcing the flag off
+  fails it.
+- New environment variable: `PERSON_PASETO_KEYS_REFRESH_SECS`.
+
 
 ### Changed — `Config::from_env` gained a testable seam and more variables (2026-07-23)
 

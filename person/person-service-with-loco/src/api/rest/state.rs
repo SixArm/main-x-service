@@ -41,15 +41,6 @@ pub struct AppState {
     /// Application configuration
     pub config: Arc<Config>,
 
-    /// Verifier for authentication-service PASETO `v4.public` bearer
-    /// tokens, checked offline against the published Ed25519 key set.
-    /// Built from the environment at construction (see
-    /// [`verifier_from_env`]); with no key set configured it holds an
-    /// empty key set (rejects everything) so the service still boots.
-    /// [`AppState::with_verifier`] can swap in a replacement (e.g. one
-    /// built from a freshly fetched key set).
-    pub verifier: Arc<Verifier>,
-
     /// Artifact store for bulk import/export jobs (uploaded input,
     /// export output, per-row error report). Built from the environment
     /// (`PERSON_BULK_ARTIFACT_DIR`) as a local-filesystem store for
@@ -98,30 +89,27 @@ impl AppState {
             search_engine: Arc::new(search_engine),
             matcher: person_matcher,
             config: Arc::new(config),
-            verifier: Arc::new(verifier_from_env()),
             bulk_store: Arc::new(LocalFsArtifactStore::from_env()) as Arc<dyn ArtifactStore>,
         }
     }
-
-    /// Replace the token verifier (e.g. with one built from a freshly
-    /// fetched Ed25519 key set at boot). Consumes and returns `self` for
-    /// chaining.
-    #[must_use]
-    pub fn with_verifier(mut self, verifier: Arc<Verifier>) -> Self {
-        self.verifier = verifier;
-        self
-    }
 }
 
+// The token verifier used to live here as an `Arc<Verifier>` snapshot.
+// It moved to the process-wide reloadable holder in
+// `super::auth::verifier()`, so that a key rotation reaches the blanket
+// guard and the `AuthUser` extractors together; a per-state snapshot
+// could only ever update one of them. The builders below still supply
+// the key set that holder is built from.
+
 /// Default issuer expected in tokens (`iss`).
-const DEFAULT_ISSUER: &str = "authentication-service";
+pub(crate) const DEFAULT_ISSUER: &str = "authentication-service";
 /// Default audience expected in tokens (`aud`).
-const DEFAULT_AUDIENCE: &str = "main-x-service";
+pub(crate) const DEFAULT_AUDIENCE: &str = "main-x-service";
 
 /// Read env var `name`, treating unset/blank as absent and falling back
 /// to `default`. Used for the issuer/audience so a blank value doesn't
 /// override the sensible default.
-fn env_or(name: &str, default: &str) -> String {
+pub(crate) fn env_or(name: &str, default: &str) -> String {
     std::env::var(name)
         .ok()
         .filter(|s| !s.trim().is_empty())
@@ -141,7 +129,7 @@ fn env_or(name: &str, default: &str) -> String {
 ///
 /// For the boot-time HTTP fetch of the key set
 /// (`PERSON_PASETO_KEYS_URL`), see [`verifier_from_env_or_fetch`].
-fn verifier_from_env() -> Verifier {
+pub(crate) fn verifier_from_env() -> Verifier {
     let issuer = env_or("PERSON_TOKEN_ISSUER", DEFAULT_ISSUER);
     let audience = env_or("PERSON_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
     env_keys_verifier(&issuer, &audience)

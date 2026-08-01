@@ -4,6 +4,12 @@
 //! environment config (database + search index) and provides a
 //! collision-free name generator so concurrently-run tests do not
 //! clash on unique fields.
+//!
+//! Each test binary compiles this module separately, so a helper used by
+//! one suite is dead code in another (the enforcement binary needs the
+//! router and the name generator, not the row-counting helpers). That is
+//! a property of the layout, not a defect worth deleting helpers over.
+#![allow(dead_code)]
 
 use axum::Router;
 use chrono::Utc;
