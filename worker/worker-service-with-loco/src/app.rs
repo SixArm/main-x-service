@@ -23,7 +23,7 @@ use migration::Migrator;
 use std::path::Path;
 
 use crate::{
-    api::rest::{ApiDoc, AppState, auth, fhir_routes, metrics_routes, state, workers_routes},
+    api::rest::{ApiDoc, AppState, auth, fhir_routes, metrics_routes, workers_routes},
     config::Config,
     matching::ProbabilisticMatcher,
     search::SearchEngine,
@@ -114,13 +114,14 @@ impl Hooks for App {
         // extractor, which reads it from the shared-store `AppState`)
         // verify against the same key set. Fetch failure falls back to
         // the env path — the service always boots.
-        let verifier = std::sync::Arc::new(state::verifier_from_env_or_fetch().await);
+        auth::init().await;
+        // Key rotation and policy edits without a restart: both loops are
+        // no-ops unless their source is configured
+        // (`WORKER_PASETO_KEYS_URL` / `WORKER_ABAC_POLICY_FILE`).
+        auth::spawn_key_refresh();
+        auth::spawn_policy_watcher();
         // Bundle DB handle + singletons into shared application state.
-        let state =
-            AppState::new(ctx.db.clone(), search_engine, matcher, config).with_verifier(verifier);
-        // Capture the verifier for the enforcement layer before the state
-        // moves into the shared store.
-        let enforcement_verifier = state.verifier.clone();
+        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
         // Make the state retrievable by request handlers via the shared store.
         ctx.shared_store.insert(state);
         // Durable event bus Phase 3: spawn the outbox relay loop. A no-op
@@ -135,16 +136,11 @@ impl Hooks for App {
         // so preflight `OPTIONS` is answered before enforcement runs).
         let router = router
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
-        let router = auth::apply_enforcement(
-            router,
-            auth::require_auth_from_env(),
-            enforcement_verifier,
-            std::sync::Arc::new(auth::policy_from_env()),
-        )
-        .layer(axum::middleware::from_fn(
-            crate::api::rest::version::require_version_mw,
-        ))
-        .layer(tower_http::cors::CorsLayer::permissive());
+        let router = auth::apply_enforcement(router, auth::require_auth_from_env())
+            .layer(axum::middleware::from_fn(
+                crate::api::rest::version::require_version_mw,
+            ))
+            .layer(tower_http::cors::CorsLayer::permissive());
         Ok(router)
     }
 

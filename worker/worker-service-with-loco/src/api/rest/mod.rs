@@ -141,10 +141,6 @@ pub struct ApiDoc;
 /// unconditionally; the `WORKER_REQUIRE_AUTH` flag (read here, at
 /// construction — restart to change; default off) is the only switch.
 pub fn create_router(state: AppState) -> Router {
-    // Capture the verifier for the enforcement layer before `state` is
-    // moved into the route groups.
-    let enforcement_verifier = state.verifier.clone();
-
     // FHIR R5 `/fhir/Practitioner` surface + `/fhir/metadata`, mirroring the
     // loco mount in `crate::app::App::routes` (built from [`fhir_routes`]) so
     // the integration-test router matches production.
@@ -259,19 +255,14 @@ pub fn create_router(state: AppState) -> Router {
     // (`WORKER_ABAC_POLICY`/`_FILE`, else the built-in default) captured
     // alongside it. Layered beneath CORS so preflight `OPTIONS` requests
     // are answered before enforcement runs.
-    auth::apply_enforcement(
-        router,
-        auth::require_auth_from_env(),
-        enforcement_verifier,
-        std::sync::Arc::new(auth::policy_from_env()),
-    )
-    // Header-based API versioning (`Accepts-version`): negotiates the
-    // version for `/api/*` and stamps it on the response
-    // (`agents/share/api-versioning.md`).
-    .layer(axum::middleware::from_fn(version::require_version_mw))
-    // Permissive CORS so browser-based operator UIs on other origins can
-    // call the API; tighten for production deployments.
-    .layer(CorsLayer::permissive())
+    auth::apply_enforcement(router, auth::require_auth_from_env())
+        // Header-based API versioning (`Accepts-version`): negotiates the
+        // version for `/api/*` and stamps it on the response
+        // (`agents/share/api-versioning.md`).
+        .layer(axum::middleware::from_fn(version::require_version_mw))
+        // Permissive CORS so browser-based operator UIs on other origins can
+        // call the API; tighten for production deployments.
+        .layer(CorsLayer::permissive())
 }
 
 /// Native loco controller routes (idiomatic path): the `/api` surface

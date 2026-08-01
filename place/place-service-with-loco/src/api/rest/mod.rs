@@ -119,7 +119,7 @@ pub struct ApiDoc;
 /// `PLACE_REQUIRE_AUTH` flag (read here, at construction — restart to
 /// change) is the only switch. Default-off; see `auth::enforce`.
 pub fn create_router(state: AppState) -> Router {
-    let enforcement = auth::EnforcementState::from_app_state(&state);
+    let enforcement = auth::EnforcementState::from_env();
     let api_routes = Router::new()
         .route("/health", get(handlers::health))
         // Auth — echo verified bearer-token claims

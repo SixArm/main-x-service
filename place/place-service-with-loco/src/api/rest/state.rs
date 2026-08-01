@@ -29,14 +29,6 @@ pub struct AppState {
     pub matcher: Arc<PlaceMatcher>,
     /// Loaded service configuration.
     pub config: Arc<Config>,
-    /// Verifier for authentication-service PASETO `v4.public` bearer
-    /// tokens, checked offline against the published Ed25519 key set.
-    /// Built from the environment at construction (see
-    /// [`verifier_from_env`]); with no key set configured it holds an
-    /// empty key set (rejects everything) so the service still boots.
-    /// [`AppState::with_verifier`] can swap in a replacement (e.g. one
-    /// built from a freshly fetched key set).
-    pub verifier: Arc<Verifier>,
 }
 
 impl AppState {
@@ -66,29 +58,19 @@ impl AppState {
             search_engine: Arc::new(search_engine),
             matcher: Arc::new(matcher),
             config: Arc::new(config),
-            verifier: Arc::new(verifier_from_env()),
         }
-    }
-
-    /// Replace the token verifier (e.g. with one built from a freshly
-    /// fetched Ed25519 key set at boot). Consumes and returns `self` for
-    /// chaining.
-    #[must_use]
-    pub fn with_verifier(mut self, verifier: Arc<Verifier>) -> Self {
-        self.verifier = verifier;
-        self
     }
 }
 
 /// Default issuer expected in tokens (`iss`).
-const DEFAULT_ISSUER: &str = "authentication-service";
+pub(crate) const DEFAULT_ISSUER: &str = "authentication-service";
 /// Default audience expected in tokens (`aud`).
-const DEFAULT_AUDIENCE: &str = "main-x-service";
+pub(crate) const DEFAULT_AUDIENCE: &str = "main-x-service";
 
 /// Read env var `name`, treating unset/blank as absent and falling back
 /// to `default`. Used for the issuer/audience so a blank value doesn't
 /// override the sensible default.
-fn env_or(name: &str, default: &str) -> String {
+pub(crate) fn env_or(name: &str, default: &str) -> String {
     std::env::var(name)
         .ok()
         .filter(|s| !s.trim().is_empty())
@@ -109,7 +91,7 @@ fn env_or(name: &str, default: &str) -> String {
 /// This is the env-injection path. Prefer [`boot_verifier`], which
 /// fetches the key set over HTTP at boot when `PLACE_PASETO_KEYS_URL`
 /// is set and falls back to this path otherwise.
-fn verifier_from_env() -> Verifier {
+pub(crate) fn verifier_from_env() -> Verifier {
     let issuer = env_or("PLACE_TOKEN_ISSUER", DEFAULT_ISSUER);
     let audience = env_or("PLACE_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
     let keys = std::env::var("PLACE_PASETO_KEYS")

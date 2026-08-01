@@ -4,6 +4,11 @@
 //! [`Config`] (so tests run against the same wiring as production) and provides
 //! a name-uniqueness helper so parallel tests do not collide on worker data.
 
+//! Each test binary compiles this module separately, so a helper used by
+//! one suite is dead code in another. That is a property of the layout,
+//! not a defect worth deleting helpers over.
+#![allow(dead_code)]
+
 use axum::Router;
 use worker_service::{
     api::rest::{AppState, create_router},

@@ -7,6 +7,31 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — key rotation and policy hot-reload without a restart (2026-08-01)
+
+AU-1, following the person service (the axum-style reference).
+
+- **One reloadable verifier.** The PASETO verifier left `AppState` for a
+  process-wide `ReloadableVerifier` that the blanket guard **and** the
+  `AuthUser` / `MaybeAuthUser` extractors read per request. `EnforcementState` no longer snapshots the verifier or the policy either; it carries only the flag.
+- **`spawn_key_refresh`** re-fetches `PLACE_PASETO_KEYS_URL` every
+  `PLACE_PASETO_KEYS_REFRESH_SECS` (default 3600; `0` disables; a no-op
+  when the URL is unset), so a key rotation needs no restart. A failed
+  fetch **keeps the current key set** — a transient auth-service outage
+  must not lock every caller out.
+- **`policy()` is a `ReloadablePolicy`**, with `reload_policy()` and
+  **`spawn_policy_watcher`** polling `PLACE_ABAC_POLICY_FILE`'s mtime
+  every 15 s. A malformed edit falls back to the built-in default rather
+  than leaving the service unprotected.
+- **`tests/enforcement.rs`** — the activation proof, in its own binary
+  because the auth `OnceLock`s are process-wide. With
+  `PLACE_REQUIRE_AUTH=1` over the real router: public paths stay open, a
+  protected read and write without a token are `401`, a malformed bearer
+  is `401` (not a 500), a valid token with no attributes reads `200` and
+  writes `403` — the 401/403 split the ABAC contract requires — and
+  `access=write` creates. This crate had no HTTP test harness at all — its `tests/` are library tests over pure functions — so the proof brings a minimal one that builds the **production** router, which is the thing whose wiring is in question.
+- New environment variable: `PLACE_PASETO_KEYS_REFRESH_SECS`.
+
 
 ### Changed — `Config::from_env` gained a testable seam and more variables (2026-07-23)
 

@@ -112,10 +112,14 @@ impl Hooks for App {
         let search_engine = SearchEngine::new(&config.search.index_path)
             .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         let matcher = PlaceMatcher::new(&config.matching);
-        let verifier = std::sync::Arc::new(crate::api::rest::state::boot_verifier().await);
-        let state =
-            AppState::new(ctx.db.clone(), search_engine, matcher, config).with_verifier(verifier);
-        let enforcement = auth::EnforcementState::from_app_state(&state);
+        auth::init().await;
+        // Key rotation and policy edits without a restart: both loops are
+        // no-ops unless their source is configured (`PLACE_PASETO_KEYS_URL`
+        // / `PLACE_ABAC_POLICY_FILE`).
+        auth::spawn_key_refresh();
+        auth::spawn_policy_watcher();
+        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
+        let enforcement = auth::EnforcementState::from_env();
         ctx.shared_store.insert(state);
         // Durable event bus Phase 3: start the outbox relay worker. A no-op
         // unless PLACE_EVENT_TRANSPORT=outbox and PLACE_EVENT_RELAY are set,

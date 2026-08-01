@@ -189,18 +189,25 @@
     `ReloadableVerifier` per request. Any service still holding a
     verifier in its state has the same latent split.
 
-  - [ ] **worker, place, thing, event** — **not** a find-and-replace;
-    the four have drifted into different shapes, measured 2026-08-01:
+  - [x] **worker** *(done 2026-08-01)* — the worst split of the five: the
+    verifier was snapshotted in `AppState` **and** captured a second time
+    by `apply_enforcement`, so a rotation could have updated one and not
+    the other. Both are gone; `apply_enforcement(router, require_auth)`
+    reads the holders per request. 33 DB-gated green, enforcement proof
+    mutation-checked.
 
-    | Crate | `policy()` `OnceLock` | `Enforcement` struct | `AppState` verifier reads |
-    |---|:-:|:-:|:-:|
-    | worker | yes | no | 2 |
-    | place | no | yes | 1 |
-    | thing | no | no | 1 |
-    | event | no | no | 1 |
+  - [x] **place** *(done 2026-08-01)* — `EnforcementState` now carries
+    only the flag. This crate had **no HTTP test harness** (its `tests/`
+    are library tests over pure functions), so the activation proof
+    brings a minimal one that builds the production router; `serial_test`
+    and `tower` joined its dev-dependencies for it. 3 DB-gated green.
 
-    So each needs its own pass and its own verification; person's diff
-    is the shape to aim at, not a patch to apply.
+  - [ ] **thing, event** — both keep `require_auth`, the verifier **and**
+    the policy in `AppState`, with `require_auth_mw` reading all three
+    off the state (`State<AppState>`), so their refactor is the largest
+    of the five: the middleware and extractors move to the holders and
+    three fields leave the state. Neither has an HTTP test harness, so
+    each also needs place's in-test router.
 - [ ] **AU-2 (M)** Same for **organization, care-pathway, course,
   portfolio** (loco-style `src/auth.rs`). Depends: AU-1 (shared doc
   wording once).
@@ -920,6 +927,19 @@ committing (see plan.md §4).
   and two were tests that had rotted against changes nobody could have
   noticed — because the suites had never run. The cost of a DB-gated
   suite that never runs is not zero; it is the illusion of coverage.
+
+- [ ] **QA-SERVER-FIELDS (S)** — `POST /api/places` (and, on the same
+  evidence, `thing`) **requires the fields the server owns**: `id`,
+  `active`, `created_at`, `updated_at`, `keywords` and any other field
+  the model declares without a serde default. Omit one and the JSON
+  extractor answers `422 missing field …` before a handler runs, for a
+  value the repository then overwrites. This is exactly the event-service
+  defect fixed on 2026-08-01 (`missing field created_at`), and the fix is
+  the same: `#[serde(default)]` on the server-managed fields. Found while
+  writing place's activation proof, whose payload is built by serializing
+  `Place::new` rather than by hand for precisely this reason. Not bundled
+  into the auth commit — a payload-contract change is its own three-part
+  change.
 
 ## Found 2026-08-01 (first run of the authentication DB suite)
 
