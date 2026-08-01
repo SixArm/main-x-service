@@ -8,6 +8,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Fixed — the DB-gated suite ran for the first time (2026-08-01)
+
+Both failures were in the tests; the service behaved correctly in each
+case.
+
+- **The workflow-automation test indexed an object as an array.**
+  `GET /api/plans/{pid}/tasks` answers `{ "tasks": [...], "counts": {...} }`,
+  so `moved[0]["assignee_ref"]` was `Null` and the assertion read as "the
+  automation never fired". It had: the rule logged an `applied` run and
+  the row carried the assignee. Now reads `moved["tasks"][0]`.
+- **The burndown test hard-coded a sprint window that drifted into the
+  past.** Burndown counts `done_at` stamps falling on or before each day
+  in the window; the test completes a task *now*, and once "now" passed
+  the fixed `ends_on` (2026-07-26) the completion stopped counting — the
+  final point read 2 remaining instead of 1. The window is now relative
+  to today (−6 / +7 days), keeping today inside a 14-day sprint.
+
+  Suite: 36/36 green vs Postgres 18; crate enrolled in
+  [`ci/db-suites.txt`](../../ci/db-suites.txt).
+
 
 ### Added
 

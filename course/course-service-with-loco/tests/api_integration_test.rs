@@ -151,8 +151,9 @@ async fn search_finds_created_record() {
     let (status, _) = send(&app, Method::POST, "/api/courses", Some(body)).await;
     assert_eq!(status, StatusCode::CREATED);
 
-    // Pull out the unique "Integration Search <ts>" token for the query.
-    let token = suffix.split_whitespace().last().expect("timestamp token");
+    // The unique token leads the generated name (`<token> Search`), so
+    // querying it matches this record and no other test's leftovers.
+    let token = suffix.split_whitespace().next().expect("unique token");
 
     let uri = format!("/api/courses/search?q={token}");
     let (status, env) = send(&app, Method::GET, &uri, None).await;

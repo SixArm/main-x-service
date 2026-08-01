@@ -35,6 +35,32 @@ worker/worker-service-with-loco
 content-management-system/content-management-system-service-with-rust
 organization/organization-service-with-loco
 authentication/authentication-service-with-loco
+contact-relationship-management/contact-relationship-management-service-with-rust
+course/course-service-with-loco
+event/event-service-with-loco
+link/link-graph-service-with-loco
+patient-flow/patient-flow-service-with-rust
+place/place-service-with-loco
+project-portfolio-management/project-portfolio-management-service-with-loco
+thing/thing-service-with-loco
+#
+# The last eight were enrolled together on 2026-08-01, after every
+# unenrolled suite was swept through its own container (tasks.md
+# QA-SWEEP). Five were already green and had simply never been run:
+# contact-relationship-management (8), link-graph (16), patient-flow (9),
+# place (2), thing (2). Three were red and are fixed:
+#
+#   course     6/8 failing — test fixtures the duplicate detector kept
+#              rejecting, plus a nil-UUID `id` sentinel the service stored
+#              verbatim. Now 14/14.
+#   event      1 failing — `POST /api/events` required the server-managed
+#              `created_at`/`updated_at`. Now 6/6.
+#   portfolio  2 failing — one test indexed an object as an array, one
+#              hard-coded a sprint window that had drifted into the past.
+#              Now 36/36.
+#
+# With these, every one of the 17 service crates runs its DB-gated suite
+# in CI.
 #
 # authentication was enrolled on 2026-08-01, once its suite ran for the
 # first time (38 tests, green vs Postgres 18). It had never been run

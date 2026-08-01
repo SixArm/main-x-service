@@ -47,7 +47,7 @@ Known gaps (verified against the tree, not memory):
 | Fluvio: live sink + consumer | all 10 services (sink), link-graph (consumer); fluvio deps in 5 older crates are dormant |
 | Envelope `data` field + `Linked`/`Unlinked` kinds | only case has it; person's link events deferred because its envelope can't carry §4.2 data |
 | Worker `same_identity` write-side | worker service (person side landed) |
-| Key-rotation refresh, policy hot-reload, enforcement e2e, CI `--include-ignored` | **case only** — the other services still boot-once / boot-only-policy / no e2e / skip `#[ignore]` in CI |
+| Key-rotation refresh, policy hot-reload, enforcement e2e | **case only** — the other services still boot-once / boot-only-policy / no e2e. (CI `--include-ignored`: closed — all 17 service crates run their DB-gated suite as of 2026-08-01.) |
 | Bulk I/O steps 2/4/5 | CSV+review-routing, Parquet, other entities, S3 store |
 | Pagination | loco services use hard caps (LIST_CAP=100, SEARCH_CAP=50) |
 | Front-end merge/link/bulk/review UIs | org/case/portfolio front-ends lack merge; no UI anywhere for links, bulk jobs, or the review queue |

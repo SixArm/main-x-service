@@ -827,6 +827,54 @@ committing (see plan.md §4).
   order-independent. Full care-pathway DB-gated suite green (1 + 22
   + 1 across the three binaries).
 
+## Done 2026-08-01 — every service's DB suite now runs
+
+- [x] **QA-SWEEP (M)** *(done 2026-08-01)* — ran all eight remaining
+  unenrolled DB-gated suites through their new containers (DEP-0). Five
+  were **already green and had simply never been run**:
+  contact-relationship-management (8 tests), link-graph (16),
+  patient-flow (9), place (2), thing (2). Three were red; all three are
+  fixed, and **all 17 service crates are now enrolled** in
+  `ci/db-suites.txt`.
+
+  **course — 6 of 14 failing, two stacked causes.**
+  - `POST /api/courses` stored an explicit all-zeros `id` verbatim.
+    `Course::id` mints via `#[serde(default)]`, which only applies to an
+    *absent* field — so the first create claimed the nil UUID and every
+    later one died on the primary key with a `500`. The handler now mints
+    on nil, matching the event service. *(Product fix.)*
+  - The fixtures fought the duplicate detector: names were
+    `Integration <suffix> <micros>`, and consecutive microsecond stamps
+    share nearly every leading digit, scoring ~0.92 on Jaro-Winkler.
+    Swapping in a UUID was not enough — the constant `Integration `
+    prefix held the score at ~0.88 via the prefix bonus. Names now lead
+    with the random token. The detector was right; the fixtures were
+    wrong. Now 14/14.
+
+  **event — 1 failing, a product defect.** `POST /api/events` *required*
+  `created_at` / `updated_at`, which the repository sets on insert and
+  refreshes on update — it demanded values it then discarded, answering
+  `422 missing field created_at`. Both are now `#[serde(default)]`. The
+  test also now reads the body before asserting the status, which is what
+  turned "422 != 201" into a one-run diagnosis. Now 6/6.
+
+  **portfolio — 2 failing, both test bugs; the service was right.**
+  - The automation test read `moved[0]["assignee_ref"]` from
+    `GET /tasks`, which answers `{ "tasks": [...], "counts": {...} }` —
+    indexing an object gave `Null`, reading as "the automation never
+    fired". It had: an `applied` run was logged and the row carried the
+    assignee.
+  - The burndown test hard-coded a July sprint window. Burndown counts
+    `done_at` stamps within the window, the test completes a task *now*,
+    and once now drifted past `ends_on` the completion stopped counting.
+    The window is now relative to today. Now 36/36.
+
+  Worth stating plainly: of the four defects this sweep found across the
+  family (counting authentication's), **two were in shipped product code**
+  and two were tests that had rotted against changes nobody could have
+  noticed — because the suites had never run. The cost of a DB-gated
+  suite that never runs is not zero; it is the illusion of coverage.
+
 ## Found 2026-08-01 (first run of the authentication DB suite)
 
 - [x] **QA-AUTH-DB (M)** *(fixed 2026-08-01)* — `authentication-service`'s

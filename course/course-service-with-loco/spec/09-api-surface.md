@@ -10,6 +10,14 @@ Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 | Docs | Swagger UI at `/swagger-ui`, raw OpenAPI 3 JSON at `/api-docs/openapi.json` (utoipa). |
 | Metrics | `GET /metrics.prom` — Prometheus text-exposition format (`text/plain; version=0.0.4`), mounted at the application **root** (not under `/api`), public (no bearer token needed). Counters: `course_created_total`, `course_updated_total`, `course_deleted_total`, `course_merged_total`, plus a labelled `http_requests_total{path,status}`. |
 
+**Record ids on create.** `POST /api/courses` mints the `id`: omit the
+field (serde default) **or** send the all-zeros UUID, which the handler
+treats as "you pick" and replaces. Sending nil used to be stored
+verbatim, so the first such create claimed the nil id and every later one
+failed on the primary key with a `500` — the same nil-sentinel handling
+the event service already had. A **non-nil** `id` is still honoured, so a
+caller may supply its own.
+
 All `/api` endpoints return `{ "success": bool, "data": …, "error": … }`.
 HTTP status codes follow REST conventions: `409` for duplicate
 detection on create, `422` for validation failure, `501` only for

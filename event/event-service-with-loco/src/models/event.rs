@@ -226,8 +226,19 @@ pub struct Event {
     // Audit timestamps
     // -----------------------------------------------------------------------
     /// When this record was first created (set by [`Event::new`]).
+    ///
+    /// `#[serde(default)]` because these are **server-managed**: the
+    /// repository stamps `created_at`/`updated_at` on insert and
+    /// preserves/refreshes them on update, so whatever a client sends is
+    /// discarded. Without the default they were nonetheless *required* on
+    /// the wire, and `POST /api/events` refused an otherwise valid body
+    /// with `422 missing field created_at` — demanding a value it then
+    /// ignored.
+    #[serde(default)]
     pub created_at: DateTime<Utc>,
-    /// When this record was last modified.
+    /// When this record was last modified. Server-managed — see
+    /// [`created_at`](Self::created_at).
+    #[serde(default)]
     pub updated_at: DateTime<Utc>,
 }
 

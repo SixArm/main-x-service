@@ -69,6 +69,14 @@ bits; the shared doc is the source of truth for everything else.
 The five endpoints (shared doc §4) mount under the event resource, under
 the same `/api/events/*` prefix as the CRUD surface:
 
+**Server-managed timestamps.** `created_at` / `updated_at` are set by
+the repository on insert and refreshed on update, and any value a client
+sends is discarded. They are therefore **optional on the wire**
+(`#[serde(default)]`): `POST /api/events` previously *required* both and
+answered `422 missing field created_at` to a body it would then have
+ignored.
+
+
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/api/events/import` | `202 {job_id}` — body: `format`, `dedupe_mode`, `dry_run`; file upload |

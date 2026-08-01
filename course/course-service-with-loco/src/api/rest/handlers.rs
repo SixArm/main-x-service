@@ -187,8 +187,17 @@ pub struct ScoredCandidate {
 )]
 pub async fn create_course(
     State(state): State<AppState>,
-    Json(course): Json<Course>,
+    Json(mut course): Json<Course>,
 ) -> impl IntoResponse {
+    // An omitted `id` gets a fresh UUID from serde's default, but an
+    // explicit all-zeros one does not — and the nil UUID is a widespread
+    // "you pick" sentinel. Stored verbatim it was worse than useless: the
+    // first such create took the nil id and every later one failed on the
+    // primary key with a 500. Mint here too, matching the event service.
+    if course.id == Uuid::nil() {
+        course.id = Uuid::new_v4();
+    }
+
     let errs = validate_course(&course);
     if !errs.is_empty() {
         return validation_response(&errs);

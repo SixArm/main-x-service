@@ -635,17 +635,29 @@ async fn engineering_tasks_sprints_and_views() {
             .assert_status_ok();
 
         // ── Sprint + tasks.
+        //
+        // The window is relative to today, not hard-coded. It used to be
+        // a fixed fortnight in July 2026, which time-bombed: burndown
+        // counts `done_at` stamps that fall on or before each day in the
+        // window, the test completes a task *now*, and once "now" drifted
+        // past `ends_on` that completion stopped being counted — the
+        // final point read 2 remaining instead of 1. Six days back and
+        // seven forward keeps today inside a 14-day window, with room
+        // before it for the "before any completion" assertion.
+        let today = chrono::Utc::now().date_naive();
+        let starts_on = (today - chrono::Duration::days(6)).to_string();
+        let ends_on = (today + chrono::Duration::days(7)).to_string();
         let sprint: Value = request
             .post(&format!("/api/plans/{pid}/sprints"))
-            .json(&json!({ "name": "Sprint 1", "starts_on": "2026-07-13",
-                            "ends_on": "2026-07-26" }))
+            .json(&json!({ "name": "Sprint 1", "starts_on": starts_on,
+                            "ends_on": ends_on }))
             .await
             .json();
         let sprint_pid = sprint["pid"].as_str().expect("sprint pid").to_string();
         let bad_sprint = request
             .post(&format!("/api/plans/{pid}/sprints"))
-            .json(&json!({ "name": "Backwards", "starts_on": "2026-07-26",
-                            "ends_on": "2026-07-13" }))
+            .json(&json!({ "name": "Backwards", "starts_on": ends_on,
+                            "ends_on": starts_on }))
             .await;
         assert_eq!(bad_sprint.status_code(), 422);
 

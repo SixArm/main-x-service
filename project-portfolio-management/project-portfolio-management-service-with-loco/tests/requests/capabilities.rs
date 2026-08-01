@@ -223,8 +223,13 @@ async fn workflow_automation_fires_on_a_board_move_and_logs_the_run() {
             .get(&format!("/api/plans/{plan_pid}/tasks"))
             .await
             .json();
+        // `GET /tasks` answers `{ "tasks": [...], "counts": {...} }`, not a
+        // bare array — indexing it with `[0]` yielded `Null`, so this
+        // assertion failed while the automation had in fact run: the rule
+        // logged an `applied` run and the row really did carry the
+        // assignee.
         assert_eq!(
-            moved[0]["assignee_ref"], assignee,
+            moved["tasks"][0]["assignee_ref"], assignee,
             "the automation assigned the task"
         );
 

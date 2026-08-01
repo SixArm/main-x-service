@@ -7,6 +7,20 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Fixed — the DB-gated suite ran for the first time (2026-08-01)
+
+- **`POST /api/events` demanded values it then ignored.** `created_at`
+  and `updated_at` are server-managed — the repository stamps them on
+  insert and refreshes them on update — but they were required on the
+  wire, so an otherwise valid create was refused with `422 missing field
+  created_at`. Both are now `#[serde(default)]`.
+- The create round-trip test now reads the response body **before**
+  asserting the status, so a refusal reports the server's reason instead
+  of `422 != 201`. That is how the above was diagnosed in one run.
+
+  Suite: 6/6 green vs Postgres 18; crate enrolled in
+  [`ci/db-suites.txt`](../../ci/db-suites.txt).
+
 
 ### Added — `Config::from_env` now loads the environment (2026-07-23)
 

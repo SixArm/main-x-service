@@ -8,6 +8,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec.md](./spec/index.md) — single source of truth (numbered §1–§18; live work queue in §13); [README.md](./README.md) — user-facing intro; [AGENTS.md](./AGENTS.md) — agent guide.
 
 ## [Unreleased]
+### Fixed — the DB-gated suite ran for the first time (2026-08-01)
+
+- **`POST /api/courses` stored an all-zeros `id` verbatim.** `Course::id`
+  mints a fresh UUID via `#[serde(default)]`, but a serde default only
+  applies to an *absent* field — an explicit nil UUID (a widespread "you
+  pick" sentinel, and what the event service already treats as one) was
+  written through. The first such create claimed the nil id; every later
+  one died on `duplicate key value violates unique constraint
+  "courses_pkey"` with a `500`. The handler now mints on nil.
+- **Test fixtures fought the duplicate detector.** Integration courses
+  were named `Integration <suffix> <micros>`; consecutive microsecond
+  timestamps share nearly every leading digit, so two such names scored
+  ~0.92 on Jaro-Winkler and each create after the first came back `409
+  DUPLICATE_CANDIDATE`. Swapping in a random UUID was not enough — the
+  constant `Integration ` prefix kept Jaro-Winkler's prefix bonus at
+  ~0.88. Names now lead with the random token, so they differ from the
+  first character. The detector was never wrong here; the fixtures were.
+
+  Suite: 14/14 green vs Postgres 18; crate enrolled in
+  [`ci/db-suites.txt`](../../ci/db-suites.txt).
+
 
 ### Changed — `Config::from_env` gained a testable seam and more variables (2026-07-23)
 

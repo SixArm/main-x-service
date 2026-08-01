@@ -72,11 +72,19 @@ async fn create_event_round_trip() {
         )
         .await
         .unwrap();
-    assert_eq!(create.status(), StatusCode::CREATED);
-
+    // Read the body *before* asserting the status, so a failure reports
+    // why the server refused rather than just "422 != 201".
+    let status = create.status();
     let body = axum::body::to_bytes(create.into_body(), usize::MAX)
         .await
         .unwrap();
+    assert_eq!(
+        status,
+        StatusCode::CREATED,
+        "create failed: {}",
+        String::from_utf8_lossy(&body)
+    );
+
     let created: ApiResponse<Event> = serde_json::from_slice(&body).unwrap();
     let event = created.data.expect("event in body");
     assert_eq!(event.name, title);

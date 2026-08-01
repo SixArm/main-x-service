@@ -58,18 +58,41 @@ pub async fn create_test_router() -> Router {
     create_router(state)
 }
 
-/// Generate a per-test unique course name so concurrent tests don't
-/// step on each other inside the shared Postgres instance.
+/// Generate a per-test unique course name so tests don't step on each
+/// other inside the shared Postgres instance.
+///
+/// The random token comes **first** and there is no shared prefix. Both
+/// details are load-bearing, and both were learned the hard way:
+///
+/// - The name used to be `Integration <suffix> <micros>`. Consecutive
+///   microsecond timestamps share nearly every leading digit, so two such
+///   names scored ~0.92 on Jaro-Winkler — over the match threshold. Every
+///   create after the first came back `409 DUPLICATE_CANDIDATE` against a
+///   record an earlier test had left behind.
+/// - Swapping the timestamp for a random UUID was not enough: with the
+///   constant `Integration ` prefix still in front, Jaro-Winkler's prefix
+///   bonus kept the score at ~0.88 — still a match.
+///
+/// The duplicate detector is not wrong here; the fixtures were. A name
+/// that differs from the first character has nothing for the prefix bonus
+/// to work with.
 pub fn unique_name(suffix: &str) -> String {
-    let ts = chrono::Utc::now().timestamp_micros();
-    format!("Integration {suffix} {ts}")
+    let token = uuid::Uuid::new_v4().simple().to_string();
+    format!("{token} {suffix}")
 }
 
-/// Build a minimal valid Course JSON body. The id is the all-zeros
-/// sentinel so the service generates a fresh UUID; `name` is unique.
+/// Build a minimal valid Course JSON body with a unique `name`.
+///
+/// `id` is **omitted**, which is how the API mints one: `Course::id`
+/// carries `#[serde(default = "Uuid::new_v4")]`, and a serde default only
+/// applies to an *absent* field. This body used to send the all-zeros
+/// UUID as a "generate one for me" sentinel, which the service dutifully
+/// stored — so the first test claimed the nil id and every later create
+/// died on `duplicate key value violates unique constraint
+/// "courses_pkey"`. (The handler now also mints on an explicit nil, so
+/// the sentinel would work too; omitting it is still the contract.)
 pub fn course_json(suffix: &str) -> Value {
     json!({
-        "id": "00000000-0000-0000-0000-000000000000",
         "name": unique_name(suffix),
         "course_code": "TEST101",
         "status": "published",
