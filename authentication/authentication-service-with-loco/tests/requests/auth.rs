@@ -368,17 +368,41 @@ async fn signout_revokes_the_session() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
-async fn jwks_endpoint_publishes_the_signing_key() {
+async fn paseto_keys_endpoint_publishes_the_signing_key() {
     request::<App, _, _>(|request, _ctx| async move {
-        let response = request.get("/.well-known/jwks.json").await;
-        assert_eq!(response.status_code(), 200, "JWKS must be public");
+        // RS256 + JWKS were decommissioned when the family moved to
+        // PASETO v4.public (agents/share/authentication-sessions.md §5);
+        // this test still asked for `/.well-known/jwks.json`, a route
+        // that no longer exists. The published set is now Ed25519 keys
+        // at `/.well-known/paseto-keys`, which is what peers fetch to
+        // verify offline.
+        // Assert on the *body*, not the status: loco's default middleware
+        // stack includes a fallback that answers every unmatched route
+        // with 200, so a status check here would pass whether or not the
+        // route existed. What must be true is that nothing serves a key
+        // set at the old path.
+        let gone = request.get("/.well-known/jwks.json").await;
+        let served_keys = serde_json::from_str::<serde_json::Value>(&gone.text())
+            .ok()
+            .and_then(|v| v.get("keys").cloned());
+        assert!(
+            served_keys.is_none(),
+            "the JWKS endpoint was decommissioned and must not come back"
+        );
 
-        let jwks: serde_json::Value = serde_json::from_str(&response.text()).unwrap();
-        let key = &jwks["keys"][0];
-        assert_eq!(key["kty"], "RSA");
+        let response = request.get("/.well-known/paseto-keys").await;
+        assert_eq!(response.status_code(), 200, "the key set must be public");
+
+        let keys: serde_json::Value = serde_json::from_str(&response.text()).unwrap();
+        let key = &keys["keys"][0];
+        assert_eq!(key["kty"], "OKP");
+        assert_eq!(key["crv"], "Ed25519");
         assert_eq!(key["use"], "sig");
-        assert_eq!(key["alg"], "RS256");
-        // The published kid is the one stamped into token headers.
+        assert!(
+            key["x"].as_str().is_some_and(|x| !x.is_empty()),
+            "the public key material must be published"
+        );
+        // The published kid is the one stamped into token footers.
         assert_eq!(
             key["kid"].as_str().unwrap(),
             authentication_service::auth::keys().kid,

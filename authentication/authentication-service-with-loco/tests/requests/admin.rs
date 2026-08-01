@@ -49,11 +49,10 @@ async fn sign_in_with_attributes(
         .await;
     assert_eq!(link.status_code(), 200);
 
-    let token = users::Model::find_by_email(&ctx.db, email)
-        .await
-        .unwrap()
-        .magic_link_token
-        .expect("a fresh magic link");
+    // The stored token is a hash (SEC-A9), so issue one whose plaintext we
+    // hold — see `prepare_data::issue_magic_link`.
+    let user = users::Model::find_by_email(&ctx.db, email).await.unwrap();
+    let token = super::prepare_data::issue_magic_link(ctx, user).await;
     let redeem = request.get(&format!("/api/auth/magic-link/{token}")).await;
     assert_eq!(redeem.status_code(), 200);
     let body: authentication_service::views::auth::LoginResponse =

@@ -22,7 +22,7 @@ use async_trait::async_trait;
 use chrono::{Duration, offset::Local};
 use loco_rs::{auth::jwt, hash, prelude::*};
 use sea_orm::FromQueryResult;
-use sea_orm::sea_query::Expr;
+use sea_orm::sea_query::{Expr, Func};
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use uuid::Uuid;
@@ -43,6 +43,21 @@ pub use super::_entities::users::{self, ActiveModel, Entity, Model};
 #[must_use]
 pub fn normalize_email(email: &str) -> String {
     email.trim().to_lowercase()
+}
+
+/// SEC-A6 — the case-insensitive account-identity predicate:
+/// `LOWER(email) = <normalised>`.
+///
+/// Built from sea-query's typed `LOWER()` rather than
+/// `Expr::cust_with_values("LOWER(email) = ?", …)`. The custom form emits
+/// the `?` **verbatim**, which is the `MySQL` placeholder where Postgres
+/// wants `$n` — so the driver sent `... WHERE LOWER(email) = ? LIMIT $1` and
+/// Postgres rejected it with `syntax error at or near "LIMIT"`. That
+/// broke every email lookup: signup, magic-link request, and the
+/// duplicate-account guard. Nothing caught it because the failure needs a
+/// real Postgres to appear at all.
+fn lower_email_eq(normalised: &str) -> sea_orm::sea_query::SimpleExpr {
+    Expr::expr(Func::lower(Expr::col(users::Column::Email))).eq(normalised)
 }
 
 /// Length (chars) of a generated magic-link token.
@@ -237,10 +252,7 @@ impl Model {
         // dot folding is deliberately NOT applied here — those are the
         // throttle bucket's concern, not identity; see `rate_limit`.)
         let user = users::Entity::find()
-            .filter(Expr::cust_with_values(
-                "LOWER(email) = ?",
-                [normalize_email(email)],
-            ))
+            .filter(lower_email_eq(&normalize_email(email)))
             .one(db)
             .await?;
         user.ok_or_else(|| ModelError::EntityNotFound)
@@ -503,7 +515,7 @@ impl Model {
         // (routed to the existing-email path), never inserted as a duplicate.
         let email = normalize_email(email);
         if users::Entity::find()
-            .filter(Expr::cust_with_values("LOWER(email) = ?", [email.clone()]))
+            .filter(lower_email_eq(&email))
             .one(&txn)
             .await?
             .is_some()

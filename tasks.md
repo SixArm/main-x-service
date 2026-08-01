@@ -827,6 +827,44 @@ committing (see plan.md §4).
   order-independent. Full care-pathway DB-gated suite green (1 + 22
   + 1 across the three binaries).
 
+## Found 2026-08-01 (first run of the authentication DB suite)
+
+- [x] **QA-AUTH-DB (M)** *(fixed 2026-08-01)* — `authentication-service`'s
+  DB-gated suite had **never been run**; the containerised database
+  (DEP-0) made it a one-liner, and it came up 16 pass / 22 fail. Three of
+  the four causes were test rot; one was a **production defect**.
+
+  - **Every `LOWER(email)` lookup failed against Postgres.**
+    `Expr::cust_with_values("LOWER(email) = ?", …)` emits the `?`
+    verbatim — a MySQL placeholder where Postgres wants `$n` — so the
+    driver sent `… WHERE LOWER(email) = ? LIMIT $1` and Postgres rejected
+    it with `syntax error at or near "LIMIT"`. That is `find_by_email` and
+    the duplicate-account guard: **signup and magic-link sign-in returned
+    500**. Replaced with sea-query's typed `LOWER()`.
+  - `src/fixtures/users.yaml` never gained the ABAC `attributes` column;
+    loco seeds by deserializing into the entity, so every model test
+    aborted on `missing field 'attributes'`.
+  - Two request tests redeemed the magic-link token they read back out of
+    the database — but SEC-A9 stores only its hash. The helper now issues
+    a link through `create_magic_link` and uses the plaintext it returns.
+  - One test asserted the decommissioned `/.well-known/jwks.json`. It now
+    asserts the PASETO key set, plus that nothing serves a key set at the
+    old path — checking the *body*, because loco's fallback middleware
+    answers unmatched routes with `200` and a status check would pass
+    either way.
+
+  38/38 green vs Postgres 18; crate enrolled in `ci/db-suites.txt`.
+
+- [ ] **QA-CUST-SQL (S)** — the same `cust_with_values` footgun may be
+  latent in **person**, **worker**, and **event**
+  (`src/db/repositories.rs`: `LOWER(family|name) LIKE $1`). Those spell
+  the placeholder `$1` rather than `?`, so they may well be fine — but
+  the repository `search()` they sit in is **not called by any handler**
+  (the handlers search Tantivy) and **not covered by any test**, so
+  nothing would notice either way. Decide per crate: exercise it or
+  delete it. Not touched here, because each needs its own verification
+  against a database and this was not the change to bundle it into.
+
 ## Done 2026-08-01 — a containerised test database per service
 
 - [x] **DEP-0 (M)** *(done 2026-08-01)* — **`compose.test.yaml` in all 17
@@ -880,13 +918,10 @@ committing (see plan.md §4).
     now default to `loco:loco@localhost:5432`, so config, container, and
     CI finally name the same connection.
 
-  **Found, not fixed** (pre-existing, unrelated to containers):
-  `authentication-service`'s DB-gated suite is **red — 16 pass, 22 fail**.
-  Every failure is `Failed to seed database: DB(Json("missing field
-  \`attributes\`"))`: `src/fixtures/users.yaml` was never updated when the
-  ABAC `users.attributes` column landed, and the column is non-nullable
-  `Json`. That is why the crate is not in `ci/db-suites.txt` — now with a
-  diagnosis rather than an unknown.
+  **Found here, fixed next** (see QA-AUTH-DB above):
+  `authentication-service`'s DB-gated suite was **red — 16 pass, 22
+  fail** — the first time it had ever been run. One of the causes was a
+  production defect in the signup / sign-in path.
 
 ## Found 2026-07-31 (during the doc harmonization pass)
 

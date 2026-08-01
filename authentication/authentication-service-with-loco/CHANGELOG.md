@@ -10,6 +10,50 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — email lookup was broken against Postgres (2026-08-01)
+
+- **Every `LOWER(email)` lookup failed.** `find_by_email` and the
+  duplicate-account guard in `create_passwordless` filtered with
+  `Expr::cust_with_values("LOWER(email) = ?", …)`. sea-query emits that
+  `?` **verbatim** — it is the `MySQL` placeholder where Postgres wants
+  `$n` — so the driver sent `… WHERE LOWER(email) = ? LIMIT $1` and
+  Postgres rejected the statement with `syntax error at or near "LIMIT"`.
+  That is the **signup and magic-link sign-in path**: both returned a
+  500. Replaced with sea-query's typed `LOWER()`
+  (`Expr::expr(Func::lower(…)).eq(…)`), which renders the right
+  placeholder for any backend.
+
+  Nothing caught it because it cannot reproduce without a real Postgres,
+  and this crate's DB-gated suite had never been run. It is now enrolled
+  in [`ci/db-suites.txt`](../../ci/db-suites.txt), so CI runs it.
+
+- **The seed fixture could not load.** `src/fixtures/users.yaml` was
+  never updated when the ABAC `users.attributes` column landed. loco
+  seeds by deserializing YAML straight into the entity, so an absent key
+  is a hard failure (`missing field 'attributes'`) rather than a fallback
+  to the column's `{}` default — every model test aborted before its
+  first assertion. Both fixture users now carry `attributes: {}`, the
+  shipped read-only posture.
+
+- **Two request tests redeemed a hashed token.** They read
+  `users.magic_link_token` back out of the database and presented it as
+  the magic link, but SEC-A9 stores only `hash(token)` and redemption
+  hashes what the caller presents — so the lookup could never match. The
+  shared helper now issues a link through the production path
+  (`create_magic_link`) and takes the plaintext from the model it
+  returns, which is exactly where the mailer takes it from.
+
+- **One request test asserted a decommissioned endpoint.**
+  `jwks_endpoint_publishes_the_signing_key` still fetched
+  `/.well-known/jwks.json` and asserted RSA/RS256 keys; the family moved
+  to PASETO v4.public and the route is gone. Rewritten as
+  `paseto_keys_endpoint_publishes_the_signing_key`, asserting the Ed25519
+  key set at `/.well-known/paseto-keys` **and** that nothing serves a key
+  set at the old path. That second assertion checks the response *body*,
+  not its status: loco's default fallback middleware answers every
+  unmatched route with `200`, so a status check would have passed whether
+  or not the route existed.
+
 ### Security
 
 - **SEC-A9: hash bearer-equivalent secrets at rest.** Three server-side

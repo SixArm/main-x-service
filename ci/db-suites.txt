@@ -34,6 +34,18 @@ person/person-service-with-loco
 worker/worker-service-with-loco
 content-management-system/content-management-system-service-with-rust
 organization/organization-service-with-loco
+authentication/authentication-service-with-loco
+#
+# authentication was enrolled on 2026-08-01, once its suite ran for the
+# first time (38 tests, green vs Postgres 18). It had never been run
+# against a database, and it was red for three unrelated reasons — a seed
+# fixture missing the ABAC `attributes` column, two tests reading a
+# magic-link token that SEC-A9 now stores hashed, and one asserting the
+# decommissioned JWKS endpoint. It also hid a **production** defect: every
+# `LOWER(email)` lookup emitted a MySQL `?` placeholder, so signup and
+# magic-link sign-in failed against Postgres outright. That is the case
+# for running these suites: a crate whose DB-gated tests never run is a
+# crate whose database behaviour is unknown, not one that works.
 #
 # organization was enrolled on 2026-07-31, alongside its move from the
 # Postgres `ILIKE` name search to Tantivy (tasks.md S-1). Its 22 DB-gated
