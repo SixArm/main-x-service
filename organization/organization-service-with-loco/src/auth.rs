@@ -380,6 +380,75 @@ impl<S: Send + Sync> FromRequestParts<S> for AuthUser {
     }
 }
 
+/// Resource attributes describing **one** organization, for the
+/// record-level ABAC pass (shared
+/// `agents/share/authorization-attributes.md` §9). Matched by policy
+/// `when` keys prefixed `resource.`.
+///
+/// Derived from fields the record already carries — there is no
+/// sensitivity column, and adding one would be a guess about a
+/// deployment's policy. `jurisdiction` is the useful discriminator here
+/// (an EU-only reader, a US-only reader); `has_fiscal_id` lets a policy
+/// treat records carrying tax identifiers more carefully without the
+/// policy needing to know which schemes count as fiscal.
+#[must_use]
+pub fn organization_resource_attrs(
+    org: &organization_matcher::Organization,
+) -> std::collections::BTreeMap<String, Vec<String>> {
+    let mut attrs = std::collections::BTreeMap::new();
+    if let Some(jurisdiction) = org.jurisdiction.as_ref().map(|j| j.to_lowercase())
+        && !jurisdiction.trim().is_empty()
+    {
+        attrs.insert("jurisdiction".to_string(), vec![jurisdiction]);
+    }
+    let has_fiscal = org.identifiers.iter().any(|i| {
+        matches!(
+            i.scheme,
+            organization_matcher::IdentifierScheme::TaxId
+                | organization_matcher::IdentifierScheme::Vat
+        )
+    });
+    attrs.insert("has_fiscal_id".to_string(), vec![has_fiscal.to_string()]);
+    attrs
+}
+
+/// Authorize an action against **one specific record**, returning the
+/// allow's **obligations** (e.g. `["mask"]`) or the HTTP refusal.
+///
+/// A no-op returning no obligations when `ORGANIZATION_REQUIRE_AUTH` is
+/// off, so wiring it into a handler changes nothing until a deployment
+/// activates enforcement — the same posture as the blanket guard.
+///
+/// This is the second, finer decision described in
+/// `agents/share/authorization-attributes.md` §9: the blanket guard has
+/// already run on the coarse (no-record) path, and this one runs after
+/// the record is loaded, so a policy can say "mask this one" or "not
+/// this one" rather than only "not this endpoint".
+///
+/// # Errors
+///
+/// `401` when enforcement is on and no valid token was presented; `403`
+/// when the policy denies, carrying the deciding rule as the reason.
+pub fn authorize_record(
+    caller: &MaybeAuthUser,
+    action: Action,
+    resource: &std::collections::BTreeMap<String, Vec<String>>,
+) -> Result<Vec<String>, (StatusCode, String)> {
+    if !require_auth() {
+        return Ok(Vec::new());
+    }
+    let claims = caller
+        .0
+        .as_ref()
+        .ok_or((StatusCode::UNAUTHORIZED, "missing bearer token".to_string()))?;
+    let decision = policy().evaluate_with_resource(claims, action, ENTITY, resource);
+    if decision.allowed {
+        Ok(decision.obligations)
+    } else {
+        Err((StatusCode::FORBIDDEN, decision.reason))
+    }
+}
+
 /// Like [`AuthUser`], but never rejects: yields `Some(claims)` when a
 /// valid bearer token is present and `None` otherwise. Handlers use it to
 /// stamp the caller identity (e.g. the audit `actor`) without requiring

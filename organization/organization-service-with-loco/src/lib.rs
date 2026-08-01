@@ -40,6 +40,8 @@ pub mod models;
 /// Hand-written OpenAPI 3 document served at `/api-docs/openapi.json`.
 pub mod openapi;
 
+/// Field masking + the GDPR right-of-access export.
+pub mod privacy;
 /// Durable event bus Phase 3: the outbox relay (drain → sink → mark
 /// published) + retention purge. See [`agents/share/event-bus.md`].
 pub mod relay;

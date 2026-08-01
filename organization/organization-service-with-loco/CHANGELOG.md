@@ -8,6 +8,45 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — field masking + GDPR export (2026-08-01)
+
+- **`src/privacy.rs`** — `mask_organization` redacts what is genuinely
+  sensitive about an organization and nothing else: `telephone` and
+  `email` (routinely a named individual's line or inbox) are masked to
+  their tail, the address's `street_address` is dropped (for a sole
+  trader the registered address is a home address, and there is no
+  `is_sole_trader` flag to key on), and `TaxId` / `Vat` identifier
+  values are masked. Public registry identifiers — LEI, DUNS, ROR,
+  ISNI, Wikidata — the names, `url`, and `jurisdiction` are untouched:
+  masking those would break the lookups a registry exists for.
+- **`GET /api/organizations/{pid}/masked`** — the redacted view on
+  demand.
+- **`GET /api/organizations/{pid}/export`** — the GDPR right-of-access
+  envelope (`entity`, `pid`, `exported_at`, `masked`, `record`, `note`).
+  **Audited on every call**, masked or not: a disclosure of personal
+  data is itself a recordable event.
+- **The ABAC `mask` obligation is wired.** `src/auth.rs` gains
+  `authorize_record` + `organization_resource_attrs`
+  (`resource.jurisdiction`, `resource.has_fiscal_id`), and
+  `GET /{pid}` honours a `mask`-obligation allow by returning the
+  redacted record **from the same URL** — so a policy can grant a
+  partial read without a second endpoint, and the caller cannot ask for
+  the unredacted form. The export follows the same decision and reports
+  `masked: true`, because an access request answered with redactions
+  must not look complete. All of it is a no-op while
+  `ORGANIZATION_REQUIRE_AUTH` is off.
+- **No consent model, deliberately.** The shared contract's consent is a
+  *data subject* granting a purpose. An organization is not one; the
+  natural persons behind it are, and the person service owns their
+  consent. A second, unauthoritative home for it would be worse than
+  none.
+- Tests: 10 DB-free pins (each redaction, the fields that must survive,
+  char-safe masking, the export envelope) plus a dedicated
+  `tests/masking.rs` binary — its own process because the auth
+  `OnceLock`s are process-wide — proving end to end that the obligation
+  redacts the ordinary `GET`, carries into the export, and audits both.
+  Mutation-checked: dropping the obligation branch fails the suite.
+
 
 ### Added — Tantivy full-text search, fuzzy + phonetic, dedup blocking (2026-07-31)
 

@@ -81,6 +81,36 @@ fn crud_paths() -> Value {
                     }
                 }
             },
+            "/api/organizations/{pid}/masked": {
+                "get": {
+                    "tags": ["privacy"],
+                    "summary": "The masked view: telephone, email, street line, and fiscal identifiers redacted",
+                    "parameters": [{ "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                    "responses": {
+                        "200": { "description": "The redacted organization", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Organization" } } } },
+                        "404": { "description": "Unknown pid" }
+                    }
+                }
+            },
+            "/api/organizations/{pid}/export": {
+                "get": {
+                    "tags": ["privacy"],
+                    "summary": "GDPR right-of-access export (audited; redacted when the caller's policy carries the `mask` obligation)",
+                    "parameters": [{ "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                    "responses": {
+                        "200": { "description": "Export envelope: entity, pid, exported_at, masked, record, note",
+                            "content": { "application/json": { "schema": { "type": "object", "properties": {
+                                "entity": { "type": "string" },
+                                "pid": { "type": "string", "format": "uuid" },
+                                "exported_at": { "type": "string", "format": "date-time" },
+                                "masked": { "type": "boolean" },
+                                "record": { "$ref": "#/components/schemas/Organization" },
+                                "note": { "type": "string" } } } } } },
+                        "403": { "description": "Record-level policy denied the read" },
+                        "404": { "description": "Unknown pid" }
+                    }
+                }
+            },
             "/api/organizations/match": {
                 "post": {
                     "tags": ["matching"],

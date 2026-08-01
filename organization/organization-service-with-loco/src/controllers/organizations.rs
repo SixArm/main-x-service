@@ -139,13 +139,106 @@ async fn create(
 /// `GET /api/organizations/{pid}`. Returns `200` with the stored
 /// `Organization` payload, or `404` when the pid is unknown (or
 /// soft-deleted, or malformed — all map to not-found via [`http_err`]).
+///
+/// Runs the **record-level** ABAC pass once the record is loaded, so a
+/// policy can decide on this organization rather than on the endpoint.
+/// An allow carrying the `mask` obligation returns the redacted view
+/// ([`crate::privacy::mask_organization`]) — that is how a deployment
+/// grants a partial read without a second endpoint. No-op while
+/// `ORGANIZATION_REQUIRE_AUTH` is off.
 #[debug_handler]
-async fn get_one(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
+async fn get_one(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+) -> Result<Response> {
     let model = OrgModel::find_by_pid(&ctx.db, &pid)
         .await
         .map_err(http_err)?;
     let org = model.to_org()?;
+    let obligations = crate::auth::authorize_record(
+        &caller,
+        authentication_verifier::Action::Read,
+        &crate::auth::organization_resource_attrs(&org),
+    )
+    .map_err(|(status, message)| {
+        Error::CustomError(status, ErrorDetail::new("forbidden", &message))
+    })?;
+    if obligations.iter().any(|o| o == "mask") {
+        return format::json(crate::privacy::mask_organization(&org));
+    }
     format::json(org)
+}
+
+/// The masked view of an organization.
+///
+/// `GET /api/organizations/{pid}/masked`. Returns `200` with the record
+/// redacted per [`crate::privacy::mask_organization`] — telephone,
+/// email, street line, and fiscal identifiers — regardless of the
+/// caller's policy. `404` for an unknown pid.
+///
+/// Distinct from the `mask` obligation on `GET /{pid}`: that one is the
+/// deployment deciding what a caller may see, while this endpoint is a
+/// caller *asking* for the redacted form (a screen share, a support
+/// call, an export preview).
+#[debug_handler]
+async fn get_masked(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
+    let model = OrgModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(http_err)?;
+    format::json(crate::privacy::mask_organization(&model.to_org()?))
+}
+
+/// GDPR right-of-access export for one organization.
+///
+/// `GET /api/organizations/{pid}/export`. Returns `200` with the
+/// envelope from [`crate::privacy::export_organization`]; `404` for an
+/// unknown pid.
+///
+/// **Every export is audited**, including a masked one: a bulk read of
+/// personal data is itself a compliance event
+/// (`agents/share/bulk-import-export.md` §8), and this is the
+/// single-subject case of that machinery. The audit row is written
+/// before the response so a failure to record it cannot be traded for a
+/// silent disclosure.
+///
+/// A caller the policy would mask gets a **masked** export, and the
+/// envelope says so — an access request answered with redactions must
+/// not look like a complete answer.
+#[debug_handler]
+async fn get_export(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+) -> Result<Response> {
+    let model = OrgModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(http_err)?;
+    let org = model.to_org()?;
+    let obligations = crate::auth::authorize_record(
+        &caller,
+        authentication_verifier::Action::Read,
+        &crate::auth::organization_resource_attrs(&org),
+    )
+    .map_err(|(status, message)| {
+        Error::CustomError(status, ErrorDetail::new("forbidden", &message))
+    })?;
+    let masked = obligations.iter().any(|o| o == "mask");
+
+    AuditModel::record(
+        &ctx.db,
+        model.pid,
+        "exported",
+        caller.actor(),
+        Some(serde_json::json!({ "masked": masked })),
+    )
+    .await?;
+
+    format::json(crate::privacy::export_organization(
+        &org,
+        &model.pid.to_string(),
+        masked,
+    ))
 }
 
 /// Replace an organization's payload.
@@ -796,6 +889,8 @@ pub fn routes() -> Routes {
         .add("/{pid}", get(get_one))
         .add("/{pid}", put(update))
         .add("/{pid}", delete(remove))
+        .add("/{pid}/masked", get(get_masked))
+        .add("/{pid}/export", get(get_export))
         .add("/{pid}/audit", get(entity_audit))
 }
 

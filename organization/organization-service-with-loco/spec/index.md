@@ -27,8 +27,10 @@ duplicates with the canonical organization-matcher. Built on loco.rs.
 ## 2. Scope
 
 MVP: CRUD + matching. Since delivered beyond the MVP (§13): full-text
-search (Tantivy), streaming, audit, OpenAPI. Still out of scope
-(deferred, §13): privacy/GDPR export, gRPC, richer validation.
+search (Tantivy), streaming, audit, OpenAPI, field masking + the GDPR
+right-of-access export. Still out of scope (deferred, §13): gRPC,
+richer validation. Consent is out of scope **by decision**, not by
+deferral (§13): an organization is not a data subject.
 Authentication is out of scope here — provided by the central
 authentication-service.
 
@@ -63,6 +65,11 @@ are never fed to the matcher. See §8 and
 1. `POST /api/organizations` — create; `name` required (422 if blank).
 2. `GET /api/organizations` — list active (cap 100), `{pid, name}`.
 3. `GET /api/organizations/{pid}` — return the stored `Organization`.
+   Runs the **record-level** ABAC pass after loading (shared
+   `authorization-attributes.md` §9): resource attributes are
+   `resource.jurisdiction` and `resource.has_fiscal_id`, and an allow
+   carrying the **`mask` obligation** returns the masked view (§6.12)
+   from this same URL. A no-op while `ORGANIZATION_REQUIRE_AUTH` is off.
 4. `PUT /api/organizations/{pid}` — replace the payload; `name`
    required (422 if blank).
 5. `DELETE /api/organizations/{pid}` — soft-delete (`active=false`,
@@ -103,7 +110,20 @@ are never fed to the matcher. See §8 and
     both are set. Blank/missing `q` → `400`; index unavailable → `503`.
     A query Tantivy's parser rejects falls back to an OR over its
     tokens rather than erroring.
-12. `GET /metrics.prom` — Prometheus metrics in text-exposition format
+12. `GET /api/organizations/{pid}/masked` — the **masked view**:
+    `telephone` and `email` masked to their tail, the address's
+    `street_address` dropped, and `TaxId` / `Vat` identifier values
+    masked. Public registry identifiers (LEI, DUNS, ROR, ISNI,
+    Wikidata, …), the names, `url`, and `jurisdiction` are untouched —
+    masking them would break the lookups a registry exists for.
+13. `GET /api/organizations/{pid}/export` — **GDPR right-of-access**
+    export: an envelope of `{entity, pid, exported_at, masked, record,
+    note}`. **Audited** on every call (`exported`, with whether it was
+    masked), because a disclosure of personal data is itself a
+    recordable event. A caller whose record-level policy carries the
+    `mask` obligation gets the redacted record and `masked: true` — an
+    access request answered with redactions must not look complete.
+14. `GET /metrics.prom` — Prometheus metrics in text-exposition format
    (`text/plain; version=0.0.4`). Mounted at the application **root**
    (not under `/api`), public even under blanket auth enforcement.
 
@@ -354,7 +374,21 @@ personal data — honour GDPR when the privacy layer lands (§13).
     which is a structured multi-parameter filter (`identifier`,
     `address-city`, …) over a capped scan rather than a free-text
     query. Moving it is a separate item, not a side effect of this one.
-- [ ] Per-field masking + GDPR export endpoint.
+- [x] **Per-field masking + GDPR export endpoint.** `src/privacy.rs`:
+  `mask_organization` (telephone → tail, email → first char + domain,
+  `street_address` dropped, `TaxId`/`Vat` values masked; registry
+  identifiers and the public fields untouched) and
+  `export_organization` (the `{entity, pid, exported_at, masked,
+  record, note}` envelope). Endpoints `GET /{pid}/masked` and
+  `GET /{pid}/export` (§6.12–13), the export **audited** either way.
+  `src/auth.rs` gains `authorize_record` + `organization_resource_attrs`
+  so `GET /{pid}` and the export honour the ABAC **`mask` obligation**
+  (case is the family reference). **Consent is deliberately absent**: an
+  organization is not a data subject, and the natural persons behind one
+  are the person service's to record — a second, unauthoritative home
+  for consent is worse than none. Tests: 10 DB-free masking/export pins
+  + a dedicated `tests/masking.rs` binary proving the obligation
+  redacts the ordinary `GET`, carries into the export, and audits both.
 - [x] Record merge — `POST /merge` folds a duplicate into a survivor
   (union fields, former-name alias, soft-delete, `merge_records` history
   + snapshot, `Merged` event); pure `src/merge.rs`; `/merges/recent`.

@@ -132,13 +132,32 @@
 - [ ] **S-4 (L)** Tantivy in **portfolio** — note the kind gate: index
   `kind` as a field and filter search/dedup within-kind. Depends: S-1.
 
-- [ ] **P-1 (M)** Privacy module in **organization**: masking
-  (`mask_*` copy-adapt from person's `src/privacy/`), masked-view
-  endpoint (`GET /{id}/masked`), GDPR export (`GET /{id}/export`),
-  consent model if applicable per `agents/share/privacy.md`. Wire the
-  ABAC `mask` obligation like case's `GET` handler (case is the
-  obligation reference).
-  *Verify:* green gate; masked fields pinned in unit tests; spec/CHANGELOG.
+- [x] **P-1 (M)** Privacy module in **organization**. *(done 2026-08-01)*
+  `src/privacy.rs`: `mask_organization` + `export_organization`, the
+  endpoints `GET /{pid}/masked` and `GET /{pid}/export`, and the ABAC
+  **`mask` obligation** wired into `GET /{pid}` and the export via new
+  `auth::authorize_record` + `auth::organization_resource_attrs`
+  (`resource.jurisdiction`, `resource.has_fiscal_id`).
+  *Verified:* fmt + clippy clean; 136 DB-free tests; 23 DB-gated green
+  vs Postgres 18, including a dedicated `tests/masking.rs` binary —
+  mutation-checked (dropping the obligation branch fails it).
+
+  What organization masks is **not** what person masks, and the
+  difference is the point: most of an organization record is published
+  fact. Redacted are `telephone`, `email` (routinely a named
+  individual's line or inbox), the address's `street_address` (for a
+  sole trader that is a home address, and there is no `is_sole_trader`
+  flag to key on, so the street line goes for every record while
+  locality / postcode / country stay), and `TaxId` / `Vat` values.
+  **Not** redacted: LEI / DUNS / ROR / ISNI / Wikidata, the names,
+  `url`, `jurisdiction` — masking those would break the lookups a
+  registry exists for.
+
+  **Consent is refused, not deferred.** The shared model is a *data
+  subject* granting a purpose; an organization is not one, and the
+  natural persons behind it are the person service's to record. A
+  second, unauthoritative home for consent is worse than none. Stated
+  in the crate spec §2/§13 so the next pass does not "finish" it.
 - [ ] **P-2 (M)** Privacy in **care-pathway** (as P-1; clinical data —
   mind `compliance-for-healthcare.md`). Depends: P-1.
 - [ ] **P-3 (M)** Privacy in **case** — it already honours the `mask`
