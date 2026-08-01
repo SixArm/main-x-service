@@ -319,6 +319,77 @@ async fn can_check_duplicates() {
     .await;
 }
 
+/// Pagination: `limit` / `offset` window the results, `X-Total-Count`
+/// reports the whole collection, and omitting both returns what the
+/// endpoint always returned.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn list_and_search_are_paginated() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        for i in 0..5 {
+            request
+                .post("/api/organizations")
+                .json(&json!({"name": format!("Paging Test {i}")}))
+                .await;
+        }
+
+        // Read one response header as a string; loco's test response
+        // exposes the real `HeaderMap`.
+        macro_rules! header {
+            ($r:expr, $name:expr) => {
+                $r.headers()
+                    .get($name)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or_default()
+                    .to_string()
+            };
+        }
+
+        // A window of two, starting at the second row.
+        let page = request.get("/api/organizations?limit=2&offset=1").await;
+        assert_eq!(page.status_code(), 200);
+        let body: serde_json::Value = page.json();
+        assert_eq!(body.as_array().expect("array").len(), 2, "the page is two rows");
+        assert_eq!(header!(page, "x-total-count"), "5", "the total ignores the window");
+        assert_eq!(header!(page, "x-limit"), "2");
+        assert_eq!(header!(page, "x-offset"), "1");
+
+        // Omitting both parameters is the pre-pagination behaviour, and
+        // the headers still say what was applied.
+        let all = request.get("/api/organizations").await;
+        let body: serde_json::Value = all.json();
+        assert_eq!(body.as_array().expect("array").len(), 5);
+        assert_eq!(header!(all, "x-limit"), "100", "the default is the old cap");
+        assert_eq!(header!(all, "x-offset"), "0");
+
+        // An over-large limit is clamped, not refused.
+        let clamped = request.get("/api/organizations?limit=100000").await;
+        assert_eq!(clamped.status_code(), 200);
+        assert_eq!(header!(clamped, "x-limit"), "500", "limit clamps to the maximum");
+
+        // An out-of-bound offset is a 400: the database would otherwise
+        // materialise and discard arbitrarily many rows.
+        assert_eq!(
+            request
+                .get("/api/organizations?offset=10001")
+                .await
+                .status_code(),
+            400
+        );
+
+        // Search pages the same way, and its total comes from the index
+        // rather than the page length.
+        let hits = request.get("/api/organizations/search?q=Paging&limit=2").await;
+        assert_eq!(hits.status_code(), 200, "search page: {}", hits.text());
+        let body: serde_json::Value = hits.json();
+        assert_eq!(body.as_array().expect("array").len(), 2);
+        assert_eq!(header!(hits, "x-total-count"), "5", "all five match the query");
+    })
+    .await;
+}
+
 /// The index is reconstructible from the database: wiping it makes
 /// search go blind, and `search_reindex` restores every active record.
 /// This is the recovery path for a lost index volume, so it is worth a

@@ -2,6 +2,7 @@
 
 import { API_BASE_URL } from "$lib/config";
 import { ApiClient } from "./client";
+import type { Page, PageRequest } from "./client";
 import type {
   BatchDeduplicationResponse,
   Organization,
@@ -38,6 +39,15 @@ export class OrganizationRepository {
    */
   list(): Promise<OrgRef[]> {
     return this.http.get<OrgRef[]>("/api/organizations");
+  }
+
+  /**
+   * `GET /api/organizations?limit=&offset=` — one page, with the total.
+   * @param page The window; omitted values leave the service's defaults.
+   * @returns The refs plus `total` / `limit` / `offset` as applied.
+   */
+  listPage(page: PageRequest = {}): Promise<Page<OrgRef>> {
+    return this.http.getPage<OrgRef>("/api/organizations", page);
   }
 
   /**

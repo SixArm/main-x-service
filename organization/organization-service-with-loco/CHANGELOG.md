@@ -8,6 +8,36 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — pagination on list and search (2026-08-01)
+
+- **`GET /api/organizations` and `GET /api/organizations/search` take
+  `?limit=` and `?offset=`**, and report `X-Total-Count` / `X-Limit` /
+  `X-Offset` (the family convention, now written down in
+  `agents/share/restful.md`). The body shape is unchanged — these
+  endpoints return a bare array and every existing caller parses one, so
+  the count goes in a header rather than in an envelope that would break
+  them all for a number most do not use.
+- **Defaults preserve the old behaviour**: no parameters ⇒ the first 100
+  (list) or 50 (search), which is exactly what the hard caps returned.
+  `limit` **clamps** to 500 rather than erroring — a caller asking for
+  100 000 wants "as many as you'll give me" — while an `offset` past
+  10 000 is a `400`, because that one is a cheap denial of service rather
+  than an unusual request (SEC-G7).
+- Search's total comes from Tantivy's `Count` collector, not the page
+  length: a page cannot tell a caller how much there is, which is the
+  whole point of the header. The count is the index's match count rather
+  than the number of rows that resolved, so it does not wobble when a hit
+  refers to a since-deleted row.
+- Tests: DB-free pins on the clamp/default/bound rules, plus a DB-gated
+  request test walking a window, checking the total exceeds the page,
+  the clamp, and the `400`.
+
+**Found while writing it:** `#[serde(flatten)]` on a query-parameter
+struct silently breaks typed fields — a flattened struct deserializes
+from a string-keyed map, so `limit=2` arrives as the string `"2"` and
+fails as a `u64`, turning a valid request into a `400`. The page fields
+are therefore declared inline on the search params rather than flattened.
+
 ### Added — key rotation and policy hot-reload without a restart (2026-08-01)
 
 AU-2, the loco-style half of the rollout (case was the reference; the

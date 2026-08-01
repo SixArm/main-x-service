@@ -8,6 +8,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — paged collection reads (2026-08-01)
+
+- **`ApiClient.getPage()`** returns `{ items, total, limit, offset }`,
+  reading the service's `X-Total-Count` / `X-Limit` / `X-Offset` headers.
+  The plain `get()` throws response headers away, which is fine for one
+  record and useless for a collection. A service that predates the
+  headers still works: the page length is the fallback.
+- **`OrganizationRepository.listPage()`** wraps it; `list()` is unchanged
+  for callers that just want the default page.
+- The organizations list route shows the row count — `shown / total` when
+  the page is not the whole collection, so a first page of a long list
+  cannot be mistaken for a short list.
+
 
 ### Added — drag-to-decide review board (2026-07-19)
 

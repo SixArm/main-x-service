@@ -3,7 +3,7 @@
 
 use loco_rs::prelude::*;
 use organization_matcher::Organization as MatchOrg;
-use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect};
+use sea_orm::{ConnectionTrait, PaginatorTrait, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
 /// Re-export the generated entity types so callers use
@@ -134,13 +134,48 @@ impl Model {
     ///
     /// When the query fails.
     pub async fn list(db: &DatabaseConnection, limit: u64) -> ModelResult<Vec<Self>> {
+        Self::list_paged(db, limit, 0).await
+    }
+
+    /// One page of active organizations (most-recent first).
+    ///
+    /// The ordering is by descending `id` — insertion order — which is
+    /// stable enough to page through as long as rows are only appended.
+    /// A row inserted *during* a page walk shifts everything after it by
+    /// one, which is the standard offset-pagination caveat and the reason
+    /// [`agents/share/restful.md`] says cursors are the right answer for
+    /// deep paging.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn list_paged(
+        db: &DatabaseConnection,
+        limit: u64,
+        offset: u64,
+    ) -> ModelResult<Vec<Self>> {
         let rows = organizations::Entity::find()
             .filter(organizations::Column::DeletedAt.is_null())
             .order_by_desc(organizations::Column::Id)
+            .offset(offset)
             .limit(limit)
             .all(db)
             .await?;
         Ok(rows)
+    }
+
+    /// How many active organizations exist, ignoring any page window —
+    /// the `X-Total-Count` a paged response reports.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn count(db: &DatabaseConnection) -> ModelResult<u64> {
+        let total = organizations::Entity::find()
+            .filter(organizations::Column::DeletedAt.is_null())
+            .count(db)
+            .await?;
+        Ok(total)
     }
 }
 

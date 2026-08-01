@@ -125,3 +125,56 @@ describe("ApiClient", () => {
     expect(err.message).toContain("boom");
   });
 });
+
+describe("getPage", () => {
+  /** A fetch stub answering with `body` and the given headers. */
+  function stub(body: unknown, headers: Record<string, string>) {
+    return async (_url: string, _init?: RequestInit) =>
+      new Response(JSON.stringify(body), { status: 200, headers });
+  }
+
+  it("reads the pagination headers the service sends", async () => {
+    const client = new ApiClient({
+      baseUrl: "http://x",
+      fetch: stub([{ pid: "a", name: "A" }], {
+        "x-total-count": "431",
+        "x-limit": "25",
+        "x-offset": "50",
+      }) as unknown as typeof fetch,
+    });
+    const page = await client.getPage<{ pid: string }>("/api/organizations", {
+      limit: 25,
+      offset: 50,
+    });
+    expect(page.items).toHaveLength(1);
+    expect(page.total).toBe(431);
+    expect(page.limit).toBe(25);
+    expect(page.offset).toBe(50);
+  });
+
+  it("sends limit and offset as query parameters", async () => {
+    let seen = "";
+    const client = new ApiClient({
+      baseUrl: "http://x",
+      fetch: (async (url: string) => {
+        seen = url;
+        return new Response("[]", { status: 200 });
+      }) as unknown as typeof fetch,
+    });
+    await client.getPage("/api/organizations", { limit: 10, offset: 20 });
+    expect(seen).toContain("limit=10");
+    expect(seen).toContain("offset=20");
+  });
+
+  it("falls back to the page length when a service sends no headers", async () => {
+    // A service that predates the convention still works; the caller can
+    // only tell by the total never exceeding the page.
+    const client = new ApiClient({
+      baseUrl: "http://x",
+      fetch: stub([{ pid: "a" }, { pid: "b" }], {}) as unknown as typeof fetch,
+    });
+    const page = await client.getPage("/api/organizations");
+    expect(page.total).toBe(2);
+    expect(page.offset).toBe(0);
+  });
+});

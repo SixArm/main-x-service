@@ -266,14 +266,35 @@
   its own task: which crate first, and what the collector story is in
   compose (DEP-1).
 
-- [ ] **PG-1 (L)** Pagination in the four newest loco services: replace
-  `LIST_CAP`/`SEARCH_CAP` with `offset`+`limit` params (bounded maxima),
-  returning total-count metadata without breaking existing response
-  shapes (additive envelope field or headers — pick one convention,
-  document in `agents/share/restful.md`). Update the four sibling
-  front-ends in the same task.
-  *Verify:* service green gate + front-end `pnpm check/test/build`;
-  contract pinned in request tests.
+- [~] **PG-1 (L)** Pagination in the four newest loco services.
+  **Convention fixed and organization done (2026-08-01); care-pathway,
+  case and portfolio remain.**
+
+  The convention is **headers, not an envelope**, written up in
+  [`agents/share/restful.md`](agents/share/restful.md): `?limit=&offset=`
+  in, `X-Total-Count` / `X-Limit` / `X-Offset` out, body unchanged. All
+  four endpoints return a bare JSON array today and every front-end
+  parses one, so an envelope would break every caller for a number most
+  of them do not use. Defaults reproduce the old hard caps, `limit`
+  clamps (500) rather than erroring, and an `offset` past 10 000 is a
+  `400` — that one is a cheap DoS, not an unusual request.
+
+  - [x] **organization** + its front-end. List and search paginate;
+    search's total comes from Tantivy's `Count` collector rather than the
+    page length. Front-end: `ApiClient.getPage()` reads the headers,
+    `listPage()` wraps it, and the list route shows `shown / total`.
+    *Verified:* 25 DB-gated green; `svelte-check` clean, 46 unit tests,
+    build ok.
+
+    Worth knowing before doing the other three: **`#[serde(flatten)]` on
+    query parameters silently breaks typed fields.** A flattened struct
+    deserializes from a string-keyed map, so `limit=2` arrives as the
+    string `"2"` and fails to parse as `u64` — a `400` on a valid
+    request. Declare the page fields inline instead.
+
+  - [ ] **care-pathway, case, portfolio** + their front-ends. Note
+    portfolio has `LIST_CAP` in three controllers (automation,
+    collaboration, plans), not one.
 
 ## Phase 3 — Platform
 

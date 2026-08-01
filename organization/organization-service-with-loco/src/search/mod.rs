@@ -99,6 +99,17 @@ pub fn engine() -> Option<&'static SearchEngine> {
         .as_ref()
 }
 
+/// Which retrieval route a search uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SearchMode {
+    /// Tokenised full-text over every indexed field.
+    Exact,
+    /// Typo-tolerant term matching (Levenshtein ≤ [`FUZZY_DISTANCE`]).
+    Fuzzy,
+    /// Soundex codes — names that sound alike.
+    Phonetic,
+}
+
 /// High-level search facade over an [`OrgIndex`].
 pub struct SearchEngine {
     /// The underlying Tantivy index wrapper.
@@ -388,6 +399,141 @@ impl SearchEngine {
     /// When the reader fails to reload.
     pub fn reload(&self) -> Result<()> {
         self.index.reload()
+    }
+
+    /// One page of hits **plus the true total**: `(pids, total)`.
+    ///
+    /// The total comes from Tantivy's `Count` collector rather than the
+    /// page length, because a page can never tell a caller how much
+    /// there is — which is the whole point of `X-Total-Count`
+    /// (`agents/share/restful.md`). `mode` picks the same three
+    /// retrieval routes the un-paged methods expose.
+    ///
+    /// # Errors
+    ///
+    /// When the search fails.
+    pub fn search_page(
+        &self,
+        query_str: &str,
+        mode: SearchMode,
+        limit: usize,
+        offset: usize,
+    ) -> Result<(Vec<String>, usize)> {
+        let searcher = self.index.reader().searcher();
+        let Some(query) = self.build_query(query_str, mode) else {
+            return Ok((Vec::new(), 0));
+        };
+        // Ask for the whole prefix up to the page end, then skip: Tantivy
+        // has no "start at N" collector, and the offset is bounded by the
+        // caller precisely so this stays finite.
+        let wanted = offset.saturating_add(limit);
+        let (top, total) = searcher
+            .search(
+                query.as_ref(),
+                &(
+                    tantivy::collector::TopDocs::with_limit(wanted.max(1)),
+                    tantivy::collector::Count,
+                ),
+            )
+            .map_err(|e| err(&format!("search: {e}")))?;
+        let s = self.index.schema();
+        let mut pids = Vec::new();
+        for (_score, addr) in top.into_iter().skip(offset) {
+            let doc: TantivyDocument = searcher
+                .doc(addr)
+                .map_err(|e| err(&format!("retrieve doc: {e}")))?;
+            if let Some(v) = doc.get_first(s.pid)
+                && let Some(t) = v.as_str()
+            {
+                pids.push(t.to_string());
+            }
+        }
+        Ok((pids, total))
+    }
+
+    /// Build the query for one retrieval mode, or `None` when the input
+    /// tokenises to nothing (an empty query matches nothing rather than
+    /// everything).
+    fn build_query(&self, query_str: &str, mode: SearchMode) -> Option<Box<dyn Query>> {
+        let s = self.index.schema();
+        match mode {
+            SearchMode::Exact => {
+                let fields = vec![
+                    s.name,
+                    s.legal_name,
+                    s.alternate_names,
+                    s.identifiers,
+                    s.keywords,
+                    s.address,
+                    s.url,
+                ];
+                let parser = QueryParser::for_index(self.index.index(), fields.clone());
+                if let Ok(query) = parser.parse_query(query_str) {
+                    Some(query)
+                } else {
+                    // Same fallback as `search`: a query the parser
+                    // rejects becomes an OR over its tokens.
+                    let tokens = tokenise(query_str);
+                    if tokens.is_empty() {
+                        return None;
+                    }
+                    let sub: Vec<(Occur, Box<dyn Query>)> = tokens
+                        .iter()
+                        .flat_map(|t| {
+                            fields.iter().map(move |f| {
+                                let q: Box<dyn Query> = Box::new(TermQuery::new(
+                                    Term::from_field_text(*f, t),
+                                    IndexRecordOption::Basic,
+                                ));
+                                (Occur::Should, q)
+                            })
+                        })
+                        .collect();
+                    Some(Box::new(BooleanQuery::new(sub)))
+                }
+            }
+            SearchMode::Fuzzy => {
+                let tokens = tokenise(query_str);
+                if tokens.is_empty() {
+                    return None;
+                }
+                let fields = [s.name, s.legal_name, s.alternate_names, s.keywords];
+                let mut sub: Vec<(Occur, Box<dyn Query>)> = Vec::new();
+                for t in &tokens {
+                    for f in fields {
+                        sub.push((
+                            Occur::Should,
+                            Box::new(FuzzyTermQuery::new(
+                                Term::from_field_text(f, t),
+                                FUZZY_DISTANCE,
+                                true,
+                            )),
+                        ));
+                    }
+                }
+                Some(Box::new(BooleanQuery::new(sub)))
+            }
+            SearchMode::Phonetic => {
+                let codes: Vec<String> = tokenise(query_str)
+                    .iter()
+                    .filter_map(|t| soundex(t))
+                    .collect();
+                if codes.is_empty() {
+                    return None;
+                }
+                let sub: Vec<(Occur, Box<dyn Query>)> = codes
+                    .iter()
+                    .map(|c| {
+                        let q: Box<dyn Query> = Box::new(TermQuery::new(
+                            Term::from_field_text(s.name_phonetic, &c.to_lowercase()),
+                            IndexRecordOption::Basic,
+                        ));
+                        (Occur::Should, q)
+                    })
+                    .collect();
+                Some(Box::new(BooleanQuery::new(sub)))
+            }
+        }
     }
 
     /// Run `query` and project the top `limit` hits down to their stored

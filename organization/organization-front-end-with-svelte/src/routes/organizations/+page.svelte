@@ -21,10 +21,16 @@
     let items = $state<OrgRef[]>([]);
     let loading = $state(true);
     let error = $state<string | null>(null);
+    // Rows matching overall, from `X-Total-Count` — not `items.length`,
+    // which is only this page. Shown so an operator can tell a short list
+    // from a first page of a long one.
+    let total = $state(0);
 
     onMount(async () => {
         try {
-            items = await repo.list();
+            const page = await repo.listPage();
+            items = page.items;
+            total = page.total;
         } catch (err) {
             error = err instanceof Error ? err.message : t("list.title");
         } finally {
@@ -77,6 +83,11 @@
 {:else if items.length === 0}
     <p>{t("list.empty")}</p>
 {:else}
+    <p class="count">
+        {items.length === total
+            ? `${total}`
+            : `${items.length} / ${total}`}
+    </p>
     <GridTheme>
       <FilterTheme>
         <div class="filter-wrap">
@@ -100,4 +111,13 @@
     height: 480px;
     overflow: hidden;
   }
+
+    /* The row count: just the total when the page holds everything, and
+       "shown / total" when it does not, so a first page of a long list
+       cannot be mistaken for a short list. */
+    .count {
+        margin: 0 0 0.5rem;
+        opacity: 0.75;
+        font-variant-numeric: tabular-nums;
+    }
 </style>

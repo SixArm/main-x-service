@@ -287,16 +287,104 @@ async fn remove(
     format::empty_json()
 }
 
-/// List active organizations (capped at 100).
+/// List active organizations, one page at a time.
 ///
-/// `GET /api/organizations`. Returns `200` with an array of `OrgRef`,
-/// newest first, soft-deleted rows excluded. The 100 cap is a deliberate
-/// guard against unbounded responses (full listing is out of scope).
+/// `GET /api/organizations[?limit=&offset=]`. Returns `200` with an
+/// array of `OrgRef`, newest first, soft-deleted rows excluded, plus the
+/// `X-Total-Count` / `X-Limit` / `X-Offset` headers
+/// (`agents/share/restful.md`). Omitting both parameters returns the
+/// first [`LIST_DEFAULT_LIMIT`] rows — exactly what this endpoint
+/// returned before it was paginated, so no existing caller changes. An
+/// `offset` beyond [`MAX_OFFSET`] is a `400`.
 #[debug_handler]
-async fn list(State(ctx): State<AppContext>) -> Result<Response> {
-    let rows = OrgModel::list(&ctx.db, 100).await?;
+async fn list(
+    axum::extract::Query(page): axum::extract::Query<PageParams>,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
+    page.check_offset()?;
+    let (limit, offset) = page.resolve(LIST_DEFAULT_LIMIT);
+    let rows = OrgModel::list_paged(&ctx.db, limit, offset).await?;
+    let total = OrgModel::count(&ctx.db).await?;
     let refs: Vec<OrgRef> = rows.iter().map(OrgRef::of).collect();
-    format::json(refs)
+    Ok(with_page_headers(format::json(refs)?, total, limit, offset))
+}
+
+// ─── Pagination (agents/share/restful.md) ───────────────────────────────
+
+/// Default page size for `GET /api/organizations` — the cap this
+/// endpoint applied before pagination existed, so omitting `limit`
+/// returns exactly what it always did.
+pub const LIST_DEFAULT_LIMIT: u64 = 100;
+
+/// Largest page any collection read will serve. A bigger `limit` is
+/// **clamped** to this rather than refused: a caller asking for 100 000
+/// rows wants "as many as you'll give me", and an `X-Limit` of 500
+/// answers that better than a `400` it has to learn to handle.
+pub const MAX_LIMIT: u64 = 500;
+
+/// Largest accepted `offset`. Past this a request is a `400`: the
+/// database would have to materialise and discard arbitrarily many rows,
+/// which is a cheap denial of service (SEC-G7). Deep paging past this
+/// wants a cursor, not a bigger number.
+pub const MAX_OFFSET: u64 = 10_000;
+
+/// `?limit=` / `?offset=` on a collection read.
+#[derive(Debug, Default, Deserialize)]
+struct PageParams {
+    /// Page size; absent, zero or unparseable ⇒ the endpoint default.
+    #[serde(default)]
+    limit: Option<u64>,
+    /// Rows to skip; absent ⇒ 0.
+    #[serde(default)]
+    offset: Option<u64>,
+}
+
+impl PageParams {
+    /// The clamped `(limit, offset)` this request will actually use.
+    ///
+    /// A zero `limit` falls back to the default rather than serving an
+    /// empty page — an empty page and an empty collection look identical
+    /// to a client, and only one of them is a real answer.
+    fn resolve(&self, default_limit: u64) -> (u64, u64) {
+        let limit = self
+            .limit
+            .filter(|l| *l > 0)
+            .unwrap_or(default_limit)
+            .min(MAX_LIMIT);
+        (limit, self.offset.unwrap_or(0))
+    }
+
+    /// Reject an out-of-bound offset before it reaches the database.
+    fn check_offset(&self) -> Result<()> {
+        if self.offset.unwrap_or(0) > MAX_OFFSET {
+            return Err(Error::CustomError(
+                StatusCode::BAD_REQUEST,
+                ErrorDetail::new(
+                    "offset_too_large",
+                    &format!("offset must not exceed {MAX_OFFSET}; narrow the query instead"),
+                ),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Stamp the pagination headers onto a response
+/// (`agents/share/restful.md`): the total ignoring the page window, plus
+/// the limit and offset actually applied, so a client that sent neither
+/// still learns the defaults.
+fn with_page_headers(mut response: Response, total: u64, limit: u64, offset: u64) -> Response {
+    let headers = response.headers_mut();
+    for (name, value) in [
+        ("x-total-count", total),
+        ("x-limit", limit),
+        ("x-offset", offset),
+    ] {
+        if let Ok(value) = axum::http::HeaderValue::from_str(&value.to_string()) {
+            headers.insert(name, value);
+        }
+    }
+    response
 }
 
 /// Score a query against an explicit candidate list (no persistence).
@@ -668,10 +756,21 @@ async fn review_decision(
     }
 }
 
-/// Query string for the search endpoint: the `q` term plus the optional
-/// retrieval-mode flags.
+/// Query string for the search endpoint: the `q` term, the optional
+/// retrieval-mode flags, and the page window.
 #[derive(Debug, Deserialize)]
 struct SearchParams {
+    /// Page size; absent, zero or unparseable ⇒ [`SEARCH_DEFAULT_LIMIT`].
+    ///
+    /// Declared here rather than by `#[serde(flatten)]`-ing
+    /// [`PageParams`]: a flattened struct is deserialized from a
+    /// string-keyed map, so `limit=2` arrives as the *string* `"2"` and
+    /// fails to parse as a `u64` — a `400` on a valid request.
+    #[serde(default)]
+    limit: Option<u64>,
+    /// Rows to skip; absent ⇒ 0.
+    #[serde(default)]
+    offset: Option<u64>,
     /// The full-text query.
     q: Option<String>,
     /// Typo-tolerant retrieval (Levenshtein distance ≤ 2) instead of
@@ -683,9 +782,9 @@ struct SearchParams {
     phonetic: bool,
 }
 
-/// Maximum results returned by `GET /search`. Unchanged from the `ILIKE`
-/// era, so the wire contract is the same size.
-pub const SEARCH_LIMIT: usize = 50;
+/// Default page size for `GET /search` — the cap this endpoint applied
+/// before pagination, so omitting `limit` returns what it always did.
+pub const SEARCH_DEFAULT_LIMIT: u64 = 50;
 
 /// Full-text search: `GET /api/organizations/search?q=acme[&fuzzy][&phonetic]`.
 ///
@@ -703,11 +802,17 @@ async fn search(
     axum::extract::Query(params): axum::extract::Query<SearchParams>,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
-    let q = params.q.unwrap_or_default();
+    let q = params.q.clone().unwrap_or_default();
     let q = q.trim();
     if q.is_empty() {
         return bad_request("query parameter `q` is required");
     }
+    let page = PageParams {
+        limit: params.limit,
+        offset: params.offset,
+    };
+    page.check_offset()?;
+    let (limit, offset) = page.resolve(SEARCH_DEFAULT_LIMIT);
     // An unavailable index is reported, never disguised as "no matches":
     // an operator must be able to tell a broken index from an empty one.
     let Some(engine) = crate::search::engine() else {
@@ -716,16 +821,31 @@ async fn search(
             ErrorDetail::new("search_unavailable", "the search index is unavailable"),
         ));
     };
-    let pids = if params.phonetic {
-        engine.phonetic_search(q, SEARCH_LIMIT)?
+    let mode = if params.phonetic {
+        crate::search::SearchMode::Phonetic
     } else if params.fuzzy {
-        engine.fuzzy_search(q, SEARCH_LIMIT)?
+        crate::search::SearchMode::Fuzzy
     } else {
-        engine.search(q, SEARCH_LIMIT)?
+        crate::search::SearchMode::Exact
     };
+    let (pids, total) = engine.search_page(
+        q,
+        mode,
+        usize::try_from(limit).unwrap_or(usize::MAX),
+        usize::try_from(offset).unwrap_or(usize::MAX),
+    )?;
     let rows = OrgModel::find_by_pids(&ctx.db, &parse_pids(&pids)).await?;
     let refs: Vec<OrgRef> = rows.iter().map(OrgRef::of).collect();
-    format::json(refs)
+    // The total is the index's match count, not the number of rows that
+    // resolved: a hit whose row has since been deleted is dropped from
+    // the page (see `find_by_pids`), and reporting the shrunken figure
+    // would make the count wobble for reasons a caller cannot see.
+    Ok(with_page_headers(
+        format::json(refs)?,
+        total as u64,
+        limit,
+        offset,
+    ))
 }
 
 /// Parse index hits into UUIDs, dropping any that will not parse.
@@ -944,10 +1064,37 @@ mod tests {
         );
     }
 
-    /// The search result cap is the documented wire contract.
+    /// The default page sizes are the pre-pagination caps, so omitting
+    /// `limit` returns exactly what these endpoints always returned.
     #[test]
-    fn search_limit_is_pinned() {
-        assert_eq!(SEARCH_LIMIT, 50);
+    fn page_defaults_match_the_old_caps() {
+        assert_eq!(SEARCH_DEFAULT_LIMIT, 50);
+        assert_eq!(LIST_DEFAULT_LIMIT, 100);
+    }
+
+    /// `limit` is clamped rather than refused, a zero or absent `limit`
+    /// falls back to the default, and the offset bound is what rejects.
+    #[test]
+    fn page_params_clamp_rather_than_reject() {
+        let huge = PageParams {
+            limit: Some(100_000),
+            offset: Some(0),
+        };
+        assert_eq!(huge.resolve(LIST_DEFAULT_LIMIT), (MAX_LIMIT, 0));
+        let zero = PageParams {
+            limit: Some(0),
+            offset: None,
+        };
+        assert_eq!(zero.resolve(LIST_DEFAULT_LIMIT), (LIST_DEFAULT_LIMIT, 0));
+        let absent = PageParams::default();
+        assert_eq!(absent.resolve(SEARCH_DEFAULT_LIMIT), (SEARCH_DEFAULT_LIMIT, 0));
+        assert!(PageParams { limit: None, offset: Some(MAX_OFFSET) }.check_offset().is_ok());
+        assert!(
+            PageParams { limit: None, offset: Some(MAX_OFFSET + 1) }
+                .check_offset()
+                .is_err(),
+            "an unbounded offset is a DoS, not a deep page"
+        );
     }
 
     /// A corrupt (non-UUID) index hit is dropped rather than failing the

@@ -63,7 +63,15 @@ are never fed to the matcher. See §8 and
 ## 6. Functional requirements
 
 1. `POST /api/organizations` — create; `name` required (422 if blank).
-2. `GET /api/organizations` — list active (cap 100), `{pid, name}`.
+2. `GET /api/organizations[?limit=&offset=]` — list active `{pid, name}`,
+   newest first, one page at a time. Reports `X-Total-Count` /
+   `X-Limit` / `X-Offset` per
+   [`agents/share/restful.md`](../../../agents/share/restful.md);
+   omitting both parameters returns the first 100, exactly as before
+   pagination. `limit` clamps to 500; `offset` beyond 10 000 is `400`
+   (an unbounded offset makes the database materialise and discard
+   arbitrarily many rows). Search (§6.11) paginates identically, and its
+   `X-Total-Count` is the **index's** match count, not the page length.
 3. `GET /api/organizations/{pid}` — return the stored `Organization`.
    Runs the **record-level** ABAC pass after loading (shared
    `authorization-attributes.md` §9): resource attributes are
