@@ -45,8 +45,10 @@ async fn require_auth_mw(req: Request, next: Next) -> Response {
         auth::require_auth(),
         &path,
         req.headers(),
-        auth::verifier(),
-        auth::policy(),
+        // Per-request snapshots, so the refresh loop and the policy
+        // watcher reach the guard too — not just the handlers.
+        &auth::verifier().current(),
+        &auth::policy().current(),
     ) {
         Ok(()) => next.run(req).await,
         Err((status, msg)) => (status, msg).into_response(),
@@ -117,6 +119,14 @@ impl Hooks for App {
     ///
     /// Infallible here; the signature is loco's.
     async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
+        // Seed the verifier from the published key set before serving, then
+        // keep it current: this aggregator previously had no boot fetch at
+        // all, so its key set could only come from the environment. Both
+        // loops are no-ops unless their source is configured
+        // (`LINK_GRAPH_PASETO_KEYS_URL` / `LINK_GRAPH_ABAC_POLICY_FILE`).
+        auth::init().await;
+        auth::spawn_key_refresh();
+        auth::spawn_policy_watcher();
         // Periodic reconciliation (design §8): pull each configured
         // service's authoritative entity_links and repair the read-model.
         // One worker per entity that sets `LINK_GRAPH_RECONCILE_URL_<ENTITY>`

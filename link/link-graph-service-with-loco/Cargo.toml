@@ -53,7 +53,9 @@ entity-ref = { path = "../entity-ref-rust-crate" }
 # Offline PASETO v4.public verification + the shared ABAC engine, for
 # case<->person governance (spec T-16/T-19; design §10). Env-supplied key
 # set only (no `fetch` feature — boot-time URL fetch is a follow-up).
-authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate" }
+# `fetch` adds `Verifier::from_paseto_keys_url` for the boot-time key-set
+# fetch and the rotation refresh loop (see src/auth.rs).
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
 
 # Lazy verify-on-read (spec T-10 / design §5.1): a one-shot GET to a
 # record's source service to resolve unknown presence. Only the status

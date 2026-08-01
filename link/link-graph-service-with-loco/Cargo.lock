@@ -226,6 +226,7 @@ name = "authentication-verifier"
 version = "0.8.0"
 dependencies = [
  "base64",
+ "reqwest",
  "rusty_paseto",
  "serde",
  "serde_json",

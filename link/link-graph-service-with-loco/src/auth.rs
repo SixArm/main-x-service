@@ -27,7 +27,9 @@
 
 use std::sync::OnceLock;
 
-use authentication_verifier::{Action, Claims, Policy, Verifier};
+use authentication_verifier::{
+    Action, Claims, Policy, ReloadablePolicy, ReloadableVerifier, Verifier,
+};
 use axum::extract::FromRequestParts;
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
@@ -79,11 +81,99 @@ fn build_from_env() -> Verifier {
     })
 }
 
-/// The process-wide verifier, built once from the environment.
+/// The process-wide **hot-reloadable** verifier.
+///
+/// Built lazily from `LINK_GRAPH_PASETO_KEYS` on first use; [`init`]
+/// swaps in the boot-time fetched key set and [`spawn_key_refresh`]
+/// swaps in a re-fetched one periodically, so **a key rotation at the
+/// auth service is picked up without restarting this service**.
+static VERIFIER: OnceLock<ReloadableVerifier> = OnceLock::new();
+
+/// The process-wide reloadable verifier. Take a snapshot per request
+/// with `verifier().current()`.
 #[must_use]
-pub fn verifier() -> &'static Verifier {
-    static VERIFIER: OnceLock<Verifier> = OnceLock::new();
-    VERIFIER.get_or_init(build_from_env)
+pub fn verifier() -> &'static ReloadableVerifier {
+    VERIFIER.get_or_init(|| ReloadableVerifier::new(build_from_env()))
+}
+
+/// Seed [`verifier`] before the app serves traffic (call once from
+/// boot). With `LINK_GRAPH_PASETO_KEYS_URL` set, the published key set
+/// is fetched over HTTP once and swapped in; on a failed fetch — or with
+/// the URL unset — the env-built verifier stands, so the service always
+/// boots. This aggregator had **no boot fetch at all** before: its key
+/// set could only ever come from the environment.
+pub async fn init() {
+    let Some(url) = std::env::var("LINK_GRAPH_PASETO_KEYS_URL")
+        .ok()
+        .map(|u| u.trim().to_string())
+        .filter(|u| !u.is_empty())
+    else {
+        return;
+    };
+    let issuer = env_or("LINK_GRAPH_TOKEN_ISSUER", DEFAULT_ISSUER);
+    let audience = env_or("LINK_GRAPH_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
+    match Verifier::from_paseto_keys_url(&url, &issuer, &audience).await {
+        Ok(fetched) => {
+            tracing::info!(
+                url,
+                keys = fetched.key_count(),
+                "fetched PASETO key set at boot"
+            );
+            verifier().store(fetched);
+        }
+        Err(error) => {
+            tracing::warn!(url, %error, "PASETO key-set fetch failed; using the env key set");
+        }
+    }
+}
+
+/// Default key-set refresh interval (seconds) when
+/// `LINK_GRAPH_PASETO_KEYS_REFRESH_SECS` is unset. One hour: rotation is
+/// infrequent, so a slow poll suffices.
+const KEY_REFRESH_DEFAULT_SECS: u64 = 3600;
+
+/// Spawn the background loop that re-fetches the published key set from
+/// `LINK_GRAPH_PASETO_KEYS_URL` and swaps it into the live [`verifier`].
+///
+/// A failed fetch **keeps the current key set** — a transient
+/// auth-service outage must not lock every caller out. Interval from
+/// `LINK_GRAPH_PASETO_KEYS_REFRESH_SECS` (default
+/// [`KEY_REFRESH_DEFAULT_SECS`]); `0` disables the loop. A no-op when
+/// the URL is unset.
+pub fn spawn_key_refresh() {
+    let Some(url) = std::env::var("LINK_GRAPH_PASETO_KEYS_URL")
+        .ok()
+        .map(|u| u.trim().to_string())
+        .filter(|u| !u.is_empty())
+    else {
+        return;
+    };
+    let secs = std::env::var("LINK_GRAPH_PASETO_KEYS_REFRESH_SECS")
+        .ok()
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .unwrap_or(KEY_REFRESH_DEFAULT_SECS);
+    if secs == 0 {
+        return;
+    }
+    let issuer = env_or("LINK_GRAPH_TOKEN_ISSUER", DEFAULT_ISSUER);
+    let audience = env_or("LINK_GRAPH_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(secs));
+        ticker.tick().await; // the first tick is immediate — skip it
+        loop {
+            ticker.tick().await;
+            match Verifier::from_paseto_keys_url(&url, &issuer, &audience).await {
+                Ok(fetched) => {
+                    tracing::info!(keys = fetched.key_count(), "refreshed PASETO key set");
+                    verifier().store(fetched);
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "PASETO key-set refresh failed; keeping current keys");
+                }
+            }
+        }
+    });
+    tracing::info!(secs, "polling LINK_GRAPH_PASETO_KEYS_URL for key rotation");
 }
 
 /// Load the ABAC policy from `LINK_GRAPH_ABAC_POLICY[_FILE]`, else the
@@ -108,11 +198,63 @@ fn policy_from_env() -> Policy {
     }
 }
 
-/// The process-wide ABAC policy, built once from the environment.
+/// The process-wide **hot-reloadable** ABAC policy. Take a snapshot per
+/// request with `policy().current()`; [`reload_policy`] swaps it at
+/// runtime, so a policy edit needs no restart.
 #[must_use]
-pub fn policy() -> &'static Policy {
-    static POLICY: OnceLock<Policy> = OnceLock::new();
-    POLICY.get_or_init(policy_from_env)
+pub fn policy() -> &'static ReloadablePolicy {
+    static POLICY: OnceLock<ReloadablePolicy> = OnceLock::new();
+    POLICY.get_or_init(|| ReloadablePolicy::new(policy_from_env()))
+}
+
+/// Re-read the ABAC policy from the environment and swap it into the
+/// live [`policy`] holder. A malformed policy falls back to the built-in
+/// default, so a bad edit can never leave the service unprotected.
+pub fn reload_policy() {
+    policy().store(policy_from_env());
+    tracing::info!("ABAC policy reloaded");
+}
+
+/// How often the policy-file watcher polls for a change (seconds).
+const POLICY_WATCH_SECS: u64 = 15;
+
+/// Spawn the background task that hot-reloads the ABAC policy when
+/// `LINK_GRAPH_ABAC_POLICY_FILE` changes on disk. Polls the file's mtime
+/// (not an OS notify — this stays dependency-light). A no-op when the
+/// variable is unset.
+pub fn spawn_policy_watcher() {
+    let Some(path) = std::env::var("LINK_GRAPH_ABAC_POLICY_FILE")
+        .ok()
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+    else {
+        return;
+    };
+    tokio::spawn(async move {
+        let mut last = file_mtime(&path);
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(POLICY_WATCH_SECS));
+        ticker.tick().await; // skip the immediate first tick
+        loop {
+            ticker.tick().await;
+            let now = file_mtime(&path);
+            if now != last {
+                last = now;
+                reload_policy();
+            }
+        }
+    });
+    tracing::info!(
+        secs = POLICY_WATCH_SECS,
+        "watching LINK_GRAPH_ABAC_POLICY_FILE for changes"
+    );
+}
+
+/// The last-modified time of `path`, or `None` when it cannot be read
+/// (missing file, permission error, platform without mtime).
+fn file_mtime(path: &str) -> Option<std::time::SystemTime> {
+    std::fs::metadata(path)
+        .and_then(|meta| meta.modified())
+        .ok()
 }
 
 /// Whether governance concealment is active (`LINK_GRAPH_REQUIRE_AUTH`).
@@ -171,7 +313,9 @@ impl<S: Send + Sync> FromRequestParts<S> for MaybeAuthUser {
     type Rejection = std::convert::Infallible;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        Ok(Self(bearer_claims(&parts.headers, verifier()).ok()))
+        Ok(Self(
+            bearer_claims(&parts.headers, &verifier().current()).ok(),
+        ))
     }
 }
 
@@ -198,7 +342,12 @@ pub fn may_see_governed(claims: Option<&Claims>) -> bool {
         return true;
     }
     match claims {
-        Some(c) => policy().evaluate(c, Action::Read, GOVERNED_ENTITY).allowed,
+        Some(c) => {
+            policy()
+                .current()
+                .evaluate(c, Action::Read, GOVERNED_ENTITY)
+                .allowed
+        }
         None => false,
     }
 }

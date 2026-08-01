@@ -155,6 +155,14 @@ async fn case_read_sees_governed_edges_that_others_have_concealed() {
             reads[0].actor.as_deref(),
             Some("11111111-1111-1111-1111-111111111111")
         );
+        // AU-3: the caller's source address is on the row. It used to be
+        // `None` unconditionally — a governance audit that records who but
+        // never from where answers half the question it exists to answer.
+        assert!(
+            reads[0].user_ip.as_deref().is_some_and(|ip| !ip.is_empty()),
+            "the governed read must record the caller's address: {:?}",
+            reads[0].user_ip
+        );
 
         // The non-case caller passes the blanket guard but the subject_of
         // edge is concealed — only the affiliation shows.

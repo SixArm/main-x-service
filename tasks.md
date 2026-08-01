@@ -238,12 +238,33 @@
   *Verified:* fmt + clippy clean in all four; DB-gated green vs
   Postgres 18 — organization 24, care-pathway 44, course 15,
   portfolio 37.
-- [ ] **AU-3 (S)** link-graph auth completion: boot-time
-  keys-over-HTTP fetch + key-rotation refresh (its `Verifier` is
-  currently env-only `OnceLock`; swap to `ReloadableVerifier`), and
-  OTLP tracing (spec T-22) + `user_ip` capture (ConnectInfo) on governed
-  audits.
-  *Verify:* green gate; link-graph spec §13 T-19 note + T-22 checked.
+- [~] **AU-3 (S)** link-graph auth completion. *(2026-08-01 — auth and
+  `user_ip` done; OTLP deliberately not)*
+
+  Done: the boot-time keys-over-HTTP fetch (there was **none** — the key
+  set could only come from the environment), `spawn_key_refresh`, the
+  reloadable verifier + policy holders with `spawn_policy_watcher`, and
+  `user_ip` on governed audits. That last one was hard-coded `None`, so
+  every governed `subject_of` read and write recorded who but never from
+  where. The address is `X-Forwarded-For`'s first hop when present, else
+  the `ConnectInfo` peer — behind a proxy the peer is the proxy on every
+  row, and one address on every row looks like evidence while being
+  none. 16 DB-gated green; the capture is pinned in
+  `tests/concealment.rs`.
+
+  **Not done — OTLP (spec T-22), and the premise was wrong.** The task
+  assumed there was an OTLP pattern to adopt. There is not: person,
+  worker and event carry an `src/observability/` module that builds an
+  OTel `Resource` and then installs a plain JSON `tracing` subscriber
+  with the exporter and the `tracing_opentelemetry` layer commented out
+  behind `// TODO: Initialize OTLP exporter`; every other service has
+  nothing. **No service in the family exports a span or a metric over
+  OTLP.** Porting that to link-graph would have moved a stub, so it is
+  left open and the shared capability baseline — which claimed
+  "Observability (tracing + OpenTelemetry OTLP)" for every crate — is
+  corrected to say what is actually there. Wiring a real exporter is
+  its own task: which crate first, and what the collector story is in
+  compose (DEP-1).
 
 - [ ] **PG-1 (L)** Pagination in the four newest loco services: replace
   `LIST_CAP`/`SEARCH_CAP` with `offset`+`limit` params (bounded maxima),

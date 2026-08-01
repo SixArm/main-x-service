@@ -208,6 +208,17 @@
   T-20.)*
 - [ ] T-22: Tracing + OpenTelemetry OTLP wiring; loco `/_health` /
   `/_ping`; graceful shutdown; Podman health check; non-root container.
+  *(2026-08-01, while completing AU-3: **there is no working OTLP export
+  anywhere in the family to copy**. Three crates — person, worker,
+  event — carry an `src/observability/` module that builds an OTel
+  `Resource` and then installs a plain JSON `tracing` subscriber, with
+  the exporter and the `tracing_opentelemetry` layer commented out
+  behind `// TODO: Initialize OTLP exporter`. Every other service,
+  including this one, has nothing. Wiring a real exporter is therefore
+  new work and a family-wide decision — which crate first, and what the
+  collector story is in compose — not a copy job, so it is left open
+  rather than half-done here. The shared capability matrix has been
+  corrected to stop claiming it.)*
 - [ ] T-23: Flip transport to the durable bus per entity as Fluvio
   topics go live; retire lazy verify-on-read per entity (design §5.1,
   event-bus.md §8).

@@ -108,7 +108,12 @@ case, and portfolio each provide:
 - **Offline PASETO v4.public verification** + the blanket **ABAC guard**
   (`<ENTITY>_REQUIRE_AUTH`, default-off), via the shared
   `authentication-verifier`
-- **Observability** (tracing + OpenTelemetry OTLP)
+- **Observability** — structured `tracing` and a Prometheus
+  `/metrics.prom` endpoint. **Not** OpenTelemetry export: person, worker
+  and event carry an `src/observability/` module that builds an OTel
+  `Resource` and then installs a plain JSON subscriber, with the exporter
+  commented out (`// TODO: Initialize OTLP exporter`); no service exports
+  a span or a metric over OTLP today (verified 2026-08-01)
 - **PostgreSQL** persistence via SeaORM + migrations
 
 ### Capabilities that vary by crate

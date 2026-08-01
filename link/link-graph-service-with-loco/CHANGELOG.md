@@ -13,6 +13,42 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > and [event-bus.md](../../agents/share/event-bus.md).
 
 ## [Unreleased]
+### Added — boot key fetch, key rotation, policy hot-reload, and audited caller addresses (2026-08-01)
+
+AU-3, the last service to adopt the family's auth hardening.
+
+- **The verifier could only ever come from the environment.** There was
+  no boot-time fetch at all — unlike the ten entity services, this
+  aggregator had no way to read the auth service's published key set.
+  `auth::init()` now fetches it once from `LINK_GRAPH_PASETO_KEYS_URL`
+  (the `fetch` feature is enabled on `authentication-verifier`), and a
+  failed fetch leaves the env-built verifier standing so the service
+  always boots.
+- **`spawn_key_refresh`** then re-fetches every
+  `LINK_GRAPH_PASETO_KEYS_REFRESH_SECS` (default 3600; `0` disables),
+  keeping the current key set on failure — a transient auth-service
+  outage must not lock every caller out.
+- **The verifier and the ABAC policy are reloadable holders** read per
+  request by the blanket guard and the bearer extractor, with
+  `spawn_policy_watcher` hot-reloading `LINK_GRAPH_ABAC_POLICY_FILE` on
+  an mtime change (malformed edit ⇒ the built-in default).
+- **Governed audits now record the caller's address.** `user_ip` was
+  hard-coded `None`, so every `subject_of` read and write was logged
+  with who but never from where — half of what a governance trail exists
+  to answer. The three governed read handlers take `ConnectInfo`, and
+  the address is taken from `X-Forwarded-For`'s first hop when present,
+  else the transport peer: behind a proxy the peer is the proxy every
+  time, and one address on every row looks like evidence while being
+  none. Pinned by an assertion in `tests/concealment.rs`.
+
+### Not done — OTLP (spec T-22)
+
+Left open deliberately. There is **no working OTLP export anywhere in
+the family** to adopt: person, worker and event build an OTel `Resource`
+and then install a plain JSON `tracing` subscriber with the exporter
+commented out; everyone else has nothing. A real exporter is new work
+and a family-wide decision, not a copy — see the note on T-22.
+
 
 ### Spec — cross-service identity-suggestion matcher (LNK-4 spec round)
 

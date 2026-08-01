@@ -306,7 +306,8 @@ policy were boot-only `OnceLock` snapshots rather than split ones, so the
 failure mode was simpler and worse: no rotation or policy edit could
 reach a running process at all.
 
-**Every entity service now has all three parts.** Still to adopt:
-**link-graph** (AU-3), which reads an env-only `OnceLock<Verifier>`.
+**Every service now has all three parts**, link-graph included
+(2026-08-01, AU-3) — which additionally gained the boot-time key fetch it
+had never had, its key set having been env-only until then.
 Remaining operational follow-up: activation itself (the per-deployment
 decision above).

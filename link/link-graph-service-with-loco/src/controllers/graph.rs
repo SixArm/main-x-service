@@ -5,12 +5,13 @@
 
 use std::collections::{HashMap, HashSet};
 
-use axum::extract::Query;
+use axum::extract::{ConnectInfo, Query};
 use axum::http::HeaderMap;
 use axum::http::header::USER_AGENT;
 use chrono::{DateTime, FixedOffset, Utc};
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 use uuid::Uuid;
 
 use entity_ref::{EdgeKind, EntityRef};
@@ -38,11 +39,31 @@ fn endpoints_of(rows: &[edges::Model]) -> Vec<EntityRef> {
 }
 
 /// Build the governance-audit context for a request: the caller `sub`
-/// (when a valid token was presented) and the `User-Agent` header.
-fn audit_context<'a>(caller: &'a MaybeAuthUser, headers: &'a HeaderMap) -> AuditContext<'a> {
+/// (when a valid token was presented), the source address, and the
+/// `User-Agent` header.
+///
+/// The address comes from `X-Forwarded-For`'s **first** hop when the
+/// header is present, else the transport peer (`ConnectInfo`). That
+/// order matters: this service normally sits behind a proxy, so the
+/// peer address would otherwise be the proxy's every time — an audit
+/// trail recording one address for every caller is worse than none,
+/// because it looks like evidence. A forwarded header is client-supplied
+/// and therefore only as trustworthy as the proxy that set it; the trail
+/// records what was presented, which is the honest thing for it to hold.
+fn audit_context<'a>(
+    caller: &'a MaybeAuthUser,
+    headers: &'a HeaderMap,
+    peer: Option<&'a str>,
+) -> AuditContext<'a> {
+    let forwarded = headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(',').next())
+        .map(str::trim)
+        .filter(|v| !v.is_empty());
     AuditContext {
         actor: caller.claims().map(|c| c.sub.as_str()),
-        user_ip: None,
+        user_ip: forwarded.or(peer),
         user_agent: headers.get(USER_AGENT).and_then(|v| v.to_str().ok()),
     }
 }
@@ -208,6 +229,7 @@ async fn neighbors(
     caller: MaybeAuthUser,
     headers: HeaderMap,
     State(ctx): State<AppContext>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
 ) -> Result<Response> {
     let Ok(start) = ref_urn.parse::<EntityRef>() else {
         return envelope::bad_request(&format!("invalid entity ref: {ref_urn:?}"));
@@ -240,7 +262,8 @@ async fn neighbors(
     // without case-read authorisation (design §10).
     let may = auth::may_see_governed(caller.claims());
     let rows = auth::conceal_governed(rows, may, |m| EdgeKind::from_token(&m.kind));
-    let audit = audit_context(&caller, &headers);
+    let peer = peer.ip().to_string();
+    let audit = audit_context(&caller, &headers, Some(peer.as_str()));
     audit_surfaced_edges(&ctx.db, &audit, "read_edge", &rows).await?;
     let as_of = consumer_offsets::Model::watermark(&ctx.db).await?;
     envelope::ok(NeighborsData {
@@ -257,6 +280,7 @@ async fn edges_list(
     caller: MaybeAuthUser,
     headers: HeaderMap,
     State(ctx): State<AppContext>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
 ) -> Result<Response> {
     let from = match parse_opt_ref(params.from.as_deref()) {
         Ok(v) => v,
@@ -295,7 +319,8 @@ async fn edges_list(
     // returns an empty list rather than revealing them (design §10).
     let may = auth::may_see_governed(caller.claims());
     let rows = auth::conceal_governed(rows, may, |m| EdgeKind::from_token(&m.kind));
-    let audit = audit_context(&caller, &headers);
+    let peer = peer.ip().to_string();
+    let audit = audit_context(&caller, &headers, Some(peer.as_str()));
     audit_surfaced_edges(&ctx.db, &audit, "read_edge", &rows).await?;
     let as_of = consumer_offsets::Model::watermark(&ctx.db).await?;
     envelope::ok(EdgesData { edges: rows, as_of })
@@ -308,6 +333,7 @@ async fn single_view(
     caller: MaybeAuthUser,
     headers: HeaderMap,
     State(ctx): State<AppContext>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
 ) -> Result<Response> {
     let Ok(start) = ref_urn.parse::<EntityRef>() else {
         return envelope::bad_request(&format!("invalid entity ref: {ref_urn:?}"));
@@ -319,7 +345,8 @@ async fn single_view(
     let may = auth::may_see_governed(caller.claims());
     let affs = auth::conceal_governed(view.affiliations, may, |e| Some(e.kind));
     // Audit each governed affiliation actually surfaced (design §10).
-    let audit = audit_context(&caller, &headers);
+    let peer = peer.ip().to_string();
+    let audit = audit_context(&caller, &headers, Some(peer.as_str()));
     for e in &affs {
         if auth::is_governed(e.kind) {
             audit_log::Model::record(
