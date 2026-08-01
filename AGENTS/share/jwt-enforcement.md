@@ -275,14 +275,32 @@ To turn enforcement on in a deployment:
 ## Status
 
 Implemented (default-off) in all nine entity services as of 2026-07-04,
-including the paseto-keys-over-HTTP boot fetch (`<ENTITY>_PASETO_KEYS_URL`),
-the key-rotation refresh loop, ABAC authorization + record-level/env
-attributes/obligations, and policy hot-reload. The **DB-backed activation
-proof** landed 2026-07-06: the **case service** is the reference —
-`tests/enforcement.rs` boots the real router with `CASE_REQUIRE_AUTH=1`
-and mints in-process PASETOs to pin the 401 (no token) / 403 (policy
-denied) / 2xx (allowed) matrix over the HTTP stack against Postgres, and
-its CI runs the DB-gated suites with `cargo test -- --include-ignored`
-(previously skipped). Other services adopt the same `tests/enforcement.rs`
-+ CI pattern. Remaining operational follow-up: activation itself (the
-per-deployment decision above).
+including the paseto-keys-over-HTTP boot fetch (`<ENTITY>_PASETO_KEYS_URL`)
+and ABAC authorization + record-level/env attributes/obligations. The
+**DB-backed activation proof** landed 2026-07-06 with the **case service**
+as the reference — `tests/enforcement.rs` boots the real router with
+`CASE_REQUIRE_AUTH=1` and mints in-process PASETOs to pin the 401 (no
+token) / 403 (policy denied) / 2xx (allowed) matrix over the HTTP stack
+against Postgres.
+
+**Key rotation, policy hot-reload, and the activation proof are now in
+all six axum-style services too** (person, worker, place, thing, event —
+2026-08-01, tasks.md AU-1). Each holds one process-wide
+`ReloadableVerifier` and one `ReloadablePolicy` that the blanket guard
+**and** the bearer extractors read per request; `spawn_key_refresh`
+(`<ENTITY>_PASETO_KEYS_REFRESH_SECS`, default 3600, `0` disables) picks
+up a rotation without a restart and keeps the current keys on a failed
+fetch; `spawn_policy_watcher` reloads `<ENTITY>_ABAC_POLICY_FILE` on an
+mtime change, falling back to the built-in default on a malformed edit.
+
+The rollout found the same latent defect in every one of them: the
+verifier was snapshotted into `AppState` (and, in worker's case, a second
+time into the enforcement layer), so a rotated key set could reach the
+handlers but not the guard, or the reverse. Snapshotting a credential
+source into request state is the anti-pattern; a service adopting this
+pattern should look for it first.
+
+Still to adopt: the loco-style services (organization, care-pathway,
+course, portfolio — tasks.md AU-2) and link-graph (AU-3), which read a
+boot-only `OnceLock<Policy>` / `Verifier`. Remaining operational
+follow-up: activation itself (the per-deployment decision above).

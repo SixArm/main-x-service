@@ -110,9 +110,13 @@ impl Hooks for App {
         let search_engine = SearchEngine::new(&config.search.index_path)
             .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         let matcher = ProbabilisticMatcher::new(config.matching.clone());
-        let verifier = std::sync::Arc::new(crate::api::rest::state::boot_verifier().await);
-        let state =
-            AppState::new(ctx.db.clone(), search_engine, matcher, config).with_verifier(verifier);
+        crate::api::rest::auth::init().await;
+        // Key rotation and policy edits without a restart: both loops are
+        // no-ops unless their source is configured (`EVENT_PASETO_KEYS_URL`
+        // / `EVENT_ABAC_POLICY_FILE`).
+        crate::api::rest::auth::spawn_key_refresh();
+        crate::api::rest::auth::spawn_policy_watcher();
+        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
         ctx.shared_store.insert(state.clone());
         // Durable event bus Phase 3: start the outbox relay loop. A no-op
         // unless `EVENT_EVENT_TRANSPORT=outbox` AND `EVENT_EVENT_RELAY` are

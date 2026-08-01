@@ -166,7 +166,7 @@
 - [ ] **P-4 (M)** Privacy in **portfolio** (lower sensitivity; masking of
   owner/person refs). Depends: P-1.
 
-- [~] **AU-1 (M)** Roll the case-only auth hardening to **person, worker,
+- [x] **AU-1 (M)** Roll the case-only auth hardening to **person, worker,
   place, thing, event** (axum-style `src/api/rest/auth.rs`): key-rotation
   refresh loop (`ReloadableVerifier` + `spawn_key_refresh` — case
   `src/auth.rs` is the pattern), policy hot-reload
@@ -174,6 +174,15 @@
   `tests/enforcement.rs` activation proof (case's is the template; each
   runs in its own test binary).
   *Verify:* per-service green gate; jwt-enforcement.md status updated.
+  **Done 2026-08-01** across all five, with `jwt-enforcement.md` §Status
+  rewritten.
+
+  The rollout's finding, worth carrying into AU-2/AU-3: **every one of
+  the five had snapshotted the verifier into request state** (worker
+  twice over), so a rotated key set could reach the handlers but not the
+  guard, or the reverse. The bug was not that rotation was missing — it
+  was that adding rotation to a snapshot would have half-worked, which is
+  harder to notice than not working at all.
 
   - [x] **person** *(done 2026-08-01)* — the axum-style reference. All
     three parts landed and verified: fmt + clippy clean, 301 lib tests,
@@ -202,12 +211,12 @@
     brings a minimal one that builds the production router; `serial_test`
     and `tower` joined its dev-dependencies for it. 3 DB-gated green.
 
-  - [ ] **thing, event** — both keep `require_auth`, the verifier **and**
-    the policy in `AppState`, with `require_auth_mw` reading all three
-    off the state (`State<AppState>`), so their refactor is the largest
-    of the five: the middleware and extractors move to the holders and
-    three fields leave the state. Neither has an HTTP test harness, so
-    each also needs place's in-test router.
+  - [x] **thing, event** *(done 2026-08-01)* — both kept `require_auth`,
+    the verifier **and** the policy in `AppState`. The verifier and policy
+    moved to the holders; only the flag stays on the state, because
+    turning enforcement on or off mid-flight is not something to do
+    without a restart. Both gained place's in-test router for the proof.
+    thing 197 lib + 3 DB-gated, event 152 lib + 7 DB-gated, all green.
 - [ ] **AU-2 (M)** Same for **organization, care-pathway, course,
   portfolio** (loco-style `src/auth.rs`). Depends: AU-1 (shared doc
   wording once).

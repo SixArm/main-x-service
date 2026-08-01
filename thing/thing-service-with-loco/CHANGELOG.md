@@ -7,6 +7,35 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — key rotation and policy hot-reload without a restart (2026-08-01)
+
+AU-1, completing the five axum-style services (person was the reference).
+
+- **One reloadable verifier, one reloadable policy.** Both left
+  `AppState` for process-wide holders that the blanket guard **and** the
+  `AuthUser` / `MaybeAuthUser` extractors read per request. Snapshotting
+  them in the state meant a rotation or a policy edit could reach one
+  path and not the other; only the `require_auth` flag is still a boot
+  value, because turning enforcement on or off mid-flight is not
+  something to do without a restart.
+- **`spawn_key_refresh`** re-fetches `THING_PASETO_KEYS_URL` every
+  `THING_PASETO_KEYS_REFRESH_SECS` (default 3600; `0` disables; a no-op
+  when the URL is unset). A failed fetch **keeps the current key set** —
+  a transient auth-service outage must not lock every caller out.
+- **`policy()` is a `ReloadablePolicy`**, with `reload_policy()` and
+  **`spawn_policy_watcher`** polling `THING_ABAC_POLICY_FILE`'s mtime
+  every 15 s; a malformed edit falls back to the built-in default rather
+  than leaving the service unprotected.
+- **`tests/enforcement.rs`** — the activation proof, in its own binary
+  because the auth `OnceLock`s are process-wide, and carrying its own
+  minimal router builder because this crate has no HTTP test harness.
+  With `THING_REQUIRE_AUTH=1` over the **production** router: public paths
+  stay open, a protected read and write without a token are `401`, a
+  malformed bearer is `401` (not a 500), a valid token with no
+  attributes reads `200` and writes `403`, and `access=write` creates.
+- New environment variable: `THING_PASETO_KEYS_REFRESH_SECS`. New
+  dev-dependencies: `serial_test`, `tower`.
+
 
 ### Changed — `Config::from_env` gained a testable seam and more variables (2026-07-23)
 
