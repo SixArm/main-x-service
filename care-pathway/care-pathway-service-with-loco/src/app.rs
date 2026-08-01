@@ -44,8 +44,10 @@ async fn require_auth_mw(req: Request, next: Next) -> Response {
         req.method(),
         &path,
         req.headers(),
-        auth::verifier(),
-        auth::policy(),
+        // Per-request snapshots, so the refresh loop and the policy
+        // watcher reach the guard too — not just the handlers.
+        &auth::verifier().current(),
+        &auth::policy().current(),
     ) {
         Ok(()) => next.run(req).await,
         Err((status, msg)) => (status, msg).into_response(),
@@ -129,6 +131,11 @@ impl Hooks for App {
         // Seed the verifier before serving so `enforce()`/`AuthUser`
         // consult the boot-fetched key set from the first request on.
         auth::init_from_env().await;
+        // Key rotation and policy edits without a restart: both loops are
+        // no-ops unless their source is configured
+        // (`CARE_PATHWAY_PASETO_KEYS_URL` / `CARE_PATHWAY_ABAC_POLICY_FILE`).
+        auth::spawn_key_refresh();
+        auth::spawn_policy_watcher();
         // Durable event bus Phase 3: spawn the outbox relay (drain → sink →
         // mark published + retention purge). A no-op unless the transport is
         // `outbox` and `CARE_PATHWAY_EVENT_RELAY` is truthy.

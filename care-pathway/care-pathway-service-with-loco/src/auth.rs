@@ -64,9 +64,11 @@
 //! the service always boots. **401** = missing/bad credential; **403**
 //! = valid credential, policy denied (body carries the deciding rule).
 
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 
-use authentication_verifier::{Action, Claims, Policy, Verifier};
+use authentication_verifier::{
+    Action, Claims, Policy, ReloadablePolicy, ReloadableVerifier, Verifier,
+};
 use axum::extract::FromRequestParts;
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
@@ -103,15 +105,15 @@ const DEFAULT_AUDIENCE: &str = "main-x-service";
 /// The process-wide token verifier cell: seeded at boot by
 /// [`init_from_env`] (which may fetch the key set over HTTP), else filled
 /// lazily by [`verifier`] from the env key set.
-static VERIFIER: OnceLock<Arc<Verifier>> = OnceLock::new();
+static VERIFIER: OnceLock<ReloadableVerifier> = OnceLock::new();
 
 /// The process-wide token verifier: whatever [`init_from_env`] seeded at
 /// boot, or — when boot never ran (unit tests, tools) — built lazily from
 /// the environment (see the module docs). Shared behind an `Arc` and
 /// read-only.
 #[must_use]
-pub fn verifier() -> &'static Arc<Verifier> {
-    VERIFIER.get_or_init(|| Arc::new(build_from_env()))
+pub fn verifier() -> &'static ReloadableVerifier {
+    VERIFIER.get_or_init(|| ReloadableVerifier::new(build_from_env()))
 }
 
 /// Seed the process-wide [`verifier`] at boot. When
@@ -130,11 +132,64 @@ pub async fn init_from_env() {
         .ok()
         .filter(|s| !s.trim().is_empty());
     let built = build_verifier(keys_url.as_deref(), &issuer, &audience).await;
-    if VERIFIER.set(Arc::new(built)).is_err() {
-        // Lost a race with a concurrent lazy `verifier()` call; the
-        // already-built verifier stays authoritative.
-        tracing::debug!("auth: verifier already initialized; boot result discarded");
+    // `store` rather than `set`: the holder may already exist (a lazy
+    // `verifier()` call beat us here), and the boot-fetched key set
+    // should win either way.
+    verifier().store(built);
+}
+
+/// Default key-set refresh interval (seconds) when
+/// `CARE_PATHWAY_PASETO_KEYS_REFRESH_SECS` is unset. One hour: rotation
+/// is infrequent, so a slow poll suffices.
+const KEY_REFRESH_DEFAULT_SECS: u64 = 3600;
+
+/// Spawn the background loop that re-fetches the published key set from
+/// `CARE_PATHWAY_PASETO_KEYS_URL` and swaps it into the live
+/// [`verifier`], so **a key rotation needs no restart**.
+///
+/// A failed fetch **keeps the current key set** — a transient
+/// auth-service outage must not lock every caller out. Interval from
+/// `CARE_PATHWAY_PASETO_KEYS_REFRESH_SECS` (default
+/// [`KEY_REFRESH_DEFAULT_SECS`]); `0` disables the loop. A no-op when
+/// the URL is unset, since an env-supplied key set has nothing to
+/// re-fetch.
+pub fn spawn_key_refresh() {
+    let Some(url) = std::env::var("CARE_PATHWAY_PASETO_KEYS_URL")
+        .ok()
+        .map(|u| u.trim().to_string())
+        .filter(|u| !u.is_empty())
+    else {
+        return;
+    };
+    let secs = std::env::var("CARE_PATHWAY_PASETO_KEYS_REFRESH_SECS")
+        .ok()
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .unwrap_or(KEY_REFRESH_DEFAULT_SECS);
+    if secs == 0 {
+        return;
     }
+    let issuer = env_or("CARE_PATHWAY_TOKEN_ISSUER", DEFAULT_ISSUER);
+    let audience = env_or("CARE_PATHWAY_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(secs));
+        ticker.tick().await; // the first tick is immediate — skip it
+        loop {
+            ticker.tick().await;
+            match Verifier::from_paseto_keys_url(&url, &issuer, &audience).await {
+                Ok(fetched) => {
+                    tracing::info!(keys = fetched.key_count(), "refreshed PASETO key set");
+                    verifier().store(fetched);
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "PASETO key-set refresh failed; keeping current keys");
+                }
+            }
+        }
+    });
+    tracing::info!(
+        secs,
+        "polling CARE_PATHWAY_PASETO_KEYS_URL for key rotation"
+    );
 }
 
 /// Build the boot verifier. `keys_url` set ⇒ fetch the key set over HTTP
@@ -238,9 +293,64 @@ pub fn policy_from_env() -> Policy {
 /// ([`policy_from_env`]) and cached — restart to change. Mirrors
 /// [`require_auth`]: a process-wide `OnceLock` built lazily.
 #[must_use]
-pub fn policy() -> &'static Policy {
-    static POLICY: OnceLock<Policy> = OnceLock::new();
-    POLICY.get_or_init(policy_from_env)
+pub fn policy() -> &'static ReloadablePolicy {
+    static POLICY: OnceLock<ReloadablePolicy> = OnceLock::new();
+    POLICY.get_or_init(|| ReloadablePolicy::new(policy_from_env()))
+}
+
+/// Re-read the ABAC policy from the environment and swap it into the
+/// live [`policy`] holder. A malformed policy falls back to the built-in
+/// default, so a bad edit can never leave the service unprotected.
+pub fn reload_policy() {
+    policy().store(policy_from_env());
+    tracing::info!("ABAC policy reloaded");
+}
+
+/// How often the policy-file watcher polls for a change (seconds).
+const POLICY_WATCH_SECS: u64 = 15;
+
+/// Spawn the background task that hot-reloads the ABAC policy when
+/// `CARE_PATHWAY_ABAC_POLICY_FILE` changes on disk, so an operator can
+/// edit the policy and have it take effect without a restart. Polls the
+/// file's mtime (not an OS notify — this stays dependency-light).
+///
+/// A no-op when the variable is unset: an inline
+/// `CARE_PATHWAY_ABAC_POLICY` (or the built-in default) has nothing to
+/// watch, and environment variables do not change under a running
+/// process.
+pub fn spawn_policy_watcher() {
+    let Some(path) = std::env::var("CARE_PATHWAY_ABAC_POLICY_FILE")
+        .ok()
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+    else {
+        return;
+    };
+    tokio::spawn(async move {
+        let mut last = file_mtime(&path);
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(POLICY_WATCH_SECS));
+        ticker.tick().await; // skip the immediate first tick
+        loop {
+            ticker.tick().await;
+            let now = file_mtime(&path);
+            if now != last {
+                last = now;
+                reload_policy();
+            }
+        }
+    });
+    tracing::info!(
+        secs = POLICY_WATCH_SECS,
+        "watching CARE_PATHWAY_ABAC_POLICY_FILE for changes"
+    );
+}
+
+/// The last-modified time of `path`, or `None` when it cannot be read
+/// (missing file, permission error, platform without mtime).
+fn file_mtime(path: &str) -> Option<std::time::SystemTime> {
+    std::fs::metadata(path)
+        .and_then(|meta| meta.modified())
+        .ok()
 }
 
 /// Lenient boolean parse: `1`/`true`/`yes`/`on` (case-insensitive,
@@ -396,7 +506,7 @@ impl<S: Send + Sync> FromRequestParts<S> for AuthUser {
     type Rejection = (StatusCode, String);
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        bearer_claims(&parts.headers, verifier()).map(AuthUser)
+        bearer_claims(&parts.headers, &verifier().current()).map(AuthUser)
     }
 }
 
@@ -421,7 +531,9 @@ impl<S: Send + Sync> FromRequestParts<S> for MaybeAuthUser {
     type Rejection = std::convert::Infallible;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        Ok(Self(bearer_claims(&parts.headers, verifier()).ok()))
+        Ok(Self(
+            bearer_claims(&parts.headers, &verifier().current()).ok(),
+        ))
     }
 }
 

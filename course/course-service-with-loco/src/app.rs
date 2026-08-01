@@ -83,9 +83,13 @@ impl Hooks for App {
         // path; the service always boots) — before the shared-store insert
         // and the middleware capture the state, so both router surfaces
         // consult the fetched key set.
-        let verifier = std::sync::Arc::new(crate::api::rest::state::boot_verifier().await);
-        let state =
-            AppState::new(ctx.db.clone(), search_engine, matcher, config).with_verifier(verifier);
+        crate::api::rest::auth::init().await;
+        // Key rotation and policy edits without a restart: both loops are
+        // no-ops unless their source is configured (`COURSE_PASETO_KEYS_URL`
+        // / `COURSE_ABAC_POLICY_FILE`).
+        crate::api::rest::auth::spawn_key_refresh();
+        crate::api::rest::auth::spawn_policy_watcher();
+        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
         ctx.shared_store.insert(state.clone());
         // Durable event bus (Phase 3): spawn the outbox relay worker. A
         // no-op unless the transport is `outbox` and `COURSE_EVENT_RELAY`

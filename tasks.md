@@ -217,9 +217,27 @@
     turning enforcement on or off mid-flight is not something to do
     without a restart. Both gained place's in-test router for the proof.
     thing 197 lib + 3 DB-gated, event 152 lib + 7 DB-gated, all green.
-- [ ] **AU-2 (M)** Same for **organization, care-pathway, course,
-  portfolio** (loco-style `src/auth.rs`). Depends: AU-1 (shared doc
-  wording once).
+- [x] **AU-2 (M)** Same for **organization, care-pathway, course,
+  portfolio**. *(done 2026-08-01)* Their verifier and policy were
+  **boot-only `OnceLock` snapshots**, so unlike the axum-style five there
+  was no split to fix — there was simply no way for a rotation or a
+  policy edit to reach a running process. Both are now reloadable
+  holders read per request, with `spawn_key_refresh` +
+  `spawn_policy_watcher` wired at boot.
+
+  Course turned out to be **axum-style**, not loco-style, despite this
+  task's grouping: its auth lives in `src/api/rest/auth.rs` and its state
+  held the verifier, policy and flag exactly as thing's did. Same
+  treatment, and the grouping in this file was simply wrong.
+
+  Activation proofs: organization, course and portfolio gained a
+  `tests/enforcement.rs` (own binary); care-pathway already had one.
+  organization's `authorize_record` — added with the privacy layer —
+  reads the same holder, so masking decisions follow a reloaded policy.
+
+  *Verified:* fmt + clippy clean in all four; DB-gated green vs
+  Postgres 18 — organization 24, care-pathway 44, course 15,
+  portfolio 37.
 - [ ] **AU-3 (S)** link-graph auth completion: boot-time
   keys-over-HTTP fetch + key-rotation refresh (its `Verifier` is
   currently env-only `OnceLock`; swap to `ReloadableVerifier`), and

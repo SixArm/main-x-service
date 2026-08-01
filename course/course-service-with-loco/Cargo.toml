@@ -94,6 +94,10 @@ criterion = { version = "0.5", features = ["html_reports"] }
 ed25519-dalek = { version = "2.2" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
 base64 = { version = "0.22" }
+# The activation proof (tests/enforcement.rs) sets process-wide env vars
+# before booting the router, so it must not run beside another test in
+# the same process.
+serial_test = "3.5"
 
 [[bench]]
 name = "matching_bench"

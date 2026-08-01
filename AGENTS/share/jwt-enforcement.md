@@ -300,7 +300,13 @@ handlers but not the guard, or the reverse. Snapshotting a credential
 source into request state is the anti-pattern; a service adopting this
 pattern should look for it first.
 
-Still to adopt: the loco-style services (organization, care-pathway,
-course, portfolio — tasks.md AU-2) and link-graph (AU-3), which read a
-boot-only `OnceLock<Policy>` / `Verifier`. Remaining operational
-follow-up: activation itself (the per-deployment decision above).
+**The remaining four entity services followed the same day** (organization,
+care-pathway, course, portfolio — tasks.md AU-2). Their verifier and
+policy were boot-only `OnceLock` snapshots rather than split ones, so the
+failure mode was simpler and worse: no rotation or policy edit could
+reach a running process at all.
+
+**Every entity service now has all three parts.** Still to adopt:
+**link-graph** (AU-3), which reads an env-only `OnceLock<Verifier>`.
+Remaining operational follow-up: activation itself (the per-deployment
+decision above).

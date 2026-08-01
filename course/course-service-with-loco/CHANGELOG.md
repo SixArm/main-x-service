@@ -8,6 +8,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec.md](./spec/index.md) — single source of truth (numbered §1–§18; live work queue in §13); [README.md](./README.md) — user-facing intro; [AGENTS.md](./AGENTS.md) — agent guide.
 
 ## [Unreleased]
+### Added — key rotation and policy hot-reload without a restart (2026-08-01)
+
+AU-2, the loco-style half of the rollout (case was the reference; the
+five axum-style services landed the same day as AU-1).
+
+- **The verifier and the ABAC policy are now reloadable holders**
+  (`ReloadableVerifier` / `ReloadablePolicy`) that the blanket guard
+  **and** the bearer extractors read per request. They were boot-only
+  `OnceLock` snapshots, so a rotated key set or an edited policy could
+  not have reached a running process at all.
+- **`spawn_key_refresh`** re-fetches `COURSE_PASETO_KEYS_URL` every
+  `COURSE_PASETO_KEYS_REFRESH_SECS` (default 3600; `0` disables; a no-op
+  when the URL is unset). A failed fetch **keeps the current key set** —
+  a transient auth-service outage must not lock every caller out.
+- **`spawn_policy_watcher`** polls `COURSE_ABAC_POLICY_FILE`'s mtime every
+  15 s and calls `reload_policy()`; a malformed edit falls back to the
+  built-in default rather than leaving the service unprotected.
+- **`tests/enforcement.rs`** — the activation proof, new here and in its
+  own binary, carrying a minimal builder for the production router since
+  this crate's other tests do not boot one.
+- New environment variable: `COURSE_PASETO_KEYS_REFRESH_SECS`.
+
 ### Fixed — the DB-gated suite ran for the first time (2026-08-01)
 
 - **`POST /api/courses` stored an all-zeros `id` verbatim.** `Course::id`

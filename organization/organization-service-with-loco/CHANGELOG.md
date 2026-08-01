@@ -8,6 +8,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — key rotation and policy hot-reload without a restart (2026-08-01)
+
+AU-2, the loco-style half of the rollout (case was the reference; the
+five axum-style services landed the same day as AU-1).
+
+- **The verifier and the ABAC policy are now reloadable holders**
+  (`ReloadableVerifier` / `ReloadablePolicy`) that the blanket guard
+  **and** the bearer extractors read per request. They were boot-only
+  `OnceLock` snapshots, so a rotated key set or an edited policy could
+  not have reached a running process at all.
+- **`spawn_key_refresh`** re-fetches `ORGANIZATION_PASETO_KEYS_URL` every
+  `ORGANIZATION_PASETO_KEYS_REFRESH_SECS` (default 3600; `0` disables; a no-op
+  when the URL is unset). A failed fetch **keeps the current key set** —
+  a transient auth-service outage must not lock every caller out.
+- **`spawn_policy_watcher`** polls `ORGANIZATION_ABAC_POLICY_FILE`'s mtime every
+  15 s and calls `reload_policy()`; a malformed edit falls back to the
+  built-in default rather than leaving the service unprotected.
+- **`tests/enforcement.rs`** — the activation proof, in its own binary
+  because the auth `OnceLock`s are process-wide: public paths stay open,
+  a protected read and write without a token are `401`, a malformed
+  bearer is `401` (not a 500), a valid token with no attributes reads
+  `200` and writes `403`, and `access=write` creates. The record-level
+  `authorize_record` added with the privacy layer reads the same holder,
+  so masking decisions follow a reloaded policy too.
+- New environment variable: `ORGANIZATION_PASETO_KEYS_REFRESH_SECS`.
+
 ### Added — field masking + GDPR export (2026-08-01)
 
 - **`src/privacy.rs`** — `mask_organization` redacts what is genuinely

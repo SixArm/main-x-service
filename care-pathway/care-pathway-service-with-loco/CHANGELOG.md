@@ -8,6 +8,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — key rotation and policy hot-reload without a restart (2026-08-01)
+
+AU-2, the loco-style half of the rollout (case was the reference; the
+five axum-style services landed the same day as AU-1).
+
+- **The verifier and the ABAC policy are now reloadable holders**
+  (`ReloadableVerifier` / `ReloadablePolicy`) that the blanket guard
+  **and** the bearer extractors read per request. They were boot-only
+  `OnceLock` snapshots, so a rotated key set or an edited policy could
+  not have reached a running process at all.
+- **`spawn_key_refresh`** re-fetches `CARE_PATHWAY_PASETO_KEYS_URL` every
+  `CARE_PATHWAY_PASETO_KEYS_REFRESH_SECS` (default 3600; `0` disables; a no-op
+  when the URL is unset). A failed fetch **keeps the current key set** —
+  a transient auth-service outage must not lock every caller out.
+- **`spawn_policy_watcher`** polls `CARE_PATHWAY_ABAC_POLICY_FILE`'s mtime every
+  15 s and calls `reload_policy()`; a malformed edit falls back to the
+  built-in default rather than leaving the service unprotected.
+- The existing `tests/enforcement.rs` activation proof already covered
+  the guard, so it needed no change — it now exercises the reloadable
+  holders by construction.
+- New environment variable: `CARE_PATHWAY_PASETO_KEYS_REFRESH_SECS`.
+
 
 ### Added — row-level record integrity (2026-07-25)
 

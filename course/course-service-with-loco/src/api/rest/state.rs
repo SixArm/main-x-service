@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use authentication_verifier::{Policy, Verifier};
+use authentication_verifier::Verifier;
 use sea_orm::DatabaseConnection;
 
 use crate::config::Config;
@@ -30,15 +30,6 @@ pub struct AppState {
     /// Loaded service configuration.
     pub config: Arc<Config>,
 
-    /// Verifier for authentication-service PASETO `v4.public` bearer
-    /// tokens, checked offline against the published Ed25519 key set.
-    /// Built from the environment at construction (see
-    /// [`verifier_from_env`]); with no key set configured it holds an
-    /// empty key set (rejects everything) so the service still boots.
-    /// [`AppState::with_verifier`] can swap in a replacement (e.g. one
-    /// built from a freshly fetched key set).
-    pub verifier: Arc<Verifier>,
-
     /// Whether blanket `/api/*` bearer-token enforcement is on.
     /// Read once from `COURSE_REQUIRE_AUTH` at construction (see
     /// [`super::auth::require_auth_from_env`]) — **off by default**;
@@ -47,14 +38,6 @@ pub struct AppState {
     /// PASETO bearer token on every route except the small public
     /// allow-list (see `super::auth::is_public_path`).
     pub require_auth: bool,
-
-    /// ABAC policy evaluated on verified tokens inside the blanket
-    /// guard (so only when [`AppState::require_auth`] is on). Read
-    /// once from `COURSE_ABAC_POLICY` / `COURSE_ABAC_POLICY_FILE` at
-    /// construction (see [`super::auth::policy_from_env`]) — unset or
-    /// unparsable ⇒ the built-in default policy; restart the service
-    /// to change it.
-    pub policy: Arc<Policy>,
 }
 
 impl AppState {
@@ -81,31 +64,28 @@ impl AppState {
             search_engine: Arc::new(search_engine),
             matcher: Arc::new(matcher),
             config: Arc::new(config),
-            verifier: Arc::new(verifier_from_env()),
             require_auth: super::auth::require_auth_from_env(),
-            policy: Arc::new(super::auth::policy_from_env()),
         }
-    }
-
-    /// Replace the token verifier (e.g. with one built from a freshly
-    /// fetched Ed25519 key set at boot). Consumes and returns `self` for
-    /// chaining.
-    #[must_use]
-    pub fn with_verifier(mut self, verifier: Arc<Verifier>) -> Self {
-        self.verifier = verifier;
-        self
     }
 }
 
+// The verifier and the ABAC policy used to be snapshotted here. They
+// moved to the process-wide reloadable holders in `super::auth`
+// (`verifier()` / `policy()`), so a key rotation or a policy edit reaches
+// the guard and the extractors together rather than only whichever
+// happened to hold a fresher copy. The `require_auth` flag stays: turning
+// enforcement on or off mid-flight is not something to do without a
+// restart.
+
 /// Default issuer expected in tokens (`iss`).
-const DEFAULT_ISSUER: &str = "authentication-service";
+pub(crate) const DEFAULT_ISSUER: &str = "authentication-service";
 /// Default audience expected in tokens (`aud`).
-const DEFAULT_AUDIENCE: &str = "main-x-service";
+pub(crate) const DEFAULT_AUDIENCE: &str = "main-x-service";
 
 /// Read env var `name`, treating unset/blank as absent and falling back
 /// to `default`. Used for the issuer/audience so a blank value doesn't
 /// override the sensible default.
-fn env_or(name: &str, default: &str) -> String {
+pub(crate) fn env_or(name: &str, default: &str) -> String {
     std::env::var(name)
         .ok()
         .filter(|s| !s.trim().is_empty())
@@ -126,7 +106,7 @@ fn env_or(name: &str, default: &str) -> String {
 /// This is the env-injection path. Prefer [`boot_verifier`], which
 /// fetches the key set over HTTP at boot when `COURSE_PASETO_KEYS_URL`
 /// is set and falls back to this path otherwise.
-fn verifier_from_env() -> Verifier {
+pub(crate) fn verifier_from_env() -> Verifier {
     let issuer = env_or("COURSE_TOKEN_ISSUER", DEFAULT_ISSUER);
     let audience = env_or("COURSE_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
     let keys = std::env::var("COURSE_PASETO_KEYS")

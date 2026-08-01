@@ -49,8 +49,10 @@ async fn require_auth_mw(req: Request, next: Next) -> Response {
         req.method(),
         req.uri().path(),
         req.headers(),
-        auth::verifier(),
-        auth::policy(),
+        // Per-request snapshots, so the refresh loop and the policy
+        // watcher reach the guard too — not just the handlers.
+        &auth::verifier().current(),
+        &auth::policy().current(),
     );
     match decision {
         Ok(()) => next.run(req).await,
@@ -116,6 +118,10 @@ impl Hooks for App {
         // back to the `PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS` env path — the service
         // always boots).
         auth::init().await;
+        // Key rotation and policy edits without a restart: both loops are
+        // no-ops unless their source is configured.
+        auth::spawn_key_refresh();
+        auth::spawn_policy_watcher();
         // Durable event bus Phase 3: start the outbox relay loop. A no-op
         // unless `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TRANSPORT=outbox` AND `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_RELAY`
         // are set, so the default `memory` transport never spawns it.
