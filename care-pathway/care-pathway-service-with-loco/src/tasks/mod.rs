@@ -4,3 +4,5 @@
 pub mod integrity_key;
 /// Re-MAC history under the current key after a rotation.
 pub mod integrity_resign;
+/// `search_reindex` — rebuild the full-text index from the database.
+pub mod search;

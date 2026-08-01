@@ -126,8 +126,20 @@
   structured multi-parameter filter over a capped scan, not a free-text
   query; moving it onto the index is a separate item.
 
-- [ ] **S-2 (L)** Tantivy in **care-pathway** (as S-1). Depends: S-1
-  (copy its loco-adapted pattern, not the pre-loco one).
+- [x] **S-2 (L)** Tantivy in **care-pathway**. *(done 2026-08-01)*
+  Organization's pattern transferred whole — index module, streaming
+  seam, reindex task + boot rebuild, blocked duplicate detection — with
+  the field set changed to what a pathway *is*: **condition codes**
+  (indexed as `system:code`) and interventions alongside the titles, so a
+  search for `I63` or `thrombolysis` finds the pathway an `ILIKE` over
+  `name` never could. Search keeps the pagination added in PG-1, with the
+  total now coming from Tantivy's `Count` collector.
+  *Verified:* 46 DB-gated green vs Postgres 18; fmt + clippy clean.
+
+  Worth knowing for S-3/S-4: care-pathway carries the **IEC 62304 SOUP
+  gate**, so adding `tantivy` failed `cargo test` until it was annotated
+  in `compliance/soup.tsv`. That is the compliance machinery working, not
+  an obstacle — case carries the same gate.
 - [ ] **S-3 (L)** Tantivy in **case** (as S-1). Depends: S-1.
 - [ ] **S-4 (L)** Tantivy in **portfolio** — note the kind gate: index
   `kind` as a field and filter search/dedup within-kind. Depends: S-1.

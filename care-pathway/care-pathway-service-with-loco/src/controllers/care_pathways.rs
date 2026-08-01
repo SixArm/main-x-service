@@ -31,6 +31,15 @@ use crate::streaming;
 /// the cap is a stop-gap — the real fix is search-blocked candidates.
 pub const CHECK_DUPLICATES_SCAN_CAP: u64 = 1000;
 
+/// Maximum number of **blocked candidates** `check-duplicates` scores a
+/// query against.
+///
+/// The search index supplies these, so this bounds how many *plausible*
+/// records are scored rather than how much of the table is read — which
+/// is what removes the old scale cliff, where record 1001 was
+/// unreachable however obvious a duplicate it was.
+pub const CHECK_DUPLICATES_CANDIDATE_LIMIT: usize = 200;
+
 /// Maximum number of rows returned by `GET /api/care-pathways` (spec §6.2).
 ///
 /// A pragmatic bound until pagination lands; the handler must pass this
@@ -92,6 +101,23 @@ impl Page {
         }
         Ok(())
     }
+}
+
+/// Parse index hits into UUIDs, dropping any that will not parse.
+///
+/// A malformed stored id can only come from a corrupted index, and the
+/// right response is to ignore that hit rather than fail a search that
+/// has other perfectly good results.
+fn parse_pids(hits: &[String]) -> Vec<uuid::Uuid> {
+    hits.iter()
+        .filter_map(|s| match uuid::Uuid::parse_str(s) {
+            Ok(id) => Some(id),
+            Err(err) => {
+                tracing::warn!(hit = %s, error = %err, "index hit is not a UUID; ignoring");
+                None
+            }
+        })
+        .collect()
 }
 
 /// Stamp `X-Total-Count` / `X-Limit` / `X-Offset` onto a response
@@ -213,8 +239,14 @@ struct MatchRequest {
 /// blank `q` is rejected by the handler as a `400`.
 #[derive(Debug, Deserialize)]
 struct SearchParams {
-    /// The case-insensitive substring to match against pathway names.
+    /// The full-text query.
     q: Option<String>,
+    /// Typo-tolerant retrieval (Levenshtein ≤ 2) instead of exact terms.
+    #[serde(default)]
+    fuzzy: bool,
+    /// Phonetic (Soundex) retrieval; takes precedence over `fuzzy`.
+    #[serde(default)]
+    phonetic: bool,
     /// Page size; absent ⇒ [`SEARCH_CAP`].
     #[serde(default)]
     limit: Option<u64>,
@@ -434,8 +466,29 @@ async fn search(
     };
     page.check_offset()?;
     let (limit, offset) = page.resolve(SEARCH_CAP);
-    let rows = PathwayModel::search_paged(&ctx.db, q.trim(), limit, offset).await?;
-    let total = PathwayModel::search_count(&ctx.db, q.trim()).await?;
+    // An unavailable index is reported, never disguised as "no matches":
+    // an operator must be able to tell a broken index from an empty one.
+    let Some(engine) = crate::search::engine() else {
+        return Err(Error::CustomError(
+            StatusCode::SERVICE_UNAVAILABLE,
+            ErrorDetail::new("search_unavailable", "the search index is unavailable"),
+        ));
+    };
+    let mode = if params.phonetic {
+        crate::search::SearchMode::Phonetic
+    } else if params.fuzzy {
+        crate::search::SearchMode::Fuzzy
+    } else {
+        crate::search::SearchMode::Exact
+    };
+    let (pids, index_total) = engine.search_page(
+        q.trim(),
+        mode,
+        usize::try_from(limit).unwrap_or(usize::MAX),
+        usize::try_from(offset).unwrap_or(usize::MAX),
+    )?;
+    let rows = PathwayModel::find_by_pids(&ctx.db, &parse_pids(&pids)).await?;
+    let total = index_total as u64;
     disclosure::record_access(
         &ctx.db,
         uuid::Uuid::nil(),
@@ -482,16 +535,24 @@ async fn check_duplicates(
     Json(query): Json<CarePathway>,
 ) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
-    let rows = PathwayModel::list(&ctx.db, CHECK_DUPLICATES_SCAN_CAP).await?;
-    // Hitting the cap means the scan was truncated; the result set may
-    // miss matches beyond the first `CAP` rows.
-    if rows.len() as u64 == CHECK_DUPLICATES_SCAN_CAP {
-        tracing::warn!(
-            cap = CHECK_DUPLICATES_SCAN_CAP,
-            "check-duplicates in-memory scan hit its row cap; results may be \
-             incomplete until search-backed candidate blocking lands (spec §13 T-6)"
-        );
-    }
+    // Blocking, not scanning (spec §13 T-6, now landed): the index
+    // supplies plausible candidates — fuzzy title, exact identifier and
+    // phonetic routes — so a duplicate's reachability depends on how
+    // similar it is rather than on how recently it was inserted. An
+    // unavailable index is surfaced rather than silently answering "no
+    // duplicates", which would let a caller create a duplicate believing
+    // it had been checked.
+    let Some(index) = crate::search::engine() else {
+        return Err(Error::CustomError(
+            StatusCode::SERVICE_UNAVAILABLE,
+            ErrorDetail::new(
+                "search_unavailable",
+                "the search index is unavailable, so duplicates cannot be checked",
+            ),
+        ));
+    };
+    let candidates = index.candidates(&query, CHECK_DUPLICATES_CANDIDATE_LIMIT)?;
+    let rows = PathwayModel::find_by_pids(&ctx.db, &parse_pids(&candidates)).await?;
     let mut hits: Vec<ScoredRef> = Vec::new();
     for row in &rows {
         // Each stored row is parsed back into a `CarePathway` and scored

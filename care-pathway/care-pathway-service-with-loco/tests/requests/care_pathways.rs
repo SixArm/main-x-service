@@ -38,6 +38,7 @@ fn stroke_pathway() -> Value {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn can_create_care_pathway() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
             .post("/api/care-pathways")
@@ -57,6 +58,7 @@ async fn can_create_care_pathway() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn blank_name_on_create_returns_422() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
             .post("/api/care-pathways")
@@ -73,6 +75,7 @@ async fn blank_name_on_create_returns_422() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn malformed_condition_code_on_create_returns_422() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let mut payload = stroke_pathway();
         // A code that is not a well-formed ICD-10 code (spec §6 / T-9).
@@ -92,6 +95,7 @@ async fn malformed_condition_code_on_create_returns_422() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn malformed_identifier_on_create_returns_422() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let mut payload = stroke_pathway();
         // A Uuid-scheme identifier whose value is not a canonical UUID
@@ -112,6 +116,7 @@ async fn malformed_identifier_on_create_returns_422() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn blank_name_on_update_returns_422() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created: Value = request
             .post("/api/care-pathways")
@@ -134,6 +139,7 @@ async fn blank_name_on_update_returns_422() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn can_get_care_pathway_by_pid() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created: Value = request
             .post("/api/care-pathways")
@@ -157,6 +163,7 @@ async fn can_get_care_pathway_by_pid() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn unknown_pid_returns_404() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
             .get("/api/care-pathways/00000000-0000-4000-8000-000000000000")
@@ -172,6 +179,7 @@ async fn unknown_pid_returns_404() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn update_unknown_pid_returns_404() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
             .put("/api/care-pathways/00000000-0000-4000-8000-000000000000")
@@ -191,6 +199,7 @@ async fn update_unknown_pid_returns_404() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn delete_unknown_pid_returns_404() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
             .delete("/api/care-pathways/00000000-0000-4000-8000-000000000000")
@@ -209,6 +218,7 @@ async fn delete_unknown_pid_returns_404() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn can_list_care_pathways() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         for name in ["Acute Stroke Care Pathway", "Sepsis Care Pathway"] {
             let response = request
@@ -235,6 +245,7 @@ async fn can_list_care_pathways() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn list_and_search_are_paginated() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         for i in 0..5 {
             request
@@ -301,6 +312,7 @@ async fn list_and_search_are_paginated() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn can_search_pathways_by_name() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         for name in ["Acute Stroke Care Pathway", "Sepsis Care Pathway"] {
             let response = request
@@ -330,6 +342,7 @@ async fn can_search_pathways_by_name() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn can_match_query_against_candidates() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
             .post("/api/care-pathways/match")
@@ -360,6 +373,7 @@ async fn can_match_query_against_candidates() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn can_check_duplicates_against_stored_pathways() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
             .post("/api/care-pathways")
@@ -397,6 +411,7 @@ async fn can_check_duplicates_against_stored_pathways() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn merge_folds_duplicate_into_survivor() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         // Main: stroke pathway with one ICD-10 code.
         let main: Value = request
@@ -473,6 +488,7 @@ async fn merge_folds_duplicate_into_survivor() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn merge_with_equal_pids_is_422() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created: Value = request
             .post("/api/care-pathways")
@@ -494,6 +510,7 @@ async fn merge_with_equal_pids_is_422() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn merge_unknown_pid_is_404() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created: Value = request
             .post("/api/care-pathways")
@@ -519,6 +536,7 @@ async fn merge_unknown_pid_is_404() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn crud_writes_audit_log_and_events() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         // Create → update → delete one pathway.
         let created: Value = request
@@ -589,6 +607,7 @@ async fn whoami_without_token_is_401() {
     // No JWKS is configured in tests, and no bearer header is sent, so the
     // protected endpoint must reject. The token-accepted path is pinned
     // un-gated by `auth::tests::valid_token_yields_claims`.
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.get("/api/care-pathways/whoami").await;
         assert_eq!(response.status_code(), 401, "whoami needs a bearer token");
@@ -601,6 +620,7 @@ async fn whoami_without_token_is_401() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn openapi_json_is_served() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.get("/api-docs/openapi.json").await;
         assert_eq!(response.status_code(), 200, "openapi.json should be served");
@@ -616,6 +636,7 @@ async fn openapi_json_is_served() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn swagger_ui_is_served() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.get("/swagger-ui").await;
         assert_eq!(response.status_code(), 200, "swagger-ui should be served");
@@ -630,3 +651,74 @@ async fn swagger_ui_is_served() {
 // `OnceLock` on first boot, so a `set_var` inside this shared binary
 // was a no-op once any sibling test had booted the app (the test was
 // order-dependent and failed whenever it didn't run first).
+
+/// Tantivy search reaches the fields an `ILIKE` over `name` never could
+/// — the condition code a pathway is *about*, an intervention, an
+/// identifier — and tolerates a typo when asked to.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn search_reaches_secondary_fields_and_tolerates_typos() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request
+            .post("/api/care-pathways")
+            .json(&json!({
+                "name": "Acute Stroke Care Pathway",
+                "provider_id": "trust-1",
+                "condition_codes": [{"system": "Icd10", "code": "I63"}],
+                "interventions": ["thrombolysis"],
+                "identifiers": [{"scheme": "GuidelineId", "value": "NICE-NG128"}]
+            }))
+            .await;
+        assert_eq!(created.status_code(), 200);
+
+        let hits = |body: Value| body.as_array().map(Vec::len).unwrap_or_default();
+
+        // The defining attribute of a pathway is its condition code, and
+        // it is now searchable.
+        for q in ["I63", "thrombolysis", "NICE-NG128"] {
+            let response = request
+                .get(&format!("/api/care-pathways/search?q={q}"))
+                .await;
+            assert_eq!(response.status_code(), 200);
+            assert_eq!(hits(response.json()), 1, "query {q}");
+        }
+
+        // A typo misses on exact retrieval and lands on fuzzy.
+        assert_eq!(
+            hits(
+                request
+                    .get("/api/care-pathways/search?q=Strok")
+                    .await
+                    .json()
+            ),
+            0
+        );
+        assert_eq!(
+            hits(
+                request
+                    .get("/api/care-pathways/search?q=Strok&fuzzy=true")
+                    .await
+                    .json()
+            ),
+            1,
+            "fuzzy must tolerate a dropped letter"
+        );
+
+        // A soft-deleted pathway leaves the index.
+        let pid = created.json::<Value>()["pid"].as_str().unwrap().to_string();
+        request.delete(&format!("/api/care-pathways/{pid}")).await;
+        assert_eq!(
+            hits(
+                request
+                    .get("/api/care-pathways/search?q=Stroke")
+                    .await
+                    .json()
+            ),
+            0,
+            "a deleted pathway must stop being a hit"
+        );
+    })
+    .await;
+}

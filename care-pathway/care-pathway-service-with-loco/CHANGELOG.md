@@ -8,6 +8,45 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — Tantivy full-text search, fuzzy + phonetic, dedup blocking (2026-08-01)
+
+Replaces the Postgres `ILIKE` name search (spec §13 T-6), following
+organization's loco-adapted pattern.
+
+- **`src/search/`** — the index schema and a `SearchEngine` facade.
+  Indexed: `name`, `alternate_names`, Soundex codes of every name token,
+  `provider_name`, identifier values, `keywords`, **`condition_codes`**
+  (as lowercased `system:code` pairs) and `interventions` full-text;
+  `pathway_code`, `provider_id`, `care_setting` and `active` exact. Only
+  `pid` is stored — hits resolve against Postgres, which stays the source
+  of truth.
+- **What that buys clinically:** a pathway's *defining* attribute is the
+  condition it targets, and an `ILIKE` over `name` could not find it. A
+  search for `I63` or `thrombolysis` or `NICE-NG128` now reaches the
+  right pathway; pinned by a DB-gated test.
+- **`GET /search`** keeps `?q=` and its pagination, and gains
+  `fuzzy=true` (Levenshtein ≤ 2) and `phonetic=true` (Soundex). Its
+  `X-Total-Count` now comes from the index's `Count` collector rather
+  than a SQL `COUNT(*)`.
+- **`check-duplicates` blocks on the index** (fuzzy title + exact
+  identifier + phonetic routes, ≤ 200 candidates) instead of scanning up
+  to 1000 rows, so a duplicate's reachability depends on similarity
+  rather than insertion order. An unavailable index is a `503`, never a
+  silent "no duplicates" — that answer would let a caller create a
+  duplicate believing it had been checked.
+- **Indexing is wired into `src/streaming.rs`**, the seam both the native
+  and FHIR controllers write through, after the write is durable and
+  best-effort: a failed index write is logged at `ERROR` and never fails
+  a committed request.
+- **Recovery:** `cargo loco task search_reindex` rebuilds from the
+  database, and an empty index over a populated table is rebuilt at boot
+  (`CARE_PATHWAY_SEARCH_BOOT_REINDEX=0` opts out).
+- New environment variables: `CARE_PATHWAY_SEARCH_INDEX_PATH`,
+  `CARE_PATHWAY_SEARCH_BOOT_REINDEX`.
+- `tantivy` is annotated in `compliance/soup.tsv` — the SOUP gate failed
+  the build until it was, which is the IEC 62304 §5.3.3 machinery doing
+  its job rather than an obstacle.
+
 ### Added — pagination on list and search (2026-08-01)
 
 Follows the family convention fixed in `agents/share/restful.md` and
