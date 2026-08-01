@@ -65,6 +65,27 @@ export class ApiError extends Error {
   }
 }
 
+/** A `limit` / `offset` window to request. */
+export interface PageRequest {
+  /** Page size; omitted ⇒ the service default. */
+  limit?: number;
+  /** Rows to skip; omitted ⇒ 0. */
+  offset?: number;
+}
+
+/** One page of a collection plus the window the service applied. */
+export interface Page<T> {
+  /** The rows in this page. */
+  items: T[];
+  /** Rows matching the query overall, ignoring the window. */
+  total: number;
+  /** The page size the service applied (it may have clamped yours). */
+  limit: number;
+  /** The offset the service applied. */
+  offset: number;
+}
+
+
 /**
  * Lean fetch wrapper for the Case Service's raw-JSON (no envelope) API.
  * Resolves to the parsed response body, or throws {@link ApiError} on any
@@ -144,11 +165,64 @@ export class ApiClient {
    * @typeParam T Expected shape of the parsed response body.
    * @throws {ApiError} on any non-2xx response.
    */
+  /**
+   * `GET` one page of a collection, returning the body **and** the
+   * pagination headers the service sends (`agents/share/restful.md`).
+   *
+   * The plain {@link get} discards response headers, which is fine for a
+   * single record and useless for a collection: the total lives in
+   * `X-Total-Count`, deliberately, so that adding it did not change the
+   * array body every existing caller already parses.
+   */
+  async getPage<T>(
+    path: string,
+    page: PageRequest = {},
+    opts: RequestOptions = {},
+  ): Promise<Page<T>> {
+    const query = new URLSearchParams();
+    if (page.limit !== undefined) query.set("limit", String(page.limit));
+    if (page.offset !== undefined) query.set("offset", String(page.offset));
+    const suffix = query.toString();
+    const { data, response } = await this.requestWithResponse<T[]>(
+      "GET",
+      suffix ? `${path}${path.includes("?") ? "&" : "?"}${suffix}` : path,
+      opts,
+    );
+    const header = (name: string): number | undefined => {
+      const raw = response.headers.get(name);
+      if (raw === null) return undefined;
+      const value = Number(raw);
+      return Number.isFinite(value) ? value : undefined;
+    };
+    const items = data ?? [];
+    return {
+      items,
+      // A service that predates the headers still works: the page length
+      // is the honest fallback.
+      total: header("x-total-count") ?? items.length,
+      limit: header("x-limit") ?? page.limit ?? items.length,
+      offset: header("x-offset") ?? page.offset ?? 0,
+    };
+  }
+
   private async request<T>(
     method: string,
     path: string,
     opts: RequestOptions = {},
   ): Promise<T> {
+    const { data } = await this.requestWithResponse<T>(method, path, opts);
+    return data;
+  }
+
+  /**
+   * As {@link request}, but also returns the raw {@link Response} so a
+   * caller can read headers (see {@link getPage}).
+   */
+  private async requestWithResponse<T>(
+    method: string,
+    path: string,
+    opts: RequestOptions = {},
+  ): Promise<{ data: T; response: Response }> {
     // JSON defaults first, then spread caller overrides so they win.
     const headers: Record<string, string> = {
       "content-type": "application/json",
@@ -195,7 +269,7 @@ export class ApiClient {
       const message = extractMessage(parsed) ?? `HTTP ${response.status}`;
       throw new ApiError(response.status, message, parsed);
     }
-    return parsed as T;
+    return { data: parsed as T, response };
   }
 }
 

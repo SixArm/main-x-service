@@ -7,7 +7,7 @@ use loco_rs::prelude::*;
 use project_portfolio_management_matcher::Plan as MatchPlan;
 use sea_orm::sea_query::Expr;
 use sea_orm::sea_query::extension::postgres::PgExpr;
-use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect};
+use sea_orm::{ConnectionTrait, PaginatorTrait, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
 pub use super::_entities::plans::{self, ActiveModel, Entity, Model};
@@ -115,13 +115,54 @@ impl Model {
     ///
     /// When the query fails.
     pub async fn list(db: &DatabaseConnection, limit: u64) -> ModelResult<Vec<Self>> {
-        let rows = plans::Entity::find()
-            .filter(plans::Column::DeletedAt.is_null())
+        Self::list_paged(db, None, limit, 0).await
+    }
+
+    /// One page of active plans (most-recent first), optionally scoped to
+    /// a parent's direct children.
+    ///
+    /// The parent filter and the page window live in one query so that
+    /// [`count_for`](Self::count_for) can mirror it exactly: a total that
+    /// counted a different predicate from the page would be worse than no
+    /// total at all.
+    ///
+    /// # Errors
+    ///
+    /// When `parent` is not a UUID, or the query fails.
+    pub async fn list_paged(
+        db: &DatabaseConnection,
+        parent: Option<&str>,
+        limit: u64,
+        offset: u64,
+    ) -> ModelResult<Vec<Self>> {
+        let mut query = plans::Entity::find().filter(plans::Column::DeletedAt.is_null());
+        if let Some(parent) = parent {
+            let parent_uuid = Uuid::parse_str(parent).map_err(|e| ModelError::Any(e.into()))?;
+            query = query.filter(plans::Column::ParentPid.eq(parent_uuid));
+        }
+        let rows = query
             .order_by_desc(plans::Column::Id)
+            .offset(offset)
             .limit(limit)
             .all(db)
             .await?;
         Ok(rows)
+    }
+
+    /// How many active plans match the same scope
+    /// [`list_paged`](Self::list_paged) would page over, ignoring the
+    /// window — the `X-Total-Count` a paged response reports.
+    ///
+    /// # Errors
+    ///
+    /// When `parent` is not a UUID, or the query fails.
+    pub async fn count_for(db: &DatabaseConnection, parent: Option<&str>) -> ModelResult<u64> {
+        let mut query = plans::Entity::find().filter(plans::Column::DeletedAt.is_null());
+        if let Some(parent) = parent {
+            let parent_uuid = Uuid::parse_str(parent).map_err(|e| ModelError::Any(e.into()))?;
+            query = query.filter(plans::Column::ParentPid.eq(parent_uuid));
+        }
+        Ok(query.count(db).await?)
     }
 
     /// List active child plans whose denormalised `parent_pid` equals
@@ -187,15 +228,45 @@ impl Model {
     ///
     /// When the query fails.
     pub async fn search(db: &DatabaseConnection, q: &str, limit: u64) -> ModelResult<Vec<Self>> {
+        Self::search_paged(db, q, limit, 0).await
+    }
+
+    /// One page of name-search hits.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn search_paged(
+        db: &DatabaseConnection,
+        q: &str,
+        limit: u64,
+        offset: u64,
+    ) -> ModelResult<Vec<Self>> {
         let pattern = format!("%{}%", escape_like(q));
         let rows = plans::Entity::find()
             .filter(plans::Column::DeletedAt.is_null())
             .filter(Expr::col(plans::Column::Name).ilike(pattern))
             .order_by_desc(plans::Column::Id)
+            .offset(offset)
             .limit(limit)
             .all(db)
             .await?;
         Ok(rows)
+    }
+
+    /// How many active plans match `q`, ignoring any window.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn search_count(db: &DatabaseConnection, q: &str) -> ModelResult<u64> {
+        let pattern = format!("%{}%", escape_like(q));
+        let total = plans::Entity::find()
+            .filter(plans::Column::DeletedAt.is_null())
+            .filter(Expr::col(plans::Column::Name).ilike(pattern))
+            .count(db)
+            .await?;
+        Ok(total)
     }
 }
 

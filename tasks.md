@@ -266,9 +266,9 @@
   its own task: which crate first, and what the collector story is in
   compose (DEP-1).
 
-- [~] **PG-1 (L)** Pagination in the four newest loco services.
-  **Convention fixed and organization done (2026-08-01); care-pathway,
-  case and portfolio remain.**
+- [x] **PG-1 (L)** Pagination in the four newest loco services.
+  *(done 2026-08-01 — all four services and all four front-ends; one
+  sub-resource follow-up noted below.)*
 
   The convention is **headers, not an envelope**, written up in
   [`agents/share/restful.md`](agents/share/restful.md): `?limit=&offset=`
@@ -303,9 +303,21 @@
     describes the query, and a caller may receive fewer rows than it
     suggests. 34 DB-gated green.
 
-  - [ ] **portfolio** + the **care-pathway, case and portfolio
-    front-ends**. Portfolio has `LIST_CAP` in three controllers
-    (automation, collaboration, plans), not one.
+  - [x] **portfolio** *(2026-08-01)* — `GET /api/plans` and its search
+    paginate, with the `?parent=` scope applied to the count as well as
+    the page. 38 DB-gated green.
+
+  - [x] **the three remaining front-ends** *(2026-08-01)* — care-pathway,
+    case and portfolio each gained `ApiClient.getPage()` and a
+    `listPage()`, matching organization's. `svelte-check` clean and
+    suites green in all three (48 / 37 / 55 tests).
+
+  - [ ] **Portfolio's operational sub-resource lists** still carry
+    `LIST_CAP = 200`: `automations`, automation runs, the deadline
+    queue, delegations, approvals. They are per-plan working lists
+    rather than the entity collection, and paginating them wants the
+    front-end screens that consume them (FE-4 territory), so they are
+    left capped rather than half-paged.
 
 ## Phase 3 — Platform
 

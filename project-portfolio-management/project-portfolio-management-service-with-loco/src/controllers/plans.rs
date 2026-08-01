@@ -148,11 +148,92 @@ struct ListParams {
     /// When set, list only the direct children of this parent plan.
     #[serde(default)]
     parent: Option<String>,
+    /// Page size; absent ⇒ [`LIST_DEFAULT_LIMIT`].
+    #[serde(default)]
+    limit: Option<u64>,
+    /// Rows to skip; absent ⇒ 0.
+    #[serde(default)]
+    offset: Option<u64>,
+}
+
+// ─── Pagination (agents/share/restful.md) ───────────────────────────────
+
+/// Default page size for `GET /api/plans` — the cap this endpoint
+/// applied before pagination.
+pub const LIST_DEFAULT_LIMIT: u64 = 100;
+
+/// Default page size for `GET /api/plans/search`.
+pub const SEARCH_DEFAULT_LIMIT: u64 = 50;
+
+/// Largest page any collection read will serve; a bigger `limit` is
+/// clamped rather than refused.
+pub const MAX_LIMIT: u64 = 500;
+
+/// Largest accepted `offset`; past this a request is a `400` (SEC-G7).
+pub const MAX_OFFSET: u64 = 10_000;
+
+/// `?limit=` / `?offset=` on a collection read. Declared inline on each
+/// query struct rather than `#[serde(flatten)]`-ed: a flattened struct
+/// deserializes from a string-keyed map, so `limit=2` arrives as the
+/// string `"2"` and fails to parse as a `u64`.
+#[derive(Debug, Default, Clone, Copy)]
+struct Page {
+    /// Page size; `None`/zero ⇒ the endpoint default.
+    limit: Option<u64>,
+    /// Rows to skip; `None` ⇒ 0.
+    offset: Option<u64>,
+}
+
+impl Page {
+    /// The clamped `(limit, offset)` this request will use.
+    fn resolve(self, default_limit: u64) -> (u64, u64) {
+        let limit = self
+            .limit
+            .filter(|l| *l > 0)
+            .unwrap_or(default_limit)
+            .min(MAX_LIMIT);
+        (limit, self.offset.unwrap_or(0))
+    }
+
+    /// Reject an out-of-bound offset before it reaches the database.
+    fn check_offset(self) -> Result<()> {
+        if self.offset.unwrap_or(0) > MAX_OFFSET {
+            return Err(Error::CustomError(
+                StatusCode::BAD_REQUEST,
+                ErrorDetail::new(
+                    "offset_too_large",
+                    &format!("offset must not exceed {MAX_OFFSET}; narrow the query instead"),
+                ),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Stamp `X-Total-Count` / `X-Limit` / `X-Offset` onto a response.
+fn with_page_headers(mut response: Response, total: u64, limit: u64, offset: u64) -> Response {
+    let headers = response.headers_mut();
+    for (name, value) in [
+        ("x-total-count", total),
+        ("x-limit", limit),
+        ("x-offset", offset),
+    ] {
+        if let Ok(value) = axum::http::HeaderValue::from_str(&value.to_string()) {
+            headers.insert(name, value);
+        }
+    }
+    response
 }
 
 /// Query string for `GET /plans/search`: the `q` name term.
 #[derive(Debug, Deserialize)]
 struct SearchParams {
+    /// Page size; absent ⇒ [`SEARCH_DEFAULT_LIMIT`].
+    #[serde(default)]
+    limit: Option<u64>,
+    /// Rows to skip; absent ⇒ 0.
+    #[serde(default)]
+    offset: Option<u64>,
     /// The case-insensitive substring to match against `name`.
     q: Option<String>,
 }
@@ -287,14 +368,23 @@ async fn list(
     axum::extract::Query(params): axum::extract::Query<ListParams>,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
-    let rows = match params.parent.as_deref() {
-        Some(parent) if !parent.trim().is_empty() => {
-            PlanModel::list_children(&ctx.db, parent.trim(), 100).await?
-        }
-        _ => PlanModel::list(&ctx.db, 100).await?,
+    let page = Page {
+        limit: params.limit,
+        offset: params.offset,
     };
+    page.check_offset()?;
+    let (limit, offset) = page.resolve(LIST_DEFAULT_LIMIT);
+    // The parent scope is applied to the page and the count alike, so the
+    // total always describes the rows actually being paged over.
+    let parent = params
+        .parent
+        .as_deref()
+        .map(str::trim)
+        .filter(|p| !p.is_empty());
+    let rows = PlanModel::list_paged(&ctx.db, parent, limit, offset).await?;
+    let total = PlanModel::count_for(&ctx.db, parent).await?;
     let refs: Vec<PlanRef> = rows.iter().map(PlanRef::of).collect();
-    format::json(refs)
+    Ok(with_page_headers(format::json(refs)?, total, limit, offset))
 }
 
 /// Case-insensitive name search (Postgres `ILIKE`, cap 50).
@@ -312,9 +402,16 @@ async fn search(
     if q.trim().is_empty() {
         return bad_request("query parameter `q` is required");
     }
-    let rows = PlanModel::search(&ctx.db, q.trim(), 50).await?;
+    let page = Page {
+        limit: params.limit,
+        offset: params.offset,
+    };
+    page.check_offset()?;
+    let (limit, offset) = page.resolve(SEARCH_DEFAULT_LIMIT);
+    let rows = PlanModel::search_paged(&ctx.db, q.trim(), limit, offset).await?;
+    let total = PlanModel::search_count(&ctx.db, q.trim()).await?;
     let refs: Vec<PlanRef> = rows.iter().map(PlanRef::of).collect();
-    format::json(refs)
+    Ok(with_page_headers(format::json(refs)?, total, limit, offset))
 }
 
 /// Score a query against an explicit candidate list (no persistence).

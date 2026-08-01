@@ -133,3 +133,43 @@ describe("ApiClient", () => {
     expect(err.message).toContain("boom");
   });
 });
+
+describe("getPage", () => {
+  /** A fetch stub answering with `body` and the given headers. */
+  function stub(body: unknown, headers: Record<string, string>) {
+    return (async () =>
+      new Response(JSON.stringify(body), {
+        status: 200,
+        headers,
+      })) as unknown as typeof fetch;
+  }
+
+  it("reads the pagination headers the service sends", async () => {
+    const client = new ApiClient({
+      baseUrl: "http://x",
+      fetch: stub([{ pid: "a" }], {
+        "x-total-count": "431",
+        "x-limit": "25",
+        "x-offset": "50",
+      }),
+    });
+    const page = await client.getPage<{ pid: string }>("/api/things", {
+      limit: 25,
+      offset: 50,
+    });
+    expect(page.items).toHaveLength(1);
+    expect(page.total).toBe(431);
+    expect(page.limit).toBe(25);
+    expect(page.offset).toBe(50);
+  });
+
+  it("falls back to the page length when a service sends no headers", async () => {
+    const client = new ApiClient({
+      baseUrl: "http://x",
+      fetch: stub([{ pid: "a" }, { pid: "b" }], {}),
+    });
+    const page = await client.getPage("/api/things");
+    expect(page.total).toBe(2);
+    expect(page.offset).toBe(0);
+  });
+});

@@ -8,6 +8,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — paged collection reads (2026-08-01)
+
+- **`ApiClient.getPage()`** returns `{ items, total, limit, offset }`,
+  reading the service's `X-Total-Count` / `X-Limit` / `X-Offset` headers.
+  The plain `get()` throws response headers away, which is fine for one
+  record and useless for a collection. A service that predates the
+  headers still works: the page length is the fallback.
+- **`CaseRepository.listPage()`** wraps it; `list()` is unchanged for callers
+  that just want the default page.
+- Note the service reports the **collection's** total, taken before
+  the per-record concealment it applies, so a caller may legitimately
+  receive fewer rows than `total` suggests. That is deliberate: a
+  caller-specific total would leak how many records concealment is
+  hiding.
+
 
 ### Added
 

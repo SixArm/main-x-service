@@ -2,6 +2,7 @@
 
 import { API_BASE_URL } from "$lib/config";
 import { ApiClient } from "./client";
+import type { Page, PageRequest } from "./client";
 import type { Case, CaseRef, ScoredRef } from "./types";
 
 /**
@@ -33,6 +34,14 @@ export class CaseRepository {
    */
   list(): Promise<CaseRef[]> {
     return this.http.get<CaseRef[]>("/api/cases");
+  }
+
+  /**
+   * `GET /api/cases?limit=&offset=` — one page, with the total.
+   * @param page The window; omitted values leave the service's defaults.
+   */
+  listPage(page: PageRequest = {}): Promise<Page<CaseRef>> {
+    return this.http.getPage<CaseRef>("/api/cases", page);
   }
 
   /**

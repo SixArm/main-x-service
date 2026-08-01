@@ -2,6 +2,7 @@
 
 import { API_BASE_URL } from "$lib/config";
 import { ApiClient } from "./client";
+import type { Page, PageRequest } from "./client";
 import type {
   AuditEntry,
   CarePathway,
@@ -48,6 +49,14 @@ export class CarePathwayRepository {
    */
   list(): Promise<PathwayRef[]> {
     return this.http.get<PathwayRef[]>("/api/care-pathways");
+  }
+
+  /**
+   * `GET /api/care-pathways?limit=&offset=` — one page, with the total.
+   * @param page The window; omitted values leave the service's defaults.
+   */
+  listPage(page: PageRequest = {}): Promise<Page<PathwayRef>> {
+    return this.http.getPage<PathwayRef>("/api/care-pathways", page);
   }
 
   /**

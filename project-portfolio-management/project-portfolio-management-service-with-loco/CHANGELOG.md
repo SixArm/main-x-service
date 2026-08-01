@@ -8,6 +8,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — pagination on the plan collection reads (2026-08-01)
+
+- **`GET /api/plans` and `GET /api/plans/search` take `?limit=` and
+  `?offset=`**, reporting `X-Total-Count` / `X-Limit` / `X-Offset`
+  (`agents/share/restful.md`). Bodies stay bare arrays. Defaults
+  reproduce the old caps (100 / 50), `limit` clamps to 500, and an
+  `offset` past 10 000 is a `400`.
+- **The `?parent=` scope reaches the count as well as the page**, so a
+  child listing's total describes that parent's children rather than
+  every plan. `list_paged` and `count_for` build the same predicate for
+  exactly this reason — a total counting a different set from the page
+  would be worse than no total.
+
+**Still capped, not yet paged:** the operational sub-resource lists
+(`automations`, automation runs, the deadline queue, delegations,
+approvals) keep their `LIST_CAP` of 200. They are per-plan working
+lists rather than the entity collection, and pagination there wants the
+front-end screens that consume them; recorded in tasks.md PG-1 rather
+than half-done here.
+
 ### Added — key rotation and policy hot-reload without a restart (2026-08-01)
 
 AU-2, the loco-style half of the rollout (case was the reference; the

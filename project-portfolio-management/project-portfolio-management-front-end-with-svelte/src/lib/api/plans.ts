@@ -2,6 +2,7 @@
 
 import { API_BASE_URL } from "$lib/config";
 import { ApiClient } from "./client";
+import type { Page, PageRequest } from "./client";
 import type { Plan, PlanRef, ScoredRef } from "./types";
 
 /**
@@ -43,6 +44,19 @@ export class PlanRepository {
   list(parentRef?: string): Promise<PlanRef[]> {
     const suffix = parentRef ? `?parent=${encodeURIComponent(parentRef)}` : "";
     return this.http.get<PlanRef[]>(`${this.base()}${suffix}`);
+  }
+
+  /**
+   * `GET /api/plans?limit=&offset=[&parent=]` — one page, with the total.
+   *
+   * The parent scope reaches the service's count as well as its page, so
+   * a child listing's total describes the children rather than every
+   * plan.
+   * @param page The window; omitted values leave the service's defaults.
+   */
+  listPage(page: PageRequest = {}, parentRef?: string): Promise<Page<PlanRef>> {
+    const suffix = parentRef ? `?parent=${encodeURIComponent(parentRef)}` : "";
+    return this.http.getPage<PlanRef>(`${this.base()}${suffix}`, page);
   }
 
   /**
