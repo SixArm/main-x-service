@@ -8,7 +8,7 @@ use loco_rs::prelude::*;
 use crate::compliance::record_integrity;
 use sea_orm::sea_query::Expr;
 use sea_orm::sea_query::extension::postgres::PgExpr;
-use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect};
+use sea_orm::{ConnectionTrait, PaginatorTrait, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
 /// Re-export the generated `care_pathways` entity (the module plus
@@ -89,13 +89,41 @@ impl Model {
     ///
     /// When the query fails.
     pub async fn list(db: &DatabaseConnection, limit: u64) -> ModelResult<Vec<Self>> {
+        Self::list_paged(db, limit, 0).await
+    }
+
+    /// One page of active care pathways (most-recent first).
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn list_paged(
+        db: &DatabaseConnection,
+        limit: u64,
+        offset: u64,
+    ) -> ModelResult<Vec<Self>> {
         let rows = care_pathways::Entity::find()
             .filter(care_pathways::Column::DeletedAt.is_null())
             .order_by_desc(care_pathways::Column::Id)
+            .offset(offset)
             .limit(limit)
             .all(db)
             .await?;
         Ok(rows)
+    }
+
+    /// How many active care pathways exist, ignoring any page window —
+    /// the `X-Total-Count` a paged response reports.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn count(db: &DatabaseConnection) -> ModelResult<u64> {
+        let total = care_pathways::Entity::find()
+            .filter(care_pathways::Column::DeletedAt.is_null())
+            .count(db)
+            .await?;
+        Ok(total)
     }
 
     /// Case-insensitive substring search on the denormalised `name`, over
@@ -108,15 +136,50 @@ impl Model {
     ///
     /// When the query fails.
     pub async fn search(db: &DatabaseConnection, q: &str, limit: u64) -> ModelResult<Vec<Self>> {
+        Self::search_paged(db, q, limit, 0).await
+    }
+
+    /// One page of name-search hits, plus the total number of matches
+    /// ignoring the window — the count `X-Total-Count` reports.
+    ///
+    /// Two queries rather than one: the page and the count. A `COUNT(*)`
+    /// over the same predicate is cheap next to materialising every
+    /// matching row just to length it.
+    ///
+    /// # Errors
+    ///
+    /// When either query fails.
+    pub async fn search_paged(
+        db: &DatabaseConnection,
+        q: &str,
+        limit: u64,
+        offset: u64,
+    ) -> ModelResult<Vec<Self>> {
         let pattern = format!("%{}%", escape_like(q));
         let rows = care_pathways::Entity::find()
             .filter(care_pathways::Column::DeletedAt.is_null())
             .filter(Expr::col(care_pathways::Column::Name).ilike(pattern))
             .order_by_desc(care_pathways::Column::Id)
+            .offset(offset)
             .limit(limit)
             .all(db)
             .await?;
         Ok(rows)
+    }
+
+    /// How many active care pathways match `q`, ignoring any window.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn search_count(db: &DatabaseConnection, q: &str) -> ModelResult<u64> {
+        let pattern = format!("%{}%", escape_like(q));
+        let total = care_pathways::Entity::find()
+            .filter(care_pathways::Column::DeletedAt.is_null())
+            .filter(Expr::col(care_pathways::Column::Name).ilike(pattern))
+            .count(db)
+            .await?;
+        Ok(total)
     }
 }
 

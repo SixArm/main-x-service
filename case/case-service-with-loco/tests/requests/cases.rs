@@ -177,11 +177,65 @@ async fn can_list_cases() {
     .await;
 }
 
+/// Pagination: `limit` / `offset` window both collection reads, and
+/// `X-Total-Count` reports the collection's match count rather than the
+/// page — deliberately the collection's, not the caller's view of it,
+/// since a caller-specific total would leak how many records
+/// concealment is hiding from them.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn list_and_search_are_paginated() {
+    request::<App, _, _>(|request, _ctx| async move {
+        for i in 0..5 {
+            request
+                .post("/api/cases")
+                .json(&json!({"title": format!("Paging Case {i}"), "agency_id": "dwp"}))
+                .await;
+        }
+        macro_rules! header {
+            ($r:expr, $name:expr) => {
+                $r.headers()
+                    .get($name)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or_default()
+                    .to_string()
+            };
+        }
+
+        let page = request.get("/api/cases?limit=2&offset=1").await;
+        assert_eq!(page.status_code(), 200);
+        let body: Value = page.json();
+        assert_eq!(body.as_array().expect("array").len(), 2);
+        assert_eq!(header!(page, "x-total-count"), "5");
+        assert_eq!(header!(page, "x-limit"), "2");
+        assert_eq!(header!(page, "x-offset"), "1");
+
+        let all = request.get("/api/cases").await;
+        assert_eq!(all.json::<Value>().as_array().expect("array").len(), 5);
+        assert_eq!(header!(all, "x-limit"), "100", "the default is the old cap");
+
+        let clamped = request.get("/api/cases?limit=100000").await;
+        assert_eq!(header!(clamped, "x-limit"), "500");
+
+        assert_eq!(
+            request.get("/api/cases?offset=10001").await.status_code(),
+            400
+        );
+
+        let hits = request.get("/api/cases/search?q=Paging&limit=2").await;
+        assert_eq!(hits.status_code(), 200, "search page: {}", hits.text());
+        assert_eq!(hits.json::<Value>().as_array().expect("array").len(), 2);
+        assert_eq!(header!(hits, "x-total-count"), "5");
+    })
+    .await;
+}
+
 // Pins the ILIKE title search: `?q=housing` matches only the housing
 // case (case-insensitive substring), and a blank `q` is a 400.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn can_search_cases_by_title() {
     request::<App, _, _>(|request, _ctx| async move {
         for title in ["Housing benefit appeal", "Tax credit overpayment"] {

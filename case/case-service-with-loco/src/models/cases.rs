@@ -7,7 +7,7 @@ use loco_rs::prelude::*;
 use crate::compliance::record_integrity;
 use sea_orm::sea_query::Expr;
 use sea_orm::sea_query::extension::postgres::PgExpr;
-use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect};
+use sea_orm::{ConnectionTrait, PaginatorTrait, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
 pub use super::_entities::cases::{self, ActiveModel, Entity, Model};
@@ -85,13 +85,47 @@ impl Model {
     ///
     /// When the query fails.
     pub async fn list(db: &DatabaseConnection, limit: u64) -> ModelResult<Vec<Self>> {
+        Self::list_paged(db, limit, 0).await
+    }
+
+    /// One page of active cases (most-recent first).
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn list_paged(
+        db: &DatabaseConnection,
+        limit: u64,
+        offset: u64,
+    ) -> ModelResult<Vec<Self>> {
         let rows = cases::Entity::find()
             .filter(cases::Column::DeletedAt.is_null())
             .order_by_desc(cases::Column::Id)
+            .offset(offset)
             .limit(limit)
             .all(db)
             .await?;
         Ok(rows)
+    }
+
+    /// How many active cases exist, ignoring any page window — the
+    /// `X-Total-Count` a paged response reports.
+    ///
+    /// This counts what the **collection** holds, before the per-record
+    /// concealment the handler applies (§10 governance): the header
+    /// therefore describes the query, not the caller's view of it.
+    /// Deriving it per caller would leak exactly what concealment
+    /// hides — the number of records they are not allowed to see.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn count(db: &DatabaseConnection) -> ModelResult<u64> {
+        let total = cases::Entity::find()
+            .filter(cases::Column::DeletedAt.is_null())
+            .count(db)
+            .await?;
+        Ok(total)
     }
 
     /// Case-insensitive substring search on the denormalised `title`, over
@@ -104,15 +138,46 @@ impl Model {
     ///
     /// When the query fails.
     pub async fn search(db: &DatabaseConnection, q: &str, limit: u64) -> ModelResult<Vec<Self>> {
+        Self::search_paged(db, q, limit, 0).await
+    }
+
+    /// One page of title-search hits.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn search_paged(
+        db: &DatabaseConnection,
+        q: &str,
+        limit: u64,
+        offset: u64,
+    ) -> ModelResult<Vec<Self>> {
         let pattern = format!("%{}%", escape_like(q));
         let rows = cases::Entity::find()
             .filter(cases::Column::DeletedAt.is_null())
             .filter(Expr::col(cases::Column::Title).ilike(pattern))
             .order_by_desc(cases::Column::Id)
+            .offset(offset)
             .limit(limit)
             .all(db)
             .await?;
         Ok(rows)
+    }
+
+    /// How many active cases match `q`, ignoring any window. Same
+    /// collection-level semantics as [`count`](Self::count).
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn search_count(db: &DatabaseConnection, q: &str) -> ModelResult<u64> {
+        let pattern = format!("%{}%", escape_like(q));
+        let total = cases::Entity::find()
+            .filter(cases::Column::DeletedAt.is_null())
+            .filter(Expr::col(cases::Column::Title).ilike(pattern))
+            .count(db)
+            .await?;
+        Ok(total)
     }
 
     /// The most recently updated `limit` cases, **including soft-deleted

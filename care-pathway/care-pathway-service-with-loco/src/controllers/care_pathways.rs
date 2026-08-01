@@ -41,6 +41,86 @@ pub const LIST_CAP: u64 = 100;
 /// (spec §6.2). A pragmatic bound on the `ILIKE` scan.
 pub const SEARCH_CAP: u64 = 50;
 
+// ─── Pagination (agents/share/restful.md) ───────────────────────────────
+
+/// Largest page any collection read will serve. A bigger `limit` is
+/// **clamped** to this rather than refused.
+pub const MAX_LIMIT: u64 = 500;
+
+/// Largest accepted `offset`; past this a request is a `400`, because
+/// the database would otherwise materialise and discard arbitrarily many
+/// rows (SEC-G7). Deep paging past this wants a cursor.
+pub const MAX_OFFSET: u64 = 10_000;
+
+/// `?limit=` / `?offset=` on a collection read.
+///
+/// Declared inline on each query struct rather than `#[serde(flatten)]`-ed:
+/// a flattened struct deserializes from a string-keyed map, so `limit=2`
+/// arrives as the string `"2"` and fails to parse as a `u64` — a `400`
+/// on a valid request.
+#[derive(Debug, Default, Clone, Copy)]
+struct Page {
+    /// Page size; `None`, zero or unparseable ⇒ the endpoint default.
+    limit: Option<u64>,
+    /// Rows to skip; `None` ⇒ 0.
+    offset: Option<u64>,
+}
+
+impl Page {
+    /// The clamped `(limit, offset)` this request will actually use. A
+    /// zero `limit` falls back to the default: an empty page and an empty
+    /// collection look identical to a client, and only one is an answer.
+    fn resolve(self, default_limit: u64) -> (u64, u64) {
+        let limit = self
+            .limit
+            .filter(|l| *l > 0)
+            .unwrap_or(default_limit)
+            .min(MAX_LIMIT);
+        (limit, self.offset.unwrap_or(0))
+    }
+
+    /// Reject an out-of-bound offset before it reaches the database.
+    fn check_offset(self) -> Result<()> {
+        if self.offset.unwrap_or(0) > MAX_OFFSET {
+            return Err(Error::CustomError(
+                StatusCode::BAD_REQUEST,
+                ErrorDetail::new(
+                    "offset_too_large",
+                    &format!("offset must not exceed {MAX_OFFSET}; narrow the query instead"),
+                ),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Stamp `X-Total-Count` / `X-Limit` / `X-Offset` onto a response
+/// (`agents/share/restful.md`).
+fn with_page_headers(mut response: Response, total: u64, limit: u64, offset: u64) -> Response {
+    let headers = response.headers_mut();
+    for (name, value) in [
+        ("x-total-count", total),
+        ("x-limit", limit),
+        ("x-offset", offset),
+    ] {
+        if let Ok(value) = axum::http::HeaderValue::from_str(&value.to_string()) {
+            headers.insert(name, value);
+        }
+    }
+    response
+}
+
+/// `?limit=` / `?offset=` for the list endpoint.
+#[derive(Debug, Default, Deserialize)]
+struct ListParams {
+    /// Page size; absent ⇒ [`LIST_CAP`].
+    #[serde(default)]
+    limit: Option<u64>,
+    /// Rows to skip; absent ⇒ 0.
+    #[serde(default)]
+    offset: Option<u64>,
+}
+
 /// Validate an incoming `CarePathway` payload.
 ///
 /// Family convention (OQ-1 resolution): validation failures return
@@ -135,6 +215,12 @@ struct MatchRequest {
 struct SearchParams {
     /// The case-insensitive substring to match against pathway names.
     q: Option<String>,
+    /// Page size; absent ⇒ [`SEARCH_CAP`].
+    #[serde(default)]
+    limit: Option<u64>,
+    /// Rows to skip; absent ⇒ 0.
+    #[serde(default)]
+    offset: Option<u64>,
 }
 
 /// Request body for `POST /merge`: which duplicate folds into which
@@ -293,11 +379,19 @@ async fn remove(
 /// Propagates DB query errors.
 #[debug_handler]
 async fn list(
+    axum::extract::Query(params): axum::extract::Query<ListParams>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
     access: AccessContext,
 ) -> Result<Response> {
-    let rows = PathwayModel::list(&ctx.db, LIST_CAP).await?;
+    let page = Page {
+        limit: params.limit,
+        offset: params.offset,
+    };
+    page.check_offset()?;
+    let (limit, offset) = page.resolve(LIST_CAP);
+    let rows = PathwayModel::list_paged(&ctx.db, limit, offset).await?;
+    let total = PathwayModel::count(&ctx.db).await?;
     // A collection read is recorded against the nil `pid`: it disclosed
     // many records, not one, so attributing it to any single record would
     // corrupt that record's §164.528 accounting.
@@ -311,7 +405,7 @@ async fn list(
     .await
     .map_err(audit_unavailable)?;
     let refs: Vec<PathwayRef> = rows.iter().map(PathwayRef::of).collect();
-    format::json(refs)
+    Ok(with_page_headers(format::json(refs)?, total, limit, offset))
 }
 
 /// Case-insensitive name search: `GET /api/care-pathways/search?q=stroke`.
@@ -334,7 +428,14 @@ async fn search(
     if q.trim().is_empty() {
         return bad_request("query parameter `q` is required");
     }
-    let rows = PathwayModel::search(&ctx.db, q.trim(), SEARCH_CAP).await?;
+    let page = Page {
+        limit: params.limit,
+        offset: params.offset,
+    };
+    page.check_offset()?;
+    let (limit, offset) = page.resolve(SEARCH_CAP);
+    let rows = PathwayModel::search_paged(&ctx.db, q.trim(), limit, offset).await?;
+    let total = PathwayModel::search_count(&ctx.db, q.trim()).await?;
     disclosure::record_access(
         &ctx.db,
         uuid::Uuid::nil(),
@@ -345,7 +446,7 @@ async fn search(
     .await
     .map_err(audit_unavailable)?;
     let refs: Vec<PathwayRef> = rows.iter().map(PathwayRef::of).collect();
-    format::json(refs)
+    Ok(with_page_headers(format::json(refs)?, total, limit, offset))
 }
 
 /// Score a query against an explicit candidate list (no persistence).

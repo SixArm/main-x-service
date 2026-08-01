@@ -292,9 +292,20 @@
     string `"2"` and fails to parse as `u64` — a `400` on a valid
     request. Declare the page fields inline instead.
 
-  - [ ] **care-pathway, case, portfolio** + their front-ends. Note
-    portfolio has `LIST_CAP` in three controllers (automation,
-    collaboration, plans), not one.
+  - [x] **care-pathway** *(2026-08-01)* — list + search paginate; totals
+    are `COUNT(*)` over the same predicate. 45 DB-gated green.
+
+  - [x] **case** *(2026-08-01)* — same, with one deliberate difference
+    worth keeping: the total is the **collection's** match count, taken
+    before the per-record concealment this service applies (§10). A
+    caller-specific total would leak exactly what concealment hides —
+    how many records that caller may not see — so `X-Total-Count`
+    describes the query, and a caller may receive fewer rows than it
+    suggests. 34 DB-gated green.
+
+  - [ ] **portfolio** + the **care-pathway, case and portfolio
+    front-ends**. Portfolio has `LIST_CAP` in three controllers
+    (automation, collaboration, plans), not one.
 
 ## Phase 3 — Platform
 

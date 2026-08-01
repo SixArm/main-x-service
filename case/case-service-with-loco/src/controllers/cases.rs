@@ -33,6 +33,92 @@ use crate::streaming;
 /// the cap is a stop-gap — the real fix is search-blocked candidates.
 pub const CHECK_DUPLICATES_SCAN_CAP: u64 = 1000;
 
+// ─── Pagination (agents/share/restful.md) ───────────────────────────────
+
+/// Default page size for `GET /api/cases` — the cap this endpoint
+/// applied before pagination, so omitting `limit` returns what it always
+/// did.
+pub const LIST_DEFAULT_LIMIT: u64 = 100;
+
+/// Default page size for `GET /api/cases/search`.
+pub const SEARCH_DEFAULT_LIMIT: u64 = 50;
+
+/// Largest page any collection read will serve; a bigger `limit` is
+/// clamped rather than refused.
+pub const MAX_LIMIT: u64 = 500;
+
+/// Largest accepted `offset`; past this a request is a `400` (SEC-G7).
+pub const MAX_OFFSET: u64 = 10_000;
+
+/// `?limit=` / `?offset=` on a collection read. Declared inline on each
+/// query struct rather than `#[serde(flatten)]`-ed: a flattened struct
+/// deserializes from a string-keyed map, so `limit=2` arrives as the
+/// string `"2"` and fails to parse as a `u64`.
+#[derive(Debug, Default, Clone, Copy)]
+struct Page {
+    /// Page size; `None`/zero ⇒ the endpoint default.
+    limit: Option<u64>,
+    /// Rows to skip; `None` ⇒ 0.
+    offset: Option<u64>,
+}
+
+impl Page {
+    /// The clamped `(limit, offset)` this request will use.
+    fn resolve(self, default_limit: u64) -> (u64, u64) {
+        let limit = self
+            .limit
+            .filter(|l| *l > 0)
+            .unwrap_or(default_limit)
+            .min(MAX_LIMIT);
+        (limit, self.offset.unwrap_or(0))
+    }
+
+    /// Reject an out-of-bound offset before it reaches the database.
+    fn check_offset(self) -> Result<()> {
+        if self.offset.unwrap_or(0) > MAX_OFFSET {
+            return Err(Error::CustomError(
+                StatusCode::BAD_REQUEST,
+                ErrorDetail::new(
+                    "offset_too_large",
+                    &format!("offset must not exceed {MAX_OFFSET}; narrow the query instead"),
+                ),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Stamp `X-Total-Count` / `X-Limit` / `X-Offset` onto a response.
+///
+/// The total is the **collection's** match count, taken before the
+/// per-record concealment this controller applies: a caller-specific
+/// total would leak exactly what concealment hides — how many records
+/// they are not allowed to see.
+fn with_page_headers(mut response: Response, total: u64, limit: u64, offset: u64) -> Response {
+    let headers = response.headers_mut();
+    for (name, value) in [
+        ("x-total-count", total),
+        ("x-limit", limit),
+        ("x-offset", offset),
+    ] {
+        if let Ok(value) = axum::http::HeaderValue::from_str(&value.to_string()) {
+            headers.insert(name, value);
+        }
+    }
+    response
+}
+
+/// `?limit=` / `?offset=` for the list endpoint.
+#[derive(Debug, Default, Deserialize)]
+struct ListParams {
+    /// Page size; absent ⇒ [`LIST_DEFAULT_LIMIT`].
+    #[serde(default)]
+    limit: Option<u64>,
+    /// Rows to skip; absent ⇒ 0.
+    #[serde(default)]
+    offset: Option<u64>,
+}
+
 /// Validate an incoming `Case` payload.
 ///
 /// Family convention (OQ-1 resolution): validation failures return
@@ -100,6 +186,12 @@ struct SearchParams {
     /// The case-insensitive substring to match against `title`. Required
     /// in practice — a missing/blank `q` is rejected with `400`.
     q: Option<String>,
+    /// Page size; absent ⇒ [`SEARCH_DEFAULT_LIMIT`].
+    #[serde(default)]
+    limit: Option<u64>,
+    /// Rows to skip; absent ⇒ 0.
+    #[serde(default)]
+    offset: Option<u64>,
 }
 
 /// Body of `POST /api/cases/merge`: which duplicate folds into which
@@ -328,11 +420,19 @@ async fn remove(
 /// A DB error when the query fails.
 #[debug_handler]
 async fn list(
+    axum::extract::Query(params): axum::extract::Query<ListParams>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
     access: AccessContext,
 ) -> Result<Response> {
-    let rows = CaseModel::list(&ctx.db, 100).await?;
+    let page = Page {
+        limit: params.limit,
+        offset: params.offset,
+    };
+    page.check_offset()?;
+    let (limit, offset) = page.resolve(LIST_DEFAULT_LIMIT);
+    let rows = CaseModel::list_paged(&ctx.db, limit, offset).await?;
+    let total = CaseModel::count(&ctx.db).await?;
     // A collection read is recorded against the nil `pid`: it disclosed
     // many records, not one, so attributing it to any single case would
     // corrupt that case's §164.528 accounting.
@@ -355,7 +455,7 @@ async fn list(
         })
         .map(CaseRef::of)
         .collect();
-    format::json(refs)
+    Ok(with_page_headers(format::json(refs)?, total, limit, offset))
 }
 
 /// Case-insensitive title search: `GET /api/cases/search?q=housing`.
@@ -379,7 +479,14 @@ async fn search(
     if q.trim().is_empty() {
         return bad_request("query parameter `q` is required");
     }
-    let rows = CaseModel::search(&ctx.db, q.trim(), 50).await?;
+    let page = Page {
+        limit: params.limit,
+        offset: params.offset,
+    };
+    page.check_offset()?;
+    let (limit, offset) = page.resolve(SEARCH_DEFAULT_LIMIT);
+    let rows = CaseModel::search_paged(&ctx.db, q.trim(), limit, offset).await?;
+    let total = CaseModel::search_count(&ctx.db, q.trim()).await?;
     disclosure::record_access(
         &ctx.db,
         uuid::Uuid::nil(),
@@ -398,7 +505,7 @@ async fn search(
         })
         .map(CaseRef::of)
         .collect();
-    format::json(refs)
+    Ok(with_page_headers(format::json(refs)?, total, limit, offset))
 }
 
 /// Score a query against an explicit candidate list (no persistence).

@@ -8,6 +8,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — pagination on list and search (2026-08-01)
+
+Follows the family convention fixed in `agents/share/restful.md` and
+first implemented in organization.
+
+- **`GET /api/care-pathways` and `GET /api/care-pathways/search` take `?limit=` and `?offset=`**
+  and report `X-Total-Count` / `X-Limit` / `X-Offset`. The body stays a
+  bare array, so no existing caller changes.
+- Defaults reproduce the old hard caps (100 / 50), `limit`
+  clamps to 500 rather than erroring, and an `offset` past 10 000 is a
+  `400` (an unbounded offset makes the database materialise and discard
+  arbitrarily many rows — SEC-G7).
+- The search total is a `COUNT(*)` over the same predicate rather than
+  the page length: a page cannot tell a caller how much there is, which
+  is the point of the header.
+- Pinned by a DB-gated request test walking a window, checking the total
+  exceeds the page, the clamp, and the `400`.
+
 ### Added — key rotation and policy hot-reload without a restart (2026-08-01)
 
 AU-2, the loco-style half of the rollout (case was the reference; the
