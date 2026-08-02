@@ -111,7 +111,7 @@ async fn read_upload(mut multipart: Multipart) -> Result<Upload> {
                     StatusCode::PAYLOAD_TOO_LARGE,
                     loco_rs::controller::ErrorDetail::new(
                         "too_large",
-                        &format!(
+                        format!(
                             "the upload is {} bytes; the limit is {cap} (CMS_MAX_UPLOAD_BYTES)",
                             bytes.len()
                         ),
@@ -216,7 +216,7 @@ async fn upload(
             StatusCode::PAYLOAD_TOO_LARGE,
             loco_rs::controller::ErrorDetail::new(
                 "quota_exceeded",
-                &format!(
+                format!(
                     "site {} has used {used} of {quota} bytes; this upload of {byte_size} would \
                      exceed the quota (CMS_SITE_QUOTA_BYTES)",
                     site.key

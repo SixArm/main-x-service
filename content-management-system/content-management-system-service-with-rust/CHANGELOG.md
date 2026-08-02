@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration →
+  2.0, sea-query → 1.0. No feature-list changes (default feature set).
+- **`ColType::PkAuto` now generates a 64-bit primary key.** Of this
+  crate's 18 tables, exactly one (`audit_logs`) goes through loco's
+  schema DSL and moves from `i32` to `i64`; content_types, sites,
+  entries, assets, routing, preview, webhooks, and `event_outbox` are
+  all raw SQL and stay `i32` — the same split as every other consumer
+  app in this migration.
+- Two `useless_conversion`s (`models/event_outbox.rs`,
+  `controllers/entries.rs`'s soft-delete-cascade-to-variants update)
+  and five pre-existing `needless_borrows_for_generic_args`
+  (`controllers/assets.rs` ×2, `controllers/entries.rs`,
+  `controllers/mod.rs` ×2) — the largest single-crate clippy cleanup
+  in this migration, all the same class of finding surfaced by the
+  same `cargo clippy` run, not new issues introduced by the bump.
+- No behavioural change; verified with the full DB-gated suite (64
+  tests, unchanged count) against a freshly migrated Postgres 18. This
+  is the last of the seventeen crates in the family-wide loco-rs 1.0.1
+  migration.
+
 ### Added
 
 - 2026-07-31 — CMS-T18's last residual: an **Atom 1.0 feed** at

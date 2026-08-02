@@ -676,7 +676,7 @@ async fn save_revision(
             axum::http::StatusCode::CONFLICT,
             loco_rs::controller::ErrorDetail::new(
                 "stale_base_revision",
-                &format!(
+                format!(
                     "this edit was made from revision {} but the variant is now at {}",
                     payload.base_revision_pid,
                     competing
@@ -1050,7 +1050,7 @@ async fn delete_entry(
     entry_variants::Entity::update_many()
         .col_expr(
             entry_variants::Column::DeletedAt,
-            sea_orm::sea_query::Expr::current_timestamp().into(),
+            sea_orm::sea_query::Expr::current_timestamp(),
         )
         .filter(entry_variants::Column::EntryPid.eq(entry_pid))
         .filter(entry_variants::Column::DeletedAt.is_null())
