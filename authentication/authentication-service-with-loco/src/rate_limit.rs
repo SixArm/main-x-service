@@ -150,7 +150,7 @@ async fn check_at_inner(
     // Serialise concurrent checks for this exact key (different keys hash to
     // different lock slots, so unrelated emails never block each other). The
     // lock is held until the transaction commits.
-    txn.execute(Statement::from_sql_and_values(
+    txn.execute_raw(Statement::from_sql_and_values(
         DbBackend::Postgres,
         "SELECT pg_advisory_xact_lock(hashtext($1))",
         [key.clone().into()],
@@ -159,7 +159,7 @@ async fn check_at_inner(
 
     // Drop this key's requests that have aged out of the window — keeps the
     // table bounded and makes the count below a pure in-window count.
-    txn.execute(Statement::from_sql_and_values(
+    txn.execute_raw(Statement::from_sql_and_values(
         DbBackend::Postgres,
         "DELETE FROM auth_rate_limits WHERE email_key = $1 AND requested_at < $2",
         [key.clone().into(), cutoff.into()],
@@ -169,7 +169,7 @@ async fn check_at_inner(
     // Count what remains (all in-window) and find the oldest, used to tell a
     // throttled caller when a slot will free.
     let row = txn
-        .query_one(Statement::from_sql_and_values(
+        .query_one_raw(Statement::from_sql_and_values(
             DbBackend::Postgres,
             "SELECT count(*) AS cnt, min(requested_at) AS oldest FROM auth_rate_limits WHERE email_key = $1",
             [key.clone().into()],
@@ -197,7 +197,7 @@ async fn check_at_inner(
     }
 
     // Under quota: record this request and allow it.
-    txn.execute(Statement::from_sql_and_values(
+    txn.execute_raw(Statement::from_sql_and_values(
         DbBackend::Postgres,
         "INSERT INTO auth_rate_limits (email_key, requested_at) VALUES ($1, $2)",
         [key.into(), now.into()],
@@ -215,7 +215,7 @@ async fn check_at_inner(
 ///
 /// Propagates any database error from the `DELETE`.
 pub async fn reset(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
-    db.execute(Statement::from_string(
+    db.execute_raw(Statement::from_string(
         DbBackend::Postgres,
         "DELETE FROM auth_rate_limits",
     ))

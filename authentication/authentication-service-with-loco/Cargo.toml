@@ -18,7 +18,7 @@ include = ["src/**/*", "LICENSE.md", "README.md", "llms.txt", "llms.json"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace.dependencies]
-loco-rs = { version = "0.16" }
+loco-rs = { version = "1.0.1" }
 
 [dependencies]
 # Keyed integrity MACs with production-grade key handling — one audited
@@ -41,7 +41,7 @@ axum = { version = "0.8" }
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 regex = { version = "1.13" }
-sea-orm = { version = "1.1", features = [
+sea-orm = { version = "2.0", features = [
   "sqlx-sqlite",
   "sqlx-postgres",
   "runtime-tokio-rustls",
@@ -50,7 +50,7 @@ sea-orm = { version = "1.1", features = [
 # Migrations live in-crate under `src/migration` (no separate migration
 # crate). The migrator and migration files use the sea-orm-migration
 # prelude directly.
-sea-orm-migration = { version = "1.1", features = ["runtime-tokio-rustls"] }
+sea-orm-migration = { version = "2.0", features = ["runtime-tokio-rustls"] }
 chrono = { version = "0.4" }
 validator = { version = "0.20" }
 uuid = { version = "1.24", features = ["v4"] }

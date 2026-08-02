@@ -18,7 +18,7 @@ pub struct Model {
     pub updated_at: DateTimeWithTimeZone,
     /// Internal autoincrement primary key (never exposed externally).
     #[sea_orm(primary_key)]
-    pub id: i32,
+    pub id: i64,
     /// Public id — the stable external UUID used in tokens (`sub`) and
     /// URLs; assigned in `before_save`, not by the caller.
     pub pid: Uuid,

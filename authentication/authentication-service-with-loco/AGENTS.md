@@ -51,7 +51,7 @@ template (see root `AGENTS.md`).
 
 | Question | Answer |
 |---|---|
-| Framework | loco.rs 0.16 (real `Hooks`/`AppContext` boot, loco controllers, loco config, `sea-orm-migration`). |
+| Framework | loco.rs 1.0.1 (real `Hooks`/`AppContext` boot, loco controllers, loco config, `sea-orm-migration` 2.0). |
 | Auth model | Passwordless magic link → server-side cookie session. No passwords are ever checked. |
 | Tokens | Cross-service: short-lived PASETO v4.public (Ed25519); public key(s) published at `/.well-known/paseto-keys` for offline verification. |
 | Build | `cargo build` |

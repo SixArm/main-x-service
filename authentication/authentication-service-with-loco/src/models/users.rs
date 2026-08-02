@@ -22,7 +22,7 @@ use async_trait::async_trait;
 use chrono::{Duration, offset::Local};
 use loco_rs::{auth::jwt, hash, prelude::*};
 use sea_orm::FromQueryResult;
-use sea_orm::sea_query::{Expr, Func};
+use sea_orm::sea_query::{Expr, ExprTrait, Func};
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use uuid::Uuid;
@@ -303,7 +303,7 @@ impl Model {
              RETURNING *",
             [hashed.into()],
         );
-        match db.query_one(stmt).await? {
+        match db.query_one_raw(stmt).await? {
             Some(row) => Model::from_query_result(&row, "").map_err(ModelError::from),
             None => Err(ModelError::EntityNotFound),
         }

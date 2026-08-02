@@ -95,7 +95,7 @@ fn require_admin(claims: &Claims) -> Result<()> {
 fn unprocessable(message: impl Into<String>) -> Error {
     Error::CustomError(
         StatusCode::UNPROCESSABLE_ENTITY,
-        ErrorDetail::new("unprocessable_entity", &message.into()),
+        ErrorDetail::new("unprocessable_entity", message.into()),
     )
 }
 

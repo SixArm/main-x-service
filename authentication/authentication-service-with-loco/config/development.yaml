@@ -55,9 +55,6 @@ mailer:
     host: localhost
     port: 1025
     secure: false
-    host: localhost
-    port: 1025
-    secure: false
     # auth:
     #   user:
     #   password:

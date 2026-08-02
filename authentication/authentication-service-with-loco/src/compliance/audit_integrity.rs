@@ -153,7 +153,7 @@ pub struct AuditIntegrityReport {
     /// Rows naming a key or scheme this service cannot check.
     pub mac_unverifiable: usize,
     /// Rows whose content did not match what was stored.
-    pub mismatched: Vec<i32>,
+    pub mismatched: Vec<i64>,
     /// `true` when no mismatch was found.
     pub verified: bool,
     /// What this result does and does not attest to, carried in the
