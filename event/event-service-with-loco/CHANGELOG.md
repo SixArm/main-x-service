@@ -7,6 +7,25 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16.4 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration →
+  2.0, sea-query → 1.0. Feature renames applied: `auth_jwt` → `auth`,
+  `bg_pg` → `worker`.
+- **`with-bigdecimal`** added to the `sea-orm` feature list — offer
+  `price` is stored as `bigdecimal::BigDecimal`, same fix as person
+  and worker's match-score columns.
+- A `useless_conversion` in `src/db/outbox.rs` from a now-redundant
+  `.into()`.
+- No raw `Statement` calls anywhere in this crate (no review-queue
+  module here), and no `EntityTrait`-import gap — `db/models.rs`
+  glob-imports the sea-orm prelude per submodule.
+- This crate is the last of the six person-style services to migrate
+  (course, person, worker, place, thing, event) — closes out that half
+  of the family-wide rollout.
+- No behavioural change; verified with the full DB-gated suite (7
+  tests, unchanged count) against a freshly migrated Postgres 18.
+
 ### Added — key rotation and policy hot-reload without a restart (2026-08-01)
 
 AU-1, completing the five axum-style services (person was the reference).
