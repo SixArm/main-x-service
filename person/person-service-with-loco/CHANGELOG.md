@@ -7,6 +7,25 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — Parquet export, feature-gated (2026-08-02)
+
+- **`format: "parquet"`** on `POST /api/persons/export` — **export-only**
+  (the import handler refuses it, on every build) and **feature-gated**
+  behind this crate's own `parquet` Cargo feature (off by default): the
+  `arrow`/`parquet` dependencies only exist when the feature is on, so a
+  deployment that never needs Parquet carries none of that weight. A
+  binary built without the feature still accepts `format: "parquet"` as a
+  recognised token but returns a clean `422` rather than silently
+  substituting JSONL.
+- The CSV column-flattening declaration (spec §10.6) moved to a new
+  shared `src/bulk/columns.rs`, used by both `csv.rs` and the new
+  `parquet_format.rs` — one column list, so the two formats can't drift
+  apart.
+- New dev-dependency `bytes` (reads Parquet bytes back in tests;
+  `parquet::file::reader::ChunkReader` has no `std::io::Cursor` impl).
+- SOUP register (`compliance/soup.tsv`) updated for the three new direct
+  dependencies (`arrow`, `parquet`, `bytes`) per IEC 62304 §5.3.3.
+
 ### Added — bulk CSV wiring + keyless-row review-queue routing (2026-08-02)
 
 - **CSV is now a full peer of JSONL** on `POST /api/persons/import` and

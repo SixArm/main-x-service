@@ -111,6 +111,24 @@ entity-ref = { path = "../../link/entity-ref-rust-crate" }
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
 mimalloc = "0.1.52"
 
+# Parquet export (BLK-3, feature-gated — agents/share/bulk-import-export.md
+# §5/§11/§12: "Heavier dependency (arrow/parquet), feature-gated and
+# export-first in v1"). Both optional and pulled in only by the `parquet`
+# feature below, so the default dependency tree (and every existing
+# deployment's build) is unchanged. `arrow` builds the in-memory
+# RecordBatch; `parquet`'s own `arrow` feature is the writer/reader that
+# serializes one to/from Parquet bytes — same crates.io release line
+# (59.1.0) since the two are versioned in lockstep upstream.
+arrow = { version = "59.1.0", default-features = false, optional = true }
+parquet = { version = "59.1.0", default-features = false, features = ["arrow"], optional = true }
+
+[features]
+# Off by default. `dep:` syntax so this is the *only* way to reach either
+# crate — plain `--features arrow` or `--features parquet` (the implicit
+# per-optional-dep features Cargo would otherwise synthesize) are
+# suppressed, so there is exactly one on/off switch to document and test.
+parquet = ["dep:parquet", "dep:arrow"]
+
 [dev-dependencies]
 # Serialises the DB-gated audit-chain tests: they each truncate
 # `audit_log`, so running them concurrently would have one test wipe
@@ -132,6 +150,11 @@ base64 = { version = "0.22" }
 
 # Benchmarking
 criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+
+# `parquet::file::reader::ChunkReader` is implemented for `bytes::Bytes`
+# (and `File`), not `std::io::Cursor` — needed to read encoded Parquet
+# bytes back in `src/bulk/parquet_format.rs`'s round-trip tests.
+bytes = "1.12.1"
 
 [build-dependencies]
 # gRPC code generation

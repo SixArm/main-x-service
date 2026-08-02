@@ -27,6 +27,35 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   `cargo test -- --ignored` against a real Postgres, `clippy --all-targets
   -D warnings`, `cargo fmt --check`. (Repo tasks.md BLK-2.)
 
+- [x] **BLK-3: Parquet export (feature-gated).** *(done 2026-08-02)*
+  `format: "parquet"` on `POST /api/persons/export` — **export-only**
+  (`BulkFormat::is_export_only`; the import handler refuses it) and
+  **feature-gated** behind this crate's own `parquet` Cargo feature (off
+  by default; `arrow` 59.1.0 + `parquet` 59.1.0, matched release line).
+  `BulkFormat::parse` recognises the token regardless of build
+  configuration; `process_export_job` returns a clean `422` rather than a
+  silent JSONL fallback when the feature is off. The person §10.6 CSV
+  column-flattening declaration was extracted into a new shared
+  `src/bulk/columns.rs` (used by both `csv.rs` and the new
+  `parquet_format.rs`, §10.7) so the two formats' column sets cannot
+  drift apart. `Scalar`/`Bool` columns become nullable Arrow
+  `Utf8`/`Boolean` (a real null for an absent field); `Json` columns
+  (arrays/arrays-of-objects) become non-nullable `Utf8` carrying the same
+  JSON text CSV puts in its cells. DB-free tests (readable-bytes
+  round-trip via `parquet`'s own Arrow reader: row count, scalar column,
+  JSON-cell column, a genuine null for an absent scalar; empty-slice;
+  bool-column typing) plus a DB-gated export round-trip. Also closed
+  IEC 62304 §5.3.3 SOUP annotations for the three new direct dependencies
+  (`arrow`, `parquet`, the dev-only `bytes` needed to read Parquet bytes
+  back in tests — `parquet::file::reader::ChunkReader` has no
+  `std::io::Cursor` impl). Green: `cargo build`/`test`/`clippy --all-targets
+  -D warnings`/`fmt --check`, each run **twice** — default features and
+  `--features parquet` — plus the DB-gated suite against a real Postgres
+  under both. **Known gap:** family CI does not pass `--features parquet`
+  to this crate, so the feature is exercised only by local runs today
+  (repo tasks.md BLK-3, spec §10.7 records this explicitly rather than
+  silently).
+
 - [x] **SEC-B10 (security): person merge audit in-transaction.** The merge
   `UPDATE` (survivor) + `DELETE` (duplicate) audit rows are now written on the
   merge transaction (`log_update_on`/`log_delete_on`) **before** commit, so a

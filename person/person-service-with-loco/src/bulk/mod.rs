@@ -34,11 +34,22 @@
 //! likely duplicate to the stored [`crate::db::review_queue`]
 //! (`provenance = "import"`) instead of a blind create (§6).
 //!
-//! Deferred to later rollout steps (noted, not built): Parquet export,
-//! the S3 artifact store, and a real soft-deleted-record export query
-//! (today `include_soft_deleted = true` is rejected as not-yet-supported
-//! rather than silently leaking or ignoring the flag).
+//! **Parquet** (rollout step 4, BLK-3) is **export-only**, per §12's lean,
+//! and **feature-gated** — [`parquet_format`] and its `arrow`/`parquet`
+//! dependencies only exist behind this crate's own `parquet` Cargo
+//! feature (off by default), so a deployment that never needs it carries
+//! none of that weight. `process_export_job` returns a clean error rather
+//! than a silent JSONL fallback when a caller asks for `format: "parquet"`
+//! on a binary built without the feature — never a surprise substitution.
+//!
+//! Deferred to later rollout steps (noted, not built): the S3 artifact
+//! store, and a real soft-deleted-record export query (today
+//! `include_soft_deleted = true` is rejected as not-yet-supported rather
+//! than silently leaking or ignoring the flag).
 
+/// The shared column-flattening declaration (§5) — [`csv`] and
+/// [`parquet_format`] both render it, neither redeclares it.
+pub mod columns;
 /// CSV codec — the operator/spreadsheet format (§5 flattening).
 pub mod csv;
 /// The per-row error report (§7).
@@ -47,6 +58,9 @@ pub mod error_report;
 pub mod handlers;
 /// Streaming JSONL codec — the lossless reference format (§5).
 pub mod jsonl;
+/// Parquet codec — export-only, feature-gated (`parquet` Cargo feature).
+#[cfg(feature = "parquet")]
+pub mod parquet_format;
 /// The import/export per-row/per-job pipeline (the testable core).
 pub mod pipeline;
 /// Person's declared upsert stable key (§10.1).
@@ -131,9 +145,14 @@ impl BulkKind {
     }
 }
 
-/// The file format of a bulk job. Parquet remains a later step
-/// (feature-gated export-only, BLK-3); JSONL and CSV are both wired
-/// end-to-end (BLK-1/BLK-2).
+/// The file format of a bulk job. All three are recognised **tokens**
+/// regardless of build configuration — `parse`/`as_str` never depend on
+/// the `parquet` Cargo feature, so a client's request is always
+/// understood the same way. What the feature gates is [`Parquet`]'s
+/// *encoder* ([`pipeline::process_export_job`] returns a clean error
+/// rather than a silent JSONL substitution when the feature is off), and
+/// [`Parquet`] is refused for **import** at the handler regardless of the
+/// feature (export-only, §12 lean — see [`is_export_only`](Self::is_export_only)).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum BulkFormat {
@@ -142,27 +161,40 @@ pub enum BulkFormat {
     /// CSV — the operator/spreadsheet format (§5 flattening convention;
     /// [`csv`] codec).
     Csv,
+    /// Parquet — columnar, analytics-oriented, **export-only**
+    /// ([`parquet_format`] codec, behind the `parquet` Cargo feature).
+    Parquet,
 }
 
 impl BulkFormat {
-    /// The persisted lowercase token (`jsonl` / `csv`).
+    /// The persisted lowercase token (`jsonl` / `csv` / `parquet`).
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             BulkFormat::Jsonl => "jsonl",
             BulkFormat::Csv => "csv",
+            BulkFormat::Parquet => "parquet",
         }
     }
 
-    /// Parse the persisted token. Unknown / unsupported formats
-    /// (`parquet`) return `None`.
+    /// Parse the persisted token. Unrecognised tokens return `None`.
     #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "jsonl" => Some(BulkFormat::Jsonl),
             "csv" => Some(BulkFormat::Csv),
+            "parquet" => Some(BulkFormat::Parquet),
             _ => None,
         }
+    }
+
+    /// Whether this format may only be used for **export** — true only for
+    /// [`Parquet`](Self::Parquet) (§12 lean: "export-only in v1, import is
+    /// roadmap"). The import handler rejects a request naming an
+    /// export-only format before a job is ever created.
+    #[must_use]
+    pub fn is_export_only(self) -> bool {
+        matches!(self, BulkFormat::Parquet)
     }
 }
 
@@ -279,13 +311,24 @@ mod tests {
     }
 
     #[test]
-    fn format_supports_jsonl_and_csv_but_not_parquet_yet() {
+    fn format_supports_jsonl_csv_and_parquet_tokens() {
         assert_eq!(BulkFormat::parse("jsonl"), Some(BulkFormat::Jsonl));
         assert_eq!(BulkFormat::parse("csv"), Some(BulkFormat::Csv));
-        assert_eq!(BulkFormat::parse("parquet"), None);
-        for f in [BulkFormat::Jsonl, BulkFormat::Csv] {
+        assert_eq!(BulkFormat::parse("parquet"), Some(BulkFormat::Parquet));
+        assert_eq!(BulkFormat::parse("xml"), None, "an unknown token is None");
+        for f in [BulkFormat::Jsonl, BulkFormat::Csv, BulkFormat::Parquet] {
             assert_eq!(BulkFormat::parse(f.as_str()), Some(f), "round-trips");
         }
+    }
+
+    /// §12 lean: Parquet is the only export-only format — recognised as a
+    /// token regardless of the `parquet` build feature, but the import
+    /// handler refuses it before a job is ever created.
+    #[test]
+    fn only_parquet_is_export_only() {
+        assert!(!BulkFormat::Jsonl.is_export_only());
+        assert!(!BulkFormat::Csv.is_export_only());
+        assert!(BulkFormat::Parquet.is_export_only());
     }
 
     #[test]

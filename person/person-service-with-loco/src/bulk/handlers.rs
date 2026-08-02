@@ -167,8 +167,12 @@ impl From<bulk_jobs::Model> for BulkJobView {
 }
 
 /// Parse a caller-supplied format, defaulting to [`BulkFormat::Jsonl`]
-/// when omitted. Rejects anything [`BulkFormat::parse`] doesn't recognise
-/// (`parquet` — export-only, a later step).
+/// when omitted. Rejects anything [`BulkFormat::parse`] doesn't
+/// recognise. Accepts every known token — including
+/// [`BulkFormat::Parquet`], which is export-only — since whether a format
+/// is valid for *this operation* is a separate question from whether the
+/// token is valid at all; see [`parse_import_format`] for the import-side
+/// enforcement.
 fn parse_format(format: Option<&str>) -> Result<BulkFormat, (StatusCode, Json<ApiResponse<()>>)> {
     match format {
         None => Ok(BulkFormat::Jsonl),
@@ -177,11 +181,32 @@ fn parse_format(format: Option<&str>) -> Result<BulkFormat, (StatusCode, Json<Ap
                 StatusCode::BAD_REQUEST,
                 Json(ApiResponse::<()>::error(
                     "UNSUPPORTED_FORMAT",
-                    format!("format '{f}' is not supported; use 'jsonl' or 'csv'"),
+                    format!("format '{f}' is not supported; use 'jsonl', 'csv', or 'parquet'"),
                 )),
             )
         }),
     }
+}
+
+/// [`parse_format`], plus rejecting an export-only format (§12 lean:
+/// Parquet is export-only) before an import job is ever created.
+fn parse_import_format(
+    format: Option<&str>,
+) -> Result<BulkFormat, (StatusCode, Json<ApiResponse<()>>)> {
+    let parsed = parse_format(format)?;
+    if parsed.is_export_only() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse::<()>::error(
+                "UNSUPPORTED_FORMAT",
+                format!(
+                    "format '{}' is export-only and cannot be used for import",
+                    parsed.as_str()
+                ),
+            )),
+        ));
+    }
+    Ok(parsed)
 }
 
 /// Actor pid (bearer `sub`) from the optional authenticated caller.
@@ -274,7 +299,7 @@ pub async fn import_person(
         }
     }
 
-    let format = match parse_format(format_field.as_deref()) {
+    let format = match parse_import_format(format_field.as_deref()) {
         Ok(f) => f,
         Err((status, body)) => return (status, Json(remap(body))),
     };
@@ -638,7 +663,8 @@ fn remap(body: Json<ApiResponse<()>>) -> ApiResponse<JobAccepted> {
 
 #[cfg(test)]
 mod tests {
-    use super::{artifact_expired, exceeds_cap, is_job_owner};
+    use super::{artifact_expired, exceeds_cap, is_job_owner, parse_format, parse_import_format};
+    use crate::bulk::BulkFormat;
 
     /// SEC-B2: the pre-materialisation byte-cap boundary. A chunk that keeps
     /// the running total at or under `max` is accepted; the chunk that
@@ -694,6 +720,31 @@ mod tests {
         assert!(
             !is_job_owner("actor-a", None),
             "an actorless job is owned by no one"
+        );
+    }
+
+    /// `parse_format` (the export-side parser) accepts every known token,
+    /// including `parquet`; defaults to JSONL when omitted; rejects an
+    /// unknown token.
+    #[test]
+    fn parse_format_accepts_every_known_token_including_parquet() {
+        assert_eq!(parse_format(None).unwrap(), BulkFormat::Jsonl);
+        assert_eq!(parse_format(Some("jsonl")).unwrap(), BulkFormat::Jsonl);
+        assert_eq!(parse_format(Some("csv")).unwrap(), BulkFormat::Csv);
+        assert_eq!(parse_format(Some("parquet")).unwrap(), BulkFormat::Parquet);
+        assert!(parse_format(Some("xml")).is_err());
+    }
+
+    /// §12 lean: `parse_import_format` accepts every `parse_format` token
+    /// *except* an export-only one (Parquet), which it refuses before an
+    /// import job is ever created.
+    #[test]
+    fn parse_import_format_refuses_export_only_formats() {
+        assert_eq!(parse_import_format(None).unwrap(), BulkFormat::Jsonl);
+        assert_eq!(parse_import_format(Some("csv")).unwrap(), BulkFormat::Csv);
+        assert!(
+            parse_import_format(Some("parquet")).is_err(),
+            "parquet is export-only"
         );
     }
 }

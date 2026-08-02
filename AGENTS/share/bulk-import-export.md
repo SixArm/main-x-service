@@ -244,7 +244,18 @@ adds one section + a §13 task declaring only what differs:
    data) while queuing a `provenance = "import"` pair in the review queue.
 3. **Export hardening.** ✅ Masking profiles + per-export audit +
    `include_soft_deleted` gating.
-4. **Parquet export** (feature-gated).
+4. **Parquet export** (feature-gated). ✅ *(done 2026-08-02, person)*
+   `format: "parquet"`, export-only, behind a `parquet` Cargo feature
+   (off by default; `arrow` + `parquet` 59.1.0). Reuses the CSV column
+   set exactly (extracted to a shared `src/bulk/columns.rs` so the two
+   formats cannot drift): `Scalar`/`Bool` → nullable Arrow `Utf8`/
+   `Boolean`, `Json` → non-nullable `Utf8` carrying the same JSON text
+   CSV cells hold. A build without the feature still recognises the
+   `format` token but returns a clean error rather than a silent JSONL
+   substitution. **Known gap:** the reference crate's own CI does not
+   pass `--features parquet`, so the feature is exercised by local runs
+   only today — a family-wide "does this crate's CI even build its
+   optional features" question, not specific to Parquet.
 5. **Roll across the other entities** — uniform contract; only the per-entity
    stable key + CSV columns + sensitivity differ.
 
@@ -280,8 +291,10 @@ adds one section + a §13 task declaring only what differs:
   risk. Asking for `s3` in a binary built without the feature is an
   **error, not a fallback** — silently writing clinical export artifacts
   to an ephemeral container disk would lose data and appear to work.
-- **Parquet import** — export-only in v1, or both? (Lean: export-only;
-  import is roadmap.)
+- ~~**Parquet import**~~ — RESOLVED (2026-08-02): export-only. The
+  reference crate's `BulkFormat::is_export_only` enforces this at the
+  import handler regardless of build configuration; a real import path
+  is still roadmap, not merely deferred by omission.
 - **File-size ceiling** — max upload before requiring chunked / presigned
   multipart, and a row cap per job.
 - **CSV nested convention** — JSON-in-cell for arrays/objects + dotted for

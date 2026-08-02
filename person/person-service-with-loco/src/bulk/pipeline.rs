@@ -315,6 +315,12 @@ fn decode_import_rows(input: &[u8], format: BulkFormat) -> Result<Vec<ImportRow>
                 })
                 .collect())
         }
+        // §12 lean: Parquet is export-only. The handler already refuses
+        // this before a job is ever created (`BulkFormat::is_export_only`);
+        // this arm only guards a hand-edited `bulk_jobs.format` row.
+        BulkFormat::Parquet => Err(crate::Error::Validation(
+            "parquet import is not supported (export-only)".to_string(),
+        )),
     }
 }
 
@@ -536,9 +542,28 @@ pub async fn process_import_job(
     Ok(outcome)
 }
 
+/// Encode to Parquet when this build carries the `parquet` feature.
+#[cfg(feature = "parquet")]
+fn encode_parquet(records: &[Person]) -> Result<Vec<u8>> {
+    super::parquet_format::encode(records)
+}
+
+/// Without the `parquet` feature, a clean error rather than a silent
+/// JSONL substitution — a caller asking for Parquet on a binary that
+/// cannot produce it must be told so, not handed a different format it
+/// did not ask for (`BulkFormat::parse` accepts the token regardless of
+/// build configuration; only the encoder is feature-gated).
+#[cfg(not(feature = "parquet"))]
+fn encode_parquet(_records: &[Person]) -> Result<Vec<u8>> {
+    Err(crate::Error::Validation(
+        "parquet export requires this crate's `parquet` build feature".to_string(),
+    ))
+}
+
 /// Run an export, returning the encoded byte buffer of matching records
 /// **and** the number of records exported (for the audit row, §8). The
-/// encoding is [`jsonl`] or [`csv`] per `params.format`.
+/// encoding is [`jsonl`], [`csv`], or [`super::parquet_format`] per
+/// `params.format`.
 ///
 /// Uses the repository's family-name `search` when `params.query` is set,
 /// else pages active records via `list_active`. Every record is then run
@@ -552,7 +577,9 @@ pub async fn process_import_job(
 /// is `true` — the repository cannot express a soft-deleted listing
 /// without a larger change, so rather than silently leaking or ignoring
 /// the flag the export is rejected as not-yet-supported. Also returns an
-/// error if the underlying repository query or the format encode fails.
+/// error if the underlying repository query or the format encode fails
+/// (including a `format: parquet` request on a binary built without the
+/// `parquet` feature).
 pub async fn process_export_job(
     repo: &dyn PersonRepository,
     params: &ExportParams,
@@ -575,6 +602,7 @@ pub async fn process_export_job(
     let bytes = match params.format {
         BulkFormat::Jsonl => jsonl::encode(&records)?,
         BulkFormat::Csv => csv::encode(&records)?,
+        BulkFormat::Parquet => encode_parquet(&records)?,
     };
     Ok((bytes, rows))
 }
@@ -1082,6 +1110,52 @@ mod db_tests {
                 .iter()
                 .any(|(_, r)| r.as_ref().is_ok_and(|p| p.id == created.id)),
             "the created record round-trips through the CSV export"
+        );
+    }
+
+    /// BLK-3: the Parquet export path (feature-gated) produces bytes a
+    /// real Parquet reader can read back, carrying the exported record's
+    /// `name.family` column.
+    #[tokio::test]
+    #[cfg(feature = "parquet")]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn parquet_export_round_trips() {
+        use ::bytes::Bytes;
+        use arrow::array::Array;
+        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+
+        let db = connect().await;
+        let repo = SeaOrmPersonRepository::new(db.clone());
+
+        repo.create(&person("ParquetExported")).await.unwrap();
+
+        let (bytes, rows) = process_export_job(
+            &repo,
+            &ExportParams {
+                query: Some("ParquetExported".to_string()),
+                masking_profile: MaskingProfile::Full,
+                format: BulkFormat::Parquet,
+                ..ExportParams::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert!(rows >= 1);
+
+        let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(bytes))
+            .unwrap()
+            .build()
+            .unwrap();
+        let batch = reader.map(|b| b.unwrap()).next().expect("one batch");
+        let family_col = batch
+            .column_by_name("name.family")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<arrow::array::StringArray>()
+            .unwrap();
+        assert!(
+            (0..family_col.len()).any(|i| family_col.value(i) == "ParquetExported"),
+            "the exported record's family name is in the Parquet bytes"
         );
     }
 }

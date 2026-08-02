@@ -148,3 +148,44 @@ match takes. `review_queue.provenance` (`operator` | `import` |
 `matcher_suggested` — the cross-service-linking vocabulary) distinguishes
 these from the interactive/batch-scan-sourced rows; it is set once on
 insert and never touched by a re-scan upsert.
+
+### 10.7 Parquet export (BLK-3, done)
+
+`format: "parquet"` — **export-only** (§12 lean: "export-only in v1,
+import is roadmap"; `BulkFormat::is_export_only`, enforced at the import
+handler regardless of the crate's build configuration) and
+**feature-gated** behind this crate's own `parquet` Cargo feature (off by
+default): `src/bulk/parquet_format.rs` and its `arrow`/`parquet`
+dependencies only exist when the feature is on, so a deployment that
+never needs it carries none of that weight. A build without the feature
+still *recognises* `format: "parquet"` as a valid token
+(`BulkFormat::parse` never depends on the feature) but
+`process_export_job` returns a clean `422` rather than a silent JSONL
+substitution — a caller must be told the capability is missing, not
+handed a different format it did not ask for.
+
+**Reuses §10.6's column set exactly** — the flattening declaration moved
+to a shared `src/bulk/columns.rs` module so CSV and Parquet render one
+column list rather than two that could drift. Per §5's "nested via
+Parquet nested types or JSON-encoded columns", this crate takes the
+JSON-encoded option (matching CSV's own choice): a `Scalar`/`Bool` column
+becomes a **nullable** Arrow `Utf8`/`Boolean` column (a real null for an
+absent field, not CSV's ambiguous empty string); a `Json` column (the
+arrays / arrays-of-objects) becomes a **non-nullable** `Utf8` column
+carrying the same compact JSON text CSV puts in its JSON-encoded cells.
+One `RecordBatch`, one row group, written via `parquet::arrow::ArrowWriter`.
+
+Verified by reading the encoded bytes back through `parquet`'s own Arrow
+reader (both a DB-free unit-test suite in `parquet_format.rs` and a
+DB-gated round-trip in `pipeline.rs`), asserting the row count, the
+scalar `name.family` value, the JSON-encoded `identifiers` cell, and a
+genuine Arrow null (not `""`) for an absent `tax_id`.
+
+**Known gap:** the family CI (`scripts/ci-check.sh`) runs `cargo
+test`/`cargo clippy` with this crate's *default* features, so the
+`parquet` feature is not exercised by the standard pipeline — only by
+running `cargo test --features parquet` / `cargo clippy --features
+parquet` locally, as this task's own verification did. Wiring a
+dedicated CI feature-matrix entry (mirroring how `cargo-fuzz`/`cargo
+deny` already get their own opt-in stage) is a reasonable follow-up but
+was judged out of scope for this (Small) task.

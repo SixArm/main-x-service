@@ -585,8 +585,35 @@
   Tantivy's default 40-byte token cutoff and was silently dropped at index
   time — a test-fixture bug, not a pipeline bug) + `clippy --all-targets -D
   warnings` clean + `cargo fmt --check` clean.
-- [ ] **BLK-3 (S)** Parquet **export** (feature-gated `parquet`;
+- [x] **BLK-3 (S)** Parquet **export** (feature-gated `parquet`;
   arrow/parquet deps only under the feature). Export-only per §12 lean.
+  *(done 2026-08-02)* `format: "parquet"` on `POST /api/persons/export`.
+  `BulkFormat::parse` recognises the token on every build (so a client's
+  request is always understood the same way); `BulkFormat::is_export_only`
+  refuses it for import at the handler regardless of build config; the
+  encoder itself lives behind a new `parquet` Cargo feature (off by
+  default, `arrow` + `parquet` 59.1.0, matched release line) — a binary
+  built without it returns a clean `422` on a `format: "parquet"` export
+  request rather than silently substituting JSONL. The person §10.6 CSV
+  column set moved into a new shared `src/bulk/columns.rs` so CSV and
+  Parquet render one declaration rather than two that could drift:
+  `Scalar`/`Bool` columns become nullable Arrow `Utf8`/`Boolean` (a real
+  null for an absent field, unlike CSV's ambiguous empty string); `Json`
+  columns (the arrays/arrays-of-objects) become non-nullable `Utf8`
+  carrying the same JSON text CSV puts in its cells. Also closed IEC
+  62304 §5.3.3 SOUP annotations for the three new direct dependencies
+  (`arrow`, `parquet`, and the dev-only `bytes` needed to read Parquet
+  bytes back in tests, since `parquet::file::reader::ChunkReader` has no
+  `std::io::Cursor` impl). *Verified:* `cargo build`/`test`/`clippy
+  --all-targets -D warnings`/`fmt --check` all run **twice** — default
+  features and `--features parquet` — plus a DB-gated Parquet export
+  round-trip against a real Postgres (reads the encoded bytes back
+  through `parquet`'s own Arrow reader). **Known gap, recorded rather
+  than silent:** `scripts/ci-check.sh`'s `test`/`clippy` stages build
+  this crate with its *default* features only, so the family CI does not
+  exercise the `parquet` feature — a follow-up (dedicated CI matrix
+  entry, mirroring how `cargo-fuzz`/`cargo-deny` already get their own
+  opt-in stage) is deferred as out of scope for this Small task.
 - [ ] **BLK-4 (M)** S3-compatible `ArtifactStore` impl (config-driven
   switch local-fs vs S3; mirror the env-var conventions). Feature-gate
   the S3 SDK dep if heavy.

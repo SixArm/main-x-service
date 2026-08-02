@@ -1,128 +1,24 @@
 //! CSV codec — the operator / spreadsheet format
 //! (`agents/share/bulk-import-export.md` §5).
 //!
-//! CSV is inherently flat, so the person wire type is flattened with the
-//! family-wide §5 convention:
+//! CSV is inherently flat, so the person wire type is flattened per the
+//! shared [`super::columns`] declaration (scalars → columns; the primary
+//! name → dotted columns; arrays / arrays-of-objects → a single
+//! JSON-encoded cell).
 //!
-//! - **scalar** fields → one column each (`id`, `active`, `gender`,
-//!   `birth_date`, `tax_id`, `deceased`, `deceased_datetime`,
-//!   `marital_status`, `multiple_birth`, `managing_organization`,
-//!   `created_at`, `updated_at`);
-//! - the primary **name** (a single nested object) → **dotted** columns
-//!   (`name.family` scalar; its `use_type` / `given` / `prefix` / `suffix`
-//!   parts follow the rule below);
-//! - every **array / array-of-objects** → a single **JSON-encoded cell**
-//!   (`name.given`, `name.prefix`, `name.suffix`, `identifiers`,
-//!   `additional_names`, `telecom`, `documents`, `emergency_contacts`,
-//!   `addresses`, `photo`, `links`).
-//!
-//! The exact column set is declared in the crate spec (§10). The codec
-//! round-trips **losslessly** against the JSONL reference: it flattens the
-//! person's Serde `Value` into cells and rebuilds the same `Value` on the
-//! way back, so `decode(encode(p)) == p`. Columns are matched **by header
-//! name**, so operator-reordered columns and extra columns are tolerated;
-//! a malformed row is a per-row `Err` (§7), never a whole-file abort.
+//! The codec round-trips **losslessly** against the JSONL reference: it
+//! flattens the person's Serde `Value` into cells and rebuilds the same
+//! `Value` on the way back, so `decode(encode(p)) == p`. Columns are
+//! matched **by header name**, so operator-reordered columns and extra
+//! columns are tolerated; a malformed row is a per-row `Err` (§7), never a
+//! whole-file abort.
 
 use serde_json::Value;
 
 use crate::models::Person;
 use crate::{Error, Result};
 
-/// How a column's cell is rendered on export and parsed on import.
-#[derive(Clone, Copy)]
-enum Kind {
-    /// A JSON scalar rendered **bare** (a string without quotes; empty cell
-    /// ⇒ the field is omitted, so `Option`/`default` fields fall back).
-    Scalar,
-    /// A boolean rendered `true` / `false`; empty cell ⇒ omitted (so
-    /// `active` defaults `true`, `deceased` `false`, `multiple_birth` `None`).
-    Bool,
-    /// A nested value rendered as a compact **JSON** cell (`[]` / `null` /
-    /// `[...]`); always emitted (never omitted), so a required array such as
-    /// `name.given` always round-trips.
-    Json,
-}
-
-/// One CSV column: its header, the path into the person wire `Value`, and
-/// its cell [`Kind`].
-struct Column {
-    header: &'static str,
-    path: &'static [&'static str],
-    kind: Kind,
-}
-
-/// The person CSV column set (spec §10). Order is the export column order;
-/// import matches by header name, so the order here is not load-bearing for
-/// reading.
-const COLUMNS: &[Column] = &[
-    col("id", &["id"], Kind::Scalar),
-    col("active", &["active"], Kind::Bool),
-    col("name.family", &["name", "family"], Kind::Scalar),
-    col("name.use_type", &["name", "use_type"], Kind::Scalar),
-    col("name.given", &["name", "given"], Kind::Json),
-    col("name.prefix", &["name", "prefix"], Kind::Json),
-    col("name.suffix", &["name", "suffix"], Kind::Json),
-    col("gender", &["gender"], Kind::Scalar),
-    col("birth_date", &["birth_date"], Kind::Scalar),
-    col("tax_id", &["tax_id"], Kind::Scalar),
-    col("deceased", &["deceased"], Kind::Bool),
-    col("deceased_datetime", &["deceased_datetime"], Kind::Scalar),
-    col("marital_status", &["marital_status"], Kind::Scalar),
-    col("multiple_birth", &["multiple_birth"], Kind::Bool),
-    col(
-        "managing_organization",
-        &["managing_organization"],
-        Kind::Scalar,
-    ),
-    col("created_at", &["created_at"], Kind::Scalar),
-    col("updated_at", &["updated_at"], Kind::Scalar),
-    col("identifiers", &["identifiers"], Kind::Json),
-    col("additional_names", &["additional_names"], Kind::Json),
-    col("telecom", &["telecom"], Kind::Json),
-    col("documents", &["documents"], Kind::Json),
-    col("emergency_contacts", &["emergency_contacts"], Kind::Json),
-    col("addresses", &["addresses"], Kind::Json),
-    col("photo", &["photo"], Kind::Json),
-    col("links", &["links"], Kind::Json),
-];
-
-/// `const`-fn column constructor (keeps [`COLUMNS`] readable).
-const fn col(header: &'static str, path: &'static [&'static str], kind: Kind) -> Column {
-    Column { header, path, kind }
-}
-
-/// The export header row, in [`COLUMNS`] order.
-#[must_use]
-pub fn header() -> Vec<&'static str> {
-    COLUMNS.iter().map(|c| c.header).collect()
-}
-
-/// Navigate `value` by `path`, returning [`Value::Null`] for any missing key.
-fn get<'a>(value: &'a Value, path: &[&str]) -> &'a Value {
-    let mut cur = value;
-    for key in path {
-        cur = cur.get(*key).unwrap_or(&Value::Null);
-    }
-    cur
-}
-
-/// Set `val` at `path` inside `map`, creating intermediate objects.
-fn set(map: &mut serde_json::Map<String, Value>, path: &[&str], val: Value) {
-    match path {
-        [key] => {
-            map.insert((*key).to_string(), val);
-        }
-        [key, rest @ ..] => {
-            let entry = map
-                .entry((*key).to_string())
-                .or_insert_with(|| Value::Object(serde_json::Map::new()));
-            if let Value::Object(obj) = entry {
-                set(obj, rest, val);
-            }
-        }
-        [] => {}
-    }
-}
+use super::columns::{COLUMNS, Kind, get, header, set};
 
 /// Render one field `Value` to its cell text for the given [`Kind`].
 fn render(value: &Value, kind: Kind) -> String {
@@ -453,14 +349,5 @@ mod tests {
         let rows = decode(no_id_col.as_bytes()).unwrap();
         assert!(!rows[0].0, "missing id column ⇒ no explicit id");
         assert!(rows[0].1.is_ok());
-    }
-
-    #[test]
-    fn header_lists_the_declared_columns() {
-        let h = header();
-        assert_eq!(h.first(), Some(&"id"));
-        assert!(h.contains(&"name.family"));
-        assert!(h.contains(&"identifiers"));
-        assert!(h.contains(&"links"));
     }
 }

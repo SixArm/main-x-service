@@ -23,7 +23,7 @@ pub use bulk_jobs::Model;
 pub struct NewBulkJob {
     /// Import or export.
     pub kind: BulkKind,
-    /// File format (`jsonl` or `csv`).
+    /// File format (`jsonl`, `csv`, or `parquet` — export-only).
     pub format: BulkFormat,
     /// Free-form parameters (dry-run flag, export filter, …).
     pub params: serde_json::Value,
