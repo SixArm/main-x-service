@@ -47,7 +47,7 @@ matcher payload (only goal **titles** bridge in) — which are
 
 | Question | Answer |
 |---|---|
-| Framework | loco.rs 0.16 (`Hooks`/`AppContext`/CLI, loco config, `sea-orm-migration`). |
+| Framework | loco.rs 1.0.1 (`Hooks`/`AppContext`/CLI, loco config, `sea-orm-migration` 2.0). |
 | Build / test | `cargo build` · `cargo test` (DB-free) · `cargo test -- --ignored` (request tests, need Postgres). |
 | Run | `cargo loco start` (needs Postgres). |
 | Persistence | One `plans` table (`pid`, nullable `kind`, `name`, `data` JSONB `Plan`, `parent_pid`, `active`, soft-delete); + `audit_logs` + `merge_records`. Sub-resource tables + `entity_links` deferred (spec §13). |

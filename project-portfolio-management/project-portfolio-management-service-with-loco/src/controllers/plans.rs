@@ -66,7 +66,7 @@ pub fn validate(wi: &Plan) -> Result<()> {
     }
     Err(Error::CustomError(
         StatusCode::UNPROCESSABLE_ENTITY,
-        ErrorDetail::new("validation", &problems.join("; ")),
+        ErrorDetail::new("validation", problems.join("; ")),
     ))
 }
 
@@ -202,7 +202,7 @@ impl Page {
                 StatusCode::BAD_REQUEST,
                 ErrorDetail::new(
                     "offset_too_large",
-                    &format!("offset must not exceed {MAX_OFFSET}; narrow the query instead"),
+                    format!("offset must not exceed {MAX_OFFSET}; narrow the query instead"),
                 ),
             ));
         }

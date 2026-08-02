@@ -8,6 +8,31 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration → 2.0,
+  sea-query → 1.0. No raw-`Statement` or `ExprTrait` fallout in this
+  crate — it has neither.
+- **loco's `ColType::PkAuto` now generates a 64-bit primary key.** 16
+  entities move from `i32` to `i64`: `plans`, `audit_logs`,
+  `merge_records`, and the governance/visibility/strategy phase tables
+  (`proposals`, `gate_reviews`, `risks`, `budget_lines`,
+  `plan_dependencies`, `milestones`, `allocations`,
+  `report_definitions`, `ideas`, `scenarios`, `objectives`,
+  `objective_links`, `benefits`) — plus the audit code that carries a
+  row id (`compliance/audit_integrity.rs`'s `mismatched: Vec<i64>`, the
+  `record_integrity.rs` test fixture). The 11 tables whose migrations
+  write raw SQL (`id SERIAL PRIMARY KEY`) instead of the loco schema DSL
+  — `event_outbox`, `insight_snapshots`, `reviews`, `automations`,
+  `automation_runs`, `scheduled_actions`, `notifications`, `sprints`,
+  `tasks`, `sprint_notes`, `devops_events` — stay `i32`.
+- Also fixed three pre-existing `needless_borrows_for_generic_args`
+  clippy findings unrelated to the width change but surfaced by the
+  same `cargo clippy` run (`controllers/mod.rs`, `controllers/oversight.rs`
+  passing `&reason` where `ErrorDetail::new` now takes it by value).
+- No behavioural change; verified with the full DB-gated suite (38
+  tests, unchanged count) against a freshly migrated Postgres 18.
+
 ### Added — pagination on the plan collection reads (2026-08-01)
 
 - **`GET /api/plans` and `GET /api/plans/search` take `?limit=` and

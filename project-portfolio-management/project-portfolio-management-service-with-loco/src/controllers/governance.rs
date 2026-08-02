@@ -27,7 +27,7 @@ use crate::validation::MAX_TEXT_LEN;
 fn unprocessable(problems: &[String]) -> Error {
     Error::CustomError(
         StatusCode::UNPROCESSABLE_ENTITY,
-        ErrorDetail::new("validation", &problems.join("; ")),
+        ErrorDetail::new("validation", problems.join("; ")),
     )
 }
 

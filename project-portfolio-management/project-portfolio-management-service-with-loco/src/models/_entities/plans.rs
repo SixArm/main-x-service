@@ -19,7 +19,7 @@ pub struct Model {
     pub updated_at: DateTimeWithTimeZone,
     /// Internal auto-increment primary key.
     #[sea_orm(primary_key)]
-    pub id: i32,
+    pub id: i64,
     /// Public, externally exposed identifier (UUID v4).
     #[sea_orm(unique)]
     pub pid: Uuid,

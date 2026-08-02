@@ -920,7 +920,7 @@ async fn regulator_extract(
         .map_err(|(status, reason)| {
         Error::CustomError(
             status,
-            loco_rs::controller::ErrorDetail::new("forbidden", &reason),
+            loco_rs::controller::ErrorDetail::new("forbidden", reason),
         )
     })?;
     let masked = obligations.iter().any(|o| o == "mask");

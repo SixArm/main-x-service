@@ -38,7 +38,7 @@ pub fn record_rejection((status, reason): (axum::http::StatusCode, String)) -> l
     } else {
         "unauthorized"
     };
-    loco_rs::Error::CustomError(status, loco_rs::controller::ErrorDetail::new(code, &reason))
+    loco_rs::Error::CustomError(status, loco_rs::controller::ErrorDetail::new(code, reason))
 }
 
 /// Weak `ETag` over a serializable view (everything except `as_of`).

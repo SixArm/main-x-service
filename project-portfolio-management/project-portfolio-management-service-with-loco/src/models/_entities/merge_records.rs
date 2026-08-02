@@ -15,7 +15,7 @@ pub struct Model {
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
     #[sea_orm(primary_key)]
-    pub id: i32,
+    pub id: i64,
     pub main_pid: Uuid,
     pub duplicate_pid: Uuid,
     pub reason: Option<String>,
