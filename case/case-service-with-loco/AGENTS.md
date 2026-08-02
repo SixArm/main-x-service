@@ -28,7 +28,9 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | POST | `/api/cases` | Create (body: `Case`; blank `title` → `422`) → `{pid, title}` |
 | GET | `/api/cases` | List active (capped 100) |
 | GET | `/api/cases/search?q=` | Tantivy full-text search (`?fuzzy=true`, `?phonetic=true`) |
-| GET | `/api/cases/{pid}` | Fetch the stored `Case` |
+| GET | `/api/cases/{pid}` | Fetch the stored `Case` (record-level ABAC; a `mask`-obligation allow returns the redacted view) |
+| GET | `/api/cases/{pid}/masked` | The masked view: `subjects` / `identifiers` / `same_as` / `case_number` redacted |
+| GET | `/api/cases/{pid}/export` | GDPR right-of-access export (audited; masked when the policy says so) |
 | PUT | `/api/cases/{pid}` | Replace payload |
 | DELETE | `/api/cases/{pid}` | Soft-delete |
 | POST | `/api/cases/match` | Rank a `{query, candidates}` set |
@@ -46,7 +48,7 @@ Plus loco's default `/_health`, `/_ping`. Every CRUD action writes an
 
 ## MVP scope
 
-CRUD + `ILIKE` title search + matching, with payload validation (blank
+CRUD + Tantivy full-text/fuzzy/phonetic search + matching, with payload validation (blank
 title, ISO-8601 `opened_date`, non-blank identifier values / subjects /
 keywords; `src/validation.rs`), OpenAPI 3 + Swagger UI (`src/openapi.rs`,
 `controllers/docs.rs`), an audit log + in-memory event stream on every
@@ -66,8 +68,15 @@ The durable event bus's Phase-2 transactional outbox + relay landed
 implemented, default-off via `CASE_REQUIRE_AUTH` (activation is a
 deployment decision). **Tantivy full-text/fuzzy/phonetic search**
 (`src/search/`) replaces the `ILIKE` title search and backs
-search-blocked `check-duplicates` candidates (spec §13 T-6). Deferred
-(spec §13): the durable bus's Phase-3 Fluvio broker sink, privacy,
+search-blocked `check-duplicates` candidates (spec §13 T-6). **Privacy**
+was already partial here — `mask_case` (in `controllers/cases.rs`) has
+redacted `subjects` / `identifiers` / `same_as` / `case_number` since
+the ABAC work landed, wired to the `mask` obligation on `GET /{pid}`.
+What was missing — the always-masked `GET /{pid}/masked` view and the
+audited `GET /{pid}/export` GDPR envelope — landed too (spec §13,
+2026-08-02), reusing the existing `disclosure::action::EXPORT`
+machinery for the export's HIPAA §164.528 accounting. Deferred
+(spec §13): the durable bus's Phase-3 Fluvio broker sink,
 front-end merge action.
 
 > **Auth pivot done here.** The family moved from RS256 JWT + JWKS to

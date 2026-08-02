@@ -8,6 +8,47 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — Privacy: masked view + GDPR export (2026-08-02)
+
+Repo tasks.md P-3. Narrower than P-1 (organization) and P-2
+(care-pathway): case already honoured the ABAC `mask` **obligation** on
+`GET /{pid}` via `mask_case`, landed earlier with the record-level ABAC
+work. What was missing was the always-redacted view and the export
+envelope.
+
+- `GET /api/cases/{pid}/masked` — the always-masked view (`mask_case`),
+  regardless of the caller's policy.
+- `GET /api/cases/{pid}/export` — the GDPR right-of-access envelope
+  (`export_case`, new, beside `mask_case` in `controllers/cases.rs`):
+  `{entity, pid, exported_at, masked, record, note}`. Masked when the
+  record-level ABAC decision carries the `mask` obligation.
+- The export is audited via `disclosure::action::EXPORT` — a constant
+  already declared in `disclosure.rs`'s action vocabulary (and covered
+  by its distinctness test) but never wired to a live code path until
+  now.
+- Kept `mask_case`/`export_case` in `controllers/cases.rs` rather than
+  extracting a `src/privacy.rs` module — matching how masking was
+  already organised in this crate, unlike organization/care-pathway
+  which each own a dedicated module. Family capability matrix
+  (`agents/share/overview.md`) already reflected this correctly (case's
+  "Privacy masking module" cell was `–` before and after; its
+  "Record-level ABAC + masking obligations" cell was already `✅`).
+- The end-to-end obligation proof (`tests/export_masking.rs`) needed
+  its own test binary, separate from the pre-existing `tests/masking.rs`
+  (the SEC-G2/G3 concealment proof): both set the process-wide
+  `policy()` / `require_auth()` / `compliance::audit_reads()`
+  `OnceLock`s, and adding the new test to the existing file let
+  whichever test's app-boot ran first silently win the policy for both —
+  the second test's env-var changes had no effect, and it failed for a
+  reason that looked unrelated to the real cause. Discovered by running
+  the DB-gated suite, not by inspection.
+- DB-gated: `tests/export_masking.rs` (new) + 2 new tests in
+  `tests/requests/cases.rs` (`masked_view_and_export_are_served`,
+  `masked_view_and_export_are_404_for_unknown_pid`).
+- No SOUP register change (no new dependency).
+- Fixed stale spec/AGENTS prose still describing the title search as
+  Postgres `ILIKE` in a couple of places missed by S-3.
+
 ### Added — Tantivy full-text/fuzzy/phonetic search (2026-08-02)
 
 Repo tasks.md S-3: transfers the care-pathway/organization Tantivy

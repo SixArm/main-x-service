@@ -15,9 +15,11 @@ case-matcher. Built on loco.rs.
 ## 2. Scope
 
 MVP: CRUD + Tantivy full-text/fuzzy/phonetic search + matching, with
-validation, OpenAPI, audit, in-memory streaming, record merge, and
+validation, OpenAPI, audit, in-memory streaming, record merge,
+field masking + audited GDPR export wired to the ABAC `mask` obligation
+(§13 2026-08-02), and
 offline PASETO v4 public token verification (Ed25519, via the
-auth-service's published key). Deferred (§13): privacy, gRPC.
+auth-service's published key). Deferred (§13): gRPC.
 Authentication issuance is out of scope here — provided by the
 central authentication-service; this service only verifies. Auth model
 source of truth: [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
@@ -68,7 +70,10 @@ PascalCase strings; `Custom` as `{"Custom":"label"}`.
    alternate titles, agency name, identifiers, keywords, and subjects
    (`?fuzzy=true` for typo tolerance, `?phonetic=true` for Soundex; blank
    `q` → `400`; an unavailable index → `503`).
-3. `GET /api/cases/{pid}` — return the stored `Case`.
+3. `GET /api/cases/{pid}` — return the stored `Case`, unless the
+   record-level ABAC decision carries the **`mask` obligation**
+   (`mask_case`, §9), in which case the masked view (§6.13) is
+   returned instead.
 4. `PUT /api/cases/{pid}` — replace the payload (`422` on any validation
    problem).
 5. `DELETE /api/cases/{pid}` — soft-delete.
@@ -106,6 +111,24 @@ PascalCase strings; `Custom` as `{"Custom":"label"}`.
    counter vec (`method`/`path`/`status`). Registry + render live in
    [`src/metrics.rs`](../src/metrics.rs); the handler is
    [`controllers/metrics.rs`](../src/controllers/metrics.rs).
+13. `GET /api/cases/{pid}/masked` — the **masked view**: `subjects`,
+    `identifiers`, `same_as`, and `case_number` redacted (`mask_case`,
+    §9); the descriptive shell (`title`, `case_type`, `status`, …)
+    untouched. Regardless of the caller's policy — distinct from the
+    `mask` obligation on `GET /{pid}` (§6.3), which is the deployment
+    deciding what a caller may see; this is a caller *asking* for the
+    redacted form. `404` for an unknown `pid`.
+14. `GET /api/cases/{pid}/export` — **GDPR right-of-access** export: an
+    envelope of `{entity, pid, exported_at, masked, record, note}`.
+    **Every export is audited** via the existing
+    `disclosure::action::EXPORT` (HIPAA §164.528), the same accounting
+    `GET /{pid}` feeds — extracting a case is itself a compliance event
+    whether or not it is masked. A caller whose record-level ABAC
+    decision carries the `mask` obligation gets the redacted record and
+    `masked: true` — an access request answered with redactions must
+    never look like a complete answer. `404` for an unknown `pid`; `503`
+    when the export could not be recorded on the audit trail
+    (`CASE_AUDIT_FAIL_CLOSED`).
 
 ## 7. Non-functional requirements
 
@@ -533,6 +556,29 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
+- [x] **2026-08-02 — Privacy: masked view + GDPR export (repo tasks.md
+  P-3).** Case already honoured the `mask` **obligation** on
+  `GET /{pid}` (`mask_case`, landed with the ABAC work — §9); this task
+  was narrower than P-1/P-2 by design, adding only what was missing:
+  `GET /{pid}/masked` (§6.13, always-redacted, no policy needed) and
+  `GET /{pid}/export` (§6.14, the GDPR right-of-access envelope). The
+  export reuses the existing `disclosure::action::EXPORT` — already
+  declared in `disclosure.rs`'s action vocabulary, unused until now — for
+  its §164.528 accounting, the same machinery `GET /{pid}` already used
+  for reads. `export_case` lives beside `mask_case` in
+  `controllers/cases.rs` rather than a new `src/privacy.rs` module,
+  matching how masking was already organised in this crate (unlike
+  organization/care-pathway, which each own a dedicated module).
+  The end-to-end obligation proof needed its **own test binary**
+  (`tests/export_masking.rs`), separate from the pre-existing
+  `tests/masking.rs` (the SEC-G2/G3 concealment proof) — both set
+  process-wide `policy()`/`require_auth()`/`compliance::audit_reads()`
+  `OnceLock`s, and sharing one binary let the second test's boot silently
+  win the race and starve the first of its own policy, so both files
+  must stay separate to keep either one meaningful.
+  *Verified:* 34 DB-gated request-suite + 2 dedicated masking/export
+  binaries (1 each) + 2 enforcement + 1 outbox-audit green vs Postgres
+  18; 193 lib tests; fmt + clippy clean.
 - [x] **T-6 (Tantivy full-text/fuzzy/phonetic search — S-3).** Transfers
   the care-pathway/organization Tantivy pattern (repo tasks.md S-1/S-2):
   `src/search/index.rs` (`CaseIndexSchema`/`CaseIndex` — `pid` STORED;
@@ -590,9 +636,8 @@ the other v1 edge kinds even though it shares the same edge shape.
   `svc`/`admin`) and writes a `links_bulk_read` audit row. DB-gated
   `bulk_links_requires_elevated_authority` (401/403/200). (Repo tasks.md
   Phase 5 SEC-G1.)
-- [x] Title search — `GET /search?q=` Postgres `ILIKE` on the
-  denormalised `title` (cap 50, wildcards escaped). Tantivy full-text /
-  fuzzy search over the JSONB payload remains deferred.
+- [x] Title search — `GET /search?q=` Tantivy full-text/fuzzy/phonetic
+  search (§13 T-6, 2026-08-02), replacing the earlier Postgres `ILIKE`.
 - [x] Event streaming + audit log on CRUD — `audit_logs` table +
   best-effort row per create/update/delete (`models/audit_logs.rs`);
   in-memory event stream (`streaming.rs`); read at `/audit/recent`,
@@ -869,7 +914,9 @@ Done: loco boot; cases table + migration; CRUD with `422` validation on
 create/update (blank `title`, `opened_date` format, non-blank
 identifier / subject / keyword, all problems reported together);
 Tantivy full-text/fuzzy/phonetic search; `/match`, `/check-duplicates`, and `/merge`
-(record merge + history) embedding case-matcher; audit log + in-memory
+(record merge + history) embedding case-matcher; field masking
+(`mask_case`) + the masked view + audited GDPR export, wired to the ABAC
+`mask` obligation; audit log + in-memory
 event streaming on every CRUD/merge (`/audit/recent`, `/{pid}/audit`,
 `/events/recent`, `/merges/recent`); offline PASETO v4 public token
 verification (`AuthUser`/`MaybeAuthUser`, `/whoami`, audit `actor` from
@@ -889,8 +936,10 @@ v0.1 (here): CRUD + title search + matching + merge + audit + streaming
 (source of truth; supersedes the RS256-JWT model) + boot-time
 paseto-keys-over-HTTP fetch (`CASE_PASETO_KEYS_URL`, fetched key set wins,
 env fallback). v0.2: Tantivy full-text/fuzzy/phonetic search + durable
-event bus Phases 1–2 — **done**. v0.3: privacy controls, blanket
-`/api/*` enforcement, durable bus Phase 3 (Fluvio relay).
+event bus Phases 1–2 — **done**. v0.3: privacy controls (masking + GDPR
+export — done 2026-08-02) + blanket
+`/api/*` enforcement — **done**; durable bus Phase 3 (Fluvio relay)
+remains.
 
 ## 16. Open questions
 

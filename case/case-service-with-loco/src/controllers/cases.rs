@@ -372,6 +372,103 @@ async fn get_one(
     }
 }
 
+/// The masked view of a case.
+///
+/// `GET /api/cases/{pid}/masked`. Returns `200` with the record redacted
+/// per [`mask_case`] — involved-party `subjects`, external
+/// `identifiers`, `same_as` URLs, and the agency `case_number` —
+/// regardless of the caller's policy. `404` for an unknown pid.
+///
+/// Distinct from the `mask` obligation on `GET /{pid}`: that one is the
+/// deployment deciding what a caller may see, while this endpoint is a
+/// caller *asking* for the redacted form (a screen share, a support
+/// call, an export preview).
+#[debug_handler]
+async fn get_masked(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
+    let model = CaseModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(super::model_not_found)?;
+    format::json(mask_case(&model.to_case()?))
+}
+
+/// Build the GDPR right-of-access payload for one case.
+///
+/// An **envelope**, not the bare record: an access request has to be
+/// answerable as "here is everything held about this subject, as of
+/// then", so the response states what was exported, when, and whether
+/// any of it was redacted. `masked` is the honest part — a masked
+/// export is a *partial* answer, and the caller must be able to tell
+/// which they received.
+fn export_case(case: &Case, pid: &str, masked: bool) -> serde_json::Value {
+    let record = if masked {
+        mask_case(case)
+    } else {
+        case.clone()
+    };
+    serde_json::json!({
+        "entity": "case",
+        "pid": pid,
+        "exported_at": chrono::Utc::now().to_rfc3339(),
+        "masked": masked,
+        "record": serde_json::to_value(&record).unwrap_or(serde_json::Value::Null),
+        "note": if masked {
+            "Partial export: subjects, identifiers, same_as, and case_number are \
+             redacted for this caller."
+        } else {
+            "Complete export of the stored case record."
+        },
+    })
+}
+
+/// GDPR right-of-access export for one case.
+///
+/// `GET /api/cases/{pid}/export`. Returns `200` with the envelope from
+/// [`export_case`]; `404` for an unknown pid.
+///
+/// **Every export is audited** as a disclosure (HIPAA §164.528), the
+/// same accounting `GET /{pid}` feeds — extracting a case record is
+/// itself a compliance event whether or not it is masked.
+///
+/// A caller the policy would mask gets a **masked** export, and the
+/// envelope says so — an access request answered with redactions must
+/// not look like a complete answer.
+///
+/// # Errors
+///
+/// `404` when no active case has that `pid`; `403` when the
+/// record-level ABAC policy denies reading this specific case;
+/// otherwise DB/parse errors, or a `503` when the export could not be
+/// recorded on the audit trail.
+#[debug_handler]
+async fn get_export(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
+) -> Result<Response> {
+    let model = CaseModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(super::model_not_found)?;
+    let case = model.to_case()?;
+    let obligations = crate::auth::authorize_record(
+        &caller,
+        Action::Read,
+        &crate::auth::case_resource_attrs(&case),
+    )
+    .map_err(record_rejection)?;
+    let masked = obligations.iter().any(|o| o == "mask");
+    disclosure::record_access(
+        &ctx.db,
+        model.pid,
+        disclosure::action::EXPORT,
+        caller.actor(),
+        &access,
+    )
+    .await
+    .map_err(audit_unavailable)?;
+    format::json(export_case(&case, &model.pid.to_string(), masked))
+}
+
 /// Replace a case's payload. `PUT /api/cases/{pid}`.
 ///
 /// Request body: a full `case_matcher::Case`. Validates it, replaces the
@@ -1088,6 +1185,8 @@ pub fn routes() -> Routes {
         .add("/{pid}", get(get_one))
         .add("/{pid}", put(update))
         .add("/{pid}", delete(remove))
+        .add("/{pid}/masked", get(get_masked))
+        .add("/{pid}/export", get(get_export))
         .add("/{pid}/audit", get(entity_audit))
         .add("/{pid}/audit/disclosures", get(entity_disclosures))
         .add("/{pid}/erase", post(erase))

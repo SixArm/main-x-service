@@ -1076,3 +1076,68 @@ async fn check_duplicates_blocks_on_identifier_alone() {
     })
     .await;
 }
+
+/// The always-masked view redacts the involved-party fields regardless
+/// of caller (enforcement is off in this suite, so no ABAC decision is
+/// in play); the descriptive shell — title — is untouched. The export
+/// envelope wraps the same content and declares `masked: false` when
+/// enforcement is off, since there is no obligation to honour.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn masked_view_and_export_are_served() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created: Value = request
+            .post("/api/cases")
+            .json(&housing_case())
+            .await
+            .json();
+        let pid = created["pid"].as_str().unwrap().to_string();
+
+        let masked: Value = request
+            .get(&format!("/api/cases/{pid}/masked"))
+            .await
+            .json();
+        assert_eq!(masked["title"], "Housing benefit appeal");
+        assert!(masked["subjects"].as_array().unwrap().is_empty());
+        assert!(masked["case_number"].is_null());
+
+        let export: Value = request
+            .get(&format!("/api/cases/{pid}/export"))
+            .await
+            .json();
+        assert_eq!(export["entity"], "case");
+        assert_eq!(export["pid"], pid);
+        assert_eq!(export["masked"], false, "no ABAC decision, no obligation");
+        assert_eq!(export["record"]["case_number"], "HB-2024-0007");
+    })
+    .await;
+}
+
+/// `GET /{pid}/masked` and `/export` are `404` for an unknown pid, same
+/// as the ordinary `GET /{pid}`.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn masked_view_and_export_are_404_for_unknown_pid() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let pid = "00000000-0000-4000-8000-000000000000";
+        assert_eq!(
+            request
+                .get(&format!("/api/cases/{pid}/masked"))
+                .await
+                .status_code(),
+            404
+        );
+        assert_eq!(
+            request
+                .get(&format!("/api/cases/{pid}/export"))
+                .await
+                .status_code(),
+            404
+        );
+    })
+    .await;
+}

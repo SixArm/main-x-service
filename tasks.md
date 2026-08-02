@@ -251,9 +251,37 @@
   *Verified:* 48 DB-gated (46 request-suite + 2 dedicated
   `tests/masking.rs`) + 1 enforcement + 1 outbox-audit green vs
   Postgres 18; 246 lib tests; fmt + clippy clean.
-- [ ] **P-3 (M)** Privacy in **case** — it already honours the `mask`
+- [x] **P-3 (M)** Privacy in **case** — it already honours the `mask`
   obligation; add the masked-view + GDPR-export endpoints on top of the
-  existing `mask_case`. Depends: P-1.
+  existing `mask_case`. Depends: P-1. *(done 2026-08-02)*
+
+  The smallest of the three privacy tasks, by design — case had already
+  done the harder part (`mask_case` + the ABAC `mask` obligation on
+  `GET /{pid}`) when the record-level ABAC work landed earlier. Added
+  `GET /{pid}/masked` and `GET /{pid}/export` (`export_case`, new,
+  living beside `mask_case` in `controllers/cases.rs` rather than a
+  separate `src/privacy.rs` module — matching how this crate already
+  organised masking, unlike organization/care-pathway). The export
+  finally wires up `disclosure::action::EXPORT`, an action constant
+  that had sat declared-but-unused in `disclosure.rs`'s vocabulary
+  (covered only by a distinctness test) since case's HIPAA §164.528
+  read-auditing work.
+
+  Real finding: the DB-gated obligation test could not share a binary
+  with the pre-existing `tests/masking.rs` (the SEC-G2/G3 concealment
+  proof). Both set the process-wide `policy()`/`require_auth()`/
+  `compliance::audit_reads()` `OnceLock`s before booting the app; adding
+  the new test to the existing file let whichever one's boot ran first
+  silently win the policy for the whole process, so the second test's
+  own env-var changes had no effect and it failed with a symptom (an
+  export audit count of zero) that read as unrelated to the real cause.
+  Moved to its own `tests/export_masking.rs` — the fix organization's
+  and care-pathway's own `tests/masking.rs` comments already warned
+  about, learned here the hard way instead of by re-reading them closely
+  enough the first time.
+  *Verified:* 34 DB-gated request-suite + 2 dedicated masking/export
+  binaries + 2 enforcement + 1 outbox-audit green vs Postgres 18; 193
+  lib tests; fmt + clippy clean.
 - [ ] **P-4 (M)** Privacy in **portfolio** (lower sensitivity; masking of
   owner/person refs). Depends: P-1.
 
