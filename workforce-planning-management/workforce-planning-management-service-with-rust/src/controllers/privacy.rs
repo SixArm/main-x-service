@@ -255,7 +255,7 @@ async fn retention_report(State(ctx): State<AppContext>) -> Result<Response> {
     for table in rules::SOFT_DELETED_TABLES {
         let count = ctx
             .db
-            .query_one(sea_orm::Statement::from_string(
+            .query_one_raw(sea_orm::Statement::from_string(
                 sea_orm::DatabaseBackend::Postgres,
                 format!(
                     "SELECT COUNT(*) AS n FROM {table} \

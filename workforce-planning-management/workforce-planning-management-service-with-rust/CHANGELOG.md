@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration →
+  2.0, sea-query → 1.0. No feature-list changes (default feature set).
+- **One raw `Statement` call site** in `src/controllers/privacy.rs`
+  (the retention report's per-table soft-delete count) moves to
+  `query_one_raw`.
+- **`ColType::PkAuto` now generates a 64-bit primary key.** Of this
+  crate's ~50 tables, exactly one (`audit_logs`) goes through loco's
+  schema DSL and moves from `i32` to `i64`; every other table —
+  employees, the acquisition/workforce/development/payroll/talent/
+  wellbeing/pulse/notifications/learning/ergonomics/adjustments
+  domains, and `event_outbox` — is created with raw SQL and stays
+  `i32`, unaffected.
+- A `useless_conversion` in `src/models/event_outbox.rs` and a
+  pre-existing `needless_borrows_for_generic_args` in
+  `src/controllers/mod.rs`, both surfaced by the same clippy run.
+- No behavioural change; verified with the full DB-gated suite (20
+  tests, unchanged count) against a freshly migrated Postgres 18.
+
 ### Added — reasonable adjustments (WPM-T36 / WPM-R33, 2026-07-25)
 
 - Neurodiversity-inclusive adjustment requests (new WPM-D25): the
