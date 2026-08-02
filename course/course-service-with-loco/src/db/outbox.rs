@@ -227,7 +227,7 @@ impl Model {
         let res = course_outbox::Entity::update_many()
             .col_expr(
                 course_outbox::Column::PublishedAt,
-                Expr::current_timestamp().into(),
+                Expr::current_timestamp(),
             )
             .filter(course_outbox::Column::Id.is_in(ids.iter().copied()))
             .exec(db)

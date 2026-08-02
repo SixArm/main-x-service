@@ -8,6 +8,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec.md](./spec/index.md) — single source of truth (numbered §1–§18; live work queue in §13); [README.md](./README.md) — user-facing intro; [AGENTS.md](./AGENTS.md) — agent guide.
 
 ## [Unreleased]
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration → 2.0,
+  sea-query → 1.0. This is the family's first "person-style" crate to
+  migrate (explicit `default-features = false` feature list rather than
+  the loco-style default set), so it's the first to hit the feature
+  renames: `auth_jwt` → `auth`, `bg_pg` → `worker`. The renamed features
+  gate exactly what they did before (the unused `bgworker::Queue`
+  scaffold in `src/app.rs` still compiles); no code depended on the old
+  names beyond the `Cargo.toml` feature list itself.
+- A `useless_conversion` in `src/db/outbox.rs` from a now-redundant
+  `.into()` after `Expr::current_timestamp()`.
+- No PK-width fallout: this crate's tables don't use loco's
+  `ColType::PkAuto` schema-DSL helper (the outbox already keys on
+  `i64`), so the 64-bit-primary-key change that touched every
+  loco-style crate in this migration doesn't apply here.
+- No behavioural change; verified with the full DB-gated suite (15
+  tests, unchanged count) against a freshly migrated Postgres 18.
+
 ### Added — key rotation and policy hot-reload without a restart (2026-08-01)
 
 AU-2, the loco-style half of the rollout (case was the reference; the

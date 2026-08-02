@@ -29,7 +29,7 @@ tokio = { version = "1.53", features = ["full"] }
 
 # Loco framework (backend-only; the service boots through loco's
 # Hooks/AppContext/CLI and mounts its REST router via after_routes).
-loco-rs = { version = "0.16", default-features = false, features = ["auth_jwt", "cli", "with-db", "cache_inmem", "bg_pg"] }
+loco-rs = { version = "1.0.1", default-features = false, features = ["auth", "cli", "with-db", "cache_inmem", "worker"] }
 migration = { path = "migration" }
 
 # Web framework (axum 0.8 to match loco 0.16)
@@ -42,7 +42,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 # Database
-sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-uuid", "with-json"] }
+sea-orm = { version = "2.0", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-uuid", "with-json"] }
 
 # Search
 tantivy = "0.22"
