@@ -41,7 +41,7 @@ identity, no profile store. See the cross-cutting spec's
    (`src/controllers/`), `#![forbid(unsafe_code)]`, thiserror,
    tracing + OTLP, OpenAPI/Swagger, header API versioning
    (`Accepts-version`), Podman not Docker, PostgreSQL not SQLite,
-   `bg_pg` jobs, in-memory loco cache. See
+   `worker` (Postgres-backed) jobs, in-memory loco cache. See
    [rust-loco-stack](../../agents/share/rust-loco-stack.md).
 3. **Pure core.** Both lifecycle machines (editorial, translation),
    block validation + sanitization, schema compatibility

@@ -44,10 +44,10 @@ representative service manifests
 |---|---|---|
 | Language | Rust 1.93+/1.95+, 2024 edition | Systems performance + memory safety |
 | Async runtime | Tokio | Async I/O and concurrency (NOT async_std) |
-| Web framework | Axum 0.8 + Loco.rs 0.16 | HTTP server, routing, config/hooks/CLI (backend-only) |
+| Web framework | Axum 0.8 + Loco.rs 1.0 | HTTP server, routing, config/hooks/CLI (backend-only) |
 | HTTP layer | hyper, tower, tower-http | CORS, compression, tracing middleware |
 | Database | PostgreSQL 18+ | Persistence (NOT SQLite) |
-| ORM / migrations | SeaORM 1.1 + sea-orm-migration | Async ORM; schema migrations |
+| ORM / migrations | SeaORM 2.0 + sea-orm-migration | Async ORM; schema migrations |
 | Search | Tantivy 0.22 | Embedded full-text search (target; several services still ILIKE) |
 | API docs | Utoipa 5 + utoipa-swagger-ui 9 (or hand-written OpenAPI) | OpenAPI 3.0 spec + Swagger UI |
 | Serialization | Serde + serde_json | JSON request/response |
@@ -93,8 +93,8 @@ ecosystem fragmentation across the ten entity slices.
 | MiMalloc | jemalloc | Faster MUSL static builds |
 | PostgreSQL | SQLite | One production database; SeaORM Postgres feature only |
 | chrono | jiff | One date/time crate (sea-orm has no `with-jiff`) |
-| sea-orm `with-chrono` / `with-time` | sea-orm `with-jiff` | `with-jiff` does not exist in sea-orm 1.1 |
-| Postgres-backed background jobs (`bg_pg`) | SQLite (`bg_sqlt`) / external broker | No extra infra dependency for the job queue |
+| sea-orm `with-chrono` / `with-time` | sea-orm `with-jiff` | `with-jiff` does not exist in sea-orm 2.0 |
+| Postgres-backed background jobs (loco `worker` feature, `queue.kind: Postgres`) | SQLite `queue.kind` / external broker | No extra infra dependency for the job queue |
 
 Loco background-job config (target):
 
@@ -199,10 +199,10 @@ coexist. Read a crate's `Cargo.toml` to know which one you are in.
 
 Examples: `organization-service`, `care-pathway-service`,
 `case-service`, `authentication-service`. Thin manifests that lean on
-`loco-rs` 0.16 to pull the web/runtime/CLI surface.
+`loco-rs` 1.0 to pull the web/runtime/CLI surface.
 
 Pulls in: `loco-rs` (Hooks / AppContext / CLI / loco config),
-`axum` 0.8, `sea-orm` 1.1 + `migration` (sea-orm-migration), `serde`,
+`axum` 0.8, `sea-orm` 2.0 + `migration` (sea-orm-migration), `serde`,
 `tokio` (minimal `rt-multi-thread`), `validator`, `uuid`, `mimalloc`,
 the sibling `*-matcher` crate (reused as the API DTO),
 `authentication-verifier`. Dev-deps add `rstest`, `insta`,
@@ -240,9 +240,9 @@ external contract (REST + OpenAPI + the matcher DTO).
 |---|---|
 | Rust edition (target) | 2024 |
 | MSRV | Rust 1.93+ (READMEs); 1.95+ stated in `rust-loco-stack.md` |
-| Loco.rs | 0.16 |
+| Loco.rs | 1.0 |
 | Axum | 0.8 |
-| SeaORM | 1.1 |
+| SeaORM | 2.0 |
 | PostgreSQL | 18+ |
 | Svelte / SvelteKit | 5 / 2 |
 | Service crate versions | per-crate (`person-service` 0.5.0, `organization-service` 0.1.0, …) |

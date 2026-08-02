@@ -215,7 +215,7 @@ What scales cleanly and what needs coordination:
 | **Rate limiter** | **Correct across replicas today** — `auth_rate_limits` row + `pg_advisory_xact_lock` make the throttle exact regardless of which replica handles the request. See [authentication](../authentication/index.md), [postgresql §9](../postgresql/index.md). |
 | **Event stream** | **Not yet cross-replica correct** — the in-memory ring is per-process, so `recent(limit)` only reflects events that replica emitted, and a subscriber bound to one replica misses events from the others. This is the one feature that constrains multi-instance correctness until the durable bus lands (§8). |
 | **Search index** | Each replica keeps its own node-local Tantivy volume (a cache, not source of truth); rebuildable from the database. Today's loco services use Postgres `ILIKE` instead, which is stateless and scales freely. See [search](../search/index.md). |
-| **Background jobs** | Postgres-backed queue (loco `bg_pg` / `queue.kind: Postgres`) in the service's own DB — workers across replicas coordinate through the shared queue tables. |
+| **Background jobs** | Postgres-backed queue (the loco `worker` feature, `queue.kind: Postgres`) in the service's own DB — workers across replicas coordinate through the shared queue tables. |
 
 The load balancer should use the service's health endpoint (§3) for
 member health and may round-robin or least-connections; **no sticky

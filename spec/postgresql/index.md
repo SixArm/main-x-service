@@ -15,9 +15,9 @@ follow the conventions below.
 
 - **PostgreSQL 18** is the target. (A few older crate docs still say 14/15/17;
   18 is canonical — treat those as drift.)
-- Access is always via **SeaORM 1.1** over `sqlx-postgres`
+- Access is always via **SeaORM 2.0** over `sqlx-postgres`
   (`runtime-tokio-rustls`); no service issues hand-rolled libpq calls. The
-  loco services additionally lean on loco.rs 0.16 (`with-db`, `bg_pg`).
+  loco services additionally lean on loco.rs 1.0 (`with-db`, `worker`).
 - SeaORM date/uuid/json features in use: `with-uuid`, `with-json`, and
   `with-time` or `with-chrono` depending on the crate (the authentication
   service uses chrono; the constraint in
@@ -170,7 +170,7 @@ The one sanctioned exception is the loco services' entity `data` column
 
 ## 10. Background jobs
 
-Background jobs are **Postgres-backed** (loco `bg_pg` /
+Background jobs are **Postgres-backed** (the loco `worker` feature,
 `queue.kind: Postgres`), sharing the app database — loco creates its own
 queue tables there. Config lives under `queue:` in `config/*.yaml`. See
 [`agents/share/loco.md`](../../agents/share/loco.md).

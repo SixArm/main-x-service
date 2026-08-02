@@ -38,7 +38,7 @@ cross-cutting spec's [scope boundary](../spec/scope.md).
    (`src/controllers/`), `#![forbid(unsafe_code)]`, thiserror,
    tracing + OTLP, OpenAPI/Swagger, header API versioning
    (`Accepts-version`), Podman not Docker, PostgreSQL not SQLite,
-   `bg_pg` jobs, in-memory loco cache. See
+   `worker` (Postgres-backed) jobs, in-memory loco cache. See
    [rust-loco-stack](../../agents/share/rust-loco-stack.md).
 3. **Pure core.** Every lifecycle machine (lead, deal, campaign,
    ticket, article), the scoring rule table + breakdown, forecast /

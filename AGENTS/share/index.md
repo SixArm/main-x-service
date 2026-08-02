@@ -48,7 +48,7 @@ Per-crate `spec.md`:
 | [auditability.md](auditability.md)                               | Audit logging and event streaming                      |
 | [event-bus.md](event-bus.md)                                     | Durable event bus design (outbox → Fluvio)             |
 | [cross-service-linking.md](cross-service-linking.md)             | Cross-service entity linking (hybrid write-local + read-model aggregator) |
-| [bulk-import-export.md](bulk-import-export.md)                   | Bulk import / export (async `bg_pg` jobs; JSONL/CSV/Parquet) |
+| [bulk-import-export.md](bulk-import-export.md)                   | Bulk import / export (async loco `worker` jobs; JSONL/CSV/Parquet) |
 | [availability.md](availability.md)                               | Availability, scaling, health checks                   |
 | [dataflow.md](dataflow.md)                                       | Create / match / merge / search data flows             |
 | [match.md](match.md)                                             | Matching algorithms                                    |

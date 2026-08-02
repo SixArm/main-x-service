@@ -45,7 +45,7 @@ fixes its shape once.
 - A bulk backdoor around events or audit — every imported row emits its
   normal event and audit record (§6, §9).
 
-## 3. Execution model — async jobs on `bg_pg`
+## 3. Execution model — async jobs on the loco `worker` feature
 
 Bulk operations run as loco **Postgres-backed background jobs**
 (`queue.kind: Postgres`, [loco.md](loco.md)); no external broker.
@@ -54,7 +54,7 @@ Bulk operations run as loco **Postgres-backed background jobs**
 POST /api/<plural>/import   ──202──▶ { job_id }
                                           │  enqueue bulk_job (queued)
                                           ▼
-                        bg_pg worker drains: queued → running
+                        worker drains: queued → running
                           per-row pipeline (§6/§7), progress updates
                           → completed | completed_with_errors | failed
 GET  /api/<plural>/import/{job_id} ──▶ status, counts, errors_url, review_url
@@ -225,7 +225,7 @@ adds one section + a §13 task declaring only what differs:
    the default (personal-data entities — person, worker, case — and the
    `case ↔ person` link especially).
 4. **§13 task** — the code follow-up: `bulk_jobs` migration, the five
-   endpoints (§4), the `bg_pg` worker, the JSONL/CSV/Parquet codecs, the
+   endpoints (§4), the worker, the JSONL/CSV/Parquet codecs, the
    per-row pipeline reusing the single-create validators + matcher + review
    queue, the error report, export masking + audit, and tests (idempotent
    re-import, per-row error report, dedupe-to-review, masked vs full export,
@@ -233,7 +233,7 @@ adds one section + a §13 task declaring only what differs:
 
 ## 11. Rollout
 
-1. **Reference entity (person).** `bulk_jobs` + the job API + the `bg_pg`
+1. **Reference entity (person).** `bulk_jobs` + the job API + the
    worker + JSONL import/export, upsert-by-key, per-row error report.
 2. **CSV + review routing.** Add the CSV flattening convention and the
    keyless-row → duplicate-detection → review-queue path.

@@ -20,8 +20,12 @@ Use:
 
 https://loco.rs/docs/processing/workers/
 
-- Use Postgres-backed background jobs (`bg_pg`) — no external broker
-- NOT SQLite-backed background jobs (`bg_sqlt`)
+- Use Postgres-backed background jobs (the loco `worker` feature —
+  renamed from `bg_pg` in loco 1.0, which also merged the old
+  `bg_sqlt` into the same feature; the queue backend is now a runtime
+  choice via `queue.kind`, not a separate compile-time feature)
+- NOT SQLite as the `queue.kind` — Postgres only, per the family's
+  PostgreSQL-not-SQLite rule
 
 Config:
 
