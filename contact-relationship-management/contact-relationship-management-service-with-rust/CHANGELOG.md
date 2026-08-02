@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration →
+  2.0, sea-query → 1.0. No feature-list changes (default feature set).
+- **`ColType::PkAuto` now generates a 64-bit primary key.** Of this
+  crate's ~23 tables, exactly one (`audit_logs`) goes through loco's
+  schema DSL and moves from `i32` to `i64`; the relationships, sales,
+  marketing, support, engagement, and `event_outbox` tables are all
+  created with raw SQL and stay `i32` — same split as the sibling
+  consumer apps.
+- A `useless_conversion` in `src/models/event_outbox.rs` and a
+  pre-existing `needless_borrows_for_generic_args` in
+  `src/controllers/mod.rs`, both surfaced by the same clippy run.
+- No behavioural change; verified with the full DB-gated suite (8
+  tests, unchanged count) against a freshly migrated Postgres 18.
+
 ### Added — engagement / partnerships / confederation (CRM-T20, 2026-07-20)
 
 - Declared stakeholder typing (role + power–interest 1–5 on contacts;

@@ -28,7 +28,7 @@ pub fn ensure_valid(problems: &[String]) -> Result<()> {
     }
     Err(Error::CustomError(
         StatusCode::UNPROCESSABLE_ENTITY,
-        ErrorDetail::new("validation", &problems.join("; ")),
+        ErrorDetail::new("validation", problems.join("; ")),
     ))
 }
 
