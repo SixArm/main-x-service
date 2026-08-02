@@ -10,7 +10,7 @@ default-run = "care-pathway-service"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace.dependencies]
-loco-rs = { version = "0.16" }
+loco-rs = { version = "1.0.1" }
 
 [dependencies]
 loco-rs = { workspace = true  }
@@ -28,7 +28,7 @@ regex = { version = "1.13" }
 # rest of the family, so one index format.
 tantivy = { version = "0.22" }
 migration = { path = "migration" }
-sea-orm = { version = "1.1", features = [
+sea-orm = { version = "2.0", features = [
   "sqlx-sqlite",
   "sqlx-postgres",
   "runtime-tokio-rustls",
@@ -110,6 +110,10 @@ s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-credential-types"]
 # Temp dirs for the artifact-store tests (SEC-B4 confinement).
 tempfile = "3"
 loco-rs = { workspace = true, features = ["testing"] }
+# `mock`: a `DatabaseConnection` that errors on any query, standing in
+# for sea-orm 1.1's removed `DatabaseConnection::Disconnected` — used to
+# prove a code path never touches the database (src/compliance/disclosure.rs).
+sea-orm = { version = "2.0", features = ["mock"] }
 # The `TestServer` loco's testing harness hands to a request test. Named
 # explicitly so the compliance request tests can factor out helpers that
 # take one (loco re-exports the harness, not the type).

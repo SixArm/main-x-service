@@ -8,6 +8,34 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration → 2.0,
+  sea-query → 1.0. Raw `Statement` queries in `models/audit_logs.rs`
+  (the advisory-lock statement) and `tests/requests/compliance.rs` move
+  to `execute_raw`; a `useless_conversion` in `models/event_outbox.rs`
+  from a now-redundant `.into()`.
+- **loco's `ColType::PkAuto` now generates a 64-bit primary key.** The
+  `care_pathways`, `audit_logs`, and `merge_records` entities move from
+  `i32` to `i64`, along with every place that carries one of their row
+  ids: the audit hash-chain (`ChainBreak.id`, the checkpoint's
+  `anchor_id`), and the compliance test fixtures. The five
+  `instances`/`outcomes` tables and `event_outbox` stay `i32` — their
+  migrations write raw SQL (`id SERIAL PRIMARY KEY`) rather than the
+  loco schema DSL, so they never picked up the width change.
+- **sea-orm 2.0 dropped `DatabaseConnection::Disconnected`**, the
+  variant `src/compliance/disclosure.rs`'s test used as a stand-in for
+  "a connection that errors if touched" (proving the read-audit no-op
+  path never reaches the database when auditing is off). Replaced with
+  a `MockDatabase` carrying no queued results, which errors identically
+  on the first real query — added as a `mock`-feature dev-dependency so
+  it never reaches a release build.
+- No behavioural change; verified with the full DB-gated suite (46
+  tests, unchanged from before this bump) against a freshly migrated
+  Postgres 18. The IEC 62304 SOUP gate needed no new entry — `loco-rs`
+  and `sea-orm` were already registered in `compliance/soup.tsv`; this
+  is a version bump of existing dependencies, not a new one.
+
 ### Added — Tantivy full-text search, fuzzy + phonetic, dedup blocking (2026-08-01)
 
 Replaces the Postgres `ILIKE` name search (spec §13 T-6), following

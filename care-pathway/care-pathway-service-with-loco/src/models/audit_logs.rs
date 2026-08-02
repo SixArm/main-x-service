@@ -92,7 +92,7 @@ impl Model {
     ) -> ModelResult<Self> {
         // Serialise the read-head/append pair (see `CHAIN_LOCK_KEY`).
         if db.get_database_backend() == DatabaseBackend::Postgres {
-            db.execute(Statement::from_string(
+            db.execute_raw(Statement::from_string(
                 DatabaseBackend::Postgres,
                 format!("SELECT pg_advisory_xact_lock({CHAIN_LOCK_KEY})"),
             ))

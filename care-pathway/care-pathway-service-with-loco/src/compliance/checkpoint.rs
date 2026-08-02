@@ -61,7 +61,7 @@ pub struct Checkpoint {
     /// Format version.
     pub version: String,
     /// The anchor row's `id` — the position this checkpoint describes.
-    pub anchor_id: i32,
+    pub anchor_id: i64,
     /// The anchor row's stored SHA-256 chain hash.
     pub head: String,
     /// How many rows stood at or before `anchor_id` when this was taken.
@@ -91,7 +91,7 @@ pub enum CheckpointVerdict {
     /// The anchor row is gone: rows have been deleted.
     AnchorMissing {
         /// The `id` that should have been present.
-        anchor_id: i32,
+        anchor_id: i64,
     },
     /// The anchor survived but no longer hashes to the recorded head.
     HeadChanged {

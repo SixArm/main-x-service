@@ -847,7 +847,7 @@ async fn a_recorded_checkpoint_detects_wholesale_deletion() {
         // Now delete the trail wholesale, as an attacker with SQL access
         // would. No audit row is written; nothing in-band records it.
         ctx.db
-            .execute(sea_orm::Statement::from_string(
+            .execute_raw(sea_orm::Statement::from_string(
                 sea_orm::DatabaseBackend::Postgres,
                 "DELETE FROM audit_logs".to_string(),
             ))
