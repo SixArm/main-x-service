@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration →
+  2.0, sea-query → 1.0. No feature-list changes (this crate uses
+  loco's default feature set, not an explicit list).
+- **loco's `ColType::PkAuto` now generates a 64-bit primary key.** All
+  10 domain tables move from `i32` to `i64`: `sites`, `wards`, `bays`,
+  `beds`, `stays`, `transfers`, `bed_requests`, `red_green_days`,
+  `infection_flags`, `audit_logs`. `event_outbox` stays `i32` — its
+  migration writes raw SQL (`id SERIAL PRIMARY KEY`) rather than the
+  loco schema DSL, the same pattern as every entity-registry crate in
+  this migration.
+- A `useless_conversion` in `src/models/event_outbox.rs` and a
+  pre-existing `needless_borrows_for_generic_args` in
+  `src/controllers/mod.rs`, both surfaced by the same clippy run.
+- No behavioural change; verified with the full DB-gated suite (9
+  tests, unchanged count) against a freshly migrated Postgres 18.
+
 ### Fixed
 
 - 2026-07-18 — **Unknown-pid reads returned 500, not 404** (loco 0.16
