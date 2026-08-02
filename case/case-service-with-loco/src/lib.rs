@@ -38,6 +38,8 @@ pub mod models;
 pub mod openapi;
 /// Durable event bus Phase 3: the `event_outbox` relay + retention loop.
 pub mod relay;
+/// Tantivy full-text search: index schema, engine, and query surface.
+pub mod search;
 pub mod streaming;
 pub mod tasks;
 pub mod validation;

@@ -14,11 +14,11 @@ case-matcher. Built on loco.rs.
 
 ## 2. Scope
 
-MVP: CRUD + `ILIKE` title search + matching, with validation, OpenAPI,
-audit, in-memory streaming, record merge, and offline PASETO v4 public
-token verification (Ed25519, via the auth-service's published key).
-Deferred (§13): Tantivy full-text search, durable event bus, privacy,
-gRPC. Authentication issuance is out of scope here — provided by the
+MVP: CRUD + Tantivy full-text/fuzzy/phonetic search + matching, with
+validation, OpenAPI, audit, in-memory streaming, record merge, and
+offline PASETO v4 public token verification (Ed25519, via the
+auth-service's published key). Deferred (§13): privacy, gRPC.
+Authentication issuance is out of scope here — provided by the
 central authentication-service; this service only verifies. Auth model
 source of truth: [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
 (supersedes the prior RS256-JWT + JWKS model).
@@ -64,8 +64,10 @@ PascalCase strings; `Custom` as `{"Custom":"label"}`.
    reported together — also enforced on update. Rules in
    [`src/validation.rs`](../src/validation.rs).
 2. `GET /api/cases` — list active (cap 100), `{pid, title}`.
-   `GET /api/cases/search?q=` — case-insensitive title search
-   (Postgres `ILIKE`, cap 50; blank `q` → `400`).
+   `GET /api/cases/search?q=` — Tantivy full-text search over title,
+   alternate titles, agency name, identifiers, keywords, and subjects
+   (`?fuzzy=true` for typo tolerance, `?phonetic=true` for Soundex; blank
+   `q` → `400`; an unavailable index → `503`).
 3. `GET /api/cases/{pid}` — return the stored `Case`.
 4. `PUT /api/cases/{pid}` — replace the payload (`422` on any validation
    problem).
@@ -531,6 +533,28 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
+- [x] **T-6 (Tantivy full-text/fuzzy/phonetic search — S-3).** Transfers
+  the care-pathway/organization Tantivy pattern (repo tasks.md S-1/S-2):
+  `src/search/index.rs` (`CaseIndexSchema`/`CaseIndex` — `pid` STORED;
+  `title`/`alternate_titles`/`title_phonetic`/`identifiers`/`keywords`/
+  `subjects`/`agency_name` TEXT; `case_number`/`agency_id`/`case_type`/
+  `status`/`active` STRING exact-match) and `src/search/mod.rs`
+  (`SearchEngine`: `search`/`fuzzy_search`/`phonetic_search`/
+  `search_page`/`candidates`). Replaces the Postgres `ILIKE` title search
+  (`GET /search?q=`, now `?fuzzy=`/`?phonetic=` too, with the true
+  `X-Total-Count` from Tantivy's `Count` collector) and the capped
+  1000-row `check-duplicates` scan (now blocked on up to 200
+  fuzzy-title/phonetic/exact-identifier candidates from the index —
+  subjects, the involved-party field, is the defining attribute made
+  searchable). Indexing is wired into
+  `streaming.rs`'s `*_and_emit` seam (best-effort, after the write
+  commits) so no write path can skip it; `tasks/search.rs` adds the
+  `search_reindex` CLI task plus a boot-time rebuild-if-empty. An
+  unavailable index is a `503` on both endpoints, never silently "no
+  results". Every returned `pid` still passes through the existing
+  record-level ABAC `read_visibility` concealment (§10/§12) before it
+  reaches a caller — the index is a candidate generator, not an
+  authorization boundary. (Repo tasks.md S-3.)
 - [x] **SEC-G8 (security): default-off exposure pin.** A named unit test
   pins that with `CASE_REQUIRE_AUTH` off (the shipped default) the sensitive
   reads — a case's PII, the audit trail, and the governed `subject_of` links
@@ -844,7 +868,7 @@ the other v1 edge kinds even though it shares the same edge shape.
 Done: loco boot; cases table + migration; CRUD with `422` validation on
 create/update (blank `title`, `opened_date` format, non-blank
 identifier / subject / keyword, all problems reported together);
-`ILIKE` title search; `/match`, `/check-duplicates`, and `/merge`
+Tantivy full-text/fuzzy/phonetic search; `/match`, `/check-duplicates`, and `/merge`
 (record merge + history) embedding case-matcher; audit log + in-memory
 event streaming on every CRUD/merge (`/audit/recent`, `/{pid}/audit`,
 `/events/recent`, `/merges/recent`); offline PASETO v4 public token
@@ -864,8 +888,9 @@ v0.1 (here): CRUD + title search + matching + merge + audit + streaming
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
 (source of truth; supersedes the RS256-JWT model) + boot-time
 paseto-keys-over-HTTP fetch (`CASE_PASETO_KEYS_URL`, fetched key set wins,
-env fallback). v0.2: Tantivy full-text/fuzzy search, durable event bus.
-v0.3: privacy controls, blanket `/api/*` enforcement.
+env fallback). v0.2: Tantivy full-text/fuzzy/phonetic search + durable
+event bus Phases 1–2 — **done**. v0.3: privacy controls, blanket
+`/api/*` enforcement, durable bus Phase 3 (Fluvio relay).
 
 ## 16. Open questions
 

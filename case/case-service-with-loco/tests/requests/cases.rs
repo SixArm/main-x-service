@@ -41,6 +41,7 @@ fn housing_case() -> Value {
 // Pins the create happy path: `POST /api/cases` with a valid body
 // returns 200, echoes the `title`, and mints a UUID `pid`.
 async fn can_create_case() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.post("/api/cases").json(&housing_case()).await;
         assert_eq!(response.status_code(), 200, "create should succeed");
@@ -59,6 +60,7 @@ async fn can_create_case() {
 // rejected with 422 (OQ-1 / T-2: not 400). The status is also pinned
 // un-gated in `src/controllers/cases.rs`.
 async fn blank_title_on_create_returns_422() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
             .post("/api/cases")
@@ -76,6 +78,7 @@ async fn blank_title_on_create_returns_422() {
 // Pins that opened_date validation runs in the create handler: a
 // non-ISO-8601 date is a 422, same status as a blank title.
 async fn malformed_opened_date_on_create_returns_422() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let mut payload = housing_case();
         // A value that is not a well-formed ISO-8601 date (spec §6 / T-9).
@@ -96,6 +99,7 @@ async fn malformed_opened_date_on_create_returns_422() {
 // Pins that validation also runs on the update path (PUT), not just
 // create: a blank title on update is a 422.
 async fn blank_title_on_update_returns_422() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created: Value = request
             .post("/api/cases")
@@ -118,6 +122,7 @@ async fn blank_title_on_update_returns_422() {
 // Pins the read-back contract: GET /{pid} returns the full stored Case
 // (title, case_number, nested identifier) exactly as created.
 async fn can_get_case_by_pid() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created: Value = request
             .post("/api/cases")
@@ -142,6 +147,7 @@ async fn can_get_case_by_pid() {
 // Pins that a well-formed but absent pid is a 404 (not a 500 or empty
 // 200).
 async fn unknown_pid_returns_404() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
             .get("/api/cases/00000000-0000-4000-8000-000000000000")
@@ -157,6 +163,7 @@ async fn unknown_pid_returns_404() {
 // Pins the list contract: GET /api/cases returns one CaseRef per active
 // case (here both created cases appear).
 async fn can_list_cases() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         for title in ["Housing benefit appeal", "Tax credit overpayment"] {
             let response = request
@@ -186,6 +193,7 @@ async fn can_list_cases() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn list_and_search_are_paginated() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         for i in 0..5 {
             request
@@ -237,6 +245,7 @@ async fn list_and_search_are_paginated() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn can_search_cases_by_title() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         for title in ["Housing benefit appeal", "Tax credit overpayment"] {
             let response = request
@@ -266,6 +275,7 @@ async fn can_search_cases_by_title() {
 // Pins the stateless /match endpoint: the candidate sharing the query's
 // docket (case-insensitively) ranks first with a deterministic 1.0.
 async fn can_match_query_against_candidates() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request
             .post("/api/cases/match")
@@ -297,6 +307,7 @@ async fn can_match_query_against_candidates() {
 // docket, different title) detects the stored twin with score 1.0 and
 // is_match true.
 async fn can_check_duplicates_against_stored_cases() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.post("/api/cases").json(&housing_case()).await;
         assert_eq!(response.status_code(), 200);
@@ -332,6 +343,7 @@ async fn can_check_duplicates_against_stored_cases() {
 // soft-deleted (404 afterwards), a merge-history row is written, and a
 // `merged` event is published for the survivor.
 async fn merge_folds_duplicate_into_survivor() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         // Main: housing case with one docket identifier.
         let main: Value = request
@@ -452,6 +464,7 @@ async fn merge_folds_duplicate_into_survivor() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 // Pins the self-merge guard: main_pid == duplicate_pid is a 422.
 async fn merge_with_equal_pids_is_422() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created: Value = request
             .post("/api/cases")
@@ -473,6 +486,7 @@ async fn merge_with_equal_pids_is_422() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 // Pins that merging into an unknown duplicate pid is a 404.
 async fn merge_unknown_pid_is_404() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created: Value = request
             .post("/api/cases")
@@ -500,6 +514,7 @@ async fn merge_unknown_pid_is_404() {
 // the system-wide audit endpoint is non-empty, and three matching events
 // land on the in-memory stream.
 async fn crud_writes_audit_log_and_events() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         // Create → update → delete one case.
         let created: Value = request
@@ -566,6 +581,7 @@ async fn whoami_without_token_is_401() {
     // No JWKS is configured in tests, and no bearer header is sent, so the
     // protected endpoint must reject. The token-accepted path is pinned
     // un-gated by `auth::tests::valid_token_yields_claims`.
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.get("/api/cases/whoami").await;
         assert_eq!(response.status_code(), 401, "whoami needs a bearer token");
@@ -579,6 +595,7 @@ async fn whoami_without_token_is_401() {
 // Pins that the OpenAPI doc is mounted and served (3.0.3, with the
 // create path present).
 async fn openapi_json_is_served() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.get("/api-docs/openapi.json").await;
         assert_eq!(response.status_code(), 200, "openapi.json should be served");
@@ -594,6 +611,7 @@ async fn openapi_json_is_served() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 // Pins that the Swagger UI page is served and points at the OpenAPI JSON.
 async fn swagger_ui_is_served() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.get("/swagger-ui").await;
         assert_eq!(response.status_code(), 200, "swagger-ui should be served");
@@ -619,6 +637,7 @@ async fn swagger_ui_is_served() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn audit_chain_survives_a_jsonb_round_trip() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created = request.post("/api/cases").json(&housing_case()).await;
         assert_eq!(created.status_code(), 200);
@@ -653,6 +672,7 @@ async fn audit_chain_survives_a_jsonb_round_trip() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn tampering_with_an_audit_row_breaks_verification() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, ctx| async move {
         request.post("/api/cases").json(&housing_case()).await;
         let report: Value = request.get("/api/cases/audit/verify").await.json();
@@ -688,6 +708,7 @@ async fn tampering_with_an_audit_row_breaks_verification() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn disclosure_accounting_declares_its_completeness() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created = request.post("/api/cases").json(&housing_case()).await;
         let pid = created.json::<Value>()["pid"]
@@ -731,6 +752,7 @@ async fn disclosure_accounting_declares_its_completeness() {
 // this test ever fails, the two obligations have stopped being
 // simultaneously satisfiable and the design is broken — not the test.
 async fn erasure_destroys_content_and_the_chain_still_verifies() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created = request.post("/api/cases").json(&housing_case()).await;
         let body: Value = created.json();
@@ -797,6 +819,7 @@ async fn erasure_destroys_content_and_the_chain_still_verifies() {
 // personal data. Returning `404` would also confirm to a prober which
 // pids are unknown.
 async fn erasure_is_idempotent_and_answers_for_an_unknown_pid() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created = request.post("/api/cases").json(&housing_case()).await;
         let body: Value = created.json();
@@ -838,6 +861,7 @@ async fn erasure_is_idempotent_and_answers_for_an_unknown_pid() {
 // and the erasure all build their `ActiveModel` from `..Default` or an
 // existing row and compile happily with a stale digest.
 async fn record_integrity_covers_every_write_path_and_catches_tampering() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, ctx| async move {
         use sea_orm::ConnectionTrait as _;
 
@@ -943,6 +967,112 @@ async fn record_integrity_covers_every_write_path_and_catches_tampering() {
             ))
             .await
             .expect("purge");
+    })
+    .await;
+}
+
+/// Tantivy search reaches the fields an `ILIKE` over `title` never could
+/// — the involved-party subject a case is *about*, an identifier, the
+/// agency it was filed with — and tolerates a typo when asked to.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn search_reaches_secondary_fields_and_tolerates_typos() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request
+            .post("/api/cases")
+            .json(&json!({
+                "title": "Housing benefit appeal",
+                "agency_id": "dwp",
+                "agency_name": "Department for Work and Pensions",
+                "case_number": "HB-2024-0007",
+                "subjects": ["person:abc"],
+                "identifiers": [{"scheme": "Docket", "value": "CV-2024-001234"}]
+            }))
+            .await;
+        assert_eq!(created.status_code(), 200);
+
+        let hits = |body: Value| body.as_array().map(Vec::len).unwrap_or_default();
+
+        // The defining attribute of a case is who it is about, and it is
+        // now searchable, alongside the agency and identifier. Spaces are
+        // percent-encoded — a raw space is not a valid request URI.
+        for (q, encoded) in [
+            ("person:abc", "person:abc"),
+            (
+                "Department for Work and Pensions",
+                "Department%20for%20Work%20and%20Pensions",
+            ),
+            ("CV-2024-001234", "CV-2024-001234"),
+        ] {
+            let response = request.get(&format!("/api/cases/search?q={encoded}")).await;
+            assert_eq!(response.status_code(), 200);
+            assert_eq!(hits(response.json()), 1, "query {q}");
+        }
+
+        // A typo misses on exact retrieval and lands on fuzzy.
+        assert_eq!(
+            hits(request.get("/api/cases/search?q=Housng").await.json()),
+            0
+        );
+        assert_eq!(
+            hits(
+                request
+                    .get("/api/cases/search?q=Housng&fuzzy=true")
+                    .await
+                    .json()
+            ),
+            1,
+            "fuzzy must tolerate a dropped letter"
+        );
+
+        // A soft-deleted case leaves the index.
+        let pid = created.json::<Value>()["pid"].as_str().unwrap().to_string();
+        request.delete(&format!("/api/cases/{pid}")).await;
+        assert_eq!(
+            hits(request.get("/api/cases/search?q=Housing").await.json()),
+            0,
+            "a deleted case must stop being a hit"
+        );
+    })
+    .await;
+}
+
+/// The search-blocked candidate detector reaches a case whose title is
+/// wholly different but whose identifier matches — the case
+/// `check-duplicates` scanning alone would only find inside the old
+/// 1000-row cap.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn check_duplicates_blocks_on_identifier_alone() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request
+            .post("/api/cases")
+            .json(&json!({
+                "title": "Wholly Unrelated Matter",
+                "identifiers": [{"scheme": "Docket", "value": "CV-2024-009999"}]
+            }))
+            .await;
+        assert_eq!(created.status_code(), 200);
+
+        let response = request
+            .post("/api/cases/check-duplicates")
+            .json(&json!({
+                "title": "Housing benefit appeal",
+                "identifiers": [{"scheme": "Docket", "value": "CV-2024-009999"}]
+            }))
+            .await;
+        assert_eq!(response.status_code(), 200);
+        let hits: Value = response.json();
+        let created_body: Value = created.json();
+        let pid = created_body["pid"].as_str().unwrap();
+        assert!(
+            hits.as_array().unwrap().iter().any(|h| h["pid"] == pid),
+            "the identifier-only match must be found via blocking: {hits}"
+        );
     })
     .await;
 }

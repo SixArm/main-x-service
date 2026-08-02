@@ -27,7 +27,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 |---|---|---|
 | POST | `/api/cases` | Create (body: `Case`; blank `title` → `422`) → `{pid, title}` |
 | GET | `/api/cases` | List active (capped 100) |
-| GET | `/api/cases/search?q=` | Case-insensitive title search (`ILIKE`, cap 50) |
+| GET | `/api/cases/search?q=` | Tantivy full-text search (`?fuzzy=true`, `?phonetic=true`) |
 | GET | `/api/cases/{pid}` | Fetch the stored `Case` |
 | PUT | `/api/cases/{pid}` | Replace payload |
 | DELETE | `/api/cases/{pid}` | Soft-delete |
@@ -64,9 +64,10 @@ The durable event bus's Phase-2 transactional outbox + relay landed
 (`models/event_outbox.rs`, `src/relay.rs`; default-off via
 `CASE_EVENT_TRANSPORT=memory`). Blanket `/api/*` auth enforcement is
 implemented, default-off via `CASE_REQUIRE_AUTH` (activation is a
-deployment decision). Deferred (spec §13): Tantivy full-text/fuzzy
-search (title search via `ILIKE` is done), search-blocked dedup
-candidates, the durable bus's Phase-3 Fluvio broker sink, privacy,
+deployment decision). **Tantivy full-text/fuzzy/phonetic search**
+(`src/search/`) replaces the `ILIKE` title search and backs
+search-blocked `check-duplicates` candidates (spec §13 T-6). Deferred
+(spec §13): the durable bus's Phase-3 Fluvio broker sink, privacy,
 front-end merge action.
 
 > **Auth pivot done here.** The family moved from RS256 JWT + JWKS to
@@ -102,7 +103,9 @@ src/
 ├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) via authentication-verifier
 ├── merge.rs               pure record-merge logic (merge_cases)
 ├── openapi.rs             hand-written OpenAPI 3 document
-├── streaming.rs           durable-bus Phase 1: Envelope + EventPublisher seam (in-memory)
+├── search/                Tantivy full-text/fuzzy/phonetic index (index.rs schema + mod.rs engine)
+├── streaming.rs           durable-bus Phase 1: Envelope + EventPublisher seam (in-memory); indexes/deindexes on every write
+├── tasks/search.rs        `search_reindex` CLI task + boot-time rebuild-if-empty
 ├── validation.rs          title + opened_date + identifier/subject/keyword checks → 422
 ├── models/
 │   ├── cases.rs           CRUD helpers over the stored payload

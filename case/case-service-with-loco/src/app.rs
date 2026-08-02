@@ -123,6 +123,11 @@ impl Hooks for App {
         // unless `CASE_EVENT_TRANSPORT=outbox` AND `CASE_EVENT_RELAY` are
         // set, so the default `memory` transport never spawns it.
         crate::relay::spawn(ctx.db.clone());
+        // Rebuild the full-text index if it is empty while records exist
+        // — the upgrade path for a deployment whose data predates the
+        // index, and the recovery path for an index directory that did
+        // not survive a restart. A no-op on a normal boot.
+        crate::tasks::search::spawn_reindex_if_empty(ctx.db.clone());
         // Blanket auth enforcement layer (authn + ABAC authz). Added
         // unconditionally; the
         // `CASE_REQUIRE_AUTH` flag is read per request and the layer is a
@@ -140,6 +145,7 @@ impl Hooks for App {
 
     #[allow(unused_variables)]
     fn register_tasks(tasks: &mut Tasks) {
+        tasks.register(crate::tasks::search::SearchReindex);
         tasks.register(crate::tasks::integrity_key::IntegrityKey);
         tasks.register(crate::tasks::integrity_resign::IntegrityResign);
         // tasks-inject (do not remove)

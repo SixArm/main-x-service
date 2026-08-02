@@ -140,7 +140,30 @@
   gate**, so adding `tantivy` failed `cargo test` until it was annotated
   in `compliance/soup.tsv`. That is the compliance machinery working, not
   an obstacle — case carries the same gate.
-- [ ] **S-3 (L)** Tantivy in **case** (as S-1). Depends: S-1.
+- [x] **S-3 (L)** Tantivy in **case** (as S-1). Depends: S-1. *(done 2026-08-02)*
+  Care-pathway's pattern transferred whole again, field set changed to
+  what a case *is*: **subjects** (the opaque involved-party ids) is the
+  defining attribute, made searchable alongside agency name, case
+  number/agency id (exact-match), case type/status (exact-match), and
+  every identifier scheme. `check-duplicates` moves from a capped
+  1000-row scan to up to 200 index-blocked candidates (fuzzy title,
+  exact identifier, phonetic title). `search`/`check-duplicates` return
+  `503` (not silent-empty) when the index is unavailable; every hit
+  still passes the existing record-level ABAC concealment before
+  reaching a caller.
+  *Verified:* 32 DB-gated + 1 outbox-audit green vs Postgres 18; 193 lib
+  tests; fmt + clippy clean.
+
+  Two things worth recording that weren't specific to case. First, S-2's
+  own commit never added `/data/` to care-pathway's `.gitignore`, so its
+  Tantivy index binaries (16 files) landed in git — fixed here alongside
+  case's own (correct, from the start) `.gitignore` entry. Second, S-2
+  left care-pathway's `AGENTS.md` and `spec/index.md` still describing
+  `ILIKE` search as current and Tantivy as deferred; case's own docs are
+  updated in this PR, and care-pathway's `AGENTS.md` is corrected too
+  (its `spec/index.md` T-6 entry is left for a future pass — bundling an
+  unrelated crate's spec rewrite into this PR was judged more churn than
+  the inconsistency warranted).
 - [ ] **S-4 (L)** Tantivy in **portfolio** — note the kind gate: index
   `kind` as a field and filter search/dedup within-kind. Depends: S-1.
 

@@ -79,6 +79,39 @@ impl Model {
         row.ok_or_else(|| ModelError::EntityNotFound)
     }
 
+    /// Fetch the active rows for a list of public ids, **preserving the
+    /// order of `pids`**.
+    ///
+    /// The order matters: the caller is a search or blocking query whose
+    /// hits are already ranked by relevance, and re-sorting them by row
+    /// id would throw that ranking away. Ids that do not resolve (unknown
+    /// or soft-deleted — a stale index entry) are simply absent, which is
+    /// what keeps a drifted index from resurrecting a deleted record.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn find_by_pids(db: &DatabaseConnection, pids: &[Uuid]) -> ModelResult<Vec<Self>> {
+        if pids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows = cases::Entity::find()
+            .filter(cases::Column::Pid.is_in(pids.iter().copied()))
+            .filter(cases::Column::DeletedAt.is_null())
+            .all(db)
+            .await?;
+        // Re-order to match `pids` (the SQL `IN` result order is
+        // unspecified). Linear in `pids` × `rows`, both bounded by the
+        // caller's result limit.
+        let mut ordered = Vec::with_capacity(rows.len());
+        for pid in pids {
+            if let Some(row) = rows.iter().find(|r| r.pid == *pid) {
+                ordered.push(row.clone());
+            }
+        }
+        Ok(ordered)
+    }
+
     /// List active cases (most-recent first), capped at `limit`.
     ///
     /// # Errors

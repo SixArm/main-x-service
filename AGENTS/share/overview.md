@@ -15,7 +15,7 @@ The **Main X Index** family of crates implements a federated identity index — 
 | [authentication-service](../../authentication/authentication-service-with-loco) | User | Central single sign-on provider — passwordless email magic-link auth, Postgres-backed cookie sessions, PASETO v4.public token issuance, `/.well-known/paseto-keys` for offline verification by peers. The first real loco.rs crate and the reference for converting the others. |
 | [organization-service](../../organization/organization-service-with-loco) | Organization | loco.rs registry for schema.org/Organization — CRUD + matching (embeds organization-matcher; API DTO is the matcher's Organization type) + Tantivy full-text search (fuzzy + phonetic; duplicate-check blocks on the index) + audit log + event streaming + OpenAPI/Swagger + record merge + offline PASETO v4.public verification + blanket ABAC guard (`ORGANIZATION_REQUIRE_AUTH`, default-off) + durable outbox events (default memory) + field masking, masked view, and the audited GDPR export wired to the ABAC `mask` obligation (no consent model — an organization is not a data subject). |
 | [care-pathway-service](../../care-pathway/care-pathway-service-with-loco) | Care pathway | loco.rs registry for clinical care pathways — CRUD + Tantivy full-text search (fuzzy + phonetic; condition codes and interventions searchable; duplicate-check blocks on the index) + matching (embeds care-pathway-matcher; API DTO is the matcher's CarePathway type) + condition-code validation + OpenAPI/Swagger + audit log + durable outbox event streaming (default memory) + offline PASETO v4.public verification + record merge + blanket ABAC guard (`CARE_PATHWAY_REQUIRE_AUTH`, default-off). Deferred: privacy, front-end merge action. |
-| [case-service](../../case/case-service-with-loco) | Case | loco.rs registry for governmental cases (case tracking — benefits, legal, social-services, complaints, appeals, investigations) — CRUD + ILIKE title search + matching (embeds case-matcher; API DTO is the matcher's Case type) + validation + OpenAPI/Swagger + audit log + durable outbox event streaming (default memory) + offline PASETO v4.public verification + record merge + record-level ABAC + masking obligations + cross-service links (`subject_of`). Case data is personal data; deferred: per-field privacy masking + GDPR export, Tantivy full-text. |
+| [case-service](../../case/case-service-with-loco) | Case | loco.rs registry for governmental cases (case tracking — benefits, legal, social-services, complaints, appeals, investigations) — CRUD + Tantivy full-text/fuzzy/phonetic search (title, subjects, agency, identifiers) with search-blocked duplicate candidates + matching (embeds case-matcher; API DTO is the matcher's Case type) + validation + OpenAPI/Swagger + audit log + durable outbox event streaming (default memory) + offline PASETO v4.public verification + record merge + record-level ABAC + masking obligations + cross-service links (`subject_of`). Case data is personal data; deferred: per-field privacy masking + GDPR export. |
 | [project-portfolio-management-service](../../project-portfolio-management/project-portfolio-management-service-with-loco) | Plan | loco.rs registry for **plans** in one recursive collection (any plan may contain any other via `parent_ref`; the former Portfolio / Project / Product / Program are now an optional descriptive `kind` label) — CRUD + matching (embeds project-portfolio-management-matcher; API DTO is the matcher's Plan type; matching is **not** gated by kind) + **operational sub-resources** under `/api/plans/{pid}/…` (goals / tasks / issues + derived timeline & burndown views) + ILIKE name search + containment cycle check + OpenAPI/Swagger + audit log + event streaming + offline PASETO v4 public verification + record merge + cross-service links + bulk import/export. Integrates the central auth (users/SSO), person/worker (people refs), organization (sponsor). |
 
 ### Matcher crates
@@ -120,7 +120,7 @@ case, and portfolio each provide:
 
 | Capability | person | worker | place | thing | event | course | org | care-pathway | case | portfolio |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| Full-text search via Tantivy¹ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | – | – |
+| Full-text search via Tantivy¹ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | – |
 | Privacy masking module (`src/privacy`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | – | – | – |
 | FHIR R5 surface | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ | ✅ | ✅ | – |
 | gRPC stub (Tonic) | ✅ | ✅ | – | – | ✅ | – | – | – | – | – |
@@ -130,10 +130,10 @@ case, and portfolio each provide:
 | Cross-service links (`entity_links` write-side) | ✅ | ✅ | – | – | – | – | – | – | ✅ | – |
 | Bulk import/export | ✅ | – | – | – | – | – | – | – | – | – |
 
-¹ case and portfolio do **case-insensitive `ILIKE` search** instead of
-Tantivy; organization moved to Tantivy on 2026-07-31 and care-pathway on
-2026-08-01 (fuzzy + phonetic retrieval, and duplicate-check candidates
-blocked on the index rather than scanned). Course additionally serves a
+¹ portfolio does **case-insensitive `ILIKE` search** instead of Tantivy;
+organization moved to Tantivy on 2026-07-31, care-pathway on 2026-08-01,
+and case on 2026-08-02 (fuzzy + phonetic retrieval, and duplicate-check
+candidates blocked on the index rather than scanned). Course additionally serves a
 non-R5 FHIR surface (`/fhir/Basic` — no FHIR R5 resource models a
 course), which the FHIR R5 row deliberately does not count. ² course emits **in-memory events only**
 (no durable outbox yet); every durable-outbox service defaults to

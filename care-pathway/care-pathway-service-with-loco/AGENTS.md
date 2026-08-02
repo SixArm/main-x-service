@@ -28,7 +28,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 |---|---|---|
 | POST | `/api/care-pathways` | Create (body: `CarePathway`; blank `name` → `422`) → `{pid, name}` |
 | GET | `/api/care-pathways` | List active (capped 100) |
-| GET | `/api/care-pathways/search?q=` | Case-insensitive name search (`ILIKE`, cap 50) |
+| GET | `/api/care-pathways/search?q=` | Tantivy full-text search (`?fuzzy=true`, `?phonetic=true`) |
 | GET | `/api/care-pathways/{pid}` | Fetch the stored `CarePathway` |
 | PUT | `/api/care-pathways/{pid}` | Replace payload |
 | DELETE | `/api/care-pathways/{pid}` | Soft-delete |
@@ -65,9 +65,10 @@ in `app.rs`) wired but **off by default** — gated by
 `CARE_PATHWAY_REQUIRE_AUTH`. The durable event bus's
 Phase-2 outbox/relay landed (`models/event_outbox.rs`, `src/relay.rs`),
 default-off via `CARE_PATHWAY_EVENT_TRANSPORT` (`memory` unless set to
-`outbox`). Deferred
-(spec §13): Tantivy full-text/fuzzy search (name search via `ILIKE` is
-done), search-blocked dedup candidates, the durable bus's Phase-3 Fluvio
+`outbox`). **Tantivy full-text/fuzzy/phonetic search** (`src/search/`)
+replaces the `ILIKE` name search and backs search-blocked
+`check-duplicates` candidates. Deferred
+(spec §13): the durable bus's Phase-3 Fluvio
 broker sink (see `agents/share/event-bus.md`), privacy,
 front-end merge
 action, terminology-server code-existence checks. The published key set

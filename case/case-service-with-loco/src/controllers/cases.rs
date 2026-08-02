@@ -33,6 +33,15 @@ use crate::streaming;
 /// the cap is a stop-gap — the real fix is search-blocked candidates.
 pub const CHECK_DUPLICATES_SCAN_CAP: u64 = 1000;
 
+/// Maximum number of **blocked candidates** `check-duplicates` scores a
+/// query against.
+///
+/// The search index supplies these, so this bounds how many *plausible*
+/// records are scored rather than how much of the table is read — which
+/// is what removes the old scale cliff, where record 1001 was
+/// unreachable however obvious a duplicate it was.
+pub const CHECK_DUPLICATES_CANDIDATE_LIMIT: usize = 200;
+
 // ─── Pagination (agents/share/restful.md) ───────────────────────────────
 
 /// Default page size for `GET /api/cases` — the cap this endpoint
@@ -86,6 +95,23 @@ impl Page {
         }
         Ok(())
     }
+}
+
+/// Parse index hits into UUIDs, dropping any that will not parse.
+///
+/// A malformed stored id can only come from a corrupted index, and the
+/// right response is to ignore that hit rather than fail a search that
+/// has other perfectly good results.
+fn parse_pids(hits: &[String]) -> Vec<uuid::Uuid> {
+    hits.iter()
+        .filter_map(|s| match uuid::Uuid::parse_str(s) {
+            Ok(id) => Some(id),
+            Err(err) => {
+                tracing::warn!(hit = %s, error = %err, "index hit is not a UUID; ignoring");
+                None
+            }
+        })
+        .collect()
 }
 
 /// Stamp `X-Total-Count` / `X-Limit` / `X-Offset` onto a response.
@@ -183,9 +209,15 @@ struct MatchRequest {
 /// Query string for `GET /api/cases/search`: the `q` title term.
 #[derive(Debug, Deserialize)]
 struct SearchParams {
-    /// The case-insensitive substring to match against `title`. Required
-    /// in practice — a missing/blank `q` is rejected with `400`.
+    /// The full-text query. Required in practice — a missing/blank `q`
+    /// is rejected with `400`.
     q: Option<String>,
+    /// Typo-tolerant retrieval (Levenshtein ≤ 2) instead of exact terms.
+    #[serde(default)]
+    fuzzy: bool,
+    /// Phonetic (Soundex) retrieval; takes precedence over `fuzzy`.
+    #[serde(default)]
+    phonetic: bool,
     /// Page size; absent ⇒ [`SEARCH_DEFAULT_LIMIT`].
     #[serde(default)]
     limit: Option<u64>,
@@ -458,16 +490,20 @@ async fn list(
     Ok(with_page_headers(format::json(refs)?, total, limit, offset))
 }
 
-/// Case-insensitive title search: `GET /api/cases/search?q=housing`.
-/// Pragmatic Postgres `ILIKE` over the denormalised `title` (cap 50);
-/// full-text / fuzzy search is deferred (spec §13 T-6).
+/// Full-text case search: `GET /api/cases/search?q=housing`.
+/// Tantivy-backed (spec §13 T-6, landed) over title, alternate titles,
+/// agency name, identifiers, keywords, and subjects; `?fuzzy=true`
+/// tolerates typos and `?phonetic=true` matches on how the title
+/// sounds.
 ///
 /// Responds `200` with an array of [`CaseRef`]. A missing/blank `q` is a
-/// `400`.
+/// `400`; an unavailable search index is a `503` (never disguised as
+/// "no matches").
 ///
 /// # Errors
 ///
-/// `400` when `q` is missing or blank; a DB error when the query fails.
+/// `400` when `q` is missing or blank; `503` when the search index is
+/// unavailable; a DB error when the query fails.
 #[debug_handler]
 async fn search(
     axum::extract::Query(params): axum::extract::Query<SearchParams>,
@@ -485,8 +521,29 @@ async fn search(
     };
     page.check_offset()?;
     let (limit, offset) = page.resolve(SEARCH_DEFAULT_LIMIT);
-    let rows = CaseModel::search_paged(&ctx.db, q.trim(), limit, offset).await?;
-    let total = CaseModel::search_count(&ctx.db, q.trim()).await?;
+    // An unavailable index is reported, never disguised as "no matches":
+    // an operator must be able to tell a broken index from an empty one.
+    let Some(engine) = crate::search::engine() else {
+        return Err(Error::CustomError(
+            StatusCode::SERVICE_UNAVAILABLE,
+            ErrorDetail::new("search_unavailable", "the search index is unavailable"),
+        ));
+    };
+    let mode = if params.phonetic {
+        crate::search::SearchMode::Phonetic
+    } else if params.fuzzy {
+        crate::search::SearchMode::Fuzzy
+    } else {
+        crate::search::SearchMode::Exact
+    };
+    let (pids, index_total) = engine.search_page(
+        q.trim(),
+        mode,
+        usize::try_from(limit).unwrap_or(usize::MAX),
+        usize::try_from(offset).unwrap_or(usize::MAX),
+    )?;
+    let rows = CaseModel::find_by_pids(&ctx.db, &parse_pids(&pids)).await?;
+    let total = index_total as u64;
     disclosure::record_access(
         &ctx.db,
         uuid::Uuid::nil(),
@@ -529,17 +586,18 @@ async fn match_against(Json(req): Json<MatchRequest>) -> Result<Response> {
 /// Find stored cases that match the query above the threshold.
 /// `POST /api/cases/check-duplicates`.
 ///
-/// Request body: a `case_matcher::Case` query. Loads up to
-/// [`CHECK_DUPLICATES_SCAN_CAP`] active rows, matches each against the
-/// query in memory, and responds `200` with the matching [`ScoredRef`]s
-/// sorted by descending score. When the scan reaches the cap the result
-/// may be incomplete (no search-backed blocking yet — spec §13 T-6) and
-/// the handler emits a `WARN`.
+/// Request body: a `case_matcher::Case` query. The search index supplies
+/// a **blocked** candidate set (spec §13 T-6, landed) — up to
+/// [`CHECK_DUPLICATES_CANDIDATE_LIMIT`] plausible matches via fuzzy
+/// title, exact identifier, and phonetic retrieval — each scored against
+/// the query, and responds `200` with the matching [`ScoredRef`]s sorted
+/// by descending score.
 ///
 /// # Errors
 ///
-/// A DB error when the row scan fails; a JSON parse error when a stored
-/// payload cannot be deserialized.
+/// `503` when the search index is unavailable, so duplicates cannot be
+/// checked; a DB error when the row fetch fails; a JSON parse error when
+/// a stored payload cannot be deserialized.
 #[debug_handler]
 async fn check_duplicates(
     State(ctx): State<AppContext>,
@@ -547,14 +605,23 @@ async fn check_duplicates(
     Json(query): Json<Case>,
 ) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
-    let rows = CaseModel::list(&ctx.db, CHECK_DUPLICATES_SCAN_CAP).await?;
-    if rows.len() as u64 == CHECK_DUPLICATES_SCAN_CAP {
-        tracing::warn!(
-            cap = CHECK_DUPLICATES_SCAN_CAP,
-            "check-duplicates in-memory scan hit its row cap; results may be \
-             incomplete until search-backed candidate blocking lands (spec §13 T-6)"
-        );
-    }
+    // Blocking, not scanning: the index supplies plausible candidates —
+    // fuzzy title, exact identifier, and phonetic routes — so a
+    // duplicate's reachability depends on how similar it is rather than
+    // on how recently it was inserted. An unavailable index is surfaced
+    // rather than silently answering "no duplicates", which would let a
+    // caller create a duplicate believing it had been checked.
+    let Some(index) = crate::search::engine() else {
+        return Err(Error::CustomError(
+            StatusCode::SERVICE_UNAVAILABLE,
+            ErrorDetail::new(
+                "search_unavailable",
+                "the search index is unavailable, so duplicates cannot be checked",
+            ),
+        ));
+    };
+    let candidates = index.candidates(&query, CHECK_DUPLICATES_CANDIDATE_LIMIT)?;
+    let rows = CaseModel::find_by_pids(&ctx.db, &parse_pids(&candidates)).await?;
     let mut hits: Vec<ScoredRef> = Vec::new();
     for row in &rows {
         let candidate = row.to_case()?;

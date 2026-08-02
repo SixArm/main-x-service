@@ -8,6 +8,47 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — Tantivy full-text/fuzzy/phonetic search (2026-08-02)
+
+Repo tasks.md S-3: transfers the care-pathway/organization Tantivy
+pattern (S-1/S-2) whole — index module, streaming seam, reindex task
+with a boot rebuild, duplicate detection blocked on the index instead
+of scanning a capped 1000 rows. What changed is the field set.
+
+- `src/search/` — `CaseIndexSchema`/`CaseIndex` (`pid` STORED;
+  `title`/`alternate_titles`/`title_phonetic`/`identifiers`/`keywords`/
+  `subjects`/`agency_name` TEXT; `case_number`/`agency_id`/`case_type`/
+  `status`/`active` STRING) and `SearchEngine` (`search`/
+  `fuzzy_search`/`phonetic_search`/`search_page`/`candidates`). A
+  case's defining attribute is who it is about — `subjects` (opaque
+  involved-party ids) is now searchable, alongside the agency and every
+  identifier scheme.
+- `GET /api/cases/search?q=` is now Tantivy-backed with `?fuzzy=true`
+  and `?phonetic=true`, and its `X-Total-Count` comes from Tantivy's
+  `Count` collector rather than a SQL `COUNT(*)`. Replaces the Postgres
+  `ILIKE` title search.
+- `POST /api/cases/check-duplicates` now scores a **blocked** candidate
+  set (fuzzy title, exact identifier, phonetic title — up to 200) from
+  the index instead of an in-memory scan capped at 1000 rows, closing
+  the scale cliff where a duplicate past row 1000 was unreachable
+  however obvious it was.
+- Both endpoints respond `503` (never a silent "no results") when the
+  index is unavailable.
+- `streaming.rs`'s `*_and_emit` seam indexes/deindexes best-effort after
+  every commit, so no write path — native or FHIR — can skip it.
+- `tasks/search.rs` — the `search_reindex` CLI task plus a
+  rebuild-if-empty on boot, for a fresh deployment or a lost index
+  volume.
+- `tantivy` added to `compliance/soup.tsv` (IEC 62304 §5.3.3 SOUP
+  gate) — indirect relevance: the database stays the source of truth,
+  every hit resolves against it through the same record-level ABAC
+  concealment as every other read path, so a stale index degrades
+  retrieval rather than corrupting a record or bypassing authorization.
+- `.gitignore` gains `/data/` (the index's default on-disk path) — a
+  derived, rebuildable artifact that must never be committed.
+- DB-gated: `search_reaches_secondary_fields_and_tolerates_typos`,
+  `check_duplicates_blocks_on_identifier_alone`.
+
 ### Changed — loco-rs 1.0.1 (2026-08-02)
 
 - **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration → 2.0,

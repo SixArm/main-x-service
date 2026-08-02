@@ -36,6 +36,7 @@ async fn create_case(request: &loco_rs::TestServer) -> String {
 // The full round-trip: POST a subject_of link (linked event), GET it,
 // DELETE it (unlinked event); assert both events for the case pid.
 async fn subject_of_link_create_list_delete_round_trip() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let pid = create_case(&request).await;
         let person = "person:0c4f1e2a-0000-4000-8000-000000000000";
@@ -94,6 +95,7 @@ async fn subject_of_link_create_list_delete_round_trip() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 // A disallowed edge kind/endpoint (same_identity from a case) is a 422.
 async fn invalid_edge_kind_is_422() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let pid = create_case(&request).await;
         let response = request
@@ -118,6 +120,7 @@ async fn invalid_edge_kind_is_422() {
 // Re-asserting the same edge is idempotent: the same edge id comes back
 // and the active list still holds exactly one row.
 async fn upsert_is_idempotent() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let pid = create_case(&request).await;
         let person = "person:0c4f1e2a-0000-4000-8000-000000000000";
@@ -147,6 +150,7 @@ async fn upsert_is_idempotent() {
 // GET /api/cases/links returns every active edge in the canonical §4.2
 // shape (edge_id / edge_kind / from_ref=case:<pid>), for reconciliation.
 async fn bulk_links_returns_the_canonical_edge_shape() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let pid = create_case(&request).await;
         let to_ref = "person:0c4f1e2a-0000-4000-8000-000000000009";
