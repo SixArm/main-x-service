@@ -390,7 +390,7 @@ impl AuditLogRepository {
         // Serialise the read-head/append pair so two concurrent writers
         // cannot claim the same predecessor and fork the chain.
         if conn.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
-            conn.execute(sea_orm::Statement::from_string(
+            conn.execute_raw(sea_orm::Statement::from_string(
                 sea_orm::DatabaseBackend::Postgres,
                 format!("SELECT pg_advisory_xact_lock({CHAIN_LOCK_KEY})"),
             ))
@@ -675,7 +675,7 @@ mod chain_tests {
 
     /// Remove every audit row, so a run starts from an empty chain.
     async fn clear(db: &sea_orm::DatabaseConnection) {
-        db.execute(Statement::from_string(
+        db.execute_raw(Statement::from_string(
             sea_orm::DatabaseBackend::Postgres,
             "DELETE FROM audit_log".to_string(),
         ))
@@ -758,7 +758,7 @@ mod chain_tests {
         .expect("log create");
         assert!(repo.verify_chain(1000).await.expect("verify").verified);
 
-        db.execute(Statement::from_string(
+        db.execute_raw(Statement::from_string(
             sea_orm::DatabaseBackend::Postgres,
             r#"UPDATE audit_log
                SET new_values = jsonb_set(new_values, '{family_name}', '"Tampered"')
@@ -798,7 +798,7 @@ mod chain_tests {
         }
         assert!(repo.verify_chain(1000).await.expect("verify").verified);
 
-        db.execute(Statement::from_string(
+        db.execute_raw(Statement::from_string(
             sea_orm::DatabaseBackend::Postgres,
             "DELETE FROM audit_log WHERE seq = (SELECT MIN(seq) + 1 FROM audit_log)".to_string(),
         ))

@@ -33,7 +33,7 @@ const CONSTRAINT: &str = "workers_gender_check";
 const VOCABULARY: &str = "('male', 'female', 'other', 'unknown')";
 
 async fn exec(db: &DatabaseConnection, sql: &str) {
-    db.execute(Statement::from_string(
+    db.execute_raw(Statement::from_string(
         db.get_database_backend(),
         sql.to_string(),
     ))
@@ -91,7 +91,7 @@ async fn normalizes_legacy_capitalized_gender_rows() {
 /// Read one worker's stored gender string.
 async fn gender_of(db: &DatabaseConnection, id: Uuid) -> String {
     let row = db
-        .query_one(Statement::from_string(
+        .query_one_raw(Statement::from_string(
             db.get_database_backend(),
             format!("SELECT gender FROM workers WHERE id = '{id}'"),
         ))

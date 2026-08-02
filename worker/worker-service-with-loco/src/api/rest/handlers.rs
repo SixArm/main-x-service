@@ -1850,7 +1850,7 @@ pub async fn verify_record_integrity(
 
     let rows = match state
         .db
-        .query_all(sea_orm::Statement::from_sql_and_values(
+        .query_all_raw(sea_orm::Statement::from_sql_and_values(
             sea_orm::DatabaseBackend::Postgres,
             "SELECT id, content_hash, content_hash_sha3, content_mac, deleted_at \
              FROM workers \

@@ -140,7 +140,7 @@ async fn destroy_child_rows<C: ConnectionTrait>(db: &C, id: Uuid) -> crate::Resu
     let mut deleted = 0;
     for table in CHILD_TABLES {
         let result = db
-            .execute(Statement::from_sql_and_values(
+            .execute_raw(Statement::from_sql_and_values(
                 db.get_database_backend(),
                 format!("DELETE FROM {table} WHERE worker_id = $1"),
                 [id.into()],
@@ -151,7 +151,7 @@ async fn destroy_child_rows<C: ConnectionTrait>(db: &C, id: Uuid) -> crate::Resu
     // Emergency-contact telecom rows hang off the emergency contacts, not
     // off the worker, so they are swept through their parent first.
     let telecom = db
-        .execute(Statement::from_sql_and_values(
+        .execute_raw(Statement::from_sql_and_values(
             db.get_database_backend(),
             "DELETE FROM worker_emergency_contact_telecom WHERE emergency_contact_id IN \
              (SELECT id FROM worker_emergency_contacts WHERE worker_id = $1)",
@@ -160,7 +160,7 @@ async fn destroy_child_rows<C: ConnectionTrait>(db: &C, id: Uuid) -> crate::Resu
         .await?;
     deleted += telecom.rows_affected();
     let contacts = db
-        .execute(Statement::from_sql_and_values(
+        .execute_raw(Statement::from_sql_and_values(
             db.get_database_backend(),
             "DELETE FROM worker_emergency_contacts WHERE worker_id = $1",
             [id.into()],
@@ -197,7 +197,7 @@ pub async fn erase<C: ConnectionTrait>(
 ) -> crate::Result<ErasureOutcome> {
     // Read the pre-state we report on, before destroying it.
     let existing = db
-        .query_one(Statement::from_sql_and_values(
+        .query_one_raw(Statement::from_sql_and_values(
             db.get_database_backend(),
             "SELECT active FROM workers WHERE id = $1",
             [id.into()],
@@ -220,7 +220,7 @@ pub async fn erase<C: ConnectionTrait>(
         //    verification reports as a gap rather than a mismatch, so an
         //    erased record does not masquerade as tampered.
         //    `gender` is NOT NULL, so it takes the honest `unknown`.
-        db.execute(Statement::from_sql_and_values(
+        db.execute_raw(Statement::from_sql_and_values(
             db.get_database_backend(),
             "UPDATE workers SET \
                gender = $2, birth_date = NULL, tax_id = NULL, \
@@ -240,7 +240,7 @@ pub async fn erase<C: ConnectionTrait>(
         // 3. Write back one tombstone name. Read paths assume a worker has
         //    at least one; leaving none would make an erased record a
         //    landmine rather than a clean degradation.
-        db.execute(Statement::from_sql_and_values(
+        db.execute_raw(Statement::from_sql_and_values(
             db.get_database_backend(),
             "INSERT INTO worker_names (id, worker_id, use_type, family, given, prefix, suffix) \
              VALUES ($1, $2, NULL, $3, ARRAY[]::text[], ARRAY[]::text[], ARRAY[]::text[])",
@@ -253,7 +253,7 @@ pub async fn erase<C: ConnectionTrait>(
     //    would still assert that this erased record and a worker record
     //    are the same human.
     let links = db
-        .execute(Statement::from_sql_and_values(
+        .execute_raw(Statement::from_sql_and_values(
             db.get_database_backend(),
             "UPDATE entity_links SET deleted_at = NOW() \
              WHERE from_pid = $1 AND deleted_at IS NULL",

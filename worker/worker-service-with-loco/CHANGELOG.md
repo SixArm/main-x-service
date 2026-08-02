@@ -7,6 +7,29 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16.4 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration →
+  2.0, sea-query → 1.0. Feature renames applied: `auth_jwt` → `auth`,
+  `bg_pg` → `worker`.
+- **21 raw `Statement` call sites** across `src/db/audit.rs`,
+  `src/compliance/erasure.rs`, `src/db/review_queue.rs`,
+  `src/api/rest/handlers.rs`, and three test files move to the `_raw`
+  variants.
+- **`with-bigdecimal`** added to the `sea-orm` feature list — the same
+  `BigDecimal` match-score columns as person-service, same fix.
+- **`DatabaseConnection::Disconnected`**, removed in sea-orm 2.0, was
+  `tests/common/mod.rs`'s stand-in for "a connection that errors if
+  touched" in the no-DB test router. Replaced with an empty
+  `MockDatabase`, added as a `mock`-feature dev-dependency.
+- A `useless_conversion` in `src/db/outbox.rs` from a now-redundant
+  `.into()`.
+- No pre-existing `EntityTrait`-import gap here (unlike person-service)
+  — this crate's `db/models.rs` submodules already glob-import the
+  prelude per-module.
+- No behavioural change; verified with the full DB-gated suite (33
+  tests, unchanged count) against a freshly migrated Postgres 18.
+
 ### Added — key rotation and policy hot-reload without a restart (2026-08-01)
 
 AU-1, following the person service (the axum-style reference).

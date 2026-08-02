@@ -1263,7 +1263,7 @@ async fn test_out_of_band_sql_edit_to_a_child_table_is_detected() {
 
     // Edit the stored identifier directly, writing no audit row.
     let conn = common::db().await;
-    conn.execute(sea_orm::Statement::from_sql_and_values(
+    conn.execute_raw(sea_orm::Statement::from_sql_and_values(
         sea_orm::DatabaseBackend::Postgres,
         "UPDATE worker_identifiers SET value = 'TAMPERED' WHERE worker_id = $1",
         [id.into()],
@@ -1404,7 +1404,7 @@ async fn test_out_of_band_edit_to_an_assessment_score_is_detected() {
     // Raise the percentile directly in SQL, writing no audit row.
     let conn = common::db().await;
     let affected = conn
-        .execute(sea_orm::Statement::from_sql_and_values(
+        .execute_raw(sea_orm::Statement::from_sql_and_values(
             sea_orm::DatabaseBackend::Postgres,
             "UPDATE worker_assessments \
              SET results = jsonb_set(results, '{0,percentile}', '99.0') \
