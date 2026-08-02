@@ -30,6 +30,7 @@ fn a_proposal(title: &str) -> Value {
 // promoted, which mints a real plan in the target collection;
 // out-of-order actions and post-submission edits are refused.
 async fn intake_pipeline_promotes_into_the_registry() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         // Bad target collection is 422; a valid draft creates.
         let bad = request
@@ -104,6 +105,7 @@ async fn intake_pipeline_promotes_into_the_registry() {
 // Duplicate-demand detection at intake: a proposal whose title matches
 // a live plan (and a sibling proposal) is flagged before funding.
 async fn duplicate_demand_is_flagged_at_intake() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         request
             .post("/api/plans")
@@ -148,6 +150,7 @@ async fn duplicate_demand_is_flagged_at_intake() {
 // hold does not, skipping refuses naming the expected gate, and the
 // summary + review list expose stage / next_gate.
 async fn gate_journey_advances_stage_in_order() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let item: Value = request
             .post("/api/plans")
@@ -198,6 +201,7 @@ async fn gate_journey_advances_stage_in_order() {
 // Risks: scoring bounds enforce 1–5, the list derives exposure
 // (highest first), and escalation materialises an open risk.
 async fn risks_score_and_escalate() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let item: Value = request
             .post("/api/plans")
@@ -256,6 +260,7 @@ async fn risks_score_and_escalate() {
 // Budgets: minor-unit arithmetic, per-currency variance, currency
 // shape validation, and the governance summary tying it together.
 async fn budgets_track_variance_and_the_summary_aggregates() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let item: Value = request
             .post("/api/plans")

@@ -16,9 +16,10 @@ kind label — **and** a project-management tool.
 > warnings` is clean, `cargo fmt` is clean, zero `#[allow]`. Scope shipped:
 > single-collection plan CRUD + kind-agnostic matching + validation +
 > record merge + audit + in-memory events + offline PASETO auth +
-> Prometheus + OpenAPI/Swagger. **Deferred** (spec §13): the operational
+> Tantivy full-text/fuzzy/phonetic search + Prometheus + OpenAPI/Swagger.
+> **Deferred** (spec §13): the operational
 > sub-resources (goals / tasks / issues) + derived views, `deduplicate` +
-> review queue, cross-service links, bulk import/export, Tantivy search.
+> review queue, cross-service links, bulk import/export.
 >
 > **Persistence note.** All plans live in **one `plans` table** with a
 > **nullable `kind`** column (the optional label) and a `parent_pid`
@@ -62,7 +63,7 @@ plan-scoped sub-resources hang off `/api/plans/{pid}/...`. See
 
 | Group | Paths |
 |---|---|
-| Plan CRUD | `POST`/`GET` `/plans`, `GET`/`PUT`/`DELETE` `/plans/{pid}`, `GET /plans/search?q=` |
+| Plan CRUD | `POST`/`GET` `/plans`, `GET`/`PUT`/`DELETE` `/plans/{pid}`, `GET /plans/search?q=` (Tantivy: `?fuzzy=`, `?phonetic=`, `?kind=`) |
 | Match | `POST /plans/match` · `/plans/check-duplicates` (kind-agnostic) |
 | Merge | `POST /plans/merge` (`422` equal pids, `404` unknown) · `GET /plans/merges/recent` |
 | Strategy (PPM Phase C) | `/ideas` (+ `vote`/`dismiss`/`convert`) · `/scenarios` (+ `/{pid}/evaluate`/`commit`) · `/objectives` (+ `/{pid}/alignment`) · `/plans/{pid}/objectives` · `/plans/{pid}/benefits` (+ `/{b_pid}/realize`) |
@@ -95,7 +96,8 @@ may match regardless of their optional `kind` labels.
 
 ## MVP scope
 
-CRUD + `ILIKE` name search + matching (embed `project-portfolio-management-matcher`,
+CRUD + Tantivy full-text/fuzzy/phonetic search (`src/search/`; replaces
+the earlier `ILIKE` name search) + matching (embed `project-portfolio-management-matcher`,
 `MatchingEngine::new(MatchConfig::default())`) over one recursive `plans`
 collection, real-time create duplicate detection (`409`,
 kind-agnostic), record merge, payload validation (`src/validation.rs`: UUID /
@@ -109,7 +111,7 @@ is set — fetched key set wins, env `PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS` 
 service always boots; spec §13, done 2026-07-04), and blanket `/api/*`
 auth enforcement wired but **off by
 default** — gated by `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`. Deferred (spec §13):
-Tantivy full-text/fuzzy search, durable event bus Phases 2–3 (outbox +
+durable event bus Phases 2–3 (outbox +
 Fluvio), privacy, front-end merge action, bulk import/export, the
 `posts` / `comments` / `members` collaboration
 sub-resources, gRPC.
@@ -138,7 +140,11 @@ sub-resources, gRPC.
 5. **Kind-agnostic matching.** There is no kind gate — any two plans may
    match, and dedup / check-duplicates / merge are not scoped by kind.
    Containment is expressed with `parent_ref` (any plan may contain any
-   other; a self- or descendant-cycle is rejected `422`).
+   other; a self- or descendant-cycle is rejected `422`). This extends to
+   search: `src/search/` indexes `kind` so `GET /plans/search?kind=` can
+   **narrow** a query — an opt-in the caller requests — but
+   `SearchEngine::candidates` (the `check-duplicates` blocking query)
+   never filters on it. Do not add a kind filter to `candidates`.
 6. **Partition rule.** Operational sub-resources and cross-service
    `entity_links` are **never** fed to the matcher; only the thin
    `Plan` payload is (goal titles bridge via `data.goals[]`).
@@ -173,7 +179,9 @@ src/
 ├── scheduler.rs              optional set-and-forget sweep ticker (env-gated, default off)
 ├── openapi.rs                OpenAPI 3 document
 ├── relay.rs                  durable-bus Phase 2 outbox relay (poll/ack loop)
-├── streaming.rs              CRUD/merge event stream — durable Envelope + EventPublisher seam (in-memory default, outbox transport)
+├── search/                   Tantivy full-text/fuzzy/phonetic index (index.rs schema + mod.rs engine; kind is a search filter, never a dedup gate)
+├── streaming.rs              CRUD/merge event stream — durable Envelope + EventPublisher seam (in-memory default, outbox transport); indexes/deindexes on every write
+├── tasks/search.rs           `search_reindex` CLI task + boot-time rebuild-if-empty
 ├── validation.rs             name + goal-title + identifier + BCP-47 + parent_ref checks → 422
 ├── models/
 │   ├── plans.rs              CRUD helpers over the stored payload

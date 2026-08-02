@@ -1,3 +1,4 @@
 //! CLI tasks (loco extension point).
-//!
-//! Empty for the MVP; reserved for `cargo loco task` commands.
+
+/// `search_reindex` — rebuild the full-text index from the database.
+pub mod search;

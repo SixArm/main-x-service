@@ -131,6 +131,11 @@ impl Hooks for App {
         // Set-and-forget: the optional scheduled-action sweep ticker
         // (env-gated, default off — the sweep endpoint always works).
         crate::scheduler::spawn(ctx.clone());
+        // Rebuild the full-text index if it is empty while records exist
+        // — the upgrade path for a deployment whose data predates the
+        // index, and the recovery path for an index directory that did
+        // not survive a restart. A no-op on a normal boot.
+        crate::tasks::search::spawn_reindex_if_empty(ctx.db.clone());
         // Blanket JWT enforcement layer. Added unconditionally; the
         // `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` flag is read per request and the layer is a
         // near-noop when the flag is off (the default).
@@ -147,6 +152,7 @@ impl Hooks for App {
 
     #[allow(unused_variables)]
     fn register_tasks(tasks: &mut Tasks) {
+        tasks.register(crate::tasks::search::SearchReindex);
         // tasks-inject (do not remove)
     }
     async fn truncate(ctx: &AppContext) -> Result<()> {

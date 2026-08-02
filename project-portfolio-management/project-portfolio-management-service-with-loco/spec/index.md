@@ -27,7 +27,7 @@ a `parent_ref` to its parent (a recursive tree). Built on loco.rs.
 
 ## 2. Scope
 
-MVP: CRUD + `ILIKE` name search + matching + record merge + audit log +
+MVP: CRUD + Tantivy full-text/fuzzy/phonetic search + matching + record merge + audit log +
 in-memory event streaming (durable-bus Phase 1) over **one recursive
 `plans` collection** + the operational sub-resources (goals, tasks,
 issues) on any plan + derived timeline / burndown read views +
@@ -41,9 +41,11 @@ match; the `kind` label does not gate matching (§5/§9.2). `kind` is an
 optional Portfolio / Project / Product / Program / Practice / Process /
 Purpose / Pathway / Proposal label, and any plan may contain any other
 plan via `parent_ref` (a self- or descendant-cycle is rejected `422`).
-Deferred (§13): the goals/issues sub-resource tables + the derived
-timeline view (tasks + sprints + burndown landed 2026-07-20), Tantivy
-full-text/fuzzy search, search-blocked dedup candidates, the durable
+Tantivy full-text/fuzzy/phonetic search (§9.1) and search-blocked
+`check-duplicates` candidates — landed. Deferred (§13): the goals/issues
+sub-resource tables + the derived
+timeline view (tasks + sprints + burndown landed 2026-07-20),
+the durable
 event bus's Fluvio broker sink (Phase 2 outbox + Phase 3 relay/retention
 landed), privacy, front-end merge action, bulk import/export, gRPC, and
 the deferred `posts` / `comments` / `members` collaboration
@@ -139,8 +141,11 @@ is expressed by `parent_ref`, never by a collection boundary.
 2. `GET /api/plans` — list active (cap 100), `{pid, name}`. `GET
    /api/plans?parent={pid}` — roll up a plan's **direct children** (by
    denormalised `parent_pid`). `GET /api/plans/search?q=` —
-   case-insensitive name search (Postgres `ILIKE`, cap 50; blank `q` →
-   `400`).
+   Tantivy full-text search over name, alternate names, owner org name,
+   identifiers, keywords, tags, and goal titles (`?fuzzy=true` for typo
+   tolerance, `?phonetic=true` for Soundex, `?kind=` to narrow to one
+   exact kind label — an opt-in filter, never a matching gate; blank `q`
+   → `400`, an unavailable index → `503`).
 3. `GET /api/plans/{pid}` — return the stored `Plan`.
 4. `PUT /api/plans/{pid}` — replace the payload (`422` if `name` is
    blank, or any `goals` / `identifiers` / `in_language` entry is
@@ -251,7 +256,7 @@ for a malformed body; `409 Conflict` for a real-time create duplicate
 |---|---|---|
 | POST | `/api/plans` | Create (`409` on duplicate) → `{pid, name}` |
 | GET | `/api/plans` | List active (cap 100); `?parent={pid}` rolls up direct children |
-| GET | `/api/plans/search?q=` | Case-insensitive name search (`ILIKE`, cap 50) |
+| GET | `/api/plans/search?q=` | Tantivy full-text search (`?fuzzy=`, `?phonetic=`, `?kind=`) |
 | GET | `/api/plans/{pid}` | Fetch the stored `Plan` |
 | PUT | `/api/plans/{pid}` | Replace payload |
 | DELETE | `/api/plans/{pid}` | Soft-delete |
@@ -579,6 +584,32 @@ HIPAA/NHS/GDPR posture for audit and access controls.
 
 ## 13. Tasks (live work queue)
 
+- [x] **2026-08-02 — Tantivy full-text/fuzzy/phonetic search (repo
+  tasks.md S-4).** Transfers the care-pathway/case Tantivy pattern
+  (S-2/S-3) whole: `src/search/index.rs` (`PlanIndexSchema`/`PlanIndex`
+  — `pid` STORED; `name`/`alternate_names`/`name_phonetic`/
+  `identifiers`/`keywords`/`tags`/`goals`/`owner_org_name` TEXT;
+  `code`/`owner_org_id`/`kind`/`status`/`active` STRING exact-match) and
+  `src/search/mod.rs` (`SearchEngine`: `search_page`, `candidates`).
+  Replaces the Postgres `ILIKE` name search (`GET /search?q=`, now
+  `?fuzzy=`/`?phonetic=` too, true `X-Total-Count` from Tantivy's
+  `Count` collector) and the capped 1000-row `check-duplicates` scan
+  (now blocked on up to 200 fuzzy-name/phonetic/exact-identifier
+  candidates). Indexing is wired into `streaming.rs`'s `*_and_emit` seam
+  (best-effort, after commit); `tasks/search.rs` adds the
+  `search_reindex` CLI task plus boot-time rebuild-if-empty. Both
+  endpoints answer `503` (never silent-empty) when the index is down.
+  **`kind` is indexed and filterable on search (`?kind=`) but is
+  deliberately never applied to `candidates`** — the embedded matcher's
+  own golden rule is that no two plans are excluded from matching by
+  kind, and gating dedup by kind would silently reintroduce the
+  per-kind collection boundary the data model unification removed (see
+  AGENTS.md golden rule 5). `search::tests::candidates_ignore_kind` +
+  `kind_filter_narrows_search_but_is_optional` pin both halves of that
+  distinction, and a DB-gated test confirms it end to end.
+  *Verified:* 38 DB-gated + 1 enforcement + 1 outbox-audit green vs
+  Postgres 18; 199 lib tests; fmt + clippy clean.
+
 - [x] **2026-07-22 — Collaboration / automation / prioritisation
   capabilities (§9.4a).** Migration `m20260722_000001_capabilities`
   (`reviews`, `automations`, `automation_runs`, `scheduled_actions`,
@@ -643,9 +674,8 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   review queue). Matching is **kind-agnostic** — no kind gate, so any
   two plans may match regardless of their optional `kind` labels; cover
   it in `tests/matching.rs`.
-- [ ] Name search — `GET /search?q=` Postgres `ILIKE` on the
-  denormalised `name` (cap 50, wildcards escaped). Tantivy full-text /
-  fuzzy deferred.
+- [x] Name search — `GET /search?q=` Tantivy full-text/fuzzy/phonetic
+  search (§9.1, §13 2026-08-02), replacing the earlier Postgres `ILIKE`.
 - [ ] Operational sub-resources — `tasks` / `goals` / `issues` tables +
   CRUD controllers, each keyed by the parent plan `pid`, audited,
   emitting scoped events. (`posts` / `comments` / `members` deferred.)
@@ -737,7 +767,8 @@ HIPAA/NHS/GDPR posture for audit and access controls.
 - [ ] Collaboration sub-resources (deferred) — `posts` / `comments` /
   `members` tables + CRUD, mirroring the plan template's collaboration
   tier, if/when prioritised.
-- [ ] Tantivy full-text/fuzzy search over the JSONB payload.
+- [x] Tantivy full-text/fuzzy/phonetic search over the JSONB payload
+  (§13 2026-08-02).
 
 - [x] **Fix: fresh-Postgres `db migrate` failed in the `event_outbox`
   migration (2026-07-18).** The loco `create_table` helper pluralizes
@@ -948,7 +979,8 @@ HIPAA/NHS/GDPR posture for audit and access controls.
 **Implemented (MVP v0.1.0 + PPM Phases A/B/C; see §13 for the
 delivered-task detail).** The crate builds and tests green: one REST
 collection (`/api/plans`) over one `plans` table with a nullable `kind`
-label and a `parent_pid` containment column — CRUD + `ILIKE` search +
+label and a `parent_pid` containment column — CRUD + Tantivy full-text/
+fuzzy/phonetic search (`kind` is a search filter, never a matching gate) +
 kind-agnostic matching (embedded matcher, no kind gate) + real-time
 create duplicate detection + record merge + payload validation (`422`,
 incl. `parent_ref` containment-cycle check) + audit log +
@@ -963,7 +995,7 @@ dependencies / schedule / milestones / allocations / capacity / reports
 the engineering core (tasks / sprints / burndown / standup / DevOps).
 Still open (§13): the remaining operational sub-resources (goals /
 issues) + the derived timeline view, `deduplicate` + review
-queue, cross-service `entity_links`, bulk import/export, Tantivy,
+queue, cross-service `entity_links`, bulk import/export,
 privacy, the collaboration sub-resources, gRPC, and the Fluvio broker
 sink. The canonical `Plan` domain model is owned by the
 [portfolio entity spec §5](../../spec/index.md); this crate spec
@@ -972,13 +1004,14 @@ references it.
 ## 15. Roadmap
 
 `0.1.0` (unreleased) target: the CRUD + matching MVP over the single
-plans collection, then `ILIKE` search + audit + in-memory streaming, then
+plans collection, then `ILIKE` search (since replaced by Tantivy,
+2026-08-02) + audit + in-memory streaming, then
 the operational sub-resources (goals / tasks / issues) + derived views +
 record merge + cross-service links + OpenAPI/Swagger + Prometheus +
 offline PASETO v4 public verification + blanket `/api/*` enforcement (auth
 source of truth, superseding the RS256-JWT model:
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
-Next (deferred, §13): Tantivy full-text/fuzzy search, the durable event
+Next (deferred, §13): the durable event
 bus's Fluvio broker sink (Phase 2 outbox + Phase 3 relay/retention
 landed), privacy,
 front-end merge action, bulk import/export, the `posts` / `comments` /
@@ -988,8 +1021,10 @@ paseto-keys-over-HTTP fetch at boot, 2026-07-04 —
 
 ## 16. Open questions
 
-- Normalise goals / tasks into a search index once Tantivy lands, or keep
-  ILIKE-on-name only?
+- ~~Normalise goals / tasks into a search index once Tantivy lands, or
+  keep ILIKE-on-name only?~~ RESOLVED (2026-08-02): landed — goal titles
+  are indexed (§13); tasks are not (a plan's tasks are operational detail,
+  not identity signal, and are not part of the matcher payload either).
 - Should `deduplicate` auto-merge above `auto_merge_threshold`, or always
   route to the review queue?
 - Burndown snapshot cadence — on every task write, or a periodic `bg_pg`

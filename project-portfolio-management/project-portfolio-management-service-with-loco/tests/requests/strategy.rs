@@ -17,6 +17,7 @@ use serial_test::serial;
 // proposal → the proposal promotes into the registry; dismissed and
 // converted ideas refuse further actions.
 async fn idea_funnel_flows_into_the_intake_pipeline() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let quiet: Value = request
             .post("/api/ideas")
@@ -95,6 +96,7 @@ async fn idea_funnel_flows_into_the_intake_pipeline() {
 // and must-include violations, and refuses committing an infeasible
 // scenario; a feasible one commits with the evaluation audited.
 async fn scenarios_evaluate_and_commit_feasibly() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         // Two projects with budgets; one carries an open risk.
         let mk = |name: &str| {
@@ -202,6 +204,7 @@ async fn scenarios_evaluate_and_commit_feasibly() {
 // objective rolls weights up per collection; the item lists its
 // mappings; weight bounds refuse.
 async fn okr_alignment_rolls_up() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let objective: Value = request
             .post("/api/objectives")
@@ -271,6 +274,7 @@ async fn okr_alignment_rolls_up() {
 // Benefits: declared targets, realized accumulation, and ROI in
 // basis points against the item's recorded budget actuals.
 async fn benefits_track_realization_and_roi() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let item: Value = request
             .post("/api/plans")

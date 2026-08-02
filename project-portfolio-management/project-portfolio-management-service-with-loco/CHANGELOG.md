@@ -8,6 +8,59 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — Tantivy full-text/fuzzy/phonetic search (2026-08-02)
+
+Repo tasks.md S-4: transfers the care-pathway/case Tantivy pattern
+(S-2/S-3) whole — index module, streaming seam, reindex task with a
+boot rebuild, duplicate detection blocked on the index instead of
+scanning a capped 1000 rows. Portfolio adds one new wrinkle: the
+optional `kind` label.
+
+- `src/search/` — `PlanIndexSchema`/`PlanIndex` (`pid` STORED;
+  `name`/`alternate_names`/`name_phonetic`/`identifiers`/`keywords`/
+  `tags`/`goals`/`owner_org_name` TEXT; `code`/`owner_org_id`/`kind`/
+  `status`/`active` STRING) and `SearchEngine` (`search_page`,
+  `candidates`). A plan's defining attribute is what it is trying to
+  achieve — goal titles are now searchable, alongside tags, the owner
+  org, and every identifier scheme.
+- `GET /api/plans/search?q=` is now Tantivy-backed with `?fuzzy=true`,
+  `?phonetic=true`, and a new `?kind=` filter; `X-Total-Count` comes
+  from Tantivy's `Count` collector rather than a SQL `COUNT(*)`.
+  Replaces the Postgres `ILIKE` name search.
+- **`kind` is a search filter, never a dedup gate.** `kind` is indexed
+  as an exact-match field so `?kind=project` narrows a *search* — but
+  `check-duplicates`' blocking query (`SearchEngine::candidates`)
+  deliberately never applies it. The matcher is kind-agnostic by design
+  (`project-portfolio-management-matcher` AGENTS.md: "do not reintroduce
+  a kind gate — two plans with different kind labels may still be the
+  same identity"), and this service's own golden rule 5 says the same:
+  dedup / check-duplicates / merge are not scoped by kind. Gating the
+  blocking query by kind would have silently reintroduced exactly the
+  per-kind collection boundary the data model unification removed.
+  `search::tests::candidates_ignore_kind` and the DB-gated
+  `check_duplicates_blocks_on_identifier_alone_and_ignores_kind` pin
+  this: a `Program`-labelled stored plan and a `Project`-labelled query
+  still block against each other.
+- `POST /api/plans/check-duplicates` now scores a **blocked** candidate
+  set (fuzzy name, exact identifier, phonetic name — up to 200) from the
+  index instead of an in-memory scan capped at 1000 rows. (The identical
+  cap still backs `governance.rs`'s separate proposal-duplicate scan,
+  which has no index of its own yet.)
+- Both endpoints respond `503` (never a silent "no results") when the
+  index is unavailable.
+- `streaming.rs`'s `*_and_emit` seam indexes/deindexes best-effort after
+  every commit, so no write path can skip it.
+- `tasks/search.rs` — the `search_reindex` CLI task plus a
+  rebuild-if-empty on boot.
+- No SOUP register change — this crate carries no `compliance/soup.tsv`
+  (personal-data sensitivity here is lower than case/care-pathway; see
+  spec P-4).
+- `.gitignore` gains `/data/` (the index's default on-disk path) — a
+  derived, rebuildable artifact that must never be committed (a lesson
+  from S-2, whose own `.gitignore` fix landed alongside S-3).
+- DB-gated: `search_reaches_secondary_fields_tolerates_typos_and_filters_by_kind`,
+  `check_duplicates_blocks_on_identifier_alone_and_ignores_kind`.
+
 ### Changed — loco-rs 1.0.1 (2026-08-02)
 
 - **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration → 2.0,

@@ -26,7 +26,7 @@ Per-crate `spec.md`:
 - gRPC API: High-performance RPC framework (a per-crate subset — see the [overview.md](overview.md) capability matrix)
 - Data Quality: Validation, standardization, normalization, merging
 - Matching: Probabilistic and deterministic matching algorithms
-- Full-Text Search: Tantivy on nine crates; case-insensitive `ILIKE` on the rest (see the capability matrix)
+- Full-Text Search: Tantivy on all ten entity registries (see the capability matrix)
 - Duplicate Detection: Real-time and batch deduplication with review queue
 - Record Merging: Merge confirmed duplicate records with full audit trail
 - Create, read, update, delete (CRUD) records

@@ -38,6 +38,7 @@ async fn item(
 // Dependencies: self/duplicate/cycle refuse; the portfolio schedule
 // reports the violation, the critical path, and undated members.
 async fn dependencies_schedule_violations_and_critical_path() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let portfolio = item(
             &request,
@@ -140,6 +141,7 @@ async fn dependencies_schedule_violations_and_critical_path() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 // Milestones: due-order list with overdue flags; complete clears.
 async fn milestones_flag_overdue_until_completed() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let pid = item(&request, "projects", "Project", "Milestoned", None, None).await;
         request
@@ -181,6 +183,7 @@ async fn milestones_flag_overdue_until_completed() {
 // Allocations sum per person across items; over 100% flags in the
 // capacity rollup; bad percent / URN refuse.
 async fn capacity_flags_over_allocation() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let one = item(&request, "projects", "Project", "Alloc One", None, None).await;
         let two = item(&request, "products", "Product", "Alloc Two", None, None).await;
@@ -232,6 +235,7 @@ async fn capacity_flags_over_allocation() {
 // Saved reports run synchronously as JSON and CSV with filters and
 // field projection; unknown fields refuse at save time.
 async fn reports_filter_project_and_render_csv() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         item(
             &request,
@@ -293,6 +297,7 @@ async fn reports_filter_project_and_render_csv() {
 // The dashboard: per-collection RAG + stage rollups, site tiles, and
 // the ETag conditional cycle (304 until state changes).
 async fn dashboard_rolls_up_and_is_conditional() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         // A red item (overdue target), a green one, and a materialised
         // risk elsewhere.

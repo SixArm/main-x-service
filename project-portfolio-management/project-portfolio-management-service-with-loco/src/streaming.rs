@@ -347,6 +347,36 @@ async fn audit_best_effort(
     }
 }
 
+/// Add (or replace) a record in the full-text index, best-effort.
+///
+/// Deliberately **after** the database write and never fatal: the row is
+/// already committed, and failing the request would tell the caller
+/// their write did not happen when it did. Logged at `ERROR` because the
+/// consequence — a live plan invisible to search, and so invisible to
+/// the duplicate detector that blocks on the index — is silent until
+/// someone notices a missing hit. The repair is
+/// `cargo loco task search_reindex`.
+fn index_best_effort(pid: Uuid, plan: &Plan) {
+    let Some(engine) = crate::search::engine() else {
+        return;
+    };
+    if let Err(err) = engine.index_plan(pid, plan) {
+        tracing::error!(%pid, error = %err, "failed to index plan; search will miss it until reindex");
+    }
+}
+
+/// Remove a record from the full-text index, best-effort (same posture
+/// as [`index_best_effort`]). Called on soft-delete and on the duplicate
+/// side of a merge, so a retired plan stops being a search hit.
+fn deindex_best_effort(pid: Uuid) {
+    let Some(engine) = crate::search::engine() else {
+        return;
+    };
+    if let Err(err) = engine.delete_plan(pid) {
+        tracing::error!(%pid, error = %err, "failed to remove plan from index");
+    }
+}
+
 /// Create a plan and emit its `Created` event, atomically under the
 /// active transport. `memory`: insert on `db`, then push to the ring
 /// buffer (today's behaviour). `outbox`: open one transaction, insert the
@@ -362,7 +392,7 @@ pub async fn create_and_emit(
     wi: &Plan,
     actor: Option<&str>,
 ) -> ModelResult<PlanModel> {
-    match transport() {
+    let model = match transport() {
         EventTransport::Memory => {
             let model = PlanModel::create(db, wi).await?;
             publish_with_actor(
@@ -372,7 +402,7 @@ pub async fn create_and_emit(
                 actor,
             );
             audit_best_effort(db, model.pid, "created", actor, Some(model.data.clone())).await;
-            Ok(model)
+            model
         }
         EventTransport::Outbox => {
             let txn = db.begin().await?;
@@ -387,9 +417,13 @@ pub async fn create_and_emit(
             // Audit joins the same transaction — atomic with entity + event.
             AuditModel::record(&txn, model.pid, "created", actor, Some(model.data.clone())).await?;
             txn.commit().await?;
-            Ok(model)
+            model
         }
-    }
+    };
+    // Index only after the write is durable, so the index never
+    // advertises a record a rolled-back transaction never created.
+    index_best_effort(model.pid, wi);
+    Ok(model)
 }
 
 /// Replace a plan's payload and emit its `Updated` event, atomically
@@ -406,7 +440,7 @@ pub async fn update_and_emit(
     wi: &Plan,
     actor: Option<&str>,
 ) -> ModelResult<PlanModel> {
-    match transport() {
+    let updated = match transport() {
         EventTransport::Memory => {
             let updated = model.into_active_model().update_data(db, wi).await?;
             publish_with_actor(
@@ -423,7 +457,7 @@ pub async fn update_and_emit(
                 Some(updated.data.clone()),
             )
             .await;
-            Ok(updated)
+            updated
         }
         EventTransport::Outbox => {
             let txn = db.begin().await?;
@@ -444,9 +478,12 @@ pub async fn update_and_emit(
             )
             .await?;
             txn.commit().await?;
-            Ok(updated)
+            updated
         }
-    }
+    };
+    // Replaces the prior document, so a superseded name stops matching.
+    index_best_effort(updated.pid, wi);
+    Ok(updated)
 }
 
 /// Soft-delete a plan and emit its `Deleted` event, atomically under
@@ -478,6 +515,9 @@ pub async fn delete_and_emit(
             txn.commit().await?;
         }
     }
+    // A soft-deleted row is invisible to lookups, so it must stop being
+    // a search hit too.
+    deindex_best_effort(pid);
     Ok((pid, name))
 }
 
@@ -501,7 +541,7 @@ pub async fn merge_and_emit(
     actor: Option<&str>,
 ) -> ModelResult<(PlanModel, Uuid, String)> {
     let (dup_pid, dup_name) = (duplicate.pid, duplicate.name.clone());
-    match transport() {
+    let outcome = match transport() {
         EventTransport::Memory => {
             let merged = main.into_active_model().update_data(db, merged_wi).await?;
             duplicate.into_active_model().soft_delete(db).await?;
@@ -514,7 +554,7 @@ pub async fn merge_and_emit(
             publish_with_actor(EventKind::Deleted, &dup_pid.to_string(), &dup_name, actor);
             audit_best_effort(db, merged.pid, "merged", actor, Some(merged.data.clone())).await;
             audit_best_effort(db, dup_pid, "merged_into", actor, None).await;
-            Ok((merged, dup_pid, dup_name))
+            (merged, dup_pid, dup_name)
         }
         EventTransport::Outbox => {
             let txn = db.begin().await?;
@@ -537,9 +577,16 @@ pub async fn merge_and_emit(
                 .await?;
             AuditModel::record(&txn, dup_pid, "merged_into", actor, None).await?;
             txn.commit().await?;
-            Ok((merged, dup_pid, dup_name))
+            (merged, dup_pid, dup_name)
         }
-    }
+    };
+    // The survivor absorbed the duplicate's names and identifiers, so it
+    // is re-indexed with the merged payload; the duplicate is
+    // soft-deleted and leaves the index. Doing only one of the two would
+    // let a merged pair keep matching as two records.
+    index_best_effort(outcome.0.pid, merged_wi);
+    deindex_best_effort(outcome.1);
+    Ok(outcome)
 }
 
 #[cfg(test)]

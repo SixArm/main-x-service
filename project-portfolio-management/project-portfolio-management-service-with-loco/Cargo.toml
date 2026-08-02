@@ -38,6 +38,9 @@ axum = { version = "0.8" }
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 regex = { version = "1.13" }
+# Embedded full-text search index (see src/search/). Same version as the
+# rest of the family, so one index format.
+tantivy = { version = "0.22" }
 migration = { path = "migration" }
 sea-orm = { version = "2.0", features = [
   "sqlx-sqlite",
@@ -83,3 +86,5 @@ ed25519-dalek = { version = "2.2" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
 sha2 = { version = "0.10" }
 base64 = { version = "0.22" }
+# Temp directories for the search-index tests.
+tempfile = { version = "3" }

@@ -40,6 +40,7 @@ fn apollo_project() -> Value {
 // Pins the create happy path: `POST /api/plans` returns 200, echoes
 // the name, and mints a UUID pid; the row is then fetchable.
 async fn can_create_and_fetch_a_project() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.post("/api/plans").json(&apollo_project()).await;
         assert_eq!(response.status_code(), 200, "create should succeed");
@@ -63,6 +64,7 @@ async fn can_create_and_fetch_a_project() {
 #[ignore = "requires PostgreSQL"]
 // Pins the validation contract: a blank name is `422`.
 async fn create_rejects_blank_name() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let body = json!({ "kind": "Project", "name": "  " });
         let response = request.post("/api/plans").json(&body).await;
@@ -77,6 +79,7 @@ async fn create_rejects_blank_name() {
 // Pins the unified model: `kind` is an optional label, so any kind (or
 // none) is accepted — no collection cross-check.
 async fn create_accepts_any_optional_kind() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         // A kind label is optional and free — accepted.
         let with_kind = json!({ "kind": "Product", "name": "Apollo" });
@@ -108,6 +111,7 @@ async fn create_accepts_any_optional_kind() {
 // Pins the containment cycle guard: pointing a plan's `parent_ref` at
 // itself is rejected `422`.
 async fn self_parent_is_rejected() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created = request
             .post("/api/plans")
@@ -128,6 +132,7 @@ async fn self_parent_is_rejected() {
 #[ignore = "requires PostgreSQL"]
 // Pins the unknown-pid contract on GET.
 async fn unknown_pid_is_404() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let pid = uuid::Uuid::new_v4();
         let response = request.get(&format!("/api/plans/{pid}")).await;
@@ -142,6 +147,7 @@ async fn unknown_pid_is_404() {
 // Pins within-collection duplicate detection: a stored project with a
 // shared Jira key is returned by check-duplicates (score 1.0).
 async fn check_duplicates_finds_a_deterministic_twin() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let created = request.post("/api/plans").json(&apollo_project()).await;
         assert_eq!(created.status_code(), 200);
@@ -170,6 +176,7 @@ async fn check_duplicates_finds_a_deterministic_twin() {
 #[ignore = "requires PostgreSQL"]
 // Pins that `/whoami` is `401` without a bearer token.
 async fn whoami_requires_a_token() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.get("/api/plans/whoami").await;
         assert_eq!(response.status_code(), 401);
@@ -186,6 +193,7 @@ async fn whoami_requires_a_token() {
 // to the count as well as the page, so a child listing's total describes
 // the children rather than every plan.
 async fn list_and_search_are_paginated() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         for i in 0..5 {
             request
@@ -226,6 +234,119 @@ async fn list_and_search_are_paginated() {
         assert_eq!(hits.status_code(), 200, "search page: {}", hits.text());
         assert_eq!(hits.json::<Value>().as_array().expect("array").len(), 2);
         assert_eq!(header!(hits, "x-total-count"), "5");
+    })
+    .await;
+}
+
+/// Tantivy search reaches the fields an `ILIKE` over `name` never could
+/// — the goal a plan is trying to achieve, the owner org, an
+/// identifier — tolerates a typo when asked to, and a `?kind=` filter
+/// narrows without being required.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL"]
+async fn search_reaches_secondary_fields_tolerates_typos_and_filters_by_kind() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request.post("/api/plans").json(&apollo_project()).await;
+        assert_eq!(created.status_code(), 200);
+
+        let hits = |body: Value| body.as_array().map(Vec::len).unwrap_or_default();
+
+        // The defining attribute of a plan is what it is trying to
+        // achieve, and it is now searchable, alongside the identifier.
+        for q in ["Cut%20p95%20latency", "APOLLO"] {
+            let response = request.get(&format!("/api/plans/search?q={q}")).await;
+            assert_eq!(response.status_code(), 200);
+            assert_eq!(hits(response.json()), 1, "query {q}");
+        }
+
+        // A typo misses on exact retrieval and lands on fuzzy.
+        assert_eq!(
+            hits(request.get("/api/plans/search?q=Apoll").await.json()),
+            0
+        );
+        assert_eq!(
+            hits(
+                request
+                    .get("/api/plans/search?q=Apoll&fuzzy=true")
+                    .await
+                    .json()
+            ),
+            1,
+            "fuzzy must tolerate a dropped letter"
+        );
+
+        // `?kind=project` matches (case-insensitively); `?kind=program`
+        // finds nothing — an opt-in narrowing, not a gate.
+        assert_eq!(
+            hits(
+                request
+                    .get("/api/plans/search?q=Apollo&kind=Project")
+                    .await
+                    .json()
+            ),
+            1
+        );
+        assert_eq!(
+            hits(
+                request
+                    .get("/api/plans/search?q=Apollo&kind=program")
+                    .await
+                    .json()
+            ),
+            0
+        );
+
+        // A soft-deleted plan leaves the index.
+        let pid = created.json::<Value>()["pid"].as_str().unwrap().to_string();
+        request.delete(&format!("/api/plans/{pid}")).await;
+        assert_eq!(
+            hits(request.get("/api/plans/search?q=Apollo").await.json()),
+            0,
+            "a deleted plan must stop being a hit"
+        );
+    })
+    .await;
+}
+
+/// The search-blocked candidate detector reaches a plan whose name is
+/// wholly different but whose identifier matches, and does not care that
+/// the query and the stored plan carry different `kind` labels — the
+/// matcher is kind-agnostic, so blocking must not silently reintroduce
+/// the boundary the data model removed.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL"]
+async fn check_duplicates_blocks_on_identifier_alone_and_ignores_kind() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request
+            .post("/api/plans")
+            .json(&json!({
+                "kind": "Program",
+                "name": "Wholly Unrelated Plan",
+                "identifiers": [{ "scheme": "JiraProjectKey", "value": "APOLLO" }]
+            }))
+            .await;
+        assert_eq!(created.status_code(), 200);
+
+        let response = request
+            .post("/api/plans/check-duplicates")
+            .json(&json!({
+                "kind": "Project",
+                "name": "Apollo platform migration",
+                "identifiers": [{ "scheme": "JiraProjectKey", "value": "APOLLO" }]
+            }))
+            .await;
+        assert_eq!(response.status_code(), 200);
+        let hits: Value = response.json();
+        let created_body: Value = created.json();
+        let pid = created_body["pid"].as_str().unwrap();
+        assert!(
+            hits.as_array().unwrap().iter().any(|h| h["pid"] == pid),
+            "the identifier-only, differently-kinded match must be found via blocking: {hits}"
+        );
     })
     .await;
 }

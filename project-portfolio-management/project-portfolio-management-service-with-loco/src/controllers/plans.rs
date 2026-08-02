@@ -24,10 +24,22 @@ use crate::models::merge_records::Model as MergeRecordModel;
 use crate::models::plans::Model as PlanModel;
 use crate::streaming;
 
-/// Maximum number of stored rows scanned in-memory by `check-duplicates`.
-/// No search-backed candidate blocking yet (deferred — spec §13); the
-/// handler `WARN`s if the scan reaches this cap.
+/// Maximum number of stored rows scanned in-memory.
+///
+/// `check-duplicates` no longer scans (it blocks on the search index —
+/// see [`CHECK_DUPLICATES_CANDIDATE_LIMIT`]); this cap remains in use by
+/// [`super::governance`]'s proposal-duplicate scan, which has no index
+/// backing it yet.
 pub const CHECK_DUPLICATES_SCAN_CAP: u64 = 1000;
+
+/// Maximum number of **blocked candidates** `check-duplicates` scores a
+/// query against.
+///
+/// The search index supplies these, so this bounds how many *plausible*
+/// records are scored rather than how much of the table is read — which
+/// is what removes the old scale cliff, where record 1001 was
+/// unreachable however obvious a duplicate it was.
+pub const CHECK_DUPLICATES_CANDIDATE_LIMIT: usize = 200;
 
 /// Parse an optional descriptive `kind` label from a string, accepting
 /// both the singular `PlanKind` variant name (`"Project"`) and the legacy
@@ -210,6 +222,23 @@ impl Page {
     }
 }
 
+/// Parse index hits into UUIDs, dropping any that will not parse.
+///
+/// A malformed stored id can only come from a corrupted index, and the
+/// right response is to ignore that hit rather than fail a search that
+/// has other perfectly good results.
+fn parse_pids(hits: &[String]) -> Vec<uuid::Uuid> {
+    hits.iter()
+        .filter_map(|s| match uuid::Uuid::parse_str(s) {
+            Ok(id) => Some(id),
+            Err(err) => {
+                tracing::warn!(hit = %s, error = %err, "index hit is not a UUID; ignoring");
+                None
+            }
+        })
+        .collect()
+}
+
 /// Stamp `X-Total-Count` / `X-Limit` / `X-Offset` onto a response.
 fn with_page_headers(mut response: Response, total: u64, limit: u64, offset: u64) -> Response {
     let headers = response.headers_mut();
@@ -234,8 +263,19 @@ struct SearchParams {
     /// Rows to skip; absent ⇒ 0.
     #[serde(default)]
     offset: Option<u64>,
-    /// The case-insensitive substring to match against `name`.
+    /// The full-text query.
     q: Option<String>,
+    /// Typo-tolerant retrieval (Levenshtein ≤ 2) instead of exact terms.
+    #[serde(default)]
+    fuzzy: bool,
+    /// Phonetic (Soundex) retrieval; takes precedence over `fuzzy`.
+    #[serde(default)]
+    phonetic: bool,
+    /// Optional exact `kind` filter (e.g. `project`) — a caller-requested
+    /// narrowing, never a gate the service imposes (matching is
+    /// kind-agnostic; see `src/search/mod.rs`).
+    #[serde(default)]
+    kind: Option<String>,
 }
 
 /// Body of `POST /{collection}/merge`: which duplicate folds into which
@@ -387,12 +427,17 @@ async fn list(
     Ok(with_page_headers(format::json(refs)?, total, limit, offset))
 }
 
-/// Case-insensitive name search (Postgres `ILIKE`, cap 50).
-/// `GET /api/plans/search?q=`.
+/// Full-text plan search: `GET /api/plans/search?q=`.
+/// Tantivy-backed over name, alternate names, owner org name,
+/// identifiers, keywords, tags, and goal titles; `?fuzzy=true`
+/// tolerates typos, `?phonetic=true` matches on how the name sounds,
+/// and `?kind=` optionally narrows to one exact kind label (an opt-in
+/// filter, not a gate — matching stays kind-agnostic).
 ///
 /// # Errors
 ///
-/// `400` when `q` is missing or blank.
+/// `400` when `q` is missing or blank; `503` when the search index is
+/// unavailable.
 #[debug_handler]
 async fn search(
     axum::extract::Query(params): axum::extract::Query<SearchParams>,
@@ -408,8 +453,30 @@ async fn search(
     };
     page.check_offset()?;
     let (limit, offset) = page.resolve(SEARCH_DEFAULT_LIMIT);
-    let rows = PlanModel::search_paged(&ctx.db, q.trim(), limit, offset).await?;
-    let total = PlanModel::search_count(&ctx.db, q.trim()).await?;
+    // An unavailable index is reported, never disguised as "no matches":
+    // an operator must be able to tell a broken index from an empty one.
+    let Some(engine) = crate::search::engine() else {
+        return Err(Error::CustomError(
+            StatusCode::SERVICE_UNAVAILABLE,
+            ErrorDetail::new("search_unavailable", "the search index is unavailable"),
+        ));
+    };
+    let mode = if params.phonetic {
+        crate::search::SearchMode::Phonetic
+    } else if params.fuzzy {
+        crate::search::SearchMode::Fuzzy
+    } else {
+        crate::search::SearchMode::Exact
+    };
+    let (pids, index_total) = engine.search_page(
+        q.trim(),
+        mode,
+        params.kind.as_deref(),
+        usize::try_from(limit).unwrap_or(usize::MAX),
+        usize::try_from(offset).unwrap_or(usize::MAX),
+    )?;
+    let rows = PlanModel::find_by_pids(&ctx.db, &parse_pids(&pids)).await?;
+    let total = index_total as u64;
     let refs: Vec<PlanRef> = rows.iter().map(PlanRef::of).collect();
     Ok(with_page_headers(format::json(refs)?, total, limit, offset))
 }
@@ -430,23 +497,41 @@ async fn match_against(Json(req): Json<MatchRequest>) -> Result<Response> {
 /// Find stored plans matching the query above the threshold.
 /// `POST /api/plans/check-duplicates`.
 ///
+/// The search index supplies a **blocked** candidate set — up to
+/// [`CHECK_DUPLICATES_CANDIDATE_LIMIT`] plausible matches via fuzzy
+/// name, exact identifier, and phonetic retrieval — each scored against
+/// the query. Deliberately **not** filtered by `kind`: the matcher is
+/// kind-agnostic, so a `Portfolio`-labelled plan and a
+/// `Program`-labelled plan may still be the same identity (see
+/// `src/search/mod.rs`).
+///
 /// # Errors
 ///
-/// A DB error when the row scan fails.
+/// `503` when the search index is unavailable, so duplicates cannot be
+/// checked; a DB error when the row fetch fails.
 #[debug_handler]
 async fn check_duplicates(
     State(ctx): State<AppContext>,
     Json(query): Json<Plan>,
 ) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
-    let rows = PlanModel::list(&ctx.db, CHECK_DUPLICATES_SCAN_CAP).await?;
-    if rows.len() as u64 == CHECK_DUPLICATES_SCAN_CAP {
-        tracing::warn!(
-            cap = CHECK_DUPLICATES_SCAN_CAP,
-            "check-duplicates in-memory scan hit its row cap; results may be \
-             incomplete until search-backed candidate blocking lands (spec §13)"
-        );
-    }
+    // Blocking, not scanning: the index supplies plausible candidates,
+    // so a duplicate's reachability depends on how similar it is rather
+    // than on how recently it was inserted. An unavailable index is
+    // surfaced rather than silently answering "no duplicates", which
+    // would let a caller create a duplicate believing it had been
+    // checked.
+    let Some(index) = crate::search::engine() else {
+        return Err(Error::CustomError(
+            StatusCode::SERVICE_UNAVAILABLE,
+            ErrorDetail::new(
+                "search_unavailable",
+                "the search index is unavailable, so duplicates cannot be checked",
+            ),
+        ));
+    };
+    let candidates = index.candidates(&query, CHECK_DUPLICATES_CANDIDATE_LIMIT)?;
+    let rows = PlanModel::find_by_pids(&ctx.db, &parse_pids(&candidates)).await?;
     let mut hits: Vec<ScoredRef> = Vec::new();
     for row in &rows {
         let candidate = row.to_plan()?;

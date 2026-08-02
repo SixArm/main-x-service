@@ -164,8 +164,40 @@
   (its `spec/index.md` T-6 entry is left for a future pass — bundling an
   unrelated crate's spec rewrite into this PR was judged more churn than
   the inconsistency warranted).
-- [ ] **S-4 (L)** Tantivy in **portfolio** — note the kind gate: index
+- [x] **S-4 (L)** Tantivy in **portfolio** — note the kind gate: index
   `kind` as a field and filter search/dedup within-kind. Depends: S-1.
+  *(done 2026-08-02)*
+
+  This task's own note needed a correction, not just an implementation:
+  "filter search/dedup within-kind" read as a duplicate-detection gate,
+  but both `project-portfolio-management-matcher/AGENTS.md` ("do not
+  reintroduce a kind gate — two plans with different kind labels may
+  still be the same identity") and this service's own `AGENTS.md`
+  golden rule 5 ("dedup / check-duplicates / merge are not scoped by
+  kind") say the opposite, in terms strong enough to call them
+  deliberate, tested invariants rather than oversights. Implemented as
+  the reading that satisfies both: `kind` is indexed and available as
+  an opt-in **search** filter (`GET /plans/search?kind=project`), and
+  `SearchEngine::candidates` (the `check-duplicates` blocking query)
+  never applies it — a `Program`-labelled stored plan still blocks
+  against a `Project`-labelled query. `search::tests::candidates_ignore_kind`
+  plus a DB-gated end-to-end test pin the distinction so a future edit
+  can't quietly collapse it back into a gate.
+
+  Otherwise the care-pathway/case pattern (S-2/S-3) transferred whole:
+  index module, streaming seam, reindex task + boot rebuild, `check-
+  duplicates` moved from a capped 1000-row scan to up to 200
+  index-blocked candidates. The field set is what a plan *is trying to
+  achieve* — goal titles are now searchable, alongside tags, the owner
+  org, and every identifier scheme. No SOUP register change (portfolio
+  carries none — lower personal-data sensitivity than case/care-pathway,
+  per P-4). `.gitignore` got its `/data/` entry from the start this
+  time.
+  *Verified:* 38 DB-gated + 1 enforcement + 1 outbox-audit green vs
+  Postgres 18; 199 lib tests; fmt + clippy clean.
+
+  **S-1..S-4 are now complete — every entity registry indexes via
+  Tantivy.**
 
 - [x] **P-1 (M)** Privacy module in **organization**. *(done 2026-08-01)*
   `src/privacy.rs`: `mask_organization` + `export_organization`, the

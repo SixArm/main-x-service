@@ -45,6 +45,7 @@ fn created_envelope(model: &PlanModel) -> Envelope {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn outbox_create_writes_plan_and_one_event_atomically() {
+    super::isolate_search_index();
     request::<App, _, _>(|_request, ctx| async move {
         let wi = Plan::new("Outbox platform migration");
 
@@ -92,6 +93,7 @@ async fn outbox_create_writes_plan_and_one_event_atomically() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn outbox_failure_rolls_back_both_writes() {
+    super::isolate_search_index();
     request::<App, _, _>(|_request, ctx| async move {
         let wi = Plan::new("Rollback platform migration");
 

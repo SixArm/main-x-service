@@ -16,6 +16,7 @@ use serial_test::serial;
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 #[allow(clippy::too_many_lines)] // one seeded estate, seven views
 async fn executive_financial_and_technology_views() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         // ── Seed: one portfolio, two children (one overrun + tagged).
         let portfolio: Value = request
@@ -213,6 +214,7 @@ async fn executive_financial_and_technology_views() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 #[allow(clippy::too_many_lines)] // one seeded estate, five moderate-fit views
 async fn moderate_fits_tranches_debt_flow_alignment_compare() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let project: Value = request
             .post("/api/plans")
@@ -401,6 +403,7 @@ async fn moderate_fits_tranches_debt_flow_alignment_compare() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 #[allow(clippy::too_many_lines)] // one seeded estate, all oversight views
 async fn oversight_areas_round_trip() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         // ── Seed: portfolio + project, gated tranche, categorised
         // risks, milestone, benefit, scenario commit.
@@ -619,6 +622,7 @@ async fn oversight_areas_round_trip() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 #[allow(clippy::too_many_lines)] // one seeded estate, the engineering surface
 async fn engineering_tasks_sprints_and_views() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let project: Value = request
             .post("/api/plans")
@@ -801,6 +805,7 @@ async fn engineering_tasks_sprints_and_views() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 #[allow(clippy::too_many_lines)] // one seeded estate, the moderate engineering surface
 async fn engineering_moderate_points_notes_wip_devops() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let project: Value = request
             .post("/api/plans")
@@ -974,6 +979,7 @@ async fn wip_limits_refuse_overfull_columns() {
             r#"{"in_progress": 1}"#,
         );
     }
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let project: Value = request
             .post("/api/plans")

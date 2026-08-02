@@ -39,6 +39,7 @@ fn person(uuid: &str) -> String {
 // external), one declines, one accepts and submits — and the consensus
 // reports the outstanding invitation rather than declaring agreement.
 async fn collaborative_review_delegates_and_aggregates_honestly() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let plan_pid = create_plan!(request, "Reviewable plan");
         let expert_a = person("11111111-1111-1111-1111-111111111111");
@@ -144,6 +145,7 @@ async fn collaborative_review_delegates_and_aggregates_honestly() {
 // A rule configured once fires when the task crosses the board, logs
 // what it did, and a rule scoped to another plan stays out of it.
 async fn workflow_automation_fires_on_a_board_move_and_logs_the_run() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let plan_pid = create_plan!(request, "Automated board");
         let other_pid = create_plan!(request, "Someone else's board");
@@ -279,6 +281,7 @@ async fn workflow_automation_fires_on_a_board_move_and_logs_the_run() {
 // Set and forget: a deadline in the future is not fired by a sweep, and
 // a cancelled one never fires at all.
 async fn scheduled_actions_only_fire_when_due_and_only_once() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let plan_pid = create_plan!(request, "Deadline plan");
         let recipient = person("55555555-5555-5555-5555-555555555555");
@@ -361,6 +364,7 @@ async fn scheduled_actions_only_fire_when_due_and_only_once() {
 // Assignee management: assign, see the workload (including unassigned),
 // then unassign.
 async fn assignee_workload_shows_the_open_pile_including_unassigned() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let plan_pid = create_plan!(request, "Staffed plan");
         let worker = person("66666666-6666-6666-6666-666666666666");
@@ -412,6 +416,7 @@ async fn assignee_workload_shows_the_open_pile_including_unassigned() {
 // The Smart Score explains itself: a plan with no evidence scores null
 // (not zero), and evidence moves the score and shrinks `missing`.
 async fn smart_score_explains_itself_and_never_fakes_evidence() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let plan_pid = create_plan!(request, "Scored plan");
         let scored: Value = request
@@ -491,6 +496,7 @@ async fn smart_score_explains_itself_and_never_fakes_evidence() {
 // Bird's-eye visibility: every phase is reported, and a plan's
 // readiness names each blocker instead of just saying "not ready".
 async fn lifecycle_reports_every_phase_and_names_each_blocker() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let plan_pid = create_plan!(request, "Lifecycle plan");
         let funnel: Value = request.get("/api/lifecycle").await.json();
