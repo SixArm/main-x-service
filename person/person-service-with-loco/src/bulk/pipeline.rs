@@ -216,7 +216,7 @@ async fn import_upsert_locked(
     let key = resolve_stable_key(person);
     let guard = db.begin().await?;
     guard
-        .execute(Statement::from_sql_and_values(
+        .execute_raw(Statement::from_sql_and_values(
             DatabaseBackend::Postgres,
             "SELECT pg_advisory_xact_lock(hashtext($1)::bigint)",
             [stable_key_lock_string(&key).into()],

@@ -1098,7 +1098,7 @@ async fn test_out_of_band_sql_edit_to_a_child_table_is_detected() {
 
     // Edit the stored identifier directly, writing no audit row.
     let conn = common::db().await;
-    conn.execute(sea_orm::Statement::from_sql_and_values(
+    conn.execute_raw(sea_orm::Statement::from_sql_and_values(
         sea_orm::DatabaseBackend::Postgres,
         "UPDATE person_identifiers SET value = 'TAMPERED' WHERE person_id = $1",
         [id.into()],
@@ -1251,7 +1251,7 @@ async fn test_a_recorded_checkpoint_detects_wholesale_deletion() {
     // Delete the trail as an attacker with SQL access would. No audit row
     // is written; nothing in-band records it.
     let conn = common::db().await;
-    conn.execute(sea_orm::Statement::from_string(
+    conn.execute_raw(sea_orm::Statement::from_string(
         sea_orm::DatabaseBackend::Postgres,
         "DELETE FROM audit_log".to_string(),
     ))

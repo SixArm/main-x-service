@@ -80,7 +80,7 @@ pub async fn db() -> sea_orm::DatabaseConnection {
 /// ground-truth assertion.
 pub async fn count_rows(conn: &sea_orm::DatabaseConnection, sql: &str, id: uuid::Uuid) -> i64 {
     use sea_orm::ConnectionTrait as _;
-    conn.query_one(sea_orm::Statement::from_sql_and_values(
+    conn.query_one_raw(sea_orm::Statement::from_sql_and_values(
         sea_orm::DatabaseBackend::Postgres,
         sql,
         [id.into()],
@@ -110,7 +110,7 @@ pub async fn purge_record(conn: &sea_orm::DatabaseConnection, id: uuid::Uuid) {
         // a foreign key; any table that does not is listed above.
         "DELETE FROM persons WHERE id = $1",
     ] {
-        conn.execute(sea_orm::Statement::from_sql_and_values(
+        conn.execute_raw(sea_orm::Statement::from_sql_and_values(
             sea_orm::DatabaseBackend::Postgres,
             sql,
             [id.into()],

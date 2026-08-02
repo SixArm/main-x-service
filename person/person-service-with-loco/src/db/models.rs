@@ -769,7 +769,7 @@ pub mod person_match_scores {
 pub mod audit_log {
     use super::{
         ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
-        EnumIter, PrimaryKeyTrait, Serialize, TimeDateTimeWithTimeZone, Uuid,
+        EntityTrait, EnumIter, PrimaryKeyTrait, Serialize, TimeDateTimeWithTimeZone, Uuid,
     };
 
     /// One audit row: action + entity + old/new JSON + request context.

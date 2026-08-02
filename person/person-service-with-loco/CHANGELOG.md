@@ -7,6 +7,39 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16.4 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration →
+  2.0, sea-query → 1.0. Feature renames applied: `auth_jwt` → `auth`,
+  `bg_pg` → `worker`.
+- **22 raw `Statement` call sites** across `src/compliance/erasure.rs`,
+  `src/bulk/pipeline.rs`, `src/db/audit.rs`, `src/db/review_queue.rs`,
+  `src/api/rest/handlers.rs`, and two test files move from
+  `.execute`/`.query_one`/`.query_all` to the `_raw` variants — the
+  largest count in the family so far, reflecting how much hand-rolled
+  SQL this crate's audit and bulk paths carry.
+- **`sea-orm`'s `BigDecimal` support needs an explicit feature.** Three
+  match-score columns (`gender_score`, `address_score`,
+  `identifier_score`) are stored as `bigdecimal::BigDecimal`; sea-orm
+  2.0 no longer implements `ValueType`/`Nullable` for it without
+  `with-bigdecimal` enabled (worked before only because something else
+  pulled the impl in transitively under 1.1's default feature set).
+  Added it explicitly.
+- **A pre-existing missing import surfaced.** The `audit_log` SeaORM
+  module imports its dependencies explicitly (`use super::{...}`)
+  rather than glob-importing the prelude like every sibling module in
+  the same file — and was missing `EntityTrait`. sea-orm 1.1's
+  `DeriveEntityModel` expansion tolerated this; 2.0's does not. Every
+  other module in `src/db/models.rs` already had it; this one just
+  hadn't been exercised by a macro version that cared.
+- **`Worker::perform_later()` now returns `Result<String>`** (the job
+  id) instead of `Result<()>`. One call site in `src/bulk/handlers.rs`
+  matched on `Ok(())`; changed to bind and ignore the id.
+- A `useless_conversion` in `src/db/outbox.rs` from a now-redundant
+  `.into()`.
+- No behavioural change; verified with the full DB-gated suite (40
+  tests, unchanged count) against a freshly migrated Postgres 18.
+
 ### Added — key rotation and policy hot-reload without a restart (2026-08-01)
 
 AU-1, with this crate as the axum-style reference (case is the

@@ -444,7 +444,7 @@ pub async fn export_person(
         ),
         Ok((job, false)) => {
             match BulkJobWorker::perform_later(&ctx, BulkJobArgs { job_id: job.id }).await {
-                Ok(()) => (
+                Ok(_job_ref) => (
                     StatusCode::ACCEPTED,
                     Json(ApiResponse::success(JobAccepted { job_id: job.id })),
                 ),
