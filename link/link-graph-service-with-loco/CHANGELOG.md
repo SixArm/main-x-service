@@ -13,6 +13,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > and [event-bus.md](../../agents/share/event-bus.md).
 
 ## [Unreleased]
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration → 2.0,
+  sea-query → 1.0. This crate's tables (`edges`, `entity_presence`,
+  `audit_log`) key on UUID, not an auto-increment integer, so the
+  `ColType::PkAuto` 64-bit width change (affecting every other crate in
+  this migration) doesn't touch it; no raw `Statement` calls, no
+  `ExprTrait`/`.eq()` construction, no `DatabaseConnection::Disconnected`
+  either — the cleanest bump in the family so far, no source changes at
+  all beyond the two `Cargo.toml`s.
+- No behavioural change; verified with the full DB-gated suite (16
+  tests, unchanged count) against a freshly migrated Postgres 18.
+
 ### Added — boot key fetch, key rotation, policy hot-reload, and audited caller addresses (2026-08-01)
 
 AU-3, the last service to adopt the family's auth hardening.
