@@ -10,6 +10,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration →
+  2.0, sea-query → 1.0. This crate owns no domain tables (it's a pure
+  aggregator over five upstream services; `migration/` is an empty
+  migrator kept only so loco's boot works), so the PK-width and
+  raw-Statement fallout that hit every entity-registry crate in this
+  migration doesn't apply here — no source change beyond the two
+  `Cargo.toml`s.
+- No behavioural change; verified with the full DB-gated suite (50
+  tests, unchanged count) — Postgres only needs to be reachable, no
+  tables are asserted against.
+
 ### Fixed
 
 - `src/auth/mod.rs` had rustfmt drift that broke the crate's
