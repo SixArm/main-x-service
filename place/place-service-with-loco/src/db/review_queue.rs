@@ -146,7 +146,7 @@ pub async fn upsert<C: ConnectionTrait>(
                 item.status.clone().into(),
             ],
         );
-        if let Some(qr) = conn.query_one(stmt).await.map_err(db_err)? {
+        if let Some(qr) = conn.query_one_raw(stmt).await.map_err(db_err)? {
             rows.push(row_from(&qr)?);
         }
     }
@@ -183,7 +183,7 @@ pub async fn list<C: ConnectionTrait>(
         )
     };
     let mut rows = Vec::new();
-    for qr in conn.query_all(stmt).await.map_err(db_err)? {
+    for qr in conn.query_all_raw(stmt).await.map_err(db_err)? {
         rows.push(row_from(&qr)?);
     }
     Ok(rows)
@@ -219,7 +219,7 @@ pub async fn decide<C: ConnectionTrait>(
             reviewed_by.map(ToString::to_string).into(),
         ],
     );
-    if let Some(qr) = conn.query_one(update).await.map_err(db_err)? {
+    if let Some(qr) = conn.query_one_raw(update).await.map_err(db_err)? {
         return Ok(DecideOutcome::Decided(row_from(&qr)?));
     }
     let probe = Statement::from_sql_and_values(
@@ -227,7 +227,7 @@ pub async fn decide<C: ConnectionTrait>(
         "SELECT status FROM review_queue WHERE id = $1",
         [id.into()],
     );
-    match conn.query_one(probe).await.map_err(db_err)? {
+    match conn.query_one_raw(probe).await.map_err(db_err)? {
         Some(qr) => Ok(DecideOutcome::AlreadyDecided(
             qr.try_get("", "status").map_err(db_err)?,
         )),

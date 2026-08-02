@@ -7,6 +7,26 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16.4 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration →
+  2.0, sea-query → 1.0. Feature renames applied: `auth_jwt` → `auth`,
+  `bg_pg` → `worker`.
+- **4 raw `Statement` call sites** in `src/db/review_queue.rs` move to
+  the `_raw` variants — this crate's only hand-rolled SQL; unlike
+  person/worker there's no separate audit-chain or erasure module.
+- **A pre-existing missing `EntityTrait` import surfaced in three
+  `db/models.rs` submodules** (`place_merge_records` and two others),
+  same class of latent bug as person-service: sea-orm 1.1's
+  `DeriveEntityModel` expansion tolerated the gap, 2.0's doesn't.
+- A `useless_conversion` in `src/db/outbox.rs` from a now-redundant
+  `.into()`.
+- No `BigDecimal`, no `DatabaseConnection::Disconnected`, and this
+  crate's tables already key on `i64` (not loco's `PkAuto` DSL), so
+  none of person/worker's other fixes were needed here.
+- No behavioural change; verified with the full DB-gated suite (3
+  tests, unchanged count) against a freshly migrated Postgres 18.
+
 ### Added — key rotation and policy hot-reload without a restart (2026-08-01)
 
 AU-1, following the person service (the axum-style reference).

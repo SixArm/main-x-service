@@ -313,7 +313,7 @@ pub mod place_opening_hours {
 pub mod place_merge_records {
     use super::{
         ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
-        EnumIter, Json, PrimaryKeyTrait, Serialize, TimeDateTimeWithTimeZone, Uuid,
+        EntityTrait, EnumIter, Json, PrimaryKeyTrait, Serialize, TimeDateTimeWithTimeZone, Uuid,
     };
 
     /// A row recording the fold of a duplicate place into a main place.
@@ -346,7 +346,7 @@ pub mod place_merge_records {
 pub mod audit_log {
     use super::{
         ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
-        EnumIter, Json, PrimaryKeyTrait, Serialize, TimeDateTimeWithTimeZone, Uuid,
+        EntityTrait, EnumIter, Json, PrimaryKeyTrait, Serialize, TimeDateTimeWithTimeZone, Uuid,
     };
 
     /// One audit row.
@@ -409,7 +409,7 @@ pub mod audit_log {
 pub mod event_outbox {
     use super::{
         ActiveModelBehavior, DeriveEntityModel, DerivePrimaryKey, DeriveRelation, Deserialize,
-        EnumIter, Json, PrimaryKeyTrait, Serialize, TimeDateTimeWithTimeZone, Uuid,
+        EntityTrait, EnumIter, Json, PrimaryKeyTrait, Serialize, TimeDateTimeWithTimeZone, Uuid,
     };
 
     /// One persisted outbox row: a canonical envelope awaiting relay to
