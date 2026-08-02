@@ -183,7 +183,7 @@ pub async fn erase<C: ConnectionTrait>(
 /// never written, which would let a dropped event resurrect the edge.
 async fn withdraw_links<C: ConnectionTrait>(db: &C, pid: Uuid) -> ModelResult<u64> {
     let result = db
-        .execute(sea_orm::Statement::from_sql_and_values(
+        .execute_raw(sea_orm::Statement::from_sql_and_values(
             db.get_database_backend(),
             "UPDATE entity_links SET deleted_at = NOW() \
              WHERE from_pid = $1 AND deleted_at IS NULL",

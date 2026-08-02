@@ -165,7 +165,7 @@ pub fn input_for<'a>(row: &'a audit_logs::Model, prev: Option<&'a str>) -> Chain
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct ChainBreak {
     /// The `audit_logs.id` at which the break was detected.
-    pub id: i32,
+    pub id: i64,
     /// `linkage` — the row does not point at its predecessor's hash (a row
     /// was inserted, deleted, or reordered); `content` — the row's stored
     /// hash does not match its own content (the row was edited).
@@ -389,14 +389,14 @@ mod tests {
     /// Build a chained row the way the writer does: hash over the row's own
     /// content plus `prev`.
     fn row(
-        id: i32,
+        id: i64,
         prev: Option<&str>,
         action: &str,
         snapshot: Option<serde_json::Value>,
     ) -> audit_logs::Model {
         let mut model = audit_logs::Model {
-            created_at: at(1_700_000_000_000_000 + i64::from(id)),
-            updated_at: at(1_700_000_000_000_000 + i64::from(id)),
+            created_at: at(1_700_000_000_000_000 + id),
+            updated_at: at(1_700_000_000_000_000 + id),
             id,
             entity_pid: Uuid::from_u128(u128::from(id.unsigned_abs())),
             action: action.to_string(),
@@ -421,7 +421,7 @@ mod tests {
     }
 
     /// Build a well-formed chain of `n` rows.
-    fn chain(n: i32) -> Vec<audit_logs::Model> {
+    fn chain(n: i64) -> Vec<audit_logs::Model> {
         let mut rows: Vec<audit_logs::Model> = Vec::new();
         for id in 1..=n {
             let prev = rows.last().and_then(|r| r.hash.clone());

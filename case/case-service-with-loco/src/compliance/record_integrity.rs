@@ -322,7 +322,7 @@ mod tests {
     }
 
     /// A stored row with a correct hash.
-    fn row(id: i32, title: &str) -> cases::Model {
+    fn row(id: i64, title: &str) -> cases::Model {
         let mut model = cases::Model {
             created_at: at(1_700_000_000_000_000),
             updated_at: at(1_700_000_000_000_000),

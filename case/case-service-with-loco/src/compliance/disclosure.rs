@@ -478,8 +478,10 @@ mod tests {
             return; // env opted in; the DB-gated suite covers that path
         }
         // A connection that would fail if touched: proves the no-op path
-        // never reaches the database.
-        let db = sea_orm::DatabaseConnection::Disconnected;
+        // never reaches the database. sea-orm 2.0 dropped the old
+        // `DatabaseConnection::Disconnected` marker variant; a `MockDatabase`
+        // with no queued results errors on the first real query instead.
+        let db = sea_orm::MockDatabase::new(sea_orm::DatabaseBackend::Postgres).into_connection();
         let ctx = AccessContext::internal();
         assert!(
             record_access(&db, Uuid::nil(), action::READ, None, &ctx)

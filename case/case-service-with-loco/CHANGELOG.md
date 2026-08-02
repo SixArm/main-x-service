@@ -8,6 +8,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration → 2.0,
+  sea-query → 1.0. Raw `Statement` queries in `models/audit_logs.rs`,
+  `src/compliance/erasure.rs`, and `tests/requests/cases.rs` move to
+  `execute_raw`; a `useless_conversion` in `models/event_outbox.rs` from
+  a now-redundant `.into()`.
+- **loco's `ColType::PkAuto` now generates a 64-bit primary key.** The
+  `cases`, `audit_logs`, and `merge_records` entities move from `i32` to
+  `i64`, along with the audit hash-chain code that carries their row ids
+  (`ChainBreak.id`, `Checkpoint.anchor_id`) and the compliance test
+  fixtures. `event_outbox` and `entity_links` are unaffected — the
+  former's migration writes raw SQL (`id SERIAL PRIMARY KEY`) rather
+  than the loco schema DSL, the latter keys on a UUID.
+- **sea-orm 2.0 dropped `DatabaseConnection::Disconnected`**, which
+  `src/compliance/disclosure.rs`'s test used as a "would fail if
+  touched" stand-in to prove the read-audit no-op path never reaches
+  the database when auditing is off. Replaced with a `MockDatabase`
+  carrying no queued results — added as a `mock`-feature dev-dependency
+  so it never reaches a release build.
+- No SOUP register change (`compliance/soup.tsv`) — `loco-rs` and
+  `sea-orm` were already annotated; this bumps existing dependencies,
+  it doesn't add one.
+- No behavioural change; verified with the full DB-gated suite (34
+  tests, unchanged count) against a freshly migrated Postgres 18.
+
 ### Added — pagination on list and search (2026-08-01)
 
 Follows the family convention fixed in `agents/share/restful.md` and

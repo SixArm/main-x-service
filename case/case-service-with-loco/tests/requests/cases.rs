@@ -900,7 +900,7 @@ async fn record_integrity_covers_every_write_path_and_catches_tampering() {
         let victim = request.post("/api/cases").json(&housing_case()).await;
         let victim_pid = victim.json::<Value>()["pid"].as_str().unwrap().to_string();
         ctx.db
-            .execute(sea_orm::Statement::from_sql_and_values(
+            .execute_raw(sea_orm::Statement::from_sql_and_values(
                 sea_orm::DatabaseBackend::Postgres,
                 "UPDATE cases SET data = jsonb_set(data, '{case_number}', '\"HB-9999-9999\"') \
                  WHERE pid = $1::uuid",
@@ -936,7 +936,7 @@ async fn record_integrity_covers_every_write_path_and_catches_tampering() {
         // Leave no corrupted record behind: the database is shared with
         // every other DB-gated target in this crate.
         ctx.db
-            .execute(sea_orm::Statement::from_sql_and_values(
+            .execute_raw(sea_orm::Statement::from_sql_and_values(
                 sea_orm::DatabaseBackend::Postgres,
                 "DELETE FROM cases WHERE pid = $1::uuid",
                 [victim_pid.into()],

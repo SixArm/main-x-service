@@ -14,7 +14,7 @@ type, so there is no separate model or adapter to drift.
 
 | Question | Answer |
 |---|---|
-| Framework | loco.rs 0.16 (`Hooks`/`AppContext`/CLI, loco config, `sea-orm-migration`). |
+| Framework | loco.rs 1.0.1 (`Hooks`/`AppContext`/CLI, loco config, `sea-orm-migration` 2.0). |
 | Build / test | `cargo build` · `cargo test` (DB-free unit + `tests/matching.rs`) · `cargo test -- --ignored` (request tests, need Postgres). |
 | Run | `cargo loco start` (needs Postgres). |
 | Persistence | One `cases` table: `pid`, `title`, `data` (JSONB Case), `active`, soft-delete. |

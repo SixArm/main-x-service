@@ -180,10 +180,7 @@ impl Model {
             return Ok(0);
         }
         let res = event_outbox::Entity::update_many()
-            .col_expr(
-                event_outbox::Column::PublishedAt,
-                Expr::current_timestamp().into(),
-            )
+            .col_expr(event_outbox::Column::PublishedAt, Expr::current_timestamp())
             .filter(event_outbox::Column::Id.is_in(ids.iter().copied()))
             .exec(db)
             .await?;
