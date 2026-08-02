@@ -26,6 +26,14 @@
 # the same user/port CI provides.
 #   deny        cargo deny check      (where a deny.toml exists)
 #   evidence    IEC 62304 artefacts: SBOM + requirement->test traceability
+#   fuzz        coverage-guided libFuzzer smoke run, FUZZ_SECONDS (default
+#               30) per target, for crates with a fuzz_targets/ directory
+#               (each matcher's fuzz/ sub-crate, plus authentication-verifier's
+#               and person's own); a no-op for any other crate. Needs
+#               nightly + cargo-fuzz on PATH — the CI job installs both;
+#               locally: rustup toolchain install nightly && cargo install
+#               cargo-fuzz. Short smoke, not exhaustive fuzzing: no corpus
+#               is persisted between runs. See each crate's fuzz/README.md.
 #
 # With no crate path, the stage runs across every crate from
 # scripts/ci-crates.sh.
@@ -156,6 +164,25 @@ run_stage() {
       # rendered SBOM, kept as a build artefact.
       ( cd "${crate}" && cargo run $(locked_flag "${crate}") --quiet --bin sbom > /tmp/sbom.json \
         && echo "  SBOM: $(wc -c < /tmp/sbom.json) bytes" )
+      ;;
+    fuzz)
+      # SEC-I2. `${crate}` here is a fuzz/ sub-crate itself (ci-crates.sh
+      # lists it as its own Cargo.toml root); only those have a
+      # fuzz_targets/ directory, so every non-fuzz crate is a no-op — same
+      # pattern as `deny`/`evidence`. `cargo fuzz` must run from the
+      # *parent* crate directory, not from inside fuzz/.
+      if [[ ! -d "${crate}/fuzz_targets" ]]; then
+        echo "  (no fuzz_targets/)"
+        return 0
+      fi
+      local parent seconds target
+      parent="$(dirname "${crate}")"
+      seconds="${FUZZ_SECONDS:-30}"
+      for target in $(cd "${crate}/fuzz_targets" && ls -- *.rs | sed 's/\.rs$//'); do
+        echo "  fuzz target: ${target} (${seconds}s)"
+        ( cd "${parent}" && cargo +nightly fuzz run "${target}" -- \
+            -max_total_time="${seconds}" -rss_limit_mb=4096 )
+      done
       ;;
     *)
       echo "unknown stage: ${STAGE}" >&2

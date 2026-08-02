@@ -1,0 +1,75 @@
+name: Fuzz smoke
+
+# Coverage-guided libFuzzer smoke run (SEC-I2). Each matcher crate (plus
+# authentication-verifier and person's bulk-import line parser) carries a
+# standalone cargo-fuzz `fuzz/` sub-crate (agents/share/security.md;
+# repo tasks.md SEC-I2) with targets mirroring its SEC-M6 proptest
+# invariants — the engine and its pure helpers never panic, and every
+# score/similarity is finite and in [0.0, 1.0]. This job builds each on
+# nightly and runs every target for a short, fixed time bound: not
+# exhaustive fuzzing (that wants hours per target and a persistent
+# corpus this repo does not keep — target/, corpus/, and artifacts/ are
+# all gitignored), but enough coverage-guided input search to catch an
+# immediate regression before it reaches main.
+#
+# Kept out of ci.yml on purpose: a nightly + ASAN-instrumented build is
+# much slower than the stable fmt/clippy/test pipeline, so this runs on
+# its own cadence (same push/PR/weekly rhythm as the per-crate Security
+# Audit workflow) rather than adding that latency to every check run.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly, Monday 03:00 UTC — after the 02:00 Security Audit sweep.
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Per target, not per crate: a crate with 3 targets gets ~90s of total
+  # fuzz time. Long enough for libFuzzer's coverage-guided search to
+  # reach the interesting branches on inputs this small; short enough to
+  # keep the whole matrix under a few minutes per crate.
+  FUZZ_SECONDS: 30
+
+jobs:
+  discover:
+    name: discover fuzz crates
+    runs-on: ubuntu-latest
+    outputs:
+      crates: ${{ steps.list.outputs.crates }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: |
+          # Every fuzz/ sub-crate is its own Cargo.toml root (see
+          # scripts/ci-crates.sh), and by convention is the literal last
+          # path segment — same filter shape as ci.yml's db-crates.
+          fuzz=$(scripts/ci-crates.sh | grep '/fuzz$' | sed 's/.*/"&"/' | paste -sd, -)
+          echo "crates=[$fuzz]" >> "$GITHUB_OUTPUT"
+
+  fuzz:
+    name: ${{ matrix.crate }}
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crate: ${{ fromJson(needs.discover.outputs.crates) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ matrix.crate }}
+          key: fuzz-${{ matrix.crate }}
+      - name: install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+      - name: fuzz smoke (${{ env.FUZZ_SECONDS }}s per target)
+        run: scripts/ci-check.sh fuzz '${{ matrix.crate }}'

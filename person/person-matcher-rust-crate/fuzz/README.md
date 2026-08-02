@@ -38,6 +38,23 @@ with `cargo +nightly fuzz run <target> fuzz/artifacts/<target>/<file>`.
 
 `target/`, `corpus/`, `artifacts/`, and `coverage/` are git-ignored.
 
+## CI
+
+`.github/workflows/fuzz.yml` (GitHub) and the `fuzz-smoke` step in
+`.woodpecker.yml` (Codeberg) run every target in every matcher's `fuzz/`
+crate — plus authentication-verifier's and person's bulk-import parser —
+for a short, fixed time bound (`FUZZ_SECONDS`, default 30s per target)
+via `scripts/ci-check.sh fuzz [crate-path]`. This is a **smoke run**, not
+exhaustive fuzzing: no corpus persists between runs, so it re-discovers
+the same easy coverage every time rather than accumulating a deeper one.
+It exists to catch an immediate regression (a panic a plain unit test
+would not think to construct) before it reaches `main`, not to replace a
+real, long-running fuzzing campaign — run one of those locally
+(`cargo +nightly fuzz run <target>`, hours, a kept `corpus/`) if you are
+specifically hardening a parser. GitHub runs the job on push/PR/weekly;
+Woodpecker has no inline cron equivalent, so it runs on every triggering
+event there.
+
 ## Isolation
 
 The `fuzz/` crate is **not** a member of any parent workspace (the matcher

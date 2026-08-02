@@ -1074,29 +1074,51 @@
   service level, so they're `ignore`-listed **with justification** and to be
   revisited on the next loco-rs bump — see the note below. Matcher/library
   crates (small trees) pass clean with no ignores needed.
-- [~] **SEC-I2 (M) 🟡** `cargo-fuzz` scaffolding. *(all 9 matchers done
-  2026-07-14; non-matcher roll + CI pending)* Each matcher has a standalone
-  `fuzz/` cargo-fuzz crate (not a workspace member, so it never touches the
-  stable build) with libFuzzer targets mirroring the SEC-M6 invariants:
-  `match_<entity>` (JSON deserialize → engine; finite score ∈ [0,1], both
-  orders) plus the pure-helper targets that crate exposes; `fuzz/README.md`
-  documents run + roll-out. **Done — all 9:** person (reference),
-  **worker / place / thing / event** (3 targets: match + `normalizer` +
-  `scorer`), and **course / organization / care-pathway / case / portfolio**
-  (2 targets: match + `normalize` — these expose their similarity primitives
-  only through the engine, no public `Scorer`). Each verified `cargo +nightly
-  fuzz build` (cargo-fuzz 0.13.2, nightly) + short campaigns run clean
-  (millions of execs each, no panics/crashes; e.g. place `match_places` 2.7M,
-  worker `match_workers` 3.35M, case `match_cases` 2.37M). **Also done:** the
-  **auth-verifier** `fuzz/` crate — `verify` (the PASETO `v4.public` token
-  parser: header / footer `kid` / signature over an arbitrary token) and
-  `policy` (`Policy::from_json` + `evaluate_with_context` — the ABAC parser +
-  rule evaluator), both pinning golden rule #5 (no panics); verified clean at
+- [x] **SEC-I2 (M) 🟡** `cargo-fuzz` scaffolding. *(all 9 matchers +
+  auth-verifier + person-bulk done 2026-07-14; CI wiring done 2026-08-02)*
+  Each matcher has a standalone `fuzz/` cargo-fuzz crate (not a workspace
+  member, so it never touches the stable build) with libFuzzer targets
+  mirroring the SEC-M6 invariants: `match_<entity>` (JSON deserialize →
+  engine; finite score ∈ [0,1], both orders) plus the pure-helper targets
+  that crate exposes; `fuzz/README.md` documents run + roll-out. **Targets
+  — all 9 matchers:** person (reference), **worker / place / thing / event**
+  (3 targets: match + `normalizer` + `scorer`), and **course / organization /
+  care-pathway / case / portfolio** (2 targets: match + `normalize` — these
+  expose their similarity primitives only through the engine, no public
+  `Scorer`). Each verified `cargo +nightly fuzz build` (cargo-fuzz 0.13.2,
+  nightly) + short campaigns run clean (millions of execs each, no
+  panics/crashes; e.g. place `match_places` 2.7M, worker `match_workers`
+  3.35M, case `match_cases` 2.37M). **Also:** the **auth-verifier** `fuzz/`
+  crate — `verify` (the PASETO `v4.public` token parser: header / footer
+  `kid` / signature over an arbitrary token) and `policy`
+  (`Policy::from_json` + `evaluate_with_context` — the ABAC parser + rule
+  evaluator), both pinning golden rule #5 (no panics); verified clean at
   `verify` 11.1M / `policy` 6.6M execs. Plus the **person bulk** `parse_line`
   target (`bulk::jsonl` split + per-line JSON parse over attacker-supplied
-  upload bytes; verified clean, 173k execs). **Remaining:** only a short CI
-  smoke run (all fuzz *targets* are now in place — every matcher, the
-  auth-verifier, and the bulk parser).
+  upload bytes; verified clean, 173k execs). 28 targets total across 12
+  fuzz crates.
+  **CI wiring (2026-08-02):** a new `fuzz` stage in `scripts/ci-check.sh`
+  — a no-op for any crate without a `fuzz_targets/` directory (same
+  pattern as `deny`/`evidence`), and for a fuzz sub-crate, `cd`s to the
+  *parent* crate (`cargo fuzz` cannot run from inside `fuzz/`) and runs
+  `cargo +nightly fuzz run <target> -- -max_total_time=${FUZZ_SECONDS:-30}`
+  per target discovered from `fuzz_targets/*.rs`. Wired into a new,
+  **separate** `.github/workflows/fuzz.yml` (discover job filters
+  `scripts/ci-crates.sh` output to paths ending `/fuzz`, then a per-crate
+  matrix job installs nightly + cargo-fuzz and runs the stage) on the same
+  push/PR/weekly cadence as the per-crate Security Audit workflow, plus a
+  `fuzz-smoke` step in `.woodpecker.yml` (Woodpecker has no inline cron, so
+  it runs on every triggering event there). Kept **out of** the main
+  `ci.yml`/pipeline deliberately: a nightly + ASAN-instrumented build is
+  much slower than the stable fmt/clippy/test pipeline it would otherwise
+  slow down on every push. This is a **smoke run**, not exhaustive fuzzing
+  — no corpus persists between runs (`target/`, `corpus/`, `artifacts/` stay
+  gitignored per crate); it exists to catch an immediate regression, not to
+  replace a real long-running local campaign. Verified locally: a full
+  sweep (`FUZZ_SECONDS=8 scripts/ci-check.sh fuzz`, no crate arg) ran all 28
+  targets across all 12 fuzz crates clean, zero failures. `person-matcher`'s
+  `fuzz/README.md` documents the CI shape as the reference (other crates'
+  READMEs point at it).
 - [x] **SEC-I3 (S) ⚪** Add `#![forbid(unsafe_code)]` to every crate root
   missing it. *(done 2026-07-14)* The three named roots (care-pathway-matcher
   `src/main.rs`, case-folder `src/lib.rs` + `src/bin/main.rs`) **plus** the 12

@@ -67,3 +67,17 @@ steps:
       - cargo install cargo-deny --locked
       - scripts/ci-check.sh deny
       - scripts/ci-check.sh evidence
+
+  # Coverage-guided libFuzzer smoke run (SEC-I2) — short, fixed-time-bound
+  # runs of every matcher/authentication-verifier/person-bulk fuzz target,
+  # not exhaustive fuzzing. Needs nightly on top of the pinned stable
+  # image; a no-op for every crate without a fuzz_targets/ directory. See
+  # .github/workflows/fuzz.yml for why this runs on its own cadence there
+  # (weekly + push/PR) rather than only here — Woodpecker has no inline
+  # cron equivalent, so this step runs on every triggering event.
+  - name: fuzz-smoke
+    image: *rust_image
+    commands:
+      - rustup toolchain install nightly
+      - cargo install cargo-fuzz --locked
+      - scripts/ci-check.sh fuzz
