@@ -8,6 +8,48 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — Privacy: field masking + GDPR export (2026-08-02)
+
+Repo tasks.md P-4 (as P-1/organization; lower sensitivity). The
+thinnest of the four privacy modules in the family: most of a `Plan`
+(`name`, `code`, `goals`, `status`, dates, `identifiers`, `tags`,
+`relationships`, `parent_ref`) is operational content, not personal
+data.
+
+- `src/privacy.rs` — `mask_plan` + `export_plan`. `lead_ref` (the plan
+  lead, a `person:`/`worker:` `EntityRef` — the most directly personal
+  field on a `Plan`) is **dropped entirely** rather than partially
+  shown: unlike a phone number or a provider name, a partial UUID has
+  no "still recognisable" value when the plan is already identified by
+  its `name`/`code`. `owner_org_id`/`owner_org_name` (the sponsoring
+  organisation — institutional, not personal, but still worth an
+  obligation-driven redaction) are masked to their tail, the same
+  treatment organization gives `telephone`/`email` and care-pathway
+  gives `provider_name`/`provider_id`.
+- `GET /api/plans/{pid}` was previously **unguarded** — no caller
+  parameter, no ABAC check of any kind, even though `auth::authorize_record`
+  + `auth::plan_resource_attrs` already existed and were wired into
+  `PUT /{pid}` (PPM-3, the phase-gate `stage` attribute). Now honours
+  the `mask` obligation the same way the other three entity services'
+  `GET /{pid}` do.
+- New `GET /api/plans/{pid}/masked` (always-redacted, no policy needed)
+  and `GET /api/plans/{pid}/export` (the GDPR envelope, audited via the
+  plain `AuditModel::record` — this crate has no HIPAA-style disclosure
+  module, unlike case/care-pathway, so it follows organization's
+  posture instead).
+- DB-gated: `tests/masking.rs` (new, its own test binary from the
+  start — case's P-3 found out the hard way that two masking-flavoured
+  tests cannot share one binary's `policy()`/`require_auth()`
+  `OnceLock`s) + 2 new tests in `tests/requests/plans.rs`
+  (`masked_view_and_export_are_served`,
+  `masked_view_and_export_are_404_for_unknown_pid`) + 6 new DB-free
+  unit tests in `src/privacy.rs`.
+- No SOUP register change (no new dependency; this crate carries no
+  `compliance/soup.tsv` at all).
+- **P-1 through P-4 are now complete** — every entity service in the
+  family that carries personal or institutional data has field masking
+  wired to the ABAC `mask` obligation.
+
 ### Added — Tantivy full-text/fuzzy/phonetic search (2026-08-02)
 
 Repo tasks.md S-4: transfers the care-pathway/case Tantivy pattern

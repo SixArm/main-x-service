@@ -42,12 +42,17 @@ optional Portfolio / Project / Product / Program / Practice / Process /
 Purpose / Pathway / Proposal label, and any plan may contain any other
 plan via `parent_ref` (a self- or descendant-cycle is rejected `422`).
 Tantivy full-text/fuzzy/phonetic search (§9.1) and search-blocked
-`check-duplicates` candidates — landed. Deferred (§13): the goals/issues
+`check-duplicates` candidates — landed. Field masking (`lead_ref`
+dropped, `owner_org_id`/`owner_org_name` masked to their tail) + the
+masked view + audited GDPR export, wired to the ABAC `mask` obligation
+— landed (§13 2026-08-02); the thinnest privacy module in the family,
+since most of a `Plan` is operational content, not personal data.
+Deferred (§13): the goals/issues
 sub-resource tables + the derived
 timeline view (tasks + sprints + burndown landed 2026-07-20),
 the durable
 event bus's Fluvio broker sink (Phase 2 outbox + Phase 3 relay/retention
-landed), privacy, front-end merge action, bulk import/export, gRPC, and
+landed), front-end merge action, bulk import/export, gRPC, and
 the deferred `posts` / `comments` / `members` collaboration
 sub-resources. (The paseto-keys-over-HTTP fetch at boot landed
 2026-07-04 — `PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS_URL`, §9.6/§13.)
@@ -257,7 +262,9 @@ for a malformed body; `409 Conflict` for a real-time create duplicate
 | POST | `/api/plans` | Create (`409` on duplicate) → `{pid, name}` |
 | GET | `/api/plans` | List active (cap 100); `?parent={pid}` rolls up direct children |
 | GET | `/api/plans/search?q=` | Tantivy full-text search (`?fuzzy=`, `?phonetic=`, `?kind=`) |
-| GET | `/api/plans/{pid}` | Fetch the stored `Plan` |
+| GET | `/api/plans/{pid}` | Fetch the stored `Plan` (record-level ABAC; a `mask`-obligation allow returns the redacted view) |
+| GET | `/api/plans/{pid}/masked` | The masked view: `lead_ref` dropped, `owner_org_id`/`owner_org_name` redacted |
+| GET | `/api/plans/{pid}/export` | GDPR right-of-access export (audited; masked when the policy says so) |
 | PUT | `/api/plans/{pid}` | Replace payload |
 | DELETE | `/api/plans/{pid}` | Soft-delete |
 
@@ -584,6 +591,33 @@ HIPAA/NHS/GDPR posture for audit and access controls.
 
 ## 13. Tasks (live work queue)
 
+- [x] **2026-08-02 — Privacy: field masking + GDPR export (repo
+  tasks.md P-4, as P-1/organization; lower sensitivity).** The
+  thinnest privacy module of the four in the family, by design: most
+  of a `Plan` (`name`, `code`, `goals`, `status`, dates, `identifiers`,
+  `tags`, `relationships`, `parent_ref`) is operational content the
+  registry and the project-management tooling exist to serve up, not
+  personal data. Two things are: `lead_ref` (the plan lead, a
+  `person:`/`worker:` `EntityRef` — the most directly personal field on
+  a `Plan`, so **dropped entirely** rather than partially shown — a
+  partial UUID has no "still recognisable" value when the plan is
+  already identified by `name`/`code`) and `owner_org_id` /
+  `owner_org_name` (the sponsoring organisation — institutional,
+  masked to its tail like organization's `telephone`/`email` and
+  care-pathway's `provider_name`/`provider_id`). `src/privacy.rs`:
+  `mask_plan` + `export_plan`. `GET /{pid}` (previously **unguarded** —
+  no caller, no ABAC check at all) now honours the `mask` obligation via
+  the existing `auth::authorize_record` + `auth::plan_resource_attrs`
+  (PPM-3's `stage` attribute, unchanged); new `GET /{pid}/masked` and
+  `GET /{pid}/export` (§9.1). The export is audited via the plain
+  `AuditModel::record` (this crate has no HIPAA-style disclosure module,
+  unlike case/care-pathway — matching organization's posture instead).
+  The end-to-end obligation proof (`tests/masking.rs`) is its own test
+  binary from the start, avoiding the `OnceLock`-sharing mistake made
+  and fixed in case's P-3.
+  *Verified:* 40 DB-gated request-suite + 1 dedicated masking binary +
+  1 enforcement + 1 outbox-audit green vs Postgres 18; 205 lib tests;
+  fmt + clippy clean.
 - [x] **2026-08-02 — Tantivy full-text/fuzzy/phonetic search (repo
   tasks.md S-4).** Transfers the care-pathway/case Tantivy pattern
   (S-2/S-3) whole: `src/search/index.rs` (`PlanIndexSchema`/`PlanIndex`
@@ -996,7 +1030,7 @@ the engineering core (tasks / sprints / burndown / standup / DevOps).
 Still open (§13): the remaining operational sub-resources (goals /
 issues) + the derived timeline view, `deduplicate` + review
 queue, cross-service `entity_links`, bulk import/export,
-privacy, the collaboration sub-resources, gRPC, and the Fluvio broker
+the collaboration sub-resources, gRPC, and the Fluvio broker
 sink. The canonical `Plan` domain model is owned by the
 [portfolio entity spec §5](../../spec/index.md); this crate spec
 references it.
@@ -1010,10 +1044,12 @@ the operational sub-resources (goals / tasks / issues) + derived views +
 record merge + cross-service links + OpenAPI/Swagger + Prometheus +
 offline PASETO v4 public verification + blanket `/api/*` enforcement (auth
 source of truth, superseding the RS256-JWT model:
-[`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
+[`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)),
+then field masking + audited GDPR export wired to the ABAC `mask`
+obligation (2026-08-02; §13).
 Next (deferred, §13): the durable event
 bus's Fluvio broker sink (Phase 2 outbox + Phase 3 relay/retention
-landed), privacy,
+landed),
 front-end merge action, bulk import/export, the `posts` / `comments` /
 `members` collaboration sub-resources, gRPC. (Done since: the
 paseto-keys-over-HTTP fetch at boot, 2026-07-04 —

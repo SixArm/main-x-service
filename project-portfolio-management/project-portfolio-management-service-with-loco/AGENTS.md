@@ -16,7 +16,8 @@ kind label — **and** a project-management tool.
 > warnings` is clean, `cargo fmt` is clean, zero `#[allow]`. Scope shipped:
 > single-collection plan CRUD + kind-agnostic matching + validation +
 > record merge + audit + in-memory events + offline PASETO auth +
-> Tantivy full-text/fuzzy/phonetic search + Prometheus + OpenAPI/Swagger.
+> Tantivy full-text/fuzzy/phonetic search + field masking / GDPR export
+> (thin — `lead_ref` + owner org only) + Prometheus + OpenAPI/Swagger.
 > **Deferred** (spec §13): the operational
 > sub-resources (goals / tasks / issues) + derived views, `deduplicate` +
 > review queue, cross-service links, bulk import/export.
@@ -63,7 +64,7 @@ plan-scoped sub-resources hang off `/api/plans/{pid}/...`. See
 
 | Group | Paths |
 |---|---|
-| Plan CRUD | `POST`/`GET` `/plans`, `GET`/`PUT`/`DELETE` `/plans/{pid}`, `GET /plans/search?q=` (Tantivy: `?fuzzy=`, `?phonetic=`, `?kind=`) |
+| Plan CRUD | `POST`/`GET` `/plans`, `GET`/`PUT`/`DELETE` `/plans/{pid}` (record-level ABAC; a `mask`-obligation allow returns the redacted view), `GET /plans/{pid}/masked`, `GET /plans/{pid}/export` (GDPR), `GET /plans/search?q=` (Tantivy: `?fuzzy=`, `?phonetic=`, `?kind=`) |
 | Match | `POST /plans/match` · `/plans/check-duplicates` (kind-agnostic) |
 | Merge | `POST /plans/merge` (`422` equal pids, `404` unknown) · `GET /plans/merges/recent` |
 | Strategy (PPM Phase C) | `/ideas` (+ `vote`/`dismiss`/`convert`) · `/scenarios` (+ `/{pid}/evaluate`/`commit`) · `/objectives` (+ `/{pid}/alignment`) · `/plans/{pid}/objectives` · `/plans/{pid}/benefits` (+ `/{b_pid}/realize`) |
@@ -110,9 +111,17 @@ audit log + in-memory event stream (durable-bus Phase 1 — see
 is set — fetched key set wins, env `PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS` fallback, the
 service always boots; spec §13, done 2026-07-04), and blanket `/api/*`
 auth enforcement wired but **off by
-default** — gated by `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`. Deferred (spec §13):
+default** — gated by `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`. **Privacy**
+(`src/privacy.rs`) provides field masking — `lead_ref` (the plan lead, a
+`person:`/`worker:` ref) dropped entirely, `owner_org_id`/`owner_org_name`
+masked to their tail — the always-masked `/masked` view, and the
+audited GDPR `/export`, wired to the ABAC `mask` obligation on
+`GET /{pid}`. Deliberately the thinnest of the four privacy modules in
+the family: most of a `Plan` (name, code, goals, status, dates,
+identifiers, tags, `relationships`, `parent_ref`) is operational
+content the registry exists to serve up, not personal data. Deferred (spec §13):
 durable event bus Phases 2–3 (outbox +
-Fluvio), privacy, front-end merge action, bulk import/export, the
+Fluvio), front-end merge action, bulk import/export, the
 `posts` / `comments` / `members` collaboration
 sub-resources, gRPC.
 
@@ -178,6 +187,7 @@ src/
 ├── lifecycle.rs              pure bird's-eye funnel + next-phase readiness checklist
 ├── scheduler.rs              optional set-and-forget sweep ticker (env-gated, default off)
 ├── openapi.rs                OpenAPI 3 document
+├── privacy.rs                field masking (lead_ref, owner org) + GDPR export envelope
 ├── relay.rs                  durable-bus Phase 2 outbox relay (poll/ack loop)
 ├── search/                   Tantivy full-text/fuzzy/phonetic index (index.rs schema + mod.rs engine; kind is a search filter, never a dedup gate)
 ├── streaming.rs              CRUD/merge event stream — durable Envelope + EventPublisher seam (in-memory default, outbox transport); indexes/deindexes on every write

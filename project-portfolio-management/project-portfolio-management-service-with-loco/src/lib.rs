@@ -49,6 +49,8 @@ pub mod models;
 pub mod openapi;
 /// The pure, explainable Smart Score behind data-driven prioritisation.
 pub mod prioritisation;
+/// Field masking (owner org, lead ref) + the GDPR right-of-access export envelope.
+pub mod privacy;
 /// Durable event bus Phase 3: the outbox relay loop + retention purge.
 pub mod relay;
 /// The set-and-forget ticker: the optional scheduled-action sweep loop.

@@ -282,8 +282,37 @@
   *Verified:* 34 DB-gated request-suite + 2 dedicated masking/export
   binaries + 2 enforcement + 1 outbox-audit green vs Postgres 18; 193
   lib tests; fmt + clippy clean.
-- [ ] **P-4 (M)** Privacy in **portfolio** (lower sensitivity; masking of
-  owner/person refs). Depends: P-1.
+- [x] **P-4 (M)** Privacy in **portfolio** (lower sensitivity; masking of
+  owner/person refs). Depends: P-1. *(done 2026-08-02)*
+
+  The thinnest of the four privacy modules, matching the task's own
+  "lower sensitivity" framing: most of a `Plan` is operational content
+  (name, code, goals, status, identifiers, tags, relationships,
+  containment), not personal data. `lead_ref` — a `person:`/`worker:`
+  ref to the plan lead, the one genuinely personal field — is dropped
+  entirely rather than partially shown (a partial UUID has no
+  "recognisable" value when the plan is already identified by name/code);
+  `owner_org_id`/`owner_org_name` get the usual tail-preserving
+  redaction.
+
+  A real gap surfaced during this pass: `GET /api/plans/{pid}` had no
+  ABAC check at all — not even the coarse kind organization/care-pathway/
+  case already had before their own privacy work — despite
+  `authorize_record` + `plan_resource_attrs` already existing and being
+  wired into `PUT /{pid}` for PPM-3. Fixed as part of the mask-obligation
+  wiring, not as a separate task, since the obligation has nowhere to
+  attach without a read-side ABAC pass.
+
+  Applied the lesson from case's P-3 pre-emptively: `tests/masking.rs`
+  was written as its own test binary from the start, rather than
+  discovering the `OnceLock`-sharing trap by hitting it.
+  *Verified:* 40 DB-gated request-suite + 1 dedicated masking binary +
+  1 enforcement + 1 outbox-audit green vs Postgres 18; 205 lib tests;
+  fmt + clippy clean.
+
+  **P-1..P-4 are now complete — every entity service carrying personal
+  or institutional data has field masking wired to the ABAC `mask`
+  obligation.**
 
 - [x] **AU-1 (M)** Roll the case-only auth hardening to **person, worker,
   place, thing, event** (axum-style `src/api/rest/auth.rs`): key-rotation

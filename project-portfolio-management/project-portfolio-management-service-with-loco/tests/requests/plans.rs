@@ -350,3 +350,69 @@ async fn check_duplicates_blocks_on_identifier_alone_and_ignores_kind() {
     })
     .await;
 }
+
+/// The always-masked view drops `lead_ref` and redacts the owner org
+/// fields regardless of caller (enforcement is off in this suite, so
+/// no ABAC decision is in play); the descriptive shell — name, code —
+/// is untouched. The export envelope wraps the same content and
+/// declares `masked: false` when enforcement is off, since there is no
+/// obligation to honour.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL"]
+async fn masked_view_and_export_are_served() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let mut project = apollo_project();
+        project["owner_org_id"] = json!("organization:9a2f");
+        project["lead_ref"] = json!("person:0c4f1e2a-0000-4000-8000-000000000000");
+        let created: Value = request.post("/api/plans").json(&project).await.json();
+        let pid = created["pid"].as_str().unwrap().to_string();
+
+        let masked: Value = request
+            .get(&format!("/api/plans/{pid}/masked"))
+            .await
+            .json();
+        assert_eq!(masked["name"], "Apollo platform migration");
+        assert_eq!(masked["code"], "PROJ-2026");
+        assert!(masked["lead_ref"].is_null());
+        assert_ne!(masked["owner_org_id"], "organization:9a2f");
+
+        let export: Value = request
+            .get(&format!("/api/plans/{pid}/export"))
+            .await
+            .json();
+        assert_eq!(export["entity"], "plan");
+        assert_eq!(export["pid"], pid);
+        assert_eq!(export["masked"], false, "no ABAC decision, no obligation");
+        assert_eq!(export["record"]["owner_org_id"], "organization:9a2f");
+    })
+    .await;
+}
+
+/// `GET /{pid}/masked` and `/export` are `404` for an unknown pid, same
+/// as the ordinary `GET /{pid}`.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL"]
+async fn masked_view_and_export_are_404_for_unknown_pid() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let pid = "00000000-0000-4000-8000-000000000000";
+        assert_eq!(
+            request
+                .get(&format!("/api/plans/{pid}/masked"))
+                .await
+                .status_code(),
+            404
+        );
+        assert_eq!(
+            request
+                .get(&format!("/api/plans/{pid}/export"))
+                .await
+                .status_code(),
+            404
+        );
+    })
+    .await;
+}

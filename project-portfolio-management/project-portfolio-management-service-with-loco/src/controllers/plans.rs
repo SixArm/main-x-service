@@ -333,15 +333,106 @@ async fn create(
 
 /// Fetch a plan by public id. `GET /api/plans/{pid}`.
 ///
+/// Responds with the full stored `Plan`, unless the record-level ABAC
+/// decision carries the `mask` **obligation**, in which case the
+/// redacted view ([`crate::privacy::mask_plan`]) is returned instead —
+/// that is how a deployment grants a partial read without a second
+/// endpoint.
+///
 /// # Errors
 ///
-/// `404` unknown pid.
+/// `404` unknown pid; `403` when the record-level ABAC policy denies
+/// reading this specific plan (e.g. a `resource.stage`-gated rule) with
+/// enforcement on.
 #[debug_handler]
-async fn get_one(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
+async fn get_one(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+) -> Result<Response> {
     let model = PlanModel::find_by_pid(&ctx.db, &pid)
         .await
         .map_err(super::model_not_found)?;
-    format::json(model.to_plan()?)
+    let plan = model.to_plan()?;
+    let obligations = crate::auth::authorize_record(
+        &caller,
+        authentication_verifier::Action::Read,
+        &crate::auth::plan_resource_attrs(model.stage.as_deref()),
+    )
+    .map_err(super::record_rejection)?;
+    if obligations.iter().any(|o| o == "mask") {
+        format::json(crate::privacy::mask_plan(&plan))
+    } else {
+        format::json(plan)
+    }
+}
+
+/// The masked view of a plan.
+///
+/// `GET /api/plans/{pid}/masked`. Returns `200` with the record redacted
+/// per [`crate::privacy::mask_plan`] — `lead_ref` dropped, `owner_org_id`
+/// / `owner_org_name` masked to their tail — regardless of the caller's
+/// policy. `404` for an unknown pid.
+///
+/// Distinct from the `mask` obligation on `GET /{pid}`: that one is the
+/// deployment deciding what a caller may see, while this endpoint is a
+/// caller *asking* for the redacted form.
+#[debug_handler]
+async fn get_masked(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
+    let model = PlanModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(super::model_not_found)?;
+    format::json(crate::privacy::mask_plan(&model.to_plan()?))
+}
+
+/// GDPR right-of-access export for one plan.
+///
+/// `GET /api/plans/{pid}/export`. Returns `200` with the envelope from
+/// [`crate::privacy::export_plan`]; `404` for an unknown pid.
+///
+/// **Every export is audited**, including a masked one: a read of
+/// owner/lead information is itself worth recording. The audit row is
+/// written before the response so a failure to record it cannot be
+/// traded for a silent disclosure.
+///
+/// A caller the policy would mask gets a **masked** export, and the
+/// envelope says so — an access request answered with redactions must
+/// not look like a complete answer.
+///
+/// # Errors
+///
+/// `404` unknown pid; `403` when the record-level ABAC policy denies
+/// reading this specific plan; otherwise DB/parse errors.
+#[debug_handler]
+async fn get_export(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+) -> Result<Response> {
+    let model = PlanModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(super::model_not_found)?;
+    let plan = model.to_plan()?;
+    let obligations = crate::auth::authorize_record(
+        &caller,
+        authentication_verifier::Action::Read,
+        &crate::auth::plan_resource_attrs(model.stage.as_deref()),
+    )
+    .map_err(super::record_rejection)?;
+    let masked = obligations.iter().any(|o| o == "mask");
+    AuditModel::record(
+        &ctx.db,
+        model.pid,
+        "exported",
+        caller.actor(),
+        Some(serde_json::json!({ "masked": masked })),
+    )
+    .await?;
+    format::json(crate::privacy::export_plan(
+        &plan,
+        &model.pid.to_string(),
+        masked,
+    ))
 }
 
 /// Replace a plan's payload. `PUT /api/plans/{pid}`.
@@ -684,6 +775,8 @@ pub fn routes() -> Routes {
         .add("/{pid}", get(get_one))
         .add("/{pid}", put(update))
         .add("/{pid}", delete(remove))
+        .add("/{pid}/masked", get(get_masked))
+        .add("/{pid}/export", get(get_export))
         .add("/{pid}/audit", get(entity_audit))
 }
 
