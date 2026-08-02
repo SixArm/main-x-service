@@ -256,8 +256,37 @@ adds one section + a §13 task declaring only what differs:
    pass `--features parquet`, so the feature is exercised by local runs
    only today — a family-wide "does this crate's CI even build its
    optional features" question, not specific to Parquet.
-5. **Roll across the other entities** — uniform contract; only the per-entity
-   stable key + CSV columns + sensitivity differ.
+5. **S3 artifact store** (feature-gated). ✅ *(done 2026-08-02, person, BLK-4)*
+   Ported care-pathway's §12-resolved async `ArtifactStore` design to
+   person's `src/bulk/store.rs`: `PERSON_BULK_ARTIFACT_BACKEND` selects
+   `local` (default) or `s3` (behind this crate's own `s3` Cargo feature,
+   off by default); `s3` without the feature is a clean error, never a
+   silent fallback to local storage. `AppState::new` became `async fn`
+   since the S3 client's credential resolution is async.
+6. **Roll across the other entities.** ✅ *(done 2026-08-03, organization +
+   case, BLK-5)* Both loco-idiomatic services, so the API DTO is the
+   matcher type stored verbatim as JSONB — no separate model to convert.
+   **Organization**: stable key LEI → DUNS → explicit `pid`; keyless rows
+   route through the existing `check-duplicates` path into the review
+   queue (`provenance` column added). **Known gap:** the per-row upsert
+   is not SEC-B3 advisory-lock-protected — a locked guard transaction
+   deadlocked under this crate's `max_connections: 1` test config because
+   `streaming::create_and_emit`/`update_and_emit` open their own internal
+   transaction and are not generic over `ConnectionTrait`; closing it
+   needs a `src/streaming.rs`-wide change, tracked as a follow-up rather
+   than half-built. **Case**: stable key is the **pair** `(agency_id,
+   case_number)` (case has no single scheme-scoped identifier the way
+   organization's LEI/DUNS are) → explicit `pid` → keyless; case had no
+   `review_queue` table at all, so one was added fresh (with `provenance`
+   from day one, no follow-up migration needed). Case's bulk export
+   reuses its existing inline `mask_case` redaction — case has no
+   dedicated `src/privacy` module (see the capability matrix in
+   [overview.md](overview.md)), but the existing masking is real and the
+   bulk path inherits it rather than adding an unmasked side door. Both:
+   **JSONL + CSV only** (no Parquet), **local-filesystem-only**
+   `ArtifactStore` (no S3 yet — the trait is async in both so a future S3
+   backend needs no signature change), and export audit gates delivery
+   (SEC-B8) exactly as person's does.
 
 ## 12. Open questions
 

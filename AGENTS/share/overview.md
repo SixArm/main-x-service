@@ -128,7 +128,7 @@ case, and portfolio each provide:
 | Boundary normalization (phone/address) | ✅ | ✅ | ✅ | – | ✅ | – | – | – | – | – |
 | Record-level ABAC + masking obligations | ✅ | ✅ | – | – | – | – | ✅ | ✅ | ✅ | ✅ |
 | Cross-service links (`entity_links` write-side) | ✅ | ✅ | – | – | – | – | – | – | ✅ | – |
-| Bulk import/export | ✅ | – | – | – | – | – | – | – | – | – |
+| Bulk import/export³ | ✅ | – | – | – | – | – | ✅ | – | ✅ | – |
 
 ¹ Every entity registry now indexes via Tantivy (fuzzy + phonetic
 retrieval, duplicate-check candidates blocked on the index rather than
@@ -140,7 +140,15 @@ matcher is kind-agnostic by design. Course additionally serves a
 non-R5 FHIR surface (`/fhir/Basic` — no FHIR R5 resource models a
 course), which the FHIR R5 row deliberately does not count. ² course emits **in-memory events only**
 (no durable outbox yet); every durable-outbox service defaults to
-`<ENTITY>_EVENT_TRANSPORT=memory`.
+`<ENTITY>_EVENT_TRANSPORT=memory`. ³ Organization and case landed
+2026-08-03 (BLK-5), scoped to **JSONL + CSV only** (no Parquet) and a
+**local-filesystem-only** artifact store (no S3 backend yet — unlike
+person's BLK-3/BLK-4). Organization's per-row upsert is not yet
+SEC-B3 advisory-lock-protected (a documented, narrow TOCTOU gap — see
+its own spec §10.7); case's bulk export reuses its existing inline
+`mask_case` redaction rather than a dedicated privacy module, so the
+case ✗ in the privacy-masking row above does not mean its bulk export
+is unmasked.
 
 ### The two cross-cutting services
 

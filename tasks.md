@@ -652,11 +652,46 @@
   unrelated); the DB-gated suite (`scripts/ci-check.sh test-db`, 21 lib +
   20 integration + 1 enforcement tests) against real Postgres, which
   exercises the real boot path through the now-async `AppState::new`.
-- [ ] **BLK-5 (L)** Roll bulk I/O to **organization** (stable key:
+- [x] **BLK-5 (L)** Roll bulk I/O to **organization** (stable key:
   LEI → DUNS → pid) and **case** (agency-scoped case number → pid),
   declaring each §10 section in their specs. Person's `src/bulk/` is the
   reference; these services are case-style loco (simpler than person).
   Depends: BLK-1..2 (so the rolled version includes CSV + review routing).
+  *(done 2026-08-03)* Ran as two parallel subagents (one per crate,
+  reference paths + green gate handed to each), then independently
+  re-verified before committing — build/clippy/fmt clean, and the full
+  DB-gated suite rerun myself against real Postgres for both, matching
+  each agent's reported counts exactly (organization: 184 lib + 33
+  DB-gated incl. 8 new bulk tests; case: 246 lib + 11 new + 39
+  pre-existing DB-gated, zero regressions). JSONL + CSV only for both (no
+  Parquet/S3 — out of BLK-5's declared scope). **Organization**: LEI →
+  DUNS → explicit `pid` → keyless; every written row goes through the
+  existing `streaming::create_and_emit`/`update_and_emit` path so a
+  bulk-imported row gets the same event/audit/index side effects as an
+  interactive create. Bumped `limit_payload`'s SEC-M1 backstop from 2mb
+  to 70mb in dev/test config so it doesn't 413 under the new 64mb
+  application-level import cap. **Known, documented gap:** the per-row
+  upsert is not SEC-B3 advisory-lock-protected — a locked-guard-
+  transaction attempt (mirroring person's) deadlocked *every* import, not
+  just concurrent ones, because `create_and_emit`/`update_and_emit` open
+  their own transaction internally and aren't generic over
+  `ConnectionTrait`, so the lock transaction plus that call needs two
+  pooled connections against this crate's own `max_connections: 1` test
+  config — closing it needs a `src/streaming.rs`-wide change, out of this
+  task's scope, tracked in organization's own spec §10.7/§13. **Case**:
+  stable key is the *pair* `(agency_id, case_number)` → explicit `pid` →
+  keyless (case has no single scheme-scoped deterministic identifier the
+  way organization has LEI/DUNS); a new `BulkCaseRow` wire envelope pairs
+  `case_matcher::Case` (which carries no `pid` field) with a genuine
+  `Option<Uuid>` — cleaner than person's raw-line `row_has_explicit_id`
+  sniff, since there's no default-fabrication ambiguity to work around.
+  Case had no `review_queue` table at all (unlike person/organization),
+  so one was built fresh with `provenance` from day one. Case's bulk
+  export reuses the existing inline `mask_case` redaction (case has no
+  dedicated `src/privacy` module per the capability matrix, but the
+  masking that exists is real and now covers the bulk path too, rather
+  than the bulk path opening an unmasked side door). Both crates: export
+  audit write gates job completion (SEC-B8) exactly as person's does.
 
 ## Phase 4 — Surfaces, deployment docs, tutorials, examples
 
