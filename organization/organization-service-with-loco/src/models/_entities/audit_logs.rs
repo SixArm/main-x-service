@@ -21,7 +21,7 @@ pub struct Model {
     pub updated_at: DateTimeWithTimeZone,
     /// Auto-increment surrogate primary key; also the recency order key.
     #[sea_orm(primary_key)]
-    pub id: i32,
+    pub id: i64,
     /// The organization `pid` this entry concerns (the "what").
     pub entity_pid: Uuid,
     /// The action verb: `created` / `updated` / `deleted` / `merged` /

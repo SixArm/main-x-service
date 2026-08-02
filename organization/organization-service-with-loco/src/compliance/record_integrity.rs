@@ -322,7 +322,7 @@ mod tests {
     }
 
     /// A stored row with a correct hash.
-    fn row(id: i32, name: &str) -> organizations::Model {
+    fn row(id: i64, name: &str) -> organizations::Model {
         let mut model = organizations::Model {
             created_at: at(1_700_000_000_000_000),
             updated_at: at(1_700_000_000_000_000),

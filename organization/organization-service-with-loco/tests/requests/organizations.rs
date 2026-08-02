@@ -351,8 +351,16 @@ async fn list_and_search_are_paginated() {
         let page = request.get("/api/organizations?limit=2&offset=1").await;
         assert_eq!(page.status_code(), 200);
         let body: serde_json::Value = page.json();
-        assert_eq!(body.as_array().expect("array").len(), 2, "the page is two rows");
-        assert_eq!(header!(page, "x-total-count"), "5", "the total ignores the window");
+        assert_eq!(
+            body.as_array().expect("array").len(),
+            2,
+            "the page is two rows"
+        );
+        assert_eq!(
+            header!(page, "x-total-count"),
+            "5",
+            "the total ignores the window"
+        );
         assert_eq!(header!(page, "x-limit"), "2");
         assert_eq!(header!(page, "x-offset"), "1");
 
@@ -367,7 +375,11 @@ async fn list_and_search_are_paginated() {
         // An over-large limit is clamped, not refused.
         let clamped = request.get("/api/organizations?limit=100000").await;
         assert_eq!(clamped.status_code(), 200);
-        assert_eq!(header!(clamped, "x-limit"), "500", "limit clamps to the maximum");
+        assert_eq!(
+            header!(clamped, "x-limit"),
+            "500",
+            "limit clamps to the maximum"
+        );
 
         // An out-of-bound offset is a 400: the database would otherwise
         // materialise and discard arbitrarily many rows.
@@ -381,11 +393,17 @@ async fn list_and_search_are_paginated() {
 
         // Search pages the same way, and its total comes from the index
         // rather than the page length.
-        let hits = request.get("/api/organizations/search?q=Paging&limit=2").await;
+        let hits = request
+            .get("/api/organizations/search?q=Paging&limit=2")
+            .await;
         assert_eq!(hits.status_code(), 200, "search page: {}", hits.text());
         let body: serde_json::Value = hits.json();
         assert_eq!(body.as_array().expect("array").len(), 2);
-        assert_eq!(header!(hits, "x-total-count"), "5", "all five match the query");
+        assert_eq!(
+            header!(hits, "x-total-count"),
+            "5",
+            "all five match the query"
+        );
     })
     .await;
 }

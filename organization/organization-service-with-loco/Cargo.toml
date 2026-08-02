@@ -10,7 +10,7 @@ default-run = "organization-service"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace.dependencies]
-loco-rs = { version = "0.16" }
+loco-rs = { version = "1.0.1" }
 
 [dependencies]
 # Keyed integrity MACs with production-grade key handling — one audited
@@ -36,7 +36,7 @@ regex = { version = "1.13" }
 # older services' `src/search/`, so the family runs one index format.
 tantivy = { version = "0.22" }
 migration = { path = "migration" }
-sea-orm = { version = "1.1", features = [
+sea-orm = { version = "2.0", features = [
   "sqlx-postgres",
   "runtime-tokio-rustls",
   "macros",

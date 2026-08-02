@@ -23,7 +23,7 @@ pub struct Model {
     /// Auto-increment surrogate primary key (internal; never exposed on
     /// the wire — used for stable `ORDER BY id` listing).
     #[sea_orm(primary_key)]
-    pub id: i32,
+    pub id: i64,
     /// Public, externally-stable id (UUID v4). The only identifier the
     /// REST API references; unique per the migration.
     #[sea_orm(unique)]

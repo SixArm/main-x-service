@@ -182,7 +182,7 @@ pub struct AuditIntegrityReport {
     pub mac_unverifiable: usize,
     /// Rows whose MAC did **not** match: the content changed and whoever
     /// changed it did not hold the key.
-    pub mismatched: Vec<i32>,
+    pub mismatched: Vec<i64>,
     /// `true` when no mismatch was found.
     pub verified: bool,
     /// What this result does and does not attest to, carried in the

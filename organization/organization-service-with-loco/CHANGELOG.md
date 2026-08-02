@@ -8,6 +8,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16 → 1.0.1**, the framework's first stable release: sea-orm
+  1.1 → 2.0, sea-orm-migration → 2.0, sea-query → 1.0. Mechanical
+  fallout: raw `Statement` queries in `models/review_queue.rs` move from
+  `.execute`/`.query_one`/`.query_all` to the `_raw` variants (sea-orm 2.0
+  splits typed `StatementBuilder` calls from raw-SQL ones); a
+  `useless_conversion` in `models/event_outbox.rs` from a now-unneeded
+  `.into()`.
+- **loco's `ColType::PkAuto` now generates a 64-bit primary key**
+  (`BIGINT`, was `SERIAL`). The `organizations`, `audit_logs`, and
+  `merge_records` generated entities (and the compliance-report /
+  test-fixture code that carries their row ids) move from `i32` to
+  `i64` to match. `event_outbox` is unaffected — its migration writes
+  raw SQL (`id SERIAL PRIMARY KEY`) rather than the loco schema DSL,
+  specifically to control the exact table name, and that raw SQL was
+  left as `SERIAL`.
+- No behavioural change; verified with the full DB-gated suite (26
+  tests) against a freshly migrated Postgres 18.
+
 ### Added — pagination on list and search (2026-08-01)
 
 - **`GET /api/organizations` and `GET /api/organizations/search` take

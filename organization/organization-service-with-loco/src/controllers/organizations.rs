@@ -98,7 +98,7 @@ fn validate(org: &Organization) -> Result<()> {
     } else {
         Err(Error::CustomError(
             StatusCode::UNPROCESSABLE_ENTITY,
-            ErrorDetail::new("unprocessable_entity", &problems.join("; ")),
+            ErrorDetail::new("unprocessable_entity", problems.join("; ")),
         ))
     }
 }
@@ -361,7 +361,7 @@ impl PageParams {
                 StatusCode::BAD_REQUEST,
                 ErrorDetail::new(
                     "offset_too_large",
-                    &format!("offset must not exceed {MAX_OFFSET}; narrow the query instead"),
+                    format!("offset must not exceed {MAX_OFFSET}; narrow the query instead"),
                 ),
             ));
         }
@@ -675,7 +675,7 @@ async fn get_review_queue(
             StatusCode::UNPROCESSABLE_ENTITY,
             ErrorDetail::new(
                 "unprocessable_entity",
-                &format!("unknown review status `{status}`"),
+                format!("unknown review status `{status}`"),
             ),
         ));
     }
@@ -749,7 +749,7 @@ async fn review_decision(
                 StatusCode::UNPROCESSABLE_ENTITY,
                 ErrorDetail::new(
                     "unprocessable_entity",
-                    &format!("item is `{current}`; only `pending` items can be decided"),
+                    format!("item is `{current}`; only `pending` items can be decided"),
                 ),
             ))
         }
@@ -1087,12 +1087,25 @@ mod tests {
         };
         assert_eq!(zero.resolve(LIST_DEFAULT_LIMIT), (LIST_DEFAULT_LIMIT, 0));
         let absent = PageParams::default();
-        assert_eq!(absent.resolve(SEARCH_DEFAULT_LIMIT), (SEARCH_DEFAULT_LIMIT, 0));
-        assert!(PageParams { limit: None, offset: Some(MAX_OFFSET) }.check_offset().is_ok());
+        assert_eq!(
+            absent.resolve(SEARCH_DEFAULT_LIMIT),
+            (SEARCH_DEFAULT_LIMIT, 0)
+        );
         assert!(
-            PageParams { limit: None, offset: Some(MAX_OFFSET + 1) }
-                .check_offset()
-                .is_err(),
+            PageParams {
+                limit: None,
+                offset: Some(MAX_OFFSET)
+            }
+            .check_offset()
+            .is_ok()
+        );
+        assert!(
+            PageParams {
+                limit: None,
+                offset: Some(MAX_OFFSET + 1)
+            }
+            .check_offset()
+            .is_err(),
             "an unbounded offset is a DoS, not a deep page"
         );
     }

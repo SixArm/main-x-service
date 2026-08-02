@@ -21,7 +21,7 @@ pub struct Model {
     pub updated_at: DateTimeWithTimeZone,
     /// Auto-increment surrogate primary key; also the recency order key.
     #[sea_orm(primary_key)]
-    pub id: i32,
+    pub id: i64,
     /// The surviving (main) organization's `pid` — the record kept.
     pub main_pid: Uuid,
     /// The merged-away duplicate's `pid` — now soft-deleted.
