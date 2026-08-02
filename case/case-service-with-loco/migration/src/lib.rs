@@ -23,6 +23,8 @@ mod m20260727_000008_blake3_digests;
 mod m20260727_000009_sha3_digests;
 mod m20260727_000010_drop_blake3;
 mod m20260727_000011_integrity_mac;
+mod m20260803_000012_review_queue;
+mod m20260803_000013_bulk_jobs;
 
 /// The crate's migrator: drives the ordered migration set for the loco
 /// CLI / boot-time migration.
@@ -46,6 +48,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260727_000009_sha3_digests::Migration),
             Box::new(m20260727_000010_drop_blake3::Migration),
             Box::new(m20260727_000011_integrity_mac::Migration),
+            Box::new(m20260803_000012_review_queue::Migration),
+            Box::new(m20260803_000013_bulk_jobs::Migration),
             // inject-above (do not remove this comment)
         ]
     }

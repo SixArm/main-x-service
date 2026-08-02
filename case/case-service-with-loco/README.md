@@ -27,6 +27,9 @@ application, complaint, appeal, and so on.
 | POST | `/api/cases/check-duplicates` | Match query vs stored cases |
 | POST | `/api/cases/merge` | Merge a duplicate into a survivor |
 | GET | `/api/cases/whoami` | Verified PASETO-token claims |
+| POST/GET | `/api/cases/import[/{id}]` | Bulk import (JSONL/CSV) + job status |
+| POST/GET | `/api/cases/export[/{id}]` | Bulk export (JSONL/CSV) + job status |
+| GET | `/api/cases/bulk-jobs` | Recent bulk jobs |
 
 The body for a case **is** the `case_matcher::Case` shape (title,
 alternate titles, case number + agency, case type, status, priority,

@@ -22,6 +22,10 @@
 
 pub mod app;
 pub mod auth;
+/// Bulk import/export (BLK-5): async, job-based load/extract via a
+/// Postgres-backed background worker.
+/// See `agents/share/bulk-import-export.md`.
+pub mod bulk;
 /// Regulatory-compliance controls: the tamper-evident audit chain and
 /// read/disclosure auditing, adopted from the care-pathway reference
 /// implementation (`spec/compliance` §8.5 step 3).

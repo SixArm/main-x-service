@@ -97,6 +97,7 @@ impl Hooks for App {
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::cases::routes())
+            .add_route(crate::bulk::handlers::routes())
             .add_route(controllers::links::routes())
             .add_route(controllers::compliance::routes())
             .add_route(controllers::fhir::routes())
@@ -140,6 +141,9 @@ impl Hooks for App {
     }
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
         queue.register(DownloadWorker::build(ctx)).await?;
+        queue
+            .register(crate::bulk::worker::BulkJobWorker::build(ctx))
+            .await?;
         Ok(())
     }
 

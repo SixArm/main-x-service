@@ -35,8 +35,41 @@ whoami   ──>  GET    /api/cases/whoami                Authorization: Bearer 
                                                                           -> verified claims (401 without a token)
 audit    ──>  GET    /api/cases/audit/recent · /api/cases/{pid}/audit     -> [audit rows]
 events   ──>  GET    /api/cases/events/recent                             -> [{kind, pid, name, seq}]
+import   ──>  POST   /api/cases/import                multipart JSONL/CSV -> 202 {job_id}
+import?  ──>  GET    /api/cases/import/{id}                               -> job status + counts + errors_url
+export   ──>  POST   /api/cases/export                {q?, format?, masking_profile?, …} -> 202 {job_id}
+export?  ──>  GET    /api/cases/export/{id}                               -> job status + download_url
+jobs     ──>  GET    /api/cases/bulk-jobs                                 -> [bulk job status]
 docs     ──>  GET    /api-docs/openapi.json · /swagger-ui                 -> OpenAPI 3 + Swagger UI
 metrics  ──>  GET    /metrics.prom                                        -> Prometheus text (root-mounted, public)
+```
+
+### Bulk import / export
+
+Async, job-based (BLK-5; `agents/share/bulk-import-export.md`; spec
+§8.7). JSONL (lossless reference) or CSV; the stable upsert key is the
+agency-scoped `(agency_id, case_number)` pair, then the row's own `pid`
+— a keyless row runs the same duplicate-detection path
+`check-duplicates` uses and, on a likely match, is still created **and**
+queued in the review queue (`provenance = "import"`). Export defaults to
+the masked view (`mask_case`); the unmasked `full` profile requires
+elevated authorisation, and every export is audited before its
+`download_url` is ever surfaced.
+
+```text
+POST /api/cases/import  (multipart: file, format=jsonl|csv, dry_run?)
+  -> 202 { "job_id": "…" }
+
+GET /api/cases/import/{job_id}
+  -> { id, kind: "import", status, rows_total, rows_created, rows_upserted,
+       rows_to_review, rows_errored, errors_url }
+
+POST /api/cases/export
+  { "format": "jsonl", "q": "housing", "masking_profile": "masked" }
+  -> 202 { "job_id": "…" }
+
+GET /api/cases/export/{job_id}
+  -> { id, kind: "export", status, rows_total, download_url }
 ```
 
 ### Merge request / response

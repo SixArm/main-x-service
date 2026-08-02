@@ -24,6 +24,11 @@ loco-rs = { version = "1.0.1" }
 loco-rs = { workspace = true  }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
+# CSV codec for the bulk import/export operator/spreadsheet format
+# (BLK-5; `agents/share/bulk-import-export.md` §5). Same version the
+# person reference implementation uses, for one family-wide RFC 4180
+# reader/writer.
+csv = "1"
 tokio = { version = "1.53", default-features = false, features = [
   "rt-multi-thread",
 ] }

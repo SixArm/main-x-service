@@ -79,6 +79,47 @@ impl Model {
         row.ok_or_else(|| ModelError::EntityNotFound)
     }
 
+    /// Find an active case by its **agency-scoped case number** — the
+    /// `(agency_id, case_number)` pair stored inside the JSONB payload.
+    ///
+    /// Used by the bulk-import stable-key resolution
+    /// (`agents/share/bulk-import-export.md` §10.1, BLK-5): a case
+    /// number is only unique *within* an agency, so both fields are
+    /// required and neither is queried alone. When more than one active
+    /// row happens to share the pair (a pre-existing data-quality issue
+    /// this method does not attempt to resolve), the most recently
+    /// inserted one is returned, so an import is at least deterministic.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn find_by_agency_case_number<C: ConnectionTrait>(
+        db: &C,
+        agency_id: &str,
+        case_number: &str,
+    ) -> ModelResult<Option<Self>> {
+        // Both conditions live in **one** `cust_with_values` call, bound
+        // with explicit Postgres `$1`/`$2` placeholders (not the generic
+        // `?` token `cust_with_values` uses for MySQL/SQLite — see its
+        // own doc examples, "Postgres only"). Splitting this into two
+        // separate `.filter(Expr::cust_with_values(...))` calls, each
+        // privately numbered `$1`, produced two competing `$1`s in the
+        // same rendered query — `data->>'agency_id' = $1 AND
+        // data->>'case_number' = $1` binding only the first value —
+        // which is silently wrong, not merely a syntax error, so this
+        // shape is deliberate rather than a style preference.
+        let row = cases::Entity::find()
+            .filter(cases::Column::DeletedAt.is_null())
+            .filter(Expr::cust_with_values(
+                "data->>'agency_id' = $1 AND data->>'case_number' = $2",
+                [agency_id, case_number],
+            ))
+            .order_by_desc(cases::Column::Id)
+            .one(db)
+            .await?;
+        Ok(row)
+    }
+
     /// Fetch the active rows for a list of public ids, **preserving the
     /// order of `pids`**.
     ///

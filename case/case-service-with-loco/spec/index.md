@@ -241,30 +241,56 @@ Cross-service links are never read by the matcher (the partition rule,
 
 ### 8.7 Bulk import / export
 
-The uniform async, job-based bulk contract is fixed family-wide in
+**Status: landed (BLK-5, 2026-08-03).** The uniform async, job-based
+bulk contract is fixed family-wide in
 [bulk import / export](../../../agents/share/bulk-import-export.md)
-(execution model on `bg_pg`, the `bulk_jobs` table, the five endpoints,
-the JSONL/CSV/Parquet formats, import dedupe semantics, the per-row
-error report, and the export privacy/audit posture). This section
-declares only what the Case Service differs on (per
-[bulk import / export §10](../../../agents/share/bulk-import-export.md)).
+(execution model on the loco `worker` feature, the `bulk_jobs` table,
+the five endpoints, import dedupe semantics, the per-row error report,
+and the export privacy/audit posture). This section declares what the
+Case Service differs on (per
+[bulk import / export §10](../../../agents/share/bulk-import-export.md))
+and records the scope this rollout deliberately did not cover.
+
+**Formats: JSONL + CSV only.** No Parquet and no S3 artifact store in
+this rollout — those were person-specific extras (its BLK-3/BLK-4)
+built *after* CSV/review-routing, and this task's dependency was only on
+the CSV/review-routing steps (BLK-1/BLK-2). `src/bulk/store.rs`'s
+`ArtifactStore` trait is nonetheless **async** (care-pathway's shape,
+not person's original synchronous one) specifically so a future S3
+rollout is additive rather than a breaking signature change; asking for
+`s3` today (`CASE_BULK_ARTIFACT_BACKEND=s3`) is a clear, named error,
+never a silent fallback to local disk.
 
 **Stable key(s) for upsert (import idempotency).** A row upserts in
 place when it carries a key that uniquely identifies an existing case;
-otherwise it runs the normal duplicate detection (§6.7) and routes
-likely duplicates to the review queue with `provenance = import`. Keys,
-in priority order:
+otherwise it runs duplicate detection (the same search-blocked
+`case-matcher` path `check-duplicates` uses) and routes a likely
+duplicate to the review queue with `provenance = import`. Keys, in
+priority order:
 
-1. **`pid`** — the case's public UUID, when present (exact upsert).
-2. **A deterministic globally-unique identifier** — any `identifiers`
-   entry on a deterministic scheme (`Docket`, `ExternalCaseId`, `Uri`,
-   `Uuid`) — the same schemes the case-matcher short-circuits to `1.0`
-   on (case-matcher §15). A shared value here is an unambiguous upsert
-   target.
-3. **Agency-scoped case number** — `case_number` **scoped by
-   `agency_id`** (the `AgencyCaseNumber` pairing; case-matcher §11/§16).
-   A case number is unique only within its agency, so the upsert key is
-   the `(agency_id, case_number)` pair, never `case_number` alone.
+1. **Agency-scoped case number** — the `(agency_id, case_number)` pair,
+   both present and non-blank. A case number is unique only *within* its
+   agency (case-matcher's own deterministic short-circuit), so the pair
+   is the key — never `case_number` alone, and never `agency_id` alone.
+2. **`pid`** — the case's public UUID, when the bulk row names one. This
+   is what makes re-importing an *export* (which always carries pids)
+   idempotent even for a case with no case number recorded.
+
+Unlike the person reference implementation's stable key, there is
+**no third, deterministic-identifier tier** (an earlier planning draft
+of this section proposed one, keyed on `identifiers` schemes
+`Docket`/`ExternalCaseId`/`Uri`/`Uuid`) — it was dropped as out of this
+task's bound rather than built partially; a future rollout can add it
+as a policy decision, not a technical blocker.
+
+`case_matcher::Case` carries **no `pid` field of its own** — the bulk
+wire type (`src/bulk/row.rs::BulkCaseRow`) wraps it with an out-of-band,
+genuinely optional `pid: Option<Uuid>` (`#[serde(flatten)]`, no
+fabricated default), so a JSONL/CSV row reads as `{"pid": "...",
+"title": "...", …}`. This is a deliberate simplification versus
+person's own stable-key module: because `pid` has no fabricated serde
+default, "no pid given" and "pid present" are never ambiguous, so there
+is no need for person's raw-line `row_has_explicit_id` byte-sniff.
 
 `same_as` URL overlap is a matcher short-circuit but is **not** used as
 a bulk upsert key (it is a sameness signal, not a stable record
@@ -274,42 +300,112 @@ identity); keyless rows fall through to duplicate detection.
 [bulk import / export §5](../../../agents/share/bulk-import-export.md);
 JSONL is the lossless reference — prefer it when fidelity matters):
 
-- **Scalar columns** (one each): `pid`, `title`, `case_number`,
-  `agency_id`, `agency_name`, `case_type`, `status`, `priority`,
-  `opened_date`, `in_language`.
+- **Scalar columns** (one each): `pid` (the wire envelope's field, not
+  part of `Case`), `title`, `case_number`, `agency_id`, `agency_name`,
+  `opened_date`.
+- **`case_type` / `status` / `priority` are JSON-encoded, not
+  scalar** — each is an enum carrying a data-bearing `Custom(String)`
+  variant, which `serde` externally tags as a JSON *object*
+  (`{"Custom":"foo"}`) rather than a bare string; a plain scalar cell
+  could not distinguish a unit variant's name from a `Custom` payload,
+  or round-trip the object shape at all. This is a deliberate departure
+  from an earlier planning draft of this section (and from person's
+  `gender`, whose enum has no data-bearing variant) that listed them as
+  plain scalar columns.
 - **Arrays / arrays-of-objects → a single JSON-encoded cell each**:
   `alternate_titles`, `subjects`, `keywords`, `identifiers`
-  (`[{scheme,value}, …]`), `same_as`. Enum-as-`{"Custom":"label"}`
-  cells round-trip as their JSON form.
+  (`[{scheme,value}, …]`), `same_as`, `in_language`.
+- `case_matcher::Case` has **no single nested object** needing dotted
+  columns the way person's `name` or organization's `address` do.
 - **Cross-service `entity_links`** (the `subject_of` / `about` edges,
   §8.6) are **not** part of the `Case` payload export; per
   [bulk import / export §9](../../../agents/share/bulk-import-export.md)
-  they are an **optional separate** link-import/export job and, being
-  the highest-governance kind (§12.1), are never bundled into the
-  default case export.
+  they are an **optional separate** link-import/export job (not built
+  here) and, being the highest-governance kind (§12.1), are never
+  bundled into the default case export.
 
 **Export sensitivity — PROMINENT (cases are personal/sensitive
 government data; ties to [§12](#12-compliance)).** A bulk extract of
 case data is itself a compliance event (HIPAA / NHS / GDPR), so export
 is governed more strictly than for non-personal entities:
 
-- **Masked by default.** The `masking_profile` defaults to **masked**
-  output; full / unmasked export requires **elevated authorisation** —
-  at least the authorisation needed to **read a case**
-  (`GET /api/cases/{pid}`), the same boundary as §9 / §12.1. A bulk
-  export MUST NEVER reveal more than the caller could read one case at a
-  time.
-- **`include_soft_deleted` defaults `false` and is gated** — soft-deleted
-  cases are exported only with explicit elevated authorisation.
-- **Every export is audited** — an `audit_logs` row per export job
-  capturing `actor` (from the verified token), the list/search
-  **filter**, format, **row count**, and **masking profile**, written
-  even for a zero-row export. This mirrors the §12.1 obligation to audit
-  every read of sensitive data.
-- **Filtered, not all-or-nothing** — exports reuse the existing
-  list/search query (title `ILIKE`, agency, status, …), so they are
-  scoped. The single-subject special case (filter = one `pid`) is the
-  per-case GDPR export.
+- **Masked by default, reusing the existing masking, not a new
+  rule.** The overview capability matrix's "Privacy masking module
+  (`src/privacy`)" column marks case **absent**, and that is accurate
+  for a *dedicated module* — but masking logic already existed, inline
+  as `controllers::cases::mask_case` (the function behind
+  `GET /{pid}/masked` and the masked branch of `GET /{pid}/export`).
+  Bulk export's default `masked` profile calls this exact function on
+  every exported record (redacting `subjects` / `identifiers` /
+  `same_as` / `case_number`) rather than inventing a second redaction
+  rule as a side effect of this task.
+- **Full / unmasked export requires elevated authorisation** — the
+  caller must clear `authorize_record(…, Action::Destructive, …)`
+  (mirroring the person reference implementation's export-elevation
+  gate), checked **synchronously at submission time** against the live
+  caller. `include_soft_deleted` defaults `false` and, like person's
+  reference implementation, is rejected as not-yet-supported rather
+  than silently leaking or ignoring the flag.
+- **Known, documented gap: no per-row record-level ABAC inside the
+  async export worker.** `GET /api/cases` (list) and
+  `GET /api/cases/search` apply per-row SEC-G3 concealment
+  (`resource.case_type`/`status`/`priority`-gated policy) against the
+  *live* caller's verified claims. The bulk export **worker** does not
+  re-apply this, because it runs asynchronously with no live HTTP
+  request or bearer token to evaluate a record-level decision against —
+  synthesising `Claims` from data stored at submission time, rather
+  than an actually-verified token, would itself be an unverified
+  privilege-check bypass path, which is a worse defect than not
+  building the feature. This matches the person reference
+  implementation, which has the same limitation despite having
+  record-level ABAC as a general capability — so it is a family-wide
+  gap, not a case-specific shortcut. **Follow-up:** closing it needs
+  either a way to carry a verified caller identity into an async job
+  (a short-lived, job-scoped credential the worker can present back to
+  the ABAC engine) or a synchronous-only privileged-export path.
+- **Every export is audited, unconditionally, and the audit write
+  gates delivery (SEC-B8).** Unlike the opt-in, default-off
+  `CASE_AUDIT_READS` read-auditing this crate already had (§12.0's
+  `compliance::disclosure` module), a bulk export's audit row is always
+  written via `models::audit_logs::Model::record` — actor, filter,
+  format, row count, masking profile, timestamp — even for a zero-row
+  export, and the write is recorded **before** the job is marked
+  `completed`: a failed audit write fails the whole job (no
+  `download_url` is ever surfaced for an unaccounted-for export). An
+  **import**'s job-level audit row, by contrast, stays best-effort
+  (logged on failure, never blocks the job) — every row it writes
+  already carries its own per-row audit from
+  `streaming::create_and_emit`/`update_and_emit`, so a failure to write
+  the *summary* row does not by itself leave anything unaccounted for.
+- **Filtered, not all-or-nothing** — exports reuse the existing title
+  search / list query, so they are scoped. The single-subject special
+  case (filter = one `pid`) is the per-case GDPR export
+  (`GET /{pid}/export`), unchanged by this work.
+
+**Concurrency — documented, not half-built.** The family contract's
+SEC-B3 concern (two concurrent importers of the same stable key must
+produce exactly one record) is **not** implemented here as a true
+cross-request lock: `streaming::create_and_emit`/`update_and_emit` each
+own their transaction internally (for the `outbox` event transport) and
+offer no hook to nest an externally-held Postgres advisory lock around
+that write without duplicating their event/audit/index logic in
+`src/bulk/`. A lock that only wrapped the read-then-decide step would
+not actually close the create-vs-update race it exists to prevent, so
+rather than ship that (worse than no lock — it *looks* safe), this
+rollout implements and tests **sequential idempotency only**:
+re-running the same file twice upserts in place, which is what
+`import_is_idempotent_on_the_agency_case_number_key` (§11) pins. True
+concurrent-importer race safety is a follow-up needing either a
+`ConnectionTrait`-generic `create_and_emit`/`update_and_emit` variant or
+a dedicated transaction-scoped bulk write path.
+
+**New tables.** `bulk_jobs` (loco-idiomatic `sea-orm-migration`, one
+`SeaORM` entity — modelled on care-pathway's own `bulk_jobs` migration,
+which is closer to this crate's layout than person's) and — new to this
+crate — `review_queue` (raw-SQL migration, modelled on
+organization's, with `provenance` in the initial schema rather than a
+follow-up migration, since there was no pre-existing table to keep
+backward-compatible).
 
 ## 9. API surface
 
@@ -405,6 +501,15 @@ constrains the aggregator: its `single-view` / `neighbors` responses
 MUST honour the same authz/masking before surfacing a case→person edge
 (see §12). See [§12](#12-compliance) for the audit + masking obligations.
 
+**Bulk import/export endpoints (§8.7, BLK-5).** `POST`/`GET
+/api/cases/import[/{id}]`, `POST`/`GET /api/cases/export[/{id}]`, `GET
+/api/cases/bulk-jobs` — mounted as a separate route table
+(`bulk::handlers::routes()`) alongside `controllers::cases::routes()`.
+`POST /import` falls under the same `DESTRUCTIVE_POST_SUFFIXES` /import
+entry named above; the privileged export paths (`masking_profile=full`
+or `include_soft_deleted=true`) are checked explicitly in the handler
+against `Action::Destructive`, not via the coarse method-derived action.
+
 ## 10. Persistence
 
 PostgreSQL via SeaORM + `sea-orm-migration`. Migrations
@@ -438,6 +543,21 @@ CREATE TABLE entity_links (
 ```
 
 This table is never read by the matcher (the partition rule, §5).
+
+**Bulk import/export tables (§8.7, BLK-5).** `m20260803_000012_review_queue`
+(raw SQL; `id`, `record_id_a`/`record_id_b` UUID pair normalized and
+UNIQUE, `match_score`, `match_quality`, `detection_method`,
+`score_breakdown` JSONB, `status` default `pending`, `provenance`
+default `operator`, `reviewed_by`, `created_at`, `reviewed_at`) and
+`m20260803_000013_bulk_jobs` (loco-idiomatic `sea-orm-migration`; `id`,
+`kind`, `entity`, `format`, `status`, `params` JSONB, the `rows_*`
+counters, `actor`, `idempotency_key` with a `UNIQUE (entity, kind,
+idempotency_key)` index, `input_url`/`result_url`/`error_report_url`,
+`created_at`/`updated_at`/`expires_at`). Neither table is read by the
+matcher or by `entity_links`; `review_queue` rows reference `cases.pid`
+values but carry no foreign key (mirroring the family's other
+review-queue tables), since a queued pair can outlive either side being
+merged or soft-deleted.
 
 ## 11. Testing strategy
 
@@ -805,47 +925,60 @@ the other v1 edge kinds even though it shares the same edge shape.
     (`controllers/links.rs`, `streaming.rs`) pin the accept/reject
     validation matrix and the `data`-carrying envelope with the frozen
     projection.
-- [ ] **Bulk import / export.** See §8.7 and the family contract
-  [bulk import / export](../../../agents/share/bulk-import-export.md)
-  (uniform across entities; only the §8.7 stable keys, CSV columns, and
-  export sensitivity differ for case). Async, job-based on `bg_pg`.
-  - [ ] Migration `m20220101_000005_bulk_jobs` creating the `bulk_jobs`
-    table ([bulk import / export §3](../../../agents/share/bulk-import-export.md)
-    schema, with the `UNIQUE (entity, kind, idempotency_key)` retry key).
-  - [ ] Five endpoints
-    ([bulk import / export §4](../../../agents/share/bulk-import-export.md)):
-    `POST`/`GET /api/cases/import/{id}`,
-    `POST`/`GET /api/cases/export/{id}`, `GET /api/cases/bulk-jobs`.
-  - [ ] `bg_pg` worker draining `queued → running →
-    completed|completed_with_errors|failed`, with progress + count
-    updates on `bulk_jobs`.
-  - [ ] JSONL (lossless reference) + CSV (flattening per §8.7) + Parquet
-    (export-first, feature-gated) codecs.
-  - [ ] Per-row import pipeline reusing the single-create validators
-    (`src/validation.rs`) + case-matcher + the review queue: stable-key
-    (§8.7) upsert in place, else duplicate detection → review queue with
-    `provenance = import`; events + audit not bypassed; `dry_run`
-    supported.
-  - [ ] Per-row error report (CSV or JSONL) with
-    `row_number, source_line, field, code, message`; one bad row never
-    aborts the load; counts reconcile (`rows_total = created + upserted
-    + to_review + errored`).
-  - [ ] **Governance ([bulk import / export §8](../../../agents/share/bulk-import-export.md),
-    §8.7, §12 / §12.1):** export masked by default; full / unmasked or
-    `include_soft_deleted` export requires elevated (case-read)
-    authorisation and is never more revealing than reading cases one at
-    a time; **every** export writes an `audit_logs` row (`actor`,
-    filter, format, row count, masking profile — even for zero rows).
-  - **Acceptance:** an idempotent-re-import test (re-submitting the same
-    file upserts to the same state, no duplicates); a per-row
-    error-report test (one bad row skipped + reported, good rows
-    commit); a dedupe-to-review test (keyless likely-duplicate row lands
-    in the review queue with `provenance = import`); a **masked-vs-full
-    export authz test** (default export is masked; full / unmasked
-    export without elevated authz is rejected, and never exposes more
-    than single-record reads); and an **export-audit test** (every
-    export — including a zero-row export — writes an `audit_logs` row
-    with actor, filter, format, row count, and masking profile).
+- [x] **Bulk import / export (BLK-5, landed 2026-08-03).** See §8.7 and
+  the family contract
+  [bulk import / export](../../../agents/share/bulk-import-export.md).
+  Async, job-based on the loco `worker` feature. JSONL + CSV only (no
+  Parquet, no S3 — §8.7 "Formats").
+  - [x] Migrations `m20260803_000012_review_queue` (new to this crate;
+    `provenance` from the start) and `m20260803_000013_bulk_jobs`
+    (`src/models/bulk_jobs.rs`, `src/models/review_queue.rs`).
+  - [x] Five endpoints (`src/bulk/handlers.rs`):
+    `POST`/`GET /api/cases/import[/{id}]`,
+    `POST`/`GET /api/cases/export[/{id}]`, `GET /api/cases/bulk-jobs`.
+    `POST /import` is a declared destructive named POST
+    (`auth::DESTRUCTIVE_POST_SUFFIXES` already listed `/import` ahead of
+    this rollout); the privileged export paths are gated explicitly in
+    the handler (§8.7).
+  - [x] `BulkJobWorker` (`src/bulk/worker.rs`, registered in
+    `app.rs::connect_workers`) draining `queued → running →
+    completed|completed_with_errors|failed`.
+  - [x] JSONL (`src/bulk/jsonl.rs`, lossless reference) + CSV
+    (`src/bulk/csv.rs` + `columns.rs`, flattening per §8.7).
+  - [x] Per-row import pipeline (`src/bulk/pipeline.rs`) reusing the
+    single-create validators (`src/validation.rs`) + case-matcher + the
+    (new) review queue: stable-key (§8.7) upsert in place, else
+    duplicate detection → review queue with `provenance = import`;
+    events + audit not bypassed (`streaming::create_and_emit`/
+    `update_and_emit`); `dry_run` supported. Sequential idempotency only
+    — see §8.7 "Concurrency" for the documented SEC-B3 follow-up.
+  - [x] Per-row error report (`src/bulk/error_report.rs`, CSV) with
+    `row_number, field, code, message`; one bad row never aborts the
+    load; counts reconcile (`rows_total = created + upserted + errored`,
+    with `rows_to_review <= rows_created`).
+  - [x] **Governance ([bulk import / export §8](../../../agents/share/bulk-import-export.md),
+    §8.7, §12 / §12.1):** export masked by default (reusing
+    `controllers::cases::mask_case`); full / unmasked or
+    `include_soft_deleted` export requires elevated (Destructive)
+    authorisation checked at submission; **every** export writes an
+    `audit_logs` row (`actor`, filter, format, row count, masking
+    profile — even for zero rows) and the write **gates delivery**
+    (SEC-B8). Known gap, documented in §8.7: no per-row record-level ABAC
+    inside the async export worker.
+  - **Acceptance (all DB-gated, `src/bulk/pipeline.rs::db_tests` +
+    `src/models/bulk_jobs.rs::db_tests`):**
+    `import_is_idempotent_on_the_agency_case_number_key` (re-submitting
+    the same file upserts to the same state, no duplicates);
+    `invalid_row_is_reported_not_fatal` (a per-row error-report test —
+    one bad row skipped + reported, good rows commit);
+    `keyless_row_with_a_likely_duplicate_creates_and_queues_for_review`
+    (a keyless likely-duplicate row is created *and* lands in the review
+    queue with `provenance = import`); `csv_import_creates_a_keyed_row` +
+    `export_round_trips_through_{jsonl,csv}` (both formats round-trip);
+    `export_masks_by_default_and_full_is_unmasked` (masked-vs-full
+    export); `export_rejects_include_soft_deleted`; and
+    `idempotent_resubmit_returns_the_same_job` /
+    `keyless_submit_is_never_deduped` (SEC-B9 idempotency-key dedupe).
 - [x] **FHIR R5 API** (`Task` default; `CarePlan` roadmap) — adopt the
   family contract ([`agents/share/fhir.md`](../../../agents/share/fhir.md)).
   **Done:** `src/fhir/{mod,resources,search}.rs` + mounted
@@ -925,8 +1058,9 @@ the token) with boot-time key-set fetch over HTTP
 boots);
 OpenAPI 3 doc + Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`);
 Prometheus metrics (`/metrics.prom`, root-mounted + public, CRUD counters
-+ HTTP request label vec); DB-free tests + gated request-level tests;
-green build + clippy.
++ HTTP request label vec); bulk import/export (BLK-5, JSONL + CSV,
+`src/bulk/`, §8.7); DB-free tests + gated request-level tests + gated
+bulk-pipeline tests; green build + clippy.
 
 ## 15. Roadmap
 
@@ -949,6 +1083,28 @@ remains.
 - Key-set refresh: the boot-time paseto-keys fetch is once-only — add a
   rotation-triggered refetch (e.g. on `UnknownKid`) or a periodic
   refresh loop?
+- **Bulk import (§8.7): true concurrent-importer race safety
+  (SEC-B3).** Today's `src/bulk/pipeline.rs` gives sequential
+  idempotency only (re-running a file is safe; two importers of the same
+  stable key racing each other is not). Closing this needs either a
+  `ConnectionTrait`-generic `streaming::create_and_emit`/
+  `update_and_emit` variant (so a caller-held Postgres advisory lock can
+  span find-then-write) or a dedicated transaction-scoped bulk write
+  path — a decision that likely belongs at the family level
+  (`agents/share/bulk-import-export.md`) rather than being invented
+  per-crate.
+- **Bulk export (§8.7): per-row record-level ABAC inside the async
+  worker.** The worker has no live bearer token to evaluate a
+  record-level (`resource.case_type`/`status`/`priority`) decision
+  against. A fix needs either a short-lived, job-scoped credential the
+  worker can present back to the ABAC engine, or restricting
+  record-level-sensitive exports to a synchronous-only path — also
+  likely a family-level design question, since the person reference
+  implementation shares the same gap.
+- **Bulk artifact storage: S3 backend.** `src/bulk/store.rs`'s
+  `ArtifactStore` trait is async specifically to make this additive
+  later (care-pathway's `S3ArtifactStore` is the template); not built in
+  this rollout (out of BLK-5's scope).
 
 ## 17. References
 

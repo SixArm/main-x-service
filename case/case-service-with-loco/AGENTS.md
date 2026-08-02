@@ -40,6 +40,11 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/api/cases/whoami` | Verified PASETO-token claims (`401` without one) |
 | GET | `/api/cases/audit/recent` · `/{pid}/audit` | Audit-log query |
 | GET | `/api/cases/events/recent` | In-memory event stream |
+| POST | `/api/cases/import` | Bulk import (multipart JSONL/CSV upload) → `202 {job_id}` |
+| GET | `/api/cases/import/{id}` | Import job status + counts + `errors_url` |
+| POST | `/api/cases/export` | Bulk export (JSON filter body) → `202 {job_id}` |
+| GET | `/api/cases/export/{id}` | Export job status + `download_url` |
+| GET | `/api/cases/bulk-jobs` | Recent bulk jobs, newest first |
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 | GET | `/metrics.prom` | Prometheus metrics (root-mounted, public, `text/plain; version=0.0.4`) |
 
@@ -75,7 +80,15 @@ the ABAC work landed, wired to the `mask` obligation on `GET /{pid}`.
 What was missing — the always-masked `GET /{pid}/masked` view and the
 audited `GET /{pid}/export` GDPR envelope — landed too (spec §13,
 2026-08-02), reusing the existing `disclosure::action::EXPORT`
-machinery for the export's HIPAA §164.528 accounting. Deferred
+machinery for the export's HIPAA §164.528 accounting. **Bulk
+import/export** (spec §8.7/§13, BLK-5, landed 2026-08-03) is wired:
+async job-based JSONL/CSV import + export via `src/bulk/` and a loco
+`BackgroundWorker`, stable-keyed on the agency-scoped
+`(agency_id, case_number)` pair then `pid`, reusing `mask_case` as the
+default export redaction and gating every export's audit write ahead of
+job completion (SEC-B8). No Parquet, no S3 in this rollout; see
+`spec/index.md` §8.7 for the documented SEC-B3 concurrency and
+per-row-ABAC scope limitations. Deferred
 (spec §13): the durable bus's Phase-3 Fluvio broker sink,
 front-end merge action.
 
@@ -116,11 +129,17 @@ src/
 ├── streaming.rs           durable-bus Phase 1: Envelope + EventPublisher seam (in-memory); indexes/deindexes on every write
 ├── tasks/search.rs        `search_reindex` CLI task + boot-time rebuild-if-empty
 ├── validation.rs          title + opened_date + identifier/subject/keyword checks → 422
+├── bulk/                  bulk import/export (BLK-5): mod · row (BulkCaseRow) · stable_key ·
+│                          columns · csv · jsonl · error_report · store (async ArtifactStore) ·
+│                          pipeline (process_import_job/process_export_job) · worker · handlers
 ├── models/
-│   ├── cases.rs           CRUD helpers over the stored payload
+│   ├── cases.rs           CRUD helpers over the stored payload (+ find_by_agency_case_number)
 │   ├── audit_logs.rs      audit-trail record/query helpers
 │   ├── merge_records.rs   merge-history record/query helpers
-│   └── _entities/{cases,audit_logs,merge_records}.rs  SeaORM entities
-migration/src/            …_000001_cases, …_000002_audit_logs, …_000003_merge_records
+│   ├── bulk_jobs.rs       bulk-job CRUD + idempotency helpers (BLK-5)
+│   ├── review_queue.rs    duplicate-review-queue CRUD (BLK-5; raw SQL, provenance from the start)
+│   └── _entities/{cases,audit_logs,merge_records,bulk_jobs}.rs  SeaORM entities
+migration/src/            …_000001_cases, …_000002_audit_logs, …_000003_merge_records,
+                          …_000012_review_queue, …_000013_bulk_jobs
 config/                   development/production/test yaml
 ```

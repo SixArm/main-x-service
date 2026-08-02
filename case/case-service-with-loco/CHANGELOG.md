@@ -8,6 +8,68 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — Bulk import/export, JSONL + CSV (BLK-5, 2026-08-03)
+
+Rolls out the family-wide async, job-based bulk import/export contract
+(`agents/share/bulk-import-export.md`) onto this crate's loco-idiomatic
+layout, porting the shape of the person service's `src/bulk/` (the
+family reference implementation). Scoped to what BLK-5 depends on
+(BLK-1/BLK-2, CSV + review-routing) — no Parquet, no S3.
+
+- New `src/bulk/` module: `mod.rs` (`BulkKind`/`BulkFormat`/
+  `JobStatus`/`MaskingProfile`), `row.rs` (`BulkCaseRow` — the bulk wire
+  envelope pairing `case_matcher::Case`, which carries no `pid` field of
+  its own, with a genuinely optional out-of-band `pid`), `stable_key.rs`
+  (agency-scoped `(agency_id, case_number)` → `pid`; no third,
+  deterministic-identifier tier), `columns.rs` + `csv.rs` (CSV
+  flattening; `case_type`/`status`/`priority` are JSON-encoded, not
+  scalar, because each carries a data-bearing `Custom(String)` variant),
+  `jsonl.rs`, `error_report.rs`, `store.rs` (an **async**
+  `ArtifactStore` trait — care-pathway's shape, not person's original
+  sync one — local-filesystem only in this rollout), `pipeline.rs` (the
+  testable `process_import_job`/`process_export_job` core), `worker.rs`
+  (`BulkJobWorker`, a loco `BackgroundWorker`), `handlers.rs` (the five
+  REST endpoints).
+- New tables: `review_queue` (new to this crate — case had none before;
+  `provenance` in the initial schema) and `bulk_jobs`
+  (`migration/src/m20260803_000012_review_queue.rs`,
+  `m20260803_000013_bulk_jobs.rs`; `src/models/review_queue.rs`,
+  `src/models/bulk_jobs.rs`, `src/models/_entities/bulk_jobs.rs`).
+- New `CaseModel::find_by_agency_case_number` (`src/models/cases.rs`) —
+  a JSONB `data->>'agency_id' = $1 AND data->>'case_number' = $2` lookup
+  via `Expr::cust_with_values`. **Postgres note recorded for future
+  readers:** `cust_with_values` needs literal `$1`/`$2` placeholders for
+  Postgres, not the generic `?` its own doc examples use for MySQL/
+  SQLite — and two separate `.filter(cust_with_values(...))` calls each
+  privately numbered `$1` render as competing `$1`s in one query
+  (binding only the first value, silently), so both conditions are one
+  `cust_with_values` call.
+- `POST /api/cases/import` is a declared destructive named POST —
+  `auth::DESTRUCTIVE_POST_SUFFIXES` already listed `/import`, written
+  ahead of this rollout in anticipation of it.
+- Export governance: the default `masked` profile reuses the existing
+  `controllers::cases::mask_case` (not a new redaction rule); `full`
+  requires `Action::Destructive` authorisation checked synchronously at
+  submission; every export is audited unconditionally via
+  `models::audit_logs::Model::record` and the audit write **gates
+  delivery** (SEC-B8) — a failed audit write fails the whole job.
+- Added `csv = "1"` dependency (`compliance/soup.tsv` updated).
+- **Documented, not built:** true concurrent-importer race safety
+  (SEC-B3 — this rollout gives sequential idempotency only, since
+  `streaming::create_and_emit`/`update_and_emit` own their own
+  transaction with no hook for an externally-held advisory lock without
+  duplicating their event/audit/index logic); per-row record-level ABAC
+  inside the async export worker (no live bearer token to evaluate
+  against — matches the person reference implementation's own gap); the
+  S3 artifact-store backend (`ArtifactStore` is async specifically so
+  this is additive later). See `spec/index.md` §8.7 and §16.
+- Tests: DB-gated (`src/bulk/pipeline.rs::db_tests`,
+  `src/models/bulk_jobs.rs::db_tests`) covering idempotent re-import on
+  the `(agency_id, case_number)` key, a keyless-duplicate row creating
+  *and* queuing a review pair with `provenance = "import"`, CSV and
+  JSONL import/export round-trips, masked-vs-full export, and
+  SEC-B9 idempotency-key dedupe; DB-free unit tests throughout `src/bulk/`.
+
 ### Added — Privacy: masked view + GDPR export (2026-08-02)
 
 Repo tasks.md P-3. Narrower than P-1 (organization) and P-2

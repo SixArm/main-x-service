@@ -23,11 +23,12 @@ pub fn spec() -> Value {
 }
 
 /// The `paths` object of the `OpenAPI` document, composed from the
-/// CRUD/matching paths and the auxiliary (auth/audit/events/metrics)
-/// paths.
+/// CRUD/matching paths, the auxiliary (auth/audit/events/metrics) paths,
+/// and the bulk import/export paths.
 fn paths() -> Value {
     let mut paths = crud_paths();
     merge_object(&mut paths, aux_paths());
+    merge_object(&mut paths, bulk_paths());
     paths
 }
 
@@ -153,6 +154,48 @@ fn aux_paths() -> Value {
     })
 }
 
+/// The bulk import/export paths (BLK-5; `agents/share/bulk-import-export.md`).
+fn bulk_paths() -> Value {
+    json!({
+            "/api/cases/import": {
+                "post": {
+                    "tags": ["bulk"],
+                    "summary": "Submit a bulk import job (multipart JSONL/CSV upload)",
+                    "description": "A declared destructive named POST (auth::DESTRUCTIVE_POST_SUFFIXES). Fields: file (required), format (jsonl|csv, default jsonl), dry_run.",
+                    "responses": {
+                        "202": { "description": "Job accepted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobAccepted" } } } },
+                        "400": { "description": "Missing file / unsupported format / oversized upload" }
+                    }
+                }
+            },
+            "/api/cases/import/{id}": {
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                "get": { "tags": ["bulk"], "summary": "Import job status + counts + errors_url",
+                    "responses": { "200": { "description": "Job status", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BulkJobView" } } } }, "404": { "description": "Not found" } } }
+            },
+            "/api/cases/export": {
+                "post": {
+                    "tags": ["bulk"],
+                    "summary": "Submit a bulk export job",
+                    "description": "Body: format (jsonl|csv), q, limit, offset, masking_profile (masked|full), include_soft_deleted. The unmasked full profile or include_soft_deleted requires elevated (Destructive) authorisation.",
+                    "responses": {
+                        "202": { "description": "Job accepted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobAccepted" } } } },
+                        "403": { "description": "Privileged export requested without elevated authorisation" }
+                    }
+                }
+            },
+            "/api/cases/export/{id}": {
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                "get": { "tags": ["bulk"], "summary": "Export job status + download_url",
+                    "responses": { "200": { "description": "Job status", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BulkJobView" } } } }, "404": { "description": "Not found" } } }
+            },
+            "/api/cases/bulk-jobs": {
+                "get": { "tags": ["bulk"], "summary": "Recent bulk jobs, newest first",
+                    "responses": { "200": { "description": "Bulk jobs", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/BulkJobView" } } } } } } }
+            }
+    })
+}
+
 /// The `components` object of the `OpenAPI` document.
 fn components() -> Value {
     json!({
@@ -163,6 +206,22 @@ fn components() -> Value {
             "schemas": {
                 "CaseRef": { "type": "object", "required": ["pid", "title"], "properties": {
                     "pid": { "type": "string", "format": "uuid" }, "title": { "type": "string" } } },
+                "JobAccepted": { "type": "object", "required": ["job_id"], "properties": {
+                    "job_id": { "type": "string", "format": "uuid" } } },
+                "BulkJobView": { "type": "object", "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "kind": { "type": "string", "description": "import | export" },
+                    "entity": { "type": "string" },
+                    "format": { "type": "string", "description": "jsonl | csv" },
+                    "status": { "type": "string", "description": "queued | running | completed | completed_with_errors | failed" },
+                    "rows_total": { "type": "integer", "nullable": true },
+                    "rows_processed": { "type": "integer" },
+                    "rows_created": { "type": "integer" },
+                    "rows_upserted": { "type": "integer" },
+                    "rows_to_review": { "type": "integer" },
+                    "rows_errored": { "type": "integer" },
+                    "download_url": { "type": "string", "nullable": true },
+                    "errors_url": { "type": "string", "nullable": true } } },
                 "ScoredRef": { "type": "object", "properties": {
                     "pid": { "type": "string" }, "title": { "type": "string" },
                     "score": { "type": "number", "format": "double" }, "confidence": { "type": "string" },
@@ -236,6 +295,21 @@ mod tests {
         assert!(paths["/api/cases/audit/recent"]["get"].is_object());
         assert!(paths["/api/cases/events/recent"]["get"].is_object());
         assert!(paths["/api/cases/{pid}/audit"]["get"].is_object());
+    }
+
+    /// Pins that the five bulk import/export endpoints (BLK-5) and their
+    /// two schemas are documented.
+    #[test]
+    fn spec_documents_bulk_endpoints() {
+        let s = spec();
+        let paths = &s["paths"];
+        assert!(paths["/api/cases/import"]["post"].is_object());
+        assert!(paths["/api/cases/import/{id}"]["get"].is_object());
+        assert!(paths["/api/cases/export"]["post"].is_object());
+        assert!(paths["/api/cases/export/{id}"]["get"].is_object());
+        assert!(paths["/api/cases/bulk-jobs"]["get"].is_object());
+        assert!(s["components"]["schemas"]["JobAccepted"]["properties"]["job_id"].is_object());
+        assert!(s["components"]["schemas"]["BulkJobView"]["properties"]["status"].is_object());
     }
 
     /// Pins that the title-search endpoint is documented with its `q`
