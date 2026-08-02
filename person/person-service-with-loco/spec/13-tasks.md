@@ -56,6 +56,42 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   (repo tasks.md BLK-3, spec §10.7 records this explicitly rather than
   silently).
 
+- [x] **BLK-4: S3-compatible `ArtifactStore` (feature-gated).**
+  *(done 2026-08-02)* Ported the care-pathway service's reference
+  design (`agents/share/bulk-import-export.md` §12): `ArtifactStore`
+  (`src/bulk/store.rs`) became `#[async_trait]` (`put`/`get`/
+  `presigned_get`, the last defaulting to `None`) and gained
+  `S3ArtifactStore` behind this crate's own `s3` Cargo feature (off by
+  default; `aws-config`/`aws-sdk-s3`/`aws-credential-types` 1.x).
+  `PERSON_BULK_ARTIFACT_BACKEND` selects `local` (default) or `s3`; an
+  unknown value warns and falls back to local; `s3` without the feature
+  is a clean error, never a silent local-storage fallback that would
+  lose a deployment's export data. S3 config:
+  `PERSON_BULK_S3_{BUCKET(required),ENDPOINT,REGION(default
+  us-east-1),FORCE_PATH_STYLE(default on)}`; credentials from the
+  standard AWS chain. `S3ArtifactStore::split_reference` refuses a
+  reference naming a different bucket (IDOR guard); `presigned_get`
+  clamps its TTL to `[1, 3600]` seconds. `AppState::new`
+  (`src/api/rest/state.rs`) became `async fn … -> crate::Result<Self>`
+  since the S3 client's credential resolution is async; both call sites
+  (`app.rs`'s `after_routes`, `tests/common/mod.rs`) were already async.
+  Test suite ported verbatim from care-pathway (local round-trip,
+  missing-artifact error, no-presigned-URL-for-local, `is_safe_key`
+  unit tests, unsafe-key rejection on `put`, outside-base rejection on
+  `get`, without-the-feature error, unknown-backend fallback, the
+  default/local backend names, foreign-bucket reference rejection,
+  path-style default, and an `#[ignore]`d live-`MinIO` round-trip with
+  its run command documented inline). SOUP register updated for the
+  three new direct dependencies. Green:
+  `cargo build`/`test`/`clippy --all-targets -D warnings`/`fmt --check`
+  under default features, `--features s3`, `--features parquet`, and
+  `--features s3,parquet`; `cargo deny check` shows the same
+  pre-existing `rsa`/`jsonwebtoken`/loco-rs advisory as before (verified
+  unrelated, not introduced here); the DB-gated suite
+  (`scripts/ci-check.sh test-db`, 21+20+1 tests) against real Postgres,
+  which exercises the real boot path through the now-async
+  `AppState::new`. (Repo tasks.md BLK-4.)
+
 - [x] **SEC-B10 (security): person merge audit in-transaction.** The merge
   `UPDATE` (survivor) + `DELETE` (duplicate) audit rows are now written on the
   merge transaction (`log_update_on`/`log_delete_on`) **before** commit, so a

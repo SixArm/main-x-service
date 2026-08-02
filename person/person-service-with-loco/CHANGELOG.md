@@ -7,6 +7,29 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — S3-compatible bulk artifact store, feature-gated (2026-08-02)
+
+- **`ArtifactStore` (`src/bulk/store.rs`) is now async** and gained an
+  `S3ArtifactStore` backend alongside `LocalFsArtifactStore`, ported from
+  the care-pathway service (the family's reference implementation,
+  `agents/share/bulk-import-export.md` §12).
+- `PERSON_BULK_ARTIFACT_BACKEND` selects `local` (default) or `s3`
+  (behind this crate's own `s3` Cargo feature, off by default; an
+  unknown value falls back to `local` with a warning; `s3` without the
+  feature is a clean error, never a silent local-storage fallback).
+- S3 configuration: `PERSON_BULK_S3_{BUCKET(required),ENDPOINT,REGION
+  (default us-east-1),FORCE_PATH_STYLE(default on)}`; credentials from
+  the standard AWS credential chain. References are `s3://<bucket>/<key>`
+  URLs; `presigned_get` issues a short-lived download URL (TTL clamped to
+  `[1, 3600]` seconds) and refuses a reference naming a foreign bucket.
+- `AppState::new` (`src/api/rest/state.rs`) is now `async fn … ->
+  crate::Result<Self>`, since the S3 backend's credential resolution is
+  async; both call sites (`app.rs`, `tests/common/mod.rs`) were already
+  async.
+- New optional dependencies `aws-config`, `aws-sdk-s3`,
+  `aws-credential-types` (1.x), gated by the `s3` feature; SOUP register
+  updated.
+
 ### Added — Parquet export, feature-gated (2026-08-02)
 
 - **`format: "parquet"`** on `POST /api/persons/export` — **export-only**

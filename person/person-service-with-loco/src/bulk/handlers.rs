@@ -367,6 +367,7 @@ async fn enqueue_import(
     let input_url = state
         .bulk_store
         .put(&format!("jobs/{}/input.{}", job.id, format.as_str()), bytes)
+        .await
         .map_err(|e| e.to_string())?;
     bulk_jobs::set_input_url(&state.db, job.id, input_url)
         .await

@@ -90,7 +90,7 @@ async fn run_import(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<(
         .input_url
         .as_deref()
         .ok_or_else(|| crate::Error::Validation("import job has no input artifact".to_string()))?;
-    let input = state.bulk_store.get(input_ref)?;
+    let input = state.bulk_store.get(input_ref).await?;
 
     let dry_run = job
         .params
@@ -122,7 +122,8 @@ async fn run_import(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<(
         Some(
             state
                 .bulk_store
-                .put(&format!("jobs/{}/errors.csv", job.id), csv.as_bytes())?,
+                .put(&format!("jobs/{}/errors.csv", job.id), csv.as_bytes())
+                .await?,
         )
     };
 
@@ -156,10 +157,13 @@ async fn run_export(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<(
     let params = export_params_from_json(&job.params, &job.format);
     let (bytes, rows_total) = process_export_job(state.person_repository.as_ref(), &params).await?;
 
-    let result_url = state.bulk_store.put(
-        &format!("jobs/{}/export.{}", job.id, params.format.as_str()),
-        &bytes,
-    )?;
+    let result_url = state
+        .bulk_store
+        .put(
+            &format!("jobs/{}/export.{}", job.id, params.format.as_str()),
+            &bytes,
+        )
+        .await?;
 
     // SEC-B8: a bulk extract of personal data is a compliance event (§8) and
     // the audit **gates delivery** — it is written (even for a zero-row

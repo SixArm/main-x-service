@@ -122,12 +122,37 @@ mimalloc = "0.1.52"
 arrow = { version = "59.1.0", default-features = false, optional = true }
 parquet = { version = "59.1.0", default-features = false, features = ["arrow"], optional = true }
 
+# S3-compatible artifact storage for bulk jobs (BLK-4, optional —
+# agents/share/bulk-import-export.md §12: care-pathway is the reference
+# implementation, ported here). The maintained AWS SDK rather than
+# hand-rolled SigV4 signing: signing is security-relevant code, and there
+# is no way to verify a hand-rolled implementation in this repository's
+# test environment without a live endpoint. Optional so the default
+# dependency tree — and the default build time — is unchanged for
+# deployments using the local backend.
+aws-config = { version = "1", optional = true, default-features = false, features = [
+  "behavior-version-latest",
+  "rt-tokio",
+  "rustls",
+] }
+aws-sdk-s3 = { version = "1", optional = true, default-features = false, features = [
+  "behavior-version-latest",
+  "rt-tokio",
+  "rustls",
+  "sigv4a",
+] }
+aws-credential-types = { version = "1", optional = true }
+
 [features]
 # Off by default. `dep:` syntax so this is the *only* way to reach either
 # crate — plain `--features arrow` or `--features parquet` (the implicit
 # per-optional-dep features Cargo would otherwise synthesize) are
 # suppressed, so there is exactly one on/off switch to document and test.
 parquet = ["dep:parquet", "dep:arrow"]
+# S3-compatible artifact storage. Off by default: the local-filesystem
+# backend covers dev and test, and the SDK is a large dependency tree no
+# deployment should pay for unless it uses it.
+s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-credential-types"]
 
 [dev-dependencies]
 # Serialises the DB-gated audit-chain tests: they each truncate

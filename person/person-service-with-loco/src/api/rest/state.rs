@@ -10,7 +10,7 @@ use authentication_verifier::Verifier;
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 
-use crate::bulk::store::{ArtifactStore, LocalFsArtifactStore};
+use crate::bulk::store::ArtifactStore;
 use crate::config::Config;
 use crate::db::{AuditLogRepository, PersonRepository, SeaOrmPersonRepository};
 use crate::matching::{PersonMatcher, ProbabilisticMatcher};
@@ -42,9 +42,11 @@ pub struct AppState {
     pub config: Arc<Config>,
 
     /// Artifact store for bulk import/export jobs (uploaded input,
-    /// export output, per-row error report). Built from the environment
-    /// (`PERSON_BULK_ARTIFACT_DIR`) as a local-filesystem store for
-    /// dev/test; an S3-compatible store is the deployment backend.
+    /// export output, per-row error report). Selected at boot by
+    /// `PERSON_BULK_ARTIFACT_BACKEND` (`local`, the default, or `s3` —
+    /// behind the `s3` cargo feature): a local-filesystem store for
+    /// dev/test, or an S3-compatible object store for deployment. See
+    /// [`crate::bulk::store`].
     pub bulk_store: Arc<dyn ArtifactStore>,
 }
 
@@ -56,13 +58,23 @@ impl AppState {
     /// them in `Arc`s. The repository is built with both the event
     /// publisher and audit log attached, so every mutation through it
     /// emits events and audit rows.
-    #[must_use]
-    pub fn new(
+    ///
+    /// Async because the bulk artifact store's selection
+    /// (`crate::bulk::store::from_env`) is async — an S3 client is built
+    /// with an async credential-chain resolution. Both call sites
+    /// (`after_routes`, the test harness) were already async.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configured artifact-store backend cannot be
+    /// built (e.g. `PERSON_BULK_ARTIFACT_BACKEND=s3` without the `s3`
+    /// cargo feature, or with an incomplete S3 configuration).
+    pub async fn new(
         db: DatabaseConnection,
         search_engine: SearchEngine,
         matcher: ProbabilisticMatcher,
         config: Config,
-    ) -> Self {
+    ) -> crate::Result<Self> {
         // Create event publisher
         let event_publisher = Arc::new(InMemoryEventPublisher::new()) as Arc<dyn EventProducer>;
 
@@ -81,7 +93,9 @@ impl AppState {
 
         let person_matcher = Arc::new(matcher) as Arc<dyn PersonMatcher>;
 
-        Self {
+        let bulk_store: Arc<dyn ArtifactStore> = Arc::from(crate::bulk::store::from_env().await?);
+
+        Ok(Self {
             db,
             person_repository,
             event_publisher,
@@ -89,8 +103,8 @@ impl AppState {
             search_engine: Arc::new(search_engine),
             matcher: person_matcher,
             config: Arc::new(config),
-            bulk_store: Arc::new(LocalFsArtifactStore::from_env()) as Arc<dyn ArtifactStore>,
-        }
+            bulk_store,
+        })
     }
 }
 

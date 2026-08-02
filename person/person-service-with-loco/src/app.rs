@@ -88,7 +88,9 @@ impl Hooks for App {
         // / `PERSON_ABAC_POLICY_FILE`).
         auth::spawn_key_refresh();
         auth::spawn_policy_watcher();
-        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
+        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config)
+            .await
+            .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         // Blanket auth enforcement (default-off, `PERSON_REQUIRE_AUTH`),
         // snapshotted here at boot — changing the env var requires a
         // restart. Layered unconditionally; the flag is the only switch.

@@ -189,3 +189,62 @@ parquet` locally, as this task's own verification did. Wiring a
 dedicated CI feature-matrix entry (mirroring how `cargo-fuzz`/`cargo
 deny` already get their own opt-in stage) is a reasonable follow-up but
 was judged out of scope for this (Small) task.
+
+### 10.8 S3-compatible artifact store (BLK-4, done)
+
+`src/bulk/store.rs`'s [`ArtifactStore`](../src/bulk/store.rs) trait
+became **async** (`#[async_trait]`) and gained a second backend
+alongside `LocalFsArtifactStore`, ported from the care-pathway service —
+the family's reference implementation
+([bulk import/export §12](../../../agents/share/bulk-import-export.md)).
+Selected at runtime by `PERSON_BULK_ARTIFACT_BACKEND` (`local`, the
+default, `fs`, `file`, or `s3`; an unrecognised value falls back to
+`local` with a warning rather than failing to boot):
+
+- **`LocalFsArtifactStore`** — unchanged behaviour, now async. Writes
+  under `PERSON_BULK_ARTIFACT_DIR` and returns confined `file://`
+  references (SEC-B4).
+- **`S3ArtifactStore`** (behind this crate's own `s3` Cargo feature, off
+  by default) — any S3-compatible object store (AWS S3, MinIO, Ceph RGW,
+  Cloudflare R2) via `PERSON_BULK_S3_{BUCKET(required),ENDPOINT,REGION
+  (default us-east-1),FORCE_PATH_STYLE(default on)}`. Credentials come
+  from the standard AWS credential chain, never a bespoke variable, so a
+  deployment's existing secret management applies unchanged. References
+  are `s3://<bucket>/<key>` URLs; `presigned_get` issues a short-lived,
+  access-controlled download URL (TTL clamped to `[1, 3600]` seconds) —
+  the local backend cannot offer one (a `file://` path is not fetchable
+  by a remote client) and says so with `None` rather than a URL-shaped
+  reference that is not one. `split_reference` refuses a reference
+  naming a different bucket than configured, so a `bulk_jobs` row edit
+  cannot be turned into a read of an arbitrary bucket this service's
+  credentials can reach.
+
+Asking for `PERSON_BULK_ARTIFACT_BACKEND=s3` in a binary built without
+the `s3` feature is a clean error, not a silent fallback to local
+storage — that would lose data by writing a deployment's exports to an
+ephemeral container disk while appearing to succeed. The AWS SDK is used
+rather than hand-rolled SigV4 signing: request signing is
+security-relevant code that cannot be verified in this repository's test
+environment without a live endpoint or the published AWS test vectors,
+and shipping an unverified signing implementation that looks finished is
+the worse risk.
+
+The async trait changed `AppState::new` (`src/api/rest/state.rs`) from a
+synchronous constructor to `pub async fn new(..) ->
+crate::Result<Self>`, since the S3 backend's client construction
+resolves credentials asynchronously. Both call sites — the loco
+`after_routes` boot hook and the integration-test harness
+(`tests/common/mod.rs`) — were already `async fn`, so this is additive;
+`bulk_store` is built once at boot (`crate::bulk::store::from_env()`)
+and shared via the existing `Arc<dyn ArtifactStore>` field rather than
+reconstructed per request.
+
+Verified: `cargo build`/`test`/`clippy --all-targets -D warnings`/`fmt
+--check` under default features, `--features s3`, `--features parquet`,
+and `--features s3,parquet`; the DB-gated suite
+(`scripts/ci-check.sh test-db`) against real Postgres, exercising the
+real boot path through `AppState::new`. The live-endpoint S3 round-trip
+test is `#[ignore]`d (documented `MinIO` invocation in its doc comment)
+since CI has no object store to test against — everything else about
+the S3 backend (key safety, reference parsing, path-style default, the
+without-the-feature error) is unit-tested without one.

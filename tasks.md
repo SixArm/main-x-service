@@ -614,9 +614,44 @@
   exercise the `parquet` feature — a follow-up (dedicated CI matrix
   entry, mirroring how `cargo-fuzz`/`cargo-deny` already get their own
   opt-in stage) is deferred as out of scope for this Small task.
-- [ ] **BLK-4 (M)** S3-compatible `ArtifactStore` impl (config-driven
+- [x] **BLK-4 (M)** S3-compatible `ArtifactStore` impl (config-driven
   switch local-fs vs S3; mirror the env-var conventions). Feature-gate
-  the S3 SDK dep if heavy.
+  the S3 SDK dep if heavy. *(done 2026-08-02)* Ported the care-pathway
+  service's reference design (`agents/share/bulk-import-export.md` §12)
+  to person: `ArtifactStore` (`src/bulk/store.rs`) became
+  `#[async_trait]` and gained `S3ArtifactStore` behind this crate's own
+  `s3` Cargo feature (off by default; `aws-config`/`aws-sdk-s3`/
+  `aws-credential-types` 1.x, mirroring care-pathway's exact feature
+  flags). `PERSON_BULK_ARTIFACT_BACKEND` selects `local` (default) or
+  `s3`; an unknown value warns and falls back to local; `s3` without the
+  feature is a clean error, never a silent local-storage fallback that
+  would lose export data. S3 config:
+  `PERSON_BULK_S3_{BUCKET(required),ENDPOINT,REGION(default
+  us-east-1),FORCE_PATH_STYLE(default on)}`; credentials from the
+  standard AWS chain, never a bespoke variable. `split_reference` refuses
+  a reference naming a foreign bucket (IDOR guard); `presigned_get`
+  clamps its TTL to `[1, 3600]` seconds. The async trait forced
+  `AppState::new` (`src/api/rest/state.rs`) from a sync constructor to
+  `pub async fn … -> crate::Result<Self>` — both call sites (`app.rs`'s
+  `after_routes`, `tests/common/mod.rs`) were already async, so this was
+  additive; `bulk_store` stays a boot-time-built, request-shared
+  `Arc<dyn ArtifactStore>` field rather than reconstructed per call
+  (care-pathway's own reference instead rebuilds the store per request —
+  person keeps its existing cached-in-`AppState` design, which the async
+  trait doesn't disturb). Test suite ported verbatim from care-pathway,
+  `PERSON_`-prefixed: local round-trip, missing-artifact error,
+  no-presigned-URL-for-local, `is_safe_key` unit tests, unsafe-key/outside
+  -base rejection, without-the-feature error, unknown-backend fallback,
+  default/local backend names, foreign-bucket rejection, path-style
+  default, and an `#[ignore]`d live-`MinIO` round-trip. SOUP register
+  updated for the three new direct dependencies. *Verified:* `cargo
+  build`/`test`/`clippy --all-targets -D warnings`/`fmt --check` under
+  default features, `--features s3`, `--features parquet`, and
+  `--features s3,parquet`; `cargo deny check` shows only the
+  pre-existing `rsa`/`jsonwebtoken`/loco-rs advisory (confirmed
+  unrelated); the DB-gated suite (`scripts/ci-check.sh test-db`, 21 lib +
+  20 integration + 1 enforcement tests) against real Postgres, which
+  exercises the real boot path through the now-async `AppState::new`.
 - [ ] **BLK-5 (L)** Roll bulk I/O to **organization** (stable key:
   LEI → DUNS → pid) and **case** (agency-scoped case number → pid),
   declaring each §10 section in their specs. Person's `src/bulk/` is the

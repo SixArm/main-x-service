@@ -43,6 +43,8 @@ pub async fn create_test_app_state() -> AppState {
     let matcher = ProbabilisticMatcher::new(config.matching.clone());
 
     AppState::new(db, search_engine, matcher, config)
+        .await
+        .expect("Failed to build application state (bulk artifact store)")
 }
 
 /// Create a test router with test application state
