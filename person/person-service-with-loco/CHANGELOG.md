@@ -7,6 +7,23 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — bulk CSV wiring + keyless-row review-queue routing (2026-08-02)
+
+- **CSV is now a full peer of JSONL** on `POST /api/persons/import` and
+  `POST /api/persons/export` (`format: "csv"`): the `bg_pg` worker
+  dispatches on the job's stored format, and stored artifact filenames
+  carry the matching extension.
+- **A keyless import row** (no strong identifier, no `tax_id`, no
+  explicit `id`) now runs through the same duplicate detection
+  `POST /check-duplicates` uses instead of a blind create. A likely
+  duplicate still creates the row — a bulk load never silently withholds
+  legitimate data — and queues the pair in the stored review queue with a
+  new `provenance = "import"` column, so it's visible to an operator
+  rather than only surfacing on a later batch scan.
+- New `review_queue.provenance` column (migration
+  `2026080200000001_review_queue_provenance`; existing rows backfilled
+  `operator`).
+
 ### Changed — loco-rs 1.0.1 (2026-08-02)
 
 - **loco-rs 0.16.4 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration →

@@ -124,6 +124,27 @@ Person's declared columns (export order; the export header):
 
 CSV is inherently lossy for deep nesting, so fidelity-sensitive loads should
 prefer JSONL; the JSON-in-cell columns keep the CSV path lossless at the cost
-of embedded JSON. Wiring the codec into the async import/export pipeline (the
-`format` dispatch in the `bg_pg` worker + the export handler) and the
-keyless-row → review-queue routing are the follow-up (BLK-2).
+of embedded JSON. **BLK-2 (done):** the codec is wired end-to-end — the
+import/export handlers accept `format: "jsonl" | "csv"`, the `bg_pg` worker
+dispatches on the job's stored `format` (`process_import_job`/
+`process_export_job` take a [`BulkFormat`](../src/bulk/mod.rs)), and the
+stored artifact filenames carry the matching extension
+(`jobs/{id}/input.{jsonl,csv}`, `jobs/{id}/export.{jsonl,csv}`).
+
+**Keyless-row → duplicate-detection → review-queue routing (BLK-2, done).**
+A row with no strong identifier, no `tax_id`, and no explicit `id` of its
+own (`stable_key::is_keyless`) cannot idempotently upsert — its
+`resolve_stable_key` fallback is only a freshly-generated placeholder pid,
+not a real find target. Such a row instead runs the same search-blocking +
+matcher duplicate detection `POST /check-duplicates` uses. A likely
+duplicate (score ≥ `IMPORT_REVIEW_THRESHOLD`, 0.7 — the same bar the
+interactive check uses) still **creates** the row (a bulk load must never
+silently withhold legitimate data) but also inserts a
+`provenance = "import"` pair into the stored `review_queue`
+(`detection_method = "import_duplicate_detection"`), so an operator sees it
+flagged rather than discovering it only on a later batch scan. No candidate
+clears the threshold ⇒ a plain create, the same path a keyed row with no
+match takes. `review_queue.provenance` (`operator` | `import` |
+`matcher_suggested` — the cross-service-linking vocabulary) distinguishes
+these from the interactive/batch-scan-sourced rows; it is set once on
+insert and never touched by a re-scan upsert.

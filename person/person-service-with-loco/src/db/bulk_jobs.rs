@@ -23,7 +23,7 @@ pub use bulk_jobs::Model;
 pub struct NewBulkJob {
     /// Import or export.
     pub kind: BulkKind,
-    /// File format (`jsonl` in step 1).
+    /// File format (`jsonl` or `csv`).
     pub format: BulkFormat,
     /// Free-form parameters (dry-run flag, export filter, …).
     pub params: serde_json::Value,
@@ -36,13 +36,13 @@ pub struct NewBulkJob {
 }
 
 impl NewBulkJob {
-    /// A JSONL **import** job with the given params and actor. The input
-    /// artifact is attached afterwards via [`set_input_url`].
+    /// An **import** job in `format` with the given params and actor. The
+    /// input artifact is attached afterwards via [`set_input_url`].
     #[must_use]
-    pub fn import(params: serde_json::Value, actor: Option<String>) -> Self {
+    pub fn import(format: BulkFormat, params: serde_json::Value, actor: Option<String>) -> Self {
         Self {
             kind: BulkKind::Import,
-            format: BulkFormat::Jsonl,
+            format,
             params,
             actor,
             idempotency_key: None,
@@ -50,12 +50,12 @@ impl NewBulkJob {
         }
     }
 
-    /// A JSONL **export** job with the given filter params and actor.
+    /// An **export** job in `format` with the given filter params and actor.
     #[must_use]
-    pub fn export(params: serde_json::Value, actor: Option<String>) -> Self {
+    pub fn export(format: BulkFormat, params: serde_json::Value, actor: Option<String>) -> Self {
         Self {
             kind: BulkKind::Export,
-            format: BulkFormat::Jsonl,
+            format,
             params,
             actor,
             idempotency_key: None,
@@ -284,12 +284,13 @@ fn i64_of(n: u64) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::NewBulkJob;
+    use crate::bulk::BulkFormat;
 
     /// SEC-B9: the idempotency key is trimmed, and a blank/whitespace key is
     /// treated as absent (so it never dedupes against another blank).
     #[test]
     fn with_idempotency_key_trims_and_drops_blank() {
-        let none = NewBulkJob::export(serde_json::json!({}), None);
+        let none = NewBulkJob::export(BulkFormat::Jsonl, serde_json::json!({}), None);
         assert_eq!(
             none.clone().with_idempotency_key(None).idempotency_key,
             None
@@ -316,7 +317,7 @@ mod tests {
 #[cfg(test)]
 mod db_tests {
     use super::{NewBulkJob, create, create_or_get_idempotent, find_by_id};
-    use crate::bulk::BulkKind;
+    use crate::bulk::{BulkFormat, BulkKind};
     use sea_orm::DatabaseConnection;
     use uuid::Uuid;
 
@@ -335,21 +336,33 @@ mod db_tests {
         let db = connect().await;
         let key = format!("idem-{}", Uuid::new_v4());
 
-        let first = NewBulkJob::export(serde_json::json!({}), Some("actor".to_string()))
-            .with_idempotency_key(Some(key.clone()));
+        let first = NewBulkJob::export(
+            BulkFormat::Jsonl,
+            serde_json::json!({}),
+            Some("actor".to_string()),
+        )
+        .with_idempotency_key(Some(key.clone()));
         let (job1, reused1) = create_or_get_idempotent(&db, first).await.unwrap();
         assert!(!reused1, "first submit creates the job");
 
         // Same key ⇒ same job, marked reused, no new row.
-        let retry = NewBulkJob::export(serde_json::json!({}), Some("actor".to_string()))
-            .with_idempotency_key(Some(key.clone()));
+        let retry = NewBulkJob::export(
+            BulkFormat::Jsonl,
+            serde_json::json!({}),
+            Some("actor".to_string()),
+        )
+        .with_idempotency_key(Some(key.clone()));
         let (job2, reused2) = create_or_get_idempotent(&db, retry).await.unwrap();
         assert!(reused2, "retried submit is deduped");
         assert_eq!(job1.id, job2.id, "same job id returned");
 
         // A different key is a distinct job.
-        let other = NewBulkJob::export(serde_json::json!({}), Some("actor".to_string()))
-            .with_idempotency_key(Some(format!("idem-{}", Uuid::new_v4())));
+        let other = NewBulkJob::export(
+            BulkFormat::Jsonl,
+            serde_json::json!({}),
+            Some("actor".to_string()),
+        )
+        .with_idempotency_key(Some(format!("idem-{}", Uuid::new_v4())));
         let (job3, reused3) = create_or_get_idempotent(&db, other).await.unwrap();
         assert!(!reused3);
         assert_ne!(job3.id, job1.id);
@@ -365,13 +378,21 @@ mod db_tests {
         let db = connect().await;
         let (a, _) = create_or_get_idempotent(
             &db,
-            NewBulkJob::import(serde_json::json!({ "dry_run": true }), None),
+            NewBulkJob::import(
+                BulkFormat::Jsonl,
+                serde_json::json!({ "dry_run": true }),
+                None,
+            ),
         )
         .await
         .unwrap();
         let b = create(
             &db,
-            NewBulkJob::import(serde_json::json!({ "dry_run": true }), None),
+            NewBulkJob::import(
+                BulkFormat::Jsonl,
+                serde_json::json!({ "dry_run": true }),
+                None,
+            ),
         )
         .await
         .unwrap();

@@ -18,7 +18,7 @@ use crate::Result;
 /// The full column list every query returns, so `RETURNING` and
 /// `SELECT` stay in lockstep with [`ReviewQueueRow`].
 const COLS: &str = "id, record_id_a, record_id_b, match_score, match_quality, \
-     detection_method, score_breakdown, status, reviewed_by, created_at, reviewed_at";
+     detection_method, score_breakdown, status, provenance, reviewed_by, created_at, reviewed_at";
 
 /// One stored review-queue row. `status` is the lowercase wire token.
 #[derive(Debug, Clone)]
@@ -40,6 +40,11 @@ pub struct ReviewQueueRow {
     /// Lowercase status token (`pending` / `confirmed` / `rejected` /
     /// `automerged`).
     pub status: String,
+    /// How this pair was first surfaced (`operator` / `import` /
+    /// `matcher_suggested` — the cross-service-linking provenance
+    /// vocabulary). Never touched on a re-scan upsert, so it always
+    /// reflects the pair's origin, not its most recent detection.
+    pub provenance: String,
     /// Reviewer identity recorded by the decision endpoint.
     pub reviewed_by: Option<String>,
     /// When the pair was first queued.
@@ -65,13 +70,18 @@ pub struct NewReviewItem {
     pub score_breakdown: Option<serde_json::Value>,
     /// Initial lowercase status token (`pending` or `automerged`).
     pub status: String,
+    /// How this pair was first surfaced (`operator` / `import` /
+    /// `matcher_suggested`). Only applied on insert; excluded from the
+    /// re-scan `DO UPDATE SET` so a re-scan never overwrites a pair's
+    /// original provenance.
+    pub provenance: String,
 }
 
 /// Outcome of a decision attempt on one review item.
 #[derive(Debug, Clone)]
 pub enum DecideOutcome {
     /// The row moved from `pending` to the requested status.
-    Decided(ReviewQueueRow),
+    Decided(Box<ReviewQueueRow>),
     /// No row with that id exists.
     NotFound,
     /// The row exists but is not `pending`; carries its current status.
@@ -89,6 +99,7 @@ fn row_from(qr: &sea_orm::QueryResult) -> Result<ReviewQueueRow> {
         detection_method: qr.try_get("", "detection_method")?,
         score_breakdown: qr.try_get("", "score_breakdown")?,
         status: qr.try_get("", "status")?,
+        provenance: qr.try_get("", "provenance")?,
         reviewed_by: qr.try_get("", "reviewed_by")?,
         created_at: qr.try_get("", "created_at")?,
         reviewed_at: qr.try_get("", "reviewed_at")?,
@@ -109,8 +120,8 @@ pub async fn upsert<C: ConnectionTrait>(
     let sql = format!(
         "INSERT INTO review_queue \
          (id, record_id_a, record_id_b, match_score, match_quality, \
-          detection_method, score_breakdown, status) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) \
+          detection_method, score_breakdown, status, provenance) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \
          ON CONFLICT (record_id_a, record_id_b) DO UPDATE SET \
              match_score = EXCLUDED.match_score, \
              match_quality = EXCLUDED.match_quality, \
@@ -138,6 +149,7 @@ pub async fn upsert<C: ConnectionTrait>(
                 item.detection_method.clone().into(),
                 Value::Json(item.score_breakdown.clone().map(Box::new)),
                 item.status.clone().into(),
+                item.provenance.clone().into(),
             ],
         );
         if let Some(qr) = conn.query_one_raw(stmt).await? {
@@ -214,7 +226,7 @@ pub async fn decide<C: ConnectionTrait>(
         ],
     );
     if let Some(qr) = conn.query_one_raw(update).await? {
-        return Ok(DecideOutcome::Decided(row_from(&qr)?));
+        return Ok(DecideOutcome::Decided(Box::new(row_from(&qr)?)));
     }
     let probe = Statement::from_sql_and_values(
         backend,

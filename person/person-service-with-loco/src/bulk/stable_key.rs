@@ -81,9 +81,46 @@ pub fn resolve_stable_key(person: &Person) -> StableKey {
     StableKey::Pid(person.id)
 }
 
+/// Whether a raw JSONL row carried an **explicit, non-null `id`**.
+///
+/// `Person::id` deserializes with `#[serde(default = "Uuid::new_v4")]`, so
+/// after parsing there is no way to tell "this row named its own pid" from
+/// "no id was given, and parsing handed it a random one" — [`Person`]
+/// alone has already lost that distinction. This answers the question
+/// from the wire bytes, before the `Person` exists, so [`is_keyless`] can
+/// tell a real upsert target from `resolve_stable_key`'s placeholder
+/// fallback. Malformed JSON reads as "no explicit id" — the row will fail
+/// to parse into a `Person` moments later and land in the error report.
+///
+/// The CSV codec answers the equivalent question directly from its own
+/// column cell ([`crate::bulk::csv::decode`]'s `had_explicit_id`), since a
+/// CSV row has no single JSON text to inspect.
+#[must_use]
+pub fn row_has_explicit_id(raw_line: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(raw_line)
+        .ok()
+        .and_then(|v| v.get("id").cloned())
+        .is_some_and(|id| !id.is_null())
+}
+
+/// Whether `person`'s row is **keyless** (`agents/share/bulk-import-export.md`
+/// §6): no strong identifier, no `tax_id`, and no explicit `id` of its own.
+///
+/// A keyless row cannot be idempotently upserted — [`resolve_stable_key`]'s
+/// [`StableKey::Pid`] fallback is only a freshly-generated placeholder, not
+/// a real record to find — so the import pipeline routes it through
+/// duplicate detection instead of a blind create.
+#[must_use]
+pub fn is_keyless(person: &Person, row_has_explicit_id: bool) -> bool {
+    match resolve_stable_key(person) {
+        StableKey::Identifier { .. } => false,
+        StableKey::Pid(_) => !row_has_explicit_id,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{StableKey, TAX_ID_SYSTEM, resolve_stable_key};
+    use super::{StableKey, TAX_ID_SYSTEM, is_keyless, resolve_stable_key, row_has_explicit_id};
     use crate::models::{Gender, HumanName, Identifier, IdentifierType, Person};
 
     fn base() -> Person {
@@ -145,5 +182,43 @@ mod tests {
             "   ".to_string(),
         ));
         assert_eq!(resolve_stable_key(&p), StableKey::Pid(p.id));
+    }
+
+    #[test]
+    fn row_has_explicit_id_detects_a_present_non_null_id() {
+        assert!(row_has_explicit_id(
+            r#"{"id":"11111111-1111-4111-8111-111111111111","name":{"family":"Doe","given":[]}}"#
+        ));
+        assert!(!row_has_explicit_id(r#"{"name":{"family":"Doe"}}"#));
+        assert!(!row_has_explicit_id(
+            r#"{"id":null,"name":{"family":"Doe"}}"#
+        ));
+        assert!(!row_has_explicit_id("not json"));
+    }
+
+    #[test]
+    fn keyless_only_when_no_strong_key_and_no_explicit_id() {
+        // Strong identifier ⇒ never keyless, explicit id or not.
+        let mut with_id = base();
+        with_id.identifiers.push(Identifier::new(
+            IdentifierType::SSN,
+            "http://hl7.org/fhir/sid/us-ssn".to_string(),
+            "123-45-6789".to_string(),
+        ));
+        assert!(!is_keyless(&with_id, false));
+        assert!(!is_keyless(&with_id, true));
+
+        // No strong key, tax_id, or explicit id ⇒ keyless.
+        let bare = base();
+        assert!(is_keyless(&bare, false));
+
+        // No strong key, but the row named its own pid ⇒ not keyless (the
+        // `Pid` fallback is a real upsert target, not a placeholder).
+        assert!(!is_keyless(&bare, true));
+
+        // tax_id alone is a real key even with no explicit id.
+        let mut with_tax = base();
+        with_tax.tax_id = Some("TAX-999".to_string());
+        assert!(!is_keyless(&with_tax, false));
     }
 }

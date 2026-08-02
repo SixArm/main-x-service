@@ -1186,6 +1186,7 @@ pub async fn batch_deduplicate(
                 detection_method: "batch_deduplication".to_string(),
                 score_breakdown: serde_json::to_value(&m.breakdown).ok(),
                 status,
+                provenance: "operator".to_string(),
                 reviewed_by: None,
                 created_at: Utc::now(),
                 reviewed_at: None,
@@ -1208,6 +1209,7 @@ pub async fn batch_deduplicate(
             detection_method: r.detection_method.clone(),
             score_breakdown: r.score_breakdown.clone(),
             status: review_status_token(&r.status).to_string(),
+            provenance: r.provenance.clone(),
         })
         .collect();
     let rows = match crate::db::review_queue::upsert(&state.db, &new_items).await {
@@ -1281,6 +1283,7 @@ fn review_row_to_item(
         detection_method: row.detection_method.clone(),
         score_breakdown: row.score_breakdown.clone(),
         status: parse_review_status(&row.status),
+        provenance: row.provenance.clone(),
         reviewed_by: row.reviewed_by.clone(),
         created_at: crate::db::convert::offset_to_ts(row.created_at),
         reviewed_at: row.reviewed_at.map(crate::db::convert::offset_to_ts),

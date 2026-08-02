@@ -16,7 +16,7 @@ use crate::api::rest::AppState;
 use crate::bulk::pipeline::{
     ExportParams, ImportOutcome, ImportParams, process_export_job, process_import_job,
 };
-use crate::bulk::{BulkKind, JobStatus, MaskingProfile, error_report};
+use crate::bulk::{BulkFormat, BulkKind, JobStatus, MaskingProfile, error_report};
 use crate::db::bulk_jobs;
 
 /// The loco background worker that runs one bulk job.
@@ -97,12 +97,20 @@ async fn run_import(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<(
         .get("dry_run")
         .and_then(serde_json::Value::as_bool)
         .unwrap_or(false);
+    // The handler already validated `job.format` against `BulkFormat::parse`
+    // before the job was ever created; an unrecognised token here would
+    // only mean the row was hand-edited in the database, so falling back
+    // to the reference format is the safe direction rather than failing
+    // the whole job.
+    let format = BulkFormat::parse(&job.format).unwrap_or(BulkFormat::Jsonl);
 
     let outcome = process_import_job(
         &state.db,
         state.person_repository.as_ref(),
         &state.search_engine,
+        state.matcher.as_ref(),
         &input,
+        format,
         &ImportParams { dry_run },
     )
     .await?;
@@ -145,12 +153,13 @@ async fn run_import(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<(
 /// write the JSONL output artifact, record the row count, and write an
 /// export audit row (§8).
 async fn run_export(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<()> {
-    let params = export_params_from_json(&job.params);
+    let params = export_params_from_json(&job.params, &job.format);
     let (bytes, rows_total) = process_export_job(state.person_repository.as_ref(), &params).await?;
 
-    let result_url = state
-        .bulk_store
-        .put(&format!("jobs/{}/export.jsonl", job.id), &bytes)?;
+    let result_url = state.bulk_store.put(
+        &format!("jobs/{}/export.{}", job.id, params.format.as_str()),
+        &bytes,
+    )?;
 
     // SEC-B8: a bulk extract of personal data is a compliance event (§8) and
     // the audit **gates delivery** — it is written (even for a zero-row
@@ -163,11 +172,13 @@ async fn run_export(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<(
     Ok(())
 }
 
-/// Derive [`ExportParams`] from a job's stored `params` JSON, including
-/// the §8 privacy controls (`masking_profile`, `include_soft_deleted`).
-/// An unrecognised `masking_profile` token falls back to the default
-/// (`masked`) — the safe direction.
-fn export_params_from_json(params: &serde_json::Value) -> ExportParams {
+/// Derive [`ExportParams`] from a job's stored `params` JSON plus its
+/// `format` column, including the §8 privacy controls (`masking_profile`,
+/// `include_soft_deleted`). An unrecognised `masking_profile` or `format`
+/// token falls back to its default (`masked` / `jsonl`) — the safe
+/// direction; the handler already validated `format` before the job was
+/// created, so a fallback here only matters for a hand-edited row.
+fn export_params_from_json(params: &serde_json::Value, job_format: &str) -> ExportParams {
     let defaults = ExportParams::default();
     ExportParams {
         query: params
@@ -193,6 +204,7 @@ fn export_params_from_json(params: &serde_json::Value) -> ExportParams {
             .get("include_soft_deleted")
             .and_then(serde_json::Value::as_bool)
             .unwrap_or(defaults.include_soft_deleted),
+        format: BulkFormat::parse(job_format).unwrap_or(defaults.format),
     }
 }
 

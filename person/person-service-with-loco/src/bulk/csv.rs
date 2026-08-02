@@ -161,16 +161,23 @@ pub fn encode(persons: &[Person]) -> Result<Vec<u8>> {
         .map_err(|e| Error::Api(format!("finish CSV: {e}")))
 }
 
-/// Parse a CSV byte buffer into per-row [`Person`] results. Columns are
-/// matched by header name (order-independent; unknown columns ignored); an
-/// invalid row is an `Err` in its slot (§7 per-row error contract) rather
-/// than aborting the whole load.
+/// Parse a CSV byte buffer into per-row `(had_explicit_id, Person result)`
+/// pairs. Columns are matched by header name (order-independent; unknown
+/// columns ignored); an invalid row is an `Err` in its slot (§7 per-row
+/// error contract) rather than aborting the whole load.
+///
+/// `had_explicit_id` is whether the row's own `id` cell was present and
+/// non-empty — the CSV-native answer to the same question
+/// [`crate::bulk::stable_key::row_has_explicit_id`] answers for a JSONL
+/// line, needed because `Person::id` defaults to a fresh UUID when the
+/// cell is empty, so the parsed `Person` alone cannot tell "no id given"
+/// from "an id was given and happened to be this one".
 ///
 /// # Errors
 ///
 /// Returns [`Error::Validation`] if the bytes are not a readable CSV (bad
 /// header / structurally broken record framing).
-pub fn decode(input: &[u8]) -> Result<Vec<serde_json::Result<Person>>> {
+pub fn decode(input: &[u8]) -> Result<Vec<(bool, serde_json::Result<Person>)>> {
     let mut rdr = csv::Reader::from_reader(input);
     let headers = rdr
         .headers()
@@ -181,11 +188,16 @@ pub fn decode(input: &[u8]) -> Result<Vec<serde_json::Result<Person>>> {
         .iter()
         .map(|c| headers.iter().position(|h| h == c.header))
         .collect();
+    let id_col = COLUMNS.iter().position(|c| c.header == "id");
 
     let mut out = Vec::new();
     for record in rdr.records() {
         let record = record.map_err(|e| Error::Validation(format!("read CSV row: {e}")))?;
-        out.push(record_to_person(&record, &indices));
+        let had_explicit_id = id_col
+            .and_then(|ci| indices[ci])
+            .and_then(|i| record.get(i))
+            .is_some_and(|cell| !cell.is_empty());
+        out.push((had_explicit_id, record_to_person(&record, &indices)));
     }
     Ok(out)
 }
@@ -309,7 +321,9 @@ mod tests {
         let bytes = encode(std::slice::from_ref(&p)).unwrap();
         let rows = decode(&bytes).unwrap();
         assert_eq!(rows.len(), 1);
-        let back = rows.into_iter().next().unwrap().expect("row parses");
+        let (had_explicit_id, parsed) = rows.into_iter().next().unwrap();
+        assert!(had_explicit_id, "the exported id column round-trips");
+        let back = parsed.expect("row parses");
         assert_eq!(
             serde_json::to_value(&back).unwrap(),
             serde_json::to_value(&p).unwrap(),
@@ -332,7 +346,13 @@ mod tests {
             Gender::Male,
         );
         let bytes = encode(std::slice::from_ref(&p)).unwrap();
-        let back = decode(&bytes).unwrap().into_iter().next().unwrap().unwrap();
+        let back = decode(&bytes)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap()
+            .1
+            .unwrap();
         assert_eq!(
             serde_json::to_value(&back).unwrap(),
             serde_json::to_value(&p).unwrap()
@@ -365,8 +385,8 @@ mod tests {
         );
         let rows = decode(&bytes).unwrap();
         assert_eq!(rows.len(), 2);
-        assert_eq!(rows[0].as_ref().unwrap().name.family, "Lovelace");
-        assert_eq!(rows[1].as_ref().unwrap().name.family, "B");
+        assert_eq!(rows[0].1.as_ref().unwrap().name.family, "Lovelace");
+        assert_eq!(rows[1].1.as_ref().unwrap().name.family, "B");
     }
 
     /// Columns are matched by header, so a reordered / extra-column file
@@ -376,7 +396,9 @@ mod tests {
         let csv = "gender,extra,name.family,name.given,id,active\n\
                    male,ignored,Vader,[\"Anakin\"],11111111-1111-4111-8111-111111111111,true\n";
         let rows = decode(csv.as_bytes()).unwrap();
-        let p = rows.into_iter().next().unwrap().expect("parses");
+        let (had_explicit_id, parsed) = rows.into_iter().next().unwrap();
+        assert!(had_explicit_id, "the reordered id column is still found");
+        let p = parsed.expect("parses");
         assert_eq!(p.name.family, "Vader");
         assert_eq!(p.name.given, vec!["Anakin".to_string()]);
         assert_eq!(p.gender, Gender::Male);
@@ -394,7 +416,43 @@ mod tests {
         );
         let rows = decode(bad.as_bytes()).unwrap();
         assert_eq!(rows.len(), 1);
-        assert!(rows[0].is_err(), "malformed identifiers cell ⇒ per-row Err");
+        assert!(
+            rows[0].1.is_err(),
+            "malformed identifiers cell ⇒ per-row Err"
+        );
+    }
+
+    /// A row whose `id` cell is empty (or the column is absent entirely)
+    /// is **not** an explicit id — the parsed `Person` still gets a fresh
+    /// UUID via the field's serde default, but callers need to know the
+    /// row itself supplied none, so a keyless row can be routed through
+    /// duplicate detection rather than a blind create. Built from a real
+    /// `encode()` row (blanking only the leading id cell) rather than a
+    /// hand-counted CSV literal, so the column count is never at risk of
+    /// drifting from [`COLUMNS`].
+    #[test]
+    fn had_explicit_id_is_false_for_an_empty_or_missing_id_cell() {
+        let p = fully_populated();
+        let bytes = encode(std::slice::from_ref(&p)).unwrap();
+        let text = std::str::from_utf8(&bytes).unwrap();
+        let (header_line, row_line) = text.split_once('\n').unwrap();
+
+        // A populated id cell IS explicit (sanity check on the fixture).
+        let rows = decode(text.as_bytes()).unwrap();
+        assert!(rows[0].0, "populated id cell ⇒ explicit id");
+
+        // Blank the leading id cell only.
+        let (_id_cell, rest) = row_line.split_once(',').unwrap();
+        let blanked = format!("{header_line}\n,{rest}\n");
+        let rows = decode(blanked.as_bytes()).unwrap();
+        assert!(!rows[0].0, "empty id cell ⇒ no explicit id");
+        assert!(rows[0].1.is_ok());
+
+        // The id column omitted entirely (operator-trimmed header).
+        let no_id_col = "active,name.family,name.given,gender\ntrue,Y,[\"B\"],female\n";
+        let rows = decode(no_id_col.as_bytes()).unwrap();
+        assert!(!rows[0].0, "missing id column ⇒ no explicit id");
+        assert!(rows[0].1.is_ok());
     }
 
     #[test]

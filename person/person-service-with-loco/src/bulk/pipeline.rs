@@ -10,22 +10,37 @@
 //!
 //! **Import** (per row): parse → validate (the same validators as
 //! single-create, so the same `422` reasons) → resolve the stable key
-//! (§10.1) → **upsert in place** when it matches an existing record
-//! (idempotent re-import), else **create**. Invalid rows are skipped and
-//! recorded in the error report; they never abort the load. Each written
-//! row goes through the repository, which emits its normal event + audit.
+//! (§10.1). A row carrying a real key **upserts in place** when it
+//! matches an existing record (idempotent re-import), else **creates**.
+//! A **keyless** row ([`stable_key::is_keyless`] — no strong identifier,
+//! no `tax_id`, no explicit `id` of its own) instead runs the same
+//! search-blocking + matcher duplicate detection `POST /check-duplicates`
+//! uses: a likely duplicate (score ≥ [`crate::bulk::IMPORT_REVIEW_THRESHOLD`])
+//! still **creates** the row (a bulk load must never silently drop
+//! legitimate data) but also queues a `provenance = "import"` pair in the
+//! stored [`crate::db::review_queue`] referencing the new record and its
+//! candidate, so an operator sees it flagged rather than discovering it
+//! only on a later batch scan; no candidate above threshold ⇒ a plain
+//! create, same as a keyed row with no match. Invalid rows are skipped
+//! and recorded in the error report; they never abort the load. Each
+//! written row goes through the repository, which emits its normal
+//! event + audit.
+//!
+//! Both **JSONL** ([`jsonl`], the lossless reference) and **CSV**
+//! ([`csv`], the operator/spreadsheet format) are accepted on import,
+//! selected by the job's declared [`BulkFormat`].
 //!
 //! **Export**: honour the person list/search filter, streaming matching
-//! records to a JSONL buffer. By default (the [`MaskingProfile::Masked`]
-//! profile) every record is run through [`crate::privacy::mask_person`]
-//! before encoding, so a bulk export never reveals more than the masked
-//! read view (§8); the privileged [`MaskingProfile::Full`] profile leaves
-//! records unmasked and is gated at the handler.
+//! records to a JSONL or CSV buffer per the job's [`BulkFormat`]. By
+//! default (the [`MaskingProfile::Masked`] profile) every record is run
+//! through [`crate::privacy::mask_person`] before encoding, so a bulk
+//! export never reveals more than the masked read view (§8); the
+//! privileged [`MaskingProfile::Full`] profile leaves records unmasked
+//! and is gated at the handler.
 //!
-//! Deferred (noted, not built): keyless-row → duplicate-detection →
-//! review-queue routing (a keyless row simply creates in step 1); a real
-//! soft-deleted-record export query (`include_soft_deleted = true` is
-//! rejected as not-yet-supported rather than leaking or ignoring it).
+//! Deferred (noted, not built): Parquet; a real soft-deleted-record
+//! export query (`include_soft_deleted = true` is rejected as
+//! not-yet-supported rather than leaking or ignoring it).
 
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseBackend, DatabaseConnection, EntityTrait, QueryFilter,
@@ -36,14 +51,17 @@ use uuid::Uuid;
 use crate::Result;
 use crate::db::PersonRepository;
 use crate::db::models::person_identifiers;
+use crate::db::review_queue::{self, NewReviewItem};
+use crate::matching::PersonMatcher;
 use crate::models::Person;
 use crate::privacy::mask_person;
 use crate::search::SearchEngine;
 
+use super::BulkFormat;
 use super::MaskingProfile;
 use super::error_report::ErrorRow;
-use super::jsonl;
 use super::stable_key::{StableKey, resolve_stable_key};
+use super::{csv, jsonl, stable_key};
 
 /// Parameters for an import run.
 #[derive(Debug, Clone, Default)]
@@ -54,17 +72,24 @@ pub struct ImportParams {
 }
 
 /// The reconciled outcome of an import run. Invariant:
-/// `rows_total == rows_created + rows_upserted + rows_errored`
-/// (`rows_to_review` is always 0 in step 1 — routing is deferred).
+/// `rows_total == rows_created + rows_upserted + rows_errored`.
+///
+/// `rows_to_review` is **not** a fourth exclusive bucket — a keyless row
+/// with a likely duplicate is still created (never silently dropped) and
+/// *also* counted here, so `rows_to_review <= rows_created`. It answers
+/// "how many of the created rows need an operator's attention", not "how
+/// many rows were withheld".
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ImportOutcome {
     /// Total non-blank record rows seen.
     pub rows_total: u64,
-    /// Rows inserted as new records.
+    /// Rows inserted as new records (includes any queued for review).
     pub rows_created: u64,
     /// Rows upserted onto an existing record.
     pub rows_upserted: u64,
-    /// Rows routed to review (always 0 in step 1).
+    /// Of `rows_created`, how many were also queued in the review queue
+    /// (`provenance = "import"`) because a keyless row matched a likely
+    /// duplicate above [`crate::bulk::IMPORT_REVIEW_THRESHOLD`].
     pub rows_to_review: u64,
     /// Rows that failed parse/validation/persistence.
     pub rows_errored: u64,
@@ -91,6 +116,10 @@ pub struct ExportParams {
     /// the repository, so [`process_export_job`] rejects it rather than
     /// silently leaking or ignoring it.
     pub include_soft_deleted: bool,
+    /// Output format — [`jsonl`] (the lossless reference) or [`csv`]
+    /// (the operator/spreadsheet format). Defaults to
+    /// [`BulkFormat::Jsonl`].
+    pub format: BulkFormat,
 }
 
 impl Default for ExportParams {
@@ -100,6 +129,7 @@ impl Default for ExportParams {
             limit: 10_000,
             offset: 0,
             masking_profile: MaskingProfile::Masked,
+            format: BulkFormat::Jsonl,
             include_soft_deleted: false,
         }
     }
@@ -242,40 +272,177 @@ async fn import_upsert_locked(
     result
 }
 
-/// Run a full import over a JSONL byte buffer, returning the reconciled
-/// [`ImportOutcome`] (including the per-row error report).
+/// One decoded import row, format-agnostic — the shape [`decode_import_rows`]
+/// normalises both [`jsonl`] and [`csv`] down to.
+struct ImportRow {
+    /// Whether the row itself carried an explicit, non-null `id` (see
+    /// [`stable_key::row_has_explicit_id`] / `csv::decode`'s
+    /// `had_explicit_id`).
+    had_explicit_id: bool,
+    /// The parsed person, or the per-row parse error message (§7).
+    parsed: std::result::Result<Person, String>,
+}
+
+/// Decode `input` per `format` into per-row [`ImportRow`]s, enforcing the
+/// SEC-B2 row cap uniformly regardless of format (`jsonl::split_lines_capped`
+/// does this inline for JSONL; CSV is checked here since `csv::decode` has
+/// no cap of its own).
+fn decode_import_rows(input: &[u8], format: BulkFormat) -> Result<Vec<ImportRow>> {
+    match format {
+        BulkFormat::Jsonl => Ok(
+            jsonl::split_lines_capped(input, crate::bulk::MAX_IMPORT_ROWS)?
+                .into_iter()
+                .map(|line| ImportRow {
+                    had_explicit_id: stable_key::row_has_explicit_id(&line),
+                    parsed: jsonl::parse_line(&line).map_err(|e| e.to_string()),
+                })
+                .collect(),
+        ),
+        BulkFormat::Csv => {
+            let decoded = csv::decode(input)?;
+            if decoded.len() > crate::bulk::MAX_IMPORT_ROWS {
+                return Err(crate::Error::Validation(format!(
+                    "bulk import exceeds the row cap: {} rows > {}",
+                    decoded.len(),
+                    crate::bulk::MAX_IMPORT_ROWS
+                )));
+            }
+            Ok(decoded
+                .into_iter()
+                .map(|(had_explicit_id, parsed)| ImportRow {
+                    had_explicit_id,
+                    parsed: parsed.map_err(|e| e.to_string()),
+                })
+                .collect())
+        }
+    }
+}
+
+/// The confidence-band label for a match score, matching the classification
+/// `POST /check-duplicates` and `POST /deduplicate` already use.
+fn match_quality_label(score: f64) -> &'static str {
+    if score >= 0.95 {
+        "certain"
+    } else if score >= 0.7 {
+        "probable"
+    } else {
+        "possible"
+    }
+}
+
+/// Find the best duplicate candidate for a **keyless** row, above
+/// [`crate::bulk::IMPORT_REVIEW_THRESHOLD`], via the same search-blocking +
+/// matcher path `POST /check-duplicates` uses (family-name + birth-year
+/// blocking, then full scoring over the blocked set). `None` when the
+/// blocking search finds nothing or nothing clears the threshold.
+async fn find_keyless_duplicate(
+    repo: &dyn PersonRepository,
+    search: &SearchEngine,
+    matcher: &dyn PersonMatcher,
+    person: &Person,
+) -> Option<crate::matching::MatchResult> {
+    use chrono::Datelike;
+
+    let birth_year = person.birth_date.map(|d| d.year());
+    let candidate_ids = search
+        .search_by_name_and_year(&person.name.family, birth_year, 50)
+        .ok()?;
+
+    let mut candidates = Vec::new();
+    for id_str in candidate_ids {
+        if let Ok(pid) = Uuid::parse_str(&id_str)
+            && pid != person.id
+            && let Ok(Some(p)) = repo.get_by_id(&pid).await
+        {
+            candidates.push(p);
+        }
+    }
+    if candidates.is_empty() {
+        return None;
+    }
+
+    matcher
+        .find_matches(person, &candidates)
+        .ok()?
+        .into_iter()
+        .filter(|m| m.score >= crate::bulk::IMPORT_REVIEW_THRESHOLD)
+        .max_by(|a, b| a.score.total_cmp(&b.score))
+}
+
+/// Create a keyless row that matched a likely duplicate, and queue the
+/// pair in the stored review queue (`provenance = "import"`). Split out
+/// of [`process_import_job`] to keep its per-row dispatch readable; only
+/// called on the non-dry-run path (dry-run classifies without this).
+async fn create_and_queue_for_review(
+    db: &DatabaseConnection,
+    repo: &dyn PersonRepository,
+    search: &SearchEngine,
+    mut person: Person,
+    duplicate: crate::matching::MatchResult,
+) -> std::result::Result<Person, String> {
+    if person.id == Uuid::nil() {
+        person.id = Uuid::new_v4();
+    }
+    let saved = repo.create(&person).await.map_err(|e| e.to_string())?;
+    if let Err(e) = search.index_person(&saved) {
+        tracing::warn!("bulk import: failed to index person {}: {}", saved.id, e);
+    }
+    let item = NewReviewItem {
+        record_id_a: saved.id,
+        record_id_b: duplicate.person.id,
+        match_score: duplicate.score,
+        match_quality: match_quality_label(duplicate.score).to_string(),
+        detection_method: "import_duplicate_detection".to_string(),
+        score_breakdown: serde_json::to_value(&duplicate.breakdown).ok(),
+        status: "pending".to_string(),
+        provenance: "import".to_string(),
+    };
+    if let Err(e) = review_queue::upsert(db, &[item]).await {
+        tracing::warn!(
+            "bulk import: failed to queue review pair for {}: {}",
+            saved.id,
+            e
+        );
+    }
+    Ok(saved)
+}
+
+/// Run a full import over an `input` byte buffer in the given `format`,
+/// returning the reconciled [`ImportOutcome`] (including the per-row error
+/// report).
 ///
 /// Each successfully written row is persisted through `repo`, which emits
 /// its normal `created`/`updated` event and audit record; the search
 /// index is updated best-effort. On `params.dry_run`, rows are parsed,
-/// validated, and classified but nothing is written.
+/// validated, and classified but nothing is written (including no
+/// review-queue row for a keyless duplicate).
 ///
 /// # Errors
 ///
-/// Returns an error only for a whole-job failure (e.g. non-UTF-8 input);
-/// per-row failures are captured in [`ImportOutcome::errors`], not
-/// returned.
+/// Returns an error only for a whole-job failure (e.g. non-UTF-8 input,
+/// an unreadable CSV header, or the SEC-B2 row cap); per-row failures are
+/// captured in [`ImportOutcome::errors`], not returned.
 pub async fn process_import_job(
     db: &DatabaseConnection,
     repo: &dyn PersonRepository,
     search: &SearchEngine,
+    matcher: &dyn PersonMatcher,
     input: &[u8],
+    format: BulkFormat,
     params: &ImportParams,
 ) -> Result<ImportOutcome> {
-    let lines = jsonl::split_lines_capped(input, crate::bulk::MAX_IMPORT_ROWS)?;
+    let rows = decode_import_rows(input, format)?;
     let mut outcome = ImportOutcome::default();
 
-    for (idx, line) in lines.iter().enumerate() {
+    for (idx, row) in rows.into_iter().enumerate() {
         let row_number = idx + 1;
         outcome.rows_total += 1;
 
-        // Parse (§7: a bad line is recorded, never fatal).
-        let mut person = match jsonl::parse_line(line) {
+        // Parse (§7: a bad row is recorded, never fatal).
+        let mut person = match row.parsed {
             Ok(p) => p,
             Err(e) => {
-                outcome
-                    .errors
-                    .push(ErrorRow::parse(row_number, e.to_string()));
+                outcome.errors.push(ErrorRow::parse(row_number, e));
                 outcome.rows_errored += 1;
                 continue;
             }
@@ -290,6 +457,35 @@ pub async fn process_import_job(
                     .push(ErrorRow::validation(row_number, ve.field, ve.message));
             }
             outcome.rows_errored += 1;
+            continue;
+        }
+
+        // §6: a keyless row cannot idempotently upsert, so it runs through
+        // duplicate detection instead of a blind create. A likely duplicate
+        // still creates the row (never silently drop legitimate data) but
+        // also queues it for an operator's attention.
+        let keyless_duplicate = if stable_key::is_keyless(&person, row.had_explicit_id) {
+            find_keyless_duplicate(repo, search, matcher, &person).await
+        } else {
+            None
+        };
+
+        if let Some(m) = keyless_duplicate {
+            if params.dry_run {
+                outcome.rows_created += 1;
+                outcome.rows_to_review += 1;
+                continue;
+            }
+            match create_and_queue_for_review(db, repo, search, person, m).await {
+                Ok(_saved) => {
+                    outcome.rows_created += 1;
+                    outcome.rows_to_review += 1;
+                }
+                Err(e) => {
+                    outcome.errors.push(ErrorRow::database(row_number, e));
+                    outcome.rows_errored += 1;
+                }
+            }
             continue;
         }
 
@@ -340,8 +536,9 @@ pub async fn process_import_job(
     Ok(outcome)
 }
 
-/// Run an export, returning the JSONL byte buffer of matching records
-/// **and** the number of records exported (for the audit row, §8).
+/// Run an export, returning the encoded byte buffer of matching records
+/// **and** the number of records exported (for the audit row, §8). The
+/// encoding is [`jsonl`] or [`csv`] per `params.format`.
 ///
 /// Uses the repository's family-name `search` when `params.query` is set,
 /// else pages active records via `list_active`. Every record is then run
@@ -355,7 +552,7 @@ pub async fn process_import_job(
 /// is `true` — the repository cannot express a soft-deleted listing
 /// without a larger change, so rather than silently leaking or ignoring
 /// the flag the export is rejected as not-yet-supported. Also returns an
-/// error if the underlying repository query or JSONL encode fails.
+/// error if the underlying repository query or the format encode fails.
 pub async fn process_export_job(
     repo: &dyn PersonRepository,
     params: &ExportParams,
@@ -375,7 +572,10 @@ pub async fn process_export_job(
     };
     let records = apply_masking(records, params.masking_profile);
     let rows = u64::try_from(records.len()).unwrap_or(u64::MAX);
-    let bytes = jsonl::encode(&records)?;
+    let bytes = match params.format {
+        BulkFormat::Jsonl => jsonl::encode(&records)?,
+        BulkFormat::Csv => csv::encode(&records)?,
+    };
     Ok((bytes, rows))
 }
 
@@ -387,10 +587,13 @@ pub async fn process_export_job(
 #[cfg(test)]
 mod db_tests {
     use super::{
-        ExportParams, ImportParams, MaskingProfile, process_export_job, process_import_job,
+        BulkFormat, ExportParams, ImportParams, MaskingProfile, process_export_job,
+        process_import_job,
     };
-    use crate::bulk::jsonl;
+    use crate::bulk::{csv, jsonl};
+    use crate::config::Config;
     use crate::db::{PersonRepository, SeaOrmPersonRepository};
+    use crate::matching::ProbabilisticMatcher;
     use crate::models::{Gender, HumanName, Identifier, IdentifierType, Person};
     use crate::search::SearchEngine;
 
@@ -405,6 +608,10 @@ mod db_tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = SearchEngine::new(dir.path()).unwrap();
         (dir, engine)
+    }
+
+    fn matcher() -> ProbabilisticMatcher {
+        ProbabilisticMatcher::new(Config::default().matching)
     }
 
     fn person(family: &str) -> Person {
@@ -445,9 +652,17 @@ mod db_tests {
         input.push(b'\n');
 
         // First run: two creates, one error.
-        let first = process_import_job(&db, &repo, &search, &input, &ImportParams::default())
-            .await
-            .unwrap();
+        let first = process_import_job(
+            &db,
+            &repo,
+            &search,
+            &matcher(),
+            &input,
+            BulkFormat::Jsonl,
+            &ImportParams::default(),
+        )
+        .await
+        .unwrap();
         assert_eq!(first.rows_total, 3, "three record rows");
         assert_eq!(
             first.rows_created, 2,
@@ -465,9 +680,17 @@ mod db_tests {
         );
 
         // Re-run the identical file: the two valid rows upsert in place.
-        let second = process_import_job(&db, &repo, &search, &input, &ImportParams::default())
-            .await
-            .unwrap();
+        let second = process_import_job(
+            &db,
+            &repo,
+            &search,
+            &matcher(),
+            &input,
+            BulkFormat::Jsonl,
+            &ImportParams::default(),
+        )
+        .await
+        .unwrap();
         assert_eq!(second.rows_created, 0, "re-import creates nothing");
         assert_eq!(second.rows_upserted, 2, "re-import upserts both");
         assert_eq!(second.rows_errored, 1);
@@ -501,9 +724,17 @@ mod db_tests {
                 let repo = SeaOrmPersonRepository::new(db.clone());
                 let dir = tempfile::tempdir().unwrap();
                 let search = SearchEngine::new(dir.path()).unwrap();
-                let out = process_import_job(&db, &repo, &search, &input, &ImportParams::default())
-                    .await
-                    .unwrap();
+                let out = process_import_job(
+                    &db,
+                    &repo,
+                    &search,
+                    &matcher(),
+                    &input,
+                    BulkFormat::Jsonl,
+                    &ImportParams::default(),
+                )
+                .await
+                .unwrap();
                 // Keep the temp index alive until the job finishes.
                 drop(dir);
                 (out.rows_created, out.rows_upserted, out.rows_errored)
@@ -551,10 +782,17 @@ mod db_tests {
 
         let p = person("DryRun");
         let input = jsonl::encode(std::slice::from_ref(&p)).unwrap();
-        let outcome =
-            process_import_job(&db, &repo, &search, &input, &ImportParams { dry_run: true })
-                .await
-                .unwrap();
+        let outcome = process_import_job(
+            &db,
+            &repo,
+            &search,
+            &matcher(),
+            &input,
+            BulkFormat::Jsonl,
+            &ImportParams { dry_run: true },
+        )
+        .await
+        .unwrap();
         assert_eq!(outcome.rows_created, 1, "classified as create");
 
         assert!(
@@ -711,6 +949,140 @@ mod db_tests {
         .await
         .unwrap_err();
         assert!(matches!(err, crate::Error::Validation(_)));
+    }
+
+    /// A keyless row (no strong identifier, no `tax_id`, no explicit `id`)
+    /// whose demographics closely match an existing record is **still
+    /// created** (a bulk load must never silently drop legitimate data)
+    /// **and** queued in the stored review queue with `provenance =
+    /// "import"`, so an operator sees it flagged.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn keyless_row_with_a_likely_duplicate_creates_and_queues_for_review() {
+        use crate::db::review_queue;
+        use chrono::NaiveDate;
+
+        let db = connect().await;
+        let repo = SeaOrmPersonRepository::new(db.clone());
+        let (_dir, search) = search_engine();
+
+        // A unique family name (per test run) so this run's search-blocking
+        // candidates are exactly the records this test creates. Kept under
+        // Tantivy's default 40-byte token cutoff (`RemoveLongFilter`) — a
+        // longer token is silently dropped at index time, which would make
+        // this row unfindable via blocking regardless of matcher logic.
+        let family = format!(
+            "KeylessDup{}",
+            &uuid::Uuid::new_v4().simple().to_string()[..8]
+        );
+        let mut existing = person(&family);
+        existing.birth_date = Some(NaiveDate::from_ymd_opt(1980, 6, 15).unwrap());
+        let existing = repo.create(&existing).await.unwrap();
+        search.index_person(&existing).unwrap();
+
+        // The keyless row: same family name + birth date + given name, but
+        // no id, no identifiers, no tax_id — built by stripping `id` from
+        // an otherwise-identical encoded person rather than hand-writing
+        // JSON, so the wire shape can't drift from `Person`'s real fields.
+        let mut incoming = person(&family);
+        incoming.birth_date = existing.birth_date;
+        let mut value = serde_json::to_value(&incoming).unwrap();
+        value.as_object_mut().unwrap().remove("id");
+        let line = serde_json::to_string(&value).unwrap();
+        let input = format!("{line}\n").into_bytes();
+
+        let outcome = process_import_job(
+            &db,
+            &repo,
+            &search,
+            &matcher(),
+            &input,
+            BulkFormat::Jsonl,
+            &ImportParams::default(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(outcome.rows_total, 1);
+        assert_eq!(outcome.rows_errored, 0, "errors: {:?}", outcome.errors);
+        assert_eq!(outcome.rows_created, 1, "the row is created, not withheld");
+        assert_eq!(
+            outcome.rows_to_review, 1,
+            "the likely duplicate is queued for review"
+        );
+
+        let queued = review_queue::list(&db, Some("pending"), 50).await.unwrap();
+        let pair = queued
+            .iter()
+            .find(|r| r.record_id_a == existing.id || r.record_id_b == existing.id)
+            .expect("a pending pair references the existing record");
+        assert_eq!(pair.provenance, "import");
+        assert_eq!(pair.detection_method, "import_duplicate_detection");
+        assert!(pair.match_score >= crate::bulk::IMPORT_REVIEW_THRESHOLD);
+    }
+
+    /// The CSV import path: a header + one keyed row (via `tax_id`)
+    /// creates, matching the JSONL path's semantics with a different wire
+    /// format.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn csv_import_creates_a_keyed_row() {
+        let db = connect().await;
+        let repo = SeaOrmPersonRepository::new(db.clone());
+        let (_dir, search) = search_engine();
+
+        let mut p = person("CsvImported");
+        p.tax_id = Some(format!("TAX-{}", uuid::Uuid::new_v4()));
+        let input = csv::encode(std::slice::from_ref(&p)).unwrap();
+
+        let outcome = process_import_job(
+            &db,
+            &repo,
+            &search,
+            &matcher(),
+            &input,
+            BulkFormat::Csv,
+            &ImportParams::default(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(outcome.rows_total, 1);
+        assert_eq!(outcome.rows_created, 1, "errors: {:?}", outcome.errors);
+
+        let saved = repo.get_by_id(&p.id).await.unwrap().expect("persisted");
+        assert_eq!(saved.tax_id, p.tax_id);
+    }
+
+    /// The CSV export path round-trips a created record through
+    /// `process_export_job` with `format: BulkFormat::Csv`.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn csv_export_round_trips() {
+        let db = connect().await;
+        let repo = SeaOrmPersonRepository::new(db.clone());
+
+        let created = repo.create(&person("CsvExported")).await.unwrap();
+
+        let (bytes, rows) = process_export_job(
+            &repo,
+            &ExportParams {
+                query: Some("CsvExported".to_string()),
+                masking_profile: MaskingProfile::Full,
+                format: BulkFormat::Csv,
+                ..ExportParams::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert!(rows >= 1);
+
+        let parsed = csv::decode(&bytes).unwrap();
+        assert!(
+            parsed
+                .iter()
+                .any(|(_, r)| r.as_ref().is_ok_and(|p| p.id == created.id)),
+            "the created record round-trips through the CSV export"
+        );
     }
 }
 

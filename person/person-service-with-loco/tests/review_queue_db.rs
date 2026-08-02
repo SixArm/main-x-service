@@ -21,6 +21,11 @@ async fn review_queue_round_trip() {
     ))
     .await
     .expect("apply migration");
+    db.execute_unprepared(include_str!(
+        "../migrations/2026080200000001_review_queue_provenance/up.sql"
+    ))
+    .await
+    .expect("apply provenance migration");
     db.execute_unprepared("DELETE FROM review_queue")
         .await
         .expect("clean slate");
@@ -35,6 +40,7 @@ async fn review_queue_round_trip() {
         detection_method: "batch_deduplication".to_string(),
         score_breakdown: Some(serde_json::json!({ "name": score })),
         status: "pending".to_string(),
+        provenance: "operator".to_string(),
     };
 
     // First scan inserts; the stored row normalizes the pair order.

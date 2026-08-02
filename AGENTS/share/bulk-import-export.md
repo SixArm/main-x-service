@@ -233,11 +233,16 @@ adds one section + a §13 task declaring only what differs:
 
 ## 11. Rollout
 
-1. **Reference entity (person).** `bulk_jobs` + the job API + the
+1. **Reference entity (person).** ✅ `bulk_jobs` + the job API + the
    worker + JSONL import/export, upsert-by-key, per-row error report.
-2. **CSV + review routing.** Add the CSV flattening convention and the
-   keyless-row → duplicate-detection → review-queue path.
-3. **Export hardening.** Masking profiles + per-export audit +
+2. **CSV + review routing.** ✅ *(done 2026-08-02, person)* The CSV
+   flattening convention (`src/bulk/csv.rs`) wired end-to-end into the
+   import/export handlers + worker (`format: "jsonl" | "csv"`), and the
+   keyless-row → duplicate-detection → review-queue path: a row with no
+   stable key of its own runs the entity's existing duplicate-check path,
+   and a likely duplicate still creates the row (never withhold legitimate
+   data) while queuing a `provenance = "import"` pair in the review queue.
+3. **Export hardening.** ✅ Masking profiles + per-export audit +
    `include_soft_deleted` gating.
 4. **Parquet export** (feature-gated).
 5. **Roll across the other entities** — uniform contract; only the per-entity

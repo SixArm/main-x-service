@@ -55,6 +55,10 @@ pub struct ReviewQueueItem {
     /// Current review status
     pub status: ReviewStatus,
 
+    /// How this pair was first surfaced (`operator` / `import` /
+    /// `matcher_suggested`).
+    pub provenance: String,
+
     /// User who reviewed this item
     pub reviewed_by: Option<String>,
 

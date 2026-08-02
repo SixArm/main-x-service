@@ -92,7 +92,7 @@ pub struct JobAccepted {
 /// privacy controls.
 #[derive(Debug, Default, Deserialize, ToSchema)]
 pub struct ExportRequest {
-    /// File format; defaults to `jsonl` (the only supported value).
+    /// File format; `jsonl` (default) or `csv`.
     #[serde(default)]
     pub format: Option<String>,
     /// Optional family-name search query.
@@ -166,8 +166,10 @@ impl From<bulk_jobs::Model> for BulkJobView {
     }
 }
 
-/// Reject a format that is not `jsonl` (CSV/Parquet are later steps).
-fn require_jsonl(format: Option<&str>) -> Result<BulkFormat, (StatusCode, Json<ApiResponse<()>>)> {
+/// Parse a caller-supplied format, defaulting to [`BulkFormat::Jsonl`]
+/// when omitted. Rejects anything [`BulkFormat::parse`] doesn't recognise
+/// (`parquet` — export-only, a later step).
+fn parse_format(format: Option<&str>) -> Result<BulkFormat, (StatusCode, Json<ApiResponse<()>>)> {
     match format {
         None => Ok(BulkFormat::Jsonl),
         Some(f) => BulkFormat::parse(f).ok_or_else(|| {
@@ -175,7 +177,7 @@ fn require_jsonl(format: Option<&str>) -> Result<BulkFormat, (StatusCode, Json<A
                 StatusCode::BAD_REQUEST,
                 Json(ApiResponse::<()>::error(
                     "UNSUPPORTED_FORMAT",
-                    format!("format '{f}' is not supported in this rollout step; use 'jsonl'"),
+                    format!("format '{f}' is not supported; use 'jsonl' or 'csv'"),
                 )),
             )
         }),
@@ -197,7 +199,7 @@ fn idempotency_key_of(headers: &HeaderMap) -> Option<String> {
         .map(str::to_string)
 }
 
-/// `POST /api/persons/import` — accept a multipart JSONL upload, enqueue
+/// `POST /api/persons/import` — accept a multipart JSONL or CSV upload, enqueue
 /// an import job, and return `202 {job_id}`.
 #[utoipa::path(
     post,
@@ -272,9 +274,10 @@ pub async fn import_person(
         }
     }
 
-    if let Err((status, body)) = require_jsonl(format_field.as_deref()) {
-        return (status, Json(remap(body)));
-    }
+    let format = match parse_format(format_field.as_deref()) {
+        Ok(f) => f,
+        Err((status, body)) => return (status, Json(remap(body))),
+    };
 
     let Some(bytes) = file_bytes else {
         return (
@@ -289,6 +292,7 @@ pub async fn import_person(
     match enqueue_import(
         &state,
         &ctx,
+        format,
         &bytes,
         dry_run,
         actor_of(&caller),
@@ -315,6 +319,7 @@ pub async fn import_person(
 async fn enqueue_import(
     state: &AppState,
     ctx: &AppContext,
+    format: BulkFormat,
     bytes: &[u8],
     dry_run: bool,
     actor: Option<String>,
@@ -322,7 +327,7 @@ async fn enqueue_import(
 ) -> Result<Uuid, String> {
     let (job, reused) = bulk_jobs::create_or_get_idempotent(
         &state.db,
-        NewBulkJob::import(serde_json::json!({ "dry_run": dry_run }), actor)
+        NewBulkJob::import(format, serde_json::json!({ "dry_run": dry_run }), actor)
             .with_idempotency_key(idempotency_key),
     )
     .await
@@ -336,7 +341,7 @@ async fn enqueue_import(
     // Store the uploaded input under the job id, then record it.
     let input_url = state
         .bulk_store
-        .put(&format!("jobs/{}/input.jsonl", job.id), bytes)
+        .put(&format!("jobs/{}/input.{}", job.id, format.as_str()), bytes)
         .map_err(|e| e.to_string())?;
     bulk_jobs::set_input_url(&state.db, job.id, input_url)
         .await
@@ -369,9 +374,10 @@ pub async fn export_person(
     Json(req): Json<ExportRequest>,
 ) -> impl IntoResponse {
     let idempotency_key = idempotency_key_of(&headers);
-    if let Err((status, body)) = require_jsonl(req.format.as_deref()) {
-        return (status, Json(remap(body)));
-    }
+    let format = match parse_format(req.format.as_deref()) {
+        Ok(f) => f,
+        Err((status, body)) => return (status, Json(remap(body))),
+    };
 
     // Parse the masking profile (default masked); an unknown token → 400.
     let masking_profile = match req.masking_profile.as_deref() {
@@ -430,7 +436,7 @@ pub async fn export_person(
 
     let created = bulk_jobs::create_or_get_idempotent(
         &state.db,
-        NewBulkJob::export(serde_json::Value::Object(params), actor_of(&caller))
+        NewBulkJob::export(format, serde_json::Value::Object(params), actor_of(&caller))
             .with_idempotency_key(idempotency_key),
     )
     .await;

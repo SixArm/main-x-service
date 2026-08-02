@@ -5,6 +5,28 @@ tick the box when an automated test or clearly described manual check
 confirms the criterion is met. Tasks small enough to land in a single
 PR; split larger tasks (`T-12a`, `T-12b`).
 
+- [x] **BLK-2: CSV format wiring + keyless-row → duplicate-detection →
+  review-queue routing.** `BulkFormat` gains `Csv`; `process_import_job` /
+  `process_export_job` take a `format` param and dispatch to `jsonl` or
+  `csv` (the worker reads `job.format`; stored artifact filenames carry
+  the matching extension). A row with no strong identifier, no `tax_id`,
+  and no explicit `id` (`stable_key::is_keyless`, plus the new
+  `row_has_explicit_id` — needed because `Person::id` defaults to a fresh
+  UUID on parse, so the parsed record alone can't tell "no id given" from
+  "an id was given") runs the same search-blocking + matcher duplicate
+  detection `POST /check-duplicates` uses; a likely duplicate
+  (`IMPORT_REVIEW_THRESHOLD = 0.7`) still creates the row (never withhold
+  legitimate data) and inserts a `review_queue` pair with the new
+  `provenance = "import"` column (migration
+  `2026080200000001_review_queue_provenance`; `operator` for existing
+  interactive/batch-scan rows, never touched by a re-scan upsert). DB-gated
+  tests: keyless-duplicate creates + queues for review (asserts the pair,
+  its provenance, and its detection method), CSV import creates a keyed
+  row, CSV export round-trips; extended the existing JSONL import/export
+  suite for the new signatures. Green: `cargo test --lib` (304 pass),
+  `cargo test -- --ignored` against a real Postgres, `clippy --all-targets
+  -D warnings`, `cargo fmt --check`. (Repo tasks.md BLK-2.)
+
 - [x] **SEC-B10 (security): person merge audit in-transaction.** The merge
   `UPDATE` (survivor) + `DELETE` (duplicate) audit rows are now written on the
   merge transaction (`log_update_on`/`log_delete_on`) **before** commit, so a

@@ -25,11 +25,19 @@
 //! the **full** (unmasked) profile or soft-deleted inclusion; every
 //! export is audited.
 //!
-//! Deferred to later rollout steps (noted, not built): CSV + Parquet
-//! formats, keyless-row → duplicate-review routing, the S3 artifact
-//! store, and a real soft-deleted-record export query (today
-//! `include_soft_deleted = true` is rejected as not-yet-supported rather
-//! than silently leaking or ignoring the flag).
+//! **CSV** (rollout step 2b, BLK-2) is wired end-to-end: [`csv`] is a
+//! full peer of [`jsonl`] in [`BulkFormat`], the import/export worker
+//! dispatches on `job.format`, and a **keyless row** (no strong
+//! identifier, no `tax_id`, no explicit `id` of its own — see
+//! [`stable_key::is_keyless`]) runs through the same search-blocking +
+//! matcher duplicate detection `POST /check-duplicates` uses, routing a
+//! likely duplicate to the stored [`crate::db::review_queue`]
+//! (`provenance = "import"`) instead of a blind create (§6).
+//!
+//! Deferred to later rollout steps (noted, not built): Parquet export,
+//! the S3 artifact store, and a real soft-deleted-record export query
+//! (today `include_soft_deleted = true` is rejected as not-yet-supported
+//! rather than silently leaking or ignoring the flag).
 
 /// CSV codec — the operator/spreadsheet format (§5 flattening).
 pub mod csv;
@@ -85,6 +93,13 @@ pub const MAX_EXPORT_ROWS: u64 = 1_000_000;
 /// expiry gate at the status handler stops the reference being handed out.
 pub const BULK_ARTIFACT_TTL_SECS: i64 = 7 * 24 * 60 * 60;
 
+/// BLK-2 — the match-score threshold above which a **keyless** import
+/// row's best duplicate candidate routes it to the review queue instead
+/// of a fresh create. Matches the threshold `check_duplicates_internal`
+/// already uses for the interactive `POST /check-duplicates` path, so a
+/// keyless row is judged by the same bar a human caller would be shown.
+pub const IMPORT_REVIEW_THRESHOLD: f64 = 0.7;
+
 /// The kind of a bulk job.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -116,30 +131,36 @@ impl BulkKind {
     }
 }
 
-/// The file format of a bulk job. Only [`Jsonl`](BulkFormat::Jsonl) is
-/// supported in rollout step 1; CSV and Parquet are later steps.
+/// The file format of a bulk job. Parquet remains a later step
+/// (feature-gated export-only, BLK-3); JSONL and CSV are both wired
+/// end-to-end (BLK-1/BLK-2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum BulkFormat {
     /// JSON Lines — one person wire record per line (lossless reference).
     Jsonl,
+    /// CSV — the operator/spreadsheet format (§5 flattening convention;
+    /// [`csv`] codec).
+    Csv,
 }
 
 impl BulkFormat {
-    /// The persisted lowercase token (`jsonl`).
+    /// The persisted lowercase token (`jsonl` / `csv`).
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             BulkFormat::Jsonl => "jsonl",
+            BulkFormat::Csv => "csv",
         }
     }
 
-    /// Parse the persisted token. Unknown / unsupported formats (`csv`,
-    /// `parquet`) return `None` in step 1.
+    /// Parse the persisted token. Unknown / unsupported formats
+    /// (`parquet`) return `None`.
     #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "jsonl" => Some(BulkFormat::Jsonl),
+            "csv" => Some(BulkFormat::Csv),
             _ => None,
         }
     }
@@ -258,10 +279,13 @@ mod tests {
     }
 
     #[test]
-    fn format_only_supports_jsonl_in_step_1() {
+    fn format_supports_jsonl_and_csv_but_not_parquet_yet() {
         assert_eq!(BulkFormat::parse("jsonl"), Some(BulkFormat::Jsonl));
-        assert_eq!(BulkFormat::parse("csv"), None);
+        assert_eq!(BulkFormat::parse("csv"), Some(BulkFormat::Csv));
         assert_eq!(BulkFormat::parse("parquet"), None);
+        for f in [BulkFormat::Jsonl, BulkFormat::Csv] {
+            assert_eq!(BulkFormat::parse(f.as_str()), Some(f), "round-trips");
+        }
     }
 
     #[test]

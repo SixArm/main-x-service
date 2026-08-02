@@ -542,21 +542,49 @@
   review-surface home, aggregator-write posture, scale). Depends: LNK-1..3.
 
 - [x] **BLK-1 (M)** Bulk I/O step 2a — **CSV** codec on person.
-  *(codec + spec done 2026-07-15)* `src/bulk/csv.rs` flattens the person wire
+  *(codec + spec done 2026-07-15; worker/export wiring folded into and
+  finished by BLK-2, 2026-08-02)* `src/bulk/csv.rs` flattens the person wire
   type per §5 (scalars → columns; primary name → dotted `name.*`; arrays →
   JSON-in-cell) and **round-trips losslessly** against JSONL
   (`decode(encode(p)) == p`); columns matched by header (reordered/extra
   tolerated); per-row `Err` on a malformed row (§7). Person's exact column
   set declared in spec §10.6; adds the `csv` crate. Unit-tested: fully-
   populated + sparse round-trip, reordered/extra columns, bad-JSON-cell
-  per-row error, multi-row, header. *Verified:* `cargo test bulk::csv`
-  (6 pass) + clippy clean. **Remaining wiring (folded into BLK-2):** the
-  `bg_pg` worker/export `format` dispatch that makes CSV a usable end-to-end
-  import/export format.
-- [ ] **BLK-2 (M)** Bulk I/O step 2b — keyless-row → duplicate-detection
-  → **review-queue** routing on person import (`provenance = import`),
-  reusing the existing matcher + review queue. Depends: BLK-1 optional,
-  independent of format.
+  per-row error, multi-row, header.
+- [x] **BLK-2 (M)** Bulk I/O step 2b — CSV worker/export wiring +
+  keyless-row → duplicate-detection → **review-queue** routing on person
+  import. *(done 2026-08-02)* Two parts:
+  1. **CSV end-to-end**: `BulkFormat` gains `Csv`; the import/export
+     handlers accept `format: "jsonl" | "csv"`; `process_import_job` /
+     `process_export_job` take a `format` param and dispatch to the
+     matching codec; the `bg_pg` worker reads `job.format`; stored
+     artifact filenames carry the matching extension
+     (`jobs/{id}/input.{jsonl,csv}`, `jobs/{id}/export.{jsonl,csv}`).
+  2. **Keyless routing**: a row with no strong identifier, no `tax_id`, and
+     no explicit `id` of its own (`stable_key::is_keyless`, backed by a new
+     `row_has_explicit_id` — `Person::id` defaults to a fresh UUID on
+     parse, so the parsed record alone can't distinguish "no id given"
+     from "an id was given") runs the same search-blocking + matcher
+     duplicate detection `POST /check-duplicates` uses. A likely duplicate
+     (`IMPORT_REVIEW_THRESHOLD = 0.7`, the interactive check's own bar)
+     still **creates** the row — a bulk load must never silently withhold
+     legitimate data — and inserts a pair into the stored `review_queue`
+     via a new `provenance` column (migration
+     `2026080200000001_review_queue_provenance`; `operator` backfilled for
+     existing rows, `import` for these; excluded from the re-scan upsert's
+     `DO UPDATE SET` so a re-scan never overwrites a pair's origin). No
+     candidate clears the threshold ⇒ a plain create, same as a keyed row
+     with no match.
+  DB-gated tests: keyless-duplicate creates + queues for review (asserts
+  the pair, its provenance, its detection method), CSV import creates a
+  keyed row, CSV export round-trips; the existing JSONL import/export
+  suite extended for the new signatures. *Verified:* `cargo test --lib`
+  (304 pass) + `cargo test -- --ignored` against a real Postgres (all
+  green, including a debugging detour: the first keyless-duplicate test
+  run found zero candidates because the test's random family name exceeded
+  Tantivy's default 40-byte token cutoff and was silently dropped at index
+  time — a test-fixture bug, not a pipeline bug) + `clippy --all-targets -D
+  warnings` clean + `cargo fmt --check` clean.
 - [ ] **BLK-3 (S)** Parquet **export** (feature-gated `parquet`;
   arrow/parquet deps only under the feature). Export-only per §12 lean.
 - [ ] **BLK-4 (M)** S3-compatible `ArtifactStore` impl (config-driven
