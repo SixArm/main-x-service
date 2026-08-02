@@ -121,12 +121,12 @@ case, and portfolio each provide:
 | Capability | person | worker | place | thing | event | course | org | care-pathway | case | portfolio |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | Full-text search via Tantivy¹ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Privacy masking module (`src/privacy`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | – | – | – |
+| Privacy masking module (`src/privacy`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | – | – |
 | FHIR R5 surface | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ | ✅ | ✅ | – |
 | gRPC stub (Tonic) | ✅ | ✅ | – | – | ✅ | – | – | – | – | – |
 | Durable outbox events (Phase 2)² | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ | ✅ | ✅ | ✅ |
 | Boundary normalization (phone/address) | ✅ | ✅ | ✅ | – | ✅ | – | – | – | – | – |
-| Record-level ABAC + masking obligations | ✅ | ✅ | – | – | – | – | – | – | ✅ | – |
+| Record-level ABAC + masking obligations | ✅ | ✅ | – | – | – | – | ✅ | ✅ | ✅ | – |
 | Cross-service links (`entity_links` write-side) | ✅ | ✅ | – | – | – | – | – | – | ✅ | – |
 | Bulk import/export | ✅ | – | – | – | – | – | – | – | – | – |
 

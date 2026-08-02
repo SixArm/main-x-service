@@ -421,6 +421,81 @@ pub fn enforce(
     }
 }
 
+/// Resource attributes describing **one** care pathway, for the
+/// record-level ABAC pass (shared
+/// `agents/share/authorization-attributes.md` §9). Matched by policy
+/// `when` keys prefixed `resource.`.
+///
+/// `care_setting` is the useful discriminator (a deployment may want
+/// `resource.care_setting` rules — e.g. an oncology-only reader).
+/// `sensitive_setting` flags the two settings that carry special-category
+/// treatment under UK Common Law Duty of Confidentiality and analogous
+/// regimes (`compliance-for-healthcare.md` §1) even though the pathway
+/// *template* itself names no patient: `mental_health` and `palliative`
+/// pathways are conventionally handled with tighter access than, say, an
+/// orthopaedics pathway, independent of whatever `care_setting` value a
+/// policy also keys on.
+#[must_use]
+pub fn care_pathway_resource_attrs(
+    pathway: &care_pathway_matcher::CarePathway,
+) -> std::collections::BTreeMap<String, Vec<String>> {
+    let mut attrs = std::collections::BTreeMap::new();
+    if let Some(setting) = &pathway.care_setting {
+        attrs.insert(
+            "care_setting".to_string(),
+            vec![format!("{setting:?}").to_lowercase()],
+        );
+    }
+    let sensitive = matches!(
+        pathway.care_setting,
+        Some(
+            care_pathway_matcher::CareSetting::MentalHealth
+                | care_pathway_matcher::CareSetting::Palliative
+        )
+    );
+    attrs.insert("sensitive_setting".to_string(), vec![sensitive.to_string()]);
+    attrs
+}
+
+/// Authorize an action against **one specific record**, returning the
+/// allow's **obligations** (e.g. `["mask"]`) or the HTTP refusal.
+///
+/// A no-op returning no obligations when `CARE_PATHWAY_REQUIRE_AUTH` is
+/// off, so wiring it into a handler changes nothing until a deployment
+/// activates enforcement — the same posture as the blanket guard.
+///
+/// This is the second, finer decision described in
+/// `agents/share/authorization-attributes.md` §9: the blanket guard has
+/// already run on the coarse (no-record) path, and this one runs after
+/// the record is loaded, so a policy can say "mask this one" or "not
+/// this one" rather than only "not this endpoint".
+///
+/// # Errors
+///
+/// `401` when enforcement is on and no valid token was presented; `403`
+/// when the policy denies, carrying the deciding rule as the reason.
+pub fn authorize_record(
+    caller: &MaybeAuthUser,
+    action: Action,
+    resource: &std::collections::BTreeMap<String, Vec<String>>,
+) -> Result<Vec<String>, (StatusCode, String)> {
+    if !require_auth() {
+        return Ok(Vec::new());
+    }
+    let claims = caller
+        .0
+        .as_ref()
+        .ok_or((StatusCode::UNAUTHORIZED, "missing bearer token".to_string()))?;
+    let decision = policy()
+        .current()
+        .evaluate_with_resource(claims, action, ENTITY, resource);
+    if decision.allowed {
+        Ok(decision.obligations)
+    } else {
+        Err((StatusCode::FORBIDDEN, decision.reason))
+    }
+}
+
 /// Read env var `name`, treating unset/blank as absent and falling back
 /// to `default`. Used for the issuer/audience so a blank value doesn't
 /// override the sensible default.
@@ -1204,6 +1279,52 @@ mod tests {
         assert_eq!(
             bearer_claims(&bearer(&token), &verifier).unwrap_err().0,
             StatusCode::UNAUTHORIZED
+        );
+    }
+
+    /// `care_setting` is carried through lowercased, and `sensitive_setting`
+    /// is `true` for the two settings that carry special-category
+    /// treatment (mental health, palliative) and `false` for an ordinary
+    /// one.
+    #[test]
+    fn resource_attrs_flag_the_sensitive_settings() {
+        let mut pathway = care_pathway_matcher::CarePathway::new("Acute Stroke Care Pathway");
+        pathway.care_setting = Some(care_pathway_matcher::CareSetting::Inpatient);
+        let attrs = care_pathway_resource_attrs(&pathway);
+        assert_eq!(
+            attrs.get("care_setting"),
+            Some(&vec!["inpatient".to_string()])
+        );
+        assert_eq!(
+            attrs.get("sensitive_setting"),
+            Some(&vec!["false".to_string()])
+        );
+
+        pathway.care_setting = Some(care_pathway_matcher::CareSetting::MentalHealth);
+        assert_eq!(
+            care_pathway_resource_attrs(&pathway).get("sensitive_setting"),
+            Some(&vec!["true".to_string()])
+        );
+
+        pathway.care_setting = Some(care_pathway_matcher::CareSetting::Palliative);
+        assert_eq!(
+            care_pathway_resource_attrs(&pathway).get("sensitive_setting"),
+            Some(&vec!["true".to_string()])
+        );
+    }
+
+    /// No `care_setting` at all ⇒ no `care_setting` attribute (nothing to
+    /// key a policy on), but `sensitive_setting` is still present and
+    /// `false` — absence must not silently mean "unfiltered by a policy
+    /// that expects the key to exist".
+    #[test]
+    fn resource_attrs_without_a_setting_are_not_sensitive() {
+        let pathway = care_pathway_matcher::CarePathway::new("Untitled");
+        let attrs = care_pathway_resource_attrs(&pathway);
+        assert!(!attrs.contains_key("care_setting"));
+        assert_eq!(
+            attrs.get("sensitive_setting"),
+            Some(&vec!["false".to_string()])
         );
     }
 }

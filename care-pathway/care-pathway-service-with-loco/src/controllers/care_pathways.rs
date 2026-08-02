@@ -192,6 +192,19 @@ fn audit_unavailable(_: crate::compliance::disclosure::AuditWriteRefused) -> Err
     )
 }
 
+/// Map a record-level authorization rejection (`(status, reason)`) to a
+/// loco error response. `403` = the policy denied the action given the
+/// record's attributes; `401` = a fail-safe when claims are missing
+/// behind the guard.
+fn record_rejection((status, reason): (StatusCode, String)) -> Error {
+    let code = if status == StatusCode::FORBIDDEN {
+        "forbidden"
+    } else {
+        "unauthorized"
+    };
+    Error::CustomError(status, ErrorDetail::new(code, &reason))
+}
+
 /// Whether a merge request folds a record into itself.
 ///
 /// `POST /merge` rejects this with `422` (spec §6.8): folding a record
@@ -316,17 +329,25 @@ async fn create(
 /// Fetch a care pathway by public id.
 ///
 /// `GET /api/care-pathways/{pid}` — response is the full stored
-/// [`CarePathway`]. `404` when `pid` is unknown or soft-deleted.
+/// [`CarePathway`], unless the record-level ABAC decision carries the
+/// `mask` **obligation**, in which case the redacted view
+/// ([`crate::privacy::mask_pathway`]) is returned instead — that is how
+/// a deployment grants a partial read without a second endpoint. `404`
+/// when `pid` is unknown or soft-deleted.
 ///
 /// **Audited as a read** (HIPAA §164.312(b)) when
 /// `CARE_PATHWAY_AUDIT_READS` is on, carrying the caller's declared
 /// purpose-of-use and disclosure recipient. The audit row is written only
-/// on a successful read: a `404` disclosed nothing, and recording it would
-/// pollute the §164.528 accounting with accesses that never happened.
+/// on a successful, authorized read: a `404` or a `403` disclosed
+/// nothing, and recording it would pollute the §164.528 accounting with
+/// accesses that never happened.
 ///
 /// # Errors
 ///
-/// `404` when no active row has that `pid`; otherwise DB/parse errors.
+/// `404` when no active row has that `pid`; `403` when the record-level
+/// ABAC policy denies reading this specific pathway (e.g. a
+/// `resource.sensitive_setting`-gated rule) with enforcement on;
+/// otherwise DB/parse errors.
 #[debug_handler]
 async fn get_one(
     Path(pid): Path<String>,
@@ -337,6 +358,13 @@ async fn get_one(
     let model = PathwayModel::find_by_pid(&ctx.db, &pid)
         .await
         .map_err(super::model_not_found)?;
+    let pathway = model.to_pathway()?;
+    let obligations = crate::auth::authorize_record(
+        &caller,
+        authentication_verifier::Action::Read,
+        &crate::auth::care_pathway_resource_attrs(&pathway),
+    )
+    .map_err(record_rejection)?;
     disclosure::record_access(
         &ctx.db,
         model.pid,
@@ -346,7 +374,84 @@ async fn get_one(
     )
     .await
     .map_err(audit_unavailable)?;
-    format::json(model.to_pathway()?)
+    if obligations.iter().any(|o| o == "mask") {
+        format::json(crate::privacy::mask_pathway(&pathway))
+    } else {
+        format::json(pathway)
+    }
+}
+
+/// The masked view of a care pathway.
+///
+/// `GET /api/care-pathways/{pid}/masked`. Returns `200` with the record
+/// redacted per [`crate::privacy::mask_pathway`] — provider name and
+/// provider id — regardless of the caller's policy. `404` for an unknown
+/// pid.
+///
+/// Distinct from the `mask` obligation on `GET /{pid}`: that one is the
+/// deployment deciding what a caller may see, while this endpoint is a
+/// caller *asking* for the redacted form (a screen share, a support
+/// call, an export preview).
+#[debug_handler]
+async fn get_masked(Path(pid): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
+    let model = PathwayModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(super::model_not_found)?;
+    format::json(crate::privacy::mask_pathway(&model.to_pathway()?))
+}
+
+/// GDPR right-of-access export for one care pathway.
+///
+/// `GET /api/care-pathways/{pid}/export`. Returns `200` with the
+/// envelope from [`crate::privacy::export_pathway`]; `404` for an
+/// unknown pid.
+///
+/// **Every export is audited** as a disclosure (HIPAA §164.528), exactly
+/// like a read but under [`disclosure::action::EXPORT`] — a bulk or
+/// single-subject extract of clinical data is itself a compliance event.
+///
+/// A caller the policy would mask gets a **masked** export, and the
+/// envelope says so — an access request answered with redactions must
+/// not look like a complete answer.
+///
+/// # Errors
+///
+/// `404` when no active row has that `pid`; `403` when the record-level
+/// ABAC policy denies reading this specific pathway; otherwise DB/parse
+/// errors, or a `503` when the export could not be recorded on the
+/// audit trail.
+#[debug_handler]
+async fn get_export(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
+) -> Result<Response> {
+    let model = PathwayModel::find_by_pid(&ctx.db, &pid)
+        .await
+        .map_err(super::model_not_found)?;
+    let pathway = model.to_pathway()?;
+    let obligations = crate::auth::authorize_record(
+        &caller,
+        authentication_verifier::Action::Read,
+        &crate::auth::care_pathway_resource_attrs(&pathway),
+    )
+    .map_err(record_rejection)?;
+    let masked = obligations.iter().any(|o| o == "mask");
+    disclosure::record_access(
+        &ctx.db,
+        model.pid,
+        disclosure::action::EXPORT,
+        caller.actor(),
+        &access,
+    )
+    .await
+    .map_err(audit_unavailable)?;
+    format::json(crate::privacy::export_pathway(
+        &pathway,
+        &model.pid.to_string(),
+        masked,
+    ))
 }
 
 /// Replace a care pathway's payload.
@@ -827,6 +932,8 @@ pub fn routes() -> Routes {
         .add("/{pid}", get(get_one))
         .add("/{pid}", put(update))
         .add("/{pid}", delete(remove))
+        .add("/{pid}/masked", get(get_masked))
+        .add("/{pid}/export", get(get_export))
         .add("/{pid}/audit", get(entity_audit))
         .add("/{pid}/audit/disclosures", get(entity_disclosures))
         .add("/{pid}/erase", post(erase))

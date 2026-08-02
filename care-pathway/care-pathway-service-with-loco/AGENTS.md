@@ -29,7 +29,9 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | POST | `/api/care-pathways` | Create (body: `CarePathway`; blank `name` → `422`) → `{pid, name}` |
 | GET | `/api/care-pathways` | List active (capped 100) |
 | GET | `/api/care-pathways/search?q=` | Tantivy full-text search (`?fuzzy=true`, `?phonetic=true`) |
-| GET | `/api/care-pathways/{pid}` | Fetch the stored `CarePathway` |
+| GET | `/api/care-pathways/{pid}` | Fetch the stored `CarePathway` (record-level ABAC; a `mask`-obligation allow returns the redacted view) |
+| GET | `/api/care-pathways/{pid}/masked` | The masked view: provider name / provider id redacted |
+| GET | `/api/care-pathways/{pid}/export` | GDPR right-of-access export (audited as a disclosure; masked when the policy says so) |
 | PUT | `/api/care-pathways/{pid}` | Replace payload |
 | DELETE | `/api/care-pathways/{pid}` | Soft-delete |
 | POST | `/api/care-pathways/match` | Rank a `{query, candidates}` set |
@@ -51,7 +53,7 @@ Plus loco's default `/_health`, `/_ping`. Every CRUD action writes an
 
 ## MVP scope
 
-CRUD + `ILIKE` name search + matching, with payload validation
+CRUD + Tantivy full-text/fuzzy/phonetic search + matching, with payload validation
 (`condition_codes` ICD-10 / ICD-11 / SNOMED CT SCTID Verhoeff;
 `identifiers` UUID / DOI shapes; `in_language` BCP-47 syntax;
 `src/validation.rs`), OpenAPI 3 +
@@ -67,10 +69,19 @@ Phase-2 outbox/relay landed (`models/event_outbox.rs`, `src/relay.rs`),
 default-off via `CARE_PATHWAY_EVENT_TRANSPORT` (`memory` unless set to
 `outbox`). **Tantivy full-text/fuzzy/phonetic search** (`src/search/`)
 replaces the `ILIKE` name search and backs search-blocked
-`check-duplicates` candidates. Deferred
+`check-duplicates` candidates. **Privacy** (`src/privacy.rs`) provides
+field masking (`provider_name` / `provider_id`), the always-masked
+`/masked` view, and the audited GDPR `/export`, wired to the ABAC `mask`
+obligation via `auth::authorize_record` + `auth::care_pathway_resource_attrs`
+(`care_setting`, `sensitive_setting` for the mental-health/palliative
+special-category settings). A pathway *template* names no patient, so
+the masked field set is thin — see `src/privacy.rs`'s module docs for
+why, and for the explicit note that the patient-identifying linkage
+(`pathway_instances.subject_ref`) is a separate, not-yet-addressed
+surface. Deferred
 (spec §13): the durable bus's Phase-3 Fluvio
-broker sink (see `agents/share/event-bus.md`), privacy,
-front-end merge
+broker sink (see `agents/share/event-bus.md`), instance-layer
+masking/authz for `subject_ref`, front-end merge
 action, terminology-server code-existence checks. The published key set
 is fetched over HTTP once at boot when `CARE_PATHWAY_PASETO_KEYS_URL` is
 set (fetched set wins; warn + env fallback via
@@ -109,7 +120,9 @@ src/
 ├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) via authentication-verifier (RS256/JWKS decommissioned)
 ├── merge.rs               pure record-merge logic (merge_pathways)
 ├── openapi.rs             hand-written OpenAPI 3 document
+├── privacy.rs             field masking (provider name/id) + GDPR export envelope
 ├── relay.rs               durable-bus Phase 2 outbox relay (poll/ack loop)
+├── search/                Tantivy full-text/fuzzy/phonetic index (index.rs schema + mod.rs engine)
 ├── streaming.rs           CRUD/merge event stream — Phase 1 durable-bus
 │                          envelope (Envelope) + EventPublisher seam +
 │                          InMemoryPublisher; frozen EventView projection

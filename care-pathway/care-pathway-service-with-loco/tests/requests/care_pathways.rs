@@ -722,3 +722,71 @@ async fn search_reaches_secondary_fields_and_tolerates_typos() {
     })
     .await;
 }
+
+/// The always-masked view redacts provider identity regardless of
+/// caller (enforcement is off in this suite, so this is the
+/// no-policy-needed path); the clinical content — name, condition
+/// codes — is untouched. The export envelope wraps the same content and
+/// declares `masked: false` when enforcement is off, since with no ABAC
+/// decision in play there is no obligation to honour.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn masked_view_and_export_are_served() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created: Value = request
+            .post("/api/care-pathways")
+            .json(&stroke_pathway())
+            .await
+            .json();
+        let pid = created["pid"].as_str().unwrap().to_string();
+
+        let masked: Value = request
+            .get(&format!("/api/care-pathways/{pid}/masked"))
+            .await
+            .json();
+        assert_eq!(masked["name"], "Acute Stroke Care Pathway");
+        assert_eq!(masked["condition_codes"][0]["code"], "I63");
+        let provider_id = masked["provider_id"].as_str().unwrap();
+        assert_ne!(provider_id, "trust-1", "must be redacted");
+        assert!(provider_id.contains('*'));
+
+        let export: Value = request
+            .get(&format!("/api/care-pathways/{pid}/export"))
+            .await
+            .json();
+        assert_eq!(export["entity"], "care_pathway");
+        assert_eq!(export["pid"], pid);
+        assert_eq!(export["masked"], false, "no ABAC decision, no obligation");
+        assert_eq!(export["record"]["provider_id"], "trust-1");
+    })
+    .await;
+}
+
+/// `GET /{pid}/masked` and `/export` are `404` for an unknown pid, same
+/// as the ordinary `GET /{pid}`.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn masked_view_and_export_are_404_for_unknown_pid() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let pid = "00000000-0000-4000-8000-000000000000";
+        assert_eq!(
+            request
+                .get(&format!("/api/care-pathways/{pid}/masked"))
+                .await
+                .status_code(),
+            404
+        );
+        assert_eq!(
+            request
+                .get(&format!("/api/care-pathways/{pid}/export"))
+                .await
+                .status_code(),
+            404
+        );
+    })
+    .await;
+}

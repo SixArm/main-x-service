@@ -43,6 +43,8 @@ pub mod merge;
 pub mod metrics;
 pub mod models;
 pub mod openapi;
+/// Field masking + the GDPR right-of-access export envelope.
+pub mod privacy;
 /// Durable event bus Phase 3: the outbox relay (drain → sink → mark
 /// published) + retention purge. See [`agents/share/event-bus.md`].
 pub mod relay;

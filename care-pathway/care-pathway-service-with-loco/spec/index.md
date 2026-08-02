@@ -14,15 +14,17 @@ care-pathway-matcher. Built on loco.rs.
 
 ## 2. Scope
 
-MVP: CRUD + `ILIKE` name search + matching + record merge + audit log +
+MVP: CRUD + Tantivy full-text/fuzzy/phonetic search + matching + record merge + audit log +
 in-memory event streaming (durable-bus Phase 1) + OpenAPI/Swagger +
 Prometheus metrics + offline PASETO v4 public token verification + blanket
 `/api/*` enforcement (off by default) + rich payload validation
-(ICD/SNOMED/UUID/DOI/BCP-47). Deferred (§13): Tantivy full-text/fuzzy
-search, search-blocked dedup candidates, the durable event bus's real
+(ICD/SNOMED/UUID/DOI/BCP-47) + field masking / GDPR export wired to the
+ABAC `mask` obligation (§13 2026-08-02; thin by design — a pathway
+*template* names no patient, see §12.2). Deferred (§13): the durable event bus's real
 Fluvio broker sink (Phases 2–3 — transactional outbox + relay/retention
-— are done; only the broker-gated `FluvioSink` remains), privacy,
-front-end merge action, a PASETO key-set
+— are done; only the broker-gated `FluvioSink` remains),
+instance-layer masking/authz for `pathway_instances.subject_ref` (the
+patient-identifying linkage — see §16), front-end merge action, a PASETO key-set
 refresh loop (the boot-time paseto-keys-over-HTTP fetch is done —
 `CARE_PATHWAY_PASETO_KEYS_URL`, §9/§13 — but runs once, no re-fetch),
 terminology-server code-existence checks, gRPC. Token
@@ -60,9 +62,15 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    syntax; `422` on any problem, all reported together — also enforced on
    update. Rules in [`src/validation.rs`](../src/validation.rs).
 2. `GET /api/care-pathways` — list active (cap 100), `{pid, name}`.
-   `GET /api/care-pathways/search?q=` — case-insensitive name search
-   (Postgres `ILIKE`, cap 50; blank `q` → `400`).
-3. `GET /api/care-pathways/{pid}` — return the stored `CarePathway`.
+   `GET /api/care-pathways/search?q=` — Tantivy full-text search over
+   name, alternate names, provider, identifiers, keywords, condition
+   codes, and interventions (`?fuzzy=true` for typo tolerance,
+   `?phonetic=true` for Soundex; blank `q` → `400`, an unavailable index
+   → `503`).
+3. `GET /api/care-pathways/{pid}` — return the stored `CarePathway`,
+   unless the record-level ABAC decision carries the **`mask`
+   obligation**, in which case the masked view (§6.16) is returned
+   instead — see [`agents/share/authorization-attributes.md`](../../../agents/share/authorization-attributes.md) §9/§11.
 4. `PUT /api/care-pathways/{pid}` — replace the payload (`422` if
    `name` is blank, or any `condition_codes` / `identifiers` /
    `in_language` entry is malformed).
@@ -130,6 +138,24 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    audited — are declared in the entity spec
    [§9.4](../../spec/09-api-surface.md) and
    [§10.4](../../spec/10-persistence.md).
+16. `GET /api/care-pathways/{pid}/masked` — the **masked view**:
+   `provider_name` and `provider_id` masked to their tail; every clinical
+   field (`name`, `condition_codes`, `interventions`, `keywords`,
+   `identifiers`) untouched — redacting those would defeat the registry
+   for no privacy gain, since a pathway *template* names no patient
+   (§12.2; see §16 for the patient-identifying linkage this does **not**
+   cover). `404` for an unknown `pid`.
+17. `GET /api/care-pathways/{pid}/export` — **GDPR right-of-access**
+   export: an envelope of `{entity, pid, exported_at, masked, record,
+   note}`. **Every export is audited** as a disclosure
+   ([`disclosure::action::EXPORT`](../src/compliance/disclosure.rs),
+   HIPAA §164.528) whether or not it is masked, because extracting
+   clinical data is itself a compliance event. A caller whose
+   record-level ABAC decision carries the `mask` obligation gets the
+   redacted record and `masked: true` — an access request answered with
+   redactions must never look like a complete answer. `404` for an
+   unknown `pid`; `503` when the export could not be recorded on the
+   audit trail (`CARE_PATHWAY_AUDIT_FAIL_CLOSED`).
 
 ## 7. Non-functional requirements
 
@@ -375,6 +401,17 @@ are rehashed on their next write.
   care delivery (`care` / `treatment` / `payment` / `operations` /
   `public-health`) from secondary use (`research` / `policy` /
   `statistics`), which is also classified as a disclosure.
+- **Right of access — field masking + export**
+  ([`src/privacy.rs`](../src/privacy.rs), §6.16–17). `mask_pathway`
+  redacts `provider_name` / `provider_id`; every clinical field is left
+  alone, since a pathway *template* names no patient and redacting
+  `condition_codes` would defeat the registry for no privacy gain.
+  `export_pathway` builds the `{entity, pid, exported_at, masked,
+  record, note}` envelope, wired to the ABAC `mask` obligation via
+  `auth::authorize_record` — a caller granted a masked read gets a
+  masked export too, and the envelope says so. Every export is audited
+  as a disclosure regardless of whether it is masked. **Not** covered:
+  the patient-identifying `pathway_instances.subject_ref` linkage (§16).
 
 ### 12.3 ONC / HTI — profile and terminology conformance
 
@@ -463,9 +500,32 @@ the evidence bundle.
 
 ## 13. Tasks (live work queue)
 
-- [x] Name search — `GET /search?q=` Postgres `ILIKE` on the
-  denormalised `name` (cap 50, wildcards escaped). Tantivy full-text /
-  fuzzy search over the JSONB payload remains deferred.
+- [x] **2026-08-02 — Privacy: field masking + GDPR export (repo
+  tasks.md P-2, as P-1/organization).** `src/privacy.rs`:
+  `mask_pathway` + `export_pathway`. Unlike organization, a
+  `CarePathway` is a **template** that names no patient — its clinical
+  content (`name`, `condition_codes`, `interventions`, `keywords`,
+  `identifiers`) is left untouched (masking it would defeat the
+  registry for no privacy gain, exactly as masking an LEI would for
+  organization); only `provider_name` / `provider_id` (institutional,
+  not personal, but worth redacting from a cross-department reader) are
+  masked. `src/auth.rs` gains `authorize_record` +
+  `care_pathway_resource_attrs` (`care_setting`, and a
+  `sensitive_setting` flag for `mental_health` / `palliative` — the two
+  settings that carry special-category treatment under UK Common Law
+  Duty of Confidentiality even though the template names no one). `GET
+  /{pid}` honours the `mask` obligation; new `GET /{pid}/masked` and
+  `GET /{pid}/export` endpoints (§6.16–17), the export audited as a
+  disclosure via the existing `disclosure::action::EXPORT`. **Explicitly
+  out of scope** (§16): `pathway_instances.subject_ref`, the actual
+  patient-identifying enrolment linkage, which lives outside this
+  module entirely.
+  *Verified:* 48 DB-gated (46 request-suite + 2 dedicated `tests/masking.rs`,
+  including a record-level-decision proof that a non-sensitive-setting
+  read is *not* masked by the same policy) + 1 enforcement + 1
+  outbox-audit green vs Postgres 18; 246 lib tests; fmt + clippy clean.
+- [x] Name search — `GET /search?q=` Tantivy full-text/fuzzy/phonetic
+  search (§13 2026-08-01), replacing the earlier Postgres `ILIKE`.
 - [x] Event streaming + audit log on CRUD — `audit_logs` table +
   best-effort row per create/update/delete (`models/audit_logs.rs`);
   in-memory event stream (`streaming.rs`); read at
@@ -804,7 +864,8 @@ Done: loco boot; care_pathways table + migration; CRUD with `422`
 validation on create/update (blank `name`; ICD-10 / ICD-11 / SNOMED CT
 `condition_codes` format checks; UUID / DOI `identifiers` shapes; BCP-47
 `in_language` syntax — all problems reported together);
-`ILIKE` name search; `/match`, `/check-duplicates`, and `/merge`
+Tantivy full-text/fuzzy/phonetic search; field masking + audited GDPR
+export wired to the ABAC `mask` obligation; `/match`, `/check-duplicates`, and `/merge`
 (record merge + history)
 embedding care-pathway-matcher; audit log + in-memory event streaming on
 every CRUD/merge (`/audit/recent`, `/{pid}/audit`, `/events/recent`,
@@ -826,27 +887,45 @@ gated request-level tests; green build + clippy.
 
 All of the scope below shipped together in the still-unreleased `0.1.0`
 line (Cargo.toml is `0.1.0`; CHANGELOG keeps it under `[Unreleased]`):
-the CRUD + matching MVP, then `ILIKE` search + audit + in-memory
+the CRUD + matching MVP, then `ILIKE` search (since replaced by
+Tantivy, 2026-08-01) + audit + in-memory
 streaming, then record merge + OpenAPI/Swagger + Prometheus + offline
 bearer-token verification + blanket `/api/*` enforcement middleware. The
 original v0.2 / v0.3 milestone split was never cut as a tagged release.
 The credential switch RS256-JWT → PASETO v4 public per
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
 has since landed (§13), as has the boot-time paseto-keys-over-HTTP fetch
-(`CARE_PATHWAY_PASETO_KEYS_URL`, fetch-once, env fallback; §9/§13). Next
-(deferred, §13): Tantivy full-text/fuzzy search, the durable event bus's
+(`CARE_PATHWAY_PASETO_KEYS_URL`, fetch-once, env fallback; §9/§13), and
+field masking + audited GDPR export wired to the ABAC `mask` obligation
+(2026-08-02; §13). Next
+(deferred, §13): the durable event bus's
 real Fluvio broker sink (Phases 2–3 — outbox + relay/retention — are done;
 only the broker-gated `FluvioSink` remains), a PASETO key-set refresh loop,
-privacy, front-end merge action.
+instance-layer privacy for `pathway_instances.subject_ref` (§16),
+front-end merge action.
 
 ## 16. Open questions
 
-- Normalise condition codes / interventions into their own tables once
-  search lands?
+- ~~Normalise condition codes / interventions into their own tables once
+  search lands?~~ RESOLVED (2026-08-01): search landed on the JSONB
+  payload via Tantivy (§13); no normalisation needed.
 - Real-time duplicate check on create (409) vs the explicit endpoint?
 - Periodic re-fetch of the PASETO key set (key rotation) — the boot
   fetch (§9 `CARE_PATHWAY_PASETO_KEYS_URL`) runs once; is a refresh
   loop (or refetch-on-`UnknownKid`) needed before rotation goes live?
+- **Instance-layer privacy for `pathway_instances.subject_ref`.** The
+  privacy module landed 2026-08-02 (§13) masks the `CarePathway`
+  *template* — which names no patient — but the actual
+  patient-identifying fact is a specific person's *enrolment*, recorded
+  as `subject_ref` (a `person:<uuid>` `EntityRef`) on the instance layer
+  (`src/instances.rs`, `models/_entities/pathway_instances.rs`). That
+  linkage is the clinical analogue of the `case ↔ person` `subject_of`
+  edge (`agents/share/cross-service-linking.md` §10) — high-governance,
+  and not yet covered by any masking or record-level ABAC. Deferred
+  rather than silently left undone; needs its own resource-attribute
+  design (likely keyed on the parent pathway's `care_setting` /
+  `sensitive_setting`) before the instance controllers can honour a
+  `mask` obligation the way `care_pathways.rs` now does.
 
 ## 17. References
 

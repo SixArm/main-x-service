@@ -225,8 +225,32 @@
   natural persons behind it are the person service's to record. A
   second, unauthoritative home for consent is worse than none. Stated
   in the crate spec §2/§13 so the next pass does not "finish" it.
-- [ ] **P-2 (M)** Privacy in **care-pathway** (as P-1; clinical data —
-  mind `compliance-for-healthcare.md`). Depends: P-1.
+- [x] **P-2 (M)** Privacy in **care-pathway** (as P-1; clinical data —
+  mind `compliance-for-healthcare.md`). Depends: P-1. *(done 2026-08-02)*
+
+  The interesting finding was that "as P-1" couldn't mean "copy
+  organization's field list" — a `CarePathway` is a **template** and
+  names no patient, so it carries none of organization's
+  fiscal/contact-info fields to redact. What it does carry is
+  institutional (`provider_name`/`provider_id`), masked anyway for a
+  cross-department reader; the truly patient-identifying fact
+  (`pathway_instances.subject_ref`, a specific person's enrolment) lives
+  entirely outside the masked entity and is called out as an explicit
+  follow-up in spec §16 rather than silently left uncovered — the same
+  honesty move P-1 made by refusing rather than deferring a consent
+  model. `care_pathway_resource_attrs` adds a `sensitive_setting` flag
+  (`mental_health`/`palliative`) grounded in
+  `compliance-for-healthcare.md`'s special-category framing, verified
+  end to end by a DB-gated test proving a policy keyed on it does *not*
+  fire for an ordinary setting.
+
+  Also fixed: care-pathway's own S-2 commit (S-3's note already flagged
+  this) never updated `spec/index.md`/`AGENTS.md` off "Postgres ILIKE
+  search" — corrected alongside this change since both files were
+  already open for the privacy edit.
+  *Verified:* 48 DB-gated (46 request-suite + 2 dedicated
+  `tests/masking.rs`) + 1 enforcement + 1 outbox-audit green vs
+  Postgres 18; 246 lib tests; fmt + clippy clean.
 - [ ] **P-3 (M)** Privacy in **case** — it already honours the `mask`
   obligation; add the masked-view + GDPR-export endpoints on top of the
   existing `mask_case`. Depends: P-1.

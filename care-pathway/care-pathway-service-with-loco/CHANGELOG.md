@@ -8,6 +8,51 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — Privacy: field masking + GDPR export (2026-08-02)
+
+Repo tasks.md P-2 (as P-1/organization). A `CarePathway` is a
+**template** — it names no patient — so the masking scope here is
+deliberately thinner than organization's: only `provider_name` /
+`provider_id` are redacted; every clinical field (`name`,
+`condition_codes`, `interventions`, `keywords`, `identifiers`) is left
+alone, since masking it would defeat the registry for no privacy gain.
+
+- `src/privacy.rs` — `mask_pathway` + `export_pathway`, mirroring
+  organization's shape (masked-value tail-preserving redaction, an
+  export envelope that declares whether it is partial).
+- `src/auth.rs` — `authorize_record` + `care_pathway_resource_attrs`.
+  The resource attributes are `care_setting` (a policy discriminator)
+  and a new `sensitive_setting` flag: `true` for `mental_health` /
+  `palliative` pathways, the two settings that carry special-category
+  treatment under UK Common Law Duty of Confidentiality and analogous
+  regimes even though the template names no one.
+- `GET /api/care-pathways/{pid}` now honours the ABAC `mask`
+  obligation, returning the redacted view instead of the full record.
+  New `GET /{pid}/masked` (always-redacted view) and `GET /{pid}/export`
+  (audited GDPR right-of-access) endpoints.
+- The export is audited as a **disclosure** via the existing
+  `disclosure::action::EXPORT` (this crate's own HIPAA §164.528
+  machinery, richer than organization's plain `AuditModel::record`) —
+  every export, masked or not, is a recordable compliance event.
+- **Explicitly out of scope, not silently skipped**: the
+  patient-identifying fact is a specific person's *enrolment* on a
+  pathway — `pathway_instances.subject_ref`, a `person:<uuid>`
+  reference — which lives on the instance layer, not on `CarePathway`
+  at all. Masking/authorizing that linkage (the clinical analogue of
+  the `case ↔ person` `subject_of` edge) is tracked in spec §16 as a
+  follow-up.
+- DB-gated: `tests/masking.rs` (new, 2 tests — the obligation
+  end-to-end, and a record-level-decision proof that a
+  non-sensitive-setting read is *not* masked by the same
+  `dept=partner` policy) + 2 new tests in
+  `tests/requests/care_pathways.rs` (`masked_view_and_export_are_served`,
+  `masked_view_and_export_are_404_for_unknown_pid`) + 2 new DB-free
+  unit tests in `src/auth.rs`.
+- No SOUP register change (no new dependency).
+- Fixed stale spec/AGENTS prose left over from S-2 (2026-08-01): both
+  still described the name search as Postgres `ILIKE` in a couple of
+  places despite Tantivy having landed.
+
 ### Changed — loco-rs 1.0.1 (2026-08-02)
 
 - **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration → 2.0,
