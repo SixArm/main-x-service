@@ -8,6 +8,48 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — BLK-5 async bulk import/export (2026-08-03)
+
+- **`POST`/`GET /api/organizations/import[/{id}]` and
+  `export[/{id}]`, plus `GET /api/organizations/bulk-jobs`** — async,
+  loco-worker-driven bulk import and export
+  (`agents/share/bulk-import-export.md`), scoped to what BLK-1/BLK-2
+  need: **JSONL + CSV only** (no Parquet) and a **local-filesystem-only**
+  artifact store (no S3 backend; the trait is async so a future S3
+  backend needs no signature change).
+- New `src/bulk/` module: the wire "bulk row" shape (an organization's
+  own fields plus an optional top-level `pid`, since
+  `organization_matcher::Organization` carries no id of its own), the
+  JSONL/CSV codecs, the stable-key resolver (LEI → DUNS → explicit
+  `pid`; a keyless row runs the same search-blocking + matcher
+  duplicate detection `POST /check-duplicates` uses and is queued in
+  the review queue with `provenance = "import"`), the per-row error
+  report, the pipeline (reuses `streaming::create_and_emit`/
+  `update_and_emit` for every written row — a bulk-imported
+  organization gets the same event/audit/search-index side effects as
+  one created interactively), the local artifact store, the
+  `BulkJobWorker`, and the REST handlers.
+- New `bulk_jobs` table (`m20260803_000002_bulk_jobs`) and a
+  `review_queue.provenance` column
+  (`m20260803_000001_review_queue_provenance`, mirroring person's
+  `m20260802_000001`).
+- Export defaults to the masked view (`crate::privacy::mask_organization`);
+  the privileged `full` profile requires elevated authorisation.
+  `include_soft_deleted=true` is `400` (not yet supported). Every
+  export is audited, and the audit write gates delivery (SEC-B8): a
+  failed audit write fails the job before the artifact is stored.
+- **Known limitation:** the per-row upsert is not wrapped in a SEC-B3
+  stable-key advisory lock, unlike the family reference pattern — see
+  spec §10.7 "Concurrency" for why (a lock held on a separate guard
+  transaction deadlocked every import under this crate's own
+  `config/test.yaml` `max_connections: 1`, since
+  `streaming::create_and_emit`/`update_and_emit` are hard-coded to
+  `&DatabaseConnection` rather than generic over `ConnectionTrait`).
+  Two importers racing the identical stable key in the same instant can
+  both create a row; closing this is a tracked follow-up.
+- 8 new request-level tests (`tests/requests/bulk.rs`, Postgres-gated)
+  plus DB-free unit tests throughout `src/bulk/`.
+
 ### Changed — loco-rs 1.0.1 (2026-08-02)
 
 - **loco-rs 0.16 → 1.0.1**, the framework's first stable release: sea-orm

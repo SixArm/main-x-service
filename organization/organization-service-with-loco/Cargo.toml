@@ -35,6 +35,9 @@ regex = { version = "1.13" }
 # Embedded full-text search index (see src/search/). Same version as the
 # older services' `src/search/`, so the family runs one index format.
 tantivy = { version = "0.22" }
+# BLK-5 bulk import/export: the CSV codec (src/bulk/csv.rs). Same crate
+# and major version the person/care-pathway bulk modules already use.
+csv = "1"
 migration = { path = "migration" }
 sea-orm = { version = "2.0", features = [
   "sqlx-postgres",
@@ -67,6 +70,12 @@ required-features = []
 
 [dev-dependencies]
 loco-rs = { workspace = true, features = ["testing"] }
+# The `TestServer` loco's testing harness hands to a request test, and
+# `multipart::{MultipartForm, Part}` for the BLK-5 bulk-import request
+# tests (`tests/requests/bulk.rs`). Named explicitly so those tests can
+# factor out helpers that take a `TestServer` and build multipart
+# bodies — loco re-exports the harness function, not the type.
+axum-test = { version = "17.3" }
 serial_test = { version = "3.5.0" }
 # Per-test throwaway index directories, so search unit tests never touch
 # the process-wide index.

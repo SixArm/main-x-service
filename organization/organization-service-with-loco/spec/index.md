@@ -157,6 +157,7 @@ embedded library; soft-delete with audit-friendly timestamps.
 | `ORGANIZATION_SEARCH_INDEX_PATH` | `data/search-index` | Directory holding the Tantivy full-text index (`src/search/`), created if absent. The index is a **derived artifact**: Postgres remains the source of truth and every hit is resolved against it, so a stale index degrades (a missing hit) rather than corrupts (it can never resurrect a deleted record). If the directory cannot be opened, search and `check-duplicates` return `503` rather than an empty result. An **empty index over a non-empty table triggers a background rebuild at boot**, so an upgrade or a lost volume self-heals; `cargo loco task search_reindex` rebuilds on demand. |
 | `ORGANIZATION_SEARCH_BOOT_REINDEX` | unset ⇒ **on** | Boot-time self-heal: when the index is empty **and** the table is not, rebuild in the background (`App::after_routes`). Falsy (`0`/`false`/`no`/`off`) ⇒ skip, for a deployment large enough to want the rebuild scheduled by hand. Anything else (including an unrecognised value) leaves it on, because the failure it prevents is silent. |
 | `ORGANIZATION_EVENT_RETENTION_DAYS` | `7` | Outbox row TTL. **Enforced** by the Phase-3 relay's periodic `purge_published` (deletes `published_at < now() - INTERVAL '<n> days'`) when the relay runs ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §3). |
+| `ORGANIZATION_BULK_ARTIFACT_DIR` | system temp dir + `organization-bulk-artifacts` | Base directory for BLK-5 bulk import/export artifacts (uploaded input, export output, error report) — `src/bulk/store.rs`, local-filesystem only this rollout step (§10.7). |
 
 ## 8. Architecture
 
@@ -178,20 +179,18 @@ resolve. The inverse edges (`has_member`, `employs`) are materialised in
 the aggregator read-model, **not** stored here. Origination from the org
 side is a roadmap item (umbrella spec §15).
 
-**Bulk import / export (roadmap, §13).** The family-wide contract — async
-`bg_pg` jobs, the `bulk_jobs` table, the five `/api/organizations/{import,export,bulk-jobs}`
-endpoints, JSONL/CSV/Parquet, idempotent upsert-by-key, the per-row error
-report, and the export privacy/audit posture — is fixed in
+**Bulk import / export (BLK-5, delivered — §10.7, §13).** The family-wide
+contract — async loco-worker jobs, the `bulk_jobs` table, the five
+`/api/organizations/{import,export,bulk-jobs}` endpoints, idempotent
+upsert-by-key, the per-row error report, and the export privacy/audit
+posture — is fixed in
 [`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md).
-Organization declares only the differences (umbrella spec §8.7): **stable
-key** = a deterministic globally-unique scheme-scoped identifier the matcher
-short-circuits on (`Lei`/`Duns`/`Iso6523`/`Gln`/`Wikidata`/`Ror`/`Isni`/`Vat`,
-matched as `(scheme, value)`) or the record `pid`; **CSV** flattens `address.*`
-to dotted columns and JSON-encodes the `identifiers` / `alternate_names` /
-`same_as` / `keywords` / `tags` / `relationships` arrays, with JSONL the
-lossless reference; **export sensitivity** is low–medium (light default
-masking protecting `telephone` / `email` + sole-trader records, parity with
-the §13 masking task), every export audited.
+This rollout step is deliberately bounded to what BLK-1/BLK-2 require:
+**JSONL + CSV only** (no Parquet — a later, person-specific extra) and a
+**local-filesystem-only** artifact store (no S3 backend). §10.7 declares
+this crate's per-entity adoption in full: the stable key (`Lei` → `Duns` →
+explicit `pid` — narrower than the matcher's full deterministic-scheme
+list, by design; see §10.7), the CSV column set, and export sensitivity.
 
 ## 9. API surface
 
@@ -199,6 +198,19 @@ See §6. Responses are raw loco JSON. `404` for unknown `pid`; `422
 Unprocessable Entity` for validation failures (blank `name` on create
 or replace — family convention); `400` for malformed requests (blank
 search `q`, invalid audit pid).
+
+**Bulk import/export (BLK-5, §10.7).** `POST /api/organizations/import`
+(multipart: `file` + `format` + optional `dry_run`) → `202 {job_id}`;
+`GET /api/organizations/import/{id}` → job status + counts +
+`errors_url`; `POST /api/organizations/export` (JSON: `format`, `q`,
+`limit`, `offset`, `masking_profile`, `include_soft_deleted`) → `202
+{job_id}`; `GET /api/organizations/export/{id}` → job status +
+`download_url`; `GET /api/organizations/bulk-jobs[?limit=]` → recent
+jobs, newest first. `import` is a declared destructive POST
+(`auth::DESTRUCTIVE_POST_SUFFIXES`); an elevated (`full` masking or
+soft-deleted) export additionally requires `Action::Destructive` via
+`authorize_record`. `format` accepts only `jsonl`/`csv` (`400`
+otherwise); `include_soft_deleted=true` is `400` (not yet supported).
 
 **Auth.** The credential is a short-lived **PASETO v4.public** token
 (Ed25519, riding in `Authorization: Bearer v4.public.…`), verified
@@ -245,6 +257,96 @@ the scraper with `metrics_path: /metrics.prom`.
 PostgreSQL via SeaORM + `sea-orm-migration`. Migration
 `m20220101_000001_organizations`. `auto_migrate` on in development.
 
+### 10.7 Bulk import/export (BLK-5) — per-entity adoption
+
+Per `agents/share/bulk-import-export.md` §10, this section is
+organization's declaration of what differs from the family-wide
+contract. `bulk_jobs` (migration `m20260803_000002_bulk_jobs`) is the
+uniform job table (`id UUID PRIMARY KEY`, `kind`, `entity`, `format`,
+`status`, `params JSONB`, the five `rows_*` counters, `actor`,
+`idempotency_key`, `input_url`/`result_url`/`error_report_url`,
+`created_at`/`updated_at`/`expires_at`), plus a `provenance` column
+added to the existing `review_queue` table
+(`m20260803_000001_review_queue_provenance`: `operator` | `import` |
+`matcher_suggested`, backfilled `operator`, set once on insert and never
+touched by a re-scan upsert).
+
+**Stable key** (priority order, `src/bulk/stable_key.rs`):
+
+1. An **LEI** identifier (`IdentifierScheme::Lei`) with a non-blank value.
+2. Failing that, a **DUNS** identifier (`IdentifierScheme::Duns`) with a
+   non-blank value.
+3. Failing that, the row's own **explicit `pid`**.
+
+This is narrower than the matcher's full deterministic-scheme list
+(`Lei`/`Duns`/`Iso6523`/`Gln`/`Wikidata`/`Ror`/`Isni`/`Vat`) — LEI and
+DUNS are the two schemes an operator's source system most plausibly
+carries as a primary key for a bulk load; the others remain valid
+*matching* short-circuits but are not (yet) bulk stable keys. A row
+satisfying none of the three is **keyless** and routes through
+duplicate detection (§6 of the family doc) instead of a blind create.
+
+`organization_matcher::Organization` carries **no id field of its
+own** (unlike person's `Person::id`) — `pid` is server-assigned on
+create. The bulk **wire row** is therefore the organization's own
+fields plus a top-level, optional `pid` (`src/bulk/columns.rs`
+`to_row_value`/`from_row_value`); re-importing an export (which always
+carries the real `pid`) is what makes priority 3 idempotent. An
+explicit `pid` that does not resolve to an existing row (e.g. it names
+a soft-deleted record, which `find_by_pid` excludes) is **not**
+preserved on create — a fresh `pid` is minted, since
+`models::organizations::Model::create` has no caller-supplied-id entry
+point. This is a deliberate, narrow scope decision (documented in
+`src/bulk/pipeline.rs`), not an oversight.
+
+**CSV column set** (`src/bulk/columns.rs`, export order): `pid`,
+`name`, `legal_name`, `url`, `jurisdiction`, `founding_date`,
+`telephone`, `email` (scalars); `address.street_address`,
+`address.locality`, `address.region`, `address.postal_code`,
+`address.country` (the single nested `address` object, dotted);
+`identifiers`, `alternate_names`, `same_as`, `keywords` (arrays, one
+JSON-encoded cell each). JSONL is the lossless reference format
+(one wire row per line); CSV round-trips losslessly against it
+(pinned by `bulk::csv::tests::round_trips_a_fully_populated_organization_losslessly`).
+
+**Export sensitivity.** Reuses the existing masking exactly
+(`crate::privacy::mask_organization` — §7 masking task): the default
+`masked` profile redacts `telephone`, `email`, the street address line,
+and fiscal (`TaxId`/`Vat`) identifier values; the privileged `full`
+profile is gated behind `authorize_record(.., Action::Destructive, ..)`
+(a no-op unless `ORGANIZATION_REQUIRE_AUTH` is on). `include_soft_deleted
+= true` is rejected at the handler with `400` (before a job is even
+created) as not-yet-supported, per the family doc's "note it as
+deferred, don't half-build it" guidance — `models::organizations` has
+no soft-deleted listing query today. Every export writes an audit row
+(`AuditModel::record(.., "bulk_exported", ..)`, keyed by the job id) and
+the write **gates delivery** (SEC-B8): a failed audit write fails the
+whole export job before the artifact is stored or `result_url` is set.
+Import audit (`"bulk_imported"`) is best-effort (the rows are already
+individually audited via `streaming::create_and_emit`/`update_and_emit`).
+
+**Concurrency (known limitation).** Unlike the family's SEC-B3
+reference pattern (an advisory-lock guard transaction wrapping
+find-then-write), this crate's per-row upsert (`bulk::pipeline::import_upsert`)
+is a **plain** find-then-write with no lock. `streaming::create_and_emit`
+/ `update_and_emit` are hard-coded to `&DatabaseConnection` (they open
+their own transaction internally under the `outbox` transport), so a
+lock held on a separate guard transaction would occupy one pooled
+connection while these need a second — under a small pool (this
+crate's own `config/test.yaml` runs `max_connections: 1`) that
+deadlocked every single import, not only a concurrent one, when first
+tried. Two importers racing the *same* stable key in the same instant
+can therefore both create a row. Closing this properly needs a
+`ConnectionTrait`-generic `streaming::create_and_emit`/`update_and_emit`
+— a `src/streaming.rs`-wide change, out of BLK-5's scope; tracked as a
+follow-up in §13.
+
+**Artifact store** (`src/bulk/store.rs`) — **local-filesystem only**
+this rollout step (`ORGANIZATION_BULK_ARTIFACT_DIR`, default a system-temp
+subdirectory); no S3 backend. The `ArtifactStore` trait is still async
+(a future S3 addition needs no signature change, the lesson learned
+from person's/care-pathway's own sync→async S3 rollouts).
+
 ## 11. Testing strategy
 
 DB-free tests: `tests/matching.rs` (matcher embedding + JSON
@@ -268,12 +370,57 @@ gate (with `ORGANIZATION_REQUIRE_AUTH=1` set in-test, un-authed `GET
 (`config/test.yaml`) and are `#[ignore]`d so the default `cargo test`
 stays green — run with `cargo test -- --ignored`.
 
+**BLK-5 bulk import/export.** DB-free unit tests throughout `src/bulk/`:
+the wire-row shape round-trip (`columns::tests`), the CSV codec against
+a fully-populated organization (`csv::tests`, incl. reordered/extra
+columns, a bad-JSON-cell per-row error, `pid`-column explicitness), the
+JSONL codec, the stable-key precedence (LEI → DUNS → explicit `pid` →
+keyless; `stable_key::tests`), the local artifact store (SEC-B4
+confinement, unsafe-key rejection; `store::tests`), the pure export
+helpers (masking application, elevation-required gate, export-limit
+clamp; `pipeline::tests`), and the audit-summary builders
+(`worker::tests`). Request-level tests
+(`tests/requests/bulk.rs`, Postgres-gated, `#[ignore]`d): JSONL
+import-then-reimport upserts idempotently by LEI (no duplicate row);
+JSONL export round-trips a created organization; a CSV import/export
+round trip; a keyless row with a likely duplicate is created **and**
+queued in the review queue with `provenance = "import"`; export masks
+by default and the `full` profile is unmasked and audited;
+`include_soft_deleted=true` and an unsupported format are both `400`
+before a job is created; `GET /bulk-jobs` lists a submitted job. These
+rely on `config/test.yaml`'s `workers.mode: ForegroundBlocking`, under
+which `BulkJobWorker::perform_later` runs synchronously, so a job's
+terminal status is observable on the very next request — no polling.
+
 ## 12. Compliance
 
 Organization data is largely public, but contact fields may be
 personal data — honour GDPR when the privacy layer lands (§13).
 
 ## 13. Tasks (live work queue)
+
+- [x] **BLK-5: async bulk import/export (organization half).** Delivers
+  the family contract in
+  [`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md)
+  for this crate, scoped to what BLK-1/BLK-2 need: **JSONL + CSV only**
+  (no Parquet) and a **local-filesystem-only** artifact store (no S3).
+  New `src/bulk/` (`mod`, `columns`, `csv`, `jsonl`, `stable_key`,
+  `error_report`, `pipeline`, `store`, `worker`, `handlers`), a
+  `bulk_jobs` migration/entity/model (`m20260803_000002_bulk_jobs`), and
+  a `review_queue.provenance` column
+  (`m20260803_000001_review_queue_provenance`, mirroring person's
+  `m20260802_000001`). Full details — stable key (LEI → DUNS → explicit
+  `pid`), the CSV column set, export sensitivity, and the documented
+  non-concurrent-safe limitation — are in §10.7; the five endpoints are
+  in §9; the test suite is in §11. Every written row goes through the
+  existing `streaming::create_and_emit`/`update_and_emit`, so a
+  bulk-imported organization gets the same event/audit/search-index
+  side effects as one created interactively — no bypass of the audit
+  trail. **Follow-up (not this task):** a `ConnectionTrait`-generic
+  `streaming::create_and_emit`/`update_and_emit` so the per-row upsert
+  can be wrapped in a SEC-B3 stable-key advisory lock without a pool
+  deadlock (§10.7 "Concurrency"); an S3 `ArtifactStore` backend behind a
+  cargo feature (the trait is already async, so this is additive).
 
 - [x] **SEC-M5 (security): check-digit / format validation of deterministic
   identifiers.** `validation::problems` now validates LEI (ISO 17442 + ISO
@@ -525,8 +672,9 @@ audit + merge `actor` from the token) per
 including the boot-time paseto-keys-over-HTTP fetch
 (`ORGANIZATION_PASETO_KEYS_URL`, fetch-once, env fallback; §7, §13);
 OpenAPI 3 + Swagger UI; Prometheus
-metrics (`/metrics.prom`, root + public, CRUD/merge counters); DB-free
-tests;
+metrics (`/metrics.prom`, root + public, CRUD/merge counters); BLK-5
+async bulk import/export (JSONL + CSV, local-filesystem artifact store;
+§9, §10.7); DB-free tests;
 request-level test suite (Postgres, `#[ignore]`-gated); loco scaffolding
 leftovers removed (no workers/tasks/data stubs); green build + clippy.
 

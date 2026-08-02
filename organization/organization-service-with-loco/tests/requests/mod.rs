@@ -4,6 +4,7 @@
 
 use std::sync::Once;
 
+mod bulk;
 mod event_outbox;
 mod organizations;
 

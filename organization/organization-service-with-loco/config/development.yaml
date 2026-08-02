@@ -24,13 +24,14 @@ server:
   host: http://localhost
   # Out of the box middleware configuration. to disable middleware you can changed the `enable` field to `false` of comment the middleware block
   middlewares:
-    # Explicit backstop (SEC-M1) — no bulk/upload feature in this
-    # crate, so loco's own 2mb default is plenty for CRUD-shaped JSON;
-    # made explicit rather than implicit so it is visible in the file
-    # a deployer actually reads.
+    # SEC-M1 backstop. `src/bulk/mod.rs::MAX_IMPORT_BYTES` (64mb, BLK-5)
+    # is the application's own cap on a bulk-import upload; this
+    # framework-level cap must sit above it with headroom for multipart
+    # overhead, or loco's own (much smaller) default silently 413s an
+    # upload the app would otherwise accept.
     limit_payload:
       enable: true
-      body_limit: 2mb
+      body_limit: 70mb
 
 # Worker Configuration
 workers:

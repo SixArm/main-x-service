@@ -32,6 +32,13 @@ audit    ──>  GET  /api/organizations/audit/recent | /{pid}/audit   -> [audi
 events   ──>  GET  /api/organizations/events/recent                 -> [{kind, pid, name, seq}]
 whoami   ──>  GET  /api/organizations/whoami    (Bearer <paseto>)   -> verified claims (401 without)
 metrics  ──>  GET  /metrics.prom                                    -> Prometheus text exposition
+import   ──>  POST /api/organizations/import  (multipart: file, format, dry_run)
+                                                                    -> 202 {job_id}
+             GET  /api/organizations/import/{id}                   -> job status + counts + errors_url
+export   ──>  POST /api/organizations/export  {format, q, masking_profile, ...}
+                                                                    -> 202 {job_id}
+             GET  /api/organizations/export/{id}                   -> job status + download_url
+bulk-jobs──>  GET  /api/organizations/bulk-jobs                    -> [recent bulk jobs]
 ```
 
 A worked **merge** call (fold a confirmed duplicate into a survivor):

@@ -21,6 +21,10 @@
 pub mod app;
 /// Bearer-token (RS256 JWT) verification extractors for the REST surface.
 pub mod auth;
+/// Async bulk import/export (BLK-5): job model, codecs (JSONL/CSV),
+/// pipeline, artifact store, background worker, and REST handlers.
+/// See `agents/share/bulk-import-export.md`.
+pub mod bulk;
 /// REST controllers: organization CRUD, matching, audit, and the docs endpoints.
 /// Compliance controls: row-level integrity and keyed MACs.
 pub mod compliance;

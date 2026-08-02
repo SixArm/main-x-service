@@ -45,6 +45,11 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | POST | `/api/organizations/review-queue/{id}/decision` | Decide a pending review item (`confirmed` / `rejected`) |
 | POST | `/api/organizations/merge` | Merge a duplicate into a survivor (`422` equal pids, `404` unknown) |
 | GET | `/api/organizations/merges/recent` | Merge-history records |
+| POST | `/api/organizations/import` | BLK-5: multipart JSONL/CSV upload → `202 {job_id}` |
+| GET | `/api/organizations/import/{id}` | BLK-5: import job status + counts + `errors_url` |
+| POST | `/api/organizations/export` | BLK-5: `{format, q, limit, offset, masking_profile, include_soft_deleted}` → `202 {job_id}` |
+| GET | `/api/organizations/export/{id}` | BLK-5: export job status + `download_url` |
+| GET | `/api/organizations/bulk-jobs` | BLK-5: recent bulk jobs, newest first |
 | GET | `/api/organizations/whoami` | Verified bearer-token claims (`401` without one) |
 | GET | `/api/organizations/audit/recent` · `/{pid}/audit` | Audit trail |
 | GET | `/api/organizations/events/recent` | In-memory event stream (frozen `EventView {kind,pid,name,seq}` projection of the canonical `Envelope`) |
@@ -79,6 +84,24 @@ is set (fetched set wins; warn + env fallback via
 `ORGANIZATION_PASETO_KEYS` otherwise — the service always boots); a
 periodic refresh loop is a future spec item.
 
+**BLK-5 async bulk import/export** (`src/bulk/`) is implemented, scoped
+to **JSONL + CSV only** (no Parquet) and a **local-filesystem-only**
+artifact store (no S3 backend — the trait is async so a future S3
+backend needs no signature change). Stable key: LEI → DUNS → explicit
+`pid` (`src/bulk/stable_key.rs`); a keyless row runs the same
+search-blocking + matcher duplicate detection `check-duplicates` uses
+and is queued in the review queue with `provenance = "import"` (the
+`review_queue` table gained a `provenance` column,
+`m20260803_000001`). Every written row goes through
+`streaming::create_and_emit`/`update_and_emit`, so a bulk-imported
+organization gets the same event/audit/search-index side effects as one
+created interactively. **Known limitation:** the per-row upsert is not
+SEC-B3 advisory-lock-protected (see spec §10.7 "Concurrency" for why —
+a locked guard transaction deadlocked under this crate's own
+`max_connections: 1` test config, since `streaming::create_and_emit`/
+`update_and_emit` are not generic over `ConnectionTrait`); two
+importers racing the identical stable key can both create a row.
+
 Auth pivot done in this crate: the family moved from RS256 JWT + JWKS to
 cookie sessions + short-lived PASETO v4.public verified offline against a
 published Ed25519 key (RS256/JWKS decommissioned); the `*_REQUIRE_AUTH`
@@ -111,11 +134,19 @@ src/
 ├── tasks/search.rs        `search_reindex` + boot self-heal
 ├── controllers/metrics.rs  GET /metrics.prom (root, public)
 ├── metrics.rs              process-wide Prometheus registry (OnceLock)
+├── bulk/                   BLK-5 async bulk import/export (JSONL + CSV;
+│                           columns, csv, jsonl, stable_key, error_report,
+│                           pipeline, store, worker, handlers)
 ├── models/
 │   ├── organizations.rs   CRUD helpers over the stored payload
-│   └── _entities/organizations.rs  SeaORM entity
+│   ├── bulk_jobs.rs       BLK-5 job CRUD/status helpers
+│   ├── review_queue.rs    batch-dedup review queue (now carries `provenance`)
+│   └── _entities/{organizations,bulk_jobs}.rs  SeaORM entities
 migration/src/            m20220101_000001_organizations, …_000002_audit_logs,
                           …_000003_merge_records, …_000004_event_outbox,
-                          m20260719_000001_review_queue
+                          m20260719_000001_review_queue,
+                          m20260803_000001_review_queue_provenance,
+                          m20260803_000002_bulk_jobs
+tests/requests/bulk.rs    BLK-5 request-level suite (Postgres-gated)
 config/                   development/production/test yaml
 ```

@@ -16,7 +16,7 @@ use axum::{
 use loco_rs::{
     Result,
     app::{AppContext, Hooks, Initializer},
-    bgworker::Queue,
+    bgworker::{BackgroundWorker, Queue},
     boot::{BootResult, StartMode, create_app},
     config::Config,
     controller::AppRoutes,
@@ -29,7 +29,7 @@ use std::path::Path;
 
 use crate::{
     auth, controllers,
-    models::_entities::{audit_logs, event_outbox, merge_records, organizations},
+    models::_entities::{audit_logs, bulk_jobs, event_outbox, merge_records, organizations},
 };
 
 /// Blanket auth-enforcement middleware: authentication (PASETO bearer)
@@ -103,11 +103,20 @@ impl Hooks for App {
     }
 
     /// Register the controller route trees on top of loco's defaults
-    /// (`/_health`, `/_ping`): the organization CRUD/match/audit routes,
-    /// the OpenAPI/Swagger docs routes, and the Prometheus metrics route
-    /// (`/metrics.prom`, mounted at root like the docs).
+    /// (`/_health`, `/_ping`): the bulk import/export routes (BLK-5), the
+    /// organization CRUD/match/audit routes, the OpenAPI/Swagger docs
+    /// routes, and the Prometheus metrics route (`/metrics.prom`,
+    /// mounted at root like the docs).
+    ///
+    /// The bulk routes are added **before**
+    /// `controllers::organizations::routes()` so their literal paths
+    /// (`/import`, `/export`, `/bulk-jobs`) are registered ahead of that
+    /// tree's `/{pid}` capture — the same literal-before-dynamic
+    /// ordering `controllers::organizations::routes` documents for its
+    /// own `/search`, `/merge`, `/whoami`, …
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
+            .add_route(crate::bulk::handlers::routes())
             .add_route(controllers::organizations::routes())
             .add_route(controllers::compliance::routes())
             .add_route(controllers::fhir::routes())
@@ -152,14 +161,19 @@ impl Hooks for App {
             )))
     }
 
-    /// Register background-queue workers. None are registered.
+    /// Register background-queue workers: the BLK-5 bulk import/export
+    /// worker, which drains `bulk_jobs` under `queue.kind: Postgres`
+    /// (`workers.mode: BackgroundQueue` in `config/*.yaml`; the loco
+    /// scaffold's unrelated `DownloadWorker` stub was removed — see
+    /// entity spec §13 T-12).
     ///
     /// # Errors
     ///
     /// Never (returns `Ok`); the signature is loco's.
-    async fn connect_workers(_ctx: &AppContext, _queue: &Queue) -> Result<()> {
-        // No background workers (the loco scaffold's DownloadWorker stub
-        // was removed; see entity spec §13 T-12).
+    async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
+        queue
+            .register(crate::bulk::worker::BulkJobWorker::build(ctx))
+            .await?;
         Ok(())
     }
 
@@ -174,7 +188,7 @@ impl Hooks for App {
     ///
     /// Order matters only for FK safety; these tables have no FKs, but
     /// children-before-parent order is kept by convention: merge/audit
-    /// rows, then the organizations they reference.
+    /// rows and bulk jobs, then the organizations they reference.
     ///
     /// # Errors
     ///
@@ -183,6 +197,7 @@ impl Hooks for App {
         truncate_table(&ctx.db, event_outbox::Entity).await?;
         truncate_table(&ctx.db, merge_records::Entity).await?;
         truncate_table(&ctx.db, audit_logs::Entity).await?;
+        truncate_table(&ctx.db, bulk_jobs::Entity).await?;
         truncate_table(&ctx.db, organizations::Entity).await?;
         Ok(())
     }

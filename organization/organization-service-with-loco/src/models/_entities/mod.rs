@@ -8,6 +8,8 @@
 
 /// `audit_logs` entity — CRUD audit-trail rows.
 pub mod audit_logs;
+/// `bulk_jobs` entity — durable state for async bulk import/export (BLK-5).
+pub mod bulk_jobs;
 /// `event_outbox` entity — durable event-bus Phase-2 hand-off buffer.
 pub mod event_outbox;
 /// `merge_records` entity — record-merge history rows.

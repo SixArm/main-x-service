@@ -1,9 +1,10 @@
 //! `sea-orm-migration` migration set for the organization service.
 //!
 //! Defines the tables the service persists to — `organizations`,
-//! `audit_logs`, `merge_records`, and `event_outbox` (the durable
-//! event-bus Phase-2 hand-off buffer) — and exposes [`Migrator`], which
-//! loco's CLI (`db migrate`) and the request-test harness run in order.
+//! `audit_logs`, `merge_records`, `event_outbox` (the durable
+//! event-bus Phase-2 hand-off buffer), and `bulk_jobs` (BLK-5 async bulk
+//! import/export) — and exposes [`Migrator`], which loco's CLI (`db
+//! migrate`) and the request-test harness run in order.
 
 // SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
 #![forbid(unsafe_code)]
@@ -17,6 +18,8 @@ mod m20220101_000003_merge_records;
 mod m20220101_000004_event_outbox;
 mod m20260719_000001_review_queue;
 mod m20260728_000001_integrity_digests;
+mod m20260803_000001_review_queue_provenance;
+mod m20260803_000002_bulk_jobs;
 
 /// The migration runner for this crate. Lists every migration in apply
 /// order; loco's CLI and the test harness drive it via `MigratorTrait`.
@@ -35,6 +38,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20220101_000004_event_outbox::Migration),
             Box::new(m20260719_000001_review_queue::Migration),
             Box::new(m20260728_000001_integrity_digests::Migration),
+            Box::new(m20260803_000001_review_queue_provenance::Migration),
+            Box::new(m20260803_000002_bulk_jobs::Migration),
             // inject-above (do not remove this comment)
         ]
     }

@@ -528,6 +528,9 @@ struct ReviewQueueItem {
     detection_method: String,
     /// Current review state.
     status: ReviewStatus,
+    /// How the pair was first surfaced (`operator` / `import` /
+    /// `matcher_suggested`; BLK-5).
+    provenance: String,
     /// Reviewer identity recorded by the decision endpoint, if decided.
     reviewed_by: Option<String>,
     /// When the pair was first queued.
@@ -546,6 +549,7 @@ fn review_row_to_item(row: &crate::models::review_queue::ReviewQueueRow) -> Revi
         match_quality: row.match_quality.clone(),
         detection_method: row.detection_method.clone(),
         status: parse_review_status(&row.status),
+        provenance: row.provenance.clone(),
         reviewed_by: row.reviewed_by.clone(),
         created_at: row.created_at,
         reviewed_at: row.reviewed_at,
@@ -621,6 +625,7 @@ async fn deduplicate(
                     detection_method: "batch_deduplication".to_string(),
                     score_breakdown: None,
                     status: review_status_token(ReviewStatus::Pending).to_string(),
+                    provenance: "operator".to_string(),
                 });
             }
         }

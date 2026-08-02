@@ -10,6 +10,9 @@
 pub mod _entities;
 /// Audit-trail recording and query helpers over the `audit_logs` entity.
 pub mod audit_logs;
+/// CRUD/status helpers over the `bulk_jobs` entity (BLK-5 async bulk
+/// import/export).
+pub mod bulk_jobs;
 /// Durable event-bus Phase-2 transactional-outbox write + relay helpers
 /// over the `event_outbox` entity (`OutboxInsert::from_envelope`,
 /// `insert_on`, `recent`, relay poll/ack).

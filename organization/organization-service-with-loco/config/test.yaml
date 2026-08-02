@@ -22,10 +22,11 @@ server:
   host: http://localhost
   # Out of the box middleware configuration. to disable middleware you can changed the `enable` field to `false` of comment the middleware block
   middlewares:
-    # See development.yaml (SEC-M1 explicit backstop).
+    # See development.yaml (SEC-M1 backstop, sized for BLK-5's 64mb
+    # bulk-import cap).
     limit_payload:
       enable: true
-      body_limit: 2mb
+      body_limit: 70mb
 
 # Worker Configuration
 workers:
