@@ -14,6 +14,13 @@ server:
   middlewares:
     static:
       enable: false
+    # Explicit backstop (SEC-M1) — no bulk/upload feature in this
+    # crate, so loco's own 2mb default is plenty for CRUD-shaped JSON;
+    # made explicit rather than implicit so it is visible in the file
+    # a deployer actually reads.
+    limit_payload:
+      enable: true
+      body_limit: 2mb
     # Permissive CORS so the SvelteKit dev server on :5173 can call
     # the API on :5150. Tighten or disable for production deployments
     # served from the same origin.

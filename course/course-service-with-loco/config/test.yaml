@@ -8,6 +8,10 @@ server:
   binding: localhost
   host: http://localhost
   middlewares:
+    # See development.yaml (SEC-M1 explicit backstop).
+    limit_payload:
+      enable: true
+      body_limit: 2mb
 
 workers:
   mode: ForegroundBlocking

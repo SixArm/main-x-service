@@ -8,6 +8,11 @@ server:
   port: 5151
   binding: 0.0.0.0
   host: http://localhost
+  middlewares:
+    # See development.yaml — must stay above `MAX_IMPORT_BYTES` (64mb).
+    limit_payload:
+      enable: true
+      body_limit: 70mb
 
 workers:
   mode: ForegroundBlocking

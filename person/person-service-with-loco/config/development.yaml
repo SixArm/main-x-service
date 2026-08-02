@@ -8,6 +8,15 @@ server:
   port: 5150
   binding: 0.0.0.0
   host: http://localhost
+  middlewares:
+    # `src/bulk/mod.rs::MAX_IMPORT_BYTES` (64mb) is the application's own
+    # cap on a bulk-import upload; this framework-level cap must sit
+    # above it with headroom for multipart overhead, or loco's own
+    # (much smaller) default silently 413s an upload the app would
+    # otherwise accept — see SEC-M1.
+    limit_payload:
+      enable: true
+      body_limit: 70mb
 
 workers:
   mode: BackgroundQueue

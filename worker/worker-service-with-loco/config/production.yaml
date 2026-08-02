@@ -13,9 +13,12 @@ server:
       enable: true
     etag:
       enable: true
+    # Explicit backstop (SEC-M1) — no bulk/upload feature in this
+    # crate; tightened from the previous 5mb to match the 2mb
+    # explicit elsewhere so dev/test/production agree.
     limit_payload:
       enable: true
-      body_limit: 5mb
+      body_limit: 2mb
     cors:
       enable: true
 

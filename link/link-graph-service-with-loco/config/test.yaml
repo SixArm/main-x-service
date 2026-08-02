@@ -12,6 +12,10 @@ server:
   port: 5160
   host: http://localhost
   middlewares:
+    # See development.yaml (SEC-M1 explicit backstop).
+    limit_payload:
+      enable: true
+      body_limit: 2mb
 
 # Worker Configuration
 workers:

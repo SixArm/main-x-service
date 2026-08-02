@@ -8,6 +8,11 @@ server:
   port: 5151
   binding: 0.0.0.0
   host: http://localhost
+  middlewares:
+    # See development.yaml (SEC-M1 explicit backstop).
+    limit_payload:
+      enable: true
+      body_limit: 2mb
 
 workers:
   mode: ForegroundBlocking

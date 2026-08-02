@@ -946,21 +946,70 @@
 
 ### F-input — unverified input, false matches & fuzzing (validators + matchers)
 
-- [~] **SEC-M1 (M) 🟠** Input-size caps. *(case + care-pathway + portfolio
-  validators done 2026-07-13; residuals below)* Per-field length +
-  array-cardinality caps in `validate`/`problems` → `422` **before** persist,
-  closing the O(n·m) Jaro-Winkler/Levenshtein/Jaccard DoS. **Done** (shared
-  caps `MAX_TEXT_LEN=1024` chars / `MAX_ARRAY_LEN=256` entries /
-  `MAX_ITEM_LEN=512` chars, incl. struct-array inner strings; false/oversized
-  unit tests + within-caps pin; each crate green): case, care-pathway,
-  portfolio, **organization** *(new `src/validation.rs`, done 2026-07-13)*,
-  **course** *(caps woven into `validate_course`/`validate_instance`, done
-  2026-07-14)*, and the **5 older axum services**
-  (person/worker/place/thing/event `validation/mod.rs` — each `<entity>_size_caps`
-  woven into `validate_<entity>`, done 2026-07-14). **Remaining:** only the
-  coarse `limit_payload` body-cap backstop on the uncapped loco configs (+
-  lower the others' 5 MB) — the config change carries loco-boot risk best
-  validated by running the app.
+- [x] **SEC-M1 (M) 🟠** Input-size caps. *(case + care-pathway + portfolio
+  validators done 2026-07-13; `limit_payload` backstop + a broken-production-config
+  sweep done 2026-08-02)* Per-field length + array-cardinality caps in
+  `validate`/`problems` → `422` **before** persist, closing the O(n·m)
+  Jaro-Winkler/Levenshtein/Jaccard DoS. Shared caps `MAX_TEXT_LEN=1024` chars
+  / `MAX_ARRAY_LEN=256` entries / `MAX_ITEM_LEN=512` chars, incl. struct-array
+  inner strings; false/oversized unit tests + within-caps pin; each crate
+  green): case, care-pathway, portfolio, **organization** *(new
+  `src/validation.rs`, done 2026-07-13)*, **course** *(caps woven into
+  `validate_course`/`validate_instance`, done 2026-07-14)*, and the **5 older
+  axum services** (person/worker/place/thing/event `validation/mod.rs` — each
+  `<entity>_size_caps` woven into `validate_<entity>`, done 2026-07-14).
+  **The `limit_payload` backstop (2026-08-02):** loco's own default
+  (`loco_rs::controller::middleware::limit_payload`) is a hardcoded 2MB and
+  is *always* active whether or not a service's config declares it — so a
+  config with no `limit_payload` key silently runs on 2MB, and a config that
+  declares a *smaller* framework cap than an application-level upload
+  feature silently breaks that feature before its own check ever runs. Two
+  real breaks found this way: person-service's 64MB bulk-import
+  (`src/bulk/mod.rs::MAX_IMPORT_BYTES`) was capped at 5MB in production/2MB
+  in dev+test; content-management-system's 25MB asset upload
+  (`src/controllers/assets.rs::DEFAULT_MAX_UPLOAD_BYTES`) was capped at 2MB
+  everywhere. Fixed by raising person to `70mb` and CMS to `30mb` (headroom
+  above their app-level caps) in all three environments, and adding an
+  explicit `2mb` backstop (formalizing, not changing, today's implicit
+  default) to the other 15 crates with a `config/` directory; worker/place/
+  thing/event's previous production-only `5mb` was tightened to the same
+  explicit `2mb` used elsewhere so all three environments agree. Verified by
+  booting person-service and content-management-system against their test
+  DBs and posting a 3MB body past the old implicit 2MB default (person:
+  reached the app's own 422 validation; CMS: reached the app's own 404
+  route logic) — neither hit a 413.
+  **Broken production.yaml discovery:** while adding the backstop, found 9
+  crates' local `config/production.yaml` contained **only** a `cache:`
+  block — no `server:`, `database:`, or `logger:` at all. loco's top-level
+  `Config` struct declares all three as required fields with no defaults
+  (`loco_rs::config::Config`), so a file in that shape could not have
+  deserialized in production: the service would fail to boot outright,
+  independent of any body-limit concern. Of the 9, this was a **real,
+  committed defect** for 3 — content-management-system,
+  contact-relationship-management, workforce-planning-management — whose
+  `config/production.yaml` is tracked in git and is what a deployment
+  actually clones; those are genuinely fixed by this change. The other 6 —
+  care-pathway, case, authentication, organization,
+  project-portfolio-management, patient-flow — `.gitignore` **every**
+  crate's `config/production.yaml` (`**/config/production.yaml`), so no
+  production config is committed for them at all; the empty-looking file
+  found locally was a stray, untracked scratch artifact, not something any
+  clone or deployment inherits — those 6 crates never shipped a broken file
+  because they never ship a file. Filled out anyway, for parity and in case
+  the local tree is itself used to deploy, but the fix does not appear in
+  `git status` and is **not part of this commit** for those 6; a real
+  deployment of those crates must still author its own `production.yaml`
+  from scratch (there is also no tracked `.example` template for any of
+  them to copy). Written to mirror each crate's own
+  development.yaml/test.yaml (same env-var names: `DATABASE_URL`,
+  `DB_CONNECT_TIMEOUT`, `DB_IDLE_TIMEOUT`, `DB_MIN_CONNECTIONS`,
+  `DB_MAX_CONNECTIONS`, `PORT`,
+  `HOST`, `JWT_SECRET`), plus the family's production middleware shape
+  (person-service's compression/etag/limit_payload/cors, reference) and an
+  SMTP-via-env mailer block. All 51 config files (17 crates × 3
+  environments) now parse as valid YAML with `logger`/`server`/`database`
+  present and an explicit `limit_payload`, verified with a Tera-placeholder
+  + PyYAML sweep.
 - [x] **SEC-M2 (M) 🟠** False-deterministic-match empty guards. *(done 2026-07-13)*
   A post-normalization empty/trivial-value guard added to every string-keyed
   deterministic short-circuit across **all 9 matchers**, each with a

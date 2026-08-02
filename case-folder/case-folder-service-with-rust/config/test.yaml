@@ -11,6 +11,10 @@ server:
   middlewares:
     static:
       enable: false
+    # See development.yaml (SEC-M1 explicit backstop).
+    limit_payload:
+      enable: true
+      body_limit: 2mb
 
 database:
   # Credentials match CI (.github/workflows/ci.yml `test-db`) and the

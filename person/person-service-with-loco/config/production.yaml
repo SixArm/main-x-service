@@ -13,9 +13,12 @@ server:
       enable: true
     etag:
       enable: true
+    # See development.yaml — must stay above `MAX_IMPORT_BYTES` (64mb):
+    # the previous 5mb here silently 413'd any bulk import over 5mb
+    # before it ever reached the application's own 64mb check.
     limit_payload:
       enable: true
-      body_limit: 5mb
+      body_limit: 70mb
     cors:
       enable: true
 

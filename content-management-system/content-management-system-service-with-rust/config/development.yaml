@@ -24,6 +24,16 @@ server:
   host: http://localhost
   # Out of the box middleware configuration. to disable middleware you can changed the `enable` field to `false` of comment the middleware block
   middlewares:
+    # `src/controllers/assets.rs::DEFAULT_MAX_UPLOAD_BYTES` (25mb,
+    # raisable via `CMS_MAX_UPLOAD_BYTES`) is the application's own cap
+    # on an asset upload; this framework-level cap must sit above it,
+    # with headroom for an operator raising `CMS_MAX_UPLOAD_BYTES`, or
+    # loco's own (much smaller) default silently 413s an upload the app
+    # would otherwise accept — see SEC-M1. Raise this too if
+    # `CMS_MAX_UPLOAD_BYTES` is ever raised past 30mb.
+    limit_payload:
+      enable: true
+      body_limit: 30mb
 
 # Worker Configuration
 workers:

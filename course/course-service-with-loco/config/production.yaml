@@ -13,6 +13,13 @@ server:
       enable: true
     etag:
       enable: true
+    # Explicit backstop (SEC-M1) — no bulk/upload feature in this
+    # crate, so loco's own 2mb default is plenty for CRUD-shaped JSON;
+    # made explicit rather than implicit so it is visible in the file
+    # a deployer actually reads.
+    limit_payload:
+      enable: true
+      body_limit: 2mb
 
 workers:
   mode: BackgroundQueue

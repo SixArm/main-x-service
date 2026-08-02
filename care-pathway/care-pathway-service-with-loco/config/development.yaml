@@ -24,6 +24,13 @@ server:
   host: http://localhost
   # Out of the box middleware configuration. to disable middleware you can changed the `enable` field to `false` of comment the middleware block
   middlewares:
+    # Explicit backstop (SEC-M1) — no bulk/upload feature in this
+    # crate, so loco's own 2mb default is plenty for CRUD-shaped JSON;
+    # made explicit rather than implicit so it is visible in the file
+    # a deployer actually reads.
+    limit_payload:
+      enable: true
+      body_limit: 2mb
 
 # Worker Configuration
 workers:
