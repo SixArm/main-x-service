@@ -35,11 +35,11 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 # Database (PostgreSQL ORM)
-sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-uuid", "with-json"] }
+sea-orm = { version = "2.0", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-uuid", "with-json"] }
 bigdecimal = { version = "0.4", features = ["serde"] }
 
 # Web Framework (Loco conventions; web/template tier removed)
-loco-rs = { version = "0.16.4", default-features = false, features = ["auth_jwt", "cli", "with-db", "cache_inmem", "bg_pg"] }
+loco-rs = { version = "1.0.1", default-features = false, features = ["auth", "cli", "with-db", "cache_inmem", "worker"] }
 migration = { path = "migration" }
 
 # Search Engine

@@ -7,6 +7,22 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Changed — loco-rs 1.0.1 (2026-08-02)
+
+- **loco-rs 0.16.4 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration →
+  2.0, sea-query → 1.0. Feature renames applied: `auth_jwt` → `auth`,
+  `bg_pg` → `worker`.
+- **4 raw `Statement` call sites** in `src/db/review_queue.rs` move to
+  the `_raw` variants — this crate's only hand-rolled SQL.
+- A `useless_conversion` in `src/db/outbox.rs` from a now-redundant
+  `.into()`.
+- No `EntityTrait`-import gap (`db/models.rs` glob-imports the sea-orm
+  prelude per-module, unlike person/place), no `BigDecimal`, no
+  `DatabaseConnection::Disconnected`, and the one table already keys
+  on `i64` — the smallest fallout of any person-style crate so far.
+- No behavioural change; verified with the full DB-gated suite (3
+  tests, unchanged count) against a freshly migrated Postgres 18.
+
 ### Added — key rotation and policy hot-reload without a restart (2026-08-01)
 
 AU-1, completing the five axum-style services (person was the reference).
