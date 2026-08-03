@@ -1,0 +1,158 @@
+# Runbook: link-graph reconciliation divergence
+
+The OPS-1 slice for link-graph-service's periodic integrity check —
+distinct from [`event-bus-outage-replay.md`](event-bus-outage-replay.md),
+which covers the *event-consumption* path that keeps the graph fresh in
+real time. Reconciliation is the check that catches what the event
+stream missed. See
+[`cross-service-linking.md`](../cross-service-linking.md) §5, §5.1, §8
+for the design.
+
+## What a reconciliation pass actually does
+
+Once per `LINK_GRAPH_RECONCILE_SECS` (default `300`s; a non-numeric or
+`0` value silently falls back to the default), **one independent worker
+per configured entity** (person, case — the only two with a live bulk
+`/links` endpoint today):
+
+1. Pulls that entity's authoritative edge set: `GET
+   LINK_GRAPH_RECONCILE_URL_<ENTITY>`, bearer `LINK_GRAPH_RECONCILE_TOKEN`
+   if set.
+2. Reads the local read-model, **scoped to that entity's `from_ref`
+   prefix only** (the SEC-B1 fix — an earlier version diffed the whole
+   graph against one entity's edges and each pass deleted the others').
+3. Diffs the two sets **by `edge_id` only** — an edge whose kind or
+   endpoints changed but keeps the same `edge_id` is not detected as
+   divergent.
+4. Sets the `link_graph_reconciliation_divergence` gauge to
+   `missing.len() + extra.len()`.
+5. Repairs: applies each `missing` edge (after validating it actually
+   belongs to that entity and that its kind permits that endpoint pair —
+   SEC-B7's second half; an edge that fails this check is skipped and
+   **stays counted as divergence**, on purpose), and **hard-deletes**
+   each `extra` edge from the read-model.
+
+None of this is transactional — each apply/delete is its own statement,
+and a mid-repair error leaves a partially-repaired graph.
+
+## The gauge has two sharp edges — know them before you trust a "0"
+
+`link_graph_reconciliation_divergence` is a **single, unlabelled gauge**.
+Both entity workers write the same metric name, so its value is
+"whatever the *most recently completed* pass of *either* entity found" —
+not a sum, not per-entity. A converged `case` pass can overwrite a
+diverging `person` pass's `47` with `0` a moment later, and you'd never
+know from the metric alone.
+
+It is also **only updated on a successful fetch**. A pass that fails
+(timeout, non-2xx, malformed JSON) leaves the gauge exactly where it
+was — a genuine `0` and a "hasn't run since boot" `0` look identical.
+The *only* per-pass signal, success or failure, is the log line (below).
+
+## Checks
+
+| Check | Where | What it tells you |
+|---|---|---|
+| Current divergence value | `GET /metrics.prom` → `link_graph_reconciliation_divergence` (public even under the guard) | Last successful pass's count, for *some* entity — see the caveat above |
+| Per-status edge counts | `GET /metrics.prom` → `link_graph_edges{status="verified\|unverified\|dangling"}` | Refreshed at scrape time from the DB; the `dangling` count is a leading indicator worth watching independent of divergence |
+| Event-consumption lag (a *different* concept) | `GET /api/health/freshness` | Bus lag, not reconciliation lag — a pass can be perfectly converged while this is stale, or vice versa |
+| Whether a pass ran and what happened | logs, `reconciliation pass complete` (info, carries `divergence=`) / `reconciliation pass failed` (warn, carries the error) | The only place a *failed* pass is visible at all |
+| Whether a source is even configured | boot log — a worker is spawned only when its `LINK_GRAPH_RECONCILE_URL_<ENTITY>` is set and passes the SEC-B7 check below | Silence from an entity can mean "converged" or "never configured" — check the env, not just the metric |
+
+There is **no** endpoint, task, or admin route to force a pass on
+demand, list the last-run time per entity, or see a pass/fail counter —
+confirmed absent, not merely undocumented. The only lever an operator
+has is restarting the process (which waits out the full
+`LINK_GRAPH_RECONCILE_SECS` again before the first pass, since the
+initial tick is deliberately skipped so boot isn't blocked) or
+restarting with a smaller interval temporarily.
+
+## Symptoms → checks → actions
+
+**"Divergence never reaches zero, and the same warning repeats every
+pass: `reconcile: rejecting an ill-typed or foreign-origin authoritative
+edge`."**
+This is SEC-B7's per-edge validation working as designed, not a bug: the
+source is returning an edge that either doesn't originate from that
+entity, or whose kind doesn't permit that endpoint-type pair (the closed
+§9 registry). It will never repair itself — the rejected edge is
+excluded from `missing` on every pass, forever. Fix the source data (or
+the registry, if the pairing should be permitted), not the aggregator.
+
+**"Divergence oscillates, or edges from other entities keep
+disappearing after each pass."**
+This is the historical SEC-B1 bug shape (fixed, but worth recognising if
+it recurs): reconciliation must be scoped to its own entity's edges. If
+you see this, something has regressed the scoping in
+`edges::Model::edge_ids_from_entity` — check that the fix is still in
+place before assuming it's a data problem.
+
+**"A source stopped reconciling — no warning, no error, nothing."**
+Check whether `LINK_GRAPH_RECONCILE_URL_<ENTITY>` names a non-loopback
+host with no `LINK_GRAPH_RECONCILE_TOKEN` set (SEC-B7's *source*
+half, distinct from the per-edge validation above): an unauthenticated
+pull from a remote host is refused at startup, logged once as
+`refusing an unauthenticated remote reconcile source: set
+LINK_GRAPH_RECONCILE_TOKEN (only a loopback URL may be token-less)`,
+and **no worker is spawned for that entity at all** — not a failing
+pass, an entity that was never configured to reconcile in the first
+place. `127.0.0.1`, `::1`, and `localhost` (case-insensitive) are the
+only URLs exempt from needing a token; anything else, including
+`127.0.0.2` or a hostname that happens to resolve to loopback, needs
+one.
+
+**"I set `LINK_GRAPH_RECONCILE_TOKEN`, but reconciliation still isn't
+happening against a real `<ENTITY>_REQUIRE_AUTH`-enforced peer."**
+The token has to be a **real PASETO** the target service's own ABAC
+policy grants `Action::Destructive` to (`access=admin` or `svc=true`
+in practice) — its bulk `/links` endpoint is gated as a privileged
+governed read (SEC-G1), not just any valid token. A shared secret that
+isn't a real, currently-valid, sufficiently-privileged token will fail
+the peer's *own* auth guard, which surfaces to link-graph as an ordinary
+`401`/`403` — collapsed into the same generic `reconciliation pass
+failed` warn as a network timeout. If in doubt, `curl` the peer's bulk
+endpoint yourself with the same token and see which HTTP status you
+actually get.
+
+**"A pass is failing and I can't tell why — the warn only says
+`reconciliation pass failed` with an opaque error."**
+Reproduce it directly: `curl -H "Authorization: Bearer $LINK_GRAPH_RECONCILE_TOKEN"
+<the configured URL>` and read the real status code and body. link-graph
+collapses a 401, a 404, a connection refusal, a timeout, and a malformed
+JSON response into the identical log line — there is no discriminating
+field, so the peer's own response is the fastest way to find out which
+one you're in.
+
+**"I need to force reconciliation right now, not wait for the timer."**
+There is no way to. Restart the process (accepting the first-tick skip,
+so the next real pass is still `LINK_GRAPH_RECONCILE_SECS` away), or
+temporarily lower `LINK_GRAPH_RECONCILE_SECS` and restart.
+
+## A worked example, if you want to see the mechanism before trusting it
+
+`link/link-graph-service-with-loco/tests/reconcile.rs`'s
+`reconcile_adds_missing_and_removes_extra` (DB-gated, `--ignored`) seeds
+the read-model with one edge, points a mock source at a different edge,
+asserts the initial divergence count, applies the repair via `GET
+/api/edges`, then re-runs and asserts the divergence is back to `0` —
+exactly the "converged — no divergence on re-run" check worth running
+by hand against a real pair of services if you're debugging a
+persistent, non-converging divergence and want to rule out the
+aggregator's own repair logic before looking at the data.
+
+## What this runbook cannot help you do
+
+- **See per-entity divergence.** The gauge is global across all
+  configured entities; if you need to know which entity is diverging,
+  you currently have to correlate against the `reconciliation pass
+  complete divergence=<n>` log lines' entity field yourself, pass by
+  pass.
+- **Force a pass, or see when one last ran.** No such control exists.
+- **Trust a `0` reading as proof reconciliation is healthy.** It proves
+  the *last completed* pass, for *some* entity, found nothing — check
+  the logs for actual pass activity before treating it as a clean bill
+  of health.
+
+These are real gaps, not just missing documentation — flag them as
+follow-up work if reconciliation ever becomes an operational concern
+rather than a background integrity check.

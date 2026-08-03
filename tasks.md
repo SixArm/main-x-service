@@ -1114,18 +1114,83 @@
   apps (contact-relationship-management, content-management-system,
   patient-flow, workforce-planning-management) follow the same shape
   under their own prefixes but were not swept.
-- [~] **OPS-1 (M)** Runbooks under `agents/share/runbooks/`: auth
+- [x] **OPS-1 (M)** Runbooks under `agents/share/runbooks/`: auth
   activation checklist (expand jwt-enforcement.md), key rotation,
   reconciliation-divergence response, event-bus outage/replay, bulk-job
   failure recovery. Each: symptoms → checks → actions → verification.
+
   **Partial (2026-07-27):**
   [`runbooks/integrity-activation.md`](agents/share/runbooks/integrity-activation.md)
   covers the integrity and audit controls — activation order and why it
   is an order, how to verify each step actually took effect, checkpoint
   storage, symptoms→checks→actions, and MAC-key rotation. Written because
   every control in that stack is **default-off**, so a deployment doing
-  nothing gets none of it. Still unwritten: PASETO key rotation,
-  reconciliation divergence, event-bus replay, bulk-job recovery.
+  nothing gets none of it.
+
+  **Done 2026-08-03** — the four remaining runbooks, each researched by
+  an independent code sweep (not written from the design docs' prose
+  alone) before being written, and each surfacing at least one real gap
+  or bug the runbook has to work around rather than paper over:
+
+  - [`runbooks/paseto-key-rotation.md`](agents/share/runbooks/paseto-key-rotation.md)
+    — found and fixed a **false claim** in
+    `authentication-service-with-loco/config/keys/README.md`: it said
+    peers refetch the key set "at their next boot **or on the first
+    `UnknownKid`**" — there is no such refetch-on-`UnknownKid` trigger
+    anywhere in `authentication-verifier` or any peer's `auth.rs`. A
+    peer only refreshes at boot or on its own `<ENTITY>_PASETO_KEYS_
+    REFRESH_SECS` timer (default 3600s; `0` disables it; unset
+    `<ENTITY>_PASETO_KEYS_URL` means never). The runbook's rotation
+    sequence is reordered around this: publish the new key as
+    *additional* first, wait out the slowest peer's refresh interval,
+    **then** promote it to primary — the crate README's original
+    2-step "promote + restart" sequence would 401 every peer that
+    hadn't yet polled. Also documents a real observability gap: no
+    endpoint or metric on any peer exposes which `kid`s it currently
+    holds.
+  - [`runbooks/reconciliation-divergence.md`](agents/share/runbooks/reconciliation-divergence.md)
+    — documents two sharp edges in the one divergence gauge link-graph
+    exports: it is **global across all configured entities** (person
+    and case both write the same unlabelled metric, so one entity's
+    convergence can mask another's ongoing divergence), and it is
+    **only updated on a successful pass** (a failed pass leaves the
+    gauge exactly where it was, so a genuine `0` and a "hasn't run
+    since boot" `0` are indistinguishable — the log line is the only
+    real signal). Confirms there is no endpoint, task, or admin route
+    to force a pass, list last-run time, or see a pass/fail counter.
+  - [`runbooks/event-bus-outage-replay.md`](agents/share/runbooks/event-bus-outage-replay.md)
+    — leads with the honest headline: **there is no replay** anywhere
+    in the family today (no CLI task, no admin endpoint, no documented
+    SQL procedure), despite several design docs using the word for this
+    rollout step. Documents three distinct ways an outbox row can be
+    marked "published" with nothing ever reaching a real broker
+    (`LoggingSink` misconfiguration, the relay not awaiting a broker
+    ack, and retention purging published-but-undelivered-in-truth rows
+    after `<ENTITY>_EVENT_RETENTION_DAYS`), and flags that the
+    consumer-side lag metric is likely reading near-zero for at least
+    one producer regardless of real lag, because that producer's
+    envelope doesn't carry `occurred_at` on the wire.
+  - [`runbooks/bulk-job-recovery.md`](agents/share/runbooks/bulk-job-recovery.md)
+    — states plainly that a `bulk_jobs` row can sit in `running`
+    forever if its worker process dies (no heartbeat, no staleness
+    check, loco's own queue reaper is off by default family-wide), that
+    `bulk_jobs` has no error-message column (the real failure reason
+    lives only in the log line), and draws the line the design doc
+    blurs between **stable-key upsert** (what makes re-submitting a
+    fixed file safe) and the **job-level `Idempotency-Key` header**
+    (what makes retrying a possibly-already-received HTTP request
+    safe) — two different mechanisms solving two different problems,
+    easy to conflate. Also restates organization/case's known
+    advisory-lock gap (SEC-B3) as an operational instruction: serialize
+    concurrent bulk imports against those two crates yourself.
+
+  All four follow the existing runbook's symptoms → checks → actions
+  shape and end with an explicit "what this runbook cannot help you
+  do" section — several real gaps (no per-kid key visibility, no
+  per-entity divergence metric, no replay tooling, no bulk-job
+  status/kind filter despite the design doc describing one) surfaced
+  by the research are documented as follow-up work rather than
+  silently designed around.
 
 - [ ] **TUT-1 (S)** `tutorials/01-getting-started.md` — run one service +
   front-end (uses DEP-1a). Every command copy-pasteable and verified.

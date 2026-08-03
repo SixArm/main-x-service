@@ -63,8 +63,19 @@ already-issued tokens valid, so there is no downtime.
 3. **Restart** the service. The key set now publishes both keys (new
    primary first, old key second). New tokens are signed by the new key;
    tokens signed by the old key still verify against the retained old
-   public key. Peers refresh the key set at their next boot or on the
-   first `UnknownKid` and trust both `kid`s.
+   public key.
+
+   **Peers do *not* refetch on the first `UnknownKid`.** There is no such
+   trigger in `authentication-verifier` or any peer's `auth.rs` — a peer
+   only picks up a changed key set at its own next **boot**, or at its
+   next `<ENTITY>_PASETO_KEYS_REFRESH_SECS` poll tick (default `3600`;
+   `0` disables the poll entirely; unset `<ENTITY>_PASETO_KEYS_URL` means
+   the peer never refetches at all and is stuck on whatever
+   `<ENTITY>_PASETO_KEYS` it booted with). Promoting the new key to
+   primary and immediately routing traffic through it can therefore 401
+   every peer that has not yet polled, for up to one refresh interval —
+   see [`runbooks/paseto-key-rotation.md`](../../../../agents/share/runbooks/paseto-key-rotation.md)
+   for the safer publish-as-additional-first sequencing this implies.
 4. **Wait** at least the max access-token lifetime (`TOKEN_EXPIRATION`,
    default `300` seconds) so every token signed by the old key has expired.
 5. **Retire** the old key: drop it from `TOKEN_ADDITIONAL_PUBLIC_KEYS` and
