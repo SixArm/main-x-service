@@ -16,6 +16,7 @@
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
     import { WorkerRepository } from "$lib/api/workers.js";
+    import LinksPanel from "$lib/components/LinksPanel.svelte";
     import type { Worker } from "$lib/api/types.js";
     import { t, tf } from "$lib/i18n.svelte.js";
 
@@ -131,6 +132,9 @@
             </ul>
         </section>
     {/if}
+
+    <!-- Cross-service edges (person / organization), not Worker.links. -->
+    <LinksPanel workerId={id} />
 {/if}
 
 <style>

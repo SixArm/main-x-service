@@ -57,6 +57,47 @@ test.describe("Worker front-end smoke", () => {
         await expect(page.getByRole("button", { name: /Find matches/ })).toBeVisible();
     });
 
+    // Pins: the worker detail page renders the cross-service links panel —
+    // its heading, the kind picker with both permitted kinds, and the
+    // empty state. Unlike the other smoke tests this one needs a worker to
+    // exist, so the two API calls the page makes are stubbed at the network
+    // layer rather than requiring a running Worker Service.
+    test("worker detail renders the cross-service links panel", async ({ page }) => {
+        const id = "0c4f1e2a-0000-4000-8000-000000000009";
+        await page.route("**/api/workers/**", async (route) => {
+            const envelope = route.request().url().includes("/links")
+                ? { success: true, data: [], error: null }
+                : {
+                      success: true,
+                      data: {
+                          id,
+                          name: { family: "Smith", given: ["John"] },
+                          gender: "male",
+                          active: true,
+                      },
+                      error: null,
+                  };
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify(envelope),
+            });
+        });
+
+        await page.goto(`/workers/${id}`);
+        await expect(
+            page.getByRole("heading", { name: "Cross-service links" }),
+        ).toBeVisible();
+        const kind = page.getByLabel("Link kind");
+        await expect(kind).toBeVisible();
+        await expect(kind.locator("option")).toHaveText([
+            "Same identity (→ person)",
+            "Employed by (→ organization)",
+        ]);
+        await expect(page.getByText("No cross-service links yet.")).toBeVisible();
+        await expect(page.getByRole("button", { name: "Assert link" })).toBeVisible();
+    });
+
     // Pins: the merge page renders its heading and both id inputs.
     test("merge form renders both ID inputs", async ({ page }) => {
         await page.goto("/workers/merge");

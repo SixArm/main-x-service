@@ -3,6 +3,8 @@ import type {
   AuditEntry,
   BatchDeduplicationRequest,
   BatchDeduplicationResponse,
+  CreateLinkRequest,
+  EntityLink,
   MatchRequest,
   MatchResult,
   MergeRequest,
@@ -177,6 +179,45 @@ export class WorkerRepository {
       `/api/workers/review-queue/${id}/decision`,
       { body: { status } },
     );
+  }
+
+  /**
+   * List this worker's active outbound cross-service links (newest first).
+   *
+   * These are `entity_links` edges to records in *other* services — not the
+   * within-service `Worker.links`.
+   *
+   * @throws {ApiError} `isNotFound` when the worker id is unknown.
+   */
+  listLinks(workerId: string): Promise<EntityLink[]> {
+    return this.http.get<EntityLink[]>(`/api/workers/${workerId}/links`);
+  }
+
+  /**
+   * Assert an outbound cross-service link from this worker. Idempotent
+   * server-side: re-asserting the same edge upserts rather than duplicating.
+   *
+   * @throws {ApiError} `isValidation` (422) when the kind/target pair is not
+   *   one worker may originate — `message` carries the server's reason.
+   */
+  createLink(
+    workerId: string,
+    request: CreateLinkRequest,
+  ): Promise<EntityLink> {
+    return this.http.post<EntityLink>(`/api/workers/${workerId}/links`, {
+      body: request,
+    });
+  }
+
+  /**
+   * Withdraw (soft-delete) one outbound link. The service replies with an
+   * empty envelope, so there is nothing to read back.
+   *
+   * @throws {ApiError} `isNotFound` when the link is unknown or already
+   *   withdrawn.
+   */
+  async deleteLink(workerId: string, linkId: string): Promise<void> {
+    await this.http.delete<unknown>(`/api/workers/${workerId}/links/${linkId}`);
   }
 
   /**

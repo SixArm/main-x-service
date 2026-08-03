@@ -12,6 +12,16 @@
 - [x] T-10: Merge UI with preview.
 - [x] T-11: Vitest unit tests for `ApiClient` + `WorkerRepository`.
 - [x] T-12: Playwright e2e smoke for every MVP route.
+- [x] T-23 (FE-2): Cross-service links panel on the worker detail route —
+  list / assert / withdraw the worker's outbound `entity_links` edges
+  (`GET`/`POST`/`DELETE /api/workers/{id}/links`). Only the two kinds
+  worker may originate are offered (`same_identity` → `person`,
+  `employed_by` → `organization`, where `role` is the job title), with a
+  client-side mirror of the service's `validate_edge` so a wrong target
+  type is caught before the `422`; the server's reason is still shown
+  inline when it is the one to refuse. Deliberately distinct from the
+  within-service `Worker.links`, which stays untouched (the partition
+  rule, [`cross-service-linking.md`](../../../agents/share/cross-service-linking.md) §7).
 - [ ] T-13: SSR-safe load functions using `event.fetch` for SEO-irrelevant but warm-cache wins.
 - [ ] T-14: Integrate Lily Headless components beyond Button (Dialog for merge confirm, Combobox for identifier system, Banner for error states).
 - [ ] T-15: Identifier / address / emergency-contact edit (currently read-only on detail; edit form re-PUTs whole record but no UI to add/remove sub-records).

@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { ApiClient } from "../../src/lib/api/client";
 import { WorkerRepository } from "../../src/lib/api/workers";
-import type { Worker } from "../../src/lib/api/types";
+import type { EntityLink, Worker } from "../../src/lib/api/types";
 
 // Cast a plain async impl to the structural `fetch` type for injection.
 function mockFetch(impl: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) {
@@ -26,6 +26,21 @@ const sampleWorker: Worker = {
     gender: "male",
     birth_date: "1980-01-15",
     active: true,
+};
+
+// A cross-service `same_identity` edge (worker → person), as the service's
+// `LinkView` serialises it.
+const personRef = "person:0c4f1e2a-0000-4000-8000-000000000000";
+const sampleLink: EntityLink = {
+    id: "e1",
+    from_ref: "worker:p1",
+    kind: "same_identity",
+    to_ref: personRef,
+    role: null,
+    confidence: 1,
+    provenance: "operator",
+    valid_from: null,
+    valid_to: null,
 };
 
 describe("WorkerRepository", () => {
@@ -78,5 +93,101 @@ describe("WorkerRepository", () => {
         const repo = new WorkerRepository(client);
         const result = await repo.search({ q: "Smith" });
         expect(result.total).toBe(42);
+    });
+
+    // Pins: the cross-service link endpoints — URL, method, and that the
+    // envelope's `data` is what the caller receives.
+    it("GETs the links sub-resource on listLinks", async () => {
+        let capturedUrl = "";
+        let capturedMethod = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input, init) => {
+                capturedUrl = String(input);
+                capturedMethod = init?.method ?? "";
+                return jsonResponse({ success: true, data: [sampleLink], error: null });
+            }),
+        });
+        const repo = new WorkerRepository(client);
+        const links = await repo.listLinks("p1");
+        expect(capturedMethod).toBe("GET");
+        expect(capturedUrl).toContain("/api/workers/p1/links");
+        expect(links).toHaveLength(1);
+        expect(links[0]?.to_ref).toBe(personRef);
+    });
+
+    // Pins: createLink POSTs the edge body to the worker's links collection.
+    it("POSTs the edge body on createLink", async () => {
+        let capturedUrl = "";
+        let capturedMethod = "";
+        let capturedBody = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input, init) => {
+                capturedUrl = String(input);
+                capturedMethod = init?.method ?? "";
+                capturedBody = init?.body as string;
+                return jsonResponse({ success: true, data: sampleLink, error: null });
+            }),
+        });
+        const repo = new WorkerRepository(client);
+        const created = await repo.createLink("p1", {
+            kind: "same_identity",
+            to_ref: personRef,
+            confidence: 1,
+        });
+        expect(capturedMethod).toBe("POST");
+        expect(capturedUrl).toContain("/api/workers/p1/links");
+        expect(JSON.parse(capturedBody)).toMatchObject({
+            kind: "same_identity",
+            to_ref: personRef,
+            confidence: 1,
+        });
+        expect(created.id).toBe("e1");
+    });
+
+    // Pins: deleteLink DELETEs the per-edge path and tolerates the
+    // service's empty `{}` success envelope (there is nothing to read).
+    it("DELETEs the per-link path on deleteLink", async () => {
+        let capturedUrl = "";
+        let capturedMethod = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input, init) => {
+                capturedUrl = String(input);
+                capturedMethod = init?.method ?? "";
+                return jsonResponse({ success: true, data: {}, error: null });
+            }),
+        });
+        const repo = new WorkerRepository(client);
+        await expect(repo.deleteLink("p1", "e1")).resolves.toBeUndefined();
+        expect(capturedMethod).toBe("DELETE");
+        expect(capturedUrl).toContain("/api/workers/p1/links/e1");
+    });
+
+    // Pins: a 422 from the edge validator surfaces as an ApiError carrying
+    // the service's human-readable reason, which the panel shows inline.
+    it("surfaces a 422 edge-validation reason from createLink", async () => {
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async () =>
+                jsonResponse(
+                    {
+                        success: false,
+                        data: null,
+                        error: {
+                            code: "VALIDATION_ERROR",
+                            message:
+                                "edge kind `same_identity` does not permit worker → organization",
+                        },
+                    },
+                    422,
+                ),
+            ),
+        });
+        const repo = new WorkerRepository(client);
+        await expect(
+            repo.createLink("p1", { kind: "same_identity", to_ref: "organization:x" }),
+        ).rejects.toMatchObject({ status: 422, code: "VALIDATION_ERROR" });
     });
 });

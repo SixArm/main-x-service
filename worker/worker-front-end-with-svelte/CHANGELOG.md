@@ -9,6 +9,37 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — cross-service links panel (2026-08-03, FE-2)
+
+- The worker detail route gains a **Cross-service links** panel
+  (`src/lib/components/LinksPanel.svelte`): it lists the worker's active
+  outbound `entity_links` edges, lets an operator assert a new one, and
+  withdraws one behind a `confirm()`. These are edges to records in
+  *other* services — not the within-service `Worker.links`, which is
+  untouched.
+- Only the two kinds the service permits a worker to originate are
+  offered: `same_identity` (→ a `person` record, the federation
+  backbone) and `employed_by` (→ an `organization`, where `role` is the
+  job title). Optional `confidence`, `provenance`, `valid_from` and
+  `valid_to` are exposed; blank `provenance` defaults to `operator`
+  server-side.
+- `src/lib/api/links.ts` mirrors the service's `validate_edge` as pure
+  functions (`checkToRef`, `checkConfidence`), so a malformed URN or a
+  wrong target type is explained inline instead of coming back as a 422.
+  The server stays the authority — an unanticipated 422's reason string
+  is surfaced verbatim.
+- Repository gains `listLinks()` / `createLink()` / `deleteLink()`;
+  types gain `EntityLink`, `CreateLinkRequest`, `WorkerEdgeKind`, and
+  `EntityRefUrn`.
+- i18n: 32 new `links.*` keys across all 13 locales. The `provenance`
+  placeholder is deliberately left untranslated — `operator` is the
+  literal value the service stores, not UI prose.
+- Tests: `tests/unit/links-validation.test.ts` pins the accept/reject
+  matrix against the Rust `validate_edge` cases; `tests/unit/workers.test.ts`
+  pins the three endpoint URLs, methods, and the 422 reason path; the e2e
+  smoke spec stubs the two API calls at the network layer so the panel is
+  asserted without a running service.
+
 ### Added — drag-to-decide review board (2026-07-19)
 
 - 2026-07-19 — `/review` now loads the **stored** review queue on mount

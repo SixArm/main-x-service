@@ -395,11 +395,7 @@ export interface BatchDeduplicationResponse {
 }
 
 /** Status of a {@link ReviewQueueItem} as an operator works through it. */
-export type ReviewStatus =
-  | "pending"
-  | "confirmed"
-  | "rejected"
-  | "automerged";
+export type ReviewStatus = "pending" | "confirmed" | "rejected" | "automerged";
 
 /** One candidate-duplicate pair awaiting (or having had) operator review. */
 export interface ReviewQueueItem {
@@ -466,4 +462,74 @@ export interface AuditEntry {
   new_values?: unknown;
   /** When the change happened (ISO 8601). */
   created_at: string;
+}
+
+// ─── Cross-service links ─────────────────────────────────────────────
+
+/**
+ * An `EntityRef` URN naming a record in another service, e.g.
+ * `person:0c4f1e2a-…` or `organization:9a2f-…`. See
+ * `agents/share/cross-service-linking.md` §3.
+ */
+export type EntityRefUrn = string;
+
+/**
+ * The cross-service edge kinds a **worker** may originate (the service's
+ * `PERMITTED_KINDS`, cross-service-linking §9):
+ *
+ * - `same_identity` — this worker is the same human as a `person` record
+ *   (the federation backbone; either side may assert it).
+ * - `employed_by` — this worker is employed by an `organization`; the
+ *   edge's `role` carries the job title.
+ *
+ * Distinct from {@link LinkType} / {@link WorkerLink}, which are
+ * *within-service* worker↔worker references.
+ */
+export type WorkerEdgeKind = "same_identity" | "employed_by";
+
+/**
+ * A stored cross-service edge as returned by the service (`LinkView`).
+ * Named `EntityLink` to avoid colliding with the within-service
+ * {@link WorkerLink}.
+ */
+export interface EntityLink {
+  /** The edge id (also the `linked` event's `edge_id`). */
+  id: string;
+  /** This worker as an `EntityRef` URN (`worker:<id>`). */
+  from_ref: EntityRefUrn;
+  /** The edge kind token. */
+  kind: string;
+  /** The far record's `EntityRef` URN. */
+  to_ref: EntityRefUrn;
+  /** Role label — the job title on an `employed_by` edge. */
+  role?: string | null;
+  /** Confidence in `[0.0, 1.0]`; 1.0 for an operator assertion. */
+  confidence?: number | null;
+  /** How the edge was asserted (`operator`, `import`, …). */
+  provenance: string;
+  /** Validity start (`YYYY-MM-DD`). */
+  valid_from?: string | null;
+  /** Validity end (`YYYY-MM-DD`) — a "former" affiliation. */
+  valid_to?: string | null;
+}
+
+/**
+ * Body of `POST /api/workers/{id}/links`. Everything but `kind` and
+ * `to_ref` is optional; `provenance` defaults to `operator` server-side.
+ */
+export interface CreateLinkRequest {
+  /** The edge kind to assert. */
+  kind: WorkerEdgeKind;
+  /** The far record's `EntityRef` URN (target type is kind-specific). */
+  to_ref: EntityRefUrn;
+  /** Job title, for an `employed_by` edge. */
+  role?: string | null;
+  /** Confidence in `[0.0, 1.0]`. */
+  confidence?: number | null;
+  /** Provenance override; blank/omitted ⇒ `operator`. */
+  provenance?: string | null;
+  /** Validity start (`YYYY-MM-DD`). */
+  valid_from?: string | null;
+  /** Validity end (`YYYY-MM-DD`). */
+  valid_to?: string | null;
 }
