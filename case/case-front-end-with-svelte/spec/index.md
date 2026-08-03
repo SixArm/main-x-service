@@ -82,7 +82,25 @@ Cross-cutting UI rule for every `*-front-end-with-svelte` app:
    to it, and reads merge timestamps from the history below. That history
    is `GET /api/cases/merges/recent` (newest first, service-capped at
    100), rendered as merged-at / main / duplicate / reason / actor.
-10. Layout shell: global navigation is a full-width **top bar** (header)
+10. Cross-service links — "subject of this case" (detail route): list,
+   assert, and withdraw the `subject_of` (case → person) edges this case
+   originates (`GET`/`POST`/`DELETE /api/cases/{pid}/links`). Case
+   originates exactly **one** edge kind
+   ([`../../../agents/share/cross-service-linking.md`](../../../agents/share/cross-service-linking.md)
+   §9), so the panel offers **no kind picker** — `kind` is fixed to
+   `subject_of` and any other value is a service-side `422`. The edge is
+   **high-sensitivity** (§10 of that doc): it asserts that a named person
+   is the subject of a governmental case, is authorised at the same level
+   as reading the case, and is audited on every write. The UI reflects
+   that — a plainly-labelled section with an explanatory note rather than
+   a casual inline control, and an explicit `confirm()` naming the person
+   reference before a withdrawal. A pure `validateLink` guard mirrors the
+   service's `validate_edge` (person `EntityRef` URN shape; confidence in
+   `[0,1]`) so an obviously-doomed request states its reason locally, in
+   the operator's own locale. Server rejections are surfaced inline from
+   loco's `ErrorDetail.description` (the `error` field carries the machine
+   code `validation`, not the reason).
+11. Layout shell: global navigation is a full-width **top bar** (header)
    with a **hamburger** toggle on narrow viewports — NOT a left sidebar —
    and the main content area is **full-width**.
 
@@ -113,6 +131,14 @@ calling the service; no token is read or attached in browser JS.
 | `/[pid]/edit` | `PUT /api/cases/{pid}` |
 | `/merge` submit | `POST /api/cases/merge` |
 | `/merge` history | `GET /api/cases/merges/recent` |
+| `/[pid]` links list | `GET /api/cases/{pid}/links` |
+| `/[pid]` link assert | `POST /api/cases/{pid}/links` |
+| `/[pid]` link withdraw | `DELETE /api/cases/{pid}/links/{id}` |
+
+The privileged cross-case dump `GET /api/cases/links` (the aggregator's
+reconciliation pull, gated as a destructive governed read) is deliberately
+**not** consumed here — an operator UI has no use for every `subject_of`
+edge in the service at once.
 
 ## 10. Persistence
 
@@ -155,6 +181,10 @@ access/audit requirements.
 - [x] Merge UI (`/merge`): merge form + preview + recent merge history,
   `CaseRepository.merge()` / `recentMerges()`, the pure `validateMerge`
   guard, 13-locale strings, unit + smoke tests.
+- [x] Cross-service links panel on `/[pid]` (FE-2): list / assert /
+  withdraw `subject_of` edges, `CaseRepository.listLinks()` /
+  `createLink()` / `deleteLink()`, the pure `validateLink` guard,
+  13-locale strings, unit + smoke tests.
 - [ ] `Custom(label)` editing for case type / status / schemes.
 - [ ] Search box once the service ships search.
 - [x] Auth — adopt BFF + httpOnly cookie + CSRF; remove

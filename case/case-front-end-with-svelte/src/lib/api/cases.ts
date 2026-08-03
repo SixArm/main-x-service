@@ -6,6 +6,8 @@ import type { Page, PageRequest } from "./client";
 import type {
   Case,
   CaseRef,
+  CreateLinkRequest,
+  EntityLink,
   MergeRecordRow,
   MergeRequest,
   MergeResponse,
@@ -123,5 +125,55 @@ export class CaseRepository {
    */
   recentMerges(): Promise<MergeRecordRow[]> {
     return this.http.get<MergeRecordRow[]>("/api/cases/merges/recent");
+  }
+
+  /**
+   * This case's active outbound cross-service links, newest first.
+   * `GET /api/cases/{pid}/links`.
+   *
+   * Governed: the service authorises this at the same level as reading
+   * the case itself (cross-service-linking §10), so a caller who may not
+   * read the case never learns the edge exists.
+   *
+   * @param casePid Persistent id of the case (URL-encoded into the path).
+   * @returns The active {@link EntityLink} rows.
+   */
+  listLinks(casePid: string): Promise<EntityLink[]> {
+    return this.http.get<EntityLink[]>(
+      `/api/cases/${encodeURIComponent(casePid)}/links`,
+    );
+  }
+
+  /**
+   * Assert an outbound link from this case. `POST /api/cases/{pid}/links`.
+   * The only kind a case may originate is `subject_of` → person; anything
+   * else is a `422`.
+   *
+   * Idempotent server-side on `(from_pid, kind, to_ref, valid_from)`, so
+   * re-asserting the same edge refreshes it rather than duplicating it.
+   *
+   * @param casePid Persistent id of the case (URL-encoded into the path).
+   * @param request The edge to assert.
+   * @returns The stored {@link EntityLink}.
+   */
+  createLink(casePid: string, request: CreateLinkRequest): Promise<EntityLink> {
+    return this.http.post<EntityLink>(
+      `/api/cases/${encodeURIComponent(casePid)}/links`,
+      { body: request },
+    );
+  }
+
+  /**
+   * Withdraw (soft-delete) one outbound link.
+   * `DELETE /api/cases/{pid}/links/{id}`. The service returns an empty
+   * JSON object, hence `void`.
+   *
+   * @param casePid Persistent id of the case.
+   * @param linkId The edge id to withdraw.
+   */
+  deleteLink(casePid: string, linkId: string): Promise<void> {
+    return this.http.delete(
+      `/api/cases/${encodeURIComponent(casePid)}/links/${encodeURIComponent(linkId)}`,
+    );
   }
 }

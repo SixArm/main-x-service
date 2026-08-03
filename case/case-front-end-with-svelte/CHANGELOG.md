@@ -8,6 +8,34 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — cross-service links panel (FE-2, 2026-08-03)
+
+- **"Subject of this case" panel** on the detail route (`/[pid]`):
+  lists, asserts, and withdraws the `subject_of` (case → person) edges
+  this case originates, via `GET`/`POST`/`DELETE
+  /api/cases/{pid}/links`. Case originates exactly one edge kind, so
+  there is **no kind picker** — `kind` is fixed to `subject_of`.
+- **Sensitivity-aware presentation.** The edge asserts that a named
+  person is the subject of a governmental case
+  (`agents/share/cross-service-linking.md` §10): a plainly-labelled
+  section with an explanatory note, and a `confirm()` that names the
+  person reference being retracted before a withdrawal.
+- **`CaseRepository.listLinks()` / `createLink()` / `deleteLink()`**,
+  with `EntityLink` / `CreateLinkRequest` types and the `SUBJECT_OF`
+  constant.
+- **Pure `validateLink` guard** (`src/lib/components/link-validation.ts`)
+  mirroring the service's `validate_edge`: a person `EntityRef` URN
+  (`person:<uuid>`) and a confidence in `[0,1]`. Returns an i18n key, so
+  the message renders in the operator's locale.
+- **Server errors surfaced from `description`, not `error`.** Loco's
+  `ErrorDetail` puts the machine code (`validation`) in `error` and the
+  reason in `description`; the shared client's generic extractor prefers
+  `error`, so the panel reaches past it — an operator sees why the edge
+  was refused rather than the word "validation".
+- **24 new i18n keys across all 13 locales**, plus unit tests
+  (`link-validation`, repository URL pins, links-block catalog coverage
+  including the `{ref}` placeholder) and a Playwright smoke assertion.
+
 ### Added — record-merge UI (2026-08-03)
 
 - **`/merge` route** (nav-linked): merge a confirmed duplicate case into a

@@ -195,6 +195,68 @@ export interface MergeRecordRow {
 }
 
 /**
+ * The one cross-service edge kind a case may originate: "this case is
+ * about this person" (`agents/share/cross-service-linking.md` §9). The
+ * service rejects every other kind with `422`, so the UI fixes it rather
+ * than offering a choice.
+ */
+export const SUBJECT_OF = "subject_of";
+
+/**
+ * A stored cross-service link (edge) as returned by the case service's
+ * link endpoints — the `LinkView` projection in
+ * `src/controllers/links.rs`. Bare JSON, no envelope.
+ *
+ * These edges are **high-sensitivity** (design §10): the existence of a
+ * `subject_of` edge asserts that a named person is the subject of a
+ * governmental case, so reading and writing one is authorised at the
+ * same level as reading the case itself.
+ */
+export interface EntityLink {
+  /** The edge id (also the `edge_id` on the emitted `linked` event). */
+  id: string;
+  /** This case as an EntityRef URN, i.e. `case:<pid>`. */
+  from_ref: string;
+  /** The edge kind token; always `subject_of` for a case-originated edge. */
+  kind: string;
+  /** The far record's EntityRef URN, i.e. `person:<uuid>`. */
+  to_ref: string;
+  /** Optional role label — unused by `subject_of`. */
+  role: string | null;
+  /** Optional operator confidence in `[0,1]`; `1.0` is an assertion. */
+  confidence: number | null;
+  /** Where the assertion came from; defaults server-side to `operator`. */
+  provenance: string;
+  /** Optional validity start (ISO `YYYY-MM-DD`). */
+  valid_from: string | null;
+  /** Optional validity end (ISO `YYYY-MM-DD`) — a withdrawn affiliation. */
+  valid_to: string | null;
+}
+
+/**
+ * Request body of `POST /api/cases/{pid}/links`. Only `to_ref` is
+ * required; `kind` is fixed to {@link SUBJECT_OF} because that is the
+ * only edge a case may originate, and `provenance` defaults to
+ * `operator` server-side when omitted or blank.
+ */
+export interface CreateLinkRequest {
+  /** The edge kind — always `subject_of` from a case. */
+  kind: typeof SUBJECT_OF;
+  /** The person's EntityRef URN, `person:<uuid>`. */
+  to_ref: string;
+  /** Optional role label; omitted for `subject_of`. */
+  role?: string | null;
+  /** Optional confidence in `[0,1]`. */
+  confidence?: number | null;
+  /** Optional provenance override (`operator` when omitted). */
+  provenance?: string | null;
+  /** Optional validity start (ISO `YYYY-MM-DD`). */
+  valid_from?: string | null;
+  /** Optional validity end (ISO `YYYY-MM-DD`). */
+  valid_to?: string | null;
+}
+
+/**
  * A scored duplicate candidate from `/check-duplicates`: a {@link CaseRef}
  * plus the matcher's verdict.
  */

@@ -87,6 +87,30 @@ describe("i18n catalog", () => {
         }
     });
 
+    it("covers the cross-service links panel keys in every locale", () => {
+        const linkKeys = STRING_KEYS.filter((k) => k.startsWith("links."));
+        // The panel is a whole section of the detail route; a partial
+        // catalog would render raw keys next to sensitive data.
+        expect(linkKeys.length).toBeGreaterThan(20);
+        for (const locale of LOCALES) {
+            for (const key of linkKeys) {
+                expect(
+                    STRINGS_BY_LOCALE[locale][key],
+                    `${locale} missing ${key}`,
+                ).toBeTruthy();
+            }
+        }
+        // The withdraw prompt keeps the placeholder the panel substitutes;
+        // losing it would confirm a sensitive withdrawal without naming
+        // which person reference is being retracted.
+        for (const locale of LOCALES) {
+            expect(
+                translate("links.withdrawConfirm", locale),
+                `${locale} withdraw confirm missing {ref}`,
+            ).toContain("{ref}");
+        }
+    });
+
     it("falls back to English then to the key", () => {
         // A locale not present falls back to English.
         expect(translate("form.save", "xx" as unknown as Locale)).toBe(

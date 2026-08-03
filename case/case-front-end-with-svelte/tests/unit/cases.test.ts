@@ -113,4 +113,52 @@ describe("CaseRepository", () => {
     expect(calls[0]?.init.method).toBe("GET");
     expect(calls[0]?.url).toBe("http://svc.test/api/cases/merges/recent");
   });
+
+  // Cross-service links (`subject_of`, case → person). The per-case link
+  // paths are nested under the case pid; the bulk `/api/cases/links` dump
+  // is a different, privileged endpoint this repository deliberately does
+  // not expose, so these pins also guard against collapsing the two.
+  it("listLinks() GETs the case's links", async () => {
+    const { repo, calls } = spyClient();
+    await repo.listLinks("p1");
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe("http://svc.test/api/cases/p1/links");
+  });
+
+  it("createLink() POSTs the edge with kind fixed to subject_of", async () => {
+    const { repo, calls } = spyClient();
+    await repo.createLink("p1", {
+      kind: "subject_of",
+      to_ref: "person:0c4f1e2a-0000-4000-8000-000000000000",
+      confidence: 1,
+      provenance: null,
+      valid_from: null,
+      valid_to: null,
+    });
+    expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.url).toBe("http://svc.test/api/cases/p1/links");
+    expect(calls[0]?.init.body).toBe(
+      JSON.stringify({
+        kind: "subject_of",
+        to_ref: "person:0c4f1e2a-0000-4000-8000-000000000000",
+        confidence: 1,
+        provenance: null,
+        valid_from: null,
+        valid_to: null,
+      }),
+    );
+  });
+
+  it("deleteLink() DELETEs the edge under the case", async () => {
+    const { repo, calls } = spyClient();
+    await repo.deleteLink("p1", "e1");
+    expect(calls[0]?.init.method).toBe("DELETE");
+    expect(calls[0]?.url).toBe("http://svc.test/api/cases/p1/links/e1");
+  });
+
+  it("link paths URL-encode both the pid and the link id", async () => {
+    const { repo, calls } = spyClient();
+    await repo.deleteLink("a/b", "c d");
+    expect(calls[0]?.url).toBe("http://svc.test/api/cases/a%2Fb/links/c%20d");
+  });
 });

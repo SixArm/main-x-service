@@ -15,6 +15,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { CaseRepository } from "$lib/api/cases";
+  import LinksPanel from "$lib/components/LinksPanel.svelte";
   import type { Case, ScoredRef } from "$lib/api/types";
   import { t } from "$lib/i18n.svelte";
 
@@ -149,4 +150,12 @@
       </ul>
     {/if}
   {/if}
+
+  <!--
+    Cross-service links: the `subject_of` (case → person) edges this case
+    asserts. Deliberately a plain, labelled section at the foot of the
+    record rather than an inline control — the edge is high-sensitivity
+    (cross-service-linking §10) and asserting one is a considered act.
+  -->
+  <LinksPanel casePid={pid} />
 {/if}

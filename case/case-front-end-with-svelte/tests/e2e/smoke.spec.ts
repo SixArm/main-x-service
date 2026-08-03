@@ -52,6 +52,27 @@ async function stubApi(page: Page) {
         json: { main_pid: PID, duplicate_pid: PID, main: CASE },
       });
     }
+    // Cross-service links (`subject_of`) on the detail route. Empty by
+    // default so the panel renders its empty state; a POST echoes back a
+    // stored edge.
+    if (path === `/api/cases/${PID}/links` && method === "GET") {
+      return route.fulfill({ json: [] });
+    }
+    if (path === `/api/cases/${PID}/links` && method === "POST") {
+      return route.fulfill({
+        json: {
+          id: "edge-1",
+          from_ref: `case:${PID}`,
+          kind: "subject_of",
+          to_ref: "person:0c4f1e2a-0000-4000-8000-000000000000",
+          role: null,
+          confidence: 1.0,
+          provenance: "operator",
+          valid_from: null,
+          valid_to: null,
+        },
+      });
+    }
     if (path === `/api/cases/${PID}` && method === "GET") {
       return route.fulfill({ json: CASE });
     }
@@ -88,6 +109,25 @@ test("detail page renders the fetched case", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Housing benefit appeal" }),
   ).toBeVisible();
+});
+
+// Pins: the detail route carries the cross-service links panel — the
+// `subject_of` (case → person) section. With no edges stubbed it shows its
+// empty state and the record-a-subject form.
+test("detail page shows the subject-of links panel", async ({ page }) => {
+  await page.goto(`/${PID}`, { waitUntil: "networkidle" });
+  await expect(
+    page.getByRole("heading", { name: "Subject of this case" }),
+  ).toBeVisible();
+  await expect(page.getByTestId("links-to-ref")).toBeVisible();
+  await expect(page.getByTestId("links-empty")).toHaveText(
+    "No subject recorded yet.",
+  );
+  // The panel never offers a kind picker: a case may originate only
+  // `subject_of`, so the kind is fixed rather than chosen.
+  await expect(page.getByTestId("links-panel").locator("select")).toHaveCount(
+    0,
+  );
 });
 
 // Pins: the edit route loads the case and renders the edit form.
