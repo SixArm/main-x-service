@@ -253,14 +253,30 @@ don't know the transport.
    feature-gated, `#[ignore]`d round-trip test is verified by compiling
    under `--features fluvio`, not by an actual execution — the "Fluvio
    test container" this step originally envisioned remains a follow-up,
-   tracked as BUS-2/BUS-3.)*
+   tracked as BUS-3.)*
 4. **Flip `<ENTITY>_EVENT_TRANSPORT=outbox`** per service in deployment;
-   stand up consumers (search re-indexer first).
+   stand up consumers (search re-indexer first). *(The first real
+   consumer landed 2026-08-03, BUS-2, in **link-graph-service** — the §9
+   aggregator, ahead of a search re-indexer: one task per entity topic,
+   behind a `fluvio` feature, calling a new `apply_event_idempotent`
+   (dedup on `event_id` via a new `processed_events` table). Resume
+   position is delegated to Fluvio's own named-consumer offset
+   management rather than reconstructed in Postgres — see
+   `link-graph-service-with-loco/spec/10-persistence.md` §10.3 for the
+   full reasoning. Only **case** has `FluvioSink` wired today (BUS-1),
+   so the other nine topics currently see no traffic; the consumer for
+   them is live but idle until BUS-3 rolls the producer side out
+   further.)*
 5. Adopt per entity in spec-priority order; the in-memory default means
    un-migrated crates keep working throughout.
 
 ## 9. Consumers (initial set)
 
+- **Cross-service link aggregator** ([link-graph-service](../../link/link-graph-service-with-loco))
+  — **landed 2026-08-03, BUS-2**, the first real consumer in the family.
+  See [cross-service-linking.md](cross-service-linking.md) §4.3 for its
+  role and `link-graph-service-with-loco/src/consumer.rs` for the
+  implementation.
 - **Search re-indexer** — keeps Tantivy in sync with DB writes via the
   stream instead of inline indexing; replayable for full rebuilds.
 - **Cross-entity cache invalidation** — e.g. a place address change
