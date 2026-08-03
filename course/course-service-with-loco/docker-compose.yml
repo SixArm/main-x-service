@@ -1,8 +1,11 @@
 # Compose file — read transparently by `podman compose up`.
 #
-# Brings up Postgres + course-service for local development. The
-# Dockerfile references its sibling course-matcher-rust-crate via the
-# build context, so this file is invoked from the repo root.
+# Brings up Postgres + course-service for local development. Build
+# context is the REPOSITORY ROOT (two levels up from this file), not
+# this directory — the Dockerfile COPYs in sibling path dependencies
+# (integrity-mac, authentication-verifier) that live outside course/.
+# Run `podman compose up -d` from this directory; compose resolves
+# `context: ../..` relative to this file.
 
 services:
   postgres:
@@ -17,7 +20,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5434}:5432"
     volumes:
-      - course_postgres_data:/var/lib/postgresql/data
+      - course_postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-course_user} -d ${POSTGRES_DB:-course}"]
       interval: 10s
@@ -28,8 +31,8 @@ services:
 
   course-service:
     build:
-      context: ..
-      dockerfile: course-service-with-loco/Dockerfile
+      context: ../..
+      dockerfile: course/course-service-with-loco/Dockerfile
     container_name: course-service
     restart: unless-stopped
     depends_on:
@@ -40,10 +43,15 @@ services:
       DATABASE_MAX_CONNECTIONS: 10
       DATABASE_MIN_CONNECTIONS: 2
       SERVER_HOST: 0.0.0.0
-      SERVER_PORT: 8080
+      SERVER_PORT: 8080  # inert for loco boot; PORT (below) is what loco reads
+      PORT: 8080
       SEARCH_INDEX_PATH: /app/data/search_index
       MATCHING_THRESHOLD: 0.85
       RUST_LOG: info
+      # Required by loco's config schema (auth.jwt.secret has no
+      # default); unused by this crate's actual auth flow, which is
+      # offline PASETO verification (see agents/share/jwt.md).
+      JWT_SECRET: ${JWT_SECRET:-dev-only-unused-jwt-secret}
     ports:
       - "${COURSE_SERVICE_PORT:-8084}:8080"
     networks:

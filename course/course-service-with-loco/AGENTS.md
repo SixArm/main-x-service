@@ -54,3 +54,41 @@ Shared reference docs live at the project root under
 | OpenAPI | served at `/swagger-ui` + `/api-docs/openapi.json` (T-14) |
 | Metrics | `src/metrics.rs` (process-wide Prometheus registry, `OnceLock`); served at root `/metrics.prom` via `metrics_routes()` in `src/api/rest/mod.rs` (T-16) |
 | Migrations | `migrations/` |
+
+## Container image
+
+`Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's
+production image. **Build context must be the repository root**, not
+this directory — this crate's sibling path dependencies
+(`integrity-mac`, `authentication-verifier`; its matcher,
+`course-matcher`, is a crates.io registry dependency, not a path
+dependency, despite an earlier version of this Dockerfile assuming
+otherwise) live outside `course/course-service-with-loco/`:
+
+```sh
+podman build -f course/course-service-with-loco/Dockerfile \
+  -t course-service .   # run from the repository root
+```
+
+Verified end-to-end (2026-08-03): builds clean, boots against a real
+Postgres, and `GET /api/health` returns `200`. This crate's Dockerfile
+already used a build context one level above this directory
+(`course/`), but never copied `integrity-mac` or
+`authentication-verifier` (which live outside `course/` entirely) —
+so it was just as broken as person/worker/event's `context: .`, only
+by a different sibling-dependency gap. Fixed to the repo-root
+convention, plus the same three further bugs found by actually running
+the built image (not merely getting `podman build` to succeed): no
+`config/` copy (boot crash: "no configuration file found in folder:
+config"); `CMD` with no `start` subcommand (the loco CLI just prints
+`--help` and exits 0); and no `LOCO_ENV` (would boot in `development`
+inside a `production` image). Also: this crate's own
+`config/production.yaml` defaults `PORT` to `8084` (its siblings
+default to `8080`), so `PORT=8080` is now set explicitly to match
+`EXPOSE`/`HEALTHCHECK` rather than relying on the family's usual
+default.
+
+See `.containerignore` at the repository root (excludes every crate's
+`target/`, or the build context would try to copy hundreds of GB of
+build artifacts). The wired multi-service `examples/compose/` stacks
+(DEP-1) that build on this are not yet written.
