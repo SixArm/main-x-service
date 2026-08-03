@@ -3,7 +3,14 @@
 import { API_BASE_URL } from "$lib/config";
 import { ApiClient } from "./client";
 import type { Page, PageRequest } from "./client";
-import type { Plan, PlanRef, ScoredRef } from "./types";
+import type {
+  MergeRecordRow,
+  MergeRequest,
+  MergeResponse,
+  Plan,
+  PlanRef,
+  ScoredRef,
+} from "./types";
 
 /**
  * Facade over {@link ApiClient} mapping each Portfolio Service REST
@@ -124,18 +131,27 @@ export class PlanRepository {
   /**
    * Merge a confirmed duplicate into a surviving plan.
    * `POST /api/plans/merge`.
-   * @param mainPid The survivor's pid.
-   * @param duplicatePid The duplicate's pid (soft-deleted on success).
-   * @param reason Optional operator note recorded in the merge history.
+   *
+   * Destructive: the duplicate is soft-deleted and its data folded into
+   * the survivor. The response carries the merged survivor itself, not a
+   * merge-record wrapper — the history row is read back separately via
+   * {@link recentMerges}.
+   *
+   * @param request The `{main_pid, duplicate_pid, reason?}` body.
    * @returns The merge result `{main_pid, duplicate_pid, main}`.
    */
-  merge(
-    mainPid: string,
-    duplicatePid: string,
-    reason?: string,
-  ): Promise<{ main_pid: string; duplicate_pid: string; main: Plan }> {
-    return this.http.post(`${this.base()}/merge`, {
-      body: { main_pid: mainPid, duplicate_pid: duplicatePid, reason },
+  merge(request: MergeRequest): Promise<MergeResponse> {
+    return this.http.post<MergeResponse>(`${this.base()}/merge`, {
+      body: request,
     });
+  }
+
+  /**
+   * Recent merge-history rows, newest first (service cap: 100).
+   * `GET /api/plans/merges/recent`.
+   * @returns The raw `merge_records` rows.
+   */
+  recentMerges(): Promise<MergeRecordRow[]> {
+    return this.http.get<MergeRecordRow[]>(`${this.base()}/merges/recent`);
   }
 }

@@ -91,6 +91,35 @@ test("edit page renders the edit form", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /Edit case/ })).toBeVisible();
 });
 
+// Pins: the merge route renders its form (both pid inputs) and reads the
+// merge history. The history endpoint is stubbed empty so the table shows
+// its empty row rather than failing the load.
+test("merge page renders the form and the recent-merges table", async ({
+  page,
+}) => {
+  await page.route("**/api/plans/merges/recent", async (route) =>
+    route.fulfill({ json: [] }),
+  );
+  await page.goto("/plans/merge", { waitUntil: "networkidle" });
+  await expect(page.getByRole("heading", { name: "Merge plans" })).toBeVisible();
+  await expect(page.locator("#merge-main")).toBeVisible();
+  await expect(page.locator("#merge-dup")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Recent merges" }),
+  ).toBeVisible();
+  await expect(page.getByText("No merges recorded yet.")).toBeVisible();
+});
+
+// Pins: the merge destination is reachable from the nav on another page
+// (the nav lives behind the hamburger at every width).
+test("nav exposes the merge link", async ({ page }) => {
+  await page.goto("/plans", { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /Toggle navigation/i }).click();
+  await expect(
+    page.getByRole("link", { name: "Merge", exact: true }),
+  ).toBeVisible();
+});
+
 // Pins: spec §6.6 — check-duplicates excludes the record itself. The stub
 // returns the current record (same pid) plus one other hit; only the other
 // must surface in the "Potential duplicates" list.

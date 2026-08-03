@@ -62,6 +62,27 @@ describe("i18n catalog", () => {
         expect(translate("ppm.scenarios.title", "ur")).toBe("منظرنامہ منصوبہ بندی");
     });
 
+    // The merge page's keys: present in English, genuinely translated
+    // elsewhere (not English copies), and carrying both placeholders in
+    // the confirmation prompt so the substitution cannot silently break.
+    it("covers the merge keys in every locale", () => {
+        const mergeKeys = STRING_KEYS.filter(
+            (key) => key === "nav.merge" || key.startsWith("merge."),
+        );
+        expect(mergeKeys.length).toBeGreaterThanOrEqual(24);
+        for (const locale of LOCALES) {
+            for (const key of mergeKeys) {
+                expect(translate(key, locale), `${locale} missing ${key}`).toBeTruthy();
+            }
+            const confirm = translate("merge.confirm", locale);
+            expect(confirm, `${locale} merge.confirm {dup}`).toContain("{dup}");
+            expect(confirm, `${locale} merge.confirm {main}`).toContain("{main}");
+        }
+        expect(translate("merge.title", "fr")).toBe("Fusionner des plans");
+        expect(translate("merge.title", "zh")).toBe("合并计划");
+        expect(translate("nav.merge", "ar")).toBe("دمج");
+    });
+
     it("spot-checks a non-Latin locale (Chinese)", () => {
         expect(translate("nav.cases", "zh")).toBe("案件");
         expect(translate("form.save", "zh")).toBe("保存");

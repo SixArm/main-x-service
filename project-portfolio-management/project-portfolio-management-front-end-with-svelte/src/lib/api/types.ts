@@ -217,6 +217,58 @@ export interface PlanRef {
 }
 
 /**
+ * Body of `POST /api/plans/merge` — which duplicate folds into which
+ * survivor, and (optionally) why. Mirrors the service's `MergeRequest`
+ * in `src/controllers/plans.rs`.
+ */
+export interface MergeRequest {
+  /** The surviving plan's persistent id. */
+  main_pid: string;
+  /** The duplicate's persistent id; soft-deleted on success. */
+  duplicate_pid: string;
+  /** Optional operator note recorded in the merge history. */
+  reason?: string | null;
+}
+
+/**
+ * Response of `POST /api/plans/merge`. Note this service returns the
+ * merged survivor directly — there is deliberately **no** `merge_record`
+ * wrapper (unlike the person service); the history row is fetched
+ * separately via `/api/plans/merges/recent`.
+ */
+export interface MergeResponse {
+  /** The survivor's persistent id (unchanged by the merge). */
+  main_pid: string;
+  /** The duplicate's persistent id (now soft-deleted). */
+  duplicate_pid: string;
+  /** The survivor's full record after the duplicate was folded in. */
+  main: Plan;
+}
+
+/**
+ * One row of `GET /api/plans/merges/recent` — the `merge_records` table
+ * as SeaORM serialises it (`src/models/_entities/merge_records.rs`).
+ */
+export interface MergeRecordRow {
+  /** When the merge was recorded (RFC 3339 with offset). */
+  created_at: string;
+  /** When the row was last written (RFC 3339 with offset). */
+  updated_at: string;
+  /** Auto-incrementing primary key (Rust `i64`). */
+  id: number;
+  /** The survivor's pid (UUID as a string). */
+  main_pid: string;
+  /** The folded-in duplicate's pid (UUID as a string). */
+  duplicate_pid: string;
+  /** The operator-supplied reason, when one was given. */
+  reason?: string | null;
+  /** The acting principal, when the request was authenticated. */
+  actor?: string | null;
+  /** Snapshot of the fields transferred from duplicate to survivor. */
+  transferred?: unknown;
+}
+
+/**
  * A scored duplicate candidate from `/check-duplicates`: a
  * {@link PlanRef} plus the matcher's verdict.
  */

@@ -95,11 +95,31 @@ describe("PlanRepository", () => {
 
   it("merge() POSTs the merge body", async () => {
     const { repo, calls } = spyClient();
-    await repo.merge("main-1", "dup-2", "confirmed");
+    await repo.merge({
+      main_pid: "main-1",
+      duplicate_pid: "dup-2",
+      reason: "confirmed",
+    });
     expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.url).toContain("/api/plans/merge");
     expect(calls[0]?.url).toBe("http://svc.test/api/plans/merge");
     expect(calls[0]?.init.body).toBe(
       JSON.stringify({ main_pid: "main-1", duplicate_pid: "dup-2", reason: "confirmed" }),
     );
+  });
+
+  it("merge() omits an absent reason", async () => {
+    const { repo, calls } = spyClient();
+    await repo.merge({ main_pid: "main-1", duplicate_pid: "dup-2" });
+    expect(calls[0]?.init.body).toBe(
+      JSON.stringify({ main_pid: "main-1", duplicate_pid: "dup-2" }),
+    );
+  });
+
+  it("recentMerges() GETs the merge history", async () => {
+    const { repo, calls } = spyClient();
+    await repo.recentMerges();
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe("http://svc.test/api/plans/merges/recent");
   });
 });

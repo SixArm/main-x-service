@@ -108,9 +108,10 @@ src/
     └── plans/
         ├── +page.svelte         list (SVAR DataGrid) + name-search + recent-activity toggle
         ├── new/+page.svelte     create
-        ├── [pid]/+page.svelte   detail + delete + check-duplicates + MatchBreakdown + merge + audit timeline (+ child roll-up)
+        ├── [pid]/+page.svelte   detail + delete + check-duplicates + MatchBreakdown + audit timeline (+ child roll-up)
         ├── [pid]/edit/+page.svelte   edit
-        └── [pid]/{board,schedule,governance}/+page.svelte
+        ├── [pid]/{board,schedule,governance}/+page.svelte
+        └── merge/+page.svelte   merge a duplicate into a survivor + recent merge history
 ```
 
 ## API consumption

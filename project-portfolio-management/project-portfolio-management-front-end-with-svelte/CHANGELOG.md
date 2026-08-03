@@ -8,6 +8,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — record-merge page (2026-08-03)
+
+- **`/plans/merge`** — an operator page for folding a confirmed-duplicate
+  plan into a survivor: survivor pid + duplicate pid + optional reason,
+  an optional side-by-side preview, a native `confirm()` before the
+  destructive call (the duplicate is soft-deleted), and a recent-merge
+  history table. Reachable from a new **Merge** entry in the top-bar nav.
+- **`PlanRepository.recentMerges()`** — `GET /api/plans/merges/recent`,
+  the service's merge history (newest first, service cap 100).
+- **`MergeRequest` / `MergeResponse` / `MergeRecordRow`** wire types.
+  This service's merge response is `{main_pid, duplicate_pid, main}` —
+  there is deliberately **no** `merge_record` wrapper the way the person
+  service has one, so the page reads the history row back separately.
+- **`src/lib/components/merge-validation.ts`** — the pre-merge guard as a
+  pure, unit-testable function returning an i18n key: both pids required,
+  and they must differ (the service answers `422` on a self-merge, so
+  catching it here saves the round trip and states the reason in the
+  operator's own language).
+- 24 new i18n keys across all 13 locales.
+
+### Changed
+
+- **`PlanRepository.merge()`** now takes a single `MergeRequest` object
+  rather than three positional arguments, so the call site reads as the
+  wire body it becomes.
+
 ### Added — paged collection reads (2026-08-01)
 
 - **`ApiClient.getPage()`** returns `{ items, total, limit, offset }`,

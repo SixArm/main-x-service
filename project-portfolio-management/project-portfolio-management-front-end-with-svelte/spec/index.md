@@ -424,6 +424,29 @@ links are **never** a match signal (entity spec §1).
 > This is the build queue for the implemented app (MVP shipped); check off
 > in three-part PRs (spec + code + test).
 
+- [x] **2026-08-03 — FE-1: the record-merge page (`/plans/merge`).**
+  A standalone operator page for folding a confirmed-duplicate plan into
+  a survivor: survivor pid + duplicate pid + optional reason, an optional
+  side-by-side preview (`GET /api/plans/{pid}` for each), a native
+  `confirm()` before the destructive call, and a recent-merge history
+  table read from `GET /api/plans/merges/recent`. New: `MergeRequest` /
+  `MergeResponse` / `MergeRecordRow` in `src/lib/api/types.ts`;
+  `PlanRepository.merge(request)` (signature changed from positional args
+  to the request object, matching the wire body) and
+  `PlanRepository.recentMerges()`; the pure guard
+  `src/lib/components/merge-validation.ts` (both pids required, must
+  differ — the service answers `422` on a self-merge); a `nav.merge` entry
+  in the top-bar nav. **Wire shape note:** this service's merge response
+  is `{main_pid, duplicate_pid, main}` with **no** `merge_record` wrapper
+  (unlike the person service), so the page shows the survivor's pid and
+  reads the history row back separately. Errors are rendered as
+  `"<status>: <message>"` — this crate's `ApiError` carries no error
+  code. 24 i18n keys added across all 13 locales. Tests:
+  `tests/unit/merge-validation.test.ts` (4 cases), repository
+  merge/recentMerges path pins in `tests/unit/plans.test.ts`, a merge-key
+  coverage + placeholder test in `tests/unit/i18n.test.ts`, and two
+  Playwright smoke pins. svelte-check 0/0, 62 vitest pass, build green.
+
 - [x] **2026-07-22 — Capability views (service spec §9.4a).**
   `CapabilityClient` + wire types in `src/lib/api/capabilities.ts`, and
   four pages: `/prioritisation` (Smart Score queue + per-component

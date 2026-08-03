@@ -92,6 +92,8 @@
       href: `/${collection}`,
       label: collection,
     })),
+    // Record merge (fold a confirmed duplicate plan into a survivor).
+    { href: "/plans/merge", label: t("nav.merge") },
     // PPM catalogue views (fully localized 2026-07-18).
     { href: "/dashboard", label: t("ppm.nav.dashboard") },
     { href: "/prioritisation", label: "Prioritisation" },
