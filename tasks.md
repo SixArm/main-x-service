@@ -469,13 +469,52 @@
 
 ## Phase 3 — Platform
 
-- [ ] **BUS-1 (L)** `FluvioSink` (feature `fluvio`) in **case** (the
+- [x] **BUS-1 (L)** `FluvioSink` (feature `fluvio`) in **case** (the
   relay's `EventSink` seam exists; see `src/relay.rs`). Topic naming per
   event-bus.md §7 (`mxi.case.events`, partition by pid). Compose file
   with a Fluvio broker for the bus-gated test tier (`#[ignore]` +
   feature-gated test: enqueue → relay → topic → consumed).
   *Verify:* default build untouched (feature off); feature build green;
-  bus-gated test compiles (runs only with broker).
+  bus-gated test compiles (runs only with broker). *(done 2026-08-03)*
+  `fluvio = { version = "0.50", optional = true }` behind a `fluvio`
+  feature; `FluvioSink` holds one `TopicProducerPool` per topic
+  (`fluvio::Fluvio::connect_with_config` + `topic_producer`), `send`
+  partitions on the record `pid` per §7. Verified the real 0.50 API
+  usage against the actual compiler (not just web-search docs) under
+  `--features fluvio` — `Fluvio::connect_with_config`,
+  `FluvioConfig::new`, `Client::topic_producer`, and
+  `TopicProducer::send(key, value)` all resolved on the first attempt.
+  `spawn` selects `FluvioSink` over `LoggingSink` when
+  `CASE_FLUVIO_ENDPOINT` is set; **an endpoint configured without the
+  `fluvio` feature refuses to start the relay** (logged at `error`)
+  rather than silently using `LoggingSink` — a fallback there would mark
+  outbox rows `published_at` without ever reaching a real broker, the
+  same silent-data-loss shape BLK-4's artifact-store "no fallback on an
+  explicit backend choice" rule exists to prevent. The initial
+  connection retries indefinitely (rather than falling back) for the
+  same reason; once connected, a broker outage is absorbed by the
+  existing at-least-once retry (an unpublished row just stays
+  unpublished until the next successful drain). `compose.fluvio.yaml` +
+  `Dockerfile.fluvio-cli` (a separate compose file from
+  `compose.test.yaml` on purpose, so the Postgres-only DB-gated suite's
+  tooling is untouched) provision a local SC+SPU broker, translating
+  Fluvio's own documented Docker Compose layout to this repo's Podman
+  conventions — **not** run by any automated stage in this repo; the
+  `#![cfg(feature = "fluvio")]`-gated, `#[ignore]`d
+  `tests/fluvio_relay.rs` is verified by compiling under the feature
+  (confirming correct API usage), not by an actual broker round-trip,
+  matching the precedent already set by person's `s3_round_trip_
+  against_a_live_endpoint` (BLK-4) — neither test has ever been executed
+  in this session, both are `#[ignore]`d with the run command documented
+  inline. *Verified:* `cargo build`/`test --lib`/`clippy --all-targets -D
+  warnings`/`fmt --check` clean under both default features (246 lib
+  tests) and `--features fluvio` (also 246 — the feature adds no new
+  DB-free unit tests, only the ignored live-broker one); `cargo deny
+  check` shows the same pre-existing `rsa` advisory as before (confirmed
+  the only `error[vulnerability]` block, not a new one from `fluvio`'s
+  tree); the full DB-gated suite (11 bulk + 39 pre-existing, including
+  the new `fluvio_relay.rs` binary compiling to 0 tests under default
+  features) rerun against real Postgres, zero regressions.
 - [ ] **BUS-2 (L)** link-graph **Fluvio consumer** (spec T-6):
   per-topic consumers driving the existing `apply_event` seam, with the
   `processed_events` idempotency table (spec §10.3) and per-topic offset

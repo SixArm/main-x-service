@@ -239,7 +239,21 @@ don't know the transport.
    transaction.)*
 3. **Add the relay worker + `FluvioSink`** behind feature `fluvio`. A
    DB-gated integration test (or a Fluvio test container) asserts an
-   enqueued row reaches the topic and is marked published.
+   enqueued row reaches the topic and is marked published. *(Relay +
+   `LoggingSink` landed 2026-08-02 in **case**, adapted from the
+   organization reference. `FluvioSink` itself landed 2026-08-03, also in
+   case (BUS-1): `fluvio` 0.50, one producer per topic, partitioned on
+   `pid`. An endpoint configured (`<ENTITY>_FLUVIO_ENDPOINT`) without the
+   `fluvio` feature refuses to start the relay rather than falling back
+   to `LoggingSink` — that fallback would mark outbox rows `published_at`
+   without ever reaching a real broker. `compose.fluvio.yaml` +
+   `Dockerfile.fluvio-cli` (case) provision a local SC+SPU broker
+   (Fluvio's own documented Docker Compose layout) for opt-in manual
+   runs; no automated stage in this repo stands one up, so the
+   feature-gated, `#[ignore]`d round-trip test is verified by compiling
+   under `--features fluvio`, not by an actual execution — the "Fluvio
+   test container" this step originally envisioned remains a follow-up,
+   tracked as BUS-2/BUS-3.)*
 4. **Flip `<ENTITY>_EVENT_TRANSPORT=outbox`** per service in deployment;
    stand up consumers (search re-indexer first).
 5. Adopt per entity in spec-priority order; the in-memory default means
