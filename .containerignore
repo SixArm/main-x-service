@@ -1,0 +1,21 @@
+# Build-context excludes for every crate's Containerfile (Dockerfile).
+#
+# Every service Containerfile in this monorepo builds from the
+# REPOSITORY ROOT (not its own crate directory), because each crate's
+# Cargo.toml depends on sibling crates by path — there is no root
+# Cargo.toml / shared vendor step (agents/share/rust-loco-stack.md).
+# Without this file, `podman build`/`docker build` would copy every
+# crate's `target/` directory (multi-gigabyte build artifacts per
+# crate, ~55 crates) into the build context, which is slow at best and
+# has been observed to fail outright (`cannot allocate memory` copying
+# extended attributes on a large `target/` tree).
+#
+# Podman prefers `.containerignore`; Docker only reads `.dockerignore`.
+# Kept as two files with identical content (`.dockerignore` symlinked
+# to this one) rather than one, so neither tool silently ignores it.
+**/target/
+**/node_modules/
+**/.svelte-kit/
+**/dist/
+**/build/
+.git/
