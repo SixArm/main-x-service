@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # PostgreSQL database
   postgres:
@@ -14,7 +12,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test:
         [
@@ -28,10 +26,17 @@ services:
       - event-network
 
   # Event Service application
+  #
+  # Build context is the REPOSITORY ROOT (two levels up from this
+  # file), not this directory — the Dockerfile COPYs in sibling path
+  # dependencies (integrity-mac, authentication-verifier) that live
+  # outside event/. Run `podman compose up -d` from this directory as
+  # documented below; compose resolves `context: ../..` relative to
+  # this file.
   event-server:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: event/event-service-with-loco/Dockerfile
     container_name: event-server
     restart: unless-stopped
     depends_on:
@@ -45,7 +50,8 @@ services:
 
       # Server configuration
       SERVER_HOST: 0.0.0.0
-      SERVER_PORT: 8080
+      SERVER_PORT: 8080  # inert for loco boot; PORT (below) is what loco reads
+      PORT: 8080
 
       # Search configuration
       SEARCH_INDEX_PATH: /app/data/search_index
@@ -59,13 +65,17 @@ services:
 
       # Logging
       RUST_LOG: ${RUST_LOG:-info}
+      # Required by loco's config schema (auth.jwt.secret has no
+      # default); unused by this crate's actual auth flow, which is
+      # offline PASETO verification (see agents/share/jwt.md).
+      JWT_SECRET: ${JWT_SECRET:-dev-only-unused-jwt-secret}
       RUST_BACKTRACE: ${RUST_BACKTRACE:-0}
     ports:
       - "${EVENT_PORT:-8080}:8080"
     volumes:
       - search_index:/app/data/search_index
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

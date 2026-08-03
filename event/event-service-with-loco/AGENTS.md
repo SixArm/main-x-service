@@ -77,6 +77,38 @@ default `cargo test --lib` / `--features fluvio` variants and the
 DB-gated suite as usual, and see `tests/fluvio_relay.rs` for the
 feature-gated, `#[ignore]`d live-broker round-trip.
 
+## Container image
+
+`Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's
+production image. **Build context must be the repository root**, not
+this directory — this crate's sibling path dependencies
+(`integrity-mac`, `authentication-verifier`; its matcher,
+`event-matcher`, is a crates.io registry dependency, not a path
+dependency) live outside `event/event-service-with-loco/`:
+
+```sh
+podman build -f event/event-service-with-loco/Dockerfile \
+  -t event-service .   # run from the repository root
+```
+
+Verified end-to-end (2026-08-03): builds clean, boots against a real
+Postgres, and `GET /api/health` returns `200`. Like person's, this
+crate's Dockerfile pre-dated the family's repo-root-context convention
+and had the same four bugs, found only by running the built image:
+no `config/` copy (boot crash: "no configuration file found in folder:
+config"); `CMD` with no `start` subcommand (the loco CLI just prints
+`--help` and exits 0); no `LOCO_ENV` (would boot in `development`
+inside a `production` image); and a dead `SERVER_PORT` env var — loco's
+own config reads `PORT`, not `SERVER_PORT` (the latter is a separate,
+unrelated surface this crate's own `src/config/mod.rs` documents for
+non-loco code paths). All four fixed; `PORT=8080` is now set
+explicitly.
+
+See `.containerignore` at the repository root (excludes every crate's
+`target/`, or the build context would try to copy hundreds of GB of
+build artifacts). The wired multi-service `examples/compose/` stacks
+(DEP-1) that build on this are not yet written.
+
 ## Doc hierarchy quick reference
 
 | File | Role |
