@@ -930,38 +930,66 @@
   compiled. Case's own links endpoints were already correct (bare JSON
   is case's own documented, deliberate convention).
 
-  **Found, independently confirmed by two of the three implementing
-  agents, and NOT fixed (out of scope, family-wide, needs its own
-  pass):** `ApiClient.buildUrl` in (at least) person, worker, case,
-  organization, and event front-ends' `src/lib/api/client.ts` — almost
-  certainly all ten `*-front-end-with-svelte` BFF-proxied apps, since
-  they share one `config.ts` boilerplate comment and byte-identical
-  `buildUrl` bodies — resolves a leading-slash repository path (e.g.
-  `/api/persons/{id}/links`) against a base URL of
-  `<origin>/api/proxy` via `new URL(path, base + "/")`. Per the URL
-  spec, an **absolute-path reference** (one starting with `/`) replaces
-  the base URL's entire path, discarding `/api/proxy` — confirmed by
-  direct reproduction in Node:
+  **Found (independently confirmed by two of the three implementing
+  agents) and fixed 2026-08-03, on the user's explicit direction after
+  being asked whether to fix it now, investigate further, or continue
+  the flattened task list.** `ApiClient.buildUrl` in all eleven
+  `*-front-end-with-svelte` `src/lib/api/client.ts` files resolved a
+  leading-slash repository path (e.g. `/api/persons/{id}/links`)
+  against a base URL of `<origin>/api/proxy` via `new URL(path, base +
+  "/")`. Per the URL spec, an **absolute-path reference** (one starting
+  with `/`) replaces the base URL's entire path, discarding
+  `/api/proxy` — confirmed by direct reproduction in Node before
+  touching any file:
   `new URL("/api/persons/p1/links", "http://localhost:4173/api/proxy/")`
   → `http://localhost:4173/api/persons/p1/links`, **not**
   `.../api/proxy/api/persons/p1/links`. Since the only server route
   these apps define is the catch-all `/api/proxy/[...path]/+server.ts`,
-  every browser API call in every affected app is silently requesting a
-  path that doesn't exist as a route — the BFF proxy (and the PASETO
-  it's meant to inject) is bypassed entirely. One corroborating trace
-  already in the tree: `project-portfolio-management-front-end-with-svelte/src/lib/api/ppm.ts:1025`
+  every browser API call in every affected app was silently requesting
+  a path with no matching route — the BFF proxy (and the PASETO it
+  injects) bypassed entirely. One corroborating trace already in the
+  tree: `project-portfolio-management-front-end-with-svelte/src/lib/api/ppm.ts:1025`
   hardcodes a literal `/api/proxy/api/auditor/evidence-pack?format=csv`
-  path rather than going through the shared client — someone already
-  hit this and worked around it in one call site without generalising
-  the fix. authentication-front-end-with-svelte is **not** affected —
-  it calls its own service directly with no BFF/proxy layer, by design
-  (it *is* the token issuer). Not fixed here: the blast radius (up to
-  ten apps' `client.ts`, each needing its own careful verification
-  against its actual routing, ideally against a live BFF + service, not
-  just static analysis) is a properly-scoped fix in its own right, not
-  a fold-in to FE-2. **This should be prioritised** — until fixed, no
-  affected front-end's BFF-mediated API calls work as designed in any
-  deployment where the browser can't reach the entity service directly.
+  path rather than going through the shared client — someone had
+  already hit this and worked around it in one call site without
+  generalising the fix.
+
+  Ten of the eleven apps (all but authentication-front-end-with-svelte,
+  which has the identical `buildUrl` code but calls its own service
+  directly with no BFF/proxy layer — inert there, not "not affected")
+  share byte-identical `buildUrl` bodies. Fixed by stripping the
+  leading slash so `path` resolves as a *relative* reference against
+  the base (which keeps its trailing slash) — appending rather than
+  replacing — re-verified in Node before applying to any file:
+  `new URL("api/persons", "http://host/api/proxy/")` →
+  `http://host/api/proxy/api/persons`. Confirmed safe against every
+  existing repository test first: they all stub a bare-origin base URL
+  (`http://test`, no path segment), for which the old and new behaviour
+  are identical, so none needed updating. Regression tests pinning the
+  fix (a base URL *with* a path segment must keep it) were added to the
+  five apps FE-2 already touched directly (person, worker, case,
+  organization, thing); the other six got the code + a corrected inline
+  comment (the old comment described the bug's own rationale as if
+  intentional — worth not reintroducing verbatim from a stale mental
+  model). All eleven: `pnpm check`/`test` green; `pnpm build`
+  spot-checked on two of the apps not otherwise built this session.
+  Committed as eleven separate app-scoped commits.
+
+  **Process note, caught by a stray `git status` rather than anything
+  systematic:** committing the OPS-1 runbooks and this DEP-2 doc
+  earlier the same day, `git add agents/share/index.md` (lowercase) on
+  this case-insensitive-but-case-preserving filesystem silently failed
+  to stage that file's modifications against its index entry tracked as
+  `AGENTS/share/index.md` — a known trap, already in this repo's own
+  memory notes, and still worth tripping over apparently. Two edits
+  (the OPS-1 runbook links, the DEP-2 `configuration.md` link) sat
+  unstaged through two "completed" commits until this pass's `git
+  status` turned them up; fixed in a follow-up commit
+  (`2678de99`) using the correctly-tracked case. Worth remembering:
+  `git status` right after a mixed `git add` is not sufficient
+  confirmation everything staged — check for a bare `M ` vs ` M` in the
+  short-format output, or diff the actual commit against the intended
+  file list.
 
 - [ ] **FE-3 (M)** Bulk import/export screen in the person front-end:
   upload JSONL, dry-run toggle, job status polling, error-report and
