@@ -844,10 +844,52 @@
 
 ## Phase 4 — Surfaces, deployment docs, tutorials, examples
 
-- [ ] **FE-1 (M)** Merge actions in the **organization, case, portfolio**
+- [x] **FE-1 (M)** Merge actions in the **organization, case, portfolio**
   front-ends (person/worker/place/thing/event/course have the pattern;
   API: `POST /merge`, `merges/recent`).
   *Verify:* `pnpm check` + `pnpm test` + `pnpm build` per app.
+
+  **Done 2026-08-03.** All three: a `/merge` route (portfolio:
+  `/plans/merge`, since its collection lives under `/plans/`) —
+  surviving main pid + duplicate pid + optional reason, an optional
+  side-by-side preview, a native `confirm()` before submitting
+  (destructive — the duplicate is soft-deleted), and a recent-merges
+  history table from `GET .../merges/recent`. Validation is a pure,
+  unit-tested guard returning an i18n key (both ids required, must
+  differ) rather than hardcoded English, since every other string on
+  each page is locale-driven; each app got its full key set genuinely
+  translated across all 13 locales (organization 27 keys, case 25,
+  portfolio 24), each pinned by the existing per-app i18n parity test.
+
+  **The three target services' wire shape differs from the six
+  reference front-ends'** — confirmed by reading each Rust controller
+  directly rather than assumed from person's pattern: `POST
+  /api/{organizations,cases,plans}/merge` returns `{main_pid,
+  duplicate_pid, main}` inline, with **no `merge_record` wrapper**
+  (unlike person/thing's `MergeResponse`), so each page reads the
+  survivor straight from that response and reads merge timestamps from
+  the separate recent-merges history rather than from a merge-record
+  id/`merged_at` that doesn't exist in this response shape. Each app's
+  `ApiError` also has no `.code` field (only `status`), so error
+  formatting uses `${err.status}: ${err.message}` rather than porting
+  the reference front-ends' `.code`-based pattern verbatim.
+
+  Portfolio's own `AGENTS.md` had a stale claim that its plan detail
+  page already had a "merge" action — verified against the actual
+  detail-page source that it didn't (an aspirational documentation
+  line, not a duplicated feature); corrected in the same pass now that
+  merge lives at its own route.
+
+  Implemented as three parallel, independently-verified passes (one
+  per front-end) since the three apps' targets don't share any state;
+  each was spot-checked afterward (git diff scope confined to its own
+  app directory, one merge page read in full against the actual
+  API client) before committing as three separate commits, one per
+  app. All three: `pnpm check` (svelte-check) 0 errors/0 warnings,
+  `pnpm test` (vitest, including each app's i18n parity test) green,
+  `pnpm build` succeeded with the new route present in the build
+  output. `pnpm test:e2e` (Playwright) intentionally not run — it needs
+  a live server; smoke-test assertions were added but not executed.
 - [ ] **FE-2 (M)** Links panel: person front-end (assert/list/withdraw
   `same_identity` + affiliations), case front-end (`subject_of`),
   worker front-end once LNK-2 lands.
