@@ -486,8 +486,8 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   and behaviour-neutral until activated: gated on `PERSON_EVENT_TRANSPORT`
   (`memory`, the default, keeps today's post-commit in-memory publish;
   `outbox` also enqueues the durable row). The relay worker
-  (Phase 3) is now delivered (T-21); a real Fluvio sink is the only
-  broker-gated follow-up.
+  (Phase 3) is now delivered (T-21); a real Fluvio sink landed
+  2026-08-03 (BUS-3, below).
   - [x] `event_outbox` migration (`BIGSERIAL id`, unique `event_id`,
     `entity`/`entity_pid`/`kind`/`occurred_at`/`actor`/`schema_version`/
     JSONB `payload`/`published_at`; partial `WHERE published_at IS NULL`
@@ -538,9 +538,9 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     off); `PERSON_EVENT_RELAY_INTERVAL_SECS` (poll interval, default `5`,
     floored at `1`); `PERSON_EVENT_RETENTION_DAYS` (now enforced,
     default `7`).
-  - **Remaining (broker-gated):** a real `FluvioSink` `impl EventSink`
-    behind a future `fluvio` cargo feature — the trait is the seam, so
-    the drain loop and retention are unchanged when it lands.
+  - **Delivered (broker-gated):** a real `FluvioSink` `impl EventSink`
+    behind the `fluvio` cargo feature landed 2026-08-03 — see BUS-3
+    below.
   - **Acceptance:** three DB-free unit tests (logging sink never fails;
     capturing sink records `(entity, key)`; config defaults). Met:
     `cargo test --lib` green (160 passed, 2 ignored); `cargo clippy
@@ -595,4 +595,59 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   module is byte-identical family-wide) green against Postgres 18;
   `cargo test --lib` + clippy pedantic clean; FE svelte-check / vitest /
   Playwright green.
+
+- [x] **2026-08-03 — Durable event bus real broker (`FluvioSink`, BUS-3).**
+  Per [event-bus.md](../../../agents/share/event-bus.md) §5/§8, the
+  Phase-3 relay's real-broker sink, ported from case-service's BUS-1
+  reference implementation. `FluvioSink` is a second `impl EventSink`
+  alongside the existing `LoggingSink` (T-21), behind a new `fluvio`
+  Cargo feature (off by default, so a default build's dependency tree
+  and behaviour are unchanged). One producer per topic
+  (`fluvio::Fluvio::connect_with_config` + `topic_producer`, held for
+  the sink's lifetime), partitioned on the record `pid` per §7.
+  - [x] `src/relay.rs`: `FluvioSink::connect(endpoint, topic)` +
+    `impl EventSink`; `fluvio_endpoint()` (`PERSON_FLUVIO_ENDPOINT`) and
+    `event_topic()` (`PERSON_EVENT_TOPIC`, default `mxi.person.events`);
+    `build_sink` (feature-gated both ways so the call site is uniform)
+    and `run_drain_loop` extracted so `spawn` selects between sinks.
+  - [x] `spawn()` selects `FluvioSink` over `LoggingSink` when
+    `PERSON_FLUVIO_ENDPOINT` is configured. An endpoint set **without**
+    the `fluvio` feature refuses to start the relay (logged at `error`)
+    rather than silently falling back to `LoggingSink` — that fallback
+    would mark outbox rows `published_at` without ever reaching a real
+    broker, the same silent-data-loss shape the bulk artifact-store's
+    "no fallback on an explicit backend choice" rule exists to prevent
+    (`agents/share/bulk-import-export.md` §12). The initial connection
+    retries indefinitely for the same reason.
+  - [x] `compose.fluvio.yaml` + `Dockerfile.fluvio-cli` provision a
+    local SC+SPU broker (Fluvio's own documented Docker Compose layout,
+    translated to this repo's Podman conventions; container names
+    prefixed `mxi-person-fluvio-`, host ports offset +100 from
+    case-service's so both crates' composes can run side by side).
+    Neither is run by any automated stage in this repo.
+  - [x] `tests/fluvio_relay.rs`: a `#![cfg(feature = "fluvio")]`-gated,
+    `#[ignore]`d live-broker round-trip, run command documented inline —
+    verified by compiling under `--features fluvio` (confirming correct
+    API usage), not by an actual execution, matching the precedent
+    already set by this crate's own
+    `s3_round_trip_against_a_live_endpoint` (BLK-4) and by
+    case-service's `fluvio_relay.rs` (BUS-1). Builds the outbox row
+    directly via `db::outbox::OutboxInsert::for_event` +
+    `tests/common::db()` rather than through a `create_and_emit`-style
+    helper, since this crate's write path enqueues the outbox row
+    inside `PersonRepository::create`/`update`/`delete` and has no
+    single-call equivalent — a deliberate deviation from the
+    case-service reference test's shape, documented inline in the test
+    file's module docs.
+  - [x] SOUP register (`compliance/soup.tsv`) updated.
+  - **Acceptance:** `cargo build --lib` clean under default features and
+    `--features fluvio`; `cargo clippy --all-targets -- -D warnings`
+    clean both ways; `cargo fmt --check` clean; `cargo test --lib` green
+    under both (311 passed, 21 ignored — same count both ways, the
+    feature only adds compiled-out-by-default code plus one `#[ignore]`d
+    integration test); `cargo deny check` shows only the same
+    pre-existing `RUSTSEC-2023-0071` (rsa, via `jsonwebtoken` →
+    `loco-rs`) advisory before and after, not a new one from `fluvio`'s
+    tree; the full DB-gated suite reruns clean against real Postgres,
+    zero regressions.
 

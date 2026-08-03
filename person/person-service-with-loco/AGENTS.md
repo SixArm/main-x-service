@@ -60,6 +60,22 @@ DATABASE_URL=… cargo test --test api_integration_test
 cargo bench
 ```
 
+## Durable event bus
+
+The transactional-outbox event bus (`src/db/outbox.rs`, `src/relay.rs`)
+is default-off via `PERSON_EVENT_TRANSPORT=memory`. With `outbox` set
+and `PERSON_EVENT_RELAY` truthy, the Phase-3 relay drains unpublished
+`event_outbox` rows to an `EventSink`. **Phase 3's real-broker sink**
+(BUS-3, landed 2026-08-03, ported from case-service's BUS-1 reference)
+is `FluvioSink` in `src/relay.rs`, behind this crate's own `fluvio`
+Cargo feature (off by default): `PERSON_FLUVIO_ENDPOINT` selects it
+over the default `LoggingSink`; unset without the feature ⇒ unchanged
+behaviour; **set** without the feature ⇒ the relay refuses to start
+(logged, not a silent no-broker fallback that would mark rows
+published without reaching a real broker). `compose.fluvio.yaml` +
+`Dockerfile.fluvio-cli` provision a local broker for opt-in manual runs
+(not part of any automated CI stage).
+
 ## Doc hierarchy quick reference
 
 | File | Role |

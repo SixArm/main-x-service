@@ -111,6 +111,13 @@ entity-ref = { path = "../../link/entity-ref-rust-crate" }
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
 mimalloc = "0.1.52"
 
+# Durable event bus Phase 3 (BUS-3; agents/share/event-bus.md §5/§8,
+# following case-service's BUS-1 reference): the relay's real broker
+# sink. Optional and behind the `fluvio` feature below so the default
+# dependency tree (and every existing deployment's build) is unchanged —
+# the relay's `LoggingSink` covers dev/CI with no broker at all.
+fluvio = { version = "0.50", optional = true }
+
 # Parquet export (BLK-3, feature-gated — agents/share/bulk-import-export.md
 # §5/§11/§12: "Heavier dependency (arrow/parquet), feature-gated and
 # export-first in v1"). Both optional and pulled in only by the `parquet`
@@ -153,6 +160,10 @@ parquet = ["dep:parquet", "dep:arrow"]
 # backend covers dev and test, and the SDK is a large dependency tree no
 # deployment should pay for unless it uses it.
 s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-credential-types"]
+# Off by default. The relay's `EventSink` seam (src/relay.rs) needs no
+# feature to build or test; only `FluvioSink` — the real-broker producer
+# — lives behind this.
+fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
 # Serialises the DB-gated audit-chain tests: they each truncate

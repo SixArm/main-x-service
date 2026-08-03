@@ -7,6 +7,29 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — Durable event bus, real-broker sink (BUS-3, 2026-08-03)
+
+`FluvioSink` (`src/relay.rs`) — the Phase-3 relay's real-broker
+`EventSink`, ported from case-service's BUS-1 reference implementation,
+behind this crate's own `fluvio` Cargo feature (off by default; `fluvio`
+0.50). One producer per topic, partitioned by record `pid` per
+`agents/share/event-bus.md` §7. New env vars: `PERSON_FLUVIO_ENDPOINT`
+(unset ⇒ unchanged `LoggingSink` default) and `PERSON_EVENT_TOPIC`
+(default `mxi.person.events`). An endpoint configured without the
+`fluvio` feature refuses to start the relay rather than silently
+falling back to `LoggingSink` — that fallback would mark outbox rows
+`published_at` without ever reaching the broker the operator asked for.
+`compose.fluvio.yaml` + `Dockerfile.fluvio-cli` provision a local
+SC+SPU broker for opt-in manual runs (not part of any automated CI
+stage; host ports offset from case-service's so both can run side by
+side); `tests/fluvio_relay.rs` is a feature-gated, `#[ignore]`d
+live-broker round-trip, verified by compiling under `--features
+fluvio` rather than an actual execution (no broker is stood up in this
+repo's CI) — it builds the outbox row directly via
+`db::outbox::OutboxInsert` rather than a `create_and_emit`-style
+helper, since this crate's write path enqueues the outbox row inside
+`PersonRepository::create`/`update`/`delete`. SOUP register updated.
+
 ### Added — S3-compatible bulk artifact store, feature-gated (2026-08-02)
 
 - **`ArtifactStore` (`src/bulk/store.rs`) is now async** and gained an
