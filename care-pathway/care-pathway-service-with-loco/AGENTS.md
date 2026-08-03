@@ -141,3 +141,37 @@ compose.fluvio.yaml        opt-in local Fluvio broker (`fluvio` feature, BUS-3; 
 Dockerfile.fluvio-cli       support image for compose.fluvio.yaml's sc-setup step
 tests/fluvio_relay.rs       `fluvio`-feature-gated, #[ignore]d live-broker round-trip test
 ```
+
+## Container image
+
+`Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's
+production image. **Build context must be the repository root**, not
+this directory — this crate's sibling path dependencies
+(`integrity-mac`, `authentication-verifier`, `care-pathway-matcher`)
+live outside `care-pathway/care-pathway-service-with-loco/`:
+
+```sh
+podman build -f care-pathway/care-pathway-service-with-loco/Dockerfile \
+  -t care-pathway-service .   # run from the repository root
+```
+
+Verified end-to-end (2026-08-03): builds clean, boots against a real
+Postgres, and `GET /_health` returns `200`. This exercise found and
+fixed two real bugs: (1) `src/compliance/soup.rs` embeds the IEC 62304
+SOUP register via a relative `include_str!` from `compliance/soup.tsv`
+at the crate root — the Dockerfile now copies that directory
+explicitly. (2) `config/production.yaml`'s `mailer.smtp.auth.user`/
+`password` used an unquoted Tera `{{ get_env(name="…", default="") }}`
+call, which renders as YAML `null` (not `""`) when the env var is
+unset — loco's `SmtpAuth` fields are `String`, not `Option<String>`, so
+this failed config parsing at boot with "invalid type: unit value,
+expected a string". This crate's `.gitignore` also excluded
+`config/production.yaml` entirely (a loco scaffold default nobody had
+removed), which is why the SMTP bug had never been caught — the file
+never left this machine, so no other checkout could exercise it. Both
+are fixed (the file is now tracked; see the `.gitignore` for the
+reasoning). See `.containerignore` at the repository root (excludes
+every crate's `target/`, or the build context would try to copy
+hundreds of GB of build artifacts). The wired multi-service
+`examples/compose/` stacks (DEP-1) that build on this are not yet
+written.
