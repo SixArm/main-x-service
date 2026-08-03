@@ -47,7 +47,8 @@ src/
 │   ├── api/proxy/[...path]/+server.ts   BFF proxy → organization service (injects the PASETO bearer)
 │   ├── new/+page.svelte          create
 │   ├── [pid]/+page.svelte        detail + delete + check-duplicates
-│   └── [pid]/edit/+page.svelte   edit
+│   ├── [pid]/edit/+page.svelte   edit
+│   └── merge/+page.svelte        merge a duplicate into a survivor + recent merge history
 tests/
 ├── unit/                         vitest (client, build, organizations, i18n, layout)
 └── e2e/smoke.spec.ts             Playwright (four routes, API stubbed)

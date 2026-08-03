@@ -75,6 +75,31 @@ async function stubApi(page: Page) {
         },
       });
     }
+    if (path.endsWith("/merges/recent") && method === "GET") {
+      return route.fulfill({
+        json: [
+          {
+            created_at: "2026-08-01T09:30:00Z",
+            updated_at: "2026-08-01T09:30:00Z",
+            id: 1,
+            main_pid: PID,
+            duplicate_pid: "33333333-3333-4333-8333-333333333333",
+            reason: "same company, duplicate registration",
+            actor: "tester",
+            transferred: null,
+          },
+        ],
+      });
+    }
+    if (path.endsWith("/merge") && method === "POST") {
+      return route.fulfill({
+        json: {
+          main_pid: PID,
+          duplicate_pid: "33333333-3333-4333-8333-333333333333",
+          main: ORG,
+        },
+      });
+    }
     if (path === `/api/organizations/${PID}` && method === "GET") {
       return route.fulfill({ json: ORG });
     }
@@ -134,4 +159,35 @@ test("review board renders the stored queue on load (no scan side effect)", asyn
   await expect(page.getByText("high · 0.91 · batch_deduplication")).toBeVisible();
   // Loading the page must never fire the destructive-classed scan.
   expect(scans).toHaveLength(0);
+});
+
+test("merge page shows both id fields and the merge history", async ({
+  page,
+}) => {
+  const merges: string[] = [];
+  page.on("request", (req) => {
+    if (req.method() === "POST" && req.url().endsWith("/merge")) {
+      merges.push(req.url());
+    }
+  });
+  await page.goto("/merge", { waitUntil: "networkidle" });
+  await expect(
+    page.getByRole("heading", { name: "Merge organizations" }),
+  ).toBeVisible();
+  await expect(page.locator("#merge-main")).toBeVisible();
+  await expect(page.locator("#merge-dup")).toBeVisible();
+  // The history is a safe GET and loads on mount.
+  await expect(page.getByTestId("merge-recent")).toBeVisible();
+  await expect(
+    page.getByText("same company, duplicate registration"),
+  ).toBeVisible();
+  // Loading the page must never fire the destructive merge.
+  expect(merges).toHaveLength(0);
+});
+
+test("the nav offers Merge from another page", async ({ page }) => {
+  await page.goto("/", { waitUntil: "networkidle" });
+  // The primary nav is always collapsed behind the hamburger.
+  await page.getByRole("button", { name: "Toggle navigation" }).click();
+  await expect(page.getByRole("link", { name: "Merge" })).toBeVisible();
 });

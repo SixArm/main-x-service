@@ -38,6 +38,7 @@ Operators curating the organization registry.
 /[pid]          detail + delete + check-duplicates
 /[pid]/edit     edit form
 /review         drag-to-decide duplicate review board (SVAR Kanban)
+/merge          record merge (main + duplicate pid, preview, history)
 /signin         magic-link sign-in (BFF)
 /verify         magic-link verification (BFF)
 ```
@@ -175,6 +176,19 @@ controls when they land.
   posts the decision). Verified: svelte-check 0 errors, vitest 43
   (repo path pins for the three new methods), Playwright 5 (stubbed
   review-board smoke incl. a no-scan-on-load pin).
+
+- [x] **FE-1 — `/merge` record-merge UI.** Main + duplicate pid, optional
+  reason, side-by-side preview (`GET /{pid}` ×2), `confirm()`-gated
+  `POST /api/organizations/merge`, and a merge-history table from
+  `GET /api/organizations/merges/recent` (loads on mount — a safe GET —
+  and refreshes after a merge). The wire shape is this service's own:
+  request `{main_pid, duplicate_pid, reason}`, response
+  `{main_pid, duplicate_pid, main}` with **no** `merge_record` wrapper,
+  so the completion panel links to the survivor rather than quoting a
+  record id. The guard (`src/lib/components/merge-validation.ts`) returns
+  an i18n **key**, not an English sentence, so the message follows the
+  chosen locale. Verified: svelte-check 0 errors, vitest 53, `pnpm build`
+  clean; 27 new keys × 13 locales.
 
 ## 14. Implementation status
 

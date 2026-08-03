@@ -5,6 +5,9 @@ import { ApiClient } from "./client";
 import type { Page, PageRequest } from "./client";
 import type {
   BatchDeduplicationResponse,
+  MergeRecordRow,
+  MergeRequest,
+  MergeResponse,
   Organization,
   OrgRef,
   ReviewDecision,
@@ -133,6 +136,33 @@ export class OrganizationRepository {
     return this.http.post<ReviewQueueItem>(
       `/api/organizations/review-queue/${encodeURIComponent(id)}/decision`,
       { body: { status } },
+    );
+  }
+
+  /**
+   * `POST /api/organizations/merge` — fold the duplicate into the
+   * survivor: the survivor gains the duplicate's data (its name kept as
+   * an alternate name) and the duplicate is soft-deleted. Destructive;
+   * callers confirm first.
+   *
+   * @param request The two pids plus an optional reason for the history.
+   * @returns The two pids and the survivor's post-merge payload.
+   * @throws {@link ApiError} 422 when the pids are equal (self-merge),
+   *   404 when either pid is unknown.
+   */
+  merge(request: MergeRequest): Promise<MergeResponse> {
+    return this.http.post<MergeResponse>("/api/organizations/merge", {
+      body: request,
+    });
+  }
+
+  /**
+   * `GET /api/organizations/merges/recent` — the merge history, newest
+   * first (the service caps the response at 100 rows).
+   */
+  recentMerges(): Promise<MergeRecordRow[]> {
+    return this.http.get<MergeRecordRow[]>(
+      "/api/organizations/merges/recent",
     );
   }
 }

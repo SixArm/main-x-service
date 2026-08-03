@@ -106,4 +106,42 @@ describe("OrganizationRepository", () => {
     );
     expect(calls[0]?.init.body).toBe(JSON.stringify({ status: "confirmed" }));
   });
+
+  it("merge() POSTs the two pids to the merge endpoint", async () => {
+    const { repo, calls } = spyClient();
+    await repo.merge({
+      main_pid: "p1",
+      duplicate_pid: "p2",
+      reason: "same company",
+    });
+    expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.url).toBe("http://svc.test/api/organizations/merge");
+    // The service's MergeRequest is {main_pid, duplicate_pid, reason} —
+    // NOT the {main_*_id, duplicate_*_id, merge_reason} shape some
+    // sibling services use.
+    expect(calls[0]?.init.body).toBe(
+      JSON.stringify({
+        main_pid: "p1",
+        duplicate_pid: "p2",
+        reason: "same company",
+      }),
+    );
+  });
+
+  it("merge() sends a null reason when none is given", async () => {
+    const { repo, calls } = spyClient();
+    await repo.merge({ main_pid: "p1", duplicate_pid: "p2", reason: null });
+    expect(calls[0]?.init.body).toBe(
+      JSON.stringify({ main_pid: "p1", duplicate_pid: "p2", reason: null }),
+    );
+  });
+
+  it("recentMerges() GETs the merge history", async () => {
+    const { repo, calls } = spyClient();
+    await repo.recentMerges();
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/organizations/merges/recent",
+    );
+  });
 });

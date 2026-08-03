@@ -86,6 +86,7 @@
         { href: "/", key: "nav.organizations" },
         { href: "/new", key: "nav.newOrganization" },
         { href: "/review", key: "nav.review" },
+        { href: "/merge", key: "nav.merge" },
     ];
 
 </script>

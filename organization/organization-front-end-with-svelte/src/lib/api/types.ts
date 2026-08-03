@@ -107,6 +107,67 @@ export interface ScoredRef {
   is_match: boolean;
 }
 
+/**
+ * Request body for `POST /api/organizations/merge`.
+ *
+ * Mirrors the service's `MergeRequest` (controllers/organizations.rs):
+ * the survivor and the duplicate are named by **pid**, not by a nested
+ * record, and `reason` is an optional free-text note stored in the merge
+ * history. The service rejects equal pids with `422`.
+ */
+export interface MergeRequest {
+  /** The surviving organization's public id. */
+  main_pid: string;
+  /** The duplicate to fold in and soft-delete. */
+  duplicate_pid: string;
+  /** Optional operator-supplied reason, recorded in the merge history. */
+  reason?: string | null;
+}
+
+/**
+ * Response body for a successful merge.
+ *
+ * Note the shape differs from some sibling services: there is **no**
+ * `merge_record` wrapper — the service returns the two pids plus the
+ * post-merge survivor payload directly.
+ */
+export interface MergeResponse {
+  /** The surviving organization's public id. */
+  main_pid: string;
+  /** The merged-away duplicate's public id (now soft-deleted). */
+  duplicate_pid: string;
+  /** The survivor's payload after the fold. */
+  main: Organization;
+}
+
+/**
+ * One row of merge history from `GET /api/organizations/merges/recent`.
+ *
+ * Serialized straight from the `merge_records` SeaORM entity, so the
+ * field names and types are the table's: `id` is the auto-increment
+ * `i64` surrogate key (a JSON number), the timestamps are RFC 3339
+ * strings, and `transferred` is the JSON snapshot of the duplicate's
+ * payload at merge time.
+ */
+export interface MergeRecordRow {
+  /** Row insert time (UTC) — when the merge happened. */
+  created_at: string;
+  /** Row last-modification time (UTC); merge rows are append-only. */
+  updated_at: string;
+  /** Auto-increment surrogate primary key; also the recency order key. */
+  id: number;
+  /** The surviving organization's pid. */
+  main_pid: string;
+  /** The merged-away duplicate's pid. */
+  duplicate_pid: string;
+  /** Operator-supplied free-text reason, when one was given. */
+  reason?: string | null;
+  /** The actor that performed the merge (bearer `sub`), when known. */
+  actor?: string | null;
+  /** JSON snapshot of the duplicate's payload at merge time. */
+  transferred?: unknown;
+}
+
 /// Review disposition wire tokens (family-wide lowercase form).
 export type ReviewStatus = "pending" | "confirmed" | "rejected" | "automerged";
 
