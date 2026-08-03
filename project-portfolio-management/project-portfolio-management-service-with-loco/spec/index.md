@@ -50,11 +50,12 @@ since most of a `Plan` is operational content, not personal data.
 Deferred (§13): the goals/issues
 sub-resource tables + the derived
 timeline view (tasks + sprints + burndown landed 2026-07-20),
-the durable
-event bus's Fluvio broker sink (Phase 2 outbox + Phase 3 relay/retention
-landed), front-end merge action, bulk import/export, gRPC, and
+front-end merge action, bulk import/export, gRPC, and
 the deferred `posts` / `comments` / `members` collaboration
-sub-resources. (The paseto-keys-over-HTTP fetch at boot landed
+sub-resources. (The durable event bus's Phase 2 outbox + Phase 3
+relay/retention, then its `FluvioSink` real-broker sink landed
+2026-08-03, feature-gated and off by default — §13. The
+paseto-keys-over-HTTP fetch at boot landed
 2026-07-04 — `PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS_URL`, §9.6/§13.)
 Token **issuance** is out of scope — provided by the central
 authentication-service. Auth source of truth (supersedes the RS256-JWT
@@ -744,11 +745,48 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   `1`/`true`/`yes`/`on`), so it is a no-op by default. Tests: DB-free
   `LoggingSink`/capturing-sink send + config defaults; the drain/ack
   seams (`unpublished`/`mark_published`) are DB-gated via the outbox
-  suite. **Broker-gated follow-up:** a real **`FluvioSink`** (`impl
-  EventSink` behind a `fluvio` cargo feature) — the trait is the seam,
-  so the drain loop is unchanged when it lands
+  suite.
+- [x] **Durable event bus — Phase 3, `FluvioSink` (BUS-3, following
+  BUS-1's case-service reference).** *(done 2026-08-03)* The real-broker
+  `impl EventSink`, behind this crate's own `fluvio` Cargo feature (off
+  by default — the dependency tree and boot behaviour of a default build
+  are unchanged). One producer per topic
+  (`fluvio::Fluvio::connect_with_config` + `topic_producer`, held for
+  the sink's lifetime), partitioned by record `pid` per §7. Config:
+  `PROJECT_PORTFOLIO_MANAGEMENT_FLUVIO_ENDPOINT` (the broker's SC
+  address; unset ⇒ `LoggingSink`, unchanged default behaviour) and
+  `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TOPIC` (default `mxi.plan.events`
+  — the `plan` streaming-entity token, per `src/streaming.rs::ENTITY`,
+  not the `portfolio` token `src/auth.rs` uses for ABAC action naming).
+  **No silent fallback**: an endpoint configured **without** the
+  `fluvio` feature refuses to start the relay at all (logged at
+  `error`), rather than a `LoggingSink` masquerade that would mark
+  outbox rows `published_at` without ever reaching the broker the
+  operator asked for — the same shape as the family's artifact-store "no
+  fallback on an explicit backend choice" rule
+  (`agents/share/bulk-import-export.md` §12). The initial connection
+  retries indefinitely rather than falling back, for the same reason.
+  `compose.fluvio.yaml` + `Dockerfile.fluvio-cli` provision a local
+  SC+SPU broker (Fluvio's own documented Docker Compose layout,
+  translated to this repo's Podman conventions, `mxi-project-portfolio-management-fluvio-*`
+  container names) for opt-in manual runs; **not** wired into any
+  automated CI stage. Tests: `cargo build`/`clippy --all-targets -D
+  warnings`/`fmt --check` clean under both default features and
+  `--features fluvio` (the real `fluvio` 0.50 API compiling is the
+  actual verification of correct usage); `tests/fluvio_relay.rs` is a
+  `#![cfg(feature = "fluvio")]`-gated, `#[ignore]`d round-trip (enqueue →
+  `FluvioSink` → `drain_once` → assert `published_at`) with its run
+  command documented inline — it needs a live broker, which no automated
+  run in this repo stands up, so it is verified by compiling under the
+  feature, not by an actual execution (same posture as person's
+  `s3_round_trip_against_a_live_endpoint`, BLK-4, and case's
+  `fluvio_relay_publishes_an_outbox_row_to_a_real_topic`, BUS-1). This
+  crate has no `compliance/soup.tsv` (unlike case), so no SOUP register
+  update was needed. BUS-2 (link-graph Fluvio consumer) and the
+  remaining BUS-3 legs (rolling `FluvioSink` to the other entity
+  services) remain.
   ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §5,
-  §8).
+  §7, §8).
 - [ ] Cross-service links — `m20220101_000005_entity_links` migration +
   `POST`/`GET`/`DELETE /api/plans/{pid}/links`; emit `linked` /
   `unlinked`; optimistic write (no cross-service call); never a matcher
@@ -1030,8 +1068,10 @@ the engineering core (tasks / sprints / burndown / standup / DevOps).
 Still open (§13): the remaining operational sub-resources (goals /
 issues) + the derived timeline view, `deduplicate` + review
 queue, cross-service `entity_links`, bulk import/export,
-the collaboration sub-resources, gRPC, and the Fluvio broker
-sink. The canonical `Plan` domain model is owned by the
+and the collaboration sub-resources, gRPC. The durable event bus's
+`FluvioSink` real-broker sink landed 2026-08-03 (BUS-3, following
+BUS-1's case-service reference; feature-gated, off by default). The
+canonical `Plan` domain model is owned by the
 [portfolio entity spec §5](../../spec/index.md); this crate spec
 references it.
 
@@ -1047,11 +1087,12 @@ source of truth, superseding the RS256-JWT model:
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)),
 then field masking + audited GDPR export wired to the ABAC `mask`
 obligation (2026-08-02; §13).
-Next (deferred, §13): the durable event
-bus's Fluvio broker sink (Phase 2 outbox + Phase 3 relay/retention
-landed),
+Next (deferred, §13):
 front-end merge action, bulk import/export, the `posts` / `comments` /
-`members` collaboration sub-resources, gRPC. (Done since: the
+`members` collaboration sub-resources, gRPC. (Done since: the durable
+event bus's Phase 2 outbox + Phase 3 relay/retention, then its
+`FluvioSink` real-broker sink (BUS-3, following BUS-1's case-service
+reference, 2026-08-03); the
 paseto-keys-over-HTTP fetch at boot, 2026-07-04 —
 `PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS_URL`, fetched key set wins, env fallback.)
 

@@ -10,16 +10,23 @@
 //!
 //! The default [`LoggingSink`] ships every event to the tracing log: it is
 //! the **no-broker** dev/CI sink and a useful observability aid — the drain
-//! + retention machinery runs and is fully exercised without Fluvio. A real
-//! **`FluvioSink`** is simply another `impl EventSink` (behind a future
-//! `fluvio` cargo feature, since it needs the broker + the `fluvio` crate);
-//! the [`EventSink`] trait is the seam, so the drain loop and retention
-//! never change when it lands (`agents/share/event-bus.md` §5).
+//! + retention machinery runs and is fully exercised without Fluvio.
+//! `FluvioSink` (BUS-3, following BUS-1's case-service reference; only
+//! compiled under this crate's `fluvio` cargo feature, off by default, so
+//! a default build's dependency tree and behaviour are unchanged) is the
+//! real-broker `impl EventSink`; the [`EventSink`] trait is the seam, so
+//! the drain loop and retention never change between the two
+//! (`agents/share/event-bus.md` §5).
 //!
 //! Activation: the relay only runs when the transport is `outbox`
 //! (`PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TRANSPORT=outbox`) **and** `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_RELAY`
 //! is truthy — so it is a no-op by default, matching the family's
-//! flag-gated posture.
+//! flag-gated posture. With those on, [`spawn`] additionally selects
+//! `FluvioSink` over [`LoggingSink`] when
+//! `PROJECT_PORTFOLIO_MANAGEMENT_FLUVIO_ENDPOINT` (§7) is configured — see
+//! `spawn`'s and `build_sink`'s doc comments in this file for the "no
+//! silent fallback" rule that governs an endpoint configured without the
+//! `fluvio` feature.
 
 use std::time::Duration;
 
@@ -72,6 +79,52 @@ impl EventSink for LoggingSink {
             payload = %payload,
             "relay: published outbox event"
         );
+        Ok(())
+    }
+}
+
+/// The real-broker sink (BUS-3, following BUS-1's case-service reference;
+/// behind the `fluvio` cargo feature): ships each event to a
+/// [Fluvio](https://www.fluvio.io/) topic, partitioned by record `pid`
+/// per `agents/share/event-bus.md` §7. One producer per topic, held for
+/// the sink's lifetime — `TopicProducerPool` is designed to be built once
+/// and reused across sends rather than reconnected per event.
+#[cfg(feature = "fluvio")]
+pub struct FluvioSink {
+    /// The connected producer for this sink's topic.
+    producer: fluvio::TopicProducerPool,
+}
+
+#[cfg(feature = "fluvio")]
+impl FluvioSink {
+    /// Connect to the Fluvio cluster at `endpoint` and open a producer for
+    /// `topic`.
+    ///
+    /// # Errors
+    ///
+    /// When the cluster connection or the producer handshake fails.
+    pub async fn connect(endpoint: &str, topic: &str) -> Result<Self, SinkError> {
+        let config = fluvio::FluvioConfig::new(endpoint);
+        let client = fluvio::Fluvio::connect_with_config(&config).await?;
+        let producer = client.topic_producer(topic).await?;
+        Ok(Self { producer })
+    }
+}
+
+#[cfg(feature = "fluvio")]
+#[async_trait::async_trait]
+impl EventSink for FluvioSink {
+    async fn send(
+        &self,
+        _entity: &str,
+        key: &str,
+        payload: &serde_json::Value,
+    ) -> Result<(), SinkError> {
+        // `_entity` selects the *topic*, which this sink is already
+        // connected to (one FluvioSink per topic, per `spawn` below); the
+        // partition key is the record `pid`, per §7.
+        let bytes = serde_json::to_vec(payload)?;
+        self.producer.send(key.to_string(), bytes).await?;
         Ok(())
     }
 }
@@ -167,18 +220,126 @@ pub fn retention_days() -> i64 {
         .unwrap_or(7)
 }
 
+/// Fluvio broker endpoint (`PROJECT_PORTFOLIO_MANAGEMENT_FLUVIO_ENDPOINT`,
+/// §7). Unset/blank ⇒ no broker configured, so the relay uses
+/// [`LoggingSink`] — the documented no-broker dev/CI sink — even under
+/// the `outbox` transport.
+#[must_use]
+pub fn fluvio_endpoint() -> Option<String> {
+    std::env::var("PROJECT_PORTFOLIO_MANAGEMENT_FLUVIO_ENDPOINT")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+}
+
+/// The topic events publish to
+/// (`PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TOPIC`, default `mxi.plan.events`
+/// per §7's `mxi.<entity>.events` convention).
+#[must_use]
+pub fn event_topic() -> String {
+    std::env::var("PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TOPIC")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "mxi.plan.events".to_string())
+}
+
 /// How many drain ticks between retention purges (purge is cheaper and
 /// less urgent than draining).
 const PURGE_EVERY_TICKS: u64 = 60;
+
+/// Seconds between retries while the initial Fluvio connection is down.
+#[cfg(feature = "fluvio")]
+const RECONNECT_BACKOFF_SECS: u64 = 5;
+
+/// Build the relay's sink for this run.
+///
+/// [`FluvioSink`] when an endpoint is configured — [`spawn`] has already
+/// refused to start if an endpoint was set without this feature compiled
+/// in, so reaching a `None` endpoint here always means [`LoggingSink`] is
+/// the intended sink. The initial connection is **retried indefinitely**
+/// rather than falling back to [`LoggingSink`]: a fallback here would
+/// silently start stamping outbox rows `published_at` without ever
+/// reaching the broker the operator explicitly asked for — the same
+/// silent-data-loss shape the family's artifact-store "no fallback on an
+/// explicit backend choice" rule exists to prevent
+/// (`agents/share/bulk-import-export.md` §12).
+#[cfg(feature = "fluvio")]
+async fn build_sink(endpoint: Option<&str>) -> Box<dyn EventSink> {
+    let Some(endpoint) = endpoint else {
+        return Box::new(LoggingSink);
+    };
+    let topic = event_topic();
+    loop {
+        match FluvioSink::connect(endpoint, &topic).await {
+            Ok(sink) => {
+                tracing::info!(endpoint, topic, "relay: connected FluvioSink");
+                return Box::new(sink);
+            }
+            Err(err) => {
+                tracing::warn!(endpoint, error = %err, "relay: FluvioSink connect failed; retrying");
+                tokio::time::sleep(Duration::from_secs(RECONNECT_BACKOFF_SECS)).await;
+            }
+        }
+    }
+}
+
+/// Without the `fluvio` feature, [`spawn`] has already refused to start
+/// when an endpoint is configured, so the only reachable case is
+/// [`LoggingSink`]. Stays `async` (with nothing to await) so both cfg
+/// variants share one call site in [`spawn`].
+#[cfg(not(feature = "fluvio"))]
+#[allow(clippy::unused_async)]
+async fn build_sink(_endpoint: Option<&str>) -> Box<dyn EventSink> {
+    Box::new(LoggingSink)
+}
+
+/// The drain + retention loop, generic over the already-connected sink.
+async fn run_drain_loop(
+    db: DatabaseConnection,
+    sink: Box<dyn EventSink>,
+    interval: u64,
+    retention: i64,
+) {
+    let mut ticks: u64 = 0;
+    loop {
+        if let Err(err) = drain_once(&db, sink.as_ref(), 100).await {
+            tracing::warn!(error = %err, "relay drain pass failed");
+        }
+        ticks = ticks.wrapping_add(1);
+        if ticks.is_multiple_of(PURGE_EVERY_TICKS) {
+            match purge_published(&db, retention).await {
+                Ok(n) if n > 0 => {
+                    tracing::info!(purged = n, "relay purged old published outbox rows");
+                }
+                Ok(_) => {}
+                Err(err) => tracing::warn!(error = %err, "relay retention purge failed"),
+            }
+        }
+        tokio::time::sleep(Duration::from_secs(interval)).await;
+    }
+}
 
 /// Spawn the background relay loop if (and only if) the transport is
 /// `outbox` and [`relay_enabled`]. A no-op otherwise — so with the default
 /// `memory` transport this never starts, keeping behaviour unchanged.
 ///
-/// Uses the [`LoggingSink`]; swap in a `FluvioSink` (feature-gated) here
-/// when the broker lands — the loop is sink-agnostic.
+/// Sink selection: no `PROJECT_PORTFOLIO_MANAGEMENT_FLUVIO_ENDPOINT` ⇒
+/// [`LoggingSink`]. An endpoint configured **without** the `fluvio` cargo
+/// feature is a clean refusal to start the relay at all (logged at
+/// `error`) rather than a silent `LoggingSink` fallback — see
+/// `build_sink`'s doc comment in this file for why a fallback here would
+/// be worse than not running.
 pub fn spawn(db: DatabaseConnection) {
     if !crate::streaming::transport().is_outbox() || !relay_enabled() {
+        return;
+    }
+    let endpoint = fluvio_endpoint();
+    if endpoint.is_some() && !cfg!(feature = "fluvio") {
+        tracing::error!(
+            "PROJECT_PORTFOLIO_MANAGEMENT_FLUVIO_ENDPOINT is set but this binary was built \
+             without the `fluvio` cargo feature; the relay will NOT start — rebuild with \
+             `--features fluvio` (falling back to the logging sink would mark outbox rows \
+             published without ever reaching a real broker)"
+        );
         return;
     }
     let interval = interval_secs();
@@ -186,27 +347,12 @@ pub fn spawn(db: DatabaseConnection) {
     tracing::info!(
         interval_secs = interval,
         retention_days = retention,
+        fluvio_endpoint = endpoint.as_deref().unwrap_or("(none — LoggingSink)"),
         "starting event-outbox relay"
     );
     tokio::spawn(async move {
-        let sink = LoggingSink;
-        let mut ticks: u64 = 0;
-        loop {
-            if let Err(err) = drain_once(&db, &sink, 100).await {
-                tracing::warn!(error = %err, "relay drain pass failed");
-            }
-            ticks = ticks.wrapping_add(1);
-            if ticks.is_multiple_of(PURGE_EVERY_TICKS) {
-                match purge_published(&db, retention).await {
-                    Ok(n) if n > 0 => {
-                        tracing::info!(purged = n, "relay purged old published outbox rows");
-                    }
-                    Ok(_) => {}
-                    Err(err) => tracing::warn!(error = %err, "relay retention purge failed"),
-                }
-            }
-            tokio::time::sleep(Duration::from_secs(interval)).await;
-        }
+        let sink = build_sink(endpoint.as_deref()).await;
+        run_drain_loop(db, sink, interval, retention).await;
     });
 }
 

@@ -22,6 +22,17 @@ kind label — **and** a project-management tool.
 > sub-resources (goals / tasks / issues) + derived views, `deduplicate` +
 > review queue, cross-service links, bulk import/export.
 >
+> **Durable event bus, real-broker sink (BUS-3, 2026-08-03).** Following
+> BUS-1's case-service reference, `src/relay.rs` gained `FluvioSink` — a
+> real-broker `impl EventSink` behind this crate's own `fluvio` Cargo
+> feature (off by default; dependency tree and boot behaviour of a
+> default build unchanged). `PROJECT_PORTFOLIO_MANAGEMENT_FLUVIO_ENDPOINT`
+> selects it over the default `LoggingSink`; set without the `fluvio`
+> feature compiled in ⇒ the relay refuses to start (logged `error`), not
+> a silent no-broker fallback. `compose.fluvio.yaml` +
+> `Dockerfile.fluvio-cli` provision a local broker for opt-in manual
+> runs only.
+>
 > **Persistence note.** All plans live in **one `plans` table** with a
 > **nullable `kind`** column (the optional label) and a `parent_pid`
 > column (the containment parent). There is one REST collection
@@ -119,9 +130,11 @@ audited GDPR `/export`, wired to the ABAC `mask` obligation on
 `GET /{pid}`. Deliberately the thinnest of the four privacy modules in
 the family: most of a `Plan` (name, code, goals, status, dates,
 identifiers, tags, `relationships`, `parent_ref`) is operational
-content the registry exists to serve up, not personal data. Deferred (spec §13):
-durable event bus Phases 2–3 (outbox +
-Fluvio), front-end merge action, bulk import/export, the
+content the registry exists to serve up, not personal data. The durable
+event bus's Phases 2–3 (outbox relay + retention, then the `FluvioSink`
+real-broker sink, BUS-3, 2026-08-03, feature-gated and off by default)
+have landed. Deferred (spec §13):
+front-end merge action, bulk import/export, the
 `posts` / `comments` / `members` collaboration
 sub-resources, gRPC.
 
@@ -188,7 +201,7 @@ src/
 ├── scheduler.rs              optional set-and-forget sweep ticker (env-gated, default off)
 ├── openapi.rs                OpenAPI 3 document
 ├── privacy.rs                field masking (lead_ref, owner org) + GDPR export envelope
-├── relay.rs                  durable-bus Phase 2 outbox relay (poll/ack loop)
+├── relay.rs                  durable-bus Phase 2/3 outbox relay (poll/ack loop) + FluvioSink (fluvio feature, BUS-3)
 ├── search/                   Tantivy full-text/fuzzy/phonetic index (index.rs schema + mod.rs engine; kind is a search filter, never a dedup gate)
 ├── streaming.rs              CRUD/merge event stream — durable Envelope + EventPublisher seam (in-memory default, outbox transport); indexes/deindexes on every write
 ├── tasks/search.rs           `search_reindex` CLI task + boot-time rebuild-if-empty
