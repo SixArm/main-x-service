@@ -193,8 +193,14 @@ export class ApiClient {
    * so relative and absolute forms behave identically.
    */
   private buildUrl(path: string, query?: RequestOptions["query"]): string {
+    // Resolve `path` as a *relative* reference against the base (its
+    // leading slash is stripped): `api/persons` against `<origin>/api/proxy/`
+    // resolves to `<origin>/api/proxy/api/persons`. A still-absolute path
+    // (one kept starting with `/`) would instead replace the base URL's
+    // entire path per the URL spec, silently discarding `/api/proxy` —
+    // the bug this fixed 2026-08-03 (tasks.md FE-2).
     const url = new URL(
-      path.startsWith("/") ? path : `/${path}`,
+      path.startsWith("/") ? path.slice(1) : path,
       `${this.baseUrl}/`,
     );
     if (query) {
