@@ -110,6 +110,19 @@ integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 # it does not survive in core dumps or swap.
 # OS entropy for the integrity_key task.
 
+# Durable event bus Phase 3 (BUS-3, ported from the case-service BUS-1
+# reference; agents/share/event-bus.md §5/§8): the relay's real broker
+# sink. Optional and behind the `fluvio` feature below so the default
+# dependency tree (and every existing deployment's build) is unchanged —
+# the relay's `LoggingSink` covers dev/CI with no broker at all.
+fluvio = { version = "0.50", optional = true }
+
+[features]
+# Off by default. The relay's `EventSink` seam (src/relay.rs) needs no
+# feature to build or test; only `FluvioSink` — the real-broker producer
+# — lives behind this.
+fluvio = ["dep:fluvio"]
+
 [dev-dependencies]
 # Serialises the DB-gated audit-chain tests: they each truncate
 # `audit_log`, so running them concurrently would have one test wipe

@@ -58,6 +58,25 @@ DATABASE_URL=… cargo test --test api_integration_test
 cargo bench
 ```
 
+## Durable event bus relay (Fluvio)
+
+The Phase-3 outbox relay (`src/relay.rs`, default-off via
+`WORKER_EVENT_TRANSPORT=outbox` + `WORKER_EVENT_RELAY`) ships a real
+**`FluvioSink`** (BUS-3, ported from the case-service BUS-1 reference)
+behind this crate's own `fluvio` Cargo feature — off by default, so a
+plain `cargo build`/`cargo test` is unaffected. `WORKER_FLUVIO_ENDPOINT`
+selects it over the default `LoggingSink`; an endpoint configured
+**without** the `fluvio` feature compiled in makes the relay refuse to
+start (logged, not a silent no-broker fallback). See spec §13 (Phase 3 /
+BUS-3) for the full contract, `compose.fluvio.yaml` +
+`Dockerfile.fluvio-cli` for a local broker, and `tests/fluvio_relay.rs`
+for the feature-gated, `#[ignore]`d live round-trip.
+
+```bash
+cargo build --lib --features fluvio     # proves the real fluvio 0.50 API compiles
+cargo clippy --all-targets --features fluvio -- -D warnings
+```
+
 ## Doc hierarchy quick reference
 
 | File | Role |

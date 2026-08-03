@@ -7,6 +7,39 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — durable event bus Phase 3, `FluvioSink` (BUS-3, 2026-08-03)
+
+Ported from the case-service BUS-1 reference implementation.
+
+- **`FluvioSink`** (`src/relay.rs`), a real-broker `impl EventSink` behind
+  a new, off-by-default `fluvio` Cargo feature — a default build's
+  dependency tree and behaviour are unchanged. One producer per topic,
+  held for the sink's lifetime, partitioned by record `pid`.
+- **Sink selection in `relay::spawn`**: `WORKER_FLUVIO_ENDPOINT` unset ⇒
+  `LoggingSink` (unchanged default); set ⇒ `FluvioSink` against
+  `WORKER_EVENT_TOPIC` (default `mxi.worker.events`); set **without** the
+  `fluvio` feature compiled in ⇒ the relay refuses to start at all
+  (logged at `error`) rather than silently falling back to `LoggingSink`
+  and marking rows published without reaching a real broker. The initial
+  connection retries indefinitely rather than falling back.
+- **`compose.fluvio.yaml` + `Dockerfile.fluvio-cli`**: a local Fluvio
+  SC+SPU broker for opt-in manual testing only; not wired into any
+  automated CI stage.
+- **`tests/fluvio_relay.rs`**: a `#![cfg(feature = "fluvio")]`-gated,
+  `#[ignore]`d live-broker round-trip test. Verified today by compiling
+  under `--features fluvio` (no automated run in this repo stands up a
+  live broker). Connects directly via `DATABASE_URL` rather than through
+  `loco_rs::testing::prelude::request` — this crate's dev-dependencies do
+  not enable loco's `testing` feature (a structural difference from
+  case), so the test follows this crate's own existing DB-gated
+  `src/db/repositories.rs::tests` pattern instead.
+- SOUP register (`compliance/soup.tsv`) gained a `fluvio` row.
+- No behavioural change to a default build: `cargo build --lib`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`, and
+  `cargo test --lib` are unaffected; the same checks pass under
+  `--features fluvio` too, which is the actual proof the `fluvio` 0.50
+  API is used correctly.
+
 ### Changed — loco-rs 1.0.1 (2026-08-02)
 
 - **loco-rs 0.16.4 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration →
