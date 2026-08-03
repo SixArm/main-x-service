@@ -8,6 +8,30 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec.md](./spec/index.md) — single source of truth (numbered §1–§18; live work queue in §13); [README.md](./README.md) — user-facing intro; [AGENTS.md](./AGENTS.md) — agent guide.
 
 ## [Unreleased]
+### Added — Durable event bus, real-broker sink (BUS-3, 2026-08-03)
+
+`FluvioSink` (`src/relay.rs`) — the Phase-3 relay's real-broker
+`EventSink`, behind this crate's own `fluvio` Cargo feature (off by
+default; `fluvio` 0.50). One producer per topic, partitioned by record
+`pid` per `agents/share/event-bus.md` §7. New env vars:
+`COURSE_FLUVIO_ENDPOINT` (unset ⇒ unchanged `LoggingSink` default) and
+`COURSE_EVENT_TOPIC` (default `mxi.course.events`). An endpoint
+configured without the `fluvio` feature refuses to start the relay
+rather than silently falling back to `LoggingSink` — that fallback
+would mark outbox rows `published_at` without ever reaching the broker
+the operator asked for. `compose.fluvio.yaml` + `Dockerfile.fluvio-cli`
+provision a local SC+SPU broker for opt-in manual runs (not part of
+any automated CI stage); `tests/fluvio_relay.rs` is a feature-gated,
+`#[ignore]`d live-broker round-trip, verified by compiling under
+`--features fluvio` rather than an actual execution (no broker is
+stood up in this repo's CI). Copy-adapted from case-service's BUS-1
+reference implementation. Also corrects a stale claim in this crate's
+own docs (spec §7.2/§13, `AGENTS.md`) that course had "no durable
+outbox, in-memory events only" — untrue since the T-21/T-22 outbox +
+relay landed 2026-07-08; the family-wide `agents/share/overview.md`
+capability matrix carries the same stale claim but is out of this
+change's scope (handled separately).
+
 ### Changed — loco-rs 1.0.1 (2026-08-02)
 
 - **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration → 2.0,

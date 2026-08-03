@@ -208,8 +208,10 @@ bring-up the integration suite expects to be migrated against.
 - **REST**: FR-1..FR-9 + FR-14..FR-18 wired (T-7 / T-8 / T-9 / T-10);
   OpenAPI via utoipa (T-14).
 - **Audit + streaming**: `AuditLogRepository` + in-memory
-  `EventPublisher` MVP (T-9). Fluvio adapter under feature flag
-  pending.
+  `EventPublisher` MVP (T-9), plus the durable transactional-outbox bus
+  (`course_outbox` table, T-21) and its Phase-3 relay + retention
+  (T-22) with a real-broker `FluvioSink` behind the `fluvio` cargo
+  feature (T-23, off by default).
 - **Privacy**: `mask_course` + GDPR Article-15 export (T-10).
 - **Metrics**: Prometheus `GET /metrics.prom` (T-16) — process-wide
   registry, CRUD/merge counters, reserved labelled

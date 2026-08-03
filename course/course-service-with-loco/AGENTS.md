@@ -47,7 +47,7 @@ Shared reference docs live at the project root under
 | Validation | `src/validation/` (T-5, FR-21..FR-28) |
 | Privacy | `src/privacy/` (T-10, mask + GDPR Article-15 export) |
 | Audit log | `src/db/audit.rs` (T-9) |
-| Event streaming | `src/streaming/` (T-9, in-memory MVP; Fluvio under flag deferred) |
+| Event streaming | `src/streaming/` (T-9, in-memory MVP) + the durable transactional-outbox bus: `src/db/outbox.rs` (Phase 2, the `course_outbox` table, T-21) and `src/relay.rs` (Phase 3 relay + retention, T-22; the real-broker `FluvioSink` behind the `fluvio` cargo feature, T-23/BUS-3) |
 | Bridge tests | [`tests/duplicate_detection.rs`](tests/duplicate_detection.rs) (T-11) |
 | Integration tests | [`tests/api_integration_test.rs`](tests/api_integration_test.rs) (T-12, `#[ignore]`-tagged) |
 | Benchmarks | `benches/` (T-13, three criterion files) |

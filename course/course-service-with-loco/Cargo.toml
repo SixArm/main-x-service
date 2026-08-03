@@ -83,6 +83,19 @@ mimalloc = "0.1.52"
 # `COURSE_PASETO_KEYS_URL` is set.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
 
+# Durable event bus Phase 3 (BUS-3; agents/share/event-bus.md §5/§8):
+# the relay's real broker sink. Optional and behind the `fluvio` feature
+# below so the default dependency tree (and every existing deployment's
+# build) is unchanged — the relay's `LoggingSink` covers dev/CI with no
+# broker at all.
+fluvio = { version = "0.50", optional = true }
+
+[features]
+# Off by default. The relay's `EventSink` seam (src/relay.rs) needs no
+# feature to build or test; only `FluvioSink` — the real-broker producer
+# — lives behind this.
+fluvio = ["dep:fluvio"]
+
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3.27"
