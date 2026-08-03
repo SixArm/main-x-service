@@ -1,0 +1,79 @@
+# A local Fluvio broker for the bus-gated test tier (BUS-3;
+# agents/share/event-bus.md §10 "Fluvio-gated" tests).
+#
+# This is opt-in and separate from compose.test.yaml on purpose: the
+# Postgres compose file is what scripts/test-db.sh drives for every
+# DB-gated run, and this crate's default and DB-gated suites must stay
+# green with no broker present at all (the relay's LoggingSink is the
+# no-broker dev/CI path — see src/relay.rs). Bring this up only when you
+# want to exercise `FluvioSink` (the `fluvio` cargo feature) for real:
+#
+#   podman compose -f compose.fluvio.yaml up -d
+#   CARE_PATHWAY_FLUVIO_ENDPOINT=127.0.0.1:9103 \
+#     cargo test --features fluvio -- --ignored fluvio_relay
+#   podman compose -f compose.fluvio.yaml down -v
+#
+# Podman, not Docker (agents/share/rust-loco-stack.md). Three services —
+# a Stream Controller (sc), a one-shot SPU-registration step (sc-setup),
+# and a Stream Processing Unit (spu) — mirroring Fluvio's own documented
+# Docker Compose layout (fluvio.io/docs/fluvio/installation/docker/),
+# translated to this repo's conventions (fully-qualified image refs,
+# `mxi-care-pathway-` container-name prefix). Identical layout to
+# case-service's compose.fluvio.yaml (BUS-1) — copy-adapted, drift
+# accepted, same posture as compose.test.yaml existing per crate. Unlike
+# compose.test.yaml, this file has **not** been exercised in this repo's
+# CI — no Fluvio broker is stood up by any automated run today, so the
+# `#[ignore]`d test this feeds is verified by compiling under
+# `--features fluvio`, not by an actual round-trip. See src/relay.rs's
+# module docs and tests/fluvio_relay.rs.
+services:
+  sc:
+    image: docker.io/infinyon/fluvio:stable
+    container_name: mxi-care-pathway-fluvio-sc
+    hostname: sc
+    ports:
+      # Host 9103 -> container 9003, so a client on the host connects to
+      # 127.0.0.1:9103 (matches CARE_PATHWAY_FLUVIO_ENDPOINT above).
+      - "9103:9003"
+    environment:
+      RUST_LOG: info
+    command: "./fluvio-run sc --local /fluvio/metadata"
+    volumes:
+      - fluvio-metadata:/fluvio/metadata
+
+  sc-setup:
+    build:
+      context: .
+      dockerfile: Dockerfile.fluvio-cli
+    container_name: mxi-care-pathway-fluvio-sc-setup
+    environment:
+      RUST_LOG: info
+    # One-shot: registers the spu service with the sc, then exits. Compose
+    # restarts this only if it fails; a clean exit 0 leaves it stopped.
+    entrypoint: >
+      /bin/sh -c "
+      fluvio profile add docker sc:9003 docker;
+      fluvio cluster spu register --id 5001 -p 0.0.0.0:9110 --private-server spu:9011;
+      exit 0;
+      "
+    depends_on:
+      - sc
+
+  spu:
+    image: docker.io/infinyon/fluvio:stable
+    container_name: mxi-care-pathway-fluvio-spu
+    hostname: spu
+    volumes:
+      - fluvio-data:/fluvio/data
+    environment:
+      RUST_LOG: info
+    ports:
+      - "9110:9010"
+      - "9111:9011"
+    command: "./fluvio-run spu -i 5001 -p spu:9010 -v spu:9011 --sc-addr sc:9004 --log-base-dir /fluvio/data"
+    depends_on:
+      - sc
+
+volumes:
+  fluvio-metadata:
+  fluvio-data:

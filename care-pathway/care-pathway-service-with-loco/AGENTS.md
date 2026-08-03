@@ -78,9 +78,11 @@ special-category settings). A pathway *template* names no patient, so
 the masked field set is thin — see `src/privacy.rs`'s module docs for
 why, and for the explicit note that the patient-identifying linkage
 (`pathway_instances.subject_ref`) is a separate, not-yet-addressed
-surface. Deferred
-(spec §13): the durable bus's Phase-3 Fluvio
-broker sink (see `agents/share/event-bus.md`), instance-layer
+surface. The durable bus's real broker sink (BUS-3, `FluvioSink` in
+`src/relay.rs`, behind this crate's own `fluvio` Cargo feature, off by
+default) landed 2026-08-03, ported from case-service's BUS-1 reference —
+see `agents/share/event-bus.md`. Deferred
+(spec §13): instance-layer
 masking/authz for `subject_ref`, front-end merge
 action, terminology-server code-existence checks. The published key set
 is fetched over HTTP once at boot when `CARE_PATHWAY_PASETO_KEYS_URL` is
@@ -121,7 +123,7 @@ src/
 ├── merge.rs               pure record-merge logic (merge_pathways)
 ├── openapi.rs             hand-written OpenAPI 3 document
 ├── privacy.rs             field masking (provider name/id) + GDPR export envelope
-├── relay.rs               durable-bus Phase 2 outbox relay (poll/ack loop)
+├── relay.rs               durable-bus Phase 3 outbox relay (poll/ack loop) + FluvioSink (BUS-3, `fluvio` feature)
 ├── search/                Tantivy full-text/fuzzy/phonetic index (index.rs schema + mod.rs engine)
 ├── streaming.rs           CRUD/merge event stream — Phase 1 durable-bus
 │                          envelope (Envelope) + EventPublisher seam +
@@ -135,4 +137,7 @@ src/
 │   └── _entities/{care_pathways,audit_logs,merge_records,event_outbox}.rs  SeaORM entities
 migration/src/            …_000001_care_pathways, …_000002_audit_logs, …_000003_merge_records, …_000004_event_outbox
 config/                   development/production/test yaml
+compose.fluvio.yaml        opt-in local Fluvio broker (`fluvio` feature, BUS-3; not part of CI)
+Dockerfile.fluvio-cli       support image for compose.fluvio.yaml's sc-setup step
+tests/fluvio_relay.rs       `fluvio`-feature-gated, #[ignore]d live-broker round-trip test
 ```

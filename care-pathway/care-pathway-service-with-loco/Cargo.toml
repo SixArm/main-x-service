@@ -95,6 +95,13 @@ aws-sdk-s3 = { version = "1", optional = true, default-features = false, feature
 ] }
 aws-credential-types = { version = "1", optional = true }
 
+# Durable event bus Phase 3 (BUS-3; agents/share/event-bus.md §5/§8):
+# the relay's real broker sink. Optional and behind the `fluvio` feature
+# below so the default dependency tree (and every existing deployment's
+# build) is unchanged — the relay's `LoggingSink` covers dev/CI with no
+# broker at all.
+fluvio = { version = "0.50", optional = true }
+
 [[bin]]
 name = "care-pathway-service"
 path = "src/bin/main.rs"
@@ -105,6 +112,10 @@ required-features = []
 # backend covers dev and test, and the SDK is a large dependency tree no
 # deployment should pay for unless it uses it.
 s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-credential-types"]
+# Off by default. The relay's `EventSink` seam (src/relay.rs) needs no
+# feature to build or test; only `FluvioSink` — the real-broker producer
+# — lives behind this.
+fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
 # Temp dirs for the artifact-store tests (SEC-B4 confinement).

@@ -20,9 +20,10 @@ Prometheus metrics + offline PASETO v4 public token verification + blanket
 `/api/*` enforcement (off by default) + rich payload validation
 (ICD/SNOMED/UUID/DOI/BCP-47) + field masking / GDPR export wired to the
 ABAC `mask` obligation (§13 2026-08-02; thin by design — a pathway
-*template* names no patient, see §12.2). Deferred (§13): the durable event bus's real
-Fluvio broker sink (Phases 2–3 — transactional outbox + relay/retention
-— are done; only the broker-gated `FluvioSink` remains),
+*template* names no patient, see §12.2) + the durable event bus's real
+`FluvioSink` broker sink (BUS-3, §13 2026-08-03; all three phases —
+transactional outbox, relay/retention, and the real-broker sink — are
+now done). Deferred (§13):
 instance-layer masking/authz for `pathway_instances.subject_ref` (the
 patient-identifying linkage — see §16), front-end merge action, a PASETO key-set
 refresh loop (the boot-time paseto-keys-over-HTTP fetch is done —
@@ -539,8 +540,7 @@ the evidence bundle.
   `CARE_PATHWAY_EVENT_TRANSPORT=outbox` writes one `event_outbox` row on
   the entity mutation's transaction (`streaming.rs`; default `memory`).
   **Phase 3** (relay + retention) is implemented — see the dedicated
-  Phase-3 item below. Only the real Fluvio broker sink remains
-  (broker-gated), designed in
+  Phase-3 item below, now joined by the real-broker sink; designed in
   [`agents/share/event-bus.md`](../../../agents/share/event-bus.md);
   `actor` is wired through `publish_with_actor`.
 - [x] **Durable event bus — Phase 3 (relay + retention).** `src/relay.rs`:
@@ -555,10 +555,28 @@ the evidence bundle.
   AND `CARE_PATHWAY_EVENT_RELAY`** (truthy `1`/`true`/`yes`/`on`), so it is
   a no-op by default. Tests: DB-free `LoggingSink`/capturing-sink send +
   config defaults; the drain/ack seams (`unpublished`/`mark_published`) are
-  DB-gated-tested via the outbox suite. **Broker-gated follow-up:** a real
-  **`FluvioSink`** (`impl EventSink` behind a `fluvio` cargo feature) — the
-  trait is the seam, so the drain loop is unchanged when it lands
-  ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §5, §8).
+  DB-gated-tested via the outbox suite.
+- [x] **Durable event bus — real broker sink (`FluvioSink`, BUS-3,
+  2026-08-03).** Ported from case-service's BUS-1 reference
+  (`case/case-service-with-loco/src/relay.rs`). `FluvioSink` (`impl
+  EventSink`) lives in `src/relay.rs` behind this crate's own `fluvio`
+  Cargo feature, off by default, so a default build's dependency tree
+  and behaviour are unchanged. `spawn()` selects it over `LoggingSink`
+  when `CARE_PATHWAY_FLUVIO_ENDPOINT` is set (default topic
+  `mxi.care_pathway.events`, overridable via `CARE_PATHWAY_EVENT_TOPIC`);
+  an endpoint configured **without** the `fluvio` feature compiled in is
+  a clean refusal to start the relay (logged at `error`), never a
+  silent `LoggingSink` fallback that would mark outbox rows published
+  without ever reaching a real broker. The initial broker connection
+  retries indefinitely rather than falling back. `compose.fluvio.yaml`
+  + `Dockerfile.fluvio-cli` provision a local broker for opt-in manual
+  runs (not part of any automated CI stage); `tests/fluvio_relay.rs` is
+  a `fluvio`-feature-gated, `#[ignore]`d live round-trip test, verified
+  today only by compiling under `--features fluvio` (no broker is stood
+  up by any automated run in this repo). `compliance/soup.tsv` carries
+  the `fluvio` SOUP row. See
+  [`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §5,
+  §8.
 - [ ] Privacy controls if any restricted fields appear.
 - [x] Record merge — `POST /merge` folds a duplicate into a survivor
   (union fields, former-title alias, soft-delete, `merge_records`
@@ -897,10 +915,9 @@ The credential switch RS256-JWT → PASETO v4 public per
 has since landed (§13), as has the boot-time paseto-keys-over-HTTP fetch
 (`CARE_PATHWAY_PASETO_KEYS_URL`, fetch-once, env fallback; §9/§13), and
 field masking + audited GDPR export wired to the ABAC `mask` obligation
-(2026-08-02; §13). Next
-(deferred, §13): the durable event bus's
-real Fluvio broker sink (Phases 2–3 — outbox + relay/retention — are done;
-only the broker-gated `FluvioSink` remains), a PASETO key-set refresh loop,
+(2026-08-02; §13), and the durable event bus's real `FluvioSink` broker
+sink (BUS-3, 2026-08-03; §13) — all three bus phases are now done. Next
+(deferred, §13): a PASETO key-set refresh loop,
 instance-layer privacy for `pathway_instances.subject_ref` (§16),
 front-end merge action.
 

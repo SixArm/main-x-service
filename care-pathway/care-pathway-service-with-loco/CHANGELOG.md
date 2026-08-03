@@ -8,6 +8,39 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — Durable event bus: real Fluvio broker sink (BUS-3, 2026-08-03)
+
+Ported from case-service's BUS-1 reference implementation
+(`case/case-service-with-loco/src/relay.rs`), mechanically adapted to
+this crate's `CARE_PATHWAY_` env prefix and `care_pathway` entity token.
+All three phases of the durable event bus are now done: transactional
+outbox (Phase 2), relay/retention (Phase 3, already landed), and now the
+real-broker sink.
+
+- `src/relay.rs` — `FluvioSink` (`impl EventSink`), behind this crate's
+  own `fluvio` Cargo feature (off by default, so a default build's
+  dependency tree and behaviour are unchanged). `spawn()` now selects
+  `FluvioSink` over the existing `LoggingSink` when
+  `CARE_PATHWAY_FLUVIO_ENDPOINT` is configured (default topic
+  `mxi.care_pathway.events`, overridable via `CARE_PATHWAY_EVENT_TOPIC`).
+  An endpoint configured **without** the `fluvio` feature compiled in is
+  a clean refusal to start the relay (logged at `error`), never a
+  silent `LoggingSink` fallback that would mark outbox rows published
+  without ever reaching a real broker (the same "no fallback on an
+  explicit backend choice" posture as the bulk artifact store, §12 of
+  `agents/share/bulk-import-export.md`). The initial broker connection
+  retries indefinitely rather than falling back.
+- `Cargo.toml` — `fluvio = { version = "0.50", optional = true }` +
+  `[features] fluvio = ["dep:fluvio"]`, alongside the crate's existing
+  `s3` optional-feature pattern.
+- `compose.fluvio.yaml` + `Dockerfile.fluvio-cli` — an opt-in local
+  Fluvio broker (`mxi-care-pathway-fluvio-*` containers), for manual
+  exercise of the `fluvio` feature; not part of any automated CI stage.
+- `tests/fluvio_relay.rs` — a `fluvio`-feature-gated, `#[ignore]`d live
+  round-trip test, verified today by compiling under `--features
+  fluvio` (no broker is stood up by any automated run in this repo).
+- `compliance/soup.tsv` — a `fluvio` SOUP row.
+
 ### Added — Privacy: field masking + GDPR export (2026-08-02)
 
 Repo tasks.md P-2 (as P-1/organization). A `CarePathway` is a
