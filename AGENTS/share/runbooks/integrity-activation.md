@@ -11,9 +11,11 @@ not trust.
 This runbook covers the **integrity and audit** controls
 (`spec/12-compliance.md` §12.4z in each entity spec). Auth activation
 itself is [`jwt-enforcement.md`](../jwt-enforcement.md); this is the
-partial OPS-1 slice for integrity, and the other OPS-1 runbooks — key
-rotation for PASETO, reconciliation divergence, event-bus replay, bulk
-recovery — are still unwritten.
+integrity slice of OPS-1. The other OPS-1 runbooks:
+[`paseto-key-rotation.md`](paseto-key-rotation.md),
+[`reconciliation-divergence.md`](reconciliation-divergence.md),
+[`event-bus-outage-replay.md`](event-bus-outage-replay.md), and
+[`bulk-job-recovery.md`](bulk-job-recovery.md).
 
 Applies to **care-pathway, case, person, worker** — the four services
 carrying the chain. Substitute the entity prefix throughout:

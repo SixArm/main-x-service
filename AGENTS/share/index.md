@@ -70,6 +70,11 @@ Per-crate `spec.md`:
 | [jwt-enforcement.md](jwt-enforcement.md)                         | Blanket `/api/*` auth enforcement (coordinated; credential now PASETO/session) |
 | [authorization-attributes.md](authorization-attributes.md)       | ABAC: `attrs` claim + policy language + default policy (read allow / mutation deny), 401/403 split, sourcing |
 | [runbooks/integrity-activation.md](runbooks/integrity-activation.md) | Runbook: activating the integrity/audit controls (they are all default-off), verifying each took effect, checkpoint storage, MAC-key rotation |
+| [runbooks/paseto-key-rotation.md](runbooks/paseto-key-rotation.md) | Runbook: rotating the PASETO signing key with zero downtime — the peer-refresh-timing trap, symptom → check → action |
+| [runbooks/reconciliation-divergence.md](runbooks/reconciliation-divergence.md) | Runbook: link-graph reconciliation divergence — what a pass does, the gauge's two sharp edges, symptom → check → action |
+| [runbooks/event-bus-outage-replay.md](runbooks/event-bus-outage-replay.md) | Runbook: event-bus outage detection and containment — there is no replay yet; what "sent" can silently lie about |
+| [runbooks/bulk-job-recovery.md](runbooks/bulk-job-recovery.md) | Runbook: bulk import/export job failure recovery — a `running` job can be stuck forever, stable-key vs idempotency-key, symptom → check → action |
 | [security.md](security.md)                                       | Security audit summary, cross-cutting invariants, the `<ENTITY>_REQUIRE_AUTH` activation gate, secret-handling, threat model |
 | [rust-loco-stack.md](rust-loco-stack.md)                         | Stack for Rust, Loco (database, search, …)             |
 | [loco.md](loco.md)                                               | Loco framework (backend-only conventions)              |
+| [configuration.md](configuration.md)                             | Complete environment-variable reference — every `<ENTITY>_*`, `LINK_GRAPH_*`, `TOKEN_*`/`AUTH_*` variable, default, effect, governing doc |
