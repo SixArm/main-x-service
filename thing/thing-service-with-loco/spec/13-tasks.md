@@ -242,9 +242,44 @@ clearly described manual check confirms the acceptance criterion.
     enforced). Three DB-free unit tests (`logging_sink_sends_ok`,
     `capturing_sink_records_entity_and_key`, `config_defaults_are_safe`)
     pass (`cargo test --lib`: 174; `clippy --lib --tests` clean).
-    Remaining follow-up: a real `FluvioSink` (feature `fluvio`) as
-    another `impl EventSink` shipping to `mxi.thing.events`, plus
-    flipping `THING_EVENT_TRANSPORT=outbox` in deployment.
+- [x] **Durable event bus — Phase 3, `FluvioSink` (BUS-3).** *(done
+  2026-08-03)* Ported from the case-service **reference** (BUS-1): the
+  real-broker `impl EventSink`, behind this crate's own `fluvio` Cargo
+  feature (off by default — the dependency tree and boot behaviour of a
+  default build are unchanged). One producer per topic
+  (`fluvio::Fluvio::connect_with_config` + `topic_producer`, held for the
+  sink's lifetime), partitioned by record `pid` per §7. Config:
+  `THING_FLUVIO_ENDPOINT` (the broker's SC address; unset ⇒
+  `LoggingSink`, unchanged default behaviour) and `THING_EVENT_TOPIC`
+  (default `mxi.thing.events`). **No silent fallback**: an endpoint
+  configured **without** the `fluvio` feature refuses to start the relay
+  at all (logged at `error`), rather than a `LoggingSink` masquerade that
+  would mark outbox rows `published_at` without ever reaching the broker
+  the operator asked for — the same shape as the family's artifact-store
+  "no fallback on an explicit backend choice" rule
+  (`agents/share/bulk-import-export.md` §12). The initial connection
+  retries indefinitely rather than falling back, for the same reason.
+  `compose.fluvio.yaml` + `Dockerfile.fluvio-cli` provision a local
+  SC+SPU broker (Fluvio's own documented Docker Compose layout,
+  translated to this repo's Podman conventions) for opt-in manual runs;
+  **not** wired into any automated CI stage. Tests:
+  `cargo build`/`clippy --all-targets -D warnings`/`fmt --check` clean
+  under both default features and `--features fluvio` (the real `fluvio`
+  0.50 API compiling is the actual verification of correct usage);
+  `tests/fluvio_relay.rs` is a `#![cfg(feature = "fluvio")]`-gated,
+  `#[ignore]`d round-trip (create under outbox transport → `FluvioSink` →
+  `drain_once` → assert `published_at`), following this crate's own
+  DB-gated-test convention (direct `DATABASE_URL` connect +
+  `SeaOrmThingRepository`, not case's `loco_rs::testing::request`
+  harness, which this crate does not use elsewhere) — its run command is
+  documented inline. It needs a live broker, which no automated run in
+  this repo stands up, so it is verified by compiling under the feature,
+  not by an actual execution (same posture as case's BUS-1 and person's
+  `s3_round_trip_against_a_live_endpoint`, BLK-4). This crate has no
+  `compliance/soup.tsv` (unlike case), so no SOUP register update
+  applies here. No behavioural change under the default build; `cargo
+  test --lib` count unchanged (174) with default features, and compiles
+  clean (same 174 DB-free tests) under `--features fluvio`.
 
 - [x] **2026-07-19 — Stored review queue + decision endpoints.** Persist
   the batch-dedup candidates (`review_queue` migration + the shared

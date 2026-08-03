@@ -43,6 +43,22 @@ Shared reference docs live at the repo root under
 | [compliance-for-healthcare.md](../../agents/share/compliance-for-healthcare.md) | HIPAA, NHS, … |
 | [compliance-for-technology.md](../../agents/share/compliance-for-technology.md) | ISO, GDPR, … |
 
+## Durable event bus — Phase 3 real-broker sink
+
+`src/relay.rs`'s outbox relay ships to a `LoggingSink` (no-broker,
+dev/CI) by default. `FluvioSink` (BUS-3, landed 2026-08-03, ported
+from case-service's BUS-1 reference) is the real-broker `EventSink`,
+compiled only under this crate's own `fluvio` Cargo feature (off by
+default — `cargo build`/`test`/`clippy` behave identically without
+it). Set `THING_FLUVIO_ENDPOINT` (broker SC address) and optionally
+`THING_EVENT_TOPIC` (default `mxi.thing.events`) to select it; an
+endpoint configured without the `fluvio` feature refuses to start the
+relay (logged at `error`) rather than silently falling back to
+`LoggingSink`. `compose.fluvio.yaml` + `Dockerfile.fluvio-cli`
+provision a local broker for opt-in manual testing — see the run
+command documented in `tests/fluvio_relay.rs`, not part of any
+automated CI stage.
+
 ## Running this crate
 
 ```bash

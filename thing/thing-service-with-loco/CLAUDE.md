@@ -201,6 +201,8 @@ curl -X POST http://localhost:8080/api/things/deduplicate \
 | `THING_EVENT_RELAY` | Enable the Phase-3 outbox relay loop (`1`/`true`/`yes`/`on`); only runs when the transport is `outbox`. Off by default | `off` |
 | `THING_EVENT_RELAY_INTERVAL_SECS` | Relay poll interval in seconds (floored at 1) | `5` |
 | `THING_EVENT_RETENTION_DAYS` | Outbox row TTL; the Phase-3 relay's retention sweep purges published rows older than this | `7` |
+| `THING_FLUVIO_ENDPOINT` | Fluvio broker SC address; selects the real-broker `FluvioSink` over the default `LoggingSink` (requires this crate's `fluvio` Cargo feature, off by default — an endpoint set without the feature refuses to start the relay rather than silently falling back) | unset (`LoggingSink`) |
+| `THING_EVENT_TOPIC` | Topic the relay publishes to (`mxi.<entity>.events` convention) | `mxi.thing.events` |
 | `RUST_LOG` | Log filter | `info` |
 
 ## Testing
