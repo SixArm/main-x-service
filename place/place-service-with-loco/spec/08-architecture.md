@@ -38,5 +38,6 @@ src/
 | Trait | Implementations |
 |---|---|
 | (No `Matcher` trait yet — `compute_match` is a free function) | — |
-| `EventProducer` | `InMemoryEventPublisher` (Fluvio planned) |
+| `EventProducer` | `InMemoryEventPublisher` (legacy, memory transport) |
+| `relay::EventSink` | `LoggingSink` (default, no-broker) · `FluvioSink` (real broker, `fluvio` Cargo feature, off by default — BUS-3, T-12c) |
 

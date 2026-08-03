@@ -11,7 +11,7 @@
 | Search | Tantivy full-text + fuzzy index (`q` / `limit` / `fuzzy` / `mask_sensitive`); geo-radius `nearby` + `offset` deferred to T-9 |
 | REST API | 14 endpoints + OpenAPI/Swagger + CORS + structured errors |
 | Repository | SeaORM CRUD with transactions, soft delete |
-| Event streaming | InMemoryEventPublisher |
+| Event streaming | InMemoryEventPublisher; durable-bus Phase 2 outbox + Phase 3 relay (`PLACE_EVENT_TRANSPORT=outbox`, default `memory`), with a real-broker `FluvioSink` behind this crate's own `fluvio` Cargo feature (off by default) — `PLACE_FLUVIO_ENDPOINT` selects it over the default `LoggingSink` (T-12, T-12b, T-12c/BUS-3) |
 | Audit log | AuditLogRepository with old / new JSON |
 | Duplicate detection | Real-time + explicit + batch with review queue |
 | Merging | Transfer + alternate-name + link + soft-delete + snapshot + event |
@@ -31,7 +31,7 @@
 | Geo-radius `nearby` HTTP endpoint + search `offset` | T-9 |
 | PostGIS-backed spatial queries | T-1 |
 | Hierarchy depth queries (recursive CTE) | T-2 |
-| Fluvio production publisher | T-3 |
+| Fluvio production publisher (deployment flip: enable at runtime, wire the search-reindex consumer) | T-12b follow-up |
 | Event consumers | (no task yet) |
 | gRPC API | T-4 |
 | OSM import pipeline | T-5 |

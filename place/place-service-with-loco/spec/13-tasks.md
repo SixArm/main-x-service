@@ -165,7 +165,43 @@ clearly described manual check confirms the acceptance criterion.
   - Done (2026-07-08): `migration/src/m20260708_000001_create_event_outbox.rs` + `migrations/2026070800000001_create_event_outbox/{up,down}.sql`; `db::models::event_outbox`; `src/db/outbox.rs`; `src/streaming/envelope.rs`. DB-free tests: envelope `for_place`/`for_merge`, `EventView` projection, `EventTransport::parse`, `OutboxInsert::from_envelope` field mapping + non-UUID-pid reject. DB-gated `#[ignore]` tests (`db::tests`, need `DATABASE_URL`): `create` writes one `created` row; `merge` writes one `merged` row carrying `merged_from` + one `deleted` row — both in one tx. `cargo test --lib` 180 passed, 2 ignored; `cargo clippy --lib --tests` clean.
 - [x] **T-12b — Durable event bus, Phase 3 (outbox relay + retention).** Add the background relay worker (`src/relay.rs`): the `EventSink` trait (the bus seam) with the default no-broker `LoggingSink`; `drain_once` (poll `Model::unpublished` → `sink.send` → `Model::mark_published`, at-least-once, stops at the first send failure to preserve per-pid order); `purge_published` (delete published rows older than `PLACE_EVENT_RETENTION_DAYS`, now **enforced**); and `spawn`, wired in `App::after_routes` (`crate::relay::spawn(ctx.db.clone())`). The loop runs **only** when `PLACE_EVENT_TRANSPORT=outbox` **and** `PLACE_EVENT_RELAY` is truthy, so the default `memory` transport is unaffected. Config: `PLACE_EVENT_RELAY` (on/off), `PLACE_EVENT_RELAY_INTERVAL_SECS` (poll cadence, default 5), `PLACE_EVENT_RETENTION_DAYS` (now consumed). Error handling mirrors the repository/outbox code: functions return the crate `Result` and `.map_err(|e| crate::Error::Database(...))` on SeaORM calls (place has no `From<DbErr>`).
   - Done (2026-07-08): `src/relay.rs` (copy-adapted from the organization reference), `pub mod relay;` in `lib.rs`, spawn in `app.rs`. 3 DB-free unit tests (logging-sink smoke, capturing-sink contract, config defaults). `cargo test --lib` 183 passed, 2 ignored; `cargo clippy --lib --tests` clean.
-  - **Remaining follow-up:** a real `FluvioSink` behind a `fluvio` cargo feature (another `impl EventSink`; the trait is the seam so the drain loop is unchanged), and flipping `PLACE_EVENT_TRANSPORT=outbox` in deployment with the search-reindex consumer. Supersedes T-3's in-memory-only Fluvio publisher note.
+  - **Remaining follow-up:** flipping `PLACE_EVENT_TRANSPORT=outbox` in deployment with the search-reindex consumer. Supersedes T-3's in-memory-only Fluvio publisher note. (The real `FluvioSink` follow-up landed as T-12c below.)
+- [x] **T-12c — Durable event bus, Phase 3, `FluvioSink` (BUS-3).**
+  *(done 2026-08-03)* Ports the case-service reference (BUS-1) onto this
+  crate's `src/relay.rs`: the real-broker `impl EventSink`, behind this
+  crate's own `fluvio` Cargo feature (off by default — the dependency
+  tree and boot behaviour of a default build are unchanged). One
+  producer per topic (`fluvio::Fluvio::connect_with_config` +
+  `topic_producer`, held for the sink's lifetime), partitioned by record
+  `pid` per `agents/share/event-bus.md` §7. Config: `PLACE_FLUVIO_ENDPOINT`
+  (the broker's SC address; unset ⇒ `LoggingSink`, unchanged default
+  behaviour) and `PLACE_EVENT_TOPIC` (default `mxi.place.events`). **No
+  silent fallback**: an endpoint configured **without** the `fluvio`
+  feature refuses to start the relay at all (logged at `error`), rather
+  than a `LoggingSink` masquerade that would mark outbox rows
+  `published_at` without ever reaching the broker the operator asked
+  for — the same shape as the family's artifact-store "no fallback on an
+  explicit backend choice" rule (`agents/share/bulk-import-export.md`
+  §12). The initial connection retries indefinitely rather than falling
+  back, for the same reason. `compose.fluvio.yaml` +
+  `Dockerfile.fluvio-cli` provision a local SC+SPU broker (Fluvio's own
+  documented Docker Compose layout, translated to this repo's Podman
+  conventions, container names `mxi-place-fluvio-*`) for opt-in manual
+  runs; **not** wired into any automated CI stage. Tests: `cargo
+  build`/`clippy --all-targets -D warnings`/`fmt --check` clean under
+  both default features and `--features fluvio` (the real `fluvio` 0.50
+  API compiling is the actual verification of correct usage);
+  `tests/fluvio_relay.rs` is a `#![cfg(feature = "fluvio")]`-gated,
+  `#[ignore]`d round-trip (create under outbox transport → `FluvioSink`
+  → `drain_once` → assert `published_at`) with its run command
+  documented inline — it needs a live broker, which no automated run in
+  this repo stands up, so it is verified by compiling under the feature,
+  not by an actual execution (same posture as person's
+  `s3_round_trip_against_a_live_endpoint`, BLK-4; and case's own
+  `tests/fluvio_relay.rs`, BUS-1). This crate carries no
+  `compliance/soup.tsv` (unlike case), so no SOUP register update was
+  needed. BUS-2 (link-graph Fluvio consumer, already landed) and rolling
+  `FluvioSink` to the remaining entity services continue independently.
 
 - [x] **2026-07-19 — Stored review queue + decision endpoints.** Persist
   the batch-dedup candidates (`review_queue` migration + the shared

@@ -58,6 +58,21 @@ DATABASE_URL=… cargo test --test api_integration_test
 cargo bench
 ```
 
+### Durable event bus — the relay's real-broker sink (BUS-3)
+
+`src/relay.rs` drains the transactional `event_outbox` (Phase 2/3,
+default-off via `PLACE_EVENT_TRANSPORT=outbox` + `PLACE_EVENT_RELAY`) to
+an `EventSink`. The default is the no-broker `LoggingSink`; a real
+`FluvioSink` (ported 2026-08-03 from the case-service reference, BUS-1)
+lives behind this crate's own `fluvio` Cargo feature, off by default, so
+a plain `cargo build`/`cargo test --lib` is unchanged. `PLACE_FLUVIO_ENDPOINT`
+selects it; an endpoint configured **without** the feature refuses to
+start the relay (logged) rather than silently falling back. Exercise it
+locally with `compose.fluvio.yaml` + `Dockerfile.fluvio-cli` (opt-in,
+not part of any CI stage) and `cargo test --features fluvio --test
+fluvio_relay -- --ignored` — see that file's module docs for the exact
+commands.
+
 ## Doc hierarchy quick reference
 
 | File | Role |

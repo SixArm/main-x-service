@@ -7,6 +7,33 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — Durable event bus, real-broker sink (BUS-3, 2026-08-03)
+
+Ports the case-service reference (BUS-1) onto this crate's relay:
+
+- **`FluvioSink`** (`src/relay.rs`) — the Phase-3 relay's real-broker
+  `EventSink`, behind this crate's own `fluvio` Cargo feature (off by
+  default; `fluvio` 0.50). One producer per topic, partitioned by record
+  `pid` per `agents/share/event-bus.md` §7. New env vars:
+  `PLACE_FLUVIO_ENDPOINT` (unset ⇒ unchanged `LoggingSink` default) and
+  `PLACE_EVENT_TOPIC` (default `mxi.place.events`).
+- **No silent fallback.** An endpoint configured without the `fluvio`
+  feature refuses to start the relay rather than silently falling back
+  to `LoggingSink` — that fallback would mark outbox rows
+  `published_at` without ever reaching the broker the operator asked
+  for. The initial connection retries indefinitely instead of falling
+  back, for the same reason.
+- `compose.fluvio.yaml` + `Dockerfile.fluvio-cli` provision a local
+  SC+SPU broker for opt-in manual runs (not part of any automated CI
+  stage; identical layout to case-service's, container names
+  `mxi-place-fluvio-*`).
+- `tests/fluvio_relay.rs` is a feature-gated, `#[ignore]`d live-broker
+  round-trip, verified by compiling under `--features fluvio` rather
+  than an actual execution (no broker is stood up in this repo's CI).
+- No behavioural change to a default build: `cargo build --lib` and
+  `cargo test --lib` pass counts are unchanged; only `--features
+  fluvio` adds the new sink to the dependency tree and build output.
+
 ### Changed — loco-rs 1.0.1 (2026-08-02)
 
 - **loco-rs 0.16.4 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration →
