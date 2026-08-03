@@ -7,6 +7,16 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Fixed — cross-service link endpoints now use the uniform response envelope (2026-08-03)
+
+`POST`/`GET`/`DELETE /api/workers/{pid}/links` previously returned bare
+JSON bodies while every other worker REST endpoint wraps in
+`{success,data,error}` (`ApiResponse<T>`) — a front-end client that
+unwraps `.data` would have silently read these as `undefined`. Fixed;
+the bulk aggregator endpoint (`GET /api/workers/links`) is unchanged
+(still bare, for the link-graph aggregator's HTTP client). New DB-gated
+regression test pins the wrapped shape end-to-end.
+
 ### Added — durable event bus Phase 3, `FluvioSink` (BUS-3, 2026-08-03)
 
 Ported from the case-service BUS-1 reference implementation.

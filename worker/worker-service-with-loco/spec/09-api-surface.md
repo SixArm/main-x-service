@@ -70,6 +70,15 @@ returned here. Graph traversal (`neighbors` / `single-view`) lives in the
 separate `link-graph-service-with-loco` aggregator, not this service. See
 [cross-service linking §4.1](../../../agents/share/cross-service-linking.md).
 
+These three per-record endpoints return the crate's uniform
+`{success,data,error}` envelope (`ApiResponse<T>`), matching every other
+worker REST endpoint — fixed 2026-08-03; they previously returned bare
+JSON, which a front-end client that unwraps `.data` would have silently
+read as `undefined` rather than erroring. The bulk aggregator endpoint
+(`GET /api/workers/links`) is deliberately **not** wrapped: it stays bare
+`{"edges": [...]}` for the link-graph aggregator's HTTP client, which
+deserializes that shape directly.
+
 ### 9.2 Assessment endpoints
 
 Workforce assessments (domain model §5.5) are a **sub-resource of a
