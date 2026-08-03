@@ -87,8 +87,10 @@ pub struct LinkRequest {
 /// A stored edge as returned to the operator: a clean projection of the
 /// `entity_links` row. `from_ref` is reconstructed as this crate's
 /// `person:<id>` URN. Distinct from the aggregator-facing [`EdgeDetail`]
-/// (`edge_id` / `edge_kind` field names).
-#[derive(Debug, Serialize)]
+/// (`edge_id` / `edge_kind` field names). `Deserialize` is derived for
+/// the integration-test/front-end-client side of the wire, not because
+/// this crate ever reads one back in.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LinkView {
     /// The edge id (also the event's `edge_id`).
     pub id: String,
@@ -246,11 +248,18 @@ fn audit_ctx(caller: &MaybeAuthUser) -> AuditContext {
     }
 }
 
-/// `404` — unknown person id.
+/// `404` — unknown person id. Wrapped in the crate's uniform
+/// `{success,data,error}` envelope ([`ApiResponse`]) like every other
+/// person REST endpoint — these link endpoints previously returned bare
+/// `{"error": ...}` bodies, which the front-end's `ApiClient` (which
+/// unwraps `.data`) would have silently read as `undefined`.
 fn not_found(id: Uuid) -> Response {
     (
         StatusCode::NOT_FOUND,
-        Json(json!({ "error": format!("Person with id '{id}' not found") })),
+        Json(crate::api::ApiResponse::<()>::error(
+            "NOT_FOUND",
+            format!("Person with id '{id}' not found"),
+        )),
     )
         .into_response()
 }
@@ -259,15 +268,24 @@ fn not_found(id: Uuid) -> Response {
 fn db_error(e: &crate::Error) -> Response {
     (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json(json!({ "error": format!("{e}") })),
+        Json(crate::api::ApiResponse::<()>::error(
+            "DATABASE_ERROR",
+            format!("{e}"),
+        )),
     )
         .into_response()
 }
 
 /// Map a record-level authorization rejection `(status, reason)` to a
-/// JSON error response (`403` policy-denied / `401` fail-safe).
+/// JSON error response (`403` policy-denied / `401` fail-safe), matching
+/// the rest of the crate's `"FORBIDDEN"` code convention regardless of
+/// the actual status (see `api/rest/handlers.rs`).
 fn rejection((status, reason): (StatusCode, String)) -> Response {
-    (status, Json(json!({ "error": reason }))).into_response()
+    (
+        status,
+        Json(crate::api::ApiResponse::<()>::error("FORBIDDEN", reason)),
+    )
+        .into_response()
 }
 
 /// LNK-1: publish the in-memory `PersonEvent::Linked` / `Unlinked` dev
@@ -403,7 +421,10 @@ pub async fn create_link(
         Err(reason) => {
             return (
                 StatusCode::UNPROCESSABLE_ENTITY,
-                Json(json!({ "error": reason })),
+                Json(crate::api::ApiResponse::<()>::error(
+                    "VALIDATION_ERROR",
+                    reason,
+                )),
             )
                 .into_response();
         }
@@ -441,7 +462,7 @@ pub async fn create_link(
     {
         tracing::warn!("failed to audit person link create: {e}");
     }
-    (StatusCode::OK, Json(view)).into_response()
+    (StatusCode::OK, Json(crate::api::ApiResponse::success(view))).into_response()
 }
 
 /// List a person's active outbound edges. `GET /api/persons/{id}/links`.
@@ -465,7 +486,11 @@ pub async fn list_links(
     match entity_links::list_active(&state.db, person.id).await {
         Ok(rows) => {
             let views: Vec<LinkView> = rows.iter().map(LinkView::of).collect();
-            (StatusCode::OK, Json(views)).into_response()
+            (
+                StatusCode::OK,
+                Json(crate::api::ApiResponse::success(views)),
+            )
+                .into_response()
         }
         Err(e) => db_error(&e),
     }
@@ -497,7 +522,10 @@ pub async fn delete_link(
         Ok(None) => {
             return (
                 StatusCode::NOT_FOUND,
-                Json(json!({ "error": format!("link '{link_id}' not found") })),
+                Json(crate::api::ApiResponse::<()>::error(
+                    "NOT_FOUND",
+                    format!("link '{link_id}' not found"),
+                )),
             )
                 .into_response();
         }
@@ -517,7 +545,11 @@ pub async fn delete_link(
             {
                 tracing::warn!("failed to audit person link delete: {e}");
             }
-            (StatusCode::OK, Json(json!({}))).into_response()
+            (
+                StatusCode::OK,
+                Json(crate::api::ApiResponse::success(json!({}))),
+            )
+                .into_response()
         }
         Err(e) => db_error(&e),
     }

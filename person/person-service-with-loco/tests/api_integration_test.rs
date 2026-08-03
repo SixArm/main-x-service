@@ -20,7 +20,10 @@ use axum::{
 use serde_json::json;
 use tower::ServiceExt; // for `oneshot` and `ready`
 
-use person_service::{api::ApiResponse, models::Person};
+use person_service::{
+    api::{ApiResponse, rest::links::LinkView},
+    models::Person,
+};
 
 /// `GET /api/health` returns 200 and identifies the service.
 #[tokio::test]
@@ -1368,4 +1371,105 @@ async fn test_compliance_sbom_is_mounted() {
     // merged in rather than the SBOM being a bare lockfile dump.
     assert!(body_str.contains("mxi:soup"));
     assert!(body_str.contains("SECURITY-CRITICAL"));
+}
+
+/// Regression pin: the cross-service link endpoints (`api/rest/links.rs`)
+/// previously returned bare JSON — `Json(view)` — while every other
+/// person REST endpoint wraps in the uniform `{success,data,error}`
+/// envelope. The front-end `ApiClient` unwraps `.data`, so a bare body
+/// would have silently decoded as `undefined` rather than erroring.
+/// `POST`/`GET`/`DELETE .../links` must decode as `ApiResponse<T>` like
+/// everything else. (The bulk aggregator endpoint, `GET /api/persons/links`,
+/// is deliberately excluded — it stays bare for the link-graph consumer,
+/// which deserializes `{"edges": [...]}` directly.)
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn test_links_endpoints_use_the_api_response_envelope() {
+    let app = common::create_test_router().await;
+
+    let family_name = common::unique_person_name("Links");
+    let person_json = json!({
+        "id": "00000000-0000-0000-0000-000000000000",
+        "name": { "family": family_name, "given": ["Envelope", "Test"] },
+        "gender": "female"
+    });
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/persons")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&person_json).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let created: ApiResponse<Person> = serde_json::from_slice(&body).unwrap();
+    let person_id = created.data.unwrap().id;
+
+    // Create a same_identity link — the response must be envelope-wrapped.
+    let to_ref = format!("worker:{}", uuid::Uuid::new_v4());
+    let link_json = json!({ "kind": "same_identity", "to_ref": to_ref });
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/persons/{person_id}/links"))
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&link_json).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let created_link: ApiResponse<LinkView> = serde_json::from_slice(&body).unwrap();
+    assert!(created_link.success);
+    let link = created_link.data.expect("wrapped link view");
+    assert_eq!(link.to_ref, to_ref);
+
+    // List — also envelope-wrapped, carrying the array in `data`.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/persons/{person_id}/links"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let listed: ApiResponse<Vec<LinkView>> = serde_json::from_slice(&body).unwrap();
+    assert!(listed.success);
+    assert_eq!(listed.data.expect("wrapped link list").len(), 1);
+
+    // Withdraw — also envelope-wrapped (an empty object in `data`).
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/persons/{person_id}/links/{}", link.id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let deleted: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert!(deleted.success);
 }

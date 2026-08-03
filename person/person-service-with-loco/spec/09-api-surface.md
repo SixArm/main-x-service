@@ -61,6 +61,17 @@ Creating a link is **optimistic** — it stores the assertion and emits a
 `linked` event without calling the target service. Verification status is
 not returned here; it is the aggregator's read-model concern.
 
+These three per-record endpoints return the crate's uniform
+`{success,data,error}` envelope (`ApiResponse<T>`), matching every other
+person REST endpoint — fixed 2026-08-03; they previously returned bare
+JSON, which a front-end client that unwraps `.data` would have silently
+read as `undefined` rather than erroring. The bulk aggregator endpoint
+(`GET /api/persons/links`, §9.3-adjacent — see
+[cross-service linking §4.2](../../../agents/share/cross-service-linking.md))
+is deliberately **not** wrapped: it stays bare `{"edges": [...]}` for the
+link-graph aggregator's HTTP client, which deserializes that shape
+directly.
+
 ### 9.2 Bulk import / export
 
 The async, job-based bulk contract is fixed family-wide in
