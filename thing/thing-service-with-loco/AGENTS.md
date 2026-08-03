@@ -83,3 +83,32 @@ cargo bench
 | `AGENTS.md` / `AGENTS/*.md` | How to work in the repo + per-topic reference |
 | `index.md` | Navigation aid with worked examples |
 | `CHANGELOG.md` | Historical record of releases and changes |
+
+## Container image
+
+`Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's
+production image. **Build context must be the repository root**, not
+this directory — this crate's sibling path dependencies
+(`integrity-mac`, `authentication-verifier`) live outside
+`thing/thing-service-with-loco/` (its matcher, `thing-matcher`, is
+pulled from crates.io, not a path dependency):
+
+```sh
+podman build -f thing/thing-service-with-loco/Dockerfile \
+  -t thing-service .   # run from the repository root
+```
+
+Verified end-to-end (2026-08-03): builds clean, boots against a real
+Postgres, and `GET /api/health` returns `200`. This exercise found and
+fixed two real bugs: Cargo.toml's `[[bench]] bridge_bench` declaration
+requires `benches/bridge_bench.rs` to exist even for a `--bin`-only
+build (cargo refuses to parse the manifest otherwise), and the
+`migration/src/*.rs` wrappers `include_str!` the raw numbered SQL from
+a `migrations/` directory that is a **sibling** of `migration/` at the
+crate root (not nested inside it — this varies by crate; link-graph-
+service nests `migrations/` inside `migration/` instead). Both
+directories are now copied explicitly in the Dockerfile. See
+`.containerignore` at the repository root (excludes every crate's
+`target/`, or the build context would try to copy hundreds of GB of
+build artifacts). The wired multi-service `examples/compose/` stacks
+(DEP-1) that build on this are not yet written.
