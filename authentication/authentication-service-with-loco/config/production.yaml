@@ -1,0 +1,92 @@
+# Loco configuration file — authentication-service (production).
+#
+# This file previously held ONLY the `cache:` block below — no
+# `server:`, `database:`, or `logger:` at all. loco's top-level
+# `Config` struct declares `logger`, `server`, and `database` as
+# required fields with no defaults, so this file could not have
+# deserialized in production: the service would fail to boot before
+# ever reaching the SEC-M1 body-limit concern. Filled out to mirror
+# this crate's own development.yaml / test.yaml (same env-var names),
+# plus the family's production middleware shape (person-service is the
+# reference).
+#
+# Note: this crate's cross-service tokens are PASETO v4.public, signed
+# from TOKEN_PRIVATE_KEY_SEED / TOKEN_PRIVATE_KEY_FILE (see AGENTS.md)
+# — NOT from the `auth.jwt` block below, which loco's config schema
+# requires as a struct but which this crate's own `src/auth/mod.rs`
+# does not read. JWT_SECRET is set anyway for schema completeness and
+# parity with the other services' production.yaml.
+
+logger:
+  enable: true
+  pretty_backtrace: false
+  level: info
+  format: json
+
+server:
+  port: {{ get_env(name="PORT", default="5150") }}
+  binding: 0.0.0.0
+  host: {{ get_env(name="HOST", default="http://localhost") }}
+  middlewares:
+    compression:
+      enable: true
+    etag:
+      enable: true
+    # Explicit backstop (SEC-M1) — no bulk/upload feature in this
+    # crate, so loco's own 2mb default is plenty for CRUD-shaped JSON;
+    # made explicit rather than implicit so it is visible in the file
+    # a deployer actually reads.
+    limit_payload:
+      enable: true
+      body_limit: 2mb
+    cors:
+      enable: true
+
+workers:
+  mode: BackgroundQueue
+
+queue:
+  kind: Postgres
+  uri: {{ get_env(name="DATABASE_URL") }}
+  dangerously_flush: false
+
+# Magic-link emails are real mail here (not logged to console, unlike
+# development) — this crate's actual sign-in path depends on SMTP
+# working in production.
+mailer:
+  smtp:
+    enable: true
+    host: {{ get_env(name="SMTP_HOST", default="localhost") }}
+    port: {{ get_env(name="SMTP_PORT", default="587") }}
+    secure: true
+    auth:
+      # Quoted: an unset SMTP_USER/SMTP_PASSWORD renders the Tera call
+      # to an empty string, and an *unquoted* empty value after `key: `
+      # is YAML null, not "" — loco's SmtpAuth fields are String, not
+      # Option<String>, so an unquoted empty default fails config
+      # parsing at boot ("invalid type: unit value, expected a
+      # string"). Quoting keeps it a real (possibly empty) string.
+      user: "{{ get_env(name="SMTP_USER", default="") }}"
+      password: "{{ get_env(name="SMTP_PASSWORD", default="") }}"
+
+database:
+  uri: {{ get_env(name="DATABASE_URL") }}
+  enable_logging: false
+  connect_timeout: {{ get_env(name="DB_CONNECT_TIMEOUT", default="500") }}
+  idle_timeout: {{ get_env(name="DB_IDLE_TIMEOUT", default="500") }}
+  min_connections: {{ get_env(name="DB_MIN_CONNECTIONS", default="2") }}
+  max_connections: {{ get_env(name="DB_MAX_CONNECTIONS", default="20") }}
+  auto_migrate: false
+  dangerously_truncate: false
+  dangerously_recreate: false
+
+auth:
+  jwt:
+    secret: {{ get_env(name="JWT_SECRET") }}
+    expiration: 604800
+
+
+# Cache provider: in-memory (loco `cache_inmem`, enabled by default).
+cache:
+  kind: InMem
+  max_capacity: 33554432 # 32MiB (default if not specified)
