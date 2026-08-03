@@ -7,6 +7,38 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — Durable event bus, real-broker sink (BUS-3, 2026-08-03)
+
+`FluvioSink` (`src/relay.rs`) — the Phase-3 relay's real-broker
+`EventSink`, behind this crate's own `fluvio` Cargo feature (off by
+default; `fluvio` 0.50). Ported from case-service's BUS-1 reference
+implementation. One producer per topic, partitioned by record `pid`
+per `agents/share/event-bus.md` §7. New env vars:
+`EVENT_FLUVIO_ENDPOINT` (unset ⇒ unchanged `LoggingSink` default) and
+`EVENT_EVENT_TOPIC` (default `mxi.event.events`, matching this crate's
+existing doubled `EVENT_EVENT_*` naming for domain-event settings). An
+endpoint configured without the `fluvio` feature refuses to start the
+relay rather than silently falling back to `LoggingSink` — that
+fallback would mark outbox rows `published_at` without ever reaching
+the broker the operator asked for. `compose.fluvio.yaml` +
+`Dockerfile.fluvio-cli` provision a local SC+SPU broker (ports
+9203/9210/9211) for opt-in manual runs (not part of any automated CI
+stage); `tests/fluvio_relay.rs` is a feature-gated, `#[ignore]`d
+live-broker round-trip, verified by compiling under `--features
+fluvio` rather than an actual execution (no broker is stood up in this
+repo's CI) — it drives `SeaOrmEventRepository` directly under
+`EventTransport::Outbox` rather than case's loco `request::<App, _,
+_>` helper, since this crate keeps the older hand-rolled
+`AppState`/repository layout. `cargo build`/`clippy --all-targets -D
+warnings`/`fmt --check`/`test --lib` all clean under both default
+features and `--features fluvio` (152 tests passed, 1 ignored,
+identical count both ways); full DB-gated suite green, zero
+regressions. `cargo deny check` carries the same single pre-existing
+`RUSTSEC-2023-0071` (via `loco-rs` → `jsonwebtoken` → `rsa`) with and
+without the feature — confirmed by diff, so `fluvio` introduces no new
+advisory. This crate has no `compliance/soup.tsv`, so no SOUP register
+update applies (unlike case's BUS-1 landing).
+
 ### Changed — loco-rs 1.0.1 (2026-08-02)
 
 - **loco-rs 0.16.4 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration →

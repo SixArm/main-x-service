@@ -58,6 +58,25 @@ DATABASE_URL=… cargo test --test api_integration_test
 cargo bench
 ```
 
+## Durable event bus — outbox relay + `FluvioSink`
+
+`src/relay.rs` is the Phase-3 outbox relay (spec §13 T-11): it drains
+`event_outbox` rows to an `EventSink`, default `LoggingSink` (no
+broker; dev/CI). The real-broker sink, `FluvioSink` (BUS-3, ported
+from case-service's BUS-1 reference), lives behind this crate's own
+`fluvio` Cargo feature — **off by default**, so a default build's
+dependency tree and behaviour are unchanged. Both the relay loop
+(`EVENT_EVENT_TRANSPORT=outbox` + `EVENT_EVENT_RELAY`) and the sink
+(`EVENT_FLUVIO_ENDPOINT`) are off unless explicitly configured; an
+endpoint configured **without** the `fluvio` feature refuses to start
+the relay (logged at `error`) rather than silently marking rows
+published without reaching a real broker. `compose.fluvio.yaml` +
+`Dockerfile.fluvio-cli` provision a local Fluvio broker for opt-in
+manual runs — not part of any automated CI stage; run the crate's
+default `cargo test --lib` / `--features fluvio` variants and the
+DB-gated suite as usual, and see `tests/fluvio_relay.rs` for the
+feature-gated, `#[ignore]`d live-broker round-trip.
+
 ## Doc hierarchy quick reference
 
 | File | Role |

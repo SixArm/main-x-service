@@ -232,15 +232,67 @@ clearly described manual check confirms the acceptance criterion.
     (`src/relay.rs`), repathed to event's repository-based outbox
     (`db::outbox::Model` + `db::models::event_outbox`), `crate::Result`
     error type, `i64` ids, and `time::OffsetDateTime` retention cutoff.
-  - **Broker-gated follow-up:** a real **`FluvioSink`** (`impl EventSink`
-    behind a future `fluvio` cargo feature) is the only remaining piece;
-    the `EventSink` seam means the drain loop + retention never change when
-    it lands (see also T-4).
-  - **Acceptance:** DB-free unit tests in `src/relay.rs` (logging-sink
-    send, capturing-sink contract, config-parser defaults) pass; the drain
-    poll/ack seams are DB-gated via the outbox suite. `cargo test --lib`
-    green; `cargo clippy --lib --tests` clean. Default (no
-    `EVENT_EVENT_TRANSPORT=outbox` + `EVENT_EVENT_RELAY`) ⇒ no relay loop.
+  - **Acceptance (Phase 2/3):** DB-free unit tests in `src/relay.rs`
+    (logging-sink send, capturing-sink contract, config-parser defaults)
+    pass; the drain poll/ack seams are DB-gated via the outbox suite.
+    `cargo test --lib` green; `cargo clippy --lib --tests` clean. Default
+    (no `EVENT_EVENT_TRANSPORT=outbox` + `EVENT_EVENT_RELAY`) ⇒ no relay
+    loop.
+  - [x] **Phase 3, `FluvioSink` (BUS-3).** *(done 2026-08-03)* Ported
+    from case-service's BUS-1 reference implementation
+    (`case/case-service-with-loco/src/relay.rs`). The real-broker `impl
+    EventSink`, behind this crate's own `fluvio` Cargo feature (off by
+    default — the dependency tree and boot behaviour of a default build
+    are unchanged). One producer per topic
+    (`fluvio::Fluvio::connect_with_config` + `topic_producer`, held for
+    the sink's lifetime), partitioned by record `pid` per §7. Config:
+    `EVENT_FLUVIO_ENDPOINT` (the broker's SC address; unset ⇒
+    `LoggingSink`, unchanged default behaviour) and `EVENT_EVENT_TOPIC`
+    (default `mxi.event.events`, matching this crate's existing doubled
+    `EVENT_EVENT_*` naming for domain-event settings). **No silent
+    fallback**: an endpoint configured **without** the `fluvio` feature
+    refuses to start the relay at all (logged at `error`), rather than a
+    `LoggingSink` masquerade that would mark outbox rows `published_at`
+    without ever reaching the broker the operator asked for — the same
+    shape as the family's artifact-store "no fallback on an explicit
+    backend choice" rule (`agents/share/bulk-import-export.md` §12). The
+    initial connection retries indefinitely rather than falling back,
+    for the same reason. `compose.fluvio.yaml` + `Dockerfile.fluvio-cli`
+    provision a local SC+SPU broker (ports 9203/9210/9211, distinct from
+    case's 9103/9110/9111 so both can run at once) for opt-in manual
+    runs; **not** wired into any automated CI stage. Tests: `cargo
+    build`/`clippy --all-targets -D warnings`/`fmt --check` clean under
+    both default features and `--features fluvio` (the real `fluvio`
+    0.50 API compiling is the actual verification of correct usage);
+    `cargo test --lib` green under both configs (152 passed, 1 ignored,
+    identical count). `tests/fluvio_relay.rs` is a `#![cfg(feature =
+    "fluvio")]`-gated, `#[ignore]`d round-trip (create under
+    `EventTransport::Outbox` → `FluvioSink` → `drain_once` → assert
+    `published_at`) with its run command documented inline — it needs a
+    live broker, which no automated run in this repo stands up, so it is
+    verified by compiling under the feature, not by an actual execution
+    (same posture as case's BUS-1 test and person's
+    `s3_round_trip_against_a_live_endpoint`, BLK-4). This crate carries
+    no `compliance/soup.tsv`, so no SOUP register update applies here
+    (unlike case's BUS-1 landing). Full DB-gated suite
+    (`scripts/ci-check.sh test-db event/event-service-with-loco`) green,
+    zero regressions. `cargo deny check` carries the same single
+    pre-existing `RUSTSEC-2023-0071` (via `loco-rs` → `jsonwebtoken` →
+    `rsa`, unrelated to `fluvio`) with and without the feature —
+    confirmed by diffing the check's output against the pre-change
+    `Cargo.lock`; `fluvio`'s own dependency tree introduces no new
+    advisory, duplicate, or license warning. **Deviation from the BUS-1
+    template:** the `tests/fluvio_relay.rs` round-trip drives
+    `SeaOrmEventRepository::with_transport(EventTransport::Outbox)`
+    directly rather than case's `request::<App, _, _>` + process-wide
+    `CASE_EVENT_TRANSPORT` env mutation — this crate keeps the
+    person/worker-style hand-rolled `AppState`/repository layout (see
+    `agents/share/architecture.md` "person-style"), which has no loco
+    request-test helper; the two approaches are functionally
+    equivalent (an outbox row enqueued in the same transaction as the
+    create) and this one avoids the `serial_test` dependency case's
+    version needs. BUS-2 (link-graph Fluvio consumer) and rolling
+    `FluvioSink` to the remaining services continue elsewhere.
 
 - [x] **T-CFG — `Config::from_env` loads the environment.** *(done
   2026-07-23)* The function was a stub that returned `Config::default()`
