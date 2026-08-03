@@ -8,6 +8,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — Durable event bus, real-broker sink (BUS-1, 2026-08-03)
+
+`FluvioSink` (`src/relay.rs`) — the Phase-3 relay's real-broker
+`EventSink`, behind this crate's own `fluvio` Cargo feature (off by
+default; `fluvio` 0.50). One producer per topic, partitioned by record
+`pid` per `agents/share/event-bus.md` §7. New env vars:
+`CASE_FLUVIO_ENDPOINT` (unset ⇒ unchanged `LoggingSink` default) and
+`CASE_EVENT_TOPIC` (default `mxi.case.events`). An endpoint configured
+without the `fluvio` feature refuses to start the relay rather than
+silently falling back to `LoggingSink` — that fallback would mark
+outbox rows `published_at` without ever reaching the broker the
+operator asked for. `compose.fluvio.yaml` + `Dockerfile.fluvio-cli`
+provision a local SC+SPU broker for opt-in manual runs (not part of
+any automated CI stage); `tests/fluvio_relay.rs` is a
+feature-gated, `#[ignore]`d live-broker round-trip, verified by
+compiling under `--features fluvio` rather than an actual execution
+(no broker is stood up in this repo's CI). SOUP register updated.
+
 ### Added — Bulk import/export, JSONL + CSV (BLK-5, 2026-08-03)
 
 Rolls out the family-wide async, job-based bulk import/export contract

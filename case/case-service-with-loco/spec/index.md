@@ -807,10 +807,39 @@ the other v1 edge kinds even though it shares the same edge shape.
   seam. Gated by transport=`outbox` **and** `CASE_EVENT_RELAY` (both off
   by default ⇒ no loop, behaviour unchanged); interval via
   `CASE_EVENT_RELAY_INTERVAL_SECS`. Tests: logging/capturing sink send
-  contract + config-default parsers (DB-free). The remaining follow-up is
-  a real **`FluvioSink`** behind a `fluvio` cargo feature +
-  `CASE_FLUVIO_ENDPOINT`/`CASE_EVENT_TOPIC` (broker-gated) — another
-  `impl EventSink`, no change to the drain/retention loop.
+  contract + config-default parsers (DB-free).
+- [x] **Durable event bus — Phase 3, `FluvioSink` (BUS-1).**
+  *(done 2026-08-03)* The real-broker `impl EventSink`, behind this
+  crate's own `fluvio` Cargo feature (off by default — the dependency
+  tree and boot behaviour of a default build are unchanged). One
+  producer per topic (`fluvio::Fluvio::connect_with_config` +
+  `topic_producer`, held for the sink's lifetime), partitioned by record
+  `pid` per §7. Config: `CASE_FLUVIO_ENDPOINT` (the broker's SC address;
+  unset ⇒ `LoggingSink`, unchanged default behaviour) and
+  `CASE_EVENT_TOPIC` (default `mxi.case.events`). **No silent fallback**:
+  an endpoint configured **without** the `fluvio` feature refuses to
+  start the relay at all (logged at `error`), rather than a
+  `LoggingSink` masquerade that would mark outbox rows `published_at`
+  without ever reaching the broker the operator asked for — the same
+  shape as the family's artifact-store "no fallback on an explicit
+  backend choice" rule (`agents/share/bulk-import-export.md` §12). The
+  initial connection retries indefinitely rather than falling back, for
+  the same reason. `compose.fluvio.yaml` + `Dockerfile.fluvio-cli`
+  provision a local SC+SPU broker (Fluvio's own documented Docker
+  Compose layout, translated to this repo's Podman conventions) for
+  opt-in manual runs; **not** wired into any automated CI stage. Tests:
+  `cargo build`/`clippy --all-targets -D warnings`/`fmt --check` clean
+  under both default features and `--features fluvio` (the real `fluvio`
+  0.50 API compiling is the actual verification of correct usage — no
+  web-search guess went unverified); `tests/fluvio_relay.rs` is a
+  `#![cfg(feature = "fluvio")]`-gated, `#[ignore]`d round-trip
+  (enqueue → `FluvioSink` → `drain_once` → assert `published_at`) with
+  its run command documented inline — it needs a live broker, which no
+  automated run in this repo stands up, so it is verified by compiling
+  under the feature, not by an actual execution (same posture as
+  person's `s3_round_trip_against_a_live_endpoint`, BLK-4). SOUP register
+  updated. BUS-2 (link-graph Fluvio consumer) and BUS-3 (roll `FluvioSink`
+  to the other nine services) remain.
 - [x] Prometheus metrics — `GET /metrics.prom` (root-mounted, public
   under enforcement) renders a process-wide registry
   (`src/metrics.rs`, `controllers/metrics.rs`) in text-exposition format:
@@ -1072,8 +1101,8 @@ paseto-keys-over-HTTP fetch (`CASE_PASETO_KEYS_URL`, fetched key set wins,
 env fallback). v0.2: Tantivy full-text/fuzzy/phonetic search + durable
 event bus Phases 1–2 — **done**. v0.3: privacy controls (masking + GDPR
 export — done 2026-08-02) + blanket
-`/api/*` enforcement — **done**; durable bus Phase 3 (Fluvio relay)
-remains.
+`/api/*` enforcement — **done**; durable bus Phase 3 (relay loop + the
+`FluvioSink` real-broker sink, BUS-1) — **done 2026-08-03**.
 
 ## 16. Open questions
 

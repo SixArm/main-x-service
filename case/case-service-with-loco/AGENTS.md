@@ -69,7 +69,15 @@ projection unchanged (see
 [`agents/share/event-bus.md`](../../agents/share/event-bus.md) §4–§5).
 The durable event bus's Phase-2 transactional outbox + relay landed
 (`models/event_outbox.rs`, `src/relay.rs`; default-off via
-`CASE_EVENT_TRANSPORT=memory`). Blanket `/api/*` auth enforcement is
+`CASE_EVENT_TRANSPORT=memory`). **Phase 3's real-broker sink** (BUS-1,
+landed 2026-08-03) is `FluvioSink` in `src/relay.rs`, behind this
+crate's own `fluvio` Cargo feature (off by default): `CASE_FLUVIO_ENDPOINT`
+selects it over the default `LoggingSink`; unset without the feature ⇒
+unchanged behaviour; **set** without the feature ⇒ the relay refuses to
+start (logged, not a silent no-broker fallback that would mark rows
+published without reaching a real broker). `compose.fluvio.yaml` +
+`Dockerfile.fluvio-cli` provision a local broker for opt-in manual runs
+(not part of any automated CI stage). Blanket `/api/*` auth enforcement is
 implemented, default-off via `CASE_REQUIRE_AUTH` (activation is a
 deployment decision). **Tantivy full-text/fuzzy/phonetic search**
 (`src/search/`) replaces the `ILIKE` title search and backs
@@ -88,9 +96,9 @@ async job-based JSONL/CSV import + export via `src/bulk/` and a loco
 default export redaction and gating every export's audit write ahead of
 job completion (SEC-B8). No Parquet, no S3 in this rollout; see
 `spec/index.md` §8.7 for the documented SEC-B3 concurrency and
-per-row-ABAC scope limitations. Deferred
-(spec §13): the durable bus's Phase-3 Fluvio broker sink,
-front-end merge action.
+per-row-ABAC scope limitations. Deferred (spec §13): BUS-2 (link-graph
+Fluvio consumer) and BUS-3 (roll `FluvioSink` to the other nine
+services), front-end merge action.
 
 > **Auth pivot done here.** The family moved from RS256 JWT + JWKS to
 > cookie sessions + offline **PASETO v4.public** verification (published

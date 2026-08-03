@@ -89,6 +89,19 @@ entity-ref = { path = "../../link/entity-ref-rust-crate" }
 # The `fetch` feature adds `Verifier::from_paseto_keys_url` for the boot-time key-set fetch (`CASE_PASETO_KEYS_URL`).
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
 
+# Durable event bus Phase 3 (BUS-1; agents/share/event-bus.md §5/§8):
+# the relay's real broker sink. Optional and behind the `fluvio` feature
+# below so the default dependency tree (and every existing deployment's
+# build) is unchanged — the relay's `LoggingSink` covers dev/CI with no
+# broker at all.
+fluvio = { version = "0.50", optional = true }
+
+[features]
+# Off by default. The relay's `EventSink` seam (src/relay.rs) needs no
+# feature to build or test; only `FluvioSink` — the real-broker producer
+# — lives behind this.
+fluvio = ["dep:fluvio"]
+
 [[bin]]
 name = "case-service"
 path = "src/bin/main.rs"
