@@ -169,3 +169,34 @@ tests/fluvio_relay.rs     `#![cfg(feature = "fluvio")]`-gated, `#[ignore]`d
 tests/requests/bulk.rs    BLK-5 request-level suite (Postgres-gated)
 config/                   development/production/test yaml
 ```
+
+## Container image
+
+`Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's
+production image. **Build context must be the repository root**, not
+this directory — this crate's sibling path dependencies
+(`integrity-mac`, `authentication-verifier`, `organization-matcher`)
+live outside `organization/organization-service-with-loco/`:
+
+```sh
+podman build -f organization/organization-service-with-loco/Dockerfile \
+  -t organization-service .   # run from the repository root
+```
+
+Verified end-to-end (2026-08-03): builds clean, boots against a real
+Postgres, and `GET /_health` returns `200`. This exercise found and
+fixed a real bug: `config/production.yaml`'s `mailer.smtp.auth.user`/
+`password` used an unquoted Tera `{{ get_env(name="…", default="") }}`
+call, which renders as YAML `null` (not `""`) when the env var is
+unset — loco's `SmtpAuth` fields are `String`, not `Option<String>`, so
+this failed config parsing at boot with "invalid type: unit value,
+expected a string". The fix is quoting the Tera output. This crate's
+`.gitignore` also excluded `config/production.yaml` entirely (a loco
+scaffold default nobody had removed), which is why the bug had never
+been caught — the file never left this machine, so no other checkout
+could exercise it. Both are fixed (the file is now tracked; see the
+`.gitignore` for the reasoning). See `.containerignore` at the
+repository root (excludes every crate's `target/`, or the build context
+would try to copy hundreds of GB of build artifacts). The wired
+multi-service `examples/compose/` stacks (DEP-1) that build on this are
+not yet written.
