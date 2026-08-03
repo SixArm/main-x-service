@@ -1,0 +1,11 @@
+# Support image for compose.fluvio.yaml's one-shot `sc-setup` step: installs
+# the `fluvio` CLI so it can register the `spu` service with the `sc`
+# service. Not the organization-service image (see the production
+# Dockerfile) — this exists solely to drive Fluvio's own cluster-setup CLI
+# commands, mirroring Fluvio's documented Docker Compose layout
+# (fluvio.io/docs/fluvio/installation/docker/).
+FROM docker.io/library/ubuntu:24.04
+RUN apt-get update && apt-get install -y --no-install-recommends curl unzip ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl -fsS https://hub.infinyon.cloud/install/install.sh?ctx=dc | bash
+ENV PATH="$PATH:/root/.fluvio/bin:/root/.fvm/bin"

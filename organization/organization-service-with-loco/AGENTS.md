@@ -102,6 +102,19 @@ a locked guard transaction deadlocked under this crate's own
 `update_and_emit` are not generic over `ConnectionTrait`); two
 importers racing the identical stable key can both create a row.
 
+**Durable event bus Phase 3** (`src/relay.rs`) is implemented: a
+background relay drains the `event_outbox` table to an `EventSink`,
+gated by `ORGANIZATION_EVENT_TRANSPORT=outbox` **and**
+`ORGANIZATION_EVENT_RELAY` (both default-off, so it is a no-op by
+default). The default sink is a no-broker `LoggingSink`; **`FluvioSink`**
+(BUS-3, ported from case-service's BUS-1 reference) is the real-broker
+sink, behind this crate's own `fluvio` Cargo feature (off by default).
+`ORGANIZATION_FLUVIO_ENDPOINT` selects it over `LoggingSink`; set
+without the `fluvio` feature compiled in, the relay refuses to start
+(logged at `error`) rather than silently falling back —
+`compose.fluvio.yaml` + `Dockerfile.fluvio-cli` provision a local broker
+for opt-in manual runs (not part of any automated CI stage).
+
 Auth pivot done in this crate: the family moved from RS256 JWT + JWKS to
 cookie sessions + short-lived PASETO v4.public verified offline against a
 published Ed25519 key (RS256/JWKS decommissioned); the `*_REQUIRE_AUTH`
@@ -134,6 +147,10 @@ src/
 ├── tasks/search.rs        `search_reindex` + boot self-heal
 ├── controllers/metrics.rs  GET /metrics.prom (root, public)
 ├── metrics.rs              process-wide Prometheus registry (OnceLock)
+├── relay.rs                durable event bus Phase 3: EventSink seam,
+│                           LoggingSink (default), FluvioSink (BUS-3,
+│                           behind the `fluvio` Cargo feature), drain +
+│                           retention loop
 ├── bulk/                   BLK-5 async bulk import/export (JSONL + CSV;
 │                           columns, csv, jsonl, stable_key, error_report,
 │                           pipeline, store, worker, handlers)
@@ -147,6 +164,8 @@ migration/src/            m20220101_000001_organizations, …_000002_audit_logs,
                           m20260719_000001_review_queue,
                           m20260803_000001_review_queue_provenance,
                           m20260803_000002_bulk_jobs
+tests/fluvio_relay.rs     `#![cfg(feature = "fluvio")]`-gated, `#[ignore]`d
+                          live-broker relay round-trip (BUS-3)
 tests/requests/bulk.rs    BLK-5 request-level suite (Postgres-gated)
 config/                   development/production/test yaml
 ```

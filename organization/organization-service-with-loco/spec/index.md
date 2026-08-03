@@ -486,10 +486,40 @@ personal data — honour GDPR when the privacy layer lands (§13).
   AND `ORGANIZATION_EVENT_RELAY`**, so it is a no-op by default. Tests:
   DB-free `LoggingSink`/capturing-sink send + config defaults; the drain/ack
   seams (`unpublished`/`mark_published`) are DB-gated-tested via the outbox
-  suite. **Broker-gated follow-up:** a real **`FluvioSink`** (`impl EventSink`
-  behind a `fluvio` cargo feature + `ORGANIZATION_FLUVIO_ENDPOINT`/
-  `ORGANIZATION_EVENT_TOPIC`) — the trait is the seam, so the drain loop is
-  unchanged when it lands ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §5, §8).
+  suite.
+- [x] **Durable event bus — Phase 3, `FluvioSink` (BUS-3).**
+  *(done 2026-08-03, ported from case-service's BUS-1 reference)* The
+  real-broker `impl EventSink`, behind this crate's own `fluvio` Cargo
+  feature (off by default — the dependency tree and boot behaviour of a
+  default build are unchanged). One producer per topic
+  (`fluvio::Fluvio::connect_with_config` + `topic_producer`, held for the
+  sink's lifetime), partitioned by record `pid` per §7. Config:
+  `ORGANIZATION_FLUVIO_ENDPOINT` (the broker's SC address; unset ⇒
+  `LoggingSink`, unchanged default behaviour) and `ORGANIZATION_EVENT_TOPIC`
+  (default `mxi.organization.events`). **No silent fallback**: an endpoint
+  configured **without** the `fluvio` feature refuses to start the relay at
+  all (logged at `error`), rather than a `LoggingSink` masquerade that
+  would mark outbox rows `published_at` without ever reaching the broker
+  the operator asked for — the same shape as the family's artifact-store
+  "no fallback on an explicit backend choice" rule
+  (`agents/share/bulk-import-export.md` §12). The initial connection
+  retries indefinitely rather than falling back, for the same reason.
+  `compose.fluvio.yaml` + `Dockerfile.fluvio-cli` provision a local SC+SPU
+  broker (Fluvio's own documented Docker Compose layout, translated to
+  this repo's Podman conventions) for opt-in manual runs; **not** wired
+  into any automated CI stage. Tests: `cargo build`/`clippy --all-targets
+  -D warnings`/`fmt --check` clean under both default features and
+  `--features fluvio` (the real `fluvio` 0.50 API compiling is the actual
+  verification of correct usage); `tests/fluvio_relay.rs` is a
+  `#![cfg(feature = "fluvio")]`-gated, `#[ignore]`d round-trip (enqueue →
+  `FluvioSink` → `drain_once` → assert `published_at`) with its run
+  command documented inline — it needs a live broker, which no automated
+  run in this repo stands up, so it is verified by compiling under the
+  feature, not by an actual execution (same posture as case's
+  `tests/fluvio_relay.rs`, BUS-1, and person's
+  `s3_round_trip_against_a_live_endpoint`, BLK-4). This crate has no
+  `compliance/soup.tsv` (unlike case), so no SOUP register update was
+  needed.
 - [x] Name search + OpenAPI/Swagger. *(Postgres `ILIKE`; superseded by
   the Tantivy item below, which removed the `ILIKE` query and its
   `escape_like` guard rather than leaving them dormant.)*
@@ -672,7 +702,10 @@ audit + merge `actor` from the token) per
 including the boot-time paseto-keys-over-HTTP fetch
 (`ORGANIZATION_PASETO_KEYS_URL`, fetch-once, env fallback; §7, §13);
 OpenAPI 3 + Swagger UI; Prometheus
-metrics (`/metrics.prom`, root + public, CRUD/merge counters); BLK-5
+metrics (`/metrics.prom`, root + public, CRUD/merge counters); durable
+event bus Phase 3 relay + retention (`src/relay.rs`, default-off) plus
+its real-broker `FluvioSink` (BUS-3, feature-gated, off by default;
+§13); BLK-5
 async bulk import/export (JSONL + CSV, local-filesystem artifact store;
 §9, §10.7); DB-free tests;
 request-level test suite (Postgres, `#[ignore]`-gated); loco scaffolding
