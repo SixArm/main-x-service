@@ -890,9 +890,79 @@
   `pnpm build` succeeded with the new route present in the build
   output. `pnpm test:e2e` (Playwright) intentionally not run — it needs
   a live server; smoke-test assertions were added but not executed.
-- [ ] **FE-2 (M)** Links panel: person front-end (assert/list/withdraw
+- [x] **FE-2 (M)** Links panel: person front-end (assert/list/withdraw
   `same_identity` + affiliations), case front-end (`subject_of`),
   worker front-end once LNK-2 lands.
+
+  **Done 2026-08-03.** Greenfield UI (no sibling front-end had a links
+  panel to copy from, unlike FE-1) — grounded in a direct sweep of the
+  Rust `links.rs` sources across all three services before any UI was
+  designed. Each front-end got a `LinksPanel.svelte` embedded on the
+  record's detail route: list the record's active outbound edges,
+  assert a new one (client-side validation mirroring the service's own
+  `validate_edge` kind/target-type matrix — person `same_identity`→worker
+  and `works_at`/`member_of`→organization; worker `same_identity`→person
+  and `employed_by`→organization with `role` as job title; case's single
+  kind `subject_of`→person, deliberately with no kind picker), and
+  withdraw with a confirmation. Case's panel is written sensitivity-aware
+  per the design doc's §10 governance note — "Subject of this case", not
+  a generic "Links" widget, and a withdrawal prompt naming the person
+  reference being retracted. All three: full i18n (24–32 keys × 13
+  locales, genuinely translated, not copied/placeholder), new unit tests
+  for the validation guards and repository methods, a stubbed e2e smoke
+  assertion. `pnpm check`/`test`/`build` green in all three (person
+  35/35, worker 36/36, case 60/60 tests).
+
+  **Found and fixed a real backend bug before the UI could even work.**
+  person's and worker's link endpoints (`POST`/`GET`/`DELETE
+  /api/{persons,workers}/{pid}/links`) returned **bare JSON** while every
+  other REST endpoint on both crates wraps in the uniform
+  `{success,data,error}` envelope — their own front-end `ApiClient`s
+  unwrap `.data`, so calling these endpoints as shipped would have
+  silently decoded as `undefined` rather than erroring. Fixed on both
+  crates (the bulk aggregator endpoint, `GET /api/{persons,workers}/links`,
+  is deliberately left bare — it's consumed by link-graph's own HTTP
+  client, which expects `{"edges": [...]}` unwrapped, and wrapping it
+  would have broken that instead). New DB-gated integration tests on
+  both crates exercise the full create/list/delete cycle through the
+  real router and assert each response actually decodes as
+  `ApiResponse<T>` — verified green against real Postgres, not just
+  compiled. Case's own links endpoints were already correct (bare JSON
+  is case's own documented, deliberate convention).
+
+  **Found, independently confirmed by two of the three implementing
+  agents, and NOT fixed (out of scope, family-wide, needs its own
+  pass):** `ApiClient.buildUrl` in (at least) person, worker, case,
+  organization, and event front-ends' `src/lib/api/client.ts` — almost
+  certainly all ten `*-front-end-with-svelte` BFF-proxied apps, since
+  they share one `config.ts` boilerplate comment and byte-identical
+  `buildUrl` bodies — resolves a leading-slash repository path (e.g.
+  `/api/persons/{id}/links`) against a base URL of
+  `<origin>/api/proxy` via `new URL(path, base + "/")`. Per the URL
+  spec, an **absolute-path reference** (one starting with `/`) replaces
+  the base URL's entire path, discarding `/api/proxy` — confirmed by
+  direct reproduction in Node:
+  `new URL("/api/persons/p1/links", "http://localhost:4173/api/proxy/")`
+  → `http://localhost:4173/api/persons/p1/links`, **not**
+  `.../api/proxy/api/persons/p1/links`. Since the only server route
+  these apps define is the catch-all `/api/proxy/[...path]/+server.ts`,
+  every browser API call in every affected app is silently requesting a
+  path that doesn't exist as a route — the BFF proxy (and the PASETO
+  it's meant to inject) is bypassed entirely. One corroborating trace
+  already in the tree: `project-portfolio-management-front-end-with-svelte/src/lib/api/ppm.ts:1025`
+  hardcodes a literal `/api/proxy/api/auditor/evidence-pack?format=csv`
+  path rather than going through the shared client — someone already
+  hit this and worked around it in one call site without generalising
+  the fix. authentication-front-end-with-svelte is **not** affected —
+  it calls its own service directly with no BFF/proxy layer, by design
+  (it *is* the token issuer). Not fixed here: the blast radius (up to
+  ten apps' `client.ts`, each needing its own careful verification
+  against its actual routing, ideally against a live BFF + service, not
+  just static analysis) is a properly-scoped fix in its own right, not
+  a fold-in to FE-2. **This should be prioritised** — until fixed, no
+  affected front-end's BFF-mediated API calls work as designed in any
+  deployment where the browser can't reach the entity service directly.
+
 - [ ] **FE-3 (M)** Bulk import/export screen in the person front-end:
   upload JSONL, dry-run toggle, job status polling, error-report and
   export download links (BFF-mediated; no token in browser).
