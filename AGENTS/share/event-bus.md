@@ -252,8 +252,17 @@ don't know the transport.
    runs; no automated stage in this repo stands one up, so the
    feature-gated, `#[ignore]`d round-trip test is verified by compiling
    under `--features fluvio`, not by an actual execution — the "Fluvio
-   test container" this step originally envisioned remains a follow-up,
-   tracked as BUS-3.)*
+   test container" this step originally envisioned remains a follow-up.
+   **`FluvioSink` itself is now rolled to all ten entity registries**
+   (BUS-3, 2026-08-03 — person, worker, place, thing, event, course,
+   organization, care-pathway, project-portfolio-management, joining
+   case from BUS-1): same feature-gated + no-silent-fallback shape, an
+   opt-in `compose.fluvio.yaml` local broker, and a feature-gated,
+   `#[ignore]`d live round-trip test per crate, none ever executed in
+   this repo's CI. The "reconcile the five older crates' dormant
+   `fluvio` Cargo deps" sub-task BUS-3 also carried turned out to be
+   moot — no `Cargo.toml` in the repo mentioned `fluvio` before BUS-1
+   landed it, so there was nothing dormant to reconcile.
 4. **Flip `<ENTITY>_EVENT_TRANSPORT=outbox`** per service in deployment;
    stand up consumers (search re-indexer first). *(The first real
    consumer landed 2026-08-03, BUS-2, in **link-graph-service** — the §9
@@ -263,12 +272,20 @@ don't know the transport.
    position is delegated to Fluvio's own named-consumer offset
    management rather than reconstructed in Postgres — see
    `link-graph-service-with-loco/spec/10-persistence.md` §10.3 for the
-   full reasoning. Only **case** has `FluvioSink` wired today (BUS-1),
-   so the other nine topics currently see no traffic; the consumer for
-   them is live but idle until BUS-3 rolls the producer side out
-   further.)*
+   full reasoning. Only **case** had `FluvioSink` wired at BUS-2 time
+   (BUS-1); now that BUS-3 has rolled it to all ten, the aggregator
+   consumes ten live topics but nine still see no traffic until a
+   deployment actually sets `<ENTITY>_FLUVIO_ENDPOINT` and
+   `<ENTITY>_EVENT_TRANSPORT=outbox` for them — this step remains a
+   per-deployment decision, not something the family repo does for
+   anyone.)*
 5. Adopt per entity in spec-priority order; the in-memory default means
-   un-migrated crates keep working throughout.
+   un-migrated crates keep working throughout. **Done for the producer
+   side (BUS-1/BUS-3) and the aggregator consumer (BUS-2)** — what
+   remains is rolling *other* consumers (search re-indexer, cache
+   invalidation, analytics — §9) and actually flipping any deployment's
+   transport to `outbox` with a real broker, both outside this repo's
+   own CI/test posture.
 
 ## 9. Consumers (initial set)
 

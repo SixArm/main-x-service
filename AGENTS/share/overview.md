@@ -124,7 +124,8 @@ case, and portfolio each provide:
 | Privacy masking module (`src/privacy`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ |
 | FHIR R5 surface | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ | ✅ | ✅ | – |
 | gRPC stub (Tonic) | ✅ | ✅ | – | – | ✅ | – | – | – | – | – |
-| Durable outbox events (Phase 2)² | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ | ✅ | ✅ | ✅ |
+| Durable outbox events (Phase 2)² | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Real-broker relay sink (`FluvioSink`, Phase 3)⁴ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Boundary normalization (phone/address) | ✅ | ✅ | ✅ | – | ✅ | – | – | – | – | – |
 | Record-level ABAC + masking obligations | ✅ | ✅ | – | – | – | – | ✅ | ✅ | ✅ | ✅ |
 | Cross-service links (`entity_links` write-side) | ✅ | ✅ | – | – | – | – | – | – | ✅ | – |
@@ -138,9 +139,13 @@ indexes its optional `kind` label as a **search** filter (`?kind=`) —
 deliberately never a duplicate-detection gate, since the embedded
 matcher is kind-agnostic by design. Course additionally serves a
 non-R5 FHIR surface (`/fhir/Basic` — no FHIR R5 resource models a
-course), which the FHIR R5 row deliberately does not count. ² course emits **in-memory events only**
-(no durable outbox yet); every durable-outbox service defaults to
-`<ENTITY>_EVENT_TRANSPORT=memory`. ³ Organization and case landed
+course), which the FHIR R5 row deliberately does not count. ² All ten
+entity registries carry a durable transactional outbox (course was
+verified 2026-08-03, correcting an earlier "in-memory events only"
+claim here — it has its own `course_outbox` table, a working
+`EventTransport::Outbox` switch, and a wired `src/relay.rs`); every
+durable-outbox service defaults to `<ENTITY>_EVENT_TRANSPORT=memory`,
+so none of this changes default behaviour. ³ Organization and case landed
 2026-08-03 (BLK-5), scoped to **JSONL + CSV only** (no Parquet) and a
 **local-filesystem-only** artifact store (no S3 backend yet — unlike
 person's BLK-3/BLK-4). Organization's per-row upsert is not yet
@@ -148,7 +153,20 @@ SEC-B3 advisory-lock-protected (a documented, narrow TOCTOU gap — see
 its own spec §10.7); case's bulk export reuses its existing inline
 `mask_case` redaction rather than a dedicated privacy module, so the
 case ✗ in the privacy-masking row above does not mean its bulk export
-is unmasked.
+is unmasked. ⁴ `FluvioSink` — the durable bus's real-broker relay sink,
+alongside the always-available no-broker `LoggingSink` — is behind each
+crate's own `fluvio` Cargo feature (off by default) and gated further
+by `<ENTITY>_FLUVIO_ENDPOINT`; unset ⇒ unchanged `LoggingSink`
+behaviour, and an endpoint configured without the feature refuses to
+start the relay (logged `error`) rather than silently falling back.
+Landed case (BUS-1, 2026-08-02) then the other nine (BUS-3, 2026-08-03),
+each with an opt-in `compose.fluvio.yaml` local broker and a
+feature-gated, `#[ignore]`d live-broker round-trip test verified only
+by compiling under the feature — no automated run in this repo stands
+up a broker. Only case's producer side is wired to a real deployment
+target today; the link-graph aggregator (BUS-2) already consumes all
+ten topics, so the other nine sinks are live but currently idle until
+a deployment actually points `<ENTITY>_FLUVIO_ENDPOINT` at a broker.
 
 ### The two cross-cutting services
 

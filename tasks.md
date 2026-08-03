@@ -581,9 +581,58 @@
   tests + 3 new `tests/idempotency.rs` tests — redelivery doesn't
   duplicate, distinct event_ids both apply, a no-`event_id` envelope
   applies every time) against real Postgres, zero regressions.
-- [ ] **BUS-3 (M)** Roll `FluvioSink` to the remaining nine services;
+- [x] **BUS-3 (M)** Roll `FluvioSink` to the remaining nine services;
   reconcile the five older crates' dormant `fluvio` Cargo deps (use or
-  remove). Depends: BUS-1, BUS-2.
+  remove). Depends: BUS-1, BUS-2. *(done 2026-08-03)* Ran as nine
+  parallel subagents (one per crate: person, worker, place, thing,
+  event, course, organization, care-pathway,
+  project-portfolio-management), each handed case's exact working BUS-1
+  port as the reference, then independently re-verified every one
+  myself before committing — build/clippy/fmt clean under both default
+  features and `--features fluvio`, and the full DB-gated suite rerun
+  against real Postgres for all nine, matching or exceeding each
+  agent's reported counts. `<ENTITY>_FLUVIO_ENDPOINT` selects
+  `FluvioSink` over `LoggingSink`; set without the `fluvio` feature
+  compiled in, the relay refuses to start (logged `error`) rather than
+  silently falling back — same posture as BUS-1. **The "reconcile
+  dormant fluvio deps" sub-clause was moot**: verified at BUS-1 time
+  that zero `Cargo.toml` in the repo mentioned `fluvio` before this
+  work landed it — there was nothing dormant to reconcile.
+  **Found and fixed a stale family-doc claim** while scoping course's
+  slice: `agents/share/overview.md`'s capability matrix said course had
+  no durable outbox ("in-memory events only"), but it demonstrably does
+  — a real `course_outbox` table, a working `EventTransport::Outbox`
+  switch, and `src/relay.rs` already wired into `app.rs`. Course was
+  therefore a legitimate BUS-3 target; the family doc is corrected in
+  the same reconciliation as this entry.
+  **Verification incident, resolved:** two of the nine crates
+  (organization, course) briefly showed `cargo build --features fluvio`
+  failures ("does not contain this feature: fluvio" /
+  "unresolved import … FluvioSink") when I ran my independent
+  verification concurrently with that crate's own agent still mid-edit
+  — a race, not a defect; both rebuilt clean on retry once the agent's
+  edits had settled. Worker-service's DB-gated suite also showed a
+  cluster of `db::audit::chain_tests::*` failures on one run
+  (`left/right` hash-chain mismatches) — traced to **reused/stale test
+  -database container state** from concurrent verification runs
+  colliding on the same `mxi-worker-test-db` container, not a
+  regression: a truly fresh, isolated container run passed all 33
+  tests cleanly, corroborating worker's own agent's independent
+  stash/pop A/B test (which found the *same* failures on the pre-BUS-3
+  baseline, and worse — 4/11 failing there vs 1/11 with the change).
+  Neither incident reflects a defect in the shipped code.
+  *Verified (per crate, matching or superseding each agent's own
+  report):* `cargo build`/`clippy --all-targets -D warnings`/`fmt
+  --check` clean under default features and `--features fluvio`;
+  `cargo test --lib` identical pass counts both ways (person 311,
+  worker 303, place 205, thing 197, event 152, course 123, organization
+  184, care-pathway n/a-unit-tests-are-request-level, portfolio 205);
+  `cargo deny check` shows only each crate's own pre-existing `rsa`
+  advisory, never a new one from `fluvio`'s dependency tree; the full
+  DB-gated suite passes against real Postgres for all nine with zero
+  regressions (person 21+20+1, worker 11+20+1+1, place 2+11, thing
+  2+outbox, event unit+integration, course 2+12+1, organization 33,
+  care-pathway 49, portfolio enforcement+masking+outbox).
 
 - [x] **LNK-1 (M)** Envelope `data` field + `Linked`/`Unlinked` kinds in
   **person**. *(done 2026-07-14)* `EventKind` gained `Linked`/`Unlinked`
