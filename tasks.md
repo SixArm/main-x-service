@@ -991,9 +991,50 @@
   short-format output, or diff the actual commit against the intended
   file list.
 
-- [ ] **FE-3 (M)** Bulk import/export screen in the person front-end:
+- [x] **FE-3 (M)** Bulk import/export screen in the person front-end:
   upload JSONL, dry-run toggle, job status polling, error-report and
   export download links (BFF-mediated; no token in browser).
+
+  **Done 2026-08-03, with one requirement descoped by explicit user
+  decision.** Researched against the live Rust source before any UI
+  was designed, which surfaced a real blocker: person-service has **no
+  HTTP endpoint that serves artifact bytes**, on either the local or S3
+  backend. `download_url`/`errors_url` in the job-status response are
+  opaque store references (`file://…`, `s3://…`) — `presigned_get`
+  exists on the S3 backend but is called from zero production code
+  paths, confirmed by grep. Asked the user how to proceed (fix the
+  backend too / build without working downloads / stop and document);
+  told to build without working downloads. `/persons/bulk` therefore
+  renders both artifact references as plain text with a note that
+  they aren't yet downloadable, rather than a link that would either
+  404 or, worse, silently do nothing. The actual gap — no
+  `GET /api/persons/{export,import}/{id}/download|errors` endpoint —
+  is recorded as spec `OQ-7` for whoever picks up the backend half
+  later.
+
+  Otherwise full scope: upload with a dry-run toggle (a multipart form
+  field, not a query param — required extending `ApiClient` to pass a
+  `FormData` body through untouched rather than JSON-serializing it,
+  done as a ~10-line, backward-compatible addition with its own
+  regression test), filtered export with a masking-profile selector
+  (`full` correctly handled as a possible 401/403, not just assumed to
+  succeed), and job-status polling for both that is supersede-safe (a
+  second submit of the same kind retires the first poll loop rather
+  than racing it) and treats a 404 mid-poll as "expired" rather than
+  crashing — the service conflates TTL expiry and another actor's job
+  behind the same 404, by design (SEC-B4), so the UI can't and doesn't
+  try to distinguish them either. `include_soft_deleted` is omitted
+  from the export form entirely: the endpoint accepts it (202) but the
+  worker doesn't support it yet, so offering it would only ever produce
+  a job that fails after acceptance. A recent-jobs table with
+  client-side kind/status filters, since `GET .../bulk-jobs` takes only
+  `limit` server-side. 69 i18n keys × 13 locales. `pnpm check`/`test`
+  (50 tests, including new coverage for the repository methods, the
+  multipart `ApiClient` path, and the pure job-status helpers)/`build`
+  all green; spot-reviewed directly (git diff scope, a full read of the
+  main page component) before committing, not just trusted on the
+  implementing agent's report.
+
 - [ ] **FE-4 (M)** Duplicate review-queue screen (services exposing the
   review API; start with person).
 
