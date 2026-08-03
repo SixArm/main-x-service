@@ -54,6 +54,23 @@ describe("ApiClient", () => {
     expect(f.calls[0]?.url).toBe("http://svc.test/api/cases");
   });
 
+  // Regression (2026-08-03): a base URL that itself has a path segment —
+  // the BFF proxy, `<origin>/api/proxy` — must keep that segment. An
+  // earlier version resolved an absolute-path `path` (one starting with
+  // `/`) as a host-relative reference, which per the URL spec replaces
+  // the base URL's entire path rather than appending to it, silently
+  // discarding `/api/proxy` from every request in every BFF-proxied
+  // front-end in the family.
+  it("keeps the base URL's own path segment (a BFF proxy prefix)", async () => {
+    const f = fakeFetch(200, {});
+    const proxied = new ApiClient({
+      baseUrl: "http://svc.test/api/proxy",
+      fetch: f.fn,
+    });
+    await proxied.get("/api/cases");
+    expect(f.calls[0]?.url).toBe("http://svc.test/api/proxy/api/cases");
+  });
+
   // Pins: POST stringifies the body and sets the JSON content-type header.
   it("POST serialises the body and sets JSON content-type", async () => {
     const f = fakeFetch(200, { pid: "p1", title: "Housing benefit appeal" });
