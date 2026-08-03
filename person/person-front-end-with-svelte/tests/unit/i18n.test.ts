@@ -146,4 +146,12 @@ const CANONICAL_KEYS: StringKey[] = [
     "form.reset", "form.required", "form.atLeastOneGiven", "form.futureBirthDate",
     "name.family", "name.given", "name.givenHint", "matchResults.title",
     "matchResults.noCandidates", "matchResults.dob", "matchResults.breakdown",
+    "links.title", "links.loading", "links.empty", "links.assertHeading",
+    "links.kind", "links.kind.sameIdentity", "links.kind.worksAt",
+    "links.kind.memberOf", "links.toRef", "links.toRefHint", "links.role",
+    "links.confidence", "links.confidenceHint", "links.provenance",
+    "links.provenanceHint", "links.validFrom", "links.validTo", "links.submit",
+    "links.submitting", "links.withdraw", "links.withdrawing",
+    "links.confirmWithdraw", "links.error.required", "links.error.malformedRef",
+    "links.error.wrongType.prefix", "links.error.wrongType.suffix",
 ];

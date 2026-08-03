@@ -3,6 +3,8 @@ import type {
   AuditEntry,
   BatchDeduplicationRequest,
   BatchDeduplicationResponse,
+  CreateLinkRequest,
+  EntityLink,
   MatchRequest,
   MatchResult,
   MergeRequest,
@@ -168,6 +170,42 @@ export class PersonRepository {
       `/api/persons/review-queue/${id}/decision`,
       { body: { status } },
     );
+  }
+
+  /**
+   * List this person's active outbound cross-service edges (newest
+   * first). Withdrawn edges are excluded server-side.
+   */
+  listLinks(personId: string): Promise<EntityLink[]> {
+    return this.http.get<EntityLink[]>(`/api/persons/${personId}/links`);
+  }
+
+  /**
+   * Assert an outbound cross-service edge from this person. Idempotent
+   * server-side: re-asserting the same `(kind, to_ref, valid_from)` tuple
+   * updates the existing edge rather than duplicating it.
+   *
+   * @throws {ApiError} 422 when the kind is not one person originates or
+   *   the target's entity type is wrong for the kind; 404 for an unknown
+   *   person.
+   */
+  createLink(
+    personId: string,
+    request: CreateLinkRequest,
+  ): Promise<EntityLink> {
+    return this.http.post<EntityLink>(`/api/persons/${personId}/links`, {
+      body: request,
+    });
+  }
+
+  /**
+   * Withdraw (soft-delete) one outbound edge. The service responds 200
+   * with an empty payload, so there is nothing to read back.
+   */
+  deleteLink(personId: string, linkId: string): Promise<void> {
+    return this.http
+      .delete<unknown>(`/api/persons/${personId}/links/${linkId}`)
+      .then(() => undefined);
   }
 
   /** Fetch a person with sensitive fields masked (privacy view). */

@@ -9,6 +9,39 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — cross-service links panel (repo FE-2)
+
+- `/persons/[id]` gains a **Cross-service links** panel: it lists this
+  person's active outbound edges, asserts a new one, and withdraws one
+  behind a `confirm()`. The three kinds person may originate are the
+  only options offered, each labelled with the target type it requires
+  (`same_identity` → worker, `works_at` / `member_of` → organization),
+  and the `to_ref` placeholder follows the selected kind.
+- New `src/lib/links.ts` holds the kind ↔ target-type rules and an
+  `EntityRef` parser mirroring the service's `validate_edge` /
+  `EntityRef::from_str`, so a valid-looking ref pointing at the wrong
+  kind of record is caught in the form instead of coming back as a
+  `422`. The server stays authoritative — its `422` reason is shown
+  inline, as are `404` / `401` / `403`.
+- Repository gains `listLinks()` / `createLink()` / `deleteLink()`;
+  types gain `EntityLink` + `CreateLinkRequest`. **Deliberately
+  distinct** from the existing `PersonLink`, which is the within-entity
+  person→person merge relationship and a matcher signal; cross-service
+  edges are never a matcher signal
+  ([`cross-service-linking.md`](../../agents/share/cross-service-linking.md)
+  §7), so the two never share a type or a section.
+- Note on the wire: `DELETE …/links/{id}` answers `200` with an empty
+  envelope rather than `204`, so the repository method tolerates a body
+  it does not read.
+- i18n: 26 new keys across all 13 locales (the parity test enforces the
+  full set, and `pnpm check` fails outright if one locale is missing a
+  key — verified by deliberately deleting one).
+- Tests: `tests/unit/links-validation.test.ts` (12 tests pinning the
+  accept/reject matrix against the Rust side's), three repository
+  URL/verb tests plus a 422-reason-surfacing test, and a Playwright
+  smoke assertion that stubs the two API calls at the network layer so
+  the smoke project keeps its "no live service required" contract.
+
 ### Added — drag-to-decide review board (2026-07-19)
 
 - 2026-07-19 — `/review` now loads the **stored** review queue on mount

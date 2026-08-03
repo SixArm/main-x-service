@@ -17,6 +17,7 @@
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
     import { PersonRepository } from "$lib/api/persons.js";
+    import LinksPanel from "$lib/components/LinksPanel.svelte";
     import { t } from "$lib/i18n.svelte.js";
     import type { Person } from "$lib/api/types.js";
 
@@ -132,6 +133,11 @@
             </ul>
         </section>
     {/if}
+
+    <!-- Cross-service edges (person → worker / organization). Separate
+         from `person.links` above, which is the within-entity merge
+         relationship — see LinksPanel's header comment. -->
+    <LinksPanel personId={id} />
 {/if}
 
 <style>

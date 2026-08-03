@@ -185,6 +185,63 @@ export interface PersonLink {
   link_type: LinkType;
 }
 
+// ─── Cross-service entity link ───────────────────────────────────────
+//
+// Deliberately distinct from {@link PersonLink} above: that is a
+// *within-entity* person→person relationship (merge/dedup, and a matcher
+// signal). An {@link EntityLink} is a *cross-service* edge asserting that
+// this person is the same real-world entity as — or is affiliated with —
+// a record owned by another service (worker, organization). Per
+// `agents/share/cross-service-linking.md` §7 the two must never be
+// conflated: cross-service edges are never fed to any matcher.
+
+/**
+ * A stored cross-service edge originating from this person, as returned
+ * by `GET`/`POST /api/persons/{id}/links` (the service's `LinkView`).
+ */
+export interface EntityLink {
+  /** Edge id — the handle for withdrawing it. */
+  id: string;
+  /** This person as an `EntityRef` URN (`person:<uuid>`). */
+  from_ref: string;
+  /** Edge-kind token (`same_identity` / `works_at` / `member_of`). */
+  kind: string;
+  /** The far record's `EntityRef` URN (`worker:<uuid>`, `organization:<uuid>`). */
+  to_ref: string;
+  /** Optional role label (unused by person's edge kinds). */
+  role: string | null;
+  /** Optional confidence in `[0, 1]`; 1.0 means operator-asserted. */
+  confidence: number | null;
+  /** How the edge was asserted; defaults server-side to `"operator"`. */
+  provenance: string;
+  /** Optional validity start (ISO 8601 date). */
+  valid_from: string | null;
+  /** Optional validity end (ISO 8601 date) — i.e. a "former" affiliation. */
+  valid_to: string | null;
+}
+
+/**
+ * Body of `POST /api/persons/{id}/links`. Only `kind` and `to_ref` are
+ * required; the rest are omitted rather than sent as nulls so the server
+ * applies its own defaults (notably `provenance = "operator"`).
+ */
+export interface CreateLinkRequest {
+  /** Edge-kind token person may originate (see `PERSON_LINK_KINDS`). */
+  kind: string;
+  /** The far record's `EntityRef` URN. */
+  to_ref: string;
+  /** Optional role label. */
+  role?: string | null;
+  /** Optional confidence in `[0, 1]`. */
+  confidence?: number | null;
+  /** Optional provenance override; blank/absent ⇒ `"operator"`. */
+  provenance?: string | null;
+  /** Optional validity start (`YYYY-MM-DD`). */
+  valid_from?: string | null;
+  /** Optional validity end (`YYYY-MM-DD`). */
+  valid_to?: string | null;
+}
+
 // ─── Person ──────────────────────────────────────────────────────────
 
 /**
@@ -356,11 +413,7 @@ export interface BatchDeduplicationResponse {
 }
 
 /** Disposition of a {@link ReviewQueueItem}. */
-export type ReviewStatus =
-  | "pending"
-  | "confirmed"
-  | "rejected"
-  | "automerged";
+export type ReviewStatus = "pending" | "confirmed" | "rejected" | "automerged";
 
 /** A candidate duplicate pair awaiting (or having received) human review. */
 export interface ReviewQueueItem {

@@ -22,5 +22,6 @@
 - [ ] T-19: Masked-view toggle on detail page.
 - [ ] T-20: GDPR-export download button.
 - [ ] T-21: Validate the SVAR licensing fit (free GPL-3.0 vs Pro) — see §16 OQ-1.
+- [x] T-23 (repo FE-2): Cross-service **links panel** on `/persons/[id]` — list this person's active outbound edges, assert a new one (`same_identity` → worker, `works_at` / `member_of` → organization), and withdraw one behind a confirm. `LinksPanel.svelte` + `EntityLink` / `CreateLinkRequest` types + `listLinks` / `createLink` / `deleteLink` on the repository + the pure kind↔target-type rules in `src/lib/links.ts` (mirroring the service's `validate_edge`, so a wrong target type is caught before the request). Server `422` reasons are surfaced inline. Deliberately distinct from the `Person.links` merge relationship (§9). Tests: `tests/unit/links-validation.test.ts` (12), three repository tests + a 422-surfacing test, an i18n-parity extension for 26 new keys across all 13 locales, and a route-stubbed Playwright smoke assertion.
 - [ ] T-22: Auth — adopt BFF + httpOnly cookie + CSRF; the browser holds only `__Host-mxi_session`, the SvelteKit server attaches a short-lived PASETO server-side; no `mxi_access_token`/`localStorage` bearer, no fragment handoff (per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
 
