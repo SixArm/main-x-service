@@ -91,6 +91,26 @@ describe("ApiClient", () => {
         expect(capturedUrl).not.toContain("mask_sensitive");
     });
 
+    // Regression (2026-08-03): a base URL that itself has a path segment —
+    // the BFF proxy, `<origin>/api/proxy` — must keep that segment. An
+    // earlier version resolved an absolute-path `path` (one starting with
+    // `/`) as a host-relative reference, which per the URL spec replaces
+    // the base URL's entire path rather than appending to it, silently
+    // discarding `/api/proxy` from every request in every BFF-proxied
+    // front-end in the family.
+    it("keeps the base URL's own path segment (a BFF proxy prefix)", async () => {
+        let capturedUrl = "";
+        const client = new ApiClient({
+            baseUrl: "http://localhost:5173/api/proxy",
+            fetch: mockFetch(async (input) => {
+                capturedUrl = String(input);
+                return jsonResponse({ success: true, data: {}, error: null });
+            }),
+        });
+        await client.get("/api/persons/abc");
+        expect(capturedUrl).toBe("http://localhost:5173/api/proxy/api/persons/abc");
+    });
+
     // Pins: a 204 (e.g. DELETE) resolves to undefined without parsing a body.
     it("returns undefined for 204 No Content", async () => {
         const client = new ApiClient({
