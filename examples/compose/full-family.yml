@@ -1,0 +1,480 @@
+# The full Main X Index family: ten entity registries + the central
+# authentication-service + the link-graph read-model aggregator, all
+# eleven services against ONE shared Postgres server (twelve logical
+# databases — one per service, `init/10-databases.sh` creates them).
+#
+# This is the demo/dev topology, not a production one: a single
+# Postgres container is simplest to bring up and tear down for a
+# tutorial or the bus-gated test tier (see agents/share/architecture.md
+# — each service still owns its own database/schema and none shares
+# tables; only the physical server is shared here). A real deployment
+# would more likely give each service its own Postgres instance, the
+# way every crate's own `compose.test.yaml` already does.
+#
+# `<ENTITY>_REQUIRE_AUTH` is left at its default (off) everywhere in
+# this file — see enforced.yml for the ABAC-guarded variant, applied
+# as a compose override on top of this file.
+#
+# Build context is the REPOSITORY ROOT for every service, resolved
+# relative to THIS file's location (`../..`), not your cwd — every
+# crate's Dockerfile COPYs in sibling path dependencies that live
+# outside its own directory (agents/share/architecture.md: no crate
+# has a root Cargo.toml).
+#
+# Usage (from anywhere; building all twelve images takes a while —
+# they compile in release mode):
+#   podman compose -f examples/compose/full-family.yml build
+#   podman compose -f examples/compose/full-family.yml up -d
+#   curl http://localhost:8089/_health   # case-service, for example
+#   podman compose -f examples/compose/full-family.yml down -v
+#
+# NOTE: run `build` and `up` as two separate steps, not `up -d --build`
+# — see single-service.yml's header comment for why (a compose-provider
+# hang observed on this repository's large build context).
+#
+# Host ports (all map to the container's internal port — 8080 for the
+# six person-style crates, 5150 for the five loco-idiomatic registries
+# and authentication, 5160 for link-graph):
+#
+#   8081 person        8085 event          8089 case
+#   8082 worker         8086 course         8090 portfolio
+#   8083 place          8087 organization   8091 authentication
+#   8084 thing           8088 care-pathway   8092 link-graph
+
+x-common-env: &common-env
+  RUST_LOG: ${RUST_LOG:-info}
+  # Required by loco's config schema (auth.jwt.secret has no default,
+  # except link-graph which has no auth.jwt block at all); unused by
+  # any of these crates' actual auth flow, which is offline PASETO
+  # verification (see agents/share/jwt.md), not JWT sessions.
+  JWT_SECRET: ${JWT_SECRET:-dev-only-unused-jwt-secret}
+
+services:
+  postgres:
+    image: docker.io/library/postgres:18-alpine
+    container_name: mxi-family-postgres
+    environment:
+      POSTGRES_USER: loco
+      POSTGRES_PASSWORD: loco
+      POSTGRES_DB: postgres
+    volumes:
+      # PGDATA lives under /var/lib/postgresql in the postgres:18 image
+      # (.../18/docker, not the .../data of earlier majors) — the old
+      # path makes the 18 image refuse to start (agents/share/postgresql.md).
+      - postgres_data:/var/lib/postgresql
+      - ./init/00-extensions.sh:/docker-entrypoint-initdb.d/00-extensions.sh:ro
+      - ./init/10-databases.sh:/docker-entrypoint-initdb.d/10-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loco"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    networks:
+      - mxi-family
+
+  # ---- person -------------------------------------------------------
+  person-migrate:
+    build: { context: ../.., dockerfile: person/person-service-with-loco/Dockerfile }
+    image: mxi-family-person-service
+    entrypoint: ["/app/person-service"]
+    command: ["db", "migrate", "-e", "production"]
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/person
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [mxi-family]
+
+  person-service:
+    build: { context: ../.., dockerfile: person/person-service-with-loco/Dockerfile }
+    image: mxi-family-person-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/person
+    ports: ["8081:8080"]
+    depends_on:
+      person-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks: [mxi-family]
+
+  # ---- worker -------------------------------------------------------
+  worker-migrate:
+    build: { context: ../.., dockerfile: worker/worker-service-with-loco/Dockerfile }
+    image: mxi-family-worker-service
+    entrypoint: ["/app/worker-service"]
+    command: ["db", "migrate", "-e", "production"]
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [mxi-family]
+
+  worker-service:
+    build: { context: ../.., dockerfile: worker/worker-service-with-loco/Dockerfile }
+    image: mxi-family-worker-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/worker
+    ports: ["8082:8080"]
+    depends_on:
+      worker-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks: [mxi-family]
+
+  # ---- place ----------------------------------------------------------
+  place-migrate:
+    build: { context: ../.., dockerfile: place/place-service-with-loco/Dockerfile }
+    image: mxi-family-place-service
+    entrypoint: ["/app/place-service"]
+    command: ["db", "migrate", "-e", "production"]
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/place
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [mxi-family]
+
+  place-service:
+    build: { context: ../.., dockerfile: place/place-service-with-loco/Dockerfile }
+    image: mxi-family-place-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/place
+    ports: ["8083:8080"]
+    depends_on:
+      place-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks: [mxi-family]
+
+  # ---- thing ----------------------------------------------------------
+  thing-migrate:
+    build: { context: ../.., dockerfile: thing/thing-service-with-loco/Dockerfile }
+    image: mxi-family-thing-service
+    entrypoint: ["/app/thing-service"]
+    command: ["db", "migrate", "-e", "production"]
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/thing
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [mxi-family]
+
+  thing-service:
+    build: { context: ../.., dockerfile: thing/thing-service-with-loco/Dockerfile }
+    image: mxi-family-thing-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/thing
+    ports: ["8084:8080"]
+    depends_on:
+      thing-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks: [mxi-family]
+
+  # ---- event ----------------------------------------------------------
+  event-migrate:
+    build: { context: ../.., dockerfile: event/event-service-with-loco/Dockerfile }
+    image: mxi-family-event-service
+    entrypoint: ["/app/event-service"]
+    command: ["db", "migrate", "-e", "production"]
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/event
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [mxi-family]
+
+  event-service:
+    build: { context: ../.., dockerfile: event/event-service-with-loco/Dockerfile }
+    image: mxi-family-event-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/event
+    ports: ["8085:8080"]
+    depends_on:
+      event-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks: [mxi-family]
+
+  # ---- course ---------------------------------------------------------
+  course-migrate:
+    build: { context: ../.., dockerfile: course/course-service-with-loco/Dockerfile }
+    image: mxi-family-course-service
+    entrypoint: ["/app/course-service"]
+    command: ["db", "migrate", "-e", "production"]
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/course
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [mxi-family]
+
+  course-service:
+    build: { context: ../.., dockerfile: course/course-service-with-loco/Dockerfile }
+    image: mxi-family-course-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/course
+    ports: ["8086:8080"]
+    depends_on:
+      course-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks: [mxi-family]
+
+  # ---- organization -----------------------------------------------------
+  organization-migrate:
+    build: { context: ../.., dockerfile: organization/organization-service-with-loco/Dockerfile }
+    image: mxi-family-organization-service
+    entrypoint: ["/app/organization-service"]
+    command: ["db", "migrate", "-e", "production"]
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/organization
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [mxi-family]
+
+  organization-service:
+    build: { context: ../.., dockerfile: organization/organization-service-with-loco/Dockerfile }
+    image: mxi-family-organization-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/organization
+    ports: ["8087:5150"]
+    depends_on:
+      organization-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks: [mxi-family]
+
+  # ---- care-pathway -----------------------------------------------------
+  care-pathway-migrate:
+    build: { context: ../.., dockerfile: care-pathway/care-pathway-service-with-loco/Dockerfile }
+    image: mxi-family-care-pathway-service
+    entrypoint: ["/app/care-pathway-service"]
+    command: ["db", "migrate", "-e", "production"]
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/care_pathway
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [mxi-family]
+
+  care-pathway-service:
+    build: { context: ../.., dockerfile: care-pathway/care-pathway-service-with-loco/Dockerfile }
+    image: mxi-family-care-pathway-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/care_pathway
+    ports: ["8088:5150"]
+    depends_on:
+      care-pathway-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks: [mxi-family]
+
+  # ---- case ---------------------------------------------------------
+  case-migrate:
+    build: { context: ../.., dockerfile: case/case-service-with-loco/Dockerfile }
+    image: mxi-family-case-service
+    entrypoint: ["/app/case-service"]
+    command: ["db", "migrate", "-e", "production"]
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/case
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [mxi-family]
+
+  case-service:
+    build: { context: ../.., dockerfile: case/case-service-with-loco/Dockerfile }
+    image: mxi-family-case-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/case
+    ports: ["8089:5150"]
+    depends_on:
+      case-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks: [mxi-family]
+
+  # ---- portfolio (project-portfolio-management) ------------------------
+  portfolio-migrate:
+    build:
+      context: ../..
+      dockerfile: project-portfolio-management/project-portfolio-management-service-with-loco/Dockerfile
+    image: mxi-family-portfolio-service
+    entrypoint: ["/app/project-portfolio-management-service"]
+    command: ["db", "migrate", "-e", "production"]
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/portfolio
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [mxi-family]
+
+  portfolio-service:
+    build:
+      context: ../..
+      dockerfile: project-portfolio-management/project-portfolio-management-service-with-loco/Dockerfile
+    image: mxi-family-portfolio-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/portfolio
+    ports: ["8090:5150"]
+    depends_on:
+      portfolio-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks: [mxi-family]
+
+  # ---- authentication (central SSO provider) ---------------------------
+  authentication-migrate:
+    build: { context: ../.., dockerfile: authentication/authentication-service-with-loco/Dockerfile }
+    image: mxi-family-authentication-service
+    entrypoint: ["/app/authentication-service-cli"]
+    command: ["db", "migrate", "-e", "production"]
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/authentication
+      # SEC-A1 fail-closed: LOCO_ENV=production (baked into the image)
+      # refuses the crate's dev-seed fallback, so a real seed is
+      # required even for this one-shot migrate step. Dev-only
+      # placeholder — regenerate for anything beyond a local demo:
+      #   python3 -c "import secrets, base64; \
+      #     print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip('='))"
+      TOKEN_PRIVATE_KEY_SEED: ${TOKEN_PRIVATE_KEY_SEED:-dv-Nv3h-Q3THpU3sgs5VvzwuWe4MbHy7uEjNjNLGEws}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [mxi-family]
+
+  authentication-service:
+    build: { context: ../.., dockerfile: authentication/authentication-service-with-loco/Dockerfile }
+    image: mxi-family-authentication-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/authentication
+      TOKEN_PRIVATE_KEY_SEED: ${TOKEN_PRIVATE_KEY_SEED:-dv-Nv3h-Q3THpU3sgs5VvzwuWe4MbHy7uEjNjNLGEws}
+    ports: ["8091:5150"]
+    depends_on:
+      authentication-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks: [mxi-family]
+
+  # ---- link-graph (read-model aggregator) ------------------------------
+  # No separate migrate step: this crate's own production.yaml sets
+  # `auto_migrate: true` (unlike every other crate here), so `start`
+  # applies pending migrations itself.
+  link-graph-service:
+    build: { context: ../.., dockerfile: link/link-graph-service-with-loco/Dockerfile }
+    image: mxi-family-link-graph-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/link_graph
+      RUST_LOG: ${RUST_LOG:-info}
+    ports: ["8092:5160"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5160/_health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks: [mxi-family]
+
+networks:
+  mxi-family:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

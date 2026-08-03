@@ -862,13 +862,69 @@
 > `scripts/test-db.sh` (see DEP-0 below). DEP-1 is the *demo/dev* stack:
 > services plus their databases, wired to each other.
 
-- [ ] **DEP-1 (M)** `examples/compose/`: podman-compose for (a) one
+- [x] **DEP-1 (M)** `examples/compose/`: podman-compose for (a) one
   service + postgres, (b) the full family (10 services + auth +
   link-graph + postgres), (c) the enforced variant (auth on, policies
   mounted, reconciliation configured). Compose is also what tutorials and
   the bus-gated tests build on.
-  **Prerequisite work done 2026-08-03 (not DEP-1 itself — the
-  compose files below are not yet written):** scoping the "full family"
+
+  **Done 2026-08-03.** `examples/compose/{single-service,full-family,
+  enforced}.yml` (+ `init/`, `policies/`, `README.md`) written and
+  verified **for real**, not just `podman compose config`: every
+  container actually brought up against a live Postgres and exercised
+  over HTTP.
+  - **single-service.yml** (case-service + its own Postgres,
+    migrate-then-start): `up -d`, migration log showed all 13
+    migrations applying, `GET /_health` → `200`, `POST /api/cases` →
+    `422` (a real validation rejection against the migrated schema, not
+    a missing-table `500`) — proves the pattern end-to-end, not just
+    that it boots.
+  - **full-family.yml** (all 12 services, one shared Postgres, twelve
+    databases via `init/00-extensions.sh` + `init/10-databases.sh`):
+    all 12 containers came up, all 12 health endpoints returned `200`
+    (`/api/health` for the six person-style crates, `/_health` for the
+    five loco-idiomatic registries + link-graph), and two real
+    functional calls confirmed the stack does actual work, not just
+    health-check theatre: `POST /api/persons` → `201` with a real
+    persisted record, and authentication-service's
+    `/.well-known/paseto-keys` → `200` with a real Ed25519 key.
+  - **enforced.yml** (override on top of full-family.yml — turns on
+    `<ENTITY>_REQUIRE_AUTH`, mounts `policies/default.json`, wires
+    `<ENTITY>_PASETO_KEYS_URL` at authentication-service, configures
+    link-graph's `LINK_GRAPH_RECONCILE_URL_{PERSON,CASE}`): merged
+    stack came up clean, health stayed public (`200` on both crate
+    shapes) while an unauthenticated `GET`/`POST /api/cases` now got
+    `401` (ABAC genuinely active, not merely configured), and
+    link-graph logged the exact documented refusal —
+    `"refusing an unauthenticated remote reconcile source: set
+    LINK_GRAPH_RECONCILE_TOKEN…"` — for both `person` and `case`,
+    confirming SEC-B7's fail-closed behaviour fires as designed rather
+    than silently no-op'ing. `LINK_GRAPH_RECONCILE_TOKEN` is left empty
+    by design: completing it needs a real PASETO minted through
+    authentication-service's live magic-link flow, which a static
+    compose file cannot script — documented as the one manual step in
+    both `enforced.yml`'s header comment and the README, not silently
+    left unexplained.
+
+  Two real bugs found and fixed along the way, beyond the four crates'
+  Dockerfile/compose fixes already recorded below:
+  1. **`init/10-databases.sh`**: an unquoted `CREATE DATABASE case;`
+     is a Postgres syntax error — `case` is a reserved SQL keyword.
+     Fixed by quoting every database name (`CREATE DATABASE "case";`);
+     harmless for the other eleven, load-bearing for this one. Found
+     by actually running the init script against a real container, not
+     by inspection — the failure only surfaces at `initdb` time.
+  2. **The `docker-compose` build-hang** (noted below for the four
+     legacy crates) recurred identically for images this task built
+     fresh via `podman compose build` — confirming it is a
+     compose-provider issue with this repository's build context size,
+     not specific to any one Dockerfile. Same workaround: `podman
+     build -t <exact-compose-image-name> …` directly, then `podman
+     compose up -d` with no `--build` (documented in both compose
+     files' header comments and the README, not left as a trap for the
+     next person to hit).
+
+  **Prerequisite work done 2026-08-03 (leading up to the above):** scoping the "full family"
   variant found that only 4 of the 12 crates it needs (person, worker,
   event, course) had a production `Dockerfile` at all — the other 8
   (place, thing, organization, care-pathway, case,
@@ -926,12 +982,106 @@
     Dockerfile `HEALTHCHECK` instruction (`--format docker` is needed
     to bake it in) — noted in each Dockerfile; the compose-level
     `healthcheck:` DEP-1 will add works under either format.
-  Remaining for DEP-1 itself: the three compose files, and fixing
-  person/worker/event/course's existing Dockerfile+docker-compose.yml
-  to the same repo-root-context pattern (their `docker-compose.yml`
-  also references the decommissioned `/api/v1/health` path in at
-  least person's case — a separate, pre-existing staleness finding,
-  not fixed today).
+  **Further prerequisite work done 2026-08-03 (still not DEP-1
+  itself):** fixed person/worker/event/course's existing
+  Dockerfile + `docker-compose.yml` to the same repo-root-context
+  pattern, then found — only by actually **running** each built image,
+  not by trusting a green `podman build` — that all four had **three
+  further real boot bugs**, on top of the context mismatch:
+  1. **No `config/` copy.** None of the four Dockerfiles copied
+     `config/` into the runtime image at all; the loco binary crashed
+     immediately with `Message("no configuration file found in folder:
+     config")`. (These four crates' `config/production.yaml` were
+     already git-tracked, unlike the six-of-eight gitignore gap found
+     above — this bug is purely a missing `COPY`.)
+  2. **`CMD` with no `start` subcommand.** All four `CMD`s were the
+     bare binary (`["/app/person-service"]`, etc.); every one of these
+     crates' `src/bin/main.rs` dispatches through `loco_rs::cli::main`,
+     which needs an explicit `start` argument — a bare invocation just
+     prints the CLI's own `--help` and exits `0`, a "successful"
+     container that serves nothing and would have looked healthy to
+     any check that only inspects the exit code.
+  3. **No `LOCO_ENV`, and a dead `SERVER_PORT`.** None set `LOCO_ENV`,
+     so a `production`-tagged image would have booted in loco's default
+     `development` config. Separately, all four already set
+     `SERVER_PORT=8080`, but loco's own `config/production.yaml` reads
+     the env var `PORT` (`server.port: {{ get_env(name="PORT",
+     default="8080") }}` — `8084` for course specifically), not
+     `SERVER_PORT` (a same-named but unrelated field these crates' own
+     `src/config/mod.rs` documents, for a different, non-loco code
+     path) — so `SERVER_PORT` was silently inert and every one of these
+     four would have bound to whatever loco's Tera default happened to
+     be. Fixed by setting `LOCO_ENV=production` and `PORT=8080`
+     explicitly (course's own default was `8084`, now overridden to
+     match its siblings' `8080` convention and its own `EXPOSE`/
+     `HEALTHCHECK`).
+
+  Course's `docker-compose.yml` had a **fourth, distinct** context bug:
+  it already built from one level up (`course/`, not its own
+  directory), but never copied `integrity-mac` or
+  `authentication-verifier` — both of which live *outside* `course/`
+  entirely — so it was exactly as broken as the other three's
+  `context: .`, just by a different sibling-dependency gap, and its
+  matcher dependency turned out to be a plain crates.io registry
+  version (`course-matcher = "0.6.1"`, no `path`), so the existing
+  Dockerfile's `COPY course-matcher-rust-crate` was unnecessary and
+  dropped. Also fixed in all four: the stale `/api/v1/health`
+  `HEALTHCHECK`/compose-healthcheck path (the decommissioned
+  API-versioning-in-the-URL scheme — see
+  [`agents/share/api-versioning.md`](agents/share/api-versioning.md))
+  → `/api/health`, confirmed as the real mounted path for all four by
+  grepping their `src/api/rest/mod.rs` route tables rather than
+  trusting the (mutually inconsistent) per-crate docs. All four
+  verified end-to-end (build + boot against real Postgres + `200` on
+  `/api/health`) after every fix, individually and all together.
+
+  **Compose-stack verification done 2026-08-03:** each of the four
+  crates' own `docker-compose.yml` (not just a bare `podman run`) now
+  brings up cleanly with `podman compose up -d` and answers `200` on
+  `/api/health`, catching two further bugs that only a real compose
+  run (not a direct `podman build`/`run`) surfaces:
+  - **All four `postgres:18-alpine` services mounted the wrong
+    directory.** They used the pre-18 convention, a named volume at
+    `/var/lib/postgresql/data`; postgres 18's image stores data at
+    `/var/lib/postgresql/<major>/docker` and refuses to start with that
+    old path mounted (`Error: in 18+, these Docker images are
+    configured to store database data in a format which is compatible
+    with "pg_ctlcluster"…` — the exact issue
+    [`agents/share/postgresql.md`](agents/share/postgresql.md) already
+    documents for `compose.test.yaml`, just not yet applied to these
+    four dev compose files). Fixed by mounting the volume at
+    `/var/lib/postgresql` (the parent directory) instead, matching
+    every crate's own `compose.test.yaml`.
+  - **`JWT_SECRET` was never set** in any of the four `environment:`
+    blocks, and loco's `config/production.yaml` `auth.jwt.secret` has
+    no Tera default — added `JWT_SECRET: ${JWT_SECRET:-dev-only-unused-jwt-secret}`
+    with a comment noting it is unused by this crate's actual auth
+    flow (offline PASETO verification, not JWT sessions —
+    [`agents/share/jwt.md`](agents/share/jwt.md)).
+
+  Also cleaned up (no behaviour change): dropped the obsolete
+  `version: "3.8"` key docker-compose warned about on every invocation
+  from person/worker/event's compose files (course's already lacked
+  it). And a build-tooling quirk worth knowing, not a bug in these
+  files: `podman compose up -d --build` (which shells out to the
+  Homebrew `docker-compose` binary as its compose provider) reliably
+  **hung indefinitely** building these repo-root-context images on this
+  machine, with no visible build subprocess and 0% CPU — while the
+  identical build via plain `podman build -f <crate>/Dockerfile -t
+  <name> .` from the repo root completed in the same one-to-three
+  minutes it always does. Pre-building the image under the exact name
+  `podman compose` expects (`<compose-project>-<service>`, e.g.
+  `worker-service-with-loco-worker-server`) and then running `podman
+  compose up -d` (no `--build`) works reliably — compose just reuses
+  the already-built image. Not investigated further (no reproduction
+  outside this compose provider); worth a second look if it recurs
+  when building `examples/compose/`.
+
+  Remaining for DEP-1 itself: the three compose files. All 12 crates
+  the "full family" variant needs now have a working, repo-root-context
+  Dockerfile, and the four with a pre-existing dev `docker-compose.yml`
+  (person, worker, event, course) have that file verified end-to-end
+  too; none has yet been exercised together in one wired compose stack.
 - [ ] **DEP-2 (M)** `agents/share/configuration.md`: the complete env-var
   reference — every `<ENTITY>_*`, `LINK_GRAPH_*`, `AUTH_*` variable, its
   default, effect, and which doc governs it. Generated by sweeping

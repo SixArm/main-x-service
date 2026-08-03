@@ -1,0 +1,19 @@
+{
+  "rules": [
+    {
+      "effect": "allow",
+      "actions": ["write", "destructive"],
+      "when": { "svc": ["true"] }
+    },
+    {
+      "effect": "allow",
+      "actions": ["destructive"],
+      "when": { "access": ["admin"] }
+    },
+    {
+      "effect": "allow",
+      "actions": ["write"],
+      "when": { "access": ["write", "admin"] }
+    }
+  ]
+}

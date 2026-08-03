@@ -1,0 +1,160 @@
+# The "enforced" variant of full-family.yml — an OVERRIDE file, not a
+# standalone stack. It turns on the ABAC guard family-wide, mounts a
+# shared example policy, points every service at authentication-service
+# for offline PASETO verification, and configures (but cannot, from a
+# static file alone, fully complete — see below) link-graph's
+# reconciliation pull.
+#
+# Usage (both files together; compose merges them, this one's values
+# win):
+#   podman compose -f examples/compose/full-family.yml \
+#                   -f examples/compose/enforced.yml build
+#   podman compose -f examples/compose/full-family.yml \
+#                   -f examples/compose/enforced.yml up -d
+#
+# What "enforced" changes, per agents/share/authorization-attributes.md
+# and agents/share/jwt-enforcement.md:
+#
+# - `<ENTITY>_REQUIRE_AUTH=true` on all ten entity services + link-graph
+#   (NOT on authentication-service itself, which issues tokens rather
+#   than consuming them the same way). With no token, every request
+#   now gets 401 instead of the default-open behaviour.
+# - `<ENTITY>_ABAC_POLICY_FILE=/policies/default.json`, mounted from
+#   ./policies/default.json (read-only) into every container. This
+#   demo file is, deliberately, exactly the built-in default policy
+#   written out explicitly (any authenticated subject reads;
+#   `access=write` writes; `access=admin` adds delete/merge/deduplicate;
+#   `svc=true` does everything) — it changes nothing on its own; it
+#   exists so a reader can see and edit real policy JSON rather than
+#   read about the built-in default in prose. Write your own rules here
+#   for anything beyond a demo.
+# - `<ENTITY>_PASETO_KEYS_URL=http://authentication-service:5150/.well-known/paseto-keys`
+#   on all ten entity services + link-graph: each fetches
+#   authentication-service's published Ed25519 key set once at boot and
+#   verifies bearer tokens **offline** from then on (no shared secret,
+#   no per-request introspection call — agents/share/authentication-sessions.md §5).
+#
+# What is wired but NOT fully automatic — link-graph reconciliation:
+#
+# `LINK_GRAPH_RECONCILE_URL_PERSON` / `_CASE` point link-graph at
+# person's and case's bulk `/links` endpoints (the only two crates with
+# a live `entity_links` write-side today — see
+# agents/share/cross-service-linking.md §11). But both endpoints gate
+# their bulk read as a **privileged governed read** (case's
+# `authorize_bulk`, SEC-G1) requiring `Action::Destructive` — in
+# practice a token with `access=admin` or `svc=true`. That token has to
+# be a **real PASETO** minted by authentication-service from a live
+# session (its passwordless magic-link flow), which a static compose
+# file cannot script for you. `LINK_GRAPH_RECONCILE_TOKEN` is therefore
+# left EMPTY below on purpose:
+#
+#   - With no token, SEC-B7 refuses to use the URL at all (link-graph's
+#     `HttpAuthoritativeSource::from_env_for` logs a warning and treats
+#     reconciliation as unconfigured for that entity) — the safe,
+#     honest failure mode, not a silent no-op that looks configured.
+#   - The read-model still updates in real time from the event stream
+#     regardless; reconciliation is the periodic *integrity check* on
+#     top of that, not the only path edges reach the graph.
+#   - To actually complete this: sign in through
+#     authentication-front-end-with-svelte (or curl the magic-link API
+#     directly), exchange the resulting session for a token via
+#     `POST /api/auth/token` with `access=admin` or `svc=true`
+#     attributes assigned to that user first (see
+#     agents/share/authorization-attributes.md §6), then re-run this
+#     override with `LINK_GRAPH_RECONCILE_TOKEN=<that token>` set in
+#     the environment. The token is short-lived (~5 min), so this is a
+#     manual, one-shot demonstration step, not something to bake as a
+#     static default.
+
+services:
+  person-service:
+    environment:
+      PERSON_REQUIRE_AUTH: "true"
+      PERSON_ABAC_POLICY_FILE: /policies/default.json
+      PERSON_PASETO_KEYS_URL: http://authentication-service:5150/.well-known/paseto-keys
+    volumes:
+      - ./policies/default.json:/policies/default.json:ro
+
+  worker-service:
+    environment:
+      WORKER_REQUIRE_AUTH: "true"
+      WORKER_ABAC_POLICY_FILE: /policies/default.json
+      WORKER_PASETO_KEYS_URL: http://authentication-service:5150/.well-known/paseto-keys
+    volumes:
+      - ./policies/default.json:/policies/default.json:ro
+
+  place-service:
+    environment:
+      PLACE_REQUIRE_AUTH: "true"
+      PLACE_ABAC_POLICY_FILE: /policies/default.json
+      PLACE_PASETO_KEYS_URL: http://authentication-service:5150/.well-known/paseto-keys
+    volumes:
+      - ./policies/default.json:/policies/default.json:ro
+
+  thing-service:
+    environment:
+      THING_REQUIRE_AUTH: "true"
+      THING_ABAC_POLICY_FILE: /policies/default.json
+      THING_PASETO_KEYS_URL: http://authentication-service:5150/.well-known/paseto-keys
+    volumes:
+      - ./policies/default.json:/policies/default.json:ro
+
+  event-service:
+    environment:
+      EVENT_REQUIRE_AUTH: "true"
+      EVENT_ABAC_POLICY_FILE: /policies/default.json
+      EVENT_PASETO_KEYS_URL: http://authentication-service:5150/.well-known/paseto-keys
+    volumes:
+      - ./policies/default.json:/policies/default.json:ro
+
+  course-service:
+    environment:
+      COURSE_REQUIRE_AUTH: "true"
+      COURSE_ABAC_POLICY_FILE: /policies/default.json
+      COURSE_PASETO_KEYS_URL: http://authentication-service:5150/.well-known/paseto-keys
+    volumes:
+      - ./policies/default.json:/policies/default.json:ro
+
+  organization-service:
+    environment:
+      ORGANIZATION_REQUIRE_AUTH: "true"
+      ORGANIZATION_ABAC_POLICY_FILE: /policies/default.json
+      ORGANIZATION_PASETO_KEYS_URL: http://authentication-service:5150/.well-known/paseto-keys
+    volumes:
+      - ./policies/default.json:/policies/default.json:ro
+
+  care-pathway-service:
+    environment:
+      CARE_PATHWAY_REQUIRE_AUTH: "true"
+      CARE_PATHWAY_ABAC_POLICY_FILE: /policies/default.json
+      CARE_PATHWAY_PASETO_KEYS_URL: http://authentication-service:5150/.well-known/paseto-keys
+    volumes:
+      - ./policies/default.json:/policies/default.json:ro
+
+  case-service:
+    environment:
+      CASE_REQUIRE_AUTH: "true"
+      CASE_ABAC_POLICY_FILE: /policies/default.json
+      CASE_PASETO_KEYS_URL: http://authentication-service:5150/.well-known/paseto-keys
+    volumes:
+      - ./policies/default.json:/policies/default.json:ro
+
+  portfolio-service:
+    environment:
+      PORTFOLIO_REQUIRE_AUTH: "true"
+      PORTFOLIO_ABAC_POLICY_FILE: /policies/default.json
+      PORTFOLIO_PASETO_KEYS_URL: http://authentication-service:5150/.well-known/paseto-keys
+    volumes:
+      - ./policies/default.json:/policies/default.json:ro
+
+  link-graph-service:
+    environment:
+      LINK_GRAPH_REQUIRE_AUTH: "true"
+      LINK_GRAPH_ABAC_POLICY_FILE: /policies/default.json
+      LINK_GRAPH_PASETO_KEYS_URL: http://authentication-service:5150/.well-known/paseto-keys
+      LINK_GRAPH_RECONCILE_URL_PERSON: http://person-service:8080/api/persons/links
+      LINK_GRAPH_RECONCILE_URL_CASE: http://case-service:5150/api/cases/links
+      # Deliberately empty — see the header comment above.
+      LINK_GRAPH_RECONCILE_TOKEN: ${LINK_GRAPH_RECONCILE_TOKEN:-}
+    volumes:
+      - ./policies/default.json:/policies/default.json:ro

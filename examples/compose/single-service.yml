@@ -1,0 +1,108 @@
+# Minimal example: ONE Main X Index service + its own Postgres.
+#
+# Picks case-service as the concrete example — it is the family's
+# reference implementation for several cross-cutting features (bulk
+# import/export, cross-service links, record-level ABAC), so it is the
+# most representative single service to read first. The pattern below
+# (build from the repo root, migrate-then-start, one Postgres) is
+# identical for every other service crate; swap the four case-specific
+# lines (marked below) to point at a different crate.
+#
+# Build context is the REPOSITORY ROOT, not this directory — every
+# crate's Dockerfile COPYs in sibling path dependencies that live
+# outside its own directory (see agents/share/architecture.md; no
+# crate has a root Cargo.toml, so there is no shared vendor/lock step).
+# Compose resolves a relative `context:` against the location of THIS
+# file, so `../..` means the repository root regardless of your cwd.
+#
+# Usage (from anywhere):
+#   podman compose -f examples/compose/single-service.yml build
+#   podman compose -f examples/compose/single-service.yml up -d
+#   curl http://localhost:8089/_health
+#   podman compose -f examples/compose/single-service.yml down -v
+#
+# NOTE: run `build` and `up` as two separate steps. `up -d --build` was
+# observed to hang indefinitely on this repository's large build
+# context under this host's `docker-compose` compose provider (no
+# subprocess, 0% CPU); a plain `build` followed by a plain `up -d`
+# (which just reuses the image compose already built) does not hang.
+# See tasks.md DEP-1 for the full note.
+
+services:
+  postgres:
+    image: docker.io/library/postgres:18-alpine
+    container_name: mxi-example-postgres
+    environment:
+      POSTGRES_USER: loco
+      POSTGRES_PASSWORD: loco
+      POSTGRES_DB: case # <- swap: this crate's database name
+    volumes:
+      # PGDATA lives under /var/lib/postgresql in the postgres:18 image
+      # (.../18/docker, not the .../data of earlier majors) — mounting
+      # a volume at the old .../data path makes the 18 image refuse to
+      # start (agents/share/postgresql.md).
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loco -d case"] # <- swap
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    networks:
+      - mxi-example
+
+  # One-shot: applies pending sea-orm-migration migrations, then exits.
+  # loco's config has `auto_migrate: false` in production.yaml for
+  # every crate but link-graph, so this step is not optional — a
+  # container that boots straight to `start` would serve against an
+  # empty schema.
+  case-migrate: # <- swap
+    build:
+      context: ../..
+      dockerfile: case/case-service-with-loco/Dockerfile # <- swap
+    image: mxi-example-case-service # <- swap
+    entrypoint: ["/app/case-service"] # <- swap
+    command: ["db", "migrate", "-e", "production"]
+    environment:
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/case # <- swap
+      JWT_SECRET: ${JWT_SECRET:-dev-only-unused-jwt-secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - mxi-example
+
+  case-service: # <- swap
+    build:
+      context: ../..
+      dockerfile: case/case-service-with-loco/Dockerfile # <- swap
+    image: mxi-example-case-service # <- swap
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/case # <- swap
+      # Required by loco's config schema (auth.jwt.secret has no
+      # default); unused by this crate's actual auth flow, which is
+      # offline PASETO verification (see agents/share/jwt.md).
+      JWT_SECRET: ${JWT_SECRET:-dev-only-unused-jwt-secret}
+      RUST_LOG: ${RUST_LOG:-info}
+    ports:
+      - "8089:5150" # <- swap: this crate's internal port (5150/8080/5160)
+    depends_on:
+      case-migrate: # <- swap
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health"] # <- swap
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - mxi-example
+
+networks:
+  mxi-example:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
