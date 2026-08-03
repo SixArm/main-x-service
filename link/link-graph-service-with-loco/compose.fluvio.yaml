@@ -1,0 +1,66 @@
+# A local Fluvio broker for the bus-gated test tier (BUS-2;
+# agents/share/event-bus.md §10 "Fluvio-gated" tests).
+#
+# Opt-in and separate from compose.test.yaml on purpose: the Postgres
+# compose file is what scripts/test-db.sh drives for every DB-gated run,
+# and this crate's default and DB-gated suites must stay green with no
+# broker present at all (lazy verify-on-read + reconciliation are the
+# integrity path with no broker configured — see src/consumer.rs). Bring
+# this up only when you want to exercise the real bus consumer (the
+# `fluvio` cargo feature) for real:
+#
+#   podman compose -f compose.fluvio.yaml up -d
+#   LINK_GRAPH_FLUVIO_ENDPOINT=127.0.0.1:9103 \
+#     cargo test --features fluvio --test fluvio_consumer -- --ignored
+#   podman compose -f compose.fluvio.yaml down -v
+#
+# Podman, not Docker (agents/share/rust-loco-stack.md). Identical layout
+# to case-service's compose.fluvio.yaml (BUS-1) — copy-adapted, drift
+# accepted, same posture as compose.test.yaml existing per crate.
+services:
+  sc:
+    image: docker.io/infinyon/fluvio:stable
+    container_name: mxi-link-graph-fluvio-sc
+    hostname: sc
+    ports:
+      - "9103:9003"
+    environment:
+      RUST_LOG: info
+    command: "./fluvio-run sc --local /fluvio/metadata"
+    volumes:
+      - fluvio-metadata:/fluvio/metadata
+
+  sc-setup:
+    build:
+      context: .
+      dockerfile: Dockerfile.fluvio-cli
+    container_name: mxi-link-graph-fluvio-sc-setup
+    environment:
+      RUST_LOG: info
+    entrypoint: >
+      /bin/sh -c "
+      fluvio profile add docker sc:9003 docker;
+      fluvio cluster spu register --id 5001 -p 0.0.0.0:9110 --private-server spu:9011;
+      exit 0;
+      "
+    depends_on:
+      - sc
+
+  spu:
+    image: docker.io/infinyon/fluvio:stable
+    container_name: mxi-link-graph-fluvio-spu
+    hostname: spu
+    volumes:
+      - fluvio-data:/fluvio/data
+    environment:
+      RUST_LOG: info
+    ports:
+      - "9110:9010"
+      - "9111:9011"
+    command: "./fluvio-run spu -i 5001 -p spu:9010 -v spu:9011 --sc-addr sc:9004 --log-base-dir /fluvio/data"
+    depends_on:
+      - sc
+
+volumes:
+  fluvio-metadata:
+  fluvio-data:

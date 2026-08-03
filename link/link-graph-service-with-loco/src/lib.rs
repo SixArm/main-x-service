@@ -37,6 +37,7 @@ pub mod app;
 pub mod auth;
 /// Compliance controls: keyed integrity over the audit trail.
 pub mod compliance;
+pub mod consumer;
 pub mod controllers;
 pub mod envelope;
 pub mod events;

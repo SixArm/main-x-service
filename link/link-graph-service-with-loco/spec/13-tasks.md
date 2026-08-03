@@ -35,11 +35,45 @@
   shape (design §4.2) + the `created` / `deleted` / `merged` envelope
   (`src/events.rs`). DB-free tests. (`schema_version` switch deferred
   with the durable bus, T-23.)
-- [ ] T-6: Per-topic bus consumers (`mxi.<entity>.events`), idempotent
+- [x] T-6: Per-topic bus consumers (`mxi.<entity>.events`), idempotent
   on `event_id` via `processed_events`; per-topic offset + freshness
-  watermark to `consumer_offsets` (§6 FR-1/2/3). **v1 provides the
-  `apply_event` seam + per-topic offset/freshness upsert; the Fluvio
-  consumer loop and `processed_events` idempotency are deferred.**
+  watermark to `consumer_offsets` (§6 FR-1/2/3). *(Done 2026-08-03,
+  BUS-2.)* One task per entity topic (`src/consumer.rs`,
+  `entity_ref::EntityType::ALL`), behind this crate's own `fluvio`
+  Cargo feature (off by default) and gated further by
+  `LINK_GRAPH_FLUVIO_ENDPOINT` — unset ⇒ unchanged v1 behaviour (lazy
+  verify-on-read + reconciliation remain the integrity path); **set
+  without the feature** ⇒ the consumer refuses to start (logged at
+  `error`, not a silent no-op). New `processed_events` table (§10.3)
+  backs a new `events::apply_event_idempotent`, which every real
+  consumer call goes through instead of `apply_event` directly — dedup
+  on `event_id`, applying unconditionally when the envelope carries none
+  (v1's optional field). **Design decision (recorded so it isn't
+  re-litigated):** resume position is delegated to Fluvio's own
+  named-consumer offset management (`offset_consumer` +
+  `OffsetManagementStrategy::Auto`) rather than reconstructed from
+  `consumer_offsets.offset_val` — see §10.3 below and `src/consumer.rs`'s
+  module docs for the full reasoning; that column keeps writing exactly
+  what `apply_event` always has (the envelope's own per-`entity_pid`
+  `seq`), now understood as a freshness/diagnostic value, not a literal
+  Fluvio partition offset.
+  Tests: `tests/idempotency.rs` (DB-gated, 3 tests — redelivery doesn't
+  duplicate, distinct event_ids both apply, a no-`event_id` envelope
+  applies every time); `tests/fluvio_consumer.rs` (feature-gated,
+  `#[ignore]`d live-broker round-trip via `compose.fluvio.yaml`,
+  verified by compiling under `--features fluvio`, not by an actual
+  execution — no automated run in this repo stands up a broker). Green:
+  `cargo build`/`test --lib`/`clippy --all-targets -D warnings`/`fmt
+  --check` under both default features and `--features fluvio`; `cargo
+  deny check` shows only the pre-existing `rsa` advisory; the full
+  DB-gated suite (19 pre-existing + 3 new idempotency tests) against
+  real Postgres, zero regressions. **Retiring lazy verify-on-read for
+  entities with a live topic** (this task's original "keep it for the
+  rest" note) is **not** implemented — `LINK_GRAPH_LAZY_VERIFY` stays a
+  single global flag, and only `case` has a real producer today (BUS-1);
+  turning it off globally now would leave every other entity's presence
+  permanently unresolvable. Revisit once BUS-3 rolls `FluvioSink` out
+  further.
 - [x] T-7: Graph projector — `linked` upsert / `unlinked` remove +
   symmetric canonicalisation for `same_identity` (§6 FR-4/5/6).
   `graph::canonical` + `edges::Model::apply_linked`/`apply_unlinked`.

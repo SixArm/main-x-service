@@ -13,6 +13,42 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > and [event-bus.md](../../agents/share/event-bus.md).
 
 ## [Unreleased]
+### Added — Real Fluvio bus consumer (BUS-2, spec T-6, 2026-08-03)
+
+- **The read-model's first real bus consumer**: one task per entity
+  topic (`mxi.<entity>.events`, `entity_ref::EntityType::ALL` — 10
+  topics), each folding every record into the read-model via a new
+  `events::apply_event_idempotent`. Behind this crate's own `fluvio`
+  Cargo feature (off by default); gated further by
+  `LINK_GRAPH_FLUVIO_ENDPOINT` — unset ⇒ unchanged behaviour (lazy
+  verify-on-read + reconciliation remain the integrity path); **set
+  without the feature** ⇒ the consumer refuses to start (logged at
+  `error`) rather than silently doing nothing, the same
+  no-silent-fallback shape as BUS-1.
+- New `processed_events` table (spec §10.3) + `apply_event_idempotent`:
+  dedupes on the envelope `event_id` under at-least-once delivery. An
+  envelope with no `event_id` (optional in v1) applies unconditionally,
+  as before.
+- **Resume position is delegated to Fluvio's own named-consumer offset
+  management** (`offset_consumer` + `OffsetManagementStrategy::Auto`),
+  not reconstructed from `consumer_offsets.offset_val` — that column
+  keeps writing exactly what `apply_event` always has (the envelope's
+  own per-`entity_pid` `seq`), now understood as a freshness/diagnostic
+  value rather than a literal Fluvio partition offset. See
+  `src/consumer.rs`'s module docs for the full reasoning.
+- `compose.fluvio.yaml` + `Dockerfile.fluvio-cli` (copy-adapted from
+  case-service's BUS-1 files) provision a local SC+SPU broker for
+  opt-in manual runs; not part of any automated CI stage.
+  `tests/fluvio_consumer.rs` is a feature-gated, `#[ignore]`d live
+  round-trip (produce onto `mxi.person.events` → `consumer::spawn` →
+  assert the edge lands), verified by compiling under `--features
+  fluvio`, not by an actual execution.
+- Verified the real `fluvio` 0.50 consumer API
+  (`Fluvio::connect_with_config`, `consumer_with_config`,
+  `ConsumerConfigExtBuilder`, `Offset::beginning`,
+  `OffsetManagementStrategy::Auto`) against the actual compiler, same
+  approach as BUS-1's producer side.
+
 ### Changed — loco-rs 1.0.1 (2026-08-02)
 
 - **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration → 2.0,

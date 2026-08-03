@@ -69,8 +69,30 @@ CREATE TABLE processed_events (
 ```
 
 `processed_events` enforces idempotency under at-least-once delivery
-(§6 FR-2); a periodic retention worker trims old rows. `consumer_offsets`
+(§6 FR-2); a periodic retention worker trims old rows
+(`LINK_GRAPH_PROCESSED_EVENTS_RETENTION_DAYS`, default 7). `consumer_offsets`
 holds per-topic position and the freshness watermark backing `as_of`.
+
+**Resume position (BUS-2, §13 T-6): delegated to Fluvio, not this
+table.** The real consumer (`src/consumer.rs`) resumes each topic via
+Fluvio's own **named-consumer offset management**
+(`offset_consumer("link-graph-<topic>")` +
+`OffsetManagementStrategy::Auto`), which the SC persists and resumes
+server-side across restarts — the idiomatic mechanism for exactly what
+this row's "per-topic offset resume" originally asked for, rather than
+this crate reconstructing it against `offset_val`.
+`Offset::beginning()` is only the fallback for a brand-new named
+consumer that has never committed a position.
+
+This leaves `offset_val` exactly what `apply_event` has always written
+to it: the envelope's own per-`entity_pid` `seq` — read now as a
+freshness/diagnostic value ("last committed **event**"), not a literal
+Fluvio partition byte offset. Threading a real Fluvio-record offset
+through `apply_event` instead would have touched roughly two dozen
+existing test call sites for no behavioural gain, since resume does not
+depend on it. Idempotency (`processed_events`) is a second, independent
+layer required regardless of which mechanism resumes a topic, since
+delivery is at-least-once either way.
 
 ### 10.4 Governance / audit (for `case ↔ person`)
 

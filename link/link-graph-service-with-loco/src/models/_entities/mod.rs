@@ -5,3 +5,4 @@ pub mod consumer_offsets;
 pub mod edges;
 pub mod entity_presence;
 pub mod prelude;
+pub mod processed_events;

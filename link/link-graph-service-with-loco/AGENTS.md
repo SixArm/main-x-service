@@ -38,16 +38,19 @@ in [`spec/16-open-questions.md`](spec/16-open-questions.md). There is no
 The crate exists and builds: `Cargo.toml`, `src/` (the four read
 endpoints in `src/controllers/graph.rs` — `/api/neighbors/{ref}`,
 `/api/edges`, `/api/single-view/{ref}`, `/api/health/freshness` — plus
-the pure projection logic in `src/graph.rs`, the `apply_event` seam in
-`src/events.rs`, lazy verify-on-read in `src/probe.rs`, reconciliation
-in `src/reconcile.rs`, offline PASETO auth in `src/auth.rs`,
-OpenAPI/Swagger, and Prometheus `/metrics.prom`), and the
-`m20260709_000001_edges` … `_000004_audit_log` migrations. Remaining
-(see [`spec/13-tasks.md`](spec/13-tasks.md) and spec §14): the Fluvio
-bus consumer loop (T-6), graph-read privacy-masking parity with the
-case service (T-18), OTLP wiring (T-22), the durable-bus flip (T-23),
-the bus/governance/bench test tiers (T-26..28), and the cross-service
-`same_identity` matcher round (T-29..33).
+the pure projection logic in `src/graph.rs`, the `apply_event` /
+`apply_event_idempotent` seam in `src/events.rs`, the real Fluvio bus
+consumer in `src/consumer.rs` (T-6, BUS-2, behind this crate's own
+`fluvio` Cargo feature), lazy verify-on-read in `src/probe.rs`,
+reconciliation in `src/reconcile.rs`, offline PASETO auth in
+`src/auth.rs`, OpenAPI/Swagger, and Prometheus `/metrics.prom`), and the
+`m20260709_000001_edges` … `_000004_audit_log`,
+`m20260803_000001_processed_events` migrations. Remaining (see
+[`spec/13-tasks.md`](spec/13-tasks.md) and spec §14): graph-read
+privacy-masking parity with the case service (T-18), OTLP wiring (T-22),
+the durable-bus flip (T-23), the bus/governance/bench test tiers
+(T-26..28), and the cross-service `same_identity` matcher round
+(T-29..33).
 
 ## Three-part change rule
 

@@ -5,9 +5,11 @@
 //! read-model: `created`/`deleted` → presence, `linked` → edge upsert,
 //! `unlinked` → edge removal, `merged` → central edge repointing onto the
 //! survivor (spec §13 T-9 / design §5.3). Every consumed event advances
-//! the per-topic freshness watermark. The actual Fluvio consumer,
-//! idempotency via `processed_events`, and lazy verify-on-read are
-//! v1-deferred (spec §13 T-6/T-10).
+//! the per-topic freshness watermark. The real Fluvio consumer
+//! ([`crate::consumer`], spec §13 T-6) calls [`apply_event_idempotent`],
+//! which wraps [`apply_event`] with a `processed_events` dedup check
+//! under at-least-once delivery (event-bus.md §6). Lazy verify-on-read
+//! remains a separate, still-live path (spec §13 T-10).
 
 use chrono::{DateTime, FixedOffset, Utc};
 use loco_rs::prelude::*;
@@ -17,7 +19,7 @@ use uuid::Uuid;
 
 use entity_ref::{EdgeKind, EntityRef, EntityType};
 
-use crate::models::{consumer_offsets, edges, entity_presence};
+use crate::models::{consumer_offsets, edges, entity_presence, processed_events};
 
 /// The bus event envelope (event-bus.md §4), decoded for the aggregator.
 /// Only the fields this service reads are modelled; unknown fields are
@@ -197,6 +199,41 @@ pub async fn apply_event<C: ConnectionTrait>(db: &C, envelope: Envelope) -> Resu
 
     let topic = topic_for(&envelope.entity);
     consumer_offsets::Model::record(db, &topic, seq, occurred_at).await?;
+    Ok(())
+}
+
+/// [`apply_event`], made safe under **at-least-once** bus delivery
+/// (event-bus.md §6): the real Fluvio consumer ([`crate::consumer`])
+/// calls this, not `apply_event` directly.
+///
+/// An envelope carrying an `event_id` already present in
+/// `processed_events` is a **redelivery** — a no-op, since `apply_event`
+/// already ran for it. A fresh `event_id` is applied, then recorded.
+/// Recording happens **after** a successful apply (not before), so a
+/// crash between the two leaves the event un-recorded rather than
+/// falsely marked done; every write `apply_event` performs is itself an
+/// upsert keyed on a stable id (`edges.edge_id`, `entity_presence.ref`,
+/// …), so a redelivery that slips through this narrow crash window
+/// re-applies safely rather than corrupting state.
+///
+/// An envelope with **no** `event_id` (the field is optional in v1 —
+/// event-bus.md §4) cannot be deduped and is applied unconditionally,
+/// exactly as [`apply_event`] alone would.
+///
+/// # Errors
+///
+/// Propagates [`apply_event`]'s errors, plus any `processed_events`
+/// query/insert failure.
+pub async fn apply_event_idempotent<C: ConnectionTrait>(db: &C, envelope: Envelope) -> Result<()> {
+    let Some(event_id) = envelope.event_id else {
+        return apply_event(db, envelope).await;
+    };
+    if processed_events::Model::is_processed(db, event_id).await? {
+        tracing::trace!(%event_id, "duplicate event skipped (already processed)");
+        return Ok(());
+    }
+    apply_event(db, envelope).await?;
+    processed_events::Model::mark_processed(db, event_id).await?;
     Ok(())
 }
 

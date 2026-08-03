@@ -42,17 +42,27 @@ design doc
   over-cap depth. Loco `/_health` + `/_ping` retained.
 - **Tests** — un-gated unit suite (§11.1) + `#[ignore]`d DB-gated
   request suite (`tests/graph_endpoints.rs`, §11.2).
+- **Real Fluvio bus consumer** (T-6, BUS-2, `src/consumer.rs`, done
+  2026-08-03) — one task per entity topic, behind this crate's own
+  `fluvio` Cargo feature, calling a new `events::apply_event_idempotent`
+  (`processed_events` dedup on `event_id`, §10.3). Off with no
+  `LINK_GRAPH_FLUVIO_ENDPOINT` configured; a configured endpoint without
+  the feature refuses to start rather than silently doing nothing. See
+  §13 T-6 for the full write-up, including the resume-position design
+  decision (delegated to Fluvio's own named-consumer offset management,
+  not `consumer_offsets.offset_val`).
 
 ### 14.2 Deferred (unchecked in §13)
 
-The Fluvio bus consumer loop + `processed_events` idempotency (T-6),
-merge-repointing (T-9), lazy verify-on-read (T-10), OpenAPI/Swagger
-(T-15), `case ↔ person` governance / audit / masking (T-16..18),
-offline PASETO auth (T-19), the reconciliation worker (T-20),
-Prometheus `/metrics.prom` + OTLP (T-21/22), the durable-bus flip
-(T-23), and the bus/governance/bench test tiers (T-26..28). The
-`apply_event` seam is the integration point a future bus consumer will
-call.
+**Note (2026-08-03): this list predates several since-landed items —
+T-9 (merge-repointing), T-10 (lazy verify-on-read), and T-15
+(OpenAPI/Swagger) are `[x]` in §13 and 14.1 despite still being named
+below; §13 is the current source of truth, not this paragraph.**
+`case ↔ person` governance / audit / masking (T-16..18), offline PASETO
+auth (T-19), the reconciliation worker (T-20), Prometheus
+`/metrics.prom` + OTLP (T-21/22), the durable-bus flip (T-23), and the
+bus/governance/bench test tiers (T-26..28) remain — check §13 directly
+for which of these have also since landed.
 
 ### 14.3 Upstream prerequisites (not in this crate)
 

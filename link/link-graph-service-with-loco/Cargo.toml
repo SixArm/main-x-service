@@ -65,6 +65,22 @@ reqwest = { version = "0.12", default-features = false, features = [
   "json",
 ] }
 
+# Real-broker bus consumer (BUS-2; agents/share/event-bus.md §5/§8/§9).
+# Optional and behind the `fluvio` feature below, so a default build's
+# dependency tree and boot behaviour are unchanged — lazy verify-on-read
+# and reconciliation remain the integrity path with no broker configured.
+fluvio = { version = "0.50", optional = true }
+# `StreamExt::next()` over a Fluvio `ConsumerStream`.
+futures-util = { version = "0.3", optional = true, default-features = false, features = [
+  "std",
+] }
+
+[features]
+# Off by default. The read-only-to-world posture and the `apply_event`/
+# `apply_event_idempotent` seam need no feature; only the real Fluvio
+# producer connection lives behind this.
+fluvio = ["dep:fluvio", "dep:futures-util"]
+
 [[bin]]
 name = "link-graph-service"
 path = "src/bin/main.rs"

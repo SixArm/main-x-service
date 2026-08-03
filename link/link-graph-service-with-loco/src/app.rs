@@ -137,6 +137,11 @@ impl Hooks for App {
                 tokio::spawn(reconcile::run_periodic(ctx.db.clone(), source));
             }
         }
+        // Real bus consumption (BUS-2, spec §13 T-6): a no-op unless
+        // `LINK_GRAPH_FLUVIO_ENDPOINT` is configured, so lazy verify-on-read
+        // + reconciliation remain the read-model's integrity path with no
+        // broker set up, exactly as before this task.
+        crate::consumer::spawn(ctx.db.clone());
         Ok(router.layer(axum::middleware::from_fn(require_auth_mw)))
     }
 
