@@ -64,6 +64,29 @@ describe("i18n catalog", () => {
         expect(translate("nav.cases", "ar")).toBe("القضايا");
     });
 
+    it("covers the merge page keys in every locale", () => {
+        const mergeKeys = STRING_KEYS.filter(
+            (k) => k.startsWith("merge.") || k === "nav.merge",
+        );
+        // The merge UI is a whole page; a partial catalog would render
+        // raw keys, so assert the block exists rather than a single key.
+        expect(mergeKeys.length).toBeGreaterThan(20);
+        for (const locale of LOCALES) {
+            for (const key of mergeKeys) {
+                expect(
+                    STRINGS_BY_LOCALE[locale][key],
+                    `${locale} missing ${key}`,
+                ).toBeTruthy();
+            }
+        }
+        // The confirm prompt keeps both placeholders the page substitutes.
+        for (const locale of LOCALES) {
+            const confirm = translate("merge.confirm", locale);
+            expect(confirm, `${locale} confirm missing {dup}`).toContain("{dup}");
+            expect(confirm, `${locale} confirm missing {main}`).toContain("{main}");
+        }
+    });
+
     it("falls back to English then to the key", () => {
         // A locale not present falls back to English.
         expect(translate("form.save", "xx" as unknown as Locale)).toBe(

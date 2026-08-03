@@ -56,6 +56,7 @@ src/
     ├── new/+page.svelte          create
     ├── [pid]/+page.svelte        detail + delete + check-duplicates
     ├── [pid]/edit/+page.svelte   edit
+    ├── merge/+page.svelte        merge a duplicate into a survivor + recent merge history
     ├── signin / verify           BFF session establishment (server routes)
     └── api/proxy/[...path]       BFF proxy → case service (attaches the PASETO server-side)
 

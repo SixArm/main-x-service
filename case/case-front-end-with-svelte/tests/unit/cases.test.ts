@@ -84,4 +84,33 @@ describe("CaseRepository", () => {
     expect(calls[0]?.init.method).toBe("POST");
     expect(calls[0]?.url).toBe("http://svc.test/api/cases/check-duplicates");
   });
+
+  // Pins: merge -> POST /api/cases/merge with the service's own body shape
+  // (`main_pid` / `duplicate_pid` / `reason` — not person's field names).
+  it("merge() POSTs the merge request to /api/cases/merge", async () => {
+    const { repo, calls } = spyClient();
+    await repo.merge({
+      main_pid: "main-1",
+      duplicate_pid: "dup-1",
+      reason: "confirmed duplicate",
+    });
+    expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.url).toContain("/api/cases/merge");
+    expect(calls[0]?.url).toBe("http://svc.test/api/cases/merge");
+    expect(calls[0]?.init.body).toBe(
+      JSON.stringify({
+        main_pid: "main-1",
+        duplicate_pid: "dup-1",
+        reason: "confirmed duplicate",
+      }),
+    );
+  });
+
+  // Pins: recentMerges -> GET /api/cases/merges/recent.
+  it("recentMerges() GETs the merge history", async () => {
+    const { repo, calls } = spyClient();
+    await repo.recentMerges();
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe("http://svc.test/api/cases/merges/recent");
+  });
 });

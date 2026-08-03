@@ -89,6 +89,7 @@
     { href: "/", key: "nav.cases" },
     { href: "/new", key: "nav.newCase" },
     { href: "/board", key: "nav.board" },
+    { href: "/merge", key: "nav.merge" },
   ];
 
   // Reactive: tracks the server-resolved session presence.

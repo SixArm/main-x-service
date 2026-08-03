@@ -8,6 +8,31 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — record-merge UI (2026-08-03)
+
+- **`/merge` route** (nav-linked): merge a confirmed duplicate case into a
+  survivor. Optional side-by-side preview of both records, a native
+  `confirm()` before the destructive call, and a **recent merges** table
+  (merged-at / main / duplicate / reason / actor) loaded on mount and
+  refreshed after a successful merge.
+- **`CaseRepository.merge()`** → `POST /api/cases/merge` and
+  **`recentMerges()`** → `GET /api/cases/merges/recent`, with
+  `MergeRequest` / `MergeResponse` / `MergeRecordRow` types.
+- The wire shape is this service's own, not a sibling's: the request is
+  `{main_pid, duplicate_pid, reason?}` and the response is
+  `{main_pid, duplicate_pid, main}` — there is **no `merge_record`
+  wrapper**, so the merge row's id and timestamp are not in the response.
+  The page links to the survivor and reads timestamps from the history
+  endpoint instead.
+- **`validateMerge`** (`src/lib/components/merge-validation.ts`) is a pure
+  helper returning an **i18n key** (not English prose), so the guard is
+  unit-testable and the message follows the selected locale. It rejects a
+  self-merge locally, which the service would answer `422`.
+- 25 new strings across all 13 locales; the parity test additionally pins
+  that every locale's `merge.confirm` keeps both `{dup}` / `{main}`
+  placeholders, since a translation that drops one would silently render
+  a prompt naming no case.
+
 ### Added — paged collection reads (2026-08-01)
 
 - **`ApiClient.getPage()`** returns `{ items, total, limit, offset }`,

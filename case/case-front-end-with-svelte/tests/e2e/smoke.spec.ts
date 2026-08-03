@@ -43,6 +43,15 @@ async function stubApi(page: Page) {
     if (path.endsWith("/check-duplicates")) {
       return route.fulfill({ json: [] });
     }
+    // Merge history for the `/merge` route (raw `merge_records` rows).
+    if (path === "/api/cases/merges/recent" && method === "GET") {
+      return route.fulfill({ json: [] });
+    }
+    if (path === "/api/cases/merge" && method === "POST") {
+      return route.fulfill({
+        json: { main_pid: PID, duplicate_pid: PID, main: CASE },
+      });
+    }
     if (path === `/api/cases/${PID}` && method === "GET") {
       return route.fulfill({ json: CASE });
     }
@@ -85,6 +94,25 @@ test("detail page renders the fetched case", async ({ page }) => {
 test("edit page renders the edit form", async ({ page }) => {
   await page.goto(`/${PID}/edit`, { waitUntil: "networkidle" });
   await expect(page.getByRole("heading", { name: "Edit case" })).toBeVisible();
+});
+
+// Pins: the merge route renders its heading and both id inputs.
+test("merge page shows the merge form", async ({ page }) => {
+  await page.goto("/merge", { waitUntil: "networkidle" });
+  await expect(page.getByRole("heading", { name: "Merge cases" })).toBeVisible();
+  await expect(page.getByTestId("merge-main")).toBeVisible();
+  await expect(page.getByTestId("merge-duplicate")).toBeVisible();
+  // With no history the empty-state line stands in for the table.
+  await expect(page.getByText("No merges recorded yet.")).toBeVisible();
+});
+
+// Pins: the merge route is reachable from the nav on another page. The
+// primary nav is collapsed behind the hamburger at every width, so open it
+// before asserting the link is visible.
+test("nav exposes the merge link", async ({ page }) => {
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Toggle navigation" }).click();
+  await expect(page.getByRole("link", { name: "Merge" })).toBeVisible();
 });
 
 // Pins: spec §6.6 — check-duplicates excludes the record itself. The stub

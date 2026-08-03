@@ -3,7 +3,14 @@
 import { API_BASE_URL } from "$lib/config";
 import { ApiClient } from "./client";
 import type { Page, PageRequest } from "./client";
-import type { Case, CaseRef, ScoredRef } from "./types";
+import type {
+  Case,
+  CaseRef,
+  MergeRecordRow,
+  MergeRequest,
+  MergeResponse,
+  ScoredRef,
+} from "./types";
 
 /**
  * Resource-bound facade over {@link ApiClient} mapping each Case Service
@@ -94,5 +101,27 @@ export class CaseRepository {
     return this.http.post<ScoredRef[]>("/api/cases/check-duplicates", {
       body: query,
     });
+  }
+
+  /**
+   * Fold a confirmed duplicate into a surviving case.
+   * `POST /api/cases/merge`. Destructive: the duplicate is soft-deleted.
+   * @param request Which duplicate folds into which survivor, and why.
+   * @returns The two pids plus the survivor's merged payload. The service
+   *   returns these inline — there is no `merge_record` wrapper.
+   */
+  merge(request: MergeRequest): Promise<MergeResponse> {
+    return this.http.post<MergeResponse>("/api/cases/merge", {
+      body: request,
+    });
+  }
+
+  /**
+   * Recent merge-history rows, newest first (the service caps at 100).
+   * `GET /api/cases/merges/recent`.
+   * @returns Raw `merge_records` rows.
+   */
+  recentMerges(): Promise<MergeRecordRow[]> {
+    return this.http.get<MergeRecordRow[]>("/api/cases/merges/recent");
   }
 }

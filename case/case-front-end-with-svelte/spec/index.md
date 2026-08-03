@@ -13,8 +13,8 @@ service.
 
 ## 2. Scope
 
-In scope: the routes (`/`, `/cases`, `/board`, `/new`, `/[pid]`,
-`/[pid]/edit`, `/signin`, `/verify`), the
+In scope: the routes (`/`, `/cases`, `/board`, `/new`, `/merge`,
+`/[pid]`, `/[pid]/edit`, `/signin`, `/verify`), the
 API client, the case form, and a BFF + httpOnly-cookie session (§6.7/§6.8,
 per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
 Out of scope: full-text search UI, audit views.
@@ -36,6 +36,7 @@ Caseworkers and case administrators across governmental agencies.
 /new         create form
 /[pid]       detail + delete + check-duplicates
 /[pid]/edit  edit form
+/merge       merge a duplicate into a survivor + recent merge history
 ```
 
 ### Layout shell & navigation
@@ -71,7 +72,17 @@ Cross-cutting UI rule for every `*-front-end-with-svelte` app:
    cookie. There is no client-held access token and **no URL-fragment
    handoff**. Per
    [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
-9. Layout shell: global navigation is a full-width **top bar** (header)
+9. Merge (`/merge`): take a surviving `main_pid` and a `duplicate_pid`
+   plus an optional reason, optionally preview both records, and merge
+   after a confirmation (`POST /api/cases/merge`). The pre-flight guard
+   (both ids present, and distinct — the service answers `422` on a
+   self-merge) is a pure helper so it is unit-testable. The response is
+   `{main_pid, duplicate_pid, main}` — the service returns no
+   `merge_record` wrapper, so the page shows the survivor's pid and links
+   to it, and reads merge timestamps from the history below. That history
+   is `GET /api/cases/merges/recent` (newest first, service-capped at
+   100), rendered as merged-at / main / duplicate / reason / actor.
+10. Layout shell: global navigation is a full-width **top bar** (header)
    with a **hamburger** toggle on narrow viewports — NOT a left sidebar —
    and the main content area is **full-width**.
 
@@ -100,6 +111,8 @@ calling the service; no token is read or attached in browser JS.
 | `/[pid]` delete | `DELETE /api/cases/{pid}` |
 | `/[pid]` duplicates | `POST /api/cases/check-duplicates` |
 | `/[pid]/edit` | `PUT /api/cases/{pid}` |
+| `/merge` submit | `POST /api/cases/merge` |
+| `/merge` history | `GET /api/cases/merges/recent` |
 
 ## 10. Persistence
 
@@ -139,6 +152,9 @@ access/audit requirements.
 - [x] ~~Cross-origin SSO token handoff (consumer side): capture token
   from the URL fragment + strip it; `signInUrl` builder + top-bar **Sign
   in** redirect~~ — **superseded** (see auth-migration task below).
+- [x] Merge UI (`/merge`): merge form + preview + recent merge history,
+  `CaseRepository.merge()` / `recentMerges()`, the pure `validateMerge`
+  guard, 13-locale strings, unit + smoke tests.
 - [ ] `Custom(label)` editing for case type / status / schemes.
 - [ ] Search box once the service ships search.
 - [x] Auth — adopt BFF + httpOnly cookie + CSRF; remove

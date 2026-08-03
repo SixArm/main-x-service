@@ -141,6 +141,60 @@ export interface CaseRef {
 }
 
 /**
+ * Request body of `POST /api/cases/merge` — which duplicate folds into
+ * which survivor, and (optionally) why. Mirrors the service's
+ * `MergeRequest` struct in `src/controllers/cases.rs`.
+ */
+export interface MergeRequest {
+  /** The surviving case's persistent id; it keeps its pid. */
+  main_pid: string;
+  /** The duplicate to fold in and soft-delete. */
+  duplicate_pid: string;
+  /** Operator-supplied reason, recorded in the merge history. */
+  reason?: string | null;
+}
+
+/**
+ * Response body of `POST /api/cases/merge`. Note the shape: the service
+ * returns the two pids plus the survivor's merged payload **inline** —
+ * there is no `merge_record` wrapper (unlike some sibling services), so
+ * the merge row's own id / timestamp are not available here. Read them
+ * from {@link MergeRecordRow} via `merges/recent` instead.
+ */
+export interface MergeResponse {
+  /** Persistent id of the surviving case. */
+  main_pid: string;
+  /** Persistent id of the soft-deleted duplicate. */
+  duplicate_pid: string;
+  /** The survivor's payload after the fold. */
+  main: Case;
+}
+
+/**
+ * One row of `GET /api/cases/merges/recent` — the raw `merge_records`
+ * table row, mirroring the SeaORM entity in
+ * `src/models/_entities/merge_records.rs`.
+ */
+export interface MergeRecordRow {
+  /** When the merge row was written (RFC 3339 with offset). */
+  created_at: string;
+  /** When the merge row was last updated (RFC 3339 with offset). */
+  updated_at: string;
+  /** Auto-incrementing primary key (Rust `i64`). */
+  id: number;
+  /** Persistent id of the survivor. */
+  main_pid: string;
+  /** Persistent id of the merged-away duplicate. */
+  duplicate_pid: string;
+  /** Operator-supplied reason, when one was given. */
+  reason?: string | null;
+  /** Who performed the merge, when the caller was authenticated. */
+  actor?: string | null;
+  /** Snapshot of the transferred payload (opaque JSON). */
+  transferred?: unknown;
+}
+
+/**
  * A scored duplicate candidate from `/check-duplicates`: a {@link CaseRef}
  * plus the matcher's verdict.
  */
