@@ -76,6 +76,49 @@ published without reaching a real broker). `compose.fluvio.yaml` +
 `Dockerfile.fluvio-cli` provision a local broker for opt-in manual runs
 (not part of any automated CI stage).
 
+## Container image
+
+`Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's
+production image. **Build context must be the repository root**, not
+this directory — this crate's sibling path dependencies
+(`integrity-mac`, `person-matcher`, `entity-ref`,
+`authentication-verifier`) live outside `person/person-service-with-loco/`:
+
+```sh
+podman build -f person/person-service-with-loco/Dockerfile \
+  -t person-service .   # run from the repository root
+```
+
+Verified end-to-end (2026-08-03): builds clean, boots against a real
+Postgres, and `GET /api/health` returns `200`. This crate's Dockerfile
+pre-dated the family's repo-root-context convention (the other nine
+service crates were fixed to it first, on 2026-08-03) and had **four**
+real bugs beyond the build-context mismatch, found only by actually
+running the built image rather than trusting that a `podman build`
+success meant the container worked:
+
+1. It never copied `config/` — the loco binary crashed at boot with
+   `Message("no configuration file found in folder: config")`.
+2. Its `CMD` was `["/app/person-service"]` with no subcommand — this
+   crate's binary dispatches through `loco_rs::cli::main`
+   (`src/bin/main.rs`), which needs an explicit `start` argument; a
+   bare invocation just prints the CLI's own `--help` and exits 0
+   (a "successful" container that serves nothing).
+3. No `LOCO_ENV` was set, so the binary would have booted in loco's
+   default `development` environment inside a `production`-tagged
+   image.
+4. `ENV SERVER_PORT=8080` is dead: loco's own `config/production.yaml`
+   reads `PORT` (`server.port: {{ get_env(name="PORT", default="8080") }}`),
+   not `SERVER_PORT` — the `SERVER_PORT` this crate's own
+   `src/config/mod.rs` documents is a separate, unrelated config
+   surface used by non-loco code paths. `PORT=8080` is now set
+   explicitly so the family's port-8080 convention holds regardless.
+
+See `.containerignore` at the repository root (excludes every crate's
+`target/`, or the build context would try to copy hundreds of GB of
+build artifacts). The wired multi-service `examples/compose/` stacks
+(DEP-1) that build on this are not yet written.
+
 ## Doc hierarchy quick reference
 
 | File | Role |
