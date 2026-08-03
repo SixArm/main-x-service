@@ -95,6 +95,42 @@ test.describe("Person front-end smoke", () => {
         await expect(page.getByText("No cross-service links yet.")).toBeVisible();
     });
 
+    // Pins: the bulk page renders both submit sections. The recent-jobs
+    // fetch runs on mount, so it is stubbed at the network layer (as the
+    // detail-page test does) to keep the smoke project service-free.
+    test("bulk page renders the import and export sections", async ({ page }) => {
+        await page.route("**/api/persons/bulk-jobs**", (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({ success: true, data: [], error: null }),
+            }),
+        );
+
+        await page.goto("/persons/bulk");
+        await expect(
+            page.getByRole("heading", { name: "Bulk import / export" }),
+        ).toBeVisible();
+
+        // Import controls.
+        await expect(page.getByRole("heading", { name: "Import", exact: true })).toBeVisible();
+        await expect(page.getByLabel(/^File/)).toBeVisible();
+        await expect(page.getByLabel("Dry run (validate only)")).toBeVisible();
+        await expect(page.getByRole("button", { name: "Start import" })).toBeVisible();
+        // Parquet is export-only, so it must not be offered for import.
+        await expect(
+            page.locator("#bulk-import-format option"),
+        ).toHaveText(["JSONL", "CSV"]);
+
+        // Export controls.
+        await expect(page.getByRole("heading", { name: "Export", exact: true })).toBeVisible();
+        await expect(page.getByLabel("Masking profile")).toBeVisible();
+        await expect(page.getByRole("button", { name: "Start export" })).toBeVisible();
+
+        // The recent-jobs section renders its empty state, not a blank gap.
+        await expect(page.getByText("No bulk jobs yet.")).toBeVisible();
+    });
+
     // Pins: the merge page renders both the main and duplicate id inputs.
     test("merge form renders both ID inputs", async ({ page }) => {
         await page.goto("/persons/merge");

@@ -101,6 +101,7 @@
         { href: "/persons/new", key: "nav.new" },
         { href: "/persons/match", key: "nav.match" },
         { href: "/persons/merge", key: "nav.merge" },
+        { href: "/persons/bulk", key: "nav.bulk" },
         { href: "/review", key: "nav.review" },
         { href: "/expiry", key: "nav.expiry" },
     ] as const;

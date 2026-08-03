@@ -477,3 +477,76 @@ export interface AuditEntry {
   /** When the change occurred (ISO 8601). */
   created_at: string;
 }
+
+// ─── Bulk import / export ────────────────────────────────────────────
+
+/**
+ * A bulk job as returned by the status and list endpoints, mirroring the
+ * Rust `BulkJobView` (`src/bulk/handlers.rs`).
+ *
+ * Note what is **absent**: the view carries no `created_at`/`updated_at`
+ * and no `actor`, so a "submitted at" timestamp has to be tracked
+ * client-side at submission time rather than read back off the wire.
+ */
+export interface BulkJobView {
+  /** The job id. */
+  id: string;
+  /** `"import"` or `"export"`. */
+  kind: string;
+  /** The entity — always `"person"` for this service. */
+  entity: string;
+  /** File format token (`jsonl` / `csv` / `parquet`). */
+  format: string;
+  /** Lifecycle status; see `BULK_JOB_STATUSES` in `$lib/bulk`. */
+  status: string;
+  /** Total record rows, once the worker has counted them. */
+  rows_total: number | null;
+  /** Rows processed so far. */
+  rows_processed: number;
+  /** Rows created outright. */
+  rows_created: number;
+  /** Rows upserted in place on their stable key. */
+  rows_upserted: number;
+  /** Rows routed to the duplicate review queue. */
+  rows_to_review: number;
+  /** Rows rejected, itemised in the error report. */
+  rows_errored: number;
+  /**
+   * Export output reference. An **opaque artifact-store reference**
+   * (`file://…` on the default local backend, `s3://…` on S3) — the
+   * service exposes no endpoint that serves the bytes, so this is not a
+   * fetchable URL despite the name. See tasks.md FE-3.
+   */
+  download_url: string | null;
+  /** Per-row error-report reference; same opaque-reference caveat. */
+  errors_url: string | null;
+}
+
+/** `202 Accepted` body returned when a bulk job is enqueued. */
+export interface BulkJobAccepted {
+  /** Id of the enqueued job, to poll for status. */
+  job_id: string;
+}
+
+/** Body of `POST /api/persons/export`; every field is optional. */
+export interface BulkExportRequest {
+  /** Output format; defaults to `jsonl` server-side. */
+  format?: string;
+  /** Optional family-name search query scoping the export. */
+  q?: string;
+  /** Max records for the unfiltered listing path. */
+  limit?: number;
+  /** Offset for the unfiltered listing path. */
+  offset?: number;
+  /**
+   * `masked` (default) or `full`. `full` is privileged and answers 401/403
+   * when the caller lacks elevated authorisation.
+   */
+  masking_profile?: string;
+  /**
+   * Soft-deleted records (§8). Deliberately **not** surfaced in the UI:
+   * the endpoint accepts it but the worker rejects it, so the job would
+   * be accepted and then fail.
+   */
+  include_soft_deleted?: boolean;
+}

@@ -1,8 +1,12 @@
 import { ApiClient } from "./client.js";
+import { dryRunFormValue, type BulkImportFormat } from "$lib/bulk.js";
 import type {
   AuditEntry,
   BatchDeduplicationRequest,
   BatchDeduplicationResponse,
+  BulkExportRequest,
+  BulkJobAccepted,
+  BulkJobView,
   CreateLinkRequest,
   EntityLink,
   MatchRequest,
@@ -234,6 +238,97 @@ export class PersonRepository {
    */
   recentAudit(limit = 50): Promise<AuditEntry[]> {
     return this.http.get<AuditEntry[]>("/api/audit/recent", {
+      query: { limit },
+    });
+  }
+
+  // ─── Bulk import / export ──────────────────────────────────────────
+
+  /**
+   * Submit a bulk import: upload the file as `multipart/form-data` and get
+   * back the id of the enqueued job to poll.
+   *
+   * The body is a `FormData`, which {@link ApiClient} passes through
+   * without JSON-serializing and without forcing a `content-type` (so
+   * `fetch` can set the multipart boundary).
+   *
+   * @param file - The JSONL or CSV file the operator chose.
+   * @param options - Format (defaults to `jsonl` server-side), dry-run
+   *   preview flag, and an optional `Idempotency-Key` so a retried submit
+   *   resolves to the original job (SEC-B9) rather than importing twice.
+   * @throws {ApiError} 400 for a bad/unsupported upload, 413 when the file
+   *   exceeds the service's 64 MiB import cap.
+   */
+  importPersons(
+    file: File,
+    options: {
+      format?: BulkImportFormat;
+      dryRun?: boolean;
+      idempotencyKey?: string;
+    } = {},
+  ): Promise<BulkJobAccepted> {
+    const form = new FormData();
+    form.append("file", file, file.name);
+    if (options.format) form.append("format", options.format);
+    // Always sent, so the request states the operator's choice rather than
+    // relying on an absent field meaning false.
+    form.append("dry_run", dryRunFormValue(options.dryRun ?? false));
+    return this.http.post<BulkJobAccepted>("/api/persons/import", {
+      body: form,
+      headers: options.idempotencyKey
+        ? { "idempotency-key": options.idempotencyKey }
+        : undefined,
+    });
+  }
+
+  /**
+   * Submit a bulk export and get back the id of the enqueued job.
+   *
+   * @param request - Format, optional filter, and masking profile.
+   * @param idempotencyKey - Optional key deduping a retried submit.
+   * @throws {ApiError} 400 for an unsupported format/profile; 401 or 403
+   *   when `masking_profile: "full"` is requested without elevated
+   *   authorisation.
+   */
+  exportPersons(
+    request: BulkExportRequest = {},
+    idempotencyKey?: string,
+  ): Promise<BulkJobAccepted> {
+    return this.http.post<BulkJobAccepted>("/api/persons/export", {
+      body: request,
+      headers: idempotencyKey
+        ? { "idempotency-key": idempotencyKey }
+        : undefined,
+    });
+  }
+
+  /**
+   * Status and row counts for one import job.
+   *
+   * @throws {ApiError} 404 once the job has passed its retention TTL, or
+   *   if it belongs to another actor — the service deliberately does not
+   *   distinguish the two.
+   */
+  getImportJob(id: string): Promise<BulkJobView> {
+    return this.http.get<BulkJobView>(`/api/persons/import/${id}`);
+  }
+
+  /** Status and row counts for one export job. Same 404 semantics. */
+  getExportJob(id: string): Promise<BulkJobView> {
+    return this.http.get<BulkJobView>(`/api/persons/export/${id}`);
+  }
+
+  /**
+   * Recent bulk jobs, newest first.
+   *
+   * The endpoint takes only `limit` (default 50, capped at 500) — there is
+   * no server-side `kind`/`status`/`offset` filtering, so the UI filters
+   * the returned array client-side.
+   *
+   * @param limit - Max rows to return.
+   */
+  listBulkJobs(limit?: number): Promise<BulkJobView[]> {
+    return this.http.get<BulkJobView[]>("/api/persons/bulk-jobs", {
       query: { limit },
     });
   }

@@ -9,6 +9,46 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — bulk import/export screen (repo FE-3)
+
+- New `/persons/bulk` route: upload a JSONL or CSV file with a **dry-run**
+  toggle, submit a filtered **export** with a masking profile, and watch
+  each `202`-accepted job poll to a terminal state with its row-count
+  breakdown (created / upserted / to-review / errored). A **recent bulk
+  jobs** table lists what the service returns, filtered client-side by
+  kind and status — the `bulk-jobs` endpoint accepts only `limit`, so
+  there is nothing to filter server-side.
+- `ApiClient` now passes a **`FormData` body through untouched** —
+  no `JSON.stringify`, and the default `content-type` is stripped so
+  `fetch` can set the multipart boundary itself (a leftover
+  `application/json` makes the service answer `400 BAD_MULTIPART`). JSON
+  bodies are unchanged, pinned by a regression test.
+- Repository gains `importPersons` / `exportPersons` / `getImportJob` /
+  `getExportJob` / `listBulkJobs`; types gain `BulkJobView` /
+  `BulkJobAccepted` / `BulkExportRequest`. New `src/lib/bulk.ts` holds
+  the pure rules mirroring `src/bulk/handlers.rs`: the terminal-state set
+  (an unknown status is **not** terminal, so a newer service cannot
+  freeze the poll), the dry-run token encoding, progress clamping, and
+  the import-format set that excludes export-only Parquet.
+- Each submit carries a **fresh `Idempotency-Key`** (SEC-B9), so a
+  retried submit dedupes while two distinct uploads do not collide.
+- Three behaviours are dictated by the service, not chosen here.
+  `download_url` / `errors_url` are shown as **plain text, not links**:
+  they are opaque artifact-store references (`file://…` / `s3://…`) and
+  the service exposes no endpoint that serves their bytes (spec §16
+  OQ-7). `include_soft_deleted` is **not offered** — the endpoint
+  accepts it but the worker rejects it, so the job would be accepted and
+  then fail. A `404` while polling stops the loop and reports
+  expired-or-gone, since the service returns `404` both for a job past
+  its retention TTL and for another actor's job.
+- Parquet is offered for export with a caption noting it is behind a
+  default-off Cargo feature the front-end cannot detect, so a `failed`
+  job reads as a build choice rather than a UI bug. A `full` masking
+  profile may draw `401`/`403`; it surfaces as an inline banner.
+- Tests: `tests/unit/bulk.test.ts` (14), an i18n-parity extension for 69
+  new keys across all 13 locales, and a route-stubbed Playwright smoke
+  assertion.
+
 ### Added — cross-service links panel (repo FE-2)
 
 - `/persons/[id]` gains a **Cross-service links** panel: it lists this

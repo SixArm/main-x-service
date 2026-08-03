@@ -21,7 +21,11 @@ export interface RequestOptions {
    * optional params can be passed through without manual filtering.
    */
   query?: Record<string, string | number | boolean | undefined | null>;
-  /** Request body; JSON-serialized when present (omit for GET/DELETE). */
+  /**
+   * Request body. JSON-serialized when present, **except** a `FormData`
+   * body, which is passed through untouched for multipart uploads (see
+   * {@link isFormDataBody}).
+   */
   body?: unknown;
   /** Per-request headers, merged over the client's default headers. */
   headers?: Record<string, string>;
@@ -75,6 +79,21 @@ export class ApiError extends Error {
   get isValidation(): boolean {
     return this.status === 422;
   }
+}
+
+/**
+ * Whether a request body is `FormData` and must therefore bypass JSON
+ * serialization.
+ *
+ * Guards on `typeof FormData` before the `instanceof`, since the global is
+ * absent in some non-browser runtimes and a bare `instanceof` would throw
+ * there rather than answering "no".
+ *
+ * @param body - The caller-supplied request body.
+ * @returns `true` when the body is a `FormData` instance.
+ */
+export function isFormDataBody(body: unknown): body is FormData {
+  return typeof FormData !== "undefined" && body instanceof FormData;
 }
 
 /**
@@ -135,13 +154,26 @@ export class ApiClient {
     opts: RequestOptions = {},
   ): Promise<T> {
     const url = this.buildUrl(path, opts.query);
-    const init: RequestInit = {
-      method,
-      headers: { ...this.defaultHeaders, ...opts.headers },
-      signal: opts.signal,
+    const headers: Record<string, string> = {
+      ...this.defaultHeaders,
+      ...opts.headers,
     };
+    const multipart = isFormDataBody(opts.body);
+    if (multipart) {
+      // `fetch` must set `content-type` itself here, because only it knows
+      // the boundary token it generated. Leaving the client's default
+      // `application/json` in place would produce a body the server cannot
+      // parse (`400 BAD_MULTIPART`). Strip every casing, since a
+      // per-request `headers` entry may have supplied its own.
+      for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === "content-type") delete headers[key];
+      }
+    }
+    const init: RequestInit = { method, headers, signal: opts.signal };
     if (opts.body !== undefined) {
-      init.body = JSON.stringify(opts.body);
+      init.body = multipart
+        ? (opts.body as FormData)
+        : JSON.stringify(opts.body);
     }
 
     const response = await this.fetchFn(url, init);
