@@ -1,0 +1,49 @@
+# Loco configuration file — link-graph-service (production).
+
+# Application logging configuration
+logger:
+  enable: true
+  pretty_backtrace: false
+  level: info
+  format: json
+
+# Web server configuration
+server:
+  port: {{ get_env(name="PORT", default="5160") }}
+  binding: 0.0.0.0
+  host: {{ get_env(name="HOST", default="http://localhost") }}
+  middlewares:
+    # Explicit backstop (SEC-M1) — no bulk/upload feature in this
+    # crate, so loco's own 2mb default is plenty for CRUD-shaped JSON;
+    # made explicit rather than implicit so it is visible in the file
+    # a deployer actually reads.
+    limit_payload:
+      enable: true
+      body_limit: 2mb
+
+# Worker Configuration
+workers:
+  mode: BackgroundQueue
+
+# Queue Configuration
+queue:
+  kind: Postgres
+  uri: {{ get_env(name="DATABASE_URL") }}
+  dangerously_flush: false
+
+# Database Configuration
+database:
+  uri: {{ get_env(name="DATABASE_URL") }}
+  enable_logging: false
+  connect_timeout: {{ get_env(name="DB_CONNECT_TIMEOUT", default="500") }}
+  idle_timeout: {{ get_env(name="DB_IDLE_TIMEOUT", default="500") }}
+  min_connections: {{ get_env(name="DB_MIN_CONNECTIONS", default="1") }}
+  max_connections: {{ get_env(name="DB_MAX_CONNECTIONS", default="10") }}
+  auto_migrate: true
+  dangerously_truncate: false
+  dangerously_recreate: false
+
+# Cache provider: in-memory (loco `cache_inmem`, enabled by default).
+cache:
+  kind: InMem
+  max_capacity: 33554432 # 32MiB (default if not specified)

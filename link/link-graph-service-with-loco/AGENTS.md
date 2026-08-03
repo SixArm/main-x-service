@@ -105,3 +105,23 @@ the shared design doc first, then the three above.
 - Within-entity `relationships` (on each domain model).
 - A system of record — Postgres-per-service stays authoritative; this is
   a derived, rebuildable projection.
+
+## Container image
+
+`Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's
+production image. **Build context must be the repository root**, not
+this directory — this crate's sibling path dependencies
+(`integrity-mac`, `authentication-verifier`, `entity-ref`) live outside
+`link/link-graph-service-with-loco/`:
+
+```sh
+podman build -f link/link-graph-service-with-loco/Dockerfile \
+  -t link-graph-service .   # run from the repository root
+```
+
+Verified end-to-end (2026-08-03): builds clean, boots against a real
+Postgres, and `GET /_health` returns `200`. See `.containerignore` at
+the repository root (excludes every crate's `target/`, or the build
+context would try to copy hundreds of GB of build artifacts). The wired
+multi-service `examples/compose/` stacks (DEP-1) that build on this are
+not yet written.
