@@ -1,10 +1,11 @@
 # project-portfolio-management-front-end-with-svelte — documentation index
 
-Operator UI for **plan** identity CRUD + matching + name search + merge +
-audit timeline over **one recursive `/api/plans` collection**, plus the
-**project-management workspace** (Kanban board, issues, timeline / Gantt,
-burndown, goals) and cookie-session / SSO auth (BFF; the browser holds no
-token), consuming the [Portfolio Service](../project-portfolio-management-service-with-loco).
+Operator UI for **plan** identity CRUD + matching + merge over **one
+recursive `/api/plans` collection**, plus the **project-management
+workspace** (Kanban board, governance, schedule), a wide set of
+oversight / executive dashboard views, and cookie-session / SSO auth
+(BFF; the browser holds no token), consuming the
+[Portfolio Service](../project-portfolio-management-service-with-loco).
 
 > **Status: implemented (v0.1.0).** `npm run check` is 0/0 and the vitest
 > suite passes; the build queue is [spec/index.md](./spec/index.md) §13.
@@ -31,24 +32,24 @@ rolls up a plan's direct children.
 ## Flow
 
 ```text
-/plans          ──>  GET  /api/plans                       list (SVAR DataGrid)
-                     GET  /api/plans/search?q=migration     name search
-                     GET  /api/plans/events/recent          recent activity -> PlanEvent[]
+/plans          ──>  GET  /api/plans                       list (SVAR DataGrid + client-side filter)
 /plans/new      ──>  POST /api/plans  {Plan}                create -> /plans/[pid]
 /plans/[pid]    ──>  GET  /api/plans/{pid}                  detail
-                     POST /api/plans/check-duplicates       -> ScoredRef[] w/ MatchBreakdown
-                     POST /api/plans/merge  {main_pid, duplicate_pid, reason?}  merge -> MergeResult
-                     GET  /api/plans/{pid}/audit            audit timeline -> AuditEntry[]
+                     POST /api/plans/check-duplicates       -> ScoredRef[] (score + confidence)
                      DELETE /api/plans/{pid}               soft-delete
-                     GET  /api/plans?parent={pid}          child roll-up
 /plans/[pid]/edit ─> PUT /api/plans/{pid}                  edit
+/plans/merge    ──>  POST /api/plans/merge  {main_pid, duplicate_pid, reason?}  merge -> MergeResponse
+                     GET  /api/plans/merges/recent          merge history
 
 project-management workspace (sub-resources under /api/plans/{pid}/…):
 …/board    ──>  GET/POST …/tasks · PATCH …/tasks/{tid}    Kanban; drag = status change
-…/issues   ──>  GET/POST …/issues · PUT …/issues/{iid}    issues (kind/severity/status)
-…/timeline ──>  GET …/timeline    -> TimelineRow[]        Gantt (milestones + task ranges)
-…/burndown ──>  GET …/burndown    -> BurndownPoint[]      remaining estimate over time
-…/goals    ──>  GET/POST/PUT/DELETE …/goals              goals panel
+…/board    ──>  GET/POST …/sprints · GET …/burndown?sprint=   sprint create/select + honest burndown
+
+Not built (no repository method, type, or route): a name-search round
+trip (GET /api/plans/search?q=), a recent-activity feed, a per-plan
+audit timeline, a match-score breakdown visual, the detail page's
+child-plan roll-up, and the issues / timeline / goals sub-resource
+views. See spec/index.md §13.
 ```
 
 ## Layout & chrome
@@ -63,14 +64,16 @@ session affordance.
 
 ## Auth
 
-Cookie session via a BFF: **Sign in**
-(`${VITE_AUTH_FRONTEND_URL}/signin?return_to=<origin + base>`) runs the
-magic-link, which establishes a server-side session and sets an httpOnly
-`__Host-mxi_session` cookie. The browser holds **no token** (no
+Cookie session via a BFF: **Sign in** leads to this app's own `/signin` +
+`/verify` pages (not a redirect to a central authentication front-end),
+which run the magic-link and establish a server-side session, setting an
+httpOnly `__Host-mxi_session` cookie. The browser holds **no token** (no
 `localStorage`, no URL fragment). This app's SvelteKit server acts as a
 **Backend-For-Frontend**: it holds the session, exchanges it for a
 short-lived **PASETO v4.public** token, and calls the portfolio service
-server-side; mutating browser→BFF calls carry a CSRF token. Source of
-truth:
+through the same-origin `/api/proxy` route; mutating browser→BFF calls
+carry a CSRF token. Configure the BFF's upstream URLs with
+`PROJECT_PORTFOLIO_MANAGEMENT_API_URL` and `AUTH_API_URL` (both default
+to `http://localhost:5150`; see `.env.example`). Source of truth:
 [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
 (RS256/JWKS not used).

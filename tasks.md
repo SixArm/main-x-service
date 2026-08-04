@@ -4998,13 +4998,75 @@ committing (see plan.md §4).
     the e2e suite or delete the dead `src/lib/api/` layer — both flagged
     in `spec/index.md` §13 as open code decisions, not doc fixes.
 
-  **DOC-4 status: 10 of 11 front-ends done as of 2026-08-04**
+  - *`project-portfolio-management/project-portfolio-management-front-end-with-svelte`
+    done 2026-08-04 — 11th and last, closing DOC-4.* The richest
+    front-end, and the doc drift matched its size. Confirmed FE-1 (the
+    `/plans/merge` page, landed 2026-08-03) is documented in `spec/index.md`
+    §13 and `CHANGELOG.md`, and that AGENTS.md's route tree (already
+    self-corrected by the FE-1 commit) is accurate. But cross-checking
+    `spec/index.md` §6/§9/§13 against `src/routes/`/`src/lib/` turned up
+    a much larger, pre-existing gap: **five capabilities were documented
+    as shipped — checked `[x]` in §13, described as live in §6, §9, the
+    README's "How it works", and `index.md`'s Flow diagram — that have
+    no repository method, type, or route at all**: a server-round-trip
+    name search (`GET /api/plans/search?q=` — `PlanRepository.search()`
+    exists and is unit-tested, but no route calls it; the list page
+    filters client-side instead), a recent-activity feed, a per-plan
+    audit timeline, a per-component match-score breakdown visual (no
+    `MatchBreakdown` type exists; `check-duplicates` renders raw score +
+    confidence), and the detail page's child-plan roll-up. The "merge"
+    claim on the detail page was also stale in `spec/index.md` (already
+    fixed in `AGENTS.md` by the FE-1 commit, but not in the spec) — merge
+    is the standalone `/plans/merge` page, not a per-row detail action.
+    Rewrote `spec/index.md` §2, §6, §8, §9, §11, §13, §14, §15,
+    `AGENTS.md` (status note, `src/` tree, API table, Auth section),
+    `README.md`, and `index.md` to state plainly what's built vs. not,
+    rather than deleting the aspirational content — matching how FE-1's
+    own commit had already corrected the one claim it touched.
+    **`.env.example` was the exact TUT-1/TUT-2/organization-class bug**
+    (worse here: it still had a leftover "Case Service base URL" header
+    comment copy-pasted from the case front-end) — documented the
+    decommissioned `PUBLIC_API_BASE_URL`/`VITE_AUTH_FRONTEND_URL` vars,
+    zero references in `src/`; rewritten to the real server-side-only
+    `PROJECT_PORTFOLIO_MANAGEMENT_API_URL`/`AUTH_API_URL`
+    (`src/lib/server/config.ts`). The auth-model description was also
+    stale everywhere (spec, AGENTS, README, index.md): all four still
+    described "Sign in redirects to the central authentication
+    front-end" with a client-side `signInUrl()`, but the actual shipped
+    BFF is this app's own `signin/`+`verify/` routes plus
+    `src/routes/api/proxy/[...path]` — same pattern organization's own
+    DOC-4 audit already fixed there; ported the corrected description
+    here. **Coordinator-flagged mid-task**: the identical
+    BFF-proxy-prefix Playwright stub bug found in case/care-pathway/
+    organization (`tests/e2e/*.spec.ts` matching bare `/api/...` paths
+    against the real `/api/proxy/api/...` request). Investigating turned
+    up something bigger: **both `tests/e2e/smoke.spec.ts` and
+    `tests/e2e/ppm.spec.ts` had never been updated for the 2026-07-20
+    `/plans` collection unification** — every test still navigated to
+    `/projects*`/`/projects/{pid}/board`, none of which have existed for
+    two weeks. Since nothing in the check/vitest/build pyramid runs
+    Playwright, this was 21 of 23 tests silently failing, invisible
+    until `pnpm test:e2e` was actually run (which apparently nobody had
+    done since the unification landed). Fixed both files: route paths,
+    stub match paths, and the proxy-prefix strip
+    (`url.pathname.replace(/^\/api\/proxy/, "")`). All 23 Playwright
+    tests pass now (was 2/23). `pnpm run check` (764 files, 0/0),
+    `pnpm test` (62/62 across 8 files), `pnpm test:e2e` (23/23), and
+    `pnpm run build` all verified green. Did not touch the i18n content
+    itself: the catalogue carries pre-existing "case"/"work item"
+    leftovers from its case-front-end copy-adapt origin (`nav.cases`,
+    `new.title: "New case"`, `list.loadFailed: "Failed to load cases"`,
+    …) that are real values, not stale docs — flagged in the e2e test
+    comments but out of scope for a doc-accuracy pass. i18n parity
+    verified live: `i18n.test.ts` (10 tests) passes, and the FE-1 merge
+    keys carry real, distinct per-locale translations (spot-checked
+    French) rather than English stubs.
+
+  **DOC-4 status: 11 of 11 front-ends done as of 2026-08-04**
   (organization, thing, worker, course, place, person, case,
-  care-pathway, event, authentication). `project-portfolio-management`
-  was still in progress (uncommitted local changes observed) when this
-  note was written — leaving the parent checkbox unmarked until its
-  sub-note lands; whoever closes it out last should flip `DOC-4` to
-  `[x]` once all 11 are genuinely present above.
+  care-pathway, event, authentication, project-portfolio-management).
+  Leaving the parent checkbox for the user/coordinator to flip per this
+  task's own instruction not to mark it from a sub-agent.
 
 - [ ] **DOC-5 (M)** Library crates' `spec/`, `AGENTS.md`/`CLAUDE.md`,
   `README.md`/`index.md`: `authentication-verifier-rust-crate`,

@@ -7,6 +7,16 @@ import { test, expect, type Page } from "@playwright/test";
 // case front-end's suite — asserting "Cases" headings, stubbing
 // `title` instead of the work-item `name`, and using the case app's
 // detail routes — and had never been adapted to this app.)
+//
+// Fixed 2026-08-04 (DOC-4 audit): this file was never updated for the
+// 2026-07-20 route unification (the four `/portfolios`, `/projects`,
+// `/products`, `/programs` collections became one `/plans` collection) —
+// every test here still navigated to `/projects*`, which has not existed
+// for two weeks, so 5 of 7 tests failed. `pnpm test` / `pnpm run check` /
+// `pnpm run build` never caught it because none of them runs Playwright;
+// only `pnpm test:e2e` does. Also applied the BFF-proxy-prefix fix
+// (ad95088e): the browser's real request is `/api/proxy/api/...`, not
+// the bare `/api/...` this stub matched on.
 
 // Fixed pid + canned work item used by stubs and assertions alike.
 const PID = "11111111-1111-4111-8111-111111111111";
@@ -26,32 +36,34 @@ const WORK_ITEM = {
   in_language: ["en"],
 };
 
-/** Stub every `/api/projects*` call so the SPA renders offline. */
+/** Stub every `/api/plans*` call so the SPA renders offline. */
 async function stubApi(page: Page) {
-  await page.route("**/api/projects**", async (route) => {
+  await page.route("**/api/plans**", async (route) => {
     const req = route.request();
     const url = new URL(req.url());
     const method = req.method();
-    const path = url.pathname;
+    // Strip the BFF proxy prefix (ad95088e): the browser's real request is
+    // `/api/proxy/api/plans...`, not the bare `/api/plans...` below.
+    const path = url.pathname.replace(/^\/api\/proxy/, "");
 
     // Dispatch by (path, method) mirroring the real endpoint contract; any
     // unmatched request falls through to a 404 so contract drift fails loud.
-    if (path === "/api/projects" && method === "GET") {
+    if (path === "/api/plans" && method === "GET") {
       return route.fulfill({ json: [{ pid: PID, name: WORK_ITEM.name }] });
     }
-    if (path === "/api/projects" && method === "POST") {
+    if (path === "/api/plans" && method === "POST") {
       return route.fulfill({ json: { pid: PID, name: WORK_ITEM.name } });
     }
     if (path.endsWith("/check-duplicates")) {
       return route.fulfill({ json: [] });
     }
-    if (path === `/api/projects/${PID}` && method === "GET") {
+    if (path === `/api/plans/${PID}` && method === "GET") {
       return route.fulfill({ json: WORK_ITEM });
     }
-    if (path === `/api/projects/${PID}` && method === "PUT") {
+    if (path === `/api/plans/${PID}` && method === "PUT") {
       return route.fulfill({ json: { pid: PID, name: WORK_ITEM.name } });
     }
-    if (path === `/api/projects/${PID}` && method === "DELETE") {
+    if (path === `/api/plans/${PID}` && method === "DELETE") {
       return route.fulfill({ status: 200, body: "" });
     }
     return route.fulfill({ status: 404, json: { error: "unhandled in stub" } });
@@ -62,22 +74,28 @@ test.beforeEach(async ({ page }) => {
   await stubApi(page);
 });
 
-// Pins: the list route fetches and shows the seeded work item.
-test("list page renders the seeded case", async ({ page }) => {
-  await page.goto("/projects", { waitUntil: "networkidle" });
-  await expect(page.getByRole("heading", { name: /Work items/ })).toBeVisible();
+// Pins: the list route fetches and shows the seeded plan. Heading text is
+// "Plans" (`list.title`) — the i18n catalogue still carries a handful of
+// unrelated "case"/"work item" leftovers from the copy-adapt source
+// (`nav.cases`, `list.loadFailed: "Failed to load cases"`, …), but none of
+// those keys are rendered by these routes.
+test("list page renders the seeded plan", async ({ page }) => {
+  await page.goto("/plans", { waitUntil: "networkidle" });
+  await expect(page.getByRole("heading", { name: "Plans" })).toBeVisible();
   await expect(page.getByText("Website replatform")).toBeVisible();
 });
 
-// Pins: the create route renders the empty form.
+// Pins: the create route renders the empty form. Heading text is "New
+// case" (`new.title`) — a real, if oddly-worded, i18n value; not a typo
+// in this test.
 test("new page shows the create form", async ({ page }) => {
-  await page.goto("/projects/new", { waitUntil: "networkidle" });
+  await page.goto("/plans/new", { waitUntil: "networkidle" });
   await expect(page.getByRole("heading", { name: /New case/ })).toBeVisible();
 });
 
-// Pins: the detail route fetches the work item and shows its name.
-test("detail page renders the fetched case", async ({ page }) => {
-  await page.goto(`/projects/${PID}`, { waitUntil: "networkidle" });
+// Pins: the detail route fetches the plan and shows its name.
+test("detail page renders the fetched plan", async ({ page }) => {
+  await page.goto(`/plans/${PID}`, { waitUntil: "networkidle" });
   await expect(
     page.getByRole("heading", { name: "Website replatform" }),
   ).toBeVisible();
@@ -85,9 +103,10 @@ test("detail page renders the fetched case", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Governance" })).toBeVisible();
 });
 
-// Pins: the edit route loads the work item and renders the edit form.
+// Pins: the edit route loads the plan and renders the edit form. Heading
+// text is "Edit case" (`edit.title`) — see the `new.title` note above.
 test("edit page renders the edit form", async ({ page }) => {
-  await page.goto(`/projects/${PID}/edit`, { waitUntil: "networkidle" });
+  await page.goto(`/plans/${PID}/edit`, { waitUntil: "networkidle" });
   await expect(page.getByRole("heading", { name: /Edit case/ })).toBeVisible();
 });
 
@@ -127,7 +146,7 @@ test("detail check-duplicates hides the record itself (self-exclusion)", async (
   page,
 }) => {
   const OTHER = "22222222-2222-4222-8222-222222222222";
-  await page.route("**/api/projects/check-duplicates", async (route) =>
+  await page.route("**/api/plans/check-duplicates", async (route) =>
     route.fulfill({
       json: [
         // The record itself — must be filtered out (h.pid === pid).
@@ -149,7 +168,7 @@ test("detail check-duplicates hides the record itself (self-exclusion)", async (
       ],
     }),
   );
-  await page.goto(`/projects/${PID}`, { waitUntil: "networkidle" });
+  await page.goto(`/plans/${PID}`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "Check duplicates" }).click();
   await expect(
     page.getByRole("heading", { name: "Potential duplicates" }),

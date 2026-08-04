@@ -37,12 +37,16 @@ In scope:
   the plan list (SVAR DataGrid), create/edit form, detail page. The nav
   has a single **Plans** destination (no collection switcher).
 - The **API client** (`src/lib/api/{types,client,plans}.ts`), the
-  plan form, a name-search box on the list, a duplicate-check /
-  match screen with a per-component **MatchBreakdown** visual, a
-  merge-duplicate action on the detail page, and a per-plan audit
-  timeline.
-- The **child roll-up**: a plan detail page also lists its child plans
-  (those whose `parent_ref` is this plan's pid).
+  plan form, a client-side name filter on the list, and a
+  duplicate-check screen (score + confidence per candidate). A
+  standalone record-merge page (`/plans/merge`, landed 2026-08-03) folds
+  a confirmed duplicate into a survivor, with a recent-merge history
+  table. **Not built**: a per-component match-score breakdown visual and
+  a per-plan audit timeline (§13).
+- The **child roll-up** (not yet built, §13): a plan detail page is meant
+  to also list its child plans (those whose `parent_ref` is this plan's
+  pid); the service supports it (`GET /api/plans?parent={pid}`, and
+  `PlanRepository` carries the query param), but no route calls it yet.
 - The **project-management views** on the detail page (or its
   sub-routes) for any plan: a **Kanban task board** (drag = status
   change), an **Issues** list, a **Gantt / timeline** view, a
@@ -55,13 +59,15 @@ Out of scope (stated): no FHIR surface (the service exposes none); no
 consent-management UI; no finance / budgeting UI; **no posts / comments
 feed, no member-role panel** (the portfolio entity carries only
 tasks / goals / issues as sub-resources — see entity spec §5; posts /
-comments / members are roadmap-only). Authentication is **not**
-implemented here as a login screen — sign-on is delegated to the central
-[authentication-service](../../../authentication/authentication-service-with-loco/)
-magic-link SSO. Per the BFF + httpOnly-cookie model
+comments / members are roadmap-only). There is **no password /
+credential form** — sign-on is passwordless magic-link, run through this
+app's own `/signin` + `/verify` BFF routes against the central
+[authentication-service](../../../authentication/authentication-service-with-loco/).
+Per the BFF + httpOnly-cookie model
 ([`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md))
 the browser holds only the `__Host-mxi_session` cookie and the SvelteKit
-server attaches a short-lived PASETO server-side — no token in JS, no
+server attaches a short-lived PASETO server-side (calling the portfolio
+service through the same-origin `/api/proxy` route) — no token in JS, no
 `localStorage`.
 
 ## 3. Stakeholders and users
@@ -197,46 +203,45 @@ keys fall back to `en`.
 
 ## 6. Functional requirements
 
-1. **List** active plans (`GET /api/plans`) in a **SVAR DataGrid** with
-   columns: name, kind, status, owner org, lead, `parent_ref`, target
-   date, tags. Sortable; client-side filter/search.
-   - Search box (search-on-submit): a non-blank query calls
-     `GET /api/plans/search?q=` (URL-encoded) and renders the
-     filtered results; **Clear** (or an empty query) restores the full
-     list. Loading and empty-result states are shown.
-   - Recent activity: a "Show recent activity" toggle lazy-loads
-     `GET /api/plans/events/recent` on first open and renders
-     the events newest-first (highest `seq` first): the kind
-     (created/updated/deleted/merged), the name (linked to the plan
-     by pid), and the `seq`. Loading, empty, and error states; the panel
-     does not auto-load on mount.
+1. **List** active plans (`GET /api/plans`) in a **SVAR DataGrid** (name,
+   pid columns) with a **SVAR FilterBar** doing a client-side, contains-
+   match filter over the already-loaded rows by name.
+   - **Not built** (§13): a search-on-submit box hitting
+     `GET /api/plans/search?q=` — `PlanRepository.search()` wraps the
+     endpoint and is unit-tested, but no route calls it, so name search
+     stays client-side over the current page. There is also no
+     recent-activity feed (`GET /api/plans/events/recent`) — no
+     repository method, type, or UI exists for it.
 2. **Create** (`POST /api/plans`), redirect to the new detail page. The
    `kind` label is chosen on the form (optional).
 3. **Detail**: render the stored `Plan`; offer edit, delete,
-   check-duplicates, merge, the audit timeline, and entry points to the
-   project-management views. A plan detail page additionally rolls up its
-   **child plans** — those whose `parent_ref` equals this plan's pid — as
-   linked lists.
+   check-duplicates, and entry points to the project-management views
+   (governance, board, schedule). **Not built** (§13): an audit timeline
+   and a child-plan roll-up (those whose `parent_ref` equals this plan's
+   pid) on this page. Merge is a **separate, standalone page**
+   (`/plans/merge`, item 7 below), not a detail-page action.
 4. **Edit** (`PUT`), redirect back to detail.
 5. **Delete** (`DELETE`, soft), redirect to the plans list.
 6. **Check-duplicates** posts the current record and lists matches
    (name, score, confidence) **across the whole collection**, excluding
-   the record itself, each with a visual **MatchBreakdown** (per-component
-   bars for name / goals / code / owner org / parent / timeframe /
-   keywords / relationships / tags). Matching is **not** gated by `kind`;
-   there is no `plan_type` / kind component.
-7. **Merge**: each duplicate row offers "Merge into this record" (the
-   detail record is the survivor/main; the row's pid is the duplicate).
-   A two-step inline confirm calls `POST /api/plans/merge` with
-   `{main_pid, duplicate_pid, reason?}`. On success it adopts the
-   returned survivor record, re-runs check-duplicates, and shows a
-   success message. Equal pids are guarded client-side (the service
-   `422`s); `404`/other errors surface via the error banner.
-8. **Audit timeline**: a "Show audit trail" toggle lazy-loads
-   `GET /api/plans/{pid}/audit` on first open and renders the
-   rows newest-first (action, actor or "—" when null, timestamp).
-   Loading, empty, and error states; the panel does not auto-load on
-   mount.
+   the record itself. Matching is **not** gated by `kind`; there is no
+   `plan_type` / kind component. **Not built** (§13): a visual
+   per-component **MatchBreakdown** (name / goals / code / owner org /
+   parent / timeframe / keywords / relationships / tags) — there is no
+   such type or component; the UI shows the raw score and confidence
+   only.
+7. **Merge** (`/plans/merge`, standalone page, landed 2026-08-03 as
+   FE-1): survivor pid + duplicate pid + optional reason, an optional
+   side-by-side preview (`GET /api/plans/{pid}` for each), a native
+   `confirm()` before the destructive `POST /api/plans/merge` call
+   (`{main_pid, duplicate_pid, reason?}`), and a recent-merge history
+   table (`GET /api/plans/merges/recent`). Equal pids are guarded
+   client-side (the service `422`s on a self-merge); errors render as
+   `"<status>: <message>"`. Reachable from a **Merge** entry in the
+   top-bar nav.
+8. **Audit timeline** — **not built** (§13). No `AuditEntry` type, no
+   `PlanRepository` method, no UI. `GET /api/plans/{pid}/audit` exists on
+   the service but nothing in this front-end calls it yet.
 9. **The plan form** (create/edit) edits: `name` (required),
    `alternate_names`, `code` (owner-scoped), `owner_org_id` (**org
    picker** into the organization entity), `owner_org_name`, `lead_ref`
@@ -270,17 +275,20 @@ keys fall back to `en`.
     feed the match `Goals` component (display-only note) via the
     `data.goals[]` bridge.
 15. **Session / auth (BFF + httpOnly cookie)**: the top bar carries a
-    session affordance. The primary path is **Sign in**, routed through
-    the BFF to the central authentication front-end for the passwordless
-    magic-link; on success the authentication-service sets the
-    `__Host-mxi_session` httpOnly cookie. The browser holds only that
-    cookie — **no token in JS, no `localStorage`, no URL-fragment
-    handoff**. The SvelteKit **server** (BFF) holds the session and
-    attaches a short-lived PASETO server-side when calling the portfolio
-    service; the browser never calls the service directly. Mutating
-    browser→BFF calls carry a CSRF token; **Sign out** revokes the
-    session. This lets operator traffic through once the service turns on
-    blanket enforcement (`PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`, off by default). Per
+    session affordance. **Sign in** leads to this app's own `/signin` +
+    `/verify` pages (not a redirect to a central authentication
+    front-end) for the passwordless magic-link; on success the
+    authentication-service sets the `__Host-mxi_session` httpOnly cookie.
+    The browser holds only that cookie — **no token in JS, no
+    `localStorage`, no URL-fragment handoff**. The SvelteKit **server**
+    (BFF: `hooks.server.ts` + `src/lib/server/{auth,session,config}.ts`)
+    holds the session and attaches a short-lived PASETO server-side when
+    calling the portfolio service through the same-origin
+    `/api/proxy/[...path]` route; the browser never calls the service
+    directly. Mutating browser→BFF calls carry a CSRF token; **Sign out**
+    revokes the session. This lets operator traffic through once the
+    service turns on blanket enforcement
+    (`PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`, off by default). Per
     [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
 16. **Layout shell**: global navigation is a full-width **top bar**
     (header) with a **leftmost hamburger** toggle — NOT a left sidebar —
@@ -310,51 +318,63 @@ keys fall back to `en`.
 `ApiClient` (lean, raw-JSON, get/post/put/patch/delete + `ApiError`) →
 `PlanRepository` (all paths under `/api/plans`) → routes. The
 service is loco.rs and returns **raw JSON** (no envelope). Under the BFF
-model (§6.15) the browser carries only the `__Host-mxi_session` cookie
-and the SvelteKit server attaches the short-lived PASETO server-side when
-calling the service; no token is read or attached in browser JS.
-`PlanForm` builds a `Plan` from the inputs (comma lists split,
-blanks nulled, goals / identifiers / relationships as editable rows;
-empty rows dropped on submit; a seeded `Custom` enum collapses to "—";
-`kind` is an optional select, `parent_ref` an optional plan picker). The
-project-management views call the sub-resource endpoints via the same
-repository. Layout chrome (Plans destination, theme / locale selectors,
-hamburger nav, session affordance) lives in `+layout.svelte`;
-`+layout.ts` sets the SPA toggles.
+model (§6.15) the browser carries only the `__Host-mxi_session` cookie;
+`ApiClient`'s base URL is the same-origin `/api/proxy`, and the
+SvelteKit server (`src/routes/api/proxy/[...path]`) attaches the
+short-lived PASETO server-side when forwarding to the service — no token
+is read or attached in browser JS. `PlanForm` builds a `Plan` from the
+inputs (comma lists split, blanks nulled, goals / identifiers /
+relationships as editable rows; empty rows dropped on submit; a seeded
+`Custom` enum collapses to "—"; `kind` is an optional select,
+`owner_org_id` / `lead_ref` / `parent_ref` are raw pid text inputs, not
+typeahead pickers — §16 open question). The project-management views
+(board, and the oversight/executive dashboard routes in §5) call their
+sub-resource / dashboard endpoints via a separate `PpmClient`
+(`src/lib/api/ppm.ts`), not `PlanRepository`. Layout chrome (Plans
+destination, theme / locale selectors, hamburger nav, session affordance)
+lives in `+layout.svelte`; `+layout.ts` sets the SPA toggles.
 
-`types.ts` hand-mirrors `project_portfolio_management_matcher::Plan` and the
-sub-resource / DTO shapes: `Plan`, `PlanKind`, `PlanStatus`,
-`Goal`, `GoalStatus`, `Task`, `TaskStatus`, `Issue`, `IssueKind`,
-`IssueSeverity`, `IssueStatus`, `Relationship`, `RelationKind`,
+`types.ts` hand-mirrors `project_portfolio_management_matcher::Plan` and
+the identity-surface DTO shapes actually in use: `Plan`, `PlanKind`,
+`PlanStatus`, `Goal`, `GoalStatus`, `RelationKind`, `PlanRelationship`,
 `PlanIdentifier`, `IdentifierScheme`, `PlanRef`, `ScoredRef`,
-`MatchBreakdown`, `MergeResult`, `AuditEntry`, `PlanEvent`,
-`TimelineRow`, `BurndownPoint`. It MUST be updated in the same change
-cycle as any matcher-type change (entity spec §18).
+`MergeRequest`, `MergeResponse`, `MergeRecordRow`. It does **not** carry
+`MatchBreakdown`, `AuditEntry`, `PlanEvent`, `TimelineRow`, or
+`BurndownPoint` — those capabilities are not built (§13); `Task` /
+`TaskStatus` / `Issue*` types live in `ppm.ts` instead, since the board
+route uses `PpmClient`, not `PlanRepository`. Keep `types.ts` in lockstep
+with any matcher-type change (entity spec §18).
 
 ## 9. API consumption
 
-Every plan lives under `/api/plans` (one recursive collection).
+Every plan lives under `/api/plans` (one recursive collection). Rows
+below are endpoints an actual route calls today.
 
 | Route / action | Endpoint |
 |---|---|
 | list | `GET /api/plans` |
-| search | `GET /api/plans/search?q=` |
-| recent activity | `GET /api/plans/events/recent` (→ `PlanEvent[]`) |
 | create | `POST /api/plans` |
 | detail load | `GET /api/plans/{pid}` |
 | delete | `DELETE /api/plans/{pid}` |
-| duplicates | `POST /api/plans/check-duplicates` (→ `ScoredRef[]` w/ `MatchBreakdown`) |
-| merge | `POST /api/plans/merge` (`{main_pid, duplicate_pid, reason?}`) |
-| audit | `GET /api/plans/{pid}/audit` (→ `AuditEntry[]`) |
+| duplicates | `POST /api/plans/check-duplicates` (→ `ScoredRef[]`, score + confidence only) |
+| merge (`/plans/merge`) | `POST /api/plans/merge` (`{main_pid, duplicate_pid, reason?}`) |
+| merge history (`/plans/merge`) | `GET /api/plans/merges/recent` |
 | edit | `PUT /api/plans/{pid}` |
-| child roll-up | `GET /api/plans?parent={pid}` |
 | schedule | `GET /api/plans/{pid}/schedule` |
 | board: list / move | `GET /api/plans/{pid}/tasks` · `PATCH /api/plans/{pid}/tasks/{tid}` (status) |
 | board: create / edit | `POST /api/plans/{pid}/tasks` · `PUT /api/plans/{pid}/tasks/{tid}` |
-| issues | `GET / POST /api/plans/{pid}/issues` · `PUT /api/plans/{pid}/issues/{iid}` |
-| goals | `GET / POST /api/plans/{pid}/goals` · `PUT / DELETE /api/plans/{pid}/goals/{gid}` |
-| timeline | `GET /api/plans/{pid}/timeline` (→ `TimelineRow[]`) |
-| burndown | `GET /api/plans/{pid}/burndown` (→ `BurndownPoint[]`) |
+| board: sprints / burndown | `GET / POST /api/plans/{pid}/sprints` · `GET /api/plans/{pid}/burndown?sprint=` |
+
+**Not wired to any route** (no repository method, or a method exists but
+nothing calls it — §13): search (`GET /api/plans/search?q=` — the
+`PlanRepository.search()` method exists and is unit-tested; the list
+page filters client-side instead), recent activity
+(`GET /api/plans/events/recent`), a per-plan audit timeline
+(`GET /api/plans/{pid}/audit`), and the child roll-up
+(`GET /api/plans?parent={pid}`, exposed as `listPage()`'s `parent`
+scope). There is no `issues` / `goals` / `timeline` sub-resource route
+or endpoint at all yet (service spec §9.4 sub-resources deferred on both
+sides).
 
 (Sub-resource verbs/paths track the service spec §9; pin them in tests
 when the controllers land.)
@@ -369,45 +389,61 @@ httpOnly cookie — no auth token in `localStorage` (BFF model, §6.15).
 ## 11. Testing strategy
 
 `pnpm run check` (svelte-check strict, 0/0). **vitest** unit tests
-(`tests/unit/`) cover:
+(`tests/unit/`, 8 files / 62 tests as of 2026-08-03) cover:
 
-- the `ApiClient` (verb / body / headers / cookie-credentials / CSRF /
-  error-classification / empty-body, incl. `PATCH`);
-- the **BFF auth integration** (server-side session→PASETO exchange and
-  CSRF on mutating browser→BFF calls per
-  [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md);
-  no client-held token to test);
-- `PlanRepository` (`tests/unit/plans.test.ts`; every method's path +
-  verb, incl. `check-duplicates`, `search()` `/search?q=` URL-encoding,
-  `merge()` body `{main_pid, duplicate_pid, reason?}` with `404` / `422`
-  `ApiError` propagation, `audit()`, `recentEvents()`, the `?parent=`
-  child roll-up query, and the sub-resource methods — task move `PATCH`,
-  issues, goals, timeline, burndown);
-- the **`PlanForm`** component (`tests/unit/plan-form.test.ts`;
-  required-name guard blocks `onsubmit` on blank/whitespace; `build()`
-  trims scalars, nulls blanks, splits comma lists, drops empty goal /
-  identifier / relationship rows, collapses a `Custom` enum seed, leaves
-  `kind` optional, `parent_ref` an optional plan picker);
-- the **i18n catalogue** (every key present in `en`; fallback to `en`
-  for a missing key; RTL flag for `ar` / `ur`);
-- a **`+layout` render test** asserting the **hamburger toggles the
-  nav** (collapsed → expanded), and that the Plans destination and the
-  theme + locale selectors render.
+- `client.test.ts` — the `ApiClient` (verb / body / headers /
+  cookie-credentials / CSRF / error-classification / empty-body, incl.
+  `PATCH`);
+- `plans.test.ts` (12 tests) — every `PlanRepository` method's path +
+  verb: `list()` (incl. the `?parent=` roll-up query, though no route
+  passes it today), `search()` `/search?q=` URL-encoding,
+  `checkDuplicates()`, `merge()` body `{main_pid, duplicate_pid,
+  reason?}`, `recentMerges()`. **No** `audit()` / `recentEvents()` /
+  issues / goals / timeline / burndown methods exist to test — those
+  capabilities are not built (§13);
+- `merge-validation.test.ts` (4 tests) — the pure pre-merge guard (both
+  pids required, must differ);
+- `capabilities.test.ts` / `ppm.test.ts` — the `CapabilityClient` /
+  `PpmClient` endpoint paths used by the oversight/executive dashboard
+  routes and the board;
+- `plan-form.test.ts` (14 tests) — required-name guard blocks
+  `onsubmit` on blank/whitespace; `build()` trims scalars, nulls blanks,
+  splits comma lists, drops empty goal / identifier / relationship rows,
+  collapses a `Custom` enum seed, leaves `kind` optional;
+- `i18n.test.ts` (10 tests) — every key present in `en`; fallback to
+  `en` for a missing key; RTL flag for `ar` / `ur`; merge-key coverage;
+- `layout.test.ts` (1 test) — the hamburger toggles the nav.
 
 Component tests run via `@testing-library/svelte` mounted client-side
 by the `svelteTesting()` vite plugin.
 
-**Playwright** smoke tests (`tests/e2e/`) with the API stubbed via
-`page.route`, run against the production build (`vite preview`) to
-avoid the `vite dev` cold-start module race: load the plan identity
-routes; the list search box (matching keeps the row,
-non-matching shows the empty message); the detail-page merge action
-(check-duplicates → confirm merge → success, asserting the merge
-endpoint fired); the audit timeline; the recent-activity panel; the
-child-plan roll-up; the Kanban board (drag a card →
-status PATCH fired); the issues list; the timeline / burndown views
-render; and the layout (hamburger toggles nav; theme + locale selectors
-switch `data-theme` / `lang` + `dir`, incl. RTL for `ar`).
+**Playwright** smoke tests, 23 tests across two files, with the API
+stubbed via `page.route`, run against the production build
+(`vite preview`) to avoid the `vite dev` cold-start module race:
+
+- `tests/e2e/smoke.spec.ts` (7 tests) — the identity surface: the
+  list / new / detail / edit pages render; the merge page renders its
+  form and the recent-merges table; the nav exposes the merge link; and
+  check-duplicates self-exclusion (the record does not list itself as a
+  candidate).
+- `tests/e2e/ppm.spec.ts` (16 tests) — the oversight/executive dashboard
+  views (dashboard, proposals, ideas, executive, financials, technology,
+  scenarios, board, auditor, compliance, risk, security, regulator,
+  engineering, calendar) and the per-plan Kanban task board (columns,
+  burndown, standup digest, sprint notes, velocity).
+
+There is **no** Playwright coverage yet for an audit timeline,
+recent-activity panel, child-plan roll-up, issues, timeline, or a
+plan-level (non-sprint) burndown — those views are not built.
+
+Both stub files match request paths against the service's bare
+`/api/...` contract; since the request actually lands on the BFF proxy
+at `/api/proxy/api/...` (`ad95088e`), both strip the `/api/proxy` prefix
+before dispatching. (Fixed 2026-08-04, DOC-4 audit: both files also
+still navigated to the pre-2026-07-20 `/projects*` routes, which do not
+exist — neither `pnpm run check` nor `pnpm test` nor `pnpm run build`
+runs Playwright, so 21 of 23 tests had been silently broken since the
+`/plans` unification; see CHANGELOG.)
 
 Run: `pnpm test` (vitest) and `pnpm test:e2e` (Playwright).
 
@@ -478,67 +514,98 @@ links are **never** a match signal (entity spec §1).
   svelte-check 0/0, 45 vitest pass.
 - [x] Scaffold the SvelteKit 2 / Svelte 5 (runes) SPA: `package.json`,
   `svelte.config.js`, `vite.config.ts`, `tsconfig` (strict +
-  `noUncheckedIndexedAccess`), `src/app.html`, `src/app.css`,
-  `.env.example` (`PUBLIC_API_BASE_URL`, `VITE_AUTH_FRONTEND_URL`).
+  `noUncheckedIndexedAccess`), `src/app.html`, `src/app.css`. The
+  original scaffold's `.env.example` (`PUBLIC_API_BASE_URL`,
+  `VITE_AUTH_FRONTEND_URL`) named the client-held-token model's vars;
+  it was superseded when the BFF (own `/signin`+`/verify`+`/api/proxy`)
+  landed and now documents `PROJECT_PORTFOLIO_MANAGEMENT_API_URL` /
+  `AUTH_API_URL`, read server-side only (fixed 2026-08-04, DOC-4 audit —
+  the vars had drifted out of every doc, not just this one).
 - [x] `src/lib/api/types.ts` — mirror `project_portfolio_management_matcher::Plan` +
-  `PlanKind` (optional) + sub-resource + DTO shapes (per §8).
+  `PlanKind` (optional) + the identity-surface DTO shapes (per §8; not
+  the sub-resource `Task`/`Issue` shapes, which live in `ppm.ts`).
 - [x] `src/lib/api/client.ts` — lean fetch wrapper (get/post/put/patch/
   delete) + `ApiError`. Browser→BFF calls only; the SvelteKit server
   attaches the PASETO bearer server-side (no client-held token).
-- [x] `src/lib/api/plans.ts` — `PlanRepository` (CRUD + search +
-  checkDuplicates + merge + audit + recentEvents + `?parent=` child
-  roll-up + sub-resource methods + timeline + burndown; all paths under
-  `/api/plans`).
-- [x] Auth — adopt BFF + httpOnly cookie + CSRF: `hooks.server.ts` /
-  server routes read the `__Host-mxi_session` cookie, exchange it for a
-  short-lived PASETO server-side, and attach it when calling the
-  portfolio service; CSRF on mutating browser→BFF calls. No
-  `mxi_access_token` / `localStorage` bearer, no fragment handoff (per
+- [x] `src/lib/api/plans.ts` — `PlanRepository` (list + listPage +
+  search + get + create + update + remove + checkDuplicates + merge +
+  recentMerges; all paths under `/api/plans`). **Not built**: `audit()`,
+  `recentEvents()`, or any issues/goals/timeline/burndown method — see
+  §9.
+- [x] Auth — adopt BFF + httpOnly cookie + CSRF: `hooks.server.ts` +
+  `src/lib/server/{auth,session,config}.ts` read the
+  `__Host-mxi_session` cookie, exchange it for a short-lived PASETO
+  server-side, and attach it when calling the portfolio service via
+  `src/routes/api/proxy/[...path]`; CSRF on mutating browser→BFF calls.
+  Sign-in is this app's own `signin/` + `verify/` routes, not a redirect
+  to a central authentication front-end. No `mxi_access_token` /
+  `localStorage` bearer, no fragment handoff (per
   [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
-- [x] `src/lib/config.ts` — `PUBLIC_API_BASE_URL` + `VITE_AUTH_FRONTEND_URL`
-  + `signInUrl()` (BFF sign-in redirect).
-- [x] `src/lib/i18n/` — 13-locale catalogues (en, cy, es, fr, de, ar,
-  ru, hi, zh, bn, pt, id, ur) + RTL flags + `en` fallback.
+- [x] `src/lib/config.ts` — `API_BASE_URL` (same-origin `/api/proxy`,
+  hardcoded, not env-driven). There is no client-side `signInUrl()`; the
+  Sign in link is a plain `href="/signin"`.
+- [x] `src/lib/i18n.svelte.ts` — 13-locale catalogues (en, cy, es, fr, de, ar,
+  ru, hi, zh, bn, pt, id, ur) + RTL flags + `en` fallback (one file, not
+  a directory).
 - [x] `+layout.svelte` / `+layout.ts` — top-bar nav with **leftmost
   hamburger**, full-width content, Plans destination + theme + locale
   selectors, session affordance (Sign in / Sign out — BFF, no token
   paste); SPA toggles.
-- [x] Plan identity routes: `/plans` (SVAR
-  DataGrid list + search + recent activity), `/plans/new`,
-  `/plans/[pid]` (detail + delete + check-duplicates +
-  MatchBreakdown + merge + audit timeline; child-plan roll-up),
-  `/plans/[pid]/edit`.
-- [x] `PlanForm` component (incl. org picker, person/worker lead
-  picker, optional plan `parent_ref` picker, goals / identifiers /
-  relationships editors; `kind` optional select).
-- [x] `MatchBreakdown` visual component (per-component score bars incl.
+- [x] Plan identity routes: `/plans` (SVAR DataGrid list + client-side
+  name filter), `/plans/new`, `/plans/[pid]` (detail + delete +
+  check-duplicates, plain score/confidence), `/plans/[pid]/edit`,
+  `/plans/merge` (FE-1, above). **Not built** on any of these: a
+  server-round-trip search box, recent activity, a MatchBreakdown
+  visual, a per-plan audit timeline, and the child-plan roll-up — see §9.
+- [x] `PlanForm` component (goals / identifiers / relationships editors;
+  `kind` optional select). `owner_org_id` / `lead_ref` / `parent_ref`
+  are plain pid text inputs, not typeahead pickers (§16 open question,
+  still open).
+- [ ] `MatchBreakdown` visual component (per-component score bars incl.
   goals / parent / relationships / tags; no `plan_type` / kind gate).
+  **Not built** — no type, no component; `check-duplicates` renders raw
+  score + confidence.
 - [x] Kanban task board (`/plans/[pid]/board`) — drag = status PATCH.
+  Uses `PpmClient`/`Task` (`ppm.ts`), not `PlanRepository`.
 - [ ] Issues list (`/plans/[pid]/issues`).
 - [ ] Gantt / timeline view (`/plans/[pid]/timeline`).
-- [ ] Burndown chart (`/plans/[pid]/burndown`).
+- [ ] Burndown chart (`/plans/[pid]/burndown`) — the board's per-sprint
+  burndown (`GET /api/plans/{pid}/burndown?sprint=`) is not this: it is
+  scoped to one sprint, not the plan-level "remaining estimate over
+  time" series this item describes.
 - [ ] Goals panel (`/plans/[pid]/goals`).
-- [x] vitest unit suite (client, `PlanRepository`, BFF auth
-  integration, signInUrl, `PlanForm`, i18n, `+layout`
-  hamburger-toggle render test).
-- [x] Playwright e2e smoke (plan routes, search, merge, audit,
-  recent activity, child-plan roll-up, board drag, issues,
-  timeline/burndown, layout hamburger + theme/locale switch incl. RTL).
+- [x] vitest unit suite, 8 files / 62 tests: `client`, `plans`
+  (`PlanRepository`), `merge-validation`, `capabilities`, `ppm`,
+  `plan-form`, `i18n`, `layout` (hamburger-toggle render test). See §11.
+- [x] Playwright e2e smoke, 23 tests across `tests/e2e/{smoke,ppm}.spec.ts`:
+  the plan identity routes render, the merge page + recent-merges table,
+  the nav's merge link, check-duplicates self-exclusion, every
+  oversight/executive dashboard view, and the Kanban board (columns,
+  burndown, standup, sprint notes, velocity). **Not covered**: recent
+  activity, audit timeline, child-plan roll-up, issues, plan-level
+  timeline/burndown, or a layout hamburger/theme/locale/RTL switch test
+  — see §11. Fixed 2026-08-04 (DOC-4 audit): both spec files still
+  navigated to pre-unification `/projects*` routes and neither stripped
+  the BFF proxy prefix, so 21/23 tests had been failing since
+  2026-07-20/`ad95088e` respectively, undetected because no other
+  command in this project's test pyramid runs Playwright.
 
 ## 14. Implementation status
 
-**Implemented (MVP, v0.1.0).** The SvelteKit app is built and verified (svelte-check clean, vitest + Playwright green): the routes in §5 are live against the sibling service via the BFF proxy, with SVAR grid / Kanban / Gantt views, Lily theme + locale chrome, and 13-locale i18n. Open §13 items (the roadmap sub-list in §5) remain unchecked.
+**Implemented (MVP, v0.1.0).** The SvelteKit app is built and verified (svelte-check clean, vitest + Playwright green): the routes in §5 are live against the sibling service via the BFF proxy, with SVAR grid / Kanban / Gantt views, Lily theme + locale chrome, and 13-locale i18n covering the original identity + merge surface (the later oversight/executive dashboard views are English-first — CHANGELOG 2026-07-22). Open §13 items — the plan-detail audit timeline, recent activity, MatchBreakdown, child roll-up, and the issues/timeline/goals sub-routes (the roadmap sub-list in §5) — remain unchecked.
 
 ## 15. Roadmap
 
 - **v0.1** (here): spec + docs only.
 - **v0.2**: scaffold + plan identity routes (list / create / detail /
-  edit) + lean client + repository + BFF auth (httpOnly cookie + CSRF, per
+  edit) + lean client + repository + BFF auth (own `/signin`+`/verify`,
+  httpOnly cookie + CSRF, per
   [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md))
-  + SSO sign-in + layout shell (top-bar hamburger, theme + locale
+  + layout shell (top-bar hamburger, theme + locale
   selectors) + vitest + Playwright smoke.
-- **v0.3**: duplicate-check + MatchBreakdown visual + merge + audit
-  timeline + child-plan roll-up.
+- **v0.3**: duplicate-check (done) + merge (done, as the standalone
+  `/plans/merge` page, FE-1 2026-08-03) + MatchBreakdown visual (not
+  built) + audit timeline (not built) + child-plan roll-up (not built).
 - **v0.4**: project-management views — Kanban board, issues, timeline /
   Gantt, burndown, goals.
 - **v0.5**: full 13-locale translation catalogues + RTL polish.

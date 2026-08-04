@@ -8,6 +8,40 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Fixed — doc/code reconciliation + e2e route staleness (2026-08-04, DOC-4 audit)
+
+- **`.env.example`** documented the decommissioned client-held-token
+  model's vars (`PUBLIC_API_BASE_URL`, `VITE_AUTH_FRONTEND_URL`, and a
+  leftover "Case Service" header comment copy-pasted from the case
+  front-end) — zero references in `src/`. Rewritten to the real
+  server-side-only vars `PROJECT_PORTFOLIO_MANAGEMENT_API_URL` /
+  `AUTH_API_URL` (`src/lib/server/config.ts`), matching README/AGENTS.md
+  which already described them correctly for the BFF proxy but not for
+  the file operators actually copy.
+- **`tests/e2e/smoke.spec.ts` and `tests/e2e/ppm.spec.ts` were
+  navigating to `/projects*` routes that have not existed since the
+  2026-07-20 `/plans` collection unification**, plus both stubs matched
+  request paths without stripping the BFF proxy prefix
+  (`/api/proxy/api/...`, from `ad95088e`). Neither `pnpm run check` nor
+  `pnpm test` (vitest) nor `pnpm run build` exercises Playwright, so this
+  was invisible until `pnpm test:e2e` was actually run — which had
+  apparently not happened since the route unification landed. Fixed
+  both: route paths (`/projects` → `/plans`, including the task-board
+  route), stub match paths, and the proxy-prefix strip. All 23
+  Playwright tests now pass (was 21 failing of 23).
+- **`spec/index.md`, `AGENTS.md`, `README.md`, `index.md`** described
+  several capabilities as built that have no repository method, type, or
+  route: a server-round-trip name search, a recent-activity feed, a
+  per-plan audit timeline, a per-component match-score breakdown visual,
+  and the plan-detail child-plan roll-up. Also corrected: the auth model
+  description (this app's own `/signin` + `/verify` BFF pages, not a
+  redirect to a central authentication front-end — `signInUrl()` and
+  `src/lib/auth.svelte.ts` do not exist), stale `src/` tree entries
+  (`src/lib/i18n/` is one file, not a directory; `PlanRepository` does
+  not carry `audit`/`recentEvents`/sub-resource methods), and several
+  stale test-suite descriptions and counts. See `spec/index.md` §6, §8,
+  §9, §11, §13 and `AGENTS.md`'s Status note for the corrected detail.
+
 ### Added — record-merge page (2026-08-03)
 
 - **`/plans/merge`** — an operator page for folding a confirmed-duplicate

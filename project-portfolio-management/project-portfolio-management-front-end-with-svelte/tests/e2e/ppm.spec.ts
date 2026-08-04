@@ -58,7 +58,9 @@ async function stubPpm(page: Page) {
   await page.route("**/api/**", async (route) => {
     const url = new URL(route.request().url());
     const method = route.request().method();
-    const path = url.pathname;
+    // Strip the BFF proxy prefix (ad95088e): the browser's real request is
+    // `/api/proxy/api/...`, not the bare `/api/...` this stub dispatches on.
+    const path = url.pathname.replace(/^\/api\/proxy/, "");
     if (path === "/api/at-a-glance") return route.fulfill({ json: DASHBOARD });
     if (path === "/api/proposals" && method === "GET")
       return route.fulfill({ json: PROPOSALS });
@@ -260,7 +262,7 @@ async function stubPpm(page: Page) {
           spend: [{ currency: "GBP", planned_minor: 2000000, actual_minor: 900000 }],
           benefits: [{ currency: "GBP", target_minor: 750000, realized_minor: 250000 }] }],
       } });
-    if (/^\/api\/projects\/w-1\/tasks$/.test(path) && method === "GET")
+    if (/^\/api\/plans\/w-1\/tasks$/.test(path) && method === "GET")
       return route.fulfill({ json: {
         tasks: [
           { pid: "t-1", title: "Wire the API", description: null, status: "in_progress",
@@ -274,17 +276,17 @@ async function stubPpm(page: Page) {
         ],
         counts: { todo: 0, in_progress: 1, in_review: 0, done: 0, blocked: 1 },
       } });
-    if (/^\/api\/projects\/w-1\/tasks\/t-1$/.test(path) && method === "PATCH")
+    if (/^\/api\/plans\/w-1\/tasks\/t-1$/.test(path) && method === "PATCH")
       return route.fulfill({ json: {
         pid: "t-1", title: "Wire the API", description: null, status: "in_review",
         assignee_ref: "worker:x", sprint_pid: "sp-1",
         created_at: "2026-07-19T00:00:00Z", status_changed_at: "2026-07-19T02:00:00Z",
         done_at: null, blocked_days: null } });
-    if (/^\/api\/projects\/w-1\/sprints$/.test(path) && method === "GET")
+    if (/^\/api\/plans\/w-1\/sprints$/.test(path) && method === "GET")
       return route.fulfill({ json: [
         { pid: "sp-1", name: "Sprint 1", starts_on: "2026-07-13", ends_on: "2026-07-26" },
       ] });
-    if (/^\/api\/projects\/w-1\/burndown/.test(path))
+    if (/^\/api\/plans\/w-1\/burndown/.test(path))
       return route.fulfill({ json: {
         as_of: "2026-07-19T00:00:00Z",
         sprint: { pid: "sp-1", name: "Sprint 1", starts_on: "2026-07-13", ends_on: "2026-07-15" },
@@ -296,7 +298,7 @@ async function stubPpm(page: Page) {
           { date: "2026-07-15", remaining: 1 },
         ],
       } });
-    if (/^\/api\/projects\/w-1\/standup$/.test(path))
+    if (/^\/api\/plans\/w-1\/standup$/.test(path))
       return route.fulfill({ json: {
         as_of: "2026-07-19T00:00:00Z", since: "2026-07-18T00:00:00Z",
         item: { pid: "w-1", name: "Platform rebuild", kind: "Project" },
@@ -342,7 +344,7 @@ async function stubPpm(page: Page) {
           due: "2026-07-24", done: false,
           item: { pid: "w-1", name: "Platform rebuild", kind: "Project" } }],
       } });
-    if (/^\/api\/projects\/w-1\/velocity$/.test(path))
+    if (/^\/api\/plans\/w-1\/velocity$/.test(path))
       return route.fulfill({ json: {
         as_of: "2026-07-19T00:00:00Z",
         note: "points are team-local; never compare across teams or items",
@@ -350,7 +352,7 @@ async function stubPpm(page: Page) {
           starts_on: "2026-07-13", ends_on: "2026-07-26" },
           tasks_done: 3, points_done: 13, unpointed_done: 1 }],
       } });
-    if (/^\/api\/projects\/w-1\/sprints\/sp-1\/notes$/.test(path) && method === "GET")
+    if (/^\/api\/plans\/w-1\/sprints\/sp-1\/notes$/.test(path) && method === "GET")
       return route.fulfill({ json: [
         { pid: "n-1", sprint_pid: "sp-1", category: "action",
           body: "Automate the smoke tests", task_pid: null },
@@ -515,7 +517,7 @@ test("regulator area renders coarse aggregates", async ({ page }) => {
 
 test("task board renders columns, burndown, and the standup digest", async ({ page }) => {
   await stubPpm(page);
-  await page.goto("/projects/w-1/board");
+  await page.goto("/plans/w-1/board");
   await expect(page.getByTestId("task-board").getByText("Wire the API")).toBeVisible();
   await expect(page.getByTestId("task-board").getByText("blocked 2d")).toBeVisible();
   await expect(page.getByText("no ideal line, no interpolation")).toBeVisible();

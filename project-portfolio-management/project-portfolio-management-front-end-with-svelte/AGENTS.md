@@ -1,11 +1,10 @@
 # AGENTS.md — Portfolio Front-End
 
 Operator UI for the [Portfolio Service](../project-portfolio-management-service-with-loco):
-plan identity CRUD + matching + name search + merge + audit timeline
-over **one recursive `/api/plans` collection**, plus the
-project-management workspace (Kanban board, issues, timeline / Gantt,
-burndown, goals) and cookie-session / SSO auth (BFF; the browser holds no
-token).
+plan identity CRUD + matching + merge over **one recursive `/api/plans`
+collection**, plus the project-management workspace (Kanban board,
+governance, schedule) and cookie-session / SSO auth (BFF; the browser
+holds no token).
 
 > Read [`spec/index.md`](./spec/index.md) first — the living spec
 > (§1–§18). Entity umbrella: [`../spec/index.md`](../spec/index.md).
@@ -14,14 +13,21 @@ token).
 > check` is **0 errors / 0 warnings**, `pnpm test` (vitest) is green, and
 > `pnpm run build` succeeds. Shipped: the unified identity surface — a
 > static `plans/` route layer (`/plans`, `/plans/new`, `/plans/[pid]`,
-> `/plans/[pid]/{edit,board,schedule,governance}`) with list + name-search
-> + create + detail + edit + delete + check-duplicates, the `PlanForm`,
+> `/plans/[pid]/{edit,board,schedule,governance}`, `/plans/merge`) with
+> list (SVAR grid + client-side filter) + create + detail + edit + delete
+> + check-duplicates + record-merge (FE-1, 2026-08-03), the `PlanForm`,
 > the `PlanRepository`, the lean `ApiClient`, the BFF proxy +
-> cookie-session auth, and the 13-locale i18n + top-bar hamburger +
-> theme/locale selectors. **Deferred** (roadmap): the rich project-
-> management views (Kanban board, issues, Gantt/timeline, burndown, goals
-> panels), the MatchBreakdown visual, and the merge/audit-timeline UI — the
-> service defers those sub-resources too.
+> cookie-session auth, the Kanban board (`/plans/[pid]/board`), a wide set
+> of oversight / executive dashboard views (§5 of the spec), and the
+> 13-locale i18n + top-bar hamburger + theme/locale selectors (the
+> dashboard-style views added after the original MVP stay English-first).
+> **Not built** (per `spec/index.md` §13, distinct from "deferred" — no
+> repository method, type, or UI element exists for these yet): the
+> per-plan audit timeline, the recent-activity feed, a match-score
+> breakdown visual, and the detail page's child-plan roll-up. Also not
+> built: the issues list, Gantt/timeline, burndown, and goals sub-routes
+> (`/plans/[pid]/{issues,timeline,burndown,goals}`) — the service defers
+> those sub-resources too.
 
 ## What this is
 
@@ -88,63 +94,81 @@ of the matching surface (except goal titles).
   `localStorage["portfolio:locale"]`), and the session affordance (Sign
   in / Sign out; the browser holds no token — see **Auth** below).
 
-## Layout (planned `src/` tree)
+## Layout (actual `src/` tree, portfolio-specific parts)
+
+The oversight / executive dashboard route directories (`auditor/`,
+`automations/`, `board/`, `calendar/`, `capacity/`, `compliance/`,
+`dashboard/`, `engineering/`, `executive/`, `financials/`, `gantt/`,
+`ideas/`, `lifecycle/`, `objectives/`, `prioritisation/`, `proposals/`,
+`regulator/`, `reports/`, `reviews/`, `risk/`, `scenarios/`,
+`security/`, `technology/`) are listed in [README.md](README.md)'s
+routes table, not repeated here.
 
 ```
 src/
+├── hooks.server.ts                BFF session handling (reads the httpOnly session cookie)
 ├── lib/
-│   ├── config.ts                 PUBLIC_API_BASE_URL (:5150) + VITE_AUTH_FRONTEND_URL (:5173) + signInUrl()
-│   ├── auth.svelte.ts            reactive session-state store (signed-in flag from the httpOnly cookie); no token in JS
-│   ├── i18n/                     13-locale catalogues (en default) + RTL flags + en fallback
+│   ├── config.ts                  API_BASE_URL → same-origin BFF proxy (/api/proxy); no browser-held bearer
+│   ├── i18n.svelte.ts             13-locale catalogues (en default) + RTL flags + en fallback; one file, not a directory
 │   ├── api/
-│   │   ├── client.ts             lean fetch wrapper (get/post/put/patch/delete + ApiError); credentials: 'include' (cookie) + CSRF header
-│   │   ├── types.ts              Plan + PlanKind + PlanStatus + Goal + Task + Issue (+ IssueKind/IssueSeverity/IssueStatus) + Relationship + RelationKind + PlanIdentifier + IdentifierScheme + PlanRef + ScoredRef + MatchBreakdown + MergeResult + AuditEntry + PlanEvent + TimelineRow + BurndownPoint
-│   │   ├── capabilities.ts       CapabilityClient (reviews, assignees, notifications, automations, scheduled actions, Smart Score, lifecycle)
-│   │   └── plans.ts              PlanRepository (CRUD + search + checkDuplicates + merge + audit + recentEvents + parent roll-up + sub-resources + timeline + burndown; all paths under /api/plans)
-│   └── components/               PlanForm, MatchBreakdown, KanbanBoard, IssuesList, Timeline, Burndown, GoalsPanel, pickers
+│   │   ├── client.ts              lean fetch wrapper (get/post/put/patch/delete + ApiError); credentials: 'include' (cookie) + CSRF header
+│   │   ├── types.ts               Plan + PlanKind + PlanStatus + Goal + Task + Issue (+ IssueKind/IssueSeverity/IssueStatus) + Relationship + RelationKind + PlanIdentifier + IdentifierScheme + PlanRef + ScoredRef + MergeRequest + MergeResponse + MergeRecordRow. No MatchBreakdown / AuditEntry / PlanEvent / TimelineRow / BurndownPoint type — those capabilities are not built (see the Status note above).
+│   │   ├── capabilities.ts        CapabilityClient (reviews, assignees, notifications, automations, scheduled actions, Smart Score, lifecycle)
+│   │   ├── ppm.ts                 PpmClient — the oversight/executive dashboard views' endpoints (board, governance, schedule, auditor, compliance, …)
+│   │   └── plans.ts               PlanRepository (list + listPage + search + get + create + update + remove + checkDuplicates + merge + recentMerges; all paths under /api/plans). No audit() or recentEvents() method.
+│   ├── server/                    BFF-only (never bundled to the browser): auth.ts (magic-link + session→PASETO exchange), session.ts (cookie), config.ts (PROJECT_PORTFOLIO_MANAGEMENT_API_URL / AUTH_API_URL)
+│   └── components/                PlanForm.svelte, merge-validation.ts (pure guard). No MatchBreakdown / KanbanBoard / IssuesList / Timeline / Burndown / GoalsPanel / picker components — the board route uses @svar-ui/svelte-kanban directly.
 └── routes/
-    ├── +layout.svelte / +layout.ts   top-bar nav (leftmost hamburger) + Plans destination + theme/locale selectors + session affordance + SPA toggle
-    ├── +page.svelte              landing (links to /plans)
+    ├── +layout.svelte / +layout.ts / +layout.server.ts   top-bar nav (leftmost hamburger) + Plans destination + theme/locale selectors + session affordance + SPA toggle
+    ├── signin/ · verify/          per-app magic-link sign-in (BFF server routes)
+    ├── api/proxy/[...path]/+server.ts   BFF proxy → portfolio service (injects the PASETO bearer)
+    ├── +page.svelte               landing (links to /plans)
     └── plans/
-        ├── +page.svelte         list (SVAR DataGrid) + name-search + recent-activity toggle
-        ├── new/+page.svelte     create
-        ├── [pid]/+page.svelte   detail + delete + check-duplicates + MatchBreakdown + audit timeline (+ child roll-up)
-        ├── [pid]/edit/+page.svelte   edit
+        ├── +page.svelte          list (SVAR DataGrid + client-side FilterBar over the loaded rows)
+        ├── new/+page.svelte      create
+        ├── [pid]/+page.svelte    detail + delete + check-duplicates (plain score/confidence, no breakdown visual)
+        ├── [pid]/edit/+page.svelte    edit
         ├── [pid]/{board,schedule,governance}/+page.svelte
-        └── merge/+page.svelte   merge a duplicate into a survivor + recent merge history
+        └── merge/+page.svelte    merge a duplicate into a survivor + recent merge history
 ```
 
 ## API consumption
 
 Every plan lives under `/api/plans` (one recursive collection).
 
+Rows below are endpoints an actual route calls today. `PlanRepository`
+also defines `search()` (`GET /api/plans/search?q=`) and `listPage()`'s
+`?parent=` roll-up scope, but no route calls either — the list page's
+search box is a client-side filter over the already-loaded rows instead.
+There is no repository method, type, or route at all for a recent-activity
+feed, a per-plan audit timeline, or a match-score breakdown visual (see
+the Status note above).
+
 | UI action | Endpoint |
 |---|---|
 | List | `GET /api/plans` |
-| Search | `GET /api/plans/search?q=` |
-| Recent activity | `GET /api/plans/events/recent` → `PlanEvent[]` |
 | Create | `POST /api/plans` |
 | Detail | `GET /api/plans/{pid}` |
 | Edit | `PUT /api/plans/{pid}` |
 | Delete | `DELETE /api/plans/{pid}` |
-| Check duplicates | `POST /api/plans/check-duplicates` → `ScoredRef[]` w/ `MatchBreakdown` |
-| Merge duplicate | `POST /api/plans/merge` (body `{main_pid, duplicate_pid, reason?}`) |
-| Audit timeline | `GET /api/plans/{pid}/audit` → `AuditEntry[]` |
-| Child roll-up | `GET /api/plans?parent={pid}` |
+| Check duplicates | `POST /api/plans/check-duplicates` → `ScoredRef[]` (score + confidence; no breakdown) |
+| Merge duplicate (`/plans/merge`) | `POST /api/plans/merge` (body `{main_pid, duplicate_pid, reason?}`) |
+| Merge history (`/plans/merge`) | `GET /api/plans/merges/recent` |
 | Schedule | `GET /api/plans/{pid}/schedule` |
 | Tasks (board) | `GET / POST /api/plans/{pid}/tasks` · `PUT / PATCH /api/plans/{pid}/tasks/{tid}` (PATCH = status move) |
-| Issues | `GET / POST /api/plans/{pid}/issues` · `PUT /api/plans/{pid}/issues/{iid}` |
-| Goals | `GET / POST /api/plans/{pid}/goals` · `PUT / DELETE /api/plans/{pid}/goals/{gid}` |
-| Timeline | `GET /api/plans/{pid}/timeline` → `TimelineRow[]` |
-| Burndown | `GET /api/plans/{pid}/burndown` → `BurndownPoint[]` |
-| Collaborative review | `POST / GET /api/reviews` · `/{pid}/respond` · `/{pid}/submit` · `GET /api/reviews/consensus` |
-| Assign a task | `POST /api/plans/{pid}/tasks/{t_pid}/assign` (`null` unassigns) |
-| Assignee workload | `GET /api/assignees/workload` |
-| Notifications | `GET /api/notifications` · `POST /api/notifications/{pid}/read` |
-| Automations | `POST / GET /api/automations` · `/{pid}/enable`·`/disable` · `GET /api/automations/runs` |
-| Scheduled actions | `POST / GET /api/scheduled-actions` · `POST /api/scheduled-actions/sweep` |
-| Smart Score | `GET /api/plans/{pid}/smart-score` · `GET /api/prioritisation` |
-| Lifecycle | `GET /api/lifecycle` · `GET /api/plans/{pid}/lifecycle` |
+| Sprints + burndown (board) | `GET / POST /api/plans/{pid}/sprints` · `GET /api/plans/{pid}/burndown?sprint=` |
+| Collaborative review (`/reviews`) | `POST / GET /api/reviews` · `/{pid}/respond` · `/{pid}/submit` · `GET /api/reviews/consensus` |
+| Automations (`/automations`) | `POST / GET /api/automations` · `/{pid}/enable`·`/disable` · `GET /api/automations/runs` |
+| Scheduled actions (`/automations`) | `POST / GET /api/scheduled-actions` · `POST /api/scheduled-actions/sweep` |
+| Smart Score (`/prioritisation`) | `GET /api/plans/{pid}/smart-score` · `GET /api/prioritisation` |
+| Lifecycle (`/lifecycle`) | `GET /api/lifecycle` · `GET /api/plans/{pid}/lifecycle` |
+
+`src/lib/api/capabilities.ts` additionally defines a per-task assign
+endpoint, an assignee-workload query, and a notifications inbox
+(`GET /api/notifications`); none is called by a route yet — the CHANGELOG's
+2026-07-22 entry already flags the notifications gap specifically. There
+is no `/plans/[pid]/{issues,timeline,goals}` route or endpoint at all
+(service spec §9.4 sub-resources not yet built on either side).
 
 ## Three-part change rule
 
@@ -169,33 +193,39 @@ pnpm test:e2e     # Playwright smoke (runs against `vite preview`)
 
 ## Auth — BFF + cookie session (no token in the browser)
 
-The intended model is a **Backend-For-Frontend**: this app's own
-SvelteKit server holds the session and talks to the portfolio service;
-the browser holds **no token** (no `localStorage`, no `mxi_access_token`,
-no URL-fragment handoff). The portfolio service's blanket auth
-enforcement (`PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`, off by default) is satisfied by the
-BFF presenting a short-lived **PASETO v4.public** bearer server-side.
+**BFF model (current).** The browser holds no token: sign-in establishes
+a server-side **cookie session** (`__Host-mxi_session`, httpOnly), the
+browser talks only to this front-end's own SvelteKit server (BFF), and
+the BFF exchanges the session for a short-lived **PASETO v4.public**
+token and calls the portfolio service server-side. Mutating requests are
+CSRF-protected; there is no `localStorage` and no `mxi_access_token`.
+Service-side enforcement (`PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`) is
+off by default.
+
+- **Sign in** — the top bar's **Sign in** leads to this app's own
+  `signin/` route (not a redirect to a central authentication front-end);
+  the magic-link flow completes at `verify/`, which establishes the
+  server-side session and sets the httpOnly `__Host-mxi_session` cookie.
+- **BFF** — `src/hooks.server.ts` reads the session cookie;
+  `src/lib/server/auth.ts` performs the magic-link + session→PASETO
+  exchange; `src/routes/api/proxy/[...path]/+server.ts` is the reverse
+  proxy that injects the PASETO bearer and forwards to the portfolio
+  service. There is no client-held session store
+  (`$lib/auth.svelte.ts` does not exist).
+- **`ApiClient`** — browser→BFF calls (`API_BASE_URL` = same-origin
+  `/api/proxy`) send the cookie (`credentials: 'include'`); state-changing
+  requests carry a **CSRF token** (`X-CSRF-Token`). Safe `GET`/`HEAD` are
+  CSRF-exempt.
+
 Source of truth:
 [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
-(RS256/JWKS not used).
+(RS256 JWT + JWKS and any cross-origin `#access_token` fragment handoff
+are decommissioned).
 
-- **Sign in** — the top bar leads with **Sign in**, redirecting to
-  `${VITE_AUTH_FRONTEND_URL}/signin?return_to=<origin + base>`; the
-  magic-link establishes a server-side session and sets an httpOnly
-  `__Host-mxi_session` cookie.
-- **`$lib/auth.svelte`** — reactive **session-state** store (a signed-in
-  flag derived from the cookie/BFF), not a token store. Browser JS never
-  reads a credential.
-- **BFF** — the SvelteKit server (`hooks.server.ts` / `+server.ts` /
-  `+page.server.ts`) holds the session, exchanges it for a short-lived
-  PASETO v4.public token, and calls the portfolio service server-side
-  with that bearer.
-- **`ApiClient`** — browser→BFF calls send the cookie
-  (`credentials: 'include'`); state-changing requests carry a **CSRF
-  token** (`X-CSRF-Token`). Safe `GET`/`HEAD` are CSRF-exempt.
-
-Configure with `PUBLIC_API_BASE_URL` and `VITE_AUTH_FRONTEND_URL` (see
-`.env.example`).
+Configure the BFF's upstream URLs with the server-side env vars
+`PROJECT_PORTFOLIO_MANAGEMENT_API_URL` (portfolio service) and
+`AUTH_API_URL` (authentication service) — see `src/lib/server/config.ts`;
+both default to `http://localhost:5150` (see `.env.example`).
 
 ## What does NOT live here
 
@@ -206,6 +236,7 @@ Configure with `PUBLIC_API_BASE_URL` and `VITE_AUTH_FRONTEND_URL` (see
   sub-resource set (tasks / goals / issues only); roadmap-only.
 - Members / role panel — not part of the v1 sub-resource set;
   roadmap-only.
-- A login screen — sign-on is delegated to the central
-  authentication-service magic-link SSO; this app only establishes /
-  carries the cookie session via its BFF (no browser-held token).
+- A password / credential form — sign-on is passwordless magic-link
+  (own `/signin` + `/verify` BFF routes calling the central
+  authentication-service); this app never handles or stores a password,
+  and the browser never holds a token.
