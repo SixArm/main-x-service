@@ -48,6 +48,7 @@ pub use state::AppState;
         handlers::health_check,
         handlers::metrics_prom,
         handlers::create_person,
+        handlers::list_persons,
         handlers::get_person,
         handlers::update_person,
         handlers::delete_person,
@@ -100,6 +101,8 @@ pub use state::AppState;
             crate::api::ApiError,
             handlers::HealthResponse,
             handlers::CreatePersonRequest,
+            handlers::ListQuery,
+            handlers::ListResponse,
             handlers::SearchQuery,
             handlers::SearchResponse,
             handlers::MatchRequest,
@@ -142,8 +145,13 @@ pub fn create_router(state: AppState) -> Router {
         .route("/health", get(handlers::health_check))
         // Auth — echo verified bearer-token claims
         .route("/whoami", get(auth::whoami))
-        // Person CRUD
-        .route("/persons", post(handlers::create_person))
+        // Person CRUD (+ the plain database-backed collection list, GET
+        // /persons — deliberately not Tantivy-backed; see
+        // `handlers::list_persons`'s doc comment)
+        .route(
+            "/persons",
+            post(handlers::create_person).get(handlers::list_persons),
+        )
         .route("/persons/{id}", get(handlers::get_person))
         .route("/persons/{id}", put(handlers::update_person))
         .route("/persons/{id}", delete(handlers::delete_person))
@@ -244,7 +252,10 @@ pub fn persons_routes() -> loco_rs::controller::Routes {
             post(links::create_link).get(links::list_links),
         )
         .add("/persons/{id}/links/{link_id}", delete(links::delete_link))
-        .add("/persons", post(handlers::create_person))
+        .add(
+            "/persons",
+            post(handlers::create_person).get(handlers::list_persons),
+        )
         .add(
             "/persons/{id}",
             get(handlers::get_person)

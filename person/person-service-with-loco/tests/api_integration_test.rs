@@ -369,6 +369,152 @@ async fn test_search_persons() {
     assert!(body_str.contains(&family_name));
 }
 
+/// `GET /api/persons` is a genuine database-backed "list everything"
+/// endpoint — distinct from `/persons/search`, and added specifically
+/// because `/persons/search?q=*` is **not** a reliable way to enumerate a
+/// collection (a live investigation found the Tantivy index can carry
+/// stale entries the database no longer has, so a small-`limit` `q=*`
+/// page can come back empty even though matching rows exist; see this
+/// endpoint's `CHANGELOG.md` entry). This test creates several people
+/// with a unique marker family name and pages through the **entire**
+/// collection with a `limit` smaller than the created count, proving:
+/// (a) every created person is found somewhere across the pages (no
+/// silent loss — the bug this endpoint replaces), and (b) no created
+/// person is seen twice across pages (deterministic `ORDER BY id`
+/// pagination, not an unordered `LIMIT`/`OFFSET` that could duplicate
+/// rows across pages under concurrent writes).
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn test_list_persons_paginates_every_created_record_exactly_once() {
+    let app = common::create_test_router().await;
+
+    // Genuinely distinct surnames, not just distinct suffixes: a shared
+    // long prefix (e.g. the same `TestPersonListPaginate` base with only
+    // a trailing digit/timestamp differing) scores high enough under
+    // Jaro-Winkler that real-time duplicate detection legitimately 409s
+    // on create — a false failure unrelated to what this test proves. A
+    // timestamp suffix shared across all seven still keeps this run's
+    // rows distinct from a previous run's leftover rows in the same
+    // database.
+    let run_suffix = chrono::Utc::now().timestamp_micros();
+    let surnames = [
+        "Abernathy",
+        "Blackwood",
+        "Cavendish",
+        "Dunmore",
+        "Ellsworth",
+        "Fitzgerald",
+        "Greenhalgh",
+    ];
+    let created_count = surnames.len();
+    let mut created_ids = std::collections::HashSet::new();
+
+    for (i, surname) in surnames.iter().enumerate() {
+        let family_name = format!("{surname}{run_suffix}");
+        let person_json = json!({
+            "id": "00000000-0000-0000-0000-000000000000",
+            "name": { "family": family_name, "given": [format!("Page{i}")] },
+            "gender": "unknown",
+        });
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/persons")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&person_json).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let created: ApiResponse<Person> = serde_json::from_slice(&body).unwrap();
+        created_ids.insert(created.data.unwrap().id);
+    }
+    assert_eq!(created_ids.len(), created_count, "each POST made a new id");
+
+    // Page through the WHOLE collection (not just our own rows — other
+    // tests' persons may coexist in this database) with a limit smaller
+    // than what we created, exactly mirroring how link-graph's suggestion
+    // job (T-31) pages `GET /api/persons?limit=&offset=`.
+    let page_limit = 3usize;
+    let mut offset = 0usize;
+    let mut seen_ids: Vec<uuid::Uuid> = Vec::new();
+    loop {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/api/persons?limit={page_limit}&offset={offset}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let page: ApiResponse<person_service::api::rest::handlers::ListResponse> =
+            serde_json::from_slice(&body).unwrap();
+        let data = page.data.unwrap();
+        let page_len = data.persons.len();
+        for p in data.persons {
+            seen_ids.push(p.id);
+        }
+        if page_len < page_limit {
+            break;
+        }
+        offset += page_limit;
+        // Belt-and-braces against an infinite loop if this regresses.
+        assert!(offset < 100_000, "paginated far past any plausible total");
+    }
+
+    // No duplicate across pages (dedup would hide a would-be duplicate).
+    let seen_unique: std::collections::HashSet<_> = seen_ids.iter().copied().collect();
+    assert_eq!(
+        seen_ids.len(),
+        seen_unique.len(),
+        "a record was returned on more than one page — pagination is not stable"
+    );
+
+    // Every person we created is present somewhere in the full walk.
+    for id in &created_ids {
+        assert!(
+            seen_unique.contains(id),
+            "created person {id} was never seen while paginating /api/persons"
+        );
+    }
+}
+
+/// SEC-G7: `GET /api/persons` with an out-of-bound pagination `offset` is
+/// rejected with `400`, mirroring `/persons/search`'s own bound.
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn test_list_persons_rejects_out_of_bound_offset() {
+    let app = common::create_test_router().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/persons?offset=1000000000")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        response.status(),
+        StatusCode::BAD_REQUEST,
+        "an offset past the SEC-G7 cap must be rejected"
+    );
+}
+
 /// SEC-G7: `GET /api/persons/search` with an out-of-bound pagination
 /// `offset` is rejected with `400` — the search engine is never asked to
 /// materialise `offset + limit` hits for an unbounded offset.

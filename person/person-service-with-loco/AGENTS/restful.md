@@ -150,6 +150,7 @@ denied (the body names the deciding rule).
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/api/persons` | Create person (with real-time duplicate detection) |
+| GET | `/api/persons` | **List** active persons, paginated (`?limit=&offset=&mask_sensitive=`) — database-backed via `PersonRepository::list_active`, deliberately **not** the Tantivy index (see `/persons/search` below and this endpoint's `CHANGELOG.md` entry for why) |
 | GET | `/api/persons/{id}` | Get person by ID |
 | PUT | `/api/persons/{id}` | Update person |
 | DELETE | `/api/persons/{id}` | Soft delete person |
@@ -161,6 +162,18 @@ denied (the body names the deciding rule).
 | GET | `/api/persons/search` | Search persons (full-text, fuzzy, phonetic) |
 
 **Query Parameters:** `q` (query), `limit` (default 10, max 100), `offset`, `fuzzy` (bool), `phonetic` (bool), `mask_sensitive` (bool)
+
+**Not a list-all mechanism.** `q` has no "match everything" value: an
+empty `q` parses to an empty Tantivy query (zero hits), and while the
+query grammar's `q=*` token does parse to `AllQuery` in isolation, this
+service's Tantivy index is a separate artefact from the database and can
+legitimately drift from it (a dev index directory that outlives a
+database reset; stale entries from records the database no longer has)
+— a live investigation confirmed a small-page `q=*` request can come
+back empty even though matching database rows exist. Use `GET
+/api/persons` (above) to enumerate the collection; it reads the
+database directly and cannot see this class of drift. See
+`CHANGELOG.md` for the investigation.
 
 ### Matching & Deduplication
 

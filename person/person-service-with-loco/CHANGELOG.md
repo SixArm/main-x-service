@@ -7,6 +7,80 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — `GET /api/persons`, a genuine database-backed list endpoint (link-graph T-31 follow-up)
+
+Found while building `link-graph-service`'s cross-service `same_identity`
+suggestion job (T-31), which needs to enumerate every person: this
+service had **no way to list its own collection**. `GET
+/api/persons/search` is the closest thing, but it is Tantivy-backed and
+requires a non-empty `q`; a live investigation (bring up the real
+server, create a real record, query it) found that even `q=*` — which
+the query grammar's own `UserInputLeaf::All` production maps to
+`AllQuery` in isolation, confirmed against the actual pinned
+`tantivy-query-grammar` 0.22.0 source, not a guess — could come back
+empty against a real running instance. Root cause: this crate's `.env`
+carries a **stale** `SEARCH_INDEX_PATH=./search_index` (a pre-loco-
+conversion leftover, alongside an equally stale `mpi_user`/`mpi`
+`DATABASE_URL`) pointing at a long-lived index directory that had
+accumulated ~900 documents across unrelated past dev sessions, with no
+lifecycle tie to whatever database happens to be attached at any given
+time — `q=*` correctly matched *all* of those (proven with `AllQuery`
+instrumentation logged inside the real running server, not inferred),
+but a small `limit` page landed entirely on entries with no surviving
+database row, so every hit was silently dropped by the
+found-in-index-but-not-in-database guard and the page came back empty.
+A **clean** index reproduces `q=*` correctly — so the search index was
+never "broken" — but a search index can *always* legitimately drift
+from the database in any deployment (resets, deletes, partial reindex
+failures), which makes it the wrong foundation for a "list everything"
+primitive regardless of this one instance's specific cause.
+
+- **`src/api/rest/handlers.rs`** — `list_persons` (`GET /api/persons`),
+  `ListQuery` (`limit`/`offset`/`mask_sensitive`, same shape as
+  `SearchQuery` minus the query fields), `ListResponse`. Sources from
+  [`PersonRepository::list_active`](src/db/repositories.rs) — a plain
+  paginated database query — **never** the search index, so its answer
+  is only ever as stale as the database itself. Reuses `search_persons`'s
+  existing SEC-G7 offset bound (`search_offset_within_bound`,
+  `MAX_SEARCH_OFFSET`) and SEC-G3 per-record read authz/masking
+  (`search_result_disposition`) verbatim — an aggregate read must never
+  reveal more than the equivalent single `GET`, exactly as already
+  proven for search.
+- **`src/db/repositories.rs`** — `PersonRepository::list_active` gained
+  `.order_by_asc(persons::Column::Id)`. This was latent and load-bearing,
+  not cosmetic: without an explicit `ORDER BY`, Postgres does not
+  guarantee a stable row order across repeated `LIMIT`/`OFFSET` calls, so
+  a caller paginating through every page — the bulk-export pipeline
+  already did this; the link-graph suggestion job now does too — could
+  silently skip or duplicate rows between pages.
+- **`src/api/rest/mod.rs`** — `GET /api/persons` wired onto the existing
+  `POST /api/persons` route (both router surfaces: `create_router` for
+  tests, `persons_routes()` for the real boot path) and the OpenAPI
+  `paths`/`schemas` registry.
+- Tests: `tests/api_integration_test.rs` —
+  `test_list_persons_paginates_every_created_record_exactly_once`
+  creates seven persons with genuinely distinct surnames (a shared long
+  prefix differing by only a trailing digit scores high enough under
+  Jaro-Winkler to trip real-time duplicate detection — an early version
+  of this test 409'd on itself) and pages through the **whole**
+  collection with a `limit` smaller than the created count, asserting
+  every created id is seen **exactly once** across pages — proving both
+  the no-loss and the no-duplication properties the new `ORDER BY`
+  guarantees. `test_list_persons_rejects_out_of_bound_offset` pins the
+  SEC-G7 bound. Both pass against a real migrated Postgres
+  (`DATABASE_URL=… cargo test --test api_integration_test -- --ignored`).
+  **Also verified against a live running server** (not just the test
+  harness): 25 real persons created via `POST /api/persons`, then
+  enumerated page-by-page via `GET /api/persons?limit=7&offset=…` —
+  4 pages, all 25 seen, zero missing, zero duplicates.
+- `AGENTS/restful.md` documents the new endpoint and adds a "not a
+  list-all mechanism" note under `/persons/search` explaining why, so
+  the next reader does not reach for `q=*` again. `spec/09-api-surface.md`
+  endpoint count bumped 15 → 16.
+- Consumed by `link-graph-service`'s T-31 suggestion job
+  (`src/suggest/job.rs`), which switched from `search?q=*&…` to this
+  endpoint in the same fix — see that crate's own `CHANGELOG.md`.
+
 ### Verified — `PersonRepository::search`'s `cust_with_values` SQL is sound (QA-CUST-SQL)
 
 Audited for the same MySQL-placeholder footgun fixed in

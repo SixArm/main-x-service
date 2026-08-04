@@ -4,7 +4,7 @@ Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 
 | Tier | Surface |
 |---|---|
-| REST (Axum) | 15 endpoints under `/api/persons/*` + `/api/audit/*` + `/api/health` |
+| REST (Axum) | 16 endpoints under `/api/persons/*` + `/api/audit/*` + `/api/health` — including `GET /api/persons`, the database-backed collection list added after a live investigation found `/persons/search?q=*` unreliable for enumeration (see `CHANGELOG.md`) |
 | Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | FHIR R5 (Axum) | Person CRUD + search under `/fhir/Person` |
 | gRPC (Tonic) | Stubbed; not yet implemented |

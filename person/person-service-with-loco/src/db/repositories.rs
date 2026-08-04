@@ -1288,9 +1288,18 @@ impl PersonRepository for SeaOrmPersonRepository {
     /// Page through active, non-deleted persons, hydrating each to a full
     /// record. (One follow-up `get_by_id` per row — fine for modest pages.)
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Person>> {
+        // `order_by_asc(Id)` is load-bearing, not cosmetic: without an
+        // explicit ORDER BY, Postgres does not guarantee a stable row
+        // order across repeated `LIMIT`/`OFFSET` queries, so a caller
+        // paginating through every page (bulk export; the link-graph
+        // suggestion job's person/worker enumeration, T-31) could silently
+        // skip or duplicate rows between pages. Ordering by the primary
+        // key is cheap (already indexed) and gives every page a
+        // deterministic, non-overlapping slice.
         let db_persons: Vec<persons::Model> = persons::Entity::find()
             .filter(persons::Column::DeletedAt.is_null())
             .filter(persons::Column::Active.eq(true))
+            .order_by_asc(persons::Column::Id)
             .limit(limit)
             .offset(offset)
             .all(&self.db)

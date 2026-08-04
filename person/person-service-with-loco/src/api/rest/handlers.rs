@@ -165,6 +165,138 @@ pub async fn create_person(
     }
 }
 
+/// Query parameters for `GET /api/persons` (the plain collection list).
+#[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+pub struct ListQuery {
+    /// Maximum number of results (default: 10, max: 100)
+    #[serde(default = "default_limit")]
+    pub limit: usize,
+
+    /// Offset for pagination (default: 0)
+    #[serde(default)]
+    pub offset: usize,
+
+    /// Mask sensitive data in response
+    #[serde(default)]
+    pub mask_sensitive: bool,
+}
+
+/// Paginated collection-list results body.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct ListResponse {
+    /// The persons on this page (possibly masked).
+    pub persons: Vec<Person>,
+    /// Count of persons in this page (not the global total).
+    pub total: usize,
+    /// Offset applied for pagination.
+    pub offset: usize,
+    /// Page size applied (capped at 100).
+    pub limit: usize,
+}
+
+/// List every active person, database-backed and paginated.
+///
+/// This is the genuine "enumerate the collection" endpoint —
+/// deliberately **not** built on the Tantivy search index the way
+/// `/persons/search` is. A search index can legitimately drift from the
+/// database (deletes/soft-deletes that predate a given index generation,
+/// a dev index directory that outlives a database reset, a `q=*`
+/// all-match query whose result window happens to land entirely on
+/// stale entries) — see the postmortem in `CHANGELOG.md` under this
+/// endpoint's entry. `list_persons` instead pages the repository
+/// directly ([`crate::db::repositories::PersonRepository::list_active`],
+/// ordered by `id` for stable pagination), so its answer is only ever as
+/// stale as the database itself, never as stale as a second, independently
+/// lifecycled copy of the data.
+///
+/// SEC-G7 offset bound and SEC-G3 record-level read authz/masking apply
+/// exactly as on `/persons/search` (`search_result_disposition`) — an
+/// aggregate read must never reveal more than the equivalent single
+/// `GET`.
+#[utoipa::path(
+    get,
+    path = "/api/persons",
+    tag = "persons",
+    params(ListQuery),
+    responses(
+        (status = 200, description = "Page of active persons", body = ListResponse),
+        (status = 400, description = "Offset too large"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn list_persons(
+    State(state): State<AppState>,
+    Query(params): Query<ListQuery>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
+) -> impl IntoResponse {
+    let limit = params.limit.min(100);
+
+    // SEC-G7, same bound and reasoning as `search_persons`.
+    if !search_offset_within_bound(params.offset) {
+        let error = ApiResponse::<ListResponse>::error(
+            "OFFSET_TOO_LARGE",
+            format!("offset must not exceed {MAX_SEARCH_OFFSET}; narrow the query instead"),
+        );
+        return (StatusCode::BAD_REQUEST, Json(error));
+    }
+
+    // A list is a collection read, same disclosure posture as search
+    // (recorded against the nil id — it discloses many records, not one).
+    if disclosure::record_access(
+        &state.audit_log,
+        "Person",
+        Uuid::nil(),
+        disclosure::action::LIST,
+        caller.claims().map(|c| c.sub.as_str()),
+        &access,
+    )
+    .await
+    .is_err()
+    {
+        return audit_unavailable::<ListResponse>();
+    }
+
+    let limit_u64 = u64::try_from(limit).unwrap_or(100);
+    let offset_u64 = u64::try_from(params.offset).unwrap_or(u64::MAX);
+    match state
+        .person_repository
+        .list_active(limit_u64, offset_u64)
+        .await
+    {
+        Ok(rows) => {
+            // SEC-G3: the same per-record read authz/masking as search
+            // results — an aggregate read must never reveal more than the
+            // equivalent single `GET`.
+            let mut persons = Vec::new();
+            for person in rows {
+                let visibility = read_visibility(&caller, &person);
+                match search_result_disposition(visibility.as_deref(), params.mask_sensitive) {
+                    ResultDisposition::Omit => {}
+                    ResultDisposition::Masked => {
+                        persons.push(crate::privacy::mask_person(&person));
+                    }
+                    ResultDisposition::Full => persons.push(person),
+                }
+            }
+            let response = ListResponse {
+                total: persons.len(),
+                persons,
+                offset: params.offset,
+                limit,
+            };
+            (StatusCode::OK, Json(ApiResponse::success(response)))
+        }
+        Err(e) => {
+            let error = ApiResponse::<ListResponse>::error(
+                "DATABASE_ERROR",
+                format!("Failed to list persons: {e}"),
+            );
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+        }
+    }
+}
+
 /// Get a person by ID
 #[utoipa::path(
     get,
