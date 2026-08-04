@@ -98,9 +98,108 @@ opens a §13 task.
     reject soft-deletes it (`unlinked`). *Lean: reuse the per-service
     review-queue pattern.*
 
-  **Still open (pin before T-29):** (a) the exact block key + the
-  auto-suggest vs discard threshold; (b) whether the review surface lives
-  per-service or as a new aggregator read endpoint; (c) confirming the
-  aggregator-calls-person's-write posture against "read-only to the world"
-  (*Lean: acceptable — the invariant forbids a write endpoint **here**, not
-  calling a peer*); (d) rate/scale controls for large registries.
+  **Pinned 2026-08-04 (closes the T-29 gate).** Each decision below is
+  grounded in a live precedent already in the repo, not invented fresh:
+
+  - **(a) Block key + auto-suggest/discard threshold.** Block key: an
+    **exact match on a shared coded national identifier** (an
+    `Identifier` system+value — NHS/SSN/other — present on both the
+    person and the worker side) when one exists, mirroring the matcher
+    family's existing deterministic identifier short-circuit
+    (`person/person-service-with-loco/AGENTS/matching.md` Rule 0/Rule 1:
+    tax-ID / identifier exact match ⇒ short-circuit). Records sharing no
+    identifier are blocked instead on **`Soundex(family)` + birth-year**
+    (the same phonetic primitive the matcher's name component already
+    uses). Only same-block pairs are ever scored — see (d) for why this
+    is the load-bearing sub-quadratic bound. Threshold: reuse the
+    family's existing **0.7** review-worthy line rather than invent a
+    new number — it is both
+    `BatchDeduplicationRequest::threshold`'s default
+    (`person/person-service-with-loco/src/models/review_queue.rs`) and
+    `IMPORT_REVIEW_THRESHOLD`
+    (`person/person-service-with-loco/src/bulk/mod.rs`, EX-1/TUT-5). A
+    score `< 0.7` is discarded — never stored, never surfaced, so a run
+    over a large registry doesn't silently grow the review queue with
+    noise. A score `>= 0.7` is written as a `matcher_suggested`
+    suggestion at that confidence. Unlike within-entity dedup there is
+    **no auto-merge tier**: even an exact-identifier block hit still
+    lands in the queue for an operator to confirm rather than
+    auto-promoting, because a cross-service identity assertion is a
+    higher-stakes claim than a within-entity duplicate — the family's
+    `auto_merge_threshold` (0.95) precedent is deliberately *not*
+    carried over here (see T-33).
+  - **(b) Review-surface home.** Per-service — **person's existing
+    `review_queue` table and endpoints**, not a new aggregator
+    endpoint. This is structurally sound, not just convenient:
+    `record_id_a`/`record_id_b`
+    (`person/person-service-with-loco/migrations/2026071900000001_create_review_queue/up.sql`)
+    carry **no foreign-key constraint**, so a cross-service row
+    (`record_id_a` = person pid, `record_id_b` = worker pid) stores
+    cleanly, and the `provenance` column BLK-2 added
+    (`m20260802_000001_review_queue_provenance`, 2026-08-02) already
+    carries the exact `matcher_suggested` token this job needs — zero
+    schema change. `detection_method` (free-text) is set to
+    `cross_service_same_identity` so a row is self-describing and
+    filterable. The one real gap — the table has no worker-side summary
+    for a side-by-side comparison — is resolved by having the reviewing
+    client resolve the worker half with its own direct
+    `GET /api/workers/{id}` call, the same drift-accepted
+    per-front-end pattern the family already uses instead of a shared
+    package (`feedback_front_end_drift` memory). T-32 extends
+    `review_decision`'s `confirmed` branch to also call
+    `entity_links::upsert` with `provenance="operator",
+    confidence=1.0` (idempotent on the existing upsert key, so it
+    reasserts the same `edge_id`) and its `rejected` branch to
+    soft-delete the edge (emitting `unlinked`) — "promotion" *is* the
+    existing person link-write path (design §4.1), triggered from the
+    existing decision endpoint, not a new one. The aggregator's own
+    `GET /api/edges?...&status=unverified` stays available as a
+    **read-only discovery convenience** (it will already project
+    `matcher_suggested` edges once T-31 posts them) but is never where a
+    decision is made.
+  - **(c) Aggregator-calls-person's-write posture: confirmed
+    acceptable.** "Read-only to the world" (this crate's `AGENTS.md`)
+    forbids the aggregator from ever exposing **its own** write
+    endpoint to external callers; it says nothing about the aggregator
+    acting as an authenticated **client** of a peer's write API — which
+    is exactly what the reconcile worker already does today in reverse
+    (`GET` against a peer, `src/reconcile.rs`
+    `HttpAuthoritativeSource::fetch_all`). LNK-4's job is the same
+    shape with the verb flipped to `POST`. Auth follows the reconcile
+    worker's SEC-B7 template exactly (`source_auth_ok`/
+    `is_loopback_url`: a loopback URL may be token-less, any remote
+    host requires a bearer token) but under **its own** env vars rather
+    than reusing the reconcile ones: `LINK_GRAPH_SUGGEST_URL_PERSON`
+    (the target, mirroring `LINK_GRAPH_RECONCILE_URL_<ENTITY>`) and
+    `LINK_GRAPH_SUGGEST_TOKEN` (the bearer). A dedicated token rather
+    than `LINK_GRAPH_RECONCILE_TOKEN`, because the two credentials have
+    different blast radii — reconcile only *reads* a peer's outbound
+    edges, suggest can *write* a `same_identity` edge into person's
+    graph — and `agents/share/security.md` invariant 10
+    ("least-authority artifacts") argues for the narrower-scoped
+    credential being independently revocable.
+  - **(d) Rate/scale controls.** A dedicated interval,
+    `LINK_GRAPH_SUGGEST_SECS` (default 3600 — an hour, coarser than
+    reconcile's 300s default because this job does real O(pairs)
+    scoring work rather than a cheap diff), following
+    `LINK_GRAPH_RECONCILE_SECS`'s skip-first-tick pattern
+    (`src/reconcile.rs::run_periodic`). Two caps, mirroring
+    `BatchDeduplicationRequest`'s existing `max_candidates` (default
+    50) and the bulk subsystem's per-run row caps (SEC-B2,
+    `agents/share/bulk-import-export.md` §12):
+    `LINK_GRAPH_SUGGEST_MAX_CANDIDATES` (default 50) bounds how many
+    same-block comparisons run per anchor record, and
+    `LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN` (default 200) caps how many
+    suggestions a single run may POST, so one pathological block cannot
+    flood person's review queue or audit log in one pass. The scale
+    claim this rests on: **blocking (a) is what keeps the job
+    sub-quadratic** — without it, comparing every person against every
+    worker is O(n·m), exactly the DoS shape
+    `agents/share/security.md` §3 invariant 3 ("bound every input…
+    unbounded fan-out into O(n·m) scoring is a DoS") warns against;
+    with blocking, cost is O(n + m + Σ|block|²) over blocks that stay
+    small in practice (a shared identifier, or a `Soundex(family)` +
+    birth-year cohort) — the same reasoning that already justifies the
+    family's Tantivy-index-blocked duplicate-check on
+    org/care-pathway/case/portfolio (`agents/share/overview.md`
+    capability-matrix footnote 1).

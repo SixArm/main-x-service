@@ -262,26 +262,54 @@
 Suggests `same_identity` (person ↔ worker) links by comparison, emitting
 `matcher_suggested` edges an operator confirms — the design is
 [§16 OQ-9](16-open-questions.md) (`cross-service-linking.md` §5.2). **Spec
-round done; the open sub-questions in OQ-9 must be pinned before T-29 code.**
+round done and fully pinned 2026-08-04 — T-29 code may start.**
 
 - [ ] T-29: Cross-type `IdentityProbe` + comparator reusing the matcher
   crates' scoring primitives (pure, deterministic, unit-tested: a
   person/worker sharing an NHS number / name / DOB scores high; unrelated
   records score low; never consumes cross-service edges — §7 partition rule).
-- [ ] T-30: Candidate blocking (shared-identifier exact + `Soundex(family)` +
-  birth-year key) over the person / worker read feeds, so comparison is
-  bounded rather than O(n·m). Depends: T-29; OQ-9(a).
+- [ ] T-30: Candidate blocking over the person / worker read feeds
+  (OQ-9(a)): block on an exact shared coded identifier (NHS/SSN/other)
+  when present, else `Soundex(family)` + birth-year; only same-block
+  pairs are scored (bounds comparison to O(n + m + Σ|block|²) rather
+  than O(n·m)). Score `< 0.7` is discarded (not stored); `>= 0.7` is a
+  `matcher_suggested` candidate at that confidence — no auto-merge tier,
+  every candidate (even an exact-identifier hit) still needs an operator
+  confirm (T-32/T-33). Depends: T-29.
 - [ ] T-31: The periodic suggestion job (aggregator-hosted, mirroring the
-  reconcile worker): pull person + worker, block, compare, and POST
-  `matcher_suggested` `same_identity` edges to person's
-  `POST /api/persons/{id}/links` (bearer-authed, env-gated URL like
-  reconcile). The aggregator stays read-only to the world. Depends: T-30;
-  OQ-9(c).
-- [ ] T-32: Review + promotion — surface suggested edges; operator confirm
-  re-asserts `operator` / `1.0` (idempotent, same `edge_id`), reject
-  soft-deletes (`unlinked`). Depends: T-31; OQ-9(b).
-- [ ] T-33: Governance + tests — suggested edges are `unverified` and never
-  auto-promoted; the suggestion job is audited; scale controls (OQ-9(d)).
+  reconcile worker's shape with the verb flipped): pull person + worker,
+  block, compare, and POST `matcher_suggested` `same_identity` edges to
+  person's `POST /api/persons/{id}/links`. Target URL
+  `LINK_GRAPH_SUGGEST_URL_PERSON`, bearer `LINK_GRAPH_SUGGEST_TOKEN` — a
+  **dedicated** token, not `LINK_GRAPH_RECONCILE_TOKEN` (different blast
+  radius: reconcile only reads, this writes), same SEC-B7
+  loopback-token-optional/remote-token-required rule as
+  `src/reconcile.rs::source_auth_ok`. Interval
+  `LINK_GRAPH_SUGGEST_SECS` (default 3600), same skip-first-tick
+  pattern as `run_periodic`. The aggregator stays read-only to the
+  world — it calls person's write API as an authenticated client; it
+  never gains a write endpoint of its own (OQ-9(c)). Depends: T-30.
+- [ ] T-32: Review + promotion, reusing **person's existing
+  `review_queue` table/endpoints** (OQ-9(b)) — no new aggregator
+  endpoint. Suggestions land as ordinary review-queue rows
+  (`record_id_a` = person pid, `record_id_b` = worker pid — the column
+  carries no FK, so a cross-service pair stores cleanly),
+  `provenance = "matcher_suggested"` (the BLK-2 column, already wired),
+  `detection_method = "cross_service_same_identity"`. Extend
+  `review_decision`'s `confirmed` branch to also call
+  `entity_links::upsert` with `provenance="operator", confidence=1.0`
+  (idempotent — reasserts the same `edge_id`); extend its `rejected`
+  branch to soft-delete the edge (`unlinked`). A reviewing client
+  resolves the worker-side summary with its own `GET /api/workers/{id}`
+  call (front-end-drift-accepted, no shared package). Depends: T-31.
+- [ ] T-33: Governance + tests — suggested edges are `unverified` and
+  never auto-promoted regardless of score (OQ-9(a)); the suggestion job
+  audits every POST it makes (mirroring `audit_ctx` on person's link
+  writes) and every run's counts; scale controls (OQ-9(d)):
+  `LINK_GRAPH_SUGGEST_MAX_CANDIDATES` (default 50, same shape as
+  `BatchDeduplicationRequest::max_candidates`) bounds same-block
+  comparisons per anchor record, `LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN`
+  (default 200) caps suggestions POSTed per run.
 
 ### Tests
 

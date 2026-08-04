@@ -690,6 +690,35 @@
   **Coding still gated** on the OQ-9 open sub-questions (block key/threshold,
   review-surface home, aggregator-write posture, scale). Depends: LNK-1..3.
 
+  **Done: spec round fully pinned, 2026-08-04.** Closed all four OQ-9
+  sub-questions with concrete decisions grounded in existing repo
+  precedent (link-graph spec §16 OQ-9 + §13 T-29–T-33 updated;
+  T-29–T-33 code itself remains open, hence `[~]` not `[x]`): **(a)**
+  block key = exact shared coded identifier else `Soundex(family)` +
+  birth-year, auto-suggest/discard threshold = 0.7 (reusing
+  `BatchDeduplicationRequest::threshold` / `IMPORT_REVIEW_THRESHOLD`'s
+  existing value), no auto-merge tier — every candidate needs an
+  operator confirm; **(b)** the review surface is person's own existing
+  `review_queue` table/endpoints (no FK on `record_id_a`/`record_id_b`,
+  the BLK-2 `provenance` column already carries `matcher_suggested`),
+  not a new aggregator endpoint — a reviewing client resolves the
+  worker-side summary via its own `GET /api/workers/{id}`; **(c)**
+  aggregator-calls-person's-write is confirmed acceptable (read-only-
+  to-the-world forbids the aggregator exposing its *own* write
+  endpoint, not acting as a client of a peer's), authenticated the
+  same SEC-B7 loopback/token way as the reconcile worker but under its
+  own dedicated `LINK_GRAPH_SUGGEST_URL_PERSON` /
+  `LINK_GRAPH_SUGGEST_TOKEN` (least-authority: a separate, narrower
+  credential than `LINK_GRAPH_RECONCILE_TOKEN`); **(d)** rate/scale
+  controls are `LINK_GRAPH_SUGGEST_SECS` (3600s interval, mirroring
+  `LINK_GRAPH_RECONCILE_SECS`'s skip-first-tick pattern),
+  `LINK_GRAPH_SUGGEST_MAX_CANDIDATES` (50, mirroring
+  `BatchDeduplicationRequest::max_candidates`), and
+  `LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN` (200) — with blocking (a) as
+  the explicit load-bearing claim that keeps the job sub-quadratic
+  rather than O(n·m). T-29–T-33 remain queued as the next (large,
+  separate) coding effort.
+
 - [x] **BLK-1 (M)** Bulk I/O step 2a — **CSV** codec on person.
   *(codec + spec done 2026-07-15; worker/export wiring folded into and
   finished by BLK-2, 2026-08-02)* `src/bulk/csv.rs` flattens the person wire
