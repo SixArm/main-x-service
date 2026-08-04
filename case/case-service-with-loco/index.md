@@ -23,9 +23,12 @@ sameAs, languages).
 create   ──>  POST   /api/cases                       {Case}              -> {pid, title}
 read     ──>  GET    /api/cases/{pid}                                     -> Case
 list     ──>  GET    /api/cases                                           -> [{pid, title}]
-search   ──>  GET    /api/cases/search?q=housing                          -> [{pid, title}]
+search   ──>  GET    /api/cases/search?q=housing                          -> [{pid, title}]  (Tantivy: ?fuzzy=, ?phonetic=)
+masked   ──>  GET    /api/cases/{pid}/masked                              -> Case (always redacted)
+export   ──>  GET    /api/cases/{pid}/export                              -> GDPR right-of-access envelope (audited)
 update   ──>  PUT    /api/cases/{pid}                 {Case}              -> {pid, title}
 delete   ──>  DELETE /api/cases/{pid}                                     -> {}
+erase    ──>  POST   /api/cases/{pid}/erase                               -> GDPR Art. 17 erasure (destructive, access=admin)
 match    ──>  POST   /api/cases/match                 {query, candidates} -> ranked results
 dedupe   ──>  POST   /api/cases/check-duplicates      {Case query}        -> [{pid, title, score, confidence, is_match}]
 merge    ──>  POST   /api/cases/merge                 {main_pid, duplicate_pid, reason?}
@@ -34,12 +37,19 @@ merges   ──>  GET    /api/cases/merges/recent                             ->
 whoami   ──>  GET    /api/cases/whoami                Authorization: Bearer <PASETO v4.public>
                                                                           -> verified claims (401 without a token)
 audit    ──>  GET    /api/cases/audit/recent · /api/cases/{pid}/audit     -> [audit rows]
+disclose ──>  GET    /api/cases/{pid}/audit/disclosures                   -> HIPAA §164.528 accounting (record-level gated)
+verify   ──>  GET    /api/cases/audit/verify · /api/cases/records/verify  -> chain / row-integrity verification report
+checkpt  ──>  GET    /api/cases/checkpoint · POST /api/cases/checkpoint/verify -> external-witness checkpoint take/check
+links    ──>  POST/GET /api/cases/{pid}/links · DELETE .../{id}           -> subject_of case→person edges (§8.6)
+links?   ──>  GET    /api/cases/links                                     -> bulk edge pull (privileged, audited)
 events   ──>  GET    /api/cases/events/recent                             -> [{kind, pid, name, seq}]
 import   ──>  POST   /api/cases/import                multipart JSONL/CSV -> 202 {job_id}
 import?  ──>  GET    /api/cases/import/{id}                               -> job status + counts + errors_url
-export   ──>  POST   /api/cases/export                {q?, format?, masking_profile?, …} -> 202 {job_id}
-export?  ──>  GET    /api/cases/export/{id}                               -> job status + download_url
+export?  ──>  POST   /api/cases/export                {q?, format?, masking_profile?, …} -> 202 {job_id}
+export!  ──>  GET    /api/cases/export/{id}                               -> job status + download_url
 jobs     ──>  GET    /api/cases/bulk-jobs                                 -> [bulk job status]
+fhir     ──>  GET/POST/PUT/DELETE /fhir/Task{,/{id}} · GET /fhir/metadata -> FHIR R5 Task CRUD/search (best-effort)
+compliance ─> GET    /api/compliance · /api/compliance/sbom               -> identification + CycloneDX SBOM
 docs     ──>  GET    /api-docs/openapi.json · /swagger-ui                 -> OpenAPI 3 + Swagger UI
 metrics  ──>  GET    /metrics.prom                                        -> Prometheus text (root-mounted, public)
 ```

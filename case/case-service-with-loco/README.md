@@ -19,17 +19,25 @@ application, complaint, appeal, and so on.
 |---|---|---|
 | POST | `/api/cases` | Create |
 | GET | `/api/cases` | List |
-| GET | `/api/cases/search?q=` | Case-insensitive title search |
+| GET | `/api/cases/search?q=` | Tantivy full-text search (`?fuzzy=`, `?phonetic=`) |
 | GET | `/api/cases/{pid}` | Fetch |
 | PUT | `/api/cases/{pid}` | Update |
 | DELETE | `/api/cases/{pid}` | Soft-delete |
+| POST | `/api/cases/{pid}/erase` | GDPR Art. 17 erasure (destructive, `access=admin`) |
 | POST | `/api/cases/match` | Rank `{query, candidates}` |
 | POST | `/api/cases/check-duplicates` | Match query vs stored cases |
 | POST | `/api/cases/merge` | Merge a duplicate into a survivor |
 | GET | `/api/cases/whoami` | Verified PASETO-token claims |
+| POST/GET | `/api/cases/{pid}/links` · `DELETE .../{id}` | Cross-service `subject_of` edges (case→person) |
+| GET/POST/PUT/DELETE | `/fhir/Task{,/{id}}` | FHIR R5 `Task` CRUD + search (best-effort) |
+| GET | `/api/compliance` · `/api/compliance/sbom` | Service identification + SBOM |
 | POST/GET | `/api/cases/import[/{id}]` | Bulk import (JSONL/CSV) + job status |
 | POST/GET | `/api/cases/export[/{id}]` | Bulk export (JSONL/CSV) + job status |
 | GET | `/api/cases/bulk-jobs` | Recent bulk jobs |
+
+The full endpoint list — audit/chain-verification, checkpoints, masked
+view, GDPR export, bulk-links reconciliation — is in
+[`AGENTS.md`](./AGENTS.md).
 
 The body for a case **is** the `case_matcher::Case` shape (title,
 alternate titles, case number + agency, case type, status, priority,
@@ -62,13 +70,24 @@ identifier value, or blank `subjects` / `keywords` entry — return
 
 ## Status
 
-MVP: CRUD + `ILIKE` title search + matching, with validation, OpenAPI 3
-+ Swagger UI, an audit log + in-memory event stream, record merge, and
-offline PASETO v4.public verification (published Ed25519 key). The
-durable event bus's Phase-2 transactional outbox + relay have landed
-(`CASE_EVENT_TRANSPORT` defaults to `memory`); Tantivy full-text search,
-the bus's Phase-3 Fluvio broker sink, and privacy are tracked in
-[spec §13](./spec/index.md). Auth credentials are issued by the central
+Well past MVP: CRUD + Tantivy full-text/fuzzy/phonetic search +
+matching, with validation, OpenAPI 3 + Swagger UI, an audit log +
+in-memory event stream, record merge, field masking + audited GDPR
+export, cross-service `subject_of` links to person records, a
+best-effort FHIR R5 `Task` surface, bulk import/export (JSONL/CSV), and
+offline PASETO v4.public verification (published Ed25519 key) plus ABAC
+authorization. The durable event bus's Phase 1–3 (transactional outbox,
+relay, and the real-broker `FluvioSink`) have all landed
+(`CASE_EVENT_TRANSPORT` still defaults to `memory`; no deployment yet
+points a broker at it). A compliance suite — tamper-evident audit chain,
+row-level record integrity, GDPR Art. 17 erasure, external-witness
+checkpoints, a keyed integrity MAC, and a CycloneDX SBOM — is live under
+`/api/cases/*` and `/api/compliance/*`. What remains is tracked in
+[spec §13](./spec/index.md) and is narrower than it looks from the
+feature list above: mainly a front-end merge action, S3 bulk-artifact
+storage, and the FHIR ONC/HTI certification-grade conformance layer
+(profile/terminology validation, SMART, Bulk Data). Auth credentials are
+issued by the central
 [authentication-service](../../authentication/authentication-service-with-loco).
 
 > Auth pivot done in this crate: the family moved from RS256 JWT + JWKS

@@ -18,11 +18,20 @@
 //! | Framework | Module |
 //! |---|---|
 //! | **HIPAA** — audit controls, integrity, accounting of disclosures | [`audit_chain`], [`disclosure`] |
+//! | **GDPR Art. 17** — erasure by redaction | [`erasure`] |
+//! | Row-level record integrity (out-of-band edit detection) | [`record_integrity`] |
+//! | External-witness checkpoints (tail-deletion detection) | [`checkpoint`] |
+//! | Keyed integrity MAC (forgery resistance) | [`mac`] |
+//! | IEC 62304 §8.1.2 / ISO 27001 A.8 — SOUP register, SBOM, build provenance | [`soup`] |
 //!
-//! What is deliberately **not** adopted yet: the FHIR conformance
-//! machinery, the SOUP/SBOM evidence bundle, and Bulk Data. Those follow
-//! at §8.5 steps 4–5; adopting them piecemeal would claim more than the
-//! code does.
+//! What is deliberately **not** adopted yet: the GDPR residency /
+//! lawful-basis / Art. 9 declarations, and the FHIR **ONC/HTI**
+//! conformance machinery specifically (US Core profile validation,
+//! terminology binding, `$validate`, SMART discovery, Bulk Data
+//! `$export` — narrower than "no FHIR": the base FHIR R5 `Task` CRUD +
+//! search surface is landed in `src/fhir/`). Adopting the remainder
+//! piecemeal would claim more than the code does; see `spec/index.md`
+//! §12.0.1 for the full state.
 //!
 //! ## Configuration
 //!

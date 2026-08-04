@@ -510,6 +510,26 @@ entry named above; the privileged export paths (`masking_profile=full`
 or `include_soft_deleted=true`) are checked explicitly in the handler
 against `Action::Destructive`, not via the coarse method-derived action.
 
+**FHIR R5 endpoints (§13, family contract [`agents/share/fhir.md`](../../../agents/share/fhir.md)).**
+`GET /fhir/metadata`, and read/create/update/delete/search at
+`/fhir/Task{,/{id}}` (`controllers::fhir::routes()`) — a best-effort
+mapping of the stored `Case` to a FHIR `Task` (§13 lists the documented
+lossy fields). Sits behind the same blanket auth+ABAC guard as `/api/*`
+(not on the public allow-list except `/fhir/metadata`'s discovery role).
+Subject-reference masking on the `for`/`focus` element is a documented
+open gap (§13), since the crate has no dedicated field-masking module —
+`mask_case` lives beside the native controller instead.
+
+**Compliance endpoints (§12.0/§12.0.1).** `GET /api/cases/audit/verify`,
+`GET /api/cases/records/verify`, `GET /api/cases/checkpoint`,
+`POST /api/cases/checkpoint/verify`, `POST /api/cases/{pid}/erase`,
+`GET /api/cases/{pid}/audit/disclosures` (all under the `cases`
+controller, alongside the data they verify), plus the service-level
+`GET /api/compliance` and `GET /api/compliance/sbom`
+(`controllers::compliance::routes()`). `POST /{pid}/erase` is a
+declared destructive action (`access=admin`); the rest are reads,
+gated only by the coarse blanket guard when it is on.
+
 ## 10. Persistence
 
 PostgreSQL via SeaORM + `sea-orm-migration`. Migrations
@@ -637,13 +657,87 @@ personal data** and a case record is *about* someone.
   service cannot account for. A deployment holding real case data should
   set it, along with `CASE_AUDIT_READS` and `CASE_REQUIRE_AUTH`.
 
-**Not yet adopted** (steps 4–5): the GDPR residency / lawful-basis /
-Art. 9 declarations, GDPR Art. 17 erasure by redaction, row-level record
-integrity hashing, the FHIR conformance machinery, and the SOUP/SBOM
-evidence bundle. The context recorded on an audit row therefore carries
-the caller's declaration only — it does **not** claim a residency or
-lawful basis this deployment has not declared. §13 T-10 (masking +
-Art. 15 export) remains the higher-priority gap for this service.
+### 12.0.1 Row-level integrity, GDPR Art. 17 erasure, external-witness
+checkpoints, and the SBOM/identification surface
+
+Landed 2026-07-26/27, the same rollout round as §12.0 (ported from the
+care-pathway reference, then propagated to person and worker). All four
+close gaps §12.0's original text left open; they are documented here
+rather than duplicated per module — see each module's own doc comment
+for the full rationale.
+
+- **Row-level record integrity** ([`src/compliance/record_integrity.rs`](../src/compliance/record_integrity.rs),
+  migration `m20260727_000007_case_content_hash`). Every `cases` row
+  carries a `content_hash` (SHA-256 over its own content and lifecycle
+  state), recomputed on every write. This is the audit chain's
+  complement, not a duplicate: the chain proves the *trail* was not
+  rewritten; this proves the *record* was not edited out of band (an
+  attacker with SQL access who edits a stored case and writes no audit
+  row defeats the chain but is caught here). `GET /api/cases/records/verify?limit=`
+  (capped at 10 000) recomputes and reports `intact` / `unhashed` (rows
+  predating the column — neither verified nor a mismatch) / `mismatched`.
+  Row deletion leaves no trace here (see checkpoints, below).
+- **GDPR Art. 17 erasure** ([`src/compliance/erasure.rs`](../src/compliance/erasure.rs)).
+  `POST /api/cases/{pid}/erase` — a **destructive**, `access=admin`-gated
+  action (`auth::DESTRUCTIVE_POST_SUFFIXES`), distinct from the soft
+  `DELETE /{pid}` (which keeps the data). Erasure replaces the payload
+  with a tombstone, soft-deletes the record, withdraws its `subject_of`
+  cross-service links (§8.6) — leaving the accusation standing while
+  erasing the detail would defeat the point — destroys the `snapshot` of
+  every audit row about the case while leaving `hash`/`prev_hash` intact
+  (so the chain keeps verifying across the redaction), and appends a
+  final chained `erased` accountability row. Irreversible; idempotent on
+  an already-erased or already soft-deleted `pid` (a right does not lapse
+  because the record was already retired).
+- **External-witness checkpoints** ([`src/compliance/checkpoint.rs`](../src/compliance/checkpoint.rs)).
+  The hash chain cannot detect **tail** deletion (delete the last *N* rows
+  and there is no successor left to break). `GET /api/cases/checkpoint`
+  takes a signed statement of the chain's current head/position/depth
+  (also emitted as an `INFO` log line, `target: "audit_checkpoint"`, so a
+  deployment shipping logs off-host has a witness for free) — it must be
+  **stored outside this service's database** to be worth anything.
+  `POST /api/cases/checkpoint/verify` checks a previously-taken checkpoint
+  against the current chain and reports whether it is still honoured.
+  `204` when the chain is empty.
+- **Keyed integrity MAC** ([`src/compliance/mac.rs`](../src/compliance/mac.rs),
+  embedding the shared [`integrity-mac`](../../../integrity/integrity-mac-rust-crate)
+  crate; migration `m20260727_000011_integrity_mac`, superseding an
+  interim BLAKE3 digest added and dropped the same day —
+  `m20260727_000008`/`_000010`). An HMAC-SHA256 tag over the audit-chain
+  and record-integrity pre-images, keyed by `CASE_INTEGRITY_MAC_KEY` /
+  `_KEY_FILE` / `_KEY_ID` / `_KEYS_RETIRED`, HKDF-subkeyed per
+  (service, domain) so a tag cannot transfer between purposes or
+  services. **Default off**: no key configured ⇒ no MAC written, and
+  existing rows report *unverifiable* rather than *mismatched* — the
+  control an attacker with database access but not the key cannot forge,
+  distinct from what a hash alone defends against.
+- **SBOM / build-provenance / service-identification** ([`src/compliance/soup.rs`](../src/compliance/soup.rs),
+  [`src/compliance/mod.rs`](../src/compliance/mod.rs) `Build`,
+  [`controllers/compliance.rs`](../src/controllers/compliance.rs)).
+  `GET /api/compliance` reports version, source commit, `SOURCE_DATE_EPOCH`
+  presence, and whether the running binary qualifies as a reproducible
+  release, plus an explicit `not_claimed` list (this is a governmental
+  case registry, not IEC 62304 health software; not an FD&C §524B cyber
+  device). `GET /api/compliance/sbom` serves a CycloneDX 1.5 SBOM + the
+  SOUP register (`compliance/soup.tsv`), derived from `Cargo.lock` at
+  compile time so it cannot drift from the running binary. Both sit
+  behind the same blanket guard as `/api/*` (deliberately not public —
+  the SBOM names exact dependency versions, which is exactly what an
+  attacker needs to match a deployment against published advisories).
+
+**Still not adopted**: the GDPR residency / lawful-basis / Art. 9
+declarations (`disclosure.rs` explicitly does not record `residency` /
+`lawful_basis` / `art9_condition` / `transfer_safeguard` — see its own
+tests), and the FHIR **ONC/HTI conformance machinery** specifically —
+US Core profile validation, terminology/value-set binding, `$validate`,
+SMART discovery, and Bulk Data `$export`
+([`agents/share/fhir.md`](../../../agents/share/fhir.md) §2.3 /
+[`compliance-for-healthcare.md`](../../../agents/share/compliance-for-healthcare.md)
+§2.3). This is narrower than "no FHIR" — the base FHIR R5 `Task` CRUD +
+search surface is landed (§13, §9) — it is the certification-grade
+conformance layer on top that remains open. `compliance/lifecycle.md`
+and `compliance/traceability.tsv` (which care-pathway, the reference,
+already carries) are also not yet ported here.
 
 ### 12.1 Cross-service `case ↔ person` link governance
 
@@ -676,6 +770,24 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
+- [x] **2026-07-25..27 — Compliance: tamper-evident audit chain,
+  read/disclosure auditing, row-level record integrity, GDPR Art. 17
+  erasure, external-witness checkpoints, keyed integrity MAC, and the
+  SBOM/identification surface.** Ported from the family reference
+  implementation in care-pathway, per `spec/compliance` §8.5 step 3 (the
+  personal-data services first, since case data is personal data). Full
+  detail lives in §12.0/§12.0.1 rather than duplicated here; six new
+  endpoints landed (`GET /audit/verify`, `GET /records/verify`,
+  `GET /checkpoint`, `POST /checkpoint/verify`, `POST /{pid}/erase`,
+  `GET /{pid}/audit/disclosures`, plus service-level `GET /api/compliance`
+  and `GET /api/compliance/sbom`) and six migrations
+  (`m20260726_000006_compliance` through `m20260727_000011_integrity_mac`,
+  §10). This entry exists because none of the above had a §13 task
+  record despite being fully landed, tested (DB-gated
+  `tests/requests/cases.rs` erasure + record-integrity suites, plus
+  DB-free unit tests in every `src/compliance/*.rs` module), and reachable
+  — the same "shipped feature with zero spec/13 presence" gap DOC-2 found
+  in sibling crates.
 - [x] **2026-08-02 — Privacy: masked view + GDPR export (repo tasks.md
   P-3).** Case already honoured the `mask` **obligation** on
   `GET /{pid}` (`mask_case`, landed with the ABAC work — §9); this task
@@ -838,8 +950,12 @@ the other v1 edge kinds even though it shares the same edge shape.
   automated run in this repo stands up, so it is verified by compiling
   under the feature, not by an actual execution (same posture as
   person's `s3_round_trip_against_a_live_endpoint`, BLK-4). SOUP register
-  updated. BUS-2 (link-graph Fluvio consumer) and BUS-3 (roll `FluvioSink`
-  to the other nine services) remain.
+  updated. **BUS-2** (link-graph Fluvio consumer) and **BUS-3** (roll
+  `FluvioSink` to the other nine services) have both since landed
+  2026-08-03 — see the family capability matrix
+  ([`agents/share/overview.md`](../../../agents/share/overview.md)); no
+  deployment yet points `CASE_FLUVIO_ENDPOINT` at a live broker, which is
+  the one thing genuinely still open here.
 - [x] Prometheus metrics — `GET /metrics.prom` (root-mounted, public
   under enforcement) renders a process-wide registry
   (`src/metrics.rs`, `controllers/metrics.rs`) in text-exposition format:
@@ -862,12 +978,13 @@ the other v1 edge kinds even though it shares the same edge shape.
   `keywords`; `422` with all problems reported together.
 - [x] Request-level integration tests (Postgres) — landed
   `#[ignore]`-gated; wiring a DB-backed run into CI remains.
-- [ ] **CI: actually run the gated request tests.** The CI test job sets
-  `DATABASE_URL` but does not pass `--ignored`, so the `#[ignore]`-gated
-  request tests (CRUD/audit/event trail, merge audit actions, blanket
-  enforcement, OpenAPI/Swagger) never execute in CI — only the DB-free
-  unit + `tests/matching.rs` suites do. Add an `--ignored` step (against
-  the CI Postgres service) so the request contracts are exercised.
+- [x] **CI: actually run the gated request tests.** *(resolved
+  2026-08-01, repo-wide.)* This crate is now enrolled in
+  [`ci/db-suites.txt`](../../../ci/db-suites.txt); the `test-db` CI stage
+  runs `scripts/ci-check.sh test-db case/case-service-with-loco` — which
+  is `cargo test -- --ignored` against the CI Postgres service — so the
+  `#[ignore]`-gated request/erasure/record-integrity/outbox suites
+  execute on every push, not just locally.
 - [x] Token verification consuming the auth-service's published key —
   `src/auth.rs` embeds `authentication-verifier`; offline verification via
   a process-wide `Verifier` (env-configured `CASE_PASETO_KEYS` /
@@ -1088,8 +1205,15 @@ boots);
 OpenAPI 3 doc + Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`);
 Prometheus metrics (`/metrics.prom`, root-mounted + public, CRUD counters
 + HTTP request label vec); bulk import/export (BLK-5, JSONL + CSV,
-`src/bulk/`, §8.7); DB-free tests + gated request-level tests + gated
-bulk-pipeline tests; green build + clippy.
+`src/bulk/`, §8.7); cross-service `subject_of` entity links (write side,
+§8.6, the family reference implementation); durable event bus Phases
+1–3 including the `FluvioSink` real-broker sink behind the `fluvio`
+feature (BUS-1); FHIR R5 `Task` CRUD + search (§9, §13); the compliance
+suite — tamper-evident audit chain, read/disclosure auditing, row-level
+record integrity, GDPR Art. 17 erasure, external-witness checkpoints,
+keyed integrity MAC, SBOM/build-provenance (§12.0/§12.0.1); DB-free tests
++ gated request-level tests + gated bulk-pipeline tests; green build +
+clippy; enrolled in CI's `test-db` stage (`ci/db-suites.txt`).
 
 ## 15. Roadmap
 
@@ -1102,7 +1226,13 @@ env fallback). v0.2: Tantivy full-text/fuzzy/phonetic search + durable
 event bus Phases 1–2 — **done**. v0.3: privacy controls (masking + GDPR
 export — done 2026-08-02) + blanket
 `/api/*` enforcement — **done**; durable bus Phase 3 (relay loop + the
-`FluvioSink` real-broker sink, BUS-1) — **done 2026-08-03**.
+`FluvioSink` real-broker sink, BUS-1) — **done 2026-08-03**. Also
+landed, not originally scoped into a version line: cross-service
+`subject_of` links (§8.6, 2026-07-10, the family reference), the
+compliance suite — audit chain, erasure, row-level integrity,
+checkpoints, keyed MAC, SBOM (§12.0/§12.0.1, 2026-07-25..27), FHIR R5
+`Task` CRUD/search (§9, §13), and bulk import/export (§8.7, BLK-5,
+2026-08-03).
 
 ## 16. Open questions
 

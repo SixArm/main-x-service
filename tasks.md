@@ -3595,6 +3595,67 @@ committing (see plan.md §4).
     quick-start commands verified runnable (`.env.example` present,
     `cargo loco start` path matches `AGENTS.md`).
 
+  - *`case/case-service-with-loco` done 2026-08-04.* This crate carries
+    an unusually large amount of session history (TUT-1/3/4/6, BUS-1,
+    QA-CUST-SQL, COMPOSE-WORKER) and needed the deepest pass of the
+    numbered-shape crates so far. Cross-checked the specific items
+    flagged for extra care: `examples/policies/closed-case-write-deny.json`
+    and `examples/api/case.http`'s status-casing bug are real but live
+    in the repo-root `examples/` tree, not this crate — confirmed and
+    left untouched, per the note not to "fix" case-service for a
+    cookbook issue. The relay is correctly documented as a plain
+    background loop (`crate::relay::spawn` from `App::after_routes`),
+    **not** conflated with the loco-worker pattern the bulk-job feature
+    uses — no fix needed there. `CLAUDE.md` is still the documented
+    thin `@AGENTS.md` one-liner. H-5's CHANGELOG-vs-Cargo.toml version
+    gap doesn't appear anywhere in `spec/13` as a contradictory claim —
+    confirmed, nothing to fix. The real, substantial finding: **an
+    entire compliance suite (six landed 2026-07-25..27 features) had
+    zero `spec/13` presence and was actively contradicted by `spec/12.0`'s
+    own "not yet adopted" list and by `src/compliance/mod.rs`'s own
+    module-doc table** — GDPR Art. 17 erasure (`POST /{pid}/erase`),
+    row-level `content_hash` record integrity
+    (`GET /records/verify`), external-witness chain checkpoints
+    (`GET /checkpoint`, `POST /checkpoint/verify`), a keyed HMAC-SHA256
+    integrity MAC (default-off, no key ⇒ no MAC), and a CycloneDX SBOM +
+    service-identification surface (`GET /api/compliance`,
+    `GET /api/compliance/sbom`) were all live, tested (DB-gated
+    `tests/requests/cases.rs` erasure/record-integrity suites + DB-free
+    unit tests in every `src/compliance/*.rs`), and reachable, but
+    `spec/index.md` §12.0's "Not yet adopted" line still listed GDPR
+    Art. 17 erasure, row-level integrity, and the SOUP/SBOM bundle as
+    outstanding, and `src/compliance/mod.rs`'s own doc comment claimed
+    the same. Added a new §12.0.1 documenting all five controls (dates,
+    migrations, env vars, endpoints, gating) and corrected the "still
+    not adopted" list to what's actually still missing (GDPR
+    residency/lawful-basis/Art. 9 declarations; the FHIR **ONC/HTI**
+    conformance layer specifically — profile/terminology validation,
+    `$validate`, SMART, Bulk Data — not "no FHIR", since the base FHIR
+    R5 `Task` CRUD/search surface is itself landed and was *also*
+    undocumented in `§9`, fixed alongside). Fixed the source-of-drift
+    doc comment in `src/compliance/mod.rs` too (`cargo fmt`/`clippy`
+    clean after). Also fixed: (1) a stale `§13` item claiming CI
+    "does not pass `--ignored`" — false since 2026-08-01, this crate is
+    now enrolled in `ci/db-suites.txt` and the `test-db` stage runs the
+    gated suites; marked done with the correction. (2) BUS-1's own
+    closing note said "BUS-2 … and BUS-3 … remain" — both landed
+    2026-08-03 per the family capability matrix; corrected to name the
+    one thing genuinely still open (no deployment points
+    `CASE_FLUVIO_ENDPOINT` at a live broker). (3) `§14`/`§15` (current
+    implementation status / roadmap) were missing cross-service
+    `subject_of` links, FHIR, the durable bus, and the whole compliance
+    suite from their "done" summaries — refreshed both. (4) `AGENTS.md`'s
+    endpoint table and layout tree were missing roughly a dozen real,
+    mounted routes (links, FHIR, all six compliance endpoints) and six
+    `src/` modules/`migration/` entries — added. (5) `README.md`'s
+    "Status" section still described Tantivy search, the Fluvio sink,
+    and privacy as pending/tracked when all three had shipped, and its
+    API table still called `?q=` search "case-insensitive" (i.e. the
+    pre-Tantivy `ILIKE` behaviour) — rewrote both. (6) `index.md`'s
+    worked-flow block was missing the same dozen routes as `AGENTS.md` —
+    added. `cargo fmt --check` / `cargo clippy --all-targets` / `cargo
+    check --lib` all clean after every edit.
+
 - [ ] **DOC-3 (L)** Matcher crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: person, worker, place, thing, event, course,
   organization, care-pathway, case, project-portfolio-management

@@ -39,17 +39,30 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/api/cases/merges/recent` | Merge-history records |
 | GET | `/api/cases/whoami` | Verified PASETO-token claims (`401` without one) |
 | GET | `/api/cases/audit/recent` · `/{pid}/audit` | Audit-log query |
+| GET | `/api/cases/{pid}/audit/disclosures` | HIPAA §164.528 accounting of disclosures (record-level gated) |
+| GET | `/api/cases/audit/verify` | Verify the tamper-evident audit hash chain |
+| GET | `/api/cases/records/verify` | Verify row-level `content_hash` integrity |
+| GET | `/api/cases/checkpoint` | Take an external-witness chain checkpoint (store off-box) |
+| POST | `/api/cases/checkpoint/verify` | Check the chain still honours a recorded checkpoint |
+| POST | `/api/cases/{pid}/erase` | GDPR Art. 17 erasure (destructive, `access=admin`) |
 | GET | `/api/cases/events/recent` | In-memory event stream |
+| POST | `/api/cases/{pid}/links` · GET · `DELETE /{id}` | Cross-service `subject_of` edges (case→person, §8.6) |
+| GET | `/api/cases/links` | Bulk edge pull for reconciliation (privileged, audited — SEC-G1) |
 | POST | `/api/cases/import` | Bulk import (multipart JSONL/CSV upload) → `202 {job_id}` |
 | GET | `/api/cases/import/{id}` | Import job status + counts + `errors_url` |
 | POST | `/api/cases/export` | Bulk export (JSON filter body) → `202 {job_id}` |
 | GET | `/api/cases/export/{id}` | Export job status + `download_url` |
 | GET | `/api/cases/bulk-jobs` | Recent bulk jobs, newest first |
+| GET/POST/PUT/DELETE | `/fhir/Task{,/{id}}` · `GET /fhir/metadata` | FHIR R5 `Task` CRUD + search (best-effort mapping) |
+| GET | `/api/compliance` | Service identification + build provenance |
+| GET | `/api/compliance/sbom` | CycloneDX SBOM + SOUP register |
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 | GET | `/metrics.prom` | Prometheus metrics (root-mounted, public, `text/plain; version=0.0.4`) |
 
 Plus loco's default `/_health`, `/_ping`. Every CRUD action writes an
-`audit_logs` row and publishes a `created`/`updated`/`deleted` event.
+`audit_logs` row and publishes a `created`/`updated`/`deleted` event. See
+[`spec/index.md`](./spec/index.md) §12 for the compliance-endpoint detail
+(gating, what each verifies) and §8.6/§9 for the links/FHIR detail.
 
 ## MVP scope
 
@@ -96,9 +109,26 @@ async job-based JSONL/CSV import + export via `src/bulk/` and a loco
 default export redaction and gating every export's audit write ahead of
 job completion (SEC-B8). No Parquet, no S3 in this rollout; see
 `spec/index.md` §8.7 for the documented SEC-B3 concurrency and
-per-row-ABAC scope limitations. Deferred (spec §13): BUS-2 (link-graph
-Fluvio consumer) and BUS-3 (roll `FluvioSink` to the other nine
-services), front-end merge action.
+per-row-ABAC scope limitations. Deferred (spec §13): a front-end merge
+action (BUS-2/BUS-3 — the link-graph Fluvio consumer and rolling
+`FluvioSink` to the other nine services — have both since landed
+2026-08-03; no deployment yet points `CASE_FLUVIO_ENDPOINT` at a live
+broker).
+
+Also landed and equally real, but easy to miss because they predate the
+items above: **cross-service `subject_of` links** (case→person,
+`src/controllers/links.rs`, `entity_links` table, §8.6 — case is the
+family's *first* entity_links write-side, 2026-07-10); a **FHIR R5
+`Task` surface** (`src/fhir/`, mounted at `/fhir/Task{,/{id}}` +
+`/fhir/metadata`, best-effort mapping — spec §9/§13); and a
+**compliance suite** (`src/compliance/`, 2026-07-25..27) — tamper-evident
+audit hash chain + read/disclosure auditing, row-level `content_hash`
+record integrity, GDPR Art. 17 erasure (`POST /{pid}/erase`),
+external-witness chain checkpoints, a keyed HMAC-SHA256 integrity MAC
+(default off, no key ⇒ no MAC written), and a CycloneDX SBOM +
+service-identification surface at `/api/compliance*`. Full detail in
+[`spec/index.md`](./spec/index.md) §12.0/§12.0.1 — none of this had a
+`spec/13` task record until this pass.
 
 For a quick demo dataset, `cargo loco task seed_examples` loads the
 repository's shared fixture (`examples/data/cases.jsonl`, 10 rows) via
@@ -131,21 +161,30 @@ person records — see `examples/data/case-subject-links.md`.
 
 ```
 src/
-├── app.rs                 loco Hooks (routes, truncate)
+├── app.rs                 loco Hooks (routes, truncate, spawns the outbox relay)
 ├── bin/main.rs            loco CLI entrypoint
-├── controllers/cases.rs   CRUD + match + check-duplicates + merge + audit/events + whoami
+├── version.rs             Accepts-version header negotiation (api-versioning.md)
+├── controllers/cases.rs   CRUD + match + check-duplicates + merge + audit/events/verify + erase + whoami
+├── controllers/links.rs   cross-service `subject_of` edges (§8.6): create/list/delete + bulk pull
+├── controllers/fhir.rs    FHIR R5 `Task` CRUD + search + CapabilityStatement
+├── controllers/compliance.rs  service identification + SBOM (`/api/compliance*`)
 ├── controllers/docs.rs    OpenAPI JSON + Swagger UI
 ├── controllers/metrics.rs Prometheus /metrics.prom (root-mounted, public)
 ├── metrics.rs             process-wide Prometheus registry (CRUD counters + http_requests_total)
-├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) via authentication-verifier
+├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) via authentication-verifier; ABAC
 ├── merge.rs               pure record-merge logic (merge_cases)
 ├── openapi.rs             hand-written OpenAPI 3 document
 ├── search/                Tantivy full-text/fuzzy/phonetic index (index.rs schema + mod.rs engine)
-├── streaming.rs           durable-bus Phase 1: Envelope + EventPublisher seam (in-memory); indexes/deindexes on every write
+├── streaming.rs           durable-bus Envelope + EventPublisher/EventSink seam (memory | outbox transports)
+├── relay.rs               Phase-3 outbox relay (plain background loop from app.rs, not a loco worker) + FluvioSink
+├── compliance/            audit_chain · disclosure · erasure (GDPR Art. 17) · checkpoint ·
+│                          record_integrity · mac (keyed HMAC) · soup (SBOM) — see spec §12.0/§12.0.1
 ├── tasks/search.rs        `search_reindex` CLI task + boot-time rebuild-if-empty
 ├── tasks/seed_examples.rs `seed_examples` CLI task — loads the repo's
 │                          demo fixture (examples/data/cases.jsonl) for
 │                          the tutorials (EX-4)
+├── tasks/integrity_key.rs `integrity_key` CLI task — generate/inspect the MAC root key
+├── tasks/integrity_resign.rs `integrity_resign` CLI task — re-tag rows after a key rotation
 ├── validation.rs          title + opened_date + identifier/subject/keyword checks → 422
 ├── bulk/                  bulk import/export (BLK-5): mod · row (BulkCaseRow) · stable_key ·
 │                          columns · csv · jsonl · error_report · store (async ArtifactStore) ·
@@ -154,11 +193,13 @@ src/
 │   ├── cases.rs           CRUD helpers over the stored payload (+ find_by_agency_case_number)
 │   ├── audit_logs.rs      audit-trail record/query helpers
 │   ├── merge_records.rs   merge-history record/query helpers
+│   ├── entity_links.rs    `subject_of` edge upsert/list/soft-delete (§8.6)
+│   ├── event_outbox.rs    transactional outbox row helpers (Phase 2)
 │   ├── bulk_jobs.rs       bulk-job CRUD + idempotency helpers (BLK-5)
 │   ├── review_queue.rs    duplicate-review-queue CRUD (BLK-5; raw SQL, provenance from the start)
-│   └── _entities/{cases,audit_logs,merge_records,bulk_jobs}.rs  SeaORM entities
-migration/src/            …_000001_cases, …_000002_audit_logs, …_000003_merge_records,
-                          …_000012_review_queue, …_000013_bulk_jobs
+│   └── _entities/         SeaORM entities (cases, audit_logs, merge_records, entity_links, event_outbox, bulk_jobs)
+migration/src/            …_000001_cases … _000005_entity_links, …_000006_compliance …
+                          _000011_integrity_mac, …_000012_review_queue, …_000013_bulk_jobs
 config/                   development/production/test yaml
 ```
 
