@@ -7,6 +7,23 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Removed — dead `WorkerRepository::search` SQL method (QA-CUST-SQL)
+
+Audited for the same MySQL-placeholder footgun fixed in
+`authentication-service` (`Expr::cust_with_values("LOWER(email) = ?", …)`
+— a `?` placeholder Postgres rejects). This crate's `search()`
+(`src/db/repositories.rs`) already spelled `"LOWER(family) LIKE $1"` —
+Postgres-style — so the specific defect did not apply. But `grep -rn`
+across the crate (handlers, tests, benches — this crate has no bulk
+module) found **zero callers**: `/api/workers/search` goes through
+Tantivy, not this method, and no test ever exercised it either. Rather
+than leave a plausible-looking, DB-syntax-unverified method sitting
+unregarded, it is removed — along with its now-orphaned `escape_like`
+SEC-G4 helper and `Expr`/`cust_with_values` import, which existed only
+to support it. Verified: `scripts/ci-check.sh test-db` still green
+(34/34), `cargo fmt --check`, and
+`cargo clippy --all-targets -- -D warnings` clean.
+
 ### Fixed — cross-service link endpoints now use the uniform response envelope (2026-08-03)
 
 `POST`/`GET`/`DELETE /api/workers/{pid}/links` previously returned bare

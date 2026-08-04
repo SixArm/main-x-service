@@ -8,7 +8,6 @@
 //! entries on every mutation. [`AuditContext`] carries the actor metadata
 //! recorded alongside those audit entries.
 
-use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
     QueryOrder, QuerySelect, Set, TransactionTrait,
@@ -357,13 +356,6 @@ pub trait WorkerRepository: Send + Sync {
     ///
     /// Returns an error if the update fails.
     async fn delete(&self, id: &Uuid) -> Result<()>;
-
-    /// Finds workers whose family name matches `query` (case-insensitive).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if a database query fails.
-    async fn search(&self, query: &str) -> Result<Vec<Worker>>;
 
     /// Returns a page of active, non-deleted workers.
     ///
@@ -1480,42 +1472,6 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         Ok(())
     }
 
-    async fn search(&self, query: &str) -> Result<Vec<Worker>> {
-        // Case-insensitive substring match on family name via SQL LIKE.
-        // SEC-G4: escape the caller's `LIKE` metacharacters (`%`, `_`, `\`)
-        // before wrapping in the `%…%` contains-pattern, so a query of
-        // `%` (matches every row) or `_`×N (an expensive scan) is treated
-        // literally, not as a wildcard. The value is a bound parameter
-        // (no SQL injection); this closes the wildcard-injection / DoS
-        // vector. Postgres `LIKE` uses `\` as the escape char.
-        let search_pattern = format!("%{}%", escape_like(&query.to_lowercase()));
-
-        // First collect distinct matching worker IDs, then hydrate each.
-        let worker_ids: Vec<Uuid> = worker_names::Entity::find()
-            .filter(Expr::cust_with_values(
-                "LOWER(family) LIKE $1",
-                [search_pattern],
-            ))
-            .select_only()
-            .column(worker_names::Column::WorkerId)
-            .distinct()
-            .into_tuple()
-            .all(&self.db)
-            .await?;
-
-        // Hydrate each match through `get_by_id` (one query set per worker);
-        // this also re-applies the soft-delete filter, so a name matching a
-        // soft-deleted worker is skipped.
-        let mut workers = Vec::new();
-        for worker_id in worker_ids {
-            if let Some(worker) = self.get_by_id(&worker_id).await? {
-                workers.push(worker);
-            }
-        }
-
-        Ok(workers)
-    }
-
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Worker>> {
         let db_workers: Vec<workers::Model> = workers::Entity::find()
             .filter(workers::Column::DeletedAt.is_null())
@@ -1543,31 +1499,9 @@ impl WorkerRepository for SeaOrmWorkerRepository {
 /// bare `cargo test`; run with
 /// `DATABASE_URL=… cargo test --lib -- --ignored`. They must COMPILE under a
 /// bare `cargo test --lib`.
-/// Escape SQL `LIKE` wildcards (`\`, `%`, `_`) so a user query matches
-/// literally inside a `%…%` contains-pattern (SEC-G4). The backslash is
-/// escaped first so it cannot re-enable a following wildcard. Postgres
-/// `LIKE` uses `\` as the default escape character.
-fn escape_like(q: &str) -> String {
-    q.replace('\\', "\\\\")
-        .replace('%', "\\%")
-        .replace('_', "\\_")
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{SeaOrmWorkerRepository, WorkerRepository, escape_like};
-    /// SEC-G4: `LIKE` wildcards in a search query are neutralised so they
-    /// match literally and cannot scan every row (`%`) or force pathological
-    /// work (`_`). Pure, DB-free.
-    #[test]
-    fn escape_like_neutralises_wildcards() {
-        assert_eq!(escape_like("smith"), "smith");
-        assert_eq!(escape_like("100%"), "100\\%");
-        assert_eq!(escape_like("a_b"), "a\\_b");
-        // Backslash is escaped first so it can't re-enable a wildcard.
-        assert_eq!(escape_like("a\\%"), "a\\\\\\%");
-    }
-
+    use super::{SeaOrmWorkerRepository, WorkerRepository};
     /// The `workers.gender` CHECK constraint's vocabulary, copied from
     /// `migrations/2024122800000002_create_workers/up.sql`. A value
     /// outside this set is rejected by `PostgreSQL` at insert time.
