@@ -3469,6 +3469,61 @@ committing (see plan.md §4).
     name. `compliance/lifecycle.md` (crate-root IEC 62304 evidence) was
     already accurate on inspection — no fix needed.
 
+  - *`project-portfolio-management/project-portfolio-management-service-with-loco`
+    done 2026-08-04.* Confirmed the one-recursive-`Plan`-collection
+    model (`kind` an optional label, never a matching/search gate) is
+    described accurately throughout, and `CLAUDE.md` is already the
+    documented one-line `@AGENTS.md` include (no fix needed, unlike the
+    five older crates worker's pass found). Found and fixed the
+    still-`[ ]`-for-shipped-work pattern DOC-2 exists to catch, at
+    unusual scale: **spec §13 had CRUD, matching-engine wiring, record
+    merge, OpenAPI/Swagger, Prometheus, PASETO auth, and blanket
+    enforcement all still checked `[ ]`** despite every one being
+    implemented and tested (this crate's original MVP task list was
+    never checked off item-by-item as PPM-phase work landed on top of
+    it) — marked each `[x]` with an implementation pointer. Two bullets
+    each blurred a shipped half with a deferred half under one
+    checkbox: "Operational sub-resources — tasks/goals/issues" (tasks
+    landed 2026-07-20; goals/issues did not) and "Derived views —
+    timeline + burndown" (burndown landed 2026-07-20; timeline did
+    not) — split into accurate sub-items. A stale duplicate "Privacy"
+    `[ ]` item directly contradicted the dated 2026-08-02 entry above
+    it recording the same feature as done — resolved the contradiction.
+    **A shipped, tested, reachable feature with zero spec presence
+    anywhere**: row-level integrity verification (`src/compliance/` —
+    SHA-256 + SHA3-256 digests + a keyed HMAC-SHA256 MAC via the shared
+    `integrity-mac` crate, `GET /api/compliance/{records,audit}/verify`,
+    landed 2026-07-27/28 alongside the rest of the family's same-day
+    integrity rollout) had no `spec/13` task, no `spec/9` endpoint
+    entry, and wasn't in `AGENTS.md`'s layout tree or endpoint table —
+    added all three. **The bigger structural gap**: spec §9 (this
+    crate's API-surface single source of truth) covered only the MVP
+    plans-CRUD core plus collaboration/automation/prioritisation
+    (§9.4a) — it named **zero** routes for seven other fully-shipped
+    route groups (governance/visibility/strategy = PPM Phases A/B/C,
+    executive insights, oversight, and the engineering-team core:
+    tasks board/sprints/burndown/velocity/standup/DevOps), each with
+    its own controller, migration, and dated §13 entry, but never
+    folded into §9. Added §9.9–§9.15 (one subsection per area, route
+    table + landing date + §13 cross-reference) rather than leaving the
+    crate's own "single source of truth" silent on roughly two-thirds
+    of its real surface. Mirrored the same gaps into `AGENTS.md`'s
+    layout tree (`controllers/{engineering,insights,oversight,
+    compliance}.rs`, `src/{engineering,insights,snapshots}.rs`,
+    `src/compliance/`, `version.rs`, six migrations were all missing)
+    and its endpoint table (added the integrity-verify row). `README.md`
+    and `index.md` were both stale in the same three ways: `GET /search`
+    still described as `ILIKE` (replaced by Tantivy 2026-08-02),
+    goals/issues/timeline presented as live sub-resources/views
+    alongside the actually-wired tasks/burndown, and README's own
+    "Status" section still listed Tantivy search and privacy as
+    **deferred** after both had shipped — rewrote the route tables and
+    Status/worked-flow sections, pointing at the new spec §9.9–§9.15
+    for the expanded surface rather than duplicating seven route tables
+    a third time. Verified `cargo test --lib` (205 passed, matching the
+    count spec §13's most recent entries already cite — no drift there)
+    and `cargo fmt --check` clean after the doc-only changes.
+
 - [ ] **DOC-3 (L)** Matcher crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: person, worker, place, thing, event, course,
   organization, care-pathway, case, project-portfolio-management
