@@ -1571,10 +1571,77 @@
   loco's own `config/development.local.yaml` overlay mechanism — already
   gitignored by case-service's own `.gitignore`, so it needed no
   cleanup from git, only removal from the working tree at teardown.
-- [ ] **TUT-4 (M)** `tutorials/04-cross-service-linking.md` —
+- [x] **TUT-4 (M)** `tutorials/04-cross-service-linking.md` —
   `subject_of` + `same_identity` writes → aggregator `neighbors` /
   `single-view` / `freshness`; break-and-reconcile demo (divergence
   metric → repair). Depends: DEP-1b.
+
+  **Done 2026-08-04.** Full `examples/compose/full-family.yml` (twelve
+  services, DEP-1b), live end to end: person + worker (one real human,
+  `same_identity`) + case (`subject_of`, the highest-governance v1
+  kind) created via curl, both edges written from their originating
+  service (`POST /{id}/links`, confirming **worker's own
+  `same_identity` write-side has landed** — resolving the open question
+  in the task brief; `worker/worker-service-with-loco/src/api/rest/links.rs`
+  is a full peer of person's, both DB-gated round-trip and outbox-emit
+  tested), then the link-graph aggregator's `neighbors` / `single-view`
+  / `health/freshness`, and finally a live break-and-reconcile pass
+  (direct `psql` corruption of link-graph's own `edges` row — delete
+  the real edge, inject a fabricated one — then periodic reconciliation
+  repairing both in one pass).
+
+  **A real, severe infrastructure finding, not a shortcut**: the
+  documented `podman compose -f full-family.yml build` command (all
+  twelve Dockerfiles building concurrently) took down the **entire
+  podman VM**, not just the compose wrapper — `podman ps -a` and even
+  `podman machine ssh ... uptime` stopped responding for 90+ seconds
+  under the memory pressure of twelve simultaneous release Rust
+  compiles on a `no-swap` 12 GB machine. `podman machine stop` (clean)
+  + `podman machine start` recovered it; the reliable workaround is
+  bypassing compose's build orchestration and building each image
+  **sequentially** with plain `podman build` (11 images, case reused
+  from an earlier run, ~27 minutes total, peak memory ~3.4 GB — the
+  ceiling is concurrency, not any one image's size). Documented in the
+  tutorial itself as the load-bearing warning for anyone hitting the
+  same silent hang. (Side effect, disclosed rather than hidden: the VM
+  restart also stopped one pre-existing, unrelated container —
+  `fhir-mssql-db` — that predated this task; not restarted, since
+  restarting other work outside this task's scope wasn't requested.)
+
+  **A second real, empirically-surprising finding**: expecting
+  `link_graph_reconciliation_divergence` to show `2` during the broken
+  window, it read `0` on every single poll (≈1 s granularity) across
+  two full corrupt→repair cycles — not a bug, but a live reproduction
+  of `agents/share/runbooks/reconciliation-divergence.md`'s own
+  documented "sharp edge": the gauge is **one unlabelled value shared
+  by every configured entity's reconcile worker** (`person` and `case`
+  here), and `person`'s own always-`0` pass (nothing on that side was
+  corrupted) kept winning the last-write race against `case`'s
+  diverging-then-repaired pass. The read-model itself (`/api/edges`,
+  and the per-status `link_graph_edges` gauge) is what actually proved
+  the repair — real observed latency 6.6 s and 9.3 s across the two
+  runs, both inside the configured 10 s `LINK_GRAPH_RECONCILE_SECS`.
+  Documented in place as a "don't trust the divergence gauge alone in a
+  multi-entity deployment" finding, not routed around.
+
+  Also confirmed live and documented: `full-family.yml` leaves every
+  `<ENTITY>_EVENT_TRANSPORT` at `memory` and link-graph's own image has
+  no `fluvio` feature compiled in, so **reconciliation is the only path
+  an edge reaches the read-model in this compose stack** — `freshness`
+  stays `{"topics":[],"as_of":null}` for the entire tutorial, even with
+  real `verified` edges present, since `as_of` tracks bus-consumption
+  freshness specifically (a different signal from reconciliation).
+  `LINK_GRAPH_RECONCILE_TOKEN` only needs to be a non-empty placeholder
+  string here (SEC-B7's loopback-or-token gate), not a real PASETO,
+  because `PERSON_REQUIRE_AUTH`/`CASE_REQUIRE_AUTH` are both off (the
+  default) and both services' bulk-links `authorize_bulk` short-circuits
+  to `Ok(())` when their own flag is off — documented alongside why
+  `examples/compose/enforced.yml` deliberately leaves that same variable
+  empty. Lazy verify-on-read (`LINK_GRAPH_LAZY_VERIFY`) settled edge
+  status to `verified` synchronously on first read, and — unplanned —
+  caught the fabricated corruption edge as `dangling` (not
+  `unverified`) on the very read that surfaced it, since its fake
+  `to_ref` 404s against person-service.
 - [ ] **TUT-5 (S)** `tutorials/05-bulk-import-export.md` — fixtures
   import (dry-run, error report), idempotent re-import, masked vs full
   export (and the 403 on ungated full). Depends: EX-1.
