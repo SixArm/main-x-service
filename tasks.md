@@ -1406,10 +1406,107 @@
 - [ ] **TUT-6 (S)** `tutorials/06-event-bus.md` — outbox rows, relay,
   `/events/recent`; extend with Fluvio when BUS-1..3 land.
 
-- [ ] **EX-1 (S)** `examples/data/` — synthetic JSONL fixtures: ~50
+- [x] **EX-1 (S)** `examples/data/` — synthetic JSONL fixtures: ~50
   persons (with duplicate pairs for the dedup tutorial), ~20
   organizations, ~10 cases with subject links. No real PII; documented
   provenance header in each file.
+
+  **Done 2026-08-04.** `examples/data/{persons,organizations,cases}.jsonl`
+  (50 / 20 / 10 rows) + `case-subject-links.md` + `README.md`.
+  - **Provenance** lives in one `README.md` rather than a per-file
+    header, because a JSONL header line is a contradiction in terms —
+    every line must parse as the entity, so a comment line would break
+    the format the files exist to demonstrate. It states plainly that
+    every value is invented and written by an AI coding assistant for
+    these tutorials, not sampled from any dataset, and tabulates the
+    reserved ranges used (`555-01xx`, Ofcom `+44 20 7946 0xxx`, RFC 2606
+    `.example`, SSN area `000`, unissued LOU/GS1/DUNS prefixes).
+  - **Check digits are real where the service checks them.** The
+    organization service validates LEI (ISO 7064 MOD 97-10) and GLN (GS1
+    mod-10) per SEC-M5, so those were computed rather than invented; a
+    made-up LEI is a `422`.
+  - **Subject links are a separate file, not a `Case` field.**
+    `subject_of` is a cross-service edge written via
+    `POST /api/cases/{pid}/links` after both records exist, and the pids
+    are not knowable at import time — so `case-subject-links.md` gives
+    the case-line → person-line mapping plus the real request shape,
+    and deliberately invents no UUIDs. `cases.jsonl`'s `subjects[]`
+    holds agency-local labels, not `person:` URNs.
+
+  **Verified against the services' own code, twice over.** Temporary
+  harnesses (not checked in — these are data, and a permanent test in
+  three service crates would be a three-part spec change in each):
+  - *Offline, all 80 rows*: each file's real `bulk::jsonl::parse_line`,
+    its `validation` module (the per-row validators the import pipeline
+    calls), and its `bulk::stable_key` resolver; plus the real person
+    `ProbabilisticScorer` over all 1 225 person pairs. Result: 0 parse
+    or validation failures; 7/15/8 stable-keyed and 43/5/2 keyless rows;
+    no stable-key collision; no duplicate identifier `(system, value)`
+    (which the person schema's `UNIQUE` constraint would turn into a DB
+    error, not an upsert).
+  - *Live, against `scripts/test-db.sh` Postgres*: 17 representative
+    persons via `POST /api/persons` → `201` (minimal rows, all three
+    fully-populated rows, each pair's first half), then each pair's
+    second half → `409 DUPLICATE_DETECTED`; all 20 organizations and all
+    10 cases created and read back field-by-field; the `subject_of` link
+    created + listed, and `subject_of → organization:` refused `422`.
+    The five pairs score 0.9934 / 0.9908 / 0.9705 / **0.9426** / 0.9995
+    — four *certain* and one deliberately *probable* (Ren vs Kenji
+    Nakamura), so the dedup tutorial has a pair that genuinely warrants
+    an operator decision. No unintended pair scores above 0.70. The
+    live pass matters: it proved the Tantivy blocking query (family-name
+    fuzzy, max edit distance 2) actually retrieves each pair, which no
+    offline scoring check can show.
+
+  **Defect found, and worked around rather than fixed here:**
+  person-service cannot persist `telecom` at all, nor `use_type` on a
+  name or identifier. `src/db/repositories.rs:501,555,596` write them as
+  `format!("{u:?}")` → `"Phone"` / `"Official"`, while the CHECK
+  constraints in
+  `migrations/2024122800000003_create_patient_related_tables/up.sql:7,23,59,61`
+  require lowercase. Any such person is a `500 DATABASE_ERROR` — the
+  validators pass it, so only a real database catches it. The sibling
+  2026 tables are unaffected (`enum_to_tag` → serde, correct case, no
+  CHECK), so emergency-contact telecom and address `use_type` do work
+  and are used. The fixtures therefore omit the broken fields; fixing
+  the service is a three-part change in person-service and is **not**
+  done — see PERSON-CONTACT-CASE below.
+
+  **Second defect found (blocks TUT-5):** the DEP-1 compose stack cannot
+  complete a bulk import. All three documented `curl -F file=@…/import`
+  commands were run against a live `full-family.yml` stack and all three
+  were accepted with a job id, but every job stays `queued`. The
+  containers run `CMD [".../<svc>-service", "start"]` — loco's
+  server-only mode — while `BulkJobWorker` is registered in
+  `connect_workers`, which only runs under `start --server-and-worker`.
+  Tracked as COMPOSE-WORKER below. The fixtures themselves are
+  unaffected: their content was proven through the synchronous create
+  endpoints and the real per-row import validators.
+
+- [ ] **COMPOSE-WORKER (S) 🟠** `examples/compose/*.yml` start every
+  service server-only, so no loco background worker runs and **no bulk
+  import or export job ever leaves `queued`**. Both `full-family.yml`
+  and `single-service.yml` inherit the Dockerfile's `CMD [..., "start"]`.
+  Fix: `command: ["start", "--server-and-worker"]` (or a sidecar worker
+  container per service, which keeps the web tier's restart behaviour
+  independent), then re-verify by importing `examples/data/persons.jsonl`
+  and watching the job reach `completed`. TUT-5 cannot be written
+  truthfully until this lands. Found by EX-1's live verification,
+  2026-08-04.
+
+- [ ] **PERSON-CONTACT-CASE (S) 🟠** person-service silently cannot store
+  contact points. `repositories.rs` persists `ContactPointSystem`,
+  `NameUse` and `IdentifierUse` via `format!("{:?}")` (PascalCase) into
+  columns whose CHECK constraints only admit lowercase, so **every**
+  person with a `telecom` entry fails with `500 DATABASE_ERROR` rather
+  than a `422`. Contacts are advertised as a baseline capability
+  (`agents/share/overview.md`), and no test covers the path — the
+  existing integration tests all post persons without `telecom`. Fix:
+  use the existing `enum_to_tag` helper (serde, already correct) on both
+  the write and read sides, or relax the constraints; either way add a
+  round-trip test that posts a person **with** telecom and reads it
+  back, and restore the contact fields to `examples/data/persons.jsonl`.
+  Found by EX-1's live fixture verification, 2026-08-04.
 - [x] **EX-2 (S)** `examples/policies/` — ABAC cookbook: dept-scoped
   read-deny, closed-case write-deny (`resource.status`), after-hours deny
   (`env.after_hours`), ownership (`$sub`), masked-read obligation,
