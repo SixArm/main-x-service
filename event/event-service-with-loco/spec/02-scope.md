@@ -34,6 +34,12 @@
   full FHIR conformance (search-param breadth, `_include`, `_history`).
 - Recurrence (RFC 5545 RRULE).
 - Time-zone-aware fuzzy matching (uses naive UTC offsets today).
-- Production Fluvio publisher / consumers.
+- Bulk import / export (§9.1 designs the contract; T-9 unstarted).
+- A live Fluvio deployment: the real-broker relay sink (`FluvioSink`)
+  itself shipped (T-11/BUS-3), behind the `fluvio` Cargo feature (off
+  by default) and idle until an operator points
+  `EVENT_FLUVIO_ENDPOINT` at a broker; a consumer reading this
+  service's topic (the link-graph aggregator's own consumer is BUS-2,
+  elsewhere) is still open.
 - ML-based match scoring.
 

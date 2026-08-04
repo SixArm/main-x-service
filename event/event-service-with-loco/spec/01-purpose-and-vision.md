@@ -38,5 +38,7 @@ of that event:
   build that on top of the event stream.
 - **Not** an authentication / authorisation provider — the central
   authentication-service owns identity; this service only verifies its
-  PASETO v4.public tokens offline (blanket enforcement is planned, §15).
+  PASETO v4.public tokens offline (blanket `/api/*`+`/fhir/*`
+  enforcement shipped 2026-07-04, default off via `EVENT_REQUIRE_AUTH`
+  — an operational activation decision, not a build gap; §13 T-8).
 

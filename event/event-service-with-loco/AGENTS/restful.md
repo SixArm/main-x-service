@@ -163,6 +163,30 @@ the search index is queried for events with similar names whose
 | GET | `/audit/recent` | Recent audit activity |
 | GET | `/audit/user` | Audit logs for one user |
 
+## Integrity verification
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/records/verify` | Row-level integrity over `Event` records — SHA-256 + SHA3-256 digests and a keyed HMAC-SHA256 MAC per row |
+| GET | `/audit/verify` | Row-level integrity over `audit_log` rows |
+
+Landed 2026-07-28 (`src/compliance/`: `mac`, `record_integrity`,
+`audit_integrity` — this crate's binding to the shared `integrity-mac`
+crate, HKDF-domain-separated per (service, domain)). The two unkeyed
+digests are published-format and anyone with SQL access can recompute
+them; the MAC is the value an adversary holding only the database
+cannot forge. **Default off**: with no `EVENT_INTEGRITY_MAC_KEY` (or
+`EVENT_INTEGRITY_MAC_KEY_FILE`, which takes precedence) configured, no
+MAC is written and affected rows report `mac_absent` rather than a
+mismatch. Other env vars: `EVENT_INTEGRITY_MAC_KEY_ID`,
+`EVENT_INTEGRITY_MAC_KEYS_RETIRED`. **Known limit:** unlike
+person/worker/care-pathway/case, this crate has no hash chain
+(`prev_hash`/`hash`) and takes no external-witness checkpoint — a MAC
+proves a row's content is unchanged since written, and says nothing
+about a row deleted wholesale. See
+[`agents/share/runbooks/integrity-activation.md`](../../../agents/share/runbooks/integrity-activation.md)
+for the family-wide activation runbook.
+
 ## FHIR
 
 FHIR R5 `Appointment` endpoints are implemented at
@@ -212,4 +236,5 @@ Error envelope:
 - `src/api/rest/state.rs` — `AppState`
 - `src/controllers/fhir.rs` — mounted FHIR R5 `Appointment` routes (`/fhir/Appointment{,/{id}}` + `/fhir/metadata`)
 - `src/fhir/` — FHIR resources, conversions, `OperationOutcome`, Bundle, `CapabilityStatement`
+- `src/compliance/` — `mac`, `record_integrity`, `audit_integrity` (`/records/verify`, `/audit/verify`)
 - `src/api/grpc/mod.rs` — gRPC stub

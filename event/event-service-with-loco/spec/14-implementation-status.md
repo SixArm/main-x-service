@@ -23,17 +23,23 @@
 | Authorization (ABAC) | Inside the blanket guard: action derived from method + destructive named POSTs (`/merge`, `/deduplicate`, `/import`); shared `authentication-verifier` 0.3 engine evaluates `EVENT_ABAC_POLICY`/`_FILE` (else the built-in default policy) over the token's `attrs` claim; first-match-wins, default allow-read / deny-mutation; `401` vs `403` split with deciding-rule reason; DB-free §7 test matrix (T-8, authorization part) |
 | Containers | Multi-stage Dockerfile built with Podman, dev + test Compose |
 | Tests | Unit + integration + Criterion benchmarks; CI workflows |
+| Keyed integrity verification | `src/compliance/` (`mac`, `record_integrity`, `audit_integrity`) — SHA-256 + SHA3-256 digests and a keyed HMAC-SHA256 MAC over each `Event` record and each `audit_log` row, via the shared `integrity-mac` crate; `GET /api/records/verify` + `GET /api/audit/verify`; default off (no `EVENT_INTEGRITY_MAC_KEY`/`_KEY_FILE` ⇒ no MAC written, rows report `mac_absent`); no hash chain / external-witness checkpoint (unlike person/worker/care-pathway/case) |
 
 ### 14.2 Open gaps → tasks
 
+FHIR Event mapping (T-1) and the production Fluvio publisher (T-4) are
+**resolved** — T-1 via T-10 (`Appointment` mapping, live), T-4 via T-11
+(transactional outbox + relay + `FluvioSink`) — and are no longer
+listed here; see their §13 entries for what shipped and what each
+literally superseded.
+
 | Gap | Task |
 |---|---|
-| FHIR Event mapping | T-1 (open question OQ-1) |
 | Time-zone-aware fuzzy matching | T-2 |
 | Recurrence / RRULE | T-3 |
-| Fluvio production publisher | T-4 |
-| Event consumers | (no task yet) |
+| Event consumers (a deployment pointing `EVENT_FLUVIO_ENDPOINT` at a live broker; the link-graph aggregator's own consumer is tracked as BUS-2, elsewhere) | (no task yet) |
 | Dedup / merge / privacy integration tests | T-5 |
 | gRPC API | T-6 |
 | iCalendar I/O | T-7 |
+| Bulk import / export | T-9 |
 

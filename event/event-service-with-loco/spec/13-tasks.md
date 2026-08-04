@@ -20,6 +20,31 @@ clearly described manual check confirms the acceptance criterion.
   - [x] Implement bidirectional conversion for the chosen resource.
   - **Acceptance:** `POST /fhir/Appointment` round-trips through the
     `Appointment` resource; `OperationOutcome` on errors. See T-10.
+- [x] **2026-07-28 — Keyed integrity verification (MAC + digests).**
+  *Landed but never recorded here until this DOC-2 pass (2026-08-04)
+  found the gap: shipped, tested, and reachable, with no `spec/13`
+  entry, no `spec/14` row, and no `spec/09`/`AGENTS/restful.md`
+  endpoint listing.* Adds `src/compliance/` (`mac`, `record_integrity`,
+  `audit_integrity`): SHA-256 + SHA3-256 digests and a keyed
+  HMAC-SHA256 MAC (this crate's binding to the shared `integrity-mac`
+  crate, HKDF-domain-separated per (service, domain)) over each `Event`
+  record and each `audit_log` row. Two read endpoints, guarded like
+  every other `/api` route: `GET /api/records/verify` and
+  `GET /api/audit/verify`. **Default off**: with no
+  `EVENT_INTEGRITY_MAC_KEY` (or `_KEY_FILE`) configured, no MAC is
+  written and affected rows report `mac_absent` rather than a mismatch
+  — adopting the control on a populated table must not produce false
+  accusations. Env vars: `EVENT_INTEGRITY_MAC_KEY`,
+  `EVENT_INTEGRITY_MAC_KEY_FILE` (takes precedence),
+  `EVENT_INTEGRITY_MAC_KEY_ID`, `EVENT_INTEGRITY_MAC_KEYS_RETIRED`.
+  **Known limit, stated in the module docs**: unlike person / worker /
+  care-pathway / case, this crate has **no hash chain** (`prev_hash` /
+  `hash`) and takes no external-witness checkpoint — a MAC proves a
+  row's content is unchanged since it was written, and says nothing
+  about a row **deleted wholesale**. See
+  `agents/share/runbooks/integrity-activation.md` for the family-wide
+  activation runbook.
+
 - [ ] **T-2 — Time-zone-aware fuzzy matching.**
   - [ ] Replace naive UTC offsets with `chrono-tz` conversions in the
     date-proximity scorer.
@@ -30,11 +55,30 @@ clearly described manual check confirms the acceptance criterion.
   - [ ] Implement expansion for search + dedup.
   - **Acceptance:** weekly RRULE expanded into 52 occurrences for
     range queries.
-- [ ] **T-4 — Production Fluvio publisher.**
-  - [ ] Implement `FluvioEventPublisher : EventProducer` behind
-    feature flag.
-  - **Acceptance:** integration test publishes an `EventCreated`
-    record end-to-end.
+- [x] **T-4 — Production Fluvio publisher.** *(superseded by T-11,
+  done 2026-08-03 — reworded during this DOC-2 pass; the literal ask
+  below was never built as written)* T-4 as originally scoped meant
+  implementing `FluvioEventPublisher : EventProducer` — a
+  Fluvio-backed impl of the legacy ring-buffer `EventProducer` trait
+  (`src/streaming/mod.rs`/`producer.rs`). That never happened: the
+  crate instead solved the same underlying need — durable production
+  delivery to Fluvio — via a different architecture, T-11's
+  transactional outbox (`event_outbox` table, written in the same
+  transaction as the entity change) + relay (`src/relay.rs`) +
+  `EventSink` trait, with `FluvioSink` as the real-broker
+  implementation (BUS-3, behind the `fluvio` Cargo feature, off by
+  default). **`FluvioProducer`** (`src/streaming/producer.rs`) is
+  therefore dead code: it still carries its original `todo!()` body,
+  is not constructed anywhere (`AppState` only ever builds
+  `InMemoryEventPublisher`), and is not reachable from any router.
+  Left in place rather than deleted by this docs-only pass — a code
+  change belongs to a follow-up cleanup PR, not a spec/doc audit — but
+  the acceptance below is retargeted to what actually ships.
+  - **Acceptance:** met via T-11 — `tests/fluvio_relay.rs` is a
+    `#[cfg(feature = "fluvio")]`, `#[ignore]`d round-trip (create under
+    `EventTransport::Outbox` → `FluvioSink` → `drain_once` → assert
+    `published_at`) against a real broker; see T-11 for the full
+    acceptance record.
 - [ ] **T-5 — Dedup / merge / privacy integration tests.**
   - [ ] Real-time dedup on create.
   - [ ] Batch dedup + auto-merge.

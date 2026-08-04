@@ -16,9 +16,13 @@
   question. Also: a periodic key-set **re-fetch/refresh loop** for key
   rotation (today the fetch happens once at boot), rate limiting,
   security headers.
-- **Observability** — Prometheus alongside OTLP, complete OTLP trace
-  exporter, custom metrics (`event_created`, `event_duration_seconds`,
-  `match_score`), Grafana dashboards + alerting.
+- **Observability** — Prometheus is done (`GET /metrics.prom`,
+  `src/metrics.rs`); remaining: the OTLP exporter is still a `TODO`
+  stub (`src/observability/mod.rs` builds an OTel `Resource` and
+  installs a plain JSON `tracing` subscriber, but exports no span or
+  metric over OTLP today), custom domain metrics (`event_created`,
+  `event_duration_seconds`, `match_score`), Grafana dashboards +
+  alerting.
 - **Performance** — time-range query caching, btree_gist exclusion
   constraints for no-overlap policies, load test at realistic event
   volumes.
@@ -28,9 +32,14 @@
   ingress, probes.
 - **Production readiness** — security audit + pen test, GDPR
   validation, DR runbook, backup / restore, CI/CD pipeline.
-- **Feature enhancements** — complete gRPC; complete FHIR (capability
-  statement, bundles, Encounter / Appointment); Fluvio production +
-  consumers; ML-based match scoring; iCalendar import / export; RFC
-  5545 RRULE recurrence; time-zone-aware fuzzy matching; consent
-  enforcement in the query layer.
+- **Feature enhancements** — complete gRPC (the `Appointment`
+  `CapabilityStatement` and the ad hoc searchset `Bundle` already ship
+  via T-10); a FHIR `Encounter` mapping alongside `Appointment`; bulk
+  import/export (T-9); Fluvio consumers (the production sink itself,
+  `FluvioSink`, shipped via T-11/BUS-3 — what remains is a deployment
+  actually pointing `EVENT_FLUVIO_ENDPOINT` at a live broker, and the
+  link-graph aggregator's own consumer, tracked as BUS-2 elsewhere);
+  ML-based match scoring; iCalendar import / export; RFC 5545 RRULE
+  recurrence; time-zone-aware fuzzy matching; consent enforcement in
+  the query layer.
 

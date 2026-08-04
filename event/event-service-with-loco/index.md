@@ -41,18 +41,42 @@ The Event Service is an identity-registry system that maintains a centralized re
 
 - ✅ Create, read, update, and delete (CRUD) event records
 - ✅ Soft delete support with complete audit trails
+- ✅ schema.org/Thing properties: `name`, `description`,
+  `disambiguating_description`, `alternate_names`, `url`, `image`,
+  `same_as`, `keywords`
 - ✅ Event identifier management (`BookingNumber`, `ConfirmationCode`,
   `TicketNumber`, `EncounterId`, `TransactionId`, `ExternalRef`,
   `Tax`, `Other`)
-- ✅ Time window (`start_date`, `end_date`, `door_time`, `duration`)
-- ✅ Location union (`Place` / `PostalAddress` / `Virtual` / `Text`)
-- ✅ Parties (organizers, performers, attendees, sponsors, …)
+- ✅ Time window (`start_date` required, `end_date`, `door_time`,
+  `duration` ISO 8601, `previous_start_date`, `time_zone`, `all_day`)
+- ✅ Status / classification: `event_status`, `event_attendance_mode`,
+  `event_type` (29 variants from `Generic` through `VisualArts` plus
+  operational subtypes like `Appointment`, `Encounter`, `Shift`,
+  `Incident`)
+- ✅ Capacity (total / physical / virtual / remaining attendee
+  capacity) and audience (`typical_age_range`, `in_language`,
+  `is_accessible_for_free`)
+- ✅ `super_event` / `sub_events` hierarchy, plus cross-event links
+  (`Replaces`, `ReplacedBy`, `Refer`, `Seealso`)
+- ✅ Location union (`Place` / `PostalAddress` / `Virtual` / `Text`) —
+  a `Place` carries name/address/geo and an optional external
+  place-service ID; `Virtual` is a URL + optional name (livestream,
+  video-conference, …); `Text` is a free-text fallback (e.g. "TBA")
+- ✅ Parties (`organizers`, `performers`, `attendees`, `sponsors`,
+  `funders`, `contributors`) — each a typed reference (`Person` /
+  `Organization`) with a name, optional external ID into a sibling
+  person/worker/organization service, and optional email / URL
+- ✅ Offers (`Vec<Offer>` for ticket / pricing tiers): `price`,
+  `price_currency` (ISO 4217), `availability`, `valid_from`,
+  `valid_through`
 - ✅ Automatic event publishing for all CRUD operations
 
 ### Event matcher
 
 - ✅ **Probabilistic Matching**: Advanced fuzzy matching algorithms
-- ✅ **Deterministic Matching**: Rule-based exact matching
+- ✅ **Deterministic Matching**: Rule-based exact matching, with a
+  short-circuit to a definite match on an exact strong-identifier
+  match (booking / ticket / confirmation / encounter / transaction)
 - ✅ **Configurable Scoring**: Customizable match thresholds and weights
 - ✅ **Match Components**:
   - Name matching (Jaro-Winkler + Levenshtein + Soundex floor)
@@ -69,7 +93,21 @@ The Event Service is an identity-registry system that maintains a centralized re
 - ✅ Advanced query syntax (AND, OR, NOT)
 - ✅ High-performance indexing with Tantivy
 - ✅ Search by name, organizer, identifier; date-range filter on `start_date`
+- ✅ Faceted by `event_status`, `event_attendance_mode`, `event_type`,
+  `in_language`
 - ✅ Automatic index synchronization with database
+
+### Validation
+
+- ✅ `name` non-empty; `end_date >= start_date`; `door_time <= start_date`
+- ✅ ISO 8601 `duration`; 2-letter ISO 639-1 `in_language` codes
+- ✅ Attendance mode coherent with the location list (Online ⇒ a
+  Virtual location; Mixed ⇒ at least one physical + one Virtual)
+- ✅ Capacity invariants: physical + virtual ≤ total; remaining ≤ total
+- ✅ Per-location validation: place name required, lat/lon ranges,
+  virtual URL scheme, address completeness
+- ✅ Per-offer validation: 3-letter currency, parseable price,
+  `valid_from ≤ valid_through`
 
 ### Event Streaming & Audit
 
@@ -85,6 +123,15 @@ The Event Service is an identity-registry system that maintains a centralized re
   - Get recent system-wide audits
   - Get user-specific audit logs
 
+### Privacy
+
+- ✅ Identifier values masked (last 4 visible) — they often double as
+  access tokens
+- ✅ Party emails masked; external party IDs stripped from the masked
+  view (`GET /api/events/{id}/masked`)
+- ✅ GDPR right-of-access export (`GET /api/events/{id}/export`)
+- ✅ Consent management (`Consent` model — type / status / dates)
+
 ### RESTful API
 
 - ✅ OpenAPI 3.0 specification
@@ -93,17 +140,25 @@ The Event Service is an identity-registry system that maintains a centralized re
 - ✅ CORS support for web applications
 - ✅ Comprehensive error handling
 - ✅ HTTP status codes following REST conventions
-- ✅ **Endpoints** (all under `/api`):
+- ✅ **Endpoints** (all under `/api`; full reference: [`AGENTS/restful.md`](AGENTS/restful.md)):
   - `GET /api/health` - Health check
+  - `GET /api/whoami` - Echo the verified bearer-token claims
   - `POST /api/events` - Create event
   - `GET /api/events/{id}` - Get event
   - `PUT /api/events/{id}` - Update event
   - `DELETE /api/events/{id}` - Delete event (soft)
   - `GET /api/events/search` - Search events
   - `POST /api/events/match` - Match event records
+  - `POST /api/events/check-duplicates` - Real-time duplicate check
+  - `POST /api/events/merge` - Merge two events
+  - `POST /api/events/deduplicate` - Batch dedup scan
+  - `GET /api/events/{id}/export` - GDPR right-of-access export
+  - `GET /api/events/{id}/masked` - Masked view
   - `GET /api/events/{id}/audit` - Get audit logs
   - `GET /api/audit/recent` - Recent audit activity
   - `GET /api/audit/user` - User audit logs
+  - `GET /api/records/verify` - Row-level integrity verification
+  - `GET /api/audit/verify` - Audit-log row integrity verification
 
 ### High Availability
 
@@ -120,9 +175,11 @@ The Event Service is an identity-registry system that maintains a centralized re
 - ✅ Configurable log levels (RUST_LOG)
 - ✅ Request/response logging
 - ✅ Error logging with context
-- ✅ Distributed tracing with OpenTelemetry
-- ✅ OpenTelemetry metrics and traces
-- ⏳ Prometheus metrics endpoint (future enhancement)
+- ✅ Prometheus metrics endpoint — `GET /metrics.prom` (`src/metrics.rs`)
+- ⏳ OpenTelemetry: `src/observability/` builds an OTel `Resource` and
+  installs a JSON `tracing` subscriber, but the OTLP exporter is still
+  a `TODO` stub — no service in this family exports a span or metric
+  over OTLP today (see [`agents/share/overview.md`](../../agents/share/overview.md))
 
 ## Quick Start
 
@@ -484,6 +541,14 @@ Match-component weights (name / start-date / end-date / location /
 organizer / performer / attendee / identifier) are documented in
 [`AGENTS/matching.md`](AGENTS/matching.md).
 
+The table above is the core set; auth (`EVENT_REQUIRE_AUTH`,
+`EVENT_PASETO_KEYS[_URL]`, `EVENT_ABAC_POLICY[_FILE]`), the durable
+event bus (`EVENT_EVENT_TRANSPORT`, `EVENT_EVENT_RELAY*`,
+`EVENT_FLUVIO_ENDPOINT`), and row-level integrity
+(`EVENT_INTEGRITY_MAC_KEY[_FILE]`) each have their own env vars,
+documented in [`AGENTS/restful.md`](AGENTS/restful.md) and the family
+[`configuration.md`](../../agents/share/configuration.md) reference.
+
 See `.env.example` for complete configuration template.
 
 ## Testing
@@ -570,11 +635,12 @@ Helm chart and Kubernetes manifests planned for Phase 13.
 - ✅ **Environment-Based Secrets**: No secrets in code or images
 - ✅ **CORS Configuration**: Configurable cross-origin policies
 - ✅ **Input Validation**: Comprehensive validation on create/update (`src/validation/`, returns 422)
+- ✅ **Authentication**: offline PASETO v4.public (Ed25519) bearer verification via `authentication-verifier`, plus default-off blanket `/api/*` + `/fhir/*` enforcement (`EVENT_REQUIRE_AUTH`) — see [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+- ✅ **Authorization**: Attribute-based access control (ABAC) inside the blanket guard — the shared `authentication-verifier` policy engine over the token's `attrs` claim (see [`agents/share/authorization-attributes.md`](../../agents/share/authorization-attributes.md)); default-off with enforcement
+- ✅ **Row-level integrity**: SHA-256 + SHA3-256 digests + a keyed HMAC-SHA256 MAC over `Event` records and `audit_log` rows, via the shared `integrity-mac` crate; `GET /api/records/verify` + `GET /api/audit/verify`; default off (no key configured ⇒ no MAC written)
 
 ### Planned
 
-- ⏳ **Authentication**: cookie sessions + offline PASETO v4.public verification (see [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md))
-- ✅ **Authorization**: Attribute-based access control (ABAC) inside the blanket guard — the shared `authentication-verifier` policy engine over the token's `attrs` claim (see [`agents/share/authorization-attributes.md`](../../agents/share/authorization-attributes.md)); default-off with enforcement
 - ⏳ **Encryption at Rest**: Database encryption
 - ⏳ **TLS/SSL**: HTTPS enforcement
 - ⏳ **Rate Limiting**: API rate limiting
@@ -586,7 +652,9 @@ Helm chart and Kubernetes manifests planned for Phase 13.
 - **HL7 FHIR**: Live R5 `Appointment` surface at
   `/fhir/Appointment{,/{id}}` + `/fhir/metadata` — best-effort
   schema.org/Event → FHIR mapping (`Encounter` roadmap), spec §6.8
-- **FDA 21 CFR Part 11**: Audit trail capabilities
+- **FDA 21 CFR Part 11**: Audit trail capabilities, plus keyed
+  integrity verification (`GET /api/records/verify`,
+  `GET /api/audit/verify`; default off)
 
 ## Performance
 
@@ -614,40 +682,53 @@ Current performance on modest hardware (i5, 16GB RAM):
 event-service-with-loco/
 ├── src/
 │   ├── api/
-│   │   ├── rest/          # REST API handlers, routes
+│   │   ├── rest/          # REST API handlers, routes, AppState, auth, versioning
 │   │   └── grpc/          # gRPC server (stub)
 │   ├── controllers/
 │   │   └── fhir.rs        # FHIR R5 Appointment routes (mounted)
 │   ├── fhir/              # FHIR R5 resources + conversions (Appointment)
+│   ├── compliance/        # Keyed integrity: mac, record_integrity, audit_integrity
 │   ├── db/
-│   │   ├── models.rs      # Database models
+│   │   ├── models.rs      # Database models (incl. event_outbox)
 │   │   ├── schema.rs      # SeaORM schema
 │   │   ├── repositories.rs # Data access layer
+│   │   ├── outbox.rs      # Transactional outbox insert/poll/ack seams
+│   │   ├── convert.rs     # DB ↔ domain conversions
 │   │   └── audit.rs       # Audit log repository
 │   ├── matching/
 │   │   ├── algorithms.rs  # Matching algorithms
 │   │   ├── scoring.rs     # Match scoring logic
+│   │   ├── adapter.rs     # Bridge to the canonical event-matcher crate
+│   │   ├── phonetic.rs    # Soundex
 │   │   └── mod.rs         # Matcher implementations
 │   ├── search/
 │   │   ├── index.rs       # Tantivy search index
 │   │   └── mod.rs         # Search engine interface
 │   ├── streaming/
-│   │   ├── producer.rs    # Event publisher
+│   │   ├── producer.rs    # Legacy in-process event publisher (ring buffer)
 │   │   ├── consumer.rs    # Event consumer (stub)
+│   │   ├── envelope.rs    # Canonical Envelope / EventTransport (durable bus)
 │   │   └── mod.rs         # Event types
+│   ├── relay.rs           # Durable-bus relay: EventSink, LoggingSink, FluvioSink
+│   ├── privacy/           # Masking, GDPR export, consent
+│   ├── validation/        # Boundary validators + normalisers
+│   ├── observability/     # OTel Resource + JSON tracing subscriber
 │   ├── models/
-│   │   ├── event.rs     # Event model
+│   │   ├── event.rs       # Event model
 │   │   └── mod.rs         # Shared models
-│   ├── config.rs          # Configuration management
+│   ├── config/            # Configuration management (env → .env → default)
+│   ├── metrics.rs         # Prometheus text-exposition (GET /metrics.prom)
 │   ├── error.rs           # Error types
 │   └── lib.rs             # Library root
 ├── migrations/            # Database migrations
-├── tests/                 # Integration tests
+├── tests/                 # Integration tests (incl. enforcement.rs, fluvio_relay.rs)
+├── benches/               # Criterion benchmarks
 ├── Dockerfile             # Production container
 ├── docker-compose.yml     # Development environment
 ├── compose.test.yaml      # Test database (Podman)
-├── DEPLOY.md             # Deployment guide
-└── README.md             # This file
+├── compose.fluvio.yaml    # Opt-in local Fluvio broker
+├── DEPLOY.md              # Deployment guide
+└── README.md              # This file
 ```
 
 ## Development Phases

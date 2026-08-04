@@ -3524,6 +3524,77 @@ committing (see plan.md §4).
     count spec §13's most recent entries already cite — no drift there)
     and `cargo fmt --check` clean after the doc-only changes.
 
+  - *`event/event-service-with-loco` done 2026-08-04.* Confirmed it is
+    genuinely the api-versioning reference `agents/share/api-versioning.md`
+    names it: `AGENTS/restful.md` already correctly documents the
+    version-free `Accepts-version` header (no stale `/api/v1` in any
+    live doc; the `/api/v1` strings that remain are historical, dated
+    `CHANGELOG.md` entries, correctly left unedited). Found the same
+    "shipped feature with zero spec presence" gap DOC-2 keeps finding:
+    **row-level integrity verification** (`src/compliance/` — SHA-256 +
+    SHA3-256 digests + a keyed HMAC-SHA256 MAC via the shared
+    `integrity-mac` crate, `GET /api/records/verify` +
+    `GET /api/audit/verify`, landed 2026-07-28) had no `spec/13` task,
+    no `spec/14` row, no `spec/12` compliance-table row, no
+    `AGENTS/restful.md` endpoint entry, and no `CHANGELOG.md` entry —
+    added all five. Also found and fixed a genuine **superseded-task**
+    case distinct from the others' "shipped but undocumented" shape:
+    `spec/13` T-4 ("Production Fluvio publisher — implement
+    `FluvioEventPublisher : EventProducer`") was still `[ ]`, but the
+    real production-delivery need it names was solved a different way
+    by T-11 (transactional outbox + relay + `FluvioSink`, done
+    2026-08-03) — the literal `EventProducer`/`FluvioProducer` design
+    was never built and `FluvioProducer` (`src/streaming/producer.rs`)
+    is dead code still carrying its original `todo!()`, unreferenced
+    from `AppState` or any router. Marked T-4 done-via-T-11 with the
+    dead-code note (left in place — a code deletion belongs to a
+    follow-up PR, not a docs audit), the same treatment T-1 already had
+    for its own supersession by T-10. `spec/14-implementation-status.md`
+    §14.2's gap table was consequently stale in three ways: it listed
+    the now-resolved T-1 and T-4 as open gaps and omitted T-9 (bulk
+    import/export, still genuinely `[ ]`) entirely — fixed. `spec/16`
+    OQ-1 (Encounter vs Appointment) was marked resolved to match T-1's
+    own "done, superseded" note. `spec/01`, `spec/02`, `spec/08`, and
+    `spec/15` each carried at least one stale "planned"/"stub" claim for
+    something already shipped — blanket auth enforcement (spec/01), the
+    production Fluvio publisher (spec/02's "out of scope" list),
+    `spec/08`'s module-layout tree (still 15 endpoints, missing
+    `compliance/`, `relay.rs`, `metrics.rs` entirely, and its trait
+    table still said "`EventProducer` | `InMemoryEventPublisher`
+    (Fluvio planned)" with no mention of the `EventSink`/`FluvioSink`
+    path that actually shipped), and `spec/15`'s roadmap listing
+    Prometheus, the FHIR capability statement/Bundle, and Fluvio
+    production as all still-future when each had already landed —
+    fixed all four. `AGENTS/testing.md` and `spec/11` were missing
+    `bridge_bench.rs` from the benchmarks table and
+    `tests/enforcement.rs` / `tests/fluvio_relay.rs` from the
+    integration-tests list entirely (same shape course's DOC-2 pass
+    found) — added. The `CLAUDE.md`/`AGENTS.md` split matched the
+    family's already-converged answer (person/worker/place/thing's
+    precedent): event's 224-line `CLAUDE.md` was mostly a subset of
+    `index.md`, but a real diff pass found several pieces genuinely
+    absent from `index.md` — the Location/Party/Offer field detail,
+    cross-event links (`Replaces`/`ReplacedBy`/`Refer`/`Seealso`), the
+    entire Privacy/Consent section, and the full Validation-rule list —
+    folded all of them into `index.md` before thinning `CLAUDE.md` to
+    `@AGENTS.md` and fixing `AGENTS.md`'s doc-hierarchy table (same
+    inverted `CLAUDE.md`-groups-with-`README.md` claim the other four
+    crates had). While folding, also fixed two overclaims already
+    present in `index.md` itself (not inherited from `CLAUDE.md`):
+    "Prometheus metrics endpoint (future enhancement)" when
+    `GET /metrics.prom` was already live, and "Distributed tracing with
+    OpenTelemetry" / "OpenTelemetry metrics and traces" as delivered
+    when `src/observability/mod.rs`'s OTLP exporter is still a `TODO`
+    stub (per the honest matrix in `agents/share/overview.md`) — plus a
+    stale "Authentication: planned" line under Security & Compliance
+    when PASETO verification + the blanket guard shipped 2026-07-04.
+    Everything else checked out: `AGENTS/matching.md`'s weights
+    verified byte-accurate against `src/matching/scoring.rs`;
+    `AGENTS/models.md`'s `EventType` 29-variant list verified against
+    `src/models/mod.rs`; `README.md` already symlinks to `index.md`;
+    quick-start commands verified runnable (`.env.example` present,
+    `cargo loco start` path matches `AGENTS.md`).
+
 - [ ] **DOC-3 (L)** Matcher crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: person, worker, place, thing, event, course,
   organization, care-pathway, case, project-portfolio-management

@@ -118,6 +118,35 @@ AU-1, completing the five axum-style services (person was the reference).
   Suite: 6/6 green vs Postgres 18; crate enrolled in
   [`ci/db-suites.txt`](../../ci/db-suites.txt).
 
+### Added — row-level integrity digests + verify endpoints (2026-07-28)
+
+*Landed but never recorded here until this DOC-2 docs pass
+(2026-08-04) found the gap — shipped, tested, and reachable, but with
+no `spec/13` task, no `spec/14` row, no `spec/12` compliance-table row,
+no `AGENTS/restful.md` endpoint entry, and no `CHANGELOG.md` entry.*
+
+- **`src/compliance/mac.rs`** — this crate's binding to the shared
+  `integrity-mac` crate: SHA-256, SHA3-256, and (when a key is
+  configured) a keyed HMAC-SHA256 MAC, HKDF-domain-separated per
+  (service, domain).
+- **`src/compliance/record_integrity.rs`** — hashes the **assembled**
+  `Event` record (the same value `GET /api/events/{id}` returns), not
+  just the root `events` row, since an event's identifiers/location/
+  parties live in child tables and are exactly the kind of field worth
+  editing quietly.
+- **`src/compliance/audit_integrity.rs`** — the same digest/MAC
+  treatment for `audit_log` rows.
+- **`GET /api/records/verify`** and **`GET /api/audit/verify`** —
+  guarded like every other `/api` route.
+- **Default off**: with no `EVENT_INTEGRITY_MAC_KEY` (or
+  `EVENT_INTEGRITY_MAC_KEY_FILE`, which takes precedence) configured,
+  no MAC is written and affected rows report `mac_absent` rather than
+  a mismatch. Other env vars: `EVENT_INTEGRITY_MAC_KEY_ID`,
+  `EVENT_INTEGRITY_MAC_KEYS_RETIRED`.
+- Unlike person / worker / care-pathway / case, this crate has no hash
+  chain (`prev_hash`/`hash`) and takes no external-witness checkpoint —
+  a MAC proves a row's content is unchanged since it was written, and
+  says nothing about a row deleted wholesale.
 
 ### Added — `Config::from_env` now loads the environment (2026-07-23)
 

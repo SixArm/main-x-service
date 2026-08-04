@@ -4,7 +4,7 @@ Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 
 | Tier | Surface |
 |---|---|
-| REST (Axum) | 15 endpoints under `/api/events/*` + `/api/audit/*` + `/api/health` |
+| REST (Axum) | 18 endpoints under `/api/health`, `/api/whoami`, `/api/events/*`, `/api/audit/*`, and the compliance pair `/api/records/verify` + `/api/audit/verify` (§13, 2026-07-28) |
 | Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | FHIR R5 (Axum) | Live `Appointment` surface — `/fhir/Appointment{,/{id}}` (read/create/update/delete/search) + `GET /fhir/metadata` (`CapabilityStatement`); `application/fhir+json`, `OperationOutcome` errors, searchset Bundle (see §6.8) |
 | gRPC (Tonic) | Stubbed |

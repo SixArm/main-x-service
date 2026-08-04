@@ -40,7 +40,7 @@ scripts/test-db.sh up event/event-service-with-loco
 scripts/ci-check.sh test-db event/event-service-with-loco
 ```
 
-Current tests:
+Current tests (`tests/api_integration_test.rs`):
 
 - `health_check_returns_healthy`
 - `create_event_round_trip`
@@ -48,6 +48,26 @@ Current tests:
 - `validation_rejects_missing_name`
 
 Shared helpers live in `tests/common/mod.rs` — `create_test_app_state()` (async) builds an `AppState` with a per-test tempdir search index.
+
+### Other DB/broker-gated integration-test files
+
+Two more files under `tests/` are DB- or broker-gated and run outside
+the default `cargo test --lib` / `--test api_integration_test` pair:
+
+- **`tests/enforcement.rs`** — the "activation proof" (AU-1): an
+  end-to-end blanket-enforcement + ABAC check over the **real** router
+  with `EVENT_REQUIRE_AUTH` on, as opposed to the DB-free pure-`enforce`
+  unit tests in `src/api/rest/auth.rs`. Its own test binary (process-wide
+  `OnceLock`s for `require_auth`/`policy`/`verifier` would otherwise leak
+  across the off-by-default suite). `#[ignore]`d — the router opens a
+  database connection. Run with `cargo test --test enforcement --
+  --ignored`.
+- **`tests/fluvio_relay.rs`** — round-trips the durable-bus relay
+  against a real Fluvio broker (BUS-3). `#![cfg(feature = "fluvio")]`-gated
+  (a default build compiles a file with zero tests) and `#[ignore]`d (needs
+  Postgres + a live broker, neither stood up by any automated run in this
+  repo). Run against `compose.fluvio.yaml`; see the file header for the
+  exact commands.
 
 ## Benchmarks
 
@@ -62,6 +82,7 @@ Benches in `benches/`:
 | `matching_bench.rs` | Name match (exact + fuzzy), time match, location match, party match, identifier match, probabilistic match against 50 candidates, phonetic similarity |
 | `search_bench.rs` | Index single event, full-text search over 500 docs, fuzzy search over 500 docs |
 | `validation_bench.rs` | Simple validation, rich validation (place + virtual + organizer + keywords), phone normalization, address standardization |
+| `bridge_bench.rs` | Service-side `Event` → `to_matcher_event` → `event_matcher::MatchingEngine::match_events`: adapter-only cost, end-to-end bridge cost, one-vs-100-candidates |
 
 ## Writing new tests
 

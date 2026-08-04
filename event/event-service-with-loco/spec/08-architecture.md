@@ -6,20 +6,23 @@
 src/
 ├── api/
 │   ├── mod.rs               # ApiResponse, ApiError
-│   ├── rest/                # /api/* — 15 endpoints
+│   ├── rest/                # /api/* — 18 endpoints
 │   └── grpc/                # Tonic stub
 ├── controllers/
 │   └── fhir.rs              # mounted FHIR R5 Appointment routes + /fhir/metadata
 ├── fhir/                    # FHIR resources, conversions, OperationOutcome, Bundle, CapabilityStatement
 ├── models/                  # Event, Location, Party, Offer, …
-├── db/                      # SeaORM entities + repositories + audit
+├── db/                      # SeaORM entities + repositories + audit + outbox
 ├── matching/                # algorithms + scoring + phonetic
 ├── search/                  # Tantivy index + query
-├── streaming/               # EventProducer trait + InMemoryEventPublisher
+├── streaming/               # legacy EventProducer trait + InMemoryEventPublisher (ring buffer) + the canonical Envelope/EventTransport
+├── relay.rs                 # durable-bus relay: EventSink trait, LoggingSink, FluvioSink (fluvio feature)
+├── compliance/               # keyed integrity: mac, record_integrity, audit_integrity
 ├── validation/              # boundary validators + normalisers
 ├── privacy/                 # masking + GDPR export + consent
 ├── config/                  # env loading + Config struct
-├── observability/           # OTLP setup
+├── observability/           # OTel Resource + JSON tracing subscriber (OTLP export not yet wired)
+├── metrics.rs               # Prometheus text-exposition (GET /metrics.prom)
 ├── error.rs
 └── lib.rs
 ```
@@ -39,8 +42,9 @@ src/
 |---|---|
 | `EventRepository` | `SeaOrmEventRepository` |
 | `EventMatcher` | `ProbabilisticMatcher`, `DeterministicMatcher` |
-| `EventProducer` | `InMemoryEventPublisher` (Fluvio planned) |
+| `EventProducer` (legacy in-process ring buffer) | `InMemoryEventPublisher`; `FluvioProducer` also exists but is dead code (`todo!()`, never constructed) — production delivery went a different route, below |
 | `EventConsumer` | stub |
+| `EventSink` (durable-bus relay, `src/relay.rs`, T-11) | `LoggingSink` (default, no broker); `FluvioSink` (BUS-3, real broker, behind the `fluvio` Cargo feature — off by default) |
 
 ### 8.4 Application state
 
