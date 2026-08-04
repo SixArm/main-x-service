@@ -38,10 +38,13 @@ OTLP, Podman.
 
 - **Layout**: `src/{app,auth,clients,metrics,openapi,streaming,
   validation,version}.rs`, `src/rules/` (pure core: tokens,
-  lifecycle, scoring, analytics, sla, segment), `src/models/`
-  (+`_entities/`, 19 tables), `src/controllers/{relationships,sales,
-  marketing,support,dashboards,audits,docs,metrics}.rs`,
-  `src/tasks/seed.rs`, crate-root `migration/` (6, explicit SQL).
+  lifecycle, scoring, analytics, sla, segment, engagement),
+  `src/models/` (+`_entities/`, 23 tables), `src/controllers/
+  {relationships,sales,marketing,support,dashboards,insights,
+  engagement,audits,docs,metrics}.rs`, `src/tasks/seed.rs`,
+  crate-root `migration/` (7, explicit SQL — the 7th,
+  `m20260720_000007_engagement`, added CRM-T20's stakeholder/
+  partnership/membership/working-group tables).
 - **Deal stages are data**, not a token table: `pipeline_stages`
   rows with probabilities + terminal flags; stage moves validate
   pipeline membership on the locked deal row.

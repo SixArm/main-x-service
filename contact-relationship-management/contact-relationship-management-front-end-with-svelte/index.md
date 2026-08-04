@@ -15,4 +15,5 @@ for the Loco JSON API sibling.
 ## The task queue
 
 Live delivery checklist: [../spec/tasks.md](../spec/tasks.md)
-(this edition: CRM-T17/T18).
+(this edition: CRM-T17/T18, plus the front-end halves of CRM-T19
+insight views and CRM-T20 engagement/partnership round).

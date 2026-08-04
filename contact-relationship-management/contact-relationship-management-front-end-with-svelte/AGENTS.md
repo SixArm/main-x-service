@@ -23,7 +23,7 @@ every page round-trips through the API.
    especially [auth](../spec/auth.md) (personas + masking) and
    [analytics-reporting](../spec/analytics-reporting.md) (honesty
    rules). Task queue: [`../spec/tasks.md`](../spec/tasks.md)
-   (CRM-T17/T18).
+   (CRM-T17/T18, plus this edition's halves of CRM-T19/T20).
 2. **Family front-end conventions.** SvelteKit 2, **Svelte 5 runes
    only** (no legacy stores/`$:`), TypeScript strict, SPA mode.
    Drift between front-ends is accepted — copy-adapt from a sibling

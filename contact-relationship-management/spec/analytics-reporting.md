@@ -27,6 +27,16 @@ attached to any relationship object; the feed and per-rep counts
 another rep's pipeline follow the persona scoping in
 [auth.md](auth.md).
 
+## Derived insight & engagement views (CRM-T19, CRM-T20)
+
+Sixteen further read-only derived views — stale-deals, follow-ups,
+pipeline-hygiene, the executive pack, forecast-trends, SLA breach
+register, DPO, cadence, engagement workload, the audit-derived
+pipeline funnel, member health, consent-by-account, the stakeholder
+register + grid, the partnership register, and membership renewals —
+follow the same honesty rules below. Full list in
+[domain-model.md](domain-model.md#derived-views-never-stored-as-editable-data).
+
 ## Honesty rules
 
 - Mixed currencies never silently sum — per-currency lines always.

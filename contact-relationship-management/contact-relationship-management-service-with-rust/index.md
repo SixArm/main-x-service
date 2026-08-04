@@ -17,4 +17,6 @@ analytics.
 ## The task queue
 
 Live delivery checklist: [../spec/tasks.md](../spec/tasks.md)
-(CRM-T*, phased; production gates CRM-G*).
+(CRM-T*, phased; production gates CRM-G*). This edition:
+CRM-T1–T16 (2026-07-18), CRM-T19 insight views (2026-07-20),
+CRM-T20 engagement/partnership round (2026-07-20).

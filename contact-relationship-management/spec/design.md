@@ -82,3 +82,18 @@ caps, `404` mapping at `find_by_pid` call sites, enforcement tests
 in their own binary (the OnceLock lesson), ETag-conditional
 dashboards, 13-locale i18n in the front-end from the start (the
 PPM lesson).
+
+## CRM-D13 — Declared data is never inferred
+
+Stakeholder role, power–interest grid position, and activity
+sentiment (CRM-R19, [requirements.md](requirements.md)) are
+operator-entered fields with no scoring or NLP behind them: a
+rating with no entry stays `null` and renders as undeclared, never
+defaulted or guessed at from other data. This mirrors CRM-D4
+(derived numbers are never stored opinions) from the other
+direction — where CRM-D4 keeps a computed number from being typed
+in as an opinion, CRM-D13 keeps a human judgement from being
+computed. The distinction matters for the insight/engagement views
+(CRM-R18/R19): every one of them is either a pure derivation over
+recorded facts, or a verbatim echo of a declared field — never a
+blend of the two presented as one number.

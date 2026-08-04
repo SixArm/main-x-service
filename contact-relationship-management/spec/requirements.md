@@ -5,7 +5,9 @@ IDs are stable; design decisions ([design.md](design.md)) and tasks
 ([tasks.md](tasks.md)) trace to them. The four-module map:
 CRM-R1–R5 sales automation, CRM-R6–R9 marketing automation,
 CRM-R10–R12 service & support, CRM-R13–R14 analytics & reporting,
-CRM-R15–R17 cross-cutting.
+CRM-R15–R17 cross-cutting, CRM-R18–R19 insight/engagement views
+(added CRM-T19/T20, 2026-07-20 — backfilled here so the "every task
+traces to a requirement" rule holds for these two).
 
 ## CRM-R1 — Contacts & accounts
 
@@ -179,3 +181,38 @@ tickets.*
   OTLP tracing, health routes, Podman build,
   `#![forbid(unsafe_code)]`, clippy-pedantic, input caps → `422`,
   unknown-pid → `404`.
+
+## CRM-R18 — Operational insight views
+
+*As a manager or DPO I get read-only rollups that surface work
+already recorded, instead of re-deriving it by hand.*
+
+- Seven derived views (`GET /api/insights/*`): stale-deals (aging
+  from stage-change audits), follow-ups (overdue + 30-day horizon
+  over open activities' `due_on`), pipeline-hygiene (rule-disclosed
+  findings), the executive period pack (won/lost, per-currency,
+  never merged), forecast-trends (from stored `ForecastSnapshot`
+  rows only, no interpolation), the SLA breach register +
+  per-assignee workload, and the DPO view (consent coverage +
+  withdrawals + duplicate-contact hygiene over shared `person_ref`).
+  ETag-conditional, stamped `as_of`, same honesty rules as CRM-R13
+  above.
+
+## CRM-R19 — Stakeholder engagement & confederation
+
+*As an account owner I record who matters on an account and how an
+innovation partnership or membership is progressing, without the
+system guessing at any of it.*
+
+- Declared (never inferred) stakeholder typing: `stakeholder_role`
+  on Contact and Account; a 1–5 power–interest grid position on
+  Contact. Declared (never inferred) `sentiment` on Activity.
+- Partnership CRUD per account with a forward-only lifecycle
+  (`scouting → pilot → scaled`, `retired` reachable from any live
+  stage); Membership (one per account, `active | lapsed` +
+  renewal); WorkingGroup + roster.
+- Nine derived views (cadence, engagement workload, the
+  audit-derived pipeline funnel, member health, consent-by-account,
+  the stakeholder register + grid, the partnership register,
+  membership renewals) plus a `kind` filter on the CRM-R18
+  follow-ups view for the renewals convention.

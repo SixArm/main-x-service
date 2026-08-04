@@ -144,7 +144,10 @@ code + tests in one PR.
   lawful basis, unsubscribe in-message), retention schedules,
   subject-access/erasure flows ([regulatory.md](regulatory.md)).
 
-- [x] CRM-T19 (2026-07-20) **Insight views + boards.** Service: seven
+- [x] CRM-T19 (2026-07-20) **Insight views + boards.** (CRM-R18;
+  design CRM-D4, CRM-D12 — CRM-R18 was backfilled during the DOC-7
+  audit pass, since this task shipped without a requirement id at
+  the time). Service: seven
   read-only derived views in `controllers/insights.rs` (`as_of` +
   ETag via the dashboards helpers): `/api/insights/stale-deals`
   (days-in-stage from `deal_stage_changed` audits, derivation
@@ -169,7 +172,8 @@ code + tests in one PR.
   clean; svelte-check 0; vitest 5; Playwright 9.
 
 - [x] CRM-T20 (2026-07-20) **Engagement / partnership / confederation
-  round.** Migration `m20260720_000007_engagement`: declared
+  round.** (CRM-R19; design CRM-D13 — both backfilled during the
+  DOC-7 audit pass, same reason as CRM-T19 above). Migration `m20260720_000007_engagement`: declared
   stakeholder typing (`contacts.stakeholder_role` + power–interest
   1–5, `accounts.stakeholder_role` — all nullable; undeclared stays
   undeclared), recorded `activities.sentiment`

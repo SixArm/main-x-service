@@ -5407,6 +5407,60 @@ committing (see plan.md §4).
     audit start (same pre-existing-drift note DOC-5 recorded; left
     untouched here too).
 
+  - [x] `contact-relationship-management` done 2026-08-04. Confirmed
+    the prior-session memory claim ("fully implemented, only
+    production gates remain") is still accurate — CRM-T1–T20 all
+    `[x]`; only CRM-G1/G2 (auth activation, GDPR/PECR review) are
+    open, both correctly design-only. `entity-ref`/`EntityType` usage
+    (`src/validation.rs`, `src/clients.rs`) matches DOC-5's finding
+    that this app is a real, non-edge-originating consumer of the
+    crate — nothing to fix.
+    **The real finding: CRM-T19 (insight views) and CRM-T20
+    (engagement/partnership/confederation), both shipped and tested
+    2026-07-20, had zero presence in `requirements.md`/`design.md`**
+    — `spec/tasks.md`'s own header states "every task traces to
+    design (CRM-D*) and requirement (CRM-R*) ids," but both entries
+    cited neither, and `requirements.md`/`design.md` topped out at
+    CRM-R17/CRM-D12 with no later addition. `domain-model.md` was
+    silent on the sixteen CRM-T19/T20 tables and derived views
+    entirely (stakeholder typing, activity sentiment, partnerships,
+    memberships, working groups; the seven insight + nine engagement
+    views) — the same "shipped feature, zero spec presence" shape
+    DOC-2 found repeatedly in the entity crates. Backfilled: CRM-R18
+    (operational insight views) + CRM-R19 (stakeholder engagement &
+    confederation) in `requirements.md`; CRM-D13 (declared data is
+    never inferred — the score/sentiment fields have no scoring or
+    NLP behind them, the mirror image of CRM-D4's "derived numbers
+    are never stored opinions") in `design.md`; a new "Engagement &
+    confederation" section plus expanded "Derived views" coverage in
+    `domain-model.md`; a cross-reference in `analytics-reporting.md`;
+    and `spec/tasks.md`'s CRM-T19/T20 entries now cite the backfilled
+    ids with a note explaining why. Also fixed plain doc staleness:
+    both editions' `README.md`/`index.md` still said "Status:
+    implemented (CRM-T17/T18)" with "front-end remaining" (false —
+    delivered same day) and stale test counts (62 unit/5
+    Playwright/"6 migrations, 19 tables" vs. the live 64 lib tests /
+    7 request tests / 12 Playwright / 7 migrations / 23 tables);
+    front-end `README.md`'s Views table and both `index.md` task-queue
+    lines didn't mention CRM-T19/T20 at all. **BFF env var**: `.env`
+    convention matches the family (no `.env.example` in this app or
+    its consumer-app siblings; `CRM_API_URL`/`AUTH_API_URL` default to
+    `:5150`, matching the service's real default port) — no fix
+    needed. **Playwright e2e**: ran `pnpm test:e2e` — 12/12 pass; this
+    front-end's `src/lib/api/client.ts` builds URLs by plain string
+    concatenation (`` `${API_BASE_URL}${path}` ``), never
+    `new URL(path, base)`, so it was never exposed to the `ad95088e`
+    BFF-proxy-prefix regression found in several entity front-ends
+    this session. **Verified live**: service `cargo test --lib`
+    (64/64), `cargo clippy --all-targets -- -D warnings` (clean);
+    front-end `pnpm test` (5/5 vitest), `svelte-check` (0 errors),
+    `pnpm test:e2e` (12/12 Playwright). Reverted an incidental
+    `Cargo.lock` diff (unrelated dependency-registry noise from
+    running `cargo clippy`/`cargo test`, not a real change) before
+    committing. Did not touch `case-folder`,
+    `patient-flow`, `workforce-planning-management`, or
+    `content-management-system` (sibling agents' concurrent work).
+
 - [ ] **DOC-8 (S)** Once DOC-2..DOC-7 land, a final sweep: re-grep for
   the family-wide anti-patterns found along the way (duplicated
   capability tables, stale `.env.example` files, "Backend-only"-style

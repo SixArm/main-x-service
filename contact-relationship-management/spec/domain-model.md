@@ -87,6 +87,35 @@ flags.
 published edits), `ticket links` (Activity of kind `note` with
 `article_pid`).
 
+## Engagement & confederation (CRM-T20)
+
+Declared stakeholder typing and a forward-only partnership
+lifecycle — none of it inferred; a rating with no entry stays
+`null`, never defaulted.
+
+**Stakeholder typing** — `stakeholder_role` (one of
+`customer | partner | regulator | sponsor | community | media |
+member`) on both **Contact** and **Account**; **Contact** also
+carries a declared power–interest grid position, `influence` +
+`interest` (1–5 each, both nullable).
+
+**Activity.sentiment** — `positive | neutral | negative`, recorded
+on the activity, never derived from its text.
+
+**Partnership** — an account-scoped innovation-partnership record.
+`account_pid`, `kind` (`university | startup | vendor | accelerator
+| other`), `stage` (`scouting → pilot → scaled`, forward one step at
+a time; `retired` reachable from any live stage), `summary`,
+`started_on`.
+
+**Membership** — one confederation-membership record per account.
+`account_pid` (unique), `joined_on`, `status`
+(`active | lapsed`), `renewal_on`.
+
+**WorkingGroup** — a cross-member collaboration group. `name`,
+`purpose`; roster in **WorkingGroupMember** (`group_pid` ×
+`contact_pid`).
+
 ## Derived views (never stored as editable data)
 
 Win rate (won ÷ closed), pipeline value by stage, stage-weighted
@@ -94,6 +123,29 @@ forecast (Σ `amount × probability` over open deals), campaign ROI
 ((attributed won revenue − cost) ÷ cost), CLV per account
 (Σ won deal amounts), SLA health (open breaches by priority),
 activity feed. All ETag-conditional; all carry `as_of`.
+
+**Insight views (CRM-T19)** — seven read-only derived views under
+`/api/insights/*`: stale-deals (days-in-stage from
+`deal_stage_changed` audits), follow-ups (open activities by
+`due_on`: overdue aging + next-30-days), pipeline-hygiene
+(rule-disclosed findings — no amount / no expected close / past
+expected close / no recent activity / unworked leads), executive
+(period pack: won/lost per-currency, lost reasons verbatim, leads /
+tickets / activities / campaigns-started / consent withdrawals),
+forecast-trends (stored `ForecastSnapshot` series only, no
+interpolation), SLA (breach register + per-assignee workload, 4h
+at-risk window disclosed), DPO (consent coverage + withdrawals +
+per-source counts + duplicate-contact hygiene over shared
+`person_ref`).
+
+**Engagement views (CRM-T20)** — nine further derived views:
+cadence (untouched contacts/accounts + no-next-touch), engagement
+workload (activity kinds + recorded sentiment), the audit-derived
+pipeline funnel (entered-per-stage from `to_stage` audits, honest
+ratios), member health (+ silent-member list), consent-by-account,
+the stakeholder register + power–interest grid (declared scores
+only), the partnership register, membership renewals; follow-ups
+(above) gains a `kind` filter for the renewals convention.
 
 ## Event kinds
 

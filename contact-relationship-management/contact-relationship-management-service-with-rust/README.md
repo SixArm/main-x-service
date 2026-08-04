@@ -16,11 +16,14 @@ provides the sales, marketing, and support client.
 > (delivery is simulated); synthetic data only. See
 > [spec/regulatory](../spec/regulatory.md).
 
-**Status: implemented (CRM-T1–T16, 2026-07-18).** Builds, 62 DB-free
-unit tests + 5 request tests + the enforcement matrix pass against
-Postgres 18, clippy-pedantic clean, live smoke verified (seed →
-forecast → ETag 304 → win rate). Remaining in
-[../spec/tasks.md](../spec/tasks.md): the front-end (CRM-T17/T18).
+**Status: implemented (CRM-T1–T16, T19, T20; 2026-07-18 through
+2026-07-20).** Builds; 64 DB-free unit tests + 7 request tests + the
+enforcement matrix (8 total under `cargo test -- --ignored`) pass
+against Postgres 18; clippy-pedantic clean; live smoke verified
+(seed → forecast → ETag 304 → win rate). Remaining in
+[../spec/tasks.md](../spec/tasks.md): the CRM-G1/CRM-G2 production
+gates (auth activation + GDPR/PECR review) before any non-demo
+exposure — not a code gap.
 
 ## Quick start
 
@@ -47,8 +50,12 @@ curl localhost:5150/api/forecast | jq .
 Contacts / accounts / activities + timelines · leads + scoring ·
 pipelines / stages / deals + Kanban · forecast + snapshots ·
 consent + segments + campaigns + nurture · tickets + SLA policies ·
-articles · dashboards · audits · `/events/recent` · OpenAPI +
-Swagger · `/metrics.prom`.
+articles · dashboards · seven `/insights/*` derived views
+(stale-deals, follow-ups, pipeline-hygiene, executive pack,
+forecast-trends, SLA, DPO) · engagement/partnership data
+(stakeholder typing, activity sentiment, partnerships, memberships,
+working groups) + nine more derived views · audits ·
+`/events/recent` · OpenAPI + Swagger · `/metrics.prom`.
 
 Auth enforcement defaults **off** (`CRM_REQUIRE_AUTH` is the family
 activation gate); upstream lookups will default to **stub mode**;
