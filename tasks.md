@@ -5333,7 +5333,7 @@ committing (see plan.md §4).
   will have moved substantially from whatever a doc pass would see
   mid-chain.
 
-- [ ] **DOC-7 (L)** The five consumer apps' docs — `case-folder`,
+- [x] **DOC-7 (L)** The five consumer apps' docs — `case-folder`,
   `patient-flow`, `workforce-planning-management`,
   `contact-relationship-management`, `content-management-system`. Each
   has a cross-cutting `spec/` (the SDD trio `requirements.md` /
@@ -5651,6 +5651,26 @@ committing (see plan.md §4).
     diff (triggered by running `cargo build`/`test` in this session, not
     an intentional change) out of the commit — same call DOC-5/
     patient-flow/CRM/WPM/content-management-system all made.
+
+  **DOC-7 closed, 2026-08-04 — all 5 consumer apps done** (case-folder,
+  patient-flow, workforce-planning-management,
+  contact-relationship-management, content-management-system). Two
+  patterns repeated across the batch worth recording together: (1) the
+  "declared client seam is a trait, shipped code is one generic
+  `EntityRef`-keyed resolver" drift found independently in both
+  `patient-flow` and `workforce-planning-management` — a converged
+  simplification neither app's design doc had caught up with; (2) not
+  every front-end shares the `ad95088e` BFF-proxy-prefix exposure DOC-4
+  found repeatedly — three of these five apps' API clients use plain
+  string concatenation rather than `new URL(path, base)` and were
+  confirmed immune, each verified by reading the client code rather
+  than assumed from the family pattern. `case-folder` found a distinct,
+  real e2e regression of its own (a nav-toggle assertion never updated
+  after the same commit that hid the nav behind a hamburger at every
+  width) — a reminder that "this app didn't get the known bug" is not
+  the same claim as "this app's e2e suite is clean," and both need
+  actually running `test:e2e`, not just checking for the one known
+  pattern.
 
 - [ ] **DOC-8 (S)** Once DOC-2..DOC-7 land, a final sweep: re-grep for
   the family-wide anti-patterns found along the way (duplicated
