@@ -4447,6 +4447,61 @@ committing (see plan.md §4).
     `AGENTS.md`'s BFF description and `CLAUDE.md`'s thin `@AGENTS.md`
     include were already accurate — no change needed there.
 
+  - *`thing/thing-front-end-with-svelte` done 2026-08-04.* Unlike the
+    organization audit above, here the BFF-auth landing (2026-07-04,
+    `f66ff50f`) and the `/review` board (2026-07-19) shipped with
+    **no** doc pass at all: `spec/13-tasks.md` still had T-22 (auth)
+    and T-18 (batch dedup UI) unchecked though both are fully
+    implemented; `spec/08-architecture.md`'s diagram showed the
+    browser calling the Thing Service directly (no BFF hop);
+    `spec/09-api-consumption.md` was missing the review-queue
+    endpoints and still called `POST /api/things/deduplicate`
+    "not yet routed" though `/review`'s scan button calls it;
+    `spec/15-roadmap.md` still gated auth on "once Thing Service
+    ships auth" — false, the migration was family-wide and
+    independent; `AGENTS.md` still said authentication was "out of
+    scope until the service ships auth" under "What does NOT live
+    here"; `README.md`'s Stack section named the removed
+    `wx-svelte-grid`/`wx-svelte-core` packages (replaced by
+    `@svar-ui/svelte-grid`+`svelte-filter` 2026-07-19) and its
+    Prerequisites cited the old `:8080` default against its own
+    Configuration section's correct `:5150`; its project-layout tree
+    predated `src/lib/server/`, `hooks.server.ts`, and three routes.
+    **`.env.example` was the exact TUT-1/TUT-2 bug**, and worse than
+    the sibling audits found elsewhere: it documented
+    `PUBLIC_API_BASE_URL=http://localhost:8080` copy-pasted from
+    **the person front-end** ("Person Service REST API base URL" as
+    the comment, in the *thing* project), zero references in `src/`,
+    while the real BFF vars `THING_API_URL`/`AUTH_API_URL`
+    (`src/lib/server/config.ts`) had no `.env.example` entry —
+    `index.md`'s Environment table had the identical stale variable.
+    `CHANGELOG.md` had zero entry for the BFF-auth landing itself (a
+    later Fixed entry only alluded to it in passing as "BFF/auth-era
+    edits") — added one, dated to the real commit. Fixed all of the
+    above, checked off T-18/T-22 with the honest residual gaps noted
+    inline (T-22: CSRF is not implemented — verified by grep, zero
+    hits; new T-23: no Playwright coverage for `/review`, `/signin`,
+    `/verify`), and narrowed `spec/16-open-questions.md` OQ-3 to what
+    is genuinely still open (401/403 redirect, CSRF) rather than
+    reading like the BFF model itself was still hypothetical.
+    Confirmed the create-form does **not** work around the
+    now-fixed thing-service `QA-SERVER-FIELDS` defect (server-owned
+    fields were already `?`-optional in the TS `Thing` interface and
+    the new-thing blank object only sets `name`) and that this
+    project's own spec/AGENTS never described the old broken
+    contract, so no fix was needed on that front. Verified live
+    (not inferred): `pnpm install`, `pnpm check` (0/0), `pnpm test`
+    (44/44), `pnpm build` all green; the i18n parity test covers
+    `review.*`/`signin.*`/`verify.*` with real translations (spot
+    checked `review.run` non-English) across all 13 locales. Left
+    unfixed and flagged rather than silently patched: `pnpm lint`
+    (`prettier --check src`) fails on `src/lib/api/types.ts` and
+    `src/lib/svar-filter-augment.d.ts` — pre-existing drift, out of
+    this doc-only pass's scope. All edited files re-confirmed well
+    under 40 KB. Did not touch `thing/thing-service-with-loco`
+    (sibling crate, out of this task's boundary) or any of the other
+    ten front-ends (concurrent sibling audits).
+
 - [ ] **DOC-5 (M)** Library crates' `spec/`, `AGENTS.md`/`CLAUDE.md`,
   `README.md`/`index.md`: `authentication-verifier-rust-crate`,
   `integrity-mac-rust-crate`, `link/entity-ref-rust-crate`. Smaller

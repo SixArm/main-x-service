@@ -17,9 +17,10 @@
 - [ ] T-15: Edit UI for the remaining Thing fields — `images`, `main_entity_of_page`, `subject_of`, `potential_action` (the edit form re-PUTs the whole record, so these round-trip unchanged; identifiers, alternate names, and same-as URLs are already editable).
 - [ ] T-16: Theming tokens in `app.css` extracted to a small theme module.
 - [ ] T-17: `check-duplicates` endpoint wired into create form (preview before commit).
-- [ ] T-18: Batch deduplicate-scan results UI.
+- [x] T-18: Batch deduplicate-scan results UI — `/review` (SVAR Kanban: Pending / Confirmed / Rejected / AutoMerged), landed 2026-07-19; drag-to-decide against `POST /api/things/review-queue/{id}/decision` landed the same day.
 - [ ] T-19: Masked-view toggle on detail page.
 - [ ] T-20: GDPR-export download button.
 - [ ] T-21: Validate the SVAR licensing fit (free GPL-3.0 vs Pro) — see §16 OQ-1.
-- [ ] T-22: Auth — adopt BFF + httpOnly cookie + CSRF; the browser holds only `__Host-mxi_session`, the SvelteKit server attaches a short-lived PASETO server-side; no `mxi_access_token`/`localStorage` bearer, no fragment handoff (per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
+- [x] T-22: Auth — BFF + httpOnly `__Host-mxi_session` cookie + session→PASETO exchange; the browser never holds a token (per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)). Landed 2026-07-04 (`f66ff50f`): `hooks.server.ts`, `/signin`, `/verify`, `/api/proxy/[...path]`, `src/lib/server/{config,session,auth}.ts`. **CSRF is not yet implemented** — the BFF has no `X-CSRF-Token`/synchroniser-cookie check on mutating browser→BFF calls; tracked as a follow-up rather than closed silently under this checkbox.
+- [ ] T-23: E2E coverage for the BFF pages — `tests/e2e/things.spec.ts` (5 tests) covers only the pre-auth MVP routes; `/review`, `/signin`, and `/verify` have no Playwright smoke test yet.
 

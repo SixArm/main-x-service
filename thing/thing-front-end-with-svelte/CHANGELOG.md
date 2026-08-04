@@ -9,6 +9,72 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Doc pass (2026-08-04, DOC-4)
+
+- `.env.example` documented a decommissioned client-held-token model
+  (`PUBLIC_API_BASE_URL=http://localhost:8080`, and — copy-pasted from
+  another project — labelled "Person Service") with zero references in
+  `src/`. The BFF actually reads `THING_API_URL`/`AUTH_API_URL`
+  server-side (`src/lib/server/config.ts`, already correctly documented
+  in `README.md`); rewrote `.env.example` to match. `index.md`'s
+  Environment table had the same stale variable.
+- Retroactively documented the BFF auth landing below (2026-07-04,
+  `f66ff50f`) — it shipped with no `CHANGELOG.md` entry of its own; the
+  only trace here was a later "left behind by recent BFF/auth-era
+  edits" aside in a Fixed entry.
+- `spec/13-tasks.md` T-18 (batch dedup UI) and T-22 (BFF auth) were
+  still unchecked despite both being implemented and covered by the
+  entries below; checked them off, and noted the real gaps T-22 leaves
+  open (no CSRF) as a new T-23 (no e2e coverage for `/review`,
+  `/signin`, `/verify`).
+- `spec/08-architecture.md`'s diagram showed the browser calling the
+  Thing Service directly; redrawn with the BFF proxy hop.
+- `spec/09-api-consumption.md` was missing the review-queue endpoints
+  (`GET /api/things/review-queue`, `POST
+  /api/things/review-queue/{id}/decision`) and still called
+  `POST /api/things/deduplicate` "not yet routed" though `/review`'s
+  scan button calls it.
+- `spec/15-roadmap.md` v0.3 still read "Auth integration (once Thing
+  Service ships auth)" — false; the family-wide auth-service migration
+  landed independently of any per-service auth work. Marked done.
+- `spec/16-open-questions.md` OQ-3 asked how the UI should redirect on
+  401/403 as if the BFF model itself were still hypothetical; it is
+  implemented — narrowed the open question to the two things that are
+  genuinely still missing (401/403 redirect, CSRF).
+- `AGENTS.md` still said "Authentication. Out of scope until the
+  service ships auth" under "What does NOT live here" — removed, and
+  added a BFF section describing what's actually implemented.
+- `README.md`: Prerequisites cited the Thing Service's old
+  `http://localhost:8080` default (the Configuration section two
+  sections down already correctly says 5150); Stack section still
+  named the removed `wx-svelte-grid`/`wx-svelte-core` packages; Project
+  layout tree predated `src/lib/server/`, `hooks.server.ts`, and the
+  `/review`/`/signin`/`/verify`/`/api/proxy` routes, and mislabelled
+  `+layout.svelte` "sidebar nav" though the family-wide rule (and this
+  project's own `spec/§5`) is a top nav bar with a hamburger toggle.
+  Fixed all four.
+- Verified (not merely inferred): `pnpm install`, `pnpm check` (0/0),
+  `pnpm test` (44/44), `pnpm build` all pass; the i18n key-parity test
+  covers `review.*`/`signin.*`/`verify.*` with real (non-English-stub)
+  translations across all 13 locales.
+- Not fixed here (flagged, not silently patched): `pnpm lint`
+  (`prettier --check src`) currently fails on `src/lib/api/types.ts`
+  and `src/lib/svar-filter-augment.d.ts` — pre-existing formatting
+  drift, out of this doc-only pass's scope.
+
+### Added — BFF authentication (2026-07-04, `f66ff50f`)
+
+- Adopted the family-wide cookie-session + PASETO v4.public model
+  (`agents/share/authentication-sessions.md`): `src/hooks.server.ts`
+  resolves the httpOnly `__Host-mxi_session` cookie into
+  `locals.sessionId`; `/signin` requests a magic link, `/verify`
+  consumes it and establishes the session; `/api/proxy/[...path]` is
+  the same-origin reverse proxy that exchanges the session for a
+  short-lived PASETO and forwards to the Thing Service with
+  `Authorization: Bearer <paseto>`. The browser never holds a token.
+  `src/lib/server/{config,session,auth}.ts` hold the server-only
+  implementation. CSRF protection is not yet implemented (see T-22).
+
 ### Added — drag-to-decide review board (2026-07-19)
 
 - 2026-07-19 — `/review` now loads the **stored** review queue on mount

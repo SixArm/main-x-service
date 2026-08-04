@@ -21,7 +21,7 @@ SvelteKit front-end for the **[Thing Service](../thing-service-with-loco/)** in 
 ## Stack
 
 - **SvelteKit 2** + **Svelte 5** (runes API)
-- **SVAR Svelte DataGrid** (`wx-svelte-grid`, `wx-svelte-core`)
+- **@svar-ui/svelte-grid** + **@svar-ui/svelte-filter** (DataGrid + FilterBar; migrated off the legacy `wx-svelte-*` packages 2026-07-19)
 - **Lily Design System Svelte Headless** (consumed via `file:` dependency)
 - **TypeScript** strict mode
 - **Vitest** for unit tests, **Playwright** for e2e
@@ -30,7 +30,8 @@ SvelteKit front-end for the **[Thing Service](../thing-service-with-loco/)** in 
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Thing Service — see [`../thing-service-with-loco/README.md`](../thing-service-with-loco/README.md). Default: `http://localhost:8080`.
+- A running Thing Service — see [`../thing-service-with-loco/README.md`](../thing-service-with-loco/README.md). Default: `http://localhost:5150` (loco dev default; see Configuration below).
+- A running Authentication Service for sign-in — see [`../../authentication/authentication-service-with-loco/README.md`](../../authentication/authentication-service-with-loco/README.md). Default: `http://localhost:5150` (a distinct instance/port in a real deployment).
 
 ## Quick start
 
@@ -70,12 +71,18 @@ src/
   app.html
   app.css                  - shared CSS variables + utility classes
   app.d.ts
+  hooks.server.ts          - resolves locals.sessionId from the BFF cookie
   lib/
     config.ts              - same-origin BFF proxy base (/api/proxy)
+    i18n.svelte.ts          - 13-locale string catalog + translate()
+    server/                 - BFF-only, never bundled into the browser
+      config.ts             - THING_API_URL / AUTH_API_URL
+      session.ts             - __Host-mxi_session cookie helpers
+      auth.ts                 - magic-link + session->PASETO exchange calls
     api/
       types.ts             - Thing, ThingIdentifier, MatchResult, … (mirrors the Rust models)
       client.ts            - ApiClient + ApiError (envelope-aware fetch)
-      things.ts           - ThingRepository (CRUD + search + match + merge + audit)
+      things.ts           - ThingRepository (CRUD + search + match + merge + audit + review-queue)
     forms/
       form.svelte.ts       - createForm rune-based store
       LabeledField.svelte
@@ -88,7 +95,8 @@ src/
       ThingForm.svelte
       MatchResultsList.svelte
   routes/
-    +layout.svelte         - sidebar nav
+    +layout.svelte         - top nav bar (hamburger on narrow viewports); theme/locale pickers
+    +layout.server.ts       - exposes signedIn to the layout
     +page.svelte           - dashboard
     things/
       +page.svelte         - list
@@ -99,12 +107,20 @@ src/
         +page.svelte       - detail
         edit/+page.svelte
         audit/+page.svelte
+    review/+page.svelte     - stored duplicate-review board (SVAR Kanban)
+    signin/+page.svelte     - BFF magic-link request
+    verify/+page.svelte     - BFF magic-link consume (sets the session cookie)
+    api/proxy/[...path]/+server.ts - BFF reverse proxy (session -> PASETO -> Thing Service)
 tests/
   unit/
-    client.test.ts         - ApiClient envelope + error tests
-    things.test.ts        - ThingRepository wrapping tests
+    client.test.ts          - ApiClient envelope + error tests
+    things.test.ts          - ThingRepository wrapping tests
+    thing-form.test.ts       - FR-4 create/edit form validation
+    merge-validation.test.ts - FR-9 merge guard
+    i18n.test.ts             - 13-locale key-parity test
+    layout.test.ts           - layout smoke
   e2e/
-    things.spec.ts        - smoke tests
+    things.spec.ts          - smoke tests (5)
 ```
 
 ## Lily Design System

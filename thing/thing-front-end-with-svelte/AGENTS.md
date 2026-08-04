@@ -38,10 +38,30 @@ Per repo decision (2026-06-02), each `*-front-end-with-svelte` project keeps its
 | Reusable form pieces | `src/lib/forms/` |
 | Thing-specific components | `src/lib/components/` |
 | Routes / pages | `src/routes/` |
+| BFF session + auth helpers (server-only) | `src/lib/server/` |
+
+## Authentication — BFF pattern (implemented)
+
+This front-end runs its own SvelteKit server as a **Backend-For-Frontend**,
+per [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
+§6. The browser holds only the httpOnly `__Host-mxi_session` cookie and
+never sees a token or calls the Thing Service directly:
+
+- `src/hooks.server.ts` resolves `locals.sessionId` from the cookie.
+- `src/routes/signin/` + `src/routes/verify/` implement the magic-link
+  login/verify pages (`src/lib/server/auth.ts` calls the authentication
+  service).
+- `src/routes/api/proxy/[...path]/+server.ts` is the same-origin reverse
+  proxy: it exchanges the session for a short-lived PASETO
+  (`src/lib/server/auth.ts::exchangeToken`) and forwards to
+  `THING_API_URL` with `Authorization: Bearer <paseto>`. Pages keep using
+  the existing `ApiClient`/`ThingRepository` unchanged — its base URL just
+  points at `/api/proxy`.
+- Env vars are read server-side only, in `src/lib/server/config.ts`
+  (`THING_API_URL`, `AUTH_API_URL`) — see `.env.example`.
 
 ## What does NOT live here
 
-- Authentication. Out of scope until the service ships auth (Thing Service spec §15).
 - FHIR Thing UI. Out of scope for MVP.
 - Consent management UI. Out of scope for MVP (Thing Service has `/consents` endpoints but no front-end yet).
 - GDPR-export download UI. Out of scope for MVP.

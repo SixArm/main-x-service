@@ -39,6 +39,9 @@ The SPA mounts at `/`. All operator workflows live under `/things`.
 | `/things/[id]/audit` | Per-record audit log |
 | `/things/match` | Score-bearing match check against a candidate Thing |
 | `/things/merge` | Two-ID merge preview + confirm |
+| `/review` | Stored duplicate-review board (SVAR Kanban: Pending / Confirmed / Rejected / AutoMerged) |
+| `/signin` | Per-app magic-link sign-in (BFF) |
+| `/verify` | Magic-link verification (BFF) |
 
 ## Worked flows
 
@@ -71,9 +74,14 @@ The SPA mounts at `/`. All operator workflows live under `/things`.
 
 ## Environment
 
+The browser calls only the same-origin BFF proxy (`/api/proxy`); there is
+no public/client-held API base URL. These are read server-side only, in
+`src/lib/server/config.ts` (see `.env.example`):
+
 | Variable | Default | Purpose |
 |---|---|---|
-| `PUBLIC_API_BASE_URL` | `http://localhost:8080` | Thing Service base URL |
+| `THING_API_URL` | `http://localhost:5150` | Thing Service base URL — the proxy injects a server-exchanged PASETO and forwards |
+| `AUTH_API_URL` | `http://localhost:5150` | Authentication Service base URL — magic-link login + session→PASETO exchange |
 
 ## Tech stack reminder
 
