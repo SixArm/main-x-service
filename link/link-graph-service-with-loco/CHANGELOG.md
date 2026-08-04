@@ -13,6 +13,77 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > and [event-bus.md](../../agents/share/event-bus.md).
 
 ## [Unreleased]
+### Fixed — DOC-6 doc audit (2026-08-04)
+
+Repo-wide task DOC-6, unblocked by LNK-4's completion (T-29..T-33,
+above). Confirmed `spec/13-tasks.md` and `spec/16-open-questions.md`
+were already accurate (each T-29..T-33 commit kept both current as it
+landed — no gaps found there). The real drift was in the narrative
+docs those two commit streams never touched: **`README.md` and every
+non-tracker `spec/*.md` file were last edited before LNK-4** (git log
+confirms — `spec/index.md` not since the auth-pivot commit,
+`spec/08-architecture.md` not since it either), so a whole feature
+program (LNK-4) and, in `spec/08-architecture.md`'s case, the entire
+real `src/` module layout (never updated past the pre-scaffold
+"planned" sketch) were undocumented outside the task tracker. Fixed,
+no `src/` change:
+
+- **`spec/14-implementation-status.md`** — the headline "15 tests"
+  claim was stale by 80 tests (live `cargo test --lib`: 95); the
+  "what is implemented" list stopped at the 2026-07-09 v1 core and
+  never gained the bus consumer, governance/auth, reconciliation,
+  metrics, or LNK-4; §14.3 "upstream prerequisites" described the
+  durable bus and the person/worker `entity_links` write-side as still
+  pending when both landed months ago. Rewritten against a fresh
+  `cargo test --lib` run and `git log` per claim, not inference.
+- **`spec/08-architecture.md`** §8.5 "Module structure (planned)" was
+  the pre-scaffold sketch (`ref/`, `registry/`, `consume/`,
+  `projector/`, `presence/`, `verify/`, `api/rest/`, `workers/`, `db/`,
+  `observability/`) — none of those directories exist; replaced with
+  the real 20-file `src/` tree (verified via `find src -name '*.rs'`).
+  Also added the suggestion job to the component table and diagram.
+- **`spec/02-scope.md`** — "Matching… a future cross-service
+  `same_identity` matcher is a producer of edges" and "Suggestion-queue
+  UI… ships no review workflow" were both false: LNK-4 landed exactly
+  those two "future" items. Fixed both directions (in-scope list +
+  out-of-scope list).
+- **`spec/12-compliance.md`** §12.3 asserted `same_identity` "is
+  operator-asserted / high-confidence" unconditionally — no longer true
+  since `matcher_suggested` `same_identity` edges exist at
+  `confidence < 1.0`.
+- **`spec/10-persistence.md`** had no section at all for the
+  `suggestion_runs` table (migration `m20260804_000001_suggestion_runs`,
+  T-33) despite documenting every other table; added §10.7.
+- **`spec/06-functional-requirements.md`** had zero FRs for LNK-4's
+  entire suggestion pipeline; added FR-23..FR-28 (§6.8).
+- **`spec/01-purpose-and-vision.md`, `AGENTS.md`, `README.md`** — the
+  "read-only to the world" / "not a matcher" invariants, true as
+  originally written, were phrased in a way a future reader could
+  misread as contradicting the suggestion job's real outbound
+  `GET`/`POST` traffic to person/worker. Clarified in place (the
+  invariant is about this crate's own *inbound* surface — pinned at
+  `spec/16-open-questions.md` OQ-9(c), confirmed already correctly
+  resolved there, not re-litigated).
+- **`spec/03-stakeholders-and-users.md`, `spec/04-glossary.md`,
+  `spec/05-domain-model.md`, `spec/07-non-functional-requirements.md`,
+  `spec/09-api-surface.md`, `spec/11-testing-strategy.md`,
+  `spec/15-roadmap.md`, `spec/17-references.md`** — added the missing
+  LNK-4 stakeholders, glossary terms, `IdentityProbe`/`IdentityMatchScore`/
+  `IdentityCandidate` domain types (§5.5), a scale-bound NFR-15, an
+  explicit "no new route" confirmation, the LNK-4 unit-test tier + the
+  manual live-test tier (§11.7, also recording T-33's own follow-up
+  note about `test-db` currently sweeping up the live tests), and
+  marked the roadmap's "Beyond v0.5 (candidate)" items **done** rather
+  than still-future.
+- **Not touched, confirmed accurate**: `spec/13-tasks.md`,
+  `spec/16-open-questions.md`, `spec/18-change-control.md`, this
+  `CHANGELOG.md`'s own T-29..T-33 entries (all eight landing commits
+  already have a dated entry here).
+
+Verified: `cargo build`, `cargo test --lib` (95 passed), `cargo fmt
+--check`, `cargo clippy --all-targets -- -D warnings` — all clean,
+before and after (no `src/` edit in this pass).
+
 ### Added — T-33: governance, scale controls, and audit for cross-service suggestion (OQ-9(a)/(d)) — closes LNK-4
 
 The last of the five LNK-4 sub-tasks (T-29 comparator → T-30 blocking →

@@ -5336,12 +5336,48 @@ committing (see plan.md §4).
   no such tag exists; H-5's own notes already recorded this crate as
   skipped.
 
-- [ ] **DOC-6 (M)** `link-graph-service-with-loco`'s `spec/`,
+- [x] **DOC-6 (M)** `link-graph-service-with-loco`'s `spec/`,
   `AGENTS.md`, `README.md`/`index.md`. **Unblocked 2026-08-04** — LNK-4's
   T-29..T-33 chain is now fully landed (`spec/13-tasks.md` and
   `spec/16-open-questions.md` both updated as each task closed), so the
   active-file-conflict reason to queue this behind it no longer
-  applies. Still not started.
+  applies.
+
+  **Done 2026-08-04.** Confirmed the brief's own hypothesis by `git
+  log`: `spec/13-tasks.md` and `spec/16-open-questions.md` really were
+  kept current commit-by-commit across all eight T-29..T-33 landings
+  (no gaps) — but `README.md` and every other `spec/*.md` file had not
+  been touched since well before LNK-4 (several since before the
+  BUS-2 Fluvio consumer, one — `spec/08-architecture.md` — since
+  before the crate was even scaffolded). Fixed, no `src/` change: the
+  headline test-count claim ("15 tests" → live 95, in
+  `spec/14-implementation-status.md`, whose "what is implemented" list
+  and "upstream prerequisites" section were also years-stale);
+  `spec/08-architecture.md` §8.5's module-structure diagram was a
+  **pre-scaffold plan that was never built** (`ref/`, `registry/`,
+  `consume/`, `projector/`, …) — replaced with the real 20-file `src/`
+  tree; `spec/02-scope.md` and `spec/12-compliance.md` each asserted
+  something LNK-4 had made false ("a future cross-service matcher…
+  not part of this service", "ships no review workflow",
+  `same_identity` "is operator-asserted" unconditionally);
+  `spec/10-persistence.md` and `spec/06-functional-requirements.md`
+  had no section at all for the new `suggestion_runs` table or the
+  LNK-4 pipeline's FRs. Also clarified, in `AGENTS.md`/`README.md`/
+  `spec/01-purpose-and-vision.md`, a real ambiguity risk the task
+  brief flagged: the "read-only to the world" / "not a matcher"
+  invariants are true but read as if they contradicted the suggestion
+  job's real outbound `GET`/`POST` traffic to person/worker — spelled
+  out that the invariant is about this crate's own inbound surface
+  only (already correctly resolved at `spec/16-open-questions.md`
+  OQ-9(c), not re-litigated, just made harder to misread). Verified
+  `cargo build` / `cargo test --lib` (95 passed) / `cargo fmt --check`
+  / `cargo clippy --all-targets -- -D warnings`, all clean before and
+  after — this was a docs-only pass.
+
+  This closes the documentation-harmonization program. **Phase 6
+  (DOC-1 through DOC-8) is now complete** — every subproject's
+  `spec/`/`AGENTS.md`/`README.md`/`index.md` has been audited against
+  live code at least once as of 2026-08-04.
 
 - [x] **DOC-7 (L)** The five consumer apps' docs — `case-folder`,
   `patient-flow`, `workforce-planning-management`,

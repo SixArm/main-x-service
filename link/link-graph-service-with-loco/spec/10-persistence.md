@@ -127,3 +127,41 @@ in case a sibling-uniformity constraint forces otherwise.
   service only diffs against it during reconciliation, §6 FR-21).
 - No within-entity `relationships` (those stay on each domain model;
   the partition rule, design §7).
+- No `review_queue` — a `matcher_suggested` candidate's review/promotion
+  state lives entirely in **person's** own `review_queue` table (§6.8,
+  §10.7 below). This service is not where a suggestion is decided.
+
+### 10.7 `suggestion_runs` — cross-service suggestion job audit (LNK-4)
+
+```sql
+CREATE TABLE suggestion_runs (
+    id                  UUID PRIMARY KEY,
+    started_at          TIMESTAMPTZ NOT NULL,
+    completed_at        TIMESTAMPTZ NOT NULL,
+    persons_fetched     BIGINT NOT NULL,
+    workers_fetched     BIGINT NOT NULL,
+    candidates          BIGINT NOT NULL,
+    posted              BIGINT NOT NULL,
+    failed              BIGINT NOT NULL,
+    dropped             BIGINT NOT NULL,
+    max_candidates      BIGINT NOT NULL,
+    max_edges_per_run   BIGINT NOT NULL
+);
+CREATE INDEX suggestion_runs_completed_at ON suggestion_runs (completed_at);
+```
+
+Migration `m20260804_000001_suggestion_runs` (T-33); model
+`src/models/suggestion_runs.rs`, `Model::record`. One row per
+**completed** suggestion pass (§6 FR-28) — a pass that fails at the
+fetch step records nothing, matching `run_periodic`'s existing
+log-and-retry posture for that case. This is a **history**, not a
+last-value slot (contrast the reconciliation worker, §10.6, whose
+summary lives only in a live Prometheus gauge — sufficient there
+because only the *current* divergence matters; insufficient here,
+since OQ-9(d) asks the suggestion job's summary to survive a missed
+scrape or a restart). A `link_graph_suggestion_last_run` gauge vec
+(labelled `stat`) mirrors the latest row's counts for live/alertable
+visibility on top of this durable history. Distinct from `audit_log`
+(§10.4): `audit_log` records governed-edge **access** (who read/wrote
+a `subject_of`/`about` edge); `suggestion_runs` records **job
+run** counts, unrelated to `case ↔ person` governance.

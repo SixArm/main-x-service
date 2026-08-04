@@ -44,7 +44,11 @@
 
 - [person-service-with-loco](../../../person/person-service-with-loco/spec/index.md)
   + [worker-service-with-loco](../../../worker/worker-service-with-loco/spec/index.md)
-  — the `same_identity` backbone.
+  — the `same_identity` backbone. Since LNK-4 (§6.8), both are also
+  direct **HTTP dependencies** of the suggestion job (`GET` their list
+  endpoints), with person additionally the job's **write target**
+  (`POST /api/persons/{id}/links`) — see person-service's own
+  `spec/13-tasks.md` T-32 entry for the review-queue side of this.
 - [organization-service-with-loco](../../../organization/organization-service-with-loco/spec/index.md)
   — affiliation targets.
 - [case-service-with-loco](../../../case/case-service-with-loco/spec/index.md)

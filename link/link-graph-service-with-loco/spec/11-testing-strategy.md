@@ -30,6 +30,15 @@ Tiered after the family convention: un-gated unit tests run DB-free in
   FR-2).
 - **`as_of` projection** — freshness watermark derives the `as_of`
   attached to graph responses.
+- **Cross-service identity suggestion (LNK-4, §6.8)** — `IdentityProbe`
+  comparison (identifier short-circuit, weighted name/DOB/gender,
+  never-spurious-on-absence), candidate blocking (same-block-only
+  comparison, deterministic truncation under
+  `LINK_GRAPH_SUGGEST_MAX_CANDIDATES`), and the highest-confidence-
+  survives-the-cut proof for `LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN`. A
+  `compile_fail` doctest pins the §7 partition rule: `IdentityProbe`
+  has no conversion to/from `person_matcher::Person` /
+  `worker_matcher::Worker`.
 
 ### 11.2 DB-gated (`#[ignore]`)
 
@@ -46,6 +55,9 @@ Tiered after the family convention: un-gated unit tests run DB-free in
 - Reconciliation worker: seed a divergence (drop an edge), run, assert
   the divergence metric reflects it and the read-model is repaired (§6
   FR-21).
+- Suggestion job (§6.8): two completed passes accumulate two
+  `suggestion_runs` rows (a history, not a last-value slot), and stored
+  counts round-trip through Postgres exactly (`tests/suggestion_runs.rs`).
 
 ### 11.3 Bus-gated (feature `fluvio` + broker/test container)
 
@@ -73,3 +85,20 @@ Tiered after the family convention: un-gated unit tests run DB-free in
 
 - `neighbors` (depth 1) and `edges` filter latency on a representative
   graph; `single-view` multi-hop at the depth cap.
+
+### 11.7 Manual live-service tests (not part of any CI stage)
+
+Three `#[ignore]`d tests (`tests/live_suggest_fetch.rs`,
+`tests/live_suggest_full_pipeline.rs`,
+`tests/live_suggest_never_promoted.rs`, LNK-4 T-31/T-33) drive this
+crate's real `HttpIdentitySource`/`HttpSuggestionSink`/
+`run_suggestion_pass` against genuinely running person-service and
+worker-service instances — no mocks on the write side. These prove
+properties a mocked test cannot (real pagination against live data; the
+governance capstone that a near-ceiling identifier match is never
+auto-promoted, §6 FR-25). **Known gap** (§13 T-33's own note): the
+blanket `cargo test -- --ignored` the `test-db` CI stage runs currently
+sweeps these up despite their own doc comments saying otherwise, so
+`scripts/ci-check.sh test-db` for this crate aborts after the first
+test binary unless run test-by-test; giving this tier its own excluded
+marker is an open follow-up, not yet scheduled.

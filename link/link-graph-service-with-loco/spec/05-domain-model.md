@@ -49,8 +49,10 @@ pub struct Edge {
 - `EdgeStatus` — `Unverified | Verified | Dangling`; the integrity
   lifecycle (§8 architecture), derived from `entity_presence`.
 - `Provenance` — `Operator | Import | MatcherSuggested`. `matcher_suggested`
-  edges enter at `confidence < 1.0` and are destined for a future review
-  queue ([design §5.2](../../../agents/share/cross-service-linking.md#52-provenance--the-suggestion-queue)).
+  edges enter at `confidence < 1.0` and surface in a review queue
+  ([design §5.2](../../../agents/share/cross-service-linking.md#52-provenance--the-suggestion-queue))
+  — for `same_identity`, that queue is **person's own `review_queue`**
+  table (LNK-4, T-32; §5.5, §6.8), not a table in this service.
 - `EntityPresence` — `{ ref: EntityRef, alive: bool, last_seq: i64 }`;
   the existence oracle.
 - `FreshnessWatermark` — per-entity-topic `{ entity, last_occurred_at,
@@ -76,7 +78,48 @@ exactly:
   `taught_by` worker) is a new registry row + endpoint-type pair +
   inverse; the topology is unchanged.
 
-### 5.5 What this model is NOT
+### 5.5 Cross-service identity suggestion types (LNK-4, `src/suggest/`)
+
+Pure, offline value types the suggestion job (§6.8) scores with — not
+persisted, not a `Provenance`/`EdgeKind` extension, not fed into
+`person_matcher` / `worker_matcher` (§1.3, the partition rule):
+
+```rust
+pub struct IdentityProbe {
+    pub name: Option<ProbeName>,          // { family, given }
+    pub birth_date: Option<NaiveDate>,
+    pub gender: Option<Gender>,           // reused from person-matcher
+    pub identifiers: Vec<ProbeIdentifier>, // normalised (scheme, value)
+}
+
+pub struct IdentityMatchScore {
+    pub confidence: f64,               // [0.0, 1.0]; identifier ceiling 0.99, probabilistic ceiling 0.97
+    pub identifier_match: bool,        // true ⇒ the identifier short-circuit fired
+    pub name_score: Option<f64>,       // None = excluded, not zero
+    pub dob_score: Option<f64>,
+    pub gender_score: Option<f64>,
+}
+
+pub struct IdentityCandidate {        // an (EntityRef, EntityRef, IdentityMatchScore) triple
+    pub person: EntityRef,
+    pub worker: EntityRef,
+    pub score: IdentityMatchScore,
+}
+```
+
+`compare_identity(a, b) -> IdentityMatchScore` scores one pair;
+`generate_candidates_bounded(persons, workers, max_candidates)` blocks
++ scores many pairs sub-quadratically (§6.8 FR-24/25). The one durable
+row this subsystem writes to *this service's own* storage is
+`SuggestionRunRecord` (`src/models/suggestion_runs.rs`, backing the
+`suggestion_runs` table, §10.7) — one per completed pass, holding
+`started_at` / `completed_at` / `persons_fetched` / `workers_fetched` /
+`candidates` / `posted` / `failed` / `dropped` / the two caps in force.
+It never stores an `IdentityProbe` or an `IdentityMatchScore` itself
+(neither is PII-bearing on its own, but neither is retained beyond one
+pass either).
+
+### 5.6 What this model is NOT
 
 - Not an entity aggregate, not a matcher DTO, not a system of record.
 - Not within-entity `relationships` — those stay on each domain model

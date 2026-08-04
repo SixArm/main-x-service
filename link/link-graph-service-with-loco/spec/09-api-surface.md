@@ -7,6 +7,14 @@ service
 All state changes arrive via the bus consumers (§8), which are not an
 HTTP surface.
 
+The LNK-4 cross-service `same_identity` suggestion job (§6.8) does not
+change this: it adds **no new route on this service**. It is a
+periodic Tokio task that makes outbound calls as an HTTP *client*
+(`GET` person + worker, `POST` to person's own link-write endpoint) —
+the inverse direction of this table, and no different in kind from the
+reconciliation worker's existing outbound `GET`s (§8.1). This table
+remains the complete inbound surface.
+
 | Tier | Surface |
 |---|---|
 | REST (loco.rs controllers on Axum) | Read endpoints under `/api/*`, registered as a loco `Routes` table. |

@@ -38,6 +38,13 @@
   privacy masking on the `subject_of` / `about` edge, matching the case
   service's posture
   ([design §10](../../../agents/share/cross-service-linking.md#10-governance--case--person)).
+- **Cross-service `same_identity` suggestion (LNK-4).** A periodic
+  aggregator-hosted job (`src/suggest/`) compares person and worker
+  records (blocked, scored `IdentityProbe` pairs) and `POST`s
+  `matcher_suggested` `same_identity` candidates to person's own
+  write API; review/promotion happens in person's existing
+  `review_queue`, not here. See §5.5, §6.8, and
+  [`spec/16-open-questions.md`](16-open-questions.md) OQ-9.
 - **Observability.** Tracing + OpenTelemetry OTLP; Prometheus metrics
   including consumer lag and reconciliation divergence.
 - PostgreSQL persistence via SeaORM, with migrations.
@@ -46,15 +53,22 @@
 
 - **Link writes.** Edge creation / withdrawal stays in the owning
   entity service (design §4.1); this service is read-only to the world.
-- **Matching.** No matcher embeds here; cross-service edges are never a
-  match signal (design §7). A future cross-service `same_identity`
-  matcher is a *producer* of edges (roadmap §15), not part of this
-  service.
+- **Within-entity matching.** No `person_matcher` / `worker_matcher`
+  embeds here; cross-service edges are never fed to either (design §7).
+  **Landed, no longer out of scope:** the LNK-4 cross-service
+  `same_identity` **suggestion** comparator (`src/suggest/`) *is* part
+  of this service (§2.1 above) — it produces `matcher_suggested` edges
+  as a peer-API client, never consumes an edge into a within-entity
+  matcher.
 - **Arbitrary-depth traversal.** v1 caps `neighbors` depth (OQ in §16);
   unbounded recursive CTE is deferred.
-- **Suggestion-queue UI.** `provenance = matcher_suggested` review
-  (design §5.2) is a roadmap item; v1 stores and exposes `provenance` /
-  `confidence` but ships no review workflow.
+- **A dedicated suggestion-review UI/endpoint of this service's own.**
+  `provenance = matcher_suggested` review (design §5.2) **now has a
+  real workflow** (LNK-4, T-32) — but it lives entirely in **person's**
+  existing `review_queue` table and endpoints, not here. This service
+  stores and exposes `provenance` / `confidence` on the read side
+  (`GET /edges?status=unverified`) as a read-only discovery
+  convenience only.
 - **gRPC API** (stub only).
 - **FHIR mapping** (no FHIR resource models a cross-service link).
 - **New edge kinds** beyond the v1 closed registry (design §9). Adding

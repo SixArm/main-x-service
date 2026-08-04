@@ -39,9 +39,14 @@ lighter affiliation posture
 `same_identity`, `works_at`, `member_of`, `employed_by` are
 medium-sensitivity (design §9). They carry the default JWT-verification
 posture (NFR-10) once the family auth rollout reaches this service
-(§14). `same_identity` is an **identity assertion** and is
-operator-asserted / high-confidence, but does not require the case-grade
-controls above.
+(§14). `same_identity` is an **identity assertion** — historically
+always operator-asserted / high-confidence (`provenance = operator`,
+`confidence = 1.0`), but since LNK-4 (§6.8) it may also arrive as
+`provenance = matcher_suggested` at `confidence < 1.0`, sitting
+`unverified` until a person-service operator confirms it via person's
+own `review_queue`. Neither provenance requires the case-grade controls
+above; a suggested-but-unconfirmed edge is still only medium-sensitivity,
+not high.
 
 ### 12.4 Data minimisation & derivation
 
@@ -58,3 +63,11 @@ The `audit_log` here is the compliance record for governed-edge access;
 it is distinct from the operational change feed (the bus this service
 consumes). They are not interchangeable — the bus is upstream input;
 `audit_log` is this service's own who/what/when record.
+
+A third table, `suggestion_runs` (§10.7, LNK-4), is neither of these: it
+records the **suggestion job's per-pass counts** (fetched / candidates /
+posted / dropped), not who accessed a governed edge. The compliance-
+relevant audit of a *suggested edge's creation* lives on **person's**
+side — its `create_link` handler writes an unconditional `person_link`
+audit row for every link creation regardless of provenance (§6.8,
+`spec/13-tasks.md` T-33) — not in this service's `suggestion_runs`.

@@ -43,17 +43,23 @@ the pure projection logic in `src/graph.rs`, the `apply_event` /
 consumer in `src/consumer.rs` (T-6, BUS-2, behind this crate's own
 `fluvio` Cargo feature), lazy verify-on-read in `src/probe.rs`,
 reconciliation in `src/reconcile.rs`, offline PASETO auth in
-`src/auth.rs`, OpenAPI/Swagger, and Prometheus `/metrics.prom`), and the
+`src/auth.rs`, the cross-service `same_identity` suggestion comparator
++ periodic job in `src/suggest/` (`mod.rs` — pure `IdentityProbe`
+comparison/blocking; `job.rs` — the `reqwest`-backed fetch → block →
+score → POST pipeline against person/worker, LNK-4 T-29..33), OpenAPI/
+Swagger, and Prometheus `/metrics.prom`), and the
 `m20260709_000001_edges` … `_000004_audit_log`,
 `m20260803_000001_processed_events`, `m20260804_000001_suggestion_runs`
-migrations. The cross-service `same_identity` matcher round (LNK-4,
-T-29..33) is **complete** — see [`spec/13-tasks.md`](spec/13-tasks.md)
-and `spec/16-open-questions.md` OQ-9. Remaining (see
+migrations (the last backs `src/models/suggestion_runs.rs`, one durable
+row per completed suggestion pass). The cross-service `same_identity`
+matcher round (LNK-4, T-29..33) is **complete** — see
+[`spec/13-tasks.md`](spec/13-tasks.md) and `spec/16-open-questions.md`
+OQ-9. `cargo test --lib`: 95 passed (2026-08-04). Remaining (see
 [`spec/13-tasks.md`](spec/13-tasks.md) and spec §14): graph-read
 privacy-masking parity with the case service (T-18), OTLP wiring (T-22),
 the durable-bus flip (T-23), the bus/governance/bench test tiers
-(T-26..28), and the documentation-harmonisation pass this LNK-4
-completion unblocks (DOC-6).
+(T-26..28), and (this pass) the documentation-harmonisation sweep
+LNK-4's completion unblocked (DOC-6).
 
 ## Three-part change rule
 
@@ -69,10 +75,20 @@ the shared design doc first, then the three above.
 
 ## Load-bearing invariants — do not erode
 
-- **Read-only to the world.** Never add a link-write endpoint here.
-  Edge creation / withdrawal lives in the owning entity service
-  (`POST/DELETE /<plural>/{pid}/links`, design §4.1). This service only
-  consumes the resulting `linked` / `unlinked` events.
+- **Read-only to the world.** Never add a link-write endpoint of this
+  service's own. Edge creation / withdrawal lives in the owning entity
+  service (`POST/DELETE /<plural>/{pid}/links`, design §4.1). This
+  service only consumes the resulting `linked` / `unlinked` events —
+  **from the outside looking in.** The invariant is about this crate's
+  own *inbound* HTTP surface, not about whether it may ever call a
+  peer's API: the `src/suggest/job.rs` periodic job (LNK-4) *does* make
+  outbound `POST`s to person's `POST /api/persons/{id}/links` as an
+  authenticated client, exactly as `src/reconcile.rs` already makes
+  outbound `GET`s to read peers' authoritative edges. Neither adds a
+  route here; both are this aggregator acting as a client of someone
+  else's write/read API. Pinned in
+  [`spec/16-open-questions.md`](spec/16-open-questions.md) OQ-9(c) —
+  read it before assuming a new outbound call here is a violation.
 - **Partition rule.** Cross-service links are **never** a matcher signal
   and are **never** stored in a within-entity `relationships` field
   (design §7). They live only here, in per-service `entity_links`, and

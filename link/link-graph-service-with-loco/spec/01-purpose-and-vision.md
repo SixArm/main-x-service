@@ -56,11 +56,20 @@ A single graph surface that:
   [design §4.1](../../../agents/share/cross-service-linking.md#41-write-side--entity_links-per-participating-service)).
   This service only consumes the resulting `linked` / `unlinked`
   events.
-- **Not** a matcher and **not** a matcher signal. Cross-service links
-  are **never** fed to any within-entity matcher (the partition rule,
+- **Not a within-entity matcher, and never a within-entity matcher
+  signal.** Cross-service links are **never** fed to any within-entity
+  matcher (the partition rule,
   [design §7](../../../agents/share/cross-service-linking.md#7-relationship-to-within-entity-matching-the-partition-rule));
   they are separate from each domain model's within-entity
-  `relationships` field.
+  `relationships` field. This does **not** mean the service hosts no
+  comparison logic at all: the LNK-4 cross-service `same_identity`
+  suggestion job (`src/suggest/`) *does* compare person and worker
+  records and score candidate pairs — but it produces suggestions
+  (`provenance = matcher_suggested`, always `confidence < 1.0`, never
+  auto-promoted) via person's own write API, never consumes an edge
+  into a within-entity matcher, and is architecturally distinct from
+  `person_matcher` / `worker_matcher`. See §5.5 and
+  [`spec/16-open-questions.md`](16-open-questions.md) OQ-9.
 - **Not** the system of record. Postgres-per-service stays
   authoritative; this is a derived, rebuildable projection of the event
   log.

@@ -65,3 +65,14 @@
   Tantivy where search is needed (not required for v1 graph reads),
   Fluvio for the bus, Utoipa OpenAPI, tracing + OpenTelemetry,
   MiMalloc on MUSL. Podman not Docker; PostgreSQL not SQLite.
+
+### 7.7 Suggestion job scale bounds (LNK-4)
+
+- **NFR-15** — The cross-service `same_identity` suggestion job's
+  comparison cost MUST stay sub-quadratic under candidate blocking
+  (`O(n + m + Σ|block|²)`, §6 FR-24) — the same "bound every input"
+  posture (`agents/share/security.md` invariant 3) the family's Tantivy-
+  blocked duplicate-checks already apply. Both configured caps
+  (`LINK_GRAPH_SUGGEST_MAX_CANDIDATES`, `LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN`,
+  §6 FR-27) MUST hold even if blocking alone is insufficient on a
+  pathological input.
