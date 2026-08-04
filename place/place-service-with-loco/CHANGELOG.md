@@ -7,6 +7,44 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Fixed — `POST /api/places` demanded server-owned fields (QA-SERVER-FIELDS)
+
+- **The JSON extractor required `id`, `is_deleted`, `created_at`,
+  `updated_at`, `keywords`, `identifiers`, `amenity_features`, and
+  `opening_hours` on the wire**, even though the server owns every one
+  of them. A hand-written create body (the way a real API client
+  writes one) omitting any of them was refused with `422 missing field
+  …` before the handler, validation, or the repository ever ran —
+  demanding a value it then ignored or discarded. Same defect, same
+  fix, as the event service's `created_at`/`updated_at` fix
+  (2026-08-01): every server-managed field is now `#[serde(default)]`.
+  `name` — the one field the server does not own — is also
+  `#[serde(default)]` now, so an omitted `name` reaches the normal
+  `validate_place` path (`422 validation_error`) instead of being
+  turned away by the extractor's generic "missing field" error.
+- **Making the fields optional alone would have been a new bug**: an
+  omitted `id` defaults to the nil UUID, and the repository previously
+  persisted whatever `id`/`created_at`/`updated_at` the domain value
+  carried verbatim rather than overwriting them — so a second
+  hand-written create would have collided on the same nil primary key,
+  and an omitted timestamp would have stored the Unix epoch. Fixed
+  alongside: `create_place` mints a fresh id whenever the wire value is
+  nil (mirroring the event service's existing pattern), and the
+  repository now stamps `created_at`/`updated_at` to "now" on insert
+  (preserving `created_at` and refreshing `updated_at` on update)
+  rather than trusting the passed-in domain value.
+- New DB-gated regression suite `tests/api_integration_test.rs`: a
+  minimal hand-built create body succeeds and reads back a fresh id,
+  ~now timestamps, and empty collections; two consecutive hand-written
+  creates mint distinct ids rather than colliding; an omitted `name`
+  still fails, but via `validation_error`, not the JSON extractor.
+  Found while writing the auth activation proof
+  (`tests/enforcement.rs`), whose payload is built by serializing
+  `Place::new` rather than by hand for precisely this reason — that
+  comment is now updated to reflect the fix.
+
+  Suite: 3/3 new + 9/9 crate-wide green vs Postgres 18 (`scripts/ci-check.sh test-db`).
+
 ### Added — Durable event bus, real-broker sink (BUS-3, 2026-08-03)
 
 Ports the case-service reference (BUS-1) onto this crate's relay:

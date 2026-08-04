@@ -112,6 +112,14 @@ pub async fn create_place(
         );
     }
 
+    // `id` is server-managed (see `Place::id`'s docs): a client that omits
+    // it — now that the field is `#[serde(default)]` — arrives here as
+    // the nil UUID. Mint a fresh one, the same pattern the event service
+    // uses, so a hand-written create body never has to invent an id.
+    if place.id == Uuid::nil() {
+        place.id = Uuid::new_v4();
+    }
+
     // Real-time duplicate detection.
     let candidates = find_candidates(&state, &place).await;
     let dups: Vec<ScoredCandidate> = candidates

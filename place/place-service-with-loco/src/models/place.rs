@@ -56,9 +56,23 @@ use super::place_type::PlaceType;
 pub struct Place {
     /// Stable, system-generated UUID v4 primary key. Assigned once at
     /// construction and preserved across updates, merges, and serialization.
+    ///
+    /// `#[serde(default)]` because this is **server-managed**: the create
+    /// handler mints a fresh id whenever the wire value is nil (the same
+    /// pattern the event service uses), so a client is never required to
+    /// invent one. Without the default, `POST /api/places` demanded an
+    /// `id` on the wire only to ignore it.
+    #[serde(default)]
     pub id: Uuid,
     /// Primary name. The only required descriptive field; everything else
     /// may be absent. Validation rejects a blank/whitespace name.
+    ///
+    /// `#[serde(default)]` (to `""`) so an omitted `name` reaches
+    /// [`validate_place`](crate::validation::validate_place) — which
+    /// already rejects a blank name — instead of being refused by the
+    /// JSON extractor with a generic "missing field" error before any
+    /// handler code runs.
+    #[serde(default)]
     pub name: String,
     /// An alias or alternate spelling (schema.org `alternateName`).
     pub alternate_name: Option<String>,
@@ -85,12 +99,16 @@ pub struct Place {
     /// city). Holds the parent's [`id`](Self::id), not the parent itself.
     pub contained_in_place: Option<Uuid>,
     /// Free-form tags for search and categorization.
+    #[serde(default)]
     pub keywords: Vec<String>,
     /// External identifiers (FIPS, GNIS, OSM, custom, …). See [`PlaceIdentifier`].
+    #[serde(default)]
     pub identifiers: Vec<PlaceIdentifier>,
     /// Amenity features (`WiFi`, parking, …). See [`AmenityFeature`].
+    #[serde(default)]
     pub amenity_features: Vec<AmenityFeature>,
     /// Per-day opening hours. See [`OpeningHoursSpecification`].
+    #[serde(default)]
     pub opening_hours: Vec<OpeningHoursSpecification>,
     /// Whether the place can be accessed free of charge.
     pub is_accessible_for_free: Option<bool>,
@@ -102,14 +120,30 @@ pub struct Place {
     pub maximum_attendee_capacity: Option<u32>,
     /// Soft-delete flag. `true` means logically removed but retained for
     /// audit and compliance. See [`soft_delete`](Self::soft_delete).
+    ///
+    /// `#[serde(default)]` (to `false`, i.e. active) rather than required
+    /// on the wire — an omitted flag means "a normal, active place",
+    /// which is the correct default, not an arbitrary one.
+    #[serde(default)]
     pub is_deleted: bool,
     /// When the record was soft-deleted, if it has been. Paired with
     /// [`is_deleted`](Self::is_deleted).
     pub deleted_at: Option<DateTime<Utc>>,
     /// Creation timestamp, set once at construction.
+    ///
+    /// `#[serde(default)]` because this is **server-managed**: the
+    /// repository stamps `created_at`/`updated_at` on insert and
+    /// preserves/refreshes them on update, so whatever a client sends is
+    /// discarded. Without the default they were nonetheless *required* on
+    /// the wire, and `POST /api/places` refused an otherwise valid body
+    /// with `422 missing field created_at` — demanding a value it then
+    /// ignored. Same defect and same fix as the event service.
+    #[serde(default)]
     pub created_at: DateTime<Utc>,
     /// Last-modification timestamp. Initialized equal to
+    /// [`created_at`](Self::created_at). Server-managed — see
     /// [`created_at`](Self::created_at).
+    #[serde(default)]
     pub updated_at: DateTime<Utc>,
 }
 

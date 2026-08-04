@@ -28,6 +28,21 @@ FHIR-resource concern.
 Standard response envelope. `409` on duplicate-detected create; `422`
 on validation failure.
 
+**Server-managed fields.** `id`, `is_deleted`, `created_at`, `updated_at`,
+and every collection field (`keywords`, `identifiers`,
+`amenity_features`, `opening_hours`) are **optional on the wire**
+(`#[serde(default)]`): `POST /api/places` previously *required* all of
+them and answered `422 missing field id` (or `created_at`, …) to a
+body it would then have ignored or discarded. The create handler now
+mints a fresh `id` whenever the wire value is nil, and the repository
+stamps `created_at`/`updated_at` to "now" on insert (preserving
+`created_at` and refreshing `updated_at` on update), matching the
+`created_at`/`updated_at` fix already shipped in the event service.
+`name` — the one field the server does **not** own — is also
+`#[serde(default)]` so an omitted value now reaches the normal
+validation path (`422 validation_error`, field `name`) instead of
+being refused by the JSON extractor before any handler code runs.
+
 Authentication is opt-in per handler by default: taking an `AuthUser`
 argument requires a valid `Authorization: Bearer <paseto>` token,
 verified offline (PASETO `v4.public`, Ed25519) against the

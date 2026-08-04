@@ -103,16 +103,13 @@ async fn test_router() -> axum::Router {
 /// A valid place payload with a unique name, so a create that reaches
 /// the handler is not turned away as a duplicate.
 ///
-/// Built by serializing `Place::new`, not by hand. The wire type
-/// requires every field the model declares without a serde default —
-/// `id`, `active`, `created_at`, `updated_at`, `keywords`, … — all of
-/// which the server owns and overwrites, so a hand-written body is a
-/// game of "which field does it want next" and a `422` from the JSON
-/// extractor when you lose. That contract is the same wart fixed in the
-/// event service (`POST /api/events` demanded a `created_at` it then
-/// discarded); it is recorded as QA-SERVER-FIELDS rather than fixed
-/// here, because this change is about the auth guard and a payload
-/// contract change belongs in its own three-part commit.
+/// Built by serializing `Place::new`, not by hand — not because a
+/// hand-written body would fail (QA-SERVER-FIELDS made every
+/// server-owned field — `id`, `is_deleted`, `created_at`, `updated_at`,
+/// `keywords`, … — optional on the wire; see
+/// `tests/api_integration_test.rs` for the hand-written-body coverage),
+/// but because this helper only needs a valid, unique record and
+/// `Place::new` is the least ceremony way to get one.
 fn place_body() -> Value {
     let unique = uuid::Uuid::new_v4().simple().to_string();
     serde_json::to_value(Place::new(&format!("{unique} Enforcement Place"))).expect("serialize")
