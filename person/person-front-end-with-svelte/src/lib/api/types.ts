@@ -429,10 +429,25 @@ export interface ReviewQueueItem {
   match_quality: string;
   /** How the pair was detected (real-time / batch / …). */
   detection_method: string;
-  /** Optional per-component score breakdown. */
+  /**
+   * Optional per-component score breakdown — the service's
+   * `MatchScoreBreakdown` serialized verbatim (a flat object of seven
+   * `f64` keys), or `null` when none was recorded. Typed `unknown`
+   * because the server sends `Option<serde_json::Value>` and makes no
+   * schema promise; `breakdownRows()` in `$lib/review` narrows it.
+   */
   score_breakdown?: unknown;
   /** Current disposition. */
   status: ReviewStatus;
+  /**
+   * How the pair reached the queue: `"operator"` (the batch
+   * deduplication scan) or `"import"` (bulk-import duplicate detection).
+   * `"matcher_suggested"` is in the family-wide vocabulary but no person
+   * code path writes it today. Never null — the column is `NOT NULL
+   * DEFAULT 'operator'` — and deliberately excluded from the re-scan
+   * upsert, so it reflects first surfacing rather than latest detection.
+   */
+  provenance: string;
   /** Operator who reviewed the item. */
   reviewed_by?: string | null;
   /** Creation timestamp (ISO 8601). */
@@ -448,7 +463,11 @@ export type ReviewDecision = "confirmed" | "rejected";
 export interface ReviewQueueListResponse {
   /** The stored review-queue items (newest first). */
   items: ReviewQueueItem[];
-  /** Number of items returned. */
+  /**
+   * Number of items **in this page**, not in the whole queue — the
+   * service computes it as `items.len()`. There is no unpaged count and
+   * no `offset` parameter, so a full total is not obtainable.
+   */
   total: number;
 }
 

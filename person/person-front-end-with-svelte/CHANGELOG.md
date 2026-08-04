@@ -9,6 +9,61 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — duplicate review-queue screen, completed (repo FE-4)
+
+- The `/review` board already existed as a SVAR Kanban with
+  drag-to-decide, but had never been specified — no functional
+  requirement, no §13 task, no tests, and its two existing strings were
+  missing from the i18n parity assertion. That gap is closed (FR-14…
+  FR-19 plus spec §5 sub-states and T-25) alongside the four real
+  functional gaps below.
+- **Filters.** A status filter and a page-size control, wired to
+  `?status=` and `?limit=`. `listReviewQueue()` takes a
+  `ReviewQueueOptions` argument; "all" is the **absence** of `status`,
+  because the endpoint has no such token and answers `422
+  INVALID_STATUS` for one it does not recognise. There is no `offset`
+  server-side, so page size is the whole of the pagination story and no
+  page control is offered that would not work.
+- **A keyboard path.** Drag-to-decide is mouse-only, so it can no longer
+  be the only way to act. A native queue table now sits beside the board
+  with a `Compare` button on each row, and the comparison panel carries
+  real `Confirm` / `Reject` buttons. Dragging still works — it is simply
+  no longer load-bearing for accessibility.
+- **Side-by-side comparison.** Selecting a pair opens an inline panel
+  that loads both records with two parallel `GET /api/persons/{id}`
+  calls — there is no combined pair endpoint — and shows name, birth
+  date, gender, primary address and primary contact against each other,
+  plus the match score, quality, detection method and provenance. The
+  fetch uses `allSettled`, not `all`: one side may have been merged away,
+  and half a comparison beats none. The matcher's `score_breakdown`
+  renders as a component / weight / score table showing only the
+  components actually present; a `null` breakdown renders an explicit
+  note, and a missing component is omitted rather than shown as `0.00`,
+  which would read as "compared and did not match" when the truth is
+  "not compared".
+- **Provenance** (`operator` / `import`) is now visible on the board
+  cards and in the queue table, not only in the panel — it is triage
+  information, so it belongs where the triage happens. An unrecognised
+  token falls through as itself rather than being swallowed.
+- **Confirming does not merge.** The decision endpoint is a pure status
+  change and the service records no link between a confirmed item and a
+  merge, so the panel deep-links `/persons/merge?main=…&duplicate=…` —
+  in **either** survivor order, because a review item names an unordered
+  pair and the service does not designate a survivor. `/persons/merge`
+  gained a one-line query-string seed for those two ids, both still
+  editable.
+- Decision buttons are **disabled** for anything not `pending`, mirroring
+  the service's `WHERE status = 'pending'` guard rather than offering a
+  request guaranteed to answer `422 INVALID_REVIEW_TRANSITION`.
+- `ReviewQueueItem` gained the **`provenance`** field the type had been
+  missing since the service added the column.
+- New pure `src/lib/review.ts`: the status vocabulary, `canDecide`, the
+  seven weighted `MATCH_COMPONENTS`, `breakdownRows`, and `mergeHref`.
+- Tests: `tests/unit/review.test.ts` (15), four repository tests, an
+  i18n-parity extension for 57 new keys across all 13 locales plus the
+  three review keys that had never been listed, and two route-stubbed
+  Playwright smoke assertions.
+
 ### Added — bulk import/export screen (repo FE-3)
 
 - New `/persons/bulk` route: upload a JSONL or CSV file with a **dry-run**

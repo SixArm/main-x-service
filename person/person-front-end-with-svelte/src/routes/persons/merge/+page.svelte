@@ -2,6 +2,10 @@
   Merge persons (/persons/merge) — manually merge a duplicate record into a
   surviving main record by id.
 
+  Both ids may arrive pre-filled as `?main=…&duplicate=…` (the review
+  board deep-links a confirmed pair here); otherwise the operator types
+  them.
+
   The operator enters both ids (+ optional reason), optionally loads a
   side-by-side preview, then merges with a confirmation. The merge
   soft-deletes the duplicate; on success a link to the surviving record is
@@ -15,6 +19,7 @@
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import { page } from "$app/state";
     import LabeledField from "$lib/forms/LabeledField.svelte";
     import FieldRow from "$lib/forms/FieldRow.svelte";
     import { PersonRepository } from "$lib/api/persons.js";
@@ -24,8 +29,12 @@
 
     const repo = PersonRepository.withFetch();
 
-    let mainId = $state("");
-    let duplicateId = $state("");
+    // Seeded once from `?main=` / `?duplicate=` so the review board can
+    // deep-link a confirmed pair straight into this form. Both stay fully
+    // editable afterwards — a review item names an unordered pair, so which
+    // record survives is the operator's call, not the link's.
+    let mainId = $state(page.url.searchParams.get("main") ?? "");
+    let duplicateId = $state(page.url.searchParams.get("duplicate") ?? "");
     let reason = $state("");
     let preview = $state<{ main: Person | null; duplicate: Person | null }>({ main: null, duplicate: null });
     let result = $state<MergeResponse | null>(null);

@@ -4,7 +4,11 @@
 import { describe, expect, it } from "vitest";
 import { ApiClient } from "../../src/lib/api/client";
 import { PersonRepository } from "../../src/lib/api/persons";
-import type { EntityLink, Person } from "../../src/lib/api/types";
+import type {
+    EntityLink,
+    Person,
+    ReviewQueueItem,
+} from "../../src/lib/api/types";
 
 // Cast a plain async function to the `fetch` type so it can be injected.
 function mockFetch(impl: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) {
@@ -39,6 +43,23 @@ const sampleLink: EntityLink = {
     provenance: "operator",
     valid_from: null,
     valid_to: null,
+};
+
+// Reusable fixture review-queue row, matching the service's wire shape
+// (note `provenance`, which is never null server-side).
+const sampleReviewItem: ReviewQueueItem = {
+    id: "r1",
+    person_id_a: "aaaaaaaa-0000-4000-8000-000000000001",
+    person_id_b: "bbbbbbbb-0000-4000-8000-000000000002",
+    match_score: 0.91,
+    match_quality: "probable",
+    detection_method: "batch_deduplication",
+    score_breakdown: { name_score: 0.94, birth_date_score: 1.0 },
+    status: "pending",
+    provenance: "operator",
+    reviewed_by: null,
+    created_at: "2026-08-04T09:00:00Z",
+    reviewed_at: null,
 };
 
 describe("PersonRepository", () => {
@@ -163,6 +184,105 @@ describe("PersonRepository", () => {
         await expect(repo.deleteLink("p1", "l1")).resolves.toBeUndefined();
         expect(capturedMethod).toBe("DELETE");
         expect(capturedUrl).toContain("/api/persons/p1/links/l1");
+    });
+
+    // ─── Review queue ───────────────────────────────────────────────
+
+    // Pins: a bare call sends no query string at all, so the endpoint
+    // applies its own defaults (every status, limit 100) — passing
+    // `status=` explicitly would be a 422, since there is no "all" token.
+    it("GETs /api/persons/review-queue with no query when given no options", async () => {
+        let capturedUrl = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                capturedUrl = String(input);
+                return jsonResponse({
+                    success: true,
+                    data: { items: [sampleReviewItem], total: 1 },
+                    error: null,
+                });
+            }),
+        });
+        const repo = new PersonRepository(client);
+        const items = await repo.listReviewQueue();
+        expect(capturedUrl).toContain("/api/persons/review-queue");
+        expect(new URL(capturedUrl).search).toBe("");
+        // The envelope's `items` array is unwrapped for the caller.
+        expect(items).toHaveLength(1);
+        expect(items[0]?.provenance).toBe("operator");
+    });
+
+    // Pins: both filters reach the wire under the names the service reads.
+    it("passes status and limit through to the query string", async () => {
+        let capturedUrl = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                capturedUrl = String(input);
+                return jsonResponse({
+                    success: true,
+                    data: { items: [], total: 0 },
+                    error: null,
+                });
+            }),
+        });
+        const repo = new PersonRepository(client);
+        await repo.listReviewQueue({ status: "pending", limit: 25 });
+        const url = new URL(capturedUrl);
+        expect(url.pathname).toContain("/api/persons/review-queue");
+        expect(url.searchParams.get("status")).toBe("pending");
+        expect(url.searchParams.get("limit")).toBe("25");
+    });
+
+    // Pins: an absent field is omitted rather than sent as the string
+    // "undefined", which the service would reject as an unknown status.
+    it("omits an absent status while still sending limit", async () => {
+        let capturedUrl = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                capturedUrl = String(input);
+                return jsonResponse({
+                    success: true,
+                    data: { items: [], total: 0 },
+                    error: null,
+                });
+            }),
+        });
+        const repo = new PersonRepository(client);
+        await repo.listReviewQueue({ limit: 500 });
+        const url = new URL(capturedUrl);
+        expect(url.searchParams.has("status")).toBe(false);
+        expect(url.searchParams.get("limit")).toBe("500");
+    });
+
+    // Pins: the decision body's field is `status` (not `decision`), and
+    // `reviewed_by` is never sent — the service takes the reviewer from
+    // the caller's token.
+    it("POSTs {status} to the decision endpoint", async () => {
+        let capturedUrl = "";
+        let capturedMethod = "";
+        let capturedBody = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input, init) => {
+                capturedUrl = String(input);
+                capturedMethod = init?.method ?? "";
+                capturedBody = init?.body as string;
+                return jsonResponse({
+                    success: true,
+                    data: { ...sampleReviewItem, status: "confirmed" },
+                    error: null,
+                });
+            }),
+        });
+        const repo = new PersonRepository(client);
+        const decided = await repo.decideReview("r1", "confirmed");
+        expect(capturedMethod).toBe("POST");
+        expect(capturedUrl).toContain("/api/persons/review-queue/r1/decision");
+        expect(JSON.parse(capturedBody)).toEqual({ status: "confirmed" });
+        expect(decided.status).toBe("confirmed");
     });
 
     // Pins: a 422 from the link endpoint surfaces the server's own reason

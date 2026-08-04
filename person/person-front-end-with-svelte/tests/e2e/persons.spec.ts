@@ -138,4 +138,112 @@ test.describe("Person front-end smoke", () => {
         await expect(page.getByLabel(/Main person ID/)).toBeVisible();
         await expect(page.getByLabel(/Duplicate person ID/)).toBeVisible();
     });
+
+    // Pins: the merge page seeds both ids from the query string, which is
+    // what the review board's post-confirmation deep link relies on.
+    test("merge form pre-fills both IDs from the query string", async ({ page }) => {
+        await page.goto("/persons/merge?main=main-111&duplicate=dup-222");
+        await expect(page.getByLabel(/Main person ID/)).toHaveValue("main-111");
+        await expect(page.getByLabel(/Duplicate person ID/)).toHaveValue("dup-222");
+    });
+
+    // Pins the FE-4 review screen: the board, the keyboard-reachable queue
+    // table, and the side-by-side comparison the Compare button opens. The
+    // queue and both sides of the pair are stubbed at the network layer so
+    // the smoke project keeps its "no service required" contract.
+    test("review board lists the queue and compares a pair on demand", async ({
+        page,
+    }) => {
+        const idA = "aaaaaaaa-0000-4000-8000-000000000001";
+        const idB = "bbbbbbbb-0000-4000-8000-000000000002";
+        const envelope = (data: unknown) =>
+            JSON.stringify({ success: true, data, error: null });
+
+        await page.route("**/api/persons/review-queue**", (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: envelope({
+                    items: [
+                        {
+                            id: "r1",
+                            person_id_a: idA,
+                            person_id_b: idB,
+                            match_score: 0.91,
+                            match_quality: "probable",
+                            detection_method: "batch_deduplication",
+                            score_breakdown: {
+                                name_score: 0.94,
+                                birth_date_score: 1.0,
+                            },
+                            status: "pending",
+                            provenance: "import",
+                            reviewed_by: null,
+                            created_at: "2026-08-04T09:00:00Z",
+                            reviewed_at: null,
+                        },
+                    ],
+                    total: 1,
+                }),
+            }),
+        );
+        await page.route(`**/api/persons/${idA}`, (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: envelope({
+                    id: idA,
+                    name: { family: "Kowalski", given: ["Anna"] },
+                    gender: "female",
+                    birth_date: "1980-01-15",
+                    active: true,
+                }),
+            }),
+        );
+        await page.route(`**/api/persons/${idB}`, (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: envelope({
+                    id: idB,
+                    name: { family: "Kowalsky", given: ["Ana"] },
+                    gender: "female",
+                    birth_date: "1980-01-15",
+                    active: true,
+                }),
+            }),
+        );
+
+        await page.goto("/review");
+        await expect(page.getByRole("heading", { name: "Review" })).toBeVisible();
+        await expect(page.getByTestId("review-board")).toBeVisible();
+        // The status filter must exist and default to every status.
+        await expect(page.getByLabel("Status")).toHaveValue("all");
+
+        // Provenance is visible at a glance in the queue, not only in the
+        // detail panel.
+        const list = page.getByTestId("review-list");
+        await expect(list).toBeVisible();
+        await expect(list.getByText("Bulk import")).toBeVisible();
+
+        // The keyboard-reachable path into the comparison: a real button,
+        // not a drag.
+        await list.getByRole("button", { name: /^Compare/ }).click();
+
+        const panel = page.getByTestId("review-compare");
+        await expect(panel).toBeVisible();
+        // Both stubbed records, side by side.
+        await expect(panel.getByText("Anna Kowalski")).toBeVisible();
+        await expect(panel.getByText("Ana Kowalsky")).toBeVisible();
+        // The breakdown renders only the components actually present.
+        await expect(panel.getByTestId("review-breakdown")).toBeVisible();
+        await expect(
+            panel.getByTestId("review-breakdown").getByText("0.94"),
+        ).toBeVisible();
+        // Both decisions are offered as real buttons for a pending item.
+        await expect(
+            panel.getByRole("button", { name: "Confirm duplicate" }),
+        ).toBeEnabled();
+        await expect(panel.getByRole("button", { name: "Reject" })).toBeEnabled();
+    });
 });
