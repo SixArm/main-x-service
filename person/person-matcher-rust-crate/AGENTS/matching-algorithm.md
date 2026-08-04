@@ -17,7 +17,10 @@ In production, downstream services typically call both deterministic and probabi
 
 ## Deterministic Logic
 
-Returns `true` iff **any one** of the following holds:
+Returns `true` iff **any one** of the following holds (illustrative subset —
+all **42** per-scheme identifiers participate identically, plus
+passport-book agreement; see "Deterministic Matching — Full Branch List"
+below for the complete, canonical enumeration):
 
 - Both UK United Kingdom National Health Service Numbers parse and are equal.
 - Both France NIRs parse and are equal.
@@ -25,6 +28,8 @@ Returns `true` iff **any one** of the following holds:
 - Both Éire IHIs parse and are equal.
 - Both UK Northern Ireland H&C Numbers parse and are equal.
 - Both US SSNs parse and are equal.
+- … (the remaining 36 schemes, each scheme-local, score the same way).
+- At least one `(country, number)` passport-book pair is shared.
 - Normalised given name matches AND normalised family name matches AND DOB matches exactly AND gender matches (or at least one is missing).
 
 Identifiers are scheme-local: a United Kingdom National Health Service Number and an H&C Number with the same 10 digits do **not** cross-match. If you change this logic, update spec §12.1 and add an integration test.
@@ -161,6 +166,7 @@ National identifiers are scheme-local: a UK United Kingdom National Health Servi
 | Netherlands BSN | Exact equality of canonical form from `parse_nl_bsn`; both must parse. | `{0.0, 1.0}`, else `None` |
 | Sweden *Personnummer* | Exact equality of canonical form from `parse_se_personnummer`; both must parse. | `{0.0, 1.0}`, else `None` |
 | UK Scotland CHI | Exact equality of canonical form from `parse_uk_chi_number`; both must parse. | `{0.0, 1.0}`, else `None` |
+| Remaining 30 schemes (T-27: `be_nn`, `bg_egn`, `cz_rc`, `dk_cpr`, `ee_ik`, `es_dni`, `fi_hetu`, `hr_oib`, `is_kt`, `lt_ak`, `lv_pk`, `mt_id`, `no_fnr`, `pl_pesel`, `ro_cnp`, `si_emso`, `sk_rc`, `uk_nino`; T-28: `gr_dss`, `li_id`, `nl_id`, `pl_nip`, `pt_nif`; T-17.1: `br_cpf`, `cn_rrn`, `in_aadhaar`, `jp_my_number`, `mx_curp`, `nz_nhi`, `za_id`) | Same shape as the rows above: exact equality of the canonical form from the scheme's own `parse_<cc>_<scheme>`; both must parse. Each is scheme-local. | `{0.0, 1.0}`, else `None` |
 | Passport book | `Some(1.0)` if any `(country, number)` pair is shared across `passport_books` on both sides; `Some(0.0)` if both non-empty but disjoint; `None` if either empty. | `{0.0, 1.0}`, else `None` |
 | Given name | `name_algorithm` applied to normalised strings; raised to `0.9` when both names appear in the same class of `MatchConfig::nickname_table`. When both persons have a `middle_name`, the final score is `0.95 × given_sim + 0.05 × middle_sim` (FR-49). | `[0.0, 1.0]` |
 | Family name | Same as given name (table-driven boost applies symmetrically; default English table contains no family-name entries). | `[0.0, 1.0]` |

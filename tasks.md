@@ -3753,6 +3753,60 @@ committing (see plan.md §4).
   if a doc describes these as used only within their own service's
   matching pipeline, that's now stale.
 
+  - *`person/person-matcher-rust-crate` done 2026-08-04.* `CLAUDE.md`
+    was already the thin `@AGENTS.md` one-liner (no drift to fix
+    there). Confirmed no doc claims `Scorer`/`Normalizer::phonetic_code`
+    are used only within person-matcher's own pipeline — nothing false
+    to correct on that specific point, but added the previously-absent
+    fact: `link-graph-service-with-loco` (LNK-4) is a real, live
+    second consumer (`Cargo.toml` path dep, `src/suggest/` using
+    `Scorer::jaro_winkler_similarity`, `Normalizer::phonetic_code`, and
+    `Gender`), confirmed via grep. The larger find: **spec was ahead of
+    code, not behind it** — `spec/08-domain-model.md` (§8.1, §8.5,
+    §8.6a), `spec/12-algorithm-specifications.md` (§12.2), and
+    `spec/13-configuration-specification.md` (§13.1) all described
+    `relationships`/`tags` fields, a `RelationshipRef`/`RelationKind`
+    type, `relationships_score`/`tags_score` breakdown fields, and
+    `relationships_weight`/`tags_weight` defaults as if already live,
+    while `spec/23-tasks-and-acceptance-criteria.md` correctly lists
+    this as open (**T-33**/**T-34**, unchecked) and neither the field,
+    the type, nor the weight exists anywhere in `src/` (confirmed by
+    grep — zero hits). Fixed all four sections to mark the feature
+    explicitly **planned, not yet implemented**, cross-referencing
+    T-33/T-34, rather than silently deleting the design content (it's
+    legitimate forward design, just mis-shelved as current behaviour).
+    Also found and fixed two rustdoc-adjacent drifts of the "code
+    changed, doc didn't" kind DOC-3 is chiefly aimed at:
+    `AGENTS/matching-algorithm.md`'s "Deterministic Logic" quick-view
+    section listed only 6 of the 42 identifier schemes and omitted
+    passport-book agreement entirely (the "Full Branch List" appendix
+    lower in the same file was already complete and correct — only the
+    top summary was stale), and its "Component Scoring — Full Table"
+    likewise stopped at 12 of 42 schemes with no note; both now state
+    the true scope. `AGENTS/architecture.md`'s "Public Surface" code
+    block was missing `BloodType`/`PassportBook` from the `models`
+    re-export list (both real, both in `lib.rs` since T-26/T-29+), and
+    its "God modules" guidance cited a stale "~1,000 lines" split
+    threshold that `matcher.rs` (3,455 lines) and `identifiers.rs`
+    (4,058 lines) have long since passed by design (42-scheme
+    boilerplate reads best kept together) — reworded rather than
+    picking an equally-arbitrary new number. `AGENTS/testing.md` had
+    one stale "(planned, see spec §18.4)" marker on property-based
+    tests that the same file's own "Property Tests" section, twenty
+    lines down, already correctly marks delivered (T-6 ✅) — fixed the
+    stale marker. Verified clean: `cargo test` (417 lib + 233
+    integration + 176 doctests + 13 adapter-contract + 11 property, all
+    passing), `cargo test --doc`, `cargo clippy --all-targets -- -D
+    warnings`, `cargo run --example basic_usage`; `README.md` confirmed
+    a real symlink to `index.md`; `index.md`'s weight table (30/20/20/
+    15/5/5/5/5) verified byte-accurate against `MatchConfig::default()`
+    in `src/matcher.rs`; `AGENTS/national-person-identifiers.md`'s
+    "42-scheme parser reference" section (the canonical one) checked
+    accurate — its separate, older 14-row background table at the top
+    of the same file is pre-existing research context, not a claim
+    about the 42 implemented schemes, and was left alone. All edited
+    files re-confirmed under 40 KB.
+
   - *`care-pathway/care-pathway-matcher-rust-crate` done 2026-08-04.*
     `spec/index.md` (this crate's single-file §1–§25 shape — confirmed
     it, not a split-file layout) had a genuine **internal
@@ -3836,6 +3890,67 @@ committing (see plan.md §4).
     `cargo fmt --check` all clean (docs-only change; no `src/` edits).
     All touched files stay well under 40 KB (`spec/index.md` 13.9 KB
     after edits).
+
+  - [x] `organization/organization-matcher-rust-crate` done. Same bug
+    class as the care-pathway and case matcher notes above (this
+    template's tags/relationships drift is now confirmed systemic, not
+    a one-off): `spec/index.md` §5 (algorithm overview), §6 (domain
+    model), §7 (configuration), §14a (relationships), §14b (tags), and
+    §21 (compatibility/re-exports) described `Organization.tags`,
+    `Organization.relationships`, `RelationshipRef`/`RelationKind`,
+    `MatchConfig::relationships_weight`/`tags_weight`, and
+    `MatchBreakdown::relationships_score`/`tags_score` in the present
+    tense as already shipped — confirmed absent from every `src/*.rs`
+    (`organization.rs`, `config.rs`, `scoring.rs`) and from `lib.rs`'s
+    actual re-export list by grep + read. §23's own task queue already
+    correctly listed both as open `[ ]` work, and the `CHANGELOG.md
+    [Unreleased]` entry for relationships was already honestly titled
+    "spec-only" — the drift was confined to §5/§6/§7/§14a/§14b/§21
+    reading as normative present-tense fact with no cross-reference to
+    §23. Annotated all six "planned, not yet implemented — see §23"
+    (design content kept, not deleted, per this crate's own
+    `AGENTS/spec-driven-development.md` "spec is right, don't launder a
+    gap into code" doctrine) and corrected §21 to the real `lib.rs`
+    list (dropped the false `RelationshipRef`/`RelationKind`/
+    `relationships_score`/`tags_score` claims). Also found and fixed a
+    second, independent gap: `spec/§24` (Testing strategy) and
+    `AGENTS/testing.md` named only unit tests, `tests/public_api.rs`,
+    and doctests — both missing the `proptest` property suite
+    (`tests/property_tests.rs`, SEC-M6, 7 tests) and the `cargo-fuzz`
+    harness (`fuzz/`, SEC-I2, 2 targets), both already shipped earlier
+    in the same `CHANGELOG.md [Unreleased]` section; added both to
+    spec §24 and a new "Property-based tests" / "Fuzzing" pair of
+    sections in `AGENTS/testing.md`. Checked SEC-M5 (LEI ISO 7064 MOD
+    97-10 / GLN GS1 mod-10 check-digit validation) specifically per
+    this task's prompt: it lives entirely in the sibling
+    `organization-service-with-loco`'s `src/validation.rs`, not in this
+    matcher crate at all (confirmed by grep — zero hits for
+    check-digit/MOD-97/GS1 anywhere in `src/`, and
+    `tests/property_tests.rs`'s own module doc says so explicitly), so
+    there was nothing to document here; noted in `CHANGELOG.md` so a
+    future pass doesn't go looking for it in the wrong crate.
+    Everything else checked out: `CLAUDE.md` is already the documented
+    one-line `@AGENTS.md` include (no drift, unlike the six older
+    *service* crates DOC-2 found — this newer matcher never had the
+    bloated version); `AGENTS.md`, `AGENTS/matching-algorithm.md`,
+    `AGENTS/normalization.md`, and `AGENTS/spec-driven-development.md`
+    (already harmonized against course-matcher residue by an earlier
+    session per `CHANGELOG.md`) are all byte-accurate against
+    `src/matcher.rs`/`src/normalize.rs`/`src/config.rs`; `README.md`
+    and `index.md` are two real, non-symlinked files, mention neither
+    tags nor relationships, and `index.md`'s hand-computed worked
+    example (name 0.950/address 1.000/url 0.988/founding 0.500/
+    keywords 0.333 → 0.849 `Medium`) was independently re-verified
+    against a scratch integration test calling the real engine — exact
+    match, not rounded coincidentally. Rustdoc spot-check across
+    `lib.rs`/`matcher.rs`/`scoring.rs`/`organization.rs`/`config.rs`/
+    `normalize.rs`/`phonetic.rs` found no stale `///`/`//!` comments.
+    Verified live: `cargo test --lib` (45 passed), `cargo test --test
+    public_api` (11), `cargo test --test property_tests` (7), `cargo
+    test --doc` (7), `cargo clippy --all-targets -- -D warnings`
+    clean, `cargo fmt --check` clean. Did not touch
+    `organization-service-with-loco` per this task's boundary. All
+    touched files stay well under 40 KB.
 
 - [ ] **DOC-4 (L)** Front-end crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: all 11 SvelteKit front-ends (person, worker,

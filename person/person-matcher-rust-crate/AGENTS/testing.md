@@ -37,7 +37,7 @@ The list in [`../spec.md`](../spec/index.md) §18.2 is the spec — each scenari
 
 - Tests must not share mutable state.
 - No `lazy_static`, no `OnceCell`. The library is stateless; the tests should be too.
-- Property-based tests (planned, see spec §18.4) will use `proptest`. They MUST seed deterministically — pass `--proptest-seed` or use the default seeding.
+- Property-based tests (delivered, T-6 — see spec §18.4 and "Property Tests" below) use `proptest`. They MUST seed deterministically — pass `--proptest-seed` or use the default seeding.
 
 ## Coverage Targets
 

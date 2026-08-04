@@ -13,7 +13,8 @@ Weights (all renormalised against participating fields):
 - `0.20` — `family_name_weight`, `date_of_birth_weight`.
 - `0.15` — `given_name_weight`.
 - `0.10` — `death_date_weight`.
-- `0.05` — `gender_weight`, `blood_type_weight`, `multiple_birth_weight`, `address_weight`, `birth_place_weight`, `death_place_weight`, `phone_weight`, `email_weight`, `relationships_weight`, `tags_weight`.
+- `0.05` — `gender_weight`, `blood_type_weight`, `multiple_birth_weight`, `address_weight`, `birth_place_weight`, `death_place_weight`, `phone_weight`, `email_weight`.
+- **Planned, not yet implemented** (§23.2 T-33 / T-34): `relationships_weight`, `tags_weight` — proposed default `0.05` each once the corresponding fields land; neither exists on `MatchConfig` in `src/matcher.rs` today.
 
 Other defaults: `use_phonetic_matching = true`; `name_algorithm = Combined`; `nickname_table = NicknameTable::empty()`; `gmail_dot_folding = false`; `phone_default_country = Some("GB")`.
 

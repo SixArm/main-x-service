@@ -12,7 +12,8 @@ lib.rs               (re-exports only)
          ├── models         (data types, no logic)
          ├── identifiers    (parse_united_kingdom_national_health_service_number,
          │                   parse_fr_nir, parse_es_tsi, parse_ie_ihi,
-         │                   parse_uk_hc_number, parse_us_ssn)
+         │                   parse_uk_hc_number, parse_us_ssn, … 42 schemes
+         │                   total — see AGENTS/national-person-identifiers.md)
          ├── normalizer     (text + phone + address + email + phonetic transforms)
          ├── scorer         (similarity primitives)
          ├── nicknames      (NicknameTable equivalence-class lookup)
@@ -40,7 +41,7 @@ pub mod identifiers;  // free-function parsers, one per scheme
 
 pub use error::{MatchingError, Result};
 pub use matcher::{Confidence, MatchBreakdown, MatchConfig, MatchResult, MatchingEngine};
-pub use models::{Address, Gender, Person, PersonBuilder};
+pub use models::{Address, BloodType, Gender, PassportBook, Person, PersonBuilder};
 pub use nicknames::NicknameTable;
 pub use normalizer::{Normalizer, ParsedAddressLine};
 pub use scorer::{Scorer, SimilarityAlgorithm};
@@ -62,7 +63,7 @@ If you genuinely need a new module:
 - ❌ Trait objects (`dyn Whatever`) where a `Copy` enum like `SimilarityAlgorithm` would suffice. The current design dispatches on the enum.
 - ❌ Builder structs with hidden default state. `PersonBuilder` is `#[derive(Default)]`; preserve that pattern.
 - ❌ Struct-literal construction of `Person` or `Address` from outside the crate. Both carry `#[non_exhaustive]`; consumers must use `Person::builder()` or `Address::new().with_*(...)` fluent setters. New fields are then non-breaking under SemVer.
-- ❌ "God modules" — if `matcher.rs` grows past ~1,000 lines, split scoring helpers into `matcher/scoring.rs` (a child file/module), not into a peer. The current file already carries the full breakdown wiring, weighted-sum reducer, and per-scheme identifier helpers — keep new helpers grouped by concern.
+- ❌ "God modules" — `matcher.rs` (currently ~3,450 lines) and `identifiers.rs` (~4,050 lines) are already large, mostly from repetitive per-scheme boilerplate (42 near-identical identifier branches / parsers) rather than tangled logic; that size is a deliberate trade — one file per layer reads better than 42 near-duplicate child files. If a genuinely new *kind* of logic needs to be added (not another per-scheme repetition), split it into a child module (e.g. `matcher/scoring.rs`), not a peer top-level module.
 
 ## Threading and Sharing
 
