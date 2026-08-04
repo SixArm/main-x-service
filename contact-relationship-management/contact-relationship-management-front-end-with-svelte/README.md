@@ -16,6 +16,16 @@ pass (`page.route`-stubbed — runs without the Rust service). Quick
 start: `pnpm install && pnpm dev` (expects the Loco sibling on
 :5150).
 
+## Environment variables
+
+Server-side only (`src/lib/server/config.ts`; never reach the browser
+bundle) — see [`.env.example`](.env.example).
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `CRM_API_URL` | `http://localhost:5150` | The Loco sibling's base URL |
+| `AUTH_API_URL` | `http://localhost:5150` | The authentication service (session → PASETO exchange, magic-link) |
+
 ## Stack
 
 SvelteKit 2 · Svelte 5 runes · TypeScript strict · SPA mode with a
