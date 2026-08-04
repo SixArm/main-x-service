@@ -29,11 +29,20 @@ Revisions are never updated or deleted; a restore writes a **new**
 revision referencing what it copied
 ([authoring](authoring.md)). The same posture as the family's
 tamper-evident audit trail: a history that can be edited is not
-history. Retention/erasure requests are handled by **redacting a
-revision's body while preserving the row, its number, and its
-linkage** — the family's GDPR-versus-immutable-history resolution
+history. The declared resolution for a retention/erasure request is
+to **redact a revision's body while preserving the row, its number,
+and its linkage** — the family's GDPR-versus-immutable-history
+resolution
 ([compliance-for-healthcare](../../agents/share/compliance-for-healthcare.md)
-§2.2), audited as a redaction with its authority.
+§2.2), auditable as a redaction with its authority.
+
+**Not yet implemented.** The ABAC guard already reserves a `/redact`
+destructive-POST suffix ahead of the feature
+(`auth::DESTRUCTIVE_POST_SUFFIXES`), and today's `mask` obligation
+redacts unpublished bodies **in a response**, but nothing yet writes
+a redacted revision to storage — there is no `/redact` endpoint.
+Tracked as a production gate (CMS-G3, [tasks.md](tasks.md)), not a
+shipped capability.
 
 ## Events
 

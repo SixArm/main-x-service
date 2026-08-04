@@ -30,9 +30,12 @@ Every save writes a full-snapshot revision; nothing updates or
 deletes one. Restore copies an old body into a **new** revision.
 Publishing sets a pointer to a specific revision, so "saved" and
 "live" are different facts and editing after publish changes
-nothing until the next publish. Erasure redacts a body while
-preserving the row and its linkage — the family's
-history-versus-erasure resolution ([audit](audit.md)).
+nothing until the next publish. The declared resolution for erasure
+is to redact a body while preserving the row and its linkage — the
+family's history-versus-erasure resolution ([audit](audit.md)) — but
+the write path is a production gate (CMS-G3), not yet implemented;
+today only the read-time `mask` ABAC obligation redacts unpublished
+content in a response.
 
 ## CMS-D4 — Every lifecycle is a pure-core state machine
 

@@ -18,8 +18,10 @@ provides the authoring client.
 > public site and ships synthetic content only. See
 > [spec/regulatory](../spec/regulatory.md).
 
-**Status: CMS-T1–T22 implemented (2026-07-30).** The
-declaration layer (sites, templates, content types with the
+**Status: CMS-T1–T24 implemented (2026-07-31); the front-end
+(T25/T26) is a separate, also-complete subproject** — see
+[../content-management-system-front-end-with-svelte](../content-management-system-front-end-with-svelte/).
+The declaration layer (sites, templates, content types with the
 compatibility classifier), the authoring core (entries, per-locale
 variants, append-only revisions with conflict refusal, block documents
 sanitized on write, diff/restore, reference extraction and
@@ -33,14 +35,16 @@ workflow, derived staleness), and routing + the **public delivery
 surface** (addresses with automatic redirects, published-only
 composition with honest ETags, sitemap and robots, personalization
 without visitor tracking), and content insights (health findings that
-name their rule, throughput with honest ratios), and preview tokens
-(scoped to one revision, hashed at rest, audited on use), and outbound
-webhooks (signed, non-redirecting, retried on a backoff) are live, and
+name their rule, throughput with honest ratios), the record-level ABAC
+pass (five personas, the `mask` obligation), preview tokens (scoped to
+one revision, hashed at rest, audited on use), and outbound webhooks
+(signed, non-redirecting, retried on a backoff) are live, and
 `task seed` builds a synthetic corpus that demonstrates every one of
-them. 223 DB-free unit tests + 58 request tests + the enforcement
+them. 231 DB-free unit tests + 60 request tests + the enforcement
 matrix + 3 delivery tests pass against Postgres 18; clippy-pedantic and
-`cargo deny` clean; live smoke verified. Remaining in
-[../spec/tasks.md](../spec/tasks.md): the front-end (T25/T26).
+`cargo deny` clean; live smoke verified. Remaining:
+[production gates](../spec/tasks.md) only (activation, public-surface
+hardening, the accessibility/records/rights review).
 
 ## Quick start
 
@@ -98,15 +102,10 @@ backlog) · preview shares · **webhooks** (register / list / withdraw /
 delivery log / dispatch) · audits · `/events/recent` · OpenAPI +
 Swagger · `/metrics.prom` · `Accepts-version` negotiation.
 
-**Planned** (the full target surface):
-
-Sites / templates / menus / redirects · content types +
-compatibility check · entries / variants / revisions / diff /
-restore · workflow (submit / approve / publish / schedule) · assets
-+ renditions + usage · translation + staleness · **public
-delivery** (`/delivery/{site}/{locale}/{path}`, `sitemap.xml`,
-`robots.txt`) · preview tokens · insights · audits ·
-`/events/recent` · webhooks · OpenAPI + Swagger · `/metrics.prom`.
+That is the full v1 target surface — nothing is still planned inside
+the service; only the [production gates](../spec/tasks.md) (auth
+activation, public-surface hardening, the accessibility/records/
+rights review) stand between this and real exposure.
 
 Auth enforcement defaults **off** (`CMS_REQUIRE_AUTH` is the family
 activation gate). When it is **on**, two checks apply: the blanket

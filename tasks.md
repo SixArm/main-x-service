@@ -5531,6 +5531,76 @@ committing (see plan.md §4).
     `contact-relationship-management`, or `content-management-system`
     (sibling agents' concurrent work).
 
+  - [x] `content-management-system` done 2026-08-04, 4th of the
+    batch landed so far. `spec/tasks.md` (Phase 0–9, CMS-T0–T26) is
+    genuinely accurate and the most internally-honest of the docs
+    read this pass — every phase note names its real test counts, its
+    residuals, and the bugs the tests caught, and every id it cites
+    (CMS-R1–R24, CMS-D1–D17) exists. Verified live rather than
+    trusted: `cargo test --lib` (231 passed), `cargo clippy
+    --all-targets -- -D warnings` and `cargo fmt --check` (both clean)
+    on the service; the DB-gated suite against a real Postgres 18 via
+    `scripts/test-db.sh` (60 request + 1 enforcement + 3 delivery
+    tests, all green — `TEST_DB_PORT=5434`, since port 5432 was
+    already held by a sibling agent's `case-folder` test-db); and on
+    the front-end, `pnpm test` (28/28), `pnpm test:e2e` (7/7
+    Playwright, correctly stubbed at `**/api/proxy/api/...` — no sign
+    of the `ad95088e` BFF-proxy-prefix regression, because this app's
+    `api()` client builds URLs by string template rather than `new
+    URL(path, base)`, so the bug class does not apply here) and `pnpm
+    check` (0 errors).
+
+    Two real findings, both fixed:
+    **(1) The service `README.md`'s status line was stale in three
+    ways** — it said "CMS-T1–T22 implemented" and "Remaining: the
+    front-end (T25/T26)" when `spec/tasks.md` shows T1–T26 all done
+    2026-07-31 (front-end included); it quoted 223 DB-free unit / 58
+    request tests where the live count is now 231 / 60 (drift from
+    the loco-rs 1.0.1 migration and the CMS-T21 record-level-ABAC
+    finisher landing after the count was last written); and a
+    "Planned (the full target surface)" section duplicated "Live now"
+    verbatim, as if the whole surface were still aspirational. Fixed:
+    status line now says T1–T24 done + front-end is a separate
+    complete subproject, current test counts, and the "Planned"
+    section is gone (replaced with one line pointing at the real
+    remaining work — the three production gates).
+    **(2) Three spec files overclaimed a shipped erasure/redaction
+    path.** `audit.md`, `design.md` (CMS-D3), and `regulatory.md`
+    ("Observed by design") all stated in the present tense that a
+    retention/erasure request "is handled by" redacting a revision's
+    body at rest. It is not: there is no `/redact` endpoint anywhere
+    in `src/controllers/`, only a `DESTRUCTIVE_POST_SUFFIXES`
+    reservation in `auth.rs` whose own comment says the suffix is
+    "listed ahead of \[its] feature" — i.e. deliberately
+    pre-registered for work that has not landed. The only redaction
+    that exists today is the read-time `mask` ABAC obligation, which
+    redacts a *response*, not the stored row. This is exactly the kind
+    of gap the production-gate list already names honestly (`CMS-G3`
+    — "erasure-by-redaction procedure") but the narrative spec files
+    didn't agree with. Fixed by rewording all three to describe
+    erasure as the *declared resolution*, not a shipped capability,
+    and moving the regulatory.md bullet from "Observed by design"
+    into "Production would additionally require" next to CMS-G3.
+    Confirmed clean, no changes needed: the front-end's `CMS_API_URL`/
+    `AUTH_API_URL` env vars (README ↔ `src/lib/server/config.ts`,
+    exact match — this app ships no `.env.example` at all, the same
+    no-`.env.example` norm the concurrent WPM/CRM/patient-flow notes
+    above are already reconciling for DOC-8, not a fresh finding); the
+    `integrity-mac` vs. hand-rolled-`hmac` webhook-signing choice in
+    `Cargo.toml` (DOC-5's finding was already resolved — the comment
+    explains the different key-sharing model in full); `entity-ref`
+    usage (`clients.rs`, `content_references`, `rules/reference.rs`
+    all use the real `entity_ref::EntityRef`/`EntityType`, not a
+    hand-rolled URN); the five-persona ABAC matrix in `spec/auth.md`
+    against `auth.rs`; both `CLAUDE.md`s (clean one-line `@AGENTS.md`
+    includes); and the front-end `CHANGELOG.md`, which was already
+    accurate. Left the pre-existing, unrelated `Cargo.lock` diff
+    (dependency-registry noise from running `cargo test`/`clippy`, not
+    a real change — already present in the working tree at audit
+    start, same as DOC-5/patient-flow/CRM/WPM noted) out of the
+    commit. Did not touch `case-folder` (sibling agent's concurrent
+    work, still outstanding as the batch's last piece).
+
 - [ ] **DOC-8 (S)** Once DOC-2..DOC-7 land, a final sweep: re-grep for
   the family-wide anti-patterns found along the way (duplicated
   capability tables, stale `.env.example` files, "Backend-only"-style

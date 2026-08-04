@@ -36,12 +36,15 @@
   unpublished content; the `CMS_REQUIRE_AUTH` activation gate must
   be on before real exposure ([security](../../agents/share/security.md)
   §4).
-- **Erasure without falsifying history** — a redaction blanks a
-  revision body while preserving the row, its number, and its
-  linkage ([audit](audit.md)).
 
 ## Production would additionally require
 
+- **Erasure without falsifying history** — the declared resolution
+  is a redaction that blanks a revision body while preserving the
+  row, its number, and its linkage ([audit](audit.md)/[design](design.md)
+  CMS-D3), but the write path is not yet implemented (no `/redact`
+  endpoint exists; the ABAC guard reserves the path ahead of the
+  feature). Tracked as CMS-G3 in [tasks.md](tasks.md).
 - **Accessibility conformance** against WCAG 2.2 AA (and, for a UK
   public-sector deployment, the Public Sector Bodies Accessibility
   Regulations 2018 with a published accessibility statement) — an
