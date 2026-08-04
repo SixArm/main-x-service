@@ -9,6 +9,43 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — review-queue screen upgrade (2026-08-04, T-24 / repo FE-4)
+
+- `/review` gained a **status + page-size filter** (`?status=`/`?limit=`
+  on `GET /api/things/review-queue`; "all" is the *absence* of `status`
+  since the endpoint answers `422 INVALID_STATUS` for a token it does
+  not know, and there is no `offset`), a **keyboard-reachable queue
+  table** (a `Compare` button per row, real `Confirm`/`Reject` buttons
+  in the panel) alongside the existing mouse-only drag-to-decide board,
+  and an **inline side-by-side comparison panel** loading both things
+  with two parallel `GET /api/things/{id}` calls and rendering id /
+  name / additional type / description / url / owner / primary
+  identifier / primary same-as, plus the matcher's `score_breakdown`
+  as a component/weight/score table and its two boolean flags.
+- Confirming a pair does **not** merge it (the decision endpoint is a
+  pure status change); the panel now deep-links to
+  `/things/merge?main=…&duplicate=…` in either survivor order, and
+  `/things/merge` gained the matching `?main=`/`?duplicate=` seed.
+- New pure module `src/lib/review.ts` (status vocabulary, `canDecide`,
+  the five weighted `MATCH_COMPONENTS`, `breakdownRows`,
+  `breakdownFlags`, `mergeHref`), unit-tested in
+  `tests/unit/review.test.ts` (19 tests).
+- i18n: 44 new keys across all 13 locales (real per-locale
+  translations, reusing the existing `results.*` component labels
+  rather than duplicating them).
+- **Two documented, verified gaps versus person's own review screen**
+  (checked against this service's actual `src/api/rest/handlers.rs` /
+  `src/db/review_queue.rs`, not assumed byte-identical): this
+  service's `review_queue` has **no `provenance` column at all**, so
+  the queue surfaces `detection_method` in its place instead of
+  fabricating a field the service does not have; and the wire
+  `ReviewQueueItem` **never serializes `score_breakdown`** (the stored
+  row has the column, but its one writer always writes `None`), so the
+  breakdown table renders its documented empty state for every live
+  item today — a backend follow-up, not a front-end shortfall. See
+  `spec/06-functional-requirements.md` FR-12–FR-18 and
+  `spec/13-tasks.md` T-24.
+
 ### Doc pass (2026-08-04, DOC-4)
 
 - `.env.example` documented a decommissioned client-held-token model

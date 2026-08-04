@@ -10,9 +10,24 @@ import type {
   ReviewDecision,
   ReviewQueueItem,
   ReviewQueueListResponse,
+  ReviewStatus,
   Thing,
 } from "./types.js";
 import { API_BASE_URL } from "$lib/config.js";
+
+/**
+ * Query parameters for `GET /api/things/review-queue`.
+ *
+ * `status` filters to one stored disposition; omitting it (rather than
+ * sending a literal `"all"`, which the service does not recognise and
+ * answers `422 INVALID_STATUS` for) returns every status. `limit` caps
+ * the page size (service default 100, hard cap 500) — there is no
+ * `offset`; the endpoint offers no paging beyond the cap.
+ */
+export interface ReviewQueueOptions {
+  status?: ReviewStatus;
+  limit?: number;
+}
 
 /**
  * Parameters for a Thing search query.
@@ -168,10 +183,19 @@ export class ThingRepository {
     );
   }
 
-  /** Load the stored review queue (newest first). */
-  listReviewQueue(): Promise<ReviewQueueItem[]> {
+  /**
+   * Load the stored review queue (newest first).
+   *
+   * @param options - Optional status filter + page size (see
+   *   {@link ReviewQueueOptions}).
+   */
+  listReviewQueue(
+    options: ReviewQueueOptions = {},
+  ): Promise<ReviewQueueItem[]> {
     return this.http
-      .get<ReviewQueueListResponse>("/api/things/review-queue")
+      .get<ReviewQueueListResponse>("/api/things/review-queue", {
+        query: { status: options.status, limit: options.limit },
+      })
       .then((response) => response.items);
   }
 

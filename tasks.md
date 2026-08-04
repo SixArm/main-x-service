@@ -1134,6 +1134,22 @@
   itself (person deep-links `/persons/merge?main=…&duplicate=…` in either
   survivor order, since a review item names an unordered pair).
 
+  **Thing done 2026-08-04** (`thing-front-end-with-svelte/spec/13-tasks.md`
+  T-24). Same filter/table/compare/merge-seed shape as person's T-25, but
+  with two verified, documented gaps against the reference — checked
+  against thing-service-with-loco's actual `src/api/rest/handlers.rs` /
+  `src/db/review_queue.rs` rather than assumed byte-identical: this
+  service's `review_queue` has **no `provenance` column at all** (unlike
+  person/worker/place/organization), so the queue surfaces
+  `detection_method` in its place instead of fabricating a field the
+  service does not carry; and the wire `ReviewQueueItem` **never
+  serializes `score_breakdown`** (the stored row has the column, but its
+  one writer always writes `None`), so the breakdown table renders its
+  documented empty state for every live item today — a backend
+  follow-up, not a front-end shortfall. `score_breakdown` was declared
+  `?: unknown` on the TS type so no further type change is needed the
+  day the service wires the column through.
+
   **Worker done 2026-08-04** (copy-adapted from person's T-25; see
   `worker-front-end-with-svelte/spec/13-tasks.md` T-25). Same shape:
   `?status=`/`?limit=` filters confirmed against

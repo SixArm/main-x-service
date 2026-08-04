@@ -293,11 +293,7 @@ export interface BatchDeduplicationResponse {
  * State of a queued duplicate pair: awaiting review (`Pending`), human
  * `Confirmed` / `Rejected`, or `AutoMerged` by the scan above threshold.
  */
-export type ReviewStatus =
-  | "pending"
-  | "confirmed"
-  | "rejected"
-  | "automerged";
+export type ReviewStatus = "pending" | "confirmed" | "rejected" | "automerged";
 
 /**
  * A candidate duplicate pair (`thing_id_a` / `thing_id_b`) captured by a
@@ -317,6 +313,23 @@ export interface ReviewQueueItem {
   reviewed_by?: string | null;
   created_at: string;
   reviewed_at?: string | null;
+  /**
+   * Per-component {@link MatchBreakdown}, forward-declared only.
+   *
+   * VERIFIED GAP (2026-08-04, against `thing-service-with-loco`'s
+   * `src/api/rest/handlers.rs` `ReviewQueueItem`): the service's stored
+   * `review_queue` row has a `score_breakdown` column, but the wire type
+   * does not serialize it — the field is simply absent from the JSON
+   * response today, not `null`. This is declared optional here so the
+   * front end degrades gracefully (an empty breakdown table, per
+   * `$lib/review`) rather than needing a follow-up type change the day
+   * the service wires the column through; it does not mean the service
+   * currently sends it. Unlike `thing_id_a`/`thing_id_b`, there is no
+   * `provenance` field at all — the service's `review_queue` table has
+   * no such column (verified against `src/db/review_queue.rs`), unlike
+   * person / worker / place / organization.
+   */
+  score_breakdown?: unknown;
 }
 
 /** One operator verdict for a pending review item. */
