@@ -82,6 +82,16 @@ pub struct LinkRequest {
     /// Optional validity end (`YYYY-MM-DD`).
     #[serde(default)]
     pub valid_to: Option<chrono::NaiveDate>,
+    /// Optional per-component score breakdown (T-32). Only meaningful
+    /// together with `kind = "same_identity"` and
+    /// `provenance = "matcher_suggested"`: the link-graph aggregator's
+    /// cross-service comparator (`link_graph_service::suggest::IdentityMatchScore`)
+    /// sends its breakdown here, and [`create_link`] maps it verbatim
+    /// into the review-queue row's `score_breakdown` column so an
+    /// operator sees *why* the pair was suggested. Ignored (never
+    /// persisted anywhere) for any other `kind`/`provenance` combination.
+    #[serde(default)]
+    pub score_breakdown: Option<serde_json::Value>,
 }
 
 /// A stored edge as returned to the operator: a clean projection of the
@@ -452,6 +462,21 @@ pub async fn create_link(
         Ok(row) => row,
         Err(e) => return db_error(&e),
     };
+    // T-32 (OQ-9(b)): a suggested `same_identity` edge also surfaces in
+    // the review queue, so an operator can confirm/reject it. Runs after
+    // the edge write succeeds (no point queuing a review for an edge that
+    // was never actually written) and is best-effort — see
+    // `queue_cross_service_review`'s doc.
+    if edge_kind == EdgeKind::SameIdentity && edge.provenance == "matcher_suggested" {
+        queue_cross_service_review(
+            &state,
+            person.id,
+            to.id,
+            edge.confidence,
+            req.score_breakdown,
+        )
+        .await;
+    }
     // Best-effort audit: a link write is a mutation of a person record.
     let view = LinkView::of(&link);
     if let Ok(new_values) = serde_json::to_value(&view)
@@ -463,6 +488,147 @@ pub async fn create_link(
         tracing::warn!("failed to audit person link create: {e}");
     }
     (StatusCode::OK, Json(crate::api::ApiResponse::success(view))).into_response()
+}
+
+/// T-32 (`agents/share/cross-service-linking.md` §5.2,
+/// `link-graph-service-with-loco/spec/16-open-questions.md` OQ-9(b)):
+/// when a `same_identity` edge is asserted with
+/// `provenance = "matcher_suggested"`, also surface it in person's
+/// existing deduplication review queue. There is no new
+/// aggregator-hosted review surface — the suggestion job's `POST` to
+/// this very handler **is** the write that puts the pair in front of an
+/// operator; this function is what makes that true rather than merely
+/// asserted.
+///
+/// `record_id_a` is always the person pid and `record_id_b` the worker
+/// pid — see [`crate::db::review_queue::upsert_cross_service`]'s doc for
+/// why this fixed convention matters and why it does not reuse
+/// [`crate::db::review_queue::upsert`]'s order-normalizing insert (that
+/// normalization is correct for within-entity dedup, where the two ids
+/// are interchangeable, and actively wrong here, where they are not).
+///
+/// Best-effort: the edge itself is already durably written by the time
+/// this runs, so a failure here (including a missing `confidence`, which
+/// the `NOT NULL match_score` column requires) is logged, not surfaced
+/// to the caller — the same posture [`create_link`]'s own audit write
+/// already takes just below this call site.
+async fn queue_cross_service_review(
+    state: &AppState,
+    person_id: Uuid,
+    worker_id: Uuid,
+    confidence: Option<f64>,
+    score_breakdown: Option<serde_json::Value>,
+) {
+    let Some(match_score) = confidence else {
+        tracing::warn!(
+            %person_id,
+            %worker_id,
+            "matcher_suggested same_identity link with no confidence; \
+             skipping the review-queue row (match_score is NOT NULL)"
+        );
+        return;
+    };
+    let item = crate::db::review_queue::NewReviewItem {
+        record_id_a: person_id,
+        record_id_b: worker_id,
+        match_score,
+        match_quality: crate::models::review_queue::match_quality_for_score(match_score)
+            .to_string(),
+        detection_method: "cross_service_same_identity".to_string(),
+        score_breakdown,
+        status: "pending".to_string(),
+        provenance: "matcher_suggested".to_string(),
+    };
+    if let Err(e) = crate::db::review_queue::upsert_cross_service(&state.db, &item).await {
+        tracing::warn!(
+            %person_id,
+            %worker_id,
+            "failed to queue cross-service same_identity review: {e}"
+        );
+    }
+}
+
+/// T-32 promotion: reassert a suggested `same_identity` edge as
+/// `operator` / `1.0` confidence. "Promotion IS the existing person
+/// link-write path" (OQ-9(b)) — this calls the very same
+/// [`upsert_and_emit`] [`create_link`] uses, so the promoted edge keeps
+/// its stable id (idempotent on `entity_links`'s own `(from_pid, kind,
+/// to_ref, valid_from)` key — [`entity_links::upsert`]'s doc) and emits
+/// the normal `linked` event under the active transport, exactly as an
+/// operator asserting the edge directly would.
+///
+/// Called from `api::rest::handlers::review_decision`'s `confirmed`
+/// branch. Returns `Ok(None)` when `person_id` no longer resolves to a
+/// person (best-effort: the caller logs and moves on rather than failing
+/// the whole review decision, which has already succeeded by the time
+/// this runs).
+///
+/// # Errors
+///
+/// Returns the crate database/streaming error if the upsert or event
+/// enqueue fails.
+pub(crate) async fn promote_cross_service_link(
+    state: &AppState,
+    person_id: Uuid,
+    worker_id: Uuid,
+    actor: Option<&str>,
+) -> crate::Result<Option<EntityLinkModel>> {
+    let Some(person) = state.person_repository.get_by_id(&person_id).await? else {
+        return Ok(None);
+    };
+    let edge = NewEdge {
+        from_pid: person.id,
+        kind: EdgeKind::SameIdentity.as_str().to_string(),
+        to_ref: EntityRef::new(EntityType::Worker, worker_id).to_string(),
+        role: None,
+        confidence: Some(1.0),
+        provenance: "operator".to_string(),
+        valid_from: None,
+        valid_to: None,
+    };
+    let link = upsert_and_emit(state, &person, &edge, actor).await?;
+    Ok(Some(link))
+}
+
+/// T-32 rejection: withdraw a suggested `same_identity` edge —
+/// soft-delete + `unlinked` event via the same [`soft_delete_and_emit`]
+/// path `DELETE /api/persons/{id}/links/{link_id}` uses. Unlike that
+/// endpoint, there is no `link_id` to key on here (a review-queue row
+/// carries only the person/worker pair), so the edge is located by its
+/// natural key via [`entity_links::find_active_by_key`].
+///
+/// Called from `api::rest::handlers::review_decision`'s `rejected`
+/// branch. Returns `Ok(None)` when there is nothing to withdraw (the
+/// person no longer exists, or the edge was already withdrawn / never
+/// actually written) — same best-effort posture as
+/// [`promote_cross_service_link`].
+///
+/// # Errors
+///
+/// Returns the crate database/streaming error if the lookup, soft-delete,
+/// or event enqueue fails.
+pub(crate) async fn reject_cross_service_link(
+    state: &AppState,
+    person_id: Uuid,
+    worker_id: Uuid,
+    actor: Option<&str>,
+) -> crate::Result<Option<EntityLinkModel>> {
+    let Some(person) = state.person_repository.get_by_id(&person_id).await? else {
+        return Ok(None);
+    };
+    let to_ref = EntityRef::new(EntityType::Worker, worker_id).to_string();
+    let Some(row) = entity_links::find_active_by_key(
+        &state.db,
+        person.id,
+        EdgeKind::SameIdentity.as_str(),
+        &to_ref,
+    )
+    .await?
+    else {
+        return Ok(None);
+    };
+    let deleted = soft_delete_and_emit(state, &person, row, actor).await?;
+    Ok(Some(deleted))
 }
 
 /// List a person's active outbound edges. `GET /api/persons/{id}/links`.

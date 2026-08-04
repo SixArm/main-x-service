@@ -145,6 +145,36 @@ pub async fn find_active(
     Ok(row)
 }
 
+/// Find one active edge by its **natural key** — `(from_pid, kind,
+/// to_ref)` with `valid_from` fixed to `NULL` (T-32's cross-service
+/// suggestion path never sets a validity window, so this mirrors exactly
+/// what [`upsert`]'s own `(from_pid, kind, to_ref, valid_from)` conflict
+/// key would match) — for a caller that knows the edge's identity but not
+/// its generated `id`. This is the review-queue promotion path
+/// (`api::rest::handlers::review_decision`'s T-32 extension): a review
+/// item has no `edge_id` column to key on, only the person/worker pair.
+/// Returns `None` when unknown / already withdrawn.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] when the query fails.
+pub async fn find_active_by_key<C: ConnectionTrait>(
+    db: &C,
+    from_pid: Uuid,
+    kind: &str,
+    to_ref: &str,
+) -> Result<Option<entity_links::Model>> {
+    let row = entity_links::Entity::find()
+        .filter(entity_links::Column::FromPid.eq(from_pid))
+        .filter(entity_links::Column::Kind.eq(kind))
+        .filter(entity_links::Column::ToRef.eq(to_ref))
+        .filter(entity_links::Column::ValidFrom.is_null())
+        .filter(entity_links::Column::DeletedAt.is_null())
+        .one(db)
+        .await?;
+    Ok(row)
+}
+
 /// Every **active** outbound edge across all persons, oldest first — the
 /// authoritative set the link-graph aggregator reconciles against
 /// (`GET /api/persons/links`, design §8). `since` (on `created_at`)

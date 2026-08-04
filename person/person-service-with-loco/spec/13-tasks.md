@@ -779,3 +779,69 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     run seeds all 50 rows (including both halves of the
     "Okonkwo/Okonkow" duplicate pair) and a second run changes nothing;
     green against Postgres 18.
+
+- [x] **T-32 (link-graph-service-with-loco LNK-4) — Cross-service
+  `same_identity` review-queue bridge + promotion/rejection.** *(done
+  2026-08-04)* The link-graph aggregator's periodic suggestion job
+  (T-31, that crate's `spec/13-tasks.md`) already POSTs `matcher_suggested`
+  `same_identity` edges to `create_link`, but that handler never touched
+  `review_queue` — this task closes that gap on the person side, per
+  [cross-service-linking.md](../../../agents/share/cross-service-linking.md)
+  §5.2 and link-graph's `spec/16-open-questions.md` OQ-9(b).
+  - [x] `LinkRequest` gained an optional `score_breakdown` field (only
+    meaningful for `kind = "same_identity"` +
+    `provenance = "matcher_suggested"`); the link-graph job now sends
+    its T-29 `IdentityMatchScore` mapped to JSON there.
+  - [x] `create_link` (`src/api/rest/links.rs`), after a successful
+    `same_identity`/`matcher_suggested` edge write, best-effort writes a
+    `review_queue` row via a new `db::review_queue::upsert_cross_service`
+    — deliberately **not** `upsert`, whose pair-order normalization
+    (correct for within-entity dedup, where the two ids are
+    interchangeable) would silently swap the person/worker columns for
+    roughly half of all pairs. `record_id_a` is always the person pid,
+    `record_id_b` always the worker pid, stored exactly as given.
+    `detection_method = "cross_service_same_identity"`,
+    `match_quality` from a newly-extracted
+    `models::review_queue::match_quality_for_score` (also now reused by
+    the batch-dedup scan and `check_duplicates`, removing three copies
+    of the same inlined `if`/`else`).
+  - [x] **Design decision — where the write happens:** in person's own
+    `create_link` handler, not a second call from link-graph's
+    suggestion job. Keeps the write local to the service that owns
+    `review_queue` (no other service writes into it today), keeps the
+    aggregator's job exactly as simple as T-31 left it (one POST, no
+    follow-up call whose failure would leave an edge with no queued
+    review), and matches "the originating service owns the write"
+    (design §4) extended to this service's own derived state.
+  - [x] `review_decision`'s `confirmed` branch now also calls a new
+    `links::promote_cross_service_link` (reasserts the edge via the
+    same `upsert_and_emit` `create_link` itself uses —
+    `provenance="operator", confidence=1.0` — idempotent on
+    `entity_links`'s own `(from_pid, kind, to_ref, valid_from)` key, so
+    it is the SAME edge id, not a second edge) and the `rejected`
+    branch calls a new `links::reject_cross_service_link`
+    (soft-delete + `unlinked`, via a new
+    `entity_links::find_active_by_key` natural-key lookup, since a
+    review row carries no `edge_id`). Both are gated on
+    **both** `row.provenance == "matcher_suggested"` **and**
+    `row.detection_method == "cross_service_same_identity"`, so an
+    ordinary within-entity decision is completely unaffected — pinned
+    by a DB-gated regression test, not merely asserted.
+  - [x] New `tests/cross_service_link_review.rs` (DB-gated, 4 tests,
+    real HTTP router via `tower::ServiceExt::oneshot`, exactly like
+    `tests/api_integration_test.rs`): a suggestion POST produces the
+    right review-queue row (fields + score breakdown); confirming
+    promotes the same edge (not a duplicate); rejecting withdraws it;
+    an ordinary `provenance="operator"`/`detection_method="batch_deduplication"`
+    decision writes no `entity_links` edge at all (the regression pin).
+  - **Acceptance:** `cargo fmt --check` / `cargo clippy --all-targets --
+    -D warnings` clean; `cargo test --lib` 315 passed (was 314; +1 for
+    `match_quality_for_score`'s boundary test); DB-gated suite green
+    against Postgres 18 via `scripts/ci-check.sh test-db` (21 `--lib`
+    DB tests + 25 `api_integration_test` + the 4 new
+    `cross_service_link_review` tests, all passing; the pre-existing
+    suites unaffected).
+  - **Out of scope (T-33, link-graph):** audit logging of every
+    suggestion-job POST, `LINK_GRAPH_SUGGEST_MAX_CANDIDATES` /
+    `_MAX_EDGES_PER_RUN` scale controls, and the
+    never-auto-promoted-regardless-of-score governance test.

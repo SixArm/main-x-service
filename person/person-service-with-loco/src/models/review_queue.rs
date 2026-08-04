@@ -136,6 +136,24 @@ pub struct ReviewDecisionRequest {
     pub status: ReviewDecision,
 }
 
+/// Confidence-band label for a match score: `certain` (≥ 0.95),
+/// `probable` (≥ 0.7), else `possible`. Extracted so the thresholds live
+/// in exactly one place — reused by the batch dedup scan
+/// (`api::rest::handlers::deduplicate`) and the T-32 cross-service
+/// `same_identity` suggestion review-queue write
+/// (`api::rest::links::create_link`), which previously would have had to
+/// duplicate this inline `if`/`else` a second time.
+#[must_use]
+pub fn match_quality_for_score(score: f64) -> &'static str {
+    if score >= 0.95 {
+        "certain"
+    } else if score >= 0.7 {
+        "probable"
+    } else {
+        "possible"
+    }
+}
+
 /// Response envelope for `GET /api/persons/review-queue`.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ReviewQueueListResponse {
@@ -148,6 +166,18 @@ pub struct ReviewQueueListResponse {
 #[cfg(test)]
 mod review_decision_tests {
     use super::*;
+
+    /// `match_quality_for_score`'s three bands, pinned at their boundary
+    /// values (both inclusive-at, and just-below).
+    #[test]
+    fn match_quality_bands() {
+        assert_eq!(match_quality_for_score(1.0), "certain");
+        assert_eq!(match_quality_for_score(0.95), "certain");
+        assert_eq!(match_quality_for_score(0.9499), "probable");
+        assert_eq!(match_quality_for_score(0.7), "probable");
+        assert_eq!(match_quality_for_score(0.6999), "possible");
+        assert_eq!(match_quality_for_score(0.0), "possible");
+    }
 
     /// Decision tokens are the lowercase wire form, and only the two
     /// operator verdicts parse — `pending` / `automerged` are refused.

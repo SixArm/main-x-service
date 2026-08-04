@@ -332,7 +332,15 @@ impl IdentitySource for HttpIdentitySource {
 
 /// The **real** suggestion sink: `POST {base_url}/{person_id}/links` with a
 /// `same_identity`/`matcher_suggested` body, matching person's
-/// `LinkRequest` shape exactly (`kind`/`to_ref`/`confidence`/`provenance`).
+/// `LinkRequest` shape exactly
+/// (`kind`/`to_ref`/`confidence`/`provenance`/`score_breakdown`). The
+/// `score_breakdown` field (T-32,
+/// `link-graph-service-with-loco/spec/16-open-questions.md` OQ-9(b)) is
+/// this comparator's own [`super::IdentityMatchScore`] mapped verbatim to
+/// JSON — person's `create_link` handler stores it straight into the
+/// review-queue row's `score_breakdown` column, so an operator reviewing
+/// the suggestion sees exactly which components (identifier / name / DOB
+/// / gender) drove the score, not just the final number.
 pub struct HttpSuggestionSink {
     /// Person's collection base URL (e.g. `http://host/api/persons`).
     base_url: String,
@@ -357,6 +365,12 @@ impl SuggestionSink for HttpSuggestionSink {
             "to_ref": candidate.worker.to_string(),
             "confidence": candidate.score.confidence,
             "provenance": "matcher_suggested",
+            "score_breakdown": {
+                "identifier_match": candidate.score.identifier_match,
+                "name_score": candidate.score.name_score,
+                "dob_score": candidate.score.dob_score,
+                "gender_score": candidate.score.gender_score,
+            },
         });
         let mut request = reqwest::Client::new().post(&url).json(&body);
         if let Some(token) = &self.token {

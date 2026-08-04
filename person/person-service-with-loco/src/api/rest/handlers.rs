@@ -21,6 +21,7 @@ use uuid::Uuid;
 use authentication_verifier::Action;
 
 use super::auth::{MaybeAuthUser, authorize_record, person_resource_attrs, read_visibility};
+use super::links;
 use super::state::AppState;
 use crate::api::ApiResponse;
 use crate::compliance::disclosure::{self, AccessContext};
@@ -858,13 +859,7 @@ pub async fn match_person(
                 .filter(|m| m.score >= threshold)
                 .take(payload.limit)
                 .map(|m| {
-                    let quality = if m.score >= 0.95 {
-                        "certain"
-                    } else if m.score >= 0.7 {
-                        "probable"
-                    } else {
-                        "possible"
-                    };
+                    let quality = crate::models::review_queue::match_quality_for_score(m.score);
 
                     let breakdown_json = serde_json::to_value(&m.breakdown).ok();
 
@@ -946,13 +941,7 @@ async fn check_duplicates_internal(state: &AppState, person: &Person) -> Vec<Mat
         .filter(|m| m.score >= 0.7)
         .take(10)
         .map(|m| {
-            let quality = if m.score >= 0.95 {
-                "certain"
-            } else if m.score >= 0.7 {
-                "probable"
-            } else {
-                "possible"
-            };
+            let quality = crate::models::review_queue::match_quality_for_score(m.score);
 
             MatchResponse {
                 person: m.person.clone(),
@@ -1295,13 +1284,7 @@ pub async fn batch_deduplicate(
                 continue;
             }
 
-            let quality = if m.score >= 0.95 {
-                "certain"
-            } else if m.score >= 0.7 {
-                "probable"
-            } else {
-                "possible"
-            };
+            let quality = crate::models::review_queue::match_quality_for_score(m.score);
 
             let status = if m.score >= req.auto_merge_threshold {
                 crate::models::ReviewStatus::AutoMerged
@@ -1545,6 +1528,61 @@ pub async fn review_decision(
             {
                 tracing::warn!("review-decision audit write failed: {e}");
             }
+
+            // T-32 (`agents/share/cross-service-linking.md` §5.2,
+            // `link-graph-service-with-loco/spec/16-open-questions.md`
+            // OQ-9(b)): a decision on a matcher-suggested cross-service
+            // `same_identity` row also promotes or withdraws the
+            // underlying `entity_links` edge — "promotion IS the
+            // existing person link-write path", not a new endpoint.
+            // Gated on BOTH `provenance` and `detection_method` so an
+            // ordinary within-entity decision (`operator` / `import`
+            // provenance, or any future reuse of `matcher_suggested` for
+            // something else) is completely unaffected. Best-effort: the
+            // review decision itself has already succeeded by this
+            // point, so a failure here is logged, not surfaced as an
+            // error response — matching this handler's existing
+            // best-effort audit-write posture just above.
+            if row.provenance == "matcher_suggested"
+                && row.detection_method == "cross_service_same_identity"
+            {
+                let actor = reviewed_by.as_deref();
+                let outcome = match req.status {
+                    crate::models::ReviewDecision::Confirmed => {
+                        links::promote_cross_service_link(
+                            &state,
+                            row.record_id_a,
+                            row.record_id_b,
+                            actor,
+                        )
+                        .await
+                    }
+                    crate::models::ReviewDecision::Rejected => {
+                        links::reject_cross_service_link(
+                            &state,
+                            row.record_id_a,
+                            row.record_id_b,
+                            actor,
+                        )
+                        .await
+                    }
+                };
+                match outcome {
+                    Ok(None) => tracing::warn!(
+                        review_id = %id,
+                        person_id = %row.record_id_a,
+                        worker_id = %row.record_id_b,
+                        "T-32: no matching person/edge found to promote/reject \
+                         (person deleted, or the edge was already withdrawn)"
+                    ),
+                    Err(e) => tracing::warn!(
+                        review_id = %id,
+                        "T-32: failed to promote/reject the cross-service link: {e}"
+                    ),
+                    Ok(Some(_)) => {}
+                }
+            }
+
             (
                 StatusCode::OK,
                 Json(ApiResponse::success(review_row_to_item(&row))),

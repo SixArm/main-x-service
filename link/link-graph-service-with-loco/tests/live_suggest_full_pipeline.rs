@@ -1,8 +1,13 @@
-//! Live, full-pipeline proof for T-31 (fetch → block → compare → POST),
-//! exercising this crate's real production code end to end against two
-//! real, separately-running peer services — not a mock. Complements
-//! `tests/live_suggest_fetch.rs` (fetch-only, either service alone) by
-//! also driving the real `HttpSuggestionSink` POST back to person.
+//! Live, full-pipeline proof for T-31 (fetch → block → compare → POST)
+//! plus T-32's review-queue bridge, exercising this crate's real
+//! production code end to end against two real, separately-running peer
+//! services — not a mock. Complements `tests/live_suggest_fetch.rs`
+//! (fetch-only, either service alone) by also driving the real
+//! `HttpSuggestionSink` POST back to person, and — since T-32 — checking
+//! that the POST's `score_breakdown` field lands on person's own
+//! `review_queue` row (`agents/share/cross-service-linking.md` §5.2,
+//! `spec/16-open-questions.md` OQ-9(b)), not merely that the edge itself
+//! was created.
 //!
 //! `#[ignore]`d and not part of any automated CI stage — see module docs
 //! in `live_suggest_fetch.rs` for the general pattern. This test
@@ -70,5 +75,37 @@ async fn live_pipeline_posts_a_real_suggested_edge() {
     assert!(
         has_same_identity,
         "expected a matcher_suggested same_identity link on person {expect_person_id}, got: {body}"
+    );
+
+    // T-32: the same POST also queued a review-queue row on person, with
+    // the T-29 score breakdown carried through — not just the edge.
+    // `person_url` is the collection base (e.g. `.../api/persons`); the
+    // review-queue endpoint is a sibling path under the same prefix.
+    let review_url = format!(
+        "{}/persons/review-queue?status=pending&limit=500",
+        person_url.trim_end_matches("/persons")
+    );
+    let response = reqwest::get(&review_url)
+        .await
+        .expect("GET the review queue")
+        .error_for_status()
+        .expect("review-queue GET should be 200");
+    let body: serde_json::Value = response.json().await.expect("parse review-queue response");
+    let items = body["data"]["items"]
+        .as_array()
+        .expect("data.items is an array");
+    let row = items
+        .iter()
+        .find(|item| {
+            item["detection_method"] == "cross_service_same_identity"
+                && item["person_id_a"] == expect_person_id.to_string()
+        })
+        .unwrap_or_else(|| {
+            panic!("expected a pending cross-service review-queue row for {expect_person_id}, got: {body}")
+        });
+    assert_eq!(row["provenance"], "matcher_suggested");
+    assert!(
+        row["score_breakdown"].is_object(),
+        "expected the T-29 score breakdown to have landed on the review-queue row, got: {row}"
     );
 }

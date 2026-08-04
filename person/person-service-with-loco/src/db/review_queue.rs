@@ -159,6 +159,77 @@ pub async fn upsert<C: ConnectionTrait>(
     Ok(rows)
 }
 
+/// Insert-or-refresh a **cross-service** suggestion row (T-32,
+/// `agents/share/cross-service-linking.md` §5.2, `spec/16-open-questions.md`
+/// OQ-9(b)) — the review-queue counterpart of a `matcher_suggested`
+/// `same_identity` link POST.
+///
+/// Unlike [`upsert`], this does **not** normalize `(record_id_a,
+/// record_id_b)` by raw `Uuid` comparison. `upsert`'s reordering is
+/// correct for its own use (within-entity dedup, where both ids are the
+/// same entity type and "which column" is meaningless) but would be
+/// actively wrong here: a cross-service pair's two columns are **not**
+/// interchangeable — `record_id_a` must always be the person pid and
+/// `record_id_b` always the worker pid, so a reader (crucially, this
+/// crate's own `review_decision` promotion path, which has to resolve
+/// "which id is the worker" without a `to_ref` column to consult) can
+/// tell them apart without guessing. Reordering by raw `Uuid` value would
+/// silently swap the two columns for roughly half of all pairs — whichever
+/// side happens to sort first as a `Uuid` — breaking that convention
+/// invisibly. The pair is therefore stored **exactly as given** in
+/// `item`. This is safe against the same `UNIQUE (record_id_a,
+/// record_id_b)` constraint `upsert` uses: a person pid and a worker pid
+/// are independent random UUID spaces, so an accidental collision with an
+/// unrelated within-entity dedup pair is not a realistic concern, and in
+/// any case this function is the **only** writer of cross-service rows —
+/// within-entity code paths only ever call `upsert`.
+///
+/// `provenance` is excluded from the `DO UPDATE SET`, exactly as `upsert`
+/// does, so a re-scan (the periodic suggestion job re-running) never
+/// overwrites a pair's original provenance.
+///
+/// # Errors
+///
+/// Returns the crate database error if the insert fails, or
+/// [`crate::Error::Api`] in the (should-never-happen) case that the
+/// `RETURNING` clause produces no row.
+pub async fn upsert_cross_service<C: ConnectionTrait>(
+    conn: &C,
+    item: &NewReviewItem,
+) -> Result<ReviewQueueRow> {
+    let sql = format!(
+        "INSERT INTO review_queue \
+         (id, record_id_a, record_id_b, match_score, match_quality, \
+          detection_method, score_breakdown, status, provenance) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \
+         ON CONFLICT (record_id_a, record_id_b) DO UPDATE SET \
+             match_score = EXCLUDED.match_score, \
+             match_quality = EXCLUDED.match_quality, \
+             detection_method = EXCLUDED.detection_method, \
+             score_breakdown = EXCLUDED.score_breakdown \
+         RETURNING {COLS}"
+    );
+    let stmt = Statement::from_sql_and_values(
+        conn.get_database_backend(),
+        &sql,
+        [
+            Uuid::new_v4().into(),
+            item.record_id_a.into(),
+            item.record_id_b.into(),
+            item.match_score.into(),
+            item.match_quality.clone().into(),
+            item.detection_method.clone().into(),
+            Value::Json(item.score_breakdown.clone().map(Box::new)),
+            item.status.clone().into(),
+            item.provenance.clone().into(),
+        ],
+    );
+    let qr = conn.query_one_raw(stmt).await?.ok_or_else(|| {
+        crate::Error::Api("cross-service review-queue upsert returned no row".to_string())
+    })?;
+    row_from(&qr)
+}
+
 /// List stored review items, newest first, optionally filtered by
 /// status token. `limit` is capped at 500.
 ///

@@ -440,19 +440,72 @@ round done and fully pinned 2026-08-04 — T-29 code may start.**
   test --lib`: still 85 passed (unit-test count unchanged — the fix is
   in the HTTP call shape, not the pure logic). `cargo fmt --check` /
   `cargo clippy --all-targets -- -D warnings` clean.
-- [ ] T-32: Review + promotion, reusing **person's existing
+- [x] T-32: Review + promotion, reusing **person's existing
   `review_queue` table/endpoints** (OQ-9(b)) — no new aggregator
-  endpoint. Suggestions land as ordinary review-queue rows
-  (`record_id_a` = person pid, `record_id_b` = worker pid — the column
-  carries no FK, so a cross-service pair stores cleanly),
-  `provenance = "matcher_suggested"` (the BLK-2 column, already wired),
-  `detection_method = "cross_service_same_identity"`. Extend
-  `review_decision`'s `confirmed` branch to also call
-  `entity_links::upsert` with `provenance="operator", confidence=1.0`
-  (idempotent — reasserts the same `edge_id`); extend its `rejected`
-  branch to soft-delete the edge (`unlinked`). A reviewing client
-  resolves the worker-side summary with its own `GET /api/workers/{id}`
-  call (front-end-drift-accepted, no shared package). Depends: T-31.
+  endpoint. *(done 2026-08-04; landed entirely in
+  `person-service-with-loco` — see that crate's own `spec/13-tasks.md`
+  T-32 entry and `CHANGELOG.md` for the full breakdown; this entry
+  records the decisions from the link-graph side.)*
+  - [x] **Entity-type-ambiguity wrinkle, resolved.** OQ-9(b)'s premise —
+    `record_id_a` = person pid, `record_id_b` = worker pid — turned out
+    to require more than "the column carries no FK": person's existing
+    `db::review_queue::upsert` **normalizes** `(record_id_a,
+    record_id_b)` by raw `Uuid` comparison before insert (correct for
+    within-entity dedup, where the two ids are the same entity type and
+    which column holds which is meaningless; actively wrong for a
+    cross-service pair, where reordering would silently swap the
+    person/worker columns for roughly half of all pairs — whichever
+    side happens to sort first as a `Uuid`). Resolved by adding a
+    **second, non-reordering** insert path,
+    `db::review_queue::upsert_cross_service`, used only for
+    cross-service rows; the fixed person-then-worker convention is
+    honoured by never reordering, not by relying on `upsert`'s
+    normalization to happen to preserve it.
+  - [x] **Where the review-queue write happens: person's own
+    `create_link` handler**, not a second call from this crate's
+    suggestion job (T-31). Considered and rejected: a follow-up POST
+    from link-graph's job would leave a real failure mode (edge
+    created, review-queue write fails independently, aggregator has no
+    transaction spanning both calls) and would complicate T-31's job
+    for no benefit, since `review_queue` is person's own table and no
+    other service writes into it. Keeping the write inside
+    `create_link` — gated on `kind = "same_identity"` +
+    `provenance = "matcher_suggested"` — means T-31's job needed no
+    behavioural change at all beyond one addition (below): it already
+    POSTs everything the write needs.
+  - [x] The one addition on this crate's side: `src/suggest/job.rs`'s
+    `HttpSuggestionSink::post_suggestion` now sends the T-29
+    `IdentityMatchScore` breakdown as a `score_breakdown` JSON object
+    alongside `kind`/`to_ref`/`confidence`/`provenance`, so person's
+    review-queue row carries the per-component evidence (identifier /
+    name / DOB / gender), not just the final confidence number.
+    `tests/live_suggest_full_pipeline.rs` (manual, `#[ignore]`d, not in
+    any CI stage) extended to also confirm the review-queue row landed
+    with its breakdown, closing the T-31→T-32 loop end to end against
+    two real running services.
+  - [x] `review_decision`'s `confirmed` branch reasserts the edge via
+    person's own `upsert_and_emit` (same idempotent
+    `(from_pid, kind, to_ref, valid_from)` key `create_link` uses —
+    the SAME edge id, never a new one) rather than a bare
+    `entity_links::upsert` call, so promotion also emits the normal
+    `linked` event under the active transport, exactly as an operator
+    asserting the edge directly would; `rejected` soft-deletes it
+    (`unlinked`) via a new `entity_links::find_active_by_key` natural-key
+    lookup (a review row carries no `edge_id`). Both gated on **both**
+    `provenance` and `detection_method`, pinned by a DB-gated regression
+    test proving an ordinary within-entity decision is unaffected.
+  - [x] A reviewing client resolves the worker-side summary with its own
+    `GET /api/workers/{id}` call (front-end-drift-accepted, no shared
+    package) — unchanged from OQ-9(b)'s original plan; nothing in this
+    crate needed to change to support it.
+  - **Acceptance:** `cargo test --lib` on this crate: still 85 passed
+    (unchanged — the change here is the POST body shape, not the pure
+    comparator/blocking logic already covered by T-29/T-30's suite);
+    `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings`
+    clean. Person-service's own DB-gated suite (4 new tests +
+    pre-existing 21 `--lib` + 25 `api_integration_test`, all green
+    against Postgres 18) is the acceptance evidence for the actual
+    review/promotion behaviour, since that is where it lives.
 - [ ] T-33: Governance + tests — suggested edges are `unverified` and
   never auto-promoted regardless of score (OQ-9(a)); the suggestion job
   audits every POST it makes (mirroring `audit_ctx` on person's link

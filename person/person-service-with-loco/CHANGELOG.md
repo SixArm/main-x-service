@@ -7,6 +7,69 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — cross-service review-queue bridge + promotion/rejection (link-graph T-32, OQ-9(b))
+
+Closes a gap T-31 (link-graph's periodic suggestion job) left open: that
+job already `POST`s `matcher_suggested` `same_identity` edges to
+`create_link`, but the handler never touched `review_queue` — a
+suggestion landed on `entity_links` with no way for an operator to see
+or decide it. Per
+[cross-service-linking.md](../../agents/share/cross-service-linking.md)
+§5.2 and link-graph's `spec/16-open-questions.md` OQ-9(b), person's
+*existing* review-queue table and decision endpoint are reused rather
+than adding a new aggregator-hosted review surface.
+
+- **`src/api/rest/links.rs`** — `LinkRequest` gained an optional
+  `score_breakdown` field (meaningful only for `kind = "same_identity"`
+  + `provenance = "matcher_suggested"`); `create_link` now best-effort
+  queues a `review_queue` row (`queue_cross_service_review`) after a
+  suggested edge is written; two new `pub(crate)` functions,
+  `promote_cross_service_link` and `reject_cross_service_link`, reused
+  by `review_decision` (below) — reasserting/withdrawing via the exact
+  same `upsert_and_emit`/`soft_delete_and_emit` paths `create_link`/
+  `delete_link` already use, so a promotion is the same edge id, not a
+  new one.
+- **`src/db/review_queue.rs`** — new `upsert_cross_service`, which does
+  **not** normalize `(record_id_a, record_id_b)` order the way `upsert`
+  does. That normalization is correct for within-entity dedup (both ids
+  are the same entity type, so which column holds which is meaningless)
+  and would be actively wrong here: `record_id_a` must always be the
+  person pid and `record_id_b` always the worker pid, and reordering by
+  raw `Uuid` comparison would silently swap them for roughly half of all
+  pairs.
+- **`src/db/entity_links.rs`** — new `find_active_by_key`, a
+  `(from_pid, kind, to_ref)` natural-key lookup for the rejection path
+  (a review-queue row carries no `edge_id` to key on directly).
+- **`src/models/review_queue.rs`** — new `match_quality_for_score`,
+  extracted from three previously-duplicated inline `if score >= 0.95 {
+  ...}` blocks (`match_person`, `check_duplicates`, `batch_deduplicate`
+  in `handlers.rs`) and reused by the new cross-service write, so the
+  certain/probable/possible thresholds live in exactly one place.
+- **`src/api/rest/handlers.rs`** — `review_decision`'s `confirmed`
+  branch now also promotes the edge and its `rejected` branch withdraws
+  it, gated on **both** `provenance == "matcher_suggested"` **and**
+  `detection_method == "cross_service_same_identity"` so an ordinary
+  within-entity decision is unaffected; best-effort (logged on failure,
+  never turns a successful decision into an error response).
+- **`link-graph-service-with-loco`'s `src/suggest/job.rs`**
+  (`HttpSuggestionSink::post_suggestion`) now sends its T-29
+  `IdentityMatchScore` as a `score_breakdown` object alongside
+  `kind`/`to_ref`/`confidence`/`provenance` — see that crate's own
+  `CHANGELOG.md`.
+- New `tests/cross_service_link_review.rs` (DB-gated, 4 tests): a
+  suggestion POST creates the right review-queue row (fields + score
+  breakdown carried through); confirming promotes the same edge (not a
+  duplicate); rejecting withdraws it; an ordinary
+  `provenance="operator"`/`detection_method="batch_deduplication"`
+  decision writes no `entity_links` edge (the regression pin — proves
+  the gate, not just asserts it).
+
+Verified against a real Postgres 18 (`scripts/ci-check.sh test-db`):
+all pre-existing DB-gated suites green (21 `--lib` + 25
+`api_integration_test`), plus the 4 new tests. `cargo test --lib`: 315
+passed (was 314; +1 for `match_quality_for_score`'s boundary test).
+`cargo fmt --check` / `cargo clippy --all-targets -- -D warnings` clean.
+
 ### Added — `GET /api/persons`, a genuine database-backed list endpoint (link-graph T-31 follow-up)
 
 Found while building `link-graph-service`'s cross-service `same_identity`

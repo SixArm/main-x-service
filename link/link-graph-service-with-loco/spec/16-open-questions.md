@@ -152,7 +152,26 @@ opens a §13 task.
     reasserts the same `edge_id`) and its `rejected` branch to
     soft-delete the edge (emitting `unlinked`) — "promotion" *is* the
     existing person link-write path (design §4.1), triggered from the
-    existing decision endpoint, not a new one. The aggregator's own
+    existing decision endpoint, not a new one.
+
+    **Landed 2026-08-04, one refinement over the paragraph above:**
+    the promotion path calls person's own `upsert_and_emit` wrapper
+    (the same one `create_link` itself uses), not a bare
+    `entity_links::upsert`, so a confirmed promotion also emits the
+    normal `linked` event under the active transport (durably, under
+    `outbox`) — a bare `upsert` call would have written the row but
+    silently skipped that event. Rejection likewise goes through
+    `soft_delete_and_emit`, keyed by a new `entity_links::find_active_by_key`
+    natural-key lookup since a review-queue row carries no `edge_id`.
+    Also landed: the write side of the *suggestion* (not just the
+    promotion) — `create_link` itself now queues the review-queue row
+    for a `matcher_suggested` `same_identity` edge, via a
+    **non-reordering** `review_queue::upsert_cross_service` rather than
+    the existing order-normalizing `upsert` (see this crate's own
+    `spec/13-tasks.md` T-32 entry for why that distinction is
+    load-bearing). Full detail in `person-service-with-loco`'s
+    `CHANGELOG.md` and its own `spec/13-tasks.md` T-32 entry, since that
+    is where all of this actually lives. The aggregator's own
     `GET /api/edges?...&status=unverified` stays available as a
     **read-only discovery convenience** (it will already project
     `matcher_suggested` edges once T-31 posts them) but is never where a

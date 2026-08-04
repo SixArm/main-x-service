@@ -13,6 +13,43 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > and [event-bus.md](../../agents/share/event-bus.md).
 
 ## [Unreleased]
+### Added — T-32: cross-service review-queue bridge + promotion/rejection (OQ-9(b))
+
+Closes the gap T-31 (below) left open: the periodic suggestion job
+already `POST`s `matcher_suggested` `same_identity` edges to person, but
+the edge landed with no way for an operator to review or confirm it.
+Reuses person's **existing** `review_queue` table/endpoints per OQ-9(b)
+— no new aggregator endpoint, and this crate stays read-only to the
+world.
+
+- **`src/suggest/job.rs`** — `HttpSuggestionSink::post_suggestion` now
+  sends the T-29 `IdentityMatchScore` breakdown as a `score_breakdown`
+  JSON object (`identifier_match`/`name_score`/`dob_score`/
+  `gender_score`) alongside `kind`/`to_ref`/`confidence`/`provenance`,
+  so the review-queue row person creates from it carries the
+  per-component evidence, not just the final confidence number. The
+  pure comparator/blocking logic (`src/suggest.rs`) is unchanged.
+- **`tests/live_suggest_full_pipeline.rs`** (manual, `#[ignore]`d, not
+  in any CI stage) extended to also fetch person's review queue after
+  the pipeline run and confirm the suggested pair's row landed with a
+  `score_breakdown` object — closing the T-31→T-32 loop end to end
+  against two real running services, not just proving the edge exists.
+- **Everything else — the actual review-queue write, the
+  entity-type-ambiguity resolution (a non-reordering
+  `upsert_cross_service` insert path, since person's existing `upsert`
+  normalizes pair order in a way that is correct for within-entity
+  dedup and wrong for a person/worker pair), and the
+  `review_decision` promotion/rejection extension — lives entirely in
+  `person-service-with-loco`.** See that crate's own `CHANGELOG.md` and
+  `spec/13-tasks.md` T-32 entry for the full account, and
+  `spec/13-tasks.md` T-32 in this crate for why the write was kept
+  server-side on person rather than added as a second call from this
+  job.
+
+`cargo test --lib`: still 85 passed (the pure suggest/blocking logic did
+not change). `cargo fmt --check` / `cargo clippy --all-targets -- -D
+warnings` clean.
+
 ### Fixed — T-31's fetch source: `search?q=*` replaced with a real list endpoint (verified live)
 
 An independent live check of the T-31 landing below found its core

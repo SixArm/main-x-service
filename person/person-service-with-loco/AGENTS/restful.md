@@ -186,12 +186,29 @@ database directly and cannot see this class of drift. See
 | GET | `/api/persons/review-queue` | Stored review queue (filter `status`, `limit`) |
 | POST | `/api/persons/review-queue/{id}/decision` | Decide a pending review item (`confirmed` / `rejected`) |
 
+**T-32 cross-service promotion (OQ-9(b)).** When the decided row is a
+matcher-suggested cross-service `same_identity` candidate
+(`provenance = "matcher_suggested"` **and**
+`detection_method = "cross_service_same_identity"` — both, so an
+ordinary within-entity decision is untouched), the decision also drives
+the underlying `entity_links` edge: `confirmed` reasserts it as
+`operator`/`1.0` (the same edge id, via the same write path
+`POST /api/persons/{id}/links` uses — never a second edge), `rejected`
+soft-deletes it (`unlinked`). Best-effort: the review decision itself
+still succeeds and returns `200` even if this side effect fails (logged,
+not surfaced).
+
 ### Cross-service links
 
 Per [cross-service-linking.md](../../../agents/share/cross-service-linking.md)
 §4.1; person is the reference originator of `same_identity` (person ↔
 worker) and also originates `works_at` / `member_of` (person →
-organization).
+organization). `POST .../{id}/links` additionally accepts an optional
+`score_breakdown` field (T-32) — meaningful only for
+`kind = "same_identity"` + `provenance = "matcher_suggested"`: it is
+carried verbatim into the review-queue row this creates (see above),
+so an operator sees the per-component evidence (identifier / name / DOB
+/ gender) behind a cross-service suggestion, not just its confidence.
 
 | Method | Path | Description |
 |--------|------|-------------|
