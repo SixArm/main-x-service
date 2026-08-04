@@ -11,11 +11,20 @@ clearly described manual check confirms the acceptance criterion.
   closing the O(n·m) matcher `DoS`. Factored into `thing_size_caps`/`cap_*`.
   Unit tested. (Repo tasks.md Phase 5 SEC-M1.)
 
-- [ ] **T-1 — Production Fluvio publisher.**
-  - [ ] Implement `FluvioEventPublisher : EventProducer` behind
-    feature flag.
-  - **Acceptance:** integration test publishes a `ThingCreated`
-    record end-to-end.
+- [x] **T-1 — Production Fluvio publisher.** *Superseded rather than
+  implemented literally: not a `FluvioEventPublisher : EventProducer`,*
+  but the durable-bus `FluvioSink : EventSink` (BUS-3, below) is the
+  production Fluvio publisher the family settled on — one real-broker
+  producer per topic, behind this crate's own `fluvio` Cargo feature,
+  selected by `THING_FLUVIO_ENDPOINT`. Remaining gap: only case's
+  producer is wired to a real deployment target today (see
+  `agents/share/overview.md` footnote 4) — this crate's sink is live
+  but idle until an operator points `THING_FLUVIO_ENDPOINT` at a
+  broker.
+  - **Acceptance:** `tests/fluvio_relay.rs` publishes a record
+    end-to-end against a broker (`#[ignore]`d — no automated run in
+    this repo stands one up; verified by compiling clean under
+    `--features fluvio`).
 - [ ] **T-2 — Introduce `ThingMatcher` trait.**
   - [ ] Promote `compute_match` to a trait so alternative scorers
     (ML-based, embedding-based) can plug in.
@@ -293,4 +302,19 @@ clearly described manual check confirms the acceptance criterion.
   module is byte-identical family-wide) green against Postgres 18;
   `cargo test --lib` + clippy pedantic clean; FE svelte-check / vitest /
   Playwright green.
+
+- [x] **2026-07-28 — Row-level integrity digests + verify endpoints.**
+  `src/compliance/mac.rs` (SHA-256 + SHA-3 + optional keyed MAC over
+  the **assembled** record, not just the root row, since `identifiers`
+  live in a child table) stamped in `to_active` on every write;
+  `src/compliance/record_integrity.rs` / `audit_integrity.rs` recompute
+  and compare on demand via `GET /api/records/verify` and `GET
+  /api/audit/verify` (`?limit=`, capped at 1000). A same-day follow-up
+  ("Make every integrity verification reachable") found the routes
+  landed with the report counters wired but unmounted — the same
+  defect class already fixed twice elsewhere — and mounted both
+  handlers. See [`CHANGELOG.md`](../CHANGELOG.md).
+  **Acceptance:** `GET /api/records/verify` and `GET /api/audit/verify`
+  are reachable and return a report naming any digest mismatch;
+  `cargo test --lib` clean.
 

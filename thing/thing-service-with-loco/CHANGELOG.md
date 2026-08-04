@@ -114,6 +114,35 @@ AU-1, completing the five axum-style services (person was the reference).
   dev-dependencies: `serial_test`, `tower`.
 
 
+### Added — row-level integrity digests + verify endpoints (2026-07-28)
+
+Third of the eight `*_REQUIRE_AUTH`-family crates to gain tamper
+evidence, and the first `api/rest`-shaped one whose records span
+several tables.
+
+- **`src/compliance/mac.rs`** — SHA-256, SHA-3, and (when a key is
+  configured) a keyed MAC over the **assembled** record — not just the
+  root `things` row. A thing's `identifiers` live in a child table and
+  are exactly the kind of field worth editing quietly (it is what a
+  downstream system matches on), so the digest is recomputed from a
+  full repository read, not the row alone. Stamped in `to_active`,
+  the single place both `create` and `update` build their active
+  model through, so no write path can forget to re-digest.
+- **`src/compliance/record_integrity.rs`** / **`audit_integrity.rs`**
+  — the verification side: reassemble each record (or audit row),
+  recompute its digests, and name any row whose stored digest no
+  longer matches its content.
+- **`GET /api/records/verify`** and **`GET /api/audit/verify`**
+  (`?limit=`, capped at 1000 — lower than the JSONB-shaped services'
+  10000 cap, since each row here costs a repository read, not a single
+  JSONB fetch) expose the check over HTTP. Landed the same day as a
+  same-day follow-up ("Make every integrity verification reachable")
+  that swept for the same defect class already fixed twice elsewhere
+  and mounted both handlers.
+- Digests are written even when no MAC key is configured — the
+  unkeyed SHA-256/SHA-3 pair is the only integrity a default
+  deployment's audit rows have.
+
 ### Changed — `Config::from_env` gained a testable seam and more variables (2026-07-23)
 
 - The env overlay moved into a pure `Config::from_source(lookup)`;

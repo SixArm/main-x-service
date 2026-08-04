@@ -11,7 +11,30 @@ Identifiers follow
 [schema.org/PropertyValue](https://schema.org/PropertyValue): DOI, ISBN,
 ISSN, GTIN, SKU, MPN, SerialNumber, URI, UUID, or `Custom(String)`.
 The first seven are globally unique and short-circuit matching to
-`1.0` on exact match.
+`1.0` on exact match. It carries no gRPC surface (unlike
+person/worker/event) — see the honest capability matrix in
+[`agents/share/overview.md`](../../agents/share/overview.md).
+
+## Features
+
+- CRUD on Thing records with soft delete; schema.org/Thing canonical
+  properties (`name`, `alternateName`, `description`,
+  `disambiguatingDescription`, `additionalType`, `url`, `identifier`,
+  `image`, `mainEntityOfPage`, `owner`, `sameAs`, `subjectOf`,
+  `potentialAction`).
+- Required-field enforcement (`name`); URL format checks; per-type
+  identifier format checks (ISBN 10/13, ISSN 8-digit, DOI `10.*/*`,
+  GTIN 8/12/13/14-digit, UUID, URI); dedupe on `alternate_names` /
+  `same_as` / `images`; URL scheme normalization.
+- Per-field masking (`owner` → withheld, identifier `value` → last 4
+  visible, per-identifier `url` cleared); GDPR Article 15 export at
+  `GET /api/things/{id}/export`; a consent model
+  (`DataProcessing`/`DataSharing`/`Marketing`/`Research` ×
+  `Active`/`Revoked`/`Expired`).
+- Row-level integrity digests (SHA-256, SHA-3, and an optional keyed
+  MAC) over the assembled record — including child-table
+  identifiers, not just the root row — recomputed on demand via
+  `GET /api/records/verify` and `GET /api/audit/verify`.
 
 ## Quick start
 
@@ -43,6 +66,16 @@ An HL7 FHIR R5 surface (`src/controllers/fhir.rs`) maps things to the
 FHIR `Device` resource: `GET /fhir/metadata` (CapabilityStatement),
 `POST /fhir/Device` (create), `GET /fhir/Device` (search),
 and `GET` / `PUT` / `DELETE /fhir/Device/{id}`.
+
+Integrity verification: `GET /api/records/verify` and `GET
+/api/audit/verify` (`?limit=`, capped at 1000) reassemble each record
+(or audit row) and recompute its SHA-256/SHA-3/optional-MAC digests,
+naming any row whose stored digest no longer matches its content.
+
+Auth is offline PASETO `v4.public` verification + ABAC, blanket-guarded
+behind `THING_REQUIRE_AUTH` (default off — see
+[`agents/share/security.md`](../../agents/share/security.md) §4 for why
+that default matters before a deployment is reachable).
 
 Prometheus metrics are served outside `/api`, at the application root:
 
@@ -99,18 +132,28 @@ Configuration is loaded from `config/{development,test,production}.yaml`
 
 | Variable             | Description                | Default                 |
 | -------------------- | -------------------------- | ----------------------- |
-| `PORT`               | REST bind port             | `8080`                  |
+| `PORT`               | REST bind port — read by `config/production.yaml` only; `development.yaml` hardcodes `5150` (see the quick start above) | `8080` (production) |
 | `DATABASE_URL`       | Postgres connection string | per config file         |
 | `SEARCH_INDEX_PATH`  | Tantivy index directory    | `./data/search_index`   |
-| `MATCHING_THRESHOLD` | Probabilistic match cutoff | `0.85`                  |
-| `GRPC_PORT` | gRPC server port (Tonic stub) | `50051` |
+| `MATCHING_THRESHOLD` | Probabilistic match cutoff | `0.7`                   |
 | `SEARCH_CACHE_SIZE_MB` | Tantivy cache budget in MB | `512` |
-| `OTLP_SERVICE_NAME` | service.name sent to the collector | `thing-service` |
-| `OTLP_ENDPOINT` | OTLP collector endpoint | `http://localhost:4317` |
-| `STREAMING_BROKER_URL` | Event-broker connection URL | `localhost:9003` |
-| `STREAMING_TOPIC` | Topic events publish to | `thing-events` |
+| `THING_EVENT_TRANSPORT` | Event bus transport: `memory` (in-memory publish) or `outbox` (durable transactional outbox — one `event_outbox` row per change, written inside the entity write's transaction) | `memory` |
+| `THING_EVENT_RELAY` | Enable the Phase-3 outbox relay loop (`1`/`true`/`yes`/`on`); only runs when the transport is `outbox` | `off` |
+| `THING_EVENT_RELAY_INTERVAL_SECS` | Relay poll interval in seconds (floored at 1) | `5` |
+| `THING_EVENT_RETENTION_DAYS` | Outbox row TTL; the relay's retention sweep purges published rows older than this | `7` |
+| `THING_FLUVIO_ENDPOINT` | Fluvio broker SC address; selects the real-broker `FluvioSink` over the default `LoggingSink` (requires this crate's `fluvio` Cargo feature, off by default) | unset (`LoggingSink`) |
+| `THING_EVENT_TOPIC` | Topic the relay publishes to | `mxi.thing.events` |
+| `THING_REQUIRE_AUTH` | Blanket `/api/*` PASETO + ABAC enforcement (`1`/`true`/`yes`/`on`) | off |
 | `RUST_LOG`           | tracing-subscriber filter  | `info`                  |
-| `OTLP_ENDPOINT`      | OpenTelemetry collector    | `http://localhost:4317` |
+
+> `GRPC_PORT`, `OTLP_SERVICE_NAME`, `OTLP_ENDPOINT`,
+> `STREAMING_BROKER_URL`, `STREAMING_TOPIC`, `DATABASE_MAX_CONNECTIONS`,
+> `DATABASE_MIN_CONNECTIONS`, `SERVER_HOST`, and `SERVER_PORT` also
+> parse into this crate's legacy `src/config/mod.rs::Config` struct but
+> are **not read anywhere else in `src/`** — a pre-loco holdover. There
+> is no gRPC server ([T-3](spec/13-tasks.md) is still open) and no OTLP
+> exporter; the real REST bind address/port and DB pool size come from
+> loco's own `config/*.yaml`.
 
 ## Testing
 

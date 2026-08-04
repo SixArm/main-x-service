@@ -4,10 +4,10 @@ Complete reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 
 | Tier | Surface |
 |---|---|
-| REST (Axum) | 15 endpoints under `/api/things/*` + `/api/audit/*` + `/api/health` |
+| REST (Axum) | 18 endpoints under `/api/things/*` + `/api/audit/*` + `/api/records/*` + `/api/health` (includes the 2026-07-28 `/api/records/verify` and `/api/audit/verify` integrity-digest endpoints) |
 | Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | Metrics | `GET /metrics.prom` at the application **root** (not under `/api`) — Prometheus text-exposition (`text/plain; version=0.0.4`); scrape with `metrics_path: /metrics.prom` |
-| gRPC (Tonic) | Stubbed |
+| gRPC (Tonic) | Not implemented — the Tonic dependency and `GRPC_PORT` setting are unwired scaffolding, no `.proto`/server code exists (T-3) |
 | Web UI | Full set documented in project-root [`spec.md`](../../spec/index.md) |
 | Docs | Swagger UI at `/swagger-ui` |
 

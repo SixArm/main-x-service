@@ -24,8 +24,11 @@
   ingress, probes.
 - **Production readiness** — security audit, GDPR validation, DR
   runbook, backup / restore, CI/CD pipeline.
-- **Feature enhancements** — complete gRPC, Fluvio production +
-  consumers, ML / embedding-based match scoring, image storage and
-  retrieval, schema.org sub-type registry (`additional_type` lookup),
-  Wikidata + OpenLibrary import pipelines.
+- **Feature enhancements** — implement gRPC (today just an unwired
+  Tonic dependency, T-3), wire the landed `FluvioSink` (T-1, BUS-3) to
+  a real deployment target (only case's producer is live today — see
+  `agents/share/overview.md` footnote 4), bulk import/export (T-8),
+  ML / embedding-based match scoring, image storage and retrieval,
+  schema.org sub-type registry (`additional_type` lookup), Wikidata +
+  OpenLibrary import pipelines.
 

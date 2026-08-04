@@ -62,7 +62,8 @@ automated CI stage.
 ## Running this crate
 
 ```bash
-# REST + gRPC API
+# REST API (no gRPC — the Tonic dependency is unwired scaffolding
+# for spec/13-tasks.md T-3, not a running server)
 cargo run --release
 
 # Tests
@@ -79,7 +80,8 @@ cargo bench
 | File | Role |
 |------|------|
 | `spec.md` | **Single source of truth** — what, how, status, tasks (§13) |
-| `README.md` / `CLAUDE.md` | User-facing intro — must stay consistent with the spec |
+| `README.md` (symlink to `index.md`) | User-facing intro — quick start, config, must stay consistent with the spec |
+| `CLAUDE.md` | A one-line `@AGENTS.md` include, loaded by Claude Code at session start (root `AGENTS.md`'s per-subproject convention) — not a second user-facing intro |
 | `AGENTS.md` / `AGENTS/*.md` | How to work in the repo + per-topic reference |
 | `index.md` | Navigation aid with worked examples |
 | `CHANGELOG.md` | Historical record of releases and changes |

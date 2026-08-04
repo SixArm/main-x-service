@@ -18,7 +18,9 @@ src/
 │   └── scoring.rs         # compute_match, MatchWeights, MatchConfidence
 ├── validation/            # boundary validators + normalisers
 ├── privacy/               # masking + GDPR export
-├── api/                   # REST + gRPC (stub)
+├── api/                   # REST only — no gRPC code exists (T-3);
+│                          # the Tonic dep + GRPC_PORT setting are
+│                          # unwired scaffolding, not a stub server
 ```
 
 ### 8.2 Layering rules

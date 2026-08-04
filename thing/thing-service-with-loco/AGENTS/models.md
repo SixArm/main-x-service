@@ -43,6 +43,24 @@ schema.org/Thing.
 
 Methods: `Thing::new(name)`, `thing.soft_delete()`.
 
+**Server-owned fields are optional on the wire (QA-SERVER-FIELDS,
+2026-08-04).** `id`, `name`, `alternate_names`, `identifiers`,
+`images`, `same_as`, `is_deleted`, `created_at`, and `updated_at` all
+carry `#[serde(default)]`, so a hand-written `POST /api/things` body
+may omit any of them instead of being refused by the JSON extractor
+with `422 missing field …` before the handler ever runs. The create
+handler mints a fresh `id` when the wire value is nil and the
+repository stamps `created_at`/`updated_at` to "now" on insert
+(preserving `created_at`, refreshing `updated_at` on update); an
+omitted `name` now reaches `validate_thing` (`422 validation_error`)
+rather than the extractor. `description`, `disambiguating_description`,
+`additional_type`, `url`, `main_entity_of_page`, `owner`, `subject_of`,
+`potential_action`, and `deleted_at` are plain `Option<T>` with no
+explicit `#[serde(default)]` — Serde's derive already treats a missing
+`Option<T>` field as `None`. See spec
+[§9](../spec/09-api-surface.md#9-api-surface) for the full contract
+and [`CHANGELOG.md`](../CHANGELOG.md) for the defect this fixed.
+
 ## ThingIdentifier
 
 `src/models/identifier.rs`

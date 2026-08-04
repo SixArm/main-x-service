@@ -32,6 +32,10 @@ In `tests/`. Run with `cargo test --tests`.
 | `integration_models.rs`        | Construction serialization, soft delete timestamps, unique IDs, identifier round-trip, PropertyValue, consent |
 | `integration_scoring.rs`       | Unicode names, edge cases, description, URL, identifier edge cases, custom weights, confidence boundaries     |
 | `integration_edge_cases.rs`    | URL protocols, ISBN/GTIN/DOI/UUID lengths, custom identifier skip, scheme lowercasing, dedupe, mask, full workflows |
+| `duplicate_detection.rs`       | Black-box service ↔ `thing-matcher` bridge — see "Bridge Integration Tests" below |
+| `enforcement.rs`               | `THING_REQUIRE_AUTH=1` activation proof over the real router — own binary (process-wide `OnceLock`s); `cargo test --test enforcement` |
+| `api_integration_test.rs`      | **DB-gated, `#[ignore]`d.** QA-SERVER-FIELDS regression: a hand-written `POST /api/things` body omitting server-owned fields succeeds and mints fresh id/timestamps; two such creates don't collide; an omitted `name` still 422s via `validation_error`. `DATABASE_URL=… cargo test --test api_integration_test -- --ignored` |
+| `fluvio_relay.rs`              | **`fluvio`-feature-gated, `#[ignore]`d.** BUS-3 outbox → `FluvioSink` → `drain_once` round-trip against a real broker (`compose.fluvio.yaml`); not part of any automated CI stage |
 
 ### Benchmark tests
 

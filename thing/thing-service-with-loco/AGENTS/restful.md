@@ -150,7 +150,8 @@ API URLs are version-free; select the representation version with the `Accepts-v
 | GET    | `/api/things/{id}/masked` | Masked thing view     |
 | GET    | `/api/things/{id}/audit`  | Audit logs            |
 | GET    | `/api/audit/recent`       | Recent audit activity |
-| GET    | `/api/audit/user`         | User audit logs       |
+| GET    | `/api/records/verify`     | Reassemble records and recompute their SHA-256/SHA-3/MAC digests, naming any row whose content diverged (`?limit=`, capped at 1000) |
+| GET    | `/api/audit/verify`       | Same integrity check over `audit_log` rows (`?limit=`, capped at 1000) |
 
 ### FHIR R5 endpoints
 
