@@ -3,13 +3,17 @@
 A small, library-friendly Rust crate for pairwise matching of
 course records modelled on [schema.org/Course](https://schema.org/Course).
 
-> **Status.** Stable. Public API + 76 unit tests + a 16-test
+> **Status.** Stable. Public API + 78 unit tests + a 16-test
 > integration suite ([`tests/public_api.rs`](tests/public_api.rs),
-> driving the re-exported surface end-to-end); Soundex phonetic
+> driving the re-exported surface end-to-end) + 6 `proptest` property
+> tests ([`tests/proptests.rs`](tests/proptests.rs), SEC-M6 —
+> never-panic, symmetry, bounded score, self-match); Soundex phonetic
 > bonus (`+0.05` on the `name` component, capped at `0.95`) ships
-> as T-6. Service-side bridge — 14 contract tests pinning identifier
-> routing + deterministic short-circuits — lives in the embedding
-> `course-service` crate at
+> as T-6. A `fuzz/` `cargo-fuzz` harness (two libFuzzer targets:
+> `match_courses`, `normalize`) runs on nightly, standalone from the
+> normal build — see [`fuzz/README.md`](fuzz/README.md). Service-side
+> bridge — 14 contract tests pinning identifier routing + deterministic
+> short-circuits — lives in the embedding `course-service` crate at
 > [`tests/duplicate_detection.rs`](../course-service-with-loco/tests/duplicate_detection.rs).
 
 ## Quick start
@@ -125,8 +129,9 @@ themselves and adapt their richer Course shape down to ours.
 ## Test + build
 
 ```bash
-cargo test --lib       # 76 unit tests (encoder + scoring + normalisation + bonus)
+cargo test --lib       # 78 unit tests (encoder + scoring + normalisation + bonus)
 cargo test --test public_api  # 16 integration tests (public re-exported surface)
+cargo test --test proptests   # 6 proptest property tests (SEC-M6)
 cargo run              # demo binary — worked examples through the public API
 cargo doc --open       # rustdoc
 

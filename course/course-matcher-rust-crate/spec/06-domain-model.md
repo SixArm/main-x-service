@@ -1,15 +1,18 @@
 ## 6. Domain model
 
-`src/course.rs`:
+`src/course.rs` — as shipped:
 
 - `Course { name, alternate_names, course_code, provider_id,
   provider_name, educational_level, learning_resource_type,
-  keywords, teaches, identifiers, same_as, in_language,
-  relationships, tags }`.
+  keywords, teaches, identifiers, same_as, in_language }`.
 - `CourseIdentifier { scheme, value }`.
 - `IdentifierScheme` — 12 variants (see §15).
 - `EducationalLevel` — 12 variants + `Custom(String)` (see §12).
 - `LearningResourceType` — 11 variants + `Custom(String)`.
+
+**Planned, not yet implemented** (§23 T-11 / T-12) — two more fields are
+spec'd but do not exist on `Course` today:
+
 - `relationships: Vec<RelationshipRef>` (default empty; see §6.1) —
   typed references to other courses by registry id. A **supporting**
   signal, NOT an identifying field on its own: two records that
@@ -24,7 +27,7 @@
   empty), weighted `tags_weight` (§7). Distinct from `keywords`
   (descriptive subject terms) but scored the same way.
 
-### 6.1 `RelationshipRef` / `RelationKind`
+### 6.1 `RelationshipRef` / `RelationKind` (planned, §23 T-11 — not yet implemented)
 
 `RelationshipRef { relation: RelationKind, course_id: String }`
 references another course in the consuming registry by **opaque id**;
@@ -41,6 +44,7 @@ re-exported from the crate root.
 Carries one `Option<f64>` per probabilistic component (`None` = not
 scored; `Some(v)` ∈ `[0.0, 1.0]`): `name_score`, `course_code_score`,
 `provider_score`, `educational_level_score`, `keywords_score`,
-`teaches_score`, `relationships_score`, `tags_score`, plus
-`deterministic_match`.
+`teaches_score`, plus `deterministic_match`. `relationships_score` and
+`tags_score` are **planned, not yet implemented** (§23 T-11 / T-12) —
+`MatchBreakdown` carries no such fields today.
 

@@ -22,7 +22,7 @@ rules, …). The shorter §1–§18 shape is used by the service crates.
 11. [Provider](11-provider.md)
 12. [Educational level](12-educational-level.md)
 13. [Keywords](13-keywords.md)
-13a. [Tags](13a-tags.md)
+13a. [Tags](13a-tags.md) *(planned, §23 T-12 — not yet implemented)*
 14. [Teaches / competencies](14-teaches-competencies.md)
 15. [Identifier short-circuits](15-identifier-short-circuits.md)
 16. [Same-as URL short-circuit](16-same-as-url-short-circuit.md)

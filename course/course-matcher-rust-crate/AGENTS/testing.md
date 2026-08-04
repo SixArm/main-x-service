@@ -5,7 +5,7 @@
 Embedded in `#[cfg(test)] mod tests` blocks in each source file.
 Run with `cargo test --lib`.
 
-### Coverage targets (76 tests today)
+### Coverage targets (78 tests today)
 
 | Module | What's covered |
 |---|---|
@@ -30,6 +30,31 @@ strict/lenient threshold effects on `is_match`, the one-to-many surface
 that `learning_resource_type` / `in_language` are unscored, and
 `MatchResult` JSON serialisation. (The service-side bridge test —
 see below — remains the cross-crate contract test through the adapter.)
+
+### Property tests (SEC-M6)
+
+[`tests/proptests.rs`](../tests/proptests.rs) (`proptest = "1.11"`,
+dev-dependency only; run with `cargo test --test proptests`) proves
+the matcher is robust on adversarial / arbitrary input rather than
+just the hand-picked cases above. Six invariants: the engine and every
+pure helper (`normalize::fold` / `course_code` / `fold_set`,
+`phonetic::soundex` / `same`) never panic on arbitrary UTF-8;
+`MatchResult::score` is always finite and in `[0.0, 1.0]` (never NaN);
+matching is symmetric (`match(a,b) == match(b,a)` on score / `is_match`
+/ confidence); an identical clone of a well-formed course self-matches
+above threshold; and `soundex` output is `None` or a well-formed
+`[A-Z][0-9]{3}` code.
+
+### Fuzzing
+
+A standalone `fuzz/` `cargo-fuzz` crate (not a workspace member, so it
+never affects the normal stable build/test/clippy) ships two
+coverage-guided libFuzzer targets: `match_courses` (deserialize a JSON
+`[course_a, course_b]` tuple → `MatchingEngine::match_courses`; finite
+score in `[0,1]`, both orders) and `normalize` (the pure `normalize`
+free functions over arbitrary UTF-8, never-panic). Run on nightly:
+`cargo +nightly fuzz run <target>` from `fuzz/` — see
+[`fuzz/README.md`](../fuzz/README.md).
 
 ### Pattern
 
