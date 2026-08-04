@@ -309,7 +309,7 @@ round done and fully pinned 2026-08-04 — T-29 code may start.**
   alone). `cargo fmt --check` / `cargo clippy --all-targets -- -D
   warnings` clean. T-30 (candidate blocking) and T-31 (the periodic job)
   build on this module next.)*
-- [ ] T-30: Candidate blocking over the person / worker read feeds
+- [x] T-30: Candidate blocking over the person / worker read feeds
   (OQ-9(a)): block on an exact shared coded identifier (NHS/SSN/other)
   when present, else `Soundex(family)` + birth-year; only same-block
   pairs are scored (bounds comparison to O(n + m + Σ|block|²) rather
@@ -317,6 +317,48 @@ round done and fully pinned 2026-08-04 — T-29 code may start.**
   `matcher_suggested` candidate at that confidence — no auto-merge tier,
   every candidate (even an exact-identifier hit) still needs an operator
   confirm (T-32/T-33). Depends: T-29.
+  *(Landed 2026-08-04: `generate_candidates(&[(EntityRef,
+  IdentityProbe)], &[(EntityRef, IdentityProbe)]) -> Vec<IdentityCandidate>`
+  in `src/suggest.rs`, still pure/offline like T-29 — no database, no
+  HTTP, no clock; T-31 is what actually fetches the feeds and POSTs.
+  Private `block_keys` computes the two-tier key exactly as pinned: each
+  normalised `(scheme, value)` identifier pair when identifiers are
+  present (a probe with several belongs to several identifier-blocks),
+  else a single `Soundex(family) + birth_year` block when a usable
+  family name and birth date are present; a probe with neither yields no
+  key and is never compared to anything. The Soundex primitive is
+  **reused**, not reimplemented: `person_matcher::Normalizer::phonetic_code`
+  was already `pub` (wraps a real American-Soundex `soundex` module) —
+  no `pub` change needed in `person-matcher`. Candidate generation
+  buckets both sides by block key (`HashMap<BlockKey, Vec<usize>>`),
+  only scores same-key person/worker index pairs, and dedupes on the
+  `(person_index, worker_index)` pair (via a `HashSet`) so a pair
+  reachable through more than one shared identifier is scored and
+  returned at most once — matching the pinned `O(n + m + Σ|block|²)`
+  bound, never the full `O(n·m)`. `SUGGESTION_THRESHOLD` (`0.7`, reused
+  from `BatchDeduplicationRequest::threshold`'s default /
+  `IMPORT_REVIEW_THRESHOLD`, not invented fresh) filters the output;
+  everything below is discarded, never returned; there is no auto-merge
+  tier — a `0.99` identifier-ceiling hit comes out the same
+  `IdentityCandidate` shape as any other, for T-32/T-33 to route. 6 new
+  unit tests, including the load-bearing blocking-boundary proof
+  (`pairs_in_different_blocks_are_never_compared_even_when_score_would_qualify`):
+  constructs a pair that scores `>= 0.7` (`>= 0.90` in the fixture) via
+  a **direct** `compare_identity` call, then shows `generate_candidates`
+  never returns it because a one-year birth-date difference puts the two
+  probes in different `Soundex(family) + birth_year` blocks — proving
+  the blocking bound is real, not merely that scoring is correct. Also
+  covered: the identifier-block finds the sharing person and excludes an
+  unrelated third record in a different block; the phonetic+birth-year
+  fallback block scores a pair with no identifiers (returned confidence
+  matches a direct `compare_identity` call); a low-scoring same-block
+  pair (same family/Soundex/year, disagreeing given name, month/day, and
+  gender) is compared but discarded; two shared identifiers produce one
+  candidate, not two; every empty/unblockable-input combination returns
+  an empty list without panicking. `cargo test --lib`: 71 passed (65
+  pre-existing + 6 new). `cargo fmt --check` / `cargo clippy
+  --all-targets -- -D warnings` clean. T-31 (the periodic job) builds on
+  this next.)*
 - [ ] T-31: The periodic suggestion job (aggregator-hosted, mirroring the
   reconcile worker's shape with the verb flipped): pull person + worker,
   block, compare, and POST `matcher_suggested` `same_identity` edges to

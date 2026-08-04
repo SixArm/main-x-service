@@ -13,6 +13,52 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > and [event-bus.md](../../agents/share/event-bus.md).
 
 ## [Unreleased]
+### Added — Cross-service candidate blocking (LNK-4, spec T-30, 2026-08-04)
+
+- **`src/suggest.rs`** — `generate_candidates(&[(EntityRef, IdentityProbe)],
+  &[(EntityRef, IdentityProbe)]) -> Vec<IdentityCandidate>`, built on
+  T-29's `compare_identity`: blocks both sides before scoring so the
+  cost is `O(n + m + Σ|block|²)` rather than the full `O(n·m)`
+  cross-product (design §16 OQ-9(a)). Still pure/offline — no database,
+  no HTTP, no clock; pulling real person/worker records is T-31's job.
+- Block key (`block_keys`, private): two-tier, per OQ-9(a) — a probe
+  carrying one or more coded identifiers blocks on **each** normalised
+  `(scheme, value)` pair (a record with multiple identifiers may belong
+  to multiple identifier-blocks); a probe with none falls back to a
+  single `Soundex(family) + birth_year` block. A probe with neither a
+  usable identifier nor a usable name+DOB gets no block key and can
+  never be compared to anything.
+- Reused `person_matcher::Normalizer::phonetic_code` (already `pub`,
+  wraps a real American-Soundex implementation) for the phonetic
+  fallback rather than writing a new Soundex — no `pub` change needed
+  in `person-matcher`, and it is the same primitive the within-entity
+  name matcher already applies as a phonetic bonus.
+- Threshold: `SUGGESTION_THRESHOLD` (`0.7`), reused from
+  `BatchDeduplicationRequest::threshold`'s default /
+  `IMPORT_REVIEW_THRESHOLD` rather than a new number. A same-block pair
+  scoring below it is compared but discarded — never returned. There is
+  **no auto-merge tier**: every `IdentityCandidate`, even a `0.99`
+  identifier-ceiling hit, is returned the same shape for T-32/T-33's
+  operator confirmation. A pair reachable through more than one shared
+  block (e.g. two shared identifiers) is scored and returned at most
+  once (dedup on the underlying pair, not the block key).
+- 6 new unit tests, including the load-bearing blocking proof
+  (`pairs_in_different_blocks_are_never_compared_even_when_score_would_qualify`):
+  a pair that scores `>= 0.7` when compared directly (identical name,
+  one-year-apart birth dates) is never returned by `generate_candidates`
+  because a one-year difference lands them in different
+  `Soundex(family) + birth_year` blocks — proving the blocking actually
+  bounds what gets compared, not just that scoring is correct. Also:
+  the identifier-block finds the sharing pair and excludes an unrelated
+  third record in a different block; the phonetic+birth-year fallback
+  block scores a pair with no identifiers; a low-scoring same-block pair
+  is discarded; multiple shared identifiers don't duplicate the
+  candidate; empty inputs (either side, or both, or an entirely
+  unblockable pair) never panic. `cargo test --lib`: 71 passed (65
+  pre-existing + 6 new); `cargo fmt --check` / `cargo clippy
+  --all-targets -- -D warnings` clean. T-31 (the periodic suggestion
+  job) builds on this next.
+
 ### Added — Cross-service identity comparator (LNK-4, spec T-29, 2026-08-04)
 
 - **`src/suggest.rs`** — the first piece of the `same_identity`

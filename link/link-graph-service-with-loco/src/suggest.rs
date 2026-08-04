@@ -84,6 +84,34 @@
 //!   legitimately share an NHS number), so identifier match must
 //!   *dominate* every probabilistic outcome, not merely most of them.
 //!
+//! ## Candidate blocking (T-30)
+//!
+//! Scoring every person against every worker is `O(n·m)` — exactly the
+//! unbounded fan-out `agents/share/security.md` §3 invariant 3 warns
+//! against. [`generate_candidates`] bounds this per OQ-9(a)'s pinned
+//! design: group both sides into buckets by [`block_keys`] and only
+//! score pairs that land in the same bucket, which is `O(n + m +
+//! Σ|block|²)` rather than `O(n·m)`. The block key is two-tier — an
+//! exact `(scheme, value)` match on a shared coded identifier when one
+//! is present (the strongest block, mirroring the matcher family's own
+//! deterministic identifier short-circuit), else `Soundex(family) +
+//! birth_year` (reusing [`person_matcher::Normalizer::phonetic_code`],
+//! the same phonetic primitive the within-entity name component already
+//! uses — no fresh Soundex implementation needed). A probe with neither
+//! a usable identifier nor a usable name+DOB produces no block key and
+//! can never be compared to anything, which is consistent with the
+//! comparator's own "no evidence, no confidence" posture.
+//!
+//! [`generate_candidates`] discards (never returns) anything scoring
+//! below [`SUGGESTION_THRESHOLD`] (`0.7`, reused from
+//! `BatchDeduplicationRequest::threshold`'s default / `IMPORT_REVIEW_THRESHOLD`
+//! rather than inventing a new number) and returns everything at or
+//! above it unchanged — there is no auto-merge tier here: even a `0.99`
+//! identifier-ceiling hit is still only a candidate for T-32/T-33's
+//! operator confirmation, never an automatic promotion. A pair reachable
+//! through more than one shared block (e.g. two shared identifiers) is
+//! scored and returned at most once.
+//!
 //! ## Birth-date table — a deliberate deviation from `score_dob_pair`
 //!
 //! `person-matcher`'s own private `score_dob_pair`
@@ -99,9 +127,11 @@
 //! propagating the drift. It takes no dependency on `person-matcher`'s
 //! private internals.
 
-use person_matcher::{Gender, Scorer};
+use person_matcher::{Gender, Normalizer, Scorer};
 
 use chrono::{Datelike, NaiveDate};
+use entity_ref::EntityRef;
+use std::collections::{HashMap, HashSet};
 
 /// A coded identifier scoped to its issuing system — e.g. `("nhs",
 /// "9434765919")` or `("ssn", "078-05-1120")`.
@@ -401,6 +431,150 @@ pub fn compare_identity(a: &IdentityProbe, b: &IdentityProbe) -> IdentityMatchSc
     }
 }
 
+// ---------------------------------------------------------------------
+// T-30: candidate blocking (OQ-9(a)) — see the module doc's "Candidate
+// blocking" section for the design.
+// ---------------------------------------------------------------------
+
+/// The review-worthy confidence threshold below which a candidate is
+/// discarded (never returned, never stored) rather than surfaced.
+/// Reused, not invented — the same `0.7` line as
+/// `BatchDeduplicationRequest::threshold`'s default and
+/// `IMPORT_REVIEW_THRESHOLD` (`person-service-with-loco`; OQ-9(a)).
+pub const SUGGESTION_THRESHOLD: f64 = 0.7;
+
+/// A blocking key computed from an [`IdentityProbe`] (OQ-9(a)). Two
+/// probes are only ever compared by [`generate_candidates`] if they
+/// share at least one key.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum BlockKey {
+    /// An exact, normalised coded-identifier `(scheme, value)` pair.
+    Identifier(String, String),
+    /// `Soundex(family) + birth_year`, the fallback block for a probe
+    /// with no coded identifier.
+    Phonetic(String, i32),
+}
+
+/// Compute every block key an [`IdentityProbe`] belongs to (OQ-9(a)).
+///
+/// A probe carrying one or more coded identifiers blocks on **each** of
+/// their normalised `(scheme, value)` pairs — a record with multiple
+/// identifiers may legitimately belong to multiple identifier-blocks,
+/// and all of them are exact-match blocks, the strongest kind. A probe
+/// with none falls back to a single `Soundex(family) + birth_year`
+/// block, computed only when both a non-blank family name and a birth
+/// date are present. A probe with neither a usable identifier nor a
+/// usable name+DOB yields no block key at all: it cannot be compared to
+/// anything by [`generate_candidates`], the same "no evidence, no
+/// confidence" posture [`compare_identity`] already takes on absent
+/// fields.
+fn block_keys(probe: &IdentityProbe) -> Vec<BlockKey> {
+    if !probe.identifiers.is_empty() {
+        return probe
+            .identifiers
+            .iter()
+            .map(|id| BlockKey::Identifier(id.scheme.clone(), id.value.clone()))
+            .collect();
+    }
+
+    let Some(name) = &probe.name else {
+        return Vec::new();
+    };
+    let Some(birth_date) = probe.birth_date else {
+        return Vec::new();
+    };
+    let family = name.family.trim();
+    if family.is_empty() {
+        return Vec::new();
+    }
+    let code = Normalizer::phonetic_code(family);
+    if code.is_empty() {
+        return Vec::new();
+    }
+    vec![BlockKey::Phonetic(code, birth_date.year())]
+}
+
+/// A scored cross-service `same_identity` candidate (T-30), at or above
+/// [`SUGGESTION_THRESHOLD`]. Producing the corresponding edge (T-31) and
+/// routing it through review/promotion (T-32/T-33) are downstream of
+/// this type — it carries no `provenance` or write-side state of its
+/// own.
+#[derive(Debug, Clone, PartialEq)]
+pub struct IdentityCandidate {
+    /// The person-side record.
+    pub person: EntityRef,
+    /// The worker-side record.
+    pub worker: EntityRef,
+    /// The comparator's score for this pair.
+    pub score: IdentityMatchScore,
+}
+
+/// Generate scored `same_identity` candidates between `persons` and
+/// `workers`, using blocking to bound the comparisons performed
+/// (OQ-9(a); see the module doc's "Candidate blocking" section).
+///
+/// Only pairs sharing at least one [`block_keys`] entry are ever passed
+/// to [`compare_identity`] — a pair in different blocks is never
+/// compared, which is what keeps this sub-quadratic (`O(n + m +
+/// Σ|block|²)`) rather than the full `O(n·m)` cross product. A pair
+/// reachable through more than one shared block (e.g. two shared
+/// identifiers) is compared and, if it qualifies, returned at most
+/// once. Only pairs scoring at or above [`SUGGESTION_THRESHOLD`] are
+/// returned; everything below is discarded — never returned, never
+/// logged as a near-miss.
+///
+/// Pure and deterministic, like [`compare_identity`]: no database, no
+/// HTTP, no clock. Fetching the person/worker feeds this function is
+/// handed is T-31's job, not this function's.
+#[must_use]
+pub fn generate_candidates(
+    persons: &[(EntityRef, IdentityProbe)],
+    workers: &[(EntityRef, IdentityProbe)],
+) -> Vec<IdentityCandidate> {
+    let mut person_blocks: HashMap<BlockKey, Vec<usize>> = HashMap::new();
+    for (index, (_, probe)) in persons.iter().enumerate() {
+        for key in block_keys(probe) {
+            person_blocks.entry(key).or_default().push(index);
+        }
+    }
+
+    let mut worker_blocks: HashMap<BlockKey, Vec<usize>> = HashMap::new();
+    for (index, (_, probe)) in workers.iter().enumerate() {
+        for key in block_keys(probe) {
+            worker_blocks.entry(key).or_default().push(index);
+        }
+    }
+
+    let mut seen_pairs: HashSet<(usize, usize)> = HashSet::new();
+    let mut candidates = Vec::new();
+
+    for (key, person_indexes) in &person_blocks {
+        let Some(worker_indexes) = worker_blocks.get(key) else {
+            continue;
+        };
+        for &pi in person_indexes {
+            for &wi in worker_indexes {
+                if !seen_pairs.insert((pi, wi)) {
+                    // Already compared under an earlier shared block key.
+                    continue;
+                }
+                let (person_ref, person_probe) = &persons[pi];
+                let (worker_ref, worker_probe) = &workers[wi];
+                let score = compare_identity(person_probe, worker_probe);
+                if score.confidence >= SUGGESTION_THRESHOLD {
+                    candidates.push(IdentityCandidate {
+                        person: *person_ref,
+                        worker: *worker_ref,
+                        score,
+                    });
+                }
+            }
+        }
+    }
+
+    candidates
+}
+
 #[cfg(test)]
 mod tests {
     //! Unit tests for the identity-suggestion comparator. All fixtures are
@@ -674,5 +848,238 @@ mod tests {
     #[test]
     fn dob_unrelated_years() {
         assert!(score_dob_pair(dob(1995, 1, 10), dob(1980, 6, 30)).abs() < f64::EPSILON);
+    }
+
+    // ---------- T-30: candidate blocking ----------
+
+    use entity_ref::EntityType;
+    use uuid::Uuid;
+
+    fn entity_ref(entity_type: EntityType, id: u128) -> EntityRef {
+        EntityRef::new(entity_type, Uuid::from_u128(id))
+    }
+
+    fn identifier(scheme: &str, value: &str) -> ProbeIdentifier {
+        ProbeIdentifier::new(scheme, value).unwrap()
+    }
+
+    /// A person sharing an exact coded identifier with the worker is
+    /// found and scored at the identifier ceiling; a second person with
+    /// no identifier and an unrelated phonetic block is never compared
+    /// to the worker at all (different block namespace entirely: the
+    /// worker's identifier-present probe never gets a phonetic block).
+    #[test]
+    fn identifier_block_finds_the_sharing_pair_and_excludes_the_other_person() {
+        let sharing_person = IdentityProbe {
+            name: Some(name("Smith", "Jane")),
+            birth_date: Some(dob(1980, 6, 15)),
+            gender: Some(Gender::Female),
+            identifiers: vec![identifier("nhs", "9434765919")],
+        };
+        let unrelated_person = IdentityProbe {
+            name: Some(name("Zubrowski", "Marguerite")),
+            birth_date: Some(dob(2001, 11, 2)),
+            gender: Some(Gender::Male),
+            identifiers: vec![],
+        };
+        let worker = IdentityProbe {
+            name: Some(name("Smith", "Jane")),
+            birth_date: Some(dob(1980, 6, 15)),
+            gender: Some(Gender::Female),
+            identifiers: vec![identifier("nhs", "9434765919")],
+        };
+
+        let sharing_person_ref = entity_ref(EntityType::Person, 1);
+        let unrelated_person_ref = entity_ref(EntityType::Person, 2);
+        let worker_ref = entity_ref(EntityType::Worker, 3);
+
+        let candidates = generate_candidates(
+            &[
+                (sharing_person_ref, sharing_person),
+                (unrelated_person_ref, unrelated_person),
+            ],
+            &[(worker_ref, worker)],
+        );
+
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].person, sharing_person_ref);
+        assert_eq!(candidates[0].worker, worker_ref);
+        assert!(candidates[0].score.identifier_match);
+        assert!((candidates[0].score.confidence - IDENTIFIER_MATCH_CEILING).abs() < f64::EPSILON);
+    }
+
+    /// Two records with no coded identifier, similar-sounding surnames,
+    /// and the same birth year land in the same `Soundex(family) +
+    /// birth_year` block and get scored — the returned confidence
+    /// matches a direct `compare_identity` call on the same probes.
+    #[test]
+    fn phonetic_and_birth_year_fallback_block_scores_the_pair() {
+        let person_probe = IdentityProbe {
+            name: Some(name("Smith", "Jane")),
+            birth_date: Some(dob(1985, 3, 10)),
+            gender: Some(Gender::Female),
+            identifiers: vec![],
+        };
+        // "Smyth" shares "Smith"'s Soundex code (the module doc's own
+        // documented example).
+        let worker_probe = IdentityProbe {
+            name: Some(name("Smyth", "Jane")),
+            birth_date: Some(dob(1985, 3, 10)),
+            gender: Some(Gender::Female),
+            identifiers: vec![],
+        };
+
+        let person_ref = entity_ref(EntityType::Person, 10);
+        let worker_ref = entity_ref(EntityType::Worker, 11);
+        let direct = compare_identity(&person_probe, &worker_probe);
+
+        let candidates =
+            generate_candidates(&[(person_ref, person_probe)], &[(worker_ref, worker_probe)]);
+
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].person, person_ref);
+        assert_eq!(candidates[0].worker, worker_ref);
+        assert!((candidates[0].score.confidence - direct.confidence).abs() < f64::EPSILON);
+        assert!(candidates[0].score.confidence >= SUGGESTION_THRESHOLD);
+    }
+
+    /// A same-block pair (identical family name, so same Soundex code
+    /// and same birth year) that nonetheless scores below the
+    /// suggestion threshold — because the given name, month/day, and
+    /// gender all disagree — is compared but discarded, never returned.
+    #[test]
+    fn low_scoring_same_block_pair_is_discarded() {
+        let person_probe = IdentityProbe {
+            name: Some(name("Smith", "Zebulon")),
+            birth_date: Some(dob(1985, 1, 10)),
+            gender: Some(Gender::Female),
+            identifiers: vec![],
+        };
+        let worker_probe = IdentityProbe {
+            name: Some(name("Smith", "Priya")),
+            birth_date: Some(dob(1985, 8, 25)),
+            gender: Some(Gender::Male),
+            identifiers: vec![],
+        };
+
+        // Sanity-check the fixture actually scores below threshold
+        // (same family name and birth year keep them in one block; the
+        // given name / month-day / gender disagreement is what pulls
+        // the score down) before trusting the blocked result.
+        let direct = compare_identity(&person_probe, &worker_probe);
+        assert!(direct.confidence < SUGGESTION_THRESHOLD);
+
+        let candidates = generate_candidates(
+            &[(entity_ref(EntityType::Person, 20), person_probe)],
+            &[(entity_ref(EntityType::Worker, 21), worker_probe)],
+        );
+
+        assert!(candidates.is_empty());
+    }
+
+    /// The load-bearing blocking proof: a pair that would score *above*
+    /// the suggestion threshold if compared directly is never even
+    /// scored by `generate_candidates`, because a one-year birth-date
+    /// difference puts them in different `Soundex(family) + birth_year`
+    /// blocks. This demonstrates blocking is actually bounding the
+    /// comparisons performed, not merely that scoring is correct.
+    #[test]
+    fn pairs_in_different_blocks_are_never_compared_even_when_score_would_qualify() {
+        let person_probe = IdentityProbe {
+            name: Some(name("Johnson", "Alice")),
+            birth_date: Some(dob(1975, 4, 10)),
+            gender: Some(Gender::Female),
+            identifiers: vec![],
+        };
+        let worker_probe = IdentityProbe {
+            name: Some(name("Johnson", "Alice")),
+            // Same month/day, one year off — a different block (block
+            // keys on the *exact* birth year), even though this is a
+            // strong demographic match.
+            birth_date: Some(dob(1976, 4, 10)),
+            gender: Some(Gender::Female),
+            identifiers: vec![],
+        };
+
+        // Prove it WOULD qualify if the comparator ever saw it.
+        let direct = compare_identity(&person_probe, &worker_probe);
+        assert!(direct.confidence >= SUGGESTION_THRESHOLD);
+        assert!(!direct.identifier_match);
+
+        // Yet blocking never presents this pair to the comparator at
+        // all, so it never appears as a candidate.
+        let candidates = generate_candidates(
+            &[(entity_ref(EntityType::Person, 30), person_probe)],
+            &[(entity_ref(EntityType::Worker, 31), worker_probe)],
+        );
+
+        assert!(candidates.is_empty());
+    }
+
+    /// A probe carrying more than one identifier shared with the other
+    /// side is reachable through more than one identifier-block, but
+    /// still produces exactly one candidate for the pair — not one per
+    /// shared identifier.
+    #[test]
+    fn multiple_shared_identifiers_do_not_duplicate_the_candidate() {
+        let person_probe = IdentityProbe {
+            identifiers: vec![
+                identifier("nhs", "9434765919"),
+                identifier("ssn", "078-05-1120"),
+            ],
+            ..IdentityProbe::default()
+        };
+        let worker_probe = IdentityProbe {
+            identifiers: vec![
+                identifier("nhs", "9434765919"),
+                identifier("ssn", "078-05-1120"),
+            ],
+            ..IdentityProbe::default()
+        };
+
+        let candidates = generate_candidates(
+            &[(entity_ref(EntityType::Person, 40), person_probe)],
+            &[(entity_ref(EntityType::Worker, 41), worker_probe)],
+        );
+
+        assert_eq!(candidates.len(), 1);
+    }
+
+    /// Empty inputs (either side, or both) return an empty candidate
+    /// list without panicking.
+    #[test]
+    fn empty_inputs_never_panic() {
+        let person_probe = IdentityProbe {
+            identifiers: vec![identifier("nhs", "9434765919")],
+            ..IdentityProbe::default()
+        };
+        let worker_probe = IdentityProbe {
+            identifiers: vec![identifier("nhs", "9434765919")],
+            ..IdentityProbe::default()
+        };
+
+        assert!(
+            generate_candidates(
+                &[],
+                &[(entity_ref(EntityType::Worker, 50), worker_probe.clone())]
+            )
+            .is_empty()
+        );
+        assert!(
+            generate_candidates(
+                &[(entity_ref(EntityType::Person, 51), person_probe.clone())],
+                &[]
+            )
+            .is_empty()
+        );
+        assert!(generate_candidates(&[], &[]).is_empty());
+        // And the never-blocked case: neither identifier nor name/DOB.
+        assert!(
+            generate_candidates(
+                &[(entity_ref(EntityType::Person, 52), IdentityProbe::default())],
+                &[(entity_ref(EntityType::Worker, 53), IdentityProbe::default())],
+            )
+            .is_empty()
+        );
     }
 }
