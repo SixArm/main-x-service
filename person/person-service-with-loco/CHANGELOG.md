@@ -7,6 +7,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Verified — `PersonRepository::search`'s `cust_with_values` SQL is sound (QA-CUST-SQL)
+
+Audited for the same MySQL-placeholder footgun fixed in
+`authentication-service` (`Expr::cust_with_values("LOWER(email) = ?", …)`
+— a `?` placeholder Postgres rejects). This crate's `search()`
+(`src/db/repositories.rs`) already spells `"LOWER(family) LIKE $1"` —
+Postgres-style — so the specific defect does not apply. Unlike worker
+and event, this method is **not dead code**: the bulk export pipeline
+(`src/bulk/pipeline.rs::run_export`) calls `repo.search(q)` whenever an
+export request carries a `query` filter. It is already exercised by an
+existing DB-gated test, `bulk::pipeline::db_tests::export_round_trips_through_jsonl`
+(plus the CSV/masking/Parquet export tests that also set
+`query: Some(...)`) — all confirmed green against Postgres 18
+(`scripts/ci-check.sh test-db`, 21/21 lib unit tests including these).
+No code change; the decision is "exercise it, and it already is."
 
 ## [0.5.0] - 2026-08-04
 ### Fixed — `merge` (and any `use_type`/`telecom`) writes were rejected by the database (PERSON-CONTACT-CASE, 2026-08-04)

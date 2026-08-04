@@ -2833,15 +2833,42 @@ committing (see plan.md §4).
 
   38/38 green vs Postgres 18; crate enrolled in `ci/db-suites.txt`.
 
-- [ ] **QA-CUST-SQL (S)** — the same `cust_with_values` footgun may be
-  latent in **person**, **worker**, and **event**
-  (`src/db/repositories.rs`: `LOWER(family|name) LIKE $1`). Those spell
-  the placeholder `$1` rather than `?`, so they may well be fine — but
-  the repository `search()` they sit in is **not called by any handler**
-  (the handlers search Tantivy) and **not covered by any test**, so
-  nothing would notice either way. Decide per crate: exercise it or
-  delete it. Not touched here, because each needs its own verification
-  against a database and this was not the change to bundle it into.
+- [x] **QA-CUST-SQL (S)** *(decided 2026-08-04)* — the same
+  `cust_with_values` footgun was suspected latent in **person**,
+  **worker**, and **event** (`src/db/repositories.rs`:
+  `LOWER(family|name) LIKE $1`). All three already spell the
+  Postgres-style `$1` placeholder (not MySQL's `?`), so none carried
+  the auth-service bug — confirmed live against Postgres 18 for all
+  three, not assumed. The three crates got **different** answers,
+  decided independently per the actual evidence of who calls `search()`:
+
+  - **person — exercise it (it already is).** `grep -rn` found a real
+    caller: `src/bulk/pipeline.rs::run_export` calls `repo.search(q)`
+    whenever a bulk-export request carries a `query` filter — this
+    method is *not* dead code here, unlike the other two. It is already
+    covered by an existing DB-gated test,
+    `bulk::pipeline::db_tests::export_round_trips_through_jsonl` (plus
+    the masked/CSV/Parquet export variants, which also set
+    `query: Some(...)`), all of which pass against a live Postgres 18
+    (`scripts/ci-check.sh test-db`, 21/21 lib unit tests green). No code
+    change — the method was already exercised and already correct; only
+    the verification (and this record of it) is new.
+  - **worker — delete it.** `grep -rn` across the whole crate (handlers,
+    tests, benches — worker has no bulk module) found **zero callers**:
+    `/api/workers/search` goes through Tantivy, and no test ever called
+    the repository method either. Removed the trait method, its impl,
+    and its now-orphaned `escape_like` SEC-G4 helper + `Expr` import
+    (nothing else used them). `scripts/ci-check.sh test-db` 34/34 green,
+    `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings`
+    clean.
+  - **event — delete it.** Same shape, same finding, same fix: zero
+    callers (`grep -rn`, no bulk module), removed alongside its
+    `escape_like` helper and `Expr` import. `scripts/ci-check.sh
+    test-db` 7/7 green, `cargo fmt --check` and `cargo clippy
+    --all-targets -- -D warnings` clean.
+
+  Each crate's decision landed in its own commit + `CHANGELOG.md`
+  entry, per the family's three-part-change discipline.
 
 ## Done 2026-08-01 — a containerised test database per service
 
