@@ -58,37 +58,41 @@ Input: CarePathway A, CarePathway B, MatchConfig
   ├─ care_setting_score  (both set) exact enum (1.0/0.0)
   ├─ interventions_score (≥1 set)   Jaccard
   ├─ keywords_score      (≥1 set)   Jaccard
-  ├─ relationships_score (≥1 set)   typed-set Jaccard over (relation, pathway_id)
-  ├─ tags_score          (both set) set Jaccard over normalised tags
   └─ renormalised weighted average over present components
 ```
+
+Two further components — `relationships_score` (§13.1) and `tags_score`
+(§13.2) — are **designed but not yet implemented in code**; tracked as
+open tasks in §23. Until then `MatchConfig`, `CarePathway`, and
+`MatchBreakdown` carry no `relationships`/`tags`-related fields.
 
 ## 6. Domain model
 
 `CarePathway`: `name` (required), `alternate_names`, `pathway_code`,
 `provider_id`, `provider_name`, `care_setting`, `condition_codes`
-(`ConditionCode { system, code }`), `interventions`, `keywords`, `tags`
-(`Vec<String>`, default empty), `identifiers` (`PathwayIdentifier {
-scheme, value }`), `same_as`, `in_language`, `relationships`
-(`RelationshipRef { relation, pathway_id }`).
+(`ConditionCode { system, code }`), `interventions`, `keywords`,
+`identifiers` (`PathwayIdentifier { scheme, value }`), `same_as`,
+`in_language`. This is the current `src/care_pathway.rs` field set.
 
-`tags: Vec<String>` holds operator-applied free-text labels for grouping
-/ workflow (e.g. `vip`, `review`, `fast-track`); each is whitespace-
-trimmed, non-empty, and the set is de-duplicated case-insensitively.
-Distinct from `keywords` (descriptive / discovery terms about *what the
-record is*): tags are user-applied operational labels. A supporting
-signal, not an identifying field on its own (§13.2).
+**Planned, not yet implemented (§23).** A `tags: Vec<String>` field
+would hold operator-applied free-text labels for grouping / workflow
+(e.g. `vip`, `review`, `fast-track`); each whitespace-trimmed,
+non-empty, and the set de-duplicated case-insensitively. Distinct from
+`keywords` (descriptive / discovery terms about *what the record is*):
+tags would be user-applied operational labels — a supporting signal,
+not an identifying field on its own (§13.2).
 
-`relationships: Vec<RelationshipRef>` holds typed pathway-to-pathway
+**Planned, not yet implemented (§23).** A `relationships:
+Vec<RelationshipRef>` field would hold typed pathway-to-pathway
 references — `RelationshipRef { relation: RelationKind, pathway_id:
-String }` where `RelationKind` is a `#[non_exhaustive]` enum mirroring
-the service: `PrecededBy` / `FollowedBy` (sequencing inverses),
-`SimilarTo` (symmetric), `Supersedes` / `SupersededBy` (versioning
-inverses), plus `Custom(String)`. `pathway_id` is an opaque registry id
-(whitespace-trimmed, non-empty); the matcher does **not** resolve,
-invert, or transitively close the references — it compares the two
-records' relationship **sets** (§13.1). A supporting signal, not an
-identifying field on its own.
+String }` where `RelationKind` would be a `#[non_exhaustive]` enum
+mirroring the service: `PrecededBy` / `FollowedBy` (sequencing
+inverses), `SimilarTo` (symmetric), `Supersedes` / `SupersededBy`
+(versioning inverses), plus `Custom(String)`. `pathway_id` would be an
+opaque registry id (whitespace-trimmed, non-empty); the matcher would
+**not** resolve, invert, or transitively close the references — it
+would compare the two records' relationship **sets** (§13.1). A
+supporting signal, not an identifying field on its own.
 
 `CodeSystem`: `Icd10`, `Icd11`, `Snomed`, `Custom(String)`.
 `CareSetting`: `Inpatient`, `Outpatient`, `PrimaryCare`,
@@ -107,11 +111,15 @@ via that opaque id, not via a fuzzy provider-name comparison.
 
 `MatchConfig` core weights (default, sum 1.0): name 0.30, condition
 0.25, pathway_code 0.15, care_setting 0.10, interventions 0.10, keywords
-0.10. Plus two **supporting** signals layered on top of the core six:
-`relationships_weight` 0.05 (§13.1) and `tags_weight` 0.05 (§13.2). The
-weighted average is renormalised over the components actually present
-(§17), so the extra supporting weights never break the renormalisation.
-Threshold 0.85. Presets: `strict()` 0.95, `lenient()` 0.70.
+0.10. Threshold 0.85. Presets: `strict()` 0.95, `lenient()` 0.70. This
+is the current `src/config.rs` field set.
+
+**Planned, not yet implemented (§23).** Two further **supporting**
+signals would layer on top of the core six once `relationships`/`tags`
+land on the domain model (§6): `relationships_weight` 0.05 (§13.1) and
+`tags_weight` 0.05 (§13.2). The weighted average's renormalisation over
+the components actually present (§17) already accommodates extra
+supporting weights without further change.
 
 Changing any weight (including adding `relationships_weight` or
 `tags_weight`) is a config-section + `CHANGELOG.md` edit in the same PR
@@ -150,7 +158,12 @@ Exact enum match → 1.0 else 0.0. `None` when either side is unset.
 Jaccard over `fold_set`. Skipped when both empty; `0.0` when exactly one
 side is populated.
 
-### 13.1 Relationships — `relationships_score`
+### 13.1 Relationships — `relationships_score` (planned, §23)
+
+**Not yet implemented.** `relationships`, `RelationshipRef`,
+`RelationKind`, `relationships_score`, and `relationships_weight` do
+not exist in code today — this section is the design for the §23 task
+that will add them.
 
 Typed-set **Jaccard** over the `(relation, pathway_id)` pairs: `score =
 |A ∩ B| / |A ∪ B|`, where each side's set is `{ (r.relation,
@@ -163,7 +176,11 @@ inversion or transitive closure). `None` (does not participate) when
 A **supporting** signal weighted `relationships_weight` (§7, default
 `0.05`); shared references never single-handedly establish a match.
 
-### 13.2 Tags — `tags_score`
+### 13.2 Tags — `tags_score` (planned, §23)
+
+**Not yet implemented.** `tags`, `tags_score`, and `tags_weight` do not
+exist in code today — this section is the design for the §23 task that
+will add them.
 
 Plain set **Jaccard** over the case-insensitively normalised tag sets:
 `tags_score = |A ∩ B| / |A ∪ B|`, where each side's set is the
@@ -214,9 +231,10 @@ the contract.
 
 Semantic versioning. Re-exports from `lib.rs` are the contract:
 `CarePathway`, `PathwayIdentifier`, `IdentifierScheme`, `ConditionCode`,
-`CodeSystem`, `CareSetting`, `RelationshipRef`, `RelationKind`,
-`MatchingEngine`, `MatchConfig`, `MatchResult`, `MatchBreakdown`,
-`Confidence`, `Error`, `Result`.
+`CodeSystem`, `CareSetting`, `MatchingEngine`, `MatchConfig`,
+`MatchResult`, `MatchBreakdown`, `Confidence`, `Error`, `Result`.
+`RelationshipRef` / `RelationKind` (§6, §13.1) will join this list once
+implemented — see §23; they are not part of the surface today.
 
 `Error`/`Result` are **reserved for future fallible APIs**: every
 current entry point (`match_care_pathways` and all component fns) is
