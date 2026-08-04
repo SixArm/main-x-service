@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation — spec/AGENTS accuracy pass (DOC-3)
+
+No behaviour change. Fixed two classes of documentation drift found during
+the family-wide matcher-crate doc audit:
+
+- **`AGENTS/*.md` still described the pre-0.5.0 place-matcher domain.**
+  `architecture.md`, `coding-style.md`, `matching-algorithm.md`,
+  `normalization.md`, `release.md`, `security-and-privacy.md`, and
+  `spec-driven-development.md` all still referenced `Place`, `PlaceBuilder`,
+  `PlaceCategory`, `PlaceId`/`PlaceIdScheme`, `match_places`, coordinates-only
+  scoring weights, and a fabricated `MatchingEngine::score_phone` /
+  `phone_default_country` / `gmail_dot_folding` matcher path — none of which
+  exist in the current `Event`-domain code (`Event` has no `phone` or
+  `email` field at all; `normalize_phone*`/`normalize_email` are unused by
+  `match_events` and remain library-only utilities). Rewritten against the
+  actual `src/models.rs` / `src/matcher.rs` surface, including the
+  correct default-weight table (name/start_date/end_date/location/
+  category/country_code/event_ids/organizer/performers/url) and a note
+  that this crate does **not** implement window-overlap temporal scoring
+  (`spec.md` §10 OQ-C is still open).
+- **`spec/03-data-model.md`, `spec/05-matching-pipeline.md`,
+  `spec/06-per-field-scoring-algorithms.md`, and `spec/07-configuration.md`
+  presented the planned `relationships`/`tags` fields, their
+  `MatchBreakdown`/`MatchConfig` members, and §5.2.1's "eleven weighted
+  components" as already-shipped fact** (`Event` carries 24 fields and
+  `MatchBreakdown` 11 today, not 26/13) — contradicting this crate's own
+  §9.3 "code wins on divergence" rule and the honest "implementation
+  pending" framing already used elsewhere in this CHANGELOG. Added
+  explicit "planned, not yet implemented" callouts rather than deleting
+  the design; §6.11/§6.12 and the two `*_weight` config rows are otherwise
+  unchanged, since they document the target design that CHANGELOG.md's
+  own pending entries below track.
+
 ### Added — cargo-fuzz harness (SEC-I2)
 
 - A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate with

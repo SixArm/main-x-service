@@ -12,11 +12,9 @@ pub struct Event {
     pub description: Option<String>,
     pub url: Option<String>,
     pub event_ids: Vec<EventId>,
-    pub relationships: Vec<RelationshipRef>,
     pub local_id: Option<String>,
     pub category: Option<EventCategory>,
     pub keywords: Vec<String>,
-    pub tags: Vec<String>,
     pub in_language: Option<String>,
     pub typical_age_range: Option<String>,
     pub start_date: Option<String>,
@@ -37,7 +35,9 @@ pub struct Event {
 }
 ```
 
-`Event` carries **26 fields**, every one optional or defaulting to empty. Field names use Rust conventions but map one-for-one onto schema.org properties (`name` → `schema:name`, `event_ids` → `schema:identifier`, `start_date` → `schema:startDate`, `organizer` → `schema:organizer`, `performers` → `schema:performer`, `super_event_id` → `schema:superEvent`, …); the full mapping table lives in the `src/models.rs` doc comments and the README.
+`Event` carries **24 fields** today, every one optional or defaulting to empty. Field names use Rust conventions but map one-for-one onto schema.org properties (`name` → `schema:name`, `event_ids` → `schema:identifier`, `start_date` → `schema:startDate`, `organizer` → `schema:organizer`, `performers` → `schema:performer`, `super_event_id` → `schema:superEvent`, …); the full mapping table lives in the `src/models.rs` doc comments and the README.
+
+> **Planned, not yet implemented — `relationships` and `tags`.** Two further fields — `relationships: Vec<RelationshipRef>` and `tags: Vec<String>` — are specified below (they would bring the struct to 26 fields) together with their scoring components (§6.11, §6.12) and `MatchConfig` weights (§7). Per §9.3 ("code wins on divergence"), `src/models.rs` today has neither field, no `RelationshipRef` / `RelationKind` types, and no corresponding `MatchConfig`/`MatchBreakdown` members — this is spec-first design, not documentation drift. See `CHANGELOG.md` `[Unreleased]` for the tracked code follow-up.
 
 - `Event` MUST be constructed via `Event::builder()` from outside the crate (`#[non_exhaustive]`).
 - `Event::validate(&self) -> Result<()>` MUST return `Ok(())` when `name` is set and `Err(MatchingError::MissingField(_))` otherwise. Validation is not invoked automatically by the matcher.
@@ -45,11 +45,11 @@ pub struct Event {
 
 #### 3.1.1 Field semantics
 
-Scored fields (probabilistic matcher consults — §6): `name`, `alternate_names` (§6.1); `start_date`, `end_date` (§6.3, ISO 8601 date or date-time strings — `"2024-06-26"`, `"2024-06-26T09:00:00Z"`, `"2024-06-26T09:00:00+01:00"`); `location` (§6.4, weighted blend of coordinates, address, venue name, virtual URL); `category` (§6.5); `country_code_as_iso_3166_1_alpha_2` (§6.6, ISO 3166-1 alpha-2, compared case-insensitively after trim); `event_ids` (§6.7, sharing any `(scheme, value)` pair is a deterministic match); `organizer` (§6.8); `performers` (§6.9); `url` (§6.10, exact equality after trim); `relationships` (§6.11, typed-set Jaccard over `(relation, event_id)` refs); `tags` (§6.12, plain set Jaccard over case-insensitively normalised tags).
+Scored fields (probabilistic matcher consults — §6): `name`, `alternate_names` (§6.1); `start_date`, `end_date` (§6.3, ISO 8601 date or date-time strings — `"2024-06-26"`, `"2024-06-26T09:00:00Z"`, `"2024-06-26T09:00:00+01:00"`); `location` (§6.4, weighted blend of coordinates, address, venue name, virtual URL); `category` (§6.5); `country_code_as_iso_3166_1_alpha_2` (§6.6, ISO 3166-1 alpha-2, compared case-insensitively after trim); `event_ids` (§6.7, sharing any `(scheme, value)` pair is a deterministic match); `organizer` (§6.8); `performers` (§6.9); `url` (§6.10, exact equality after trim). Two further scored fields, `relationships` (§6.11) and `tags` (§6.12), are specified but **not yet implemented** — see the callout above.
 
-`relationships: Vec<RelationshipRef>` holds typed event-to-event references — `RelationshipRef { relation: RelationKind, event_id: String }` where `RelationKind` is a `#[non_exhaustive]` enum mirroring the service: `Outer` / `Inner` (containment) and `ImmediatelyBefore` / `ImmediatelyAfter` (temporal adjacency). `event_id` is an opaque registry id (whitespace-trimmed, non-empty); the matcher does not resolve, invert, or transitively close the references — it compares the two events' relationship **sets** (§6.11). A supporting signal, not an identifying field on its own.
+**Planned:** `relationships: Vec<RelationshipRef>` would hold typed event-to-event references — `RelationshipRef { relation: RelationKind, event_id: String }` where `RelationKind` is a `#[non_exhaustive]` enum mirroring the service: `Outer` / `Inner` (containment) and `ImmediatelyBefore` / `ImmediatelyAfter` (temporal adjacency). `event_id` is an opaque registry id (whitespace-trimmed, non-empty); the matcher would not resolve, invert, or transitively close the references — it would compare the two events' relationship **sets** (§6.11). A supporting signal, not an identifying field on its own.
 
-`tags: Vec<String>` holds short, free-text operational labels an operator attached to the record for grouping / filtering / triage / workflow (e.g. `"vip"`, `"review"`, `"fast-track"`); each tag is trimmed and non-empty, the set is unordered and de-duplicated case-insensitively, and it defaults to empty. Distinct from `keywords` (descriptive / discovery terms about *what the record is*): tags are user-applied operational labels. Scored as a plain set Jaccard over the case-insensitively normalised tag sets (§6.12); a **supporting** signal, not an identifying field on its own.
+**Planned:** `tags: Vec<String>` would hold short, free-text operational labels an operator attached to the record for grouping / filtering / triage / workflow (e.g. `"vip"`, `"review"`, `"fast-track"`); each tag trimmed and non-empty, the set unordered and de-duplicated case-insensitively, defaulting to empty. Distinct from `keywords` (descriptive / discovery terms about *what the record is*): tags are user-applied operational labels. Would score as a plain set Jaccard over the case-insensitively normalised tag sets (§6.12); a **supporting** signal, not an identifying field on its own.
 
 Data-only fields (round-trip honesty; **not** scored): `description`; `local_id` (originating-system identifier — sources may collide); `keywords`; `in_language` (IETF BCP-47 tag, e.g. `"en-GB"`); `typical_age_range`; `door_time`; `previous_start_date`; `event_status` (see §3.6); `event_attendance_mode` (see §3.7); `maximum_attendee_capacity`, `maximum_physical_attendee_capacity`, `maximum_virtual_attendee_capacity` (`0` is meaningful, absence is `None`); `is_accessible_for_free`; `super_event_id`.
 
@@ -62,7 +62,7 @@ Date fields that fail to parse as ISO 8601 MUST be stored as supplied (round-tri
 pub struct EventBuilder { /* private fields */ }
 ```
 
-Fluent builder for `Event`. All string setters accept `impl Into<String>`. Setters mirror `Event`'s fields one-for-one. The list setters `alternate_names(Vec<String>)`, `event_ids(Vec<EventId>)`, `keywords(Vec<String>)`, `tags(Vec<String>)`, and `performers(Vec<String>)` **replace** the entire list; `add_alternate_name(impl Into<String>)`, `add_event_id(EventId)`, `add_keyword(impl Into<String>)`, `add_tag(impl Into<String>)`, and `add_performer(impl Into<String>)` **append** a single element. `build() -> Event` consumes the builder.
+Fluent builder for `Event`. All string setters accept `impl Into<String>`. Setters mirror `Event`'s fields one-for-one. The list setters `alternate_names(Vec<String>)`, `event_ids(Vec<EventId>)`, `keywords(Vec<String>)`, and `performers(Vec<String>)` **replace** the entire list; `add_alternate_name(impl Into<String>)`, `add_event_id(EventId)`, `add_keyword(impl Into<String>)`, and `add_performer(impl Into<String>)` **append** a single element. `build() -> Event` consumes the builder. (Planned `tags`/`add_tag` setters mirroring `keywords` are tracked alongside the `tags` field — see §3.1.)
 
 `EventBuilder` is `#[derive(Default)]`. All fields start unset (`None` / empty `Vec`).
 
@@ -201,12 +201,10 @@ pub struct MatchBreakdown {
     pub organizer_score: Option<f64>,
     pub performers_score: Option<f64>,
     pub url_score: Option<f64>,
-    pub relationships_score: Option<f64>,
-    pub tags_score: Option<f64>,
 }
 ```
 
-`MatchBreakdown` carries **13 score fields**, each `Option<f64>` in `[0.0, 1.0]`. `None` means "the field did not participate in the weighted sum"; `Some(s)` carries the per-field score. `MatchResult::confidence` carries `#[serde(default = "default_confidence")]` where `default_confidence()` returns `Confidence::Low`, so legacy payloads predating the field round-trip as `Low`.
+`MatchBreakdown` carries **11 score fields** today, each `Option<f64>` in `[0.0, 1.0]`. `None` means "the field did not participate in the weighted sum"; `Some(s)` carries the per-field score. `MatchResult::confidence` carries `#[serde(default = "default_confidence")]` where `default_confidence()` returns `Confidence::Low`, so legacy payloads predating the field round-trip as `Low`. **Planned:** `relationships_score` and `tags_score` (bringing the total to 13) ship alongside the `relationships` / `tags` fields — see §3.1.
 
 ### 3.11 `MatchConfig`
 

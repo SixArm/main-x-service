@@ -13,15 +13,17 @@ This crate practises **spec-driven development**: the specification ([`../spec.m
 
 | You're changing… | Update spec section |
 |---|---|
-| The list of `Place` fields or any `Place` field's semantics | §3.1 |
-| `Place`-builder ergonomics | §3.2 |
-| `Address` fields or scoring weights | §3.3, §6.4 |
-| `PlaceCategory` variants | §3.4 |
-| `PlaceId` or `PlaceIdScheme` variants | §3.5 |
-| `Confidence` band boundaries | §3.6 |
-| `MatchBreakdown` / `MatchResult` shape | §3.7 |
-| `MatchingError` variants | §3.9 |
-| Normalisation behaviour (name, postcode, phone, email, phonetic, address) | §4 |
+| The list of `Event` fields or any `Event` field's semantics | §3.1 |
+| `EventBuilder` ergonomics | §3.2 |
+| `Location` fields or scoring weights | §3.3, §6.4 |
+| `Address` fields or scoring weights | §3.4, §6.4 |
+| `EventCategory` variants | §3.5 |
+| `EventStatus` / `EventAttendanceMode` variants | §3.6, §3.7 |
+| `EventId` or `EventIdScheme` variants | §3.8 |
+| `Confidence` band boundaries | §3.9 |
+| `MatchBreakdown` / `MatchResult` shape | §3.10 |
+| `MatchingError` variants | §3.12 |
+| Normalisation behaviour (name, postcode, phone, email, phonetic, address, ISO 8601) | §4 |
 | Deterministic-match rules | §5.1 |
 | Probabilistic-match pipeline | §5.2 |
 | Strict-mode behaviour | §5.2.3 |

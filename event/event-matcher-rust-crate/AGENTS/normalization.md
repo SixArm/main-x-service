@@ -112,7 +112,7 @@ Stages (`spec.md` §4.5):
 2. **House number.** Leading run of ASCII digits, optionally followed by a single alphabetic suffix (`"10A"`). The suffix is taken **only when not followed by another alphanumeric**, so `"10 Apple Tree Lane"` does not absorb the `A` of `Apple`.
 3. **Street.** Remainder, run through `normalize_address_line` (= `expand_street_abbreviations` + `normalize_name`).
 
-The matcher's line-1 sub-score combines a Jaro-Winkler similarity on `parsed.street` with an exact-match score on `parsed.house_number`: `0.6 × street + 0.4 × house number` when both sides have a house number; street similarity alone otherwise (`spec.md` §6.4).
+The matcher's location-address sub-score combines a Jaro-Winkler similarity on `parsed.street` with an exact-match score on `parsed.house_number`: `0.6 × street + 0.4 × house number` when both sides have a house number; street similarity alone otherwise (`spec.md` §6.4).
 
 ### Adding a new street abbreviation
 
@@ -135,7 +135,7 @@ The matcher's line-1 sub-score combines a Jaro-Winkler similarity on `parsed.str
 3. Reject inputs with anything other than exactly one `@`, an empty localpart, or an empty domain (return `None`).
 4. If `gmail_dot_folding` is `true` and the domain is `gmail.com` or `googlemail.com`, strip every `.` from the localpart and drop any `+tag` suffix.
 
-The matcher emits `Some(1.0)` / `Some(0.0)` for normalised equality, `None` when either side is missing or fails to canonicalise (`spec.md` §6.9).
+See "Phone and email are library utilities, not scoring inputs" below — `Event` has no `email` field either, so this normaliser is not consulted by `match_events`.
 
 ## Phonetic codes
 
@@ -143,21 +143,15 @@ The matcher emits `Some(1.0)` / `Some(0.0)` for normalised equality, `None` when
 
 American Soundex is tuned for English-language names and may lose information on non-English digraphs. A locale-aware encoder (Double Metaphone, Daitch-Mokotoff) is tracked as OQ-E.
 
-## Matcher wiring (phone path)
+## Phone and email are library utilities, not scoring inputs
 
-`MatchingEngine::score_phone` prefers the E.164 form and falls back to the legacy national-significant form (`spec.md` §6.8):
-
-1. Compute `normalize_phone_e164(phone1, cc)` and `normalize_phone_e164(phone2, cc)` where `cc = MatchConfig::phone_default_country` (default `Some("GB")`).
-2. If both parse, `phone_score = 1.0` iff the canonical strings are equal, else `0.0`.
-3. Otherwise compare `normalize_phone(phone1) == normalize_phone(phone2)`.
-
-Cross-country deployments should set `phone_default_country` to the predominant jurisdiction (or `None` to refuse to guess). The fallback preserves behaviour for inputs the country table does not cover.
+Unlike `person-matcher` / `place-matcher`, `Event` (`src/models.rs`) carries **no `phone` field and no `email` field**. `MatchConfig` has no `phone_default_country`, no `gmail_dot_folding`, and `MatchingEngine` has no `score_phone` / `score_email` method — `MatchBreakdown` has no `phone_score` or `email_score` entry. `normalize_phone`, `normalize_phone_e164`, and `normalize_email` remain public on `Normalizer` purely as reusable primitives for callers building their own comparisons upstream (e.g. scoring an organiser's or venue contact's phone/email before it reaches this crate). See `spec.md` §4.3's explicit note. Don't assume phone/email participate in `match_events` — they don't.
 
 ## What we do not normalise
 
 - **`local_id`** — intentionally not normalised AND not scored. Different sources may issue colliding values.
 - **`country_code_as_iso_3166_1_alpha_2`** — stored as supplied (`"GB"`, `"gb"`, etc.); the matcher compares case-insensitively after trim but does NOT rewrite the stored value. See OQ-B.
-- **`PlaceId::value`** — trimmed at construction, otherwise compared verbatim. Different schemes have different canonical forms; the crate makes no per-scheme assumptions.
+- **`EventId::value`** — trimmed at construction, otherwise compared verbatim. Different schemes have different canonical forms; the crate makes no per-scheme assumptions.
 
 ## Adding a new normaliser
 
@@ -171,7 +165,7 @@ Cross-country deployments should set `phone_default_country` to the predominant 
 - Don't collapse double-barrelled names (`Lloyd-Webber`) into a single word without thinking — current `normalize_name` drops the hyphen, yielding `lloydwebber`. This is intentional but worth knowing.
 - Don't lowercase postcodes; the canonical form is uppercase.
 - Don't trust that `char::is_ascii_punctuation` covers Unicode punctuation. It does not — `’` (curly apostrophe, U+2019) would survive. If you need broader stripping, propose it via the spec.
-- Don't compare `normalize_phone` output across countries — it's UK-centric and will silently collapse French / Italian national numbers to lookalike digit strings. Use `normalize_phone_e164` (or rely on the matcher, which already does) for multi-country data.
+- Don't compare `normalize_phone` output across countries — it's UK-centric and will silently collapse French / Italian national numbers to lookalike digit strings. Use `normalize_phone_e164` for multi-country data. Note this crate's matcher does not call either phone normaliser itself (`Event` has no phone field) — this only matters for callers using `Normalizer` directly.
 - Don't add a new country to `COUNTRY_PHONE_TABLE` without explicit trunk-prefix and NSN-range provenance. Guessing the range produces false-negative matches when legitimate numbers fall outside it.
 - Don't extend the address parser to apply position-aware heuristics for `"St"` (Saint vs Street) without a corresponding spec update (see OQ-D).
 - Don't add house-number ranges to the `house_number` field (`"123-125 High St"`). The current parser captures only the leading number; widening this changes the equality semantics of the matcher's line-1 sub-score.

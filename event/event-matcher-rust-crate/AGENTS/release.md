@@ -7,14 +7,14 @@ See [`../spec.md`](../spec/index.md) §9 for the formal versioning policy.
 - Pre-1.0 (current): minor bumps MAY contain breaking API changes, per Cargo convention. Document them clearly under "Breaking" in the CHANGELOG entry.
 - Post-1.0: strict SemVer.
 - Default-weight or default-threshold changes count as behaviour changes. Bump minor and call out under "Behaviour Change" in `CHANGELOG.md`.
-- The `0.4.0` release is the first under the geographic Event-matcher domain. Subsequent minor bumps should preserve the 0.4.x public surface unless a deliberate breaking change is documented.
+- **`0.5.0`** repurposed the crate from geographic *place* matching to schema.org/Event matching (see `AGENTS.md`'s "Domain change in 0.5.0" note). The `0.4.x` line is the place-matcher domain and is **not** upgrade-compatible; pin to `0.4.x` for that behaviour (`spec.md` §9). Subsequent minor bumps should preserve the `0.5.x`/`0.6.x` Event-domain public surface unless a deliberate breaking change is documented.
 
 ## `#[non_exhaustive]` implications
 
 The following items carry `#[non_exhaustive]`:
 
-- `Place` and `Address` — gaining fields is non-breaking. Downstream code MUST construct via `Place::builder()` and `Address::new()` rather than struct-literal syntax.
-- `PlaceCategory` and `PlaceIdScheme` — gaining variants is non-breaking. Downstream `match` statements MUST include a `_ => …` arm.
+- `Event`, `Address`, and `Location` — gaining fields is non-breaking. Downstream code MUST construct via `Event::builder()`, `Address::new()`, and `Location::new()` rather than struct-literal syntax.
+- `EventCategory`, `EventStatus`, `EventAttendanceMode`, and `EventIdScheme` — gaining variants is non-breaking. Downstream `match` statements MUST include a `_ => …` arm.
 - `MatchingError` — gaining variants is non-breaking.
 
 Removing fields or variants from a `#[non_exhaustive]` item is breaking. Renaming a serde key is also breaking.
@@ -45,7 +45,7 @@ Before publishing a new version:
 
 After `cargo publish` succeeds:
 
-1. In a scratch directory, `cargo new smoke && cd smoke && cargo add Event-matcher@<X.Y.Z>`.
+1. In a scratch directory, `cargo new smoke && cd smoke && cargo add event-matcher@<X.Y.Z>`.
 2. Replace `src/main.rs` with the quick-start example from `README.md`.
 3. `cargo run` and confirm the printed output matches expectations.
 4. `cargo doc --open` and confirm the rendered docs match the current spec.
@@ -67,4 +67,4 @@ If a CHANGELOG entry doesn't have a corresponding spec edit, one of them is wron
 - Patch-bump dependencies regularly; document in CHANGELOG under "Dependencies".
 - Minor / major dependency bumps that change public behaviour require a behaviour-change note even if our crate's surface is unchanged.
 - Run `cargo audit` before every release. Zero findings is the bar. Pin or yank if a transitive dependency is flagged.
-- Current direct runtime dependencies (`Cargo.toml`): `serde`, `serde_json`, `unicode-normalization`, `strsim`, `thiserror`, `soundex`. No `tokio`, `async-std`, or other runtimes.
+- Current direct runtime dependencies (`Cargo.toml`): `serde`, `serde_json`, `unicode-normalization`, `strsim`, `thiserror`, `soundex`, `mimalloc`. No `tokio`, `async-std`, or other runtimes.

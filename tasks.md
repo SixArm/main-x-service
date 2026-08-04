@@ -4315,6 +4315,68 @@ committing (see plan.md §4).
     crate, out of this task's boundary). All edited files re-confirmed
     well under 40 KB.
 
+  - *`event/event-matcher-rust-crate` done 2026-08-04.* `CLAUDE.md`
+    already the thin `@AGENTS.md` one-liner. `spec/index.md` confirms
+    this crate runs §1–§13, not the family's §1–§25 matcher shape
+    (`spec-driven-development.md` says so explicitly, "SDD artefacts
+    that some projects split across multiple files are consolidated
+    into the numbered sections") — a genuine, deliberate difference
+    from `person-matcher`/`worker-matcher`, not drift, so left as is.
+    Biggest finding, the **same shape as place-matcher's** (confirming
+    the pattern is systemic, not one-off): `spec/03-data-model.md`,
+    `spec/05-matching-pipeline.md`, `spec/06`, and `spec/07` presented
+    the planned `relationships`/`tags` fields, their
+    `MatchBreakdown`/`MatchConfig` members, and §5.2.1's "eleven
+    weighted components" as already-shipped fact, while
+    `CHANGELOG.md`'s own "Unreleased" section already (correctly)
+    labels both "implementation pending" — `Event` was documented as
+    "26 fields" when the real struct has 24, `MatchBreakdown` as "13
+    score fields" vs the real 11, and `RelationshipRef`/`RelationKind`
+    types that don't exist in `src/models.rs` at all (confirmed by
+    grep). Against this crate's own spec §9.3 ("code wins on
+    divergence"). Fixed with "planned, not yet implemented" callouts
+    in all four files rather than deleting the design (real tracked
+    work per the CHANGELOG). Second, much larger finding: **every file
+    in `AGENTS/` (architecture.md, coding-style.md,
+    matching-algorithm.md, normalization.md, release.md,
+    security-and-privacy.md, spec-driven-development.md) was still
+    describing the crate's pre-0.5.0 domain** — `Place`, `PlaceBuilder`,
+    `PlaceCategory`, `PlaceId`/`PlaceIdScheme`, `match_places`, a
+    coordinates/address/place-id weight table, and (most seriously) a
+    fabricated `MatchingEngine::score_phone` method plus
+    `MatchConfig::phone_default_country`/`gmail_dot_folding` fields
+    that never existed in the Event domain (`Event` carries no `phone`
+    or `email` field at all — confirmed by grep; `normalize_phone*`/
+    `normalize_email` are unused library-only utilities, per
+    `spec/04-normalisation.md`'s own explicit note). `AGENTS.md` and
+    `CLAUDE.md` themselves were already correctly rewritten for Event
+    at the 0.5.0 rebrand; only the `AGENTS/*.md` topic guides were
+    missed, for all seven files — the largest single-crate `AGENTS/`
+    staleness found in this batch so far. Rewrote all seven files
+    against the real `src/models.rs`/`src/matcher.rs` surface: correct
+    default-weight table (name/start_date/end_date/location/category/
+    country_code/event_ids/organizer/performers/url), the real worked
+    examples (Glastonbury Festival, RustConf, strict-mode Cafe
+    Centrale/Central), and an explicit note that this crate does
+    **not** implement window-overlap temporal scoring —
+    `start_date`/`end_date` are scored independently by Gaussian decay
+    over endpoint distance, and window-overlap is
+    `spec/10-open-questions.md` OQ-C, still open. Third:
+    `agents/share/overview.md`'s matcher table flatly claimed
+    event-matcher does "Time-bounded event matching with
+    window-overlap" — false per the above (verified by grep across
+    `src/`: zero occurrences of "overlap" outside a doc comment and
+    OQ-C itself) — fixed the one row to describe the real Gaussian
+    endpoint-decay algorithm and point at OQ-C, re-reading the file
+    immediately before editing given nine sibling agents editing
+    adjacent crates concurrently. `README.md`/`index.md` were already
+    accurate (no Place references, no premature relationships/tags
+    claims) and its code examples were spot-checked against the real
+    API; `cargo test --doc` reconfirmed 74 passing doctests unchanged
+    before and after. Did not touch `event/event-service-with-loco`
+    (sibling crate, out of this task's boundary). All edited files
+    re-confirmed well under 40 KB.
+
 - [ ] **DOC-4 (L)** Front-end crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: all 11 SvelteKit front-ends (person, worker,
   place, thing, event, course, organization, care-pathway, case,

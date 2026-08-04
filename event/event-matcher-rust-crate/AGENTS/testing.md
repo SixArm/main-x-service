@@ -17,13 +17,13 @@ Run everything: `cargo test`. Run a single test: `cargo test test_name`. Show st
 
 ## Required coverage
 
-Every public item re-exported from `lib.rs` MUST be exercised by at least one test or doctest. The doctests on `Place`, `MatchingEngine`, `MatchConfig`, `Scorer`, and `Normalizer` are the primary worked examples — keep them honest by running `cargo test --doc` before any release.
+Every public item re-exported from `lib.rs` MUST be exercised by at least one test or doctest. The doctests on `Event`, `MatchingEngine`, `MatchConfig`, `Scorer`, and `Normalizer` are the primary worked examples — keep them honest by running `cargo test --doc` before any release.
 
 When you add a new public item, add a doctest. When you add behaviour to an existing item, add at least one integration test that pins it. See [spec-driven-development.md](./spec-driven-development.md).
 
 ## Naming conventions
 
-- `<thing>_<expected>` or `test_<thing>_<expected>` — e.g. `perfect_match_all_fields`, `coordinates_score_far_apart_decays_to_zero`, `place_id_equality_is_scheme_scoped`.
+- `<thing>_<expected>` or `test_<thing>_<expected>` — e.g. `test_perfect_match_all_fields`, `test_start_date_score_far_apart_decays_to_zero`, `test_event_id_distinct_schemes_do_not_match`.
 - Use plain English in `assert!` messages when the assertion is non-obvious: `assert!(result.is_match, "expected aliases to match");`.
 - Keep the test name a complete English clause readable in the `cargo test` output.
 
@@ -33,13 +33,12 @@ Synthetic data only. Reuse the existing illustrative fixtures rather than invent
 
 | Fixture kind | Conventional choice |
 |---|---|
-| Landmark coordinates | Eiffel Tower (48.8582, 2.2945), Big Ben (51.5007, -0.1247), Statue of Liberty, Wembley Stadium (51.5558, -0.2797). Public knowledge, not personal data. |
-| UK postcodes | `CF10 1AA`, `SW1A 2AA`, `EC4M 7BB`, etc. |
-| UK phones | Drama-reserved `07700 900xxx` ranges. |
-| US phones | Fictitious `(415) 555-…` and similar `555-01xx`. |
-| Emails | RFC 2606 reserved `example.org`, `example.com`, `example.net`. Gmail-folding cases MAY use `@gmail.com` with synthetic localparts (`jsmith`, `j.smith`). |
-| Wikidata QIDs | `Q243` (Eiffel Tower), `Q41940` (Snowdon / Yr Wyddfa), other well-known QIDs. |
-| Google Place IDs | The crate uses public IDs in spec examples; for new tests use invented `ChIJ_xyz`-style strings when the value need not be meaningful. |
+| Event names | Glastonbury Festival / "Glasto 2024", RustConf 2024 / "RustConf '24", "Cafe Centrale Concert". Public / generic, not personal data. |
+| Venue coordinates | London (51.507_22, -0.127_5), Paris (48.853_0, 2.349_2), Worthy Farm / Glastonbury (51.150_3, -2.586_2). Public knowledge, not personal data. |
+| UK postcodes | `CF10 1AA`, `SW1A 2AA`, `BA4 4BY`, etc. |
+| External event IDs | `EventId::new(EventIdScheme::Eventbrite, "…")`, `EventIdScheme::Wikidata` with an invented `Qnnnnn`-style QID when the value need not be meaningful — the crate does not depend on any ID resolving to a real record. |
+| Organiser / performer names | Synthetic (`"Rust Foundation"`, invented performer names) — never a real living person unless the fact is already public and non-sensitive (e.g. a well-known public figure used purely as a string, as spec worked examples occasionally do). |
+| UK / US phone or email fixtures (for the `Normalizer` utilities directly — `Event` has no phone/email field) | Drama-reserved `07700 900xxx` UK ranges, fictitious `(415) 555-…` US ranges, RFC 2606 reserved `example.org` / `example.com` / `example.net` emails. |
 
 ## Test independence
 
@@ -56,8 +55,8 @@ Synthetic data only. Reuse the existing illustrative fixtures rather than invent
 ## What belongs in unit vs integration
 
 - **Unit tests** validate a *function*: `normalize_phone("+44 7700 900123")` returns `"7700900123"`.
-- **Integration tests** validate a *flow*: build two places, run `match_places`, assert on the result and breakdown.
-- **Property tests** validate a *universal property*: "score is in `[0.0, 1.0]` for any well-formed `Place` pair".
+- **Integration tests** validate a *flow*: build two events, run `match_events`, assert on the result and breakdown.
+- **Property tests** validate a *universal property*: "score is in `[0.0, 1.0]` for any well-formed `Event` pair".
 - Do not duplicate. If integration covers a happy path, do not add a redundant unit test that asserts the same thing.
 
 ## Doctest hygiene
@@ -65,23 +64,23 @@ Synthetic data only. Reuse the existing illustrative fixtures rather than invent
 - Keep doctests short; one expected behaviour per block.
 - Use `# use ...;` hidden lines to make examples runnable without cluttering the rendered docs.
 - If a doctest needs `unwrap()`, it is fine — doctests are demonstrations, not production code. Prefer `expect("...")` with a clear message when the unwrap could plausibly fail.
-- Doctests on `MatchingEngine`, `MatchConfig`, `Scorer`, `Normalizer`, `Place`, and `PlaceBuilder` are the primary worked examples downstream users will encounter. Treat them as part of the public API surface — breaking them is a behavioural change.
+- Doctests on `MatchingEngine`, `MatchConfig`, `Scorer`, `Normalizer`, `Event`, and `EventBuilder` are the primary worked examples downstream users will encounter. Treat them as part of the public API surface — breaking them is a behavioural change.
 
 ## Performance tests
 
-- The `criterion` harness at `benches/match_pair.rs` exercises hot paths: single-pair `match_places` (identical / fuzzy / unrelated), `deterministic_match`, `rank_one_to_many` parameterised by `n ∈ {10, 100, 1000}`, and a config-variant sweep.
+- The `criterion` harness at `benches/match_pair.rs` exercises hot paths: single-pair `match_events` (identical / fuzzy / unrelated), `deterministic_match`, `rank_one_to_many` parameterised by `n ∈ {10, 100, 1000}`, and a config-variant sweep.
 - Run with `cargo bench`. Use `--quick` for a smoke check during PR review; HTML reports land in `target/criterion/`.
 - PRs that touch `MatchingEngine`, `Normalizer`, or `Scorer` SHOULD post before / after timings for at least one representative bench.
 
 ## Property tests
 
-- `tests/property_tests.rs` uses `proptest` to pin invariants that example-based tests can miss: normalisation idempotency (`f(f(x)) == f(x)`), score bounds (`s ∈ [0.0, 1.0]`), self-match positivity (`match_places(p, p).score == 1.0` when at least one field scores), symmetry of `match_places` and `deterministic_match`, monotonicity of `Confidence::from_score`, and serde round-trips.
+- `tests/property_tests.rs` uses `proptest` to pin invariants that example-based tests can miss: normalisation idempotency (`f(f(x)) == f(x)`), score bounds (`s ∈ [0.0, 1.0]`), self-match positivity (`match_events(e, e).is_match == true` and `confidence == High` for any validating `Event`), symmetry of both `match_events` and `deterministic_match`, monotonicity of `Confidence::from_score`, ISO 8601 round-trips, and serde round-trips (`Event`, `MatchConfig`).
 - When a property fails, `proptest` shrinks the input and writes a seed to `tests/property_tests.proptest-regressions`. **Commit that file** — it makes the seed a permanent fixed-input regression test for everyone who runs `cargo test`.
 - New invariants belong in `proptest!` blocks if the property is naturally universally quantified (e.g. "for all `p`, …"). One-off corner cases belong in `integration_tests.rs` as ordinary `#[test]` functions.
 
 ## Negative tests
 
-- Always include at least one negative case: a clear non-match, a missing-field place, an out-of-range coordinate (lat > 90, lon > 180, NaN), an empty `PlaceId` value (must yield `None` from `PlaceId::new`), an email without `@`.
+- Always include at least one negative case: a clear non-match, a missing-field event, an out-of-range coordinate (lat > 90, lon > 180, NaN), an empty `EventId` value (must yield `None` from `EventId::new`), a `start_date` that fails to parse as ISO 8601.
 - Negative tests guard against the "accidentally matches everything" failure mode that probabilistic systems are prone to.
 
 ## Pinning a `spec.md` section

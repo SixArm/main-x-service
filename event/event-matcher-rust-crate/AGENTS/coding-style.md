@@ -14,7 +14,7 @@ Read alongside [`../spec.md`](../spec/index.md) §8 (determinism and safety) and
 - Types: `PascalCase` (`MatchingEngine`, `MatchBreakdown`).
 - Functions / methods / locals / fields: `snake_case`.
 - Constants: `SCREAMING_SNAKE_CASE`.
-- Enum variants: `PascalCase` (`Combined`, `OsmNode`).
+- Enum variants: `PascalCase` (`Combined`, `Eventbrite`).
 - Use en-GB spelling in documentation prose (`normalisation`, `behaviour`, `optimised`); use en-US spelling in code identifiers (`normalize_name`, `optimize`), matching the wider Rust crate ecosystem.
 
 ## Rust idioms
@@ -22,22 +22,22 @@ Read alongside [`../spec.md`](../spec/index.md) §8 (determinism and safety) and
 - Prefer `Option` / `Result` over panics. **No `unwrap`** in library code, ever. (Tests, examples, and `main.rs` may use `unwrap` on values that the test pins to a known shape — but prefer `expect("…")` with a message.)
 - Prefer `match` over chains of `if let` when there are 3+ arms.
 - Prefer iterator combinators (`.filter`, `.map`, `.collect`) over manual loops for transformation pipelines.
-- Use `impl Into<String>` on builder setters (we do this already on `PlaceBuilder`).
+- Use `impl Into<String>` on builder setters (we do this already on `EventBuilder`).
 - Use `&str` for read-only string parameters; only take `String` when you need ownership.
 
 ## Error handling
 
 - Library code returns `crate::Result<T>` (alias for `Result<T, MatchingError>`).
 - New error variants go in `src/error.rs`. Update [`../spec.md`](../spec/index.md) §3.9 (error model) in the same change.
-- Parsers and constructors that can reject input return `Option<T>` (e.g. `PlaceId::new`, `Normalizer::normalize_email`, `Normalizer::normalize_phone_e164`); the matcher itself is infallible — invalid coordinates, malformed phones, or absent fields degrade to `None` in the breakdown rather than an error (`spec.md` §5.4).
+- Parsers and constructors that can reject input return `Option<T>` (e.g. `EventId::new`, `Normalizer::normalize_email`, `Normalizer::normalize_phone_e164`, `Normalizer::parse_iso8601_unix_seconds`); the matcher itself is infallible — invalid coordinates, unparseable dates, or absent fields degrade to `None` in the breakdown rather than an error (`spec.md` §5.4).
 
 ## Doc comments
 
 - Every `pub` item MUST have a `///` doc comment (enforced by `#![deny(missing_docs)]`).
 - Module-level docs use `//!` and explain *purpose*, not *implementation*.
-- Doctests on public items MUST compile. Use `# use Event_matcher::…;` hidden imports if needed.
+- Doctests on public items MUST compile. Use `# use event_matcher::…;` hidden imports if needed.
 - Prefer one-sentence summaries followed by a paragraph of detail. Avoid bullet-only doc blocks.
-- Worked examples in doc comments SHOULD reuse the standard fixtures (Eiffel Tower, Big Ben, Snowdon, Wembley, Starbucks branches) for cognitive economy.
+- Worked examples in doc comments SHOULD reuse the standard fixtures (Glastonbury Festival / "Glasto 2024", RustConf, Cafe Centrale Concert) for cognitive economy.
 
 ## Inline comments
 
@@ -63,10 +63,10 @@ See [`testing.md`](./testing.md).
 ## Generics
 
 - Avoid generics unless they earn their keep. The crate is not a framework; small concrete types are easier to reason about and easier to audit.
-- Where generics are warranted (e.g. `PlaceBuilder::name<S: Into<String>>(…)`), keep the bound minimal and document the intent.
+- Where generics are warranted (e.g. `EventBuilder::name<S: Into<String>>(…)`), keep the bound minimal and document the intent.
 
 ## Dependencies
 
 - New runtime dependencies require a justification in the PR description and a note in [`../spec.md`](../spec/index.md) if they expand the trust boundary.
-- Current direct runtime dependencies: `serde`, `serde_json`, `unicode-normalization`, `strsim`, `thiserror`, `soundex`. No `tokio`, `async-std`, or other runtimes.
+- Current direct runtime dependencies: `serde`, `serde_json`, `unicode-normalization`, `strsim`, `thiserror`, `soundex`, `mimalloc`. No `tokio`, `async-std`, or other runtimes.
 - Dev-only dependencies (e.g. `proptest`, `criterion`) are lower-risk but should still be deliberate.
