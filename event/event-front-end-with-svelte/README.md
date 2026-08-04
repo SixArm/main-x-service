@@ -21,7 +21,7 @@ SvelteKit front-end for the **[Event Service](../event-service-with-loco/)** in 
 ## Stack
 
 - **SvelteKit 2** + **Svelte 5** (runes API)
-- **SVAR Svelte DataGrid** (`wx-svelte-grid`, `wx-svelte-core`)
+- **SVAR Svelte DataGrid + Filter** (`@svar-ui/svelte-grid`, `@svar-ui/svelte-filter`; also `@svar-ui/svelte-calendar` for `/calendar`)
 - **Lily Design System Svelte Headless** (consumed via `file:` dependency)
 - **TypeScript** strict mode
 - **Vitest** for unit tests, **Playwright** for e2e
@@ -30,7 +30,7 @@ SvelteKit front-end for the **[Event Service](../event-service-with-loco/)** in 
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Event Service — see [`../event-service-with-loco/README.md`](../event-service-with-loco/README.md). Default: `http://localhost:8080`.
+- A running Event Service and Authentication Service — see [`../event-service-with-loco/README.md`](../event-service-with-loco/README.md). Default for both, per the Configuration table below: `http://localhost:5150`.
 
 ## Quick start
 
@@ -84,8 +84,13 @@ src/
       EventGrid.svelte    - SVAR DataGrid binding
       EventForm.svelte
       MatchResultsList.svelte
+    i18n.svelte.ts          - 13-locale i18n store (Svelte 5 runes)
+    server/
+      config.ts             - EVENT_API_URL / AUTH_API_URL (server-only)
+      session.ts             - __Host-mxi_session cookie helpers
+      auth.ts                - magic-link + session->PASETO exchange (BFF)
   routes/
-    +layout.svelte         - sidebar nav
+    +layout.svelte         - top nav bar + hamburger (no sidebar)
     +page.svelte           - dashboard
     events/
       +page.svelte         - list
@@ -96,10 +101,17 @@ src/
         +page.svelte       - detail
         edit/+page.svelte
         audit/+page.svelte
+    calendar/+page.svelte    - SVAR Calendar, drag-to-reschedule
+    signin/+page.svelte      - BFF magic-link sign-in
+    verify/+page.svelte      - BFF magic-link verification landing
+    api/proxy/[...path]/+server.ts  - BFF reverse proxy (injects PASETO)
 tests/
   unit/
     client.test.ts         - ApiClient envelope + error tests
     events.test.ts        - EventRepository wrapping tests
+    form.test.ts           - createForm + validation rules
+    i18n.test.ts            - 13-locale catalog + fallback
+    layout.test.ts          - nav shell
   e2e/
     events.spec.ts        - smoke tests
 ```
@@ -116,7 +128,7 @@ Lily's `ThemePicker` and `LocalePicker` components are live in `src/routes/+layo
 
 ## SVAR DataGrid
 
-`wx-svelte-grid` is GPL-3.0 in its free tier. **If this front-end ships in a commercial product, evaluate the SVAR Pro/Enterprise license before adopting.** See `spec.md §16 Open questions`.
+`@svar-ui/svelte-grid` is GPL-3.0 in its free tier. **If this front-end ships in a commercial product, evaluate the SVAR Pro/Enterprise license before adopting.** See `spec.md §16 Open questions`.
 
 ## Status
 

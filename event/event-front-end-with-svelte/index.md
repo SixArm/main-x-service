@@ -39,6 +39,9 @@ The SPA mounts at `/`. All operator workflows live under `/events`.
 | `/events/[id]/audit` | Per-record audit log |
 | `/events/match` | Score-bearing match check against a candidate Event |
 | `/events/merge` | Two-ID merge preview + confirm |
+| `/calendar` | SVAR Calendar over the event time-window; drag-to-reschedule |
+| `/signin` | Magic-link sign-in (BFF; plain English only — no i18n yet) |
+| `/verify` | Magic-link verification landing (BFF; plain English only) |
 
 ## Worked flows
 
@@ -60,7 +63,10 @@ The SPA mounts at `/`. All operator workflows live under `/events`.
 1. `/events/match` posts a partial Event body to
    `POST /api/events/match`.
 2. Service returns blocked candidates sorted by descending score
-   (name similarity + window-overlap + identifier short-circuits).
+   (name similarity + independent Gaussian-decay scoring of
+   `start_date`/`end_date` endpoint distance + identifier
+   short-circuits). Window-overlap scoring is **not** implemented —
+   see `event-matcher`'s spec OQ-C, still open.
 3. The page renders quality + per-component breakdown.
 
 ### Merge workflow
@@ -73,9 +79,12 @@ The SPA mounts at `/`. All operator workflows live under `/events`.
 
 ## Environment
 
+Both are **server-side only** (`src/lib/server/config.ts`), never bundled into the browser. The browser talks only to this app's own origin — entity-API calls go through the same-origin `/api/proxy` BFF route, which injects a server-exchanged PASETO.
+
 | Variable | Default | Purpose |
 |---|---|---|
-| `PUBLIC_API_BASE_URL` | `http://localhost:8080` | Event Service base URL |
+| `EVENT_API_URL` | `http://localhost:5150` | Event Service base URL |
+| `AUTH_API_URL` | `http://localhost:5150` | Authentication Service base URL (session→PASETO exchange, magic-link) |
 
 ## Tech stack reminder
 
@@ -84,5 +93,7 @@ The SPA mounts at `/`. All operator workflows live under `/events`.
 - TypeScript strict + `noUncheckedIndexedAccess`.
 - SVAR DataGrid for tabular data; Lily Headless for accessibility primitives; native HTML elsewhere.
 - No global stores for HTTP state — construct an `EventRepository` per page/component.
+- Auth is BFF-style: httpOnly `__Host-mxi_session` cookie only in the browser; the SvelteKit server exchanges it for a short-lived PASETO. CSRF is not yet implemented (spec §13 T-23b).
+- i18n: 13 locales via a dependency-free rune store (`src/lib/i18n.svelte.ts`); `/signin` and `/verify` are not yet translated (spec §13 T-24).
 
 See [`AGENTS.md`](AGENTS.md) for the full ground-rules.

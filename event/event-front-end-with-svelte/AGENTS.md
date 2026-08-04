@@ -39,9 +39,12 @@ Per repo decision (2026-06-02), each `*-front-end-with-svelte` project keeps its
 | Event-specific components | `src/lib/components/` |
 | Routes / pages | `src/routes/` |
 
+## Authentication (BFF)
+
+Sign-in is landed: `/signin` + `/verify` (magic-link, per-app), `src/lib/server/{session,auth,config}.ts`, and the `/api/proxy/[...path]` reverse proxy that injects a server-exchanged PASETO — the browser holds only the httpOnly `__Host-mxi_session` cookie, never a token. See [`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md). **CSRF protection on mutating browser→BFF calls is not yet implemented** (spec §13 T-23, §16 OQ-3) — do not treat the auth story as complete until that lands.
+
 ## What does NOT live here
 
-- Authentication. Out of scope until the service ships auth (Event Service spec §15).
 - FHIR Event UI. Out of scope for MVP.
 - Consent management UI. Out of scope for MVP (Event Service has `/consents` endpoints but no front-end yet).
 - GDPR-export download UI. Out of scope for MVP.

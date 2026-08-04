@@ -4811,6 +4811,127 @@ committing (see plan.md §4).
     `case/case-service-with-loco` (out of this task's boundary) or any
     sibling front-end.
 
+  - *`care-pathway/care-pathway-front-end-with-svelte` done 2026-08-04.*
+    Found a bigger drift than the `.env.example` bug this task expected
+    (though that bug was present too): **`spec/index.md` had not been
+    touched for the 2026-07-19 – 2026-08-01 SVAR rebuild** that added
+    `/insights`, `/board`, `/gantt`, the intervention-`/sequence` Gantt,
+    and the whole pathway-instances layer (Kanban + Gantt + detail-page
+    section) — §2/§5/§6/§9 still described the four-route v0.1–v0.3 app
+    (and named a `/care-pathways` route that no longer exists), and §7
+    flatly claimed "dependency-light (no data grid / design system)"
+    while the app has used SVAR DataGrid/FilterBar/Kanban/Gantt + Lily
+    since 2026-07-19 — a direct, checkable-in-30-seconds contradiction
+    with `AGENTS.md` ground rule 4, which was already accurate.
+    Rewrote §2/§5/§6/§7/§9/§11/§13/§14/§15 against the live routes, API
+    surface, and test suite rather than patching around the gap.
+    (1) **`.env.example`** was the exact TUT-1/TUT-2/organization bug —
+    `PUBLIC_API_BASE_URL`/`VITE_AUTH_FRONTEND_URL` (zero references in
+    `src/`) instead of the real `CARE_PATHWAY_API_URL`/`AUTH_API_URL`
+    `src/lib/server/config.ts` reads (README/AGENTS already had these
+    right) — rewritten. (2) **Stale test inventory**: spec said "46
+    tests across 5 files" and described `auth.test.ts`/`config.test.ts`,
+    both deleted by the BFF migration; live is 48 across
+    `client`/`care-pathways`/`i18n`/`care-pathway-form`/`layout`
+    `.test.ts`. Playwright was documented as "8 tests" covering the old
+    four-route + search/merge/audit/recent-activity flows; live is 6,
+    rewritten 2026-08-01 for registry/detail/insights/board/gantt/sequence
+    — merge and audit-trail lost e2e coverage in that rewrite and now
+    have vitest-only coverage, flagged as a follow-up rather than
+    silently backfilled. (3) **Ran the actual Playwright suite (not just
+    read it) and found it red, independently of case's finding above**:
+    all 6 tests failed with `unhandled in stub`, for the identical root
+    cause — commit `ad95088e` (2026-08-03, "Fix ApiClient dropping the
+    BFF proxy prefix from every request", tasks.md FE-2) changed every
+    real request to route through `/api/proxy/api/...`, but this crate's
+    `tests/e2e/smoke.spec.ts` stub — unlike the five front-ends FE-2
+    touched directly — was never updated to match and still matched on
+    the bare `/api/care-pathways/...` path. Fixed the stub to strip the
+    `/api/proxy` prefix before matching (same fix shape as case's);
+    reran to confirm 6/6 green. Between this and case's finding above,
+    the "read the spec, trust it" pass would have missed a genuinely
+    broken test suite in at least two of the eleven front-ends — worth
+    a spot-check of the remaining ones' `pnpm test:e2e` if not already
+    covered by their own DOC-4 sub-audits. (4) **Live-verified**: `pnpm
+    run check` (0/0), `pnpm test` (48/48), `pnpm test:e2e` (6/6 after
+    the fix), `pnpm build` all green; the 13-locale i18n parity test
+    (`tests/unit/i18n.test.ts`) passed with full key coverage.
+    (5) Also surfaced, not silently resolved: the list page's v0.2
+    search-on-submit box and v0.3 recent-activity toggle were dropped
+    (not carried forward) in the SVAR rebuild —
+    `CarePathwayRepository.search()`/`.recentEvents()` remain
+    unit-tested but unwired to any route; flagged in spec §13 as an
+    open question (restore vs. retire) rather than decided unilaterally.
+    Did not touch the sibling `care-pathway-service-with-loco` (out of
+    scope) or any other front-end (concurrent sibling audits).
+
+  - *`event/event-front-end-with-svelte` done 2026-08-04.* Same
+    family-wide pattern as the sibling audits above: BFF auth
+    (magic-link `/signin` + `/verify`, httpOnly `__Host-mxi_session`,
+    server-side PASETO exchange via `/api/proxy/[...path]`) and
+    13-locale i18n are both fully implemented but several docs still
+    described auth as future work. `AGENTS.md`'s "What does NOT live
+    here" said "Authentication. Out of scope until the service ships
+    auth" — false; replaced with an accurate summary and an explicit
+    note that **CSRF is the one real gap** (confirmed by grep: zero
+    "csrf" hits anywhere in `src/`). `spec/13-tasks.md` T-23 was a
+    single unchecked box for "BFF + httpOnly cookie + CSRF" though
+    only CSRF is actually missing; split into T-23a `[x]` (BFF+cookie,
+    done) and T-23b `[ ]` (CSRF, open) rather than either falsely
+    checking or falsely leaving the done part unchecked; added T-24
+    for the still-plain-English `/signin`/`/verify` copy (per its own
+    in-file comment). `spec/15-roadmap.md` v0.3 and `spec/16-open-
+    questions.md` OQ-3 both still gated/described auth as not-yet-
+    landed; fixed both. `spec/08-architecture.md`'s diagram showed the
+    browser's `ApiClient` calling `event-service-with-loco` directly
+    with no BFF hop at all; replaced it with a diagram showing the
+    SvelteKit-server BFF hop to both the event service and the
+    authentication service. `spec/02-scope.md` §2.2 "Out of scope
+    (MVP)" still listed **Authentication, i18n/locale switching, and
+    the theme switcher** as unbuilt — all three are live; moved them
+    into §2.1 with honest caveats (CSRF still open; `/signin`/`/verify`
+    are plain-English-only). **`.env.example` was the TUT-1/TUT-2
+    bug**, and a worse one than most: it was a raw copy-paste of
+    `person-service`'s template (`PUBLIC_API_BASE_URL=http://
+    localhost:8080`) with zero references anywhere in `src/`, while
+    the real BFF vars `EVENT_API_URL`/`AUTH_API_URL` (read by
+    `src/lib/server/config.ts`, both defaulting to `:5150`, already
+    correctly documented in `README.md`'s own Configuration table)
+    went undocumented in `.env.example` entirely; fixed. `README.md`
+    itself had an internal contradiction — its Prerequisites section
+    cited the old `:8080` default two sections above its own correct
+    `:5150` Configuration table — plus stale `wx-svelte-grid`/
+    `wx-svelte-core` package names (migrated to `@svar-ui/svelte-grid`
+    + `svelte-filter` 2026-07-19 per its own CHANGELOG) and a
+    project-layout tree predating `src/lib/server/`, `/calendar`,
+    `/signin`, `/verify`, and three of the five unit-test files; fixed
+    all four. `index.md`'s route map was missing `/calendar`,
+    `/signin`, `/verify`; its Environment section still named the
+    decommissioned `PUBLIC_API_BASE_URL`; and its match-check
+    worked-flow claimed "window-overlap" scoring — false per the DOC-3
+    event-matcher audit (Gaussian endpoint-decay instead; window-
+    overlap is that crate's OQ-C, still open) — fixed all three. Two
+    smaller cross-reference fixes: `spec/07-non-functional-
+    requirements.md` pointed at "T-7 below" for the SSR-load-functions
+    follow-up (T-7 is "Detail/edit/soft-delete"; the real task is
+    T-13), and `spec/03-stakeholders-and-users.md` had a corrupted
+    table header ("Eventa" — evidently substitution damage from
+    copy-adapting a sibling's "Persona" header) alongside its own
+    stale "deferred until auth lands" line; fixed both.
+    `spec/09-api-consumption.md` was silent on `Accepts-version` even
+    though Event is the family's
+    [API-versioning reference](agents/share/api-versioning.md) and its
+    own BFF proxy sends the header correctly — added a note (the
+    header behaviour itself was already correct in code, confirmed by
+    reading `src/routes/api/proxy/[...path]/+server.ts`). Verified
+    live rather than inferred: `pnpm check` (426 files, 0 errors/0
+    warnings) and `pnpm test` (34/34 passing across 5 files including
+    the 13-locale i18n parity test) both re-run after the doc edits.
+    Did not touch `event/event-service-with-loco` or
+    `event/event-matcher-rust-crate` (sibling crates, out of this
+    task's boundary) or any of the other ten front-ends (concurrent
+    sibling audits).
+
 - [ ] **DOC-5 (M)** Library crates' `spec/`, `AGENTS.md`/`CLAUDE.md`,
   `README.md`/`index.md`: `authentication-verifier-rust-crate`,
   `integrity-mac-rust-crate`, `link/entity-ref-rust-crate`. Smaller

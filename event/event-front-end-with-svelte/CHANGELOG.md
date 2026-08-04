@@ -9,6 +9,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- 2026-08-04 — **DOC-4 doc audit.** `.env.example` was a stale copy of person-service's template (`PUBLIC_API_BASE_URL=http://localhost:8080`) — this app's real BFF server reads `EVENT_API_URL`/`AUTH_API_URL` (both defaulting to `:5150`); fixed to match `src/lib/server/config.ts`. `AGENTS.md`, `spec/02-scope.md`, `spec/13-tasks.md`, `spec/15-roadmap.md`, `spec/16-open-questions.md`, `spec/08-architecture.md`, and `index.md` still described auth/i18n/the calendar route as unimplemented or future work; the BFF (magic-link `/signin` + `/verify`, httpOnly session cookie, server-side PASETO exchange, `/api/proxy` reverse proxy) and 13-locale i18n are both landed — updated docs to match, split T-23 into T-23a (done) / T-23b (CSRF, still open), and added T-24 for the still-English-only `/signin`/`/verify` copy. Fixed `README.md`'s stale `wx-svelte-grid`/`wx-svelte-core` references (migrated to `@svar-ui/svelte-grid`/`svelte-filter` 2026-07-19) and its internally-contradictory `:8080` default (the Configuration table two sections down already said `:5150`). Fixed `index.md`'s route map (missing `/calendar`, `/signin`, `/verify`) and a factual error carried over from the matcher docs — the match-check worked-flow claimed "window-overlap" scoring, which `event-matcher` does not implement (Gaussian endpoint-decay instead; window-overlap is its OQ-C, still open).
+
 ### Added
 
 - 2026-07-19 — SVAR strong fit: new **/calendar** route (nav-linked): Event time windows in the
