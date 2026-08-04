@@ -14,7 +14,8 @@
 //!   overflowed `days_from_civil` — see SEC-M4);
 //! - `score` is always a real number in `[0.0, 1.0]` (never `NaN`);
 //! - matching is **symmetric** for same-kind records;
-//! - the **kind gate** pins any cross-kind pair to a `0.0` non-match;
+//! - there is **no kind gate** — a cross-kind pair is scored by the
+//!   normal probabilistic pipeline, never forced to `0.0`;
 //! - an identical clone of a record matches itself.
 
 use project_portfolio_management_matcher::{MatchingEngine, Plan, PlanKind, normalize, phonetic};

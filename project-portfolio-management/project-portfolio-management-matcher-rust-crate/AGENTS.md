@@ -61,7 +61,7 @@ src/
 ├── plan.rs   domain types (Plan, PlanKind [optional label], Goal, GoalStatus, PlanStatus, IdentifierScheme, PlanIdentifier, PlanRelationship, RelationKind)
 ├── matcher.rs     MatchingEngine + per-component fns + deterministic rules (no kind gate)
 ├── scoring.rs     MatchResult, MatchBreakdown, Confidence, weighted_average
-├── normalize.rs   fold, code, fold_set
+├── normalize.rs   fold, code, url, fold_set, iso_date_to_days
 ├── phonetic.rs    Soundex (name component bonus)
 ├── config.rs      MatchConfig (weights + threshold)
 └── error.rs       error type

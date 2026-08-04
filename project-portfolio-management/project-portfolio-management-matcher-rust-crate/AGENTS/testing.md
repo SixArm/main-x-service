@@ -24,9 +24,33 @@ goals / owner / parent / timeframe corroboration, relationships + tags supportin
 renormalisation, threshold presets, the one-to-many surface, and
 `MatchResult` JSON serialisation. Run `cargo test --test public_api`.
 
+## Property-based tests (SEC-M6)
+
+[`tests/property_tests.rs`](../tests/property_tests.rs) uses `proptest`
+(dev-dependency) to prove invariants over arbitrary, not just
+hand-picked, input: `score_is_finite_and_bounded` (never `NaN`, always
+`[0.0, 1.0]`); `matching_is_symmetric_same_kind`; `different_kinds_are_not_gated`
+(there is no kind gate — a cross-kind pair is still scored normally,
+`kind_gate_blocked` stays `false`); `identical_clone_matches_itself`;
+`pure_helpers_never_panic` and `iso_date_never_overflows` (guards the
+SEC-M4 fix in `normalize::iso_date_to_days`). Run
+`cargo test --test property_tests`.
+
+## Fuzzing (SEC-I2)
+
+[`fuzz/`](../fuzz/) is a standalone `cargo-fuzz` crate (not a workspace
+member — never affects the normal stable build/test/clippy) with two
+coverage-guided libFuzzer targets: `match_plans` (deserialize →
+`MatchingEngine::match_plans`, finite score in `[0,1]`, both argument
+orders) and `normalize` (the pure `normalize` free functions,
+never-panic). Requires nightly + `cargo-fuzz`; see
+[`fuzz/README.md`](../fuzz/README.md). Not run by the stable `cargo
+test` gate below.
+
 ## Gate
 
-`cargo test` (all green), `cargo clippy --all-targets --all-features --
--D warnings` (clean — mirrors CI), `cargo fmt --check` (clean). No
+`cargo test` (all green — unit + `public_api` + `property_tests` +
+doctests), `cargo clippy --all-targets --all-features -- -D warnings`
+(clean — mirrors CI), `cargo fmt --check` (clean). No
 `unwrap`/`expect`/`panic` and no `#[allow(clippy::…)]` in library code
 (clippy-clean without suppressions).

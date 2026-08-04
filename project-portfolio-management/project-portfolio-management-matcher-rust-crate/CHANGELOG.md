@@ -73,9 +73,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   - `matching_is_symmetric_same_kind` — `match_plans(a, b)` equals
     `match_plans(b, a)` in score, `is_match`, and confidence for
     same-kind records.
-  - `kind_gate_blocks_all_cross_kind_pairs` — the **kind gate**: any pair of
-    different `kind` always scores `0.0`, never matches, and sets
-    `kind_gate_blocked` with every component `None`.
+  - `kind_gate_blocks_all_cross_kind_pairs` — at the time this property
+    landed, the **kind gate**: any pair of different `kind` always
+    scored `0.0`, never matched, and set `kind_gate_blocked` with every
+    component `None`. **Superseded 2026-07-20** (see the `Changed`
+    entry above): the kind gate was removed, and this property was
+    rewritten as `different_kinds_are_not_gated` — the opposite
+    assertion — in `tests/property_tests.rs`.
   - `identical_clone_matches_itself` — reflexivity: a clone of any
     well-formed record clears the threshold (`is_match`).
   - `pure_helpers_never_panic` / `iso_date_never_overflows` — `fold`,

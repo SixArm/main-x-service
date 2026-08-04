@@ -24,9 +24,9 @@
 //!   the score to `1.0`.
 //! - **Probabilistic** — a weighted fuzzy score over name (Jaro-Winkler +
 //!   Soundex), goal titles (Jaccard), owner-scoped code, owner org,
-//!   parent portfolio, timeframe (Gaussian date proximity), keywords,
-//!   relationships (typed-set Jaccard), and tags; renormalised over the
-//!   components both records carry.
+//!   parent plan (`parent_ref`), timeframe (Gaussian date proximity),
+//!   keywords, relationships (typed-set Jaccard), and tags; renormalised
+//!   over the components both records carry.
 //!
 //! ## Usage
 //!

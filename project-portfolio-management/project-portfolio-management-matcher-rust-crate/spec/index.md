@@ -352,9 +352,13 @@ strip diacritics. Do not add IO, async, or panics to library code.
 ## 23. Tasks (live work queue)
 
 > **Status: implemented (v0.1.0).** The crate is built, `cargo test`
-> green (55 unit + 10 integration + 7 doctests), `clippy --all-targets
-> --all-features -- -D warnings` clean, `cargo fmt` clean, zero
-> `#[allow]`. The boxes below are checked accordingly.
+> green (57 unit + 10 integration (`tests/public_api.rs`) + 6 property
+> (`tests/property_tests.rs`, SEC-M6) + 7 doctests), `clippy
+> --all-targets --all-features -- -D warnings` clean, `cargo fmt`
+> clean, zero `#[allow]`. A standalone `cargo-fuzz` harness (`fuzz/`,
+> SEC-I2, two targets) runs separately on nightly — not part of the
+> stable `cargo test` count above. The boxes below are checked
+> accordingly.
 
 - [x] **2026-07-22 — Extend `PlanKind` with `Practice`, `Process`,
   `Purpose`, `Pathway`, `Proposal`.** Additive variants on the closed
@@ -393,6 +397,17 @@ strip diacritics. Do not add IO, async, or panics to library code.
 - [x] Re-export the public surface from `lib.rs` (§21). *(The
       `project-portfolio-management-service` bridge test lands with the service crate's
       `tests/matching.rs`.)*
+- [x] **SEC-M2** — a bare root `same_as` URL (`"/"`) no longer forces a
+      deterministic match; `R-2` skips it.
+- [x] **SEC-M4** — bound the year in `normalize::iso_date_to_days` to
+      `0..=9999` so a crafted long-year date cannot overflow
+      `days_from_civil`.
+- [x] **SEC-M6** — `tests/property_tests.rs`: `proptest` properties
+      proving never-panic, bounded/finite score, same-kind symmetry,
+      no-kind-gate, and self-match reflexivity over arbitrary input.
+- [x] **SEC-I2** — `fuzz/`: a standalone `cargo-fuzz` crate with
+      `match_plans` and `normalize` libFuzzer targets (nightly-only,
+      not part of the stable `cargo test` gate).
 - [ ] Optional: per-`kind` timeframe `σ`; ordered goal-sequence
       similarity; `lead_ref` corroboration.
 - [ ] Split this single `spec/index.md` into the numbered §-per-file
@@ -401,8 +416,14 @@ strip diacritics. Do not add IO, async, or panics to library code.
 ## 24. Testing strategy
 
 Unit tests embedded per module; an integration suite
-(`tests/public_api.rs`) over the re-exported surface; rustdoc examples
-run as doctests. Gate (mirrors CI): `cargo test`, `cargo clippy
+(`tests/public_api.rs`) over the re-exported surface; a `proptest`
+property suite (`tests/property_tests.rs`, SEC-M6) proving never-panic,
+bounded-score, symmetry, no-kind-gate, and reflexivity invariants over
+arbitrary input; rustdoc examples run as doctests. A standalone,
+nightly-only `cargo-fuzz` harness (`fuzz/`, SEC-I2, two libFuzzer
+targets — see [`AGENTS/testing.md`](../AGENTS/testing.md)) complements
+`proptest` with coverage-guided search; it is not part of the stable
+gate below. Gate (mirrors CI): `cargo test`, `cargo clippy
 --all-targets --all-features -- -D warnings`, `cargo fmt --check`.
 Library code carries **no** `#[allow(clippy::…)]` attributes — it is
 clippy-clean without suppressions (repo-wide invariant). Dedicated

@@ -3952,6 +3952,122 @@ committing (see plan.md §4).
     `organization-service-with-loco` per this task's boundary. All
     touched files stay well under 40 KB.
 
+  - [x] **`project-portfolio-management/project-portfolio-management-matcher-rust-crate`
+    done 2026-08-04 — the 10th and last crate in this batch.** Unlike
+    the case/care-pathway/organization matcher notes above, this crate
+    had **no** tags/relationships spec-vs-code drift — §13.1/§13.2
+    (relationships/tags) already correctly describe them as
+    implemented, matching `src/matcher.rs`/`src/config.rs` exactly
+    (verified byte-accurate: nine weights sum to 1.0, threshold 0.85,
+    strict/lenient 0.95/0.70). This crate's own §23 already flags
+    `spec/index.md` as a single un-split file rather than the sibling
+    matchers' numbered-file layout — a known, honestly-declared
+    deviation, not a fresh finding. What was found and fixed: (1) a
+    **stale rustdoc comment** in `tests/property_tests.rs`'s module
+    doc claiming "the kind gate pins any cross-kind pair to a 0.0
+    non-match" — the exact opposite of current behaviour (the kind
+    gate was removed 2026-07-20; the property itself is named
+    `different_kinds_are_not_gated` and asserts no gate fires), fixed
+    to state the true "no kind gate" invariant. (2) The matching
+    **`CHANGELOG.md` SEC-M6 bullet**, which still described a
+    `kind_gate_blocks_all_cross_kind_pairs` property as if it were the
+    current test — annotated as superseded by the 2026-07-20 kind-gate
+    removal rather than rewriting history. (3) `src/lib.rs`'s crate-doc
+    strategy summary said "parent portfolio" for the timeframe/parent
+    component list — stale `portfolio_ref`-era wording; corrected to
+    "parent plan (`parent_ref`)". (4) **`AGENTS/testing.md` and
+    `spec/index.md` §23/§24 didn't mention the `proptest` suite
+    (`tests/property_tests.rs`, SEC-M6, 6 tests) or the `fuzz/`
+    cargo-fuzz harness (SEC-I2, 2 targets) at all** — both real,
+    shipped, and already in `CHANGELOG.md [Unreleased]` — added a
+    "Property-based tests" / "Fuzzing" section pair to
+    `AGENTS/testing.md` and corresponding §23 task entries + an updated
+    §24/status-line test count in `spec/index.md` (55 unit + 10
+    integration was stale; live count is 57 unit + 10 integration + 6
+    property + 7 doctests). (5) `AGENTS.md`'s file-layout table said
+    `normalize.rs` holds "fold, code, fold_set" — incomplete; it also
+    exports `url` and `iso_date_to_days` (both load-bearing, R-2 and
+    the timeframe component respectively) — added. `CLAUDE.md` was
+    already the documented thin `@AGENTS.md` one-liner (no drift to
+    fix). `README.md`/`index.md` are two real, non-symlinked files
+    (consistent with case/care-pathway/organization-matcher's same
+    choice, not the person-matcher symlink — accepted family drift);
+    their usage snippets and the 9-row weight table are accurate and
+    all 7 doctests pass. Rustdoc spot-check across
+    `lib.rs`/`matcher.rs`/`scoring.rs`/`plan.rs`/`config.rs`/
+    `normalize.rs`/`phonetic.rs`/`error.rs` found no other stale
+    `///`/`//!` comments. Verified live: `cargo test` (57 unit + 10
+    `public_api` + 6 `property_tests` + 7 doctests, all green),
+    `cargo clippy --all-targets --all-features -- -D warnings` clean,
+    `cargo fmt --check` clean, `cargo run` demo output matches its
+    described behaviour. Did not touch
+    `project-portfolio-management-service-with-loco` per this task's
+    boundary. All touched files stay well under 40 KB.
+
+  *(As of this sub-note: person, care-pathway, case, organization, and
+  project-portfolio-management matchers are done under DOC-3; worker,
+  place, thing, event, and course matchers were still in flight
+  concurrently and had not yet landed their own sub-notes above at the
+  time this note was written — re-check before ticking the parent
+  DOC-3 box.)*
+
+  - *`course/course-matcher-rust-crate` done 2026-08-04.* Same
+    tags/relationships spec-ahead-of-code pattern found independently
+    in care-pathway-matcher and case-matcher above, confirmed by grep
+    across every `src/*.rs`: spec §5 (algorithm overview, plus §5.1/
+    §5.2), §6 (domain model, plus §6.1/§6.2), §7 (configuration), and
+    §13a (tags) all described `Course.relationships`/`Course.tags`,
+    `RelationshipRef`/`RelationKind`, `MatchConfig::relationships_weight`/
+    `tags_weight`, and `MatchBreakdown::relationships_score`/`tags_score`
+    in the present tense as already-shipped algorithm components — none
+    exist in `src/course.rs`, `src/config.rs`, `src/scoring.rs`, or
+    `src/matcher.rs`. §23's own task queue already correctly lists both
+    as open (`T-11` relationships, `T-12` tags), and `CHANGELOG.md`
+    `[Unreleased]` says outright the tags addition was "Specced… code
+    follow-up tracked as §23 T-12" — so, as with the two sibling
+    crates, the spec-first discipline was followed but the normative
+    sections gave no in-line signal a reader wouldn't get without also
+    checking §23. Fixed by annotating §5/§5.1/§5.2/§6/§6.1/§6.2/§7/§13a
+    (plus the §13a ToC entry in `spec/index.md`) "planned, §23 T-11/
+    T-12 — not yet implemented," keeping the design content rather than
+    deleting it, and restating the shipped six-component pseudocode/
+    field list/weight table as what `match_courses` actually runs
+    today. Also confirmed the sibling concern this task flags by
+    name — whether spec §15's deterministic-identifier list mistypes
+    "LOM" as "LMS id" (a real bug found elsewhere in the family this
+    session, per `course-service-with-loco`'s own DOC-2 pass) — is
+    **not** present here: `spec/15-identifier-short-circuits.md`
+    correctly lists `Doi`/`Wikidata`/`Lom`/`Oer`/`Uri`/`Uuid`, matching
+    `IdentifierScheme::is_deterministic` in `src/course.rs` exactly (the
+    provider-scoped `LmsCourseId` variant is separately, correctly
+    listed as NOT deterministic). Separately found and fixed a stale
+    test count: `index.md` and `AGENTS/testing.md` both said "76 unit
+    tests," but `cargo test --lib -- --list` reports 78 (confirmed by
+    direct `#[test]` grep across `src/*.rs` too); also added the
+    previously-undocumented `tests/proptests.rs` (6 SEC-M6 property
+    tests) and the `fuzz/` cargo-fuzz harness (two libFuzzer targets,
+    SEC-I2) to `index.md`, `AGENTS/testing.md`, and spec §24 — both
+    shipped per `CHANGELOG.md` `[Unreleased]` with zero prior mention
+    in any doc. Rustdoc spot-check (`lib.rs`, `matcher.rs`, `scoring.rs`,
+    `course.rs`, `config.rs`, `normalize.rs`, `phonetic.rs`, `error.rs`)
+    found no stale `///`/`//!` comments; `IdentifierScheme` (12
+    variants), `EducationalLevel` (12 + `Custom`), and
+    `LearningResourceType` (11 + `Custom`) variant counts in spec §6 all
+    match the code exactly. `CLAUDE.md` is already the documented
+    one-line `@AGENTS.md` include (no DOC-2-style drift to fix).
+    `README.md` is a real symlink to `index.md`; both `index.md` code
+    blocks (deterministic + probabilistic worked examples) use real
+    public-API calls and were hand-verified against `matcher.rs`/
+    `scoring.rs`. `AGENTS/index.md`, `AGENTS/normalization.md`, and
+    `AGENTS/spec-driven-development.md` needed no changes — none
+    mention `tags`/`relationships` and stayed accurate throughout.
+    Verified live: `cargo test --lib` (78 passed), `cargo test --doc`
+    (13 passed), `cargo test --test public_api` (16 passed),
+    `cargo test --test proptests` (6 passed), `cargo fmt --check`
+    clean, `cargo clippy --all-targets -- -D warnings` clean. Did not
+    touch `course/course-service-with-loco` (sibling crate, out of this
+    task's boundary). All edited files re-confirmed well under 40 KB.
+
 - [ ] **DOC-4 (L)** Front-end crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: all 11 SvelteKit front-ends (person, worker,
   place, thing, event, course, organization, care-pathway, case,

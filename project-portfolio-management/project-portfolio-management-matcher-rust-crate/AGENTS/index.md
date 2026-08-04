@@ -5,7 +5,7 @@
 | [spec-driven-development.md](spec-driven-development.md) | SDD discipline — three-part PRs, anti-patterns |
 | [matching-algorithm.md](matching-algorithm.md) | The algorithm — no kind gate, components, weights, deterministic rules |
 | [normalization.md](normalization.md) | String normalisation rules |
-| [testing.md](testing.md) | Test strategy — unit + bridge |
+| [testing.md](testing.md) | Test strategy — unit, integration, property (`proptest`), fuzz |
 
 See also:
 
