@@ -15,10 +15,17 @@ src/
 ├── api/
 │   ├── mod.rs               # ApiResponse, ApiError
 │   └── rest/                # controllers: handlers + courses_routes() + ApiDoc + AppState
+│                             #   + auth.rs (T-15) + version.rs (T-25) + fhir.rs (T-20 controller)
 ├── models/                  # Course, CourseInstance, Provider, identifier, …
-├── db/                      # SeaORM entities + repository trait + audit
+├── db/                      # SeaORM entities + repository trait + audit + outbox (T-21)
 ├── matching/                # service-side adapter onto course_matcher::MatchingEngine
 ├── search/                  # Tantivy index + query
+├── validation/               # FR-21..FR-28 + input-size caps (SEC-M1, T-5)
+├── privacy/                  # mask_course + GDPR Article-15 export (T-10)
+├── streaming/                 # in-memory EventPublisher (T-9) + durable-outbox Envelope (T-21)
+├── fhir/                      # non-standard Basic resource structs + conversions (T-20)
+├── compliance/                 # record/audit-log integrity digests + MAC (§2.1c, T-24)
+├── relay.rs                    # outbox relay + retention + FluvioSink (T-22/T-23)
 ├── config/                  # domain Config (search / matching / streaming knobs)
 └── error.rs
 config/                      # loco environment config (development / test / production YAML)

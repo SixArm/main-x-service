@@ -20,7 +20,15 @@ locations and parties).
 > verification + ABAC blanket enforcement on `/api/*` and `/fhir/*`,
 > **default-off** via `COURSE_REQUIRE_AUTH` (see
 > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)).
-> See [`spec.md §13`](spec/13-tasks.md) for the per-task ledger.
+> Also shipped: the durable transactional-outbox event bus with an
+> opt-in real-broker Fluvio sink (T-21..T-23), a deliberately
+> **non-standard FHIR** surface at `/fhir/Basic` (T-20, since no FHIR
+> R5 resource models a course), header-based `Accepts-version` API
+> negotiation (T-25), and default-off row-level integrity digests +
+> audit-log MAC verification (T-24). Not built: gRPC (not even a
+> stub), OpenTelemetry export, and bulk import/export (T-19, designed
+> not built). See [`spec.md §13`](spec/13-tasks.md) for the per-task
+> ledger.
 
 ## Quick start
 
@@ -69,6 +77,16 @@ cargo loco db migrate
 REST routes mount under `/api/courses/*` and `/api/courses/{id}/instances/*`.
 See [`AGENTS/restful.md`](AGENTS/restful.md) for the full list. All
 endpoints return the standard `{success, data, error}` envelope.
+URLs are version-free; negotiate the response shape with the
+`Accepts-version` header (default `1.0`) per
+[`agents/share/api-versioning.md`](../../agents/share/api-versioning.md).
+
+A separate, deliberately **non-standard FHIR** surface is served at
+`/fhir/Basic{,/{id}}` + `/fhir/metadata` — no FHIR R5 resource models
+an educational course, so a course is wrapped as a FHIR `Basic`
+resource rather than left unimplemented (see
+[`agents/share/fhir.md`](../../agents/share/fhir.md) §3 and
+`AGENTS/restful.md`).
 
 Interactive OpenAPI 3 documentation ships with the binary:
 
@@ -152,20 +170,36 @@ from the environment via `Config::from_env`:
 | `DATABASE_URL`             | Postgres connection string | —                       |
 | `SEARCH_INDEX_PATH`        | Tantivy index directory    | `./data/search_index`   |
 | `MATCHING_THRESHOLD`       | Probabilistic match cutoff | `0.85`                  |
-| `GRPC_PORT` | gRPC server port (Tonic stub) | `50051` |
 | `SEARCH_CACHE_SIZE_MB` | Tantivy cache budget in MB | `512` |
-| `OTLP_SERVICE_NAME` | service.name sent to the collector | `course-service` |
-| `OTLP_ENDPOINT` | OTLP collector endpoint | `http://localhost:4317` |
-| `STREAMING_BROKER_URL` | Event-broker connection URL | `localhost:9003` |
-| `STREAMING_TOPIC` | Topic events publish to | `course-events` |
 | `RUST_LOG`                 | tracing-subscriber filter  | `info`                  |
-| `OTLP_ENDPOINT`            | OpenTelemetry collector    | `http://localhost:4317` |
+
+**Parsed but not read anywhere else** (legacy pre-loco `Config` fields
+that nothing in `src/` consults — the real bind address/port come from
+loco's own `config/<environment>.yaml`, and there is no OpenTelemetry
+exporter or streaming-broker client in this crate): `GRPC_PORT` (no
+gRPC surface exists at all — not even a stub), `OTLP_SERVICE_NAME` /
+`OTLP_ENDPOINT` (no `src/observability/` module), `STREAMING_BROKER_URL`
+/ `STREAMING_TOPIC` (superseded by the real durable-bus config below).
+Flagged rather than silently dropped in case a future pass wires or
+removes them.
+
+The **real** event-bus / auth / compliance environment variables are
+not `Config::from_env` fields — they're read directly where used, and
+are documented at their task entries in
+[`spec/13-tasks.md`](spec/13-tasks.md) and `CHANGELOG.md` rather than
+duplicated here: `COURSE_EVENT_TRANSPORT`, `COURSE_EVENT_RELAY[_INTERVAL_SECS]`,
+`COURSE_EVENT_RETENTION_DAYS`, `COURSE_FLUVIO_ENDPOINT`, `COURSE_EVENT_TOPIC`
+(T-21/T-22/T-23); `COURSE_REQUIRE_AUTH`, `COURSE_PASETO_KEYS[_URL]`,
+`COURSE_PASETO_KEYS_REFRESH_SECS`, `COURSE_ABAC_POLICY[_FILE]` (T-15, AU-2);
+`COURSE_INTEGRITY_MAC_KEY[_FILE|_ID]`, `COURSE_INTEGRITY_MAC_KEYS_RETIRED`
+(T-24).
 
 ## Testing
 
 ```bash
-# 109+ unit tests (matcher facade, search index, validation, db
-# helpers, streaming, privacy, metrics, router + handlers, fhir);
+# 123 unit tests + 2 DB-gated #[ignore] (matcher facade, search index,
+# validation, db helpers, streaming/outbox, privacy, compliance/integrity,
+# config, relay, fhir, metrics, router + handlers + auth + versioning);
 # run for the live count.
 cargo test --lib
 
@@ -213,15 +247,29 @@ bring-up the integration suite expects to be migrated against.
   (T-22) with a real-broker `FluvioSink` behind the `fluvio` cargo
   feature (T-23, off by default).
 - **Privacy**: `mask_course` + GDPR Article-15 export (T-10).
+- **FHIR**: deliberately non-standard `/fhir/Basic` surface (T-20) — no
+  FHIR R5 resource models a course.
+- **Row-level integrity**: `GET /api/records/verify` + `GET
+  /api/audit/verify` (T-24) — SHA-256 + SHA3-256 digests and a keyed
+  HMAC-SHA256 MAC, default off. No hash chain (unlike person / worker /
+  care-pathway / case).
+- **API versioning**: `Accepts-version` header negotiation (T-25),
+  `/api/*` only.
 - **Metrics**: Prometheus `GET /metrics.prom` (T-16) — process-wide
   registry, CRUD/merge counters, reserved labelled
   `http_requests_total`.
-- **Tests**: 109+ unit + 14 bridge + 12 #[ignore]-tagged integration
-  (T-12) + 3 criterion benches (T-13).
+- **Tests**: 123 unit + 2 DB-gated #[ignore] unit + 14 bridge + 12
+  #[ignore]-tagged integration (T-12) + 1 #[ignore] auth-activation +
+  1 feature-gated #[ignore] Fluvio round-trip + 3 criterion benches
+  (T-13).
 - **Auth**: offline PASETO v4.public bearer verification + ABAC blanket
   guard on `/api/*` and `/fhir/*` (T-15), **default-off** via
-  `COURSE_REQUIRE_AUTH`; `GET /api/whoami` echoes verified claims. See
+  `COURSE_REQUIRE_AUTH`, with key rotation + policy hot-reload without
+  a restart (AU-2); `GET /api/whoami` echoes verified claims. See
   [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
+- **gRPC**: not built — no `tonic`/`prost` dependency, not even a stub.
+- **OpenTelemetry export**: not built — structured `tracing` only.
+- **Bulk import / export**: designed (spec §9.2) but not built (T-19).
 
 ## License
 

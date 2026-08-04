@@ -53,7 +53,9 @@ import/export job (`kind`, `format`, `status`, `params`, the
 `rows_total`/`rows_created`/`rows_upserted`/`rows_to_review`/`rows_errored`
 counts, `actor`, artifact URLs, and `expires_at` TTL), with
 `UNIQUE (entity, kind, idempotency_key)` so a retried submit maps to the
-same job. Jobs run on the loco `bg_pg` worker; artifacts (uploaded source,
+same job. Jobs run on the loco `worker` feature (Postgres-backed
+background jobs — renamed from `bg_pg` in the loco 0.16 → 1.0.1
+migration this crate already carries); artifacts (uploaded source,
 export output, error report) live in the config-driven artifact store
 (S3-compatible in deployment, local fs in dev), referenced by short-lived
 access-controlled URLs.

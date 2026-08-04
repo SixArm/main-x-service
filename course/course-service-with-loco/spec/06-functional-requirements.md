@@ -21,7 +21,7 @@
 | FR-17 | Every CRUD operation MUST emit an audit-log entry. |
 | FR-18 | Every CRUD operation MUST emit a Course event (`CourseCreated`, `CourseUpdated`, `CourseDeleted`, `CourseMerged`, `CourseInstanceCreated`, `CourseInstanceUpdated`, `CourseInstanceDeleted`) on the streaming bus. |
 | FR-19 | Search responses MUST normalise to `{ items, total }` (the front-end expects the `items` key). |
-| FR-20 | A deterministic identifier match (DOI, Wikidata, LMS id, OER id, URI, UUID) MUST short-circuit scoring to `1.0` with `confidence = High`. |
+| FR-20 | A deterministic identifier match (DOI, Wikidata, LOM, OER id, URI, UUID — `IdentifierType::is_deterministic`; **not** LMS course-id or a bare course code, both provider-scoped) MUST short-circuit scoring to `1.0` with `confidence = High`. |
 | FR-21 | `name` is required, non-empty after trim. |
 | FR-22 | `course_code`, when present, MUST be 1-100 chars. |
 | FR-23 | `number_of_credits`, when present, MUST be a non-negative integer. |

@@ -33,6 +33,7 @@ tests.
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/health` | Service health check (envelope-wrapped `HealthResponse`) |
+| GET | `/api/whoami` | Echoes the verified bearer's claims (T-15) — public when `COURSE_REQUIRE_AUTH` is off. |
 | GET | `/_health` | loco built-in readiness (DB + queue) — plain, no envelope |
 | GET | `/_ping` | loco built-in liveness — plain, no envelope |
 | GET | `/metrics.prom` | Prometheus metrics (T-16) — mounted at the application **root** (not under `/api`), public, `text/plain; version=0.0.4`. NOT envelope-wrapped. |
@@ -147,6 +148,18 @@ Blocking: by `name` (FuzzyTermQuery, multi-token) AND/OR by
 |---|---|---|
 | GET | `/api/courses/{id}/audit` | Audit log for one course (and its child instances + syllabus) |
 | GET | `/api/audit/recent` | Recent audit activity |
+
+## Compliance / integrity (T-24, default off)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/records/verify?limit=200` | Reassembles each `Course` record and recomputes its stored SHA-256 / SHA3-256 / MAC against the live pre-image; reports `verified` / `mismatch` / `mac_absent` / `unhashed` per row. |
+| GET | `/api/audit/verify?limit=200` | Same, over `audit_log` rows. |
+
+With no `COURSE_INTEGRITY_MAC_KEY` (or `..._KEY_FILE`) set, no MAC is
+written and both endpoints report `mac_absent` rather than a mismatch.
+See [`spec/12-compliance.md`](../spec/12-compliance.md) and
+`src/compliance/`.
 
 ## FHIR (non-standard `Basic` surface)
 

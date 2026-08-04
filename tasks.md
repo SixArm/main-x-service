@@ -3348,6 +3348,127 @@ committing (see plan.md §4).
     quick-start `DATABASE_URL`/port matched `config/development.yaml`
     exactly.
 
+  - *`course/course-service-with-loco` done 2026-08-04.* Confirmed
+    `CLAUDE.md` is already the documented thin `@AGENTS.md` one-liner
+    (this is the crate worker's DOC-2 note flagged as already-converted;
+    confirmed here rather than re-derived) and `README.md` symlinks to
+    `index.md`. Course is the family's only entity with a
+    `CourseInstance` sub-resource and a deliberately **non-standard**
+    FHIR surface (`/fhir/Basic`, per `agents/share/fhir.md` §3, since no
+    FHIR R5 resource models a course) — both were already documented
+    accurately in `spec/13`/`AGENTS/restful.md` — but several other real
+    gaps of the same "shipped feature with zero spec presence" shape
+    surfaced: (1) **`spec/02-scope.md` directly contradicted `spec/13`
+    T-20**: it still listed "FHIR resource mapping (no FHIR resource
+    fits Course cleanly)" under *out of scope*, even though T-20 shipped
+    the non-standard `Basic` wrapper on 2026-07-07 — self-contradicting
+    within the same file, the same bug class DOC-2 exists to catch.
+    Also claimed "gRPC API (stub only)" — false, there is no
+    `tonic`/`prost` dependency at all, not even an unused stub (unlike
+    thing, which at least had the dependency); and claimed "Observability
+    (tracing + OpenTelemetry OTLP)" as delivered — false, `OTLP_*` parse
+    into `Config` but reach no exporter, there is no `src/observability/`
+    module. Rewrote §2.1/§2.2 and added §2.1b/§2.1c pointers. (2) **Two
+    entirely undocumented, shipped, tested features** — the same
+    "zero spec presence" pattern place/thing/organization each found:
+    row-level integrity digests + audit-log MAC (`src/compliance/`,
+    `GET /api/records/verify`, `GET /api/audit/verify`, landed
+    2026-07-28, 11 tests) and header-based API versioning
+    (`src/api/rest/version.rs`, `Accepts-version`, landed 2026-07-08
+    alongside T-20, 5 tests) — both had **zero** `spec/13` task, no
+    `spec/14` row, and the integrity one had no `spec/12` mention either
+    (versioning was already in `AGENTS/restful.md`, just not `spec/`).
+    Added `spec/13` T-24/T-25 plus an `AU-2` task for key-rotation/policy
+    hot-reload (landed 2026-08-01, also missing), `spec/12`, `spec/07`
+    env-var tables (`COURSE_INTEGRITY_MAC_KEY[_FILE|_ID|S_RETIRED]`,
+    `COURSE_PASETO_KEYS_REFRESH_SECS`), `spec/14`, `spec/15`'s stale v0.4
+    entry (still called Fluvio "next" though T-23 shipped it 2026-08-03),
+    `spec/09`'s tier table (no FHIR row, no `/api/whoami` or
+    `/api/records|audit/verify` mention), `AGENTS/restful.md` (missing
+    `/api/whoami` + the two verify endpoints), and `spec/08`'s module
+    tree (missing `streaming/`, `privacy/`, `validation/`, `fhir/`,
+    `compliance/`, `relay.rs` entirely). (3) **A genuine spec bug, not
+    drift**: `spec/06` FR-20 and `spec/04`'s glossary both listed "LMS
+    id" as a deterministic identifier scheme that short-circuits
+    matching to `1.0` — but `IdentifierType::is_deterministic()`
+    explicitly excludes `LmsCourseId` (it has a doctest asserting
+    exactly `!LmsCourseId.is_deterministic()`); the deterministic set is
+    DOI/Wikidata/**LOM**/OER/URI/UUID, and "LOM" (IEEE Learning Object
+    Metadata) appears to have been mistyped as "LMS id" at some point —
+    fixed both. (4) **Stale test counts everywhere**: `AGENTS/testing.md`
+    said "109+", `spec/11`/`spec/14` said 42 — the live count
+    (`cargo test --lib`) is 125 (123 run + 2 DB-gated `#[ignore]`).
+    Rewrote `AGENTS/testing.md`'s per-module table against a live
+    `--list` run (14 modules were entirely missing, `api::rest::auth`
+    alone carrying 25 untabulated tests) and added the two missing
+    `tests/*.rs` files (`enforcement.rs`, `fluvio_relay.rs`) that
+    `duplicate_detection.rs`/`api_integration_test.rs` overshadowed.
+    (5) `spec/10`'s bulk-import design section still said the loco
+    `bg_pg` worker feature; this crate is already on loco 1.0.1, which
+    renamed it to `worker` (per `CHANGELOG.md` 2026-08-02) — fixed the
+    stale name in design prose for code that doesn't exist yet.
+    Everything else checked out: `AGENTS/models.md`'s `Course` +
+    `CourseInstance` field tables verified byte-accurate against
+    `src/models/course.rs`/`course_instance.rs`; `AGENTS/matching.md`'s
+    weights (0.35/0.15/0.15/0.10/0.10/0.15) verified against
+    `course-matcher`'s `MatchConfig::default`; quick-start commands and
+    the docker-compose port mapping (host 8084 → container 8080)
+    verified against `config/development.yaml`.
+
+  - *`care-pathway/care-pathway-service-with-loco` done 2026-08-04.*
+    Confirmed `CLAUDE.md` is still the documented thin `@AGENTS.md`
+    one-liner (no drift), no `AGENTS/` directory (correct for a newer
+    loco-idiomatic crate), and `spec/index.md` §12 already states this
+    crate's most load-bearing claim — it is the family's **reference
+    implementation** of all four control-driving compliance frameworks
+    in `agents/share/compliance-for-healthcare.md` §2 — prominently and
+    accurately; SOUP/SBOM, profile/terminology validation, and the
+    erasure-vs-immutable-chain story were all already correctly
+    reflected. What was **not** reflected: two real, shipped, tested
+    compliance-critical features had **zero spec presence** anywhere —
+    (1) **keyed HMAC integrity MACs + external-witness chain
+    checkpoints** (`src/compliance/mac.rs` + `checkpoint.rs`, landed
+    2026-07-27, embedding the shared `integrity-mac` crate with
+    per-domain HKDF subkeys) closing the one gap the hash chain alone
+    cannot see — deletion of its own tail, which leaves no successor to
+    break and so verifies perfectly, or vacuously if every row is gone.
+    `GET`/`POST /api/compliance/checkpoint{,/verify}` and the
+    `integrity_key`/`integrity_resign` CLI tasks existed in code and in
+    the family-wide `agents/share/runbooks/integrity-activation.md`
+    runbook, but nowhere in this crate's own `spec/§6/§12/§13`,
+    `AGENTS.md`, `README.md`, or `index.md` — added a full §12.1
+    subsection, a §13 task entry, and endpoint rows/tables to all four
+    docs. (2) **AU-2 (key rotation + ABAC policy hot-reload without a
+    restart) and pagination**, both landed 2026-08-01 and documented in
+    `CHANGELOG.md`, but the spec's own §9 still flatly asserted "No
+    refresh loop — periodic re-fetch on key rotation is a future item"
+    and §16 carried it as an *open question*, while `auth.rs` had long
+    since shipped `spawn_key_refresh`/`spawn_policy_watcher` — the
+    exact kind of drift DOC-2 exists to catch, since a reader of the
+    spec alone would conclude a rotated key locks out a running
+    process. Fixed §9, resolved the §16 open question, and added §13
+    task entries for both. `README.md`'s "Status" section had drifted
+    furthest: it listed Tantivy search, the Phase-3 Fluvio sink,
+    privacy, and the key-refresh loop as **"Deferred"** — all four had
+    shipped weeks earlier — while still describing search as `ILIKE`;
+    rewrote the whole section against `CHANGELOG.md` and confirmed the
+    crate is tagged `care-pathway-service-v0.1.0` (2026-08-04), so §15's
+    "still-unreleased" framing was also stale. Same `ILIKE`/cap-50 and
+    missing-pagination staleness fixed in `index.md`'s worked-flow
+    example and `AGENTS.md`'s/`README.md`'s endpoint tables. `AGENTS.md`'s
+    `src/` layout tree was the widest gap of the whole pass — it still
+    matched roughly the 2026-07-04 auth-pivot state and named none of
+    `src/compliance/` (8 files), `src/fhir/` (4 files), or the
+    `insights`/`instances`/`compliance`/`fhir` controllers, the
+    `tasks/`/`workers/`/`bulk/` modules, or `version.rs`; rewrote it
+    against a live `find src -name '*.rs'`. Cross-checked `cargo test
+    --lib -- --list` (246 tests, matching spec's own count claim — no
+    drift there) and the `tests/*.rs` file list, adding the four
+    request-suite files (`instances.rs`, `insights.rs`,
+    `event_outbox.rs`/`outbox_audit.rs`, `enforcement.rs`) §11 didn't
+    name. `compliance/lifecycle.md` (crate-root IEC 62304 evidence) was
+    already accurate on inspection — no fix needed.
+
 - [ ] **DOC-3 (L)** Matcher crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: person, worker, place, thing, event, course,
   organization, care-pathway, case, project-portfolio-management

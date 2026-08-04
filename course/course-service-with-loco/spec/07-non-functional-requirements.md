@@ -15,10 +15,11 @@ Read once at `AppState` construction (`App::after_routes`); restart to change. A
 | `COURSE_REQUIRE_AUTH` | off | Truthy (`1`/`true`/`yes`/`on`, case-insensitive) turns on the blanket `/api/*` + `/fhir/*` bearer-token guard. Anything else (incl. unset) ⇒ off. |
 | `COURSE_PASETO_KEYS_URL` | — | URL of the auth service's `/.well-known/paseto-keys`; fetched once at boot. On success wins over `COURSE_PASETO_KEYS`; fetch failure logs a warning and falls back to the env path. |
 | `COURSE_PASETO_KEYS` | empty (reject-all) | Ed25519 key-set JSON (OKP/Ed25519 form) via env. Used when the URL is unset/blank or its fetch fails. |
+| `COURSE_PASETO_KEYS_REFRESH_SECS` | `3600` | Re-fetch interval for `COURSE_PASETO_KEYS_URL` (AU-2, `spawn_key_refresh`), so a rotated key reaches a running process without a restart. `0` disables the background refresh. A failed fetch keeps the current key set. |
 | `COURSE_TOKEN_ISSUER` | `authentication-service` | Expected `iss` claim. |
 | `COURSE_TOKEN_AUDIENCE` | `main-x-service` | Expected `aud` claim. |
 | `COURSE_ABAC_POLICY` | built-in default | Inline ABAC policy JSON. Unparsable ⇒ warn-log + built-in default policy. |
-| `COURSE_ABAC_POLICY_FILE` | built-in default | Path to an ABAC policy JSON file (used when `COURSE_ABAC_POLICY` is unset). Unreadable/unparsable ⇒ warn-log + built-in default policy. |
+| `COURSE_ABAC_POLICY_FILE` | built-in default | Path to an ABAC policy JSON file (used when `COURSE_ABAC_POLICY` is unset), polled every 15s for changes (AU-2, `spawn_policy_watcher`) so an edit reaches a running process without a restart. Unreadable/unparsable ⇒ warn-log + built-in default policy. |
 
 ### 7.2 Durable event bus configuration (T-21)
 
@@ -34,4 +35,18 @@ Transactional-outbox transport for the durable event bus ([`agents/share/event-b
 | `COURSE_EVENT_TOPIC` | `mxi.course.events` | The Fluvio topic `FluvioSink` publishes to, per `agents/share/event-bus.md` §7's `mxi.<entity>.events` convention. |
 
 Merge emits a `merged` outbox row for the survivor (carrying the duplicate's pid in `merged_from`) plus a `deleted` row for the duplicate, atomically in one transaction. The Phase-3 relay worker (`src/relay.rs`) drains `course_outbox` (`Model::unpublished` / `mark_published`) to an `EventSink` — the default `LoggingSink` is the no-broker dev/CI sink — stamps `published_at`, and purges published rows past the retention window; it is spawned in `App::after_routes` and is a no-op unless `COURSE_EVENT_TRANSPORT=outbox` and `COURSE_EVENT_RELAY` are set. **The real-broker `FluvioSink` (BUS-3) has landed**, behind this crate's own `fluvio` cargo feature (off by default — a default build's dependency tree is unchanged); see §13 T-23. The only remaining Phase-3 follow-up is wiring the `CourseInstance` sub-resource onto the outbox.
+
+### 7.3 Row-level integrity configuration (T-24)
+
+Read by `src/compliance/mac.rs` where used (not cached at boot). **All
+optional; default off** — with no key configured, no MAC is written and
+`GET /api/records/verify` / `GET /api/audit/verify` report rows as
+`mac_absent` rather than as mismatches.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `COURSE_INTEGRITY_MAC_KEY` | unset | The MAC root key (raw bytes, environment-sourced). |
+| `COURSE_INTEGRITY_MAC_KEY_FILE` | unset | Path to a key file; takes precedence over `COURSE_INTEGRITY_MAC_KEY` and never falls back to it (`agents/share/security.md` invariant 1). |
+| `COURSE_INTEGRITY_MAC_KEY_ID` | unset | The active key's id, carried in verification output so a rotation is auditable. |
+| `COURSE_INTEGRITY_MAC_KEYS_RETIRED` | unset | Retired key material, still accepted for verifying rows written under an older key. |
 
