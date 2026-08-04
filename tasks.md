@@ -3743,7 +3743,15 @@ committing (see plan.md §4).
   matchers (10 crates). Same audit shape as DOC-2 — these follow the
   §1–§25 SDD shape (distinct from the service crates' §1–§18), confirm
   each still matches that shape and its own `spec/` isn't describing
-  scoring rules the code has since changed.
+  scoring rules the code has since changed. Also check rustdoc
+  (`///`/`//!`) comments on public scoring functions and types are
+  accurate, not just present (`#![deny(missing_docs)]` already
+  guarantees presence — accuracy is the gap this checks for). Note for
+  `person-matcher`/`worker-matcher` specifically: `Scorer` and
+  `Normalizer::phonetic_code` are now also depended on by
+  `link-graph-service-with-loco/src/suggest/` (LNK-4, this session) —
+  if a doc describes these as used only within their own service's
+  matching pipeline, that's now stale.
 
 - [ ] **DOC-4 (L)** Front-end crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: all 11 SvelteKit front-ends (person, worker,
