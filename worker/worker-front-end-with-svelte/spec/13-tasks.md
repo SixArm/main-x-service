@@ -44,4 +44,64 @@
   (`authentication-sessions.md` §4 — synchroniser token echoed in an
   `X-CSRF-Token` header) is not yet implemented. Every `POST`/`PUT`/
   `DELETE` under `/api/proxy` today relies on `SameSite=Lax` alone.
+- [x] T-25 (repo FE-4): **Duplicate review-queue screen** at `/review` —
+  2026-08-04. The board itself predates this task and was never fully
+  specified. What landed now closes the board's gaps, mirroring the
+  person front-end's own T-25 (the reference implementation for this
+  fan-out): a **status + page-size filter** wired to `?status=` /
+  `?limit=` (`listReviewQueue` gained a `ReviewQueueOptions` argument;
+  "all" is the *absence* of `status`, since the endpoint answers `422
+  INVALID_STATUS` for a token it does not know — confirmed against
+  `worker-service-with-loco/src/api/rest/handlers.rs::get_review_queue`,
+  which is byte-for-byte the same guard as person's — and there is no
+  `offset` so page size is the whole pagination story); a
+  **keyboard-reachable path** — the SVAR Kanban's drag-to-decide is
+  mouse-only, so a native queue table with a per-row `Compare` button
+  was added alongside it, and the panel carries real `Confirm` /
+  `Reject` buttons (drag still works, it is simply no longer the only
+  way); and an **inline side-by-side comparison** loading both workers
+  with two parallel `GET /api/workers/{id}` calls (`Promise.allSettled`,
+  so a soft-deleted side still renders the other) and rendering the
+  matcher's `score_breakdown` as a component / weight / score table —
+  confirmed against `worker-service-with-loco/src/matching/mod.rs`'s
+  `MatchScoreBreakdown` that the seven components and their weights
+  (name 0.30, birth date 0.25, gender 0.10, address 0.10, identifier
+  0.10, tax id 0.10, document 0.05) are identical in name and value to
+  the person service's own in-service matcher — a distinct, simpler
+  struct from the `worker-matcher` reference crate's much larger
+  ~50-component breakdown (national identifiers + document/phone/email/
+  phonetic fields), which is not what powers this queue's stored
+  `score_breakdown`. Chosen as an inline expandable section rather than
+  a modal, matching person: no focus-trap dependency, keeps the board
+  visible as context, cannot strand a keyboard user behind a trap.
+  Scope decisions forced by the service: **confirming does not merge**
+  (the decision endpoint is a pure status change and the service
+  records no link to a merge), so the panel deep-links
+  `/workers/merge?main=…&duplicate=…` — in **either** survivor order,
+  because a review item names an unordered pair — and `/workers/merge`
+  gained a one-line `?main=`/`?duplicate=` seed it did not have before;
+  decision buttons are disabled for a non-`pending` item rather than
+  offering a request guaranteed to answer `422
+  INVALID_REVIEW_TRANSITION`. **Known gap vs. the person reference,
+  verified rather than assumed**: `worker-service-with-loco`'s
+  `review_queue` table and `ReviewQueueItem` carry **no `provenance`
+  column** — person's was added by a dedicated migration
+  (`m20260802_000001_review_queue_provenance.rs`) that was never ported
+  to worker — so this screen cannot surface a provenance badge the
+  service does not send. Backend follow-up, not a front-end omission;
+  the front-end will pick it up the day the column exists (out of scope
+  here — no Rust service crate was touched by this task). New pure
+  module `src/lib/review.ts` (status vocabulary, `canDecide`, the seven
+  weighted `MATCH_COMPONENTS`, `breakdownRows`, `mergeHref`). Tests:
+  `tests/unit/review.test.ts` (15 — weights sum to 1.00, descending
+  order, the null/non-object/unknown-key breakdown paths, the decidable
+  guard, both merge-link orders), four repository tests in
+  `tests/unit/workers.test.ts` (bare call sends no query string, both
+  filters reach the wire, an absent status is omitted rather than sent
+  as `"undefined"`, and the decision body's field is `status`), an
+  i18n-parity extension for 57 new keys across all 13 locales, and two
+  route-stubbed Playwright smoke assertions in `tests/e2e/workers.spec.ts`
+  (the board + queue + comparison panel, and the merge page's
+  query-param seed) — all passing (`pnpm check`: 0/0; `pnpm vitest run`:
+  6 files / 56 tests; `pnpm exec playwright test`: 9/9).
 

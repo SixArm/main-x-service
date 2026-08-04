@@ -12,6 +12,7 @@ import type {
   ReviewDecision,
   ReviewQueueItem,
   ReviewQueueListResponse,
+  ReviewStatus,
   Worker,
 } from "./types.js";
 import { API_BASE_URL } from "$lib/config.js";
@@ -30,6 +31,20 @@ export interface SearchOptions {
   phonetic?: boolean;
   /** Mask sensitive fields (e.g. tax id) in the results. */
   mask_sensitive?: boolean;
+}
+
+/** Parameters for {@link WorkerRepository.listReviewQueue}. */
+export interface ReviewQueueOptions {
+  /**
+   * Restrict to one disposition. Omit for every status — the endpoint
+   * has no "all" token, so "all" is the *absence* of the parameter.
+   */
+  status?: ReviewStatus;
+  /**
+   * Page size. Defaults to 100 server-side and is capped at 500 there.
+   * There is no `offset`, so this is the only pagination control.
+   */
+  limit?: number;
 }
 
 /**
@@ -163,10 +178,22 @@ export class WorkerRepository {
     );
   }
 
-  /** Load the stored review queue (newest first). */
-  listReviewQueue(): Promise<ReviewQueueItem[]> {
+  /**
+   * Load the stored review queue (newest first).
+   *
+   * @param options - Optional `status` filter and page-size `limit`. There
+   *   is no `offset` on this endpoint — `limit` is the whole of the
+   *   pagination story. An unrecognised `status` gets a `422
+   *   INVALID_STATUS` from the service — do not pass a literal `"all"`;
+   *   omit the field instead.
+   */
+  listReviewQueue(
+    options: ReviewQueueOptions = {},
+  ): Promise<ReviewQueueItem[]> {
     return this.http
-      .get<ReviewQueueListResponse>("/api/workers/review-queue")
+      .get<ReviewQueueListResponse>("/api/workers/review-queue", {
+        query: { status: options.status, limit: options.limit },
+      })
       .then((response) => response.items);
   }
 

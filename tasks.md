@@ -1134,6 +1134,29 @@
   itself (person deep-links `/persons/merge?main=…&duplicate=…` in either
   survivor order, since a review item names an unordered pair).
 
+  **Worker done 2026-08-04** (copy-adapted from person's T-25; see
+  `worker-front-end-with-svelte/spec/13-tasks.md` T-25). Same shape:
+  `?status=`/`?limit=` filters confirmed against
+  `worker-service-with-loco/src/api/rest/handlers.rs::get_review_queue`
+  (byte-for-byte the same guard as person's), a keyboard-reachable queue
+  table + `Compare`/`Confirm`/`Reject` buttons alongside the existing
+  drag-to-decide board, an inline comparison panel with two parallel
+  `GET /api/workers/{id}` calls plus `score_breakdown` rendered against
+  the seven components confirmed identical in name/weight to person's
+  (`worker-service-with-loco/src/matching/mod.rs::MatchScoreBreakdown` —
+  distinct from the much larger `worker-matcher` reference crate's own
+  breakdown struct, which does not power this queue), and a
+  `/workers/merge?main=…&duplicate=…` deep link in either order (the
+  merge page had no query-param seeding before this and gained it).
+  **Known gap, verified rather than assumed**: unlike person,
+  `worker-service-with-loco`'s `review_queue` has no `provenance` column
+  (person's was added by a migration never ported to worker), so
+  provenance is **not** surfaced here — a backend gap, not a front-end
+  omission. New `src/lib/review.ts` + `tests/unit/review.test.ts` (15
+  tests); `pnpm check` (0/0), `pnpm vitest run` (6 files/56 tests),
+  `pnpm build`, and `pnpm exec playwright test` (9/9, including two new
+  review/merge-prefill assertions) all green.
+
 > Note: the **test** database side of this is already done — every
 > service crate carries a `compose.test.yaml` driven by
 > `scripts/test-db.sh` (see DEP-0 below). DEP-1 is the *demo/dev* stack:

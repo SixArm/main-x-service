@@ -9,6 +9,64 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — duplicate review-queue screen (2026-08-04, repo FE-4, T-25)
+
+- `/review` gains a **status + page-size filter** wired to `?status=` /
+  `?limit=` (`WorkerRepository.listReviewQueue` gained a
+  `ReviewQueueOptions` argument); "all" is the *absence* of `status`,
+  since the endpoint answers `422 INVALID_STATUS` for a token it does
+  not know — confirmed against
+  `worker-service-with-loco/src/api/rest/handlers.rs::get_review_queue`,
+  which is byte-for-byte the same guard as the person service's, and
+  there is no `offset` so page size is the whole pagination story.
+- A **keyboard-reachable path**: the pre-existing SVAR Kanban board's
+  drag-to-decide interaction is mouse-only, so a native queue table
+  (`data-testid="review-list"`) with a per-row `Compare` button was
+  added alongside it — drag still works, it is simply no longer the
+  only way in.
+- An **inline side-by-side comparison panel**
+  (`data-testid="review-compare"`) fetching both sides of a pair with
+  two parallel `GET /api/workers/{id}` calls (`Promise.allSettled`, so a
+  soft-deleted side still renders the other) and rendering the
+  matcher's `score_breakdown` as a component / weight / score table.
+  The seven components and weights (name 0.30, birth date 0.25, gender
+  0.10, address 0.10, identifier 0.10, tax id 0.10, document 0.05) are
+  identical in name and value to the person service's own in-service
+  matcher (confirmed against `worker-service-with-loco/src/matching/
+  mod.rs::MatchScoreBreakdown`) — a distinct, much simpler struct from
+  the `worker-matcher` reference crate's ~50-component breakdown, which
+  does not power this queue.
+- Real `Confirm` / `Reject` buttons in the panel, disabled for a
+  non-`pending` item (`canDecide`) rather than offering a request
+  guaranteed to answer `422 INVALID_REVIEW_TRANSITION` (first-writer-
+  wins).
+- **Confirming does not merge.** The decision endpoint is a pure status
+  change; the panel deep-links to `/workers/merge?main=…&duplicate=…`
+  in either survivor order (a review item names an unordered pair), and
+  `/workers/merge` gained a one-line `?main=`/`?duplicate=` query-string
+  seed it did not have before (`page.url.searchParams`, matching the
+  person front-end's own merge page).
+- New pure module `src/lib/review.ts`: the four-status vocabulary,
+  `canDecide`, the seven weighted `MATCH_COMPONENTS`, `breakdownRows`
+  (omits an absent component rather than showing it as zero — "not
+  compared" must not read as "compared and did not match"), and
+  `mergeHref`.
+- **Known gap, verified rather than assumed**: unlike the person
+  service, `worker-service-with-loco`'s `review_queue` table carries no
+  `provenance` column, so this screen cannot surface a provenance badge
+  the service does not send. This is a backend gap tracked for the
+  service crate, not a front-end omission — see `spec/13-tasks.md` T-25.
+- Tests: `tests/unit/review.test.ts` (15 new — weight sum, descending
+  order, the null/non-object/unknown-key breakdown paths, the decidable
+  guard, both merge-link orders); four new `WorkerRepository` tests in
+  `tests/unit/workers.test.ts` (bare call sends no query string, both
+  filters reach the wire, an absent status is omitted rather than sent
+  as `"undefined"`, the decision body's field is `status`); an
+  i18n-parity extension for 57 new `review.*` keys across all 13
+  locales; two new Playwright smoke assertions in
+  `tests/e2e/workers.spec.ts` (the board + queue + comparison panel, and
+  the merge page's query-param seed).
+
 ### Added — BFF: cookie sessions + PASETO proxy (2026-06-18)
 
 - Retroactive entry (DOC-4, 2026-08-04): this landed in `f66ff50f`

@@ -4,6 +4,10 @@
   The duplicate is soft-deleted; on success a link to the merged main
   record is shown.
 
+  Both ids may arrive pre-filled as `?main=…&duplicate=…` (the review
+  board deep-links a confirmed pair here); otherwise the operator types
+  them.
+
   $state:
     - mainId / duplicateId / reason — merge inputs.
     - preview — the two fetched records for side-by-side confirmation.
@@ -12,6 +16,7 @@
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import { page } from "$app/state";
     import LabeledField from "$lib/forms/LabeledField.svelte";
     import FieldRow from "$lib/forms/FieldRow.svelte";
     import { WorkerRepository } from "$lib/api/workers.js";
@@ -21,8 +26,12 @@
 
     const repo = WorkerRepository.withFetch();
 
-    let mainId = $state("");
-    let duplicateId = $state("");
+    // Seeded once from `?main=` / `?duplicate=` so the review board can
+    // deep-link a confirmed pair straight into this form. Both stay fully
+    // editable afterwards — a review item names an unordered pair, so which
+    // record survives is the operator's call, not the link's.
+    let mainId = $state(page.url.searchParams.get("main") ?? "");
+    let duplicateId = $state(page.url.searchParams.get("duplicate") ?? "");
     let reason = $state("");
     let preview = $state<{ main: Worker | null; duplicate: Worker | null }>({ main: null, duplicate: null });
     let result = $state<MergeResponse | null>(null);

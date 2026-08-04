@@ -190,4 +190,130 @@ describe("WorkerRepository", () => {
             repo.createLink("p1", { kind: "same_identity", to_ref: "organization:x" }),
         ).rejects.toMatchObject({ status: 422, code: "VALIDATION_ERROR" });
     });
+
+    // Pins: a bare call sends no query string at all, so the endpoint
+    // applies its own defaults (every status, limit 100) — passing
+    // `status=` explicitly would be a 422, since there is no "all" token.
+    it("GETs /api/workers/review-queue with no query when given no options", async () => {
+        let capturedUrl = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                capturedUrl = String(input);
+                return jsonResponse({
+                    success: true,
+                    data: {
+                        items: [
+                            {
+                                id: "r1",
+                                worker_id_a: "aaaaaaaa-0000-4000-8000-000000000001",
+                                worker_id_b: "bbbbbbbb-0000-4000-8000-000000000002",
+                                match_score: 0.91,
+                                match_quality: "probable",
+                                detection_method: "batch_deduplication",
+                                score_breakdown: { name_score: 0.94 },
+                                status: "pending",
+                                reviewed_by: null,
+                                created_at: "2026-08-04T09:00:00Z",
+                                reviewed_at: null,
+                            },
+                        ],
+                        total: 1,
+                    },
+                    error: null,
+                });
+            }),
+        });
+        const repo = new WorkerRepository(client);
+        const items = await repo.listReviewQueue();
+        expect(capturedUrl).toContain("/api/workers/review-queue");
+        expect(new URL(capturedUrl).search).toBe("");
+        // The envelope's `items` array is unwrapped for the caller.
+        expect(items).toHaveLength(1);
+        expect(items[0]?.status).toBe("pending");
+    });
+
+    // Pins: both filters reach the wire under the names the service reads.
+    it("passes status and limit through to the query string", async () => {
+        let capturedUrl = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                capturedUrl = String(input);
+                return jsonResponse({
+                    success: true,
+                    data: { items: [], total: 0 },
+                    error: null,
+                });
+            }),
+        });
+        const repo = new WorkerRepository(client);
+        await repo.listReviewQueue({ status: "pending", limit: 25 });
+        const url = new URL(capturedUrl);
+        expect(url.pathname).toContain("/api/workers/review-queue");
+        expect(url.searchParams.get("status")).toBe("pending");
+        expect(url.searchParams.get("limit")).toBe("25");
+    });
+
+    // Pins: an absent field is omitted rather than sent as the string
+    // "undefined", which the service would reject as an unknown status.
+    it("omits an absent status while still sending limit", async () => {
+        let capturedUrl = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                capturedUrl = String(input);
+                return jsonResponse({
+                    success: true,
+                    data: { items: [], total: 0 },
+                    error: null,
+                });
+            }),
+        });
+        const repo = new WorkerRepository(client);
+        await repo.listReviewQueue({ limit: 500 });
+        const url = new URL(capturedUrl);
+        expect(url.searchParams.has("status")).toBe(false);
+        expect(url.searchParams.get("limit")).toBe("500");
+    });
+
+    // Pins: the decision body's field is `status` (not `decision`), and
+    // `reviewed_by` is never sent — the service takes the reviewer from
+    // the caller's token.
+    it("POSTs {status} to the decision endpoint", async () => {
+        let capturedUrl = "";
+        let capturedMethod = "";
+        let capturedBody = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input, init) => {
+                capturedUrl = String(input);
+                capturedMethod = init?.method ?? "";
+                capturedBody = init?.body as string;
+                return jsonResponse({
+                    success: true,
+                    data: {
+                        id: "r1",
+                        worker_id_a: "aaaaaaaa-0000-4000-8000-000000000001",
+                        worker_id_b: "bbbbbbbb-0000-4000-8000-000000000002",
+                        match_score: 0.91,
+                        match_quality: "probable",
+                        detection_method: "batch_deduplication",
+                        score_breakdown: { name_score: 0.94 },
+                        status: "confirmed",
+                        reviewed_by: null,
+                        created_at: "2026-08-04T09:00:00Z",
+                        reviewed_at: "2026-08-04T09:05:00Z",
+                    },
+                    error: null,
+                });
+            }),
+        });
+        const repo = new WorkerRepository(client);
+        const decided = await repo.decideReview("r1", "confirmed");
+        expect(capturedMethod).toBe("POST");
+        expect(capturedUrl).toContain("/api/workers/review-queue/r1/decision");
+        expect(JSON.parse(capturedBody)).toEqual({ status: "confirmed" });
+        expect(decided.status).toBe("confirmed");
+    });
 });
