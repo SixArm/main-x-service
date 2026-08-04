@@ -32,6 +32,7 @@ use uuid::Uuid;
 
 use person_service::{
     api::{ApiResponse, rest::links::LinkView},
+    db::models::audit_log,
     db::review_queue::{self, NewReviewItem},
     models::{Person, ReviewQueueItem, ReviewStatus},
 };
@@ -367,4 +368,64 @@ async fn ordinary_review_decision_is_unaffected_by_t32() {
         person_links(&app, person_b.id).await.is_empty(),
         "an ordinary within-entity decision must never write an entity_links edge"
     );
+}
+
+/// T-33 (`link-graph-service-with-loco/spec/13-tasks.md` T-33): "the
+/// suggestion job audits every POST it makes" is satisfied by `create_link`'s
+/// **existing**, unconditional best-effort `person_link` audit write — the
+/// same audit path an operator's own link write goes through, not a
+/// second, job-specific audit trail. This is the regression pin proving
+/// that rather than merely asserting it in a doc comment: a
+/// `matcher_suggested` `POST /api/persons/{id}/links` (exactly the shape
+/// link-graph's `HttpSuggestionSink::post_suggestion` sends) leaves a
+/// `CREATE`/`person_link` row naming the same link id, carrying
+/// `provenance = "matcher_suggested"` in its `new_values` snapshot.
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test cross_service_link_review -- --ignored`"]
+async fn matcher_suggested_link_creation_is_audited() {
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+    let app = common::create_test_router().await;
+    let db = common::db().await;
+    let family = common::unique_person_name("XSvcAudit");
+    let person = create_person(&app, &family, "Jane").await;
+    let worker_id = Uuid::new_v4();
+
+    let (status, body) = post_json(
+        &app,
+        &format!("/api/persons/{}/links", person.id),
+        json!({
+            "kind": "same_identity",
+            "to_ref": format!("worker:{worker_id}"),
+            "confidence": 0.93,
+            "provenance": "matcher_suggested",
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "link create response: {body}");
+    let link = serde_json::from_value::<ApiResponse<LinkView>>(body)
+        .unwrap()
+        .data
+        .unwrap();
+    let link_id: Uuid = link.id.parse().expect("link id is a UUID");
+
+    let audit_rows = audit_log::Entity::find()
+        .filter(audit_log::Column::EntityType.eq("person_link"))
+        .filter(audit_log::Column::EntityId.eq(link_id))
+        .all(&db)
+        .await
+        .expect("audit query succeeds");
+    assert_eq!(
+        audit_rows.len(),
+        1,
+        "expected exactly one person_link audit row for this link id"
+    );
+    let row = &audit_rows[0];
+    assert_eq!(row.action, "CREATE");
+    let new_values = row
+        .new_values
+        .as_ref()
+        .expect("CREATE audit rows carry new_values");
+    assert_eq!(new_values["provenance"], "matcher_suggested");
+    assert_eq!(new_values["to_ref"], format!("worker:{worker_id}"));
 }

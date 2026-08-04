@@ -7,3 +7,4 @@ pub mod consumer_offsets;
 pub mod edges;
 pub mod entity_presence;
 pub mod processed_events;
+pub mod suggestion_runs;

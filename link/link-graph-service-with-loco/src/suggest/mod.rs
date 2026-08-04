@@ -136,6 +136,33 @@
 //! `matcher_suggested` `same_identity` edges — lives in the sibling
 //! [`job`] module, split out once this file's T-29/T-30 content was
 //! already over a thousand lines on its own.
+//!
+//! ## Scale control 1 — `LINK_GRAPH_SUGGEST_MAX_CANDIDATES` (T-33, OQ-9(d))
+//!
+//! [`generate_candidates`] bounds *which pairs* get compared (blocking);
+//! it does not bound *how many* comparisons run within one block. A
+//! single pathological block (a common surname + a common birth year,
+//! say) could still hold thousands of same-block records on one side,
+//! making that one block's `Σ|block|²` term large even though the
+//! overall bound stays sub-quadratic. [`generate_candidates_bounded`]
+//! adds the second cap: for each **anchor** record on the person side,
+//! at most [`DEFAULT_MAX_CANDIDATES`] (configurable — `job`'s
+//! `LINK_GRAPH_SUGGEST_MAX_CANDIDATES`, default `50`) worker records from
+//! the same block are ever compared against it. This mirrors
+//! `person-service-with-loco`'s own
+//! `BatchDeduplicationRequest::max_candidates` **exactly**: that handler
+//! takes `persons[i + 1..].iter().take(req.max_candidates)` — a fixed
+//! number of candidates off the front of an order-preserving slice, per
+//! anchor, not a globally-shared budget and not a score-sorted top-N.
+//! [`generate_candidates_bounded`] does the same thing here:
+//! `worker_indexes.iter().take(max_candidates)`, where `worker_indexes`
+//! is populated in the input `workers` slice's original order — so which
+//! comparisons get dropped when a block exceeds the cap is deterministic
+//! (always the block's *last* entries by input order), not
+//! HashMap-iteration-order-dependent or random. [`generate_candidates`]
+//! itself is unchanged (still the T-29/T-30 default-capped entry point);
+//! `job`'s [`super::job::run_suggestion_pass`] calls
+//! [`generate_candidates_bounded`] directly with the configured value.
 
 use person_matcher::{Gender, Normalizer, Scorer};
 
@@ -525,19 +552,21 @@ pub struct IdentityCandidate {
     pub score: IdentityMatchScore,
 }
 
+/// Default for `LINK_GRAPH_SUGGEST_MAX_CANDIDATES` (T-33, OQ-9(d)):
+/// mirrors `BatchDeduplicationRequest::max_candidates`'s default
+/// (`person-service-with-loco/src/models/review_queue.rs`), reused
+/// rather than inventing a new number — same posture as
+/// [`SUGGESTION_THRESHOLD`].
+pub const DEFAULT_MAX_CANDIDATES: usize = 50;
+
 /// Generate scored `same_identity` candidates between `persons` and
 /// `workers`, using blocking to bound the comparisons performed
-/// (OQ-9(a); see the module doc's "Candidate blocking" section).
-///
-/// Only pairs sharing at least one [`block_keys`] entry are ever passed
-/// to [`compare_identity`] — a pair in different blocks is never
-/// compared, which is what keeps this sub-quadratic (`O(n + m +
-/// Σ|block|²)`) rather than the full `O(n·m)` cross product. A pair
-/// reachable through more than one shared block (e.g. two shared
-/// identifiers) is compared and, if it qualifies, returned at most
-/// once. Only pairs scoring at or above [`SUGGESTION_THRESHOLD`] are
-/// returned; everything below is discarded — never returned, never
-/// logged as a near-miss.
+/// (OQ-9(a); see the module doc's "Candidate blocking" section), with
+/// [`DEFAULT_MAX_CANDIDATES`] same-block comparisons per anchor
+/// (OQ-9(d); see the module doc's "Scale control 1" section). A thin
+/// wrapper over [`generate_candidates_bounded`] — `job`'s
+/// `run_suggestion_pass` calls that function directly with the
+/// `LINK_GRAPH_SUGGEST_MAX_CANDIDATES`-configured value instead.
 ///
 /// Pure and deterministic, like [`compare_identity`]: no database, no
 /// HTTP, no clock. Fetching the person/worker feeds this function is
@@ -546,6 +575,42 @@ pub struct IdentityCandidate {
 pub fn generate_candidates(
     persons: &[(EntityRef, IdentityProbe)],
     workers: &[(EntityRef, IdentityProbe)],
+) -> Vec<IdentityCandidate> {
+    generate_candidates_bounded(persons, workers, DEFAULT_MAX_CANDIDATES)
+}
+
+/// [`generate_candidates`], but with the per-anchor same-block comparison
+/// cap (`max_candidates`) as an explicit parameter rather than the
+/// [`DEFAULT_MAX_CANDIDATES`] constant — see the module doc's "Scale
+/// control 1" section for the design and why it mirrors
+/// `BatchDeduplicationRequest::max_candidates` exactly.
+///
+/// Only pairs sharing at least one [`block_keys`] entry are ever passed
+/// to [`compare_identity`] — a pair in different blocks is never
+/// compared, which is what keeps this sub-quadratic (`O(n + m +
+/// Σ|block|²)`) rather than the full `O(n·m)` cross product. Within a
+/// block, each person **anchor** is compared against at most
+/// `max_candidates` workers from that same block — the first
+/// `max_candidates` by the `workers` slice's own input order, not a
+/// score-sorted top-N (scoring happens *after* this cap is applied, so
+/// there is nothing to sort by yet — exactly
+/// `BatchDeduplicationRequest`'s own `.take()`-before-scoring shape). A
+/// pair reachable through more than one shared block (e.g. two shared
+/// identifiers) is compared and, if it qualifies, returned at most once.
+/// Only pairs scoring at or above [`SUGGESTION_THRESHOLD`] are returned;
+/// everything below is discarded — never returned, never logged as a
+/// near-miss.
+///
+/// `max_candidates == 0` compares nothing and returns an empty list
+/// (rather than panicking or looping forever) — `Iterator::take(0)`
+/// already yields nothing, so this needs no special-casing.
+///
+/// Pure and deterministic: no database, no HTTP, no clock.
+#[must_use]
+pub fn generate_candidates_bounded(
+    persons: &[(EntityRef, IdentityProbe)],
+    workers: &[(EntityRef, IdentityProbe)],
+    max_candidates: usize,
 ) -> Vec<IdentityCandidate> {
     let mut person_blocks: HashMap<BlockKey, Vec<usize>> = HashMap::new();
     for (index, (_, probe)) in persons.iter().enumerate() {
@@ -569,7 +634,15 @@ pub fn generate_candidates(
             continue;
         };
         for &pi in person_indexes {
-            for &wi in worker_indexes {
+            // OQ-9(d) / T-33: bound same-block comparisons per anchor
+            // (this person index) — see the module doc's "Scale control
+            // 1" section. `worker_indexes` is in the `workers` slice's
+            // own input order (populated via `enumerate` above), so
+            // `.take(max_candidates)` is a deterministic prefix, never a
+            // random subset and never dependent on `HashMap` iteration
+            // order (which only decides which *block* is processed
+            // first, not which entries within it survive the cap).
+            for &wi in worker_indexes.iter().take(max_candidates) {
                 if !seen_pairs.insert((pi, wi)) {
                     // Already compared under an earlier shared block key.
                     continue;
@@ -1096,6 +1169,108 @@ mod tests {
                 &[(entity_ref(EntityType::Worker, 53), IdentityProbe::default())],
             )
             .is_empty()
+        );
+    }
+
+    // ---------- T-33: LINK_GRAPH_SUGGEST_MAX_CANDIDATES ----------
+
+    /// The load-bearing truncation proof: a block with more workers than
+    /// `max_candidates` is truncated to exactly the cap, and the survivors
+    /// are always the *same* deterministic prefix (the first
+    /// `max_candidates` workers by input order) — not a random subset,
+    /// and stable across repeated runs on the same input.
+    #[test]
+    fn max_candidates_caps_same_block_comparisons_per_anchor_deterministically() {
+        let person_probe = IdentityProbe {
+            identifiers: vec![identifier("nhs", "1112223333")],
+            ..IdentityProbe::default()
+        };
+        let person_ref = entity_ref(EntityType::Person, 100);
+
+        // Ten workers, all sharing the person's identifier, so all ten
+        // would qualify (at the identifier ceiling) if nothing capped
+        // them — the cap, not the threshold, is what is under test.
+        let workers: Vec<(EntityRef, IdentityProbe)> = (0..10u128)
+            .map(|i| {
+                (
+                    entity_ref(EntityType::Worker, 200 + i),
+                    IdentityProbe {
+                        identifiers: vec![identifier("nhs", "1112223333")],
+                        ..IdentityProbe::default()
+                    },
+                )
+            })
+            .collect();
+
+        let capped =
+            generate_candidates_bounded(&[(person_ref, person_probe.clone())], &workers, 3);
+        assert_eq!(capped.len(), 3, "the block held 10; the cap is 3");
+        let expected: Vec<EntityRef> = workers[..3].iter().map(|(r, _)| *r).collect();
+        let actual: Vec<EntityRef> = capped.iter().map(|c| c.worker).collect();
+        assert_eq!(
+            actual, expected,
+            "must be exactly the first 3 workers by input order, not a random subset"
+        );
+
+        // Re-running on the identical input produces the identical
+        // result — deterministic, not `HashMap`-iteration-order-flaky.
+        let capped_again = generate_candidates_bounded(&[(person_ref, person_probe)], &workers, 3);
+        let actual_again: Vec<EntityRef> = capped_again.iter().map(|c| c.worker).collect();
+        assert_eq!(actual_again, expected);
+    }
+
+    /// A block smaller than the cap is entirely unaffected — the cap only
+    /// ever removes candidates, never adds the illusion of more.
+    #[test]
+    fn max_candidates_does_not_truncate_a_block_under_the_cap() {
+        let person_probe = IdentityProbe {
+            identifiers: vec![identifier("nhs", "9998887777")],
+            ..IdentityProbe::default()
+        };
+        let workers: Vec<(EntityRef, IdentityProbe)> = (0..3u128)
+            .map(|i| {
+                (
+                    entity_ref(EntityType::Worker, 300 + i),
+                    IdentityProbe {
+                        identifiers: vec![identifier("nhs", "9998887777")],
+                        ..IdentityProbe::default()
+                    },
+                )
+            })
+            .collect();
+
+        let candidates = generate_candidates_bounded(
+            &[(entity_ref(EntityType::Person, 60), person_probe)],
+            &workers,
+            50,
+        );
+        assert_eq!(
+            candidates.len(),
+            3,
+            "a 3-worker block under a 50 cap is untouched"
+        );
+    }
+
+    /// `generate_candidates` (the T-29/T-30 default entry point) is
+    /// exactly `generate_candidates_bounded` at [`DEFAULT_MAX_CANDIDATES`]
+    /// — every pre-T-33 test above this one keeps passing unchanged
+    /// because none of their fixtures approach 50 same-block records.
+    #[test]
+    fn generate_candidates_defaults_to_the_default_max_candidates_cap() {
+        let person_probe = IdentityProbe {
+            identifiers: vec![identifier("nhs", "5551234567")],
+            ..IdentityProbe::default()
+        };
+        let worker_probe = IdentityProbe {
+            identifiers: vec![identifier("nhs", "5551234567")],
+            ..IdentityProbe::default()
+        };
+        let persons = [(entity_ref(EntityType::Person, 70), person_probe)];
+        let workers = [(entity_ref(EntityType::Worker, 71), worker_probe)];
+
+        assert_eq!(
+            generate_candidates(&persons, &workers),
+            generate_candidates_bounded(&persons, &workers, DEFAULT_MAX_CANDIDATES)
         );
     }
 }

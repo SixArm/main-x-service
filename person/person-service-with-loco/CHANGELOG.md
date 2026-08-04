@@ -7,6 +7,29 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — T-33 regression pin: `matcher_suggested` link creation is audited (link-graph T-33, OQ-9(d))
+
+link-graph's T-33 (governance + scale controls + audit for the
+cross-service suggestion job, closing LNK-4) needed to confirm "the
+suggestion job audits every POST it makes" rather than merely assert
+it. Investigation found `create_link` already writes an unconditional
+best-effort `person_link` audit row for every link creation regardless
+of `provenance` — no code change was needed on this side, only a test
+proving it.
+
+- **`tests/cross_service_link_review.rs`** — new
+  `matcher_suggested_link_creation_is_audited`: `POST`s a
+  `matcher_suggested` `same_identity` link and confirms exactly one
+  `CREATE`/`person_link` `audit_log` row exists naming the created
+  link's id, with `provenance = "matcher_suggested"` and the correct
+  `to_ref` in its `new_values` snapshot.
+
+Verified against a real Postgres 18: full DB-gated suite green (21
+`--lib` + 25 `api_integration_test` + 5 `cross_service_link_review`,
+this new test included). `cargo test --lib`: 315 passed (unchanged — no
+new `src/` unit tests, only this one integration test). `cargo fmt
+--check` / `cargo clippy --all-targets -- -D warnings` clean.
+
 ### Added — cross-service review-queue bridge + promotion/rejection (link-graph T-32, OQ-9(b))
 
 Closes a gap T-31 (link-graph's periodic suggestion job) left open: that

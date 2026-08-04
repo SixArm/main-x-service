@@ -841,7 +841,15 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     DB tests + 25 `api_integration_test` + the 4 new
     `cross_service_link_review` tests, all passing; the pre-existing
     suites unaffected).
-  - **Out of scope (T-33, link-graph):** audit logging of every
-    suggestion-job POST, `LINK_GRAPH_SUGGEST_MAX_CANDIDATES` /
-    `_MAX_EDGES_PER_RUN` scale controls, and the
-    never-auto-promoted-regardless-of-score governance test.
+  - **Follow-up landed (T-33, link-graph, 2026-08-04):** "the
+    suggestion job audits every POST it makes" turned out to already be
+    true of `create_link`'s existing unconditional `person_link` audit
+    write (no `provenance` special-case) — investigated rather than
+    assumed, and pinned by a new
+    `tests/cross_service_link_review.rs::matcher_suggested_link_creation_is_audited`
+    DB-gated regression test rather than left as an unverified claim.
+    No `src/` change was needed. `LINK_GRAPH_SUGGEST_MAX_CANDIDATES` /
+    `_MAX_EDGES_PER_RUN` scale controls, the durable `suggestion_runs`
+    audit table, and the never-auto-promoted-regardless-of-score
+    governance test all live entirely on the link-graph side — see that
+    crate's own `spec/13-tasks.md` T-33 entry.

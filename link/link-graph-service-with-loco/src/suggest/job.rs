@@ -75,25 +75,96 @@
 //! for the full investigation and root cause. This job now pages that
 //! endpoint directly; the Tantivy search index is not consulted at all.
 //!
-//! ## Scale controls deferred to T-33
+//! ## Scale controls (T-33, OQ-9(d))
 //!
-//! `LINK_GRAPH_SUGGEST_MAX_CANDIDATES` / `LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN`
-//! (OQ-9(d)) are **not** implemented here — T-33's job, alongside the
-//! audit-every-POST trail and the non-auto-promotion governance test. This
-//! job does apply one defensive, non-configurable cap of its own
-//! ([`MAX_FETCH_OFFSET`]) on the fetch pagination loop regardless — both
-//! person's and worker's list endpoints now bound `offset` themselves
-//! (`MAX_SEARCH_OFFSET` / `MAX_LIST_OFFSET`, both `10_000`), but this job
-//! does not rely on a peer enforcing that; it stops itself either way.
+//! Two configured caps, on top of this job's own non-configurable
+//! [`MAX_FETCH_OFFSET`] (both person's and worker's list endpoints now
+//! bound `offset` themselves — `MAX_SEARCH_OFFSET` / `MAX_LIST_OFFSET`,
+//! both `10_000` — but this job does not rely on a peer enforcing that;
+//! it stops itself either way):
+//!
+//! - **`LINK_GRAPH_SUGGEST_MAX_CANDIDATES`** (default `50`, same shape as
+//!   `BatchDeduplicationRequest::max_candidates`) — read by
+//!   [`max_candidates_from_env`], passed straight through to
+//!   [`super::generate_candidates_bounded`] (see that module's "Scale
+//!   control 1" doc section for the design). Bounds same-block
+//!   comparisons per person anchor, so one pathological block cannot make
+//!   a single pass do unbounded work.
+//! - **`LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN`** (default `200`) — read by
+//!   [`max_edges_per_run_from_env`]. When [`super::generate_candidates_bounded`]
+//!   returns more candidates than this, [`run_suggestion_pass`] `POST`s
+//!   only the **highest-confidence** `max_edges_per_run` of them (sorted
+//!   descending on [`super::IdentityMatchScore::confidence`], ties broken
+//!   on the `(person, worker)` id pair for full determinism) — an
+//!   identifier-ceiling match is stronger evidence than a borderline
+//!   probabilistic one, so if a run must be cut short the strongest
+//!   suggestions survive it. The rest are simply not `POSTed` this pass;
+//!   nothing is lost, because the next pass re-fetches and re-scores the
+//!   same data (the fetch is idempotent) and will find them again. The
+//!   number dropped is both logged (`tracing::warn!`, so an operator
+//!   watching logs sees the cap binding) and included in
+//!   [`SuggestionRunStats::dropped`], which is durably recorded per pass
+//!   (see "Durable per-run audit" below) — a live gauge or a log line
+//!   alone would not survive past the next scrape/restart, and an
+//!   operator asking "was the cap binding last week" needs an answer
+//!   that does.
+//!
+//! ## Audit — every POST, and every run's counts (T-33)
+//!
+//! **Every POST.** This job's only write is the `POST
+//! {person}/{id}/links` [`HttpSuggestionSink::post_suggestion`] makes,
+//! and that request lands on person's own `create_link` handler
+//! (`person-service-with-loco/src/api/rest/links.rs`) — the exact same
+//! handler an operator's own link write goes through. `create_link`
+//! **unconditionally** writes a best-effort `person_link` audit row
+//! (`state.audit_log.log_create("person_link", link.id, new_values,
+//! &audit_ctx(&caller))`) for every successful link creation, regardless
+//! of `provenance` — a `matcher_suggested` suggestion from this job is
+//! not special-cased out of that write. So "the suggestion job audits
+//! every POST it makes" is already true of the *existing* T-31/T-32
+//! infrastructure on person's side; this job needs no audit trail of its
+//! own for the POST itself (that would be a second, redundant audit of
+//! the same event from the wrong side of the wire — this job is not the
+//! service of record for the edge it just asked person to create). See
+//! `person-service-with-loco/tests/cross_service_link_review.rs`'s
+//! `matcher_suggested_link_creation_is_audited` test (T-33) for the
+//! regression pin proving this rather than merely asserting it in a
+//! comment.
+//!
+//! **Every run's counts.** [`crate::reconcile`]'s periodic pass — the
+//! closest sibling to this job — records its one summary number
+//! (`link_graph_reconciliation_divergence`) only as a live Prometheus
+//! gauge plus a `tracing::info!` line; that is sufficient there because
+//! "did the last pass find drift" is answered by the gauge's *current*
+//! value. This job's summary is richer (fetch counts on two services,
+//! a candidate count, a post/fail/drop split) and OQ-9(d) specifically
+//! asks for it to be *auditable after the fact*, which a gauge cannot
+//! give — a gauge holds only the latest value and is lost across a
+//! process restart or a missed scrape. So [`run_periodic`] does both:
+//! it mirrors reconcile's gauge-plus-log pattern (the
+//! `link_graph_suggestion_last_run` gauge vec,
+//! [`crate::metrics::Metrics`]) for live/alertable visibility, **and**
+//! durably records one [`crate::models::suggestion_runs`] row per
+//! completed pass (a new small table — reconcile has no equivalent
+//! because its own state, the read-model itself, already **is** durable
+//! and queryable; this job writes nothing durable of its own to double
+//! as that record). A pass that fails at the fetch step (the only error
+//! [`run_suggestion_pass`] can return) records nothing, matching
+//! `run_periodic`'s existing log-and-retry posture for that case.
 
 use async_trait::async_trait;
-use chrono::NaiveDate;
+use chrono::{NaiveDate, Utc};
 use entity_ref::{EntityRef, EntityType};
 use loco_rs::prelude::*;
+use sea_orm::DatabaseConnection;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use super::{IdentityCandidate, IdentityProbe, ProbeIdentifier, ProbeName, generate_candidates};
+use super::{
+    DEFAULT_MAX_CANDIDATES, IdentityCandidate, IdentityProbe, ProbeIdentifier, ProbeName,
+    generate_candidates_bounded,
+};
+use crate::models::suggestion_runs::SuggestionRunRecord;
 
 /// A source of one entity's identity data, for the suggestion pass.
 /// Injectable so the fetch→block→compare→post pipeline is testable without
@@ -386,26 +457,40 @@ impl SuggestionSink for HttpSuggestionSink {
     }
 }
 
-/// Counts from one suggestion pass, logged (not audited — T-33's job) at
-/// the end of [`run_suggestion_pass`].
+/// Counts from one suggestion pass. Logged at the end of
+/// [`run_suggestion_pass`] and — since T-33 — durably recorded to
+/// [`crate::models::suggestion_runs`] by [`run_periodic`] (see the module
+/// doc's "Audit — every POST, and every run's counts" section).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct SuggestionRunStats {
     /// Persons fetched this pass.
     pub persons_fetched: usize,
     /// Workers fetched this pass.
     pub workers_fetched: usize,
-    /// Candidates `generate_candidates` returned (at/above the threshold).
+    /// Candidates `generate_candidates_bounded` returned (at/above the
+    /// threshold, within the configured `max_candidates` per-anchor cap).
     pub candidates: usize,
     /// Candidates successfully `POSTed`.
     pub posted: usize,
     /// Candidates whose POST failed (logged individually, run continues).
     pub failed: usize,
+    /// Candidates that qualified but were never `POSTed` this pass because
+    /// [`SuggestionRunStats::candidates`] exceeded the configured
+    /// `max_edges_per_run` cap (T-33, OQ-9(d)) — the lowest-confidence
+    /// ones by construction (see [`run_suggestion_pass`]'s sort). Not
+    /// lost: the next pass re-fetches and re-scores the same data and
+    /// will find them again, since the fetch is idempotent.
+    pub dropped: usize,
 }
 
 /// Run one suggestion pass: fetch both sides, block + score
-/// ([`generate_candidates`]), and POST every surviving candidate. A single
-/// candidate's POST failure is logged and does not abort the rest of the
-/// run — matching the family's per-row-error-tolerant posture elsewhere
+/// ([`super::generate_candidates_bounded`], bounded by `max_candidates`
+/// same-block comparisons per person anchor — T-33, OQ-9(d)), then `POST`
+/// the highest-confidence `max_edges_per_run` surviving candidates (see
+/// the module doc's "Scale controls" section for why highest-confidence
+/// and how ties break). A single candidate's POST failure is logged and
+/// does not abort the rest of the run — matching the family's
+/// per-row-error-tolerant posture elsewhere
 /// (`agents/share/bulk-import-export.md` §7: one bad row never aborts the
 /// whole pass).
 ///
@@ -418,6 +503,8 @@ pub async fn run_suggestion_pass<P, W, S>(
     persons: &P,
     workers: &W,
     sink: &S,
+    max_candidates: usize,
+    max_edges_per_run: usize,
 ) -> ModelResult<SuggestionRunStats>
 where
     P: IdentitySource + ?Sized,
@@ -426,14 +513,43 @@ where
 {
     let person_probes = persons.fetch_all().await?;
     let worker_probes = workers.fetch_all().await?;
-    let candidates = generate_candidates(&person_probes, &worker_probes);
+    let mut candidates =
+        generate_candidates_bounded(&person_probes, &worker_probes, max_candidates);
+    let total_candidates = candidates.len();
+
+    // T-33 (OQ-9(d)): prioritise the strongest evidence when a run must be
+    // cut short. Descending confidence, ties broken on the (person,
+    // worker) id pair so the ordering — and therefore exactly which
+    // candidates get dropped — is fully deterministic, never dependent on
+    // `HashMap` iteration order or float-comparison happenstance.
+    candidates.sort_by(|a, b| {
+        b.score
+            .confidence
+            .partial_cmp(&a.score.confidence)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.person.id.cmp(&b.person.id))
+            .then_with(|| a.worker.id.cmp(&b.worker.id))
+    });
+    let dropped = total_candidates.saturating_sub(max_edges_per_run);
+    if dropped > 0 {
+        tracing::warn!(
+            dropped,
+            max_edges_per_run,
+            total_candidates,
+            "suggest: LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN cap is binding this run; \
+             the lowest-confidence candidates were not posted (idempotent fetch means \
+             they may be found again next run)"
+        );
+    }
+    candidates.truncate(max_edges_per_run);
 
     let mut stats = SuggestionRunStats {
         persons_fetched: person_probes.len(),
         workers_fetched: worker_probes.len(),
-        candidates: candidates.len(),
+        candidates: total_candidates,
         posted: 0,
         failed: 0,
+        dropped,
     };
     for candidate in &candidates {
         match sink.post_suggestion(candidate).await {
@@ -507,13 +623,75 @@ pub fn sources_from_env() -> Option<(HttpIdentitySource, HttpIdentitySource, Htt
     resolve_sources(person_url, worker_url, token)
 }
 
+/// Default for `LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN` (T-33, OQ-9(d)):
+/// the bulk subsystem's own per-run row caps
+/// (`agents/share/bulk-import-export.md` §12, SEC-B2) are the family
+/// precedent for "how many rows can one background pass commit", not a
+/// number invented fresh for this job.
+pub const DEFAULT_MAX_EDGES_PER_RUN: usize = 200;
+
+/// Pure parse of `LINK_GRAPH_SUGGEST_MAX_CANDIDATES`'s raw value (T-33,
+/// OQ-9(d)): the per-anchor same-block comparison cap passed to
+/// [`super::generate_candidates_bounded`]. Absent, blank, zero, or
+/// unparseable all fall back to [`DEFAULT_MAX_CANDIDATES`] — the same
+/// "zero/unparseable falls back to the default" rule
+/// `agents/share/restful.md` pins for pagination `limit`, so a
+/// misconfigured `0` cannot silently turn the job into a no-op that never
+/// compares anything. Pure (no env access) so it is unit-testable without
+/// mutating process env vars, mirroring [`resolve_sources`]'s own reason
+/// for splitting the pure logic from its env-reading shim.
+#[must_use]
+fn resolve_max_candidates(raw: Option<&str>) -> usize {
+    raw.and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|n| *n > 0)
+        .unwrap_or(DEFAULT_MAX_CANDIDATES)
+}
+
+/// Pure parse of `LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN`'s raw value (T-33,
+/// OQ-9(d)): the cap on how many suggestions [`run_suggestion_pass`]
+/// `POST`s in one pass. Same zero/unparseable-falls-back-to-default rule
+/// as [`resolve_max_candidates`].
+#[must_use]
+fn resolve_max_edges_per_run(raw: Option<&str>) -> usize {
+    raw.and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|n| *n > 0)
+        .unwrap_or(DEFAULT_MAX_EDGES_PER_RUN)
+}
+
+/// Read `LINK_GRAPH_SUGGEST_MAX_CANDIDATES` from the environment and
+/// resolve it via [`resolve_max_candidates`].
+#[must_use]
+fn max_candidates_from_env() -> usize {
+    resolve_max_candidates(
+        std::env::var("LINK_GRAPH_SUGGEST_MAX_CANDIDATES")
+            .ok()
+            .as_deref(),
+    )
+}
+
+/// Read `LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN` from the environment and
+/// resolve it via [`resolve_max_edges_per_run`].
+#[must_use]
+fn max_edges_per_run_from_env() -> usize {
+    resolve_max_edges_per_run(
+        std::env::var("LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN")
+            .ok()
+            .as_deref(),
+    )
+}
+
 /// Run the suggestion pass periodically until the process exits — the
 /// "worker" wiring (OQ-9(c)/(d)), mirroring
 /// [`crate::reconcile::run_periodic`]'s shape exactly: `LINK_GRAPH_SUGGEST_SECS`
 /// (default 3600), first tick skipped so boot is not blocked, a failed
 /// pass is logged and retried next tick. Spawned from `App::after_routes`
 /// only when [`sources_from_env`] returns `Some`.
-pub async fn run_periodic<P, W, S>(persons: P, workers: W, sink: S)
+///
+/// `db` is used only for T-33's durable per-run recording (see the module
+/// doc's "Audit" section) — this job's actual work is HTTP client traffic
+/// between two peers, not a read-model repair, so `db` is otherwise
+/// untouched.
+pub async fn run_periodic<P, W, S>(persons: P, workers: W, sink: S, db: DatabaseConnection)
 where
     P: IdentitySource,
     W: IdentitySource,
@@ -524,12 +702,40 @@ where
         .and_then(|v| v.trim().parse::<u64>().ok())
         .filter(|s| *s > 0)
         .unwrap_or(3600);
+    let max_candidates = max_candidates_from_env();
+    let max_edges_per_run = max_edges_per_run_from_env();
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(secs));
     interval.tick().await; // consume the immediate first tick
     loop {
         interval.tick().await;
-        match run_suggestion_pass(&persons, &workers, &sink).await {
-            Ok(stats) => tracing::info!(?stats, "suggestion pass complete"),
+        let started_at = Utc::now().fixed_offset();
+        match run_suggestion_pass(&persons, &workers, &sink, max_candidates, max_edges_per_run)
+            .await
+        {
+            Ok(stats) => {
+                tracing::info!(?stats, "suggestion pass complete");
+                crate::metrics::Metrics::global().set_suggestion_run_stats(&stats);
+                let record = SuggestionRunRecord {
+                    started_at,
+                    persons_fetched: stats.persons_fetched,
+                    workers_fetched: stats.workers_fetched,
+                    candidates: stats.candidates,
+                    posted: stats.posted,
+                    failed: stats.failed,
+                    dropped: stats.dropped,
+                    max_candidates,
+                    max_edges_per_run,
+                };
+                if let Err(error) =
+                    crate::models::suggestion_runs::Model::record(&db, &record).await
+                {
+                    tracing::warn!(
+                        %error,
+                        "failed to durably record this suggestion run's stats \
+                         (the pass itself still completed)"
+                    );
+                }
+            }
             Err(error) => tracing::warn!(%error, "suggestion pass failed"),
         }
     }
@@ -783,9 +989,15 @@ mod tests {
         let workers = MockSource(vec![worker.clone()]);
         let sink = MockSink::default();
 
-        let stats = run_suggestion_pass(&persons, &workers, &sink)
-            .await
-            .expect("pass succeeds");
+        let stats = run_suggestion_pass(
+            &persons,
+            &workers,
+            &sink,
+            DEFAULT_MAX_CANDIDATES,
+            DEFAULT_MAX_EDGES_PER_RUN,
+        )
+        .await
+        .expect("pass succeeds");
 
         assert_eq!(stats.persons_fetched, 1);
         assert_eq!(stats.workers_fetched, 1);
@@ -833,9 +1045,15 @@ mod tests {
         let workers = MockSource(vec![worker]);
         let sink = MockSink::default();
 
-        let stats = run_suggestion_pass(&persons, &workers, &sink)
-            .await
-            .expect("pass succeeds");
+        let stats = run_suggestion_pass(
+            &persons,
+            &workers,
+            &sink,
+            DEFAULT_MAX_CANDIDATES,
+            DEFAULT_MAX_EDGES_PER_RUN,
+        )
+        .await
+        .expect("pass succeeds");
 
         assert_eq!(stats.candidates, 0);
         assert_eq!(stats.posted, 0);
@@ -855,9 +1073,15 @@ mod tests {
             always_fail: true,
         };
 
-        let stats = run_suggestion_pass(&persons, &workers, &sink)
-            .await
-            .expect("pass itself still succeeds; only the POST failed");
+        let stats = run_suggestion_pass(
+            &persons,
+            &workers,
+            &sink,
+            DEFAULT_MAX_CANDIDATES,
+            DEFAULT_MAX_EDGES_PER_RUN,
+        )
+        .await
+        .expect("pass itself still succeeds; only the POST failed");
 
         assert_eq!(stats.candidates, 1);
         assert_eq!(stats.posted, 0);
@@ -871,9 +1095,180 @@ mod tests {
         let workers = MockSource(vec![]);
         let sink = MockSink::default();
 
-        let stats = run_suggestion_pass(&persons, &workers, &sink)
+        let stats = run_suggestion_pass(
+            &persons,
+            &workers,
+            &sink,
+            DEFAULT_MAX_CANDIDATES,
+            DEFAULT_MAX_EDGES_PER_RUN,
+        )
+        .await
+        .expect("pass succeeds");
+        assert_eq!(stats, SuggestionRunStats::default());
+    }
+
+    // ---------- T-33: max_candidates / max_edges_per_run env parsing ----------
+
+    #[test]
+    fn max_candidates_from_env_falls_back_to_default_when_unset_zero_or_unparseable() {
+        assert_eq!(super::resolve_max_candidates(None), DEFAULT_MAX_CANDIDATES);
+        assert_eq!(
+            super::resolve_max_candidates(Some("0")),
+            DEFAULT_MAX_CANDIDATES
+        );
+        assert_eq!(
+            super::resolve_max_candidates(Some("not a number")),
+            DEFAULT_MAX_CANDIDATES
+        );
+        assert_eq!(super::resolve_max_candidates(Some("7")), 7);
+    }
+
+    #[test]
+    fn max_edges_per_run_from_env_falls_back_to_default_when_unset_zero_or_unparseable() {
+        assert_eq!(
+            super::resolve_max_edges_per_run(None),
+            DEFAULT_MAX_EDGES_PER_RUN
+        );
+        assert_eq!(
+            super::resolve_max_edges_per_run(Some("0")),
+            DEFAULT_MAX_EDGES_PER_RUN
+        );
+        assert_eq!(
+            super::resolve_max_edges_per_run(Some("nope")),
+            DEFAULT_MAX_EDGES_PER_RUN
+        );
+        assert_eq!(super::resolve_max_edges_per_run(Some("5")), 5);
+    }
+
+    // ---------- T-33: run_suggestion_pass scale controls ----------
+
+    /// A block bigger than `max_candidates` is truncated — proven here at
+    /// the `run_suggestion_pass` level (not just `generate_candidates_bounded`
+    /// directly), so the parameter is genuinely threaded all the way
+    /// through, not merely available deeper in the stack.
+    #[tokio::test]
+    async fn run_suggestion_pass_threads_max_candidates_through_to_blocking() {
+        let person_probe = IdentityProbe {
+            identifiers: vec![ProbeIdentifier::new("nhs", "1231231234").unwrap()],
+            ..IdentityProbe::default()
+        };
+        let persons = MockSource(vec![(entity_ref(EntityType::Person, 500), person_probe)]);
+        let worker_probes: Vec<(EntityRef, IdentityProbe)> = (0..10u128)
+            .map(|i| {
+                (
+                    entity_ref(EntityType::Worker, 600 + i),
+                    IdentityProbe {
+                        identifiers: vec![ProbeIdentifier::new("nhs", "1231231234").unwrap()],
+                        ..IdentityProbe::default()
+                    },
+                )
+            })
+            .collect();
+        let workers = MockSource(worker_probes);
+        let sink = MockSink::default();
+
+        let stats = run_suggestion_pass(&persons, &workers, &sink, 4, DEFAULT_MAX_EDGES_PER_RUN)
             .await
             .expect("pass succeeds");
-        assert_eq!(stats, SuggestionRunStats::default());
+
+        assert_eq!(
+            stats.candidates, 4,
+            "max_candidates=4 must cap the 10-worker block at the run_suggestion_pass level"
+        );
+        assert_eq!(stats.posted, 4);
+        assert_eq!(
+            stats.dropped, 0,
+            "under max_edges_per_run, nothing is dropped"
+        );
+    }
+
+    /// When `generate_candidates_bounded` returns more candidates than
+    /// `max_edges_per_run`, only the highest-confidence ones are `POSTed`;
+    /// the rest are counted in `dropped`, not silently lost from the
+    /// stats. Three independent (different-block) pairs are constructed
+    /// with three distinct, known confidences via the DOB-proximity table
+    /// (`score_dob_pair`), so the expected posting order is unambiguous.
+    #[tokio::test]
+    async fn run_suggestion_pass_caps_edges_per_run_and_prioritises_highest_confidence() {
+        fn pair(
+            tag: u128,
+            family: &str,
+            worker_dob: NaiveDate,
+        ) -> ((EntityRef, IdentityProbe), (EntityRef, IdentityProbe)) {
+            let family = family.to_string();
+            let person_probe = IdentityProbe {
+                name: Some(ProbeName {
+                    family: family.clone(),
+                    given: "Sam".to_string(),
+                }),
+                birth_date: NaiveDate::from_ymd_opt(1980, 1, 10),
+                gender: Some(person_matcher::Gender::Female),
+                identifiers: vec![],
+            };
+            let worker_probe = IdentityProbe {
+                name: Some(ProbeName {
+                    family,
+                    given: "Sam".to_string(),
+                }),
+                birth_date: Some(worker_dob),
+                gender: Some(person_matcher::Gender::Female),
+                identifiers: vec![],
+            };
+            (
+                (entity_ref(EntityType::Person, 700 + tag), person_probe),
+                (entity_ref(EntityType::Worker, 800 + tag), worker_probe),
+            )
+        }
+
+        // Three genuinely distinct surnames (different Soundex codes, not
+        // merely different trailing digits — Soundex ignores non-letters,
+        // so e.g. "Family1"/"Family2"/"Family3" would all collide on one
+        // "Family" code and defeat the isolation this test relies on) so
+        // each pair blocks independently and only the intended (person,
+        // worker) pair within it is ever compared.
+        // A: exact DOB match -> dob_score 1.0 -> highest confidence.
+        let (person_a, worker_a) =
+            pair(1, "Anderson", NaiveDate::from_ymd_opt(1980, 1, 10).unwrap());
+        // B: DOB one day off -> dob_score 0.95 -> middle confidence.
+        let (person_b, worker_b) = pair(2, "Baxter", NaiveDate::from_ymd_opt(1980, 1, 11).unwrap());
+        // C: same year only -> dob_score 0.50 -> lowest (but still >= 0.7 threshold).
+        let (person_c, worker_c) =
+            pair(3, "Castillo", NaiveDate::from_ymd_opt(1980, 7, 25).unwrap());
+
+        let persons = MockSource(vec![person_a.clone(), person_b.clone(), person_c.clone()]);
+        let workers = MockSource(vec![worker_a, worker_b, worker_c]);
+        let sink = MockSink::default();
+
+        let stats = run_suggestion_pass(&persons, &workers, &sink, DEFAULT_MAX_CANDIDATES, 2)
+            .await
+            .expect("pass succeeds");
+
+        assert_eq!(stats.candidates, 3, "all three pairs qualify (>= 0.7)");
+        assert_eq!(stats.posted, 2, "max_edges_per_run=2 caps the POSTs");
+        assert_eq!(
+            stats.dropped, 1,
+            "the lowest-confidence pair (C) is dropped"
+        );
+        assert_eq!(stats.failed, 0);
+
+        let posted_persons: std::collections::HashSet<EntityRef> = sink
+            .posted
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|c| c.person)
+            .collect();
+        assert!(
+            posted_persons.contains(&person_a.0),
+            "the highest-confidence pair (A, exact DOB) must be posted"
+        );
+        assert!(
+            posted_persons.contains(&person_b.0),
+            "the middle-confidence pair (B, DOB off by one day) must be posted"
+        );
+        assert!(
+            !posted_persons.contains(&person_c.0),
+            "the lowest-confidence pair (C, same-year-only DOB) must be the one dropped"
+        );
     }
 }

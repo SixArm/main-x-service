@@ -5,8 +5,10 @@
 //! wraps the SQL pair via `include_str!`, consistent with the sibling
 //! service crates (spec §10). Creates the derived read-model tables
 //! `edges`, `entity_presence`, `consumer_offsets`, `processed_events`
-//! (§10.3 bus-consumer idempotency, BUS-2), and the governance
-//! `audit_log` (§10.4).
+//! (§10.3 bus-consumer idempotency, BUS-2), the governance
+//! `audit_log` (§10.4), and `suggestion_runs` (T-33, OQ-9(d) — the
+//! durable per-pass audit trail for the periodic cross-service
+//! `same_identity` suggestion job).
 
 // SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
 #![forbid(unsafe_code)]
@@ -21,6 +23,7 @@ mod m20260709_000003_consumer_offsets;
 mod m20260709_000004_audit_log;
 mod m20260728_000001_add_audit_mac;
 mod m20260803_000001_processed_events;
+mod m20260804_000001_suggestion_runs;
 
 /// The migration runner this crate exposes to loco / `sea-orm-migration`.
 pub struct Migrator;
@@ -36,6 +39,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260709_000004_audit_log::Migration),
             Box::new(m20260728_000001_add_audit_mac::Migration),
             Box::new(m20260803_000001_processed_events::Migration),
+            Box::new(m20260804_000001_suggestion_runs::Migration),
             // inject-above (do not remove this comment)
         ]
     }

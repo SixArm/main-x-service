@@ -6,3 +6,4 @@ pub mod edges;
 pub mod entity_presence;
 pub mod prelude;
 pub mod processed_events;
+pub mod suggestion_runs;

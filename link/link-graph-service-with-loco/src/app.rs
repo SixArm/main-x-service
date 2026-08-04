@@ -30,7 +30,9 @@ use std::path::Path;
 
 use crate::auth;
 use crate::controllers;
-use crate::models::_entities::{audit_log, consumer_offsets, edges, entity_presence};
+use crate::models::_entities::{
+    audit_log, consumer_offsets, edges, entity_presence, suggestion_runs,
+};
 use crate::reconcile;
 use crate::suggest::job as suggest_job;
 
@@ -141,11 +143,19 @@ impl Hooks for App {
         // Cross-service `same_identity` suggestion (T-31, design §16
         // OQ-9(c)/(d)): pull person + worker, block + score, POST
         // `matcher_suggested` edges to person. A no-op unless
-        // `LINK_GRAPH_SUGGEST_URL_PERSON` (+ `_WORKER`) is configured; needs
-        // no database handle of its own — it is pure HTTP client traffic
-        // between two peers, not a read-model repair.
+        // `LINK_GRAPH_SUGGEST_URL_PERSON` (+ `_WORKER`) is configured. The
+        // job's own work is pure HTTP client traffic between two peers,
+        // not a read-model repair — but since T-33 it also durably
+        // records each completed pass's counts to `suggestion_runs`
+        // (OQ-9(d) "audit every run's counts"), which is the one thing
+        // here that does need a database handle.
         if let Some((persons, workers, sink)) = suggest_job::sources_from_env() {
-            tokio::spawn(suggest_job::run_periodic(persons, workers, sink));
+            tokio::spawn(suggest_job::run_periodic(
+                persons,
+                workers,
+                sink,
+                ctx.db.clone(),
+            ));
         }
         // Real bus consumption (BUS-2, spec §13 T-6): a no-op unless
         // `LINK_GRAPH_FLUVIO_ENDPOINT` is configured, so lazy verify-on-read
@@ -182,6 +192,7 @@ impl Hooks for App {
         truncate_table(&ctx.db, entity_presence::Entity).await?;
         truncate_table(&ctx.db, consumer_offsets::Entity).await?;
         truncate_table(&ctx.db, audit_log::Entity).await?;
+        truncate_table(&ctx.db, suggestion_runs::Entity).await?;
         Ok(())
     }
 

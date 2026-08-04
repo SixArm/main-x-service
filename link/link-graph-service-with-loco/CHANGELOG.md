@@ -13,6 +13,114 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > and [event-bus.md](../../agents/share/event-bus.md).
 
 ## [Unreleased]
+### Added — T-33: governance, scale controls, and audit for cross-service suggestion (OQ-9(a)/(d)) — closes LNK-4
+
+The last of the five LNK-4 sub-tasks (T-29 comparator → T-30 blocking →
+T-31 periodic job → T-32 review-queue bridge → **T-33**). Adds the two
+configured scale caps OQ-9(d) pinned, the durable per-run audit trail,
+and a live proof that a suggestion is never auto-promoted regardless of
+score. No behaviour change for a deployment that never sets
+`LINK_GRAPH_SUGGEST_URL_PERSON` — see T-31's entry below.
+
+- **`src/suggest/mod.rs`** — `generate_candidates_bounded(persons,
+  workers, max_candidates)`: the same blocking as T-30, plus a
+  per-anchor cap on same-block comparisons. Investigated
+  `person-service-with-loco`'s `BatchDeduplicationRequest::max_candidates`
+  before copying its semantics: `.take(max_candidates)` off the front
+  of an order-preserving candidate slice, per anchor — not a shared
+  budget, not score-sorted. Matched exactly:
+  `worker_indexes.iter().take(max_candidates)` per person anchor within
+  a block, `worker_indexes` in the `workers` slice's own input order,
+  so which entries get dropped when a block exceeds the cap is
+  deterministic. `generate_candidates` (T-29/T-30's entry point) is now
+  a thin wrapper over this at the new `DEFAULT_MAX_CANDIDATES` (`50`)
+  constant — no behaviour change for any existing caller or test whose
+  fixtures stay under 50 same-block records. 3 new unit tests,
+  including the load-bearing truncation proof (a 10-worker
+  identifier-sharing block capped at 3 returns exactly `workers[..3]`,
+  twice in a row).
+- **`src/suggest/job.rs`**:
+  - `run_suggestion_pass` now takes `max_candidates` and
+    `max_edges_per_run` explicitly, calls `generate_candidates_bounded`
+    with the former, and — when the candidate count exceeds the
+    latter — sorts candidates descending by confidence (ties broken on
+    the `(person, worker)` id pair) and `POST`s only the survivors. The
+    number dropped is logged (`tracing::warn!`) and carried on the new
+    `SuggestionRunStats::dropped` field. `LINK_GRAPH_SUGGEST_MAX_CANDIDATES`
+    / `LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN` (defaults `50`/`200`,
+    zero/unparseable/unset all fall back to the default) are read once
+    per pass in `run_periodic` and threaded through. 4 new unit tests:
+    env-parsing fallback for both variables, the cap threading through
+    to blocking at the `run_suggestion_pass` level (not just proven
+    deeper in `suggest.rs`), and the highest-confidence-survives-the-cut
+    proof (three independent same-family-Soundex-avoiding pairs at
+    three known confidences via the DOB-proximity table, capped to 2,
+    proving the lowest-confidence pair is the one dropped, not an
+    arbitrary one).
+  - `run_periodic` now takes a `DatabaseConnection` (threaded from
+    `app.rs`'s `ctx.db.clone()`), used only to durably record each
+    completed pass to the new `suggestion_runs` table (below) and to set
+    the new `link_graph_suggestion_last_run` gauge — the job's actual
+    work (HTTP fetch + POST) is otherwise unchanged.
+  - **Audit investigation, not a new mechanism, for "every POST":**
+    person's `create_link` handler already writes an unconditional
+    best-effort `person_link` audit row for every link creation
+    regardless of provenance, including `matcher_suggested` — this
+    job's only write goes through that exact handler. Building a second
+    audit trail here would have audited the same event twice from the
+    wrong side of the wire. Regression-pinned instead of left as a doc
+    claim: `person-service-with-loco`'s new
+    `tests/cross_service_link_review.rs::matcher_suggested_link_creation_is_audited`.
+- **`src/models/suggestion_runs.rs`** (new) + migration
+  `m20260804_000001_suggestion_runs` — one durable row per **completed**
+  suggestion pass (`persons_fetched`/`workers_fetched`/`candidates`/
+  `posted`/`failed`/`dropped`/`max_candidates`/`max_edges_per_run`,
+  `started_at`/`completed_at`). `reconcile.rs`'s own periodic pass only
+  ever exposes its one summary number as a live gauge — sufficient
+  there ("did the last pass find drift" only needs the current value)
+  but not here, since OQ-9(d) explicitly asks for this job's richer
+  summary to survive a missed scrape or a restart. A failed pass (fetch
+  error) records nothing, matching `run_periodic`'s existing
+  log-and-retry posture. New DB-gated test `tests/suggestion_runs.rs`
+  proves two completed passes accumulate two rows (history, not a
+  last-value slot) and the stored counts round-trip through Postgres
+  exactly.
+- **`src/metrics.rs`** — new `link_graph_suggestion_last_run` gauge vec
+  (labelled `stat`), mirroring `reconciliation_divergence`'s existing
+  live-visibility idiom; the durable table above is the history, this
+  gauge is the live snapshot. 2 new unit tests.
+- **`tests/live_suggest_never_promoted.rs`** (new, manual, `#[ignore]`d,
+  not in any CI stage) — the LNK-4 governance capstone, run **live**
+  against one real running person-service (not mocked): a real seeded
+  person sharing a coded identifier with an in-test synthetic worker
+  probe drives the real pipeline; the resulting edge is confirmed at
+  `IDENTIFIER_MATCH_CEILING` (`0.99`, above the family's own
+  within-entity `auto_merge_threshold` of `0.95`) with `provenance =
+  "matcher_suggested"` — never `operator`/`1.0` — and the review-queue
+  row stays `pending` — never `confirmed`/`automerged`. A second
+  identical pass reasserts the same edge and leaves it still `pending`,
+  ruling out a background promotion path. Verified by hand against a
+  real running person-service (test-db-backed): both passes green.
+- **`spec/13-tasks.md`** / **`spec/16-open-questions.md`** — T-33 marked
+  done with the full landing account; OQ-9 marked fully resolved;
+  **LNK-4 marked complete**, unblocking DOC-6.
+
+**Acceptance:** `cargo test --lib`: 95 passed (was 85, +10). `cargo fmt
+--check` / `cargo clippy --all-targets -- -D warnings` clean. DB-gated
+tests green against Postgres 18 (7 test binaries, 19 tests, run
+individually — `scripts/ci-check.sh test-db` for this crate currently
+aborts after the first binary because of a **pre-existing**, unrelated
+issue: the manual `live_suggest_fetch.rs`/`live_suggest_full_pipeline.rs`
+tests are swept up by the blanket `-- --ignored` the `test-db` CI stage
+runs despite documenting themselves as outside any CI stage — confirmed
+via `git stash` to already fail identically at T-32's landing commit,
+so not a T-33 regression, but worth a follow-up to give live/manual
+tests their own excluded tier). Person-service's own DB-gated suite is
+green (21 `--lib` + 25 `api_integration_test` + 5
+`cross_service_link_review`, the new audit test included, + 1
+`enforcement` + 1 `seed_examples_db`); `cargo test --lib`: 315 passed
+(unchanged from T-32).
+
 ### Added — T-32: cross-service review-queue bridge + promotion/rejection (OQ-9(b))
 
 Closes the gap T-31 (below) left open: the periodic suggestion job

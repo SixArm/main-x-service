@@ -26,8 +26,9 @@
 //! ```
 
 use entity_ref::EntityType;
+use link_graph_service::suggest::DEFAULT_MAX_CANDIDATES;
 use link_graph_service::suggest::job::{
-    HttpIdentitySource, HttpSuggestionSink, run_suggestion_pass,
+    DEFAULT_MAX_EDGES_PER_RUN, HttpIdentitySource, HttpSuggestionSink, run_suggestion_pass,
 };
 use uuid::Uuid;
 
@@ -47,9 +48,15 @@ async fn live_pipeline_posts_a_real_suggested_edge() {
     let workers = HttpIdentitySource::new(EntityType::Worker, worker_url, None);
     let sink = HttpSuggestionSink::new(person_url.clone(), None);
 
-    let stats = run_suggestion_pass(&persons, &workers, &sink)
-        .await
-        .expect("full pipeline run against real services");
+    let stats = run_suggestion_pass(
+        &persons,
+        &workers,
+        &sink,
+        DEFAULT_MAX_CANDIDATES,
+        DEFAULT_MAX_EDGES_PER_RUN,
+    )
+    .await
+    .expect("full pipeline run against real services");
     println!("live_pipeline_posts_a_real_suggested_edge: {stats:?}");
 
     assert!(

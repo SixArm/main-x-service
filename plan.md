@@ -47,7 +47,12 @@ closed (this session, FE-1..FE-4); `agents/share/architecture.md` and
 `overview.md` were rewritten with an honest, footnoted capability
 matrix (`overview.md`'s own text now says exactly what it doesn't
 overclaim); and tutorials/sample-data/family-compose all shipped this
-session (`tutorials/`, `examples/`, `DEP-1`).
+session (`tutorials/`, `examples/`, `DEP-1`); and cross-service
+`same_identity` matcher-suggestion (LNK-4, design §5.2) is now fully
+landed (T-29..T-33, 2026-08-04) — comparator, blocking, the periodic
+job, person's review-queue bridge, and governance/scale/audit,
+including a live-verified proof that no score ever auto-promotes a
+suggestion.
 
 **What is genuinely still a gap, checked against `overview.md`'s
 capability matrix on 2026-08-04** (see that file for the authoritative,
@@ -59,7 +64,6 @@ row-by-row picture — this is a summary, not a second copy):
 | FHIR R5 surface | course (non-standard `Basic` alias only, by design), portfolio (no resource maps) |
 | Record-level ABAC + masking obligations | place, thing, event, course (person/worker/organization/care-pathway/case/portfolio have it) |
 | Fluvio: a **real broker round-trip**, anywhere | all 10 services + link-graph — the sink code and consumer exist, but every verification is feature-compiled + mocked, never a live broker |
-| Cross-service `same_identity` **matcher-suggestion** (LNK-4, design §5.2) | mid-implementation as of 2026-08-04 — T-29 (comparator) / T-30 (blocking) / T-31 (periodic job) landed same-session; T-32 (review/promotion in person) / T-33 (governance+scale) remain |
 | Bulk I/O: S3 store, Parquet, and the other 7 entities | organization/case are JSONL+CSV+local-fs only; person alone has the full set |
 | `case`/`project-portfolio-management`/`link-graph`/`authentication-verifier` CHANGELOG releases | version already used by a prior dated release + substantial unbumped work since — needs a version-bump decision before H-5 can finish for these four |
 | crates.io publish for `entity-ref`/`authentication-verifier` | explicitly deferred by operator choice, not blocked technically |

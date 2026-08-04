@@ -222,3 +222,26 @@ opens a §13 task.
     family's Tantivy-index-blocked duplicate-check on
     org/care-pathway/case/portfolio (`agents/share/overview.md`
     capability-matrix footnote 1).
+
+  **OQ-9 fully resolved 2026-08-04 (T-33 landed, closing LNK-4).** Both
+  (d) caps are implemented exactly as pinned:
+  `LINK_GRAPH_SUGGEST_MAX_CANDIDATES` bounds `generate_candidates`'s
+  per-anchor same-block comparisons (a thin default-`50` wrapper over
+  `generate_candidates_bounded`, which takes the cap explicitly), and
+  `LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN` bounds how many of
+  `run_suggestion_pass`'s scored candidates actually get `POSTed` (the
+  highest-confidence survivors, ties broken deterministically on the
+  `(person, worker)` id pair). (a)'s "no auto-merge tier for
+  cross-service identity" is now live-verified, not just asserted: a
+  real person + a synthetic worker sharing a coded identifier score at
+  `IDENTIFIER_MATCH_CEILING` (`0.99`, above the family's own
+  within-entity `auto_merge_threshold` of `0.95`) and the resulting
+  review-queue row still lands and stays `pending`
+  (`tests/live_suggest_never_promoted.rs`). "The suggestion job audits
+  every POST it makes" turned out to already be true of T-31/T-32's
+  existing infrastructure — person's `create_link` unconditionally
+  audits every link creation regardless of provenance — so T-33 added a
+  regression test proving that rather than a second, redundant audit
+  mechanism; "audits every run's counts" is new (`suggestion_runs`
+  table, one durable row per completed pass). See `spec/13-tasks.md`
+  T-33 for the full landing account.

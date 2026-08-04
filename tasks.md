@@ -719,7 +719,7 @@
   rejected; cross-originated kinds rejected). *Verified:* person + worker
   `cargo test --lib links` (9 each) + clippy clean. Follow-ups (shared with
   LNK-2): `linked`/`unlinked` events + matcher-partition guard test.
-- [~] **LNK-4 (L)** Cross-service `same_identity` **matcher + review
+- [x] **LNK-4 (L)** Cross-service `same_identity` **matcher + review
   queue** (design §5.2, roadmap): a job comparing person↔worker records
   (reuse matcher components), emitting `matcher_suggested` edges
   (confidence < 1.0) into a review surface; operator confirm promotes to
@@ -758,8 +758,18 @@
   `BatchDeduplicationRequest::max_candidates`), and
   `LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN` (200) — with blocking (a) as
   the explicit load-bearing claim that keeps the job sub-quadratic
-  rather than O(n·m). T-29–T-33 remain queued as the next (large,
-  separate) coding effort.
+  rather than O(n·m).
+
+  **Done: T-29–T-33 all landed, 2026-08-04 (same session as the spec
+  round above).** The comparator (T-29), blocking (T-30), the periodic
+  job (T-31), person's review-queue bridge + promotion/rejection
+  (T-32), and governance + the two scale controls + audit (T-33, the
+  last of the chain) are all in place and tested — including a live
+  test proving a near-ceiling (0.99) identifier match still lands
+  `pending`/`matcher_suggested`, never auto-promoted. See
+  `link-graph-service-with-loco/spec/13-tasks.md`'s T-29..T-33 entries
+  and `CHANGELOG.md` for the full account. `DOC-6` below is now
+  unblocked.
 
 - [x] **BLK-1 (M)** Bulk I/O step 2a — **CSV** codec on person.
   *(codec + spec done 2026-07-15; worker/export wiring folded into and
@@ -5327,11 +5337,11 @@ committing (see plan.md §4).
   skipped.
 
 - [ ] **DOC-6 (M)** `link-graph-service-with-loco`'s `spec/`,
-  `AGENTS.md`, `README.md`/`index.md`. **Queue this after LNK-4's
-  T-29..T-33 chain finishes** (active file conflicts otherwise) — by
-  the time this runs, `spec/13-tasks.md` and `spec/16-open-questions.md`
-  will have moved substantially from whatever a doc pass would see
-  mid-chain.
+  `AGENTS.md`, `README.md`/`index.md`. **Unblocked 2026-08-04** — LNK-4's
+  T-29..T-33 chain is now fully landed (`spec/13-tasks.md` and
+  `spec/16-open-questions.md` both updated as each task closed), so the
+  active-file-conflict reason to queue this behind it no longer
+  applies. Still not started.
 
 - [x] **DOC-7 (L)** The five consumer apps' docs — `case-folder`,
   `patient-flow`, `workforce-planning-management`,
@@ -5711,5 +5721,6 @@ committing (see plan.md §4).
   the repo.
 
   This closes the documentation-harmonization program's DOC-1..DOC-5
-  and DOC-7/DOC-8 scope. **`DOC-6` (`link-graph-service-with-loco`)
-  remains queued** behind LNK-4's T-32/T-33, which have not started.
+  and DOC-7/DOC-8 scope. **`DOC-6` (`link-graph-service-with-loco`)**
+  was queued behind LNK-4's T-32/T-33 — both now landed (2026-08-04) —
+  so `DOC-6` is unblocked but still not started.
