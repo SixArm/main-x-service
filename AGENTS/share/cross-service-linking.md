@@ -54,8 +54,11 @@ cost of eventual consistency and a reconciliation duty (§6, §8).
 - Event sourcing — Postgres per service stays the system of record; the
   aggregator's graph is a derived read-model.
 - A shared runtime library — only the `EntityRef` value type and the edge-
-  kind registry are shared *contracts*, copied per project (drift-accepted,
-  same posture as [event-bus.md](event-bus.md) `mxi-events`).
+  kind registry were meant to be shared *contracts*, copied per project
+  (drift-accepted, same posture as [event-bus.md](event-bus.md)
+  `mxi-events`). **In practice this was never what happened**: see §12's
+  resolved open question below — `entity-ref` is a real Cargo `path`
+  dependency embedded by eight crates today.
 
 ## 3. The `EntityRef` — the one shared contract
 
@@ -76,8 +79,12 @@ A record in another service is named by an opaque **URN string**:
 - `id` is the record's public UUID (`pid`), matching the event envelope's
   `pid` ([event-bus.md §4](event-bus.md)).
 - A tiny value type owns `parse` / `Display` and the `entity_type → service`
-  map. It is pure data with no behaviour; **copy it per project** rather
-  than packaging it (drift is cheap; the format is frozen here).
+  map. It is pure data with no behaviour. The plan was to **copy it per
+  project** rather than package it (drift is cheap; the format is frozen
+  here) — but every real consumer so far has taken it as a Cargo `path`
+  dependency on [`link/entity-ref-rust-crate`](../../link/entity-ref-rust-crate)
+  instead, and nothing has forked it, so §12 now treats "depend on it" as
+  the settled answer rather than a still-open lean.
 
 ```rust
 pub struct EntityRef { pub entity_type: EntityType, pub id: Uuid }
@@ -404,9 +411,23 @@ affiliation posture:
   assert (person *or* worker), with the aggregator canonicalising and
   deduping on the ordered pair? (Lean: yes — both emit; dedupe on canonical
   pair.)
-- **Shared `mxi-links` crate** vs copy-per-project for `EntityRef` + the
+- ~~**Shared `mxi-links` crate** vs copy-per-project for `EntityRef` + the
   registry. (Lean: copy until a second non-aggregator consumer exists —
-  same call as `mxi-events`.)
+  same call as `mxi-events`.)~~ — RESOLVED by practice, not decision: no
+  crate ever copied it. Every consumer added `entity-ref = { path =
+  "../../link/entity-ref-rust-crate" }` instead — a real shared
+  dependency, contrary to §2/§3's stated plan. As of 2026-08-04 that is
+  eight crates: `link-graph-service-with-loco` (the aggregator), the
+  three edge-originating services (person, worker, case), and four
+  consumer apps that hadn't been designed yet when this doc was written
+  (contact-relationship-management, content-management-system,
+  patient-flow, workforce-planning-management) — each importing
+  `EntityRef`/`EntityType` in its own `validation.rs`/`clients.rs` to
+  validate and dereference cross-service refs, not to originate edges.
+  `mxi-links` (a *packaged*, crates.io-published crate) is still not
+  built; "depend on the in-tree crate via a path" is the de facto
+  answer and is cheap enough that formalising it further has not been
+  worth doing.
 - **Traversal depth.** Cap `neighbors` at depth 1–2 in v1, or expose
   arbitrary-depth recursive CTE? (Lean: cap at 2; revisit with real query
   patterns.)

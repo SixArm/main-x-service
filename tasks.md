@@ -5098,6 +5098,63 @@ committing (see plan.md §4).
   (found during H-5) — decide whether that's a real gap to fix here or
   a separate call.
 
+  **`link/entity-ref-rust-crate` done (2026-08-04), 3rd/last of the
+  batch.** The decision on the H-5 gap: **fixed now.** Created
+  `CHANGELOG.md` from scratch (it had none) — Keep a Changelog format
+  matching the family convention, reconstructed from `git log`: a
+  `[0.1.0] - 2026-07-08` inaugural-release entry (the crate has never
+  been version-bumped past 0.1.0) covering `EntityType`/`EntityRef`/
+  `EdgeKind`/`Sensitivity`, plus an `[Unreleased]` section for the two
+  later non-behavioural commits (SEC-I1 `deny.toml`+`security.yml`
+  2026-07-13; a `uuid` 1.23→1.24 bump 2026-07-25). The crate has no
+  `spec/`, `AGENTS.md`, `CLAUDE.md`, or `index.md` at all (only
+  `README.md` + `src/lib.rs`) — noted as a deliberate scale choice for
+  this single-file value-type crate rather than a gap to backfill, and
+  said so explicitly in the new CHANGELOG's header so a future reader
+  doesn't go looking for files that were never meant to exist.
+
+  **The real finding: this crate's own "who copies this" framing was
+  stale, and badly.** Both `README.md` and the `src/lib.rs` doc comment
+  said the contract "can be copied per project until a second
+  non-aggregator consumer justifies a shared dependency" — describing
+  copying as the current posture and shared-dependency as a future,
+  threshold-gated event. Grepping `Cargo.toml` across the repo for
+  `entity-ref = { path = ...}` found **eight** real consumers today,
+  none of which copied anything: `link-graph-service-with-loco` (the
+  anticipated aggregator, and by far the heaviest user — 12 files import
+  `entity_ref::`), the three edge-originating services the design doc
+  did anticipate (person, worker, case), **and four consumer apps the
+  design doc could not have anticipated** (contact-relationship-
+  management, content-management-system, patient-flow, workforce-
+  planning-management — each added after `entity-ref` shipped, each
+  using `EntityRef`/`EntityType` in its own `validation.rs`/`clients.rs`
+  to validate/dereference cross-service refs like `person_ref` rather
+  than to originate edges). Fixed the crate's own README + lib.rs doc
+  comment to state this plainly, and — since this doc mismatch traces
+  directly to the shared design doc's own stated Non-goal — also fixed
+  `agents/share/cross-service-linking.md` §2, §3, and §12: the "shared
+  runtime library" Non-goal and the "copy it per project" line now say
+  what actually happened, and the §12 open question ("copy vs. a shared
+  `mxi-links` crate") is marked resolved-by-practice rather than left as
+  a stale "lean". Also added `entity-ref` to the root `AGENTS.md` and
+  `agents/share/overview.md` **Library crates** tables — it was
+  entirely absent from both, which is its own instance of the same
+  "who consumes this" drift the audit was asked to check for. Noted in
+  both that, unlike the table's `authentication-verifier` row, `entity-ref`
+  is **not** published to crates.io (H-5 already recorded this as
+  deferred, not forgotten).
+
+  **Verified, not assumed:** `cargo test` (8 unit + 1 doctest),
+  `cargo clippy --all-targets -- -D warnings`, and `cargo fmt --check`
+  all clean before and after the doc edits (doc-only changes; no `src/`
+  behaviour touched). The README's code example and every rustdoc claim
+  (`r.service()`, `EdgeKind::EmployedBy.permits/.inverse`,
+  `EdgeKind::SubjectOf.sensitivity`) were spot-checked against `src/lib.rs`
+  and match. Did not touch `authentication-verifier-rust-crate` or
+  `integrity-mac-rust-crate` (sibling agents' concurrent work) or
+  `link-graph-service-with-loco` (out of scope; LNK-4 may still be
+  landing there).
+
   - [x] `integrity/integrity-mac-rust-crate` done 2026-08-04. Clean
     bill of health — every claim checked turned out to already be
     accurate; no `src/`/doc drift found, so no content was rewritten.

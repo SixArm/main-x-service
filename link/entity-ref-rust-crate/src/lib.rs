@@ -18,10 +18,19 @@
 //!   sensitivity, and can validate an endpoint pair.
 //!
 //! It is pure data with no behaviour beyond parsing/validation — no I/O,
-//! no clock, no panics — and is deliberately **dependency-light** so it
-//! can be copied per project (the family's drift-accepted posture) until
-//! a second non-aggregator consumer justifies a shared dependency. This
-//! is rollout **step 1** ("land the contracts; no behaviour yet").
+//! no clock, no panics — and is deliberately **dependency-light**. The
+//! original rollout plan (`agents/share/cross-service-linking.md` §2/§11)
+//! framed this as copyable per project until a second non-aggregator
+//! consumer justified a shared dependency; in practice it is embedded as
+//! a real Cargo `path` dependency by eight crates (as of 2026-08-04):
+//! the `link-graph-service-with-loco` aggregator, the three entity
+//! services that originate edges (person, worker, case), and four
+//! consumer apps (contact-relationship-management,
+//! content-management-system, patient-flow,
+//! workforce-planning-management) that validate/dereference cross-service
+//! refs without originating edges. See the crate's `README.md` for the
+//! full picture. This crate's own contract shipped as rollout **step 1**
+//! ("land the contracts; no behaviour yet").
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
