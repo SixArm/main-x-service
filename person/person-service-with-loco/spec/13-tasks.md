@@ -228,7 +228,8 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     Ok; on + protected + no token ⇒ `401`; on + protected + valid ⇒
     Ok; on + expired/tampered ⇒ `401` — plus the flag-parser
     semantics. Met: `cargo test --lib` green.
-- [ ] **T-1c — Auth follow-ups: boot-time key fetch + authorization.**
+- [x] **T-1c — Auth follow-ups: boot-time key fetch + authorization.**
+  *(fully done — the last open item below was closed by AU-1, 2026-08-01)*
   - [x] Fetch the key set over HTTP from the auth service at boot
     *(done 2026-07-04)*: new `PERSON_PASETO_KEYS_URL` env var —
     unset/blank ⇒ the `PERSON_PASETO_KEYS` env path exactly as before;
@@ -239,12 +240,16 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     back to the env path — the service **always boots**. Swapped into
     `AppState` via `with_verifier` **before** the enforcement
     middleware and shared-store state are built, so both router
-    surfaces verify against it. One-shot fetch; no refresh loop
-    (periodic refresh is a §15 roadmap note). Pinned by DB-free tokio
+    surfaces verify against it. Pinned by DB-free tokio
     tests in `src/api/rest/auth.rs`: fetch from a local ephemeral-port
     listener serving the in-process key set (minted token verifies),
     fallback on a dead port (no panic, token rejected), and the
-    URL-unset ⇒ env-path precedence.
+    URL-unset ⇒ env-path precedence. **Superseded** by AU-1 (below,
+    2026-08-01): the one-shot-fetch-only limitation this bullet
+    originally noted ("no refresh loop") no longer holds — a
+    process-wide `ReloadableVerifier` now re-fetches on
+    `PERSON_PASETO_KEYS_REFRESH_SECS`, so a key rotation at the auth
+    service is picked up without a restart.
   - [x] ABAC authorization *(done 2026-07-05; supersedes the earlier
     roles/RBAC-on-`roles`/`scope` sketch, per
     [authorization-attributes](../../../agents/share/authorization-attributes.md))*
@@ -264,32 +269,88 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     POST/PUT ok, DELETE + merge 403; `access=admin` ⇒ destructive ok;
     `svc=true` ⇒ everything; configured deny beats later allow;
     401-vs-403 split; bad policy JSON falls back to the default —
-    `cargo test --lib` green.
-  - [ ] DB-gated request test (`#[ignore]`, Postgres): with
+    `cargo test --lib` green. **Superseded** by AU-1 (below,
+    2026-08-01): the policy is now a `ReloadablePolicy` an operator can
+    edit on disk and have take effect without a restart.
+  - [x] DB-gated request test (`#[ignore]`, Postgres): with
     `PERSON_REQUIRE_AUTH` set, an unauthenticated `GET /api/persons/…`
     returns `401` while `GET /api-docs/openapi.json` stays `200`.
-  - **Acceptance (met, except the DB-gated request test above):**
-    valid token whose attributes satisfy the policy gets `2xx`; a
-    valid token the policy denies gets `403`; no/bad token gets
-    `401`. Key-set fetch from a stub auth service at boot: **met** via
-    the local-listener tokio tests above (`cargo test --lib` green).
-    Activation (`PERSON_REQUIRE_AUTH=1`) remains the operational
-    decision.
-- [ ] **T-2 — Production Fluvio publisher.**
-  - [ ] Implement `FluvioEventPublisher : EventProducer` behind
-    feature flag `fluvio`.
-  - [ ] Document failover behaviour when the broker is unreachable.
-  - **Acceptance:** integration test against a local Fluvio broker
-    publishes a `PersonCreated` event end-to-end.
-- [ ] **T-3 — Complete FHIR bundle handling.**
-  - [ ] `Bundle` GET / POST / search wrapping.
-  - [ ] OperationOutcome on malformed bundles.
-  - **Acceptance:** Touchstone FHIR validator passes on a sample
-    bundle round-trip.
-- [ ] **T-4 — FHIR capability statement endpoint.**
-  - [ ] `GET /fhir/metadata` returns a CapabilityStatement listing
+    *(done 2026-08-01 via AU-1's `tests/enforcement.rs`, below — its own
+    binary because the auth `OnceLock`s are process-wide: public paths
+    stay open, a protected read/write without a token is `401`, a
+    malformed bearer is `401` not `500`, a valid token with no
+    attributes reads `200`/writes `403`, `access=write` creates, and
+    forcing the flag off is asserted to fail the "protected" case.)*
+  - **Acceptance:** valid token whose attributes satisfy the policy
+    gets `2xx`; a valid token the policy denies gets `403`; no/bad
+    token gets `401`. Key-set fetch from a stub auth service at boot,
+    and the DB-gated request test, are both met (`cargo test --lib`
+    green; `tests/enforcement.rs` green against Postgres). Activation
+    (`PERSON_REQUIRE_AUTH=1`) remains the operational decision.
+- [x] **AU-1 — PASETO key rotation and ABAC policy hot-reload without a
+  restart.** *(done 2026-08-01; this crate is the axum-style reference,
+  case-service the loco-style one)* Closes the "changing
+  `PERSON_PASETO_KEYS_URL`/`PERSON_ABAC_POLICY_FILE` requires a restart"
+  gap T-1a/T-1c/T-1b originally shipped with.
+  - [x] The PASETO verifier moved out of `AppState` into a process-wide
+    `ReloadableVerifier` read per request by both the blanket guard and
+    the `AuthUser`/`MaybeAuthUser` extractors (previously two
+    independent `Arc<Verifier>` snapshots that a rotation could only
+    ever update one of).
+  - [x] `spawn_key_refresh` re-fetches `PERSON_PASETO_KEYS_URL` every
+    `PERSON_PASETO_KEYS_REFRESH_SECS` (default 3600; `0` disables;
+    no-op when the URL is unset) and swaps the result in. A failed
+    fetch **keeps the current key set** (a transient auth-service
+    outage must not lock every caller out).
+  - [x] `auth::policy()` is a `ReloadablePolicy`; `reload_policy()` +
+    `spawn_policy_watcher` poll `PERSON_ABAC_POLICY_FILE`'s mtime every
+    15s. A malformed edit falls back to the built-in default rather
+    than leaving the service unprotected.
+  - [x] New `tests/enforcement.rs` — the T-1c DB-gated activation proof
+    (above).
+  - **Acceptance:** met — new env var `PERSON_PASETO_KEYS_REFRESH_SECS`;
+    `tests/enforcement.rs` green against Postgres 18.
+- [x] **T-2 — Production Fluvio publisher.** *(superseded/done via BUS-3,
+  2026-08-03 — see the "Durable event bus real broker (`FluvioSink`,
+  BUS-3)" entry below)* `FluvioSink : EventSink` (the Phase-3 relay's
+  broker seam, not literally an `EventProducer` impl as this task
+  originally sketched — the relay/outbox architecture superseded that
+  shape back in T-20/T-21) lives behind the `fluvio` Cargo feature,
+  off by default. Failover is documented: an endpoint configured
+  without the feature refuses to start the relay (logged `error`)
+  rather than silently falling back to `LoggingSink`.
+  - [x] Implement the real-broker sink behind feature flag `fluvio`.
+  - [x] Document failover behaviour when the broker is unreachable.
+  - **Acceptance (met differently than drafted):** no local-Fluvio-broker
+    CI integration test exists — `tests/fluvio_relay.rs` is a
+    feature-gated `#[ignore]`d live-broker round-trip verified by
+    compiling under `--features fluvio`, matching the family-wide
+    precedent (BLK-4's `s3_round_trip_against_a_live_endpoint`,
+    case-service's BUS-1 reference); no automated stage in this repo
+    stands up a broker.
+- [x] **T-3 — Complete FHIR bundle handling.** *(done via T-11, below,
+  2026-07-07)* `GET /fhir/Patient` / `GET /fhir/Person` already return a
+  `searchset` `Bundle` (`src/api/fhir/bundle.rs`, `src/api/fhir/handlers.rs`);
+  every non-2xx FHIR response is a `FhirOperationOutcome`. `POST` takes a
+  bare resource body (not itself Bundle-wrapped), matching the family
+  contract (`agents/share/fhir.md` §4) rather than this task's original
+  "Bundle POST" phrasing.
+  - [x] `Bundle` GET / search wrapping.
+  - [x] OperationOutcome on malformed bundles.
+  - **Acceptance (met differently than drafted):** no Touchstone FHIR
+    validator run exists in this repo; correctness is pinned instead by
+    T-11's DB-free unit tests (round-trip, missing-name rejection,
+    metadata/CapabilityStatement-matches-routes).
+- [x] **T-4 — FHIR capability statement endpoint.** *(done via T-11,
+  below, 2026-07-07)* `GET /fhir/metadata` returns a `CapabilityStatement`
+  (fhirVersion `5.0.0`) listing the `Patient` interactions
+  (read/create/update/delete/search-type) and the nine supported search
+  params; a unit test pins that it matches the mounted routes.
+  - [x] `GET /fhir/metadata` returns a CapabilityStatement listing
     supported resources + interactions.
-  - **Acceptance:** schema check against R5 CapabilityStatement.
+  - **Acceptance (met differently than drafted):** pinned by a unit test
+    against the mounted routes rather than an external R5 schema
+    validator.
 - [ ] **T-5 — Dedup / merge / privacy integration tests.**
   - [ ] Real-time dedup on create.
   - [ ] Batch dedup + auto-merge.
@@ -348,8 +409,13 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   - **Acceptance:** the `validate_edge` accept/reject matrix (incl. the
     affiliation cases), the `linked`/`unlinked` emission (envelope + emit
     tests), and the matcher-partition guard are all tested (green).
-- [ ] **T-10 — Bulk import / export.** *(rollout steps 1 & 3 done
-  2026-07-10; steps 2, 4, 5 remain)* Person is the family **reference
+- [x] **T-10 — Bulk import / export.** *(all five rollout steps done:
+  1 & 3 on 2026-07-10; step 2 on 2026-08-02 as BLK-2 (below); step 4 on
+  2026-08-02 as BLK-3 (above); step 5 on 2026-08-02 as BLK-4 (above) —
+  this task's own Step 2/4/5 checkboxes went stale because the
+  completing work landed under the repo `tasks.md` BLK-2/3/4 labels
+  without a pass back through this file; found and reconciled during
+  the 2026-08-04 documentation audit)* Person is the family **reference
   entity** for this capability. See §9.2, §10.5 and
   [bulk import/export](../../../agents/share/bulk-import-export.md).
   - [x] **Step 1 (JSONL reference core).**
@@ -392,9 +458,10 @@ PR; split larger tasks (`T-12a`, `T-12b`).
       round-trip). Met: `cargo test --lib` green (182 passed, 6 ignored);
       `cargo build`, `cargo clippy --all-targets --all-features`, and the
       migration clippy all clean (0).
-  - [ ] **Step 2** — CSV codec (flattening per §9.2: dotted single-nested,
+  - [x] **Step 2** — CSV codec (flattening per §9.2: dotted single-nested,
     JSON-in-cell arrays) + keyless/unmatched rows → duplicate detection →
-    review queue with `provenance = import`.
+    review queue with `provenance = import`. *(done 2026-08-02 as
+    **BLK-2**, above — see that entry for the full acceptance detail.)*
   - [x] **Step 3** — export masking + gating *(done 2026-07-10)*:
     `bulk::MaskingProfile` (`masked` default / `full`); `ExportParams`
     gains `masking_profile` + `include_soft_deleted`. `process_export_job`
@@ -424,9 +491,15 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     --all-features`, migration clippy all clean (0). **Deferred:** a real
     soft-deleted-record export query, and folding the single-record GDPR
     export into the `filter = one pid` special case.
-  - [ ] **Step 4** — Parquet **export-only**, feature-gated.
-  - [ ] **Step 5** — S3-compatible artifact store; roll the contract to
-    the other entities.
+  - [x] **Step 4** — Parquet **export-only**, feature-gated. *(done
+    2026-08-02 as **BLK-3**, above.)*
+  - [x] **Step 5** — S3-compatible artifact store; roll the contract to
+    the other entities. *(the artifact-store half done 2026-08-02 as
+    **BLK-4**, above, for this crate; "roll the contract to the other
+    entities" is tracked family-wide, not per-crate — see
+    `agents/share/bulk-import-export.md` §11 rollout step 6, which
+    landed organization + case on 2026-08-03 without an S3 backend for
+    either.)*
 - [x] **T-11 — FHIR R5 API** (`Patient` primary + `Person` alias) — adopt
   the family contract *(done 2026-07-07)*. **Done:** reconciled the
   unmounted `src/api/fhir/` prototype to the standard — `resourceType`
@@ -651,3 +724,58 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     tree; the full DB-gated suite reruns clean against real Postgres,
     zero regressions.
 
+
+- [x] **PERSON-CONTACT-CASE — Fix `merge`/`use_type`/`telecom` writes
+  rejected by the database.** *(done 2026-08-04; found writing TUT-2 in
+  the repo `tasks.md`, whose premise depends on merge working)* Every
+  merge of two *different* persons failed `500 DATABASE_ERROR` on the
+  `patient_names_use_type_check` constraint: `src/db/repositories.rs`
+  wrote `NameUse`/`IdentifierUse`/`ContactPointSystem`/
+  `ContactPointUse`/`LinkType` via `format!("{:?}")` (`"Old"`,
+  `"Phone"`, `"Replaces"`) into columns whose CHECK constraints accept
+  only lowercase tags — no test caught it because no prior test posted
+  a name/identifier with `use_type` set, and the only merge test was
+  the self-merge rejection guard (SEC-B5), which exits before the
+  insert.
+  - [x] Write side switched to the pre-existing `enum_to_tag` helper
+    (already correct for `person_addresses`/emergency-contact tables);
+    read side switched to `tag_to_enum` instead of hand-rolled
+    `PascalCase` match arms. `identifier_type`'s `Other` variant (Debug
+    `"Other"`, CHECK `'OTHER'`) fixed the same way.
+  - [x] `NameUse` and `LinkType` gained `PartialEq, Eq` for the
+    regression test's assertions.
+  - [x] New DB-gated
+    `test_merge_two_persons_round_trips_alias_name_and_replaces_link`
+    (`tests/api_integration_test.rs`) merges two real persons and
+    re-fetches the survivor, pinning both the write (insert succeeds)
+    and read (stored lowercase tags deserialize to the right enum
+    variants) sides together.
+  - **Residual, narrower gap, not fixed here:** `LinkType::ReplacedBy`'s
+    `#[serde(rename_all = "lowercase")]` produces `"replacedby"`, not
+    the CHECK's `'replaced_by'` — nothing in this crate constructs that
+    variant today, so it is tracked but not blocking.
+  - **Acceptance:** the new DB-gated test is green against Postgres 18
+    (`scripts/ci-check.sh test-db`); `cargo test --lib` unaffected.
+
+- [x] **EX-4 — `seed_examples` CLI task.** *(done 2026-08-04)*
+  `cargo loco task seed_examples` loads the repository's shared demo
+  fixture (`examples/data/persons.jsonl`, 50 rows including five
+  deliberate duplicate pairs) into the `persons` table, for the
+  tutorials (repo `tasks.md` EX-4).
+  - [x] Inserts via the **model-layer create**
+    (`db::repositories::SeaOrmPersonRepository::create`) rather than
+    `POST /api/persons`, deliberately bypassing real-time duplicate
+    detection — the normal create endpoint returns `409` on the second
+    half of every duplicate pair (confirmed live by EX-1), which would
+    silently drop half the fixture.
+  - [x] No audit row or event is written by the seed itself; the
+    tutorials that exercise duplicate detection, audit, and events do
+    so against the seeded records afterward.
+  - [x] Refuses to insert into a non-empty `persons` table (prints a
+    message, exits cleanly), so a second run is a no-op.
+  - [x] New `src/tasks/seed_examples.rs` (`parse_fixture`, `seed`,
+    `SeedExamples`); DB-free unit tests parse the real fixture.
+  - **Acceptance:** DB-gated `tests/seed_examples_db.rs` proves a first
+    run seeds all 50 rows (including both halves of the
+    "Okonkwo/Okonkow" duplicate pair) and a second run changes nothing;
+    green against Postgres 18.

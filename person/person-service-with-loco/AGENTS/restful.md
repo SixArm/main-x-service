@@ -173,34 +173,84 @@ denied (the body names the deciding rule).
 | GET | `/api/persons/review-queue` | Stored review queue (filter `status`, `limit`) |
 | POST | `/api/persons/review-queue/{id}/decision` | Decide a pending review item (`confirmed` / `rejected`) |
 
+### Cross-service links
+
+Per [cross-service-linking.md](../../../agents/share/cross-service-linking.md)
+§4.1; person is the reference originator of `same_identity` (person ↔
+worker) and also originates `works_at` / `member_of` (person →
+organization).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/persons/{id}/links` | Create/upsert an outbound edge (idempotent) |
+| GET | `/api/persons/{id}/links` | List this person's outbound edges |
+| DELETE | `/api/persons/{id}/links/{link_id}` | Withdraw (soft-delete) an edge |
+| GET | `/api/persons/links[?since=]` | Bulk pull of all active edges — the link-graph aggregator's reconciliation source, canonical `EdgeDetail` shape (`{ "edges": [...] }`) |
+
+### Bulk import / export
+
+Person is the family's **reference entity** for
+[bulk-import-export.md](../../../agents/share/bulk-import-export.md);
+mutating routes are async loco `worker` jobs. `import` is a declared
+destructive POST.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/persons/import` | Submit a bulk import (multipart upload; `202 {job_id}`; supports `dry_run`) — JSONL, CSV, or (feature `parquet`, export-only) rejects Parquet |
+| GET | `/api/persons/import/{id}` | Import job status + counts + `errors_url` |
+| POST | `/api/persons/export` | Submit a bulk export (JSON filter body; `202 {job_id}`) — JSONL, CSV, or `parquet` (feature-gated) |
+| GET | `/api/persons/export/{id}` | Export job status + `download_url` |
+| GET | `/api/persons/bulk-jobs` | List recent import/export jobs |
+
 ### Privacy
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/persons/{id}/export` | GDPR data export |
 | GET | `/api/persons/{id}/masked` | Masked person view |
+| POST | `/api/persons/{id}/erase` | GDPR erasure — destroys personal data, keeps the audit chain linkage (irreversible; destructive, `access=admin`) |
 
-### Audit
+### Audit & compliance
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/persons/{id}/audit` | Person audit logs |
+| GET | `/api/persons/{id}/audit/disclosures` | HIPAA §164.528 accounting of disclosures for this person |
 | GET | `/api/audit/recent` | Recent audit activity |
 | GET | `/api/audit/user` | User-specific audit logs |
+| GET | `/api/audit/verify` | Recompute the audit hash chain, report any linkage/content break (HIPAA §164.312(c)) |
+| GET | `/api/audit/checkpoint` | Take a checkpoint witness of the current audit chain tail |
+| POST | `/api/audit/checkpoint/verify` | Check whether the chain still honours a recorded checkpoint (detects wholesale deletion) |
+| GET | `/api/records/verify` | Recompute each person record's content hash, report mismatches (complements `/api/audit/verify`) |
+| GET | `/api/compliance` | Service identification and build provenance |
+| GET | `/api/compliance/sbom` | CycloneDX SBOM + SOUP register (not on the public allow-list — it names exact dependency versions) |
 
 **Audit Query Parameters:** `limit` (default 50, max 500), `user_id` (for user endpoint)
 
 ## FHIR R5 Endpoints
 
+Per [fhir.md](../../../agents/share/fhir.md) §3: **`Patient` is the
+primary resource** (`high` fidelity, full CRUD + search); `/fhir/Person`
+is a thin **read-only alias** for the demographic view (T-11, done
+2026-07-07 — this reconciled the crate's earlier unmounted prototype,
+which used the non-standard `resourceType: "Person"`).
+
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/fhir/Person/{id}` | Get FHIR Person |
-| POST | `/fhir/Person` | Create FHIR Person |
-| PUT | `/fhir/Person/{id}` | Update FHIR Person |
-| DELETE | `/fhir/Person/{id}` | Delete FHIR Person |
-| GET | `/fhir/Person` | Search FHIR Persons |
+| GET | `/fhir/metadata` | `CapabilityStatement` (fhirVersion 5.0.0) |
+| POST | `/fhir/Patient` | Create FHIR Patient |
+| GET | `/fhir/Patient` | Search FHIR Patients |
+| GET | `/fhir/Patient/{id}` | Get FHIR Patient |
+| PUT | `/fhir/Patient/{id}` | Update FHIR Patient |
+| DELETE | `/fhir/Patient/{id}` | Delete FHIR Patient |
+| GET | `/fhir/Person` | Search FHIR Persons (alias; GET only) |
+| GET | `/fhir/Person/{id}` | Get FHIR Person (alias; GET only) |
 
 **FHIR Search Parameters:** `name`, `family`, `given`, `identifier`, `birthdate`, `gender`, `_count`
+
+Every non-2xx FHIR response is a `FhirOperationOutcome`; all responses
+are `application/fhir+json`. `/fhir/*` sits behind the same blanket
+auth+ABAC guard as `/api/*` (not on the public allow-list).
 
 ## Response Format
 
@@ -248,9 +298,13 @@ Error responses:
 - `src/api/rest/handlers.rs` — All REST handler implementations
 - `src/api/rest/routes.rs` — Route organization
 - `src/api/rest/state.rs` — AppState (shared application state)
+- `src/api/rest/links.rs` — Cross-service link handlers (`entity_links`)
 - `src/api/fhir/mod.rs` — FHIR module, FhirPerson, conversions
-- `src/api/fhir/handlers.rs` — FHIR endpoint handlers
+- `src/api/fhir/handlers.rs` — FHIR endpoint handlers (`Patient` primary + `Person` alias)
 - `src/api/fhir/resources.rs` — FHIR resource converters
 - `src/api/fhir/bundle.rs` — FHIR bundle handling
 - `src/api/fhir/search_parameters.rs` — FHIR search parameter support
 - `src/api/grpc/mod.rs` — gRPC server (stub)
+- `src/bulk/handlers.rs` — Bulk import/export REST handlers
+- `src/bulk/worker.rs` — `BulkJobWorker` (loco `worker` job)
+- `src/compliance/` — SBOM/SOUP identification, audit-chain verification, checkpoints, record-integrity verification

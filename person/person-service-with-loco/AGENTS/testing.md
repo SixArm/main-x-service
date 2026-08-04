@@ -75,6 +75,7 @@ Benchmark tests use Criterion for statistical benchmarking.
 | `benches/matching_bench.rs`   | Name matching, full person matcher, phonetic encoding          |
 | `benches/search_bench.rs`     | Person indexing, full-text search, fuzzy search                 |
 | `benches/validation_bench.rs` | Person validation, phone normalization, address standardization |
+| `benches/bridge_bench.rs`     | Service↔matcher adapter bridge: `to_matcher_person` projection, end-to-end `match_persons`, one-to-many candidate scoring |
 
 ### Running Benchmarks
 
@@ -157,7 +158,7 @@ a test here.
 
 Run with: `cargo test --test duplicate_detection`
 
-### Coverage (18 tests)
+### Coverage (19 tests)
 
 | Category | What it pins |
 |---|---|
@@ -166,6 +167,7 @@ Run with: `cargo test --test duplicate_detection`
 | Negative cases | unrelated records score low, common-name + divergent demographics not flagged as duplicate |
 | Field-routing pinning | per-adapter mapping tests (telecom → phone/email, address field renames, identifier-system-URI routing) |
 | National-ID scheme audit | all 26 matcher national-ID slots route from a `system`-URI fragment and deterministic-match on a shared well-formed value (`all_national_id_schemes_route_to_their_slot`); AU/IE IHI digit-count disambiguation; CPF deterministic full-credit |
+| Partition guard | `links_are_not_a_matcher_signal` — adding cross-service link data never moves the match score (§7 of `cross-service-linking.md`) |
 | Edge cases | sparse records, empty fields, config presets |
 
 ### Running

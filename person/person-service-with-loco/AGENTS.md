@@ -43,6 +43,28 @@ Shared reference docs live at the project root under
 | [compliance-for-healthcare.md](../../agents/share/compliance-for-healthcare.md) | HIPAA, NHS, … |
 | [compliance-for-technology.md](../../agents/share/compliance-for-technology.md) | ISO, GDPR, … |
 
+## Session context (auto-loaded)
+
+`CLAUDE.md` is this crate's one-line `@AGENTS.md` include (the family
+convention — see the root `AGENTS.md` "Per-subproject docs" table), so
+these `@`-imports are what a Claude Code session in this crate actually
+loads at start, beyond the tables above (which are plain links, for a
+human or agent to open on demand rather than always pull into context):
+
+@../../agents/share/overview.md
+@AGENTS/matching.md
+@AGENTS/models.md
+@AGENTS/restful.md
+@AGENTS/testing.md
+@../../agents/share/architecture.md
+@../../agents/share/auditability.md
+@../../agents/share/availability.md
+@../../agents/share/match-search-merge.md
+@../../agents/share/observability.md
+@../../agents/share/privacy.md
+@../../agents/share/restful.md
+@../../agents/share/loco.md
+
 ## Running this crate
 
 ```bash

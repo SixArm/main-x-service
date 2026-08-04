@@ -3058,6 +3058,60 @@ committing (see plan.md §4).
   something `agents/share/*.md` already states accurately, prefer a
   link over a second copy (same fix pattern as DOC-1).
 
+  - [x] **person/person-service-with-loco** *(done 2026-08-04)*.
+    `spec/13-tasks.md`: reconciled real drift — T-2 (Fluvio publisher),
+    T-3 (FHIR bundle), T-4 (FHIR CapabilityStatement) were still `[ ]`
+    though delivered by BUS-3 and T-11 respectively; T-10's own Step
+    2/4/5 checkboxes were stale `[ ]` though the work landed under the
+    repo `tasks.md` BLK-2/3/4 labels without a pass back through this
+    file; T-1c's last open box (a DB-gated activation test) was closed
+    by AU-1's `tests/enforcement.rs` with no corresponding task update.
+    Added missing task entries for `seed_examples` (EX-4), the
+    PERSON-CONTACT-CASE merge/`use_type` write-rejection fix, and AU-1
+    (PASETO key rotation + ABAC policy hot-reload) — none had a §13
+    entry despite landing this session. Also fixed `spec/14` (open-gaps
+    table still listed T-2/T-3/T-4 as open, "15 endpoints" stale to
+    35+, FHIR row didn't say Patient-primary) and `spec/16` (OQ-1
+    resolved — FHIR Organization lives in organization-service, not
+    here). `AGENTS/restful.md`: added three entirely-missing endpoint
+    groups (cross-service links, bulk import/export, and
+    audit/compliance/erasure — 15 real mounted routes with no table
+    entry) and fixed the FHIR table, which still described the
+    pre-T-11 non-standard `resourceType: "Person"` prototype instead of
+    the shipped `Patient`-primary/`Person`-alias shape.
+    `AGENTS/testing.md`: bench/bridge-test counts were off by one file
+    / one test. `index.md`: corrected an OpenTelemetry-export
+    overclaim and a "Prometheus metrics — future enhancement" claim for
+    an endpoint that already ships (both against the honest matrix in
+    `agents/share/overview.md`), an "Authentication: planned" claim
+    when PASETO verification + the blanket guard were long since done,
+    stale test-coverage/version/Project-Structure/Development-Phases
+    figures, and ported several curl examples, feature bullets (tax ID,
+    documents, emergency contacts, a whole missing "Data Quality &
+    Validation" section) and the Merge data-flow step that existed only
+    in `CLAUDE.md` and would otherwise have been lost.
+    **Cross-cutting structural finding, reported for the other five
+    older crates (worker/place/thing/event/course) to cross-check:**
+    root `AGENTS.md`'s own "per-subproject docs" table says `CLAUDE.md`
+    should be "a one-line `@AGENTS.md` include" — true for the 22 newer
+    crates (verified: organization's and care-pathway's `CLAUDE.md` are
+    both literally `@AGENTS.md`), but person's `CLAUDE.md` instead held
+    a full independent README (Quick Start, Project Structure,
+    Configuration, curl examples, …) that near-duplicated `index.md`
+    almost section-for-section, *plus* a scattered set of `@`-imports
+    (`AGENTS/matching.md`, `AGENTS/models.md`, `agents/share/*.md`,
+    …) that `AGENTS.md` itself did not carry — so a Claude Code session
+    here was pulling in "read-only reference" content only because it
+    happened to be interleaved into the README-shaped file, not because
+    the crate's actual working-agreements doc named it. Resolved (not
+    just flagged) by moving those `@`-imports into a new "Session
+    context (auto-loaded)" section in `AGENTS.md` and reducing
+    `CLAUDE.md` to the documented one-liner, after confirming every
+    piece of `CLAUDE.md`-only prose content had a home in `index.md`
+    (added the few pieces that didn't — see above). No content was
+    dropped; the crate now matches the documented convention and the
+    newer crates' actual practice.
+
   - *`worker/worker-service-with-loco` done 2026-08-04.* Found and
     fixed: (1) **duplicate task IDs** in `spec/13-tasks.md` — "T-10"
     named both the cross-service-links task and the workforce-
@@ -3161,6 +3215,68 @@ committing (see plan.md §4).
     weights/confidence thresholds (`AGENTS/matching.md`) verified
     byte-accurate against `src/matching/scoring.rs`; `README.md`
     already symlinks to `index.md`.
+
+  - *`thing/thing-service-with-loco` done 2026-08-04.* Confirmed
+    today's QA-SERVER-FIELDS fix (8fecaac7) was already documented
+    accurately in `spec/09-api-surface.md` and `CHANGELOG.md`; added a
+    corresponding note to `AGENTS/models.md` (which fields are now
+    `#[serde(default)]`) since it had none. Found and fixed several
+    other real gaps, the same shapes place and worker's passes turned
+    up: (1) **`spec/02-scope.md` claimed "REST API (Axum) + gRPC
+    stub"** and both `CLAUDE.md`/`AGENTS.md` claimed "REST + gRPC API"
+    — false; there is no `.proto`, no gRPC module, and no server, just
+    an unused `tonic` dependency and a `GRPC_PORT` setting nothing
+    reads (confirmed against `agents/share/overview.md`'s matrix,
+    which already correctly marks thing's gRPC stub `–`). Fixed the
+    claim everywhere it appeared (`spec/02`, `spec/08`, `spec/09`,
+    `spec/15`, `AGENTS.md`). (2) **A shipped, tested, reachable
+    feature with zero `spec/` presence**: row-level integrity digests
+    (`src/compliance/mac.rs`+`record_integrity.rs`+`audit_integrity.rs`,
+    `GET /api/records/verify` + `GET /api/audit/verify`, landed
+    2026-07-28) had no `spec/13` task, no `spec/14` row, no
+    `CHANGELOG.md` entry, and wasn't in `AGENTS/restful.md`'s endpoint
+    table (which also still listed a phantom `/api/audit/user` that
+    doesn't exist in the router) — added all four. (3) **A large,
+    previously-undiscovered dead-config surface**: `SERVER_HOST`,
+    `SERVER_PORT`, `GRPC_PORT`, `DATABASE_MAX_CONNECTIONS`,
+    `DATABASE_MIN_CONNECTIONS`, `OTLP_SERVICE_NAME`, `OTLP_ENDPOINT`,
+    `STREAMING_BROKER_URL`, and `STREAMING_TOPIC` all parse into the
+    crate's legacy pre-loco `src/config/mod.rs::Config` struct but are
+    read **nowhere else** in `src/` — the real bind address/port/pool
+    size come from loco's own `config/*.yaml`, and there is no OTLP
+    exporter at all (no `src/observability/` module, unlike
+    person/worker/event). `CLAUDE.md`'s and `index.md`'s configuration
+    tables documented all nine as if live; annotated every one rather
+    than deleting the rows outright, since a future pass may choose to
+    wire or remove them (flagging, not silently patching, since this
+    edges toward a code question). (4) **Stale test count**:
+    `spec/14-implementation-status.md` said 141 unit tests; the live
+    count (`cargo test --lib`) is 197 — rewrote the Delivered/gap
+    tables to add T-7/T-9/T-10/BUS-3/review-queue/QA-SERVER-FIELDS,
+    none of which appeared there before, plus a `T-8` (bulk
+    import/export) gap row that was missing. Also fixed **T-1**
+    ("Production Fluvio publisher"), which was still `[ ]` even though
+    BUS-3's `FluvioSink` is exactly that capability, landed under a
+    different trait name (`EventSink`, not `EventProducer`) —
+    marked `[x]` with a note on what's actually still open (no
+    deployment points `THING_FLUVIO_ENDPOINT` at a broker yet). (5)
+    **`AGENTS/testing.md`** was missing 4 of the 10 real `tests/*.rs`
+    files (`api_integration_test.rs`, `duplicate_detection.rs`,
+    `enforcement.rs`, `fluvio_relay.rs`) — added rows for all four. (6)
+    **The `CLAUDE.md`/`AGENTS.md` split**: same finding and fix as
+    worker's and place's notes above — thinned thing's 8.2 KB
+    `CLAUDE.md` to `@AGENTS.md` after first porting its
+    Features/Configuration/Security content that wasn't already in
+    `index.md` (unlike worker/place, thing's `CLAUDE.md` was not a
+    strict subset of `index.md`, so this pass expanded `index.md`
+    rather than discarding that content), and corrected thing's own
+    "doc hierarchy" table, which had the same inverted
+    `CLAUDE.md`-groups-with-`README.md` claim. `AGENTS/matching.md`'s
+    weight/confidence tables and its cross-references into the
+    *entity-level* `thing/spec/13-tasks.md` (T-8) and
+    `thing/spec/16-open-questions.md` (OQ-2) — distinct from this
+    crate's own `spec/13`/`spec/16` — verified correct on inspection;
+    `README.md` already symlinks to `index.md`.
 
 - [ ] **DOC-3 (L)** Matcher crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: person, worker, place, thing, event, course,
