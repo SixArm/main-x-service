@@ -4394,7 +4394,7 @@ committing (see plan.md §4).
   Layout table also still listed `spec.md` as a single file; fixed
   alongside.
 
-- [ ] **DOC-4 (L)** Front-end crates' `spec/`, `AGENTS.md`,
+- [x] **DOC-4 (L)** Front-end crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: all 11 SvelteKit front-ends (person, worker,
   place, thing, event, course, organization, care-pathway, case,
   project-portfolio-management, authentication). Cross-check each
@@ -5062,11 +5062,34 @@ committing (see plan.md §4).
     keys carry real, distinct per-locale translations (spot-checked
     French) rather than English stubs.
 
-  **DOC-4 status: 11 of 11 front-ends done as of 2026-08-04**
-  (organization, thing, worker, course, place, person, case,
-  care-pathway, event, authentication, project-portfolio-management).
-  Leaving the parent checkbox for the user/coordinator to flip per this
-  task's own instruction not to mark it from a sub-agent.
+  **DOC-4 closed, 2026-08-04 — all 11 front-ends done** (organization,
+  thing, worker, course, place, person, case, care-pathway, event,
+  authentication, project-portfolio-management).
+
+  **Cross-cutting finding worth its own record**: a real, previously
+  undetected e2e regression from commit `ad95088e` (the family-wide
+  BFF-proxy-prefix fix) affected every front-end whose
+  `tests/e2e/smoke.spec.ts` stub compared `url.pathname` against a bare
+  `/api/<plural>` path — the browser's real request lands on
+  `/api/proxy/api/<plural>` instead, so the stub never matched and
+  several tests failed on every run. Invisible to `svelte-check`,
+  vitest, and `pnpm build`; only `pnpm test:e2e` surfaces it. Found and
+  fixed independently in **case** and **care-pathway** by their own
+  audits; **organization**'s own audit ran check/test/build but not
+  `test:e2e` and missed it — caught and fixed directly afterward
+  (`a5f72954`, 2/7 tests were failing, now 7/7) after the pattern
+  repeating twice made it worth checking the remaining crates directly
+  rather than trusting each audit to think to run it. **PPM** compounded
+  the same bug with a second, larger one: both its e2e spec files still
+  navigated the `/projects*` routes retired by the 2026-07-20 `/plans`
+  collection unification, so 21 of its 23 e2e tests had been silently
+  failing for two weeks; its own audit caught and fixed both issues
+  together (23/23 passing, independently re-verified). **authentication**
+  has no `/api/proxy` passthrough at all — a different, more fundamental
+  shape (server-side `+page.server.ts` actions/loads, which
+  `page.route()` cannot intercept) — its audit confirmed this empirically
+  and documented the real e2e failure honestly rather than attempting a
+  fix out of scope for a docs pass.
 
 - [ ] **DOC-5 (M)** Library crates' `spec/`, `AGENTS.md`/`CLAUDE.md`,
   `README.md`/`index.md`: `authentication-verifier-rust-crate`,
