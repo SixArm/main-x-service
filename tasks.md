@@ -3753,6 +3753,90 @@ committing (see plan.md §4).
   if a doc describes these as used only within their own service's
   matching pipeline, that's now stale.
 
+  - *`care-pathway/care-pathway-matcher-rust-crate` done 2026-08-04.*
+    `spec/index.md` (this crate's single-file §1–§25 shape — confirmed
+    it, not a split-file layout) had a genuine **internal
+    self-contradiction**, the same failure class DOC-2 kept finding in
+    the service crates: §6 (Domain model), §7 (Configuration), §13.1,
+    §13.2, and the §5 algorithm-overview diagram all described
+    `tags`/`relationships` (`CarePathway.tags`, `CarePathway.
+    relationships`, `MatchConfig::relationships_weight`/`tags_weight`,
+    `MatchBreakdown::relationships_score`/`tags_score`,
+    `RelationshipRef`/`RelationKind`) in the present tense as if
+    already shipped, while §21's re-export list even claimed
+    `RelationshipRef`/`RelationKind` were part of the live `lib.rs`
+    contract — none of it exists in `src/` (verified by grep across
+    every `src/*.rs` and both test files: zero hits), and §23's own
+    task queue correctly lists implementing both as still `[ ]`,
+    matching a `CHANGELOG.md [Unreleased]` entry that says outright
+    "Code implementation is tracked in spec §23." Fixed by annotating
+    §5/§6/§7/§13.1/§13.2/§21 as **planned, not yet implemented**
+    (cross-referenced to §23) rather than deleting the design content —
+    consistent with this crate's own `AGENTS/spec-driven-development.md`
+    policy ("when spec and code disagree, the spec is right... open a
+    task in §23," not silently rewritten to match code), and with the
+    ground rule to flag rather than quietly change scoring behaviour
+    since implementing the feature is a separate three-part PR. Every
+    other section checked out against the code: the six live components'
+    weights (name 0.30 / condition 0.25 / pathway_code 0.15 /
+    care_setting 0.10 / interventions 0.10 / keywords 0.10, threshold
+    0.85, strict/lenient 0.95/0.70), the three deterministic
+    short-circuits (R-0 identifier schemes, R-1 provider+pathway_code,
+    R-2 same_as), and the SEC-M2 empty-code guard are all byte-accurate
+    against `src/config.rs`/`src/matcher.rs`. Rustdoc spot-check
+    (`lib.rs`, `matcher.rs`, `scoring.rs`, `care_pathway.rs`,
+    `config.rs`, `normalize.rs`, `phonetic.rs`, `error.rs`, `main.rs`)
+    found no stale `///`/`//!` comments — every one matches current
+    behaviour. `CLAUDE.md` is already the documented one-line
+    `@AGENTS.md` include (no drift to fix, unlike the six older service
+    crates DOC-2 found). `README.md`/`index.md`/`AGENTS.md`/`AGENTS/
+    *.md` needed no changes — none of them mention `tags`/
+    `relationships` and their usage examples/weight tables already
+    matched the code. Verified live: `cargo test` (10 unit-test modules
+    + 10-test `tests/public_api.rs` + 4-test `tests/property_tests.rs`
+    + 7 doctests, all green), `cargo clippy --all-targets -- -D
+    warnings` clean, `cargo fmt --check` clean, and the sibling
+    `care-pathway-service-with-loco/tests/matching.rs` bridge test
+    §20 claims exists (read-only confirmation only — that crate is out
+    of this task's scope). Did not touch
+    `care-pathway-service-with-loco` per this task's boundary.
+
+  - [x] `case/case-matcher-rust-crate` done. Found and fixed a real
+    spec/code mismatch, not a doc-only staleness: `spec/index.md` §5
+    (algorithm overview), §6 (domain model), §7 (configuration), §13a
+    (relationships), §13b (tags), and §21 (compatibility/re-exports)
+    described a `tags` field/`tags_score`/`tags_weight` and a
+    `relationships` field/`RelationshipRef`/`RelationKind`/
+    `relationships_score`/`relationships_weight` as though already
+    implemented — none of them exist in `src/case.rs`, `src/config.rs`,
+    `src/scoring.rs`, or `lib.rs`'s re-exports (confirmed by grep + read
+    of every `src/*.rs`). §23's own task list correctly already listed
+    implementing both as open work, so the crate's spec-first
+    discipline was being followed but the normative sections read as
+    present-tense fact with no cross-reference to §23. Annotated all six
+    sections "planned — see §23" / "not yet implemented" (kept the
+    design content per "spec is right, don't silently launder"; did not
+    invent code) and corrected §21 to drop `RelationshipRef`/
+    `RelationKind` from the *current* re-export list (that part was a
+    flat factual error, not just forward-looking). Also added the
+    SEC-M2 trivial-identifier/trivial-`same_as` skip behaviour to §15/
+    §16 and `AGENTS/matching-algorithm.md` (landed per `CHANGELOG.md`
+    `[Unreleased]`, previously undocumented in spec), and the `fuzz/`
+    cargo-fuzz harness (SEC-I2, also in `CHANGELOG.md` `[Unreleased]`)
+    to spec §24 and `AGENTS/testing.md`. Verified: `CaseStatus` has no
+    `#[serde(rename_all)]` and nothing in spec/README/index/AGENTS
+    claims a lowercase wire form — spec §6 correctly states bare
+    PascalCase (`"Docket"`, `"InProgress"`). `CLAUDE.md` was already
+    the thin `@AGENTS.md` include (no DOC-2-style drift to fix).
+    `README.md`/`index.md` are accurate, not symlinks, and all 7
+    doctests + `cargo test --doc` pass. `AGENTS/*.md` (index,
+    matching-algorithm, normalization, spec-driven-development, testing)
+    were otherwise accurate against the live code. `cargo test`,
+    `cargo clippy --all-targets --all-features -- -D warnings`, and
+    `cargo fmt --check` all clean (docs-only change; no `src/` edits).
+    All touched files stay well under 40 KB (`spec/index.md` 13.9 KB
+    after edits).
+
 - [ ] **DOC-4 (L)** Front-end crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: all 11 SvelteKit front-ends (person, worker,
   place, thing, event, course, organization, care-pathway, case,

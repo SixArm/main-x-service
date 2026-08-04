@@ -59,36 +59,49 @@ Input: Case A, Case B, MatchConfig
   ├─ case_type_score    (both set)    exact enum (1.0/0.0)
   ├─ status_score       (both set)    exact enum (1.0/0.0)
   ├─ keywords_score     (≥1 set)      Jaccard
-  ├─ tags_score         (both set)    Jaccard over folded tags  (§13b)
-  ├─ relationships_score(≥1 set)      typed-set Jaccard over (relation, case_id)  (§13a)
+  ├─ tags_score         (both set)    Jaccard over folded tags  — PLANNED, §13b/§23, not yet in code
+  ├─ relationships_score(≥1 set)      typed-set Jaccard over (relation, case_id)  — PLANNED, §13a/§23, not yet in code
   └─ renormalised weighted average over present components
 ```
 
 `priority`, `opened_date`, and `in_language` are carried on `Case`
 but never scored.
 
+> **Implementation status.** `tags_score` and `relationships_score`
+> are specified ahead of the code (per this crate's spec-first
+> discipline — see `AGENTS/spec-driven-development.md`): §23 carries
+> the open task to add them. Until that task lands, `Case` has no
+> `tags` or `relationships` field, `MatchConfig` has no
+> `tags_weight`/`relationships_weight`, and `MatchBreakdown` has no
+> `tags_score`/`relationships_score` — the live algorithm is exactly
+> the six components above the line, matching `src/matcher.rs` today.
+
 ## 6. Domain model
 
-`Case`: `title` (required), `alternate_titles`, `case_number`,
-`agency_id`, `agency_name`, `case_type`, `status`, `priority` (data
-only), `opened_date` (data only), `subjects`, `keywords`, `tags`,
-`identifiers` (`CaseIdentifier { scheme, value }`), `same_as`,
-`in_language`, `relationships` (`Vec<RelationshipRef>`).
+`Case` (as implemented today): `title` (required), `alternate_titles`,
+`case_number`, `agency_id`, `agency_name`, `case_type`, `status`,
+`priority` (data only), `opened_date` (data only), `subjects`,
+`keywords`, `identifiers` (`CaseIdentifier { scheme, value }`),
+`same_as`, `in_language`.
 
-`tags` (default empty) are user-applied operational labels for grouping
-/ filtering / triage / workflow (e.g. `"vip"`, `"review"`,
-`"fast-track"`), distinct from `keywords` (subject-matter discovery
-terms). The matcher scores `tags` by case-insensitive set Jaccard
-(§13b); a supporting signal, not an identifying field on its own.
+**Planned (§23, not yet on `Case`):** `tags` and
+`relationships` (`Vec<RelationshipRef>`).
 
-`relationships` holds typed case-to-case references —
+`tags` (default empty, once added) would be user-applied operational
+labels for grouping / filtering / triage / workflow (e.g. `"vip"`,
+`"review"`, `"fast-track"`), distinct from `keywords` (subject-matter
+discovery terms). The matcher would score `tags` by case-insensitive
+set Jaccard (§13b); a supporting signal, not an identifying field on
+its own.
+
+`relationships`, once added, would hold typed case-to-case references —
 `RelationshipRef { relation: RelationKind, case_id: String }` where
 `RelationKind` is a `#[non_exhaustive]` enum mirroring the service:
 `RelatedTo` and `ConsolidatedWith` (symmetric), `ParentCase` / `SubCase`
 (inverses — consolidation hierarchy), and `Supersedes` / `SupersededBy`
 (inverses — replacement). `case_id` is an opaque registry id
-(whitespace-trimmed, non-empty); the matcher does not resolve, invert,
-or transitively close the references — it compares the two cases'
+(whitespace-trimmed, non-empty); the matcher would not resolve, invert,
+or transitively close the references — it would compare the two cases'
 relationship **sets** (§13a). A supporting signal, not an identifying
 field on its own.
 
@@ -108,13 +121,14 @@ serialises as `{"Custom":"label"}`.
 
 ## 7. Configuration
 
-`MatchConfig` weights (default): title 0.30, subjects 0.25,
-case_number 0.15, case_type 0.10, status 0.05, keywords 0.15,
-`tags_weight` 0.05 (a supporting signal — §13b), `relationships_weight`
-0.05 (a supporting signal — §13a). The eight weights are renormalised
-over the participating components per match (§17), so they need not sum
-to exactly 1.0. Threshold 0.85. Presets: `strict()` 0.95, `lenient()`
-0.70.
+`MatchConfig` weights (default, as implemented today): title 0.30,
+subjects 0.25, case_number 0.15, case_type 0.10, status 0.05,
+keywords 0.15 — these six sum to exactly 1.0. **Planned (§23, not yet
+on `MatchConfig`):** `tags_weight` 0.05 (a supporting signal — §13b)
+and `relationships_weight` 0.05 (a supporting signal — §13a); once
+added, the eight weights would be renormalised over the participating
+components per match (§17), so they need not sum to exactly 1.0.
+Threshold 0.85. Presets: `strict()` 0.95, `lenient()` 0.70.
 
 Changing any default weight is a three-part change: edit this section,
 the `MatchConfig` defaults, and `CHANGELOG.md`.
@@ -124,8 +138,8 @@ the `MatchConfig` defaults, and `CHANGELOG.md`.
 `fold` (trim + NFKC + lowercase, diacritic-preserving); `case_number`
 (alphanumeric-only, uppercased — so `"CV-2024-001234"` ≡
 `"cv 2024 001234"`); `url` (fold + drop trailing slash); `fold_set`
-(sort + dedupe). Subjects, keywords, and tags compare via `fold_set`
-Jaccard.
+(sort + dedupe). Subjects and keywords compare via `fold_set` Jaccard
+today; `tags` (§13b) would too, once implemented.
 
 ## 9. Title similarity
 
@@ -155,7 +169,11 @@ Case type weight 0.10, status weight 0.05.
 Jaccard over `fold_set`. Skipped when both empty; `0.0` when exactly one
 side is populated.
 
-## 13a. Relationships
+## 13a. Relationships (planned — see §23)
+
+> **Not yet implemented.** `Case` carries no `relationships` field and
+> `MatchBreakdown` carries no `relationships_score` today; this section
+> specifies the intended design ahead of the §23 implementation task.
 
 Typed-set **Jaccard** over the `(relation, case_id)` pairs:
 `score = |A ∩ B| / |A ∪ B|`, where each side's set is
@@ -169,7 +187,11 @@ otherwise a value in `[0.0, 1.0]`. A **supporting** signal weighted
 `relationships_weight` (§7, default `0.05`); shared references never
 single-handedly establish a match.
 
-## 13b. Tags
+## 13b. Tags (planned — see §23)
+
+> **Not yet implemented.** `Case` carries no `tags` field and
+> `MatchBreakdown` carries no `tags_score` today; this section
+> specifies the intended design ahead of the §23 implementation task.
 
 Plain set **Jaccard** over the case-insensitively normalised tag sets:
 `tags_score = |A ∩ B| / |A ∪ B|` over each side's `fold_set` of tags —
@@ -189,11 +211,19 @@ downstream consumers and MUST NOT contribute to the score.
 
 R-0: any shared value on a deterministic scheme → 1.0. Empty values
 ignored. `AgencyCaseNumber`/`LocalId`/`Custom` are excluded.
+**SEC-M2:** a *trivial* value is also ignored — one with no
+alphanumeric character other than `'0'` (i.e. empty/punctuation-only,
+the sentinel `"0"`, or an all-zeros UUID) — so two different cases
+sharing only a placeholder identifier do not spuriously short-circuit
+(`src/matcher.rs::is_trivial_identifier`).
 
 ## 16. Agency+number, same_as, and open questions
 
 R-1: shared non-empty agency key + equal normalised `case_number` →
-1.0. R-2: any normalised `same_as` URL overlap → 1.0.
+1.0. R-2: any normalised `same_as` URL overlap → 1.0. **SEC-M2:** R-2
+also ignores a bare root `"/"` (which `normalize::url` deliberately
+keeps non-empty), so two different cases sharing only `"/"` do not
+short-circuit.
 
 Open questions: should a shared subject set alone be a strong pin
 (currently probabilistic — many cases per subject)? Should case-type or
@@ -225,9 +255,11 @@ contract.
 
 Semantic versioning. Re-exports from `lib.rs` are the contract:
 `Case`, `CaseIdentifier`, `IdentifierScheme`, `CaseType`, `CaseStatus`,
-`Priority`, `RelationshipRef`, `RelationKind`, `MatchingEngine`,
-`MatchConfig`, `MatchResult`, `MatchBreakdown`, `Confidence`, `Error`,
-`Result`.
+`Priority`, `MatchingEngine`, `MatchConfig`, `MatchResult`,
+`MatchBreakdown`, `Confidence`, `Error`, `Result`. (`RelationshipRef`
+and `RelationKind` are **planned** additions — §13a, §23 — not yet
+present in `src/case.rs` or re-exported from `lib.rs`; add them to
+this list in the same PR that lands §23's relationships task.)
 
 ## 22. Anti-patterns
 
@@ -261,8 +293,16 @@ IO, async, or panics to library code.
 
 Unit tests embedded per module; an integration suite
 (`tests/public_api.rs`) over the re-exported surface; rustdoc examples
-run as doctests. Gate: `cargo test`, `cargo clippy --all-targets
---all-features -- -D warnings`, `cargo fmt --check`.
+run as doctests; property-based tests (`tests/proptests.rs`, `proptest`)
+pinning never-panic and finite-`[0.0,1.0]`-score invariants. Gate:
+`cargo test`, `cargo clippy --all-targets --all-features -- -D
+warnings`, `cargo fmt --check`.
+
+**Fuzzing (SEC-I2).** A standalone `fuzz/` `cargo-fuzz` crate (not a
+workspace member — never affects the stable build/test/clippy gate
+above) carries two coverage-guided libFuzzer targets, `match_cases` and
+`normalize`, over the same never-panic / finite-score invariants. Run
+on nightly: `cargo +nightly fuzz run <target>` — see `fuzz/README.md`.
 
 ## 25. Change control
 

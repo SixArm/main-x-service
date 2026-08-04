@@ -18,6 +18,13 @@ Deterministic schemes (`IdentifierScheme::is_deterministic`): `Docket`,
 `ExternalCaseId`, `Uri`, `Uuid`. NOT deterministic:
 `AgencyCaseNumber` / `LocalId` (agency-scoped) and `Custom`.
 
+**SEC-M2 — trivial values never short-circuit.** R-0 skips a folded
+identifier value with no alphanumeric character other than `'0'`
+(empty/punctuation-only, the sentinel `"0"`, or an all-zeros UUID); R-2
+skips a bare root `"/"` `same_as` value. Two *different* cases sharing
+only such a placeholder must not pin to `1.0`
+(`src/matcher.rs::is_trivial_identifier`).
+
 ## Probabilistic components
 
 | Component | Default weight | Algorithm |

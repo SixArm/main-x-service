@@ -25,6 +25,27 @@ threshold presets, the one-to-many surface, the documented enum serde
 wire shape (unit variants vs `Custom`), and `MatchResult` JSON
 serialisation. Run `cargo test --test public_api`.
 
+## Property-based tests
+
+[`tests/proptests.rs`](../tests/proptests.rs) (`proptest`, dev-only)
+drives random inputs to pin: the engine never panics; `MatchResult`
+scores (and every breakdown sub-score) are finite and in `[0.0, 1.0]`;
+`match_cases` is symmetric in argument order; and the pure helpers
+(`normalize::*`, `phonetic::soundex`/`same`, `Confidence::classify`)
+never panic on arbitrary UTF-8/floats. Run `cargo test --test
+proptests`.
+
+## Fuzzing (SEC-I2)
+
+A standalone [`fuzz/`](../fuzz/) `cargo-fuzz` crate — not a workspace
+member, so it never affects the gate below — carries two
+coverage-guided libFuzzer targets: `match_cases` (JSON-deserialized
+`[case_a, case_b]` → `MatchingEngine::match_cases`, asserting a finite
+`[0,1]` score in both argument orders) and `normalize` (the pure
+`normalize` functions, never-panic over arbitrary UTF-8). Requires a
+nightly toolchain; see [`fuzz/README.md`](../fuzz/README.md) for
+`cargo +nightly fuzz run <target>`.
+
 ## Gate
 
 `cargo test` (all green), `cargo clippy --all-targets --all-features
