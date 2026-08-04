@@ -10,6 +10,37 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — DOC-7 doc + e2e audit (2026-08-04)
+
+- **Real e2e regression, not a doc bug**: `tests/e2e/smoke.spec.ts`'s
+  "navigation menu links every primary route" and "aria-current marks
+  the active nav link" asserted nav-link visibility without first
+  opening the hamburger toggle. Commit `f66ff50f` (the cookie-session
+  auth migration) changed `.navigation-menu` to always render
+  `display: none` until the toggle adds `.open` — "collapsed behind the
+  hamburger at every width", not just narrow ones (`src/lib/css/app.css`,
+  confirmed by `git show f66ff50f -- .../app.css`) — but didn't update
+  these two pre-existing tests, and nobody had run `npm run test:e2e`
+  since (it needs the live Rust backend; see below). Fixed both tests to
+  click `getByRole('button', { name: 'Toggle navigation' })` before
+  asserting, matching the same interaction the unit test
+  `routes/layout.test.ts` ("hamburger toggles nav visibility") already
+  covers at the component level. Verified live against the sibling
+  service in `USE_UPSTREAM_STUBS=1` mode: was 70/73 passing (this + one
+  `auth.spec.ts` failure that turned out to be a local `FRONTEND_URL`
+  port mismatch in my own test setup, not a real bug), now 73/73.
+- **Stale test counts**: `spec/testing.md` said the e2e suite was
+  "~65 `test()` cases" (its own per-file table already summed to the
+  real 73 — only the prose was stale) and the vitest section said "43
+  cases across 7 files", omitting `i18n.test.ts` (4 tests) and
+  `routes/layout.test.ts` (1 test) entirely — live count is 48 across 9
+  files. Fixed `spec/testing.md` (both counts + two new coverage
+  bullets), `spec/tasks.md` (ST-12), and `AGENTS.md` (CI gate section).
+  No `.env.example` bug of the TUT-1/TUT-2/DOC-4 class here: this app
+  has no `.env.example` and no BFF — it's a CSR-only SPA that talks to
+  `/api/*` through the Vite dev-server proxy (`LOCO_API_PROXY`,
+  `VITE_API_BASE_URL`), both correctly documented in `README.md`.
+
 ### Added
 
 - 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,

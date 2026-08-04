@@ -10,6 +10,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — DOC-7 doc audit (2026-08-04)
+
+- **Unit-test count was undercounted family-wide in this crate's own
+  docs**: `spec/testing.md`'s table and unit-test breakdown, and this
+  file's inaugural "Added" Tests bullet, both said "14" and listed only
+  `src/nhs.rs` (8) + `src/controllers/alerts.rs` (6), omitting
+  `src/auth/mod.rs`'s 7 session-lifecycle tests entirely — a whole test
+  file uncounted. Live `cargo test --lib` is 21. Only `README.md` had it
+  right. Fixed `spec/testing.md` (table row + a new "auth session
+  lifecycle" subsection listing the 7 tests) and the CHANGELOG bullet
+  above. No source change; verified with `cargo test --lib` (21 passed)
+  and, against the crate's `compose.test.yaml` Postgres, `cargo test --
+  --ignored` (50 passed).
+
 ### Changed — loco-rs 1.0.1 (2026-08-02)
 
 - **loco-rs 0.16 → 1.0.1**: sea-orm 1.1 → 2.0, sea-orm-migration →
@@ -97,11 +111,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     UUIDs when an upstream is unreachable.
   - **Hand-written OpenAPI 3** document (`openapi.yaml`) covering all 29
     operations; kept accurate to the mounted routes.
-  - **Tests**: 14 unit (8 NHS Modulus 11 + 6 geofence breach) + 50
-    Postgres-backed request tests (`tests/requests/*`) exercising every
-    controller against the in-process stubs. (The unit count started at
-    6 in this inaugural cut and was raised to 14 by the LT-6 / LT-16
-    entries above; request tests grew from 29 → 49 → 50.)
+  - **Tests**: 21 unit (8 NHS Modulus 11 + 6 geofence breach + 7 auth
+    session lifecycle) + 50 Postgres-backed request tests
+    (`tests/requests/*`) exercising every controller against the
+    in-process stubs. (The NHS/geofence unit count started at 6 and was
+    raised to 14 by the LT-6 / LT-16 entries above; the 7 `src/auth/mod.rs`
+    session tests shipped with the inaugural auth cut but were never
+    counted in this bullet or in `spec/testing.md` until this pass
+    brought both to the real 21; request tests grew from 29 → 49 → 50.)
 
 ### Notes
 

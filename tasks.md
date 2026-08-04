@@ -5601,6 +5601,57 @@ committing (see plan.md §4).
     commit. Did not touch `case-folder` (sibling agent's concurrent
     work, still outstanding as the batch's last piece).
 
+  - [x] `case-folder` done 2026-08-04 — closes DOC-7 (all five consumer
+    apps done). This app's shape differs from its four siblings: no
+    BFF, no `.env.example` — it's a CSR-only SPA whose browser talks
+    directly to `/api/*` on the sibling Loco service through the Vite
+    dev-server proxy (`LOCO_API_PROXY`/`VITE_API_BASE_URL`), both
+    correctly documented in `README.md`/`AGENTS.md` already, so the
+    TUT-1/TUT-2/DOC-4-class `.env.example` bug this task worried about
+    doesn't apply here (confirmed by checking, not assumed absent).
+    Found instead: (1) **Undercounted unit tests, twice.** Both
+    editions' `spec/testing.md` and the service's `CHANGELOG.md`
+    undercounted `cargo test --lib`/`npm run test:unit` by exactly one
+    whole test file each — the Rust side said "14" (8 NHS + 6 geofence)
+    omitting `src/auth/mod.rs`'s 7 session-lifecycle tests (live: 21,
+    matching what `README.md` already said correctly); the Svelte side
+    said "43 cases across 7 files" omitting `i18n.test.ts` (4 tests)
+    and `routes/layout.test.ts` (1 test), both added by the same
+    `f66ff50f` auth-migration commit that never got a testing-doc pass
+    (live: 48 across 9 files). Fixed both `spec/testing.md`s + the
+    Rust `CHANGELOG.md`. (2) **A genuine e2e regression, not a doc
+    bug**: ran the Svelte suite for real against the Loco service in
+    `USE_UPSTREAM_STUBS=1` mode (this app's own `AGENTS.md`/`README.md`
+    already document this pre-flight requirement honestly, so did the
+    same) and got 70/73 — `tests/e2e/smoke.spec.ts`'s two nav-link
+    assertions never opened the hamburger toggle before checking
+    visibility. `git show f66ff50f -- .../app.css` confirmed the same
+    commit changed `.navigation-menu` to `display: none` "at every
+    width" behind the toggle (matching the dedicated unit test
+    `routes/layout.test.ts`'s "hamburger toggles nav visibility") but
+    never updated these two pre-existing e2e assertions — invisible
+    until now because the suite needs a live backend nobody had run it
+    against since. Fixed both assertions to click the toggle first;
+    73/73 now. (A third apparent failure, `auth.spec.ts`'s magic-link
+    redirect, was my own test-harness artifact — I ran the front-end on
+    a non-default port to dodge another agent's dev server already
+    holding :5173, without setting the Loco service's matching
+    `FRONTEND_URL`, so the magic link it minted pointed at the wrong
+    port; confirmed a non-issue by re-running with `FRONTEND_URL` set
+    correctly.) Also corrected two stale `~65`/`test() cases`
+    approximations (`AGENTS.md`, `spec/tasks.md` ST-12) to the real 73
+    — the per-file breakdown table in `spec/testing.md` already summed
+    to 73, only the prose headline hadn't been updated.
+    **Verified, not assumed**: `cargo build`/`clippy --all-targets -D
+    warnings`/`fmt --check` clean; `cargo test --lib` (21/21); `cargo
+    test -- --ignored` against the crate's own `compose.test.yaml`
+    Postgres (50/50); `npm run check` (0/0); `npm run test:unit`
+    (48/48); `npm run build` clean; `npm run test:e2e` (73/73, live
+    backend). Left the pre-existing `Cargo.lock` dependency-registry
+    diff (triggered by running `cargo build`/`test` in this session, not
+    an intentional change) out of the commit — same call DOC-5/
+    patient-flow/CRM/WPM/content-management-system all made.
+
 - [ ] **DOC-8 (S)** Once DOC-2..DOC-7 land, a final sweep: re-grep for
   the family-wide anti-patterns found along the way (duplicated
   capability tables, stale `.env.example` files, "Backend-only"-style

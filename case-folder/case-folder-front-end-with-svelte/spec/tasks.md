@@ -22,7 +22,7 @@
 - [x] **ST-10** Accessibility baseline (skip link, single h1, labelled fields) (SD-6) — UR-9
 - [x] **ST-11** Locale + theme pickers via Lily helpers; NHS themes (SD-6)
 - [x] **ST-12** Playwright e2e suite against stub-mode API — 14 spec
-  files, ~65 `test()` cases (smoke, dashboard, folders, patients, places,
+  files, 73 `test()` cases (smoke, dashboard, folders, patients, places,
   move, history, errors, volumes, clickthrough, auth, ifit, wiring, a11y) (—)
 
 ## Active / next

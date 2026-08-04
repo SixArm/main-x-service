@@ -8,7 +8,7 @@
 | Type check    | `cargo check`                                       | required green                                                     |
 | Lint          | `cargo clippy -- -D warnings`                       | required green                                                     |
 | Format        | `cargo fmt --check`                                 | required green                                                     |
-| Unit          | `cargo test --lib` (in-crate `#[cfg(test)]`)        | **14 in repo (nhs + geofence)**                                   |
+| Unit          | `cargo test --lib` (in-crate `#[cfg(test)]`)        | **21 in repo (nhs + geofence + auth session)**                    |
 | Request tests | `cargo test --test requests` (Loco testing harness) | **50 in repo** (use `StubClient`s — no real Patient/Worker needed) |
 
 ## Unit tests in repo
@@ -33,6 +33,21 @@ boundary-crossing rule:
 - `move_via_unresolvable_cabinet_is_not_a_breach` (unknown cabinet id)
 - `cabinet_under_orphan_room_is_unresolved` (room whose building is absent)
 - `only_breaching_moves_are_returned_from_a_mixed_log`
+
+### `src/auth/mod.rs` — session lifecycle (7 tests)
+
+The in-process session store (create/resolve/revoke) behind the
+magic-link session cookie is tested directly, independent of the
+request-level `auth.rs` suite below:
+
+- `create_then_resolve_round_trips_identity`
+- `unknown_session_id_resolves_to_none`, `revoked_session_resolves_to_none`,
+  `expired_session_resolves_to_none`
+- `identity_resolves_from_cookie_and_bearer` (either transport resolves
+  the same session)
+- `revoke_from_headers_drops_the_session`
+- `session_id_is_opaque_not_a_token` (the session id carries no decodable
+  claims — unlike the magic-link token itself)
 
 ## Request tests in repo (`tests/requests/*.rs`)
 

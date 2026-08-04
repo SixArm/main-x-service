@@ -19,6 +19,10 @@ test.describe('smoke', () => {
 
     test('navigation menu links every primary route', async ({ page }) => {
         await page.goto('/');
+        // The primary nav is always collapsed behind the hamburger toggle,
+        // at every viewport width (src/lib/css/app.css `.navigation-menu`) —
+        // open it before asserting link visibility.
+        await page.getByRole('button', { name: 'Toggle navigation' }).click();
         const nav = page.getByRole('navigation', { name: /primary navigation/i });
         const links = ['Dashboard', 'Patients', 'Folders', 'Buildings', 'Cabinets', 'Move folder', 'Move history'];
         for (const name of links) {
@@ -38,6 +42,8 @@ test.describe('smoke', () => {
 
     test('aria-current marks the active nav link', async ({ page }) => {
         await page.goto('/folders');
+        // Same hamburger-collapsed nav as above — open it first.
+        await page.getByRole('button', { name: 'Toggle navigation' }).click();
         const nav = page.getByRole('navigation', { name: /primary navigation/i });
         await expect(nav.getByRole('link', { name: 'Folders' })).toHaveAttribute(
             'aria-current',

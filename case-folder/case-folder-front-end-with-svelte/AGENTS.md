@@ -124,7 +124,7 @@ Both required green:
 
 - `npm run check` — zero errors. Warnings in third-party / pre-existing
   components are tolerated unless they came in with this PR.
-- `npm run test:e2e` — the Playwright suite (14 spec files, ~65
+- `npm run test:e2e` — the Playwright suite (14 spec files, 73
   `test()` cases; see [spec/testing.md](spec/testing.md) for the table).
   The Loco API must be running in **stub mode** (see Prerequisites in
   [README.md](README.md)).

@@ -14,8 +14,8 @@
 
 ## Unit + component tests (in repo)
 
-vitest runs in `jsdom`; `npm run test:unit` currently passes **43**
-cases across 7 files. Required coverage:
+vitest runs in `jsdom`; `npm run test:unit` currently passes **48**
+cases across 9 files. Required coverage:
 
 - `store/nhs.ts` (`nhs.test.ts`):
   - `normaliseNhsNumber("943 476 5919") === "9434765919"`
@@ -37,6 +37,15 @@ cases across 7 files. Required coverage:
 - Components (`@testing-library/svelte`): `Icon`, `InputCount`,
   `AddressographBox`, `ButtonBar` each ship a `*.test.ts` asserting
   rendered output and prop reactivity.
+- `i18n.svelte.ts` (`i18n.test.ts`): the catalog supports exactly the 13
+  required locales, every locale defines every key (full-coverage parity
+  check), a non-Latin locale (`zh`) is spot-checked against English, and
+  `ar`/`ur` are marked right-to-left with the rest left-to-right.
+- `routes/+layout.svelte` (`layout.test.ts`): the hamburger toggle flips
+  `aria-expanded` and the nav's `.open` class — the primary nav is always
+  collapsed behind it, at every viewport width
+  (`src/lib/css/app.css` `.navigation-menu`); e2e specs must click the
+  toggle before asserting nav-link visibility (see `smoke.spec.ts`).
 
 ## End-to-end tests (Playwright)
 
@@ -59,7 +68,7 @@ the difference. `tests/e2e/global-setup.ts` pings `/healthz` and
 `/api/stats` before any test runs and fails fast with actionable
 instructions if the API isn't up or hasn't been seeded.
 
-Suites (14 spec files, ~65 `test()` cases):
+Suites (14 spec files, 73 `test()` cases):
 
 | File                   | Tests | Coverage                                                                                |
 | ---------------------- | ----- | --------------------------------------------------------------------------------------- |
