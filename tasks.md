@@ -1725,7 +1725,7 @@
   unaffected: their content was proven through the synchronous create
   endpoints and the real per-row import validators.
 
-- [ ] **COMPOSE-WORKER (S) 🟠** `examples/compose/*.yml` start every
+- [x] **COMPOSE-WORKER (S) 🟠** `examples/compose/*.yml` start every
   service server-only, so no loco background worker runs and **no bulk
   import or export job ever leaves `queued`**. Both `full-family.yml`
   and `single-service.yml` inherit the Dockerfile's `CMD [..., "start"]`.
@@ -1735,6 +1735,55 @@
   and watching the job reach `completed`. TUT-5 cannot be written
   truthfully until this lands. Found by EX-1's live verification,
   2026-08-04.
+
+  **Done 2026-08-04.** Added `command: [...]` to every `*-service:`
+  block in `examples/compose/full-family.yml` (all 12 — the ten entity
+  registries + authentication + link-graph) and the one service block
+  in `examples/compose/single-service.yml` (case-service). Landed as
+  the full explicit argv, not the brief's literal
+  `["start", "--server-and-worker"]`: none of these Dockerfiles set an
+  `ENTRYPOINT` (confirmed by grep — only `CMD`), so compose's
+  `command:` replaces the entire argv, and a bare `["start", ...]`
+  would try to `exec("start")` as a binary path and fail. Each block
+  now reads `["/app/<bin>", "start", "--server-and-worker"]`, matching
+  the exact binary name each crate's own Dockerfile `CMD` already
+  names (`authentication-service-cli` for authentication, the crate
+  name for the other eleven). `--server-and-worker` confirmed against
+  the installed `loco-rs` 0.13/0.14 sources
+  (`~/.cargo/registry/.../loco-rs-*/src/cli.rs`) rather than trusting
+  the brief's spelling. `*-migrate` one-shot containers were left
+  untouched, as instructed.
+
+  **Verified live**, not just read — chosen vehicle: `single-service.yml`
+  (case-service) rather than a `full-family.yml` rebuild, since one
+  service already proves the fix and case-service's image was already
+  built and cached locally from an earlier session (`docker.io/library/
+  mxi-family-case-service`, ~3h old), so no rebuild — and no repeat of
+  TUT-4's parallel-build VM crash — was needed at all; compose reused
+  the existing image under the new `command:`. `up -d` → the
+  container's own boot banner now reads `modes: server, worker` (was
+  `modes: server`) and logs `worker is online` /
+  `Starting background job processing`, confirming
+  `StartMode::ServerAndWorker` actually took effect. Submitted a real
+  `examples/data/cases.jsonl` import (`POST /api/cases/import` →
+  `{"job_id":"57a1f8d0-..."}`); polled `GET /api/cases/import/{id}`
+  and it was already `"status":"completed"` on the very first poll
+  (`rows_total:10, rows_created:10, rows_upserted:0, rows_to_review:0,
+  rows_errored:0`) — fast enough that no intermediate `running` state
+  was ever observed. Cross-checked against the data itself, not just
+  the job row: `GET /api/cases?limit=1` returned
+  `X-Total-Count: 10`, confirming the rows are real, not a job-status
+  fiction. `down -v` torn down cleanly; `podman ps -a` afterward shows
+  no container from this work (one unrelated, pre-existing
+  `fhir-mssql-db` container from a different task was left untouched,
+  as it predates and is out of scope for this one).
+
+  **Not re-verified**: `full-family.yml`'s twelve-service form (the
+  single-service fix is byte-for-byte the same change, twelve times
+  over, mechanically applied — full-family's own live exercise happens
+  incidentally the next time a full-family tutorial runs, e.g. a future
+  TUT-6). No podman-machine issue was hit this run; the machine was
+  left running and healthy throughout (no restart needed, unlike TUT-4).
 
 - [x] **PERSON-CONTACT-CASE (S) 🟠** person-service silently cannot store
   contact points. `repositories.rs` persists `ContactPointSystem`,

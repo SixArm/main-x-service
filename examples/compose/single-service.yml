@@ -77,6 +77,14 @@ services:
       context: ../..
       dockerfile: case/case-service-with-loco/Dockerfile # <- swap
     image: mxi-example-case-service # <- swap
+    # COMPOSE-WORKER: the Dockerfile's own CMD is server-only ("start"),
+    # which never registers BulkJobWorker (loco's connect_workers only
+    # runs under `start --server-and-worker`) — so a bulk import/export
+    # job would accept a 202 and then sit in "queued" forever. No
+    # ENTRYPOINT is set in the image, so the full argv is repeated here
+    # (a bare `command: ["start", "--server-and-worker"]` would try to
+    # exec "start" as a binary path and fail).
+    command: ["/app/case-service", "start", "--server-and-worker"] # <- swap
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://loco:loco@postgres:5432/case # <- swap
