@@ -28,6 +28,23 @@ Per repo decision (2026-06-02), each `*-front-end-with-svelte` project keeps its
 - **Lily Headless** for accessibility primitives where Lily wins (focus trap, listbox, combobox, dialog). Native HTML elsewhere.
 - **No global stores** for HTTP state. Construct a `PlaceRepository` per page/component.
 
+## Authentication — the BFF pattern
+
+Per [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+§6, the browser never holds a token. It carries only the httpOnly
+`__Host-mxi_session` cookie and calls same-origin routes:
+
+- `/signin` and `/verify` — per-app magic-link sign-in / verification
+  (`src/lib/server/auth.ts`, `src/lib/server/session.ts`).
+- `/api/proxy/[...path]` — a same-origin reverse proxy
+  (`src/routes/api/proxy/[...path]/+server.ts`). The server exchanges the
+  session for a short-lived PASETO and forwards to the Place Service with
+  `Authorization: Bearer <paseto>`; it never forwards the browser's
+  cookie upstream. Every browser API call goes through this proxy — see
+  `src/lib/config.ts` (`API_BASE_URL` = `location.origin + "/api/proxy"`).
+- `src/lib/server/config.ts` reads `PLACE_API_URL` / `AUTH_API_URL`
+  server-side only; neither is exposed to the client bundle.
+
 ## What lives where
 
 | Concern | Location |
@@ -38,10 +55,10 @@ Per repo decision (2026-06-02), each `*-front-end-with-svelte` project keeps its
 | Reusable form pieces | `src/lib/forms/` |
 | Place-specific components | `src/lib/components/` |
 | Routes / pages | `src/routes/` |
+| BFF server-only helpers (session, auth, config) | `src/lib/server/` |
 
 ## What does NOT live here
 
-- Authentication. Out of scope until the service ships auth (Place Service spec §15).
 - FHIR Place UI. Out of scope for MVP.
 - Consent management UI. Out of scope for MVP (Place Service has `/consents` endpoints but no front-end yet).
 - GDPR-export download UI. Out of scope for MVP.

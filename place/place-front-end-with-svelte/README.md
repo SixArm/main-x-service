@@ -21,7 +21,7 @@ SvelteKit front-end for the **[Place Service](../place-service-with-loco/)** in 
 ## Stack
 
 - **SvelteKit 2** + **Svelte 5** (runes API)
-- **SVAR Svelte DataGrid** (`wx-svelte-grid`, `wx-svelte-core`)
+- **SVAR Svelte DataGrid** (`@svar-ui/svelte-grid`, with `@svar-ui/svelte-filter` for the list's FilterBar; also `@svar-ui/svelte-kanban` for the `/review` board)
 - **Lily Design System Svelte Headless** (consumed via `file:` dependency)
 - **TypeScript** strict mode
 - **Vitest** for unit tests, **Playwright** for e2e
@@ -120,7 +120,7 @@ The Lily **theme selector** (45 shared themes at `/assets/themes/`) and **locale
 
 ## SVAR DataGrid
 
-`wx-svelte-grid` is GPL-3.0 in its free tier. **If this front-end ships in a commercial product, evaluate the SVAR Pro/Enterprise license before adopting.** See `spec.md §16 Open questions`.
+`@svar-ui/svelte-grid` (and its sibling `@svar-ui` packages) is GPL-3.0 in its free tier. **If this front-end ships in a commercial product, evaluate the SVAR Pro/Enterprise license before adopting.** See `spec.md §16 Open questions`.
 
 ## Status
 

@@ -39,6 +39,9 @@ The SPA mounts at `/`. All operator workflows live under `/places`.
 | `/places/[id]/audit` | Per-record audit log |
 | `/places/match` | Score-bearing match check against a candidate Place |
 | `/places/merge` | Two-ID merge preview + confirm |
+| `/review` | Stored duplicate-review board (SVAR Kanban: Pending / Confirmed / Rejected / AutoMerged) |
+| `/signin` | Per-app magic-link sign-in (BFF auth page) |
+| `/verify` | Magic-link verification (BFF auth page) |
 
 ## Worked flows
 
@@ -70,9 +73,14 @@ The SPA mounts at `/`. All operator workflows live under `/places`.
 
 ## Environment
 
+The browser calls only the same-origin BFF proxy (`/api/proxy`) — there is
+no public API base URL. These are server-side only, read in
+`src/lib/server/config.ts`:
+
 | Variable | Default | Purpose |
 |---|---|---|
-| `PUBLIC_API_BASE_URL` | `http://localhost:8080` | Place Service base URL |
+| `PLACE_API_URL` | `http://localhost:5150` | Place Service base URL — the proxy injects a server-exchanged PASETO and forwards |
+| `AUTH_API_URL` | `http://localhost:5150` | Authentication Service base URL — magic-link login + session→PASETO exchange |
 
 ## Tech stack reminder
 

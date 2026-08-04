@@ -11,9 +11,11 @@
 | Audit view | ✅ |
 | Match check | ✅ |
 | Merge UI | ✅ |
-| Unit tests | ✅ (8 tests across `client.test.ts` + `places.test.ts`) |
-| E2E smoke | ✅ (6 tests) |
-| `pnpm install` verified | ❌ — manual step pending |
-| `pnpm test` verified | ❌ — manual step pending |
+| Batch deduplicate review board (`/review`) | ✅ (T-18, 2026-07-19) |
+| Auth — BFF + httpOnly session + PASETO exchange | ✅ (T-22: `/signin`, `/verify`, `/api/proxy`) |
+| Unit tests | ✅ (40 tests across 5 files: `client.test.ts`, `places.test.ts`, `i18n.test.ts`, `form.svelte.test.ts`, `layout.test.ts`) |
+| E2E smoke | ✅ (5 tests, `tests/e2e/places.spec.ts`) |
+| `pnpm check` verified | ✅ (0 errors, 0 warnings) |
+| `pnpm install` / `pnpm test` / `pnpm build` verified | ✅ (2026-08-04 DOC-4 audit) |
 | Live integration | ❌ — pending operator walkthrough |
 

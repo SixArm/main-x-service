@@ -4645,6 +4645,51 @@ committing (see plan.md §4).
   task's boundary) or any of the other ten front-ends (concurrent
   sibling audits).
 
+- *`place/place-front-end-with-svelte` done 2026-08-04.* Same
+  family-wide pattern as the worker/case notes above. (1)
+  `.env.example` was stale and wrong — it documented
+  `PUBLIC_API_BASE_URL` (read by nothing in `src/`); the real
+  server-only vars `src/lib/server/config.ts` reads are `PLACE_API_URL`
+  / `AUTH_API_URL` (both default `http://localhost:5150`). Fixed
+  directly. (2) `AGENTS.md` still said "Authentication. Out of scope
+  until the service ships auth" — T-22 (BFF: `/signin`, `/verify`,
+  `/api/proxy`, `src/lib/server/{session,auth,config}.ts`) has already
+  shipped. Added a "BFF pattern" section instead of the false claim.
+  (3) `spec/13-tasks.md` T-18 (batch dedup review UI → `/review`,
+  landed 2026-07-19) and T-22 (BFF auth) were still unchecked; marked
+  done with landing notes. (4) `spec/14-implementation-status.md` test
+  counts were stale (claimed 8 unit / 6 e2e; live `pnpm test` shows 40
+  unit tests across 5 files + 5 e2e). (5) `spec/09-api-consumption.md`
+  still listed `POST /api/places/deduplicate` as "not yet routed" (it
+  drives the `/review` scan button) and was missing the two
+  review-queue endpoints entirely. (6) `spec/08-architecture.md`'s
+  diagram showed the browser calling the Place Service directly with
+  no BFF hop; added one. (7) `spec/01-purpose-and-vision.md`,
+  `spec/03-stakeholders-and-users.md`, `spec/12-compliance.md`,
+  `spec/15-roadmap.md` all still framed auth as future/deferred;
+  reworded now that T-22 landed. `spec/15-roadmap.md`'s v0.4 line was
+  also a leftover copy-paste artifact ("sibling scaffolds for
+  Worker/Place/Thing/Event front-ends" — this project *is* one of
+  those siblings, and all already exist); replaced with the real
+  remaining tasks. Fixed a stray "Placea" table-header typo (→
+  "Persona") while in `spec/03`. (8) `README.md`'s Stack and SVAR
+  DataGrid sections still named the removed `wx-svelte-grid`/
+  `wx-svelte-core` packages (migrated to `@svar-ui/svelte-*`
+  2026-07-19 per `CHANGELOG.md`; confirmed against `package.json`).
+  (9) `index.md` (June 18 vintage, predates the BFF) was missing
+  `/review`/`/signin`/`/verify` from its route map and had the same
+  stale `PUBLIC_API_BASE_URL` as `.env.example`; fixed both. Verified
+  live: `pnpm check` (426 files, 0 errors/0 warnings), `pnpm install`,
+  `pnpm test` (40/40), `pnpm build` all green. Confirmed the
+  QA-SERVER-FIELDS fix needed no front-end change — `PlaceRepository
+  .create` posts the form's `Place` as-is with `id` left unset
+  (optional in `types.ts`), no client-side id-generation workaround to
+  remove. i18n: the 13-locale parity test passes and spot-checked
+  `review.*` strings carry real per-locale translations, not English
+  stubs. Did not touch `place-service-with-loco` (out of this task's
+  boundary) or any of the other ten front-ends (concurrent sibling
+  audits).
+
 - [ ] **DOC-5 (M)** Library crates' `spec/`, `AGENTS.md`/`CLAUDE.md`,
   `README.md`/`index.md`: `authentication-verifier-rust-crate`,
   `integrity-mac-rust-crate`, `link/entity-ref-rust-crate`. Smaller

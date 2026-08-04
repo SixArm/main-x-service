@@ -17,9 +17,9 @@
 - [ ] T-15: Identifier / opening-hours / amenity edit (these sub-record lists are read-only on detail; the edit form re-PUTs the whole record but has no UI to add/remove them. Address and geo are already editable via `PlaceForm`. Rewritten 2026-06-13: the original wording said "emergency-contact edit" — a person-entity copy artifact; places have no emergency contacts).
 - [ ] T-16: Theming tokens in `app.css` extracted to a small theme module.
 - [ ] T-17: `check-duplicates` endpoint wired into create form (preview before commit).
-- [ ] T-18: Batch deduplicate-scan results UI.
+- [x] T-18: Batch deduplicate-scan results UI. Landed 2026-07-19 as `/review` — SVAR Kanban board (Pending / Confirmed / Rejected / AutoMerged) that loads the stored `GET /api/places/review-queue` on mount and drives decisions through `POST /api/places/review-queue/{id}/decision`; the scan button (`POST /api/places/deduplicate`, destructive-classed) is explicit, never a page-load side effect.
 - [ ] T-19: Masked-view toggle on detail page.
 - [ ] T-20: GDPR-export download button.
 - [ ] T-21: Validate the SVAR licensing fit (free GPL-3.0 vs Pro) — see §16 OQ-1.
-- [ ] T-22: Auth — adopt BFF + httpOnly cookie + CSRF; the browser holds only `__Host-mxi_session`, the SvelteKit server attaches a short-lived PASETO server-side; no `mxi_access_token`/`localStorage` bearer, no fragment handoff (per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
+- [x] T-22: Auth — adopt BFF + httpOnly cookie + CSRF; the browser holds only `__Host-mxi_session`, the SvelteKit server attaches a short-lived PASETO server-side; no `mxi_access_token`/`localStorage` bearer, no fragment handoff (per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)). Landed: `/signin` + `/verify` routes, `src/lib/server/{session,auth,config}.ts`, and the `/api/proxy/[...path]` reverse proxy that injects the server-exchanged PASETO. CSRF on mutating browser→BFF calls is not yet separately verified — worth a follow-up task if it isn't covered elsewhere.
 

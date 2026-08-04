@@ -15,7 +15,7 @@ A web interface that:
 
 ### 1.3 Non-goals
 
-- **Not** a public-facing portal — assumes authenticated operator users (auth itself out of scope until the service ships it).
+- **Not** a public-facing portal — assumes authenticated operator users. Auth landed as T-22 (BFF + httpOnly session cookie + server-side PASETO exchange; see `AGENTS.md` "Authentication — the BFF pattern"); enforcement is still governed by the service's own `PLACE_REQUIRE_AUTH` gate (default-off — see [`../../../agents/share/security.md`](../../../agents/share/security.md) §4).
 - **Not** a substitute for direct API access — power users use Swagger UI / curl.
 - **Not** a FHIR client — FHIR routes are out of scope (the service exposes them; this UI doesn't render them).
 

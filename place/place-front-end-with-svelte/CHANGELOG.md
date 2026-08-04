@@ -9,6 +9,59 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — DOC-4 doc audit (2026-08-04)
+
+- **`.env.example` was stale and wrong.** It documented `PUBLIC_API_BASE_URL`
+  (a pre-BFF client-held var read by nothing in `src/`); the real,
+  server-only vars `src/lib/server/config.ts` reads are `PLACE_API_URL`
+  and `AUTH_API_URL` (both default `http://localhost:5150`). Fixed
+  directly (config bug, not a behavioural claim).
+- **`AGENTS.md` overclaimed auth was out of scope.** T-22 (BFF auth:
+  `/signin`, `/verify`, `/api/proxy`, `src/lib/server/{session,auth,config}.ts`)
+  shipped without this file being updated. Added a "BFF pattern" section
+  and a `src/lib/server/` row to "what lives where"; removed the false
+  "Authentication out of scope" bullet.
+- **`spec/13-tasks.md`** T-18 (batch dedup review UI) and T-22 (BFF auth)
+  were still unchecked despite being implemented (`/review`,
+  `/signin`+`/verify`+`/api/proxy`). Marked done with landing notes.
+- **`spec/14-implementation-status.md`** test counts were stale: it said
+  8 unit / 6 e2e tests; the suite is actually 40 unit tests across 5
+  files and 5 e2e tests (verified via `pnpm test` / grep this session).
+  Added rows for the review board and BFF auth; verified `pnpm check`
+  (0 errors/0 warnings), `pnpm install`, `pnpm test`, `pnpm build`.
+- **`spec/09-api-consumption.md`** still listed `POST /api/places/deduplicate`
+  as "not yet routed" — it drives the `/review` scan button. Added the
+  two review-queue endpoints (`GET .../review-queue`,
+  `POST .../review-queue/{id}/decision`) that were missing entirely, and
+  a note that calls now go through `/api/proxy`.
+- **`spec/08-architecture.md`** diagram showed the browser calling the
+  Place Service directly; added the BFF proxy hop.
+- **`spec/01-purpose-and-vision.md`, `spec/03-stakeholders-and-users.md`,
+  `spec/12-compliance.md`, `spec/15-roadmap.md`** all still framed auth
+  as future/deferred ("out of scope until the service ships it",
+  "deferred until auth lands"); reworded now that T-22 has landed.
+  `spec/15-roadmap.md`'s v0.4 line was also a leftover copy-paste
+  artifact ("sibling scaffolds for Worker/Place/Thing/Event front-ends"
+  — this project *is* one of those siblings, and all exist already);
+  replaced with the actual remaining tasks (T-17, T-19, T-20, T-21).
+  Fixed a stray "Placea" table-header typo (→ "Persona") in
+  `spec/03-stakeholders-and-users.md` while there.
+- **`README.md`** Stack/SVAR-DataGrid sections still named the removed
+  `wx-svelte-grid`/`wx-svelte-core` deps; the 2026-07-19 migration to
+  `@svar-ui/svelte-grid` (+ `svelte-filter`, `svelte-kanban`) was never
+  reflected there. Updated to match `package.json`.
+- **`index.md`** (June 18 vintage) predated the BFF: missing `/review`,
+  `/signin`, `/verify` from the route map, and its Environment section
+  had the same stale `PUBLIC_API_BASE_URL` as `.env.example`. Fixed both.
+- Verified: no client-side `id`/UUID generation workaround exists in the
+  create path (`PlaceRepository.create` posts the form's `Place` as-is;
+  `id` is optional in `types.ts` and left unset) — nothing to undo for
+  place-service's `QA-SERVER-FIELDS` fix (server-owned fields on
+  `POST /api/places` are no longer required). i18n: the 13-locale parity
+  test (`tests/unit/i18n.test.ts`, "every locale defines every English
+  key") passes, and spot-checked recently-added `review.*` strings carry
+  real per-locale translations, not English stubs.
+
 ### Added — drag-to-decide review board (2026-07-19)
 
 - 2026-07-19 — `/review` now loads the **stored** review queue on mount
