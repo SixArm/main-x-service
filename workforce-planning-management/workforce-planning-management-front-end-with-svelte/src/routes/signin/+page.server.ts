@@ -1,4 +1,4 @@
-// Sign-in action (BFF, per-app magic-link login, PF-T18): the server
+// Sign-in action (BFF, per-app magic-link login, WPM-T18): the server
 // asks the authentication service for a magic link that returns to
 // THIS app's own `/verify` (via `return_url` = this origin, honoured
 // by the auth service's allow-list). No credential is held

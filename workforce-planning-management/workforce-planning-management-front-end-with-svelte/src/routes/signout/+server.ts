@@ -1,4 +1,4 @@
-// Sign-out (BFF, PF-T18): best-effort server-side session revocation
+// Sign-out (BFF, WPM-T18): best-effort server-side session revocation
 // at the authentication service, then clear the httpOnly cookie and
 // send the browser home.
 

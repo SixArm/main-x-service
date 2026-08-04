@@ -1,5 +1,5 @@
 <!--
-  Verify page (BFF, PF-T18). The magic-link exchange happens entirely
+  Verify page (BFF, WPM-T18). The magic-link exchange happens entirely
   in the server `load`, which sets the httpOnly session cookie and
   redirects home on success — so this renders ONLY on a
   missing/invalid link.

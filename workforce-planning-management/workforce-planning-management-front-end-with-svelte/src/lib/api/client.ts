@@ -25,9 +25,12 @@ export interface Conditional<T> {
 }
 
 /**
- * Conditional GET with `If-None-Match` (the board-polling path,
- * PF-T17): `304` yields `body: null` so the caller keeps its current
- * render; anything else parses as usual.
+ * Conditional GET with `If-None-Match`: `304` yields `body: null` so
+ * the caller keeps its current render; anything else parses as
+ * usual. Carried over from the patient-flow BFF proxy this crate was
+ * copy-adapted from (there the caller was its board-polling path,
+ * PF-T17) — WPM has no polling view yet, so this helper is currently
+ * unused; kept as ready-made infra rather than removed.
  */
 export async function apiConditional<T>(
   path: string,

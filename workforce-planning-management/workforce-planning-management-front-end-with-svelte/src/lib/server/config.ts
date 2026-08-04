@@ -6,5 +6,5 @@ import { env } from "$env/dynamic/private";
 export const WPM_API_URL: string = env.WPM_API_URL ?? "http://localhost:5150";
 
 /** Authentication service base URL — for the session→PASETO exchange
- *  and the magic-link login flow (PF-T18). */
+ *  and the magic-link login flow (WPM-T18). */
 export const AUTH_API_URL: string = env.AUTH_API_URL ?? "http://localhost:5150";

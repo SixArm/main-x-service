@@ -22,9 +22,10 @@ code + tests in one PR.
       the pure core, org-chart derivation + cycle refusal, salary in
       minor units, audit + event seam (`WPM_EVENT_TRANSPORT=memory`).
       (WPM-D1–D4, WPM-D9; WPM-R7, WPM-R16)
-- [x] WPM-T3 Upstream client seam: person / worker / organization /
-      course traits + `http` + `stub`, config-selected; display-name
-      cache; stub-mode boot test. (WPM-D11)
+- [x] WPM-T3 Upstream client seam: one generic `EntityRef`-keyed
+      resolver over person / worker / organization / course, `http` +
+      `stub` via a single `Mode` enum, config-selected; display-name
+      + birth-date caches; stub-mode boot test. (WPM-D11)
 - [x] WPM-T4 Seed task: synthetic org (~40 employees across
       departments, managers, salaries) — synthetic data only. (WPM-R17)
 

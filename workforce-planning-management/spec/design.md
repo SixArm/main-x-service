@@ -74,10 +74,15 @@ expiry — the thinnest LMS that satisfies WPM-R11.
 
 ## WPM-D11 — Stub-first upstream clients
 
-Display-name lookups behind traits with `http` + `stub`
-implementations, config-selected, cached, best-effort — the service
-boots and tests with no siblings running (patient-flow WPM-D
-precedent).
+Display-name (and, for wellbeing age-banding, birth-date) lookups,
+config-selected between `http` and `stub` via a single `Mode` enum,
+cached, best-effort — the service boots and tests with no siblings
+running (the patient-flow precedent). **As shipped** (`src/clients.rs`)
+this converged to one generic `EntityRef`-keyed resolver plus a
+`Mode::{Stub,Http}` switch rather than a per-entity trait — the same
+convergent simplification patient-flow's own `clients.rs` made (every
+upstream lookup does the same GET-and-extract-a-name-field), not a
+deviation worth re-litigating.
 
 ## WPM-D12 — Family fixtures from day one
 

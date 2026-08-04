@@ -1,5 +1,5 @@
 <!--
-  Sign-in page (BFF, per-app magic-link login, PF-T18). Posts to the
+  Sign-in page (BFF, per-app magic-link login, WPM-T18). Posts to the
   `default` server action, which calls the authentication service
   server-side with a return URL pointing back at THIS app's /verify.
   No token is held in the browser.

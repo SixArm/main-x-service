@@ -2,7 +2,7 @@
 //
 // The browser calls this same-origin proxy; the server forwards to the
 // workforce-planning-management service. No token ever lives in browser JS: when a
-// session cookie is present (PF-T18 magic-link flow), the server
+// session cookie is present (WPM-T18 magic-link flow), the server
 // exchanges it for a short-lived PASETO and injects the bearer here.
 // With `WPM_REQUIRE_AUTH` off (the shipped default) the
 // unauthenticated forward is sufficient and the exchange is skipped.
@@ -29,7 +29,7 @@ const proxy: RequestHandler = async ({
   headers.delete("content-length");
   headers.set("accepts-version", "1.0");
 
-  // Session → short-lived PASETO, server-side only (PF-T18).
+  // Session → short-lived PASETO, server-side only (WPM-T18).
   if (locals.sessionId) {
     const token = await exchangeToken(fetch, locals.sessionId);
     if (token) headers.set("authorization", `Bearer ${token}`);

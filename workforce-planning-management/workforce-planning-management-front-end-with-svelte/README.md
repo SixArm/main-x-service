@@ -19,6 +19,21 @@ svelte-check clean; 10 vitest + 9 Playwright specs pass
 start: `pnpm install && pnpm dev` (expects the Loco sibling on
 :5150; `pnpm test` / `pnpm exec playwright test`).
 
+## Environment variables
+
+Server-side only (`src/lib/server/config.ts`); the browser never
+sees these — every request goes through the same-origin BFF proxy.
+See `.env.example`.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `WPM_API_URL` | `http://localhost:5150` | workforce-planning-management-service base URL the proxy forwards to |
+| `AUTH_API_URL` | `http://localhost:5150` | authentication-service base URL — magic-link login + session→PASETO exchange |
+
+Both default to the same port because every family service defaults
+to `:5150`; point them at distinct ports/hosts when running the
+auth service and this service side by side.
+
 ## Stack
 
 SvelteKit 2 · Svelte 5 runes · TypeScript strict · SPA mode with a

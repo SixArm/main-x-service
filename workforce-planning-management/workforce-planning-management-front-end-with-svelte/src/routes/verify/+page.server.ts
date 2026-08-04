@@ -1,5 +1,5 @@
 // BFF verify flow (server-side; the credential never reaches the
-// browser, PF-T18). The emailed magic link lands at `/verify?token=…`;
+// browser, WPM-T18). The emailed magic link lands at `/verify?token=…`;
 // the SvelteKit server exchanges the single-use token at the
 // authentication service and re-hosts the resulting opaque session id
 // as an httpOnly cookie on THIS origin, then redirects home. No access

@@ -5461,6 +5461,76 @@ committing (see plan.md §4).
     `patient-flow`, `workforce-planning-management`, or
     `content-management-system` (sibling agents' concurrent work).
 
+  - [x] `workforce-planning-management` done 2026-08-04. Confirmed
+    the prior-session memory claim ("fully implemented, only
+    production gates remain") is still accurate: `spec/tasks.md`'s
+    WPM-T1–T36 are all `[x]`; only WPM-G1/G2 (auth activation,
+    subject-rights/retention legal work) are `[~]`, both correctly
+    design-complete/operational-remainder. The three commits since
+    the 2026-07-18/25 delivery rounds (loco-rs 1.0.1 migration,
+    per-service test-db containers, the family-wide SEC-M1
+    `limit_payload` fix) are all properly reflected in the service
+    `CHANGELOG.md`; none needed a `spec/tasks.md` entry (framework/
+    infra moves, not WPM-domain behaviour). Cross-checked every
+    quantitative claim in `spec/testing.md`/`architecture.md` against
+    the live code rather than trusting them: 139 lib unit tests,
+    19 `#[ignore]`d request suites, 17 migration sets, 18 controller
+    modules, 13 locales, 10 vitest + 9 Playwright specs — every one
+    matched exactly (`cargo test --lib`, `pnpm test`, `pnpm test:e2e`
+    all green; no stale numbers found, unlike the drift DOC-2 found
+    repeatedly in the entity crates). `entity-ref`/`EntityType` usage
+    (`src/validation.rs::require_ref`, `src/clients.rs`) is real and
+    matches DOC-5's finding that this app is a genuine dependent.
+    `roadmap.md`'s "`employed_by` edge emission — roadmap, not yet
+    wired" claim is accurate (grepped `src/` for `entity_links`/
+    `employed_by`: none exists).
+    **The one real doc/code drift found**: WPM-D11 (design.md) and
+    WPM-T3 (tasks.md) both described the upstream client seam as
+    "person / worker / organization / course traits" — but the
+    shipped `src/clients.rs` has no trait at all, just one generic
+    `EntityRef`-keyed resolver behind a single `Mode::{Stub,Http}`
+    enum (the exact same convergent simplification the sibling
+    `patient-flow` audit above found and fixed in its own design doc
+    — same precedent, independently rediscovered here before reading
+    that note). Fixed both to describe what shipped.
+    **BFF env var**: `WPM_API_URL`/`AUTH_API_URL` in
+    `src/lib/server/config.ts` are correct (both default `:5150`,
+    matching the family's port-collision-by-default pattern, verified
+    against the real `authentication-service` config) — no bug, but
+    neither the front-end `README.md`/`AGENTS.md` nor an
+    `.env.example` documented them at all (worker-front-end and the
+    sibling `patient-flow` audit above both treat this as a real gap
+    worth fixing, though the concurrent `contact-relationship-
+    management` audit judged the family's no-`.env.example` norm
+    sufficient — noted for DOC-8 to reconcile); added
+    `.env.example` (mirroring patient-flow's) plus a README
+    "Environment variables" section. **Also fixed**: nine BFF/session
+    source comments citing `PF-T17`/`PF-T18` verbatim (copy-pasted
+    from the patient-flow front-end this app was scaffolded from,
+    never re-pointed at WPM's own `WPM-T18`); reworded the one
+    (`client.ts`'s `apiConditional`) that referenced a patient-flow
+    feature (board polling) WPM doesn't have, rather than just
+    swapping the id — `apiConditional`/`BOARD_POLL_MS` are confirmed
+    dead code in this crate (grepped: no caller anywhere) but were
+    deliberately left in place as unused ready-made infra rather than
+    deleted, since removing code is outside a doc audit's remit; the
+    comment now says so honestly instead of misattributing it to a
+    WPM task that doesn't cover it. **Playwright e2e**: ran
+    `pnpm test:e2e` — 9/9 pass; `src/lib/api/client.ts` builds URLs by
+    plain string concatenation (`` `${API_BASE_URL}${path}` ``), never
+    `new URL(path, base)`, so this front-end was never exposed to the
+    `ad95088e` BFF-proxy-prefix regression found in several entity
+    front-ends this session. **Verified live**: service
+    `cargo test --lib` (139/139), `cargo clippy --all-targets --
+    -D warnings` (clean); front-end `svelte-check` (0 errors/
+    warnings), `pnpm test` (10/10 vitest), `pnpm test:e2e` (9/9
+    Playwright). Reverted an incidental `Cargo.lock` diff (unrelated
+    dependency-registry noise from running `cargo clippy`/
+    `cargo test`, not a real change) before committing. Did not touch
+    `case-folder`, `patient-flow`,
+    `contact-relationship-management`, or `content-management-system`
+    (sibling agents' concurrent work).
+
 - [ ] **DOC-8 (S)** Once DOC-2..DOC-7 land, a final sweep: re-grep for
   the family-wide anti-patterns found along the way (duplicated
   capability tables, stale `.env.example` files, "Backend-only"-style
