@@ -1,0 +1,163 @@
+### case-service — example requests
+# case/case-service-with-loco — loco-idiomatic layout (src/controllers/).
+# Envelope: BARE loco JSON — curl-verified identical posture to
+# organization/care-pathway, NOT the "{success,data,error}" shape a
+# stale doc note once suggested (see examples/api/README.md). Gated by
+# CASE_REQUIRE_AUTH (default off).
+#
+# GOTCHA (curl-verified): case has NO `GET /review-queue` HTTP surface
+# (unlike organization/care-pathway) — bulk import still routes likely
+# duplicates into the `review_queue` table (bulk-import-export.md),
+# there is just no REST endpoint to list/decide them yet. Hitting a
+# made-up `/api/cases/review-queue` doesn't 404 — it matches the
+# `{pid}` route and 500s trying to parse "review-queue" as a UUID
+# ("invalid character: found `r` at 0"). Don't copy that path.
+
+@baseUrl = http://localhost:8089
+@casePid = REPLACE_WITH_PID_FROM_CREATE
+# curl-verified example: creating the body below in a local run produced
+# pid a00bd500-f953-434d-ab8b-ee35eabacb67 — copy your own create
+# response's "pid" instead of reusing this one.
+@token = REPLACE_WITH_BEARER_FROM_00-auth-handshake.http
+
+
+### Health check
+GET {{baseUrl}}/_health
+
+
+### Who am I — always requires a valid bearer token
+GET {{baseUrl}}/api/cases/whoami
+Authorization: Bearer {{token}}
+
+
+### Create a case — minimal valid body.
+# curl-verified response: {"pid":"<uuid>","title":"Housing benefit appeal"}
+POST {{baseUrl}}/api/cases
+Content-Type: application/json
+Accepts-version: 1.0
+
+{
+  "title": "Housing benefit appeal",
+  "agency_id": "dwp",
+  "case_number": "HB-2024-0007",
+  "subjects": ["person:abc"],
+  "keywords": ["housing", "benefit"],
+  "identifiers": [{ "scheme": "Docket", "value": "CV-2024-001234" }]
+}
+
+
+### Get the created case back. If the ABAC policy's deciding allow rule
+# carries a `mask` obligation, this transparently returns mask_case(...)
+# instead — curl-verified shape: case_number/subjects/identifiers/
+# same_as zeroed, everything else intact
+# (agents/share/authorization-attributes.md §11; no-op with
+# CASE_REQUIRE_AUTH off, as in this compose).
+GET {{baseUrl}}/api/cases/{{casePid}}
+
+
+### List — paginated (curl-verified X-Total-Count/X-Limit/X-Offset headers)
+GET {{baseUrl}}/api/cases?limit=25&offset=0
+
+
+### Search — fuzzy + phonetic via Tantivy; title/subjects/agency/identifiers
+GET {{baseUrl}}/api/cases/search?q=Housing&fuzzy=true
+
+
+### Update a case
+PUT {{baseUrl}}/api/cases/{{casePid}}
+Content-Type: application/json
+
+{
+  "title": "Housing benefit appeal (amended)",
+  "agency_id": "dwp",
+  "case_number": "HB-2024-0007",
+  "status": "in_progress"
+}
+
+
+### Probabilistic + deterministic match
+POST {{baseUrl}}/api/cases/match
+Content-Type: application/json
+
+{ "title": "Housing benefit appeal", "agency_id": "dwp" }
+
+
+### Explicit duplicate check — curl-verified: bare `[]` when no candidates
+POST {{baseUrl}}/api/cases/check-duplicates
+Content-Type: application/json
+
+{ "title": "Housing benefit appeal" }
+
+
+### Merge two confirmed-duplicate cases (destructive)
+# POST {{baseUrl}}/api/cases/merge
+# Content-Type: application/json
+#
+# { "main_pid": "{{casePid}}", "duplicate_pid": "<other-uuid>" }
+
+
+### Recent merges
+GET {{baseUrl}}/api/cases/merges/recent
+
+
+### Cross-service link — assert this case is `subject_of` a person
+# (the highest-governance v1 edge kind, cross-service-linking.md §10;
+# case is the crate that originates this edge).
+POST {{baseUrl}}/api/cases/{{casePid}}/links
+Content-Type: application/json
+
+{
+  "kind": "subject_of",
+  "to_ref": "person:11111111-1111-1111-1111-111111111111",
+  "provenance": "operator"
+}
+
+
+### List this case's outbound links
+GET {{baseUrl}}/api/cases/{{casePid}}/links
+
+
+### Bulk edge pull for the link-graph aggregator's reconciliation
+# (a privileged/governed read — cross-service-linking.md §8)
+GET {{baseUrl}}/api/cases/links?since=2026-01-01T00:00:00Z
+
+
+### Always-masked view (privacy.md — distinct from the obligation-driven
+# mask on the plain GET above)
+GET {{baseUrl}}/api/cases/{{casePid}}/masked
+
+
+### GDPR export
+GET {{baseUrl}}/api/cases/{{casePid}}/export
+
+
+### Audit trail for this record
+GET {{baseUrl}}/api/cases/{{casePid}}/audit
+
+
+### Recent audit log (system-wide) — curl-verified: hash-chained rows
+# (prev_hash/hash/hash_sha3, agents/share/auditability.md)
+GET {{baseUrl}}/api/cases/audit/recent
+
+
+### Bulk import (JSONL/CSV) — 202 Accepted, returns a job id
+# POST {{baseUrl}}/api/cases/import
+# Content-Type: application/json
+#
+# { "format": "jsonl", "dedupe_mode": "upsert" }
+
+
+### Bulk export
+# POST {{baseUrl}}/api/cases/export
+# Content-Type: application/json
+#
+# { "format": "csv" }
+
+
+### FHIR R5 — read this case as a Task resource (governmental case ⇒
+# Task, the documented best-effort mapping, agents/share/fhir.md §3)
+GET {{baseUrl}}/fhir/Task/{{casePid}}
+
+
+### Delete (soft-delete) a case
+DELETE {{baseUrl}}/api/cases/{{casePid}}

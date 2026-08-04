@@ -1,0 +1,154 @@
+### Auth handshake walkthrough — authentication-service
+# Family SSO: passwordless magic-link -> Postgres cookie session ->
+# short-lived PASETO v4.public cross-service token -> bearer call on a peer.
+# See agents/share/authentication-sessions.md §5 for the full design, and
+# agents/share/authorization-attributes.md for the `attrs` claim / ABAC.
+#
+# Response envelope here is BARE loco JSON (no {"success":...} wrapper) —
+# see src/controllers/auth.rs. Run these top to bottom: each later request
+# needs a cookie or token value a prior one produced.
+#
+# `AUTHENTICATION_REQUIRE_AUTH`-style gating does not apply to this crate
+# itself (it is the issuer); the peer call at the bottom demonstrates a
+# service that DOES gate on `<ENTITY>_REQUIRE_AUTH`, which is off by
+# default in examples/compose/full-family.yml (agents/share/security.md §4)
+# — so step 6 succeeds with or without a real bearer token against the
+# stock compose file.
+
+@baseUrl = http://localhost:8091
+@personBaseUrl = http://localhost:8081
+@email = demo@example.com
+
+
+### 1. Sign up (or re-request a magic link for an existing account).
+# Always returns 200 {} regardless of whether the email is new, rate
+# limited, or rejected — this is a deliberate anti-enumeration contract
+# (src/controllers/auth.rs). It does NOT return the token in the body.
+POST {{baseUrl}}/api/auth/signup
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "name": "Demo User"
+}
+
+
+### 2. Retrieve the magic-link token — dev mode, no real mailbox.
+# SMTP is disabled in config/development.yaml; the mail send is
+# best-effort and fails silently. The AUTHORITATIVE way to get the token
+# locally is the tracing console log line:
+#
+#   magic link issued (dev: open the link, or GET /api/auth/magic-link/{token})
+#
+# Read it with:
+#   podman compose -f examples/compose/full-family.yml logs authentication-service \
+#     | grep 'magic link issued' | tail -1
+#
+# Copy the token that appears after `?token=` (or the bare `magic_link`
+# field, depending on log formatter) into @magicLinkToken below.
+@magicLinkToken = REPLACE_WITH_TOKEN_FROM_LOG
+
+
+### 3. Verify the magic link — consumes the token, establishes the session.
+# GET, not POST: the token rides in the path, no body. On success:
+#  - body is LoginResponse: {"token","pid","name","email","is_verified"}
+#    (the "token" field here is a PASETO v4.public string, despite the
+#    doc-comment in the crate calling it an "access token" — that comment
+#    is stale, see agents/share/authentication-sessions.md).
+#  - TWO Set-Cookie headers: __Host-mxi_session (HttpOnly) and
+#    __Host-mxi_csrf (readable — the BFF needs to read it to echo it back).
+# A client without automatic cookie-jar support (plain curl, or a REST
+# client with cookies disabled) must copy both values by hand into
+# @sessionCookie / @csrfToken below.
+GET {{baseUrl}}/api/auth/magic-link/{{magicLinkToken}}
+
+@sessionCookie = REPLACE_WITH_Host-mxi_session_COOKIE_VALUE
+@csrfToken = REPLACE_WITH_Host-mxi_csrf_COOKIE_VALUE
+
+
+### 4. Exchange the session for a short-lived PASETO v4.public token.
+# Requires the session cookie AND the CSRF header (constant-time compared
+# against the hashed cookie value server-side, src/csrf.rs). No body.
+# Response: bare {"token": "v4.public...."} — note this is NOT the same
+# shape as step 3's LoginResponse.
+POST {{baseUrl}}/api/auth/token
+Cookie: __Host-mxi_session={{sessionCookie}}
+X-CSRF-Token: {{csrfToken}}
+
+@bearerToken = REPLACE_WITH_TOKEN_FROM_STEP_4_RESPONSE
+
+
+### 5. Introspect the current session with the freshly-minted bearer token.
+# GET /api/auth/me is gated on Authorization: Bearer, not the cookie —
+# it independently re-checks the session (by the token's `sid` claim) is
+# still active and slides the idle TTL.
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{bearerToken}}
+
+
+### 6. Fetch the published Ed25519 key set every peer verifies against.
+# No auth required — this is the public discovery endpoint
+# (agents/share/authentication-sessions.md §5, the JWKS analogue).
+GET {{baseUrl}}/.well-known/paseto-keys
+
+
+### 7a. Use the bearer token on an ordinary PEER endpoint (person-service).
+# With PERSON_REQUIRE_AUTH off (the compose default, curl-verified) this
+# succeeds with or without the header — the blanket guard is a no-op.
+# Accepts-version demonstrates the header-based versioning scheme
+# (agents/share/api-versioning.md).
+GET {{personBaseUrl}}/api/persons/search?q=&limit=1
+Authorization: Bearer {{bearerToken}}
+Accepts-version: 1.0
+
+
+### 7b. Use the bearer token on the peer's OWN introspection endpoint.
+# UNLIKE ordinary endpoints, /api/whoami always demands a valid bearer —
+# curl-verified: it 401s "missing authorization header" with none, REGARDLESS
+# of PERSON_REQUIRE_AUTH. With this handshake's real token it still 401s,
+# with "no verification key for kid ..." — examples/compose/full-family.yml
+# does not wire PERSON_PASETO_KEYS_URL at authentication-service, so
+# person-service's verifier holds zero keys. This is a genuine gap in the
+# demo compose (not a doc error): to make this call succeed, set
+# PERSON_PASETO_KEYS_URL=http://authentication-service:5150/.well-known/paseto-keys
+# on person-service and restart it.
+GET {{personBaseUrl}}/api/whoami
+Authorization: Bearer {{bearerToken}}
+
+
+### 8. Sign out — clears both cookies server-side, revokes the session.
+# Subsequent calls to step 4 (POST /api/auth/token) with the same session
+# cookie will now 401; a bearer token already minted keeps working until
+# it naturally expires (~5 min) — see authentication-sessions.md §3 on
+# why revocation is immediate for new tokens but not retroactive.
+POST {{baseUrl}}/api/auth/signout
+Authorization: Bearer {{bearerToken}}
+
+
+### 9. (Admin only) List a user's ABAC attributes.
+# Requires a bearer token whose `attrs.access` includes "admin" — the
+# bootstrap admin is assigned out-of-band via the `user_attributes` CLI
+# task (src/tasks/attributes.rs), not over HTTP. Included here to show
+# the shape; expect 403 unless you've bootstrapped an admin locally.
+# @pid is the "pid" field from step 3's LoginResponse.
+@pid = REPLACE_WITH_PID_FROM_STEP_3
+
+GET {{baseUrl}}/api/auth/admin/users/{{pid}}/attributes
+Authorization: Bearer {{bearerToken}}
+
+
+### 10. (Admin only) Replace a user's ABAC attributes.
+# Full replacement, not a merge. Keys/values are short lowercase tokens;
+# "sub"/"email"/"entity" are reserved. On success, every existing session
+# for this user is revoked (so a stale token can't outlive its old
+# attributes) and an `attributes_assigned` audit row is written.
+PUT {{baseUrl}}/api/auth/admin/users/{{pid}}/attributes
+Authorization: Bearer {{bearerToken}}
+Content-Type: application/json
+
+{
+  "attributes": {
+    "access": ["write"],
+    "dept": ["cardiology"]
+  }
+}

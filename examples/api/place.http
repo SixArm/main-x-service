@@ -1,0 +1,150 @@
+### place-service — example requests
+# place/place-service-with-loco — "person-style" layout (src/api/rest/).
+# Envelope: {"success":bool,"data":...,"error":...} but data/error are
+# OMITTED (not null) on the unused side — #[serde(skip_serializing_if)],
+# src/api/mod.rs. Different from person/worker/event's "always both keys".
+# Gated by PLACE_REQUIRE_AUTH (default off).
+#
+# GOTCHA (curl-verified): Place has NO #[serde(default)] anywhere, so
+# create/match/check-duplicates need the FULL struct — every Vec field
+# as [], plus id/created_at/updated_at/is_deleted explicitly. A body with
+# only name/address/geo (as a naive reading of the README curl example
+# would suggest) fails JSON deserialization. Also: place keeps the
+# client-supplied `id` verbatim (never replaces a nil UUID), unlike
+# person/worker/event/course — reusing the placeholder id below on a
+# second create will 500.
+
+@baseUrl = http://localhost:8083
+@placeId = 00000000-0000-0000-0000-000000000000
+@token = REPLACE_WITH_BEARER_FROM_00-auth-handshake.http
+
+
+### Health check
+GET {{baseUrl}}/api/health
+
+
+### Who am I — always requires a valid bearer token, unlike every other
+# route in this file (curl-verified: 401 "missing authorization header"
+# with none, even though PLACE_REQUIRE_AUTH is off).
+GET {{baseUrl}}/api/whoami
+Authorization: Bearer {{token}}
+
+
+### Create a place — the full struct (see the GOTCHA note above).
+POST {{baseUrl}}/api/places
+Content-Type: application/json
+Accepts-version: 1.0
+
+{
+  "id": "{{placeId}}",
+  "name": "Central Park",
+  "keywords": [],
+  "identifiers": [],
+  "amenity_features": [],
+  "opening_hours": [],
+  "is_deleted": false,
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z"
+}
+
+
+### Get the created place back
+GET {{baseUrl}}/api/places/{{placeId}}
+
+
+### Update a place (same full-struct requirement as create)
+PUT {{baseUrl}}/api/places/{{placeId}}
+Content-Type: application/json
+
+{
+  "id": "{{placeId}}",
+  "name": "Central Park (renamed)",
+  "keywords": ["park", "landmark"],
+  "identifiers": [],
+  "amenity_features": [],
+  "opening_hours": [],
+  "is_deleted": false,
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z"
+}
+
+
+### Search places — total is reported in the JSON body (data.total),
+# not response headers, for this crate.
+GET {{baseUrl}}/api/places/search?q=Central&limit=10
+
+
+### Probabilistic + deterministic match — also needs the full struct.
+POST {{baseUrl}}/api/places/match
+Content-Type: application/json
+
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "name": "Central Park",
+  "keywords": [],
+  "identifiers": [],
+  "amenity_features": [],
+  "opening_hours": [],
+  "is_deleted": false,
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z"
+}
+
+
+### Explicit duplicate check (same full-struct body as match)
+POST {{baseUrl}}/api/places/check-duplicates
+Content-Type: application/json
+
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "name": "Central Park",
+  "keywords": [],
+  "identifiers": [],
+  "amenity_features": [],
+  "opening_hours": [],
+  "is_deleted": false,
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z"
+}
+
+
+### Batch deduplicate — scans the whole index
+POST {{baseUrl}}/api/places/deduplicate
+
+
+### Review queue — list pending candidate pairs
+GET {{baseUrl}}/api/places/review-queue?status=pending
+
+
+### Review queue — decide a pending item
+# POST {{baseUrl}}/api/places/review-queue/{{reviewId}}/decision
+# Content-Type: application/json
+#
+# { "status": "confirmed" }
+
+
+### Merge two confirmed-duplicate places (destructive)
+# POST {{baseUrl}}/api/places/merge
+# Content-Type: application/json
+#
+# { "main_id": "{{placeId}}", "duplicate_id": "<other-uuid>" }
+
+
+### Masked view (privacy.md)
+GET {{baseUrl}}/api/places/{{placeId}}/masked
+
+
+### GDPR export
+GET {{baseUrl}}/api/places/{{placeId}}/export
+
+
+### Audit trail
+GET {{baseUrl}}/api/places/{{placeId}}/audit
+
+
+### FHIR R5 — read this place as a Location resource
+GET {{baseUrl}}/fhir/Location/{{placeId}}
+
+
+### Delete (soft-delete) a place
+DELETE {{baseUrl}}/api/places/{{placeId}}

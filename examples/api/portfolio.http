@@ -1,0 +1,142 @@
+### project-portfolio-management-service — example requests
+# project-portfolio-management/project-portfolio-management-service-with-loco
+# — loco-idiomatic layout (src/controllers/). Envelope: BARE loco JSON,
+# same posture as organization.http — see that file's header. Gated by
+# PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH (default off). One recursive
+# `Plan` type — `kind` (Project/Portfolio/Product/Program/...) is an
+# optional descriptive label, never a matching or routing gate.
+#
+# This crate has the widest surface in the family (Kanban, sprints,
+# burndown, goals, governance, strategy, risk, …) — see AGENTS.md for
+# the complete module list. This file covers plan CRUD + match/dedupe
+# plus the flagship engineering sub-resources (tasks, sprints, burndown).
+#
+# GOTCHA: unlike the other loco-idiomatic crates, plan create has NO
+# 409-on-duplicate path (curl-verified against the code, not just
+# behaviour) — creating the same name twice does not conflict.
+
+@baseUrl = http://localhost:8090
+@planPid = REPLACE_WITH_PID_FROM_CREATE
+# curl-verified example: creating the body below in a local run produced
+# pid 6cc2d9aa-8e85-47cc-ae6b-5619c73c6aab — copy your own create
+# response's "pid" instead of reusing this one.
+@sprintPid = REPLACE_WITH_PID_FROM_SPRINT_CREATE
+@taskPid = REPLACE_WITH_PID_FROM_TASK_CREATE
+@token = REPLACE_WITH_BEARER_FROM_00-auth-handshake.http
+
+
+### Health check
+GET {{baseUrl}}/_health
+
+
+### Who am I — always requires a valid bearer token
+GET {{baseUrl}}/api/plans/whoami
+Authorization: Bearer {{token}}
+
+
+### Create a plan — minimal valid body. `kind` is descriptive only.
+# curl-verified response: {"pid":"<uuid>","name":"Apollo platform migration"}
+POST {{baseUrl}}/api/plans
+Content-Type: application/json
+Accepts-version: 1.0
+
+{
+  "kind": "Project",
+  "name": "Apollo platform migration",
+  "code": "PROJ-2026",
+  "owner_org_id": "organization:9a2f",
+  "goals": [{ "title": "Cut p95 latency" }],
+  "keywords": ["infra"],
+  "identifiers": [{ "scheme": "JiraProjectKey", "value": "APOLLO" }]
+}
+
+
+### Get the created plan back
+GET {{baseUrl}}/api/plans/{{planPid}}
+
+
+### List — paginated (curl-verified X-Total-Count/X-Limit/X-Offset headers)
+GET {{baseUrl}}/api/plans?limit=25&offset=0
+
+
+### Search — fuzzy + phonetic via Tantivy; `kind` is a filter, never a
+# matching gate.
+GET {{baseUrl}}/api/plans/search?q=Apollo&fuzzy=true&kind=Project
+
+
+### Probabilistic + deterministic match — kind-agnostic (any two plans
+# may match regardless of their `kind` label)
+POST {{baseUrl}}/api/plans/match
+Content-Type: application/json
+
+{ "name": "Apollo platform migration", "owner_org_id": "organization:9a2f" }
+
+
+### Explicit duplicate check — curl-verified: bare `[]` when no candidates
+POST {{baseUrl}}/api/plans/check-duplicates
+Content-Type: application/json
+
+{ "name": "Apollo platform migration" }
+
+
+### Merge two confirmed-duplicate plans (destructive)
+# POST {{baseUrl}}/api/plans/merge
+# Content-Type: application/json
+#
+# { "main_pid": "{{planPid}}", "duplicate_pid": "<other-uuid>" }
+
+
+### Kanban — create a task under this plan
+# @name createTask
+POST {{baseUrl}}/api/plans/{{planPid}}/tasks
+Content-Type: application/json
+
+{ "title": "Set up CI" }
+
+
+### Kanban — list this plan's tasks (curl-verified: grouped with a
+# `counts` summary by status alongside the flat `tasks` array)
+GET {{baseUrl}}/api/plans/{{planPid}}/tasks
+
+
+### Kanban — move a task (PATCH; WIP-limit capped per column)
+PATCH {{baseUrl}}/api/plans/{{planPid}}/tasks/{{taskPid}}
+Content-Type: application/json
+
+{ "status": "in_progress" }
+
+
+### Create a sprint — `starts_on`/`ends_on` are REQUIRED (curl-verified:
+# `{"name":...}` alone 422s).
+# @name createSprint
+POST {{baseUrl}}/api/plans/{{planPid}}/sprints
+Content-Type: application/json
+
+{ "name": "Sprint 1", "starts_on": "2026-01-01", "ends_on": "2026-01-14" }
+
+
+### Burndown for a sprint — `sprint` query param is REQUIRED
+# (curl-verified: omitting it 400s "missing field `sprint`"). There is
+# no separate /timeline endpoint — burndown is the shipped operational
+# view (agents/share/overview.md capability matrix).
+GET {{baseUrl}}/api/plans/{{planPid}}/burndown?sprint={{sprintPid}}
+
+
+### Velocity across this plan's sprints
+GET {{baseUrl}}/api/plans/{{planPid}}/velocity
+
+
+### Masked view (privacy.md)
+GET {{baseUrl}}/api/plans/{{planPid}}/masked
+
+
+### GDPR export
+GET {{baseUrl}}/api/plans/{{planPid}}/export
+
+
+### Audit trail
+GET {{baseUrl}}/api/plans/{{planPid}}/audit
+
+
+### Delete (soft-delete) a plan
+DELETE {{baseUrl}}/api/plans/{{planPid}}

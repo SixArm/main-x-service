@@ -1,0 +1,148 @@
+### organization-service — example requests
+# organization/organization-service-with-loco — loco-idiomatic layout
+# (src/controllers/). Envelope: BARE loco JSON — a success body is the
+# resource/array itself, no wrapper; non-2xx is loco's own
+# {"error":"...","description":"..."} (ErrorDetail). Gated by
+# ORGANIZATION_REQUIRE_AUTH (default off). The API DTO IS the matcher's
+# Organization type, stored verbatim as JSONB.
+
+@baseUrl = http://localhost:8087
+@orgPid = REPLACE_WITH_PID_FROM_CREATE
+# curl-verified example: creating the body below in a local run produced
+# pid 63c5dbda-72ae-4ca8-b65e-927191e9ed87 — every id is server-minted
+# and different per run, so copy your own create response's "pid".
+@token = REPLACE_WITH_BEARER_FROM_00-auth-handshake.http
+
+
+### Health check
+GET {{baseUrl}}/_health
+
+
+### Who am I — always requires a valid bearer token (curl-verified 401
+# with none, regardless of ORGANIZATION_REQUIRE_AUTH).
+GET {{baseUrl}}/api/organizations/whoami
+Authorization: Bearer {{token}}
+
+
+### Create an organization — minimal valid body.
+# curl-verified response: {"pid":"<uuid>","name":"Acme, Inc."}
+POST {{baseUrl}}/api/organizations
+Content-Type: application/json
+Accepts-version: 1.0
+
+{
+  "name": "Acme, Inc.",
+  "legal_name": "Acme Incorporated",
+  "url": "https://acme.com",
+  "same_as": ["https://www.wikidata.org/wiki/Q42"],
+  "jurisdiction": "US",
+  "founding_date": "1985-04-01",
+  "keywords": ["anvils"]
+}
+
+
+### Get the created organization back (the full stored DTO)
+GET {{baseUrl}}/api/organizations/{{orgPid}}
+
+
+### List organizations — paginated; curl-verified response headers
+# X-Total-Count / X-Limit / X-Offset (agents/share/restful.md).
+GET {{baseUrl}}/api/organizations?limit=25&offset=0
+
+
+### Search — fuzzy + phonetic full-text via Tantivy
+GET {{baseUrl}}/api/organizations/search?q=Acme&fuzzy=true&phonetic=true&limit=10
+
+
+### Update an organization
+PUT {{baseUrl}}/api/organizations/{{orgPid}}
+Content-Type: application/json
+
+{
+  "name": "Acme, Inc.",
+  "legal_name": "Acme International Incorporated",
+  "url": "https://acme.com",
+  "jurisdiction": "US",
+  "founding_date": "1985-04-01",
+  "keywords": ["anvils", "rockets"]
+}
+
+
+### Probabilistic + deterministic match — score a candidate without creating
+POST {{baseUrl}}/api/organizations/match
+Content-Type: application/json
+
+{ "name": "Acme, Inc.", "jurisdiction": "US" }
+
+
+### Explicit duplicate check — curl-verified: bare `[]` when no candidates
+POST {{baseUrl}}/api/organizations/check-duplicates
+Content-Type: application/json
+
+{ "name": "Acme, Inc." }
+
+
+### Batch deduplicate — scans the whole index, populates the review queue
+POST {{baseUrl}}/api/organizations/deduplicate
+
+
+### Review queue — curl-verified shape: {"items":[...],"total":n}
+GET {{baseUrl}}/api/organizations/review-queue?status=pending
+
+
+### Review queue — decide a pending item
+# POST {{baseUrl}}/api/organizations/review-queue/{{reviewId}}/decision
+# Content-Type: application/json
+#
+# { "status": "confirmed" }
+
+
+### Merge two confirmed-duplicate organizations (destructive)
+# POST {{baseUrl}}/api/organizations/merge
+# Content-Type: application/json
+#
+# { "main_pid": "{{orgPid}}", "duplicate_pid": "<other-uuid>" }
+
+
+### Recent merges
+GET {{baseUrl}}/api/organizations/merges/recent
+
+
+### Masked view (privacy.md)
+GET {{baseUrl}}/api/organizations/{{orgPid}}/masked
+
+
+### GDPR export
+GET {{baseUrl}}/api/organizations/{{orgPid}}/export
+
+
+### Audit trail for this record
+GET {{baseUrl}}/api/organizations/{{orgPid}}/audit
+
+
+### Recent audit log (system-wide) — curl-verified: array of
+# {created_at,updated_at,id,entity_pid,action,actor,snapshot,hash,...}
+GET {{baseUrl}}/api/organizations/audit/recent
+
+
+### Bulk import (JSONL/CSV) — 202 Accepted, returns a job id
+# POST {{baseUrl}}/api/organizations/import
+# Content-Type: application/json
+#
+# { "format": "jsonl", "dedupe_mode": "upsert" }
+
+
+### Bulk export
+# POST {{baseUrl}}/api/organizations/export
+# Content-Type: application/json
+#
+# { "format": "csv" }
+
+
+### FHIR R5 — read this organization as an Organization resource (the
+# reference FHIR implementation for the family, agents/share/fhir.md)
+GET {{baseUrl}}/fhir/Organization/{{orgPid}}
+
+
+### Delete (soft-delete) an organization
+DELETE {{baseUrl}}/api/organizations/{{orgPid}}

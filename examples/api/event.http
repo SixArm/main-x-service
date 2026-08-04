@@ -1,0 +1,134 @@
+### event-service — example requests
+# event/event-service-with-loco — "person-style" layout (src/api/rest/).
+# Envelope: {"success":bool,"data":...,"error":...} — data/error ALWAYS
+# both present (never omitted), same shape as person/worker (src/api/mod.rs).
+# Gated by EVENT_REQUIRE_AUTH (default off). No review-queue HTTP surface
+# and no cross-service links for this crate (capability matrix).
+
+@baseUrl = http://localhost:8085
+@eventId = 00000000-0000-0000-0000-000000000000
+@token = REPLACE_WITH_BEARER_FROM_00-auth-handshake.http
+
+
+### Health check
+GET {{baseUrl}}/api/health
+
+
+### Who am I — always requires a valid bearer token (curl-verified 401
+# "missing authorization header" with none, regardless of
+# EVENT_REQUIRE_AUTH — see person.http for the same pattern).
+GET {{baseUrl}}/api/whoami
+Authorization: Bearer {{token}}
+
+
+### Create an event — minimal valid body (id/active/name have no
+# #[serde(default)]; everything else defaults).
+# @name createEvent
+POST {{baseUrl}}/api/events
+Content-Type: application/json
+Accepts-version: 1.0
+
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "active": true,
+  "name": "Demo Conference",
+  "start_date": "2026-06-01T18:00:00Z",
+  "end_date": "2026-06-01T20:00:00Z",
+  "event_status": "scheduled",
+  "event_attendance_mode": "offline",
+  "event_type": "conference",
+  "all_day": false
+}
+
+
+### Get the created event back
+GET {{baseUrl}}/api/events/{{eventId}}
+
+
+### Search events — `q` is REQUIRED (not Option) for this crate, unlike
+# place/thing's optional `q`.
+GET {{baseUrl}}/api/events/search?q=Conference&limit=10
+
+
+### Update an event
+PUT {{baseUrl}}/api/events/{{eventId}}
+Content-Type: application/json
+
+{
+  "id": "{{eventId}}",
+  "active": true,
+  "name": "Demo Conference (rescheduled)",
+  "start_date": "2026-06-02T18:00:00Z",
+  "end_date": "2026-06-02T20:00:00Z",
+  "event_status": "scheduled",
+  "event_attendance_mode": "offline",
+  "event_type": "conference",
+  "all_day": false
+}
+
+
+### Probabilistic + deterministic match
+POST {{baseUrl}}/api/events/match
+Content-Type: application/json
+
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "active": true,
+  "name": "Demo Conference",
+  "start_date": "2026-06-01T18:00:00Z",
+  "end_date": "2026-06-01T20:00:00Z",
+  "event_status": "scheduled",
+  "event_attendance_mode": "offline",
+  "event_type": "conference",
+  "all_day": false
+}
+
+
+### Explicit duplicate check (same body shape as match)
+POST {{baseUrl}}/api/events/check-duplicates
+Content-Type: application/json
+
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "active": true,
+  "name": "Demo Conference",
+  "start_date": "2026-06-01T18:00:00Z",
+  "end_date": "2026-06-01T20:00:00Z",
+  "event_status": "scheduled",
+  "event_attendance_mode": "offline",
+  "event_type": "conference",
+  "all_day": false
+}
+
+
+### Batch deduplicate — scans the whole index
+POST {{baseUrl}}/api/events/deduplicate
+
+
+### Merge two confirmed-duplicate events (destructive)
+# POST {{baseUrl}}/api/events/merge
+# Content-Type: application/json
+#
+# { "main_id": "{{eventId}}", "duplicate_id": "<other-uuid>" }
+
+
+### Masked view
+GET {{baseUrl}}/api/events/{{eventId}}/masked
+
+
+### GDPR export
+GET {{baseUrl}}/api/events/{{eventId}}/export
+
+
+### Audit trail
+GET {{baseUrl}}/api/events/{{eventId}}/audit
+
+
+### FHIR R5 — read this event as an Appointment resource (schema.org/Event
+# has no direct FHIR analogue; Appointment is the documented best-effort
+# mapping, agents/share/fhir.md §3).
+GET {{baseUrl}}/fhir/Appointment/{{eventId}}
+
+
+### Delete (soft-delete) an event
+DELETE {{baseUrl}}/api/events/{{eventId}}

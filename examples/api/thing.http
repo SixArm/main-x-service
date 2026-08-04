@@ -1,0 +1,145 @@
+### thing-service — example requests
+# thing/thing-service-with-loco — "person-style" layout (src/api/rest/).
+# Envelope: same as place — {"success","data","error"} with data/error
+# OMITTED (not null) on the unused side (#[serde(skip_serializing_if)]).
+# Gated by THING_REQUIRE_AUTH (default off).
+#
+# GOTCHA (curl-verified, same as place): Thing has NO #[serde(default)],
+# so create/match/check-duplicates need the full struct — every Vec
+# field as [], plus id/created_at/updated_at/is_deleted. The client id
+# is kept verbatim (never replaced), so reusing a nil id across two
+# creates will 500 on the second.
+
+@baseUrl = http://localhost:8084
+@thingId = 00000000-0000-0000-0000-000000000000
+@token = REPLACE_WITH_BEARER_FROM_00-auth-handshake.http
+
+
+### Health check
+GET {{baseUrl}}/api/health
+
+
+### Who am I — always requires a valid bearer token (curl-verified 401
+# "missing authorization header" with none, regardless of
+# THING_REQUIRE_AUTH — see person.http for the same pattern).
+GET {{baseUrl}}/api/whoami
+Authorization: Bearer {{token}}
+
+
+### Create a thing — the full struct (see the GOTCHA note above).
+POST {{baseUrl}}/api/things
+Content-Type: application/json
+Accepts-version: 1.0
+
+{
+  "id": "{{thingId}}",
+  "name": "Pride and Prejudice",
+  "alternate_names": [],
+  "identifiers": [],
+  "images": [],
+  "same_as": [],
+  "is_deleted": false,
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z"
+}
+
+
+### Get the created thing back
+GET {{baseUrl}}/api/things/{{thingId}}
+
+
+### Update a thing (same full-struct requirement as create)
+PUT {{baseUrl}}/api/things/{{thingId}}
+Content-Type: application/json
+
+{
+  "id": "{{thingId}}",
+  "name": "Pride and Prejudice (annotated edition)",
+  "alternate_names": ["P&P"],
+  "identifiers": [],
+  "images": [],
+  "same_as": [],
+  "is_deleted": false,
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z"
+}
+
+
+### Search things
+GET {{baseUrl}}/api/things/search?q=Pride&limit=10
+
+
+### Probabilistic + deterministic match — also needs the full struct.
+POST {{baseUrl}}/api/things/match
+Content-Type: application/json
+
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "name": "Pride and Prejudice",
+  "alternate_names": [],
+  "identifiers": [],
+  "images": [],
+  "same_as": [],
+  "is_deleted": false,
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z"
+}
+
+
+### Explicit duplicate check (same full-struct body as match)
+POST {{baseUrl}}/api/things/check-duplicates
+Content-Type: application/json
+
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "name": "Pride and Prejudice",
+  "alternate_names": [],
+  "identifiers": [],
+  "images": [],
+  "same_as": [],
+  "is_deleted": false,
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z"
+}
+
+
+### Batch deduplicate — scans the whole index
+POST {{baseUrl}}/api/things/deduplicate
+
+
+### Review queue — list pending candidate pairs
+GET {{baseUrl}}/api/things/review-queue?status=pending
+
+
+### Review queue — decide a pending item
+# POST {{baseUrl}}/api/things/review-queue/{{reviewId}}/decision
+# Content-Type: application/json
+#
+# { "status": "confirmed" }
+
+
+### Merge two confirmed-duplicate things (destructive)
+# POST {{baseUrl}}/api/things/merge
+# Content-Type: application/json
+#
+# { "main_id": "{{thingId}}", "duplicate_id": "<other-uuid>" }
+
+
+### Masked view
+GET {{baseUrl}}/api/things/{{thingId}}/masked
+
+
+### GDPR export
+GET {{baseUrl}}/api/things/{{thingId}}/export
+
+
+### Audit trail
+GET {{baseUrl}}/api/things/{{thingId}}/audit
+
+
+### FHIR R5 — read this thing as a Device resource
+GET {{baseUrl}}/fhir/Device/{{thingId}}
+
+
+### Delete (soft-delete) a thing
+DELETE {{baseUrl}}/api/things/{{thingId}}

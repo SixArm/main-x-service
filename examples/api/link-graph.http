@@ -1,0 +1,71 @@
+### link-graph-service — example requests
+# link/link-graph-service-with-loco — the read-only cross-service
+# aggregator (agents/share/cross-service-linking.md). Envelope: its OWN
+# ApiEnvelope — {"success":bool,"data":...} on 200 /
+# {"success":false,"error":"..."} on 400 (src/envelope.rs). This is a
+# DIFFERENT implementation from the person-style envelope even though
+# the field names coincide — see examples/api/README.md.
+#
+# Gated by LINK_GRAPH_REQUIRE_AUTH (default off, curl-verified: every
+# request below runs unauthenticated against the stock compose). With
+# it on, `subject_of` (governed) edges are additionally concealed from a
+# caller not authorized to read cases — a no-op while the flag is off.
+#
+# GOTCHA (expected, not a bug): every query below curl-verified returns
+# an EMPTY edge set even after creating a case->person `subject_of` link
+# in case.http. The aggregator only has edges once it has consumed the
+# originating service's `linked` event, and examples/compose/full-family.yml
+# leaves every `<ENTITY>_EVENT_TRANSPORT` at its default `memory`
+# (agents/share/event-bus.md) — an in-process bus with nothing durable
+# for this separate service to consume. Switch the originating service
+# to the Postgres outbox transport (and wire a relay) to see real edges
+# here.
+
+@baseUrl = http://localhost:8092
+@personRef = person:00000000-0000-0000-0000-000000000000
+@caseRef = case:00000000-0000-0000-0000-000000000000
+@token = REPLACE_WITH_BEARER_FROM_00-auth-handshake.http
+
+
+### Health check
+GET {{baseUrl}}/_health
+
+
+### Neighbors of a record, both directions, depth 1 (default)
+GET {{baseUrl}}/api/neighbors/{{personRef}}
+Accepts-version: 1.0
+
+
+### Neighbors — filtered by edge kind, outbound only, capped depth 2
+# (MAX_DEPTH; depth > 2 is a 400)
+GET {{baseUrl}}/api/neighbors/{{caseRef}}?kind=subject_of&direction=out&depth=2
+
+
+### Malformed ref — curl-verified 400 with the envelope's error shape
+GET {{baseUrl}}/api/neighbors/not-a-valid-ref
+
+
+### Edges — filter by from/to/kind/status
+GET {{baseUrl}}/api/edges?from={{personRef}}&kind=same_identity
+
+
+### Edges — by status (unverified | verified | dangling)
+GET {{baseUrl}}/api/edges?status=verified
+
+
+### Single view — the unified identity + affiliation walk over
+# same_identity + works_at/employed_by (cross-service-linking.md)
+GET {{baseUrl}}/api/single-view/{{personRef}}
+
+
+### Consumer freshness — per-entity lag; NOT a public/liveness endpoint
+# despite the "/health/" path segment (curl-verified: distinct from
+# /_health; gated like every other /api/* route once
+# LINK_GRAPH_REQUIRE_AUTH is on).
+GET {{baseUrl}}/api/health/freshness
+
+
+### With a bearer token (only load-bearing once LINK_GRAPH_REQUIRE_AUTH
+# is on — off by default, so this is equivalent to the first request)
+GET {{baseUrl}}/api/neighbors/{{personRef}}
+Authorization: Bearer {{token}}

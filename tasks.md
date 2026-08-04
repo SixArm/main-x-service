@@ -1517,9 +1517,44 @@
   `abac::tests::every_example_policy_parses` reads and `Policy::from_json`
   parses every file in the directory (`cargo test` green, 58 tests incl.
   4 doctests, clippy clean).
-- [ ] **EX-3 (S)** `examples/api/` — per-service request collections
+- [x] **EX-3 (S)** `examples/api/` — per-service request collections
   (`.http` files or curl scripts) for the main endpoints incl. auth
-  handshake. Spot-verified against a running compose.
+  handshake. Spot-verified against a running compose. Done: twelve
+  `.http` files (one per service) + `00-auth-handshake.http` +
+  `README.md` under `examples/api/`, written from each crate's actual
+  `src/controllers/`/`src/api/rest/` route + handler code, not from the
+  family narrative docs. Live-verified against
+  `examples/compose/full-family.yml` (build, then `up -d` as two
+  separate commands): health check + create + get curl-verified for
+  all twelve services; search/list, match, check-duplicates,
+  review-queue, cross-service links, FHIR read, and several
+  engineering/operational sub-resources (care-pathway instance
+  enroll+status, portfolio task move + sprint + burndown) also
+  curl-verified live. The full auth handshake (signup → magic-link
+  verify → session cookie → `POST /token` with CSRF → `/api/auth/me` →
+  `/.well-known/paseto-keys` → account export/audit → admin-attributes
+  403) was driven end-to-end against a throwaway `LOCO_ENV=development`
+  authentication-service container on the same compose network, since
+  the shipped compose bakes `LOCO_ENV=production` (SEC-A1 fail-closed)
+  and `users.magic_link_token` is stored pre-hashed (SEC-A9) — neither
+  the dev-console-log trick nor a direct DB read yields a usable token
+  against the stock stack, which `00-auth-handshake.http` and
+  `authentication.http` now document. Real discrepancies caught by
+  curl and corrected before commit: worker's assessment endpoints
+  return the bare resource, not the crate's usual envelope; `place`/
+  `thing` require the full struct (no `#[serde(default)]`) rather than
+  a minimal body; review-queue decisions take `{"status":...}`, not
+  `{"decision":...}`; `case-service` has no review-queue HTTP surface
+  at all (a made-up path 500s, mis-parsing "review-queue" as a UUID);
+  care-pathway's instance status body is `{"to":...}` and its FHIR
+  `$export` is `GET /fhir/$export` (not `POST .../PlanDefinition/$export`);
+  portfolio's burndown requires `?sprint=`; and `/api/whoami` (and its
+  loco-style `/api/<plural>/whoami` equivalents) unconditionally
+  require a bearer token regardless of `<ENTITY>_REQUIRE_AUTH`. Also
+  corrected a stale premise from the task brief itself: all four
+  loco-idiomatic services (organization, care-pathway, case, portfolio)
+  return bare loco JSON identically — case is not a `{success,...}`-vs-
+  bare exception, they all are.
 - [ ] **EX-4 (S)** A demo **seed** path: loco task (person + organization
   + case) or documented bulk-import of EX-1 fixtures — pick one,
   reference it from TUT-1/2/4.

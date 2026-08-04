@@ -1,0 +1,129 @@
+### care-pathway-service — example requests
+# care-pathway/care-pathway-service-with-loco — loco-idiomatic layout
+# (src/controllers/). Envelope: BARE loco JSON, same posture as
+# organization.http — see that file's header for the full explanation.
+# Gated by CARE_PATHWAY_REQUIRE_AUTH (default off). No REST bulk
+# import/export in this crate (only FHIR $export, near the bottom).
+
+@baseUrl = http://localhost:8088
+@pathwayPid = REPLACE_WITH_PID_FROM_CREATE
+# curl-verified example: creating the body below in a local run produced
+# pid 448813be-ebb1-43c4-bbd8-589c0b79277f — copy your own create
+# response's "pid" instead of reusing this one.
+@instancePid = REPLACE_WITH_PID_FROM_INSTANCE_CREATE
+# curl-verified: enrolling a subject via POST .../instances (below)
+# produces a response with its own "pid" — copy that in, distinct from
+# the pathway's own pid above.
+@token = REPLACE_WITH_BEARER_FROM_00-auth-handshake.http
+
+
+### Health check
+GET {{baseUrl}}/_health
+
+
+### Who am I — always requires a valid bearer token
+GET {{baseUrl}}/api/care-pathways/whoami
+Authorization: Bearer {{token}}
+
+
+### Create a care pathway — minimal valid body.
+# curl-verified response: {"pid":"<uuid>","name":"Acute Stroke Care Pathway"}
+POST {{baseUrl}}/api/care-pathways
+Content-Type: application/json
+Accepts-version: 1.0
+
+{
+  "name": "Acute Stroke Care Pathway",
+  "provider_id": "trust-1",
+  "pathway_code": "STROKE-01",
+  "condition_codes": [{ "system": "Icd10", "code": "I63" }],
+  "identifiers": [{ "scheme": "GuidelineId", "value": "NICE-NG128" }]
+}
+
+
+### Get the created care pathway back
+GET {{baseUrl}}/api/care-pathways/{{pathwayPid}}
+
+
+### List — paginated (X-Total-Count / X-Limit / X-Offset headers)
+GET {{baseUrl}}/api/care-pathways?limit=25&offset=0
+
+
+### Search — fuzzy + phonetic via Tantivy; condition codes and
+# interventions are searchable too.
+GET {{baseUrl}}/api/care-pathways/search?q=Stroke&fuzzy=true&phonetic=true
+
+
+### Probabilistic + deterministic match
+POST {{baseUrl}}/api/care-pathways/match
+Content-Type: application/json
+
+{ "name": "Acute Stroke Care Pathway", "provider_id": "trust-1" }
+
+
+### Explicit duplicate check
+POST {{baseUrl}}/api/care-pathways/check-duplicates
+Content-Type: application/json
+
+{ "name": "Acute Stroke Care Pathway" }
+
+
+### Merge two confirmed-duplicate pathways (destructive)
+# POST {{baseUrl}}/api/care-pathways/merge
+# Content-Type: application/json
+#
+# { "main_pid": "{{pathwayPid}}", "duplicate_pid": "<other-uuid>" }
+
+
+### Directory insight — pathways grouped by care setting / specialty
+GET {{baseUrl}}/api/care-pathways/insights/directory
+
+
+### Enroll a patient into a pathway instance (an operational sub-resource
+# distinct from the pathway template itself)
+POST {{baseUrl}}/api/care-pathways/{{pathwayPid}}/instances
+Content-Type: application/json
+
+{ "subject_ref": "person:11111111-1111-1111-1111-111111111111" }
+
+
+### Get a pathway instance
+GET {{baseUrl}}/api/instances/{{instancePid}}
+
+
+### Advance a pathway instance to its next step. Body field is `to`, not
+# `status` (curl-verified: `{"status":...}` 422s "Bad Request"). Legal
+# transitions (src/instances.rs): active <-> on_hold, either -> completed
+# or discontinued (terminal).
+POST {{baseUrl}}/api/instances/{{instancePid}}/status
+Content-Type: application/json
+
+{ "to": "on_hold" }
+
+
+### Masked view (privacy.md)
+GET {{baseUrl}}/api/care-pathways/{{pathwayPid}}/masked
+
+
+### GDPR export for a pathway instance's subject
+GET {{baseUrl}}/api/care-pathways/{{pathwayPid}}/export
+
+
+### Audit trail
+GET {{baseUrl}}/api/care-pathways/{{pathwayPid}}/audit
+
+
+### FHIR R5 — read this pathway as a PlanDefinition resource
+GET {{baseUrl}}/fhir/PlanDefinition/{{pathwayPid}}
+
+
+### FHIR Bulk Data — kick off an async $export (ONC/HTI-style bulk
+# export; this crate's compliance reference implementation). GET, not
+# POST (curl-verified: POST 405s); mounted at /fhir/$export, NOT under
+# /fhir/PlanDefinition/$export. curl-verified: 202 Accepted with a
+# Content-Location header pointing at the status-poll URL.
+GET {{baseUrl}}/fhir/$export
+
+
+### Delete (soft-delete) a care pathway
+DELETE {{baseUrl}}/api/care-pathways/{{pathwayPid}}

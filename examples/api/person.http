@@ -1,0 +1,151 @@
+### person-service — example requests
+# person/person-service-with-loco — "person-style" layout (src/api/rest/).
+# Envelope: {"success":bool,"data":...,"error":{"code","message","details"}}
+# — data/error are ALWAYS both present (never omitted), src/api/mod.rs.
+# Gated by PERSON_REQUIRE_AUTH (default off — see 00-auth-handshake.http
+# for how to mint a bearer token once it's on).
+
+@baseUrl = http://localhost:8081
+@personId = 00000000-0000-0000-0000-000000000000
+@otherPersonId = 11111111-1111-1111-1111-111111111111
+@token = REPLACE_WITH_BEARER_FROM_00-auth-handshake.http
+
+
+### Health check
+GET {{baseUrl}}/api/health
+
+
+### Who am I — auth introspection. UNLIKE the rest of this file, whoami
+# always requires a valid bearer token (its own AuthUser extractor, not
+# gated by PERSON_REQUIRE_AUTH) — confirmed live: even with the blanket
+# guard off, this 401s ("missing authorization header") with no token.
+# curl-verified: examples/compose/full-family.yml does not wire
+# PERSON_PASETO_KEYS_URL at authentication-service, so even a real token
+# minted by 00-auth-handshake.http fails here with "no verification key
+# for kid ..." — a real gap in the demo compose, not a documentation slip.
+GET {{baseUrl}}/api/whoami
+Authorization: Bearer {{token}}
+
+
+### Create a person — minimal valid body (name + gender are the only
+# fields with no #[serde(default)]; id defaults to a fresh UUID).
+# @name createPerson
+POST {{baseUrl}}/api/persons
+Content-Type: application/json
+Accepts-version: 1.0
+
+{
+  "name": { "use": "official", "family": "Smith", "given": ["Ada"] },
+  "birth_date": "1990-05-15",
+  "gender": "female"
+}
+
+
+### Get the created person back (swap in the id from createPerson's
+# response `data.id` if your client doesn't chain requests).
+GET {{baseUrl}}/api/persons/{{personId}}
+
+
+### Search persons — total/offset are reported in the JSON body
+# (data.total / data.offset), not response headers, for this crate.
+GET {{baseUrl}}/api/persons/search?q=Smith&limit=10&offset=0
+
+
+### Update a person
+PUT {{baseUrl}}/api/persons/{{personId}}
+Content-Type: application/json
+
+{
+  "name": { "use": "official", "family": "Smith", "given": ["Ada", "Jane"] },
+  "birth_date": "1990-05-15",
+  "gender": "female"
+}
+
+
+### Probabilistic + deterministic match — score a candidate against
+# existing records without creating anything.
+POST {{baseUrl}}/api/persons/match
+Content-Type: application/json
+
+{
+  "name": { "family": "Smith", "given": ["Ada"] },
+  "birth_date": "1990-05-15",
+  "gender": "female"
+}
+
+
+### Explicit duplicate check (does not create; same body shape as match)
+POST {{baseUrl}}/api/persons/check-duplicates
+Content-Type: application/json
+
+{
+  "name": { "family": "Smith", "given": ["Ada"] },
+  "birth_date": "1990-05-15",
+  "gender": "female"
+}
+
+
+### Batch deduplicate — scans the whole index for candidate pairs
+POST {{baseUrl}}/api/persons/deduplicate
+
+
+### Review queue — list pending candidate pairs
+GET {{baseUrl}}/api/persons/review-queue?status=pending
+
+
+### Review queue — confirm or reject a pending item (first-writer-wins;
+# only `pending` items can be decided). Replace {{reviewId}} with a real
+# id from the previous request's response.
+# POST {{baseUrl}}/api/persons/review-queue/{{reviewId}}/decision
+# Content-Type: application/json
+#
+# { "status": "confirmed" }
+
+
+### Merge two confirmed-duplicate records (destructive; needs two real
+# pre-existing records — see agents/share/merge.md).
+# POST {{baseUrl}}/api/persons/merge
+# Content-Type: application/json
+#
+# { "main_id": "{{personId}}", "duplicate_id": "{{otherPersonId}}" }
+
+
+### Cross-service link — assert same_identity to a worker record
+# (cross-service-linking.md §9; person + worker are the only two crates
+# that originate entity_links today).
+POST {{baseUrl}}/api/persons/{{personId}}/links
+Content-Type: application/json
+
+{ "kind": "same_identity", "to_ref": "worker:{{otherPersonId}}" }
+
+
+### List this person's outbound links
+GET {{baseUrl}}/api/persons/{{personId}}/links
+
+
+### Masked view (privacy.md — sensitive fields redacted)
+GET {{baseUrl}}/api/persons/{{personId}}/masked
+
+
+### GDPR export for this subject
+GET {{baseUrl}}/api/persons/{{personId}}/export
+
+
+### Audit trail for this record
+GET {{baseUrl}}/api/persons/{{personId}}/audit
+
+
+### Bulk import (JSONL) — 202 Accepted, returns a job id
+# (bulk-import-export.md; person is the reference crate for bulk).
+# POST {{baseUrl}}/api/persons/import
+# Content-Type: application/json
+#
+# { "format": "jsonl", "dedupe_mode": "upsert" }
+
+
+### FHIR R5 — read this person as a Patient resource
+GET {{baseUrl}}/fhir/Patient/{{personId}}
+
+
+### Delete (soft-delete) a person
+DELETE {{baseUrl}}/api/persons/{{personId}}

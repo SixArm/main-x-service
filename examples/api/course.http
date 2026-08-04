@@ -1,0 +1,133 @@
+### course-service — example requests
+# course/course-service-with-loco — "person-style" layout (src/api/rest/).
+# Envelope: same as place/thing — data/error OMITTED (not null) on the
+# unused side (#[serde(skip_serializing_if)]). Gated by
+# COURSE_REQUIRE_AUTH (default off). No review-queue HTTP surface, no
+# cross-service links, no bulk import/export for this crate.
+#
+# GOTCHA: `GET /api/courses` (bare list, no query) is unimplemented —
+# it returns 501. Use /api/courses/search instead.
+
+@baseUrl = http://localhost:8086
+@courseId = 00000000-0000-0000-0000-000000000000
+@instanceId = 11111111-1111-1111-1111-111111111111
+@token = REPLACE_WITH_BEARER_FROM_00-auth-handshake.http
+
+
+### Health check
+GET {{baseUrl}}/api/health
+
+
+### Who am I — always requires a valid bearer token (curl-verified 401
+# "missing authorization header" with none, regardless of
+# COURSE_REQUIRE_AUTH — see person.http for the same pattern).
+GET {{baseUrl}}/api/whoami
+Authorization: Bearer {{token}}
+
+
+### GET /api/courses (bare list) — deliberately unimplemented, returns
+# 501; included so you don't file it as a bug. Use search below instead.
+GET {{baseUrl}}/api/courses
+
+
+### Create a course — minimal valid body (Course is heavily
+# #[serde(default)]-annotated, person-style).
+# @name createCourse
+POST {{baseUrl}}/api/courses
+Content-Type: application/json
+Accepts-version: 1.0
+
+{
+  "name": "Intro to Widgets",
+  "course_code": "TEST101",
+  "status": "published"
+}
+
+
+### Get the created course back
+GET {{baseUrl}}/api/courses/{{courseId}}
+
+
+### Search courses — the response's array field is `items`, not
+# `results`/`courses` (differs from every sibling crate).
+GET {{baseUrl}}/api/courses/search?q=Widgets&limit=10
+
+
+### Update a course
+PUT {{baseUrl}}/api/courses/{{courseId}}
+Content-Type: application/json
+
+{
+  "name": "Intro to Widgets (2026 edition)",
+  "course_code": "TEST101",
+  "status": "published"
+}
+
+
+### Probabilistic + deterministic match
+POST {{baseUrl}}/api/courses/match
+Content-Type: application/json
+
+{ "name": "Intro to Widgets", "course_code": "TEST101", "status": "published" }
+
+
+### Explicit duplicate check
+POST {{baseUrl}}/api/courses/check-duplicates
+Content-Type: application/json
+
+{ "name": "Intro to Widgets", "course_code": "TEST101", "status": "published" }
+
+
+### Batch deduplicate
+POST {{baseUrl}}/api/courses/deduplicate
+
+
+### Merge two confirmed-duplicate courses (destructive)
+# POST {{baseUrl}}/api/courses/merge
+# Content-Type: application/json
+#
+# { "main_id": "{{courseId}}", "duplicate_id": "<other-uuid>" }
+
+
+### Create a course instance — a specific offering of this course
+# (course_id in the body is required by the model, though the server
+# also takes it from the path).
+POST {{baseUrl}}/api/courses/{{courseId}}/instances
+Content-Type: application/json
+
+{
+  "id": "{{instanceId}}",
+  "course_id": "{{courseId}}",
+  "name": "Spring 2026",
+  "status": "scheduled"
+}
+
+
+### List this course's instances
+GET {{baseUrl}}/api/courses/{{courseId}}/instances
+
+
+### Get one instance
+GET {{baseUrl}}/api/courses/{{courseId}}/instances/{{instanceId}}
+
+
+### Masked view
+GET {{baseUrl}}/api/courses/{{courseId}}/masked
+
+
+### GDPR export
+GET {{baseUrl}}/api/courses/{{courseId}}/export
+
+
+### Audit trail
+GET {{baseUrl}}/api/courses/{{courseId}}/audit
+
+
+### FHIR — read this course as a Basic resource (no FHIR R5 resource
+# models a course; Basic is the documented non-standard fallback,
+# agents/share/fhir.md §3).
+GET {{baseUrl}}/fhir/Basic/{{courseId}}
+
+
+### Delete (soft-delete) a course
+DELETE {{baseUrl}}/api/courses/{{courseId}}

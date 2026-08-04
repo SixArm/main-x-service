@@ -1,0 +1,163 @@
+### worker-service — example requests
+# worker/worker-service-with-loco — "person-style" layout (src/api/rest/).
+# Envelope: {"success":bool,"data":...,"error":{"code","message","details"}}
+# — data/error ALWAYS both present, identical shape to person's (src/api/mod.rs).
+# Gated by WORKER_REQUIRE_AUTH (default off).
+
+@baseUrl = http://localhost:8082
+@workerId = 00000000-0000-0000-0000-000000000000
+@otherWorkerId = 11111111-1111-1111-1111-111111111111
+@assessmentId = 22222222-2222-2222-2222-222222222222
+@token = REPLACE_WITH_BEARER_FROM_00-auth-handshake.http
+
+
+### Health check
+GET {{baseUrl}}/api/health
+
+
+### Who am I — always requires a valid bearer token (its own AuthUser
+# extractor, not gated by WORKER_REQUIRE_AUTH) — curl-verified: 401s
+# "missing authorization header" with no token even though the blanket
+# guard is off. See person.http for the same pattern and the compose
+# gap (no WORKER_PASETO_KEYS_URL wired to authentication-service).
+GET {{baseUrl}}/api/whoami
+Authorization: Bearer {{token}}
+
+
+### Create a worker — minimal valid body (mirrors person's Human Name +
+# gender requirement).
+# @name createWorker
+POST {{baseUrl}}/api/workers
+Content-Type: application/json
+Accepts-version: 1.0
+
+{
+  "name": { "use": "official", "family": "Smith", "given": ["Ada"] },
+  "birth_date": "1990-05-15",
+  "gender": "female"
+}
+
+
+### Get the created worker back
+GET {{baseUrl}}/api/workers/{{workerId}}
+
+
+### Search workers
+GET {{baseUrl}}/api/workers/search?q=Smith&limit=10&offset=0
+
+
+### Update a worker
+PUT {{baseUrl}}/api/workers/{{workerId}}
+Content-Type: application/json
+
+{
+  "name": { "use": "official", "family": "Smith", "given": ["Ada", "Jane"] },
+  "birth_date": "1990-05-15",
+  "gender": "female"
+}
+
+
+### Probabilistic + deterministic match
+POST {{baseUrl}}/api/workers/match
+Content-Type: application/json
+
+{
+  "name": { "family": "Smith", "given": ["Ada"] },
+  "birth_date": "1990-05-15",
+  "gender": "female"
+}
+
+
+### Explicit duplicate check
+POST {{baseUrl}}/api/workers/check-duplicates
+Content-Type: application/json
+
+{
+  "name": { "family": "Smith", "given": ["Ada"] },
+  "birth_date": "1990-05-15",
+  "gender": "female"
+}
+
+
+### Batch deduplicate
+POST {{baseUrl}}/api/workers/deduplicate
+
+
+### Review queue — list pending candidate pairs
+GET {{baseUrl}}/api/workers/review-queue?status=pending
+
+
+### Review queue — decide a pending item
+# POST {{baseUrl}}/api/workers/review-queue/{{reviewId}}/decision
+# Content-Type: application/json
+#
+# { "status": "confirmed" }
+
+
+### Merge two confirmed-duplicate workers (destructive)
+# POST {{baseUrl}}/api/workers/merge
+# Content-Type: application/json
+#
+# { "main_id": "{{workerId}}", "duplicate_id": "{{otherWorkerId}}" }
+
+
+### Cross-service link — assert same_identity back to the person record,
+# and employed_by to an organization.
+POST {{baseUrl}}/api/workers/{{workerId}}/links
+Content-Type: application/json
+
+{ "kind": "same_identity", "to_ref": "person:{{otherWorkerId}}" }
+
+
+### List this worker's outbound links
+GET {{baseUrl}}/api/workers/{{workerId}}/links
+
+
+### Record a workforce assessment (aptitude / personality / psychometric /
+# selection — worker-only capability, per-scale results + score bands).
+# GOTCHA (curl-verified): the assessment endpoints bypass the crate's
+# usual ApiResponse envelope entirely and return the created assessment
+# BARE with 201 Created (src/api/rest/assessments.rs — `Json(created)`,
+# not the ApiResponse wrapper every other worker.http request uses).
+# @name createAssessment
+POST {{baseUrl}}/api/workers/{{workerId}}/assessments
+Content-Type: application/json
+
+{
+  "category": "psychometric",
+  "instrument": "Numerical Reasoning Inventory",
+  "provider": "Test Publisher",
+  "status": "completed",
+  "administered_on": "2026-01-15",
+  "results": [
+    { "scale": "numerical_reasoning", "raw_score": 41.0, "max_score": 50.0, "percentile": 82.0, "narrative": "strong under time pressure" }
+  ]
+}
+
+
+### Get one assessment
+GET {{baseUrl}}/api/workers/{{workerId}}/assessments/{{assessmentId}}
+
+
+### Derived assessment profile for this worker (masked under ABAC)
+GET {{baseUrl}}/api/workers/{{workerId}}/assessment-profile
+
+
+### Masked view
+GET {{baseUrl}}/api/workers/{{workerId}}/masked
+
+
+### GDPR export
+GET {{baseUrl}}/api/workers/{{workerId}}/export
+
+
+### Audit trail
+GET {{baseUrl}}/api/workers/{{workerId}}/audit
+
+
+### FHIR R5 — read this worker as a Practitioner resource
+GET {{baseUrl}}/fhir/Practitioner/{{workerId}}
+
+
+### Delete (soft-delete) a worker
+DELETE {{baseUrl}}/api/workers/{{workerId}}

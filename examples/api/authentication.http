@@ -1,0 +1,117 @@
+### authentication-service — example requests
+# authentication/authentication-service-with-loco — the central SSO
+# provider (not an entity registry). Envelope: BARE loco JSON — a
+# success body is the payload itself, no wrapper; non-2xx is loco's own
+# {"error":"...","description":"..."} (or, for the always-200 signup/
+# magic-link endpoints, `{}`). See 00-auth-handshake.http for the full
+# walkthrough with inline curl-verified commentary on retrieving a
+# magic-link token in this compose (LOCO_ENV=production is baked into
+# the image — SEC-A1 fail-closed — so the usual "read it from the dev
+# console log" trick needs a throwaway container overridden to
+# LOCO_ENV=development; see that file). This file is the flatter
+# per-endpoint reference; run 00-auth-handshake.http first if you want
+# working values for @sessionCookie / @csrfToken / @token / @pid below.
+
+@baseUrl = http://localhost:8091
+@email = demo@example.com
+@magicLinkToken = REPLACE_WITH_TOKEN_FROM_00-auth-handshake.http
+@sessionCookie = REPLACE_WITH_SESSION_COOKIE
+@csrfToken = REPLACE_WITH_CSRF_COOKIE_VALUE
+@token = REPLACE_WITH_BEARER_FROM_00-auth-handshake.http
+@pid = REPLACE_WITH_PID_FROM_VERIFY_RESPONSE
+
+
+### Health check
+GET {{baseUrl}}/_health
+
+
+### Sign up — creates the account (if new) and issues a magic link.
+# Always 200 {} — deliberate anti-enumeration (SEC-A5/A6), never reveals
+# whether the email was new, existing, or rate-limited.
+POST {{baseUrl}}/api/auth/signup
+Content-Type: application/json
+
+{ "email": "{{email}}", "name": "Demo User" }
+
+
+### Re-request a magic link for an existing account (sign-in). Same
+# always-200-{} contract as signup.
+POST {{baseUrl}}/api/auth/magic-link
+Content-Type: application/json
+
+{ "email": "{{email}}" }
+
+
+### Verify the magic link — GET, token in the path, no body.
+# curl-verified live (00-auth-handshake.http): 200 with LoginResponse
+# {"token","pid","name","email","is_verified"} + two Set-Cookie headers
+# (__Host-mxi_session HttpOnly, __Host-mxi_csrf readable).
+GET {{baseUrl}}/api/auth/magic-link/{{magicLinkToken}}
+
+
+### Exchange the session for a short-lived PASETO v4.public token.
+# Requires both the session cookie and the matching CSRF header.
+# curl-verified: 200 {"token":"v4.public...."}.
+POST {{baseUrl}}/api/auth/token
+Cookie: __Host-mxi_session={{sessionCookie}}
+X-CSRF-Token: {{csrfToken}}
+
+
+### Who am I — session + bearer introspection.
+# curl-verified: {"pid","name","email"}.
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{token}}
+Accepts-version: 1.0
+
+
+### The published Ed25519 key set every peer verifies against (public,
+# no auth). curl-verified shape: {"keys":[{"kty":"OKP","crv":"Ed25519",
+# "kid","use":"sig","x"}]}.
+GET {{baseUrl}}/.well-known/paseto-keys
+
+
+### GDPR export of the caller's own account — curl-verified shape:
+# {"user":{...},"sessions":[...],"auth_events":[...]}.
+GET {{baseUrl}}/api/auth/account/export
+Authorization: Bearer {{token}}
+
+
+### The caller's own auth event history — curl-verified: an array of
+# {event,email,user_pid,detail,created_at} (e.g. "signup",
+# "magic_link_redeemed").
+GET {{baseUrl}}/api/auth/account/audit
+Authorization: Bearer {{token}}
+
+
+### Admin — system-wide recent audit log. Requires `attrs.access` to
+# include "admin"; curl-verified: 403 without it (the bootstrap admin is
+# assigned via the `user_attributes` CLI task, not HTTP — see §9/§10
+# below).
+GET {{baseUrl}}/api/auth/audit/recent
+Authorization: Bearer {{token}}
+
+
+### Admin — list a user's ABAC attributes (attrs claim source,
+# agents/share/authorization-attributes.md §6). Expect 403 unless
+# you've bootstrapped an admin locally.
+GET {{baseUrl}}/api/auth/admin/users/{{pid}}/attributes
+Authorization: Bearer {{token}}
+
+
+### Admin — replace a user's ABAC attributes (full replacement, not a
+# merge; revokes all of the target user's sessions on success).
+PUT {{baseUrl}}/api/auth/admin/users/{{pid}}/attributes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "attributes": { "access": ["write"], "dept": ["cardiology"] } }
+
+
+### Sign out — clears both cookies, revokes the session.
+POST {{baseUrl}}/api/auth/signout
+Authorization: Bearer {{token}}
+
+
+### Delete the caller's own account (GDPR erasure)
+# DELETE {{baseUrl}}/api/auth/account
+# Authorization: Bearer {{token}}
