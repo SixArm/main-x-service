@@ -4575,6 +4575,76 @@ committing (see plan.md §4).
   task's boundary) or any of the other ten front-ends (concurrent
   sibling audits).
 
+- *`course/course-front-end-with-svelte` done 2026-08-04.* Same
+  underlying gap as worker's DOC-4 note above, confirming this is a
+  family-wide pattern rather than a one-off: the 2026-06-18 BFF
+  migration (`f66ff50f`) fully shipped auth (`src/hooks.server.ts`,
+  `src/lib/server/{auth,config,session}.ts`, `/signin`, `/verify`,
+  `src/routes/api/proxy/[...path]/+server.ts`) plus i18n (13 locales,
+  `src/lib/i18n.svelte.ts`) and the `ThemePicker`/`LocalePicker` in
+  the layout shell, and **none of it was ever recorded** in this
+  crate's own docs — verified by reading the actual `src/` tree, not
+  inferred. Found and fixed: (1) `spec/02-scope.md` §2.2 flatly
+  listed **Authentication UI**, **i18n/locale switching**, and
+  **Theme switcher** as *out of scope* — all three are shipped and
+  tested; moved to §2.1 in-scope with landing dates. (2)
+  `spec/13-tasks.md` T-24 (auth) was still an unchecked box quoting
+  the pre-BFF PASETO model almost verbatim; marked done with the real
+  landing story, and split off two new open tasks — T-26 (CSRF is
+  genuinely absent: verified zero CSRF hits by grep, and there is no
+  route-level guard either — `locals.sessionId`/`signedIn` is wired
+  for chrome display only, nothing redirects an unauthenticated
+  visitor) and T-27 (`/signin`/`/verify` are English-only by design,
+  per the code's own comment — a real, disclosed gap, not silently
+  found). (3) `spec/01-purpose-and-vision.md`, `spec/03-stakeholders-
+  and-users.md`, and `spec/12-compliance.md` all still described auth
+  as unshipped/deferred; corrected each to the actual state (sign-in
+  shipped, route-level gating and per-action attribution still open).
+  (4) `spec/15-roadmap.md` v0.4 listed auth as blocked/future; marked
+  shipped 2026-06-18, added a v0.4.1 entry for the 2026-07-19 board/
+  calendar routes. (5) `AGENTS.md`'s "What does NOT live here" list
+  asserted "Authentication. Out of scope until the service ships
+  auth" — false on both halves (the service shipped auth per its own
+  T-15, and so did this front-end); replaced with a BFF section
+  naming the real files and the genuine CSRF/route-guard gap. (6)
+  **A second-order bug, not just a doc gap**: `.env.example` and
+  `index.md` documented a stale `PUBLIC_API_BASE_URL` env var that
+  the BFF code doesn't read at all (the real vars are `COURSE_API_URL`/
+  `AUTH_API_URL`) — but fixing the name surfaced that the *value*
+  `README.md` and `index.md` gave for `COURSE_API_URL` (`5150`,
+  mirroring `src/lib/server/config.ts`'s own fallback constant) is
+  itself wrong: `course-service-with-loco` is the one service in the
+  family whose dev config overrides the loco default to port `8084`
+  (confirmed live against its `config/development.yaml`, matching
+  what this front-end's own `README.md` already said elsewhere about
+  the *service's* default port — an internal self-contradiction
+  between two parts of the same file). Docs now state the correct
+  `8084` default and `.env.example` sets it; per this task's ground
+  rule the code's own wrong fallback constant was **not** silently
+  changed, only flagged as new task T-28, since a developer who
+  follows the documented `cp .env.example .env` quick-start step
+  never hits it. (7) `README.md`'s Stack and Project-layout sections
+  still named the removed `wx-svelte-grid`/`wx-svelte-core` packages
+  (migrated to `@svar-ui/svelte-*` 2026-07-19 per `CHANGELOG.md`,
+  confirmed against `package.json`) and had no mention of `hooks.
+  server.ts`, `src/lib/server/`, the proxy route, or the board/
+  calendar/signin/verify routes. (8) Test counts were stale
+  everywhere they appeared (`spec/14-implementation-status.md`,
+  `README.md`, `AGENTS/testing.md` all said 27 vitest tests; a live
+  `pnpm test` run shows 35 across 6 files — `i18n.test.ts` and
+  `layout.test.ts` were never counted). Verified live:
+  `pnpm install`, `pnpm check` (446 files, 0 errors/0 warnings),
+  `pnpm test` (35/35 passing) all green; i18n parity is a real,
+  passing test (`tests/unit/i18n.test.ts`), not a doc claim — all 13
+  locales carry the full key set, spot-checked non-English for `ar`/
+  `zh`/`de`/`cy`, with `/signin`/`/verify` as the one honestly-
+  disclosed English-only exception. Added one CHANGELOG `[Unreleased]`
+  Documentation entry retroactively logging the 2026-06-18 landing
+  rather than rewriting history. Did not touch
+  `course/course-service-with-loco` (sibling crate, out of this
+  task's boundary) or any of the other ten front-ends (concurrent
+  sibling audits).
+
 - [ ] **DOC-5 (M)** Library crates' `spec/`, `AGENTS.md`/`CLAUDE.md`,
   `README.md`/`index.md`: `authentication-verifier-rust-crate`,
   `integrity-mac-rust-crate`, `link/entity-ref-rust-crate`. Smaller

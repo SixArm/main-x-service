@@ -9,6 +9,41 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Documentation
+
+- **2026-08-04 — DOC-4 pass: recorded the 2026-06-18 BFF auth + i18n
+  landing that had never been written down here.** The family-wide
+  auth-migration commit (2026-06-18) added this app's full BFF —
+  `src/hooks.server.ts`, `src/lib/server/{auth,config,session}.ts`,
+  `/signin` + `/verify`, the `/api/proxy` reverse proxy injecting a
+  server-exchanged PASETO — plus the 13-locale i18n catalog
+  (`src/lib/i18n.svelte.ts`) and the `ThemePicker`/`LocalePicker` in
+  the layout shell. None of it was ever recorded here, and
+  `spec/01-purpose-and-vision.md`, `spec/02-scope.md` (which flatly
+  listed auth, i18n, and the theme switcher as **out of scope**),
+  `spec/03-stakeholders-and-users.md`, `spec/12-compliance.md`,
+  `spec/13-tasks.md` (T-24 still `[ ]`), `spec/15-roadmap.md` (auth
+  still listed as a future v0.4), and `AGENTS.md` all still described
+  it as unshipped. Also fixed: `.env.example` and `index.md`
+  documented a stale `PUBLIC_API_BASE_URL` (port 8084) env var that
+  the BFF code doesn't read — the real server-only vars are
+  `COURSE_API_URL`/`AUTH_API_URL`, which `README.md` already named
+  right but with the wrong default for `COURSE_API_URL`: it (and
+  `index.md`) listed `5150`, mirroring `src/lib/server/config.ts`'s
+  own fallback, but `course-service-with-loco` is the one service in
+  the family whose dev config overrides the loco default to `8084`
+  (confirmed live against `course-service-with-loco/config/development.yaml`)
+  — a developer who skips `cp .env.example .env` gets silently routed
+  to the wrong port. Docs now state the real `8084` default; the
+  code's own fallback constant is untouched and flagged as T-28
+  rather than silently changed. `README.md`'s Stack/Project-layout
+  sections still named the removed `wx-svelte-grid`/`wx-svelte-core`
+  packages (migrated to `@svar-ui/svelte-*` 2026-07-19) and undercounted
+  the unit-test suite (27 vs the real 35 — `i18n.test.ts` and
+  `layout.test.ts` were uncounted). New spec tasks T-25 (retroactive
+  record), T-26 (CSRF + route-level auth guard — neither exists yet),
+  T-27 (`/signin`/`/verify` are still English-only by design).
+
 ### Added
 
 - 2026-07-19 — SVAR moderate fit: new **/calendar** route (nav-linked): every course instance's

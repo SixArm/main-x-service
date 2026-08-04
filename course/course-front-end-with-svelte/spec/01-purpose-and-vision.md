@@ -15,7 +15,7 @@ A web interface that:
 
 ### 1.3 Non-goals
 
-- **Not** a public-facing portal — assumes authenticated operator users (auth itself out of scope until the service ships it).
+- **Not** a public-facing portal — assumes authenticated operator users. BFF magic-link sign-in (`/signin`, `/verify`) landed 2026-06-18; no route currently redirects an unauthenticated visitor away (§13 T-24).
 - **Not** a substitute for direct API access — power users use Swagger UI / curl.
 - **Not** a FHIR client — the Course Service exposes no FHIR surface (no FHIR resource fits Course cleanly; service spec §2.2).
 

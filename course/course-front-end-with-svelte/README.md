@@ -22,8 +22,8 @@ SvelteKit front-end for the **[Course Service](../course-service-with-loco/)** i
 ## Stack
 
 - **SvelteKit 2** + **Svelte 5** (runes API)
-- **SVAR Svelte DataGrid** (`wx-svelte-grid`, `wx-svelte-core`)
-- **Lily Design System Svelte Headless** (consumed via `file:` dependency)
+- **SVAR** DataGrid, Filter, Kanban, Calendar (`@svar-ui/svelte-*` — migrated off the legacy `wx-svelte-*` packages 2026-07-19)
+- **Lily Design System Svelte Headless** + `ThemePicker`/`LocalePicker` (consumed via `file:` dependencies)
 - **TypeScript** strict mode
 - **Vitest** for unit tests, **Playwright** for e2e
 
@@ -49,10 +49,10 @@ The browser calls the same-origin BFF proxy at `/api/proxy` — there is no publ
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `COURSE_API_URL` | `http://localhost:5150` | Course Service base URL — the proxy injects a server-exchanged PASETO and forwards |
+| `COURSE_API_URL` | `http://localhost:8084` (real service default; the code's own fallback is `5150` — see spec §13 T-28, always set this var) | Course Service base URL — the proxy injects a server-exchanged PASETO and forwards |
 | `AUTH_API_URL` | `http://localhost:5150` | Authentication Service base URL — magic-link login + session→PASETO exchange |
 
-Set in `.env`. Both are read server-side in `src/lib/server/config.ts` and are never exposed to the client bundle.
+Set in `.env` (`cp .env.example .env` gets the right defaults). Both are read server-side in `src/lib/server/config.ts` and are never exposed to the client bundle.
 
 ## Testing
 
@@ -71,8 +71,14 @@ src/
   app.html
   app.css                  - shared CSS variables + utility classes
   app.d.ts
+  hooks.server.ts          - BFF: reads the httpOnly session cookie into `locals`
   lib/
     config.ts              - same-origin BFF proxy base (/api/proxy)
+    i18n.svelte.ts         - 13-locale string catalog + translate()/isRtl()
+    server/
+      auth.ts               - server-side calls to the authentication service
+      config.ts             - COURSE_API_URL / AUTH_API_URL (server-only)
+      session.ts            - httpOnly session-cookie helpers
     api/
       types.ts             - Course, CourseIdentifier, MatchResult, … (mirrors the Rust models)
       client.ts            - ApiClient + ApiError (envelope-aware fetch)
@@ -90,8 +96,14 @@ src/
       courseFormValidate.ts   - pure validate + normalizeForWire (FR-4; unit-tested)
       MatchResultsList.svelte
   routes/
-    +layout.svelte         - sidebar nav
+    +layout.svelte         - top nav bar (ThemePicker + LocalePicker wired live)
+    +layout.server.ts      - exposes `signedIn` (from the session cookie) to the chrome
     +page.svelte           - dashboard
+    api/proxy/[...path]/+server.ts  - BFF reverse proxy; injects a server-exchanged PASETO
+    signin/                - per-app magic-link sign-in (+page.svelte, +page.server.ts)
+    verify/                - magic-link verification (+page.svelte, +page.server.ts)
+    board/+page.svelte     - course lifecycle Kanban board (SVAR Kanban)
+    calendar/+page.svelte  - CourseInstance schedule calendar (SVAR Calendar)
     courses/
       +page.svelte         - list
       new/+page.svelte
@@ -107,6 +119,8 @@ tests/
     courses.test.ts           - CourseRepository wrapping + search params
     form.test.ts              - createForm rune controller
     courseFormValidate.test.ts - FR-4 validation + normalizeForWire
+    i18n.test.ts               - 13-locale key-parity + translate()/isRtl()
+    layout.test.ts             - layout shell smoke test
   e2e/
     courses.spec.ts        - smoke tests
 ```
@@ -121,14 +135,15 @@ import Button from "lily-design-system-svelte-headless/src/lib/components/Button
 
 The Lily **theme selector** (45 shared themes at `/assets/themes/`) and **locale selector** (13 locales) are wired live in the layout shell — `src/routes/+layout.svelte` imports and renders `ThemePicker` and `LocalePicker`. Lily Headless is available for further primitives as the design system stabilises.
 
-## SVAR DataGrid
+## SVAR
 
-`wx-svelte-grid` is GPL-3.0 in its free tier. **If this front-end ships in a commercial product, evaluate the SVAR Pro/Enterprise license before adopting.** See `spec.md §16 Open questions`.
+The `@svar-ui/svelte-*` packages are GPL-3.0 in their free tier. **If this front-end ships in a commercial product, evaluate the SVAR Pro/Enterprise license before adopting.** See `spec.md §16 Open questions`.
 
 ## Status
 
 MVP wired against the now-real Course Service surface. Routes for
-list / new / detail / edit / delete / match / merge / audit are
-live; instance and syllabus-section edit UI are the remaining
-gaps tracked in [`spec.md §13`](spec/13-tasks.md). 27 vitest + 5
+list / new / detail / edit / delete / match / merge / audit /
+board / calendar / sign-in are live; instance and syllabus-section
+edit UI, CSRF, and a route-level auth guard are the remaining gaps
+tracked in [`spec.md §13`](spec/13-tasks.md). 35 vitest + 5
 Playwright smoke tests.

@@ -36,12 +36,14 @@ Real files: `client.test.ts` (ApiClient envelope + error tests),
 `courses.test.ts` (CourseRepository wiring + search query-param
 forwarding), `form.test.ts` (the `createForm` rune controller:
 validate-blocks-submit, submit-error capture, reset, per-field
-set/clear), and `courseFormValidate.test.ts` (FR-4 rules — required
+set/clear), `courseFormValidate.test.ts` (FR-4 rules — required
 name, http(s) URL fields, `course_code` ≤ 100, `number_of_credits`
-≥ 0 — plus the `normalizeForWire` blank→undefined sweep). The
-validator/normaliser live in `src/lib/components/courseFormValidate.ts`
+≥ 0 — plus the `normalizeForWire` blank→undefined sweep), `i18n.test.ts`
+(pins full-key parity across all 13 locales plus glossary spot-checks
+and `isRtl`), and `layout.test.ts` (layout shell smoke test). The
+form validator/normaliser live in `src/lib/components/courseFormValidate.ts`
 (extracted from `CourseForm.svelte` so they unit-test without a DOM
-mount).
+mount). 35 tests total across the 6 files.
 
 Conventions:
 
@@ -102,8 +104,9 @@ test("dashboard renders health badge", async ({ page }) => {
 ## Manual live integration
 
 No automated tests. Run `pnpm dev` (or a preview build) with
-`PUBLIC_API_BASE_URL` pointed at a running
-`course-service-with-loco`, then click through one flow per spec §6
+`COURSE_API_URL` (and `AUTH_API_URL` for the sign-in flow) pointed at
+a running `course-service-with-loco` (and `authentication-service`),
+then click through one flow per spec §6
 FR: search-finds-record, create-lands-on-detail, inline-409, edit-PUT,
 soft-delete-hides, match-renders-score, merge-soft-deletes-duplicate,
 audit-log-presence. Each pass should create its own records and clean

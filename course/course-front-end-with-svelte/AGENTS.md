@@ -41,7 +41,20 @@ Per repo decision (2026-06-02), each `*-front-end-with-svelte` project keeps its
 
 ## What does NOT live here
 
-- Authentication. Out of scope until the service ships auth (Course Service spec §15).
 - FHIR Course UI. Out of scope — the service has no FHIR surface (service spec §2.2).
 - Consent management UI. Out of scope for MVP (the Course Service exposes no consent endpoints).
 - GDPR-export download UI. Out of scope for MVP.
+
+## Authentication (BFF)
+
+Landed 2026-06-18, family-wide. The browser holds only the httpOnly
+`__Host-mxi_session` cookie; the SvelteKit server (`src/hooks.server.ts`,
+`src/lib/server/{auth,config,session}.ts`) does the magic-link exchange
+and PASETO minting server-side, and `src/routes/api/proxy/[...path]/+server.ts`
+attaches the token on every proxied call. No token ever reaches client JS
+or `localStorage`. See
+[`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
+**Not yet done**: CSRF protection on browser→BFF mutating calls, and no
+route-level guard redirects an unauthenticated visitor away from a page
+(the service's own `COURSE_REQUIRE_AUTH` gate is the enforcement point
+today, and it defaults off) — see `spec/13-tasks.md`.

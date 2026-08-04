@@ -39,6 +39,10 @@ The SPA mounts at `/`. All operator workflows live under `/courses`.
 | `/courses/[id]/audit` | Per-record audit log |
 | `/courses/match` | Score-bearing match check against a candidate Course |
 | `/courses/merge` | Two-ID merge preview + confirm |
+| `/board` | Course lifecycle Kanban board (SVAR Kanban; drag writes status) |
+| `/calendar` | CourseInstance schedule calendar (SVAR Calendar, read-only) |
+| `/signin` | Per-app magic-link sign-in (BFF auth page) |
+| `/verify` | Magic-link verification (BFF auth page) |
 
 ## Worked flows
 
@@ -77,16 +81,37 @@ The SPA mounts at `/`. All operator workflows live under `/courses`.
 
 ## Environment
 
+The browser calls the same-origin BFF proxy at `/api/proxy`; there is no
+public API base URL. Both variables below are server-only (read in
+`src/lib/server/config.ts`, never exposed to the client bundle):
+
 | Variable | Default | Purpose |
 |---|---|---|
-| `PUBLIC_API_BASE_URL` | `http://localhost:8084` | Course Service base URL (note: 8084, not 8080 — see CHANGELOG v0.2.0) |
+| `COURSE_API_URL` | `http://localhost:8084` (real service default — the code's own fallback is `5150`, which is wrong for this service; see spec §13 T-28, always set this var) | Course Service base URL — the proxy injects a server-exchanged PASETO and forwards |
+| `AUTH_API_URL` | `http://localhost:5150` | Authentication Service base URL — magic-link login + session→PASETO exchange |
+
+### Sign-in workflow (BFF)
+
+1. Operator visits `/signin`, submits an email. The server action calls
+   the authentication service's magic-link endpoint with a `return_url`
+   back to this app's own `/verify` (no token in the browser).
+2. The emailed link lands on `/verify?token=…`; the SvelteKit server
+   exchanges the token, re-hosts the resulting opaque session id as the
+   httpOnly `__Host-mxi_session` cookie, and redirects home.
+3. `src/routes/api/proxy/[...path]/+server.ts` exchanges that session for
+   a short-lived PASETO server-side on every proxied API call
+   (`src/lib/server/auth.ts`). See
+   [`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
+   CSRF protection for the browser→BFF mutating calls is not yet
+   implemented (spec §13 tracks it as a follow-up).
 
 ## Tech stack reminder
 
 - SvelteKit 2 + Svelte 5 **runes only** (`$state`, `$derived`, `$effect`, `$props`, `$bindable`).
 - SPA-only (`+layout.ts` exports `ssr = false; prerender = false;`).
 - TypeScript strict + `noUncheckedIndexedAccess`.
-- SVAR DataGrid for tabular data; Lily Headless for accessibility primitives; native HTML elsewhere.
+- SVAR DataGrid, Kanban, Calendar for structured data; Lily Headless for accessibility primitives; native HTML elsewhere.
+- Lily `ThemePicker` + `LocalePicker` (13 locales) wired live in the layout shell.
 - No global stores for HTTP state — construct a `CourseRepository` per page/component.
 
 See [`AGENTS.md`](AGENTS.md) for the full ground-rules.
