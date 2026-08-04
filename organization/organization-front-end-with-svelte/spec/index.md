@@ -108,6 +108,13 @@ record's own pid from check-duplicates results (§6.6).
 | `/[pid]` delete | `DELETE /api/organizations/{pid}` |
 | `/[pid]` duplicates | `POST /api/organizations/check-duplicates` |
 | `/[pid]/edit` | `PUT /api/organizations/{pid}` |
+| `/organizations` | `GET /api/organizations` (SVAR grid + client-side filter) |
+| `/review` scan | `POST /api/organizations/deduplicate` |
+| `/review` load | `GET /api/organizations/review-queue` |
+| `/review` decide | `POST /api/organizations/review-queue/{id}/decision` |
+| `/merge` preview | `GET /api/organizations/{pid}` ×2 |
+| `/merge` submit | `POST /api/organizations/merge` |
+| `/merge` history | `GET /api/organizations/merges/recent` |
 
 ## 10. Persistence
 
@@ -116,28 +123,31 @@ None client-side beyond in-memory route state.
 ## 11. Testing strategy
 
 `pnpm run check` (svelte-check strict, 0/0). **vitest** unit tests
-(`tests/unit/`, 49 across 5 files) cover:
-- `client.test.ts` — the `ApiClient` (verb/body/headers/bearer-token —
-  explicit token, store-driven attach, clear, and explicit-`null`
-  override / error-classification / empty-body).
-- `auth.test.ts` — the `auth` token store (`setToken`/`clearToken`
-  round-trip, trim/blank handling), the pure SSO parser
-  `captureTokenFromHash` (extract / URL-decode / `null` for
-  empty/garbage/no-token/blank), and `captureFromLocation` (browser
-  side: stores the token and strips the fragment via
-  `history.replaceState`; no-op when none).
-- `config.test.ts` — the `signInUrl` builder (encoded `return_to` of
-  origin + base, trailing-slash safe).
+(`tests/unit/`, 54 across 6 files) cover:
+- `client.test.ts` — the `ApiClient` (verb/body/headers, error
+  classification, empty-body handling). The BFF proxy injects the
+  PASETO server-side (§6.7), so this client carries no browser-held
+  bearer-token path.
 - `organizations.test.ts` — `OrganizationRepository` (every method's
-  path + verb, incl. a regression pinning `check-duplicates`).
+  path + verb, incl. regressions pinning `check-duplicates`, `merge`,
+  and `recentMerges`).
 - `build.test.ts` — the spec §8 core in `src/lib/api/build.ts`:
   `buildOrganization` (blank → `null`, comma-list split, contact fields,
   all-or-nothing address, dropping empty identifier rows),
   `splitList`/`blankToUndef`, and `excludeSelf` (§6.6 self-match drop).
-**Playwright** smoke tests (`tests/e2e/`) load the four routes (`/`,
-`/new`, `/[pid]`, `/[pid]/edit`) with the API stubbed via
-`page.route`, asserting each renders; they run against the production
-build (`vite preview`) to avoid the `vite dev` cold-start module race.
+- `merge-validation.test.ts` — the `/merge` guard (both ids required,
+  must differ), returning i18n keys rather than English strings.
+- `i18n.test.ts` — the 13-locale catalog: exact locale set, a label per
+  locale, **full key coverage in every locale** (no missing/extra
+  keys), default locale, RTL detection (`ar`/`ur`), and fallback to
+  English then to the key itself.
+- `layout.test.ts` — the layout's session-panel behaviour.
+
+**Playwright** smoke tests (`tests/e2e/smoke.spec.ts`, 7) load `/`,
+`/new`, `/[pid]`, `/[pid]/edit`, `/review`, and `/merge` with the API
+stubbed via `page.route`, asserting each renders, plus a nav-reachability
+check for Merge; they run against the production build (`vite preview`)
+to avoid the `vite dev` cold-start module race.
 Run: `pnpm test` (vitest) and `pnpm test:e2e` (Playwright).
 
 ## 12. Compliance
@@ -192,8 +202,14 @@ controls when they land.
 
 ## 14. Implementation status
 
-Done: all four routes; lean client (+put/delete); repository; form;
-SPA config. `pnpm run check` clean; production build succeeds.
+Done: the eight routes in §5 (list, `/organizations` grid, create,
+detail, edit, `/review` duplicate board, `/merge` record merge, plus
+`/signin`/`/verify`); lean client (+put/delete); repository covering
+CRUD, check-duplicates, batch deduplicate, the stored review queue, and
+merge + merge history; form; the BFF (§6.7/§6.8 — session cookie,
+`/api/proxy`, magic-link sign-in), SPA config. `pnpm run check` clean;
+production build succeeds; 54 vitest + 7 Playwright, all 13 locales at
+full key coverage.
 
 ## 15. Roadmap
 

@@ -50,8 +50,8 @@ src/
 │   ├── [pid]/edit/+page.svelte   edit
 │   └── merge/+page.svelte        merge a duplicate into a survivor + recent merge history
 tests/
-├── unit/                         vitest (client, build, organizations, i18n, layout)
-└── e2e/smoke.spec.ts             Playwright (four routes, API stubbed)
+├── unit/                         vitest, 54 tests (client, build, organizations, i18n, layout, merge-validation)
+└── e2e/smoke.spec.ts             Playwright, 7 tests (six routes + nav, API stubbed)
 ```
 
 ## Session / SSO
@@ -82,6 +82,11 @@ BFF: `src/lib/server/` exchanges the session for the PASETO and the
 | Edit | `PUT /api/organizations/{pid}` |
 | Delete | `DELETE /api/organizations/{pid}` |
 | Check duplicates | `POST /api/organizations/check-duplicates` |
+| Batch scan (`/review`) | `POST /api/organizations/deduplicate` |
+| Review queue (`/review`) | `GET /api/organizations/review-queue` |
+| Review decision (`/review`) | `POST /api/organizations/review-queue/{id}/decision` |
+| Merge (`/merge`) | `POST /api/organizations/merge` |
+| Merge history (`/merge`) | `GET /api/organizations/merges/recent` |
 
 ## Commands
 

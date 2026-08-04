@@ -8,6 +8,31 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — `/merge` record-merge UI (2026-08-03, FE-1)
+
+- `/merge` — fold a duplicate into a surviving main record: main pid +
+  duplicate pid + optional reason, an optional side-by-side preview
+  (`GET /{pid}` × 2), a `confirm()`-gated `POST /api/organizations/merge`,
+  and a merge-history table from `GET /api/organizations/merges/recent`
+  (loads on mount, refreshes after a merge).
+- This service's merge wire shape has **no** `merge_record` wrapper —
+  the response is `{main_pid, duplicate_pid, main}` — so the completion
+  panel links straight to the survivor rather than quoting a
+  merge-record id, unlike the six sibling front-ends (person, worker,
+  place, thing, event, course) that do carry that wrapper.
+- Validation (`src/lib/components/merge-validation.ts`) is a pure,
+  unit-tested guard (both ids present, must differ) returning an i18n
+  **key**, not a hardcoded English string.
+- Repository gains `merge()` / `recentMerges()`; types gain
+  `MergeRequest`, `MergeResponse`, `MergeRecordRow`; nav gains Merge;
+  i18n gains 27 keys (`nav.merge` + 26 `merge.*`) across all 13
+  locales.
+- Tests: `tests/unit/merge-validation.test.ts` (4), extended
+  `tests/unit/organizations.test.ts` (`merge`/`recentMerges` path
+  pins), and three new Playwright smoke cases in `tests/e2e/smoke.spec.ts`
+  covering the merge page and its nav entry. Suite is now 54 vitest +
+  7 Playwright.
+
 ### Added — paged collection reads (2026-08-01)
 
 - **`ApiClient.getPage()`** returns `{ items, total, limit, offset }`,

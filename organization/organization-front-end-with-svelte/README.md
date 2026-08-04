@@ -15,6 +15,7 @@ SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA.
 | `/[pid]` | Detail + delete + check-duplicates |
 | `/[pid]/edit` | Edit |
 | `/review` | Drag-to-decide duplicate review board |
+| `/merge` | Merge a duplicate into a survivor + recent merge history |
 | `/signin` | Magic-link sign-in (BFF) |
 | `/verify` | Magic-link verification (BFF) |
 
@@ -75,8 +76,8 @@ route, which injects the server-exchanged PASETO.
 ```bash
 pnpm run check     # svelte-check (strict, 0 errors / 0 warnings)
 pnpm run build
-pnpm test          # vitest unit suite (tests/unit/, 49)
-pnpm test:e2e      # Playwright smoke (tests/e2e/, 4; runs the production build)
+pnpm test          # vitest unit suite (tests/unit/, 54)
+pnpm test:e2e      # Playwright smoke (tests/e2e/, 7; runs the production build)
 ```
 
 ## License

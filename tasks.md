@@ -4407,6 +4407,46 @@ committing (see plan.md §4).
   `.env.example` this session (case, person); check the other 9 rather
   than assume they're fine.
 
+  - *`organization/organization-front-end-with-svelte` done 2026-08-04.*
+    `spec/index.md` §13 already documented FE-1 (the `/merge` screen,
+    commit `b7ba369f`) in detail — that commit touched `spec/index.md`
+    and `AGENTS.md` itself — so the "landed in code+tests but no doc
+    pass" risk this task worries about did **not** materialize here.
+    What was missing: (1) **`.env.example` was the exact TUT-1/TUT-2
+    bug** — it still documented the decommissioned client-held-token
+    model's vars (`PUBLIC_API_BASE_URL`, `VITE_AUTH_FRONTEND_URL`),
+    zero references in `src/`, while the real BFF vars
+    `ORGANIZATION_API_URL`/`AUTH_API_URL` (read by
+    `src/lib/server/config.ts`, already correctly documented in
+    `README.md`/`AGENTS.md`) had no `.env.example` entry at all —
+    rewritten to match. (2) **`CHANGELOG.md` had zero mention of FE-1**
+    despite `spec/` and `AGENTS.md` both being touched by that commit —
+    added a dated entry. (3) **Stale test counts everywhere**: README
+    said "49"/"4" (vitest/Playwright), `spec/§11` said "49 across 5
+    files" and listed two test files (`auth.test.ts`, `config.test.ts`)
+    that don't exist any more (deleted by the earlier BFF-migration
+    commit `f66ff50f`, predating FE-1) while omitting three that do
+    exist (`i18n.test.ts`, `layout.test.ts`,
+    `merge-validation.test.ts`) — live count is 54 vitest / 7
+    Playwright across 6 files; fixed README and rewrote `spec/§11`'s
+    file-by-file description against the actual suite. (4) **API
+    consumption tables** in `spec/§9`, `AGENTS.md`, and `index.md`'s
+    Flow diagram covered only the four original CRUD routes — none
+    listed the `/review` (batch-scan, review-queue, decision) or
+    `/merge` (preview, submit, history) endpoints the FE-1 and
+    2026-07-19 review-board work actually added — added rows to all
+    three. (5) **`README.md`'s route table and `spec/§14`
+    Implementation status** still read like the v0.1 four-route MVP
+    (§14 said "all four routes" flatly) — added `/merge` to the README
+    table and rewrote §14 against the real eight-route surface. i18n
+    verified live: `pnpm test` includes an "every locale covers every
+    key" parity check that passed, and the merge screen contributes
+    exactly 27 keys (26 `merge.*` + `nav.merge`) at full 13-locale
+    coverage, matching the FE-1 note's own count. `pnpm run check`
+    (0/0), `pnpm test` (54/54), `pnpm build` all verified green.
+    `AGENTS.md`'s BFF description and `CLAUDE.md`'s thin `@AGENTS.md`
+    include were already accurate — no change needed there.
+
 - [ ] **DOC-5 (M)** Library crates' `spec/`, `AGENTS.md`/`CLAUDE.md`,
   `README.md`/`index.md`: `authentication-verifier-rust-crate`,
   `integrity-mac-rust-crate`, `link/entity-ref-rust-crate`. Smaller

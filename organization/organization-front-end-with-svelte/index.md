@@ -21,6 +21,12 @@ Operator UI for organization CRUD + matching, consuming the
               POST /api/organizations/check-duplicates  -> scored matches (self excluded)
               DELETE /api/organizations/{pid}            soft-delete
 /[pid]/edit ─> PUT  /api/organizations/{pid}            edit
+/review   ──>  GET  /api/organizations/review-queue     stored review queue
+              POST /api/organizations/deduplicate       batch scan (button-only)
+              POST /api/organizations/review-queue/{id}/decision  drag-to-decide
+/merge    ──>  GET  /api/organizations/{pid}  x2          optional side-by-side preview
+              POST /api/organizations/merge              fold duplicate into survivor
+              GET  /api/organizations/merges/recent      merge history
 ```
 
 ## Session / authentication (BFF)
