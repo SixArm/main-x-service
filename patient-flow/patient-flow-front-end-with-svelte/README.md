@@ -29,6 +29,10 @@ npm test               # vitest (BedCard matrix)
 npx playwright test    # e2e (stubbed API — no backend needed)
 ```
 
+Configure with `PATIENT_FLOW_API_URL` (the service) and
+`AUTH_API_URL` (the authentication service) — both server-side only,
+read by `src/lib/server/config.ts`; see `.env.example`.
+
 ## Routes
 
 | Route | View |

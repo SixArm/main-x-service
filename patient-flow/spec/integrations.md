@@ -30,8 +30,14 @@ the whiteboard to showing the URN, never blocks an admission.
 The URN format and `entity_type → service` map come from the shared
 [`entity-ref`](../../link/entity-ref-rust-crate/) crate
 ([cross-service-linking.md](../../agents/share/cross-service-linking.md) §3).
-Patient Flow depends on the crate (or copies the type, per the
-family's drift-accepted posture).
+Patient Flow depends on the crate directly (`entity-ref = { path =
+"../../link/entity-ref-rust-crate" }` in `Cargo.toml`), using
+`EntityRef`/`EntityType` in `src/validation.rs` (URN shape checks)
+and `src/clients.rs` (display-name resolution) — the family's earlier
+"copy per project" plan never happened in practice; see
+[cross-service-linking.md](../../agents/share/cross-service-linking.md)
+§12 for the family-wide accounting (eight real dependents, patient-flow
+among them).
 
 ## Cross-service links — deliberately not used for flow state
 

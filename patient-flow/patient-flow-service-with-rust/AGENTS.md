@@ -58,7 +58,8 @@ cross-cutting spec's [scope boundary](../spec/scope.md).
 
 ```
 src/app.rs · src/controllers/ · src/models/ (+_entities/) ·
-src/clients/ (person|worker|place|organization × http|stub) ·
+src/clients.rs (one generic EntityRef-keyed resolver, http|stub
+  mode via PATIENT_FLOW_UPSTREAM_MODE — not per-service modules) ·
 src/flow/ (pure core) · src/auth.rs · src/streaming.rs ·
 src/validation.rs · src/openapi.rs · migration/ · tests/requests/
 ```

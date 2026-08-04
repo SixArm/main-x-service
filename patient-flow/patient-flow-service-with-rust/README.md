@@ -13,10 +13,12 @@ the ward whiteboard and touchscreen client.
 > medical device, not assured for clinical use. Synthetic data only.
 > See [spec/regulatory](../spec/regulatory.md).
 
-**Status: implemented (PF-T1–T14, 2026-07-18).** Builds, 64 DB-free
+**Status: implemented (PF-T1–T18, 2026-07-18).** Builds, 64 DB-free
 unit tests pass, clippy-pedantic clean, verified end-to-end against
-Postgres 18. Remaining in [../spec/tasks.md](../spec/tasks.md):
-PF-T17 (request-test suite) and the front-end (PF-T15/T16).
+Postgres 18; the DB-gated request-test suite (PF-T17, 9 tests) and
+the Svelte front-end (PF-T15/T16/T18) have also landed. Remaining:
+only the design-only production gates in
+[../spec/tasks.md](../spec/tasks.md) (PF-T-G1..G4).
 
 ## Quick start
 

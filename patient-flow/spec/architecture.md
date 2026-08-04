@@ -29,8 +29,9 @@ src/
 │                          whiteboard, at_a_glance, locate, capacity,
 │                          audits, docs, metrics
 ├── models/                CRUD helpers + _entities/ (SeaORM)
-├── clients/               person/worker/place/organization —
-│                          trait + http + stub per service
+├── clients.rs             one generic EntityRef-keyed display-name
+│                          resolver — http|stub mode (not a
+│                          per-service trait/module split)
 ├── flow/                  pure domain logic: bed state machine,
 │                          allocation rules, red2green, DTOC clock
 ├── auth.rs                offline PASETO verify + ABAC (+ masking)

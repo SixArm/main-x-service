@@ -38,10 +38,16 @@ closest source). BFF auth per [../../spec/auth.md](../../spec/auth.md).
   PF-T18 seam for the session→PASETO exchange.
 - **Copy source**: the case front-end (dependency-light, no data
   grid) rather than portfolio — a whiteboard is custom CSS cards,
-  not a grid. Runtime dependencies are the Lily Design System only
-  (headless primitives + the ThemePicker / LocalePicker helpers,
-  `file:` deps on the sibling design-system repo, 2026-07-19); the
-  theme stylesheets are served from `static/assets/themes` (a
+  not a grid. Runtime dependencies beyond the framework are the Lily
+  Design System (headless primitives + the ThemePicker / LocalePicker
+  helpers, `file:` deps on the sibling design-system repo, 2026-07-19)
+  and, since the same day's follow-on (PF-T15a), a set of
+  `@svar-ui/svelte-*` packages: **`svelte-grid`** + **`svelte-filter`**
+  power the `/wards` index (FilterBar over code/ward/kind/specialty),
+  and **`svelte-calendar`** powers the `/edd` month view.
+  `svelte-kanban`, `svelte-gantt`, and `svelte-filemanager` are
+  installed as candidate-feature seams with no route using them yet.
+  The theme stylesheets are served from `static/assets/themes` (a
   symlink to the shared design-system themes). LocalePicker owns
   `lang`/`dir` (RTL for ar/ur) and persists the choice — there is
   no translation catalogue yet, so it is the i18n-ready seam.
@@ -57,6 +63,7 @@ closest source). BFF auth per [../../spec/auth.md](../../spec/auth.md).
 ## Delivery
 
 PF-T15/T16 and PF-T18 (BFF session + PASETO exchange; ETag-aware
-board polling) **delivered 2026-07-18** — see
+board polling) **delivered 2026-07-18**; PF-T15a (Lily theme/locale
+chrome, the `/wards` and `/edd` routes) followed **2026-07-19** — see
 [../../spec/tasks.md](../../spec/tasks.md). Open queue: none; later
 ideas live in the cross-cutting [roadmap](../../spec/roadmap.md).

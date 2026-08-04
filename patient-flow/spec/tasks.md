@@ -23,11 +23,13 @@ code + tests in one PR.
   Bay / Bed with validation → 422, soft delete, audit + event
   emission seam (`PATIENT_FLOW_EVENT_TRANSPORT=memory`). (PF-D2,
   PF-D3, PF-D9; PF-R1, PF-R13)
-- [x] PF-T3 Upstream client seam: person / worker / place /
-  organization traits + `http` + `stub`, config-selected; stub-mode
-  boot test; display-name cache. (PF-D11; PF-R15)
-- [x] PF-T4 Seed task: synthetic demo hospital (2 sites, ~6 wards
-  incl. virtual + escalation, ~120 beds). (PF-R15)
+- [x] PF-T3 Upstream client seam: `src/clients.rs` — one generic
+  `EntityRef`-keyed resolver (not per-service traits/modules) with
+  `http` + `stub` modes selected by `PATIENT_FLOW_UPSTREAM_MODE`;
+  stub-mode boot test; display-name cache. (PF-D11; PF-R15)
+- [x] PF-T4 Seed task: synthetic demo hospital — as landed, 1 site
+  ("St Elsewhere General"), 5 wards (2 inpatient, 1 assessment, 1
+  escalation, 1 virtual), 76 beds (`cargo loco task seed`). (PF-R15)
 
 ## Phase 2 — bed states & journey (PF-R2, PF-R4–R6)
 
@@ -111,6 +113,15 @@ code + tests in one PR.
   mirroring the endpoint contract (case-front-end precedent — fails
   loud on contract drift, no Rust service needed); `svelte-check`
   clean. Landed 2026-07-18.
+- [x] PF-T15a Follow-on UI, landed 2026-07-19 (no separate PF-R/PF-D;
+  same-day extension of PF-T15's route set — see
+  [front-end CHANGELOG](../patient-flow-front-end-with-svelte/CHANGELOG.md)):
+  Lily Design System chrome (`ThemePicker`/`LocalePicker` in the
+  non-kiosk nav, 45-theme catalogue incl. NHS themes, RTL-aware
+  locale); a `/wards` index route (SVAR DataGrid + FilterBar); a
+  `/edd` route (SVAR Calendar, month view, read-only expected-
+  discharge overview). `@svar-ui/svelte-{kanban,gantt,filemanager}`
+  are installed as candidate-feature seams with no route yet.
 - [x] PF-T18 BFF session + PASETO exchange — landed 2026-07-18,
   copy-adapted from the case front-end: `lib/server/{session,auth}.ts`
   (httpOnly `__Host-mxi_session` cookie helpers; magic-link request /

@@ -77,9 +77,15 @@ checks, the case-service pattern. (→ PF-R14; [auth.md](auth.md))
 
 ## PF-D11 — Stub-first upstream clients
 
-Trait per upstream service with `http` and `stub` implementations
-(case-folder precedent); upstream reads are best-effort and never
-block writes. (→ PF-R15)
+Stub-first, `http`/`stub` mode selected by
+`PATIENT_FLOW_UPSTREAM_MODE` (case-folder precedent); upstream reads
+are best-effort (a display-name lookup) and never block writes. **As
+landed** (PF-T3), this is one generic `EntityRef`-keyed resolver in
+`src/clients.rs` — not a per-upstream-service trait/module split as
+originally sketched here — because every upstream lookup does the
+same thing (resolve a display name from a `GET
+{PATIENT_FLOW_<TYPE>_SERVICE_URL}/api/<type>s/{id}`), so a trait per
+service would have four near-identical impls. (→ PF-R15)
 
 ## PF-D12 — Loco-idiomatic layout
 

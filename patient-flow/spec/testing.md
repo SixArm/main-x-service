@@ -35,7 +35,8 @@
 
 - `cargo clippy --all-targets` pedantic-clean, `cargo deny` per repo
   policy; CI mirrors the case-folder quality/security workflows.
-- Seed task (`cargo loco task seed`) creates a demo hospital (2
-  sites, ~6 wards incl. 1 virtual + 1 escalation, ~120 beds, ~90
-  synthetic stays) so whiteboards demo instantly; synthetic data
-  only ([regulatory.md](regulatory.md)).
+- Seed task (`cargo loco task seed`) creates a demo hospital — 1
+  site, 5 wards (2 inpatient, 1 assessment, 1 escalation, 1 virtual),
+  76 beds, ~54 synthetic stays (roughly two-thirds occupancy) — so
+  whiteboards demo instantly; synthetic data only
+  ([regulatory.md](regulatory.md)).

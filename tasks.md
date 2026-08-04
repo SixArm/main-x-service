@@ -5344,6 +5344,69 @@ committing (see plan.md §4).
   front-end pair's docs agree with each other on what's actually
   wired up.
 
+  - [x] `patient-flow` done 2026-08-04. `spec/tasks.md` itself was
+    already accurate (PF-T1..T18 correctly `[x]`, only the design-only
+    production gates PF-T-G1..G4 open) — the drift was in the
+    **numbers and claims around it**, not the checklist:
+    (1) **PF-T4's own description and `spec/testing.md`'s seed
+    paragraph both overclaimed the demo estate** — "2 sites, ~6 wards,
+    ~120 beds[, ~90 stays]" — against what `src/tasks/seed.rs` actually
+    builds: 1 site, 5 wards (2 inpatient + 1 assessment + 1 escalation
+    + 1 virtual), 76 beds, ~54 occupied (traced the bay/bed-count loop
+    by hand — README's own "76 beds" figure was already correct, only
+    the two spec numbers were stale). (2) **PF-D11 + PF-T3 + both
+    `AGENTS.md` and `spec/architecture.md`'s layout diagram claimed a
+    per-upstream-service trait/module split** (`src/clients/` with
+    "person|worker|place|organization × http|stub"); the real
+    `src/clients.rs` is one generic `EntityRef`-keyed resolver with a
+    single `Mode::{Stub,Http}` — a reasonable convergent
+    simplification (every upstream lookup does the same GET-and-
+    extract-a-name-field), not a bug, so fixed all four docs to
+    describe what shipped rather than the original per-service sketch.
+    (3) **`spec/integrations.md` still framed `entity-ref` as
+    "depends on the crate (or copies the type)"** — the DOC-5 audit
+    (this session) already found patient-flow is one of eight real
+    `entity-ref` path-dependents and fixed the crate's own docs +
+    `agents/share/cross-service-linking.md` accordingly; this file
+    hadn't caught up — pointed it at the real `Cargo.toml` dependency
+    and at cross-service-linking.md §12 rather than repeat the stale
+    framing. (4) **The front-end's `spec/index.md` "Runtime
+    dependencies" list named only the Lily Design System**, silent on
+    the six `@svar-ui/svelte-*` packages `package.json` actually
+    carries — three routed (`svelte-grid`/`svelte-filter` on `/wards`,
+    `svelte-calendar` on `/edd`, both landed 2026-07-19 per the
+    front-end `CHANGELOG.md` the same day as PF-T15/T16 but never
+    folded into the cross-cutting `spec/tasks.md` phase list) and three
+    installed-not-yet-routed (`svelte-kanban`/`svelte-gantt`/
+    `svelte-filemanager`, confirmed by grepping `src/` for each
+    import) — added a PF-T15a entry to `spec/tasks.md` and fixed
+    `spec/index.md`'s dependency list and delivery note. (5) **The
+    real env-var bug this task's brief specifically named**: this
+    front-end had **no `.env.example` at all** (README's own
+    `PATIENT_FLOW_API_URL`/`AUTH_API_URL` documentation was already
+    correct against `src/lib/server/config.ts` — the file just didn't
+    exist; sibling consumer app `case-folder` is in the same state,
+    unlike all 11 entity front-ends which have one) — created it and
+    added a README pointer, matching the family template (case
+    front-end's `.env.example`). (6) **The service `README.md`'s
+    status line was stale** — "implemented (PF-T1–T14) ... Remaining:
+    PF-T17 ... and the front-end (PF-T15/T16)" when all of PF-T15..T18
+    are `[x]` in `spec/tasks.md` — fixed to name only the real
+    remainder (the PF-T-G* production gates). **Playwright e2e**: ran
+    `pnpm test:e2e` — 7/7 pass; the stub already matches on
+    `**/api/proxy/**` and strips the `/api/proxy` prefix correctly, so
+    this front-end was **not** hit by the `ad95088e` BFF-proxy-prefix
+    regression other front-ends had this session. **Verified live**:
+    service `cargo test --lib` (64/64), `cargo clippy --all-targets --
+    -D warnings` (clean); front-end `pnpm run check` (0 errors),
+    `pnpm test` (22/22 vitest). Did not touch `case-folder`,
+    `workforce-planning-management`,
+    `contact-relationship-management`, or `content-management-system`
+    (four sibling agents' concurrent work) or any pre-existing,
+    unrelated `Cargo.lock` diff already present in the working tree at
+    audit start (same pre-existing-drift note DOC-5 recorded; left
+    untouched here too).
+
 - [ ] **DOC-8 (S)** Once DOC-2..DOC-7 land, a final sweep: re-grep for
   the family-wide anti-patterns found along the way (duplicated
   capability tables, stale `.env.example` files, "Backend-only"-style
