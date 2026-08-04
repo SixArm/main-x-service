@@ -1492,9 +1492,85 @@
   `-- db migrate`), is what the tutorial uses throughout. And the front-end's
   `.env.example` is stale in the same way TUT-1 found for case
   (`PUBLIC_API_BASE_URL` vs. the real `PERSON_API_URL`/`AUTH_API_URL`).
-- [ ] **TUT-3 (M)** `tutorials/03-authentication-abac.md` — magic link
+- [x] **TUT-3 (M)** `tutorials/03-authentication-abac.md` — magic link
   (console), session cookie, `POST /token`, protected call, 401/403
   matrix, write + hot-reload a policy, `mask` obligation demo.
+
+  **Done 2026-08-04.** Pairs **authentication-service** with
+  **case-service** (per `authorization-attributes.md` §9/§11/§12: case is
+  the reference implementation for record-level ABAC, the `mask`
+  obligation, and policy hot-reload). Runs both directly via
+  `cargo run --` against two throwaway test Postgres instances
+  (`TEST_DB_PORT=5434` for case-service's, alongside auth's default
+  5432) — `cargo loco db migrate` still doesn't work in this environment
+  (no `cargo-loco` shim, confirmed again), matching TUT-2's finding.
+  Walks: signup → magic link retrieved straight from the dev console log
+  (simpler here than EX-3's compose-only workaround, since a bare
+  `cargo run -- start` already boots `environment: development` with no
+  override needed — EX-3's throwaway-container trick was compensating
+  for the shipped compose baking in `LOCO_ENV=production`) → verify →
+  session cookie pair → `POST /api/auth/token` (session + CSRF → PASETO
+  v4.public, decoded live to show the real claim shape) → restart
+  case-service with `CASE_REQUIRE_AUTH=true` (confirmed read-once-at-boot,
+  restart required) and the full 401/403 matrix (no token / blank-`attrs`
+  / `access=write` / `access=admin`) minting each `attrs` combination via
+  the `user_attributes` CLI task (the only surface that can bootstrap the
+  first admin — the HTTP admin API is itself `access=admin`-gated) →
+  write a policy file (a scratch copy, never the repo's own example) →
+  hot-reload it twice, live-timed both times (~4-6 s and ~7-10 s
+  observed, comfortably inside the nominal 15 s `POLICY_WATCH_SECS`
+  ceiling — never the full worst case in this run, honestly reported as
+  such rather than claimed as a guarantee) → side-by-side full vs.
+  `mask`-obligation read on the same case for two callers differing only
+  in `dept`.
+
+  **Two real, live-verified findings, not assumptions**, both documented
+  in place rather than routed around silently:
+
+  1. `examples/policies/closed-case-write-deny.json` (EX-2's cookbook),
+     loaded **exactly as shipped**, denies *every* non-admin write
+     unconditionally — not just writes to a closed case. Live-verified:
+     an `access=write` caller's `POST` 403s ("default deny") even
+     against a case that doesn't exist yet, so `resource.status` can't
+     be the reason. Cause: a **configured** policy file replaces the
+     built-in default policy outright rather than layering on it, and
+     this cookbook file's two rules (`access=admin` override,
+     `resource.status=closed` deny) never grant a plain write at all —
+     it's written to be **composed** with a base grant, not deployed
+     standalone, which its own `README.md` entry doesn't say. This
+     tutorial's copy adds the missing `access=write ⇒ allow write` rule
+     as a third entry (deny-before-allow order, so the closed-case
+     restriction still fires).
+  2. `examples/api/case.http`'s own `PUT` example body
+     (`"status": "in_progress"`, not marked curl-verified unlike its
+     neighbours) is wrong: `case_matcher::CaseStatus` carries **no**
+     `#[serde(rename_all)]`, so the wire form is the bare Rust variant
+     name — `"Open"` / `"Closed"`, not `"open"`/`"closed"`. A lowercase
+     `status` value 422s with a generic `{"error":"Bad Request"}` (the
+     Axum extractor rejecting the body before the handler's validator
+     ever runs) — confirmed live, both the failure and the fix. This is
+     unrelated to the *separate*, intentionally-lowercase
+     `resource.status` tokens `case_resource_attrs` derives for ABAC
+     matching. Not fixed (out of scope — only `tutorials/` and
+     `tasks.md` staged by this task); documented so the next reader
+     doesn't lose time to it.
+
+  Smaller, also live-confirmed: an unauthenticated/under-authorized call
+  gets a **plain-text** body (`missing authorization header` /
+  `default deny`), not the family's usual JSON error envelope; a token
+  with no attributes assigned serializes with **no `attrs` key at all**
+  in its PASETO payload (not `"attrs":{}`), matching
+  `authorization-attributes.md` §3's "absent claim ⇒ empty map" exactly;
+  and assigning attributes via the CLI task revokes every session for
+  that user (SEC-A8), so each `attrs` change in the matrix walkthrough
+  needed a fresh magic-link sign-in before the new token would carry it
+  — expected per spec, but easy to trip over if you reuse a stale
+  session cookie.
+
+  The port collision (both crates default to 5150) is resolved via
+  loco's own `config/development.local.yaml` overlay mechanism — already
+  gitignored by case-service's own `.gitignore`, so it needed no
+  cleanup from git, only removal from the working tree at teardown.
 - [ ] **TUT-4 (M)** `tutorials/04-cross-service-linking.md` —
   `subject_of` + `same_identity` writes → aggregator `neighbors` /
   `single-view` / `freshness`; break-and-reconcile demo (divergence
