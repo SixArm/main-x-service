@@ -3,6 +3,10 @@
   place into a surviving main place by id, with an optional preview step and
   a confirm() guard (the merge soft-deletes the duplicate).
 
+  Both ids may arrive pre-filled as `?main=…&duplicate=…` (the review
+  board deep-links a confirmed pair here); otherwise the operator types
+  them.
+
   Local $state:
     - mainId / duplicateId / reason — merge request inputs.
     - preview  — optional fetched main/duplicate records for review.
@@ -11,6 +15,7 @@
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import { page } from "$app/state";
     import LabeledField from "$lib/forms/LabeledField.svelte";
     import FieldRow from "$lib/forms/FieldRow.svelte";
     import { PlaceRepository } from "$lib/api/places.js";
@@ -20,8 +25,12 @@
 
     const repo = PlaceRepository.withFetch();
 
-    let mainId = $state("");
-    let duplicateId = $state("");
+    // Seeded once from `?main=` / `?duplicate=` so the review board can
+    // deep-link a confirmed pair straight into this form. Both stay fully
+    // editable afterwards — a review item names an unordered pair, so which
+    // record survives is the operator's call, not the link's.
+    let mainId = $state(page.url.searchParams.get("main") ?? "");
+    let duplicateId = $state(page.url.searchParams.get("duplicate") ?? "");
     let reason = $state("");
     let preview = $state<{ main: Place | null; duplicate: Place | null }>({ main: null, duplicate: null });
     let result = $state<MergeResponse | null>(null);

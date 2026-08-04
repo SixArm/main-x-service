@@ -11,8 +11,25 @@ import type {
   ReviewDecision,
   ReviewQueueItem,
   ReviewQueueListResponse,
+  ReviewStatus,
 } from "./types.js";
 import { API_BASE_URL } from "$lib/config.js";
+
+/** Parameters for {@link PlaceRepository.listReviewQueue}. */
+export interface ReviewQueueOptions {
+  /**
+   * Restrict to one disposition. Omit for every status — the endpoint has
+   * no "all" token and answers `422 INVALID_STATUS` for one it does not
+   * recognise, so "all" is the *absence* of this parameter, not a value.
+   */
+  status?: ReviewStatus;
+  /**
+   * Page size. Defaults to 100 server-side and is capped at 500 there.
+   * There is no `offset` on this endpoint, so this is the whole of the
+   * pagination story.
+   */
+  limit?: number;
+}
 
 /** Options for {@link PlaceRepository.search}. */
 export interface SearchOptions {
@@ -160,10 +177,18 @@ export class PlaceRepository {
     );
   }
 
-  /** Load the stored review queue (newest first). */
-  listReviewQueue(): Promise<ReviewQueueItem[]> {
+  /**
+   * Load the stored review queue (newest first).
+   * @param options - Optional status filter + page size; see
+   *   {@link ReviewQueueOptions}.
+   */
+  listReviewQueue(
+    options: ReviewQueueOptions = {},
+  ): Promise<ReviewQueueItem[]> {
     return this.http
-      .get<ReviewQueueListResponse>("/api/places/review-queue")
+      .get<ReviewQueueListResponse>("/api/places/review-queue", {
+        query: { status: options.status, limit: options.limit },
+      })
       .then((response) => response.items);
   }
 

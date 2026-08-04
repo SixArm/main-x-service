@@ -1157,6 +1157,34 @@
   `pnpm build`, and `pnpm exec playwright test` (9/9, including two new
   review/merge-prefill assertions) all green.
 
+  **Place done 2026-08-04** (copy-adapted from person's T-25; see
+  `place-front-end-with-svelte/spec/13-tasks.md` T-23). `?status=`/
+  `?limit=` filters confirmed against
+  `place-service-with-loco/src/api/rest/handlers.rs::get_review_queue`
+  (same `422 INVALID_STATUS` / no-`offset` guard as person's); a
+  keyboard-reachable queue table + `Compare`/`Confirm`/`Reject` buttons
+  alongside the existing drag-to-decide board; an inline comparison panel
+  with two parallel `GET /api/places/{id}` calls (name/type/address/geo/
+  telephone/GLN). **Known gap, verified against the Rust source rather
+  than assumed**: place-service's `ReviewQueueItem` carries **neither**
+  `provenance` (no such column in `review_queue` — confirmed against the
+  crate's migration) **nor** a wire-serialized `score_breakdown` (the
+  column exists on the stored row but the batch-scan handler always
+  writes `NULL` and the wire struct never exposes it) — both backend
+  gaps, not front-end omissions. The queue surfaces `detection_method`
+  (which *is* on the wire) in place of a provenance badge; the breakdown
+  section always renders its "not recorded" note today, but
+  `src/lib/review.ts`'s `breakdownRows`/`MATCH_COMPONENTS` (place-
+  matcher's real default weights — name 0.35, geo 0.25, address 0.20,
+  place_type 0.10, identifier 0.10, per `AGENTS/matching.md`) are fully
+  generic and unit-tested so the panel activates automatically the day
+  the service ships the field. `/places/merge?main=…&duplicate=…` deep
+  link added in either order (the merge page had no query-param seeding
+  before this). New `src/lib/review.ts` + `tests/unit/review.test.ts`
+  (15 tests); `pnpm check` (0/0), `pnpm test` (6 files/55 tests),
+  `pnpm build`, and `pnpm exec playwright test` (7/7, including two new
+  review/merge-prefill assertions) all green.
+
 > Note: the **test** database side of this is already done — every
 > service crate carries a `compose.test.yaml` driven by
 > `scripts/test-db.sh` (see DEP-0 below). DEP-1 is the *demo/dev* stack:

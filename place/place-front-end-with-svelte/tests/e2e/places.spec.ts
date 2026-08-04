@@ -47,4 +47,102 @@ test.describe("Place front-end smoke", () => {
         await expect(page.getByLabel(/Main place ID/)).toBeVisible();
         await expect(page.getByLabel(/Duplicate place ID/)).toBeVisible();
     });
+
+    // Pins: the merge page seeds both ids from the query string, which is
+    // what the review board's post-confirmation deep link relies on.
+    test("merge form pre-fills both IDs from the query string", async ({ page }) => {
+        await page.goto("/places/merge?main=main-111&duplicate=dup-222");
+        await expect(page.getByLabel(/Main place ID/)).toHaveValue("main-111");
+        await expect(page.getByLabel(/Duplicate place ID/)).toHaveValue("dup-222");
+    });
+
+    // Pins the FE-4 review screen: the board, the keyboard-reachable queue
+    // table, and the side-by-side comparison the Compare button opens. The
+    // queue and both sides of the pair are stubbed at the network layer so
+    // the smoke project keeps its "no service required" contract.
+    test("review board lists the queue and compares a pair on demand", async ({
+        page,
+    }) => {
+        const idA = "aaaaaaaa-0000-4000-8000-000000000001";
+        const idB = "bbbbbbbb-0000-4000-8000-000000000002";
+        const envelope = (data: unknown) =>
+            JSON.stringify({ success: true, data, error: null });
+
+        await page.route("**/api/places/review-queue**", (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: envelope({
+                    items: [
+                        {
+                            id: "r1",
+                            place_id_a: idA,
+                            place_id_b: idB,
+                            match_score: 0.91,
+                            match_quality: "probable",
+                            detection_method: "batch_deduplication",
+                            status: "pending",
+                            reviewed_by: null,
+                            created_at: "2026-08-04T09:00:00Z",
+                            reviewed_at: null,
+                        },
+                    ],
+                    total: 1,
+                }),
+            }),
+        );
+        await page.route(`**/api/places/${idA}`, (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: envelope({
+                    id: idA,
+                    name: "Central Library",
+                    address: { address_locality: "Springfield" },
+                }),
+            }),
+        );
+        await page.route(`**/api/places/${idB}`, (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: envelope({
+                    id: idB,
+                    name: "Central Libary",
+                    address: { address_locality: "Springfield" },
+                }),
+            }),
+        );
+
+        await page.goto("/review");
+        await expect(page.getByRole("heading", { name: "Review" })).toBeVisible();
+        await expect(page.getByTestId("review-board")).toBeVisible();
+        // The status filter must exist and default to every status.
+        await expect(page.getByLabel("Status")).toHaveValue("all");
+
+        // The detection method is visible at a glance in the queue (place
+        // has no provenance column — see `$lib/review`'s module doc).
+        const list = page.getByTestId("review-list");
+        await expect(list).toBeVisible();
+        await expect(list.getByText("batch_deduplication")).toBeVisible();
+
+        // The keyboard-reachable path into the comparison: a real button,
+        // not a drag.
+        await list.getByRole("button", { name: /^Compare/ }).click();
+
+        const panel = page.getByTestId("review-compare");
+        await expect(panel).toBeVisible();
+        // Both stubbed records, side by side.
+        await expect(panel.getByText("Central Library")).toBeVisible();
+        await expect(panel.getByText("Central Libary")).toBeVisible();
+        // Place-service never serializes `score_breakdown` on the wire
+        // today, so the breakdown section always renders its explicit
+        // "not recorded" note rather than a table.
+        await expect(panel.getByTestId("review-no-breakdown")).toBeVisible();
+        // Both decisions are offered as real buttons for a pending item.
+        await expect(
+            panel.getByRole("button", { name: "Confirm duplicate" }),
+        ).toBeEnabled();
+        await expect(panel.getByRole("button", { name: "Reject" })).toBeEnabled();
+    });
 });
