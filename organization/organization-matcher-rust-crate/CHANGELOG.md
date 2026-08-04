@@ -10,6 +10,33 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — doc accuracy pass (DOC-3)
+
+- **`spec/index.md` §5/§6/§7/§14a/§14b/§21 described the planned
+  relationships/tags components in the present tense as if already
+  implemented**, contradicting §23's own (correct) `[ ]` task entries
+  for them within the same file — `relationships`/`tags` do not exist on
+  `Organization`, `relationships_weight`/`tags_weight` do not exist on
+  `MatchConfig`, and `relationships_score`/`tags_score` do not exist on
+  `MatchBreakdown` (confirmed by reading `src/organization.rs`,
+  `src/config.rs`, `src/scoring.rs`, and `src/lib.rs`'s re-export list —
+  none mention them). Marked each section "planned, not yet
+  implemented" with a pointer to §23, and corrected §21's compatibility
+  list to the actual `lib.rs` re-exports. No code or test behaviour
+  changed; this only fixes the spec's internal self-contradiction.
+- **§24 Testing strategy named only the unit tests, `tests/public_api.rs`,
+  and doctests** — missing the `proptest` property suite
+  (`tests/property_tests.rs`, SEC-M6) and the `cargo-fuzz` harness
+  (`fuzz/`, SEC-I2), both already landed earlier in this same
+  `[Unreleased]` section. Added both; mirrored into
+  `AGENTS/testing.md`, which had the identical gap.
+- Confirmed **SEC-M5** (LEI ISO 7064 MOD 97-10 / GLN GS1 mod-10
+  check-digit validation) lives entirely in
+  `organization-service-with-loco`'s `src/validation.rs` — this crate
+  has no check-digit validators at all (`tests/property_tests.rs`'s own
+  module doc says so explicitly). Nothing to change here; noted so a
+  future pass doesn't go looking for it in the matcher.
+
 ### Added — cargo-fuzz harness (SEC-I2)
 
 - A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate adopting

@@ -23,6 +23,30 @@ short-circuiting, R-1 tax-id, R-2 `same_as`, legal-suffix high
 confidence, renormalisation, threshold presets, the one-to-many surface,
 and `MatchResult` JSON serialisation. Run `cargo test --test public_api`.
 
+## Property-based tests (SEC-M6)
+
+[`tests/property_tests.rs`](../tests/property_tests.rs) uses `proptest`
+(dev-dependency) to check invariants over arbitrary UTF-8 input rather
+than fixed examples: the engine (`match_organizations`,
+`match_one_to_many`/`rank`/`find_matches`) and the pure helpers
+(`normalize::{fold,legal_name,domain,fold_set}`, `phonetic::{soundex,same}`,
+`IdentifierScheme::is_deterministic`) never panic; `score` stays in
+`[0.0, 1.0]` and is never `NaN`; matching is symmetric (score, `is_match`,
+`confidence`, the deterministic flag); an identical clone of a
+well-formed organization self-matches; `soundex` returns `Some` iff an
+ASCII-alpha anchor is present; `Confidence::classify` is monotonic. Run
+`cargo test --test property_tests`.
+
+## Fuzzing (SEC-I2)
+
+[`fuzz/`](../fuzz/) is a standalone `cargo-fuzz` crate (not a workspace
+member, so it never affects the normal stable build/test/clippy) with
+two coverage-guided libFuzzer targets: `match_organizations` (JSON pair
+→ `MatchingEngine::match_organizations`, finite score in `[0,1]`, both
+argument orders) and `normalize` (the pure `normalize` free functions,
+never-panic). Nightly-only: `cargo +nightly fuzz run <target>` from
+`fuzz/` — see [`fuzz/README.md`](../fuzz/README.md).
+
 ## Doctests
 
 The rustdoc `# Examples` on `Organization::new`,
