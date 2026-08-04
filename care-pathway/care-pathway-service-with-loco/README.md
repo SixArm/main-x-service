@@ -21,7 +21,7 @@ specific condition over a defined episode.
 | GET | `/api/care-pathways/{pid}` | Fetch |
 | PUT | `/api/care-pathways/{pid}` | Update |
 | DELETE | `/api/care-pathways/{pid}` | Soft-delete |
-| GET | `/api/care-pathways/search?q=` | Case-insensitive name search (`ILIKE`, cap 50) |
+| GET | `/api/care-pathways/search?q=` | Tantivy full-text search (`?fuzzy=true`, `?phonetic=true`); paginated |
 | POST | `/api/care-pathways/match` | Rank `{query, candidates}` |
 | POST | `/api/care-pathways/check-duplicates` | Match query vs stored pathways |
 | POST | `/api/care-pathways/merge` | Merge a duplicate into a survivor |
@@ -32,6 +32,10 @@ specific condition over a defined episode.
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 | GET | `/metrics.prom` | Prometheus metrics (root path, public under auth enforcement) |
 
+`GET /api/care-pathways` and the search endpoint above both take
+`?limit=`/`?offset=` and report `X-Total-Count`/`X-Limit`/`X-Offset`
+response headers (defaults reproduce the old hard caps of 100/50).
+
 ### Compliance ([spec §12](./spec/index.md))
 
 | Method | Path | Purpose |
@@ -40,8 +44,19 @@ specific condition over a defined episode.
 | GET | `/api/compliance/sbom` | CycloneDX 1.5 SBOM + SOUP register (from this binary's own `Cargo.lock`) |
 | GET | `/api/compliance/audit/verify` | Verify the tamper-evident audit hash chain (HIPAA §164.312(c)) |
 | GET | `/api/compliance/records/verify` | Verify row-level record integrity — detects an entity row edited outside the service |
+| GET | `/api/compliance/checkpoint` | Take a MAC'd external-witness statement of the audit chain's head/anchor/row-count |
+| POST | `/api/compliance/checkpoint/verify` | Verify the chain still honours a previously-taken checkpoint — catches wholesale tail deletion, which the chain alone cannot see |
 | GET | `/api/care-pathways/{pid}/audit/disclosures` | Accounting of disclosures (HIPAA §164.528) |
 | POST | `/api/care-pathways/{pid}/erase` | GDPR Art. 17 erasure — **irreversible**, destructive under ABAC |
+
+The audit chain and row hashes are written by default; the **checkpoint
+and MAC controls above are inert until configured** —
+`CARE_PATHWAY_INTEGRITY_MAC_KEY` (or `_KEY_FILE`) turns on keyed MACs,
+and a checkpoint only protects what an operator actually stores off-box.
+See
+[`agents/share/runbooks/integrity-activation.md`](../../agents/share/runbooks/integrity-activation.md)
+for the activation order; `cargo loco task integrity_key` generates and
+checks the key without ever logging it.
 
 ### FHIR R5 ([spec §12.3](./spec/index.md))
 
@@ -153,40 +168,50 @@ update. See [spec §6.1](./spec/index.md).
 
 ## Status
 
-Implemented: CRUD + `ILIKE` name search + matching + record merge +
-audit log + in-memory event streaming (durable-bus Phase 1) +
+Implemented: CRUD + Tantivy full-text/fuzzy/phonetic search (with
+search-blocked dedup candidates) + matching + record merge + field
+masking + audited GDPR export +
+audit log + all three phases of the durable event bus (in-memory
+stream, transactional outbox, and the `FluvioSink` real-broker sink
+behind this crate's `fluvio` feature) +
 OpenAPI/Swagger + Prometheus metrics + offline PASETO v4.public
-verification + blanket `/api/*` auth enforcement (off by default, gated
-by `CARE_PATHWAY_REQUIRE_AUTH`) + rich payload validation
-(ICD/SNOMED/UUID/DOI/BCP-47) + boot-time published-key fetch over HTTP
-(once, when `CARE_PATHWAY_PASETO_KEYS_URL` is set, with warn + env
-fallback). The durable event bus's Phase-2 transactional outbox + relay
-have landed (`src/models/event_outbox.rs`, `src/relay.rs`,
-`src/streaming.rs`; default-off via
-`CARE_PATHWAY_EVENT_TRANSPORT=memory`).
+verification + blanket `/api/*` auth enforcement and ABAC authorization
+(off by default, gated by `CARE_PATHWAY_REQUIRE_AUTH`) + rich payload
+validation (ICD/SNOMED/UUID/DOI/BCP-47) + `?limit=`/`?offset=`
+pagination on list and search + boot-time published-key fetch over HTTP
+plus a background refresh loop (`CARE_PATHWAY_PASETO_KEYS_URL` /
+`_REFRESH_SECS`) and ABAC-policy hot-reload
+(`CARE_PATHWAY_ABAC_POLICY_FILE`), all without a restart.
 
-**Compliance (2026-07-25)** — this crate is the family's reference
-implementation of the four control-driving frameworks in
+**Compliance (2026-07-25 through 2026-08-04)** — this crate is the
+family's reference implementation of the four control-driving
+frameworks in
 [`agents/share/compliance-for-healthcare.md`](../../agents/share/compliance-for-healthcare.md)
-§2: a tamper-evident audit hash chain + read/disclosure auditing
+§2: a tamper-evident audit hash chain + read/disclosure auditing +
+keyed HMAC integrity MACs with per-domain HKDF subkeys + MAC'd
+external-witness chain checkpoints (closing the tail-truncation gap the
+hash chain alone cannot see) + row-level record content hashing
 (HIPAA), Art. 17 erasure that survives that chain plus residency and
 lawful-basis declarations (GDPR / EU EHDS), FHIR profile + terminology
-validation with `$validate`, SMART discovery and Bulk Data `$export`
+validation with `$validate`, SMART discovery and a durable (worker +
+artifact-store) Bulk Data `$export`
 (ONC / HTI), and a SOUP register, CycloneDX SBOM, machine-checked
 requirement→test traceability and reproducible-build tooling
 (IEC 62304 / SaMD). Read-auditing is **default off**
-(`CARE_PATHWAY_AUDIT_READS`); for a compliance deployment also set
-`CARE_PATHWAY_REQUIRE_AUTH` and `CARE_PATHWAY_EVENT_TRANSPORT=outbox`.
-See [spec §12](./spec/index.md) — including §12.5, which states the
-limits plainly.
+(`CARE_PATHWAY_AUDIT_READS`), and the MAC/checkpoint controls are
+**inert until a key is configured**; for a compliance deployment also
+set `CARE_PATHWAY_REQUIRE_AUTH`, `CARE_PATHWAY_EVENT_TRANSPORT=outbox`,
+and `CARE_PATHWAY_INTEGRITY_MAC_KEY` — see
+[`agents/share/runbooks/integrity-activation.md`](../../agents/share/runbooks/integrity-activation.md)
+for the order. See [spec §12](./spec/index.md) — including §12.5, which
+states the limits plainly.
 
-Deferred (see
-[spec §13](./spec/index.md)): Tantivy full-text/fuzzy search,
-search-blocked dedup candidates, the durable bus's Phase-3 Fluvio broker
-sink, privacy, front-end merge action, a key-set refresh loop (the
-boot fetch runs once), and the compliance follow-ups in T-15
-(row-level entity hashing, Bulk Data on `bg_pg`, CI wiring, Inferno).
-Token issuance is
+Deferred (see [spec §13](./spec/index.md)): instance-layer
+privacy/authz for `pathway_instances.subject_ref`, front-end merge
+action, terminology-server code-existence checks, the native (non-FHIR)
+bulk import/export API, and the remaining compliance follow-ups in T-15
+(lifting `compliance/` to the repo root once a second crate adopts it,
+an Inferno-style `/fhir` conformance run). Token issuance is
 provided by the central
 [authentication-service](../../authentication/authentication-service-with-loco).
 

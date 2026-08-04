@@ -19,8 +19,8 @@ create   ──>  POST   /api/care-pathways                {CarePathway}      ->
 read     ──>  GET    /api/care-pathways/{pid}                             -> CarePathway
 update   ──>  PUT    /api/care-pathways/{pid}          {CarePathway}      -> {pid, name}
 delete   ──>  DELETE /api/care-pathways/{pid}                             -> 204
-list     ──>  GET    /api/care-pathways                                   -> [{pid, name}]  (cap 100)
-search   ──>  GET    /api/care-pathways/search?q=stroke                   -> [{pid, name}]  (ILIKE, cap 50)
+list     ──>  GET    /api/care-pathways   ?limit=&offset=                 -> [{pid, name}]  (X-Total-Count)
+search   ──>  GET    /api/care-pathways/search?q=stroke  ?fuzzy=&phonetic=  -> [{pid, name}]  (Tantivy; paginated)
 dedupe   ──>  POST   /api/care-pathways/check-duplicates  {query}         -> [{pid, score, ...}]
 match    ──>  POST   /api/care-pathways/match   {query, candidates}       -> ranked results
 merge    ──>  POST   /api/care-pathways/merge   {main_pid, duplicate_pid}  -> merge record
@@ -30,7 +30,15 @@ events   ──>  GET    /api/care-pathways/events/recent                     ->
 whoami   ──>  GET    /api/care-pathways/whoami          (Bearer PASETO)   -> verified claims (401 without)
 docs     ──>  GET    /api-docs/openapi.json  ·  /swagger-ui               -> OpenAPI 3 + Swagger UI
 metrics  ──>  GET    /metrics.prom                                        -> Prometheus text (public)
+compliance ──> GET   /api/compliance  ·  /sbom  ·  /audit/verify  ·  /records/verify  ·  /checkpoint{,/verify}
+fhir     ──>  GET/POST/PUT/DELETE /fhir/PlanDefinition{,/{id}}  ·  /metadata  ·  $validate  ·  $export
 ```
+
+`compliance` and `fhir` are the family's reference-implementation
+surfaces for the four control-driving frameworks in
+[`agents/share/compliance-for-healthcare.md`](../../agents/share/compliance-for-healthcare.md);
+see [README.md](./README.md) for their full endpoint tables and
+[spec §12](./spec/index.md) for the design.
 
 The `CarePathway` body shape is the `care-pathway-matcher` type
 (name, pathway code, provider, care setting, condition codes (ICD/SNOMED),

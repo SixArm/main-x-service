@@ -25,10 +25,15 @@ ABAC `mask` obligation (§13 2026-08-02; thin by design — a pathway
 transactional outbox, relay/retention, and the real-broker sink — are
 now done). Deferred (§13):
 instance-layer masking/authz for `pathway_instances.subject_ref` (the
-patient-identifying linkage — see §16), front-end merge action, a PASETO key-set
-refresh loop (the boot-time paseto-keys-over-HTTP fetch is done —
-`CARE_PATHWAY_PASETO_KEYS_URL`, §9/§13 — but runs once, no re-fetch),
-terminology-server code-existence checks, gRPC. Token
+patient-identifying linkage — see §16), front-end merge action,
+terminology-server code-existence checks, gRPC, and the native
+(non-FHIR) bulk import/export API (§13). The PASETO key-set refresh loop
+and ABAC policy hot-reload are **done** (§9/§13, 2026-08-01) — a rotated
+key or an edited policy reaches a running process without a restart.
+Also done: keyed HMAC integrity MACs and external-witness chain
+checkpoints (§12.1, 2026-07-27) closing the tail-truncation gap the hash
+chain alone cannot see, and `?limit=`/`?offset=` pagination on list and
+search (§6.2, 2026-08-01). Token
 issuance is out of scope — provided by the central authentication-service.
 The session / cross-service token model is fixed by
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md),
@@ -62,12 +67,18 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    `Doi`; other schemes non-blank), and `in_language` checked for BCP-47
    syntax; `422` on any problem, all reported together — also enforced on
    update. Rules in [`src/validation.rs`](../src/validation.rs).
-2. `GET /api/care-pathways` — list active (cap 100), `{pid, name}`.
+2. `GET /api/care-pathways` — list active, `{pid, name}`.
    `GET /api/care-pathways/search?q=` — Tantivy full-text search over
    name, alternate names, provider, identifiers, keywords, condition
    codes, and interventions (`?fuzzy=true` for typo tolerance,
    `?phonetic=true` for Soundex; blank `q` → `400`, an unavailable index
-   → `503`).
+   → `503`). Both take `?limit=`/`?offset=` and report
+   `X-Total-Count`/`X-Limit`/`X-Offset` response headers, per the family
+   convention in
+   [`agents/share/restful.md`](../../../agents/share/restful.md):
+   defaults reproduce the old hard caps (100 list / 50 search), `limit`
+   clamps to 500, and an `offset` past 10 000 is `400` (SEC-G7). The
+   search total is a `COUNT(*)` over the predicate, not the page length.
 3. `GET /api/care-pathways/{pid}` — return the stored `CarePathway`,
    unless the record-level ABAC decision carries the **`mask`
    obligation**, in which case the masked view (§6.16) is returned
@@ -107,7 +118,14 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    CycloneDX 1.5 SBOM + SOUP register.
    `GET /api/compliance/audit/verify?limit=` — re-verifies the audit
    hash chain (default 1000 rows, capped 10 000) and reports every
-   break. `GET /api/care-pathways/{pid}/audit/disclosures` — HIPAA
+   break. `GET /api/compliance/records/verify` — re-verifies row-level
+   record content integrity (§12.1), naming any row changed outside the
+   service. `GET /api/compliance/checkpoint` — takes a MAC'd
+   external-witness statement of the chain's current head, position, and
+   row count (§12.1); `POST /api/compliance/checkpoint/verify` takes one
+   back and reports whether the chain still honours it, distinguishing
+   an anchor row deleted from its content changed from earlier history
+   shrunk. `GET /api/care-pathways/{pid}/audit/disclosures` — HIPAA
    §164.528 accounting, stating its own completeness.
    `POST /api/care-pathways/{pid}/erase` — GDPR Art. 17 erasure
    (**destructive** under ABAC; irreversible; idempotent).
@@ -196,8 +214,14 @@ set, the key set is instead **fetched over HTTP once at boot**
 `/.well-known/paseto-keys`; seeded from `App::after_routes` via
 `auth::init_from_env`): the fetched set wins over
 `CARE_PATHWAY_PASETO_KEYS`; on fetch failure the service warns and falls
-back to the env key set, so it always boots. No refresh loop — periodic
-re-fetch on key rotation is a future item (§16). See the family contract
+back to the env key set, so it always boots. **A background loop then
+keeps polling** (`auth::spawn_key_refresh`, AU-2, 2026-08-01): every
+`CARE_PATHWAY_PASETO_KEYS_REFRESH_SECS` (default 3600; `0` disables; a
+no-op when the URL is unset) it re-fetches and swaps the key set into
+the live `ReloadableVerifier` that the guard and the bearer extractors
+read per request, so a key rotation reaches a running process without a
+restart. A failed refresh keeps the current key set rather than locking
+every caller out on a transient auth-service outage. See the family contract
 `agents/share/jwt-enforcement.md`; the session / token model is fixed by
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md),
 which supersedes the prior RS256-JWT model.
@@ -217,7 +241,13 @@ unparsable ⇒ warn-log + the built-in default policy (any authenticated
 subject reads; `access=write` writes; `access=admin` adds DELETE/merge;
 `svc=true` does everything). `401` = missing/bad credential; `403` =
 valid credential, policy denied (the body names the deciding rule). This
-supersedes the earlier per-crate roles/RBAC sketch.
+supersedes the earlier per-crate roles/RBAC sketch. **Hot-reloadable**
+(AU-2, 2026-08-01): the policy lives in a `ReloadablePolicy` the guard
+reads per request, and — when `CARE_PATHWAY_ABAC_POLICY_FILE` is set — a
+background loop (`auth::spawn_policy_watcher`) polls the file's mtime
+every 15 s and calls `reload_policy()` on a change, so an operator can
+edit the policy without a restart; a malformed edit falls back to the
+built-in default rather than leaving the service unprotected.
 
 ## 10. Persistence
 
@@ -295,8 +325,23 @@ SQL and asserts the chain reports a `content` break — the property the
 whole design exists to provide. The rest cover erasure (content gone,
 chain still verifying, scoped to its subject, idempotent), the
 disclosure accounting's completeness caveat, the posture and SBOM
-endpoints, `$validate`, the SMART 404, the `CapabilityStatement`, and
-the full Bulk Data kickoff → status → NDJSON → cancel flow.
+endpoints, `$validate`, the SMART 404, the `CapabilityStatement`, the
+full Bulk Data kickoff → status → NDJSON → cancel flow, and — the
+truncation blind spot itself — a checkpoint catching a wholesale
+`audit_logs` deletion the chain alone reports as `verified: true`.
+
+Two further DB-gated request files exercise operational surfaces not
+covered above: [`tests/requests/instances.rs`](../tests/requests/instances.rs)
+(enrolment, lifecycle transitions, review cadence, urgency, care team,
+step completion, outcomes, and the derived caseload/overdue-review/
+care-team-load/cohort views) and
+[`tests/requests/insights.rs`](../tests/requests/insights.rs) (the five
+registry lenses in §13's 2026-07-20 entry).
+[`tests/requests/event_outbox.rs`](../tests/requests/event_outbox.rs)
+and [`tests/outbox_audit.rs`](../tests/outbox_audit.rs) cover the
+durable-bus outbox path and its audit-in-same-transaction property;
+[`tests/enforcement.rs`](../tests/enforcement.rs) is the blanket-guard
+activation proof described above by behaviour rather than by name.
 
 ## 12. Compliance
 
@@ -372,6 +417,42 @@ would produce false mismatches. An attacker who alters only a timestamp
 is not detected; anything that changes what the record *says* is. Rows
 predating the column verify as `unhashed` rather than as mismatches, and
 are rehashed on their next write.
+
+**Keyed integrity MAC** ([`src/compliance/mac.rs`](../src/compliance/mac.rs),
+embedding the shared [`integrity-mac`](../../../integrity/integrity-mac-rust-crate/index.md)
+crate). A SHA-256 digest alone proves nothing against an attacker with
+database write access — its format is published, so a forged row can
+carry a matching hash. `CARE_PATHWAY_INTEGRITY_MAC_KEY` (or
+`_KEY_FILE`, which takes precedence) configures an HMAC-SHA256 root key;
+HKDF derives a distinct subkey per purpose (`audit-chain`, `record`,
+`checkpoint`, below) so a tag produced for one domain can never verify
+as another. No key configured ⇒ no MAC is written, and rows are reported
+`mac_absent` rather than as mismatches — adopting the control must not
+manufacture a wall of false accusations. `cargo loco task
+integrity_key` generates/checks/reports the key without ever logging it
+(§ no-secret-in-logs, `agents/share/security.md`); `cargo loco task
+integrity_resign` re-signs existing rows after a key rotation. Landed
+2026-07-27; the family-wide activation order and env vars are
+[`agents/share/runbooks/integrity-activation.md`](../../../agents/share/runbooks/integrity-activation.md).
+
+**External-witness checkpoints** ([`src/compliance/checkpoint.rs`](../src/compliance/checkpoint.rs)).
+The hash chain cannot see the chain's own tail deleted: removing the
+newest N rows leaves no successor to break, so the shortened chain
+verifies perfectly, and deleting every row verifies vacuously. A
+checkpoint closes that blind spot by recording, outside this database,
+what the chain looked like at a known moment. `GET
+/api/compliance/checkpoint` returns a MAC'd statement of the chain's
+current head hash, anchor row id, and row count; `POST
+/api/compliance/checkpoint/verify` takes a previously-taken checkpoint
+back and reports whether the chain still honours it — distinguishing
+the anchor row missing (rows deleted) from its hash changed (content
+altered) from fewer rows standing at or before it (earlier history
+deleted, even though the anchor itself survived). **The control is the
+off-box storage, not this code**: a checkpoint kept in this database is
+worthless, since whoever can delete audit rows can delete a checkpoint
+row in the same transaction. Each checkpoint is also logged at `INFO`,
+so a deployment that already ships logs off-host has a witness without
+building anything further. Landed 2026-07-27.
 
 ### 12.2 GDPR / EU EHDS — erasure, residency, lawful basis
 
@@ -525,6 +606,33 @@ the evidence bundle.
   including a record-level-decision proof that a non-sensitive-setting
   read is *not* masked by the same policy) + 1 enforcement + 1
   outbox-audit green vs Postgres 18; 246 lib tests; fmt + clippy clean.
+- [x] **2026-08-01 — Pagination on list and search.** `GET
+  /api/care-pathways` and `GET /api/care-pathways/search` take
+  `?limit=`/`?offset=` and report `X-Total-Count`/`X-Limit`/`X-Offset`
+  (§6.2), per the family convention in `agents/share/restful.md`
+  (first implemented in organization). Defaults reproduce the old hard
+  caps (100 list / 50 search); `limit` clamps to 500 rather than
+  erroring; `offset` past 10 000 is `400` (SEC-G7). The search total is
+  a `COUNT(*)` over the predicate, not the page length. *Verified:* a
+  DB-gated request test walks a window and checks the total, the clamp,
+  and the `400`.
+- [x] **2026-08-01 — AU-2: key rotation and ABAC policy hot-reload
+  without a restart.** The loco-style half of the family rollout (case
+  was the reference). `src/auth.rs`: the verifier and the ABAC policy
+  became **reloadable holders** (`ReloadableVerifier` /
+  `ReloadablePolicy`) the blanket guard and the bearer extractors read
+  per request — previously boot-only `OnceLock` snapshots that a
+  rotated key or an edited policy could never reach. `spawn_key_refresh`
+  re-fetches `CARE_PATHWAY_PASETO_KEYS_URL` every
+  `CARE_PATHWAY_PASETO_KEYS_REFRESH_SECS` (new env var, default 3600;
+  `0` disables; no-op when the URL is unset) and swaps the fetched set
+  in; a failed fetch keeps the current keys. `spawn_policy_watcher`
+  polls `CARE_PATHWAY_ABAC_POLICY_FILE`'s mtime every 15 s and calls
+  `reload_policy()`; a malformed edit falls back to the built-in
+  default rather than leaving the service unprotected. Resolves the §16
+  "periodic re-fetch" open question. *Verified:* the existing
+  `tests/enforcement.rs` activation proof needed no change — it now
+  exercises the reloadable holders by construction.
 - [x] Name search — `GET /search?q=` Tantivy full-text/fuzzy/phonetic
   search (§13 2026-08-01), replacing the earlier Postgres `ILIKE`.
 - [x] Event streaming + audit log on CRUD — `audit_logs` table +
@@ -876,50 +984,95 @@ the evidence bundle.
     ([`spec/compliance` §8.5](../../../spec/compliance/index.md)).
   - [ ] Run an Inferno-style conformance suite against `/fhir`.
 
+- [x] **2026-07-27 — Keyed integrity MAC + external-witness checkpoints
+  (§12.1).** A SHA-256 digest alone is forgeable by anyone with database
+  write access, since its format is published; this closes that. New
+  `src/compliance/mac.rs` embeds the shared
+  [`integrity-mac`](../../../integrity/integrity-mac-rust-crate/index.md)
+  crate: `CARE_PATHWAY_INTEGRITY_MAC_KEY` (or `_KEY_FILE`, which wins) +
+  HKDF-derived per-domain subkeys (`audit-chain` / `record` /
+  `checkpoint`) so a tag from one domain can never verify as another; no
+  key ⇒ no MAC written, rows report `mac_absent` rather than a
+  mismatch. `cargo loco task integrity_key` (`op:generate` /
+  `op:check` / `op:status`, key never logged) and `integrity_resign`
+  (re-sign existing rows after rotation). New `src/compliance/checkpoint.rs`
+  + `GET`/`POST /api/compliance/checkpoint{,/verify}` (§6.13): a MAC'd
+  statement of the chain's head/anchor/row-count, closing the one gap
+  the hash chain cannot see on its own — deletion of the chain's own
+  **tail**, which leaves no successor to break and so verifies
+  perfectly (or, if every row is gone, vacuously). The control is the
+  off-box storage of the checkpoint, not the code — a checkpoint kept in
+  this database is exactly as deletable as the rows it witnesses.
+  Family-wide activation order:
+  [`agents/share/runbooks/integrity-activation.md`](../../../agents/share/runbooks/integrity-activation.md).
+  *Verified:* a DB-gated test empties `audit_logs`, asserts
+  `/audit/verify` still reports `verified: true` (stating the blind spot
+  outright), then shows a checkpoint catches it; unit tests for every
+  domain having a distinct label and `Domain::ALL` covering every
+  variant.
+
 ## 14. Implementation status
 
 Done: loco boot; care_pathways table + migration; CRUD with `422`
 validation on create/update (blank `name`; ICD-10 / ICD-11 / SNOMED CT
 `condition_codes` format checks; UUID / DOI `identifiers` shapes; BCP-47
-`in_language` syntax — all problems reported together);
-Tantivy full-text/fuzzy/phonetic search; field masking + audited GDPR
-export wired to the ABAC `mask` obligation; `/match`, `/check-duplicates`, and `/merge`
+`in_language` syntax — all problems reported together); paginated
+Tantivy full-text/fuzzy/phonetic search + paginated list
+(`?limit=`/`?offset=`, `X-Total-Count`/`X-Limit`/`X-Offset`); field
+masking + audited GDPR export wired to the ABAC `mask` obligation;
+`/match`, `/check-duplicates`, and `/merge`
 (record merge + history)
 embedding care-pathway-matcher; audit log + in-memory event streaming on
 every CRUD/merge (`/audit/recent`, `/{pid}/audit`, `/events/recent`,
-`/merges/recent`) — Phase 1 of the durable event bus (canonical
-`Envelope` + `EventPublisher` seam + `InMemoryPublisher`; frozen
-`EventView` projection on `/events/recent`); offline **PASETO v4 public**
+`/merges/recent`) — all three phases of the durable event bus (canonical
+`Envelope` + `EventPublisher`/`EventSink` seams, transactional outbox,
+relay + retention, and the `FluvioSink` real-broker sink behind the
+`fluvio` feature); offline **PASETO v4 public**
 verification (`AuthUser`/`MaybeAuthUser`, `/whoami`, audit `actor` from
 the token — credential switched from RS256-JWT per §13), including the
-boot-time paseto-keys-over-HTTP fetch (`CARE_PATHWAY_PASETO_KEYS_URL`,
-fetch-once, env fallback; §9/§13); OpenAPI 3 doc
+boot-time paseto-keys-over-HTTP fetch **and** a background refresh loop
+(`CARE_PATHWAY_PASETO_KEYS_URL`/`_REFRESH_SECS`; §9/§13) and ABAC
+policy hot-reload (`CARE_PATHWAY_ABAC_POLICY_FILE` watcher; §9/§13);
+OpenAPI 3 doc
 + Swagger UI (`/api-docs/openapi.json`, `/swagger-ui`); a root-level
 Prometheus `/metrics.prom` endpoint (CRUD/merge counters +
 `http_requests_total`, public under enforcement); blanket `/api/*`
 enforcement middleware (`auth::enforce` + `after_routes` layer,
-off by default via `CARE_PATHWAY_REQUIRE_AUTH`); DB-free tests +
-gated request-level tests; green build + clippy.
+off by default via `CARE_PATHWAY_REQUIRE_AUTH`); the operational
+instance layer (enrolment, lifecycle, review cadence, urgency, care
+team, outcomes — §13 2026-07-20) and the registry insight views
+(directory/coverage/variants/providers/languages); the full compliance
+surface (§12) — tamper-evident audit hash chain, keyed MAC + external-
+witness checkpoints, row-level record integrity, read/disclosure
+auditing, GDPR Art. 17 erasure, SOUP register + CycloneDX SBOM,
+machine-checked requirement→test traceability; the FHIR R5
+`PlanDefinition` surface (§12.3) with `$validate`, conditional SMART
+discovery, and Bulk Data `$export` (durable, on the `bg_pg` worker); DB-free
+tests + gated request-level tests; green build + clippy.
 
 ## 15. Roadmap
 
-All of the scope below shipped together in the still-unreleased `0.1.0`
-line (Cargo.toml is `0.1.0`; CHANGELOG keeps it under `[Unreleased]`):
-the CRUD + matching MVP, then `ILIKE` search (since replaced by
+All of the scope below shipped as `0.1.0`, tagged
+`care-pathway-service-v0.1.0` on 2026-08-04 (CHANGELOG.md): the CRUD +
+matching MVP, then `ILIKE` search (since replaced by
 Tantivy, 2026-08-01) + audit + in-memory
 streaming, then record merge + OpenAPI/Swagger + Prometheus + offline
 bearer-token verification + blanket `/api/*` enforcement middleware. The
-original v0.2 / v0.3 milestone split was never cut as a tagged release.
-The credential switch RS256-JWT → PASETO v4 public per
+original v0.2 / v0.3 milestone split was never cut as a separate
+release — it landed inside the same `0.1.0` line. The credential switch
+RS256-JWT → PASETO v4 public per
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
-has since landed (§13), as has the boot-time paseto-keys-over-HTTP fetch
-(`CARE_PATHWAY_PASETO_KEYS_URL`, fetch-once, env fallback; §9/§13), and
-field masking + audited GDPR export wired to the ABAC `mask` obligation
-(2026-08-02; §13), and the durable event bus's real `FluvioSink` broker
+landed (§13), as did the boot-time paseto-keys-over-HTTP fetch plus a
+background refresh loop (`CARE_PATHWAY_PASETO_KEYS_URL`/`_REFRESH_SECS`;
+§9/§13), ABAC policy hot-reload (§9/§13), field masking + audited GDPR
+export wired to the ABAC `mask` obligation
+(2026-08-02; §13), keyed integrity MACs + external-witness checkpoints
+(2026-07-27; §12.1/§13), pagination on list/search (2026-08-01; §13),
+and the durable event bus's real `FluvioSink` broker
 sink (BUS-3, 2026-08-03; §13) — all three bus phases are now done. Next
-(deferred, §13): a PASETO key-set refresh loop,
-instance-layer privacy for `pathway_instances.subject_ref` (§16),
-front-end merge action.
+(deferred, §13): instance-layer privacy for
+`pathway_instances.subject_ref` (§16), front-end merge action, and the
+native (non-FHIR) bulk import/export API.
 
 ## 16. Open questions
 
@@ -927,9 +1080,12 @@ front-end merge action.
   search lands?~~ RESOLVED (2026-08-01): search landed on the JSONB
   payload via Tantivy (§13); no normalisation needed.
 - Real-time duplicate check on create (409) vs the explicit endpoint?
-- Periodic re-fetch of the PASETO key set (key rotation) — the boot
-  fetch (§9 `CARE_PATHWAY_PASETO_KEYS_URL`) runs once; is a refresh
-  loop (or refetch-on-`UnknownKid`) needed before rotation goes live?
+- ~~Periodic re-fetch of the PASETO key set (key rotation)~~ RESOLVED
+  (2026-08-01, AU-2): `auth::spawn_key_refresh` polls
+  `CARE_PATHWAY_PASETO_KEYS_URL` every
+  `CARE_PATHWAY_PASETO_KEYS_REFRESH_SECS` and swaps the fetched set into
+  the live `ReloadableVerifier` (§9/§13); a refetch-on-`UnknownKid` fast
+  path was not additionally needed.
 - **Instance-layer privacy for `pathway_instances.subject_ref`.** The
   privacy module landed 2026-08-02 (§13) masks the `CarePathway`
   *template* — which names no patient — but the actual

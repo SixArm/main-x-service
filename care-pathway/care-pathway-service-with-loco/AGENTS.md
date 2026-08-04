@@ -50,6 +50,17 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 
 Plus loco's default `/_health`, `/_ping`. Every CRUD action writes an
 `audit_logs` row and publishes a `created`/`updated`/`deleted` event.
+`GET /api/care-pathways` and `GET /api/care-pathways/search` take
+`?limit=`/`?offset=` and report `X-Total-Count`/`X-Limit`/`X-Offset`.
+
+This crate is also the family's **reference implementation** of the
+compliance controls in
+[`agents/share/compliance-for-healthcare.md`](../../agents/share/compliance-for-healthcare.md)
+§2 (spec §12) — a full `/api/compliance/*` surface (posture, SBOM, audit
+hash-chain verify, row-integrity verify, MAC'd external-witness
+checkpoints) plus a mounted FHIR R5 `PlanDefinition` surface (spec
+§12.3). See [README.md](./README.md) for both endpoint tables in full;
+the tables above cover only the native `/api/care-pathways` surface.
 
 ## MVP scope
 
@@ -84,11 +95,36 @@ default) landed 2026-08-03, ported from case-service's BUS-1 reference —
 see `agents/share/event-bus.md`. Deferred
 (spec §13): instance-layer
 masking/authz for `subject_ref`, front-end merge
-action, terminology-server code-existence checks. The published key set
+action, terminology-server code-existence checks, and the native
+(non-FHIR) bulk import/export API. The published key set
 is fetched over HTTP once at boot when `CARE_PATHWAY_PASETO_KEYS_URL` is
 set (fetched set wins; warn + env fallback via
-`CARE_PATHWAY_PASETO_KEYS` otherwise — the service always boots); a
-periodic refresh loop is a future spec item.
+`CARE_PATHWAY_PASETO_KEYS` otherwise — the service always boots), **and
+then a background loop keeps re-fetching it**
+(`CARE_PATHWAY_PASETO_KEYS_REFRESH_SECS`, default 3600), so a rotated
+key reaches a running process with no restart; the ABAC policy
+(`CARE_PATHWAY_ABAC_POLICY_FILE`) hot-reloads the same way (AU-2,
+2026-08-01).
+
+The full **compliance surface** (`src/compliance/`, spec §12) — the
+family's reference implementation of
+[`agents/share/compliance-for-healthcare.md`](../../agents/share/compliance-for-healthcare.md)
+§2 — landed 2026-07-25 through 2026-08-04: a tamper-evident audit hash
+chain, keyed HMAC integrity MACs with per-domain HKDF subkeys
+(`src/compliance/mac.rs`, embedding the shared `integrity-mac` crate),
+MAC'd external-witness chain checkpoints
+(`src/compliance/checkpoint.rs` — closes the tail-truncation blind spot
+the hash chain alone cannot see), row-level record content hashing,
+read/disclosure auditing, GDPR Art. 17 erasure, and a SOUP register +
+CycloneDX SBOM + machine-checked requirement→test traceability.
+`cargo loco task integrity_key`/`integrity_resign` generate, check, and
+re-sign the MAC key without ever logging it. The mounted **FHIR R5**
+surface (`src/fhir/`, `controllers/fhir.rs`, spec §12.3) maps the
+stored DTO to `PlanDefinition`, with `$validate`, conditional SMART
+discovery, and a durable (worker + artifact-store) Bulk Data `$export`.
+Family-wide activation order for the compliance controls (all default
+off/inert):
+[`agents/share/runbooks/integrity-activation.md`](../../agents/share/runbooks/integrity-activation.md).
 
 Auth pivot done in this crate: the family moved from RS256 JWT + JWKS to
 cookie sessions + short-lived PASETO v4.public verified offline against a
@@ -113,13 +149,46 @@ only the credential changed. See
 
 ```
 src/
-├── app.rs                 loco Hooks (routes, truncate)
-├── bin/main.rs            loco CLI entrypoint
-├── controllers/care_pathways.rs   CRUD + match + check-duplicates + merge + audit/events + whoami
-├── controllers/docs.rs    OpenAPI JSON + Swagger UI
-├── controllers/metrics.rs root /metrics.prom Prometheus endpoint
+├── app.rs                 loco Hooks (routes, workers, truncate, key/policy-refresh spawn)
+├── bin/main.rs             loco CLI entrypoint
+├── bin/sbom.rs             `cargo run --bin sbom` — SBOM to stdout, no server boot
+├── controllers/
+│   ├── care_pathways.rs   CRUD + match + check-duplicates + merge + masked/export + audit/events/disclosures + erase + whoami
+│   ├── compliance.rs      posture, SBOM, audit-chain verify, record verify, checkpoint take/verify
+│   ├── fhir.rs             mounted FHIR R5 PlanDefinition CRUD/search + $validate + SMART + $export
+│   ├── insights.rs         directory/coverage/variants/providers/languages registry lenses
+│   ├── instances.rs        instance lifecycle/review/urgency/team/steps/outcomes + caseload/overdue/care-team-load
+│   ├── docs.rs             OpenAPI JSON + Swagger UI
+│   └── metrics.rs          root /metrics.prom Prometheus endpoint
+├── compliance/
+│   ├── mod.rs              posture assembly, data-protection declarations, safety class
+│   ├── audit_chain.rs      SHA-256 tamper-evident hash chain over audit_logs
+│   ├── mac.rs               keyed HMAC integrity MAC (embeds shared integrity-mac crate, per-domain HKDF subkeys)
+│   ├── checkpoint.rs        MAC'd external-witness chain checkpoints (tail-truncation blind spot)
+│   ├── record_integrity.rs  row-level content_hash over care_pathways
+│   ├── disclosure.rs        purpose-of-use vocabulary + read/disclosure auditing (HIPAA §164.528)
+│   ├── erasure.rs           GDPR Art. 17 erasure against the immutable chain
+│   ├── soup.rs               SOUP register + CycloneDX SBOM (embeds compliance/soup.tsv + Cargo.lock at compile time)
+│   └── bulk.rs               FHIR Bulk Data $export in-process shape (job orchestration lives in bulk/ + workers/)
+├── fhir/
+│   ├── mod.rs               to/from PlanDefinition conversions
+│   ├── profile.rs           family-local StructureDefinition profile + terminology validation
+│   ├── resources.rs         resource structs, OperationOutcome, Bundle
+│   └── search.rs             FHIR search-param parsing → searchset Bundle
+├── bulk/
+│   ├── mod.rs               durable bulk_jobs table + artifact store, shared by FHIR $export (native bulk import/export is future work)
+│   └── store.rs              ArtifactStore trait + local-filesystem dev backend
+├── workers/
+│   ├── bulk_export.rs        bg_pg worker materialising FHIR $export NDJSON off the request path
+│   └── downloader.rs         placeholder worker
+├── tasks/
+│   ├── search.rs             `cargo loco task` Tantivy reindex + boot-time reindex-if-empty
+│   ├── integrity_key.rs      generate/check/report the MAC root key (never logs the key)
+│   └── integrity_resign.rs   re-sign existing rows after a MAC key rotation
 ├── metrics.rs             process-wide Prometheus registry (CRUD/merge counters + http_requests_total)
-├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) via authentication-verifier (RS256/JWKS decommissioned)
+├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) + ABAC, both reloadable (ReloadableVerifier/ReloadablePolicy — AU-2 key/policy hot-reload)
+├── version.rs             `Accepts-version` header negotiation middleware (agents/share/api-versioning.md)
+├── instances.rs            pure instance lifecycle state machine (active↔on_hold→terminal)
 ├── merge.rs               pure record-merge logic (merge_pathways)
 ├── openapi.rs             hand-written OpenAPI 3 document
 ├── privacy.rs             field masking (provider name/id) + GDPR export envelope
@@ -128,18 +197,20 @@ src/
 ├── streaming.rs           CRUD/merge event stream — Phase 1 durable-bus
 │                          envelope (Envelope) + EventPublisher seam +
 │                          InMemoryPublisher; frozen EventView projection
-├── validation.rs          name + condition-code (ICD/SNOMED) checks → 422
+├── validation.rs          name + condition-code (ICD/SNOMED) + input-size-cap checks → 422
 ├── models/
-│   ├── care_pathways.rs   CRUD helpers over the stored payload
-│   ├── audit_logs.rs      audit-trail record/query helpers
+│   ├── care_pathways.rs   CRUD helpers over the stored payload (sets content_hash on every write)
+│   ├── audit_logs.rs      audit-trail record/query helpers (chains under pg_advisory_xact_lock)
 │   ├── merge_records.rs   merge-history record/query helpers
 │   ├── event_outbox.rs    durable-bus Phase 2: OutboxInsert::from_envelope mapping + enqueue (tx-generic) + relay poll/ack
-│   └── _entities/{care_pathways,audit_logs,merge_records,event_outbox}.rs  SeaORM entities
-migration/src/            …_000001_care_pathways, …_000002_audit_logs, …_000003_merge_records, …_000004_event_outbox
+│   ├── bulk_jobs.rs        queued→running→terminal FHIR $export job lifecycle
+│   └── _entities/{care_pathways,audit_logs,merge_records,event_outbox,bulk_jobs,pathway_instances,instance_steps,instance_team,instance_events,instance_measures}.rs  SeaORM entities
+migration/src/            …care_pathways, …audit_logs, …merge_records, …event_outbox, …instances (m20260720_…), …outcomes, …compliance (m20260725_000007), …record_integrity, …bulk_jobs
 config/                   development/production/test yaml
 compose.fluvio.yaml        opt-in local Fluvio broker (`fluvio` feature, BUS-3; not part of CI)
 Dockerfile.fluvio-cli       support image for compose.fluvio.yaml's sc-setup step
 tests/fluvio_relay.rs       `fluvio`-feature-gated, #[ignore]d live-broker round-trip test
+compliance/                crate-root IEC 62304 evidence: lifecycle.md, soup.tsv, traceability.tsv
 ```
 
 ## Container image
