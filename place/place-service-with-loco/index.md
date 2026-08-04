@@ -39,6 +39,12 @@ FHIR `Location` resource: `GET /fhir/metadata` (CapabilityStatement),
 `POST /fhir/Location` (create), `GET /fhir/Location` (search),
 and `GET` / `PUT` / `DELETE /fhir/Location/{id}`.
 
+Keyed integrity verification: `GET /api/records/verify` and
+`GET /api/audit/verify` check the stored SHA-256 / SHA3-256 digests and
+HMAC-SHA256 MAC over place records and the audit log. Default off — set
+`PLACE_INTEGRITY_MAC_KEY` (or `_KEY_FILE`) to start writing MACs;
+unkeyed rows report `mac_absent`, not a mismatch.
+
 Prometheus metrics are exposed at the root path `GET /metrics.prom`
 (text-exposition format, `text/plain; version=0.0.4`) — not under
 `/api` — so a default scraper (`metrics_path: /metrics.prom`) finds it.
@@ -101,12 +107,19 @@ Configuration is loaded from `config/{development,test,production}.yaml`
 | `STREAMING_TOPIC` | Topic events publish to | `place-events` |
 | `RUST_LOG`           | tracing-subscriber filter  | `info`                  |
 | `OTLP_ENDPOINT`      | OpenTelemetry collector    | `http://localhost:4317` |
+| `PLACE_EVENT_TRANSPORT` | Event transport: `memory` (default) or `outbox` (durable event bus, Phase 2 — writes an `event_outbox` row inside each write's transaction) | `memory` |
+| `PLACE_EVENT_RELAY` | Phase-3 outbox relay worker on/off (truthy `1`/`true`/`yes`/`on`); runs only when transport is also `outbox` | off |
+| `PLACE_EVENT_RELAY_INTERVAL_SECS` | Relay drain poll interval in seconds (floored at 1) | `5` |
+| `PLACE_EVENT_RETENTION_DAYS` | Outbox row TTL, enforced by the Phase-3 relay's retention purge | `7` |
+| `PLACE_FLUVIO_ENDPOINT` | Real-broker relay sink (`FluvioSink`, needs the `fluvio` Cargo feature) | unset (no-broker `LoggingSink`) |
+| `PLACE_INTEGRITY_MAC_KEY` / `_KEY_FILE` | Keyed integrity MAC root key (hex) / a file holding it (`_KEY_FILE` wins) — unset means no MAC is written and `/api/records/verify` + `/api/audit/verify` report `mac_absent` | unset |
 
 ## Testing
 
 ```bash
-# 191+ unit tests (models, matching components, validation, privacy,
-# search, streaming, metrics, api); run for the live count.
+# 205 unit tests (models, matching, validation, privacy, search,
+# streaming, auth, FHIR, compliance/integrity, config, db, relay);
+# run for the live count.
 cargo test --lib
 
 # 14 bridge tests pinning the service ↔ canonical place-matcher

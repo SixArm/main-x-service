@@ -2,11 +2,13 @@
 
 ## Test Categories
 
-### Unit Tests (125 tests)
+### Unit Tests (207 tests: 205 run by default + 2 DB-gated `#[ignore]`)
 
-Located in `#[cfg(test)] mod tests` within each source file.
-Counts below are the largest modules; `search` (6), `streaming` (2),
-`metrics` (1), and `api::rest` (1) round the total to 125.
+Located in `#[cfg(test)] mod tests` within each source file. Verified
+2026-08-04 via `cargo test --lib -- --list`; the models/matching/
+validation/privacy/search core (below) predates the auth, event-bus,
+FHIR, and compliance work and is unchanged in count except
+`validation` (+4, the SEC-M1 size-cap tests).
 
 | Module                  | Tests | What's Covered                                                                                                                                                                                                  |
 | ----------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -25,8 +27,19 @@ Counts below are the largest modules; `search` (6), `streaming` (2),
 | `matching::phonetic`    | 10    | Robert, Rupert, match, no match, Ashcraft, empty, single char, case, Washington, place names                                                                                                                    |
 | `matching::scoring`     | 8     | Identical places, name only, different, GLN deterministic, confidence levels, weights sum, fuzzy, phonetic bonus                                                                                                |
 | `matching::adapter`     | 5     | Service → matcher field routing (telecom, address renames, identifier-scheme URIs, place-type mapping, sparse records)                                                                                          |
-| `validation`            | 25    | Valid place, empty/whitespace name, invalid lat/lon, valid coords, invalid/valid GLN + check-digit helper, valid/invalid opening-hours times + `time_is_valid` helper, invalid/valid URL, invalid/valid telephone, address missing fields, address with locality, multiple errors, normalization |
+| `validation`            | 29    | Valid place, empty/whitespace name, invalid lat/lon, valid coords, invalid/valid GLN + check-digit helper, valid/invalid opening-hours times + `time_is_valid` helper, invalid/valid URL, invalid/valid telephone, address missing fields, address with locality, multiple errors, normalization, 4× SEC-M1 input-size-cap tests |
 | `privacy`               | 8     | Mask telephone/fax/geo, preserve name, no sensitive fields, short phone, GDPR export, export fields                                                                                                             |
+| `search` (+ `search::index`) | 6 | Index/exact/fuzzy search, delete-removes, empty-index, create-or-open round trip                                                                                                                          |
+| `streaming` (+ `streaming::envelope`) | 11 | `EventTransport::parse`; `Envelope` construction (`for_place`/`for_merge`), `EventView` projection, `OutboxInsert` field mapping (T-12) |
+| `metrics`               | 1     | Registry render includes default counters                                                                                                                                                                       |
+| `api::rest` (+ `state`, `version`, `handlers::review_report_tests`) | 11 | OpenAPI path/schema assertions, `AppState` construction, `Accepts-version` negotiation, review-queue report shaping |
+| `api::rest::auth`       | 23    | Bearer verification (valid/missing/non-bearer/expired/tampered/no-key), blanket-enforcement matrix, ABAC action derivation + policy matrix, boot-time key fetch (URL wins / fetch-failure fallback) |
+| `fhir` (+ `fhir::search`) | 10  | Identifier scheme round-trip, DTO↔`Location` round-trip, missing-name reject, soft-delete⇒`inactive`, search-predicate matching, `CapabilityStatement` (T-11) |
+| `controllers::fhir`     | 1     | `CapabilityStatement` lists `Location` + its search params                                                                                                                                                      |
+| `compliance::mac` (+ `record_integrity`, `audit_integrity`) | 11 | Key-set loading, record/audit digest + MAC compute, `mac_absent` when unkeyed |
+| `config`                | 5     | Env-var parsing / defaults                                                                                                                                                                                      |
+| `db::outbox` (+ `db::tests`) | 6 (2 `#[ignore]`, need `DATABASE_URL`) | `OutboxInsert::from_envelope` field mapping + non-UUID-pid reject; DB-gated: `create` writes one `created` row, `merge` writes `merged`+`deleted` atomically (T-12) |
+| `relay`                 | 3     | Logging-sink smoke test, capturing-sink contract, config defaults (T-12b)                                                                                                                                       |
 
 ### Integration Tests (72 tests in `integration_*.rs`; 86 total in `tests/`)
 
@@ -44,6 +57,16 @@ below) brings the `tests/` directory total to 86.
 | `integration_scoring.rs`    | 24    | Unicode names, long names, single char, reversed words, address edge cases, geo poles/date line/radius boundary, identifier edge cases, Soundex consistency, custom weights, confidence boundaries, score range validation, phonetic bonus, all components, batch sorting |
 | `integration_geo_radius.rs` | 4     | Geo-radius candidate filtering over a collection (the future `nearby` endpoint primitive), radius monotonicity, matcher-bridge worked example (near-duplicate match + unrelated reject) |
 | `integration_edge_cases.rs` | 16    | Boundary coordinates, GLN length validation, URL protocols, address minimal/empty fields, multi-word normalization, idempotent normalization, all sensitive fields masking, empty phone masking, GDPR field preservation, combined workflows, GLN deterministic override  |
+
+**DB/broker-gated additions (2026-08).** Three more files exist in
+`tests/` beyond the 86 counted above, all `#[ignore]`d so a plain
+`cargo test --tests` is unaffected — they need real infrastructure:
+
+| File | Tests | Gate | What's covered |
+|---|---|---|---|
+| `api_integration_test.rs` | 3 | `DATABASE_URL` | QA-SERVER-FIELDS regression: a minimal hand-written create body round-trips a fresh id + "now" timestamps; two hand-written creates don't collide; an omitted `name` fails via `validation_error`, not the JSON extractor |
+| `enforcement.rs` | 1 | `DATABASE_URL`, run with `-- --ignored` | `PLACE_REQUIRE_AUTH=1` activation proof over the real production router (public paths open, protected read/write need a token, valid-but-empty-`attrs` reads but not writes) |
+| `fluvio_relay.rs` | 1 | `--features fluvio` **and** a live Fluvio broker | `FluvioSink` round-trip (create → outbox → relay → real topic); verified today only by compiling under the feature, not by an actual run |
 
 ### Benchmark Tests (16 benchmarks)
 

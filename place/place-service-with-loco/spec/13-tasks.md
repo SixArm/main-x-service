@@ -216,3 +216,30 @@ clearly described manual check confirms the acceptance criterion.
   `cargo test --lib` + clippy pedantic clean; FE svelte-check / vitest /
   Playwright green.
 
+- [x] **2026-07-27/28 — Keyed integrity verification (MAC + digests).**
+  *Landed but never recorded here until this doc pass (2026-08-04)
+  found the gap: shipped, tested, and reachable, with no `spec/13`
+  entry, no `spec/14` row, and no `spec/09`/`AGENTS/restful.md`
+  endpoint listing.* Adds `src/compliance/` (`mac`, `record_integrity`,
+  `audit_integrity`): SHA-256 + SHA3-256 digests and a keyed
+  HMAC-SHA256 MAC (this crate's binding to the shared
+  `integrity-mac` crate, HKDF-domain-separated per (service, domain))
+  over each `Place` record and each `audit_log` row. Two read
+  endpoints, guarded like every other `/api` route:
+  `GET /api/records/verify` and `GET /api/audit/verify`. **Default
+  off**: with no `PLACE_INTEGRITY_MAC_KEY` (or `_KEY_FILE`) configured,
+  no MAC is written and affected rows report `mac_absent` rather than
+  a mismatch — adopting the control on a populated table must not
+  produce false accusations. Env vars: `PLACE_INTEGRITY_MAC_KEY`,
+  `PLACE_INTEGRITY_MAC_KEY_FILE` (takes precedence),
+  `PLACE_INTEGRITY_MAC_KEY_ID`, `PLACE_INTEGRITY_MAC_KEYS_RETIRED`.
+  **Known limit, stated in the module docs**: unlike person / worker /
+  care-pathway / case, this crate has **no hash chain** (`prev_hash` /
+  `hash`) and takes no external-witness checkpoint — a MAC proves a
+  row's content is unchanged since it was written, and says nothing
+  about a row **deleted wholesale**. See
+  `agents/share/runbooks/integrity-activation.md` for the family-wide
+  activation runbook. 11 DB-free unit tests
+  (`compliance::mac::tests` ×2, `compliance::record_integrity::tests`
+  ×6, `compliance::audit_integrity::tests` ×3).
+

@@ -4,26 +4,35 @@ Complete reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
 
 | Tier | Surface |
 |---|---|
-| REST (Axum) | 14 endpoints under `/api/places/*` + `/api/audit/recent` + `/api/health` |
+| REST (Axum) | 16 endpoints under `/api/places/*` + `/api/audit/recent` + `/api/health` |
 | Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
+| Integrity verification (Axum) | `GET /api/records/verify`, `GET /api/audit/verify` — keyed-MAC + digest checks over place records / the audit log (§13; default `mac_absent` with no key configured) |
+| FHIR R5 (Axum) | `Location` resource — `GET/POST/PUT/DELETE /fhir/Location{,/{id}}`, `GET /fhir/metadata` (`CapabilityStatement`) — see §13 T-11 |
 | Observability | `GET /metrics.prom` (root path, Prometheus text-exposition `text/plain; version=0.0.4`) |
 | gRPC (Tonic) | Stubbed |
 | Web UI | Full set documented in project-root [`spec.md`](../../spec/index.md) |
 | Docs | Swagger UI at `/swagger-ui` |
 
-The 14 REST endpoints are: `GET /api/health`; `POST /api/places`;
+The 16 `/api` REST endpoints are: `GET /api/health`; `POST /api/places`;
 `GET`/`PUT`/`DELETE /api/places/{id}`; `GET /api/places/search`;
 `POST /api/places/match`; `POST /api/places/check-duplicates`;
 `POST /api/places/merge`; `POST /api/places/deduplicate`;
+`GET /api/places/review-queue`;
+`POST /api/places/review-queue/{id}/decision`;
 `GET /api/places/{id}/export`; `GET /api/places/{id}/masked`;
-`GET /api/places/{id}/audit`; `GET /api/audit/recent`.
+`GET /api/places/{id}/audit`; `GET /api/audit/recent`
+(plus `GET /api/whoami` and the integrity-verify pair listed above as
+their own tiers). Full table: [`AGENTS/restful.md`](../AGENTS/restful.md).
 
 Search query parameters are `q`, `limit`, `fuzzy`, `mask_sensitive`.
 Geo-radius search (`nearby`), an `/api/audit/user` route, and search
 `offset` pagination are **not yet delivered** — see §13 T-9.
 
-This crate does **not** expose a FHIR R5 surface — Places are not a
-FHIR-resource concern.
+This crate **does** expose an HL7 FHIR R5 surface mapping places to the
+FHIR `Location` resource (delivered 2026-07-07, T-11) — see the FHIR
+tier above. (An earlier draft of this section said Places were not a
+FHIR-resource concern; that was superseded when T-11 shipped and this
+section had not been updated to match.)
 
 Standard response envelope. `409` on duplicate-detected create; `422`
 on validation failure.

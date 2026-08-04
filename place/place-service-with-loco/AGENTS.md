@@ -78,8 +78,8 @@ commands.
 | File | Role |
 |------|------|
 | `spec.md` | **Single source of truth** — what, how, status, tasks (§13) |
-| `README.md` / `CLAUDE.md` | User-facing intro — must stay consistent with the spec |
-| `AGENTS.md` / `AGENTS/*.md` | How to work in the repo + per-topic reference |
+| `README.md` (symlink to `index.md`) | User-facing intro — must stay consistent with the spec |
+| `AGENTS.md` / `AGENTS/*.md` / `CLAUDE.md` | How to work in the repo + per-topic reference. `CLAUDE.md` is a one-line `@AGENTS.md` include (matching the family convention — see root `AGENTS.md`), not a second user-facing doc; its content used to duplicate `index.md` and has been folded/removed rather than kept in sync by hand. |
 | `index.md` | Navigation aid with worked examples |
 | `CHANGELOG.md` | Historical record of releases and changes |
 
@@ -96,6 +96,9 @@ pulled from crates.io, not a path dependency):
 podman build -f place/place-service-with-loco/Dockerfile \
   -t place-service .   # run from the repository root
 ```
+
+For local development, `podman compose up -d` (from this crate's own
+directory) is usually simpler than building the image directly.
 
 Verified end-to-end (2026-08-03): builds clean, boots against a real
 Postgres, and `GET /api/health` returns `200`. This exercise found and

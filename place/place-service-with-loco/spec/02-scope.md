@@ -17,11 +17,14 @@
 - Per-field privacy masking (phone / fax / coordinate rounding),
   GDPR Article 15 export, consent records.
 - REST API (Axum) + gRPC stub.
+- HL7 FHIR R5 API (`Location` resource) — see §9, §13 T-11.
+- Keyed integrity verification (SHA-256 + SHA3-256 digests + an
+  HMAC-SHA256 MAC, default-off) over place records and the audit log —
+  see §12, §13.
 - PostgreSQL persistence via SeaORM, with PostGIS for spatial.
 
 ### 2.2 Out of scope (today)
 
-- FHIR R5 — Places are not a FHIR-resource concern.
 - Production Fluvio publisher / consumers.
 - PostGIS-backed spatial queries (currently fallback to Haversine +
   bounding-box in app code).

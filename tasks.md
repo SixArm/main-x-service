@@ -3115,6 +3115,53 @@ committing (see plan.md §4).
     the schema-only scaffolding is not spec drift, just unfinished
     work already honestly described as such.
 
+  - *`place/place-service-with-loco` done 2026-08-04.* Confirmed
+    today's QA-SERVER-FIELDS fix (65f83fbb) was already a clean
+    three-part landing — `spec/09-api-surface.md` and `CHANGELOG.md`
+    both already documented it accurately; nothing to fix there.
+    Found and fixed several other real gaps: (1) **`spec/02-scope.md`
+    and `spec/09-api-surface.md` both flatly claimed "this crate does
+    not expose a FHIR R5 surface / Places are not a FHIR-resource
+    concern"** — false; T-11 shipped a full `Location` mapping,
+    mounted and routed, on 2026-07-07, and `spec/13-tasks.md` says so
+    two sections later in the same file. Fixed both, and added the
+    FHIR tier + corrected endpoint count (14 → 16) to §9's surface
+    table. (2) **A shipped, tested, reachable feature with zero
+    `spec/` presence anywhere**: keyed integrity verification
+    (`src/compliance/` — SHA-256 + SHA3-256 digests + an HMAC-SHA256
+    MAC via the shared `integrity-mac` crate, `GET /api/records/verify`
+    + `GET /api/audit/verify`, landed 2026-07-27/28) had no `spec/13`
+    task, no `spec/14` row, and wasn't in `AGENTS/restful.md`'s
+    endpoint table or `spec/09` at all — added all three. While
+    tracking this down, found `agents/share/overview.md`'s
+    `integrity-mac` row was itself stale, naming only "person, worker,
+    care-pathway, case" when the capability is now family-wide (all
+    ten entity registries + authentication + link-graph, verified by
+    directory listing + `git log`) — fixed that one shared line too.
+    (3) **Stale test counts everywhere**: `AGENTS/testing.md` said 125
+    unit tests, `spec/14-implementation-status.md` said 151,
+    `index.md` said "191+" — the live count (`cargo test --lib`) is
+    205 (207 incl. 2 DB-gated `#[ignore]`); none of the three matched
+    each other, let alone reality. Rewrote `AGENTS/testing.md`'s
+    per-module table against a live `--list` run (new modules since
+    the 125-test snapshot: `api::rest::auth`, `fhir`, `compliance::*`,
+    `config`, `db::outbox`, `relay` — none previously documented) and
+    corrected the other two. Also documented three DB/broker-gated
+    integration-test files (`api_integration_test.rs`,
+    `enforcement.rs`, `fluvio_relay.rs`) that existed but weren't
+    mentioned in `AGENTS/testing.md` at all. (4) **`AGENTS/models.md`**
+    didn't note which `Place` fields are `#[serde(default)]` /
+    server-managed post-QA-SERVER-FIELDS — added a column. (5) **The
+    `CLAUDE.md`/`AGENTS.md` split**: same finding and same fix as
+    worker's note above (place was one of the five still-bloated
+    crates it named) — thinned place's 21 KB `CLAUDE.md` to
+    `@AGENTS.md` (nothing in it was absent from `index.md`/`AGENTS/`)
+    and corrected place's own "doc hierarchy" table, which had the
+    same inverted `CLAUDE.md`-groups-with-`README.md` claim. Matching
+    weights/confidence thresholds (`AGENTS/matching.md`) verified
+    byte-accurate against `src/matching/scoring.rs`; `README.md`
+    already symlinks to `index.md`.
+
 - [ ] **DOC-3 (L)** Matcher crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: person, worker, place, thing, event, course,
   organization, care-pathway, case, project-portfolio-management

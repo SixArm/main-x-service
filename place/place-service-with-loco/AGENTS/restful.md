@@ -67,6 +67,22 @@ use place_service::validation::{validate_place, normalize_place, ValidationError
 use place_service::privacy::{mask_place, gdpr_export};
 ```
 
+### Compliance (keyed integrity verification)
+
+```rust
+use place_service::compliance::mac::{KEY_ENV, KEY_FILE_ENV, KEY_ID_ENV, RETIRED_KEYS_ENV};
+use place_service::compliance::{record_integrity, audit_integrity};
+```
+
+This crate's binding to the shared `integrity-mac` crate: SHA-256 +
+SHA3-256 digests and a keyed HMAC-SHA256 MAC over `Place` records and
+`audit_log` rows, surfaced at `GET /api/records/verify` / `GET
+/api/audit/verify` (see the endpoint table below). Default off — no
+key configured means no MAC is written and rows report `mac_absent`
+rather than a mismatch. See `src/compliance/mod.rs`'s module docs for
+the full design, including the stated limit versus person / worker /
+care-pathway / case (no hash chain here yet).
+
 ## Usage Examples
 
 ### Create and validate a place
@@ -168,6 +184,8 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET    | `/api/places/{id}/masked` | Masked place view     |
 | GET    | `/api/places/{id}/audit`  | Audit logs            |
 | GET    | `/api/audit/recent`       | Recent audit activity |
+| GET    | `/api/records/verify`     | Keyed-MAC + digest integrity check over place records (`mac_absent` unless `PLACE_INTEGRITY_MAC_KEY`/`_KEY_FILE` is set) |
+| GET    | `/api/audit/verify`       | Keyed-MAC + digest integrity check over `audit_log` rows |
 
 ### FHIR R5 Endpoints
 

@@ -9,7 +9,9 @@
 | Domain model | Full schema.org/Place property coverage including PostalAddress, GeoCoordinates, hierarchy |
 | Matching | Name (Jaro-Winkler + Soundex) + Geo (Haversine) + Address (weighted) + Identifier (GLN deterministic) |
 | Search | Tantivy full-text + fuzzy index (`q` / `limit` / `fuzzy` / `mask_sensitive`); geo-radius `nearby` + `offset` deferred to T-9 |
-| REST API | 14 endpoints + OpenAPI/Swagger + CORS + structured errors |
+| REST API | 16 endpoints + OpenAPI/Swagger + CORS + structured errors |
+| FHIR R5 API | `Location` resource: read/create/update/delete/search at `/fhir/Location{,/{id}}` + `GET /fhir/metadata` `CapabilityStatement`; reuses the native validators, event/audit path, and blanket auth+ABAC guard (T-11) |
+| Integrity verification | SHA-256 + SHA3-256 digests and a keyed HMAC-SHA256 MAC over place records and `audit_log` rows, via the shared `integrity-mac` crate; `GET /api/records/verify` + `GET /api/audit/verify`; default off (`mac_absent`, not a mismatch) until `PLACE_INTEGRITY_MAC_KEY`/`_KEY_FILE` is configured — no hash chain / external-witness checkpoint yet (unlike person/worker/care-pathway/case) |
 | Repository | SeaORM CRUD with transactions, soft delete |
 | Event streaming | InMemoryEventPublisher; durable-bus Phase 2 outbox + Phase 3 relay (`PLACE_EVENT_TRANSPORT=outbox`, default `memory`), with a real-broker `FluvioSink` behind this crate's own `fluvio` Cargo feature (off by default) — `PLACE_FLUVIO_ENDPOINT` selects it over the default `LoggingSink` (T-12, T-12b, T-12c/BUS-3) |
 | Audit log | AuditLogRepository with old / new JSON |
@@ -22,7 +24,7 @@
 | Authentication (blanket enforcement) | Default-off `PLACE_REQUIRE_AUTH`-gated middleware on both router surfaces: valid PASETO bearer required on every route except the public allow-list (`/api/health`, `/_health`, `/_ping`, `/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom`); pure `auth::enforce` decision + DB-free test matrix (T-8) |
 | Authentication (boot-time key fetch) | `PLACE_PASETO_KEYS_URL` set ⇒ key set fetched over HTTP once at boot (`state::boot_verifier` in `after_routes`, before middleware capture; fetched set wins; failure warn-logs and falls back to `PLACE_PASETO_KEYS`/empty — always boots); no refresh loop (rotation re-fetch is roadmap) (T-8) |
 | Authorization (ABAC) | Inside the blanket guard: action derived from method + destructive named POSTs (`/merge`, `/deduplicate`, `/import`); shared `authentication-verifier` 0.3 engine evaluates `PLACE_ABAC_POLICY`/`_FILE` (else the built-in default policy) over the token's `attrs` claim; first-match-wins, default allow-read / deny-mutation; `401` vs `403` split with deciding-rule reason; DB-free §7 test matrix (T-8) |
-| Tests | 151 unit + 86 integration (incl. 14 bridge) + 16 Criterion benchmarks |
+| Tests | 205 unit (`cargo test --lib`, +2 DB-gated `#[ignore]`) + 86 integration (incl. 14 bridge; +5 DB/broker-gated `#[ignore]`) + 16 Criterion benchmarks |
 
 ### 14.2 Open gaps → tasks
 

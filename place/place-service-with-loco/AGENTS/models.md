@@ -8,33 +8,49 @@ Based on [schema.org/Place](https://schema.org/Place).
 
 Core entity representing a physical place.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `Uuid` | Unique identifier (auto-generated v4) |
-| `name` | `String` | Primary name (required) |
-| `alternate_name` | `Option<String>` | Alternate name / alias |
-| `description` | `Option<String>` | Description |
-| `place_type` | `Option<PlaceType>` | Classification |
-| `address` | `Option<PostalAddress>` | Structured address |
-| `geo` | `Option<GeoCoordinates>` | Coordinates |
-| `telephone` | `Option<String>` | Phone (international format) |
-| `fax_number` | `Option<String>` | Fax number |
-| `url` | `Option<String>` | Website URL |
-| `global_location_number` | `Option<String>` | 13-digit GLN |
-| `branch_code` | `Option<String>` | Branch code |
-| `contained_in_place` | `Option<Uuid>` | Parent place ID |
-| `keywords` | `Vec<String>` | Tags |
-| `identifiers` | `Vec<PlaceIdentifier>` | External identifiers |
-| `amenity_features` | `Vec<AmenityFeature>` | Features |
-| `opening_hours` | `Vec<OpeningHoursSpecification>` | Hours |
-| `is_accessible_for_free` | `Option<bool>` | Free access |
-| `public_access` | `Option<bool>` | Open to public |
-| `smoking_allowed` | `Option<bool>` | Smoking permitted |
-| `maximum_attendee_capacity` | `Option<u32>` | Max capacity |
-| `is_deleted` | `bool` | Soft delete flag |
-| `deleted_at` | `Option<DateTime<Utc>>` | Deletion timestamp |
-| `created_at` | `DateTime<Utc>` | Creation timestamp |
-| `updated_at` | `DateTime<Utc>` | Last update timestamp |
+**Wire optionality (`#[serde(default)]`).** `id`, `name`,
+`is_deleted`, `created_at`, `updated_at`, and every collection field
+(`keywords`, `identifiers`, `amenity_features`, `opening_hours`) carry
+`#[serde(default)]` — every one of them is optional on
+`POST`/`PUT /api/places` bodies (QA-SERVER-FIELDS, 2026-08-04). The
+server-managed ones (everything in that list except `name`) are
+**ignored on input and stamped by the server regardless of what a
+client sends**: the handler mints a fresh `id` when the wire value is
+nil, and the repository stamps `created_at`/`updated_at` on
+insert/update. `name` is `#[serde(default)]` too, but for a different
+reason — it is the one field the server does *not* own, so an omitted
+value now reaches `validate_place` (`422 validation_error`) instead of
+being refused by the JSON extractor before any handler code runs. See
+[`spec/09-api-surface.md`](../spec/09-api-surface.md) for the full
+contract.
+
+| Field | Type | Server-managed? | Description |
+|-------|------|:---:|-------------|
+| `id` | `Uuid` | server-managed | Unique identifier (auto-generated v4 if the wire value is nil) |
+| `name` | `String` | — (required, `422` if blank) | Primary name |
+| `alternate_name` | `Option<String>` | | Alternate name / alias |
+| `description` | `Option<String>` | | Description |
+| `place_type` | `Option<PlaceType>` | | Classification |
+| `address` | `Option<PostalAddress>` | | Structured address |
+| `geo` | `Option<GeoCoordinates>` | | Coordinates |
+| `telephone` | `Option<String>` | | Phone (international format) |
+| `fax_number` | `Option<String>` | | Fax number |
+| `url` | `Option<String>` | | Website URL |
+| `global_location_number` | `Option<String>` | | 13-digit GLN |
+| `branch_code` | `Option<String>` | | Branch code |
+| `contained_in_place` | `Option<Uuid>` | | Parent place ID |
+| `keywords` | `Vec<String>` | optional on wire | Tags |
+| `identifiers` | `Vec<PlaceIdentifier>` | optional on wire | External identifiers |
+| `amenity_features` | `Vec<AmenityFeature>` | optional on wire | Features |
+| `opening_hours` | `Vec<OpeningHoursSpecification>` | optional on wire | Hours |
+| `is_accessible_for_free` | `Option<bool>` | | Free access |
+| `public_access` | `Option<bool>` | | Open to public |
+| `smoking_allowed` | `Option<bool>` | | Smoking permitted |
+| `maximum_attendee_capacity` | `Option<u32>` | | Max capacity |
+| `is_deleted` | `bool` | server-managed | Soft delete flag (default `false`) |
+| `deleted_at` | `Option<DateTime<Utc>>` | | Deletion timestamp |
+| `created_at` | `DateTime<Utc>` | server-managed | Creation timestamp (stamped on insert) |
+| `updated_at` | `DateTime<Utc>` | server-managed | Last update timestamp (stamped on insert/update) |
 
 Methods: `Place::new(name)`, `place.soft_delete()`
 
