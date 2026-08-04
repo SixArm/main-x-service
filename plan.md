@@ -14,45 +14,60 @@
 > code edit + test edit) inside that crate, with its §13 updated. Do not
 > create plan/tasks files inside any crate.
 
-## 1. Current state (as of 2026-07-11, `main` @ 61ed6c67)
+## 1. Current state (as of 2026-08-04, `main`)
 
-Recently completed (this quarter's arc):
+> **This section was last refreshed 2026-08-04** (a full pass through
+> `agents/share/overview.md`'s live capability matrix, `tasks.md`'s
+> Phase 1–6, and the security/compliance docs — not carried forward
+> from memory). Everything below **§1's "Known gaps" table**, and most
+> of **§2's Themes**, describes the state as of **2026-07-11** and is
+> now largely superseded — kept for its historical narrative value
+> (why the program was sequenced the way it was) rather than as a
+> current status. **Do not treat anything below this notice as current
+> without checking `agents/share/overview.md`'s capability matrix and
+> `tasks.md` first** — this file is a plan, not a live tracker; letting
+> it silently drift out of sync with what actually shipped is exactly
+> the failure mode the 2026-08-04 documentation-harmonization pass
+> (`tasks.md` Phase 6, DOC-1 onward) exists to catch and stop repeating.
 
-- **Auth**: family-wide ABAC (verifier 0.8: attrs claim, policy engine,
-  resource/env attributes, obligations, hot-reloadable policy+verifier),
-  blanket `/api/*` enforcement wired default-off in all services, CSRF +
-  sessions reshape + BFF plumbing, operator attribute UI, DB-backed
-  enforcement e2e (case = reference), activation playbook.
-- **Durable event bus, Phase 2**: transactional outbox + relay (with a
-  `LoggingSink`) in **all ten** services; audit joins the outbox
-  transaction; `EventTransport` switch (`memory` default, `outbox`).
-  Phase 3 (Fluvio) not started — no crate has a live Fluvio sink.
-- **Cross-service linking**: `entity-ref` contract crate; the
-  `link-graph-service-with-loco` aggregator (reads, merge-repointing,
-  governance concealment + audit + blanket guard, OpenAPI, metrics, lazy
-  verify-on-read, reconciliation live over HTTP); write-sides on **case**
-  (`subject_of`) and **person** (`same_identity`) with canonical
-  bulk-links endpoints the aggregator reconciles.
-- **Bulk import/export (person = reference)**: `bulk_jobs` + `bg_pg`
-  worker + JSONL import (idempotent upsert-by-stable-key, per-row error
-  report) + export (masked-by-default, elevated-authz gate for
-  full/soft-deleted, per-export audit).
+Since 2026-07-11, essentially every item in the original "Known gaps"
+table below has shipped: Tantivy landed in all four newest loco
+services (2026-07-31–2026-08-02); Fluvio sinks landed family-wide
+(`FluvioSink` behind a `fluvio` feature + `<ENTITY>_FLUVIO_ENDPOINT`,
+BUS-1 on case then BUS-3 on the other nine, 2026-08-02/03) though **no
+environment in this repo has ever stood up a live broker** — every
+verification to date is compile-under-feature plus a `#[ignore]`d test,
+not a real round-trip; worker's `same_identity` write-side landed;
+bulk I/O rolled to organization + case (JSONL/CSV, local artifact
+store only — no S3, no Parquet on those two; person alone has the full
+S3/Parquet/CSV set); pagination shipped family-wide
+(`?limit=`/`?offset=` + `X-Total-Count`/`X-Limit`/`X-Offset` headers,
+`agents/share/restful.md`); the front-end merge/link/bulk/review gaps
+closed (this session, FE-1..FE-4); `agents/share/architecture.md` and
+`overview.md` were rewritten with an honest, footnoted capability
+matrix (`overview.md`'s own text now says exactly what it doesn't
+overclaim); and tutorials/sample-data/family-compose all shipped this
+session (`tutorials/`, `examples/`, `DEP-1`).
 
-Known gaps (verified against the tree, not memory):
+**What is genuinely still a gap, checked against `overview.md`'s
+capability matrix on 2026-08-04** (see that file for the authoritative,
+row-by-row picture — this is a summary, not a second copy):
 
 | Gap | Where |
 |---|---|
-| Tantivy full-text (ILIKE only) | care-pathway, case, portfolio (organization landed 2026-07-31 — the loco-adapted reference for the other three) |
-| Privacy module (masking/GDPR/consent) | organization, care-pathway, case, portfolio |
-| Fluvio: live sink + consumer | all 10 services (sink), link-graph (consumer); fluvio deps in 5 older crates are dormant |
-| Envelope `data` field + `Linked`/`Unlinked` kinds | only case has it; person's link events deferred because its envelope can't carry §4.2 data |
-| Worker `same_identity` write-side | worker service (person side landed) |
-| Key-rotation refresh, policy hot-reload, enforcement e2e | **case only** — the other services still boot-once / boot-only-policy / no e2e. (CI `--include-ignored`: closed — all 17 service crates run their DB-gated suite as of 2026-08-01.) |
-| Bulk I/O steps 2/4/5 | CSV+review-routing, Parquet, other entities, S3 store |
-| Pagination | loco services use hard caps (LIST_CAP=100, SEARCH_CAP=50) |
-| Front-end merge/link/bulk/review UIs | org/case/portfolio front-ends lack merge; no UI anywhere for links, bulk jobs, or the review queue |
-| Stale shared docs | `agents/share/architecture.md` (describes the old person layout), `overview.md` capability list (claims Tantivy/privacy/gRPC family-wide) |
-| No tutorials, no sample data, no family compose | repo-wide |
+| Privacy module (masking/GDPR/consent) | **case only** (organization, care-pathway, portfolio all landed since 2026-07-11) |
+| FHIR R5 surface | course (non-standard `Basic` alias only, by design), portfolio (no resource maps) |
+| Record-level ABAC + masking obligations | place, thing, event, course (person/worker/organization/care-pathway/case/portfolio have it) |
+| Fluvio: a **real broker round-trip**, anywhere | all 10 services + link-graph — the sink code and consumer exist, but every verification is feature-compiled + mocked, never a live broker |
+| Cross-service `same_identity` **matcher-suggestion** (LNK-4, design §5.2) | mid-implementation as of 2026-08-04 — T-29 (comparator) / T-30 (blocking) / T-31 (periodic job) landed same-session; T-32 (review/promotion in person) / T-33 (governance+scale) remain |
+| Bulk I/O: S3 store, Parquet, and the other 7 entities | organization/case are JSONL+CSV+local-fs only; person alone has the full set |
+| `case`/`project-portfolio-management`/`link-graph`/`authentication-verifier` CHANGELOG releases | version already used by a prior dated release + substantial unbumped work since — needs a version-bump decision before H-5 can finish for these four |
+| crates.io publish for `entity-ref`/`authentication-verifier` | explicitly deferred by operator choice, not blocked technically |
+| Repo-wide documentation harmonization (Phase 6) | in progress 2026-08-04 — root + person/worker/place/thing done; matchers, front-ends, library crates, link-graph, and the five consumer apps queued |
+
+For the full, current, task-level picture, `tasks.md` is authoritative
+— this file's Themes/Sequencing below describe the *shape* of the
+program as originally conceived, not what remains today.
 
 ## 2. Themes
 
