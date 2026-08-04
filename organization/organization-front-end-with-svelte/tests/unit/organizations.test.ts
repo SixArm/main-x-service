@@ -88,12 +88,31 @@ describe("OrganizationRepository", () => {
     expect(calls[0]?.init.body).toBe("{}");
   });
 
-  it("listReviewQueue() GETs the stored queue", async () => {
+  it("listReviewQueue() GETs the stored queue with no query string by default", async () => {
     const { repo, calls } = spyClient();
     await repo.listReviewQueue();
     expect(calls[0]?.init.method).toBe("GET");
     expect(calls[0]?.url).toBe(
       "http://svc.test/api/organizations/review-queue",
+    );
+  });
+
+  it("listReviewQueue() sends status and limit as query params", async () => {
+    const { repo, calls } = spyClient();
+    await repo.listReviewQueue({ status: "confirmed", limit: 25 });
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/organizations/review-queue?status=confirmed&limit=25",
+    );
+  });
+
+  // Pins: "all" is the *absence* of the status param, not a literal
+  // value — the endpoint has no "all" token and answers 422 for one it
+  // does not recognise.
+  it("listReviewQueue() omits status entirely when undefined", async () => {
+    const { repo, calls } = spyClient();
+    await repo.listReviewQueue({ limit: 100 });
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/organizations/review-queue?limit=100",
     );
   });
 
@@ -142,6 +161,20 @@ describe("OrganizationRepository", () => {
     expect(calls[0]?.init.method).toBe("GET");
     expect(calls[0]?.url).toBe(
       "http://svc.test/api/organizations/merges/recent",
+    );
+  });
+
+  // Pins the `/review` comparison panel's live-breakdown path: the stored
+  // review-queue item never carries `score_breakdown` on the wire, so the
+  // panel calls `/match` against the loaded pair instead.
+  it("matchAgainst() POSTs the query and candidates to the match endpoint", async () => {
+    const { repo, calls } = spyClient();
+    const dup: Organization = { name: "Acme Inc" } as Organization;
+    await repo.matchAgainst(org, [dup]);
+    expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.url).toBe("http://svc.test/api/organizations/match");
+    expect(calls[0]?.init.body).toBe(
+      JSON.stringify({ query: org, candidates: [dup] }),
     );
   });
 });

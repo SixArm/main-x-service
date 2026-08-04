@@ -5,6 +5,7 @@ import { ApiClient } from "./client";
 import type { Page, PageRequest } from "./client";
 import type {
   BatchDeduplicationResponse,
+  MatchRankResult,
   MergeRecordRow,
   MergeRequest,
   MergeResponse,
@@ -13,8 +14,24 @@ import type {
   ReviewDecision,
   ReviewQueueItem,
   ReviewQueueListResponse,
+  ReviewStatus,
   ScoredRef,
 } from "./types";
+
+/** Parameters for {@link OrganizationRepository.listReviewQueue}. */
+export interface ReviewQueueOptions {
+  /**
+   * Restrict to one disposition. Omit for every status — the endpoint
+   * has no "all" token, so "all" is the *absence* of the parameter (an
+   * unrecognised token, including the literal string `"all"`, is a `422`).
+   */
+  status?: ReviewStatus;
+  /**
+   * Page size. Defaults to 100 server-side and is capped at 500 there.
+   * There is no `offset`, so this is the only pagination control.
+   */
+  limit?: number;
+}
 
 /**
  * Resource-bound wrapper over {@link ApiClient}: one method per
@@ -118,13 +135,51 @@ export class OrganizationRepository {
   }
 
   /**
-   * `GET /api/organizations/review-queue` — the stored review queue,
-   * newest first.
+   * `GET /api/organizations/review-queue[?status=&limit=]` — the stored
+   * review queue, newest first.
+   *
+   * @param options Optional server-side `status` filter and page size.
+   *   Both are omitted from the query string when absent, so a bare call
+   *   keeps the endpoint's own defaults (all statuses, `limit` 100).
+   * @throws {@link ApiError} 422 for a status token the service does not
+   *   recognise.
    */
-  listReviewQueue(): Promise<ReviewQueueItem[]> {
+  listReviewQueue(
+    options: ReviewQueueOptions = {},
+  ): Promise<ReviewQueueItem[]> {
+    const query = new URLSearchParams();
+    if (options.status !== undefined) query.set("status", options.status);
+    if (options.limit !== undefined) query.set("limit", String(options.limit));
+    const suffix = query.toString();
+    const path = suffix
+      ? `/api/organizations/review-queue?${suffix}`
+      : "/api/organizations/review-queue";
     return this.http
-      .get<ReviewQueueListResponse>("/api/organizations/review-queue")
+      .get<ReviewQueueListResponse>(path)
       .then((response) => response.items);
+  }
+
+  /**
+   * `POST /api/organizations/match` — rank `candidates` against `query`
+   * without persisting anything.
+   *
+   * Used by the `/review` comparison panel to obtain a **live** score
+   * breakdown for a pending pair: the stored review-queue item never
+   * carries `score_breakdown` on the wire (see `$lib/review`'s doc
+   * comment), but this endpoint's `MatchResult.breakdown` does.
+   *
+   * @param query The organization to score against each candidate.
+   * @param candidates The candidate organizations to rank.
+   * @returns One `[candidateIndex, result]` pair per candidate,
+   *   descending by score.
+   */
+  matchAgainst(
+    query: Organization,
+    candidates: Organization[],
+  ): Promise<MatchRankResult[]> {
+    return this.http.post<MatchRankResult[]>("/api/organizations/match", {
+      body: { query, candidates },
+    });
   }
 
   /**

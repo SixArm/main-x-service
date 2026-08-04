@@ -1116,10 +1116,11 @@
   main page component) before committing, not just trusted on the
   implementing agent's report.
 
-- [~] **FE-4 (M)** Duplicate review-queue screen (services exposing the
+- [x] **FE-4 (M)** Duplicate review-queue screen (services exposing the
   review API; start with person). **Person done 2026-08-04**; the other
-  services with a `review_queue` (worker, place, thing, organization) are
-  the remaining fan-out. The person board existed already but was
+  services with a `review_queue` (worker, place, thing, organization) —
+  **all four now done, 2026-08-04 — FE-4 complete.** The person board
+  existed already but was
   unspecified and untested — see that project's `spec/13-tasks.md` T-25
   for what the completion added: `?status=`/`?limit=` filters (there is
   no `offset`, and "all" is the *absence* of `status` because the
@@ -1200,6 +1201,39 @@
   (15 tests); `pnpm check` (0/0), `pnpm test` (6 files/55 tests),
   `pnpm build`, and `pnpm exec playwright test` (7/7, including two new
   review/merge-prefill assertions) all green.
+
+  **Organization done 2026-08-04** (copy-adapted from person's T-25;
+  see `organization-front-end-with-svelte/spec/index.md` §13). The
+  fourth and last crate in the fan-out. `?status=`/`?limit=` filters
+  confirmed against `organization-service-with-loco`'s own
+  `controllers/organizations.rs::get_review_queue` (an unrecognised
+  status token, including the literal `"all"`, is `422`, matching the
+  family shape but with this crate's own `unprocessable_entity` error
+  code rather than person's `INVALID_STATUS`); a keyboard-reachable
+  queue table + `Compare`/`Confirm`/`Reject` buttons alongside the
+  existing drag-to-decide board; `provenance` surfaced on both (this
+  service's `review_queue` **does** carry the column, unlike thing/
+  worker/place). One deviation from the reference, forced by this
+  service's own wire shape: `GET /review-queue`'s `ReviewQueueItem`
+  never serializes `score_breakdown` at all (the column exists on the
+  stored row; `review_row_to_item` omits it from the response struct),
+  so — rather than render a permanently-empty breakdown, matching the
+  documented-gap pattern thing/place used — the comparison panel calls
+  this service's already-shipped `POST /api/organizations/match`
+  against the loaded pair for a **live** breakdown from the real
+  matcher (`MATCH_COMPONENTS`: name 0.35, address 0.20, url 0.15,
+  jurisdiction 0.10, founding-date 0.10, keywords 0.10, per
+  `organization-matcher-rust-crate/src/config.rs`). Also fixed in
+  passing: the front-end's own `ReviewQueueItem` TypeScript type was
+  missing `provenance` outright, a pre-existing gap from when BLK-5
+  added the column server-side without a matching front-end update.
+  `/merge?main=…&duplicate=…` deep-link prefill added via `$app/state`
+  (the merge page had no query-param seeding before this). New
+  `src/lib/review.ts` + `tests/unit/review.test.ts` (15 tests);
+  `pnpm check` (0/0), `pnpm test` (7 files/72 tests, was 54),
+  `pnpm build`, and `pnpm test:e2e` (10/10, was 7 — three new: the
+  keyboard table, the live-breakdown compare panel, the merge
+  query-string prefill) all green.
 
 > Note: the **test** database side of this is already done — every
 > service crate carries a `compose.test.yaml` driven by

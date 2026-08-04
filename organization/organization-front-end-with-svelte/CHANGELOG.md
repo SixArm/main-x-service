@@ -8,6 +8,46 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — `/review` upgraded to the person T-25 standard (2026-08-04, FE-4)
+
+- `?status=`/`?limit=` filters on `GET /api/organizations/review-queue`
+  (there is no `offset`; `"all"` is the *absence* of `status` — a
+  literal `"all"` gets the service's own `422`, confirmed against
+  `controllers/organizations.rs::get_review_queue` rather than assumed).
+- A keyboard-reachable `<table>` of the same queue items, each with a
+  real `Compare` button, alongside the existing SVAR Kanban
+  drag-to-decide board (mouse-only drag is not a keyboard path).
+  `provenance` is now surfaced on both the Kanban card description and
+  the table.
+- An inline (non-modal) side-by-side comparison panel: two parallel
+  `GET /api/organizations/{pid}` calls, plus a **live** per-component
+  score breakdown from `POST /api/organizations/match` — this crate's
+  stored `ReviewQueueItem` never carries `score_breakdown` on the wire
+  (the DB column exists; the controller's response struct omits it), so
+  the panel recomputes one against the loaded pair rather than reading a
+  value that never arrives. Real `Confirm`/`Reject` buttons, disabled
+  once an item is no longer `pending` (mirrors the service's
+  first-writer-wins guard).
+- Confirming does **not** merge (the decision endpoint is a pure status
+  change). A confirmed item now shows a deep link to `/merge` with both
+  ids pre-filled, in either survivor order — and `/merge` itself gained
+  the `?main=&duplicate=` prefill (`$app/state`'s `page.url`) that link
+  relies on.
+- New `src/lib/review.ts`: pure helpers (`REVIEW_STATUSES`,
+  `REVIEW_LIMITS`, `isReviewStatus`, `canDecide`, `MATCH_COMPONENTS` —
+  this matcher's six weighted components summing to 1.00 —
+  `breakdownRows`, `mergeHref`).
+- `ReviewQueueItem` gained the `provenance` field it was missing in
+  TypeScript (the server has carried it since BLK-5); `OrganizationRepository`
+  gained `matchAgainst()` and a `listReviewQueue(options)` overload;
+  `types.ts` gained `MatchBreakdown`/`MatchResult`/`MatchRankResult`.
+- 57 new i18n keys (`review.*`) across all 13 locales, coverage-tested.
+- Tests: `tests/unit/review.test.ts` (15, new), extended
+  `tests/unit/organizations.test.ts` (`listReviewQueue` query-string
+  pins + `matchAgainst`), three new Playwright cases (the keyboard
+  table, the live-breakdown comparison, the merge query-string
+  prefill). Suite is now 72 vitest + 10 Playwright.
+
 ### Added — `/merge` record-merge UI (2026-08-03, FE-1)
 
 - `/merge` — fold a duplicate into a surviving main record: main pid +

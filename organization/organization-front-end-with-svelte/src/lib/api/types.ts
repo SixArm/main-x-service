@@ -168,6 +168,43 @@ export interface MergeRecordRow {
   transferred?: unknown;
 }
 
+/**
+ * Per-component scores from `organization_matcher::MatchBreakdown`.
+ * `undefined`/`null` means the component was skipped because one or both
+ * records lacked the data, so it did not contribute to the weighted sum
+ * (never rendered as zero — see `$lib/review`'s `breakdownRows`).
+ */
+export interface MatchBreakdown {
+  name_score?: number | null;
+  address_score?: number | null;
+  url_score?: number | null;
+  jurisdiction_score?: number | null;
+  founding_date_score?: number | null;
+  keywords_score?: number | null;
+  /** Whether a deterministic short-circuit (LEI/DUNS/…) fired. */
+  deterministic_match: boolean;
+}
+
+/**
+ * The outcome of matching two organizations, from `POST
+ * /api/organizations/match`. `confidence` is the matcher's `Confidence`
+ * enum, serialized verbatim (`"High" | "Medium" | "Low"`).
+ */
+export interface MatchResult {
+  score: number;
+  is_match: boolean;
+  confidence: "High" | "Medium" | "Low";
+  breakdown: MatchBreakdown;
+}
+
+/**
+ * One `[candidateIndex, result]` pair from `POST /api/organizations/match`
+ * — the service ranks `candidates` against `query` and returns a Rust
+ * `(usize, MatchResult)` tuple per candidate, which serializes as a
+ * 2-element JSON array.
+ */
+export type MatchRankResult = [number, MatchResult];
+
 /// Review disposition wire tokens (family-wide lowercase form).
 export type ReviewStatus = "pending" | "confirmed" | "rejected" | "automerged";
 
@@ -190,6 +227,13 @@ export interface ReviewQueueItem {
   detection_method: string;
   /** Current review disposition. */
   status: ReviewStatus;
+  /**
+   * How this pair was first surfaced (`operator` / `import` /
+   * `matcher_suggested` — the cross-service-linking provenance
+   * vocabulary; BLK-5). Free text server-side, so an unrecognised value
+   * is real data, not a bug.
+   */
+  provenance: string;
   /** Operator who decided the item, if decided. */
   reviewed_by?: string | null;
   /** When the pair was first queued. */

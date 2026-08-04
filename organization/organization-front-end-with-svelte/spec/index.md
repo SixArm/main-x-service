@@ -200,16 +200,49 @@ controls when they land.
   chosen locale. Verified: svelte-check 0 errors, vitest 53, `pnpm build`
   clean; 27 new keys × 13 locales.
 
+- [x] **FE-4 — `/review` upgraded to the person T-25 standard
+  (2026-08-04).** Brought the 2026-07-19 Kanban-only board (above) to
+  parity with `person-front-end-with-svelte`'s `/review` completion
+  (root `tasks.md` FE-4, person-service's own `spec/13-tasks.md` T-25):
+  `?status=`/`?limit=` filters (no `offset`; `"all"` is the *absence* of
+  `status`, verified against this crate's own
+  `controllers/organizations.rs::get_review_queue` — a literal `"all"`
+  is `422`, not a request that silently means "every status"), a
+  keyboard-reachable `<table>` with real `Compare`/`Confirm`/`Reject`
+  buttons alongside the existing drag-to-decide board, `provenance` on
+  both surfaces, and an inline (non-modal) side-by-side comparison panel.
+  One deviation from the person pattern, forced by this service's own
+  wire shape rather than chosen freely: `GET /review-queue`'s
+  `ReviewQueueItem` never serializes `score_breakdown` (the column
+  exists in `review_queue`; the controller's response struct omits it),
+  so a stored breakdown can never reach the browser. Rather than render
+  a permanently-empty table, the comparison panel calls the already-shipped
+  `POST /api/organizations/match` against the loaded pair for a **live**
+  breakdown — reusing an existing no-persistence endpoint, not adding one.
+  `ReviewQueueItem`'s TypeScript type was also missing `provenance`
+  outright (a pre-existing gap since BLK-5 added the column
+  server-side); fixed. `/merge` gained `?main=&duplicate=` prefill via
+  `$app/state` so `$lib/review`'s `mergeHref` deep-link (shown once an
+  item is `confirmed`) actually lands filled in. New `src/lib/review.ts`
+  (pure; `MATCH_COMPONENTS` mirrors this matcher's six weights —
+  name 0.35 / address 0.20 / url 0.15 / jurisdiction 0.10 /
+  founding-date 0.10 / keywords 0.10 — summing to 1.00). 57 new i18n
+  keys × 13 locales. Verified: svelte-check 0/0, vitest 72 (was 54;
+  +15 `review.test.ts`, +3 repository pins), `pnpm build` clean,
+  Playwright 10/10 (was 7; +3: keyboard table, live-breakdown compare,
+  merge query-string prefill).
+
 ## 14. Implementation status
 
 Done: the eight routes in §5 (list, `/organizations` grid, create,
 detail, edit, `/review` duplicate board, `/merge` record merge, plus
 `/signin`/`/verify`); lean client (+put/delete); repository covering
-CRUD, check-duplicates, batch deduplicate, the stored review queue, and
-merge + merge history; form; the BFF (§6.7/§6.8 — session cookie,
-`/api/proxy`, magic-link sign-in), SPA config. `pnpm run check` clean;
-production build succeeds; 54 vitest + 7 Playwright, all 13 locales at
-full key coverage.
+CRUD, check-duplicates, batch deduplicate, the stored review queue
+(status/limit filters + live match-based score breakdown), and merge +
+merge history (with query-string pre-fill); form; the BFF
+(§6.7/§6.8 — session cookie, `/api/proxy`, magic-link sign-in), SPA
+config. `pnpm run check` clean; production build succeeds; 72 vitest +
+10 Playwright, all 13 locales at full key coverage.
 
 ## 15. Roadmap
 

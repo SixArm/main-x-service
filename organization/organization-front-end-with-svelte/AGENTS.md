@@ -35,9 +35,10 @@ src/
 │   ├── config.ts                 API_BASE_URL → same-origin BFF proxy (/api/proxy)
 │   ├── api/
 │   │   ├── client.ts             lean fetch wrapper (+ ApiError); no browser-held bearer — the BFF proxy injects the PASETO server-side
-│   │   ├── types.ts              Organization + OrgIdentifier + PostalAddress + OrgRef + ScoredRef; IdentifierScheme + DETERMINISTIC_SCHEMES + ALL_SCHEMES
+│   │   ├── types.ts              Organization + OrgIdentifier + PostalAddress + OrgRef + ScoredRef; IdentifierScheme + DETERMINISTIC_SCHEMES + ALL_SCHEMES; ReviewQueueItem (incl. provenance) + MatchBreakdown/MatchResult/MatchRankResult
 │   │   ├── build.ts              pure form->payload core: buildOrganization + splitList/blankToUndef + excludeSelf
-│   │   └── organizations.ts      OrganizationRepository (CRUD + checkDuplicates)
+│   │   └── organizations.ts      OrganizationRepository (CRUD + checkDuplicates + review queue + matchAgainst + merge)
+│   ├── review.ts                 pure `/review` helpers: REVIEW_STATUSES/REVIEW_LIMITS, isReviewStatus, canDecide, MATCH_COMPONENTS, breakdownRows, mergeHref
 │   ├── server/                   BFF-only (never bundled to the browser): auth.ts (magic-link + session→PASETO exchange), session.ts (cookie), config.ts (ORGANIZATION_API_URL / AUTH_API_URL)
 │   └── components/OrganizationForm.svelte
 ├── routes/
@@ -48,10 +49,11 @@ src/
 │   ├── new/+page.svelte          create
 │   ├── [pid]/+page.svelte        detail + delete + check-duplicates
 │   ├── [pid]/edit/+page.svelte   edit
-│   └── merge/+page.svelte        merge a duplicate into a survivor + recent merge history
+│   ├── review/+page.svelte       Kanban board + keyboard table + inline compare panel (live score breakdown via `/match`) + confirm/reject
+│   └── merge/+page.svelte        merge a duplicate into a survivor (`?main=&duplicate=` pre-fill) + recent merge history
 tests/
-├── unit/                         vitest, 54 tests (client, build, organizations, i18n, layout, merge-validation)
-└── e2e/smoke.spec.ts             Playwright, 7 tests (six routes + nav, API stubbed)
+├── unit/                         vitest, 72 tests (client, build, organizations, i18n, layout, merge-validation, review)
+└── e2e/smoke.spec.ts             Playwright, 10 tests (routes + nav + review keyboard table/compare/merge-prefill, API stubbed)
 ```
 
 ## Session / SSO
@@ -83,8 +85,9 @@ BFF: `src/lib/server/` exchanges the session for the PASETO and the
 | Delete | `DELETE /api/organizations/{pid}` |
 | Check duplicates | `POST /api/organizations/check-duplicates` |
 | Batch scan (`/review`) | `POST /api/organizations/deduplicate` |
-| Review queue (`/review`) | `GET /api/organizations/review-queue` |
+| Review queue (`/review`) | `GET /api/organizations/review-queue[?status=&limit=]` |
 | Review decision (`/review`) | `POST /api/organizations/review-queue/{id}/decision` |
+| Score breakdown, live (`/review` compare panel) | `POST /api/organizations/match` — the stored review item never carries `score_breakdown` on the wire, so the panel recomputes it against the loaded pair |
 | Merge (`/merge`) | `POST /api/organizations/merge` |
 | Merge history (`/merge`) | `GET /api/organizations/merges/recent` |
 

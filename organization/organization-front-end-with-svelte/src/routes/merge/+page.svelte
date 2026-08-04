@@ -1,6 +1,12 @@
 <!--
   Merge route (`/merge`) — fold one organization into another.
 
+  Both pids may arrive pre-filled as `?main=…&duplicate=…` — the review
+  board (`/review`) deep-links a confirmed pair here via `$lib/review`'s
+  `mergeHref`, in either survivor order, since a review item names an
+  unordered pair and the service records no link between a confirmed
+  item and a merge. Both fields stay fully editable afterwards.
+
   Collects a surviving main pid and a duplicate pid (plus an optional
   reason), optionally previews both records side by side, then merges
   after an explicit confirmation. The service's response carries the two
@@ -21,6 +27,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
+    import { page } from "$app/state";
     import { OrganizationRepository } from "$lib/api/organizations";
     import { ApiError } from "$lib/api/client";
     import { validateMerge } from "$lib/components/merge-validation";
@@ -33,8 +40,12 @@
 
     const repo = OrganizationRepository.withFetch();
 
-    let mainPid = $state("");
-    let duplicatePid = $state("");
+    // Seeded once from `?main=` / `?duplicate=` so the review board can
+    // deep-link a confirmed pair straight into this form. Both stay fully
+    // editable afterwards — a review item names an unordered pair, so which
+    // record survives is the operator's call, not the link's.
+    let mainPid = $state(page.url.searchParams.get("main") ?? "");
+    let duplicatePid = $state(page.url.searchParams.get("duplicate") ?? "");
     let reason = $state("");
     let preview = $state<{ main: Organization | null; duplicate: Organization | null }>({
         main: null,

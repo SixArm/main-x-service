@@ -793,6 +793,45 @@ organization is not a data subject.
   `tests/seed_examples_db.rs` (first run seeds all 20, second run is a
   no-op). Details in §11.
 
+- [x] **FE-4 — `/review` upgraded to the person T-25 standard**
+  *(2026-08-04)*. The front-end's board was unspecified and untested,
+  same starting state as person's before its own T-25 completion (root
+  `tasks.md` FE-4). Brought to parity: `?status=`/`?limit=` filters on
+  `GET /review-queue` (no `offset`; "all" is the *absence* of `status`,
+  confirmed against this crate's own handler — an unrecognised token,
+  including the literal `"all"`, is `422`, not the person-service's
+  `INVALID_STATUS` code but the same shape); a keyboard-reachable queue
+  `<table>` with real `Compare`/`Confirm`/`Reject` buttons alongside the
+  existing SVAR Kanban drag-to-decide; an inline (non-modal) side-by-side
+  comparison panel over two parallel `GET /api/organizations/{pid}`
+  calls; `provenance` surfaced on both the Kanban card description and
+  the table. One deliberate deviation from the person pattern, forced by
+  this crate's own wire shape: `GET /review-queue`'s `ReviewQueueItem`
+  never serializes `score_breakdown` (the column exists in
+  `review_queue` — `models/review_queue.rs` — but
+  `controllers/organizations.rs::review_row_to_item` omits the field, so
+  the stored scan never reaches the browser). Rather than a
+  permanently-empty breakdown table, the front-end's comparison panel
+  calls the existing `POST /api/organizations/match` endpoint against
+  the loaded pair for a **live** `MatchBreakdown` — a legitimate reuse of
+  an already-shipped, no-persistence endpoint, not a new one. The
+  front-end's `ReviewQueueItem` TypeScript type was also missing
+  `provenance` entirely (a pre-existing gap from when BLK-5 added the
+  column server-side); added. `/merge` now reads `?main=&duplicate=`
+  via `$app/state`'s `page.url.searchParams` to pre-fill both id
+  fields, so `$lib/review`'s `mergeHref` deep-link (shown once an item
+  is `confirmed`, in either survivor order) actually lands filled in.
+  New `src/lib/review.ts` (pure: `REVIEW_STATUSES`/`REVIEW_LIMITS`,
+  `isReviewStatus`, `canDecide`, `MATCH_COMPONENTS` — this matcher's six
+  weighted components, name/address/url/jurisdiction/founding-date/
+  keywords, summing to 1.00 per
+  `organization-matcher-rust-crate/src/config.rs`'s
+  `MatchConfig::default` — `breakdownRows`, `mergeHref`), 15 new unit
+  tests. 57 new i18n keys × 13 locales (parity-tested). `pnpm check`
+  (0/0), `pnpm test` (72, up from 54), `pnpm build`, and
+  `pnpm test:e2e` (10/10, up from 7 — three new: the keyboard table, the
+  live-breakdown comparison, the merge query-string prefill) all green.
+
 ## 14. Implementation status
 
 Done: loco boot; organizations table + migration; CRUD (blank name →
