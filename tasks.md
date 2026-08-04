@@ -1388,8 +1388,58 @@
   by the research are documented as follow-up work rather than
   silently designed around.
 
-- [ ] **TUT-1 (S)** `tutorials/01-getting-started.md` — run one service +
+- [x] **TUT-1 (S)** `tutorials/01-getting-started.md` — run one service +
   front-end (uses DEP-1a). Every command copy-pasteable and verified.
+
+  **Done 2026-08-04.** `tutorials/01-getting-started.md`: builds +
+  starts `examples/compose/single-service.yml` (case-service + its own
+  Postgres) as two separate commands per the documented `up -d --build`
+  hang, verifies `/_health`, creates a case via the exact body from
+  `examples/api/case.http`, reads it back by pid, and reads the
+  paginated list with its `X-Total-Count`/`X-Limit`/`X-Offset` headers
+  — then runs `case-front-end-with-svelte`'s dev server against the
+  same backend and confirms both the SPA shell and its own BFF proxy
+  (`/api/proxy/api/cases`) serve the just-created case. Ends with a
+  tear-down section (`down -v`) and names TUT-2..TUT-6 as not-yet-written.
+
+  **Every command block actually run, twice, end to end**: cleared a
+  `podman machine` disk-full condition first (unrelated leftover
+  containers/images from other work had filled the VM's 100 GB disk to
+  98% — `podman container prune -f` + `podman image prune -a -f` freed
+  it back to 53 GB free; noted nowhere in the tutorial since it isn't
+  part of the documented flow, just a one-time host fix), then ran
+  `build` → `up -d` → health/create/get/list curls → `pnpm install` →
+  `pnpm check` (0 errors/0 warnings) → `pnpm dev` → root-page and
+  BFF-proxy curls → `down -v`, confirmed zero `mxi-example-*`/
+  `compose-case-*` containers and zero stray `vite dev` processes
+  remained, then repeated the whole sequence a second time from a fresh
+  `up -d` (new pid, same shape) to make sure nothing in the first pass
+  was a fluke. All JSON shown in the tutorial is real captured output,
+  not invented.
+
+  **Corrected against the task brief**: the health path is `/_health`
+  (confirmed from the compose file's own healthcheck), not guessed.
+
+  **Real defect found and worked around, not fixed**: the front-end's
+  own `.env.example` names stale variables
+  (`PUBLIC_API_BASE_URL`/`VITE_AUTH_FRONTEND_URL`) that
+  `src/lib/server/config.ts` does not read — the code (and the
+  front-end's own `README.md` table) actually reads `CASE_API_URL`/
+  `AUTH_API_URL`. Using `.env.example` as shipped silently leaves the
+  BFF proxy pointed at its `http://localhost:5150` fallback, which is
+  not where this tutorial's compose stack publishes case-service
+  (`8089`). The tutorial calls this out explicitly and uses the correct
+  variable names; fixing `.env.example` itself is left alone as outside
+  this task's scope (only `tutorials/` + `tasks.md` staged).
+
+  **Not covered on purpose** (out of scope for TUT-1, called out in its
+  own "what's next"): the `seed_examples` loco task (EX-4) needs a host
+  route to the service's Postgres to run `cargo loco task
+  seed_examples`, but `single-service.yml` deliberately publishes no
+  Postgres port — so TUT-1 seeds its one record via a single `curl`
+  POST instead, and leaves `seed_examples` for TUT-2/TUT-4 once they
+  exist; authentication/ABAC (TUT-3); and the other nine services
+  (`full-family.yml`, DEP-1b).
 - [ ] **TUT-2 (M)** `tutorials/02-identity-lifecycle.md` — create →
   409-duplicate → check-duplicates → match → merge → audit trail, curl +
   UI.
