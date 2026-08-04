@@ -4502,6 +4502,79 @@ committing (see plan.md §4).
     (sibling crate, out of this task's boundary) or any of the other
     ten front-ends (concurrent sibling audits).
 
+- *`worker/worker-front-end-with-svelte` done 2026-08-04.* The
+  FE-2 cross-service links panel is genuinely well-documented already
+  (`CHANGELOG.md`, `spec/13-tasks.md` T-23) — the real gap was older:
+  the family-wide BFF migration (`f66ff50f`, 2026-06-18) touched this
+  project's docs only as a mechanical `worker-service-rust-crate` →
+  `worker-service-with-loco` rename pass, never a content pass, even
+  though the code (`src/hooks.server.ts`, `src/lib/server/{auth,
+  config,session}.ts`, `/signin`, `/verify`,
+  `src/routes/api/proxy/[...path]/+server.ts`) fully implements the
+  BFF. Found and fixed, verified against the real `src/` tree rather
+  than assumed: (1) **`.env.example` was completely wrong** — it read
+  `PUBLIC_API_BASE_URL=http://localhost:8080` under a `# Person
+  Service` comment (copy-paste leftover), a variable `grep` confirms
+  is read nowhere in `src/`; the BFF actually reads `WORKER_API_URL`
+  and `AUTH_API_URL` (`src/lib/server/config.ts`, already correctly
+  documented in `README.md`, which a prior pass *had* updated — the
+  drift was `.env.example`/`index.md` lagging a README fix, not a
+  README bug). (2) **`AGENTS.md`** never mentioned the BFF at all and
+  its "What does NOT live here" list still said "Authentication. Out
+  of scope until the service ships auth" — false since 2026-06-18;
+  added a BFF section (session cookie, proxy, PASETO exchange, the
+  known CSRF gap) and two `What lives where` rows. (3) **`spec/13-tasks.md`
+  T-22** was still a single unchecked box for "BFF + httpOnly cookie +
+  CSRF" though the BFF/cookie part has been live for seven weeks and
+  only CSRF is missing (verified: zero CSRF hits by grep) — split into
+  T-22a (done, dated) / T-22b (CSRF, open). (4) **`spec/08-architecture.md`**
+  still drew the pre-BFF diagram (browser calling the Worker Service
+  directly); redrawn to show the SvelteKit server as the BFF between
+  the browser and both the Worker Service and the authentication-service.
+  (5) **`spec/09-api-consumption.md`** was missing the review-queue
+  endpoints (`GET /api/workers/review-queue`,
+  `POST /api/workers/review-queue/{id}/decision`, shipped 2026-07-19)
+  and the T-23 links endpoints entirely, plus the auth-service calls
+  the BFF makes outside `WorkerRepository`; added all. (6)
+  **`spec/14-implementation-status.md`** still had 2026-06-02-era
+  placeholder rows (`pnpm install`/`pnpm test` "❌ manual step
+  pending") and was missing every 2026-07-19/08-03 feature row
+  (review board, expiry calendar, links panel, BFF, i18n); rewrote
+  against a live `pnpm install && pnpm check && pnpm test && pnpm build`
+  run (0 errors/0 warnings, 37/37 unit tests across 5 files, 7 e2e
+  specs — counts verified by grep, not copied from a stale claim).
+  (7) **`spec/15-roadmap.md`** v0.3 read "once Worker Service ships
+  auth" (auth is the central authentication-service, not gated on
+  Worker Service) and v0.4 listed "Worker" among its own siblings to
+  scaffold; both marked done with the real landing story. (8)
+  **`index.md`** was the most stale file — still 2026-06-02 vintage:
+  route map missing `/review`/`/expiry`/`/signin`/`/verify`, and an
+  Environment section naming the nonexistent `PUBLIC_API_BASE_URL`;
+  rewrote the route map, added an Architecture pointer + two worked
+  flows (cross-service links, BFF sign-in), and fixed Environment to
+  match `.env.example`. Also fixed two smaller README.md drifts found
+  along the way: the SVAR package list still named the removed
+  `wx-svelte-grid`/`wx-svelte-core` (migrated to `@svar-ui/svelte-grid`
+  2026-07-19 per `CHANGELOG.md`, verified against `package.json`), the
+  Worker Service prerequisite default port said `8080` against the
+  service's real `config/development.yaml` port `5150` (and the
+  Configuration table two lines below already said 5150 — an
+  internal README self-contradiction), and a "45 shared themes...
+  wired live" claim where only 41 of the 45 theme stylesheets under
+  `static/assets/themes/` are actually in the `ThemePicker`'s list
+  (verified by diffing the file list against the `THEMES` array —
+  named the four unwired ones rather than just changing the number).
+  i18n verified live: `tests/unit/i18n.test.ts` passes, all 13 locales
+  carry the 32 `links.*` keys with real (non-English) translations
+  (spot-checked `links.heading` across all 13). Left the CHANGELOG's
+  historical 0.1.0 entry (`PUBLIC_API_BASE_URL`) unedited per the
+  established DOC-2 precedent of not rewriting history, and instead
+  added a new dated `[Unreleased]` entry retroactively logging the
+  2026-06-18 BFF landing, which had never been logged at all. Did not
+  touch `worker/worker-service-with-loco` (sibling crate, out of this
+  task's boundary) or any of the other ten front-ends (concurrent
+  sibling audits).
+
 - [ ] **DOC-5 (M)** Library crates' `spec/`, `AGENTS.md`/`CLAUDE.md`,
   `README.md`/`index.md`: `authentication-verifier-rust-crate`,
   `integrity-mac-rust-crate`, `link/entity-ref-rust-crate`. Smaller

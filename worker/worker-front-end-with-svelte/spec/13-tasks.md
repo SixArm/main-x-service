@@ -31,5 +31,17 @@
 - [ ] T-19: Masked-view toggle on detail page.
 - [ ] T-20: GDPR-export download button.
 - [ ] T-21: Validate the SVAR licensing fit (free GPL-3.0 vs Pro) — see §16 OQ-1.
-- [ ] T-22: Auth — adopt BFF + httpOnly cookie + CSRF; the browser holds only `__Host-mxi_session`, the SvelteKit server attaches a short-lived PASETO server-side; no `mxi_access_token`/`localStorage` bearer, no fragment handoff (per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
+- [x] T-22a: Auth — adopt the BFF + httpOnly-cookie shape: `/signin` +
+  `/verify` per-app magic-link pages, `__Host-mxi_session` httpOnly
+  cookie (`src/lib/server/session.ts`, `src/hooks.server.ts`), and the
+  same-origin `/api/proxy` reverse proxy that exchanges the session for
+  a short-lived PASETO server-side (`src/lib/server/auth.ts`) before
+  calling the Worker Service. No `mxi_access_token`/`localStorage`
+  bearer, no fragment handoff (per
+  [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
+  Landed 2026-06-18 (`f66ff50f`); see `CHANGELOG.md`.
+- [ ] T-22b: CSRF protection on mutating browser→BFF calls
+  (`authentication-sessions.md` §4 — synchroniser token echoed in an
+  `X-CSRF-Token` header) is not yet implemented. Every `POST`/`PUT`/
+  `DELETE` under `/api/proxy` today relies on `SameSite=Lax` alone.
 

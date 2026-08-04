@@ -9,6 +9,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — BFF: cookie sessions + PASETO proxy (2026-06-18)
+
+- Retroactive entry (DOC-4, 2026-08-04): this landed in `f66ff50f`
+  alongside a family-wide rename pass but was never logged here. The
+  front-end became a **Backend-For-Frontend** per
+  [`authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+  §6: `/signin` + `/verify` per-app magic-link pages
+  (`src/routes/signin/`, `src/routes/verify/+page.server.ts`), an
+  httpOnly `__Host-mxi_session` cookie read by `src/hooks.server.ts`
+  into `event.locals.sessionId`, and a same-origin reverse proxy
+  (`src/routes/api/proxy/[...path]/+server.ts`) that exchanges the
+  session for a short-lived PASETO (`src/lib/server/auth.ts`) and
+  forwards to the Worker Service. The browser never holds a token —
+  `ApiClient`'s base URL points at the proxy (`src/lib/config.ts`),
+  unchanged for page code. Server-only config moved to
+  `src/lib/server/config.ts` (`WORKER_API_URL`, `AUTH_API_URL`),
+  replacing the client-exposed `PUBLIC_API_BASE_URL`. CSRF protection
+  on mutating browser→BFF calls (§4 of the same doc) was not part of
+  this change — see `spec/13-tasks.md` T-22.
+
 ### Added — cross-service links panel (2026-08-03, FE-2)
 
 - The worker detail route gains a **Cross-service links** panel
