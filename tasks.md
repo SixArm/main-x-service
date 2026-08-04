@@ -5672,9 +5672,44 @@ committing (see plan.md §4).
   actually running `test:e2e`, not just checking for the one known
   pattern.
 
-- [ ] **DOC-8 (S)** Once DOC-2..DOC-7 land, a final sweep: re-grep for
+- [x] **DOC-8 (S)** Once DOC-2..DOC-7 land, a final sweep: re-grep for
   the family-wide anti-patterns found along the way (duplicated
   capability tables, stale `.env.example` files, "Backend-only"-style
   absolute claims that stopped being true) across anything DOC-2..7
   didn't individually call out, and confirm no `AGENTS.md`/`CLAUDE.md`/
   `AGENTS/*.md` file crossed 40 KB as a result of this pass's edits.
+
+  **Done 2026-08-04.** First reconciled the one real inconsistency
+  DOC-7 left open: two of its five audits (patient-flow,
+  workforce-planning-management) added `.env.example` as a real gap,
+  a third (contact-relationship-management) judged the family's
+  no-`.env.example` norm sufficient — inconsistent. Added
+  `.env.example` to CRM and content-management-system too (both real
+  vars were already correct in code, just undocumented via a
+  template file), matching every entity front-end's universal
+  convention; `case-folder` correctly keeps neither (no BFF, CSR-only
+  architecture, genuinely different shape).
+
+  Then the sweep itself: **40 KB check** — zero `AGENTS.md`/
+  `CLAUDE.md`/`AGENTS/*.md` files exceed it repo-wide (confirmed via
+  `find` + `stat`, not sampling). **"Backend-only" claim** — the only
+  remaining hit is `tasks.md`'s own DOC-1 entry, which is the
+  historical record of finding and fixing that exact claim in root
+  `index.md`, not a live recurrence. **Stale `.env.example`
+  `PUBLIC_API_BASE_URL`/`VITE_AUTH_FRONTEND_URL` grep** — two hits
+  (person, authentication front-ends) turned out to be false
+  positives on inspection: both intentionally keep the old var name
+  as a **commented-out** line with a clear explanation (person: a
+  genuinely distinct, real var used only by the Playwright
+  live-integration harness, not the app; authentication: a truly
+  dead legacy var from the pre-BFF model, deliberately left visible-
+  but-inert "so a fresh `.env` does not appear to configure something
+  it doesn't") — exemplary handling, not the anti-pattern, confirmed
+  by reading full file content rather than trusting the grep hit
+  alone. **Duplicated capability-table grep** (the exact overclaiming
+  phrasing DOC-1 found in root `index.md`) — zero hits elsewhere in
+  the repo.
+
+  This closes the documentation-harmonization program's DOC-1..DOC-5
+  and DOC-7/DOC-8 scope. **`DOC-6` (`link-graph-service-with-loco`)
+  remains queued** behind LNK-4's T-32/T-33, which have not started.
