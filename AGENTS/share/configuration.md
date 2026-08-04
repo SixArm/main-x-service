@@ -137,7 +137,7 @@ design docs behind this table.
 | case | `CASE_` | |
 | portfolio | `PROJECT_PORTFOLIO_MANAGEMENT_` | **Except** the integrity-MAC family (§9), which uses `PORTFOLIO_INTEGRITY_MAC_*` — a real, standing inconsistency, not a typo to silently correct without checking `src/compliance/mac.rs`'s `KeyConfig::new(..., "PORTFOLIO")` call first. |
 | authentication | *(unprefixed)* `TOKEN_*` / `AUTH_*` | See §8 |
-| link-graph | `LINK_GRAPH_` | Per-entity vars additionally suffix an entity token (§7): `LINK_GRAPH_RECONCILE_URL_<ENTITY>`, `LINK_GRAPH_PROBE_URL_<ENTITY>`. Those tokens are `PERSON`, `WORKER`, `ORGANIZATION`, `CASE`, `PLACE`, `THING`, `EVENT`, `COURSE`, `COURSEINSTANCE` (no underscore), `CARE_PATHWAY` (with one) — the uppercased `EntityType::as_str()` from the shared `entity-ref` crate, not the service's own compose/topic prefix. |
+| link-graph | `LINK_GRAPH_` | Per-entity vars additionally suffix an entity token (§7): `LINK_GRAPH_RECONCILE_URL_<ENTITY>`, `LINK_GRAPH_PROBE_URL_<ENTITY>`, `LINK_GRAPH_SUGGEST_URL_<ENTITY>` (T-31, only `PERSON`/`WORKER` in use). Those tokens are `PERSON`, `WORKER`, `ORGANIZATION`, `CASE`, `PLACE`, `THING`, `EVENT`, `COURSE`, `COURSEINSTANCE` (no underscore), `CARE_PATHWAY` (with one) — the uppercased `EntityType::as_str()` from the shared `entity-ref` crate, not the service's own compose/topic prefix. |
 
 ## 7. Link-graph — consumption, reconciliation, probing
 
@@ -154,6 +154,10 @@ Beyond §4's auth set (`LINK_GRAPH_REQUIRE_AUTH`, `_PASETO_KEYS[_URL]`,
 | `LINK_GRAPH_RECONCILE_TOKEN` | unset ⇒ **any non-loopback `_RECONCILE_URL_*` is refused** (SEC-B7) | Bearer token sent on reconcile pulls — must be a real PASETO the target service's own guard accepts, not an arbitrary shared secret, once that service has `<P>_REQUIRE_AUTH` on |
 | `LINK_GRAPH_PROBE_URL_<ENTITY>` | unset ⇒ that entity is not probed | By-id presence-probe URL template containing a literal `{id}` |
 | `LINK_GRAPH_LAZY_VERIFY` | off | Verify-on-read for endpoints not yet covered by the durable bus |
+| `LINK_GRAPH_SUGGEST_URL_PERSON` | unset ⇒ the suggestion job (T-31) does not start | Person's **collection base** URL (e.g. `http://host/api/persons`) — doubles as both the fetch source (`{url}/search?q=*&…`, the only way to enumerate a service's full collection today — see `spec/13-tasks.md` T-31) and the write target (`{url}/{id}/links`), since person is this job's sole write target |
+| `LINK_GRAPH_SUGGEST_URL_WORKER` | unset ⇒ the suggestion job does not start (even with `_URL_PERSON` set) | Worker's collection base URL (e.g. `http://host/api/workers`), used **only** to fetch — never to write. Not part of OQ-9(c)'s literal pinned set; added because the job cannot produce a candidate without also reading worker's collection, named to match this section's own `_URL_<ENTITY>` convention |
+| `LINK_GRAPH_SUGGEST_TOKEN` | unset ⇒ **any non-loopback `_SUGGEST_URL_*` is refused** (SEC-B7, same rule as `_RECONCILE_TOKEN`) | Bearer sent on every suggestion-job call (both fetches **and** the POST) — a **dedicated** token, not `LINK_GRAPH_RECONCILE_TOKEN`, since this job writes while reconcile only reads |
+| `LINK_GRAPH_SUGGEST_SECS` | `3600`; must be `> 0` | Suggestion pass period — coarser than `_RECONCILE_SECS`'s 300s default because this job does real `O(pairs)` scoring work, not a cheap diff |
 
 [`cross-service-linking.md`](cross-service-linking.md) is the design doc.
 

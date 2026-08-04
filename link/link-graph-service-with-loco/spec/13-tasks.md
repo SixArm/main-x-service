@@ -359,7 +359,7 @@ round done and fully pinned 2026-08-04 — T-29 code may start.**
   pre-existing + 6 new). `cargo fmt --check` / `cargo clippy
   --all-targets -- -D warnings` clean. T-31 (the periodic job) builds on
   this next.)*
-- [ ] T-31: The periodic suggestion job (aggregator-hosted, mirroring the
+- [x] T-31: The periodic suggestion job (aggregator-hosted, mirroring the
   reconcile worker's shape with the verb flipped): pull person + worker,
   block, compare, and POST `matcher_suggested` `same_identity` edges to
   person's `POST /api/persons/{id}/links`. Target URL
@@ -372,6 +372,50 @@ round done and fully pinned 2026-08-04 — T-29 code may start.**
   pattern as `run_periodic`. The aggregator stays read-only to the
   world — it calls person's write API as an authenticated client; it
   never gains a write endpoint of its own (OQ-9(c)). Depends: T-30.
+  *(Landed 2026-08-04: `src/suggest.rs` became `src/suggest/mod.rs`
+  (unchanged T-29/T-30 content) plus the new `src/suggest/job.rs`.
+  `IdentitySource`/`SuggestionSink` traits (mirroring
+  `reconcile::AuthoritativeSource`) keep the fetch→block→compare→post
+  pipeline testable against mocks; `HttpIdentitySource`/
+  `HttpSuggestionSink` are the real `reqwest` implementations. **A
+  gap this task surfaced rather than assumed:** neither service has a
+  plain "list everything" endpoint — only `search?q=…`, and an empty
+  `q` parses to an empty Tantivy `BooleanQuery` (zero hits). The query
+  grammar's `*` token, though, parses to `UserInputLeaf::All` →
+  `AllQuery`, matching every document (confirmed against the vendored
+  `tantivy-query-grammar` 0.22 source) — `q=*` plus the existing
+  `limit`/`offset` pagination is how this job enumerates a full
+  collection today; a real bulk-list endpoint is a
+  person/worker-service change, out of this task's scope. Introduced
+  **`LINK_GRAPH_SUGGEST_URL_WORKER`** beyond OQ-9(c)'s literal text
+  (which names only the person write target) since the job cannot
+  produce a candidate without also reading worker's collection;
+  named to match the established `LINK_GRAPH_RECONCILE_URL_<ENTITY>`
+  convention. `reconcile::source_auth_ok` was widened to `pub(crate)`
+  and reused verbatim (not reimplemented) for SEC-B7 on all three
+  URLs. Person/worker → `IdentityProbe`: `name.given` space-joined
+  (mirroring both services' own Tantivy indexers); an identifier's
+  scheme prefers the FHIR `system` URI (the cross-service-stable
+  field, per person's own `matching::adapter::route_identifier`),
+  falling back to `identifier_type` only when `system` is blank;
+  gender tokens map one-for-one, `"unknown"` → the real `Unknown`
+  variant, anything unrecognised → `None`. Wired into
+  `App::after_routes`, spawned only when `sources_from_env()`
+  resolves; needs no database handle (pure HTTP client traffic).
+  `LINK_GRAPH_SUGGEST_MAX_CANDIDATES`/`_MAX_EDGES_PER_RUN`, per-POST
+  audit, and the non-auto-promotion governance test are deliberately
+  **not** here — T-33's job; this task applies only its own defensive
+  `MAX_FETCH_OFFSET = 10_000` fetch-pagination cap (mirroring person's
+  SEC-G7 `MAX_SEARCH_OFFSET`). 14 new unit tests (wire-mapping fixtures,
+  every gender token, the SEC-B7 accept/reject matrix, and the mocked
+  end-to-end pipeline). `cargo test --lib`: 85 passed (71 pre-existing
+  + 14 new). `cargo fmt --check` / `cargo clippy --all-targets -- -D
+  warnings` clean. No live HTTP round-trip test was added — mirroring
+  reconcile.rs's own posture of only unit-testing the pure/mocked
+  logic, not the real `reqwest` fetch loop; a live round-trip is left
+  to T-33's governance-test pass, which needs live services anyway to
+  prove non-auto-promotion. T-32 (person's review-queue promotion) and
+  T-33 (governance/scale/audit) build on this next.)*
 - [ ] T-32: Review + promotion, reusing **person's existing
   `review_queue` table/endpoints** (OQ-9(b)) — no new aggregator
   endpoint. Suggestions land as ordinary review-queue rows

@@ -32,6 +32,7 @@ use crate::auth;
 use crate::controllers;
 use crate::models::_entities::{audit_log, consumer_offsets, edges, entity_presence};
 use crate::reconcile;
+use crate::suggest::job as suggest_job;
 
 /// Blanket read-guard middleware (spec §9.4 / T-19). Delegates to the pure
 /// [`auth::enforce`]: with `LINK_GRAPH_REQUIRE_AUTH` off, or on a public
@@ -136,6 +137,15 @@ impl Hooks for App {
             if let Some(source) = reconcile::HttpAuthoritativeSource::from_env_for(entity) {
                 tokio::spawn(reconcile::run_periodic(ctx.db.clone(), source));
             }
+        }
+        // Cross-service `same_identity` suggestion (T-31, design §16
+        // OQ-9(c)/(d)): pull person + worker, block + score, POST
+        // `matcher_suggested` edges to person. A no-op unless
+        // `LINK_GRAPH_SUGGEST_URL_PERSON` (+ `_WORKER`) is configured; needs
+        // no database handle of its own — it is pure HTTP client traffic
+        // between two peers, not a read-model repair.
+        if let Some((persons, workers, sink)) = suggest_job::sources_from_env() {
+            tokio::spawn(suggest_job::run_periodic(persons, workers, sink));
         }
         // Real bus consumption (BUS-2, spec §13 T-6): a no-op unless
         // `LINK_GRAPH_FLUVIO_ENDPOINT` is configured, so lazy verify-on-read

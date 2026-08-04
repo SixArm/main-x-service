@@ -192,8 +192,14 @@ impl HttpAuthoritativeSource {
 /// presence. A **loopback** URL (dev/test) may be token-less; any other host
 /// requires a bearer token, since a remote source's edges are applied to the
 /// graph unverified-by-origin otherwise. Pure, so it is unit-testable.
+///
+/// `pub(crate)` rather than private: `suggest::job` (T-31) reuses this
+/// exact rule for its own `LINK_GRAPH_SUGGEST_URL_*` sources rather than
+/// duplicating the loopback/token logic a second time — one implementation
+/// of a security-critical check is easier to audit than two that are
+/// supposed to agree (`agents/share/security.md` invariant 7).
 #[must_use]
-fn source_auth_ok(url: &str, has_token: bool) -> bool {
+pub(crate) fn source_auth_ok(url: &str, has_token: bool) -> bool {
     has_token || is_loopback_url(url)
 }
 

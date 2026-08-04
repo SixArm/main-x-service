@@ -13,6 +13,95 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > and [event-bus.md](../../agents/share/event-bus.md).
 
 ## [Unreleased]
+### Added — Cross-service suggestion job (LNK-4, spec T-31, 2026-08-04)
+
+- **`src/suggest/job.rs`** (new — `src/suggest.rs` became
+  `src/suggest/mod.rs` plus this sibling, since the T-29/T-30 comparator
+  file was already 1000+ lines on its own): the actual I/O this feature
+  has been building toward — fetches person + worker identity data over
+  HTTP, maps each record to T-29's `IdentityProbe`, runs the pair
+  through T-30's `generate_candidates`, and POSTs every surviving
+  candidate to person's `POST /api/persons/{id}/links` as a
+  `matcher_suggested` `same_identity` edge. Mirrors `src/reconcile.rs`'s
+  shape with the verb flipped (`GET` there, `POST` here); the aggregator
+  gains no write endpoint of its own (OQ-9(c)).
+- `IdentitySource` / `SuggestionSink` traits (mirroring
+  `reconcile::AuthoritativeSource`) so the fetch→block→compare→post
+  pipeline is unit-tested against mocks, never a live person/worker
+  service. `HttpIdentitySource` / `HttpSuggestionSink` are the real
+  `reqwest`-backed implementations.
+- **A real gap this task surfaced, not assumed:** neither person's nor
+  worker's REST API has a plain "list every record" endpoint — only
+  `GET /<plural>/search?q=…`, and an *empty* `q` parses to an empty
+  Tantivy `BooleanQuery` (zero hits), not "match everything". The
+  query grammar's dedicated `*` token, however, parses to
+  `UserInputLeaf::All` → `AllQuery`, which does match every indexed
+  document (confirmed against the vendored `tantivy-query-grammar`
+  0.22 source rather than assumed). `q=*` combined with the existing
+  `limit`/`offset` pagination is therefore how this job enumerates a
+  service's full collection — the only way to do so through either
+  service's public API today. Closing that gap properly (a real
+  bulk-list endpoint) is a `person`/`worker`-service change, out of
+  this task's scope.
+- **Env vars.** `LINK_GRAPH_SUGGEST_URL_PERSON` (person's collection
+  base, e.g. `http://host/api/persons` — doubles as the fetch source
+  via `/search` and the write target via `/{id}/links`, since person is
+  this job's sole write target) and `LINK_GRAPH_SUGGEST_TOKEN` are
+  exactly as pinned in OQ-9(c). **`LINK_GRAPH_SUGGEST_URL_WORKER`** is
+  a necessary addition beyond OQ-9(c)'s literal text (which names only
+  the person write target): the job cannot produce a single candidate
+  without also reading worker's collection, and there is nowhere else
+  for that URL to come from. Named to match the established
+  `LINK_GRAPH_RECONCILE_URL_<ENTITY>` per-entity convention rather than
+  inventing a new shape. `LINK_GRAPH_SUGGEST_SECS` (default 3600,
+  coarser than reconcile's 300s since this job does real `O(pairs)`
+  scoring work) follows the same skip-first-tick pattern as
+  `reconcile::run_periodic`.
+- SEC-B7 reused, not reimplemented: `reconcile::source_auth_ok` is now
+  `pub(crate)` and this job calls it for **both** fetch URLs and the
+  write URL — a remote host refuses to start without
+  `LINK_GRAPH_SUGGEST_TOKEN`; a loopback host may go token-less.
+- Wired into `App::after_routes` (`src/app.rs`): spawns
+  `suggest::job::run_periodic` only when `sources_from_env()` resolves
+  (i.e. `LINK_GRAPH_SUGGEST_URL_PERSON` is set, `_WORKER` is also set,
+  and the SEC-B7 check passes for both). No database handle needed —
+  the job is pure HTTP client traffic between two peers, not a
+  read-model repair.
+- Person/worker → `IdentityProbe` mapping: `name.given` space-joined
+  (mirroring how both services' own Tantivy indexers already flatten
+  multiple given names — `person.name.given.join(" ")` in their own
+  `search/mod.rs`); an identifier's block/match `scheme` prefers the
+  FHIR `system` namespace URI (the more specific, cross-service-stable
+  field — both services use the same well-known URIs for the same
+  real-world scheme, the same signal `person`'s own
+  `matching::adapter::route_identifier` keys on) and falls back to the
+  coarser `identifier_type` token only when `system` is blank; gender
+  tokens (`"male"`/`"female"`/`"other"`/`"unknown"`) map to their
+  `person_matcher::Gender` variant one-for-one, with `"unknown"`
+  mapping to the real `Unknown` variant (not `None`) and any
+  unrecognised token mapping to `None` (excluded, not guessed).
+- Deliberately **not** built here (T-33's job, per its own §13 entry):
+  `LINK_GRAPH_SUGGEST_MAX_CANDIDATES` / `_MAX_EDGES_PER_RUN`, per-POST
+  audit logging, and the non-auto-promotion governance test. This job
+  applies one defensive, non-configurable fetch-pagination cap of its
+  own (`MAX_FETCH_OFFSET = 10_000`, mirroring person's own SEC-G7
+  `MAX_SEARCH_OFFSET` — worker's search handler enforces no such bound
+  itself).
+- 14 new unit tests: `probe_from_wire` against fixture JSON matching
+  the real `Person`/`Worker` wire shape (including the `system`-blank
+  fallback and sparse records); every gender-token mapping; the SEC-B7
+  accept/reject matrix for `resolve_sources` (loopback without a token,
+  remote without a token refused on either the person or the worker
+  side, remote with a token, person URL unset, worker URL missing);
+  and the mocked end-to-end pipeline (`run_suggestion_pass`) — a
+  shared-identifier pair is posted exactly once at the identifier
+  ceiling, an unrelated pair posts nothing, a sink failure is counted
+  in `failed` without aborting the run, and empty sources produce an
+  empty successful pass. `cargo test --lib`: 85 passed (71 pre-existing
+  + 14 new); `cargo fmt --check` / `cargo clippy --all-targets -- -D
+  warnings` clean. T-32 (person's review-queue promotion) and T-33
+  (governance/scale/audit) build on this next.
+
 ### Added — Cross-service candidate blocking (LNK-4, spec T-30, 2026-08-04)
 
 - **`src/suggest.rs`** — `generate_candidates(&[(EntityRef, IdentityProbe)],

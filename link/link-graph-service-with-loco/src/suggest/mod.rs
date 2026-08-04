@@ -126,12 +126,28 @@
 //! comparator matches what the family's own docs promise rather than
 //! propagating the drift. It takes no dependency on `person-matcher`'s
 //! private internals.
+//!
+//! ## The periodic job (T-31)
+//!
+//! This module (`suggest/mod.rs`) stays exactly what it was under T-29/T-30
+//! — pure, deterministic, offline. The actual I/O — fetching person/worker
+//! records over HTTP, mapping them to [`IdentityProbe`], running them
+//! through [`generate_candidates`], and `POSTing` the survivors as
+//! `matcher_suggested` `same_identity` edges — lives in the sibling
+//! [`job`] module, split out once this file's T-29/T-30 content was
+//! already over a thousand lines on its own.
 
 use person_matcher::{Gender, Normalizer, Scorer};
 
 use chrono::{Datelike, NaiveDate};
 use entity_ref::EntityRef;
 use std::collections::{HashMap, HashSet};
+
+/// The periodic suggestion job (T-31, spec `13-tasks.md`, design §16
+/// OQ-9(c)): fetches person/worker identity data over HTTP, scores it
+/// through this module's [`compare_identity`]/[`generate_candidates`], and
+/// POSTs surviving candidates to person's `entity_links` write API.
+pub mod job;
 
 /// A coded identifier scoped to its issuing system — e.g. `("nhs",
 /// "9434765919")` or `("ssn", "078-05-1120")`.
