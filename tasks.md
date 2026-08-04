@@ -1642,9 +1642,85 @@
   caught the fabricated corruption edge as `dangling` (not
   `unverified`) on the very read that surfaced it, since its fake
   `to_ref` 404s against person-service.
-- [ ] **TUT-5 (S)** `tutorials/05-bulk-import-export.md` — fixtures
+- [x] **TUT-5 (S)** `tutorials/05-bulk-import-export.md` — fixtures
   import (dry-run, error report), idempotent re-import, masked vs full
   export (and the 403 on ungated full). Depends: EX-1.
+
+  **Done 2026-08-04.** Depended on `COMPOSE-WORKER` landing first
+  (previous commit) — without it every job submitted here would have
+  accepted a `202` and sat in `queued` forever, exactly as EX-1 found.
+  Rather than reusing the fixed compose stack directly, ran
+  person-service **locally** via `cargo run -- start --server-and-worker`
+  (the identical `StartMode::ServerAndWorker` the compose fix invokes,
+  just without a container — and the pattern TUT-2/TUT-3 already
+  established as what actually works in this environment, no
+  `cargo-loco` shim installed).
+
+  **All five asked-for behaviours live-verified** against
+  `examples/data/persons.jsonl` (50 rows, 5 duplicate pairs; EX-1):
+  - **Dry-run** committed nothing (`total: 0` after) — and surfaced a
+    genuinely surprising, live-verified finding not asked for but
+    documented in full: `rows_to_review` came back `0`, not `5`, on
+    the dry run. Read `src/bulk/pipeline.rs`'s dry-run branch to
+    understand why — dry-run never writes a row, so when it reaches
+    the *second* half of a duplicate pair the *first* half (which
+    exists only earlier in the same file) was never persisted for it
+    to find; duplicate detection queries the database, not the
+    in-flight batch. A dry run therefore cannot see duplicates that
+    exist only **within** the file being imported, only ones already
+    in the database beforehand. Not a bug, but an easy-to-miss limit
+    on trusting a dry-run's `rows_to_review` as a preview.
+  - **Real import**: `rows_created: 50, rows_to_review: 5` — the five
+    pairs surfaced correctly this time (rows now commit progressively,
+    so the second half of each pair finds the first), matching
+    `match-search-merge.md`'s "still created, also queued" contract.
+    ~15–18 s wall time (duplicate detection + Tantivy indexing per row).
+  - **Error report**: `persons.jsonl` imports clean (EX-1 already
+    proved this), so a small 4-row file with a blank required field, a
+    future birth date, and malformed JSON was crafted fresh
+    (`/tmp/persons-errors.jsonl`, not checked in — the tutorial embeds
+    it inline) — `status: "completed_with_errors"`, `rows_created: 1,
+    rows_errored: 3`, and the real `errors.csv` content captured
+    verbatim, including a live detail worth knowing: a row failing one
+    validator reports only that one error line, not every rule it
+    happens to also violate.
+  - **Idempotent re-import**: submitting the same 50-row file again
+    gave `rows_upserted: 7, rows_created: 43, rows_to_review: 43` —
+    exactly `examples/data/README.md`'s documented 7-keyed/43-keyless
+    split. The keyed rows upserted in place (no growth); the 43
+    keyless rows have no upsert handle, ran ordinary duplicate
+    detection, found their own first-run copy (now genuinely present,
+    the mirror image of the dry-run gap above), and were created again
+    while being queued for review — review-queue count verified
+    growing from 5 to 48 (`5 + 43`) live. "Idempotent" here means
+    upsert-by-key is idempotent, not that the whole file replay is a
+    no-op — worth being precise about in the write-up.
+  - **Masked vs. full export, and the `403`**: with `PERSON_REQUIRE_AUTH`
+    off, both profiles worked (masked SSN `***-**-4728` / passport
+    `*****0108` vs. full's real `000-31-4728`). With auth turned on
+    (a real authentication-service brought up on port 5151 alongside,
+    same TUT-3 pattern including the `user_attributes` CLI task and
+    the SEC-A8 session-revoke-on-attribute-change re-sign-in dance):
+    full **401**s with no token (same as masked — the blanket guard
+    gates on *any* valid token before the export-specific check runs);
+    both **403** with a token carrying no `attrs` (export is not one
+    of `DESTRUCTIVE_POST_SUFFIXES`, so the blanket guard alone denies
+    a plain `write` under the default-deny-mutation policy); with
+    `access=write`, masked **202**s but full still **403**s — the
+    precise, live-verified punchline: `export_requires_elevation`
+    demands `Action::Destructive` specifically, and `write` does not
+    imply `destructive` (`authorization-attributes.md` §2's rule
+    applied to a masking profile instead of an HTTP verb); with
+    `access=admin`, full finally **202**s and completes
+    (`rows_total: 94` — 50 + 1 + 43 from the steps above). Full 4-row
+    matrix captured in the tutorial.
+
+  Full teardown (`test-db.sh down` for both throwaway Postgres
+  instances, both `cargo run` processes killed, scratch files removed);
+  `podman ps -a` afterward shows only the pre-existing, unrelated
+  `fhir-mssql-db` container from a different task, untouched. Also
+  updated `examples/data/README.md`'s "cannot finish an import yet"
+  warning (written before `COMPOSE-WORKER` landed) to point at the fix.
 - [ ] **TUT-6 (S)** `tutorials/06-event-bus.md` — outbox rows, relay,
   `/events/recent`; extend with Fluvio when BUS-1..3 land.
 

@@ -117,17 +117,22 @@ curl -F file=@examples/data/cases.jsonl -F format=jsonl \
 `GET /api/<plural>/import/{job_id}` for `rows_created` / `rows_upserted` /
 `rows_to_review` / `rows_errored` and the error-report URL.
 
-> **The demo compose stack cannot finish an import yet.** All three
-> commands above were run against a live `full-family.yml` stack and all
-> three were accepted, returning a job id — but the job stays `queued`
-> forever. The containers start with `CMD [..., "start"]`, which is
-> loco's server-only mode; `BulkJobWorker` is registered in
-> `connect_workers`, which only runs under `start --server-and-worker`.
-> Until the compose files add that flag (or a sidecar worker service),
-> use each service's `cargo loco task seed_examples`
+> **Update 2026-08-04: fixed.** Earlier, all three commands above were
+> run against a live `full-family.yml` stack and all three were
+> accepted, returning a job id — but the job stayed `queued` forever.
+> The containers started with `CMD [..., "start"]`, which is loco's
+> server-only mode; `BulkJobWorker` is registered in `connect_workers`,
+> which only runs under `start --server-and-worker`. Both compose files
+> now set `command: ["/app/<bin>", "start", "--server-and-worker"]` on
+> every service (`COMPOSE-WORKER`, `tasks.md`), live-verified against
+> `single-service.yml`/case-service: a real `cases.jsonl` import reached
+> `completed` with `rows_created: 10`. TUT-5 verifies the same fix's
+> effect via `cargo run -- start --server-and-worker` directly (faster
+> to iterate against than a container rebuild) against person-service.
+> `cargo loco task seed_examples`
 > ([above](#loading-into-a-running-service--the-seed_examples-task-ex-4))
-> to load these fixtures, or run the service locally in worker mode.
-> Recorded against EX-1/TUT-5 in the root [`tasks.md`](../../tasks.md).
+> remains a valid, even simpler way to load these fixtures when you
+> don't need the async job semantics themselves.
 
 Then create the ten `subject_of` edges — see
 [`case-subject-links.md`](case-subject-links.md).
