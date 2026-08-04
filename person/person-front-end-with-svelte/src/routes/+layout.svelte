@@ -1,7 +1,7 @@
 <!--
   Root layout — the app shell wrapping every route.
 
-  Renders the persistent sidebar (brand, primary nav, Lily theme/locale
+  Renders the persistent top navigation bar (brand, primary nav, Lily theme/locale
   pickers) and a <main> slot for the active page. The nav highlights the
   current route via aria-current. Pure shell: no data fetching here.
 
@@ -93,7 +93,7 @@
     // Hamburger toggle state for the top navigation bar (narrow viewports).
     let menuOpen = $state(false);
 
-    // Primary sidebar navigation; order is the operator workflow order.
+    // Primary top-nav-bar navigation; order is the operator workflow order.
     // Labels are i18n keys resolved reactively at render time.
     const navItems = [
         { href: "/", key: "nav.dashboard" },

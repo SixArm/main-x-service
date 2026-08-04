@@ -9,17 +9,18 @@ SvelteKit front-end for the **[Person Service](../person-service-with-loco/)** i
 | `/` | Dashboard — service health + recent audit activity |
 | `/persons` | List & search (full-text, fuzzy, phonetic) with SVAR DataGrid |
 | `/persons/new` | Create person; surfaces 409 duplicate candidates |
-| `/persons/[id]` | Detail view — identity, identifiers, addresses, telecom, emergency contacts |
+| `/persons/[id]` | Detail view — identity, identifiers, addresses, telecom, emergency contacts, cross-service links panel |
 | `/persons/[id]/edit` | Edit |
 | `/persons/[id]/audit` | Per-person audit log |
 | `/persons/match` | Match check — score a hypothetical record against the index |
-| `/persons/merge` | Merge two persons (main + duplicate) |
-| `/review` | Stored duplicate-review board — SVAR Kanban, drag-to-decide |
+| `/persons/merge` | Merge two persons (main + duplicate); accepts `?main=`/`?duplicate=` to pre-fill both ids |
+| `/persons/bulk` | Bulk import/export — upload JSONL/CSV with a dry-run toggle, submit a filtered export, poll jobs to completion |
+| `/review` | Stored duplicate-review board — SVAR Kanban (drag-to-decide) + a keyboard-reachable queue table + inline comparison panel |
 | `/expiry` | Identity-document expiry calendar — SVAR Calendar |
 | `/signin` | Per-app magic-link sign-in (BFF auth page) |
 | `/verify` | Magic-link verification (BFF auth page) |
 
-The persistent layout sidebar (every route) also carries a Lily **theme switcher** and **locale switcher** (FR-11 / FR-12); selections persist to `localStorage`.
+The persistent top navigation bar (every route; collapses behind a hamburger toggle on narrow viewports — FR-13, no left sidebar) also carries a Lily **theme switcher** and **locale switcher** (FR-11 / FR-12); selections persist to `localStorage`.
 
 ## Stack
 
@@ -36,7 +37,7 @@ The persistent layout sidebar (every route) also carries a Lily **theme switcher
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Person Service — see [`../person-service-with-loco/README.md`](../person-service-with-loco/README.md). Default: `http://localhost:8080`.
+- A running Person Service — see [`../person-service-with-loco/README.md`](../person-service-with-loco/README.md). Dev default (`loco start`, and this app's own fallback): `http://localhost:5150`. The podman-compose container maps `:8080` instead — see "Configuration" below and the integration-test section.
 
 ## Quick start
 
@@ -122,12 +123,21 @@ src/
   app.html
   app.css                  - shared CSS variables + utility classes
   app.d.ts
+  hooks.server.ts          - BFF: reads the session cookie into locals
   lib/
     config.ts              - same-origin BFF proxy base (/api/proxy)
+    i18n.svelte.ts          - 13-locale string catalog + reactive locale store
+    links.ts                - cross-service link kind<->target-type rules
+    bulk.ts                 - bulk import/export pure rules (terminal states, dry-run token, …)
+    review.ts               - review-queue status vocabulary + score-breakdown helpers
     api/
-      types.ts             - Person, HumanName, MatchResult, … (mirrors the Rust models)
-      client.ts            - ApiClient + ApiError (envelope-aware fetch)
-      persons.ts           - PersonRepository (CRUD + search + match + merge + audit)
+      types.ts             - Person, HumanName, MatchResult, EntityLink, BulkJobView, … (mirrors the Rust models)
+      client.ts            - ApiClient + ApiError (envelope-aware fetch; FormData pass-through)
+      persons.ts           - PersonRepository (CRUD + search + match + merge + audit + links + bulk + review-queue)
+    server/                 - BFF-only, never bundled to the browser
+      config.ts             - PERSON_API_URL / AUTH_API_URL
+      session.ts             - __Host-mxi_session cookie helpers
+      auth.ts                 - magic-link request/verify + session->PASETO exchange
     forms/
       form.svelte.ts       - createForm rune-based store
       LabeledField.svelte
@@ -139,24 +149,29 @@ src/
       HumanNameInput.svelte
       PersonForm.svelte
       MatchResultsList.svelte
+      LinksPanel.svelte    - cross-service links panel (detail page)
   routes/
-    +layout.svelte         - sidebar nav + Lily theme/locale pickers
+    +layout.svelte         - top nav bar + hamburger + Lily theme/locale pickers
     +page.svelte           - dashboard
+    +page.server.ts        - sign-out action
+    signin/, verify/        - BFF magic-link login
+    api/proxy/[...path]/    - BFF reverse proxy (injects the PASETO)
     persons/
       +page.svelte         - list
       new/+page.svelte
       match/+page.svelte
       merge/+page.svelte
+      bulk/+page.svelte     - bulk import/export
       [id]/
-        +page.svelte       - detail
+        +page.svelte       - detail (incl. links panel)
         edit/+page.svelte
         audit/+page.svelte
+    review/+page.svelte     - duplicate review-queue board
+    expiry/+page.svelte     - identity-document expiry calendar
 tests/
-  unit/
-    client.test.ts         - ApiClient envelope + error tests
-    persons.test.ts        - PersonRepository wrapping tests
-  e2e/
-    persons.spec.ts        - smoke tests
+  unit/                     - client, persons, bulk, links-validation, review, i18n, layout (7 files, 69 tests)
+  e2e/                      - route-stubbed Playwright smoke tests
+  integration/              - golden-paths.spec.ts against a live service
 ```
 
 ## Lily Design System
@@ -170,8 +185,10 @@ Three Lily packages are consumed via `file:` dependencies (see `package.json`):
 | `lily-design-system-svelte-headless` | accessibility primitives (focus trap, listbox, combobox, dialog) | Headless package wired; richer primitives (Dialog/Combobox/Banner) tracked in spec §13 T-14 |
 
 `src/routes/+layout.svelte` imports and renders the `ThemePicker` and
-`LocalePicker`; their selections persist to `localStorage` under
-`lily-theme` / `lily-locale`. Forms still use styled native HTML controls;
+`LocalePicker`; the theme selection persists to `localStorage` under
+`lily-theme` (the picker's own `storageKey`), while the locale selection
+persists under `mxi.person.locale`, owned by the app's own
+`src/lib/i18n.svelte.ts` store rather than the picker. Forms still use styled native HTML controls;
 deeper headless primitives are swapped in as the design system stabilises.
 
 ```svelte

@@ -21,6 +21,11 @@ The front-end binds 1:1 to the Person Service REST surface (see [`person-service
 | `GET /api/persons/{id}/links` | `LinksPanel` on `/persons/[id]` |
 | `POST /api/persons/{id}/links` | `LinksPanel` — assert an outbound edge |
 | `DELETE /api/persons/{id}/links/{linkId}` | `LinksPanel` — withdraw an edge |
+| `POST /api/persons/import` | `/persons/bulk` — submit an import job (`FormData`: file + format + dry_run) |
+| `GET /api/persons/import/{id}` | `/persons/bulk` — poll an import job to a terminal state |
+| `POST /api/persons/export` | `/persons/bulk` — submit an export job (format + filter + masking profile) |
+| `GET /api/persons/export/{id}` | `/persons/bulk` — poll an export job to a terminal state |
+| `GET /api/persons/bulk-jobs` | `/persons/bulk` — recent-jobs table (client-filtered by kind/status) |
 
 Envelope handling is centralised in `ApiClient`; per-endpoint methods on `PersonRepository` return unwrapped `data`.
 
@@ -50,4 +55,18 @@ re-asserting an edge refreshes it rather than duplicating it. `DELETE`
 is a soft-delete (the edge is withdrawn, not erased) and answers `200`
 with an empty payload rather than `204`. The server's `422` reason
 string is human-readable and is surfaced inline.
+
+### Bulk import/export
+
+The five `.../import`, `.../export`, `.../bulk-jobs` endpoints are the
+front-end's binding to
+[`bulk-import-export.md`](../../../agents/share/bulk-import-export.md).
+Both submit endpoints answer `202` with a job id; the front-end polls
+the matching `GET` until the job reaches a terminal status
+(`completed` / `completed_with_errors` / `failed` — an unrecognised
+status is treated as **not** terminal, per `src/lib/bulk.ts`, so a
+newer service vocabulary cannot freeze the poll). `download_url` /
+`errors_url` on a finished job are opaque artifact-store references
+(`file://…` / `s3://…`) with no serving endpoint, so they render as
+plain text rather than a link (§16 OQ-7).
 

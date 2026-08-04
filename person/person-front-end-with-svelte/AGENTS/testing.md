@@ -20,10 +20,10 @@ pnpm test:e2e
 # Integration (playwright; requires PUBLIC_API_BASE_URL service up)
 pnpm test:integration
 
-# Type check
-pnpm svelte-check
+# Type check (svelte-kit sync + svelte-check)
+pnpm check
 
-# Lint (if configured)
+# Lint (prettier --check)
 pnpm lint
 ```
 
@@ -31,8 +31,10 @@ pnpm lint
 
 Conventions:
 
-- One file per source module under test (`client.test.ts`,
-  `persons.test.ts`).
+- One file per source module under test: `client.test.ts`,
+  `persons.test.ts`, `bulk.test.ts`, `links-validation.test.ts`,
+  `review.test.ts`, `i18n.test.ts`, `layout.test.ts` (7 files, 69 tests
+  as of 2026-08-04).
 - Mock `fetch` via `vi.fn()`; assert on URL, method, headers, body.
 - For repository tests: pin the exact route path (e.g.
   `POST /api/persons/check-duplicates` — Person Service uses

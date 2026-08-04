@@ -7,7 +7,8 @@
 | `/persons/new` | Create |
 | `/persons/match` | Match check |
 | `/persons/merge` | Merge |
-| `/persons/[id]` | Detail |
+| `/persons/bulk` | Bulk import/export — upload JSONL/CSV, submit filtered export, poll job status to a terminal state |
+| `/persons/[id]` | Detail — includes the cross-service **links panel** (§9) |
 | `/persons/[id]/edit` | Edit |
 | `/persons/[id]/audit` | Audit log |
 | `/review` | Duplicate-review board — SVAR Kanban (drag-to-decide) + a keyboard-reachable queue table, with an inline comparison sub-state (see below) |

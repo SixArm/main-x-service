@@ -15,7 +15,7 @@ A web interface that:
 
 ### 1.3 Non-goals
 
-- **Not** a public-facing portal — assumes authenticated operator users (auth itself out of scope until the service ships it).
+- **Not** a public-facing portal — assumes authenticated operator users. Auth is implemented as a BFF: magic-link sign-in, an httpOnly session cookie, and a server-side session→PASETO exchange (§13 T-22); the explicit CSRF synchroniser token is the one remaining piece (§16 OQ-3).
 - **Not** a substitute for direct API access — power users use Swagger UI / curl.
 - **Not** a FHIR client — FHIR routes are out of scope (the service exposes them; this UI doesn't render them).
 

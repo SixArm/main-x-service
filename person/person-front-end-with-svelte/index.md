@@ -28,7 +28,8 @@ is [`spec.md`](spec/index.md); deep references live in [`AGENTS/`](AGENTS/).
 ## Route map
 
 The SPA mounts at `/`. All operator workflows live under `/persons`. The
-persistent layout sidebar (every route) also carries a Lily **theme
+persistent **top navigation bar** (every route — a hamburger-collapsed
+header, NOT a left sidebar, per FR-13) also carries a Lily **theme
 switcher** (`ThemePicker`, FR-11) and **locale switcher** (`LocalePicker`,
 FR-12); both persist their selection to `localStorage`.
 
@@ -37,11 +38,15 @@ FR-12); both persist their selection to `localStorage`.
 | `/` | Dashboard — service health + recent audit feed |
 | `/persons` | List + search (SVAR DataGrid; `q` + fuzzy + phonetic toggles) |
 | `/persons/new` | Create form with real-time 409 duplicate detection inline |
-| `/persons/[id]` | Detail view (identity, identifiers, addresses, telecom, emergency contacts) |
+| `/persons/[id]` | Detail view (identity, identifiers, addresses, telecom, emergency contacts, cross-service links panel) |
 | `/persons/[id]/edit` | Edit form |
 | `/persons/[id]/audit` | Per-record audit log |
 | `/persons/match` | Score-bearing match check against a candidate Person |
-| `/persons/merge` | Two-ID merge preview + confirm |
+| `/persons/merge` | Two-ID merge preview + confirm (accepts `?main=`/`?duplicate=` seed) |
+| `/persons/bulk` | Bulk import/export — upload + dry-run, filtered export, job polling |
+| `/review` | Duplicate review-queue board (SVAR Kanban) + queue table + comparison panel |
+| `/expiry` | Identity-document expiry calendar (SVAR Calendar) |
+| `/signin`, `/verify` | BFF magic-link sign-in / verification |
 
 ## Worked flows
 
@@ -65,17 +70,59 @@ FR-12); both persist their selection to `localStorage`.
 
 ### Merge workflow
 
-1. Operator picks main + duplicate IDs in `/persons/merge`.
+1. Operator picks main + duplicate IDs in `/persons/merge` (or arrives
+   pre-seeded from `?main=`/`?duplicate=`, e.g. from the review queue).
 2. Page calls `POST /api/persons/merge` with the two IDs and a
    merge reason.
 3. On success: detail page redirect to main; duplicate is
    soft-deleted server-side.
 
+### Review-queue workflow
+
+1. Operator opens `/review`; the board (Kanban) and queue table both
+   render `GET /api/persons/review-queue` results, filterable by
+   `?status=` / `?limit=`.
+2. Selecting a pair (drag on the board, or a queue row's **Compare**
+   button) opens an inline panel loading both persons in parallel and
+   the matcher's `score_breakdown`.
+3. **Confirm** / **Reject** call the decision endpoint (a pure status
+   change — it does not merge); a `confirmed` item deep-links to
+   `/persons/merge?main=…&duplicate=…`.
+
+### Cross-service links workflow
+
+1. On `/persons/[id]`, the **Cross-service links** panel lists this
+   person's active outbound `entity_links` edges.
+2. Asserting a new edge is restricted client-side to the three valid
+   kind→target-type pairs (`same_identity`→worker, `works_at`/
+   `member_of`→organization — `src/lib/links.ts`) before
+   `POST /api/persons/{id}/links` is sent.
+3. Withdrawing calls `DELETE .../links/{linkId}` behind a `confirm()`.
+
+### Sign-in workflow (BFF)
+
+1. `/signin` posts an email to the authentication service, which emails
+   a magic link back to this app's own `/verify`.
+2. `/verify` consumes the link server-side and sets the httpOnly
+   `__Host-mxi_session` cookie — no token ever reaches browser JS.
+3. Every subsequent entity-API call goes through
+   `/api/proxy/[...path]`, which exchanges the session for a short-lived
+   PASETO and forwards it as `Authorization: Bearer …`.
+
 ## Environment
+
+Server-side only (never exposed to the browser bundle — the browser calls
+the same-origin `/api/proxy`; see `src/lib/server/config.ts`):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `PUBLIC_API_BASE_URL` | `http://localhost:8080` | Person Service base URL |
+| `PERSON_API_URL` | `http://localhost:5150` | Person Service base URL — the BFF proxy injects a PASETO and forwards |
+| `AUTH_API_URL` | `http://localhost:5150` | Authentication Service base URL — magic-link login + session→PASETO exchange |
+
+`PUBLIC_API_BASE_URL` (default `http://localhost:8080`) is a separate
+variable read only by the Playwright **integration** suite (`bin/e2e`,
+`playwright.config.ts`), not by the app itself — see README.md
+"Configuration".
 
 ## Tech stack reminder
 

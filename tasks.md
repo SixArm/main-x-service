@@ -4690,6 +4690,63 @@ committing (see plan.md §4).
   boundary) or any of the other ten front-ends (concurrent sibling
   audits).
 
+- *`person/person-front-end-with-svelte` done 2026-08-04.* Confirmed
+  the four FE-1..FE-4 screens (merge, links panel, bulk, review) are
+  real and tested (`pnpm test` 69/69 across 7 files; `pnpm check` 453
+  files, 0 errors/0 warnings; `pnpm build` clean), then closed the
+  same doc-vs-code gaps the sibling audits above are finding, plus two
+  gaps specific to this crate. (1) **`.env.example` was wrong**,
+  matching the TUT-1/TUT-2 pattern named in this task: it documented
+  `PUBLIC_API_BASE_URL` (read by nothing in `src/`) while
+  `src/lib/server/config.ts` actually reads `PERSON_API_URL` /
+  `AUTH_API_URL` (both default `http://localhost:5150`, matching the
+  real `.env`); fixed, and noted `PUBLIC_API_BASE_URL` is a real but
+  separate var read only by the Playwright integration harness
+  (`bin/e2e`, `playwright.config.ts`, default `:8080` — the
+  podman-compose container's port, not the dev default). (2) **The BFF
+  auth was already fully implemented** (`/signin`, `/verify`,
+  `hooks.server.ts`, `src/routes/api/proxy/[...path]/+server.ts`,
+  `src/lib/server/{session,auth,config}.ts` — session cookie +
+  server-side PASETO exchange, no token in browser JS) but seven files
+  still described it as future/deferred: `AGENTS.md` ("Authentication.
+  Out of scope until the service ships auth"), `spec/13-tasks.md` T-22
+  unchecked, `spec/15-roadmap.md` v0.3, `spec/16-open-questions.md`
+  OQ-3, `spec/01/03/12`. Reworded all seven to state what's actually
+  live, and kept T-22 genuinely open (`[~]`) for the one real gap: no
+  CSRF synchroniser token yet, only `SameSite=Lax`. `spec/08-
+  architecture.md`'s diagram showed the browser calling the service
+  directly with no BFF hop at all; replaced it. (3) **Two shipped
+  features had zero FR presence** — the cross-service links panel
+  (T-23) and the bulk screen (T-24) had full §13 task write-ups but no
+  `spec/06` functional requirements and the bulk endpoints were absent
+  from `spec/09`'s endpoint table entirely, unlike the review queue
+  (T-25), which *had* been backfilled with FR-14..FR-20 this session;
+  added FR-21/FR-22 and the five bulk endpoint rows to match. `spec/05`
+  was also missing the `/persons/bulk` route outright. (4) **A locale-
+  persistence claim was simply false** in four files (`spec/02`,
+  `spec/06` FR-12, `README.md` ×2, checked against
+  `src/lib/i18n.svelte.ts`): the `LocalePicker` selection does not
+  persist under `lily-locale` as documented — the app's own i18n store
+  owns a *different* key, `mxi.person.locale`, specifically so no
+  second key can drift (the theme picker's `lily-theme` key, by
+  contrast, checked out correct). Fixed all four. (5) **"Persistent
+  layout sidebar"** in `README.md`/`index.md` contradicted both the
+  actual `<header class="topbar">` implementation and this crate's own
+  `spec/06` FR-13 ("NOT a left sidebar"); fixed the wording (and two
+  stale in-code comments in `+layout.svelte` making the same false
+  claim). (6) Two dangling **task cross-references** (`spec/07`,
+  `spec/10` both said "T-7" for the SSR-load-functions follow-up; T-7
+  is "Detail/edit/soft-delete", the real SSR task is T-13) — fixed.
+  (7) `spec/14-implementation-status.md` was missing rows for the
+  three new screens and auth entirely, and named a `person-form-
+  validation.test.ts` that has never existed (verified against the
+  live `tests/unit/` directory — only 7 files exist); replaced with
+  the real file list. (8) `AGENTS/testing.md` still listed only 2 of
+  7 unit-test files and said `pnpm svelte-check` where the documented
+  script is `pnpm check`. Did not touch `person/person-service-with-
+  loco` (out of this task's boundary) or any of the other ten
+  front-ends (concurrent sibling audits).
+
 - [ ] **DOC-5 (M)** Library crates' `spec/`, `AGENTS.md`/`CLAUDE.md`,
   `README.md`/`index.md`: `authentication-verifier-rust-crate`,
   `integrity-mac-rust-crate`, `link/entity-ref-rust-crate`. Smaller

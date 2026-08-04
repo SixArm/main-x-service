@@ -37,11 +37,37 @@ Per repo decision (2026-06-02), each `*-front-end-with-svelte` project keeps its
 | Person endpoints | `src/lib/api/persons.ts` |
 | Reusable form pieces | `src/lib/forms/` |
 | Person-specific components | `src/lib/components/` |
+| BFF server-only config/session/auth helpers (never bundled to the browser) | `src/lib/server/` |
 | Routes / pages | `src/routes/` |
+
+## Authentication — the BFF pattern
+
+This front-end is its own Backend-For-Frontend, per
+[`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
+The browser never holds a token:
+
+- `/signin` (`src/routes/signin/`) requests a magic link from the
+  authentication service, returning to this app's own `/verify`.
+- `/verify` (`src/routes/verify/`) consumes the single-use link
+  server-side and sets the httpOnly `__Host-mxi_session` cookie
+  (`src/lib/server/session.ts`) — no access token ever reaches the
+  browser, `localStorage`, or a URL fragment.
+- `src/hooks.server.ts` reads that cookie into `locals.sessionId` on
+  every request.
+- `src/routes/api/proxy/[...path]/+server.ts` is the reverse proxy every
+  entity-API call goes through: it strips the browser's cookie,
+  exchanges the session for a short-lived PASETO server-side
+  (`src/lib/server/auth.ts::exchangeToken`), and forwards with
+  `Authorization: Bearer …` to `PERSON_API_URL`.
+- Sign-out is the root `+page.server.ts`'s `signout` action: revokes the
+  session server-side, then clears the cookie.
+
+**Remaining gap**: no explicit CSRF synchroniser token on mutating
+browser→BFF calls yet — only `SameSite=Lax` backstops it today. See
+`spec/13-tasks.md` T-22 and `spec/16-open-questions.md` OQ-3.
 
 ## What does NOT live here
 
-- Authentication. Out of scope until the service ships auth (Person Service spec §15).
 - FHIR Person UI. Out of scope for MVP.
 - Consent management UI. Out of scope for MVP (Person Service has `/consents` endpoints but no front-end yet).
 - GDPR-export download UI. Out of scope for MVP.
