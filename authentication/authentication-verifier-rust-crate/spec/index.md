@@ -44,26 +44,36 @@ secret, no per-request introspection hop.
 In scope: PASETO-keys parsing (Ed25519 public keys), footer-`kid`-based
 key selection, PASETO v4.public signature verification, `iss` / `aud` /
 `exp` / `nbf` enforcement, optional HTTPS key-set fetching (`fetch`
-feature), and the **ABAC policy engine** (the `abac` module: policy
-parsing, the built-in default policy, pure first-match-wins evaluation
-over the `attrs` claim + derived action + entity).
+feature), **algorithm agility** for the key set itself (a key set may
+name algorithms this build does not implement — such keys are kept and
+diagnosed, not silently dropped; see §5), and the **ABAC policy engine**
+(the `abac` module: policy parsing, the built-in default policy, pure
+first-match-wins evaluation over the `attrs` claim + derived action +
+entity).
 
 Out of scope: token issuance, sessions/revocation (auth-service only),
-PASETO `local` (symmetric) tokens, non-Ed25519 algorithms, key-set
-refresh scheduling (callers refetch on `UnknownKid`), framework-specific
-extractors, **action derivation** (each service's guard maps HTTP
-method + its destructive named POSTs to an `Action`), policy
-configuration loading from env/file (callers read
+PASETO `local` (symmetric) tokens, **verifying** non-Ed25519 algorithms
+(a key set may name one — §5 `VerifyError::UnsupportedAlgorithm` — but
+this build signs/checks Ed25519 only), key-set refresh scheduling
+(callers refetch on `UnknownKid`, or hold a `ReloadableVerifier`, §5,
+and refresh on a timer), framework-specific extractors, **action derivation**
+(each service's guard maps HTTP method + its destructive named POSTs to
+an `Action`), policy configuration loading from env/file (callers read
 `<ENTITY>_ABAC_POLICY` / `_FILE` and hand the JSON to
 `Policy::from_json`), and attribute **assignment/sourcing**
 (auth-service only).
 
 ## 3. Stakeholders and users
 
-Peer service crates (person / worker / place / thing / event / course /
-organization / care-pathway) that accept the federation's bearer
-tokens; the loco conversion uses this crate instead of re-implementing
-verification per service.
+Every peer service crate in the family that accepts the federation's
+bearer tokens: the entity registries (see the "Service crates" table in
+the root [AGENTS.md](../../../AGENTS.md)), the consumer apps, and the
+`link-graph-service-with-loco` read-model aggregator — each uses this
+crate instead of re-implementing verification (and, since v0.3, ABAC)
+per service. This list has grown well past the original six-then-eight
+loco-conversion crates named in earlier drafts of this section; see §5
+"Algorithm agility" for how to check the current count rather than
+trusting a number pinned here.
 
 ## 4. Glossary
 
@@ -75,33 +85,67 @@ PASETO trailer (here carrying `kid`), authenticated but not encrypted.
 
 ## 5. Domain model — the public API contract
 
-- **`Verifier`** — Ed25519 public keys indexed by `kid` + pinned issuer
+- **`Verifier`** — verification keys indexed by `kid` + pinned issuer
   and audience. Constructed once, shared behind an `Arc`; `verify` is
   read-only.
   - `from_paseto_keys_value(&serde_json::Value, issuer, audience)` —
-    loads every published Ed25519 public-key entry (requires `kid` and
-    the public-key material); skips non-Ed25519 entries; **permits an
-    empty key set** (boots before the key source is reachable; rejects
-    everything with `UnknownKid`).
+    loads every published key entry that carries a `kid` (requires
+    public-key material for the ones it can use); **permits an empty
+    key set** (boots before the key source is reachable; rejects
+    everything with `UnknownKid`); rejects a **duplicate `kid`** (§ below)
+    rather than resolving it last-wins.
   - `from_paseto_keys_url(url, issuer, audience)` *(feature `fetch`)* —
     GET the `/.well-known/paseto-keys` document, then delegate to
-    `from_paseto_keys_value`.
+    `from_paseto_keys_value`. Hardened (SEC-V1, 2026-07-13): requires
+    `https://`, except `http://` to a **loopback** host
+    (`127.0.0.1`/`::1`/`localhost`, for dev/CI key servers); a 10 s
+    timeout; redirects forbidden (so an `https` URL can't be bounced to
+    plaintext); the response body capped at 64 KiB.
   - `verify(token) -> Result<Claims, VerifyError>` — parse the PASETO
-    footer → require `kid` → look up key → verify the v4.public
-    signature + `iss`/`aud`/`exp`/`nbf`.
-  - `key_count() -> usize`.
-- **`Claims`** — `sub` (user pid, UUID string), `iss`, `aud`, `iat`
-  (unix s), `nbf` (unix s), `exp` (unix s), `sid` (originating
-  auth-service session, for revocation correlation), `scope`/`roles`
-  (**deprecated for authorization** — kept on the wire; the ABAC guard
-  ignores them), and `attrs` (`BTreeMap<String, Vec<String>>`,
+    footer → require `kid` → look up key → dispatch on the key's
+    declared algorithm → verify the v4.public signature +
+    `iss`/`aud`/`exp`/`nbf`.
+  - `key_count() -> usize` — number of **usable** (Ed25519) keys; a key
+    for an algorithm this build does not implement is not counted here.
+  - `unsupported_key_count() -> usize` *(algorithm agility, 2026-07-27)*
+    — number of loaded keys whose algorithm this build does not
+    implement. Non-zero mid-rollout is normal (the issuer publishes a
+    new algorithm before every verifier understands it); worth exporting
+    as a metric.
+  - `algorithms() -> Vec<String>` *(algorithm agility)* — sorted,
+    deduplicated algorithm labels this verifier holds keys for, usable
+    or not, for logging what a key set actually advertises.
+- **`ReloadableVerifier`** *(v0.8.0)* — `RwLock<Arc<Verifier>>`:
+  `new(verifier)`, `current() -> Arc<Verifier>` (a per-request snapshot
+  under a brief read-lock), `store(verifier)` (a brief write-lock
+  swapping the key set at runtime, e.g. after a periodic re-fetch of
+  `/.well-known/paseto-keys`, so a **key rotation** needs no restart). No
+  `Debug` (key material never lands in a log). Poison-safe. A refresh
+  should keep the current verifier on a fetch failure — never swap to an
+  empty key set — so a transient auth-service outage cannot lock callers
+  out. Mirrors `ReloadablePolicy`'s shape.
+- **`Claims`** — `sub` (user pid, UUID string), `email`, `name`, `iss`,
+  `aud`, `iat` (unix s), `nbf` (unix s, optional), `exp` (unix s), `sid`
+  (originating auth-service session, for revocation correlation),
+  `scope`/`roles` (**deprecated for authorization** — kept on the wire;
+  the ABAC guard ignores them), and `attrs` (`BTreeMap<String, Vec<String>>`,
   `#[serde(default)]`, omitted when empty — the ABAC subject
   attributes, e.g. `access: ["write"]`, `svc: ["true"]`).
   **Byte-identical** to the service's `auth::Claims`; pinned by the
   service's cross-crate contract test.
-- **`VerifyError`** — `Keys(String)`, `MissingKid`,
-  `UnknownKid(String)`, `Paseto(String)` (signature / claim / parse
-  failure), and `Fetch(String)` (feature `fetch`).
+- **`VerifyError`** — `Keys(String)` (malformed key-set document, or a
+  duplicate `kid`), `Malformed(String)` (the token is not a structurally
+  valid `v4.public` token, or its footer isn't `{"kid": ...}` — distinct
+  from a signature failure), `MissingKid`, `UnknownKid(String)`,
+  `Paseto(String)` (Ed25519 signature check failed), `Claim(String)`
+  (signature valid but `iss`/`aud`/`exp`/`nbf` rejected it),
+  `UnsupportedAlgorithm { kid, algorithm }` *(algorithm agility,
+  2026-07-27)* — the `kid` selected a key whose algorithm this build
+  does not implement; deliberately distinct from `UnknownKid` (that
+  means "I hold no key for this signer, refetch might help"; this means
+  "I hold the key and cannot use it, refetching will not help — upgrade
+  this binary") — and `Fetch(String)` (feature `fetch`).
+
 - **`abac` module** (re-exported at the crate root) — the shared
   authorization engine per
   [authorization-attributes.md](../../../agents/share/authorization-attributes.md)
@@ -143,6 +187,30 @@ PASETO trailer (here carrying `kid`), authenticated but not encrypted.
     checks one. So a 403 body and the audit trail can state exactly why,
     and a conditional allow can carry a mask/audit obligation.
 
+### Algorithm agility (be-ready posture, 2026-07-27)
+
+`Verifier` dispatches on each loaded key's *declared* algorithm rather
+than assuming Ed25519 (internally, an enum `VerificationKey::{Ed25519,
+Unsupported}` — an unrecognised algorithm can only ever land in the
+`Unsupported` variant, which carries no key material, so **verification
+cannot silently fall through to a default** when a new variant is
+added). A key set may name an algorithm this build does not implement;
+such keys are **kept, not dropped**, so a token naming one fails as
+`UnsupportedAlgorithm` (which says "upgrade this binary") rather than
+`UnknownKid` (which invites a key-set refetch that would never help).
+This is the family's readiness step for the Ed25519 signature being the
+one Shor-vulnerable component in the auth path — see
+[authentication-sessions.md](../../../agents/share/authentication-sessions.md)
+§5.1 for why this is a be-ready-not-act-now problem and what the
+realistic next-algorithm paths are. Nothing in this crate switches
+algorithm; it only makes a future switch a key rotation rather than a
+coordinated code migration. Source-compatible with every consumer — at
+landing time, fifteen path-dependent service crates across the entity
+registries, the consumer apps, and the link-graph aggregator all built
+unchanged; grep `Cargo.toml` for `authentication-verifier =` across the
+monorepo for the current, growing count rather than trusting a number
+fixed here.
+
 ### The PASETO-keys / `kid` contract
 
 - The service publishes its Ed25519 public key(s) at
@@ -163,10 +231,15 @@ PASETO trailer (here carrying `kid`), authenticated but not encrypted.
    rejected via `VerifyError::Paseto`.
 3. A missing footer `kid` yields `MissingKid`; an unmatched `kid`
    yields `UnknownKid(kid)`.
-4. A key-set document without a key array, or an Ed25519 entry missing
-   `kid` / public-key material, yields `Keys(...)` at construction.
-5. Non-Ed25519 key entries are skipped silently; an empty key set
-   constructs successfully.
+4. A key-set document without a key array, an Ed25519 entry missing
+   `kid` / public-key material, or a **duplicate `kid`** across entries,
+   yields `Keys(...)` at construction — never a last-wins merge, so the
+   verifier's answer cannot depend on JSON array order.
+5. A key entry naming an algorithm this build does not implement is
+   **kept**, not dropped, and reported via `unsupported_key_count()` /
+   `algorithms()`; a token whose `kid` selects one is rejected with
+   `UnsupportedAlgorithm { kid, algorithm }`, distinct from `UnknownKid`
+   (algorithm agility, §5). An empty key set constructs successfully.
 6. The `attrs` claim round-trips mint→verify; a token without an
    `attrs` member (pre-0.3) verifies with an empty map.
 7. The ABAC engine evaluates per
@@ -178,6 +251,19 @@ PASETO trailer (here carrying `kid`), authenticated but not encrypted.
    everything else denied. Malformed policy JSON is an `Err` from
    `Policy::from_json` (never a panic); callers fall back to
    `Policy::default_policy()`.
+8. **No vacuous match on an absent namespace (SEC-V2).** A `!`-negated
+   `resource.`/`env.` condition must not match merely because no
+   resource/environment map was supplied (e.g. the coarse blanket-guard
+   path, which calls plain `evaluate`) — that would let a rule like
+   `{"when":{"env.network":["!untrusted"]}}` silently grant every
+   authenticated caller. An absent namespaced attribute biases to the
+   **safe** outcome by the rule's effect: an `allow` rule does not match
+   (no silent grant); a `deny` rule still matches (fail-closed). Subject-
+   attribute (non-namespaced) negation is unaffected.
+9. `from_paseto_keys_url` (feature `fetch`, SEC-V1) refuses any URL that
+   is not `https://`, except `http://` to a loopback host; follows no
+   redirects; times out at 10 s; and caps the response body at 64 KiB —
+   each a `VerifyError::Fetch`, never a hang or an unbounded allocation.
 
 ## 7. Non-functional requirements
 
@@ -232,6 +318,20 @@ crate's **cross-crate contract test** (`tests/sign_verify_contract.rs`),
 which also pins the `Claims` shape and footer-`kid` selection against the
 service's signer.
 
+**Fuzzing (SEC-I2).** `fuzz/` is a standalone `cargo-fuzz` crate (not a
+workspace member; default offline features only — never affects the
+stable `cargo build`/`test`/`clippy` path) with two coverage-guided
+libFuzzer targets: `verify` (`Verifier::verify` over an arbitrary token,
+exercising the full structural parse — header, authenticated-footer
+base64url/JSON `kid` decode, key selection, Ed25519 check, with a real
+key loaded so the `kid`-found branch is reachable) and `policy`
+(`Policy::from_json` over arbitrary UTF-8, then `evaluate_with_context`
+for every action against a fixed subject/resource/environment — parser
+plus rule matching, negation, `$sub`/`$email` templates, and the
+`resource.`/`env.` namespaces). Both assert the crate's golden rule #5
+(no panics — every failure is a handled `Err`). Run with a nightly
+toolchain: `cargo +nightly fuzz run <target>` (see `fuzz/README.md`).
+
 ## 12. Compliance
 
 Claims may carry identity data (`sub`, `attrs`, `scope`/`roles`):
@@ -282,6 +382,32 @@ attribute values, so it is safe for 403 bodies and audit trails.
       `evaluate`/`evaluate_with_resource` unchanged. Engine tests:
       `$sub` ownership, literal-`$`, `env` time-window deny, empty-env
       delegation identity. Version 0.4.0 → 0.5.0.
+- [x] **Algorithm agility for the verifier (unreleased, post-v0.8.0).**
+      *(2026-07-27)* `Verifier` now dispatches on each key's *declared*
+      algorithm (internal `VerificationKey::{Ed25519, Unsupported}` enum)
+      instead of assuming Ed25519, so an unrecognised algorithm cannot
+      silently verify — see §5 "Algorithm agility" and
+      [authentication-sessions.md](../../../agents/share/authentication-sessions.md)
+      §5.1 for the full rationale. Added `unsupported_key_count()` /
+      `algorithms()`; `key_count()` now counts only usable keys; a
+      duplicate `kid` is a construction error, not last-wins; a token
+      selecting an unsupported key fails `UnsupportedAlgorithm`, not
+      `UnknownKid`. Source-compatible — no consuming crate changed.
+      Landed in `src/lib.rs`; **not yet reflected in a CHANGELOG release
+      heading** (Cargo.toml is still `0.8.0`; this and the three tasks
+      below sit in `CHANGELOG.md`'s `[Unreleased]` pending a version-bump
+      decision — H-5 explicitly deferred cutting a release here rather
+      than create a second, contradictory `[0.8.0]` heading).
+- [x] **cargo-fuzz harness (SEC-I2, unreleased).** *(2026-07-14)* Added
+      `fuzz/` (two libFuzzer targets, `verify` and `policy`) per §11.
+- [x] **SEC-V1/V2/V4 hardening (unreleased).** *(2026-07-13)* HTTPS
+      (or loopback-only HTTP) + timeout + no-redirect + 64 KiB body cap
+      on `from_paseto_keys_url` (SEC-V1, §6 FR9); no vacuous match for a
+      negated `resource.`/`env.` condition on an absent namespace
+      (SEC-V2, §6 FR8); cross-key-forgery, missing-`exp`, and
+      never-panic-on-malformed-input tests (SEC-V4). See
+      [security.md](../../../agents/share/security.md) §2 for the
+      family-wide audit these came out of.
 - [x] **Hot-reloadable verifier for key rotation (v0.8.0).**
       *(2026-07-05)* `ReloadableVerifier` (`RwLock<Arc<Verifier>>`;
       `new`/`current`/`store`; poison-safe; no `Debug`) lets a service
@@ -330,27 +456,57 @@ attribute values, so it is safe for 403 bodies and audit trails.
 The doc set, `fetch` feature, offline-test discipline, and
 packageability (`cargo package --list`) carried over unchanged in shape.
 
-**ABAC shipped (v0.3.0, 2026-07-05).** `Claims.attrs` + the `abac`
-policy engine per §5/§6 FR6–FR7; additive (pre-0.3 tokens verify
-unchanged). 31 unit + 4 doc tests green, clippy clean.
+**ABAC through v0.8.0 shipped (2026-07-05).** `Claims.attrs` + the
+`abac` policy engine (§5/§6 FR6–FR7) plus its four additive follow-ons —
+record-level resource attributes (v0.4.0), ownership templates +
+environment attributes (v0.5.0), obligations (v0.6.0), and hot-reload
+for both the policy (`ReloadablePolicy`, v0.7.0) and the verifier
+(`ReloadableVerifier`, v0.8.0) — are all shipped and released.
+
+**Unreleased since v0.8.0 (as of this audit).** Three further changes
+have landed in `src/`/`fuzz/` but not yet in a dated `CHANGELOG.md`
+heading or a bumped `Cargo.toml` version (see §13): SEC-V1/V2/V4
+hardening (2026-07-13), the `fuzz/` cargo-fuzz harness (SEC-I2,
+2026-07-14), and verifier algorithm agility (2026-07-27, §5). `cargo
+test` is 54 unit + 4 doc tests green (57 unit + 5 doc with
+`--features fetch`, which adds the loopback-fetch tests plus the
+`from_paseto_keys_url` doctest); `cargo clippy --all-targets -- -D
+warnings` and `cargo fmt --check` are both clean. Neither a `authentication-verifier-vX.Y.Z`
+git tag nor a `cargo publish` has happened for any version past the
+crates.io-published 0.2 — confirmed via `git tag -l`, which has no
+`authentication-verifier-*` tag at all, and H-5's own notes, which
+explicitly deferred both the version-bump/tag and the crates.io publish
+decision for this crate.
 
 ## 15. Roadmap
 
 v0.1 (RS256-JWT, superseded): core JWKS verification + `fetch`. v0.2.0:
 **PASETO v4.public pivot** — `from_paseto_keys_*`, footer-`kid`
 selection, Ed25519 verification; same `Claims` role. A **BREAKING**
-change (see [CHANGELOG.md](../CHANGELOG.md)). **v0.3.0 (here): ABAC** —
-the `attrs` claim + the shared `abac` policy engine; additive. Later:
-rotation ergonomics (refetch-on-`UnknownKid`), record-level resource
-attributes and environment attributes if the shared design adopts them
-(authorization-attributes.md §9), removal of `scope`/`roles` in a
-future major.
+change (see [CHANGELOG.md](../CHANGELOG.md)). v0.3.0: **ABAC** — the
+`attrs` claim + the shared `abac` policy engine; additive. v0.4.0–v0.8.0:
+record-level resource attributes, ownership/environment attributes,
+obligations, and hot-reload for both the policy and the verifier — all
+additive (§13, §14). **Unreleased (here): SEC-V1/V2/V4 hardening,
+cargo-fuzz (SEC-I2), and verifier algorithm agility** — landed in code,
+awaiting a version-bump/release decision (§14). Later: refetch-on-
+`UnknownKid` convenience helper, a property test over the PASETO-keys
+parser itself (distinct from the `verify` fuzz target, which fuzzes
+tokens, not key-set documents), removal of `scope`/`roles` in a future
+major.
 
 ## 16. Open questions
 
 - Should the crate offer an Axum extractor, or stay framework-free and
   let each service wrap it? (Currently framework-free.)
 - Multiple audiences per verifier, if peers ever get distinct `aud`s.
+- **Version-bump for the unreleased hardening** — the next release
+  needs a number that doesn't collide with the existing `[0.8.0] -
+  2026-07-05` heading; SEC-V1/V2/V4 are behavioural hardening
+  (arguably a minor, not a patch, since e.g. SEC-V2 changes an ABAC
+  decision in a real if narrow case) and algorithm agility is
+  additive-but-security-relevant. (Lean: `0.9.0`, decided alongside the
+  crates.io publish call, both explicitly deferred by H-5.)
 - ~~PASETO library choice~~ — resolved: `rusty_paseto` (v4 public,
   `default-features = false`) ships in v0.2.0 and builds under
   `#![forbid(unsafe_code)]` (shared-doc §10).

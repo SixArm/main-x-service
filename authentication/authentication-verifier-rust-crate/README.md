@@ -53,6 +53,18 @@ per-request introspection hop.
 > rotation** — e.g. via a periodic re-fetch of `/.well-known/paseto-keys`
 > — without a restart. Keep the current keys on a failed fetch.
 
+> **Unreleased since v0.8.0.** `Cargo.toml` is still `0.8.0`; three
+> further changes have landed in code/tests but not yet in a dated
+> `CHANGELOG.md` release heading (see [CHANGELOG.md](./CHANGELOG.md)
+> `[Unreleased]`): hardened `from_paseto_keys_url` (HTTPS-only except
+> loopback HTTP, timeout, no redirects, a 64 KiB body cap), an ABAC fix
+> so a negated `resource.`/`env.` rule can't match vacuously when no
+> resource/environment was supplied, a `fuzz/` cargo-fuzz harness, and
+> (2026-07-27) the verifier becoming **algorithm-agile**: a key naming
+> an algorithm this build doesn't implement is kept and diagnosed as
+> `UnsupportedAlgorithm` rather than silently dropped — see
+> `spec/index.md` §5.
+
 - Spec: [spec/index.md](./spec/index.md)
 - Agent guide: [AGENTS.md](./AGENTS.md)
 - Design: [authentication-sessions.md](../../agents/share/authentication-sessions.md) §5,
@@ -127,10 +139,12 @@ for the attribute model, policy language, and default policy.
 
 | Item | Purpose |
 |---|---|
-| `Verifier::from_paseto_keys_value(&keys, issuer, audience)` | Build from an in-memory `paseto-keys` document. Loads Ed25519 public keys only (other algorithms are skipped); an empty key set is permitted and rejects every token with `UnknownKid`. |
-| `Verifier::from_paseto_keys_url(url, issuer, audience).await` | Fetch the key set over HTTPS, then build. **Requires `features = ["fetch"]`** (pulls in `reqwest` with rustls). |
-| `Verifier::verify(token) -> Result<Claims, VerifyError>` | Select the key by the token **footer `kid`**, check the PASETO v4.public (Ed25519) signature, then enforce `iss`, `aud`, `exp`, and `nbf`. |
-| `Verifier::key_count() -> usize` | Number of Ed25519 keys loaded from the key set. |
+| `Verifier::from_paseto_keys_value(&keys, issuer, audience)` | Build from an in-memory `paseto-keys` document. Every entry with a `kid` is loaded; an entry naming an algorithm this build doesn't implement is *kept* (diagnosable, not silently skipped — see "Algorithm agility" below) but only Ed25519 entries are usable; a duplicate `kid` is an error, not last-wins; an empty key set is permitted and rejects every token with `UnknownKid`. |
+| `Verifier::from_paseto_keys_url(url, issuer, audience).await` | Fetch the key set, then build. **Requires `features = ["fetch"]`** (pulls in `reqwest` with rustls). Requires `https://`, except `http://` to a loopback host (dev/CI); 10 s timeout; no redirects; 64 KiB response cap. |
+| `Verifier::verify(token) -> Result<Claims, VerifyError>` | Select the key by the token **footer `kid`**, dispatch on its algorithm, check the PASETO v4.public (Ed25519) signature, then enforce `iss`, `aud`, `exp`, and `nbf`. |
+| `Verifier::key_count() -> usize` | Number of **usable** (Ed25519) keys loaded. |
+| `Verifier::unsupported_key_count() -> usize` / `Verifier::algorithms() -> Vec<String>` | How many loaded keys this build cannot use, and the algorithm labels seen — for logging/metrics during an algorithm rollout. |
+| `ReloadableVerifier` | A hot-swappable verifier holder (v0.8): `new(verifier)`, `current() -> Arc<Verifier>` (per-request snapshot), `store(verifier)` (runtime key-set swap for rotation, with no restart). |
 | `Claims` | Verified claims: `sub` (user pid, UUID string), `iss`, `aud`, `iat`, `nbf`, `exp`, `sid` (originating auth-service session), `attrs` (ABAC subject attributes; empty on pre-0.3 tokens), plus `scope`/`roles` (deprecated for authorization). |
 | `Decision` | `{ allowed, reason, obligations }` — the outcome; `obligations` (v0.6) are the deciding allow rule's advisory instructions (`"mask"`, `"audit"`) for the enforcement point. `Decision::requires("mask")` checks one. |
 | `Policy` / `Rule` / `Action` / `Decision` (the `abac` module, re-exported at the root) | The shared ABAC engine: `Policy::from_json` loads a configured policy, `Policy::default_policy()` is the built-in coarse tier, `Policy::evaluate(&claims, action, entity)` decides first-match-wins with default allow-read / deny-mutation. Pure — no I/O, no clock, no panics. |
@@ -142,11 +156,26 @@ for the attribute model, policy language, and default policy.
 
 | Variant | Meaning |
 |---|---|
-| `Keys(String)` | The key-set document was missing or structurally invalid (no key array; Ed25519 entry missing `kid` or public-key material; bad key bytes). |
+| `Keys(String)` | The key-set document was missing or structurally invalid (no key array; Ed25519 entry missing `kid` or public-key material; bad key bytes; a duplicate `kid`). |
+| `Malformed(String)` | The token isn't a structurally valid `v4.public` token, or its footer isn't `{"kid": ...}` — distinct from a signature failure. |
 | `MissingKid` | The token footer carries no `kid`, so no key can be selected. |
 | `UnknownKid(String)` | No loaded key matches the token's `kid` — stale key cache, wrong issuer, or forgery. Refetch the key set to pick up a key rotation. |
-| `Paseto(String)` | Signature, issuer, audience, expiry, or not-before validation failed (or the token was unparseable). |
+| `Paseto(String)` | The Ed25519 signature check failed. |
+| `Claim(String)` | The signature was valid but `iss` / `aud` / `exp` / `nbf` did not satisfy the policy. |
+| `UnsupportedAlgorithm { kid, algorithm }` | The `kid` selected a key whose algorithm this build doesn't implement. Distinct from `UnknownKid` on purpose: refetching the key set will not fix it, upgrading the binary will (algorithm agility, 2026-07-27). |
 | `Fetch(String)` | Fetching the key set over HTTP failed (only with the `fetch` feature). |
+
+### Algorithm agility
+
+Since 2026-07-27, `Verifier` dispatches on each key's *declared*
+algorithm rather than assuming Ed25519, so a future non-Ed25519 key in
+the published set can't silently verify as if it were one. Keys for an
+algorithm this build doesn't implement are **kept, not dropped** — a
+token naming one fails as `UnsupportedAlgorithm` (upgrade the binary),
+not `UnknownKid` (refetch the key set), which is the correct diagnosis
+for a partial algorithm rollout. See
+[authentication-sessions.md](../../agents/share/authentication-sessions.md)
+§5.1 for why this exists ahead of any actual algorithm switch.
 
 ## The paseto-keys / `kid` contract
 

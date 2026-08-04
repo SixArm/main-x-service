@@ -5229,6 +5229,89 @@ committing (see plan.md §4).
     start (other consumer-app crates, from a concurrent sibling task)
     were left untouched.
 
+  - [x] `authentication/authentication-verifier-rust-crate` done
+    2026-08-04. Confirmed first the prompt's own caveat: **two separate
+    dependencies exist and were not conflated** —
+    `link-graph-service-with-loco/Cargo.toml` depends on both
+    `person-matcher` (`Scorer`/`Gender`, for LNK-4's identity-matching
+    suggestions) *and* `authentication-verifier` (with the `fetch`
+    feature, for ABAC/PASETO), confirmed by grep, not assumption. Also
+    checked (and found false) the prompt's premise that H-5 tagged
+    `authentication-verifier-v0.8.0`: `git tag -l` has no
+    `authentication-verifier-*` tag at all, and H-5's own tasks.md entry
+    explicitly lists this crate under "Skipped, and why" — cutting a
+    release under the *current* `0.8.0` would collide with the
+    already-committed `[0.8.0] - 2026-07-05` heading, so H-5 made no
+    CHANGELOG edit, no commit, no tag, and (separately, by explicit user
+    instruction) no crates.io publish for it.
+
+    **The real gap: an entire shipped, security-relevant feature was
+    undocumented everywhere in the crate's own doc set.** Commit
+    `80bb3eee` (2026-07-27, "Make the token verifier algorithm-agile")
+    made `Verifier` dispatch on each key's *declared* algorithm instead
+    of assuming Ed25519 (an internal `VerificationKey::{Ed25519,
+    Unsupported}` enum so an unrecognised algorithm can't silently
+    verify), added `VerifyError::UnsupportedAlgorithm`,
+    `Verifier::unsupported_key_count()`/`algorithms()`, and duplicate-
+    `kid` rejection — but that commit touched only `src/lib.rs` and
+    `agents/share/authentication-sessions.md` (confirmed via `git show
+    --stat`); the crate's own `spec/index.md`, `CHANGELOG.md`,
+    `AGENTS.md`, `README.md`, and `index.md` never mentioned any of it.
+    `README.md`'s API table still said "other algorithms are skipped",
+    which is now the **opposite** of real behaviour (they're kept and
+    diagnosed, not skipped) — a real behavioural contradiction, not
+    just an omission. Separately, `spec/index.md` §5's `VerifyError`
+    listing was missing two more real variants (`Malformed`, `Claim`)
+    and the whole `ReloadableVerifier` type (v0.8.0, shipped
+    2026-07-05) that neither `spec/` nor `AGENTS.md`'s Public API row
+    mentioned at all. Also stale: §3 Stakeholders still named the
+    original eight loco-conversion crates while 16 crates now carry a
+    path dependency (grep-verified; deliberately did not hardcode that
+    number into the fix, since it was already stale once — pointed at
+    the grep instead), and §15 Roadmap's "v0.3.0 (here)" marker was five
+    releases behind reality.
+
+    Fixed `spec/index.md` (§2 Scope, §3 Stakeholders, new "Algorithm
+    agility" §5 subsection, §6 FR5/FR8/FR9 for algorithm-agility/SEC-V2/
+    SEC-V1, §11 fuzz-harness paragraph, four new §13 task entries dated
+    against `git log`, §14 implementation-status + test-count refresh,
+    §15 Roadmap, a new §16 open question on the pending version bump),
+    `AGENTS.md` (Public API row, golden rule 4, a new unreleased-work
+    callout, `fuzz/` added to Layout), `README.md` (the false "skipped"
+    claim, the `VerifyError` table's 3 missing variants, `key_count`/
+    `ReloadableVerifier`/`unsupported_key_count`/`algorithms` rows, a
+    new "Algorithm agility" section), and `index.md`'s worked-flow
+    diagram (`attrs` was missing from the `Claims` sketch; added the
+    ABAC decision step and the hot-reload rotation path). Also filled
+    the CHANGELOG gap directly: added the missing algorithm-agility
+    entry to `[Unreleased]` (test names cross-checked against `cargo
+    test` output, not invented) — SEC-V1/V2/V4 and the SEC-I2 fuzz
+    harness were already correctly documented in `[Unreleased]`, only
+    algorithm-agility (the newest change, landing after all of those)
+    had no entry anywhere. Did not bump the `Cargo.toml` version, cut a
+    release, tag, or publish — same H-5 blocker (no non-colliding
+    version number without a version-bump decision this task doesn't
+    own), now recorded as an explicit open question in §16 instead of
+    silently repeating the gap.
+
+    By contrast, the session's other headline addition to this
+    crate — `src/abac.rs`'s hot-reload/obligations/resource-attribute/
+    environment-attribute machinery (v0.4.0–v0.8.0) — was **already**
+    accurately and completely documented in `spec/index.md` §5/§13
+    before this audit; no fix needed there, confirmed by reading every
+    public `abac.rs` item against the spec's claims about it.
+
+    **Verified, not assumed:** `cargo test` (54 unit + 4 doc, green),
+    `cargo test --features fetch` (57 unit + 5 doc, green), `cargo
+    clippy --all-targets -- -D warnings` clean, `cargo fmt --check`
+    clean, `cargo package --list` unchanged (matches the `include =`
+    allowlist in `Cargo.toml`; `spec/`/`AGENTS.md`/`index.md`/`fuzz/`
+    were never packaged, which is correct and untouched) — all run
+    before and after the doc edits, no `src/` behaviour touched. Did
+    not touch `integrity-mac-rust-crate` or `link/entity-ref-rust-crate`
+    (sibling agents' concurrent work, both already landed above) or any
+    entity service.
+
 - [ ] **DOC-6 (M)** `link-graph-service-with-loco`'s `spec/`,
   `AGENTS.md`, `README.md`/`index.md`. **Queue this after LNK-4's
   T-29..T-33 chain finishes** (active file conflicts otherwise) — by

@@ -34,10 +34,29 @@ secret and no per-request introspection call.
 > nine entity services call from their blanket `/api/*` guards.
 > `scope` / `roles` are deprecated for authorization.
 
+> **v0.4.0–v0.8.0 — ABAC grows record/environment awareness + hot-reload
+> (all additive).** Record-level `resource.*` attributes (0.4),
+> `$sub`/`$email` ownership templates + `env.*` attributes (0.5),
+> obligations like `"mask"`/`"audit"` on `Decision` (0.6), and
+> hot-reloadable holders for both the policy (`ReloadablePolicy`, 0.7)
+> and the verifier (`ReloadableVerifier`, 0.8) — key rotation with no
+> restart. See `CHANGELOG.md` for each.
+>
+> **Unreleased since v0.8.0 (security hardening + fuzzing +
+> verifier algorithm agility).** `Cargo.toml` is still `0.8.0` — these
+> landed in code and tests but not yet in a dated `CHANGELOG.md`
+> heading or a version bump (a deliberate H-5 deferral, not an
+> oversight): SEC-V1 (`from_paseto_keys_url` now requires HTTPS, or
+> HTTP to loopback only, with a timeout/no-redirect/64 KiB body cap),
+> SEC-V2 (a negated `resource.`/`env.` condition no longer matches
+> vacuously when the namespace is absent), a `fuzz/` cargo-fuzz harness
+> (SEC-I2), and (2026-07-27) the `Verifier` becoming algorithm-agile —
+> see the golden rule below and `spec/index.md` §5/§13/§14.
+
 | Question | Answer |
 |---|---|
 | Kind | Plain library crate (no framework, no database, no I/O by default). |
-| Public API | `Verifier::{from_paseto_keys_value, from_paseto_keys_url, verify, key_count}`, `Claims` (incl. the 0.3 `attrs` ABAC claim), `VerifyError`, and the `abac` module (`Policy`, `Rule`, `Action`, `ActionPattern`, `Effect`, `Decision` — re-exported at the root). |
+| Public API | `Verifier::{from_paseto_keys_value, from_paseto_keys_url, verify, key_count, unsupported_key_count, algorithms}`, `ReloadableVerifier` (0.8 hot-reload holder), `Claims` (incl. the 0.3 `attrs` ABAC claim), `VerifyError` (incl. the 2026-07-27 `UnsupportedAlgorithm` variant), and the `abac` module (`Policy`, `Rule`, `Action`, `ActionPattern`, `Effect`, `Decision`, `ReloadablePolicy` — re-exported at the root). |
 | Features | `fetch` — HTTPS key-set loading via `reqwest` (rustls). Default: none. |
 | Build | `cargo build` |
 | Test | `cargo test` (fully offline; throwaway Ed25519 test keypair). |
@@ -57,9 +76,15 @@ secret and no per-request introspection call.
 3. **Stay dependency-light.** Core deps are a PASETO v4 library (e.g.
    `rusty_paseto`), `serde`, `serde_json`, `thiserror` only. Anything
    heavier (HTTP, async runtimes) goes behind a feature like `fetch`.
-4. **PASETO v4.public only; Ed25519 keys only.** Non-Ed25519 key
-   entries are skipped, and that's deliberate — the service publishes
-   Ed25519 public keys exclusively. No PASETO `local` (symmetric).
+4. **PASETO v4.public only; verification implements Ed25519 only.**
+   The service publishes Ed25519 public keys today, and this build only
+   knows how to check that signature — but (2026-07-27, algorithm
+   agility) a key set entry naming a *different* algorithm is **kept,
+   not silently skipped**: it is diagnosed as `UnsupportedAlgorithm` if
+   a token ever selects it, so a partial rollout to a future algorithm
+   fails loud rather than as a misleading `UnknownKid`. See
+   `spec/index.md` §5 "Algorithm agility". No PASETO `local`
+   (symmetric).
 5. **No panics in the API.** Every failure mode is a `VerifyError`
    variant. An empty key set is valid input (rejects with `UnknownKid`).
 6. **`#![forbid(unsafe_code)]`** stays.
@@ -72,6 +97,8 @@ src/lib.rs        verification: Verifier, Claims, VerifyError,
 src/abac.rs       authorization: the shared ABAC policy engine
                   (Policy, Rule, Action, Decision) + engine unit tests
 spec/index.md     living spec (§1–§18)
+fuzz/             standalone cargo-fuzz crate (SEC-I2); not a
+                  workspace member, never affects the stable build
 ```
 
 ## When you are unsure

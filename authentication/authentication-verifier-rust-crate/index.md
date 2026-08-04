@@ -22,8 +22,11 @@ boot          ──>  GET /.well-known/paseto-keys  (once, from the auth servic
                       │  Verifier::from_paseto_keys_value(&keys, issuer, audience)
                       │  (or Verifier::from_paseto_keys_url(...) with feature "fetch")
 per request   ──>  verifier.verify(bearer_token)   // PASETO v4.public, footer kid
-                      │  -> Claims { sub: pid, iss, aud, iat, nbf, exp, sid, scope/roles }
-key rotation  ──>  on VerifyError::UnknownKid, refetch the key set and rebuild
+                      │  -> Claims { sub: pid, iss, aud, iat, nbf, exp, sid, attrs, scope/roles }
+                      │  policy.evaluate(&claims, action, entity) -> Decision  // ABAC
+key rotation  ──>  on VerifyError::UnknownKid, refetch the key set and rebuild —
+                      or hold a ReloadableVerifier and `store()` a fresh one on a
+                      timer, so rotation needs no restart (v0.8.0)
 ```
 
 ## Relationship to the entity

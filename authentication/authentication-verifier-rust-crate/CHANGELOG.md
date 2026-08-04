@@ -10,6 +10,46 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — algorithm agility for the verifier
+
+- **`Verifier` dispatches on each key's *declared* algorithm** instead of
+  assuming Ed25519. Keys are held internally as an enum
+  (`VerificationKey::{Ed25519, Unsupported}`) specifically so
+  verification cannot fall through to a default: an unrecognised
+  algorithm can only ever land in `Unsupported`, which carries no key
+  material, and adding a future algorithm variant breaks the match until
+  it is handled deliberately.
+- **A key naming an algorithm this build doesn't implement is now kept,
+  not silently dropped.** Previously such a key was skipped at load, so
+  a token naming it failed as `UnknownKid` — a correct rejection with a
+  misleading diagnosis, since a refetch returns the same key and the
+  same failure forever. It now fails as the new
+  **`VerifyError::UnsupportedAlgorithm { kid, algorithm }`**, which says
+  "upgrade this binary" — the actual fix during a partial algorithm
+  rollout.
+- **`Verifier::key_count()` now counts only usable (Ed25519) keys.** New
+  **`Verifier::unsupported_key_count()`** and **`Verifier::algorithms()`**
+  make an in-progress rollout visible (e.g. as metrics) rather than
+  hidden inside a single opaque count.
+- **A duplicate `kid` in a key set is now a construction error**
+  (`VerifyError::Keys`), not a last-wins merge — a verifier whose answer
+  depended on JSON array order would fail intermittently after a
+  rotation and be close to undiagnosable.
+- This is the readiness step for the one Shor-vulnerable component in
+  the family's auth path (the Ed25519 signature on cross-service PASETO
+  tokens): nothing here switches algorithm, it only makes a future
+  switch a **key rotation** rather than a coordinated code migration.
+  See
+  [authentication-sessions.md](../../agents/share/authentication-sessions.md)
+  §5.1 for the full rationale (why this is "be ready", not "act now";
+  the realistic next-algorithm paths; why `v4.local` and introspection
+  are excluded).
+- Source-compatible: every consuming service crate builds unchanged.
+- Test: `an_unsupported_key_can_never_produce_an_accept`,
+  `token_naming_an_unsupported_algorithm_reports_the_algorithm`,
+  `unselectable_unsupported_entry_is_skipped_not_fatal`,
+  `unknown_algorithm_in_the_key_set_does_not_break_ed25519`.
+
 ### Added — cargo-fuzz harness (SEC-I2)
 
 - A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate with two
