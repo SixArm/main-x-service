@@ -48,7 +48,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - **Re-spec to httpOnly-cookie + BFF session model (2026-06-17).** Adopted
   the canonical design doc
-  [`AGENTS/share/authentication-sessions.md`](../../AGENTS/share/authentication-sessions.md)
+  [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
   (single source of truth). **Supersedes the prior bearer-token SPA
   model.** Spec/docs only in this entry; the code follow-up is tracked in
   spec §13.
@@ -102,7 +102,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - **Cross-origin SSO token handoff (issuer side).** This front-end is now
   the issuer in the first-party, OAuth-implicit-shaped token handoff (see
-  `AGENTS/share/jwt-enforcement.md`).
+  `agents/share/jwt-enforcement.md`).
   - **Federation key.** `session.start()` mirrors the issued access token
     to the shared `localStorage["mxi_access_token"]` key (in addition to
     the back-compat `mxi.auth.token` / `mxi.auth.user`); `clear()` removes
@@ -166,9 +166,45 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Configuration
 
-- `PUBLIC_API_BASE_URL` (default `http://localhost:5150`): auth service
-  REST base URL, called **server-side** by the BFF.
-- `VITE_RETURN_TO_ALLOWLIST` (default empty ⇒ same-origin only):
-  comma-separated operator-app origins the post-verify redirect may
-  target. An **open-redirect** control — no credential travels in the
-  redirect (the `#access_token=` handoff is removed).
+- `AUTH_API_URL` (default `http://localhost:5150`): auth service REST
+  base URL, read **server-side only** by the BFF (`src/lib/server/auth.ts`,
+  `src/lib/server/admin.ts`). This is the var that configures the running
+  app — corrected 2026-08-04 (DOC-4); previously documented as
+  `PUBLIC_API_BASE_URL`, which is not read by any live route (see below).
+- `PUBLIC_API_BASE_URL` / `VITE_RETURN_TO_ALLOWLIST` — **dead**, feed only
+  the disconnected `src/lib/api/{client,auth}.ts` pre-BFF layer, which no
+  route imports (only its own unit tests do). The `return_to` handoff
+  `VITE_RETURN_TO_ALLOWLIST` fed is itself removed (`f66ff50f`,
+  2026-06-18) — see the docs-audit entry below.
+
+### Documentation (2026-08-04, DOC-4 audit)
+
+- Corrected `.env.example`, `README.md`, `AGENTS.md`, and `spec/index.md`
+  to document `AUTH_API_URL` (the real, server-only var the live BFF
+  reads) instead of `PUBLIC_API_BASE_URL` (unused by any route).
+- Removed/corrected extensive stale documentation of the cross-origin
+  `return_to` handoff (spec §5/§6/§10/§11/§13/§16, `README.md`,
+  `index.md`): the feature — and its implementing file
+  `src/lib/auth/return-to.ts` — was fully deleted in `f66ff50f`
+  (2026-06-18), but the docs kept describing it as live for the ~7 weeks
+  since. `/verify` now documented accurately: always redirects to `/`.
+- Documented that the UI ships the full family-standard **13-locale**
+  catalog (`spec/index.md` §4/§7, `README.md`, `AGENTS.md`, `index.md`),
+  not just English + Welsh as previously written — the expansion landed
+  in code back in `f66ff50f`/`459f8daa` but was never reflected in prose.
+- Documented, rather than silently fixed, two real gaps found live: (1)
+  `tests/e2e/smoke.spec.ts` fails 5 of 9 cases because its browser-side
+  `page.route()` stubs cannot intercept the BFF's server-side `fetch`
+  calls — a gap dating to the same BFF migration, not introduced here;
+  (2) `src/lib/api/{client,auth}.ts` is dead code (no route imports it,
+  only its own 19 unit tests do). Both recorded in `spec/index.md`
+  §11/§13/§14 as open work, not fixed in this pass.
+- Fixed `AGENTS/share/…` link casing to `agents/share/…` across `spec/`,
+  `README.md`, `AGENTS.md`, `index.md`, `CHANGELOG.md` — this crate was
+  the only one of the 11 front-ends using the uppercase form (431 other
+  references repo-wide use lowercase; git tracks the directory itself as
+  `AGENTS`, but case-insensitive local checkouts masked the mismatch).
+- Added the missing `## 11. Testing` heading to `spec/index.md` — the
+  testing content existed but had no section header, leaving §10
+  (Persistence) run straight into it and the numbering jump from §10 to
+  §12 unexplained.

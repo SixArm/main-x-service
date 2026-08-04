@@ -12,14 +12,17 @@ A SvelteKit 2 / Svelte 5 (runes) app for passwordless magic-link
 **sign up / sign in / sign out**, structured as a **Backend-For-Frontend
 (BFF)**: the SvelteKit **server** holds the session and calls the auth
 service; the browser holds only the httpOnly `__Host-mxi_session` cookie.
-The UI is bilingual (English + Welsh / Cymraeg) via a dependency-free i18n
-store (`src/lib/i18n.svelte.ts`); the chosen locale is also sent to the
-service so the magic-link email language matches.
+The UI ships the family's standard **13-locale** catalog (not just
+English + Welsh — see the Glossary note in `spec/index.md` §4) via a
+dependency-free i18n store (`src/lib/i18n.svelte.ts`); the chosen locale
+is also sent to the service so the magic-link email language matches.
 
 > **Session model (canonical):**
-> [`AGENTS/share/authentication-sessions.md`](../../AGENTS/share/authentication-sessions.md).
+> [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
 > No token in browser JS. **Supersedes the prior bearer-token /
-> `localStorage` SPA model** (and its `#access_token=` handoff).
+> `localStorage` SPA model** (and its `#access_token=`/`return_to` cross-
+> origin handoff, removed entirely — not just the credential part; see
+> spec §13).
 
 ## Ground rules
 
@@ -28,10 +31,11 @@ service so the magic-link email language matches.
    (events are callback props).
 2. **BFF, not pure SPA.** The auth-bearing paths (verify, dashboard load,
    sign-out) run on the SvelteKit **server** (`hooks.server.ts` /
-   `+page.server.ts` / `+server.ts`) so the httpOnly session cookie is
-   held server-side. The session is a **cookie**, never `localStorage`.
-   Add CSRF protection to browser→BFF mutations
-   (`AGENTS/share/authentication-sessions.md` §4). Read-only UI may still
+   `+page.server.ts` / `+layout.server.ts`) so the httpOnly session cookie
+   is held server-side. The session is a **cookie**, never `localStorage`.
+   CSRF protection on browser→BFF mutations is implemented
+   (`agents/share/authentication-sessions.md` §4; `src/lib/server/session.ts`
+   holds the `__Host-mxi_csrf` cookie helpers). Read-only UI may still
    render client-side, but any auth-bearing fetch goes through the BFF.
 3. **TypeScript strict** (with `noUncheckedIndexedAccess`).
 4. **Minimal deps.** Unlike the data-heavy sibling front-ends, this UI
@@ -40,38 +44,50 @@ service so the magic-link email language matches.
    `package.json` but currently **unused in `src/`**. Add nothing further
    unless a real need appears (drift is accepted family-wide).
 5. **No envelope.** The auth service is loco.rs and returns **raw JSON**
-   (no `{success,data,error}` wrapper). `src/lib/api/client.ts` is
-   deliberately leaner than the enveloped clients in sibling front-ends.
+   (no `{success,data,error}` wrapper).
+6. **`src/lib/api/` is dead code, not a client library to extend.**
+   `client.ts` (`ApiClient`) and `auth.ts` (`AuthRepository`) are the
+   pre-BFF, browser-held-token model's HTTP layer. No route imports
+   either one today — the live BFF calls the auth service via
+   `src/lib/server/auth.ts` / `src/lib/server/admin.ts` instead (plain
+   `fetch` against `AUTH_API_URL`, never a shared client class). `api/`'s
+   only remaining callers are its own unit tests
+   (`tests/unit/client.test.ts`, `tests/unit/auth.test.ts`). Don't wire a
+   new route to it without first checking whether it should be deleted
+   instead — see spec §13.
 
 ## Layout
 
 Layout under the BFF model (landed; the prior `session.svelte.ts` token
-store + fragment handoff are
-removed):
+store, `src/lib/auth/return-to.ts`, and the fragment handoff are removed
+— not just superseded, deleted, in `f66ff50f`):
 
 ```
 src/
-├── hooks.server.ts               BFF: read/validate __Host-mxi_session, populate event.locals
+├── hooks.server.ts               BFF: read __Host-mxi_session + __Host-mxi_csrf, populate event.locals
+├── app.d.ts                      App.Locals: sessionId, csrfToken
 ├── lib/
-│   ├── config.ts                 PUBLIC_API_BASE_URL (:5150) + VITE_RETURN_TO_ALLOWLIST
-│   ├── i18n.svelte.ts            bilingual (en/cy) catalog + reactive locale store + t()
-│   ├── server/                   server-only BFF: session + CSRF cookie helpers, /token exchange, admin.ts (ABAC attribute GET/PUT)
-│   ├── api/
-│   │   ├── client.ts             lean fetch wrapper (server-side; attaches cookie/bearer, ApiError)
-│   │   ├── types.ts              LoginResponse / CurrentUser (mirror the service views)
-│   │   └── auth.ts               AuthRepository (signup/magic-link/verify/me/signout)
-│   └── auth/
-│       └── return-to.ts          return_to allowlist (open-redirect control) + plain redirect decision
+│   ├── config.ts                 dead: PUBLIC_API_BASE_URL + VITE_RETURN_TO_ALLOWLIST, read only by lib/api/ below
+│   ├── i18n.svelte.ts            13-locale catalog + reactive locale store + t() (en source of truth; see spec §4)
+│   ├── server/                   the REAL BFF, reads AUTH_API_URL (private, server-only):
+│   │   ├── session.ts              SESSION_COOKIE/CSRF_COOKIE names + options, Set-Cookie parsing
+│   │   ├── auth.ts                 verifyMagicLink/requestMagicLink/signup/exchangeToken/currentUser/signout
+│   │   └── admin.ts                ABAC attribute GET/PUT (exchanges session for a bearer first)
+│   └── api/                      DEAD — no route imports this; kept alive only by its own unit tests (see Ground rule 6)
+│       ├── client.ts               ApiClient (reads config.ts's PUBLIC_API_BASE_URL)
+│       ├── types.ts                LoginResponse / CurrentUser (mirror the service views; still used by server/ too)
+│       └── auth.ts                 AuthRepository (signup/magic-link/verify/me/signout)
 └── routes/
-    ├── +layout.svelte            nav + signed-in badge
-    ├── +page.svelte              account dashboard (data from +page.server.ts)
-    ├── +page.server.ts           dashboard load: read cookie → GET /me ; sign-out action
-    ├── signup/+page.svelte       request a magic link (new account)
-    ├── signin/+page.svelte       request a magic link (existing account)
+    ├── +layout.server.ts         resolves the signed-in user: cookie → /token exchange → GET /me (drives every page)
+    ├── +layout.svelte            top nav + locale/theme pickers + signed-in badge
+    ├── +page.svelte              account dashboard (data from +layout.server.ts, NOT its own load)
+    ├── +page.server.ts           sign-out action ONLY (no load of its own)
+    ├── signup/+page.svelte + +page.server.ts   request a magic link (new account)
+    ├── signin/+page.svelte + +page.server.ts   request a magic link (existing account)
     ├── admin/attributes/         operator UI: view/replace a user's ABAC attributes (?pid=…; admin-gated; save action)
     └── verify/
         ├── +page.svelte          status UI
-        └── +page.server.ts       consume ?token= server-side -> set session + CSRF cookies -> redirect
+        └── +page.server.ts       consume ?token= server-side -> set session + CSRF cookies -> redirect to "/" (always; no return_to)
 ```
 
 ## API consumption
@@ -84,23 +100,30 @@ on mutations).
 |---|---|
 | Sign up | `POST /api/auth/signup {email, name?, locale?}` |
 | Sign in | `POST /api/auth/magic-link {email, locale?}` |
-| Verify (`/verify?token=…`) | `GET /api/auth/magic-link/{token}` → relay `Set-Cookie: __Host-mxi_session` |
-| Dashboard | `GET /api/auth/me` (session cookie) |
-| Sign out | `POST /api/auth/signout` (session cookie) → revoke + clear cookie |
-| Manage attributes (admin) | `GET`/`PUT /api/auth/admin/users/{pid}/attributes` (bearer from the session exchange; requires `access=admin`) |
+| Verify (`/verify?token=…`) | `GET /api/auth/magic-link/{token}` → relay `Set-Cookie: __Host-mxi_session` (and `__Host-mxi_csrf`) |
+| Dashboard load, every page | `POST /api/auth/token` (session cookie + CSRF header → bearer) then `GET /api/auth/me` (bearer) |
+| Sign out | `POST /api/auth/token` (as above) then `POST /api/auth/signout` (bearer) → revoke + clear cookies |
+| Manage attributes (admin) | `POST /api/auth/token` then `GET`/`PUT /api/auth/admin/users/{pid}/attributes` (bearer; requires `access=admin`) |
 
-The `POST /api/auth/token` exchange is cookie-authed and mutating, so the
-BFF echoes the session's CSRF token (captured from `__Host-mxi_csrf` at
-verify, re-hosted httpOnly on this origin) in the `X-CSRF-Token` header.
+`GET /me` and `POST /signout` are **not** called with the session cookie
+directly — every one of them first spends the session on a
+`POST /api/auth/token` exchange (cookie + CSRF header → short-lived
+PASETO), then calls with `Authorization: Bearer <token>`. This exchange
+is cookie-authed and mutating, so the BFF echoes the session's CSRF token
+(captured from `__Host-mxi_csrf` at verify, re-hosted httpOnly on this
+origin) in the `X-CSRF-Token` header.
 
-`locale` is the optional current UI locale (`en`/`cy`); it makes the
-magic-link email language match the UI and drops out of the body when
-unset (the service defaults to English). No token is returned to or held
-by the browser — the credential is the httpOnly session cookie
-(`AGENTS/share/authentication-sessions.md` §3, §6).
+`locale` is the optional current UI locale (any of the 13 supported
+codes); it makes the magic-link email language match the UI and drops
+out of the body when unset (the service defaults to English). No token
+is returned to or held by the browser — the credential is the httpOnly
+session cookie (`agents/share/authentication-sessions.md` §3, §6).
 
 In development the magic link is printed to the **auth service console**
-(no SMTP). The link points at `{FRONTEND_URL}/verify?token=…`.
+(no SMTP) — confirmed live in `tutorials/03-authentication-abac.md`
+(TUT-3). The link points at `{FRONTEND_URL}/verify?token=…`, where
+`FRONTEND_URL` is the **auth service's own** env var (not read by this
+front-end).
 
 ## Commands
 
@@ -108,8 +131,17 @@ In development the magic link is printed to the **auth service console**
 pnpm install
 pnpm dev          # http://localhost:5173
 pnpm run check    # svelte-check (strict)
+pnpm test         # vitest (unit) — passing
 pnpm run build
 ```
 
-Configure the API base URL with `PUBLIC_API_BASE_URL` (see
-`.env.example`).
+Configure the auth-service base URL with `AUTH_API_URL` (see
+`.env.example`; NOT `PUBLIC_API_BASE_URL` — see Ground rule 6).
+
+`pnpm run test:e2e` (playwright) currently **fails 5 of 9 cases** — its
+`page.route()` stubs intercept only browser-issued requests, but every
+auth-service call moved server-side under the BFF migration, so
+`AUTH_API_URL` (unset in CI/dev ⇒ `http://localhost:5150`) is hit for
+real and the stub never engages. This is a pre-existing, unfixed gap
+from the BFF migration (`f66ff50f`), not something introduced by this
+audit; see spec §11/§13.

@@ -4932,6 +4932,80 @@ committing (see plan.md §4).
     task's boundary) or any of the other ten front-ends (concurrent
     sibling audits).
 
+  - *`authentication/authentication-front-end-with-svelte` done
+    2026-08-04 — 11th and last crate in this batch.* This front-end has
+    no shared `.env.example`-var precedent to lean on (it's the SSO
+    front-end, not an entity consumer of it), so the pattern the other
+    ten found (`PUBLIC_API_BASE_URL` documented, real var
+    different) had to be independently re-discovered here, and it was:
+    the live BFF (`src/lib/server/auth.ts`, `admin.ts`) reads
+    `AUTH_API_URL` (private, server-only); `.env.example`/`README.md`/
+    `AGENTS.md`/`spec/index.md` all instead documented
+    `PUBLIC_API_BASE_URL`, which feeds a **dead** parallel API layer
+    (`src/lib/api/{client,auth}.ts` + `src/lib/config.ts`) that no route
+    imports — its only callers are its own 19 unit tests
+    (`client.test.ts` + `auth.test.ts`). Fixed `.env.example` to lead
+    with `AUTH_API_URL`, demoting the two dead vars to a commented-out,
+    clearly-labelled block. Two larger findings beyond the env-var
+    pattern: (1) **an entire feature — the cross-origin `return_to`
+    handoff — was deleted from code in `f66ff50f` (2026-06-18) but kept
+    being described as live** across `spec/index.md` (§5 route table,
+    FR 3/4, §10 sessionStorage, §11, §13, §16), `README.md` ("Cross-
+    origin `return_to`" section), and `index.md` (a full worked
+    example) for the ~7 weeks since — `src/lib/auth/return-to.ts` and
+    `tests/unit/return-to.test.ts` don't exist; `/verify` unconditionally
+    redirects to `/`. Confirmed via `organization-front-end-with-svelte`'s
+    own independent `/signin` that every sibling is now its own BFF with
+    its own session, so the handoff has no architectural reason to come
+    back — rewrote every affected section rather than patching around
+    the gap. (2) **the UI silently grew from bilingual (en/cy) to the
+    full family 13-locale catalog** (`f66ff50f`/`459f8daa`, RTL for
+    ar/ur, a live `tests/unit/i18n.test.ts` parity assertion) with zero
+    prose update anywhere — `spec/`, `README.md`, `AGENTS.md`, `index.md`
+    all still said "bilingual (English + Welsh)"; fixed throughout.
+    Also fixed: this crate was the **only one of the 11** front-ends
+    using `AGENTS/share/…` (uppercase) link casing instead of the
+    `agents/share/…` all 431 other references repo-wide use — git
+    tracks the directory as `AGENTS`, so the uppercase form isn't
+    "wrong" in isolation, but macOS's case-insensitive filesystem was
+    masking an inconsistency that would 404 on a case-sensitive host;
+    conformed to the repo-wide convention across `spec/`, `README.md`,
+    `AGENTS.md`, `index.md`, `CHANGELOG.md`. Added a missing
+    `## 11. Testing` heading in `spec/index.md` (the section's content
+    existed but had no header, so §10 ran straight into it and the
+    numbering silently skipped from §10 to §12). **Ran `pnpm test:e2e`
+    (not just check/test/build) per this task's instruction and found a
+    real, live-failing suite: 5 of 9 Playwright cases fail.** Checked
+    this against the `/api/proxy` prefix bug three sibling audits
+    (case, care-pathway) and organization found this session (coordinator
+    flagged it mid-task) — confirmed empirically it's a *different*,
+    more fundamental bug: this crate has no `/api/proxy` client-side
+    passthrough at all (unlike the entity front-ends), so every
+    auth-service call happens inside SvelteKit server actions/loads
+    (Node-side `fetch`), which Playwright's `page.route()` cannot
+    intercept under any circumstances — proved by instrumenting
+    `page.on('request')` during a sign-in submit and observing zero
+    requests to any `/api/auth/*` path. Documented rather than silently
+    patched (a real fix needs a Node-level fetch intercept or a live
+    auth-service, out of scope for a doc pass): `spec/index.md` §11/§13
+    now states the true 4/9 pass rate and root cause, as do `README.md`
+    and `AGENTS.md`. Also flagged (not fixed): zero unit coverage of the
+    real `src/lib/server/auth.ts`/`admin.ts` functions the live routes
+    actually call — only the dead `src/lib/api/` layer is unit-tested.
+    `pnpm check` (370 files, 0/0), `pnpm test` (36/36 across 5 files),
+    and `pnpm build` all verified green before and after the doc edits
+    (doc-only change; no `src/` file touched). Did not attempt to fix
+    the e2e suite or delete the dead `src/lib/api/` layer — both flagged
+    in `spec/index.md` §13 as open code decisions, not doc fixes.
+
+  **DOC-4 status: 10 of 11 front-ends done as of 2026-08-04**
+  (organization, thing, worker, course, place, person, case,
+  care-pathway, event, authentication). `project-portfolio-management`
+  was still in progress (uncommitted local changes observed) when this
+  note was written — leaving the parent checkbox unmarked until its
+  sub-note lands; whoever closes it out last should flip `DOC-4` to
+  `[x]` once all 11 are genuinely present above.
+
 - [ ] **DOC-5 (M)** Library crates' `spec/`, `AGENTS.md`/`CLAUDE.md`,
   `README.md`/`index.md`: `authentication-verifier-rust-crate`,
   `integrity-mac-rust-crate`, `link/entity-ref-rust-crate`. Smaller

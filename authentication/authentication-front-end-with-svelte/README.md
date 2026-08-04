@@ -4,14 +4,15 @@ Operator UI for the [Authentication Service](../authentication-service-with-loco
 passwordless email magic-link **sign up / sign in / sign out**.
 
 SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · **BFF** (server-side
-session) · bilingual (English + Welsh / Cymraeg).
+session) · 13-locale UI (English, Welsh / Cymraeg, + 11 more).
 
 > **Session model.** Login establishes a **server-side session**; the
 > browser holds only the httpOnly `__Host-mxi_session` cookie — no token in
 > JS. See the canonical design doc
-> [`AGENTS/share/authentication-sessions.md`](../../AGENTS/share/authentication-sessions.md).
+> [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
 > This **supersedes the prior bearer-token / `localStorage` SPA model**
-> (and its `#access_token=` cross-origin handoff).
+> (and its `#access_token=`/`return_to` cross-origin handoff — removed
+> entirely, not just the credential part).
 
 ## Routes
 
@@ -31,7 +32,7 @@ session) · bilingual (English + Welsh / Cymraeg).
 ## Quick start
 
 ```bash
-cp .env.example .env     # PUBLIC_API_BASE_URL=http://localhost:5150
+cp .env.example .env     # AUTH_API_URL=http://localhost:5150
 pnpm install
 pnpm dev                 # http://localhost:5173
 ```
@@ -43,22 +44,29 @@ exchanges the token server-side; the auth service sets the
 
 ## Language (i18n)
 
-The UI is bilingual: **English** (`en`) and **Welsh / Cymraeg** (`cy`) —
-the latter a deliberate UK public-sector Welsh-language-duty choice. Pick
-a language via the Lily `LocalePicker` in the top-bar layout (a Lily
-`ThemePicker` sits beside it for theme choice); the locale persists to
-`localStorage["mxi.auth.locale"]` and re-renders every string live. It is
+The UI ships the family's standard **13-locale** catalog (English, Welsh
+`cy`, Spanish, French, German, Arabic, Russian, Hindi, Mandarin, Bengali,
+Portuguese, Indonesian, Urdu) — Welsh a deliberate UK public-sector
+Welsh-language-duty choice, the other eleven matching the sibling
+front-ends' coverage. Pick a language via the Lily `LocalePicker` in the
+top-bar layout (a Lily `ThemePicker` sits beside it for theme choice);
+the locale persists to `localStorage["mxi.auth.locale"]` and re-renders
+every string live, including right-to-left layout for Arabic/Urdu. It is
 also sent as a `locale` hint on sign-up / sign-in so the **magic-link
 email** arrives in the same language. There is no i18n library — just a
-small per-locale catalog and a reactive store in
-`src/lib/i18n.svelte.ts`.
+per-locale catalog and a reactive store in `src/lib/i18n.svelte.ts`
+(`pnpm test` pins full 13-locale key coverage).
 
 ## Configuration
 
 | Var | Default | Purpose |
 |---|---|---|
-| `PUBLIC_API_BASE_URL` | `http://localhost:5150` | Auth service REST base URL (no trailing slash). Called **server-side** by the BFF. |
-| `VITE_RETURN_TO_ALLOWLIST` | _(empty)_ | Comma-separated operator-app origins (exact `scheme://host[:port]`) the post-verify redirect may target. Unset/empty ⇒ same-origin only. An **open-redirect** control — no credential travels in the redirect. |
+| `AUTH_API_URL` | `http://localhost:5150` | Auth service REST base URL (no trailing slash). Read **server-side only**, by the BFF (`src/lib/server/auth.ts`, `src/lib/server/admin.ts`). This is the var that actually configures the running app. |
+
+`PUBLIC_API_BASE_URL` and `VITE_RETURN_TO_ALLOWLIST` also appear in
+`.env.example` but are **dead**: they feed `src/lib/config.ts` →
+`src/lib/api/{client,auth}.ts`, which no route imports (only their own
+unit tests do). See `AGENTS.md` Ground rule 6.
 
 ## How it works
 
@@ -71,9 +79,10 @@ httpOnly cookie the browser cannot read.
   establishes a server-side session and returns
   `Set-Cookie: __Host-mxi_session=…` (HttpOnly · Secure · `SameSite=Lax` ·
   `__Host-` prefix), which the BFF relays to the browser.
-- The dashboard load and sign-out run on the server, reading the cookie
-  and calling `GET /me` / `POST /signout` (the latter revokes the session
-  and clears the cookie).
+- The dashboard load and sign-out run on the server: reading the cookie,
+  exchanging it for a short-lived bearer (`POST /token`), and calling
+  `GET /me` / `POST /signout` with that bearer (the latter revokes the
+  session and clears the cookies).
 - **No token in browser JS.** The `localStorage` access token,
   `mxi_access_token` federation key, and `Authorization: Bearer` from the
   browser are all gone.
@@ -81,32 +90,41 @@ httpOnly cookie the browser cannot read.
   validated server-side.
 
 Full design (session table, cookie attributes, CSRF, cross-service PASETO,
-rollout): [`AGENTS/share/authentication-sessions.md`](../../AGENTS/share/authentication-sessions.md).
+rollout): [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
 
-### Cross-origin `return_to`
+### No cross-origin handoff
 
-An operator app on a different origin links here to sign in and is sent
-back afterwards — but **no credential is handed off** (each origin is
-signed in via its own session cookie):
-
-1. The operator app links here as
-   `/signin?return_to=<absolute operator-app URL>` (or `/signup?...`).
-2. If `origin(return_to)` is allowlisted (`VITE_RETURN_TO_ALLOWLIST`, or
-   our own origin), it is preserved across the magic-link email
-   round-trip. A non-allowlisted value is ignored.
-3. After `/verify` signs the user in, the browser is redirected to
-   `return_to` — a plain navigation, **no `#access_token=` fragment**.
-
-The allowlist (`src/lib/auth/return-to.ts`) is the open-redirect control.
+Earlier revisions of this app issued a shared bearer token and handed it
+to another operator-app origin via an allowlisted `?return_to=` +
+`#access_token=` URL fragment. **That handoff is removed, not just its
+credential-carrying part** — `/verify` always redirects to `/` on this
+app's own origin; there is no `return_to` parameter, no allowlist
+consulted, and `src/lib/auth/return-to.ts` no longer exists (deleted in
+`f66ff50f`). Under the family-wide BFF pattern
+(`agents/share/authentication-sessions.md` §6) every sibling front-end is
+its **own** independent BFF with its own `/signin` route and its own
+session cookie against the auth service directly, so there is no longer
+a "come here to sign in, then bounce back" flow to support. See
+`spec/index.md` §13 for the history.
 
 ## Testing
 
 ```bash
-pnpm run check     # svelte-check (strict, 0 errors expected)
-pnpm run build
-pnpm run test      # vitest (unit)
-pnpm run test:e2e  # playwright
+pnpm run check     # svelte-check (strict, 0 errors expected) — passing
+pnpm run build     # passing
+pnpm run test      # vitest (unit) — passing, 36 tests / 5 files
+pnpm run test:e2e  # playwright — 4/9 PASSING, 5/9 FAILING (see below)
 ```
+
+`pnpm run test:e2e` fails 5 of 9 cases. `tests/e2e/smoke.spec.ts` stubs
+the auth API via `page.route()`, which only intercepts requests the
+**browser** makes — but every auth-service call moved server-side when
+this app became a BFF, so the stub never sees them; the SvelteKit Node
+server hits the real `AUTH_API_URL` (`http://localhost:5150` by default)
+instead, which has nothing listening in CI/local dev without the auth
+service running. Two of the five failures also assert the removed
+`return_to` handoff above. This is a pre-existing gap from the BFF
+migration, not introduced by this pass; see `spec/index.md` §11/§13.
 
 ## Project layout
 
