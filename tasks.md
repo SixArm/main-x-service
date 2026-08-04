@@ -5091,7 +5091,7 @@ committing (see plan.md §4).
   and documented the real e2e failure honestly rather than attempting a
   fix out of scope for a docs pass.
 
-- [ ] **DOC-5 (M)** Library crates' `spec/`, `AGENTS.md`/`CLAUDE.md`,
+- [x] **DOC-5 (M)** Library crates' `spec/`, `AGENTS.md`/`CLAUDE.md`,
   `README.md`/`index.md`: `authentication-verifier-rust-crate`,
   `integrity-mac-rust-crate`, `link/entity-ref-rust-crate`. Smaller
   crates, lighter audit; `entity-ref` has no `CHANGELOG.md` at all
@@ -5311,6 +5311,20 @@ committing (see plan.md §4).
     not touch `integrity-mac-rust-crate` or `link/entity-ref-rust-crate`
     (sibling agents' concurrent work, both already landed above) or any
     entity service.
+
+  **DOC-5 closed, 2026-08-04 — all 3 library crates done**
+  (authentication-verifier, integrity-mac, entity-ref). Two worthwhile
+  cross-cutting corrections came out of this small batch:
+  entity-ref's crate docs and `agents/share/cross-service-linking.md`
+  itself both described "copy per project until a second consumer"
+  as still the live decision, when 8 real crates (including 4 consumer
+  apps the design doc predates) already depend on it directly — fixed
+  in both places rather than just the crate-local copy. And the
+  authentication-verifier audit caught and corrected a false premise
+  in its own task brief (that H-5 had tagged `authentication-verifier
+  -v0.8.0`) by checking `git tag -l` rather than trusting the prompt —
+  no such tag exists; H-5's own notes already recorded this crate as
+  skipped.
 
 - [ ] **DOC-6 (M)** `link-graph-service-with-loco`'s `spec/`,
   `AGENTS.md`, `README.md`/`index.md`. **Queue this after LNK-4's
