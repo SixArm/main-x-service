@@ -8,6 +8,67 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Fixed — Playwright stub matched the pre-BFF path (DOC-4, 2026-08-04)
+
+- **All 8 e2e smoke tests were silently broken.** `stubApi()` in
+  `tests/e2e/smoke.spec.ts` dispatched on `url.pathname` compared against
+  bare service paths (`/api/cases`, `/api/cases/{pid}`, …). Since the
+  BFF-proxy auth pivot, `ApiClient`'s base URL is the same-origin proxy
+  (`location.origin + "/api/proxy"`, `src/lib/config.ts`), so the
+  browser's actual request lands on `/api/proxy/api/cases` — the exact
+  match never fired, every stubbed call fell through to the handler's
+  final `404`, and 5 of 8 tests failed (`list`, `detail`, the links
+  panel, `merge`, and check-duplicates self-exclusion; only the three
+  tests asserting a static heading with no data dependency passed).
+  Fixed by stripping the `/api/proxy` prefix from `url.pathname` before
+  dispatch. Found and fixed while live-verifying this crate's quick-start
+  commands for the DOC-4 documentation audit — `pnpm run check` and
+  `pnpm test` stayed green throughout, so nothing short of actually
+  running `pnpm test:e2e` surfaced it.
+
+### Fixed — documentation audit (DOC-4, 2026-08-04)
+
+- **`.env.example` documented the decommissioned client-held-token
+  model's vars** (`PUBLIC_API_BASE_URL`, `VITE_AUTH_FRONTEND_URL`) —
+  zero references in `src/`. The real BFF vars `CASE_API_URL` /
+  `AUTH_API_URL` (read by `src/lib/server/config.ts`, already correctly
+  documented in `README.md`) had no `.env.example` entry at all.
+  Rewritten to match (the same bug TUT-1 found live and worked around
+  without fixing this file).
+- **`AGENTS.md` described a redirect-to-the-auth-front-end sign-in flow**
+  that predates this app's own per-app `/signin`/`/verify` magic-link
+  route (`href="/signin"`, local); fixed to match. Its `src/lib/config.ts`
+  description (`PUBLIC_API_BASE_URL` + `AUTH_FRONTEND_URL` +
+  `signInUrl()`) also predated the BFF pivot — the file now only exports
+  `API_BASE_URL` (the same-origin proxy) — fixed, along with the missing
+  `/cases` and `/board` routes in the layout tree, the missing
+  merge/links rows in the API-consumption table, the stale
+  `PUBLIC_API_BASE_URL`/`VITE_AUTH_FRONTEND_URL` configuration line, and
+  the stale unit-test file list (`auth`/`config` no longer exist;
+  `i18n`/`layout`/`link-validation`/`merge-validation` were missing).
+- **`index.md`'s "Auth pivot in progress" warning was stale** — the BFF
+  pivot landed (per `AGENTS.md` and `spec/index.md §13`); replaced with
+  a statement of the landed state, and added the merge/links endpoints
+  to the Flow diagram (previously only the four original CRUD routes).
+- **`README.md`'s route table omitted `/merge`** (FE-1, landed
+  2026-08-03) despite listing every other route including `/board` and
+  `/cases`; added.
+- **`spec/index.md`** — §5's information architecture omitted `/cases`
+  and `/board` (present in §2's own scope line and in `AGENTS.md`); added.
+  §7 flatly claimed "dependency-light (no data grid / design system)",
+  contradicted by the SVAR DataGrid/Kanban/Filter + Lily picker
+  dependencies added 2026-07-19 (see below) — corrected. §11's testing
+  narrative and §13's task counts still described the pre-merge/pre-links
+  suite (`auth.test.ts`/`config.test.ts`, "40 tests across 5 files" /
+  "5 tests"); corrected to the live counts (61 vitest / 8 Playwright
+  across 7 + 1 files) and to the e2e stub-path fix above. §14/§15 still
+  read like the v0.1 four-route MVP with auth as a roadmap item, despite
+  §13 marking BFF auth, merge, and links **done**; rewritten against the
+  real eight-route, BFF-complete surface.
+- Verified live: `pnpm run check` (0 errors / 0 warnings), `pnpm test`
+  (61/61), `pnpm test:e2e` (8/8, after the stub fix above), `pnpm run
+  build` all green.
+
 ### Added — cross-service links panel (FE-2, 2026-08-03)
 
 - **"Subject of this case" panel** on the detail route (`/[pid]`):

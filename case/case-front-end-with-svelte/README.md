@@ -13,9 +13,10 @@ SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA.
 | `/cases` | SVAR DataGrid index with FilterBar (client-side filtering) |
 | `/board` | Status Kanban board (SVAR) — drag a card to another column to change status |
 | `/new` | Create |
-| `/[pid]` | Detail + delete + check-duplicates |
+| `/[pid]` | Detail + delete + check-duplicates + "subject of this case" cross-service links panel |
 | `/[pid]/edit` | Edit |
-| `/signin` | Magic-link sign-in (BFF flow against the auth service) |
+| `/merge` | Merge a confirmed duplicate into a survivor + recent merge history |
+| `/signin` | Magic-link sign-in (this app's own BFF flow) |
 | `/verify` | Magic-link verification landing page |
 
 ## Prerequisites

@@ -24,12 +24,14 @@ service REST API, whose request/response body is the
 5. **No envelope.** The service is loco.rs and returns **raw JSON**;
    `src/lib/api/client.ts` is the lean wrapper (get/post/put/delete).
 6. **Auth (BFF + cookie session).** The browser holds **no token** — no
-   `localStorage`, no `mxi_access_token`, no URL-fragment handoff. The
-   top-bar **Sign in** redirects to the auth front-end; the magic-link
-   sets an httpOnly `__Host-mxi_session` cookie. This app's SvelteKit
-   server acts as a **Backend-For-Frontend**: it holds the session,
-   exchanges it for a short-lived **PASETO v4.public** token, and calls
-   the case service server-side; mutating calls carry a CSRF token. See
+   `localStorage`, no `mxi_access_token`, no URL-fragment handoff. This
+   app has its **own** `/signin` + `/verify` magic-link flow — there is
+   no cross-origin redirect to the auth front-end; the top-bar **Sign
+   in** link points at this app's own `/signin`. Verifying the link sets
+   an httpOnly `__Host-mxi_session` cookie. This app's SvelteKit server
+   acts as a **Backend-For-Frontend**: it holds the session, exchanges it
+   for a short-lived **PASETO v4.public** token, and calls the case
+   service server-side; mutating calls carry a CSRF token. See
    [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
    (source of truth; RS256/JWKS decommissioned).
 
@@ -43,26 +45,28 @@ service REST API, whose request/response body is the
 ```
 src/
 ├── lib/
-│   ├── config.ts                 PUBLIC_API_BASE_URL (:5150) + AUTH_FRONTEND_URL + signInUrl()
-│   ├── server/                   BFF: session cookie helpers + session→PASETO exchange + service config
+│   ├── config.ts                 API_BASE_URL = same-origin BFF proxy (location.origin + /api/proxy)
+│   ├── server/                   BFF: session cookie helpers + session→PASETO exchange + service config (CASE_API_URL, AUTH_API_URL)
 │   ├── api/
-│   │   ├── client.ts             lean fetch wrapper (+ ApiError; optional per-request token)
-│   │   ├── types.ts              Case + CaseIdentifier + CaseType + CaseStatus + Priority + IdentifierScheme + CaseRef + ScoredRef
-│   │   └── cases.ts              CaseRepository (CRUD + checkDuplicates)
-│   └── components/CaseForm.svelte
+│   │   ├── client.ts             lean fetch wrapper (+ ApiError; optional per-request token; getPage())
+│   │   ├── types.ts              Case + CaseIdentifier + CaseType + CaseStatus + Priority + IdentifierScheme + CaseRef + ScoredRef + EntityLink + Merge*
+│   │   └── cases.ts              CaseRepository (CRUD + checkDuplicates + merge/recentMerges + listLinks/createLink/deleteLink)
+│   └── components/CaseForm.svelte, LinksPanel.svelte, merge-validation.ts, link-validation.ts
 └── routes/
-    ├── +layout.svelte / +layout.ts   nav + SPA toggle + SSO sign-in/out
-    ├── +page.svelte              list
-    ├── new/+page.svelte          create
-    ├── [pid]/+page.svelte        detail + delete + check-duplicates
-    ├── [pid]/edit/+page.svelte   edit
-    ├── merge/+page.svelte        merge a duplicate into a survivor + recent merge history
-    ├── signin / verify           BFF session establishment (server routes)
-    └── api/proxy/[...path]       BFF proxy → case service (attaches the PASETO server-side)
+    ├── +layout.svelte / +layout.ts   top-bar nav (hamburger on narrow) + SPA toggle + SSO sign-in/out
+    ├── +page.svelte               list
+    ├── cases/+page.svelte         SVAR DataGrid + FilterBar index (client-side filtering)
+    ├── board/+page.svelte         SVAR Kanban — drag a card to change status
+    ├── new/+page.svelte           create
+    ├── [pid]/+page.svelte         detail + delete + check-duplicates + "subject of this case" links panel
+    ├── [pid]/edit/+page.svelte    edit
+    ├── merge/+page.svelte         merge a duplicate into a survivor + recent merge history
+    ├── signin / verify            this app's own magic-link request/verify (BFF session establishment)
+    └── api/proxy/[...path]        BFF proxy → case service (attaches the PASETO server-side)
 
 tests/
-├── unit/                         vitest: client / cases / auth / config / case-form
-└── e2e/smoke.spec.ts             Playwright: four routes + check-duplicates self-exclusion
+├── unit/                         vitest: client / cases / case-form / i18n / layout / link-validation / merge-validation
+└── e2e/smoke.spec.ts             Playwright: 8 tests over the routes above + check-duplicates self-exclusion
 ```
 
 ## API consumption
@@ -75,6 +79,9 @@ tests/
 | Edit | `PUT /api/cases/{pid}` |
 | Delete | `DELETE /api/cases/{pid}` |
 | Check duplicates | `POST /api/cases/check-duplicates` |
+| Merge | `POST /api/cases/merge` |
+| Recent merges | `GET /api/cases/merges/recent` |
+| Links (list / assert / withdraw) | `GET`/`POST /api/cases/{pid}/links`, `DELETE /api/cases/{pid}/links/{id}` |
 
 ## Commands
 
@@ -87,5 +94,6 @@ pnpm test:e2e     # Playwright smoke tests
 pnpm run build
 ```
 
-Configure with `PUBLIC_API_BASE_URL` (case service) and
-`VITE_AUTH_FRONTEND_URL` (SSO sign-in front-end); see `.env.example`.
+Configure with `CASE_API_URL` (case service) and `AUTH_API_URL`
+(authentication service) — both server-side only, read by
+`src/lib/server/config.ts`; see `.env.example`.

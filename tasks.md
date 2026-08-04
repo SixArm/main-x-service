@@ -4747,6 +4747,70 @@ committing (see plan.md §4).
   loco` (out of this task's boundary) or any of the other ten
   front-ends (concurrent sibling audits).
 
+  - *`case/case-front-end-with-svelte` done 2026-08-04.* (1)
+    **Confirmed and fixed the exact TUT-1 `.env.example` bug**: it
+    documented the decommissioned client-held-token vars
+    (`PUBLIC_API_BASE_URL`, `VITE_AUTH_FRONTEND_URL`), zero references
+    in `src/`, while `src/lib/server/config.ts` actually reads
+    `CASE_API_URL` / `AUTH_API_URL` (both default `:5150`) — already
+    correctly documented in `README.md` but absent from `.env.example`
+    entirely; rewritten to match. (2) FE-1 (merge screen) and FE-2
+    (links panel) landed with a **real** spec pass this time (unlike
+    some siblings) — `spec/index.md` §6.9/§6.10 and §9's endpoint table
+    already covered both in detail — but §5's information architecture,
+    §11's testing narrative, §13's test counts, §14, and §15 had not
+    been touched since the v0.1 four-route MVP: §5 omitted the `/cases`
+    (SVAR DataGrid) and `/board` (SVAR Kanban) routes present in §2's
+    own scope line; §11 still described `auth.test.ts`/`config.test.ts`
+    (deleted by the BFF migration) and omitted `i18n`/`layout`/
+    `link-validation`/`merge-validation`; §13 said "40 tests across 5
+    files" / "5 [Playwright] tests" against a live 61/7 and 8/1; §14
+    read like the v0.1 MVP; §15 listed BFF auth as a v0.3 roadmap item
+    though §13 already marked it done. All rewritten against the live
+    suite. (3) **§7's "dependency-light (no data grid / design system)"
+    was flatly false** — SVAR DataGrid/Kanban/FilterBar and the Lily
+    theme/locale pickers were added 2026-07-19 per `CHANGELOG.md` and
+    are real, used dependencies (confirmed via `package.json` +
+    `grep -rl` against `src/`); corrected, while confirming
+    `@svar-ui/svelte-calendar`/`svelte-gantt`/`svelte-filemanager` are
+    genuinely still unrouted (zero references in `src/`) so that part
+    of the old claim's spirit survives. (4) `AGENTS.md` claimed the
+    top-bar **Sign in** "redirects to the auth front-end" — false; this
+    app has its own `/signin`/`/verify` magic-link route
+    (`href="/signin"`, confirmed in `+layout.svelte`), matching
+    `README.md`/`index.md`/`spec/index.md` §6.8, which were already
+    correct. Also fixed `AGENTS.md`'s stale `src/lib/config.ts`
+    description (claimed `PUBLIC_API_BASE_URL`/`AUTH_FRONTEND_URL`/
+    `signInUrl()`; the file now only exports `API_BASE_URL`, the
+    same-origin BFF-proxy base), its missing `/cases`/`/board` routes
+    and merge/links endpoints, and its bottom configuration line (same
+    stale var names as the `.env.example` bug). (5) `index.md` carried
+    a stale "Auth pivot in progress... may still reflect the old
+    client-held bearer" warning contradicting the already-landed BFF
+    work; replaced with the landed-state statement, and added the
+    merge/links endpoints to the Flow diagram. (6) `README.md`'s route
+    table omitted `/merge` (FE-1) while listing every other route;
+    added. (7) **Found and fixed a real, live-confirmed bug outside
+    the docs**: `pnpm test:e2e` was failing 5 of 8 tests.
+    `tests/e2e/smoke.spec.ts`'s stub dispatched on `url.pathname`
+    compared against bare service paths (`/api/cases`, …), but the
+    BFF-proxy auth pivot means the browser's actual request lands on
+    `/api/proxy/api/cases` (`src/lib/config.ts`'s `API_BASE_URL` is the
+    same-origin proxy) — the exact match never fired and every stub
+    fell through to the handler's terminal 404; only the three tests
+    asserting a static heading with no data dependency passed. Fixed by
+    stripping the `/api/proxy` prefix from `url.pathname` before
+    dispatch (one line); confirmed all 8 pass with both the default
+    parallel workers and `--workers=1` (ruling out a concurrency
+    flake). `svelte-check`/vitest/`pnpm build` stayed green throughout,
+    so nothing short of actually running `pnpm test:e2e` — which this
+    task's own brief asked for — surfaced it. Documented in
+    `CHANGELOG.md` and `spec/index.md` §11. Verified live: `pnpm run
+    check` (0/0), `pnpm test` (61/61), `pnpm test:e2e` (8/8 post-fix),
+    `pnpm run build` all green. Did not touch
+    `case/case-service-with-loco` (out of this task's boundary) or any
+    sibling front-end.
+
 - [ ] **DOC-5 (M)** Library crates' `spec/`, `AGENTS.md`/`CLAUDE.md`,
   `README.md`/`index.md`: `authentication-verifier-rust-crate`,
   `integrity-mac-rust-crate`, `link/entity-ref-rust-crate`. Smaller

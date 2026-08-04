@@ -30,7 +30,12 @@ async function stubApi(page: Page) {
     const req = route.request();
     const url = new URL(req.url());
     const method = req.method();
-    const path = url.pathname;
+    // The browser calls the same-origin BFF proxy (`/api/proxy/...`), which
+    // forwards to the case service at the unprefixed path — so the actual
+    // request `pathname` is `/api/proxy/api/cases`, not `/api/cases`. Strip
+    // the proxy prefix before dispatching so the (path, method) comparisons
+    // below match the real service path the client believes it is calling.
+    const path = url.pathname.replace(/^\/api\/proxy/, "");
 
     // Dispatch by (path, method) mirroring the real endpoint contract; any
     // unmatched request falls through to a 404 so contract drift fails loud.

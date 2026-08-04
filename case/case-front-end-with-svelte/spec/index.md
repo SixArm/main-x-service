@@ -33,8 +33,10 @@ Caseworkers and case administrators across governmental agencies.
 
 ```
 /            list of cases
+/cases       SVAR DataGrid + FilterBar index (client-side filtering)
+/board       SVAR Kanban board, one column per status; drag-to-change-status
 /new         create form
-/[pid]       detail + delete + check-duplicates
+/[pid]       detail + delete + check-duplicates + "subject of this case" links panel
 /[pid]/edit  edit form
 /merge       merge a duplicate into a survivor + recent merge history
 ```
@@ -106,8 +108,15 @@ Cross-cutting UI rule for every `*-front-end-with-svelte` app:
 
 ## 7. Non-functional requirements
 
-Svelte 5 runes only; TS strict (`noUncheckedIndexedAccess`); SPA;
-dependency-light (no data grid / design system).
+Svelte 5 runes only; TS strict (`noUncheckedIndexedAccess`); SPA. Started
+dependency-light (v0.1, no data grid / design system); SVAR DataGrid +
+FilterBar (`/cases`), SVAR Kanban (`/board`), and the Lily
+`ThemePicker`/`LocalePicker` were added 2026-07-19 (see `CHANGELOG.md`) —
+each is a real, used dependency, not a speculative install, though
+`@svar-ui/svelte-calendar`, `@svar-ui/svelte-gantt`, and
+`@svar-ui/svelte-filemanager` are installed with no route using them yet
+(candidate features, catalogued in the roadmap). The core CRUD/merge/links
+forms remain plain inputs + `app.css` utilities.
 
 ## 8. Architecture
 
@@ -147,21 +156,31 @@ None client-side beyond in-memory route state.
 ## 11. Testing strategy
 
 `pnpm run check` (svelte-check strict, 0/0). **vitest** unit tests
-(`tests/unit/`) cover the `ApiClient` (verb/body/headers, per-call and
-session-store bearer-token attachment, per-call `null` override,
-error-classification/empty-body), the session store
-(`auth.test.ts`: no-token default, `setToken`/`clearToken` round-trip,
-guarded localStorage write-through under the shared key, and
-`captureTokenFromHash` — well-formed extract, multi-param, no leading
-`#`, URL-decode, empty/`#`, no-token, garbage → `null`), the sign-in URL
-builder (`config.test.ts`: `signInUrl` encoded `return_to`, base path,
-trailing-slash safety), and
-`CaseRepository` (every method's path + verb, incl. a regression pinning
-`check-duplicates`).
-**Playwright** smoke tests (`tests/e2e/`) load the four routes (`/`,
-`/new`, `/[pid]`, `/[pid]/edit`) with the API stubbed via
-`page.route`, asserting each renders; they run against the production
-build (`vite preview`) to avoid the `vite dev` cold-start module race.
+(`tests/unit/`, 61 tests across 7 files) cover: `client.test.ts` (the
+`ApiClient` — verb/body/headers, per-call `token` override, `getPage()`
+pagination-header parsing, error-classification/empty-body);
+`cases.test.ts` (`CaseRepository` — every method's path + verb, incl. a
+regression pinning `check-duplicates`, and the merge/links methods);
+`case-form.test.ts` (form-to-`Case` assembly); `i18n.test.ts` (13-locale
+parity — every locale covers every key with no extras, RTL detection,
+English fallback, plus dedicated coverage assertions for the `merge.*`
+and `links.*` blocks including their `{dup}`/`{main}`/`{ref}`
+placeholders); `layout.test.ts` (nav); `merge-validation.test.ts` (the
+pure `validateMerge` guard, incl. local self-merge rejection); and
+`link-validation.test.ts` (the pure `validateLink` guard — `EntityRef`
+URN shape, confidence bounds).
+**Playwright** smoke tests (`tests/e2e/smoke.spec.ts`, 8 tests) load
+`/`, `/new`, `/[pid]` (incl. the links panel), `/[pid]/edit`, `/merge`,
+plus the nav-exposes-merge-link and check-duplicates-self-exclusion
+cases, with the API stubbed via `page.route`; they run against the
+production build (`vite preview`) to avoid the `vite dev` cold-start
+module race. The stub dispatches on `url.pathname` with the `/api/proxy`
+BFF-proxy prefix stripped first — the client's requests land on
+`/api/proxy/api/cases`, not `/api/cases`, so a stub matching only the
+bare service path silently 404s every request (found and fixed
+2026-08-04: all 8 were failing under the bare-path comparison,
+undetected because `svelte-check`/vitest/build all stay green
+regardless).
 Run: `pnpm test` (vitest) and `pnpm test:e2e` (Playwright).
 
 ## 12. Compliance
@@ -171,10 +190,12 @@ access/audit requirements.
 
 ## 13. Tasks (live work queue)
 
-- [x] vitest unit tests for `ApiClient` + `CaseRepository` + auth store +
-  `signInUrl` + `CaseForm` assembly (`tests/unit/`, 40 tests across 5 files).
-- [x] playwright smoke for the four routes + check-duplicates self-exclusion
-  (`tests/e2e/smoke.spec.ts`, 5 tests, API stubbed, runs against `vite preview`).
+- [x] vitest unit tests for `ApiClient` + `CaseRepository` + `CaseForm`
+  assembly + i18n parity + layout + the merge/link validators
+  (`tests/unit/`, 61 tests across 7 files — see §11).
+- [x] playwright smoke for the routes + check-duplicates self-exclusion
+  (`tests/e2e/smoke.spec.ts`, 8 tests, API stubbed, runs against `vite
+  preview`; see §11 on the 2026-08-04 BFF-proxy-path stub fix).
 - [x] ~~Cross-origin SSO token handoff (consumer side): capture token
   from the URL fragment + strip it; `signInUrl` builder + top-bar **Sign
   in** redirect~~ — **superseded** (see auth-migration task below).
@@ -193,16 +214,26 @@ access/audit requirements.
 
 ## 14. Implementation status
 
-Done: all four routes; lean client; repository; form (incl. case
-type / status / priority dropdowns + identifiers editor); SPA config.
-`pnpm run check` clean; production build succeeds.
+Done: the eight routes in §5 (list, `/cases` SVAR grid, `/board` SVAR
+Kanban, create, detail + delete + check-duplicates + links panel, edit,
+merge + recent-merges); lean client + `CaseRepository` (CRUD,
+check-duplicates, merge/recentMerges, listLinks/createLink/deleteLink);
+form (case type / status / priority dropdowns + identifiers editor); SPA
+config; full BFF auth (session cookie → PASETO exchange → server-side
+proxy, CSRF on mutating calls, per-app `/signin`+`/verify` magic-link —
+no client-held token); 13-locale i18n throughout, including the merge
+and links blocks. `pnpm run check` clean (0/0); vitest 61/61; Playwright
+8/8; production build succeeds.
 
 ## 15. Roadmap
 
-v0.1 (here): CRUD + duplicate-check UI. v0.2: tests + search box.
-v0.3: auth (BFF + httpOnly cookie + CSRF, per
-[`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md))
-+ audit views.
+v0.1: CRUD + duplicate-check UI. v0.2 (done): tests. v0.3 (done): auth
+(BFF + httpOnly cookie + CSRF, per
+[`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
+Since v0.3: merge UI, cross-service links panel, SVAR grid/board routes,
+Lily pickers. Still open: a search box once the service ships search;
+audit views; `Custom(label)` editing; the catalogued-but-unrouted SVAR
+calendar/gantt/filemanager seams (§7).
 
 ## 16. Open questions
 

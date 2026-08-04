@@ -16,11 +16,16 @@ Operator UI for case CRUD + matching, consuming the
 
 ```text
 /         ──>  GET  /api/cases                  list
+/cases    ──>  GET  /api/cases                  SVAR DataGrid + FilterBar index
+/board    ──>  GET  /api/cases (+ PUT per drag)  status Kanban
 /new      ──>  POST /api/cases  {Case}          create -> /[pid]
 /[pid]    ──>  GET  /api/cases/{pid}            detail
               POST /api/cases/check-duplicates   -> scored matches
               DELETE /api/cases/{pid}             soft-delete
+              GET/POST/DELETE /api/cases/{pid}/links   "subject of this case" panel
 /[pid]/edit ─> PUT  /api/cases/{pid}             edit
+/merge    ──>  POST /api/cases/merge             merge a duplicate into a survivor
+              GET  /api/cases/merges/recent       recent merge history
 ```
 
 ## Sign-in (SSO) — cookie session via BFF
@@ -41,6 +46,7 @@ enforcement. See
 [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
 (source of truth; RS256/JWKS decommissioned).
 
-> Auth pivot in progress: the runtime here may still reflect the old
-> client-held bearer / fragment-handoff flow; the BFF + cookie + PASETO
-> follow-up is tracked in the spec.
+> The BFF pivot has landed: `src/hooks.server.ts` + `src/lib/server/*`
+> implement the session cookie → PASETO exchange → server-side proxy
+> (`/api/proxy/[...path]`). There is no client-held bearer token and no
+> URL-fragment handoff anywhere in this app's runtime.
