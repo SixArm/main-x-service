@@ -3278,6 +3278,76 @@ committing (see plan.md §4).
     crate's own `spec/13`/`spec/16` — verified correct on inspection;
     `README.md` already symlinks to `index.md`.
 
+  - *`organization/organization-service-with-loco` done 2026-08-04.*
+    Confirmed `CLAUDE.md` is still the documented thin `@AGENTS.md`
+    one-liner (no drift since worker's DOC-2 pass), no `AGENTS/`
+    directory (correct for a newer loco-idiomatic crate — §5's domain
+    model section is intentionally short because the API DTO **is**
+    `organization_matcher::Organization`, nothing forked to describe),
+    and `README.md`/`index.md` are two real (non-symlinked) files with
+    distinct roles here, not a duplicate pair. Found and fixed several
+    real gaps, the largest being that organization is this crate's most
+    load-bearing claim to fame — the family's **FHIR R5 reference
+    implementation** (`agents/share/fhir.md` §10) — and that fact had
+    **zero presence** outside `spec/13`'s own task entry: absent from
+    `spec/§2` (Scope), `§6`/`§9` (API surface — no `/fhir/*` row
+    anywhere), `§14` (Implementation status), `AGENTS.md`'s endpoint
+    table and layout tree, `README.md`, `index.md`, and `CHANGELOG.md`
+    (no dated entry at all for the commit that shipped it,
+    `57b6c710`, 2026-07-08) — added it to all seven. (2) **A second
+    shipped-but-undocumented feature from the same commit**:
+    header-based API versioning (`src/version.rs`, `Accepts-version`,
+    copied from the event-service reference) had the same zero-presence
+    problem in `spec/` and `CHANGELOG.md` (AGENTS.md/README already
+    mentioned it) — added a `spec/§13` task, a `§9` paragraph, and the
+    missing `CHANGELOG.md` entry (folded into the same FHIR entry,
+    since one commit shipped both). (3) **AU-2 (key rotation + ABAC
+    policy hot-reload without a restart, 2026-08-01)** — real, wired,
+    tested (`tests/enforcement.rs`, `ReloadableVerifier`/
+    `ReloadablePolicy`, `spawn_key_refresh`, `spawn_policy_watcher`,
+    the `ORGANIZATION_PASETO_KEYS_REFRESH_SECS` env var) — had no
+    `spec/13` task entry, wasn't in the `§7` env-var table, and left
+    **two now-false claims standing**: `§7`'s own PASETO_KEYS_URL row
+    said "no refresh loop" and `§16` carried an open question asking
+    whether one was needed, both contradicted by AU-2 landing three
+    days later. Added the task, the env var row, and resolved (not
+    deleted) the open question with a strikethrough + resolution note,
+    matching person's DOC-2 precedent. (4) **A stale duplicate task**:
+    `§13` had a `[ ] Bulk import / export — adopt the family contract`
+    item describing, verbatim, work already marked `[x]` under **BLK-5**
+    earlier in the same section — i.e. the exact "still `[ ]` for
+    shipped work" bug this audit exists to catch, self-contradicting
+    within one file. Collapsed into a single `[x]` pointer entry with a
+    note on why, rather than deleting the history outright. (5) **`§13`
+    `seed_examples` (EX-4, 2026-08-04)** was in `AGENTS.md` and
+    `CHANGELOG.md` but had no `spec/13`/`§14` entry — added both,
+    matching person's/worker's/place's/thing's identical finding for
+    their own EX-4/T-N gaps. (6) **`§11` Testing strategy** named only
+    2 of the 7 real test binaries — `tests/enforcement.rs`,
+    `tests/masking.rs`, `tests/outbox_audit.rs`, `tests/seed_examples_db.rs`,
+    and `tests/fluvio_relay.rs` were all missing — added a subsection
+    for the five Postgres-gated, own-process binaries (each isolated
+    from the others by a process-wide `OnceLock`, same pattern as
+    case's `tests/masking.rs`). (7) **`§14` Implementation status**
+    was a stale MVP-era summary missing FHIR, privacy/masking/export,
+    SEC-M1/SEC-M5, batch dedup + review queue, pagination, AU-2, and
+    API versioning — rewritten against the actual `§13` "Done" list
+    (187 lib tests, `cargo test --lib -- --list`, live-counted) plus a
+    new "Still open" paragraph so the section stops silently
+    contradicting `§13`. (8) **`§13`'s "Richer validation" item**
+    marked flatly `[ ]` even though SEC-M5 (validated, `[x]`, earlier
+    in the same section) already delivers the "identifier formats"
+    third of it — changed to `[~]` naming exactly what's done
+    (check-digits) vs. still open (URL/country-code format, confirmed
+    absent by reading `src/validation.rs`). `§12` Compliance's "honour
+    GDPR when the privacy layer lands" was also stale (the privacy
+    layer landed 2026-08-01) — updated to state what's live. Everything
+    else checked out: `§13`'s BLK-5/Tantivy/merge/masking entries were
+    already accurate against `src/`; the env-var table (aside from the
+    two fixes above) matched `config/*.yaml` and `src/`; `README.md`'s
+    quick-start `DATABASE_URL`/port matched `config/development.yaml`
+    exactly.
+
 - [ ] **DOC-3 (L)** Matcher crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: person, worker, place, thing, event, course,
   organization, care-pathway, case, project-portfolio-management

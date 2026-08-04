@@ -27,10 +27,16 @@ duplicates with the canonical organization-matcher. Built on loco.rs.
 ## 2. Scope
 
 MVP: CRUD + matching. Since delivered beyond the MVP (§13): full-text
-search (Tantivy), streaming, audit, OpenAPI, field masking + the GDPR
-right-of-access export. Still out of scope (deferred, §13): gRPC,
-richer validation. Consent is out of scope **by decision**, not by
-deferral (§13): an organization is not a data subject.
+search (Tantivy), streaming (incl. the durable outbox + relay + a
+`FluvioSink`), audit, OpenAPI, record merge + a stored review queue,
+field masking + the GDPR right-of-access export, async bulk
+import/export (BLK-5, JSONL/CSV), a **FHIR R5 API** (the family
+reference implementation), header-based API versioning, and PASETO key
+rotation + ABAC policy hot-reload without a restart (AU-2). Still out
+of scope (deferred, §13): gRPC, richer validation (URL/country-code
+format checks — identifier check-digits landed via SEC-M5), real-time
+duplicate check on create. Consent is out of scope **by decision**, not
+by deferral (§13): an organization is not a data subject.
 Authentication is out of scope here — provided by the central
 authentication-service.
 
@@ -145,12 +151,13 @@ embedded library; soft-delete with audit-friendly timestamps.
 | Variable | Default | Purpose |
 |---|---|---|
 | `ORGANIZATION_PASETO_KEYS` | empty key set | Published Ed25519 public-key set (`paseto-keys` JSON) for offline PASETO v4.public token verification (`src/auth.rs`). |
-| `ORGANIZATION_PASETO_KEYS_URL` | unset ⇒ no fetch | When set, fetch the key set over HTTP **once at boot** (`Verifier::from_paseto_keys_url`, typically the auth-service `/.well-known/paseto-keys`; seeded from `App::after_routes` via `auth::init_from_env`). Success ⇒ the fetched set wins over `ORGANIZATION_PASETO_KEYS`; failure ⇒ warn + fall back to the env key set — the service always boots. No refresh loop (periodic re-fetch on key rotation is a future item, §16). |
+| `ORGANIZATION_PASETO_KEYS_URL` | unset ⇒ no fetch | When set, fetch the key set over HTTP **at boot** (`Verifier::from_paseto_keys_url`, typically the auth-service `/.well-known/paseto-keys`; seeded from `App::after_routes` via `auth::init_from_env`). Success ⇒ the fetched set wins over `ORGANIZATION_PASETO_KEYS`; failure ⇒ warn + fall back to the env key set — the service always boots. Refreshed periodically thereafter — see `ORGANIZATION_PASETO_KEYS_REFRESH_SECS` below (AU-2, §13). |
+| `ORGANIZATION_PASETO_KEYS_REFRESH_SECS` | `3600` | AU-2: how often `auth::spawn_key_refresh` re-fetches `ORGANIZATION_PASETO_KEYS_URL` in the background, so a rotated key reaches a running process without a restart. `0` disables the refresh loop; a no-op when `ORGANIZATION_PASETO_KEYS_URL` is unset. A failed refresh **keeps the current key set** (a transient auth-service outage must not lock every caller out). The verifier and the ABAC policy are both hot-reloadable holders (`ReloadableVerifier` / `ReloadablePolicy`) read per request, proven end-to-end by `tests/enforcement.rs`. |
 | `ORGANIZATION_TOKEN_ISSUER` | `authentication-service` | Expected `iss` (see [`authentication-sessions.md`](../../../agents/share/authentication-sessions.md) §5 claims). |
 | `ORGANIZATION_TOKEN_AUDIENCE` | `main-x-service` | Expected `aud` (see [`authentication-sessions.md`](../../../agents/share/authentication-sessions.md) §5 claims). |
 | `ORGANIZATION_REQUIRE_AUTH` | unset ⇒ **off** | Blanket `/api/*` enforcement (credential is now a PASETO v4.public token or BFF cookie session). Lenient bool: `1`/`true`/`yes`/`on` ⇒ on; else off. See [`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md) (credential superseded by [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)). |
 | `ORGANIZATION_ABAC_POLICY` | unset ⇒ built-in default policy | ABAC authorization policy as inline JSON (evaluated only when enforcement is on). Unparsable ⇒ warn-log + built-in default. See [`agents/share/authorization-attributes.md`](../../../agents/share/authorization-attributes.md). |
-| `ORGANIZATION_ABAC_POLICY_FILE` | unset | Path to the ABAC policy JSON file (used when `ORGANIZATION_ABAC_POLICY` is unset). Unreadable/unparsable ⇒ warn-log + built-in default. |
+| `ORGANIZATION_ABAC_POLICY_FILE` | unset | Path to the ABAC policy JSON file (used when `ORGANIZATION_ABAC_POLICY` is unset). Unreadable/unparsable ⇒ warn-log + built-in default. Polled every 15s for changes by `auth::spawn_policy_watcher` (AU-2) and hot-reloaded; a malformed edit falls back to the built-in default rather than leaving the service unprotected. |
 | `ORGANIZATION_EVENT_TRANSPORT` | `memory` | Durable event-bus transport ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §7). `memory` ⇒ the process-wide ring buffer (Phase 1; no DB, no tx — today's behaviour). `outbox` ⇒ the transactional outbox (Phase 2): every CRUD/merge handler writes one `event_outbox` row **on the same transaction** as the entity mutation, so the change and its event commit or roll back together. Unrecognised value ⇒ `memory` (fail-safe). Read once at boot and cached. |
 | `ORGANIZATION_EVENT_RELAY` | off | Phase-3 relay switch. Truthy (`1`/`true`/`yes`/`on`) **and** `EVENT_TRANSPORT=outbox` ⇒ `App::after_routes` spawns the background relay loop (`src/relay.rs`: drain `event_outbox` → `EventSink` → `mark_published`, + periodic retention purge). Off by default ⇒ no loop. |
 | `ORGANIZATION_EVENT_RELAY_INTERVAL_SECS` | `5` | Relay drain-loop tick interval (floored at 1). |
@@ -198,6 +205,32 @@ See §6. Responses are raw loco JSON. `404` for unknown `pid`; `422
 Unprocessable Entity` for validation failures (blank `name` on create
 or replace — family convention); `400` for malformed requests (blank
 search `q`, invalid audit pid).
+
+**API versioning.** `/api/*` URLs carry no version segment; a client
+selects the representation version with the `Accepts-version` request
+header (default `1.0` when omitted), per
+[`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
+`src/version.rs` (`resolve_version`, pure/unit-tested) is layered as
+`require_version_mw` in `App::after_routes` alongside the auth guard: an
+explicit but unsupported version is `406 Not Acceptable`; a supported (or
+omitted) one is stamped back onto the response as `Accepts-version`. A
+bare major (`1`) aliases its current minor (`1.0`). Copied from the
+event-service reference implementation (§13).
+
+**FHIR R5 (`Organization`) — family reference implementation.**
+`src/fhir/{mod,resources,search}.rs` + mounted `src/controllers/fhir.rs`
+serve `GET`/`POST`/`PUT`/`DELETE /fhir/Organization{,/{id}}`, `GET
+/fhir/Organization?<params>` (a searchset `Bundle`; supported params:
+`_id`, `_lastUpdated`, `_count`, `identifier`, `name`, `address`,
+`address-city`, `address-postalcode`), and `GET /fhir/metadata` (the
+`CapabilityStatement`), per
+[`agents/share/fhir.md`](../../../agents/share/fhir.md). Every non-2xx
+response is a FHIR `OperationOutcome`; every response carries
+`application/fhir+json`. These routes reuse the native model helpers,
+validators, event/audit path, and sit behind the same blanket
+auth+ABAC guard as `/api/*` (`/fhir/*` is not on the public allow-list).
+Organization was built first and is the copy source for the other
+in-scope services (§13).
 
 **Bulk import/export (BLK-5, §10.7).** `POST /api/organizations/import`
 (multipart: `file` + `format` + optional `dry_run`) → `202 {job_id}`;
@@ -392,10 +425,37 @@ rely on `config/test.yaml`'s `workers.mode: ForegroundBlocking`, under
 which `BulkJobWorker::perform_later` runs synchronously, so a job's
 terminal status is observable on the very next request — no polling.
 
+**Dedicated Postgres-gated test binaries** (each its own process because
+`require_auth`/`policy`/`verifier`/`transport` are process-wide
+`OnceLock`s that would otherwise leak between suites; each `#[ignore]`d,
+run with `cargo test --test <name> -- --ignored`):
+
+- `tests/enforcement.rs` — the AU-2 "activation proof" against the real
+  router with `ORGANIZATION_REQUIRE_AUTH=1`: public paths stay open, a
+  protected read/write without a token is `401`, a malformed bearer is
+  `401` (not `500`), a valid token with no attributes reads `200`/writes
+  `403`, and `access=write` creates.
+- `tests/masking.rs` — the privacy layer end to end: a policy allow
+  carrying the `mask` obligation redacts the ordinary `GET`, carries into
+  the export, and both are audited. Mutation-checked (dropping the
+  obligation branch fails the suite).
+- `tests/outbox_audit.rs` — under the `outbox` transport, `create_and_emit`
+  writes the entity, its `event_outbox` row, and its `audit_logs` row in
+  one transaction.
+- `tests/seed_examples_db.rs` — the `seed_examples` task (EX-4): a first
+  run seeds all 20 fixture rows, a second run is a no-op.
+- `tests/fluvio_relay.rs` — `#![cfg(feature = "fluvio")]`-gated (compiles
+  to zero tests on a default build) round-trip against a real Fluvio
+  broker (BUS-3); needs `compose.fluvio.yaml`, so no automated run in
+  this repo exercises it — verified by compiling under the feature.
+
 ## 12. Compliance
 
-Organization data is largely public, but contact fields may be
-personal data — honour GDPR when the privacy layer lands (§13).
+Organization data is largely public, but contact fields may be personal
+data. Per-field masking, the masked view, and the audited GDPR
+right-of-access export have landed (§13, §6.12–13) and honour the ABAC
+`mask` obligation; there is deliberately no consent model (§2) — an
+organization is not a data subject.
 
 ## 13. Tasks (live work queue)
 
@@ -577,7 +637,12 @@ personal data — honour GDPR when the privacy layer lands (§13).
 - [x] Record merge — `POST /merge` folds a duplicate into a survivor
   (union fields, former-name alias, soft-delete, `merge_records` history
   + snapshot, `Merged` event); pure `src/merge.rs`; `/merges/recent`.
-- [ ] Richer validation (identifier formats, URL, country codes).
+- [~] Richer validation (identifier formats, URL, country codes).
+  **Partial**: SEC-M5 (below) validates the deterministic-identifier
+  formats (LEI/GLN/DUNS/VAT check digits). Still open: URL well-formedness
+  and country-code (ISO 3166) validation — `src/validation.rs` only
+  length-bounds `url` and `address.country` today, it does not check
+  their shape.
 - [ ] Cross-service link **target** readiness — organization is a v1
   link target only (§8;
   [`agents/share/cross-service-linking.md`](../../../agents/share/cross-service-linking.md)),
@@ -618,22 +683,36 @@ personal data — honour GDPR when the privacy layer lands (§13).
     feature) and seeds the process-wide verifier — fetched set wins
     (`tracing::info!`); on fetch failure it warns and falls back to the
     `ORGANIZATION_PASETO_KEYS` env path, so the service always boots.
-    Unset/blank URL ⇒ prior behaviour exactly. Fetch-once only; a
-    periodic refresh loop on key rotation stays future work (§16).
+    Unset/blank URL ⇒ prior behaviour exactly. Originally fetch-once
+    only; superseded by AU-2 below, which adds a periodic refresh loop.
     Tests: local ephemeral-port HTTP listener serving the test key set
     (fetched verifier accepts a token signed by that key) + fast-failing
     URL fallback (no panic) + no-URL env path.
-- [ ] Bulk import / export — adopt the family contract
-  ([`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md)):
-  `bulk_jobs` migration, the five `/api/organizations/{import,export,bulk-jobs}`
-  endpoints, a `bg_pg` worker, JSONL/CSV/Parquet codecs, a per-row pipeline
-  reusing the single-create validators + organization-matcher + review queue
-  (`provenance = import`; upsert by deterministic scheme-scoped identifier or
-  `pid`), the per-row error report, and export masking + audit (light default
-  masking, gated `include_soft_deleted`). Organization-specific declarations
-  (stable key, CSV column set, sensitivity) are umbrella spec §8.7; mirrors
-  umbrella spec §13 T-14. Tests: idempotent re-import, error report,
-  dedupe-to-review, masked vs full export, export audit.
+  - [x] **AU-2: key rotation + ABAC policy hot-reload without a
+    restart** *(2026-08-01; the loco-style half of the rollout — case
+    was the reference, the five axum-style services landed the same
+    day as AU-1)*. The verifier and the ABAC policy were boot-only
+    `OnceLock` snapshots, so a rotated key set or an edited policy file
+    could never reach a running process. Now `ReloadableVerifier` /
+    `ReloadablePolicy` (both read per request by the blanket guard and
+    the bearer extractors) back two background loops started from
+    `App::after_routes`: `auth::spawn_key_refresh` re-fetches
+    `ORGANIZATION_PASETO_KEYS_URL` every
+    `ORGANIZATION_PASETO_KEYS_REFRESH_SECS` (default 3600s; `0`
+    disables; a failed fetch keeps the current key set rather than
+    locking every caller out), and `auth::spawn_policy_watcher` polls
+    `ORGANIZATION_ABAC_POLICY_FILE`'s mtime every 15s and calls
+    `reload_policy()` (a malformed edit falls back to the built-in
+    default). **Acceptance:** `tests/enforcement.rs`, the activation
+    proof against the real router (§11).
+- [x] **Bulk import/export — adopt the family contract**
+  ([`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md)).
+  **Delivered as BLK-5** — see the dedicated entry at the top of this
+  section and §9/§10.7/§11 for the full contract, endpoints, stable-key
+  rule, and tests. *(DOC-2, 2026-08-04: this item was found still open
+  here — describing the identical work — after BLK-5 had already
+  shipped and been marked done above; collapsed into one entry rather
+  than left duplicated and contradicting itself.)*
 - [x] **FHIR R5 API** (`Organization`) — **reference implementation** for
   the family contract (**Done**: `src/fhir/{mod,resources,search}.rs` +
   mounted `src/controllers/fhir.rs`, wired in `app.rs`; read/create/update/
@@ -685,47 +764,106 @@ personal data — honour GDPR when the privacy layer lands (§13).
   re-scan) green — full `--ignored` suite 16/16; clippy pedantic clean.
   The front-end `/review` drag-to-decide board consumes it.
 
+- [x] **Header-based API versioning** *(2026-07-08)*. `src/version.rs`
+  (`resolve_version`, pure/unit-tested — no header ⇒ current version;
+  bare-major alias; unsupported ⇒ error) layered as `require_version_mw`
+  in `App::after_routes`. Copied from the event-service reference
+  implementation of
+  [`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md);
+  organization's URLs were already version-free, so this rollout step
+  was purely additive (the negotiation header + `406`, not a URL
+  migration). Details in §9.
+
+- [x] **Pagination on `GET /api/organizations` and `GET
+  /api/organizations/search`** *(2026-08-01)*. `?limit=&offset=`, with
+  `X-Total-Count`/`X-Limit`/`X-Offset` response headers per
+  [`agents/share/restful.md`](../../../agents/share/restful.md);
+  omitting both parameters preserves the pre-pagination behaviour
+  exactly (first 100 / 50). `limit` clamps to 500; `offset` beyond
+  10 000 is `400` (SEC-G7 — an unbounded offset is a cheap DoS via
+  discarded row materialisation). Search's total comes from Tantivy's
+  `Count` collector, not the page length. Details in §6.2/§6.11.
+
+- [x] **`seed_examples` CLI task (EX-4)** *(2026-08-04)*.
+  `cargo loco task seed_examples` loads the repo's shared demo fixture
+  (`examples/data/organizations.jsonl`, 20 rows) via the model-layer
+  create (no duplicate check, no audit row, no event — deliberate for a
+  seed task); refuses to insert into a non-empty `organizations` table.
+  New `src/tasks/seed_examples.rs`; DB-free fixture-parse tests +
+  `tests/seed_examples_db.rs` (first run seeds all 20, second run is a
+  no-op). Details in §11.
+
 ## 14. Implementation status
 
 Done: loco boot; organizations table + migration; CRUD (blank name →
-`422`, unknown pid → `404`); `/match` and `/check-duplicates` embedding
-organization-matcher; audit log; in-memory event streaming (Phase 1:
-canonical `Envelope` + `EventPublisher` seam, `EventView` projection
-frozen for `/events/recent`); Tantivy full-text search (fuzzy +
-phonetic + duplicate blocking, replacing the earlier `ILIKE` name
-search); record merge
-(`/merge` + `merge_records` history); offline
-**PASETO v4.public** verification (`AuthUser`/`MaybeAuthUser`, `/whoami`,
-audit + merge `actor` from the token) per
+`422`, unknown pid → `404`) with `?limit=&offset=` pagination
+(`X-Total-Count`/`X-Limit`/`X-Offset`, SEC-G7-bounded); `/match` and
+`/check-duplicates` embedding organization-matcher, blocked on the
+search index; audit log; in-memory event streaming (Phase 1: canonical
+`Envelope` + `EventPublisher` seam, `EventView` projection frozen for
+`/events/recent`) plus the durable outbox (Phase 2, transactional,
+default-off) and its Phase-3 relay + retention (`src/relay.rs`,
+default-off) with a real-broker `FluvioSink` (BUS-3, feature-gated, off
+by default); Tantivy full-text search (fuzzy + phonetic + duplicate
+blocking, replacing the earlier `ILIKE` name search); batch dedup +
+a stored `review_queue` with confirm/reject decision endpoints; record
+merge (`/merge` + `merge_records` history); per-field masking + the
+masked view + the audited GDPR right-of-access export, wired to the
+ABAC `mask` obligation (no consent model — an organization is not a
+data subject); input-size caps (SEC-M1) and deterministic-identifier
+check-digit validation (SEC-M5); offline **PASETO v4.public**
+verification (`AuthUser`/`MaybeAuthUser`, `/whoami`, audit + merge
+`actor` from the token) per
 [`authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
-— originally shipped against RS256-JWT/JWKS, since switched (§13) —
-including the boot-time paseto-keys-over-HTTP fetch
-(`ORGANIZATION_PASETO_KEYS_URL`, fetch-once, env fallback; §7, §13);
-OpenAPI 3 + Swagger UI; Prometheus
-metrics (`/metrics.prom`, root + public, CRUD/merge counters); durable
-event bus Phase 3 relay + retention (`src/relay.rs`, default-off) plus
-its real-broker `FluvioSink` (BUS-3, feature-gated, off by default;
-§13); BLK-5
-async bulk import/export (JSONL + CSV, local-filesystem artifact store;
-§9, §10.7); DB-free tests;
-request-level test suite (Postgres, `#[ignore]`-gated); loco scaffolding
-leftovers removed (no workers/tasks/data stubs); green build + clippy.
+— originally shipped against RS256-JWT/JWKS, since switched — plus
+ABAC policy authorization inside the blanket guard, and **AU-2**: both
+the verifier and the policy are hot-reloadable without a restart
+(periodic PASETO-key refresh + a policy-file mtime watcher); OpenAPI 3
++ Swagger UI; Prometheus metrics (`/metrics.prom`, root + public,
+CRUD/merge counters); a **FHIR R5 API** for `Organization` — the
+**family reference implementation** (read/create/update/delete/search +
+`CapabilityStatement`, behind the same auth+ABAC guard); header-based
+API versioning (`Accepts-version`, copied from the event-service
+reference); BLK-5 async bulk import/export (JSONL + CSV,
+local-filesystem artifact store; keyless rows route to the review
+queue with `provenance = "import"`); the `seed_examples` CLI task
+(EX-4); DB-free tests; request-level test suite plus five dedicated
+Postgres-gated test binaries (`enforcement`, `masking`, `outbox_audit`,
+`seed_examples_db`, `fluvio_relay`; §11); loco scaffolding leftovers
+removed (no workers/tasks/data stubs); green build + clippy.
+
+Still open (§13): richer validation beyond identifier check-digits (URL
+well-formedness, ISO country codes); real-time duplicate check on
+create (`409`); an `S3` `ArtifactStore` backend for BLK-5; a
+`ConnectionTrait`-generic `streaming::create_and_emit`/`update_and_emit`
+so the BLK-5 per-row upsert can be advisory-lock-protected (SEC-B3)
+without a pool deadlock; moving the FHIR structured search onto the
+Tantivy index; cross-service link **target** readiness confirmation
+(§8, §13).
 
 ## 15. Roadmap
 
-v0.1 (here): CRUD + matching MVP. v0.2: search + audit + streaming.
-v0.3: privacy + merge + OpenAPI + auth middleware (PASETO v4.public per
+v0.1 (here): CRUD + matching MVP. v0.2: search + audit + streaming. v0.3:
+privacy + merge + OpenAPI + auth middleware (PASETO v4.public per
 [`authentication-sessions.md`](../../../agents/share/authentication-sessions.md),
-superseding the RS256-JWT model).
+superseding the RS256-JWT model). v0.4 (delivered, §13/§14): FHIR R5,
+header-based API versioning, ABAC policy authorization, BLK-5 bulk
+import/export, key rotation + policy hot-reload (AU-2).
 
 ## 16. Open questions
 
 - Should identifiers/address be normalised into their own tables (vs the
-  single JSONB payload) once search lands?
+  single JSONB payload) once search lands? Tantivy search has since
+  landed (§13) without normalising — this question is unresolved, not
+  answered by that landing.
 - Real-time duplicate check on create (409) vs the explicit endpoint?
-- Periodic re-fetch of the PASETO key set (key rotation) — the boot
-  fetch (§7 `ORGANIZATION_PASETO_KEYS_URL`) runs once; is a refresh
-  loop (or refetch-on-`UnknownKid`) needed before rotation goes live?
+  Still just the explicit `check-duplicates`/`import` paths; `POST
+  /api/organizations` never blocks on a match today.
+- ~~Periodic re-fetch of the PASETO key set (key rotation)~~ —
+  **RESOLVED by AU-2** (§13, §7): `auth::spawn_key_refresh` re-fetches
+  `ORGANIZATION_PASETO_KEYS_URL` on `ORGANIZATION_PASETO_KEYS_REFRESH_SECS`
+  (default hourly), and the ABAC policy file is likewise watched and
+  hot-reloaded.
 
 ## 17. References
 

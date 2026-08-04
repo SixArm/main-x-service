@@ -344,6 +344,40 @@ five axum-style services landed the same day as AU-1).
   `create_and_emit` under `outbox` and asserts entity + event + audit all
   commit together.
 
+### Added — FHIR R5 API + header-based API versioning (2026-07-08)
+
+- **`GET`/`POST`/`PUT`/`DELETE /fhir/Organization{,/{id}}`, `GET
+  /fhir/Organization?<params>` (a searchset `Bundle`), and `GET
+  /fhir/metadata`** (the `CapabilityStatement`) — this crate is the
+  **family reference implementation** of
+  `agents/share/fhir.md`, built first and copied by the other
+  in-scope services. New `src/fhir/{mod,resources,search}.rs` (resource
+  structs, `to_fhir_organization`/`from_fhir_organization`,
+  `FhirOperationOutcome`, the searchset `Bundle`, search-param parsing)
+  and mounted `src/controllers/fhir.rs`. Maps the stored
+  `organization_matcher::Organization` DTO to a FHIR `Organization` at
+  `high` fidelity: `name`/`alias`, identifiers (LEI/DUNS/…) →
+  `identifier` (token `system|value`), addresses → `address`, telecom →
+  `telecom`, `part_of` → `partOf` reference, `active`. Every non-2xx
+  response is an `OperationOutcome`; every response carries
+  `application/fhir+json`. Reuses the native model helpers, validators,
+  and event/audit path; `/fhir/*` sits behind the same blanket
+  auth+ABAC guard as `/api/*` (not on the public allow-list). Supported
+  search params: `_id`, `_lastUpdated`, `_count`, `identifier`, `name`,
+  `address`, `address-city`, `address-postalcode`. 9 DB-free unit tests
+  (DTO↔resource round-trip, each interaction, search→Bundle,
+  `OperationOutcome` on 404/400/422, `CapabilityStatement` matches
+  mounted routes); clippy-clean.
+- **Header-based API versioning.** New `src/version.rs`
+  (`resolve_version`, pure/unit-tested) layered as `require_version_mw`
+  in `App::after_routes`, per `agents/share/api-versioning.md`: no
+  `Accepts-version` header ⇒ served at the current version (`1.0`); an
+  explicit but unsupported version ⇒ `406 Not Acceptable`; a bare major
+  (`1`) aliases its current minor. The resolved version is echoed back
+  as an `Accepts-version` response header. Copied from the event-service
+  reference implementation; organization's URLs were already
+  version-free, so this was purely additive (no `/api/v1` to remove).
+
 ### Added — authz: ABAC policy authorization inside the blanket guard (2026-07-05)
 
 - ABAC authorization landed (supersedes the earlier per-crate

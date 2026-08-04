@@ -39,7 +39,14 @@ export   ──>  POST /api/organizations/export  {format, q, masking_profile, .
                                                                     -> 202 {job_id}
              GET  /api/organizations/export/{id}                   -> job status + download_url
 bulk-jobs──>  GET  /api/organizations/bulk-jobs                    -> [recent bulk jobs]
+fhir     ──>  GET  /fhir/Organization/{id}                          -> FHIR R5 Organization
+                                                                       (family reference implementation)
+             GET  /fhir/metadata                                    -> CapabilityStatement
 ```
+
+Every `/api/*` request is negotiated by the `Accepts-version` header
+(default `1.0`, no version in the URL) — see
+[`agents/share/api-versioning.md`](../../agents/share/api-versioning.md).
 
 A worked **merge** call (fold a confirmed duplicate into a survivor):
 

@@ -11,24 +11,34 @@ matching, built on **loco.rs** and embedding the canonical
 
 ## API
 
+API URLs are version-free; select the version with the
+`Accepts-version` request header (default `1.0`) — see
+[`agents/share/api-versioning.md`](../../agents/share/api-versioning.md).
+
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/api/organizations` | Create |
-| GET | `/api/organizations` | List |
-| GET | `/api/organizations/{pid}` | Fetch |
+| GET | `/api/organizations?limit=&offset=` | List (paginated: `X-Total-Count`/`X-Limit`/`X-Offset`) |
+| GET | `/api/organizations/{pid}` | Fetch (record-level ABAC; a `mask`-obligation allow returns the redacted view) |
+| GET | `/api/organizations/{pid}/masked` | The masked view (telephone/email/street line/fiscal identifiers redacted) |
+| GET | `/api/organizations/{pid}/export` | GDPR right-of-access export (audited every call) |
 | PUT | `/api/organizations/{pid}` | Update |
 | DELETE | `/api/organizations/{pid}` | Soft-delete |
 | POST | `/api/organizations/match` | Rank `{query, candidates}` |
-| POST | `/api/organizations/check-duplicates` | Match query vs stored orgs |
+| POST | `/api/organizations/check-duplicates` | Match query vs stored orgs (blocked on the search index) |
 | POST | `/api/organizations/deduplicate` | Batch-scan stored orgs pairwise; persists candidates in the stored review queue (destructive-classed under ABAC) |
 | GET | `/api/organizations/review-queue` | Stored review queue (filter `status`, `limit`) |
 | POST | `/api/organizations/review-queue/{id}/decision` | Decide a pending item (`confirmed` / `rejected`; first-writer-wins) |
-| GET | `/api/organizations/search?q=` | Case-insensitive name search (`ILIKE`) |
+| GET | `/api/organizations/search?q=[&fuzzy][&phonetic]` | Tantivy full-text search — fuzzy = typo-tolerant, phonetic = Soundex |
 | POST | `/api/organizations/merge` | Fold a duplicate into a survivor |
 | GET | `/api/organizations/merges/recent` | Merge-history records |
+| POST | `/api/organizations/import` | Bulk import (multipart JSONL/CSV) → `202 {job_id}` |
+| POST | `/api/organizations/export` | Bulk export → `202 {job_id}` |
+| GET | `/api/organizations/bulk-jobs` | Recent bulk import/export jobs |
 | GET | `/api/organizations/whoami` | Verified bearer-token claims (`401` without one) |
 | GET | `/api/organizations/audit/recent` · `/{pid}/audit` | Audit trail |
 | GET | `/api/organizations/events/recent` | In-memory event stream (`EventView`) |
+| GET | `/fhir/Organization{,/{id}}` · `/fhir/metadata` | FHIR R5 API (family reference implementation) |
 | GET | `/swagger-ui` · `/api-docs/openapi.json` | API docs |
 | GET | `/metrics.prom` | Prometheus metrics (root path, public) |
 
@@ -38,7 +48,9 @@ The request/response body for an organization **is** the
 `same_as`, `address`, `jurisdiction`, `founding_date`, `keywords`).
 schema.org publishes the camelCase property names (`legalName`,
 `sameAs`, …); the wire format here is the Rust DTO's snake_case
-(entity spec OQ-1, resolved).
+(entity spec OQ-1, resolved). The `/fhir/Organization` resource is a
+separate, standards-faithful FHIR representation of the same stored
+record — see [AGENTS.md](./AGENTS.md).
 
 ## Quick start
 
@@ -87,15 +99,21 @@ default run stays green without a database. Validation failures
 
 ## Status
 
-Done: CRUD + matching + name search (`ILIKE`) + audit log + event
-streaming + record merge + OpenAPI/Swagger + Prometheus metrics
-(`/metrics.prom`) + offline PASETO v4.public verification (blanket
-`/api/*` enforcement is wired, default-off; the published key set is
-fetched over HTTP once at boot when `ORGANIZATION_PASETO_KEYS_URL` is
-set, with warn + env fallback). Still deferred (see
-[spec §13](./spec/index.md)): Tantivy full-text search, per-field
-privacy/GDPR export, a key-set refresh loop (the boot fetch runs once),
-and richer validation. Auth is provided by the central
+Done: CRUD + matching + **Tantivy full-text search** (fuzzy + phonetic,
+`check-duplicates` blocked on the index) + a stored review queue + audit
+log + event streaming (in-memory + a durable outbox with a Fluvio relay,
+default-off) + record merge + per-field masking + the audited GDPR
+export + OpenAPI/Swagger + Prometheus metrics (`/metrics.prom`) +
+offline PASETO v4.public verification + ABAC policy authorization
+(blanket `/api/*` and `/fhir/*` enforcement is wired, default-off; the
+published key set is fetched over HTTP at boot when
+`ORGANIZATION_PASETO_KEYS_URL` is set and refreshed periodically
+thereafter, with warn + env fallback) + a **FHIR R5 API** (`Organization`
+— this crate is the family's reference implementation) + header-based
+API versioning + async bulk import/export (JSONL/CSV). Still deferred
+(see [spec §13](./spec/index.md)): richer validation beyond identifier
+check-digits (URL/country-code format), real-time duplicate check on
+create, and an S3 bulk-artifact backend. Auth is provided by the central
 [authentication-service](../../authentication/authentication-service-with-loco).
 
 Auth pivot done in this crate: the family moved from RS256 JWT + JWKS to

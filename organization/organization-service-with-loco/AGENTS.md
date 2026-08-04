@@ -31,7 +31,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/api/organizations` | Create (body: `Organization`) → `{pid, name}` |
-| GET | `/api/organizations` | List active (capped 100) |
+| GET | `/api/organizations?limit=&offset=` | List active, paginated (`X-Total-Count`/`X-Limit`/`X-Offset`; default first 100, `limit` clamps to 500, `offset` beyond 10 000 is `400`) |
 | GET | `/api/organizations/search?q=[&fuzzy][&phonetic]` | Tantivy full-text search (name, legal name, alternate names, identifiers, keywords, address, url); `fuzzy` = typo-tolerant, `phonetic` = Soundex |
 | GET | `/api/organizations/{pid}` | Fetch the stored `Organization` (record-level ABAC; a `mask`-obligation allow returns the redacted view) |
 | GET | `/api/organizations/{pid}/masked` | The masked view: telephone / email / street line / fiscal identifiers redacted |
@@ -58,15 +58,33 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 
 Plus loco's default `/_health`, `/_ping`.
 
+**FHIR R5 — family reference implementation.** `GET`/`POST`/`PUT`/`DELETE
+/fhir/Organization{,/{id}}`, `GET /fhir/Organization?<params>` (a
+searchset `Bundle`; `_id`, `_lastUpdated`, `_count`, `identifier`,
+`name`, `address`, `address-city`, `address-postalcode`), and `GET
+/fhir/metadata` (the `CapabilityStatement`) — see
+[`agents/share/fhir.md`](../../agents/share/fhir.md). `src/fhir/` maps
+the stored `organization_matcher::Organization` to a FHIR
+`Organization` (`high` fidelity); every non-2xx response is an
+`OperationOutcome`; these routes sit behind the same auth+ABAC guard as
+`/api/*`. Organization was built first here and is the copy source for
+the other in-scope services.
+
 ## Scope
 
-CRUD + matching + **name search** + **record merge** + **audit log** +
-**event streaming** + **OpenAPI/Swagger** + **Prometheus metrics**
+CRUD (paginated list/search — `?limit=&offset=`, `X-Total-Count`/
+`X-Limit`/`X-Offset`) + matching + **name search** + **record merge** +
+a stored **review queue** + **audit log** + **event streaming**
+(in-memory + a durable transactional outbox, both default-off transport
+selectable) + **OpenAPI/Swagger** + **Prometheus metrics**
 (`/metrics.prom`) + **offline PASETO v4.public verification**
-(`AuthUser`/`MaybeAuthUser`, `/whoami`, audit/merge `actor`) +
-**request-level tests** (Postgres, `#[ignore]`-gated) are wired. The
-wire format is snake_case (`legal_name`, `same_as`, …) and validation
-failures return `422`. Blanket `/api/*` auth enforcement is implemented
+(`AuthUser`/`MaybeAuthUser`, `/whoami`, audit/merge `actor`) + **ABAC
+policy authorization** inside the blanket guard + a **FHIR R5 API**
+(family reference implementation, above) + **header-based API
+versioning** (`Accepts-version`, above) + **request-level tests**
+(Postgres, `#[ignore]`-gated) are wired. The wire format is snake_case
+(`legal_name`, `same_as`, …) and validation failures return `422`.
+Blanket `/api/*` (and `/fhir/*`) auth enforcement is implemented
 (`auth::enforce`, default-off via `ORGANIZATION_REQUIRE_AUTH`).
 **Tantivy full-text search** (`src/search/`) replaced the Postgres
 `ILIKE` name search: fuzzy + phonetic retrieval, and `check-duplicates`
@@ -78,11 +96,15 @@ field masking, the masked view, and the audited GDPR export, wired to
 the ABAC `mask` obligation; there is deliberately **no consent model**
 (an organization is not a data subject — the person service owns the
 consent of the people behind it). Still deferred (spec §13): richer
-validation, and moving the structured FHIR search onto the index. The published-Ed25519-key
-set is fetched over HTTP once at boot when `ORGANIZATION_PASETO_KEYS_URL`
-is set (fetched set wins; warn + env fallback via
-`ORGANIZATION_PASETO_KEYS` otherwise — the service always boots); a
-periodic refresh loop is a future spec item. For a quick demo dataset,
+validation beyond identifier check-digits (URL/country-code format),
+real-time duplicate check on create, and moving the structured FHIR
+search onto the index. The published-Ed25519-key set is fetched over
+HTTP at boot when `ORGANIZATION_PASETO_KEYS_URL` is set (fetched set
+wins; warn + env fallback via `ORGANIZATION_PASETO_KEYS` otherwise —
+the service always boots) and **refreshed periodically thereafter**
+(`ORGANIZATION_PASETO_KEYS_REFRESH_SECS`, default hourly; AU-2); the
+ABAC policy file is likewise watched and hot-reloaded without a
+restart. For a quick demo dataset,
 `cargo loco task seed_examples` loads the repository's shared fixture
 (`examples/data/organizations.jsonl`, 20 rows) via the model-layer
 create (no duplicate check, no audit row, no event — deliberate for a
@@ -145,7 +167,16 @@ changed. See
 src/
 ├── app.rs                 loco Hooks (routes, truncate)
 ├── bin/main.rs            loco CLI entrypoint
+├── version.rs              header-based API versioning (`Accepts-version`,
+│                           `require_version_mw`, layered in `after_routes`)
+├── auth.rs                 offline PASETO v4.public verify + ABAC; AU-2's
+│                           `ReloadableVerifier`/`ReloadablePolicy`,
+│                           `spawn_key_refresh`, `spawn_policy_watcher`
 ├── controllers/organizations.rs   CRUD + match + check-duplicates + search
+├── controllers/fhir.rs     mounted FHIR R5 surface (`/fhir/Organization`,
+│                           `/fhir/metadata`) — family reference implementation
+├── fhir/                   FHIR resource structs, to/from-FHIR conversions,
+│                           `OperationOutcome`, searchset `Bundle`, search-param parsing
 ├── privacy.rs             masking + the GDPR export envelope
 ├── search/                Tantivy index (index.rs schema, mod.rs engine)
 ├── tasks/search.rs        `search_reindex` + boot self-heal
@@ -173,6 +204,14 @@ migration/src/            m20220101_000001_organizations, …_000002_audit_logs,
                           m20260803_000002_bulk_jobs
 tests/fluvio_relay.rs     `#![cfg(feature = "fluvio")]`-gated, `#[ignore]`d
                           live-broker relay round-trip (BUS-3)
+tests/enforcement.rs      AU-2 activation proof: blanket guard + ABAC over
+                          the real router (own binary — process-wide OnceLocks)
+tests/masking.rs          privacy layer end to end: `mask` obligation on
+                          GET, the masked view, the audited export (own binary)
+tests/outbox_audit.rs     under `outbox` transport: entity + event_outbox +
+                          audit_logs commit in one transaction (own binary)
+tests/seed_examples_db.rs seed_examples (EX-4): first run seeds 20 rows,
+                          second run is a no-op
 tests/requests/bulk.rs    BLK-5 request-level suite (Postgres-gated)
 config/                   development/production/test yaml
 ```
