@@ -21,6 +21,8 @@
 //! - [`models`] — `SeaORM` entities + query/projection helpers.
 //! - [`controllers`] — the read-only Axum controllers.
 //! - [`envelope`] — the `{ success, data, error }` API wrapper.
+//! - [`suggest`] — the cross-service `same_identity` suggestion
+//!   comparator (LNK-4 / T-29; pure, DB-free, never consumes edges).
 //! - [`app`] — loco `Hooks` wiring.
 //!
 //! See `spec/index.md` for the living specification.
@@ -47,3 +49,4 @@ pub mod models;
 pub mod openapi;
 pub mod probe;
 pub mod reconcile;
+pub mod suggest;

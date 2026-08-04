@@ -3135,6 +3135,15 @@ dependencies = [
 
 [[package]]
 name = "itertools"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3f2be4da1690a039e9ae5fd575f706a63ad5a2120f161b1d653c9da3930dd21"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
@@ -3466,6 +3475,7 @@ dependencies = [
  "loco-rs",
  "migration",
  "mimalloc",
+ "person-matcher",
  "prometheus",
  "reqwest 0.12.28",
  "rusty_paseto",
@@ -3780,6 +3790,16 @@ name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
+
+[[package]]
+name = "nhs-number"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49bf07de676c04a26a6026aac282524ac949982e371b01f91545c394e1a2be88"
+dependencies = [
+ "rand 0.10.2",
+ "serde",
+]
 
 [[package]]
 name = "nix"
@@ -4169,6 +4189,21 @@ name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
+
+[[package]]
+name = "person-matcher"
+version = "0.6.1"
+dependencies = [
+ "chrono",
+ "mimalloc",
+ "nhs-number",
+ "serde",
+ "serde_json",
+ "soundex",
+ "strsim",
+ "thiserror 2.0.19",
+ "unicode-normalization",
+]
 
 [[package]]
 name = "pest"
@@ -5275,7 +5310,7 @@ dependencies = [
  "derive-where",
  "derive_more",
  "futures-util",
- "itertools",
+ "itertools 0.14.0",
  "log",
  "mac_address",
  "ouroboros",
@@ -5337,7 +5372,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4cbb7ae053b9b37c919ea944a3bc52f7830a90c223f8a765c908293bca8f22d"
 dependencies = [
  "heck 0.5.0",
- "itertools",
+ "itertools 0.14.0",
  "pluralizer",
  "proc-macro2",
  "quote",
@@ -5838,6 +5873,15 @@ checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "soundex"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cb2858d06ea70c4c79a4f456c94643fee213a799bbff9fc9293b47550fc238c"
+dependencies = [
+ "itertools 0.6.5",
 ]
 
 [[package]]

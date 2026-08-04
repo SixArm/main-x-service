@@ -13,6 +13,40 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > and [event-bus.md](../../agents/share/event-bus.md).
 
 ## [Unreleased]
+### Added — Cross-service identity comparator (LNK-4, spec T-29, 2026-08-04)
+
+- **`src/suggest.rs`** — the first piece of the `same_identity`
+  suggestion job (design §16 OQ-9, `cross-service-linking.md` §5.2):
+  a pure, deterministic, DB-free `IdentityProbe { name, birth_date,
+  gender, identifiers }` + `compare_identity(&IdentityProbe,
+  &IdentityProbe) -> IdentityMatchScore`, the lean projection a `Person`
+  and a `Worker` both reduce to before comparison. No I/O, no clock, no
+  cross-service edge consumed or produced — mapping real records and
+  writing suggested edges is T-30/T-31's job.
+- Depends on `person-matcher` 0.6.1 (new path dependency) for
+  `Scorer::jaro_winkler_similarity` and `Gender` — not `worker-matcher`,
+  whose `Scorer`/`Gender` are near-duplicates and add nothing this probe
+  needs. No changes to person-matcher or worker-matcher themselves.
+- Scoring: a shared coded identifier (exact match on a normalised
+  `(scheme, value)` pair) short-circuits to `IDENTIFIER_MATCH_CEILING`
+  (`0.99`); otherwise a weighted blend of name (0.45), birth date
+  (0.45), and gender (0.10) — each excluded (not zeroed) when either
+  side lacks the field — scaled to `PROBABILISTIC_CEILING` (`0.97`) so
+  a perfect demographic match can never outrank a real identifier match.
+  Full weight table and rationale in the module doc.
+- `score_dob_pair` here is a **fresh** implementation of the full
+  six-row table `AGENTS/matching.md` documents ("Birth Date Matching");
+  `person-matcher`'s own private `score_dob_pair` only implements two of
+  those six rows (a pre-existing doc/code drift, left as-is rather than
+  reached into or silently papered over).
+- 17 new unit tests + a `compile_fail` doctest pinning the §7 partition
+  rule: `IdentityProbe` has no `From`/`Into` conversion to
+  `person_matcher::Person` (or `worker_matcher::Worker`), so a
+  suggestion produced here cannot be fed into either within-entity
+  `MatchingEngine`. `cargo test --lib`: 65 passed (48 pre-existing + 17
+  new); `cargo fmt --check` / `cargo clippy --all-targets -- -D
+  warnings` clean.
+
 ### Added — Real Fluvio bus consumer (BUS-2, spec T-6, 2026-08-03)
 
 - **The read-model's first real bus consumer**: one task per entity

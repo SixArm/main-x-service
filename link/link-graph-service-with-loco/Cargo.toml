@@ -50,6 +50,17 @@ prometheus = { version = "0.13" }
 # §13 T-2/T-3 deviation note).
 entity-ref = { path = "../entity-ref-rust-crate" }
 
+# LNK-4 / T-29 (spec §16 OQ-9, cross-service-linking.md §5.2): the
+# `same_identity` suggestion comparator (`src/suggest.rs`) reuses
+# person-matcher's pure `Scorer::jaro_winkler_similarity` and `Gender`
+# rather than reimplementing string similarity. `person-matcher` is
+# depended on (not `worker-matcher`) because the two crates' `Scorer` /
+# `Gender` are near-duplicates (see `worker-matcher`'s own copy) and
+# person-matcher is the family's reference matcher crate — one dependency
+# covers both sides of the person/worker comparison, since `IdentityProbe`
+# is the same lean type regardless of which service a record came from.
+person-matcher = { version = "0.6.1", path = "../../person/person-matcher-rust-crate" }
+
 # Offline PASETO v4.public verification + the shared ABAC engine, for
 # case<->person governance (spec T-16/T-19; design §10). Env-supplied key
 # set only (no `fetch` feature — boot-time URL fetch is a follow-up).

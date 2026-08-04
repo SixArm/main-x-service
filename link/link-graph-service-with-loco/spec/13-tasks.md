@@ -264,10 +264,51 @@ Suggests `same_identity` (person ↔ worker) links by comparison, emitting
 [§16 OQ-9](16-open-questions.md) (`cross-service-linking.md` §5.2). **Spec
 round done and fully pinned 2026-08-04 — T-29 code may start.**
 
-- [ ] T-29: Cross-type `IdentityProbe` + comparator reusing the matcher
+- [x] T-29: Cross-type `IdentityProbe` + comparator reusing the matcher
   crates' scoring primitives (pure, deterministic, unit-tested: a
   person/worker sharing an NHS number / name / DOB scores high; unrelated
   records score low; never consumes cross-service edges — §7 partition rule).
+  *(Done: `src/suggest.rs` — `IdentityProbe { name, birth_date, gender,
+  identifiers }` + `ProbeName` + `ProbeIdentifier` (exact match on a
+  normalised `(scheme, value)` pair; blank identifiers are rejected at
+  construction) + `compare_identity` → `IdentityMatchScore` (overall
+  confidence plus the per-component breakdown, mirroring the family's
+  score-breakdown convention). Depends on `person-matcher` 0.6.1 (path
+  dependency, new `[dependencies]` entry) for `Scorer::jaro_winkler_similarity`
+  and `Gender` — not `worker-matcher`, whose `Scorer`/`Gender` are
+  near-duplicates and add nothing `IdentityProbe` needs, since both
+  services' records reduce to the same lean probe before scoring.
+  Weights: name 0.45 (family 0.6 / given 0.4), DOB 0.45, gender 0.10
+  (documented in the module doc, mirroring
+  `person-service-with-loco/AGENTS/matching.md`'s table style). A shared
+  coded identifier short-circuits to `IDENTIFIER_MATCH_CEILING` (`0.99`);
+  the weighted probabilistic path is capped below that at
+  `PROBABILISTIC_CEILING` (`0.97`) so a perfect demographic agreement can
+  never outrank a real identifier match. `score_dob_pair` here is a
+  **fresh** implementation of the full six-row table documented in
+  `AGENTS/matching.md` ("Birth Date Matching") rather than a reuse of
+  `person-matcher`'s own private `score_dob_pair`, which only implements
+  two of those six rows — a pre-existing doc/code drift in person-matcher
+  this task did not want to either propagate or silently fix by reaching
+  into private internals. No `pub` change was needed in person-matcher or
+  worker-matcher. Every component is `None` (excluded, not zero) when
+  either side lacks the field, and blank strings never spuriously match
+  (SEC-M2/M3 "no spurious identity on absence"). 17 new unit tests
+  (identifier ceiling, identifier mismatch on scheme or value, name+DOB
+  match below the identifier ceiling, unrelated pair scores low, a
+  gender-only mismatch costs less than a name mismatch, both-`Unknown`
+  gender is a soft `0.5` not a spurious `1.0`, missing DOB degrades
+  gracefully, wholly-absent fields never manufacture a match, blank names
+  never spuriously match, blank identifiers rejected at construction,
+  plus the six `score_dob_pair` table rows) + a `compile_fail` doctest
+  pinning the §7 partition rule (`IdentityProbe` has no `From`/`Into`
+  conversion to `person_matcher::Person`, so feeding a suggestion into a
+  within-entity `MatchingEngine` cannot compile). `cargo test --lib`: 65
+  passed (48 pre-existing + 17 new — the crate's own §11.1 "15 tests"
+  note was already stale before this task, unrelated to T-29 and left
+  alone). `cargo fmt --check` / `cargo clippy --all-targets -- -D
+  warnings` clean. T-30 (candidate blocking) and T-31 (the periodic job)
+  build on this module next.)*
 - [ ] T-30: Candidate blocking over the person / worker read feeds
   (OQ-9(a)): block on an exact shared coded identifier (NHS/SSN/other)
   when present, else `Soundex(family)` + birth-year; only same-block
