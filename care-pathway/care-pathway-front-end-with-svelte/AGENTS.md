@@ -1,8 +1,10 @@
 # AGENTS.md — Care Pathway Front-End
 
 Operator UI for the [Care Pathway Service](../care-pathway-service-with-loco):
-care-pathway CRUD + matching + name search + merge + audit trail +
-recent-activity + cookie-session / BFF auth (PASETO).
+care-pathway CRUD + matching + merge + audit trail + registry insights +
+instance tracking (Kanban board / Gantt) + cookie-session / BFF auth
+(PASETO). Name search and a recent-activity view exist as repository
+methods but are not wired to any route — see spec §6.1/§13.
 
 > Read [`spec/index.md`](./spec/index.md) first — the living spec.
 
@@ -58,8 +60,8 @@ src/
 | UI action | Endpoint |
 |---|---|
 | List / registry grid | `GET /api/care-pathways` |
-| Search | `GET /api/care-pathways/search?q=` |
-| Recent activity | `GET /api/care-pathways/events/recent` → `PathwayEvent[]` |
+| Search (repository method, unwired — see spec §6.1/§13) | `GET /api/care-pathways/search?q=` |
+| Recent activity (repository method, unwired — see spec §6.1/§13) | `GET /api/care-pathways/events/recent` → `PathwayEvent[]` |
 | Create | `POST /api/care-pathways` |
 | Detail | `GET /api/care-pathways/{pid}` |
 | Edit | `PUT /api/care-pathways/{pid}` |

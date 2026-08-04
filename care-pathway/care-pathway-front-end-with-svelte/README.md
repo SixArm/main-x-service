@@ -1,23 +1,29 @@
 # care-pathway-front-end-with-svelte
 
 Operator UI for the [Care Pathway Service](../care-pathway-service-with-loco):
-care-pathway **CRUD + matching + name search + merge + audit trail +
-recent activity**.
+care-pathway **CRUD + matching + merge + audit trail + registry
+insights + instance tracking (board/Gantt)**.
 
-SvelteKit 2 · Svelte 5 (runes) · SVAR DataGrid · Lily Design System · TypeScript strict · SPA.
+SvelteKit 2 · Svelte 5 (runes) · SVAR DataGrid/Kanban/Gantt/Filter · Lily Design System · TypeScript strict · SPA.
 
 ## Routes
 
 | Route | Purpose |
 |---|---|
-| `/` | List care pathways + name-search box + recent-activity toggle |
-| `/care-pathways` | SVAR DataGrid index with FilterBar (client-side filtering) |
-| `/sequence` | Intervention sequence Gantt (SVAR) — the selected pathway's interventions as ordered bars on an **ordinal** axis (a sequence view, not a schedule; the model carries order only, no durations or dates) |
+| `/` | Registry: SVAR DataGrid + FilterBar (client-side name filter) |
 | `/new` | Create |
-| `/[pid]` | Detail + delete + check-duplicates + merge + audit-trail toggle |
+| `/[pid]` | Detail + instances + delete + check-duplicates + merge + audit-trail toggle |
 | `/[pid]/edit` | Edit |
+| `/insights` | Five read-only registry lenses (directory / coverage / variants / providers / languages) |
+| `/board` | Instance Kanban for one pathway (drag = `POST /api/instances/{pid}/status`) |
+| `/gantt` | Instance timeline Gantt for one pathway |
+| `/sequence` | Intervention sequence Gantt (SVAR) — the selected pathway's interventions as ordered bars on an **ordinal** axis (a sequence view, not a schedule; the model carries order only, no durations or dates) |
 | `/signin` | Magic-link sign-in (BFF flow against the auth service) |
 | `/verify` | Magic-link verification landing page |
+
+> A list-page name-search box and a "recent activity" event-stream
+> toggle shipped in earlier versions and are not present in the current
+> registry page; see `spec/index.md` §6.1/§13.
 
 Auth (BFF): **Sign in** via the central authentication-service
 magic-link establishes a server-side **cookie session**
@@ -58,10 +64,12 @@ The care-pathway record body **is** the `care_pathway_matcher::CarePathway`
 shape (name, pathway code, provider, care setting, target condition codes
 (ICD/SNOMED), interventions, keywords, identifiers, sameAs). The form
 edits these; `check-duplicates` posts the current record and lists stored
-matches with their scores. The list page offers a name-search box
-(`GET /search?q=`) and a recent-activity toggle (`GET /events/recent`);
-the detail page offers a per-row **Merge into this record** action
-(`POST /merge`) and a per-pathway audit-trail toggle (`GET /{pid}/audit`).
+matches with their scores. The detail page offers a per-row **Merge into
+this record** action (`POST /merge`) and a per-pathway audit-trail
+toggle (`GET /{pid}/audit`). `/insights` renders five read-only,
+server-derived lenses over the registry; `/[pid]`, `/board`, and
+`/gantt` surface a pathway's enrolled **instances** (people/subjects on
+the pathway), including a drag-to-move Kanban of instance status.
 
 ## Testing
 

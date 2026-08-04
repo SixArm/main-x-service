@@ -42,7 +42,15 @@ async function stubApi(page: Page) {
   await page.route("**/api/**", async (route) => {
     const req = route.request();
     const url = new URL(req.url());
-    const path = url.pathname;
+    // The browser calls the same-origin BFF proxy
+    // (`/api/proxy/<service path>`, see `src/lib/config.ts` +
+    // `src/routes/api/proxy/[...path]/+server.ts`), not the bare service
+    // path — strip the proxy prefix so the matches below stay written
+    // against the service's own paths (2026-08-03 ApiClient fix,
+    // tasks.md FE-2; this stub predated it and matched on the bare path).
+    const path = url.pathname.startsWith("/api/proxy")
+      ? url.pathname.slice("/api/proxy".length)
+      : url.pathname;
     const method = req.method();
     const json = (body: unknown) => route.fulfill({ json: body });
 

@@ -8,6 +8,59 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Fixed — Playwright smoke suite broken by the 2026-08-03 BFF-proxy fix (2026-08-04)
+
+- `tests/e2e/smoke.spec.ts`'s API stub matched requests against the bare
+  service path (`/api/care-pathways/...`), which is what the client sent
+  **before** commit `ad95088e` (2026-08-03, "Fix ApiClient dropping the
+  BFF proxy prefix from every request", tasks.md FE-2) corrected
+  `ApiClient` to route through the same-origin BFF proxy
+  (`/api/proxy/api/care-pathways/...`). That fix landed with a
+  regression test in five other front-ends but not here, and this
+  suite's stub was never updated to match — **all 6 Playwright tests
+  were failing** (`unhandled in stub`) before this fix. The stub now
+  strips the `/api/proxy` prefix before matching; verified green
+  (6/6) against `vite preview`.
+
+### Doc sync (2026-08-04, DOC-4 audit)
+
+- **`.env.example` documented the decommissioned client-held-token
+  model's vars** (`PUBLIC_API_BASE_URL`, `VITE_AUTH_FRONTEND_URL`, zero
+  references in `src/`) instead of the real BFF vars
+  `CARE_PATHWAY_API_URL`/`AUTH_API_URL` that `src/lib/server/config.ts`
+  actually reads (already correctly documented in `README.md`/
+  `AGENTS.md`) — rewritten to match.
+- **`spec/index.md` had not been updated for the 2026-07-19 –
+  2026-08-01 SVAR rebuild**: §2/§5/§6/§9 still described the v0.1–v0.3
+  dependency-light app (`/care-pathways` as a route that no longer
+  exists; no mention of `/insights`, `/board`, `/gantt`, or the
+  instances layer at all), and §7 flatly claimed "dependency-light (no
+  data grid / design system)" while the app has used the full SVAR
+  suite (DataGrid, FilterBar, Kanban, Gantt) plus Lily since 2026-07-19.
+  Rewrote §2/§5/§6/§7/§9/§11/§13/§14/§15 against the actual routes,
+  API surface, and test suite. Also surfaced (not silently fixed): the
+  list page's v0.2 search-on-submit box and v0.3 recent-activity toggle
+  were dropped in the SVAR rebuild without replacement —
+  `CarePathwayRepository.search()`/`.recentEvents()` are unit-tested but
+  wired to no route — and merge/audit-trail lost their Playwright
+  coverage in the same rebuild (vitest-only today). Both flagged as
+  open follow-ups in spec §13 rather than resolved unilaterally.
+- **Stale test counts**: spec §11/§13 said "46 tests across 5 files"
+  and described `tests/unit/auth.test.ts`/`config.test.ts` (removed
+  when the BFF migration replaced the client-held-token auth store);
+  the live suite is 48 vitest tests across `client.test.ts`,
+  `care-pathways.test.ts`, `i18n.test.ts`, `care-pathway-form.test.ts`,
+  and `layout.test.ts`. Playwright was "8 tests" in spec, actually 6
+  (rewritten for the SVAR routes, see the Fixed section above).
+  `pnpm run check` (0/0), `pnpm test` (48/48), `pnpm test:e2e` (6/6),
+  and `pnpm build` all verified green.
+- `README.md`'s route table still listed `/care-pathways` and omitted
+  `/insights`/`/board`/`/gantt`; fixed, and its "How it works" section's
+  search/recent-activity mention (unwired, see above) replaced with the
+  insights/instances description. `AGENTS.md`'s BFF description and API
+  table were already accurate; added a note that search/recent-activity
+  are unwired repository methods, for consistency with the spec.
+
 ### Added — paged collection reads (2026-08-01)
 
 - **`ApiClient.getPage()`** returns `{ items, total, limit, offset }`,

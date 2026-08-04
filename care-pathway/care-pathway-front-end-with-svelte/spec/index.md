@@ -13,14 +13,19 @@ service.
 
 ## 2. Scope
 
-In scope: the routes (`/`, `/care-pathways`, `/sequence`, `/new`,
-`/[pid]`, `/[pid]/edit`, `/signin`, `/verify`), the
-API client, the care-pathway form, a name-search box on the list, a
+In scope: the routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`, `/insights`,
+`/board`, `/gantt`, `/sequence`, `/signin`, `/verify`), the API client,
+the care-pathway form, the SVAR **DataGrid + FilterBar** registry (`/`),
+the five read-only **insights** lenses, the **instances** layer (the
+detail page's instances section, the SVAR **Kanban** board, and the SVAR
+**Gantt** instance timeline), the intervention-**sequence** Gantt, a
 merge-duplicate action on the detail page, a per-pathway audit-trail
-view on the detail page, and a system-wide recent-activity (event
-stream) view on the list page, and a BFF + httpOnly-cookie session (§6.9, per
+view on the detail page, and a BFF + httpOnly-cookie session (§6.9, per
 [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
-Out of scope: fuzzy/full-text search UI, system-wide audit feed.
+Out of scope: fuzzy/full-text search UI, system-wide audit feed. The
+repository still carries `search()` and `recentEvents()` methods
+(unit-tested) from the pre-SVAR list page; neither is wired to any route
+today — see §13.
 
 ## 3. Stakeholders and users
 
@@ -35,10 +40,14 @@ Clinical informaticians and pathway authors.
 ## 5. Information architecture
 
 ```
-/            list of care pathways
+/            registry (SVAR DataGrid + FilterBar)
 /new         create form
-/[pid]       detail + delete + check-duplicates
+/[pid]       detail + instances + delete + check-duplicates + merge + audit trail
 /[pid]/edit  edit form
+/insights    five read-only registry lenses
+/board       instance Kanban (one pathway; drag = status move)
+/gantt       instance timeline Gantt (one pathway)
+/sequence    intervention-sequence Gantt (one pathway template)
 ```
 
 ### Layout shell & navigation
@@ -51,17 +60,19 @@ Cross-cutting UI rule for every `*-front-end-with-svelte` app:
 
 ## 6. Functional requirements
 
-1. List active care pathways (`GET /api/care-pathways`).
-   - Search box (search-on-submit): a non-blank query calls
-     `GET /api/care-pathways/search?q=` (URL-encoded) and renders the
-     filtered results; **Clear** (or an empty query) restores the full
-     list. Loading and empty-result states are shown.
-   - Recent activity: a "Show recent activity" toggle lazy-loads
-     `GET /api/care-pathways/events/recent` on first open and renders the
-     events newest-first (highest `seq` first): the kind
-     (created/updated/deleted/merged), the name (linked to the pathway by
-     pid), and the `seq`. Loading, empty, and error states are shown; the
-     panel does not auto-load on mount.
+1. Registry (`/`, `GET /api/care-pathways`): pathways render in an SVAR
+   **DataGrid** (name / pid columns; row selection navigates to the
+   detail route) with an SVAR **FilterBar** doing a client-side
+   contains-match filter on name over the loaded rows. Loading, empty,
+   and error states are shown.
+   - *Superseded, not wired to any route today*: a search-on-submit box
+     (`GET /api/care-pathways/search?q=`) and a "Show recent activity"
+     toggle (`GET /api/care-pathways/events/recent`) shipped in v0.2/v0.3
+     (§15) and were not carried forward when the list page was rebuilt
+     onto the SVAR grid (2026-08-01). `CarePathwayRepository.search()`
+     and `.recentEvents()` still exist and are still unit-tested (§11)
+     but no UI calls them — flagged as a possible unintentional
+     regression rather than a deliberate removal; see §13.
 2. Create (`POST`), redirect to the new detail page.
 3. Detail: render the stored `CarePathway`; offer edit, delete, and
    check-duplicates.
@@ -97,11 +108,38 @@ Cross-cutting UI rule for every `*-front-end-with-svelte` app:
 10. Layout shell: global navigation is a full-width **top bar** (header)
     with a **hamburger** toggle on narrow viewports — NOT a left sidebar —
     and the main content area is **full-width**.
+11. Registry insights (`/insights`, read-only): the five lenses —
+    directory (by care setting / specialty), coverage (condition codes ×
+    care setting, plus gaps), variants (cross-provider name variants),
+    providers (provider directory), languages (per-`in_language`
+    counts) — each rendered as a table from its own
+    `GET /api/care-pathways/insights/{directory,coverage,variants,providers,languages}`
+    call. Each lens's `note` string is shown verbatim; the UI does not
+    recompute the numbers.
+12. Pathway instances: the detail page (`/[pid]`) renders the template's
+    enrolled instances (`GET /api/care-pathways/{pid}/instances`,
+    best-effort — a fetch failure degrades to an empty list rather than
+    failing the page). The SVAR **Kanban** board (`/board`) shows one
+    selected pathway's instances as status columns (Active / On hold /
+    Completed / Discontinued); dragging a card calls
+    `POST /api/instances/{pid}/status`, and an illegal transition
+    (service `422`) is rolled back by reload. The SVAR **Gantt**
+    (`/gantt`) renders the same instances as bars from `enrolled_on` to
+    `next_review_on ?? closed_on ?? today`, labelled by `subject_ref`;
+    instances without an `enrolled_on` list below the chart instead of
+    being invented onto the timeline.
+13. Intervention-sequence Gantt (`/sequence`): a selected pathway
+    template's own `interventions` as ordered bars on an **ordinal**
+    axis — explicitly a sequence view, not a schedule (the model carries
+    order only, no per-step duration or date).
 
 ## 7. Non-functional requirements
 
-Svelte 5 runes only; TS strict (`noUncheckedIndexedAccess`); SPA;
-dependency-light (no data grid / design system).
+Svelte 5 runes only; TS strict (`noUncheckedIndexedAccess`); SPA. Uses
+the SVAR component suite (DataGrid + FilterBar, Kanban, Gantt) and the
+Lily Design System headless `ThemePicker`/`LocalePicker` — see
+`AGENTS.md` ground rule 4. This stopped being a dependency-light app on
+2026-07-19 (§15); forms remain plain inputs, not a form-builder library.
 
 ## 8. Architecture
 
@@ -125,16 +163,20 @@ fields (incl. `in_language` as "Languages").
 
 | Route / action | Endpoint |
 |---|---|
-| `/` list | `GET /api/care-pathways` |
-| `/` search | `GET /api/care-pathways/search?q=` |
-| `/` recent activity | `GET /api/care-pathways/events/recent` (→ `PathwayEvent[]`) |
+| `/` registry grid | `GET /api/care-pathways` |
 | `/new` | `POST /api/care-pathways` |
 | `/[pid]` load | `GET /api/care-pathways/{pid}` |
+| `/[pid]` instances | `GET /api/care-pathways/{pid}/instances` (→ `PathwayInstance[]`) |
 | `/[pid]` delete | `DELETE /api/care-pathways/{pid}` |
 | `/[pid]` duplicates | `POST /api/care-pathways/check-duplicates` |
 | `/[pid]` merge | `POST /api/care-pathways/merge` (`{main_pid, duplicate_pid, reason?}`) |
 | `/[pid]` audit | `GET /api/care-pathways/{pid}/audit` (→ `AuditEntry[]`) |
 | `/[pid]/edit` | `PUT /api/care-pathways/{pid}` |
+| `/insights` (5 lenses) | `GET /api/care-pathways/insights/{directory,coverage,variants,providers,languages}` |
+| `/board` instance move | `POST /api/instances/{pid}/status` (`{to}`) |
+| `/gantt` | `GET /api/care-pathways/{pid}/instances` |
+| — (unwired, §6.1/§13) | `GET /api/care-pathways/search?q=`, `GET /api/care-pathways/events/recent` |
+| — (repository only, not wired to a route) | `GET /api/instances/{pid}` (`InstanceDetail`), `GET /api/instances/caseload` |
 
 ## 10. Persistence
 
@@ -143,42 +185,36 @@ None client-side beyond in-memory route state.
 ## 11. Testing strategy
 
 `pnpm run check` (svelte-check strict, 0/0). **vitest** unit tests
-(`tests/unit/`) cover the `ApiClient` (verb/body/headers/bearer-token/
-error-classification/empty-body), the **auth token store**
-(`tests/unit/auth.test.ts`: `setToken`/`clearToken` round-trip; the
-client attaches `Authorization: Bearer` when the store holds a token and
-omits it when empty; a per-call token/`null` overrides the store; and
-`captureTokenFromHash` — well-formed extract, multi-param fragment, no
-leading `#`, URL-decode, empty/`#`, no-token, and garbage/blank → null),
-the **SSO sign-in URL builder** (`tests/unit/config.test.ts`: `signInUrl`
-encodes `return_to`, includes the SvelteKit base path, and trims a
-trailing slash so there is no `//signin`), and
-`CarePathwayRepository` (every
-method's path + verb, incl. a regression pinning `check-duplicates`,
-`search()` pinning the `/search?q=` path with URL-encoding, and
-`merge()` pinning `POST /merge` with the `{main_pid, duplicate_pid,
-reason?}` body — pids in the body, not the URL, plus `404` (unknown pid)
-and `422` (equal-pid) `ApiError` propagation for the detail-page error
-banner; `audit()` pinning `GET /{pid}/audit` with URL-encoding; and
-`recentEvents()` pinning `GET /events/recent`), and the
-**`CarePathwayForm`** component (`tests/unit/care-pathway-form.test.ts`,
-via `@testing-library/svelte` mounted client-side by the
-`svelteTesting()` vite plugin: the required-name guard blocks `onsubmit`
-on a blank/whitespace name and shows the banner; `build()` trims scalars
-+ nulls blanks, splits the comma list fields incl. `in_language`, drops
-empty condition-code / identifier rows, and collapses a `Custom`
-care-setting / identifier-scheme seed). **Playwright** smoke
-tests (`tests/e2e/`) load the four routes (`/`, `/new`, `/[pid]`,
-`/[pid]/edit`) with the API stubbed via `page.route`, asserting each
-renders; one test exercises the list search box (matching query keeps
-the row, non-matching shows the empty-result message); one test drives
-the detail-page merge action (check-duplicates → confirm merge →
-success message, asserting the merge endpoint fired); one test opens the
-detail-page audit trail (toggle → rows render with action + "—" actor);
-one test opens the list-page recent-activity panel (toggle → events
-render newest-first with kind + seq). They run against the production
-build (`vite preview`) to avoid the `vite dev` cold-start module race.
-Run: `pnpm test` (vitest) and `pnpm test:e2e` (Playwright).
+(`tests/unit/`, 48 tests across 5 files) cover: `client.test.ts` (11 —
+the `ApiClient` verb/body/headers/error-classification/empty-body;
+no bearer-token tests remain, since the browser holds no token under the
+BFF model, §6.9); `care-pathways.test.ts` (25 — every
+`CarePathwayRepository` method's path + verb, incl. a regression pinning
+`check-duplicates`, `search()` and `recentEvents()` (still pinned though
+unwired to any route, §6.1), `merge()` pinning `POST /merge` with the
+`{main_pid, duplicate_pid, reason?}` body plus its `404`/`422`
+`ApiError` propagation, `audit()`, and the insights/instances/caseload
+methods); `i18n.test.ts` (6 — the 13-locale catalog: exact locale list,
+full key coverage every locale, RTL flags, English fallback); `layout.test.ts`
+(1); and `care-pathway-form.test.ts` (5, via `@testing-library/svelte`
+mounted client-side by the `svelteTesting()` vite plugin: the
+required-name guard blocks `onsubmit` on a blank/whitespace name and
+shows the banner; `build()` trims scalars + nulls blanks, splits the
+comma list fields incl. `in_language`, drops empty condition-code /
+identifier rows, and collapses a `Custom` care-setting / identifier-scheme
+seed). **Playwright** smoke tests (`tests/e2e/smoke.spec.ts`, 6 tests,
+API stubbed via `page.route`) cover: the registry grid renders a seeded
+pathway; the detail page renders the pathway plus its instances; the
+insights page renders all five lens tables; the board renders instances
+as Kanban cards; the gantt renders the instance timeline; the sequence
+route renders the intervention-sequence gantt. The v0.2/v0.3-era smoke
+tests for `/new`, `/[pid]/edit`, list search, detail merge, and
+detail/list audit/recent-activity were replaced by this suite in the
+2026-08-01 SVAR rebuild rather than kept alongside it — merge and audit
+trail are exercised only at the vitest/repository level today (§13).
+They run against the production build (`vite preview`) to avoid the
+`vite dev` cold-start module race. Run: `pnpm test` (vitest) and
+`pnpm test:e2e` (Playwright).
 
 ## 12. Compliance
 
@@ -188,31 +224,41 @@ for any access/audit requirements.
 ## 13. Tasks (live work queue)
 
 - [x] vitest unit tests for `ApiClient` + `CarePathwayRepository`
-  (incl. merge 404/422 `ApiError` propagation) + auth token store +
-  `signInUrl` + `CarePathwayForm` (required-name guard + `build()`
-  normalization, incl. `in_language`) (`tests/unit/`, 46 tests across 5 files).
-- [x] playwright smoke for the four routes (`tests/e2e/smoke.spec.ts`,
-  8 tests — the four routes plus search / merge / audit / recent-activity,
-  API stubbed, runs against `vite preview`).
+  (incl. merge 404/422 `ApiError` propagation) + `CarePathwayForm`
+  (required-name guard + `build()` normalization, incl. `in_language`) +
+  the i18n catalog (`tests/unit/`, 48 tests across 5 files — see §11).
+- [x] Playwright smoke, rewritten 2026-08-01 for the SVAR surface
+  (`tests/e2e/smoke.spec.ts`, 6 tests — registry / detail+instances /
+  insights / board / gantt / sequence, API stubbed, runs against
+  `vite preview`). Superseded the earlier 8-test suite covering the four
+  CRUD routes plus search/merge/audit/recent-activity; see §11 for what
+  is no longer exercised at the e2e level.
 - [x] Merge-duplicate action on the detail page — each duplicate row
   offers "Merge into this record" (two-step inline confirm) calling
   `POST /api/care-pathways/merge`; adopts the returned survivor and
-  re-checks. `repository.merge()` added; vitest (2) + Playwright (1)
-  cover it.
+  re-checks. `repository.merge()` added; vitest covers it (no e2e
+  coverage since the 2026-08-01 Playwright rewrite, §11).
 - [x] Audit-trail view on the detail page — a "Show audit trail" toggle
   lazy-loads `GET /api/care-pathways/{pid}/audit` and renders the rows
   newest-first (action, actor or "—", timestamp) with loading/empty/error
-  states. `repository.audit()` + `AuditEntry` type added; vitest (2) +
-  Playwright (1) cover it.
-- [x] Recent-activity view on the list page — a "Show recent activity"
-  toggle lazy-loads `GET /api/care-pathways/events/recent` and renders
-  the events newest-first (kind, name linked by pid, seq) with
-  loading/empty/error states. `repository.recentEvents()` + `PathwayEvent`
-  type added; vitest (1) + Playwright (1) cover it.
+  states. `repository.audit()` + `AuditEntry` type added; vitest covers
+  it (no e2e coverage since the 2026-08-01 Playwright rewrite, §11).
+- [x] SVAR component suite (2026-07-19 – 2026-08-01): DataGrid +
+  FilterBar registry (`/`), Kanban instance board (`/board`), Gantt
+  instance timeline (`/gantt`) and intervention-sequence Gantt
+  (`/sequence`), the five `/insights` lenses, and the `/[pid]` instances
+  section — see §6.1/§6.11–13. This retired the §7 "dependency-light
+  (no data grid / design system)" claim; fixed 2026-08-04.
+- [ ] **Follow-up (flagged 2026-08-04, not yet triaged):** decide
+  whether the list-page search-on-submit box and "Show recent activity"
+  toggle (v0.2/v0.3, dropped in the 2026-08-01 SVAR rebuild) should be
+  restored — the FilterBar covers client-side name filtering but not
+  full-text search or event-stream visibility — or whether
+  `CarePathwayRepository.search()`/`.recentEvents()` and their unit
+  tests should be retired as intentionally superseded. Either way,
+  restore Playwright coverage for merge and audit trail, which currently
+  have no e2e assertions (§11).
 - [ ] `Custom(label)` editing for code systems / settings / schemes.
-- [x] Search box once the service ships search — list page calls
-  `GET /api/care-pathways/search?q=` (search-on-submit + Clear);
-  `repository.search()` added; vitest (2) + Playwright (1) cover it.
 - [x] ~~Bearer token wiring — reactive token store `$lib/auth.svelte`
   (`localStorage["mxi_access_token"]`) + `ApiClient` bearer attach +
   layout paste/clear affordance~~ — **superseded** (see auth-migration task below).
@@ -229,22 +275,34 @@ for any access/audit requirements.
 
 ## 14. Implementation status
 
-Done: all four routes; lean client; repository (incl. `search()`,
-`merge()`, `audit()`, and `recentEvents()`); list search box;
-list-page recent-activity (event-stream) view; detail-page
-merge-duplicate action; detail-page audit-trail view; BFF auth
-(`src/lib/server/` session cookie + magic-link + session→PASETO
+Done: all nine routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`,
+`/insights`, `/board`, `/gantt`, `/sequence`, `/signin`+`/verify`); lean
+client; repository (CRUD + `checkDuplicates` + `merge` + `audit` + the
+five `insights*` lenses + `listInstances`/`getInstance`/
+`setInstanceStatus`/`caseload`, plus the unwired `search()` and
+`recentEvents()` — §6.1/§13); SVAR **DataGrid + FilterBar** registry,
+**Kanban** instance board, **Gantt** instance timeline +
+intervention-sequence Gantt, and the `/insights` lenses; detail-page
+instances section, merge-duplicate action, and audit-trail toggle; BFF
+auth (`src/lib/server/` session cookie + magic-link + session→PASETO
 exchange, `/signin` + `/verify` routes, `/api/proxy` bearer injection —
-the browser holds no token); form (incl.
-condition codes + identifiers editors); SPA config. `pnpm run check`
-clean; production build succeeds.
+the browser holds no token); form (incl. condition codes + identifiers
+editors); SPA config. `pnpm run check` clean; production build
+succeeds.
 
 ## 15. Roadmap
 
-v0.1 (here): CRUD + duplicate-check UI. v0.2: tests + search box.
-v0.3: audit-trail view (done) + recent-activity view (done) + auth token
-+ cross-origin SSO sign-in handoff (shipped, since superseded by the BFF
-+ cookie-session model — §13).
+v0.1: CRUD + duplicate-check UI. v0.2: tests + search box. v0.3:
+audit-trail view + recent-activity view + auth token + cross-origin SSO
+sign-in handoff (shipped, since superseded by the BFF + cookie-session
+model — §13). v0.4 (2026-07-19 – 2026-08-01): rebuilt onto the SVAR
+component suite — DataGrid + FilterBar registry, Kanban instance board,
+Gantt instance timeline + intervention-sequence Gantt, the five
+insights lenses, and Lily theme/locale pickers — retiring the v0.1–v0.3
+dependency-light posture (§7). The v0.2 search box and v0.3
+recent-activity view were not carried into the v0.4 registry page and
+their Playwright coverage (along with merge/audit's) was dropped in the
+same rebuild; neither has been re-triaged (§13).
 
 ## 16. Open questions
 
