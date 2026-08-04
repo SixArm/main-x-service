@@ -68,5 +68,5 @@ See [`testing.md`](./testing.md).
 ## Dependencies
 
 - New runtime dependencies require a justification in the PR description and a note in [`../spec.md`](../spec/index.md) if they expand the trust boundary.
-- Current direct runtime dependencies: `serde`, `serde_json`, `unicode-normalization`, `strsim`, `thiserror`, `soundex`. No `tokio`, `async-std`, or other runtimes.
+- Current direct runtime dependencies: `serde`, `serde_json`, `unicode-normalization`, `strsim`, `thiserror`, `soundex`, `mimalloc` (only used by the `#[cfg(target_env = "musl")]` global allocator in `src/main.rs`, the demo binary — the library itself does not reference it). No `tokio`, `async-std`, or other runtimes.
 - Dev-only dependencies (e.g. `proptest`, `criterion`) are lower-risk but should still be deliberate.

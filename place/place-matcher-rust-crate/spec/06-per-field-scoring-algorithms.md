@@ -75,27 +75,33 @@ Compute `normalize_phone_e164(phone, cc)` for both sides where `cc = MatchConfig
 
 Compute `normalize_email(email, gmail_dot_folding)` for both sides. `1.0` iff both canonicalise and are equal; `0.0` if both canonicalise but differ. `None` if either side has `email = None`, or if either side fails to canonicalise (`normalize_email` returned `None`).
 
-### 6.10 Setting (indoor / outdoor) — `setting_score`
+### 6.10, 6.11 — Setting and Tags: planned, not yet implemented
 
-Compare the two `setting` values (`IndoorOutdoor`). `1.0` iff equal (both `Indoor`, both `Outdoor`, or both `Mixed`); `0.5` when one side is `Mixed` and the other is `Indoor` or `Outdoor` (compatible — a mixed place partly matches either); `0.0` when one is `Indoor` and the other `Outdoor` (a strong non-match signal — an enclosed place and an open place are rarely the same). `None` when either side has `setting = None`.
+Two further components (`setting_score` over an `IndoorOutdoor` field,
+and `tags_score` as a plain set-Jaccard over free-text operator labels)
+are **specified but not yet implemented** in `src/matcher.rs`. Neither
+`Place` nor `MatchConfig` nor `MatchBreakdown` currently carries the
+corresponding fields (§3.1.3). The design, retained here as the
+implementation target:
 
-### 6.11 Tags — `tags_score`
+- **`setting_score`** would compare two `IndoorOutdoor` values: `1.0`
+  iff equal (both `Indoor`, both `Outdoor`, or both `Mixed`); `0.5` when
+  one side is `Mixed` and the other is `Indoor` or `Outdoor` (compatible
+  — a mixed place partly matches either); `0.0` when one is `Indoor` and
+  the other `Outdoor` (a strong non-match signal — an enclosed place and
+  an open place are rarely the same); `None` when either side is unset.
+- **`tags_score`** would be a plain set Jaccard over the two tag sets
+  (identical in shape to how `keywords` are scored where present).
+  Each side's `tags` would be normalised case-insensitively (trim +
+  ASCII lowercase) and collected into a set, dropping empty /
+  whitespace-only entries, then `tags_score = |A ∩ B| / |A ∪ B|`. A
+  **supporting** signal only — operator labels group and triage
+  records, but identical tags alone do not identify a place — carrying
+  a small weight (§7) and never short-circuiting a match; `None` when
+  either side has an empty tag set.
 
-Plain set Jaccard over the two tag sets (identical in shape to how
-`keywords` are scored where present). Each side's `tags` are normalised
-case-insensitively (trim + ASCII lowercase) and collected into a set,
-dropping empty / whitespace-only entries; then
-
-```text
-tags_score = |A ∩ B| / |A ∪ B|
-```
-
-`tags_score` is a **supporting** signal — operator labels group and
-triage records, but identical tags alone do not identify a place — so it
-carries a small weight (§7) and never short-circuits a match.
-
-`tags_score` is `None` (does not participate) when **either** side has an
-empty tag set.
+See [`CHANGELOG.md`](../CHANGELOG.md) "Unreleased" for the tracked
+implementation follow-up.
 
 ---
 

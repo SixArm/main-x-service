@@ -26,7 +26,7 @@ let r = MatchingEngine::default_config().match_places(&a, &b);
 // r.is_match == true; r.confidence == High
 ```
 
-Per-field sketch under default weights: `name_score ≈ 1.00` (the alternate matches exactly; weight `0.20`); `coordinates_score = exp(-(9/50)^2) ≈ 0.97` (≈ 9 m apart; weight `0.30`); `category_score = 1.0` (both `Monument`; weight `0.10`); `country_code_score = 1.0` (both `"FR"`; weight `0.05`); every other component is `None`. Renormalised: `(0.20 + 0.291 + 0.10 + 0.05) / 0.65 ≈ 0.984` ≥ `0.80` → `is_match = true`; `Confidence::High`.
+Per-field sketch under default weights: `name_score ≈ 0.84` (best-of-cartesian-product across `("Eiffel Tower", "La Tour Eiffel") × ("Tour Eiffel",)`; the closest pair is not an exact string match — `"la tour eiffel"` vs `"tour eiffel"` still differs by the leading `"la "` — so `Combined` = `0.7 × JaroWinkler + 0.3 × Levenshtein` lands well under `1.0`; weight `0.20`); `coordinates_score = exp(-(d/50)^2) ≈ 0.97` (~9 m apart; weight `0.30`); `category_score = 1.0` (both `Monument`; weight `0.10`); `country_code_score = 1.0` (both `"FR"`; weight `0.05`); every other component is `None`. Renormalised: `(0.20 × 0.84 + 0.30 × 0.97 + 0.10 + 0.05) / 0.65 ≈ 0.938` ≥ `0.80` → `is_match = true`; `Confidence::High` (`≥ 0.90`).
 
 ### 11.2 Two Starbucks branches — same name, different cities
 

@@ -100,6 +100,20 @@ When you write a test that pins a specific spec rule:
 4. Fix the code (or the spec, if the property was wrong).
 5. Keep the regression file committed.
 
+## Fuzzing (SEC-I2)
+
+`fuzz/` is a `cargo-fuzz` crate (standalone — **not** a workspace member,
+so it never affects the crate's normal stable build/test/clippy) with
+three coverage-guided libFuzzer targets: `match_places` (deserialize a
+JSON `[place_a, place_b]` tuple → `MatchingEngine::match_places`; asserts
+a finite score in `[0,1]` in both argument orders), `normalizer` (the pure
+`Normalizer` helpers over arbitrary UTF-8; never-panic), and `scorer` (the
+pure `Scorer` similarities; finite in `[0,1]`). It complements the
+`proptest` properties above with libFuzzer's coverage-guided search over
+the same never-panic / bounded-score invariants. Run on nightly:
+`cargo +nightly fuzz run <target>` from `fuzz/`; see `fuzz/README.md` for
+the per-target detail.
+
 ## Adapter Contract Tests
 
 `tests/adapter_contract.rs` pins the **public API surface** that downstream

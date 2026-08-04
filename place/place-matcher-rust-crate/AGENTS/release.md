@@ -31,6 +31,7 @@ Before publishing a new version:
 - [ ] `cargo clippy --all-targets -- -D warnings` passes.
 - [ ] `cargo test` passes (unit + integration + doctest + property).
 - [ ] `cargo doc --no-deps` builds with no warnings.
+- [ ] `cargo deny check` passes (see "Dependency updates" below).
 - [ ] `cargo publish --dry-run` succeeds.
 - [ ] `cargo run` and `cargo run --example basic_usage` smoke-tested.
 
@@ -66,5 +67,5 @@ If a CHANGELOG entry doesn't have a corresponding spec edit, one of them is wron
 
 - Patch-bump dependencies regularly; document in CHANGELOG under "Dependencies".
 - Minor / major dependency bumps that change public behaviour require a behaviour-change note even if our crate's surface is unchanged.
-- Run `cargo audit` before every release. Zero findings is the bar. Pin or yank if a transitive dependency is flagged.
-- Current direct runtime dependencies (`Cargo.toml`): `serde`, `serde_json`, `unicode-normalization`, `strsim`, `thiserror`, `soundex`. No `tokio`, `async-std`, or other runtimes.
+- Run `cargo deny check` before every release (the crate's actual CI gate, `.github/workflows/security.yml` — it scans the same RUSTSEC advisory database `cargo audit` would, plus licenses/bans/sources, honouring `deny.toml`'s `[advisories] ignore` policy). Zero findings is the bar. Pin or yank if a transitive dependency is flagged.
+- Current direct runtime dependencies (`Cargo.toml`): `serde`, `serde_json`, `unicode-normalization`, `strsim`, `thiserror`, `soundex`, `mimalloc` (only used by the `#[cfg(target_env = "musl")]` global allocator in `src/main.rs`, the demo binary). No `tokio`, `async-std`, or other runtimes.

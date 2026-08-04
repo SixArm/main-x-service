@@ -11,7 +11,7 @@
 | `MatchingError` | Sum-type for fallible operations. Only variant today is `MissingField`. | §3.9 |
 | `Normalizer` | Stateless namespace for text normalisation. | §4 |
 | `ParsedAddressLine` | `{ house_number, unit, street }` decomposition of an address line. | §4.5 |
-| `Place` | Core place record. 17 fields, every one optional or defaulting to empty. | §3.1 |
+| `Place` | Core place record. 15 fields, every one optional or defaulting to empty (2 more — `setting`, `tags` — are planned but not yet implemented; see §3.1.3). | §3.1 |
 | `PlaceBuilder` | Fluent builder for `Place`. | §3.2 |
 | `PlaceCategory` | 35 enumerated variants plus `Other(String)`. | §3.4 |
 | `PlaceId` | `{ scheme, value }`. Scheme-local equality. | §3.5 |

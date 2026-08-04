@@ -14,8 +14,6 @@ pub struct MatchConfig {
     pub place_ids_weight: f64,
     pub phone_weight: f64,
     pub email_weight: f64,
-    pub setting_weight: f64,
-    pub tags_weight: f64,
     pub use_phonetic_matching: bool,
     pub name_algorithm: SimilarityAlgorithm,
     pub strict_mode: bool,
@@ -40,13 +38,14 @@ pub struct MatchConfig {
 | `place_ids_weight` | `0.15` | Weight of the place-IDs component (§6.7). |
 | `phone_weight` | `0.03` | Weight of the phone component (§6.8). |
 | `email_weight` | `0.02` | Weight of the email component (§6.9). |
-| `setting_weight` | `0.05` | Weight of the indoor/outdoor setting component (§6.10). |
-| `tags_weight` | `0.05` | Weight of the tags component (§6.11) — a supporting signal in the same small-weight cluster as country-code / setting. |
 | `use_phonetic_matching` | `false` | Compute Soundex-bonus (§6.2). |
 | `name_algorithm` | `SimilarityAlgorithm::Combined` | Algorithm used by `name_score`. |
 | `strict_mode` | `false` | Tighten `is_match` to also require `deterministic_match` (§5.2.3). |
 | `gmail_dot_folding` | `false` | Apply Gmail-specific localpart canonicalisation (§4.4). |
 | `phone_default_country` | `Some("GB")` | Fallback ISO 3166-1 alpha-2 country for E.164 parsing (§4.3.2). |
+
+A planned `setting_weight` (`0.05`) and `tags_weight` (`0.05`) are **not
+yet present** on `MatchConfig` — see §3.1.3 and §6.10/§6.11.
 
 ### 7.2 Strict — `MatchConfig::strict()`
 

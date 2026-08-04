@@ -114,9 +114,11 @@ The `AGENTS/` directory contains topic-specific guidance. Read the one that matc
 ├── LICENSE.md
 ├── README.md                 ← user-facing
 ├── benches/                  ← criterion benchmarks
+├── deny.toml                 ← cargo-deny supply-chain policy (SEC-I1)
 ├── examples/                 ← runnable examples (basic_usage, custom_config)
+├── fuzz/                     ← cargo-fuzz targets (SEC-I2; not a workspace member)
 ├── index.md                  ← documentation entry point
-├── spec.md                   ← LIVING SPECIFICATION (SSOT — read this)
+├── spec/                     ← LIVING SPECIFICATION (SSOT — read this; §1–§13, spec/index.md)
 ├── scripts/                  ← spec-drift check
 ├── src/                      ← crate source
 └── tests/                    ← integration tests, property tests

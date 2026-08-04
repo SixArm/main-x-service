@@ -30,8 +30,8 @@ The library is pure and deterministic: same inputs always produce the same outpu
 - Each new dependency is a supply-chain attack surface. Justify it in the PR description.
 - Prefer crates with permissive licences (MIT / Apache-2.0 / BSD) that are compatible with the project's own multi-licence offering.
 - Avoid procedural macros that fetch at compile time, panic in macros, or pull in `build.rs` scripts of unknown provenance.
-- Current direct runtime dependencies (`Cargo.toml`): `serde`, `serde_json`, `unicode-normalization`, `strsim`, `thiserror`, `soundex`. No `tokio`, `async-std`, or other runtimes.
-- Run `cargo audit` before every release; zero findings is the bar. See [release.md](./release.md).
+- Current direct runtime dependencies (`Cargo.toml`): `serde`, `serde_json`, `unicode-normalization`, `strsim`, `thiserror`, `soundex`, `mimalloc` (only used by the `#[cfg(target_env = "musl")]` global allocator in `src/main.rs`, the demo binary). No `tokio`, `async-std`, or other runtimes.
+- Run `cargo deny check` before every release (the crate's actual CI gate — see `.github/workflows/security.yml` and `deny.toml`); zero findings is the bar. See [release.md](./release.md).
 
 ## Vulnerability reporting
 

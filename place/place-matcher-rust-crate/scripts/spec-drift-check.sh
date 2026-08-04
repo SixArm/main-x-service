@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Spec-drift check (spec.md §23 T-7).
+# Spec-drift check (see AGENTS/spec-driven-development.md).
 #
 # Fail with a non-zero exit code if any "watched" source file changed in
-# the diff but `spec.md` did not — unless the changed paths match an
-# allowlist pattern in `.spec-allow`.
+# the diff but the `spec/` directory did not — unless the changed paths
+# match an allowlist pattern in `.spec-allow`.
 #
 # Usage: spec-drift-check.sh [base-ref] [head-ref]
 #
@@ -19,13 +19,17 @@ set -euo pipefail
 base_ref="${1:-${GITHUB_BASE_REF:-main}}"
 head_ref="${2:-HEAD}"
 
-# Files whose changes REQUIRE a matching update to spec.md.
-# Conservative initial scope: just src/matcher.rs (per T-7).  Extend to
-# normalize, identifiers, models as the spec/code-sync discipline beds in.
+# Files whose changes REQUIRE a matching update to the spec/ directory.
+# Conservative initial scope: just src/matcher.rs.  Extend to normalize,
+# identifiers, models as the spec/code-sync discipline beds in.
 watched_pattern='^src/matcher\.rs$'
 
 allow_file=".spec-allow"
-spec_file="spec.md"
+# The spec is a directory of numbered files (spec/01-*.md .. spec/13-*.md
+# + spec/index.md), not a single spec.md — it was migrated from a single
+# file to a directory; see AGENTS.md's file-layout note. Any changed path
+# under spec/ counts as "the spec was updated".
+spec_pattern='^spec/'
 
 # Resolve a base ref that exists locally.  In GitHub Actions PRs the
 # default checkout fetches `pull/<n>/merge`; on a contributor machine
@@ -49,10 +53,10 @@ if [ -z "${watched_changes}" ]; then
   exit 0
 fi
 
-spec_changed=$(printf '%s\n' "${changed_files}" | grep -Fx "${spec_file}" || true)
+spec_changed=$(printf '%s\n' "${changed_files}" | grep -E "${spec_pattern}" || true)
 
 if [ -n "${spec_changed}" ]; then
-  echo "spec-drift-check: watched files AND ${spec_file} both changed — OK."
+  echo "spec-drift-check: watched files AND spec/ both changed — OK."
   exit 0
 fi
 
@@ -71,11 +75,11 @@ if [ -f "${allow_file}" ]; then
   fi
 fi
 
-echo "spec-drift-check: FAIL — spec.md MUST be updated in the same PR as watched-file changes." >&2
+echo "spec-drift-check: FAIL — spec/ MUST be updated in the same PR as watched-file changes." >&2
 echo "  Watched files changed in this PR:" >&2
 printf '    %s\n' ${watched_changes} >&2
 echo "" >&2
 echo "  To resolve, either:" >&2
-echo "    1. Update spec.md in the same PR (preferred — keeps spec authoritative)." >&2
+echo "    1. Update the relevant spec/*.md file in the same PR (preferred — keeps spec authoritative)." >&2
 echo "    2. Add a path pattern to .spec-allow for genuinely spec-irrelevant changes." >&2
 exit 1
