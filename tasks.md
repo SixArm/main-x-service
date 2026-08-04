@@ -2762,18 +2762,48 @@ committing (see plan.md §4).
   noticed — because the suites had never run. The cost of a DB-gated
   suite that never runs is not zero; it is the illusion of coverage.
 
-- [ ] **QA-SERVER-FIELDS (S)** — `POST /api/places` (and, on the same
-  evidence, `thing`) **requires the fields the server owns**: `id`,
-  `active`, `created_at`, `updated_at`, `keywords` and any other field
-  the model declares without a serde default. Omit one and the JSON
-  extractor answers `422 missing field …` before a handler runs, for a
-  value the repository then overwrites. This is exactly the event-service
-  defect fixed on 2026-08-01 (`missing field created_at`), and the fix is
-  the same: `#[serde(default)]` on the server-managed fields. Found while
-  writing place's activation proof, whose payload is built by serializing
-  `Place::new` rather than by hand for precisely this reason. Not bundled
-  into the auth commit — a payload-contract change is its own three-part
-  change.
+- [x] **QA-SERVER-FIELDS (S)** *(fixed 2026-08-04)* — `POST /api/places`
+  (and, on the same evidence, `thing`) **required the fields the server
+  owns**: `id`, `is_deleted`, `created_at`, `updated_at`, `keywords` and
+  every other collection field the model declared without a serde
+  default. Omitting one made the JSON extractor answer `422 missing
+  field …` before a handler ran, for a value the repository then
+  discarded. Confirmed real first: a hand-built POST body (not built via
+  `Place::new()`/`Thing::new()`) 422'd on `missing field id` against a
+  live Postgres, before any fix landed.
+
+  Same defect, same fix, as the event-service `created_at`/`updated_at`
+  fix (2026-08-01): every server-managed field is now
+  `#[serde(default)]` in both `Place` and `Thing`. `name` — the one
+  field the server does *not* own — is also `#[serde(default)]` now, so
+  an omitted name reaches `validate_place`/`validate_thing` (`422
+  validation_error`) instead of being turned away by the extractor's
+  generic "missing field" error.
+
+  Making the fields merely optional would have been a *new* bug on its
+  own: an omitted `id` defaults to the nil UUID, and both repositories
+  previously persisted whatever `id`/`created_at`/`updated_at` the
+  domain value carried **verbatim** rather than overwriting them — so a
+  second hand-written create would have collided on the same nil
+  primary key, and an omitted timestamp would have stored the Unix
+  epoch. Fixed alongside: `create_place`/`create_thing` mint a fresh id
+  whenever the wire value is nil (mirroring the event service's
+  existing pattern), and both repositories now stamp
+  `created_at`/`updated_at` to "now" on insert (preserving `created_at`
+  and refreshing `updated_at` on update) instead of trusting the
+  passed-in domain value.
+
+  New DB-gated regression suite in both crates
+  (`tests/api_integration_test.rs`, 3 tests each): a minimal hand-built
+  create body succeeds and reads back a fresh id, ~now timestamps, and
+  empty collections; two consecutive hand-written creates mint distinct
+  ids rather than colliding; an omitted `name` still fails, but via
+  `validation_error`, not the JSON extractor. Verified live:
+  `scripts/ci-check.sh test-db` green for both crates (place 9/9,
+  thing 9/9, fresh Postgres 18 each time), plus `cargo fmt --check` and
+  `cargo clippy --all-targets -- -D warnings` clean on both. The stale
+  "recorded as QA-SERVER-FIELDS rather than fixed here" comment in each
+  crate's `tests/enforcement.rs` is updated to point at the new suite.
 
 ## Found 2026-08-01 (first run of the authentication DB suite)
 

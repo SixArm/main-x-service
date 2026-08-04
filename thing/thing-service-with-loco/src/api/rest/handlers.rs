@@ -114,6 +114,14 @@ pub async fn create_thing(
         );
     }
 
+    // `id` is server-managed (see `Thing::id`'s docs): a client that omits
+    // it — now that the field is `#[serde(default)]` — arrives here as
+    // the nil UUID. Mint a fresh one, the same pattern the event service
+    // uses, so a hand-written create body never has to invent an id.
+    if thing.id == Uuid::nil() {
+        thing.id = Uuid::new_v4();
+    }
+
     // Real-time duplicate detection: score against existing records and reject
     // if any candidate meets the configured match threshold.
     let candidates = find_candidates(&state, &thing).await;

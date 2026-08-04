@@ -55,14 +55,29 @@ use super::identifier::ThingIdentifier;
 pub struct Thing {
     /// Stable system identifier, auto-generated as a UUID v4 by
     /// [`Thing::new`]. Distinct from any external [`identifiers`](Self::identifiers).
+    ///
+    /// `#[serde(default)]` because this is **server-managed**: the create
+    /// handler mints a fresh id whenever the wire value is nil (the same
+    /// pattern the event service uses), so a client is never required to
+    /// invent one. Without the default, `POST /api/things` demanded an
+    /// `id` on the wire only to ignore it.
+    #[serde(default)]
     pub id: Uuid,
 
     /// Primary name — schema.org [`name`](https://schema.org/name).
     /// Required; the only field [`validate_thing`](crate::validation::validate_thing)
     /// rejects when empty.
+    ///
+    /// `#[serde(default)]` (to `""`) so an omitted `name` reaches
+    /// [`validate_thing`](crate::validation::validate_thing) — which
+    /// already rejects a blank name — instead of being refused by the
+    /// JSON extractor with a generic "missing field" error before any
+    /// handler code runs.
+    #[serde(default)]
     pub name: String,
     /// Aliases, prior names, and translations — schema.org
     /// [`alternateName`](https://schema.org/alternateName).
+    #[serde(default)]
     pub alternate_names: Vec<String>,
     /// Free-text description — schema.org
     /// [`description`](https://schema.org/description).
@@ -79,8 +94,10 @@ pub struct Thing {
     pub url: Option<String>,
     /// Typed external identifiers (ISBN, DOI, GTIN, …) — schema.org
     /// [`identifier`](https://schema.org/identifier).
+    #[serde(default)]
     pub identifiers: Vec<ThingIdentifier>,
     /// Image URLs — schema.org [`image`](https://schema.org/image).
+    #[serde(default)]
     pub images: Vec<String>,
     /// URL of the page for which this is the main entity — schema.org
     /// [`mainEntityOfPage`](https://schema.org/mainEntityOfPage).
@@ -92,6 +109,7 @@ pub struct Thing {
     /// Authoritative external URLs (Wikipedia, Wikidata, …) — schema.org
     /// [`sameAs`](https://schema.org/sameAs). Used as cross-reference
     /// evidence during matching.
+    #[serde(default)]
     pub same_as: Vec<String>,
     /// URL of a CreativeWork/Event about this item — schema.org
     /// [`subjectOf`](https://schema.org/subjectOf).
@@ -102,13 +120,29 @@ pub struct Thing {
 
     /// Soft-delete flag. Records are never physically removed; setting this
     /// hides them while preserving the audit trail. See [`Thing::soft_delete`].
+    ///
+    /// `#[serde(default)]` (to `false`, i.e. active) rather than required
+    /// on the wire — an omitted flag means "a normal, active thing",
+    /// which is the correct default, not an arbitrary one.
+    #[serde(default)]
     pub is_deleted: bool,
     /// Timestamp the record was soft-deleted, or `None` if still active.
     pub deleted_at: Option<DateTime<Utc>>,
     /// Creation timestamp, set once by [`Thing::new`].
+    ///
+    /// `#[serde(default)]` because this is **server-managed**: the
+    /// repository stamps `created_at`/`updated_at` on insert and
+    /// preserves/refreshes them on update, so whatever a client sends is
+    /// discarded. Without the default they were nonetheless *required* on
+    /// the wire, and `POST /api/things` refused an otherwise valid body
+    /// with `422 missing field created_at` — demanding a value it then
+    /// ignored. Same defect and same fix as the event service.
+    #[serde(default)]
     pub created_at: DateTime<Utc>,
     /// Last-update timestamp. Equal to [`created_at`](Self::created_at) on a
-    /// freshly constructed record.
+    /// freshly constructed record. Server-managed — see
+    /// [`created_at`](Self::created_at).
+    #[serde(default)]
     pub updated_at: DateTime<Utc>,
 }
 

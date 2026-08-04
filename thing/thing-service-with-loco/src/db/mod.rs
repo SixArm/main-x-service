@@ -14,8 +14,10 @@ pub mod review_queue;
 
 use convert::{offset_to_ts, ts_to_offset};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, Database, DatabaseConnection,
-    EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
+    ActiveModelTrait,
+    ActiveValue::{NotSet, Set},
+    ColumnTrait, ConnectionTrait, Database, DatabaseConnection, EntityTrait, PaginatorTrait,
+    QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
 };
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -207,10 +209,15 @@ impl ThingRepository for SeaOrmThingRepository {
     /// cannot be read back after insert.
     async fn create(&self, thing: &Thing) -> Result<Thing> {
         let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
-        to_active(thing)
-            .insert(&txn)
-            .await
-            .map_err(|e| map_db(&e))?;
+        // `created_at`/`updated_at` are server-managed (see `Thing`'s
+        // field docs): stamp both to "now" here, overriding whatever the
+        // domain value carries, rather than trusting a client-supplied —
+        // or `#[serde(default)]`-defaulted, i.e. Unix-epoch — timestamp.
+        let now = OffsetDateTime::now_utc();
+        let mut active = to_active(thing);
+        active.created_at = Set(now);
+        active.updated_at = Set(now);
+        active.insert(&txn).await.map_err(|e| map_db(&e))?;
         insert_collections(&txn, thing).await?;
         // Durable event bus (Phase 2): under the outbox transport, write
         // the `event_outbox` row **inside this same transaction**, before
@@ -259,10 +266,14 @@ impl ThingRepository for SeaOrmThingRepository {
             return Err(crate::Error::NotFound);
         }
         let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
-        to_active(thing)
-            .update(&txn)
-            .await
-            .map_err(|e| map_db(&e))?;
+        // `created_at` is preserved (not overwritten by whatever the
+        // domain value carries — a stale read or a defaulted-empty one);
+        // `updated_at` is always refreshed to "now". Both are
+        // server-managed, matching `create`.
+        let mut active = to_active(thing);
+        active.created_at = NotSet;
+        active.updated_at = Set(OffsetDateTime::now_utc());
+        active.update(&txn).await.map_err(|e| map_db(&e))?;
         delete_collections(&txn, thing.id).await?;
         insert_collections(&txn, thing).await?;
         // Outbox row shares the update transaction (see `create`).
