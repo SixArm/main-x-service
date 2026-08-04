@@ -1035,8 +1035,23 @@
   main page component) before committing, not just trusted on the
   implementing agent's report.
 
-- [ ] **FE-4 (M)** Duplicate review-queue screen (services exposing the
-  review API; start with person).
+- [~] **FE-4 (M)** Duplicate review-queue screen (services exposing the
+  review API; start with person). **Person done 2026-08-04**; the other
+  services with a `review_queue` (worker, place, thing, organization) are
+  the remaining fan-out. The person board existed already but was
+  unspecified and untested — see that project's `spec/13-tasks.md` T-25
+  for what the completion added: `?status=`/`?limit=` filters (there is
+  no `offset`, and "all" is the *absence* of `status` because the
+  endpoint answers `422 INVALID_STATUS` otherwise), a keyboard-reachable
+  queue table + explicit `Confirm`/`Reject` buttons alongside the
+  mouse-only drag-to-decide, an inline side-by-side comparison fetching
+  both records with two parallel `GET /api/persons/{id}` calls plus the
+  matcher's `score_breakdown`, and `provenance` surfaced on the cards.
+  The load-bearing scope fact for the fan-out: **confirming does not
+  merge** — the decision endpoint is a pure status change and no service
+  links a confirmed item to a merge, so the UI must supply that path
+  itself (person deep-links `/persons/merge?main=…&duplicate=…` in either
+  survivor order, since a review item names an unordered pair).
 
 > Note: the **test** database side of this is already done — every
 > service crate carries a `compose.test.yaml` driven by
