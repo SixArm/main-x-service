@@ -7,6 +7,40 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Fixed — `merge` (and any `use_type`/`telecom`) writes were rejected by the database (PERSON-CONTACT-CASE, 2026-08-04)
+
+Every merge of two *different* persons failed with `500 DATABASE_ERROR`
+("`patient_names_use_type_check`"). `merge_duplicate_into_main`
+unconditionally sets the duplicate's aliased name to `NameUse::Old` and
+adds a `LinkType::Replaces` link, and `src/db/repositories.rs` wrote
+`NameUse`/`IdentifierUse`/`ContactPointSystem`/`ContactPointUse`/
+`LinkType` via `format!("{:?}")` — `"Old"`, `"Phone"`, `"Replaces"` —
+into columns whose CHECK constraints accept only lowercase
+(`migrations/2024122800000003_create_patient_related_tables`). This is
+the same defect `examples/data/README.md` already documented for
+`telecom`/name `use_type` on fixture data, but unconditional on merge:
+no test caught it because no test posts a name/identifier with
+`use_type` set, and the suite's only merge test is the self-merge
+rejection guard, which exits before the insert. Found writing TUT-2
+(`tasks.md`), whose entire premise depends on merge working.
+
+Fix: the write side now uses the pre-existing `enum_to_tag` helper
+(already correct for `person_addresses`/emergency-contact tables)
+instead of `format!`; the read side now uses `tag_to_enum` instead of
+hand-rolled `PascalCase` match arms. `identifier_type`'s `Other`
+variant (Debug: `"Other"`, CHECK: `'OTHER'`) is fixed the same way.
+`NameUse` and `LinkType` gained `PartialEq, Eq` for the new regression
+test's assertions. New DB-gated
+`test_merge_two_persons_round_trips_alias_name_and_replaces_link`
+(`tests/api_integration_test.rs`) merges two real persons and re-fetches
+the survivor, pinning both the write (insert succeeds) and read (stored
+lowercase tags deserialize to the right enum variants) sides together.
+
+**Residual, narrower gap, not fixed here:** `LinkType::ReplacedBy`'s
+`#[serde(rename_all = "lowercase")]` produces `"replacedby"`, not the
+CHECK's `'replaced_by'` — nothing in this crate constructs that variant
+today, so it's tracked but not blocking.
+
 ### Added — `seed_examples` CLI task (EX-4, 2026-08-04)
 
 `cargo loco task seed_examples` loads the repository's shared demo

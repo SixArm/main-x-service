@@ -489,16 +489,26 @@ impl SeaOrmPersonRepository {
     /// parent row and each child table.
     ///
     /// The primary name gets `is_primary = true`; the first address and
-    /// first contact are flagged primary by position. Enum fields are
-    /// stringified (`{:?}`) except `gender`, which is lowercased to honor
-    /// the DB CHECK constraint.
+    /// first contact are flagged primary by position. `gender` is
+    /// lowercased by hand to honor its DB CHECK constraint;
+    /// `NameUse`/`IdentifierUse`/`ContactPointSystem`/`ContactPointUse`/
+    /// `LinkType` go through [`enum_to_tag`] (their own
+    /// `#[serde(rename_all = "lowercase")]`), which the sibling
+    /// `person_addresses`/emergency-contact tables already relied on —
+    /// PERSON-CONTACT-CASE found that these five instead used
+    /// `format!("{:?}")` (`PascalCase`: `"Old"`, `"Phone"`, `"Replaces"`),
+    /// which every one of these columns' lowercase-only CHECK constraints
+    /// rejects with a `500 DATABASE_ERROR`. Nothing caught it because no
+    /// test ever posted a name/identifier with `use_type` set or a
+    /// `telecom` entry — and the merge workflow's own `Replaces` link and
+    /// `Old`-aliased name hit it on **every** merge, unconditionally.
     /// Build the `person_names` active models: the primary name (flagged
     /// `is_primary = true`) followed by any additional names.
     fn name_active_models(person: &Person) -> Vec<person_names::ActiveModel> {
         let to_model = |name: &HumanName, is_primary: bool| person_names::ActiveModel {
             id: Set(Uuid::new_v4()),
             person_id: Set(person.id),
-            use_type: Set(name.use_type.as_ref().map(|u| format!("{u:?}"))),
+            use_type: Set(name.use_type.as_ref().and_then(enum_to_tag)),
             family: Set(name.family.clone()),
             given: Set(name.given.clone()),
             prefix: Set(name.prefix.clone()),
@@ -552,8 +562,12 @@ impl SeaOrmPersonRepository {
             .map(|id| person_identifiers::ActiveModel {
                 id: Set(Uuid::new_v4()),
                 person_id: Set(person.id),
-                use_type: Set(id.use_type.as_ref().map(|u| format!("{u:?}"))),
-                identifier_type: Set(format!("{:?}", id.identifier_type)),
+                use_type: Set(id.use_type.as_ref().and_then(enum_to_tag)),
+                // `IdentifierType`'s `#[serde(rename_all = "UPPERCASE")]`
+                // already matches every named variant's Debug output
+                // (`MRN`, `SSN`, …) except `Other` (Debug: `"Other"`,
+                // CHECK: `'OTHER'`) — `enum_to_tag` gets that one right too.
+                identifier_type: Set(enum_to_tag(&id.identifier_type).unwrap_or_default()),
                 system: Set(id.system.clone()),
                 value: Set(id.value.clone()),
                 assigner: Set(id.assigner.clone()),
@@ -591,9 +605,9 @@ impl SeaOrmPersonRepository {
             .map(|(idx, cp)| person_contacts::ActiveModel {
                 id: Set(Uuid::new_v4()),
                 person_id: Set(person.id),
-                system: Set(format!("{:?}", cp.system)),
+                system: Set(enum_to_tag(&cp.system).unwrap_or_default()),
                 value: Set(cp.value.clone()),
-                use_type: Set(cp.use_type.as_ref().map(|u| format!("{u:?}"))),
+                use_type: Set(cp.use_type.as_ref().and_then(enum_to_tag)),
                 is_primary: Set(idx == 0),
                 created_at: Set(OffsetDateTime::now_utc()),
                 updated_at: Set(OffsetDateTime::now_utc()),
@@ -608,7 +622,13 @@ impl SeaOrmPersonRepository {
                 id: Set(Uuid::new_v4()),
                 person_id: Set(person.id),
                 other_person_id: Set(link.other_person_id),
-                link_type: Set(format!("{:?}", link.link_type)),
+                // `LinkType`'s `#[serde(rename_all = "lowercase")]` matches
+                // the CHECK constraint for `Replaces`/`Refer`/`Seealso`
+                // (single words) but not `ReplacedBy` (serde: `"replacedby"`,
+                // CHECK: `'replaced_by'`) — nothing in this crate
+                // constructs that variant today, so it is a narrower,
+                // separately-tracked residual rather than a blocker here.
+                link_type: Set(enum_to_tag(&link.link_type).unwrap_or_default()),
                 created_at: Set(OffsetDateTime::now_utc()),
                 created_by: Set(None),
             })
@@ -618,19 +638,10 @@ impl SeaOrmPersonRepository {
     }
 
     /// Rebuild a domain [`HumanName`] from a stored `person_names` row,
-    /// parsing the stringified `use_type` back to its [`NameUse`](crate::models::NameUse) variant.
+    /// parsing the stored lowercase `use_type` tag back to its
+    /// [`NameUse`](crate::models::NameUse) variant via [`tag_to_enum`].
     fn human_name_from_db(n: &person_names::Model) -> HumanName {
-        use crate::models::NameUse;
-        let use_type = n.use_type.as_ref().and_then(|u| match u.as_str() {
-            "Usual" => Some(NameUse::Usual),
-            "Official" => Some(NameUse::Official),
-            "Temp" => Some(NameUse::Temp),
-            "Nickname" => Some(NameUse::Nickname),
-            "Anonymous" => Some(NameUse::Anonymous),
-            "Old" => Some(NameUse::Old),
-            "Maiden" => Some(NameUse::Maiden),
-            _ => None,
-        });
+        let use_type = tag_to_enum(n.use_type.as_ref());
         HumanName {
             use_type,
             family: n.family.clone(),
@@ -643,24 +654,12 @@ impl SeaOrmPersonRepository {
     /// Rebuild a domain [`Identifier`] from a stored `person_identifiers`
     /// row, parsing the stringified `identifier_type` / `use_type`.
     fn identifier_from_db(id: &person_identifiers::Model) -> Identifier {
-        use crate::models::{IdentifierType, IdentifierUse};
-        let identifier_type = match id.identifier_type.as_str() {
-            "MRN" => IdentifierType::MRN,
-            "SSN" => IdentifierType::SSN,
-            "DL" => IdentifierType::DL,
-            "NPI" => IdentifierType::NPI,
-            "PPN" => IdentifierType::PPN,
-            "TAX" => IdentifierType::TAX,
-            _ => IdentifierType::Other,
-        };
-        let use_type = id.use_type.as_ref().and_then(|u| match u.as_str() {
-            "Usual" => Some(IdentifierUse::Usual),
-            "Official" => Some(IdentifierUse::Official),
-            "Temp" => Some(IdentifierUse::Temp),
-            "Secondary" => Some(IdentifierUse::Secondary),
-            "Old" => Some(IdentifierUse::Old),
-            _ => None,
-        });
+        use crate::models::IdentifierType;
+        // Falls back to `Other` for an unrecognized tag — covers both the
+        // literal `'OTHER'` row and any forward-compatible unknown value.
+        let identifier_type =
+            tag_to_enum(Some(&id.identifier_type)).unwrap_or(IdentifierType::Other);
+        let use_type = tag_to_enum(id.use_type.as_ref());
         Identifier {
             identifier_type,
             use_type,
@@ -684,7 +683,7 @@ impl SeaOrmPersonRepository {
         db_contacts: &[person_contacts::Model],
         db_links: &[person_links::Model],
     ) -> Result<Person> {
-        use crate::models::{ContactPointSystem, ContactPointUse, Gender, LinkType};
+        use crate::models::{ContactPointSystem, Gender, LinkType};
 
         // Parse gender. DB stores lowercase per CHECK constraint
         // ('male'/'female'/'other'/'unknown'); accept PascalCase too
@@ -735,25 +734,8 @@ impl SeaOrmPersonRepository {
         let telecom = db_contacts
             .iter()
             .filter_map(|cp| {
-                let system = match cp.system.as_str() {
-                    "Phone" => ContactPointSystem::Phone,
-                    "Fax" => ContactPointSystem::Fax,
-                    "Email" => ContactPointSystem::Email,
-                    "Pager" => ContactPointSystem::Pager,
-                    "Url" => ContactPointSystem::Url,
-                    "Sms" => ContactPointSystem::Sms,
-                    "Other" => ContactPointSystem::Other,
-                    _ => return None,
-                };
-
-                let use_type = cp.use_type.as_ref().and_then(|u| match u.as_str() {
-                    "Home" => Some(ContactPointUse::Home),
-                    "Work" => Some(ContactPointUse::Work),
-                    "Temp" => Some(ContactPointUse::Temp),
-                    "Old" => Some(ContactPointUse::Old),
-                    "Mobile" => Some(ContactPointUse::Mobile),
-                    _ => None,
-                });
+                let system: ContactPointSystem = tag_to_enum(Some(&cp.system))?;
+                let use_type = tag_to_enum(cp.use_type.as_ref());
 
                 Some(ContactPoint {
                     system,
@@ -763,18 +745,14 @@ impl SeaOrmPersonRepository {
             })
             .collect();
 
-        // Links
+        // Links. A row this crate itself wrote always has a recognized
+        // tag; `filter_map` only guards against a hand-edited row (or
+        // `ReplacedBy`, whose write side has the residual case mismatch
+        // noted at its `Set(...)` call above).
         let links = db_links
             .iter()
             .filter_map(|link| {
-                let link_type = match link.link_type.as_str() {
-                    "ReplacedBy" => LinkType::ReplacedBy,
-                    "Replaces" => LinkType::Replaces,
-                    "Refer" => LinkType::Refer,
-                    "Seealso" => LinkType::Seealso,
-                    _ => return None,
-                };
-
+                let link_type: LinkType = tag_to_enum(Some(&link.link_type))?;
                 Some(PersonLink {
                     other_person_id: link.other_person_id,
                     link_type,

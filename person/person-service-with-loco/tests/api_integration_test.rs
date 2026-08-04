@@ -461,6 +461,248 @@ async fn test_merge_into_self_is_rejected() {
     );
 }
 
+/// Create a minimal person via the real `POST /api/persons` handler
+/// (not the model layer directly), so the round trip below also covers
+/// the create → search-index → merge path an operator actually drives.
+async fn create_minimal_person(
+    app: &axum::Router,
+    family: &str,
+    given: &str,
+    birth_date: &str,
+) -> Person {
+    let body = json!({
+        "name": { "family": family, "given": [given] },
+        "birth_date": birth_date,
+        "gender": "female"
+    });
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/persons")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let api: ApiResponse<Person> = serde_json::from_slice(&bytes).unwrap();
+    api.data.unwrap()
+}
+
+/// Merging two *different* real persons round-trips the `"old"`-aliased
+/// name and the `Replaces` link through Postgres.
+///
+/// Regression test for a bug TUT-2's live verification found: `merge`
+/// always sets the duplicate's primary name to `NameUse::Old` and always
+/// adds a `LinkType::Replaces` link, and the repository wrote both via
+/// `format!("{:?}")` (`"Old"`, `"Replaces"`) into columns whose CHECK
+/// constraints accept only lowercase — so **every** merge of two
+/// different persons failed with a `500 DATABASE_ERROR`, unconditionally.
+/// `test_merge_into_self_is_rejected` above never reached the insert (it
+/// exits on the equal-id guard), so this was the only merge path in the
+/// suite that would have caught it. This test both merges and then
+/// re-fetches the survivor, so it pins the write side (the insert
+/// succeeding at all) and the read side (the stored lowercase tags
+/// deserializing back to the right enum variants) together.
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn test_merge_two_persons_round_trips_alias_name_and_replaces_link() {
+    let app = common::create_test_router().await;
+
+    let main_family = common::unique_person_name("MergeMain");
+    let dup_family = common::unique_person_name("MergeDup");
+    // Different birth years so the second create's own duplicate-detection
+    // blocking query (family-name fuzzy + exact birth year) can't find the
+    // first — this test is about merge, not duplicate detection, and a
+    // same-year 409 here would be a self-inflicted false positive rather
+    // than a finding about the code under test.
+    let main = create_minimal_person(&app, &main_family, "Main", "1990-01-01").await;
+    let duplicate = create_minimal_person(&app, &dup_family, "Dup", "1955-06-15").await;
+
+    let merge_json = json!({
+        "main_person_id": main.id,
+        "duplicate_person_id": duplicate.id,
+        "merge_reason": "regression test"
+    });
+    let merge_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/persons/merge")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&merge_json).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let merge_body = axum::body::to_bytes(merge_response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let merge_body_str = String::from_utf8(merge_body.to_vec()).unwrap();
+    assert!(
+        merge_body_str.contains("\"success\":true"),
+        "expected a successful merge, got: {merge_body_str}"
+    );
+
+    // Re-fetch the survivor: proves the alias name and link were not only
+    // accepted but actually persisted and read back correctly.
+    let get_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/persons/{}", main.id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(get_response.status(), StatusCode::OK);
+    let get_body = axum::body::to_bytes(get_response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let get_api_response: ApiResponse<Person> = serde_json::from_slice(&get_body).unwrap();
+    let survivor = get_api_response.data.unwrap();
+
+    let alias = survivor
+        .additional_names
+        .iter()
+        .find(|n| n.family == dup_family)
+        .expect("duplicate's primary name should survive as an additional_names alias");
+    assert_eq!(alias.use_type, Some(person_service::models::NameUse::Old));
+
+    let link = survivor
+        .links
+        .iter()
+        .find(|l| l.other_person_id == duplicate.id)
+        .expect("survivor should carry a link to the merged-away duplicate");
+    assert_eq!(link.link_type, person_service::models::LinkType::Replaces);
+
+    // And the duplicate itself is soft-deleted, not merely relinked.
+    let dup_get_response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/persons/{}", duplicate.id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        dup_get_response.status(),
+        StatusCode::NOT_FOUND,
+        "a merged-away duplicate should answer 404, same as any other soft-deleted record"
+    );
+}
+
+/// A person carrying `telecom` (with `use_type` set) and an identifier
+/// with `use_type` set round-trips through Postgres.
+///
+/// The other half of the PERSON-CONTACT-CASE fix (`tasks.md`): before
+/// it, **any** person carrying `telecom` failed to create at all —
+/// `examples/data/README.md` documents this as the reason
+/// `examples/data/persons.jsonl` carries no top-level `telecom` and no
+/// name/identifier `use_type`. This pins the fix directly rather than
+/// only via the merge path above (which exercises `NameUse`/`LinkType`
+/// but not `ContactPointSystem`/`ContactPointUse`/`IdentifierUse`).
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn test_create_person_with_telecom_and_identifier_use_type_round_trips() {
+    use person_service::models::{ContactPointSystem, ContactPointUse, IdentifierUse};
+
+    let app = common::create_test_router().await;
+
+    let family = common::unique_person_name("Telecom");
+    let body = json!({
+        "name": { "family": family, "given": ["Contact"] },
+        "birth_date": "1992-02-02",
+        "gender": "other",
+        // `use_type`, not `use` — the wire field carries no serde rename,
+        // and several *other* tests in this file (and
+        // `examples/api/person.http`) write `"use"` here, which silently
+        // no-ops rather than erroring (`#[serde(default)]`). Using the
+        // real field name here is deliberate: this test exists to prove
+        // `use_type` round-trips, so it has to actually set it.
+        "telecom": [
+            { "system": "phone", "value": "+1 555 0100", "use_type": "mobile" },
+            { "system": "email", "value": "contact@example.org" }
+        ],
+        "identifiers": [
+            { "identifier_type": "MRN", "system": "urn:test:mrn", "value": "MRN-1", "use_type": "official" }
+        ]
+    });
+
+    let create_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/persons")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = create_response.status();
+    let create_body = axum::body::to_bytes(create_response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    assert_eq!(
+        status,
+        StatusCode::CREATED,
+        "expected 201, got {status}: {}",
+        String::from_utf8_lossy(&create_body)
+    );
+    let created: ApiResponse<Person> = serde_json::from_slice(&create_body).unwrap();
+    let person_id = created.data.unwrap().id;
+
+    let get_response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/persons/{person_id}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(get_response.status(), StatusCode::OK);
+    let get_body = axum::body::to_bytes(get_response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let retrieved = serde_json::from_slice::<ApiResponse<Person>>(&get_body)
+        .unwrap()
+        .data
+        .unwrap();
+
+    let phone = retrieved
+        .telecom
+        .iter()
+        .find(|cp| cp.system == ContactPointSystem::Phone)
+        .expect("phone telecom entry should round-trip");
+    assert_eq!(phone.use_type, Some(ContactPointUse::Mobile));
+
+    let email = retrieved
+        .telecom
+        .iter()
+        .find(|cp| cp.system == ContactPointSystem::Email)
+        .expect("email telecom entry should round-trip");
+    assert_eq!(email.use_type, None);
+
+    let identifier = retrieved
+        .identifiers
+        .first()
+        .expect("identifier should round-trip");
+    assert_eq!(identifier.use_type, Some(IdentifierUse::Official));
+}
+
 /// `GET /api/persons/{id}/audit/disclosures` answers the HIPAA
 /// §164.528 accounting question, and — critically — says whether it can
 /// answer it at all.

@@ -168,7 +168,7 @@ pub struct HumanName {
 
 /// Intended use of a [`HumanName`], mirroring the FHIR `name-use`
 /// value set.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum NameUse {
     /// The name normally used.
@@ -201,7 +201,7 @@ pub struct PersonLink {
 
 /// The semantic relationship expressed by a [`PersonLink`], mirroring
 /// the FHIR `link-type` value set.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum LinkType {
     /// The person resource containing this link is replaced by the linked person

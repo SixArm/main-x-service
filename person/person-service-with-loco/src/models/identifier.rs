@@ -40,7 +40,7 @@ pub struct Identifier {
 
 /// Intended use of an [`Identifier`], mirroring the FHIR
 /// `identifier-use` value set.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum IdentifierUse {
     /// The identifier recommended for display and use in real-world interactions

@@ -142,7 +142,7 @@ pub struct ContactPoint {
 
 /// The communication channel of a [`ContactPoint`], mirroring the FHIR
 /// `contact-point-system` value set.
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum ContactPointSystem {
     /// Telephone number.
@@ -163,7 +163,7 @@ pub enum ContactPointSystem {
 
 /// Intended use of a [`ContactPoint`], mirroring the FHIR
 /// `contact-point-use` value set.
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum ContactPointUse {
     /// Home contact.
