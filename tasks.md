@@ -3737,7 +3737,7 @@ committing (see plan.md §4).
     all, and if so how, given this crate has no existing blanket-guard
     mechanism to extend (spec §16 open question, §13 sub-task).
 
-- [ ] **DOC-3 (L)** Matcher crates' `spec/`, `AGENTS.md`,
+- [x] **DOC-3 (L)** Matcher crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: person, worker, place, thing, event, course,
   organization, care-pathway, case, project-portfolio-management
   matchers (10 crates). Same audit shape as DOC-2 — these follow the
@@ -4376,6 +4376,23 @@ committing (see plan.md §4).
     before and after. Did not touch `event/event-service-with-loco`
     (sibling crate, out of this task's boundary). All edited files
     re-confirmed well under 40 KB.
+
+  **All 10 matcher crates done, 2026-08-04 — closing DOC-3.** One
+  cross-cutting defect surfaced independently by three of the ten
+  audits (thing, place) plus a manual sweep of the rest: `scripts/
+  spec-drift-check.sh` (the CI gate requiring a `spec/` update
+  alongside a `src/matcher.rs` change) grepped for an exact-match file
+  named `spec.md`, which no longer exists in any of the five crates
+  that carry the script (event, person, thing, place, worker) since
+  the spec became a directory — the gate has been silently passing
+  every PR regardless of whether `spec/` was actually updated. thing
+  and place fixed their own copies as part of their audits; person and
+  worker's audits did not catch it, so it was fixed directly afterward
+  (`65508dcb`, `0106c833`) using the same corrected pattern, each
+  verified by confirming the fixed regex matches a `spec/*.md` path
+  change where the old exact-match did not. worker's `AGENTS.md` File
+  Layout table also still listed `spec.md` as a single file; fixed
+  alongside.
 
 - [ ] **DOC-4 (L)** Front-end crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: all 11 SvelteKit front-ends (person, worker,
