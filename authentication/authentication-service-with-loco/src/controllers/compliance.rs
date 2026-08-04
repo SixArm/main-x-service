@@ -17,8 +17,17 @@
 //! caveat inline rather than leaving it to documentation, because a bare
 //! `verified: true` reads as more than it means.
 //!
-//! Behind the blanket auth + ABAC guard when `AUTH_REQUIRE_AUTH` is on, and a
-//! read, so the default policy admits any authenticated caller.
+//! ## Authorization — currently none (open question)
+//!
+//! Unlike the equivalent endpoint on sibling loco-idiomatic services
+//! (e.g. case-service, behind its blanket `CASE_REQUIRE_AUTH` guard),
+//! this crate has **no blanket `/api/*` guard at all** — every other
+//! route here is gated per-handler (session cookie, PASETO bearer, or
+//! the admin handler's own `access=admin` check) — so there is no
+//! `AUTH_REQUIRE_AUTH` flag and this endpoint is reachable
+//! unauthenticated. The response discloses no PII (row counts and row
+//! ids only, never an email), but the gap is real and undecided; see
+//! `spec/index.md` §16.
 
 use axum::extract::Query;
 use loco_rs::prelude::*;

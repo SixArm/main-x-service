@@ -3043,7 +3043,7 @@ committing (see plan.md §4).
   already documents its own incomplete promotion status honestly) —
   not rewritten.
 
-- [ ] **DOC-2 (L)** Entity + auth service crates' `spec/`, `AGENTS.md`,
+- [x] **DOC-2 (L)** Entity + auth service crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md` against current code: person, worker, place,
   thing, event, course, organization, care-pathway, case,
   project-portfolio-management, authentication-service (11 crates).
@@ -3057,6 +3057,18 @@ committing (see plan.md §4).
   actually run. Fix what's wrong; where a crate's own doc duplicates
   something `agents/share/*.md` already states accurately, prefer a
   link over a second copy (same fix pattern as DOC-1).
+
+  **All 11 crates done 2026-08-04** (person, worker, place, thing,
+  organization, course, care-pathway, project-portfolio-management,
+  event, case, authentication-service — sub-notes below). Recurring
+  finding across the batch: a real, shipped, tested feature (most often
+  the keyed-integrity-verification endpoints, sometimes cross-service
+  links or FHIR) landed in code with zero `spec`/`AGENTS.md` presence;
+  every crate's stale `§13`/`§14`/`§15` narrative text (claims of
+  "deferred"/"open"/"planned" for work that had since landed, or vice
+  versa) was cross-checked against the code rather than assumed
+  current; and, where still on the old pattern, `CLAUDE.md` was thinned
+  to the documented one-line `@AGENTS.md` include.
 
   - [x] **person/person-service-with-loco** *(done 2026-08-04)*.
     `spec/13-tasks.md`: reconciled real drift — T-2 (Fluvio publisher),
@@ -3655,6 +3667,75 @@ committing (see plan.md §4).
     worked-flow block was missing the same dozen routes as `AGENTS.md` —
     added. `cargo fmt --check` / `cargo clippy --all-targets` / `cargo
     check --lib` all clean after every edit.
+
+  - *`authentication/authentication-service-with-loco` done 2026-08-04.*
+    The 11th and last crate in this batch — the family's central SSO
+    provider and reference loco.rs crate, so checked more thoroughly
+    than the rest, including a live run (test Postgres on a non-default
+    port, `cargo loco db migrate` + `cargo loco start` + real
+    `signup`/redeem/compliance-verify/audit-recent curls) rather than
+    inspection alone. `CLAUDE.md` reconfirmed already the thin
+    `@AGENTS.md` one-liner (no drift); `README.md`/`index.md`'s
+    quick-start and dev-console magic-link retrieval both verified live
+    and accurate as written.
+
+    Found and fixed several real gaps, same shapes the other ten
+    crates' passes turned up: (1) **A shipped, tested, reachable
+    feature with zero spec presence**: keyed integrity verification
+    (`src/compliance/` — SHA-256/SHA3-256 digests + an HMAC-SHA256 MAC
+    over `auth_events`, `GET /api/compliance/audit/verify`, landed
+    2026-07-28) had no `spec` entry anywhere, no `CHANGELOG.md` entry,
+    and wasn't in `AGENTS.md`'s endpoint/config/layout tables — added
+    all of it (spec §6.13/§10/§13/§16; `AGENTS.md` endpoint row,
+    config vars, layout tree). (2) **A live, security-relevant doc/code
+    mismatch inside the source itself**: `src/controllers/compliance.rs`'s
+    own doc comment claimed the endpoint sat "behind the blanket auth +
+    ABAC guard when `AUTH_REQUIRE_AUTH` is on" — false, copied unadapted
+    from a sibling crate (case-service, which genuinely has that guard);
+    this crate has **no blanket `/api/*` guard at all**, and the
+    endpoint is live-confirmed reachable with no token
+    (`curl localhost:5150/api/compliance/audit/verify` → `200`, no
+    PII in the response — row counts/ids only). Fixed the doc comment
+    to state the real (unauthenticated) behaviour and added it as an
+    explicit open question (spec §16) + an unchecked `§13` sub-task,
+    flagged rather than silently gated, since deciding *how* to gate it
+    is a code decision outside this pass's scope. (3) **Two internal
+    spec self-contradictions**: §5/§10 still called the sessions-table
+    idle/absolute-TTL reshape "pending §13" and CSRF "remaining", while
+    §13 itself already showed both `[x]` done 2026-07-05 (confirmed
+    live against the migration + `is_active` code); and §14/§15 called
+    the ABAC HTTP admin-API attribute-assignment surface "deferred"/
+    "next" when §13 already showed it `[x]` done the same day — all
+    four fixed to match the code and each other. (4) **A live-verified
+    factual error**: spec §6.3 flatly asserted magic-link redemption
+    "no longer returns a bearer token," but a real redeem response
+    (`GET /api/auth/magic-link/{token}`) is
+    `{"token":"v4.public…","pid":…,…}` — `views::auth::LoginResponse`
+    still carries a transitional bearer token in the body pending
+    front-end BFF adoption, exactly as §13's T-12 sub-item already (and
+    correctly) said; fixed §6.3 to match, and fixed the struct's own
+    stale `RS256 access token` doc comment (RS256 has been decommissioned
+    since the PASETO pivot). (5) **`GET /api/auth/audit/recent`'s Auth
+    column read "—" (open) in both `AGENTS.md` and `README.md`**, though
+    SEC-A2 (2026-07-13, and spec §12) revised it to `access=admin`-gated
+    months ago — live-confirmed `401 missing authorization header`
+    without a token; fixed both tables, and two further spec cross-refs
+    (§6.9, §13/T-9) that still called it "open". (6) Confirmed the
+    `.cargo/config.toml` `loco = "run --"` alias genuinely makes
+    `cargo loco start`/`db migrate` work when run from inside this
+    directory (live-tested), unlike person/worker's older crates
+    (TUT-2's finding) — added a clarifying note to `AGENTS.md`'s Run row
+    rather than leaving the claim to work by unstated luck. `cargo
+    build` / `cargo test --lib` (84 passed) / `cargo clippy --bins` all
+    clean after every edit; `Cargo.lock` churn from the local build was
+    reverted before committing, untouched.
+
+    **Not fixed, deliberately** — flagged instead of silently patched,
+    per this task's own instruction to flag rather than silently change
+    code on an ambiguous security question: whether
+    `/api/compliance/audit/verify` should require authentication at
+    all, and if so how, given this crate has no existing blanket-guard
+    mechanism to extend (spec §16 open question, §13 sub-task).
 
 - [ ] **DOC-3 (L)** Matcher crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: person, worker, place, thing, event, course,

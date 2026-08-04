@@ -28,7 +28,8 @@ Built on **loco.rs** — and the family's reference loco application.
 | POST | `/api/auth/token` | Session | Exchange session for a short-lived PASETO v4.public bearer |
 | GET | `/api/auth/me` | Session | Current user |
 | POST | `/api/auth/signout` | Session | Revoke session |
-| GET | `/api/auth/audit/recent` | — | System-wide authentication audit trail |
+| GET | `/api/auth/audit/recent` | Admin | System-wide authentication audit trail (`access=admin`; SEC-A2) |
+| GET | `/api/compliance/audit/verify` | **— (no check; see AGENTS.md)** | Recompute integrity digests over `auth_events`; report any mismatch |
 | GET | `/api/auth/account/export` | Session | GDPR right of access: the subject's data |
 | GET | `/api/auth/account/audit` | Session | GDPR right of access: the subject's own audit trail |
 | DELETE | `/api/auth/account` | Session | GDPR right to erasure: soft-delete + anonymise |

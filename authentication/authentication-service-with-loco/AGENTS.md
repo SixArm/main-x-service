@@ -57,7 +57,7 @@ template (see root `AGENTS.md`).
 | Build | `cargo build` |
 | Test | `cargo test` (DB-free: unit + contract tests); `cargo test -- --ignored` for the Postgres-backed model/request tests. |
 | Lint | `cargo clippy --bins` |
-| Run | `cargo loco start` (needs Postgres; see README). |
+| Run | `cargo loco start` (needs Postgres; see README). Works here via this crate's own `.cargo/config.toml` alias (`loco = "run --"`) when run from inside this directory — no `cargo-loco` shim needs to be installed. Same for `cargo loco db migrate`, `cargo loco task …`. If it ever doesn't resolve (e.g. invoked via `--manifest-path` from elsewhere, which does not pick up this local alias), `cargo run -- start` / `-- db migrate` / `-- task …` is the equivalent. |
 
 ---
 
@@ -71,16 +71,24 @@ template (see root `AGENTS.md`).
 | POST | `/api/auth/token` | Session + CSRF | Exchange a valid session for a short-lived PASETO v4.public bearer (~5 min), carrying the session's ABAC `attrs` claim. Requires the `X-CSRF-Token` header to match the session's synchroniser token (`403` on mismatch). |
 | GET | `/api/auth/me` | Session | Current user (rejects revoked + GDPR-erased accounts). |
 | POST | `/api/auth/signout` | Session | Revoke the current session. |
-| GET | `/api/auth/audit/recent` | — | System-wide authentication audit trail (newest 100). |
+| GET | `/api/auth/audit/recent` | Admin | System-wide authentication audit trail (newest 100). `401` no/invalid token, `403` unless `access=admin` (SEC-A2 — the rows carry emails, an enumeration oracle if left open). |
 | GET | `/api/auth/account/export` | Session | GDPR right of access: the subject's data (`users` + `sessions` + `auth_events`). |
 | GET | `/api/auth/account/audit` | Session | GDPR right of access: the subject's own audit trail. |
 | DELETE | `/api/auth/account` | Session | GDPR right to erasure: soft-delete + anonymise + revoke sessions + audit. |
 | GET | `/api/auth/admin/users/{pid}/attributes` | Admin | Show a user's ABAC subject attributes. `403` unless the caller carries `access=admin`. |
 | PUT | `/api/auth/admin/users/{pid}/attributes` | Admin | Replace a user's ABAC attribute map (body `{ "attributes": { … } }`); validates keys/values, writes an `attributes_assigned` audit row. |
+| GET | `/api/compliance/audit/verify` | **— (see note)** | Recompute SHA-256/SHA-3/MAC digests over `auth_events` rows; reports any row whose content no longer matches what was stored. |
 | GET | `/.well-known/paseto-keys` | — | Published Ed25519 public key(s) for offline PASETO verification. |
 | GET | `/api-docs/openapi.json` | — | Hand-written OpenAPI 3 document. |
 | GET | `/swagger-ui` | — | Swagger UI page (CDN assets) rendering the doc. |
 | GET | `/metrics.prom` | — | Prometheus metrics (text exposition; root path, no `/api` prefix). |
+
+> **`/api/compliance/audit/verify` has no auth/authz check today** —
+> unlike sibling loco-idiomatic crates (e.g. case-service, behind
+> `CASE_REQUIRE_AUTH`), this crate has no blanket `/api/*` guard to
+> hang one on; every other route above is gated ad hoc instead. It
+> leaks no PII (row counts and ids only). Open decision — see
+> `spec/index.md` §16.
 
 To avoid account enumeration, `signup` and `magic-link` always return
 `200` regardless of whether the email exists. They are also
@@ -146,9 +154,11 @@ src/
 ├── controllers/
 │   ├── auth.rs            signup / magic-link / verify / me / signout / audit + GDPR account export/audit/erasure
 │   ├── admin.rs           ABAC attribute assignment over HTTP (GET/PUT /api/auth/admin/users/{pid}/attributes; access=admin gated)
+│   ├── compliance.rs      GET /api/compliance/audit/verify — keyed integrity verification (currently no auth check; see spec §16)
 │   ├── docs.rs            /api-docs/openapi.json + /swagger-ui
 │   ├── paseto_keys.rs     published key endpoint (/.well-known/paseto-keys — Ed25519 public key set)
 │   └── metrics.rs         /metrics.prom (Prometheus text exposition)
+├── compliance/            mac.rs (HMAC-SHA256 via the shared integrity-mac crate) + audit_integrity.rs (SHA-256/SHA-3/MAC digest + verify over auth_events)
 ├── metrics.rs            Prometheus registry + auth-specific counters
 ├── i18n.rs               dependency-light email copy catalog (en / cy)
 ├── openapi.rs            hand-written OpenAPI 3 document
@@ -160,7 +170,7 @@ src/
 │   └── _entities/         generated SeaORM entities
 ├── mailers/auth.rs        magic-link mailer (prod)
 ├── tasks/attributes.rs    `user_attributes` CLI task — operator ABAC attribute assignment (set/show/unset/clear users.attributes)
-├── migration/             in-crate migrator: m20220101_000001_users, _000002_sessions, _000003_auth_events, _000004_users_deleted_at, _000005_auth_rate_limits, _000006_users_attributes, _000007_sessions_data, _000008_sessions_ttls, _000009_hash_credentials_at_rest
+├── migration/             in-crate migrator: m20220101_000001_users, _000002_sessions, _000003_auth_events, _000004_users_deleted_at, _000005_auth_rate_limits, _000006_users_attributes, _000007_sessions_data, _000008_sessions_ttls, _000009_hash_credentials_at_rest, m20260728_000001_add_auth_event_mac
 └── views/auth.rs          LoginResponse / CurrentResponse
 config/                    development/production/test yaml (keys/ holds only a README — no committed key files)
 ```
@@ -180,6 +190,10 @@ config/                    development/production/test yaml (keys/ holds only a 
 | `AUTH_SESSION_ABSOLUTE_TTL_SECS` | `43200` (12 h) | Hard absolute session ceiling set at issuance, never extended. |
 | `AUTH_ATTRIBUTE_VOCABULARY` | — | Optional inline-JSON allow-set of ABAC attribute keys→values (`{ "access": ["read","write","admin"], "dept": ["cardiology"], "svc": [] }`; empty list ⇒ any value). Enforced on assignment (CLI + admin) to catch typos. Unset ⇒ unrestricted. |
 | `AUTH_ATTRIBUTE_VOCABULARY_FILE` | — | Path form of the above (used when the inline var is unset). |
+| `AUTH_INTEGRITY_MAC_KEY` | — | HMAC-SHA256 key for the `auth_events` integrity MAC (`GET /api/compliance/audit/verify`). Unset ⇒ no MAC written; affected rows report `mac_absent`, not a mismatch. |
+| `AUTH_INTEGRITY_MAC_KEY_FILE` | — | Path form of the above; takes precedence over the inline var. |
+| `AUTH_INTEGRITY_MAC_KEY_ID` | — | Key id stamped into new MACs, for rotation. |
+| `AUTH_INTEGRITY_MAC_KEYS_RETIRED` | — | Comma-separated retired key material, still verifiable, no longer used to sign. |
 | `FRONTEND_URL` | `http://localhost:5173` | Base for the magic link in emails/logs. |
 | `DATABASE_URL` | loco config default | Postgres connection. |
 

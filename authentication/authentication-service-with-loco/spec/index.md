@@ -96,10 +96,13 @@ sign-in.
   `absolute_expires_at`, `revoked_at`. One row per logged-in browser;
   the unit of revocation. Valid iff `revoked_at IS NULL AND now() <
   idle_expires_at AND now() < absolute_expires_at`. *(Target shape per
-  shared §3; the `data` JSONB column has landed (ABAC sourcing); the
-  code otherwise still reuses the legacy `jid`/`expires_at` columns with
-  `sid` = `jid`, pending the §13 reshape. Either way the session is an
-  opaque server-side row — not a JWT.)*
+  shared §3 — landed: the `data` JSONB column (ABAC sourcing) and the
+  `last_seen_at`/`idle_expires_at`/`absolute_expires_at` TTL columns +
+  the `sessions_active_user` partial index (§13, 2026-07-05) are both
+  in place. The opaque session id stays the legacy `jid` column
+  (`sid` = `jid`) — a `sid`-pk rename was judged lower-value and is
+  deliberately not planned. Either way the session is an opaque
+  server-side row — not a JWT.)*
 - **PASETO key material** — an Ed25519 keypair (not in the DB; env /
   files per §8). The private key signs `POST /token`; the public
   key(s) are published at `/.well-known/paseto-keys`, keyed by `kid`.
@@ -133,9 +136,15 @@ noted in the CHANGELOG "Notes". See §13 for the removal task.
 3. `GET /api/auth/magic-link/{token}` — validate the (unexpired) token,
    mark the email verified, **create a session row and set the
    `__Host-mxi_session` cookie** (HttpOnly/Secure/SameSite/`Path=/`),
-   issue a CSRF token, and return `{pid, name, email, is_verified}`. It
-   **no longer returns a bearer token** — the credential is the
-   `Set-Cookie`. Mechanism unchanged per shared §7; only the outcome
+   issue a CSRF token, and return `{token, pid, name, email,
+   is_verified}`. **The credential of record is the `Set-Cookie`, not
+   the body** — but the response body **still also carries a PASETO
+   v4.public bearer token today** (`views::auth::LoginResponse`),
+   transitionally, until every front-end adopts the BFF
+   pattern (§6, `POST /token`) and stops reading it. Live-verified: a
+   real `GET /api/auth/magic-link/{token}` response body is
+   `{"token":"v4.public…","pid":…,"name":…,"email":…,"is_verified":…}`.
+   Mechanism unchanged per shared §7; only the outcome
    changes. Session establishment **copies the user's ABAC
    `attributes` into the session** (`sessions.data.attrs`) per shared
    authorization-attributes.md §6, so token minting reads only the
@@ -188,7 +197,8 @@ single-use (cleared on consumption).
      `sessions`, and their `auth_events` audit trail. No tokens, key
      material, password hash, or api key.
    - `GET /api/auth/account/audit` (session cookie) — the subject's own
-     audit trail (per-subject counterpart to the open `/audit/recent`).
+     audit trail (per-subject counterpart to the admin-gated system-wide
+     `/audit/recent`, §12).
    - `DELETE /api/auth/account` (session cookie, CSRF-protected) —
      **right to erasure** (Art. 17): soft-delete + anonymise the `users`
      row (stamp `deleted_at`, tombstone `email`/`name`), revoke all the
@@ -242,14 +252,50 @@ single-use (cleared on consumption).
       byte-for-byte by `authentication_verifier::Claims` 0.3. Parsing of
       the stored JSONB is tolerant (`users::attributes_map`):
       malformed entries are inert and can never fail minting.
-    - Attribute **assignment** is an operator action. The **CLI task**
-      has **landed** (`user_attributes`, `src/tasks/attributes.rs`):
-      `op:show|set|unset|clear` over one user's `users.attributes`,
-      selected by `email:` or `pid:`, with lowercase key/value
-      validation and the reserved pseudo-attributes `sub`/`email`/
-      `entity` refused. An HTTP admin API is a later follow-up (§13).
-      Until assigned, users hold `{}` and are read-only under the
-      family's default policy.
+    - Attribute **assignment** is an operator action, with **two
+      landed surfaces**: the **CLI task** (`user_attributes`,
+      `src/tasks/attributes.rs`): `op:show|set|unset|clear` over one
+      user's `users.attributes`, selected by `email:` or `pid:`; and
+      the **HTTP admin API** (`GET`/`PUT
+      /api/auth/admin/users/{pid}/attributes`, `src/controllers/admin.rs`,
+      gated by a caller whose own `attrs` include `access=admin` — the
+      bootstrap admin is assigned via the CLI). Both validate keys/values
+      as short lowercase tokens (reserved `sub`/`email`/`entity`
+      refused), write an `attributes_assigned` `auth_events` audit row,
+      and revoke every session for the affected user (SEC-A8), so a
+      session cannot keep minting a stale `attrs` snapshot. Until
+      assigned, users hold `{}` and are read-only under the family's
+      default policy.
+
+13. **Keyed integrity verification** (`src/compliance/`, landed
+    2026-07-28 — see §13 for the doc-catch-up note). `GET
+    /api/compliance/audit/verify` recomputes, per `auth_events` row, a
+    SHA-256 digest, a SHA3-256 digest, and — where a key is configured
+    — an HMAC-SHA256 MAC (the shared `integrity-mac` crate,
+    HKDF-domain-separated per (service, domain)), and reports any row
+    whose recomputed value no longer matches what was stored. The two
+    unkeyed digests are written unconditionally, so a deployment that
+    has not configured a MAC key still gets *some* integrity signal
+    rather than none. **Default off**: with no `AUTH_INTEGRITY_MAC_KEY`
+    (or `_KEY_FILE`) configured, no MAC is written and affected rows
+    report `mac_absent` rather than a mismatch. Env vars:
+    `AUTH_INTEGRITY_MAC_KEY`, `AUTH_INTEGRITY_MAC_KEY_FILE` (takes
+    precedence), `AUTH_INTEGRITY_MAC_KEY_ID`,
+    `AUTH_INTEGRITY_MAC_KEYS_RETIRED`. **Known limit** (stated in the
+    module docs): a MAC proves a row's *content* is unchanged since it
+    was written; it says nothing about a row **deleted wholesale** —
+    this crate takes no hash chain and no external-witness checkpoint,
+    unlike care-pathway/case/person/worker (see
+    [`agents/share/runbooks/integrity-activation.md`](../../../agents/share/runbooks/integrity-activation.md),
+    which scopes to those four). **Open question (§16): this endpoint
+    currently has no authentication or authorization check at all** —
+    unlike the sibling loco-idiomatic services (e.g. case-service's
+    equivalent, gated behind its blanket `CASE_REQUIRE_AUTH` guard),
+    this crate has no blanket `/api/*` guard to sit behind; every other
+    endpoint here is gated ad hoc (session cookie, PASETO bearer, or
+    the admin handler's own `access=admin` check). The report leaks no
+    PII (row counts and row ids only), but the gap is real and
+    undecided — see §16.
 
 ## 7. Non-functional requirements
 
@@ -322,7 +368,9 @@ The API is described by a hand-written **OpenAPI 3.0.3** document
 `utoipa`). It is served by the docs controller
 (`src/controllers/docs.rs`) at `GET /api-docs/openapi.json`, with a
 Swagger UI page at `GET /swagger-ui` (CDN assets). The document covers
-every endpoint plus the `SignupParams` /
+every endpoint **except `GET /api/compliance/audit/verify`** (§6.13,
+landed 2026-07-28 with no OpenAPI entry added — a gap for a future
+pass, tracked in §13) plus the `SignupParams` /
 `MagicLinkParams` / `CurrentResponse` / `Claims` (PASETO) /
 `PasetoKeys` / `PasetoKey` / `AuthEvent` / `AccountExport`
 (+ `AccountUserExport` / `AccountSessionExport` / `AccountAuditExport`)
@@ -341,22 +389,30 @@ loco-JSON envelope above.
 
 ## 10. Persistence
 
-PostgreSQL via SeaORM + `sea-orm-migration`. Migrations:
+PostgreSQL via SeaORM + `sea-orm-migration`. Migrations, in order:
 `m20220101_000001_users`, `m20220101_000002_sessions`,
 `m20220101_000003_auth_events`, `m20220101_000004_users_deleted_at` (the
 GDPR-erasure soft-delete column), `m20220101_000005_auth_rate_limits`
 (the magic-link rate-limiter window log),
 `m20220101_000006_users_attributes` (the ABAC subject-attribute map,
-JSONB `NOT NULL DEFAULT '{}'`), and `m20220101_000007_sessions_data`
-(the session payload JSONB holding the copied `attrs`). `auto_migrate`
-is on in development, off in production.
+JSONB `NOT NULL DEFAULT '{}'`), `m20220101_000007_sessions_data`
+(the session payload JSONB holding the copied `attrs`),
+`m20220101_000008_sessions_ttls` (the `last_seen_at`/idle/absolute TTL
+columns + `sessions_active_user` partial index, §13),
+`m20220101_000009_hash_credentials_at_rest` (SEC-A9: hashes the
+magic-link token / session `jid` / CSRF token at rest), and
+`m20260728_000001_add_auth_event_mac` (adds `auth_events.hash` /
+`hash_sha3` / `mac` — the keyed-integrity columns §6.13 verifies).
+`auto_migrate` is on in development, off in production.
 
-**Cookie sessions.** The cookie session currently reuses the existing
-`sessions` table (`sid` = the legacy `jid` column); the `data` JSONB
-column has landed (ABAC sourcing, §6.12), and the reshape to the rest
-of the shared-§3 schema (`last_seen_at`, idle/absolute TTLs, partial
-index on `(user_pid) WHERE revoked_at IS NULL`) is a deferred §13
-follow-up. The **Ed25519** PASETO signing seed lives in
+**Cookie sessions.** The cookie session reuses the existing `sessions`
+table (`sid` = the legacy `jid` column — a `sid`-pk rename was judged
+lower-value and is deliberately not planned). The `data` JSONB column
+(ABAC sourcing, §6.12) and the rest of the shared-§3 reshape
+(`last_seen_at`, `idle_expires_at`/`absolute_expires_at`, the
+`sessions_active_user` partial index on `(user_pid) WHERE revoked_at IS
+NULL`) have both landed (§13, 2026-07-05); `is_active` enforces
+revocation + idle + absolute. The **Ed25519** PASETO signing seed lives in
 env / a file (not the DB; built-in dev seed otherwise), public keys
 published at `/.well-known/paseto-keys`. RS256 RSA keys are
 decommissioned.
@@ -504,6 +560,31 @@ only by that subject.
 
 ## 13. Tasks (live work queue)
 
+- [x] **2026-07-28 — Keyed integrity verification (MAC + digests) over
+      `auth_events`.** *Landed but never recorded here until this doc
+      pass (2026-08-04, DOC-2) found the gap: shipped, tested, and
+      reachable (`GET /api/compliance/audit/verify`), with no `spec`
+      entry anywhere, no `CHANGELOG.md` entry, and no `AGENTS.md`
+      endpoint/config-table row.* Adds `src/compliance/` (`mac`,
+      `audit_integrity`) — SHA-256 + SHA3-256 digests and a keyed
+      HMAC-SHA256 MAC (via the shared `integrity-mac` crate) over each
+      `auth_events` row; migration `m20260728_000001_add_auth_event_mac`.
+      See §6.13 for the full description and env vars. Now documented in
+      §6.13/§10/§16 here and in `AGENTS.md`'s API surface + configuration
+      tables.
+  - [ ] **Open: this endpoint has no auth/authz check**, unlike its
+        sibling crates' equivalents (case-service's is behind
+        `CASE_REQUIRE_AUTH`). This crate has **no blanket `/api/*`
+        guard at all** — every other endpoint is gated ad hoc (session
+        cookie, PASETO bearer, or the admin handler's own
+        `access=admin` check) — so there is no existing mechanism to
+        hang a guard on without designing one. Decide and either wire
+        a guard or record the decision to leave it open (it discloses
+        no PII today — row counts and ids only). See §16.
+  - [ ] **Open: not in the OpenAPI document.** `src/openapi.rs` has no
+        entry for this path (§9); `docs::routes()` tests assert the
+        other endpoints but not this one.
+
 - [x] **SEC-A9 (security): hash bearer-equivalent secrets at rest.** The
       magic-link token (`users.magic_link_token`), the opaque session id
       (`sessions.jid` — the `__Host-mxi_session` cookie value + PASETO `sid`
@@ -635,7 +716,8 @@ only by that subject.
       `account_erased` audit row; `/me` + export then `401` for the
       erased subject (`users::find_active_by_pid`). Per-subject
       `GET /api/auth/account/audit` (bearer) added; system-wide
-      `/audit/recent` left open by decision (§12). Un-gated unit tests +
+      `/audit/recent` was left open at the time, later revised to
+      admin-gated by SEC-A2 (§12). Un-gated unit tests +
       DB-gated request tests; OpenAPI documents the three endpoints +
       `AccountExport`/`AccountSessionExport`/`AccountAuditExport`
       schemas. *(2026-06-13; entity spec T-9.)*
@@ -778,8 +860,10 @@ only by that subject.
 > **Pivot landed.** The code reality is cookie sessions + PASETO
 > v4.public (§1, §13 T-12,
 > [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md));
-> RS256 JWT + JWKS are removed. Remaining refinements: full
-> double-submit CSRF and the sessions-table reshape (§13).
+> RS256 JWT + JWKS are removed. The CSRF synchroniser token + origin
+> backstop (SEC-A10) and the sessions-table TTL reshape have both
+> landed (§13, 2026-07-05); remaining refinements are Mailpit and an
+> auto-rotation scheduler (§15).
 
 Done: real loco scaffold; passwordless magic-link flow; PASETO
 v4.public signing (Ed25519); `/.well-known/paseto-keys` key set;
@@ -799,8 +883,11 @@ the published key set carries all keys; `verify_token` selects by the
 footer `kid`); localized
 magic-link email (en / cy via `src/i18n.rs`, optional request `locale`);
 **ABAC attribute sourcing** (`users.attributes` → session `data.attrs`
-→ PASETO `attrs` claim, per shared authorization-attributes.md §6;
-assignment surface deferred — §13).
+→ PASETO `attrs` claim, per shared authorization-attributes.md §6);
+the **assignment surface has landed** — both the `user_attributes` CLI
+task and the `access=admin`-gated HTTP admin API, each writing an
+`attributes_assigned` audit row (§13); keyed integrity verification
+over `auth_events` (`GET /api/compliance/audit/verify`, §6.13).
 
 ## 15. Roadmap
 
@@ -812,15 +899,16 @@ cross-service auth to **PASETO v4.public** (`POST /token` +
 `/.well-known/paseto-keys`), front-ends to the BFF
 pattern, and RS256 + JWKS decommissioned — per
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
-This **supersedes** the JWT model. Remaining v0.2 items: full
-double-submit CSRF, the sessions-table reshape, Mailpit,
-auto-rotation scheduler. v0.3: begin loco conversion of the sibling
-services using this as the template (peers adopt the PASETO
-`authentication-verifier`); **ABAC** — the sourcing side (attributes →
-session → `attrs` claim) has landed here, peers enforce via the shared
-`abac` engine in verifier 0.3 (per shared authorization-attributes.md —
-authorization is attribute-based, not a fixed role list); next: the
-operator attribute-assignment surface (§13).
+This **supersedes** the JWT model. The CSRF synchroniser token +
+origin backstop and the sessions-table TTL reshape have both landed;
+remaining v0.2 items: Mailpit, an auto-rotation scheduler. v0.3: begin
+loco conversion of the sibling services using this as the template
+(peers adopt the PASETO `authentication-verifier`); **ABAC** — both
+the sourcing side (attributes → session → `attrs` claim) *and* the
+operator attribute-assignment surface (CLI task + HTTP admin API) have
+landed here; peers enforce via the shared `abac` engine in verifier 0.3
+(per shared authorization-attributes.md — authorization is
+attribute-based, not a fixed role list).
 
 ## 16. Open questions
 
@@ -834,6 +922,18 @@ operator attribute-assignment surface (§13).
 - ~~PASETO library choice~~ — resolved: `rusty_paseto` (+
   `ed25519-dalek`) shipped. Still open: BFF token-exchange
   caching (shared §10).
+- **Should `GET /api/compliance/audit/verify` (§6.13) require
+  authentication?** It leaks no PII today (row counts and row ids
+  only), but it is the only endpoint in this crate with no auth check
+  of any kind, and its own source doc comment previously (wrongly)
+  claimed it sat behind a blanket `AUTH_REQUIRE_AUTH` guard that does
+  not exist here — copied, unadapted, from a sibling crate that does
+  have one. Options: (a) build a minimal blanket guard for this crate
+  (a larger change — no other endpoint here uses that pattern; every
+  other route is gated per-handler), (b) gate this one handler the
+  same way `admin.rs` does (`access=admin`), or (c) leave it open and
+  record that decision explicitly. No lean yet — flagged, not decided,
+  by the 2026-08-04 doc pass (§13).
 
 ## 17. References
 

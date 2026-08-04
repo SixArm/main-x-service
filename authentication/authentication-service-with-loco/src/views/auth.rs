@@ -6,9 +6,16 @@ use crate::models::_entities::{auth_events, sessions, users};
 
 /// Response returned after a redeemed magic link: the access token plus
 /// the authenticated user's public fields.
+///
+/// The credential of record is the `Set-Cookie: __Host-mxi_session`
+/// header the handler also sets, not this body — but the body still
+/// carries a bearer token too, transitionally, until every front-end
+/// adopts the BFF pattern (`POST /token`) and stops reading it from
+/// here (spec §6.3).
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LoginResponse {
-    /// RS256 access token (bearer).
+    /// PASETO v4.public access token (bearer). Transitional — see the
+    /// struct doc.
     pub token: String,
     /// User public id (`pid`).
     pub pid: String,
