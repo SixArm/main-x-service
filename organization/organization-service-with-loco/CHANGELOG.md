@@ -8,6 +8,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — `seed_examples` CLI task (EX-4, 2026-08-04)
+
+`cargo loco task seed_examples` loads the repository's shared demo
+fixture (`examples/data/organizations.jsonl`, 20 rows) into the
+`organizations` table, for the tutorials (`tasks.md` EX-4). Inserts
+via the **model-layer create** (`models::organizations::Model::create`)
+rather than `POST /api/organizations`, so the same seed path as person
+and case, and no audit row or event is written by the seed itself.
+Refuses to insert into a non-empty `organizations` table (prints a
+message and exits cleanly), so a second run is a no-op rather than a
+duplicate load. New `src/tasks/seed_examples.rs` (`parse_fixture`
+reuses `bulk::jsonl::parse_line`, `seed`, `SeedExamples`); DB-free unit
+tests parse the real fixture; a DB-gated `tests/seed_examples_db.rs`
+proves a first run seeds all 20 rows and a second run changes nothing.
+
 ### Added — Durable event bus, real-broker sink (BUS-3, 2026-08-03)
 
 `FluvioSink` (`src/relay.rs`) — the Phase-3 relay's real-broker

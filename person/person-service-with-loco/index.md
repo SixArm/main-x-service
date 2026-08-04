@@ -374,6 +374,28 @@ sea-orm-cli migrate down
 sea-orm-cli migrate status
 ```
 
+### Seed demo data
+
+`cargo loco task seed_examples` loads the repository's shared demo
+fixture ([`examples/data/persons.jsonl`](../../examples/data/README.md),
+50 rows including five deliberate duplicate pairs) into the `persons`
+table, for the tutorials. It inserts via the model-layer create
+(`db::repositories::SeaOrmPersonRepository::create`) rather than
+`POST /api/persons`, deliberately bypassing real-time duplicate
+detection — the normal create endpoint returns `409` on the second half
+of every duplicate pair, which would silently drop half the fixture.
+No audit row or event is written by the seed itself. It refuses to
+insert into a non-empty `persons` table (prints a message and exits
+cleanly), so a second run is a no-op:
+
+```bash
+cargo loco task seed_examples
+```
+
+See the sibling `organization-service`/`case-service` crates for the
+matching `seed_examples` task over `examples/data/organizations.jsonl`
+/ `cases.jsonl` (repo `tasks.md` EX-4).
+
 ## API Documentation
 
 ### Interactive Documentation

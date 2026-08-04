@@ -51,6 +51,44 @@ GLN by the GS1 mod-10 weighting. A made-up LEI is a `422`, so these were
 computed. They are structurally valid and semantically meaningless — they
 identify nothing.
 
+## Loading into a running service — the `seed_examples` task (EX-4)
+
+The reliable way to get this data into a database today is each
+service's **`seed_examples` loco task**, not bulk import (see the
+warning in [Importing](#importing) below — the demo compose stack's
+bulk-import path is currently broken, tracked as
+[`COMPOSE-WORKER`](../../tasks.md)). The task reads the same fixture
+files documented here and inserts through the **model layer** directly
+— bypassing the `POST /api/<plural>` create endpoint's real-time
+duplicate detection, which would otherwise return `409` on the second
+half of every one of `persons.jsonl`'s five duplicate pairs (confirmed
+live by EX-1) and silently drop them. No audit row or event is written
+by the seed itself; the tutorials that exercise duplicate detection,
+audit, and events do so against the seeded records afterward, not
+against the act of seeding. Each task refuses to insert into a
+non-empty table, so re-running it is a no-op rather than a duplicate
+load.
+
+Run from each service crate's own directory, against its own database
+(`DATABASE_URL` / `config/development.yaml` as usual):
+
+```sh
+cd person/person-service-with-loco       && cargo loco task seed_examples
+cd organization/organization-service-with-loco && cargo loco task seed_examples
+cd case/case-service-with-loco           && cargo loco task seed_examples
+```
+
+This seeds 50 persons, 20 organizations, and 10 cases. It does **not**
+create the ten `subject_of` links documented in
+[`case-subject-links.md`](case-subject-links.md) — those require the
+seeded records' pids, which are not known until after both the person
+and case tasks have run; create them afterward via
+`POST /api/cases/{pid}/links` as that file describes.
+
+Once the tutorials TUT-1/TUT-2/TUT-4 exist (`tasks.md`), they should
+reference `cargo loco task seed_examples` in each of the three crates
+as the seed step, rather than the bulk-import path below.
+
 ## Importing
 
 Each service's bulk import is multipart, async, and returns a job id
@@ -86,9 +124,10 @@ curl -F file=@examples/data/cases.jsonl -F format=jsonl \
 > loco's server-only mode; `BulkJobWorker` is registered in
 > `connect_workers`, which only runs under `start --server-and-worker`.
 > Until the compose files add that flag (or a sidecar worker service),
-> use the single-record `POST /api/<plural>` endpoints to load these
-> fixtures, or run the service locally in worker mode. Recorded against
-> EX-1/TUT-5 in the root [`tasks.md`](../../tasks.md).
+> use each service's `cargo loco task seed_examples`
+> ([above](#loading-into-a-running-service--the-seed_examples-task-ex-4))
+> to load these fixtures, or run the service locally in worker mode.
+> Recorded against EX-1/TUT-5 in the root [`tasks.md`](../../tasks.md).
 
 Then create the ten `subject_of` edges — see
 [`case-subject-links.md`](case-subject-links.md).

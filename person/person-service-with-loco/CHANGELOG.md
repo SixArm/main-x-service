@@ -7,6 +7,28 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — `seed_examples` CLI task (EX-4, 2026-08-04)
+
+`cargo loco task seed_examples` loads the repository's shared demo
+fixture (`examples/data/persons.jsonl`, 50 rows including five
+deliberate duplicate pairs) into the `persons` table, for the
+tutorials (`tasks.md` EX-4). Inserts via the **model-layer create**
+(`db::repositories::SeaOrmPersonRepository::create`) rather than
+`POST /api/persons`, deliberately bypassing real-time duplicate
+detection — the normal create endpoint returns `409` on the second
+half of every duplicate pair (confirmed live by EX-1), which would
+silently drop half the fixture. No audit row or event is written by
+the seed itself (no audit log / event publisher attached); the
+tutorials that exercise duplicate detection, audit, and events do so
+against the seeded records afterward. Refuses to insert into a
+non-empty `persons` table (prints a message and exits cleanly), so a
+second run is a no-op rather than a duplicate load. New
+`src/tasks/seed_examples.rs` (`parse_fixture`, `seed`, `SeedExamples`);
+DB-free unit tests parse the real fixture; a DB-gated
+`tests/seed_examples_db.rs` proves a first run seeds all 50 rows
+(including both halves of the "Okonkwo/Okonkow" pair) and a second run
+changes nothing.
+
 ### Fixed — cross-service link endpoints now use the uniform response envelope (2026-08-03)
 
 `POST`/`GET`/`DELETE /api/persons/{pid}/links` previously returned bare

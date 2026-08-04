@@ -130,6 +130,7 @@ impl Hooks for App {
     fn register_tasks(tasks: &mut Tasks) {
         tasks.register(crate::tasks::integrity_key::IntegrityKey);
         tasks.register(crate::tasks::integrity_resign::IntegrityResign);
+        tasks.register(crate::tasks::seed_examples::SeedExamples);
     }
 
     async fn truncate(_ctx: &AppContext) -> Result<()> {

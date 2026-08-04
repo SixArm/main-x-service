@@ -3,3 +3,6 @@
 
 /// `search_reindex` — rebuild the full-text index from the database.
 pub mod search;
+/// `seed_examples` — load `examples/data/organizations.jsonl` for the
+/// tutorials.
+pub mod seed_examples;

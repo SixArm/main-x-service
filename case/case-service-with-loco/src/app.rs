@@ -152,6 +152,7 @@ impl Hooks for App {
         tasks.register(crate::tasks::search::SearchReindex);
         tasks.register(crate::tasks::integrity_key::IntegrityKey);
         tasks.register(crate::tasks::integrity_resign::IntegrityResign);
+        tasks.register(crate::tasks::seed_examples::SeedExamples);
         // tasks-inject (do not remove)
     }
     async fn truncate(ctx: &AppContext) -> Result<()> {

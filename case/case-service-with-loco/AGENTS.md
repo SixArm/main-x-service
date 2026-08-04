@@ -100,6 +100,13 @@ per-row-ABAC scope limitations. Deferred (spec §13): BUS-2 (link-graph
 Fluvio consumer) and BUS-3 (roll `FluvioSink` to the other nine
 services), front-end merge action.
 
+For a quick demo dataset, `cargo loco task seed_examples` loads the
+repository's shared fixture (`examples/data/cases.jsonl`, 10 rows) via
+the model-layer create (no duplicate check, no audit row, no event —
+deliberate for a seed task); it refuses to insert into a non-empty
+`cases` table (EX-4). It does not create the `subject_of` links to
+person records — see `examples/data/case-subject-links.md`.
+
 > **Auth pivot done here.** The family moved from RS256 JWT + JWKS to
 > cookie sessions + offline **PASETO v4.public** verification (published
 > Ed25519 key) — see
@@ -136,6 +143,9 @@ src/
 ├── search/                Tantivy full-text/fuzzy/phonetic index (index.rs schema + mod.rs engine)
 ├── streaming.rs           durable-bus Phase 1: Envelope + EventPublisher seam (in-memory); indexes/deindexes on every write
 ├── tasks/search.rs        `search_reindex` CLI task + boot-time rebuild-if-empty
+├── tasks/seed_examples.rs `seed_examples` CLI task — loads the repo's
+│                          demo fixture (examples/data/cases.jsonl) for
+│                          the tutorials (EX-4)
 ├── validation.rs          title + opened_date + identifier/subject/keyword checks → 422
 ├── bulk/                  bulk import/export (BLK-5): mod · row (BulkCaseRow) · stable_key ·
 │                          columns · csv · jsonl · error_report · store (async ArtifactStore) ·

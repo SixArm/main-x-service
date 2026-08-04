@@ -4,3 +4,5 @@
 pub mod integrity_key;
 /// Re-MAC history under the current key after a rotation.
 pub mod integrity_resign;
+/// `seed_examples` — load `examples/data/persons.jsonl` for the tutorials.
+pub mod seed_examples;

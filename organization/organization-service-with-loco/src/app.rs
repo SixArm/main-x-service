@@ -182,6 +182,7 @@ impl Hooks for App {
     #[allow(unused_variables)]
     fn register_tasks(tasks: &mut Tasks) {
         tasks.register(crate::tasks::search::SearchReindex);
+        tasks.register(crate::tasks::seed_examples::SeedExamples);
         // tasks-inject (do not remove)
     }
     /// Truncate all tables between tests (request-suite setup).

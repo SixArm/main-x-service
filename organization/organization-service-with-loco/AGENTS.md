@@ -82,7 +82,11 @@ validation, and moving the structured FHIR search onto the index. The published-
 set is fetched over HTTP once at boot when `ORGANIZATION_PASETO_KEYS_URL`
 is set (fetched set wins; warn + env fallback via
 `ORGANIZATION_PASETO_KEYS` otherwise — the service always boots); a
-periodic refresh loop is a future spec item.
+periodic refresh loop is a future spec item. For a quick demo dataset,
+`cargo loco task seed_examples` loads the repository's shared fixture
+(`examples/data/organizations.jsonl`, 20 rows) via the model-layer
+create (no duplicate check, no audit row, no event — deliberate for a
+seed task); it refuses to insert into a non-empty table (EX-4).
 
 **BLK-5 async bulk import/export** (`src/bulk/`) is implemented, scoped
 to **JSONL + CSV only** (no Parquet) and a **local-filesystem-only**
@@ -145,6 +149,9 @@ src/
 ├── privacy.rs             masking + the GDPR export envelope
 ├── search/                Tantivy index (index.rs schema, mod.rs engine)
 ├── tasks/search.rs        `search_reindex` + boot self-heal
+├── tasks/seed_examples.rs `seed_examples` — loads the repo's demo
+│                           fixture (examples/data/organizations.jsonl)
+│                           for the tutorials (EX-4)
 ├── controllers/metrics.rs  GET /metrics.prom (root, public)
 ├── metrics.rs              process-wide Prometheus registry (OnceLock)
 ├── relay.rs                durable event bus Phase 3: EventSink seam,

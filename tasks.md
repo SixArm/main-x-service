@@ -1555,9 +1555,77 @@
   loco-idiomatic services (organization, care-pathway, case, portfolio)
   return bare loco JSON identically — case is not a `{success,...}`-vs-
   bare exception, they all are.
-- [ ] **EX-4 (S)** A demo **seed** path: loco task (person + organization
+- [x] **EX-4 (S)** A demo **seed** path: loco task (person + organization
   + case) or documented bulk-import of EX-1 fixtures — pick one,
   reference it from TUT-1/2/4.
+
+  **Done 2026-08-04.** Picked the **loco task**, not bulk-import — per
+  EX-1's live finding that the shipped compose stack runs every
+  container server-only (`COMPOSE-WORKER`), so `BulkJobWorker` never
+  registers and a bulk-import job never leaves `queued`. A `seed_examples`
+  task per crate (`person`, `organization`, `case`
+  `src/tasks/seed_examples.rs`, registered in each `app.rs`) reads the
+  matching `examples/data/*.jsonl` fixture and inserts through the
+  **model layer** directly (`SeaOrmPersonRepository::create` /
+  `organizations::Model::create` / `cases::Model::create`), bypassing
+  the HTTP create handler's real-time duplicate detection — necessary
+  because `persons.jsonl` deliberately carries five duplicate pairs that
+  `POST /api/persons` would `409` on the second half of (EX-1 confirmed
+  this live). No audit row or event is written by the seed itself (no
+  audit log / event publisher attached to the model-layer path); that is
+  a deliberate, documented choice, not a gap — the tutorials that
+  exercise duplicate detection, audit, and events do so against records
+  already present, not against the act of seeding. Each task counts its
+  table first and refuses to insert into a non-empty one, so a re-run is
+  a no-op rather than a duplicate load.
+
+  Organization and case reuse each crate's own `bulk::jsonl::parse_line`
+  (the same parser BLK-5 import already uses) rather than reinventing
+  JSONL parsing; person parses directly into `models::Person` (the same
+  type its own `bulk::jsonl::parse_line` uses). All three wire types
+  matched the fixture files with no changes needed — EX-1's earlier
+  offline verification of the fixtures against these same parsers meant
+  no drift surfaced here.
+
+  **Verified live against real Postgres**, all three crates, via
+  `scripts/test-db.sh up <crate>` + `scripts/ci-check.sh test-db <crate>`
+  (then `down`): a DB-gated test per crate truncates its table, runs the
+  task, asserts the exact row count (50 / 20 / 10), asserts a second run
+  changes nothing (idempotency guard held), and — person only — asserts
+  both halves of the documented "Okonkwo/Okonkow" duplicate pair
+  (`examples/data/README.md`) landed in `person_names`. All three
+  crates' full DB-gated suites (not just the new tests) ran green
+  alongside this — 21+30+34 request-level tests, several `#[ignore]`d
+  outbox/enforcement/masking binaries — confirming the new task didn't
+  disturb anything already there. `cargo fmt --check` and
+  `cargo clippy --all-targets -- -D warnings` clean on all three crates
+  (`-D warnings` is a hard CI gate, so this was actually run, not
+  assumed). DB-free unit tests per crate parse one real line of the
+  actual fixture file into the wire type, catching wire-type/fixture
+  drift cheaply.
+
+  **Docs**: a new "Loading into a running service" section in
+  `examples/data/README.md` documents the task as the reliable path
+  (cross-referencing `COMPOSE-WORKER`), each crate's `AGENTS.md`
+  (organization, case) / `index.md` (person) gained a short mention +
+  invocation, and each crate's `CHANGELOG.md` gained an `[Unreleased]`
+  entry. No crate `spec/index.md` §13 edit: `integrity_key` and
+  `integrity_resign` — the closest precedent, an operator/demo CLI
+  utility rather than a service-behaviour change — landed in both
+  `person` and `case` with **zero** mentions in any per-crate markdown
+  (verified by grep before deciding this), unlike `search_reindex`
+  (a real service capability, fully documented in spec + AGENTS +
+  CHANGELOG). `seed_examples` is closer to `integrity_key` in kind, so
+  it got the lighter footprint: AGENTS/README + CHANGELOG, no spec
+  rewrite.
+
+  **Not done, deliberately out of scope**: `TUT-1`/`TUT-2`/`TUT-4` do
+  not exist yet (later in the flattened task order); they should
+  reference `cargo loco task seed_examples` in each of the three crates
+  once written. Case's `seed_examples` does not create the ten
+  `subject_of` links in `case-subject-links.md` — the case/person pids
+  are not known until after both seed tasks run, so that step stays a
+  documented follow-up curl call, not automated here.
 
 ## Phase 5 — Security hardening (audit-driven, 2026-07-12)
 
