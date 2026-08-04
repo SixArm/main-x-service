@@ -3058,6 +3058,63 @@ committing (see plan.md §4).
   something `agents/share/*.md` already states accurately, prefer a
   link over a second copy (same fix pattern as DOC-1).
 
+  - *`worker/worker-service-with-loco` done 2026-08-04.* Found and
+    fixed: (1) **duplicate task IDs** in `spec/13-tasks.md` — "T-10"
+    named both the cross-service-links task and the workforce-
+    assessments task, and "T-11" both bulk import/export and
+    `Config::from_env`; renumbered the later pair to T-14/T-15 and
+    updated `spec/14-implementation-status.md`'s cross-references
+    (CHANGELOG.md left as the historical record, unedited). (2) **T-3
+    (FHIR capability statement + bundle) marked wholesale `[ ]`** even
+    though `GET /fhir/metadata` and an ad hoc searchset `Bundle` had
+    already shipped 2026-07-07 via T-12 — split into done sub-items
+    (CapabilityStatement, ad hoc Bundle) vs. remaining (typed
+    `Bundle`/`BundleEntry`, `POST`/transaction bundles, Touchstone
+    validation); mirrored into §14/§15. (3) **`AGENTS/models.md`
+    missing the `Worker.worker_type` field** entirely — a real,
+    persisted, Tantivy-indexed, erasure-scrubbed field
+    (`src/models/worker.rs`), not scaffolding; added to the field
+    table + a new `WorkerType` enum entry. (4) **`AGENTS/restful.md`
+    missing the cross-service links endpoints** (`POST`/`GET`/`DELETE
+    /api/workers/{pid}/links` + the bulk `GET /api/workers/links`
+    pull) even though `spec/09-api-surface.md` §9.1 documents them in
+    full and the doc's own header claims to be the "complete endpoint
+    reference" — added a Links section mirroring §9.1. (5) **The
+    `CLAUDE.md`/`AGENTS.md` split**: root `AGENTS.md` documents
+    `CLAUDE.md` as "a one-line `@AGENTS.md` include," but worker's was
+    16.5 KB of content (Features/Quick Start/Project Structure/…)
+    that was a near-total subset of `index.md` (the real `README.md`
+    target, which has every section CLAUDE.md had, plus more) — i.e.
+    the same duplicate-copy problem DOC-1 found, not genuinely unique
+    content. Cross-checked against the other 10 DOC-2 crates first:
+    the newer loco-idiomatic ones (organization, care-pathway, case,
+    authentication, project-portfolio-management) **already** carry
+    the thin one-line `CLAUDE.md`, and course-service (an older crate)
+    has already converted too — only person, worker, place, thing,
+    event are still on the old bloated pattern. This confirms the
+    family's actual converged answer rather than requiring a fresh
+    derivation: **fold nothing** (nothing in worker's CLAUDE.md was
+    absent from `index.md`), thin `CLAUDE.md` to `@AGENTS.md`, and
+    correct worker's own `AGENTS.md` "doc hierarchy" table, which had
+    been asserting the opposite (grouping `CLAUDE.md` with `README.md`
+    as "user-facing intro"). The same resolution applies to
+    person/place/thing/event when their DOC-2 passes run — no
+    independent re-derivation needed. Everything else checked out:
+    `AGENTS/matching.md`'s weight/threshold/rule tables verified
+    byte-accurate against `src/matching/scoring.rs`; `README.md`
+    already symlinks to `index.md` (not a duplicate); the workforce
+    assessment capability (worker's most distinctive vs. its siblings)
+    is accurately covered end-to-end in spec §5.5/§6.9/§9.2/§10.5 and
+    `AGENTS/models.md`/`AGENTS/restful.md`. One pre-existing item
+    surfaced but deliberately **not** touched: `src/models/ods.rs` /
+    `geography.rs` / `codesystem.rs` plus ~15 matching `src/db/models.rs`
+    tables (NHS ODS organization expansion) have real domain models,
+    migrations, and SeaORM entities dating to the 2026-06-18 init
+    commit, but zero repository/API wiring — `spec/15-roadmap.md`
+    already and correctly lists this as unstarted roadmap work, so
+    the schema-only scaffolding is not spec drift, just unfinished
+    work already honestly described as such.
+
 - [ ] **DOC-3 (L)** Matcher crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: person, worker, place, thing, event, course,
   organization, care-pathway, case, project-portfolio-management

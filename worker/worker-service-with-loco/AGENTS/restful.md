@@ -181,6 +181,29 @@ denied (the body names the deciding rule).
 | GET | `/api/workers/review-queue` | Stored review queue (filter `status`, `limit`) |
 | POST | `/api/workers/review-queue/{id}/decision` | Decide a pending review item (`confirmed` / `rejected`) |
 
+### Cross-service links
+
+Worker is a link **originator** in the federated cross-service graph
+([cross-service linking](../../../agents/share/cross-service-linking.md)).
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| POST   | `/api/workers/{pid}/links` | Create/upsert an outbound edge (`same_identity` → person, `employed_by` → organization) |
+| GET    | `/api/workers/{pid}/links` | List this worker's outbound edges |
+| DELETE | `/api/workers/{pid}/links/{id}` | Soft-delete an edge (emits `unlinked`) |
+| GET    | `/api/workers/links` | Bulk reconciliation pull for the link-graph aggregator (record-level ABAC, classified `destructive`) |
+
+Writes are **optimistic** — the assertion is stored and a `linked` /
+`unlinked` event is published on the existing event envelope; the
+target service is **not** called. The three per-record endpoints
+return the crate's uniform `{success,data,error}` envelope
+(`ApiResponse<T>`), matching every other worker REST endpoint. The
+bulk aggregator endpoint (`GET /api/workers/links`) is deliberately
+**not** wrapped — it stays bare `{"edges": [...]}` for the link-graph
+aggregator's HTTP client. See
+[spec §9.1](../spec/09-api-surface.md#91-cross-service-link-endpoints)
+for the full contract.
+
 ### Assessments
 
 Aptitude / personality / psychometric / selection tests recorded against
@@ -309,6 +332,9 @@ Error responses:
 - `src/api/rest/handlers.rs` — All REST handler implementations
 - `src/api/rest/routes.rs` — Route organization
 - `src/api/rest/state.rs` — AppState (shared application state)
+- `src/api/rest/links.rs` — Cross-service link controllers (create/list/delete + bulk pull)
+- `src/api/rest/assessments.rs` — Assessment controllers
+- `src/db/entity_links.rs` — `entity_links` persistence (edges this worker originates)
 - `src/api/fhir/mod.rs` — FHIR module, FhirWorker, conversions
 - `src/api/fhir/handlers.rs` — FHIR endpoint handlers
 - `src/api/fhir/resources.rs` — FHIR resource converters

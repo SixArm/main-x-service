@@ -96,13 +96,21 @@ clearly described manual check confirms the acceptance criterion.
     feature flag `fluvio`.
   - **Acceptance:** integration test publishes a `WorkerCreated`
     record end-to-end against a local Fluvio broker.
-- [ ] **T-3 — FHIR capability statement + bundle handling.**
-  - [ ] `GET /fhir/metadata` returns a CapabilityStatement listing
-    the `Worker` resource (the wire `resourceType` this server
-    actually emits — see §6.8).
-  - [ ] `Bundle` GET / POST / search wrapping.
+- [~] **T-3 — FHIR capability statement + bundle handling.**
+  - [x] *(done 2026-07-07, via T-12)* `GET /fhir/metadata` returns a
+    CapabilityStatement listing the **`Practitioner`** resource — the
+    wire `resourceType` this server actually emits (T-12 switched it
+    from the original non-standard `Worker`; see §6.8) — with its
+    supported interactions and search params.
+  - [x] *(done 2026-07-07, via T-12)* `GET /fhir/Practitioner` wraps
+    search results in an ad hoc `searchset` `Bundle`
+    (`src/api/fhir/handlers.rs::search_fhir_workers`).
+  - [ ] Promote the ad hoc `Bundle` to typed `Bundle`/`BundleEntry`
+    structs (`src/api/fhir/bundle.rs` is a placeholder module reserved
+    for this); no `POST`/transaction `Bundle` support yet.
   - **Acceptance:** Touchstone FHIR validator passes on a sample
-    bundle round-trip.
+    bundle round-trip — not yet run; the `searchset` shape has not been
+    validated against a real FHIR test kit.
 - [ ] **T-4 — FHIR Organization resource.**
   - [ ] Bidirectional Organization mapping.
   - **Acceptance:** `POST /fhir/Organization` round-trips a record.
@@ -369,8 +377,12 @@ clearly described manual check confirms the acceptance criterion.
   `cargo test --lib` + clippy pedantic clean; FE svelte-check / vitest /
   Playwright green.
 
-- [x] **T-10 — Workforce assessments (aptitude / personality /
-  psychometric / selection).** *(done 2026-07-23)* Record and serve the
+- [x] **T-14 — Workforce assessments (aptitude / personality /
+  psychometric / selection).** *(done 2026-07-23; renumbered from a
+  duplicate "T-10" during the 2026-08-04 doc audit — T-10 was already
+  taken by the cross-service-links task above, landed the same week;
+  the CHANGELOG's own "task T-10" references predate the renumbering
+  and describe this same task)* Record and serve the
   tests a worker has taken, as a worker sub-resource. Spec: domain model
   §5.5, functional requirements §6.9, API §9.2, persistence §10.5.
   - [x] **Domain model** (`src/models/assessment.rs`):
@@ -465,8 +477,10 @@ clearly described manual check confirms the acceptance criterion.
     every row is legal), plus an idempotent re-run. `cargo test --lib`
     green (226 passed); clippy `--all-targets` clean.
 
-- [x] **T-11 — `Config::from_env` loads the environment.** *(done
-  2026-07-23)* The function was a stub that returned `Config::default()`
+- [x] **T-15 — `Config::from_env` loads the environment.** *(done
+  2026-07-23; renumbered from a duplicate "T-11" during the 2026-08-04
+  doc audit — T-11 was already taken by the bulk import/export task
+  above)* The function was a stub that returned `Config::default()`
   and ignored the process environment, so every documented variable
   (`DATABASE_URL`, `SERVER_PORT`, `SEARCH_INDEX_PATH`, …) was inert —
   the integration-test harness, which builds its state from

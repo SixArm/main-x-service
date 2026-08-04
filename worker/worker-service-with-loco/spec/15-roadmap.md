@@ -28,8 +28,10 @@
   ingress, probes.
 - **Production readiness** — security audit + pen test, HIPAA + GDPR
   validation, DR runbook, backup / restore, CI/CD pipeline.
-- **Feature enhancements** — complete gRPC, complete FHIR (capability
-  statement, bundles, Organization), Fluvio production + consumers,
+- **Feature enhancements** — complete gRPC, complete FHIR (typed
+  `Bundle`/`POST`-bundle support — the CapabilityStatement and ad hoc
+  searchset Bundle already ship — plus an Organization resource),
+  Fluvio production + consumers,
   ML-based match scoring, worker photo storage, consent enforcement,
   **credential-expiry-warning workflow**, **role + assignment history
   timeline**, NPI / DEA registry import pipelines.

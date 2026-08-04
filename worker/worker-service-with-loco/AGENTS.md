@@ -113,7 +113,8 @@ build artifacts). The wired multi-service `examples/compose/` stacks
 | File | Role |
 |------|------|
 | `spec.md` | **Single source of truth** — what, how, status, tasks (§13) |
-| `README.md` / `CLAUDE.md` | User-facing intro — must stay consistent with the spec |
+| `README.md` (symlink to `index.md`) | User-facing intro — quick start, config, must stay consistent with the spec |
+| `CLAUDE.md` | A one-line `@AGENTS.md` include, loaded by Claude Code at session start (root `AGENTS.md`'s per-subproject convention) — not a second user-facing intro |
 | `AGENTS.md` / `AGENTS/*.md` | How to work in the repo + per-topic reference |
 | `index.md` | Navigation aid with worked examples |
 | `CHANGELOG.md` | Historical record of releases and changes |

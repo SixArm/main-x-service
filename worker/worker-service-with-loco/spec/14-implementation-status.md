@@ -17,7 +17,7 @@
 | Merging | Transfer + alias + link + soft-delete + snapshot + event |
 | Validation | Required fields, format checks, phone normalisation, address standardisation, `422` |
 | Privacy | Field masking, GDPR export, consent model |
-| Assessments | Aptitude / personality / psychometric / selection tests: `worker_assessments` table + domain model with the category↔scale rule, lifecycle machine, and score bands; six endpoints under `/api/workers/{id}/assessments` + the derived `assessment-profile`; validation, worker-level ABAC + `mask` obligation on every read path, audit on read and mutation (T-10, done 2026-07-23) |
+| Assessments | Aptitude / personality / psychometric / selection tests: `worker_assessments` table + domain model with the category↔scale rule, lifecycle machine, and score bands; six endpoints under `/api/workers/{id}/assessments` + the derived `assessment-profile`; validation, worker-level ABAC + `mask` obligation on every read path, audit on read and mutation (T-14, done 2026-07-23) |
 | Authentication (peer verification) | Offline PASETO v4.public (Ed25519) bearer verification via `authentication-verifier` 0.3; `AuthUser` extractor + `GET /api/whoami`; env-configured key set (T-1a) |
 | Authentication (blanket enforcement) | Default-off `WORKER_REQUIRE_AUTH` middleware on both router surfaces: pure `enforce(...)` + `apply_enforcement` in `src/api/rest/auth.rs`; public allow-list = health/ping, `/api/health`, OpenAPI/Swagger, `/metrics.prom`; DB-free unit-test matrix (T-1b enforcement sub-item, done 2026-07-04) |
 | Authentication (boot-time key fetch) | `WORKER_PASETO_KEYS_URL` fetched once at boot via `Verifier::from_paseto_keys_url` (verifier `fetch` feature); fetched set wins over `WORKER_PASETO_KEYS`; fetch failure warns and falls back to the env path — the service always boots; verifier swapped into `AppState` before routers/middleware are built; local-listener + dead-port tokio tests (T-1b fetch sub-item, done 2026-07-04) |
@@ -30,14 +30,13 @@
 | Gap | Task |
 |---|---|
 | Fluvio production publisher | T-2 |
-| FHIR capability statement | T-3 |
-| FHIR bundle (full) | T-3 |
+| FHIR bundle (typed `Bundle`/`BundleEntry`, `POST`/transaction bundles) | T-3 (CapabilityStatement + ad hoc searchset Bundle already done, 2026-07-07) |
 | FHIR Organization resource | T-4 |
 | Event consumers | (no task yet) |
 | Dedup / merge / privacy integration tests | T-5 |
 | gRPC API | T-6 |
 | Credential-expiry workflow | T-7 |
 | Role / assignment history | T-8 |
-| Assessment front-end views + FHIR `Observation` projection | T-10 follow-ups (not queued) |
+| Assessment front-end views + FHIR `Observation` projection | T-14 follow-ups (not queued) |
 | FHIR routes mounted on the loco router | T-9 (done 2026-06-13) |
 

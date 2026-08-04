@@ -15,6 +15,7 @@ The central domain model. Represents a worker identity record.
 | additional_names      | Vec\<HumanName\>          | Aliases, former names                 |
 | telecom               | Vec\<ContactPoint\>       | Phone, email, fax contacts            |
 | gender                | Gender                    | Male, Female, Other, Unknown          |
+| worker_type           | Option\<WorkerType\>      | Doctor, Nurse, Carer, Staff, Employee, Manager, Supervisor, Consultant, Other |
 | birth_date            | Option\<NaiveDate\>       | Date of birth                         |
 | tax_id                | Option\<String\>          | Tax identifier (CPF, SSN, TIN)        |
 | documents             | Vec\<IdentityDocument\>   | Identity documents                    |
@@ -53,6 +54,15 @@ The central domain model. Represents a worker identity record.
 **File:** `src/models/mod.rs`
 
 Enum: `Male`, `Female`, `Other`, `Unknown`
+
+## WorkerType
+
+**File:** `src/models/worker.rs`
+
+Enum: `Doctor`, `Nurse`, `Carer`, `Staff`, `Employee`, `Manager`,
+`Supervisor`, `Consultant`, `Other`. Persisted, Tantivy-indexed
+(searchable), and scrubbed by GDPR erasure alongside
+`deceased_datetime` / `marital_status`.
 
 ## Address
 
