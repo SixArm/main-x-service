@@ -70,7 +70,7 @@
   workflows YAML-validated; no `[features]` section anywhere so
   `--all-features` enables nothing new.
 
-- [ ] **H-5 (M)** Release hygiene: cut CHANGELOG releases for crates with
+- [~] **H-5 (M)** Release hygiene: cut CHANGELOG releases for crates with
   large `[Unreleased]` sections (person, case, care-pathway, organization,
   portfolio, link-graph, authentication-service, authentication-verifier,
   entity-ref); tag (`<crate>-vX.Y.Z`); decide/execute crates.io publish
@@ -78,6 +78,48 @@
   dependency-light and publishable).
   *Verify:* CHANGELOGs have dated release headings; tags pushed to both
   remotes.
+
+  **Done (2026-08-04):** Cut + tagged 4 of the 9 named crates, using the
+  Cargo `[package] name` as the tag token (matches what `cargo publish`
+  keys on): `person-service-v0.5.0`, `care-pathway-service-v0.1.0`,
+  `organization-service-v0.1.0`, `authentication-service-v0.1.0`. Each
+  is one commit (`## [Unreleased]` renamed to a dated `## [X.Y.Z] -
+  2026-08-04` heading at the *current, unbumped* Cargo.toml version,
+  fresh empty `## [Unreleased]` added above it) + one annotated-free
+  lightweight tag on that commit. Commits pushed (`git push origin
+  main`) then all 4 tags pushed in one call; landed on **both** remotes
+  — verified via `git ls-remote --tags` against both
+  `git@github.com:SixArm/main-x-service.git` and
+  `git@codeberg.org:SixArm/main-x-service.git` directly (not just
+  `origin`, since `origin` fans out to both), same 4 SHAs on each.
+
+  **Skipped, and why** (not forgotten — each is a real blocker
+  discovered while executing, not a scope-narrowing choice):
+  - **`case`, `project-portfolio-management`, `link-graph`,
+    `authentication-verifier`** — cutting a release under the *current*
+    Cargo.toml version would create a **second, contradictory
+    `## [X.Y.Z]` heading** in the same CHANGELOG: each already has a
+    real, dated, previously-committed release at that exact version
+    number (`case` `[0.1.0] - 2026-06-13`, portfolio `[0.1.0] -
+    2026-06-18`, link-graph `[0.1.0] — 2026-06-16`,
+    authentication-verifier `[0.8.0] - 2026-07-05`) — and Cargo.toml was
+    never bumped past it despite substantial work landing since (event
+    bus, ABAC, Tantivy search, bulk import/export, cargo-fuzz + SEC-V1/
+    V2/V4 for the verifier, …). This task's own instructions forbid
+    bumping the version (a separate decision), so there is no version
+    number that both (a) matches Cargo.toml and (b) doesn't collide
+    with an existing entry — releasing here needs a version-bump
+    decision first, out of scope for H-5 as scoped. No CHANGELOG edit,
+    no commit, no tag for these four.
+  - **`entity-ref`** — has no `CHANGELOG.md` at all (confirmed:
+    `link/entity-ref-rust-crate/` contains only `Cargo.toml`,
+    `Cargo.lock`, `deny.toml`, `README.md`, `src/`). Nothing to cut a
+    release from; would need a CHANGELOG created from scratch, which is
+    a different task than "release hygiene."
+  - **crates.io publish** for `entity-ref` and `authentication-verifier`
+    — deferred **per explicit user instruction** for this pass, not
+    forgotten and not blocked by the above; `cargo publish` was not run
+    for either crate.
 
 ## Phase 2 — Capability completion (four newest loco services)
 
