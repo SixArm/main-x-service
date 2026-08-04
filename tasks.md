@@ -1721,8 +1721,76 @@
   `fhir-mssql-db` container from a different task, untouched. Also
   updated `examples/data/README.md`'s "cannot finish an import yet"
   warning (written before `COMPOSE-WORKER` landed) to point at the fix.
-- [ ] **TUT-6 (S)** `tutorials/06-event-bus.md` — outbox rows, relay,
+- [x] **TUT-6 (S)** `tutorials/06-event-bus.md` — outbox rows, relay,
   `/events/recent`; extend with Fluvio when BUS-1..3 land.
+
+  **Done 2026-08-04.** Uses **case-service** — the durable-event-bus
+  reference implementation and the one service whose Fluvio producer
+  side is wired to a real deployment target (`overview.md`'s
+  capability-matrix footnote 4). Ran locally via `cargo run -- start`
+  with `CASE_EVENT_TRANSPORT=outbox CASE_EVENT_RELAY=true` against a
+  throwaway `scripts/test-db.sh` Postgres; live-verified a create, an
+  update, and a merge all the way through: the `event_outbox` row (full
+  envelope payload, `psql` query against `mxi-case-test-db`), the relay
+  draining it to the no-broker `LoggingSink` (real log line captured),
+  and `GET /api/cases/events/recent` reflecting all five events
+  newest-first with the correct `seq` ordering (a merge's own `Deleted`
+  sorting ahead of the duplicate's `Created` because `seq` is assigned
+  at envelope-build time in the handler, not at relay-publish time).
+
+  **A genuinely new, live-verified finding, not an assumption**: the
+  outbox relay is **not** a loco background worker — `src/app.rs`'s
+  `after_routes` hook spawns it directly via `tokio::spawn`,
+  unconditionally on every boot, and `crate::relay::spawn` itself is
+  what no-ops when `CASE_EVENT_TRANSPORT`/`CASE_EVENT_RELAY` are off.
+  Confirmed live: the server booted showing `modes: server` (not
+  `server, worker`, unlike TUT-5's bulk-job-worker finding) and still
+  logged `starting event-outbox relay` and later `relay: published
+  outbox event` — so plain `cargo run -- start` is correct here, and
+  `--server-and-worker` is neither needed nor wrong for this particular
+  background task, only for loco's own `BackgroundQueue` workers (bulk
+  import/export). Worth being precise about since TUT-5 just established
+  the opposite pattern for a *different* background mechanism in a
+  *different* service.
+
+  **A correction to earlier tutorials' "no `cargo-loco` shim" claim,
+  narrowed rather than overturned**: `cargo loco --version` and `cargo
+  loco db migrate` both actually ran in this crate — not because a
+  global `cargo-loco` plugin is now installed, but because
+  `case/case-service-with-loco/.cargo/config.toml` (and
+  authentication-service's) carries a repo-local `[alias] loco = "run
+  --"`, present in the newer loco-scaffolded crates and absent from
+  person/worker/place's. TUT-2/TUT-3/TUT-5's finding stands for the
+  crates they used; this tutorial still writes every command as `cargo
+  run -- …` throughout for consistency across crates that do and don't
+  carry the alias.
+
+  **The PUT status-casing defect TUT-3 found in `examples/api/case.http`
+  reconfirmed and demonstrated correctly**: `"status":"in_progress"`
+  (the shipped example) still 422s; `case_matcher::CaseStatus` has no
+  `#[serde(rename_all)]`, so `"status":"Open"` is what a live `PUT`
+  needs. Still not fixed here (only `tutorials/` and `tasks.md` staged
+  by this task, matching the file's own scope note); this tutorial's
+  own `PUT` example uses the correct casing rather than propagating the
+  known-bad one.
+
+  **Fluvio (§7) is documented, not run** — config vars
+  (`CASE_FLUVIO_ENDPOINT` etc.), the crate's own opt-in
+  `compose.fluvio.yaml` (a Stream Controller + SPU pair, separate from
+  `compose.test.yaml`), and the two no-silent-fallback guardrails
+  (`fluvio` feature required, indefinite reconnect retry) are covered
+  from the source, with an explicit statement that no broker was stood
+  up in this session — matching `compose.fluvio.yaml`'s own header
+  comment and `event-bus.md` §8's honest scope note that this is true of
+  every one of the ten `FluvioSink`-carrying services today, not a gap
+  specific to this tutorial.
+
+  Full teardown (`test-db.sh down` for the one throwaway Postgres,
+  `cargo run` process killed, `/tmp/case-service.log` removed);
+  `podman ps -a` afterward shows only the pre-existing, unrelated
+  `fhir-mssql-db` container from a different task, untouched. This was
+  the last of the six planned tutorials (TUT-1..TUT-6); only `LNK-4`
+  (spec-first) remains in the flattened task order.
 
 - [x] **EX-1 (S)** `examples/data/` — synthetic JSONL fixtures: ~50
   persons (with duplicate pairs for the dedup tutorial), ~20
