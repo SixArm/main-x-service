@@ -3005,3 +3005,108 @@ committing (see plan.md §4).
   `dist` for both pickers; `svelte-check` clean; 467 unit tests pass;
   15/16 Playwright suites pass (case-folder needs its live backend);
   no `effect_update_depth_exceeded` in the browser.
+
+## Phase 6 — Documentation harmonization (spec/AGENTS/README audit, 2026-08-04)
+
+> Repo-wide: every subproject's `spec/` (the SDD single source of
+> truth), `AGENTS.md`/`CLAUDE.md`/`AGENTS/*` (working agreements), and
+> `README.md`/`index.md` (navigation + quick start) checked against the
+> **current** code, not against what the doc itself claims — the same
+> discipline that caught root `index.md` being stale since before
+> `case`/`project-portfolio-management` shipped (DOC-1, below). Every
+> `AGENTS.md`/`CLAUDE.md`/`AGENTS/*.md` file stays **under 40 KB**
+> (none currently exceed it — confirmed 2026-08-04 — so this is a
+> guardrail on the edits here, not a current violation to fix). The
+> family's own stated anti-pattern is the thing to watch for and
+> remove on sight: a hand-maintained table/list that duplicates
+> content already accurate elsewhere ("duplicating it here is how the
+> two stop agreeing" — `agents/share/overview.md`'s own words, already
+> proven true once this pass by root `index.md`).
+>
+> Batched by subproject family so independent crates can be audited in
+> parallel; do **not** audit `link-graph-service-with-loco` while
+> LNK-4's T-29..T-33 chain is still landing (active file conflicts) —
+> queue it last.
+
+- [x] **DOC-1 (S)** Root-level docs: `index.md` (`README.md` symlinks
+  to it), root `AGENTS.md`, root `spec/` (the monorepo-umbrella
+  `architecture`/`postgresql` topic dirs + the loose
+  `data.md`/`data-modeling.md` files). *Done 2026-08-04* — `index.md`
+  rewritten: removed a subprojects table and capability list stale
+  since 2026-06-18 (missing `case`, `project-portfolio-management`,
+  `link-graph`, all 5 consumer apps, `examples/`, `tutorials/`),
+  replaced with pointers to `agents/share/overview.md`/`index.md` (the
+  tables that actually stay current) plus a new Examples/tutorials
+  section; fixed the "Backend-only Rust services" status line (false
+  since the front-ends landed). Root `AGENTS.md` and root `spec/` were
+  read during this pass and found current/self-aware (the latter
+  already documents its own incomplete promotion status honestly) —
+  not rewritten.
+
+- [ ] **DOC-2 (L)** Entity + auth service crates' `spec/`, `AGENTS.md`,
+  `README.md`/`index.md` against current code: person, worker, place,
+  thing, event, course, organization, care-pathway, case,
+  project-portfolio-management, authentication-service (11 crates).
+  Per crate: confirm the `spec/` §13 task queue reflects what's
+  actually merged (not still `[ ]` for shipped work, not silently
+  missing recently-landed features like this session's `seed_examples`
+  task or the person merge fix); confirm `AGENTS.md` describes the
+  crate's *real* capabilities (cross-check against the honest matrix
+  in `agents/share/overview.md` rather than restating a possibly-stale
+  local claim); confirm `README.md`/`index.md` quick-start commands
+  actually run. Fix what's wrong; where a crate's own doc duplicates
+  something `agents/share/*.md` already states accurately, prefer a
+  link over a second copy (same fix pattern as DOC-1).
+
+- [ ] **DOC-3 (L)** Matcher crates' `spec/`, `AGENTS.md`,
+  `README.md`/`index.md`: person, worker, place, thing, event, course,
+  organization, care-pathway, case, project-portfolio-management
+  matchers (10 crates). Same audit shape as DOC-2 — these follow the
+  §1–§25 SDD shape (distinct from the service crates' §1–§18), confirm
+  each still matches that shape and its own `spec/` isn't describing
+  scoring rules the code has since changed.
+
+- [ ] **DOC-4 (L)** Front-end crates' `spec/`, `AGENTS.md`,
+  `README.md`/`index.md`: all 11 SvelteKit front-ends (person, worker,
+  place, thing, event, course, organization, care-pathway, case,
+  project-portfolio-management, authentication). Cross-check each
+  against what actually shipped this session (merge/link/bulk/review
+  screens landed in FE-1..FE-4 — confirm each front-end's own `spec/`
+  and `AGENTS.md` mention them, since they landed in code+tests but a
+  doc pass wasn't guaranteed for every one). Confirm the BFF env-var
+  names documented match what `src/lib/server/config.ts` (or
+  equivalent) actually reads — TUT-1 and TUT-2 both found a stale
+  `.env.example` this session (case, person); check the other 9 rather
+  than assume they're fine.
+
+- [ ] **DOC-5 (M)** Library crates' `spec/`, `AGENTS.md`/`CLAUDE.md`,
+  `README.md`/`index.md`: `authentication-verifier-rust-crate`,
+  `integrity-mac-rust-crate`, `link/entity-ref-rust-crate`. Smaller
+  crates, lighter audit; `entity-ref` has no `CHANGELOG.md` at all
+  (found during H-5) — decide whether that's a real gap to fix here or
+  a separate call.
+
+- [ ] **DOC-6 (M)** `link-graph-service-with-loco`'s `spec/`,
+  `AGENTS.md`, `README.md`/`index.md`. **Queue this after LNK-4's
+  T-29..T-33 chain finishes** (active file conflicts otherwise) — by
+  the time this runs, `spec/13-tasks.md` and `spec/16-open-questions.md`
+  will have moved substantially from whatever a doc pass would see
+  mid-chain.
+
+- [ ] **DOC-7 (L)** The five consumer apps' docs — `case-folder`,
+  `patient-flow`, `workforce-planning-management`,
+  `contact-relationship-management`, `content-management-system`. Each
+  has a cross-cutting `spec/` (the SDD trio `requirements.md` /
+  `design.md` / `tasks.md`, distinct from the numbered shape) plus a
+  per-edition service + front-end, each with its own `AGENTS.md`.
+  Confirm `spec/tasks.md` (each app's live queue, not the numbered
+  shape's §13) reflects real status, and that each app's service/
+  front-end pair's docs agree with each other on what's actually
+  wired up.
+
+- [ ] **DOC-8 (S)** Once DOC-2..DOC-7 land, a final sweep: re-grep for
+  the family-wide anti-patterns found along the way (duplicated
+  capability tables, stale `.env.example` files, "Backend-only"-style
+  absolute claims that stopped being true) across anything DOC-2..7
+  didn't individually call out, and confirm no `AGENTS.md`/`CLAUDE.md`/
+  `AGENTS/*.md` file crossed 40 KB as a result of this pass's edits.
