@@ -1440,9 +1440,58 @@
   POST instead, and leaves `seed_examples` for TUT-2/TUT-4 once they
   exist; authentication/ABAC (TUT-3); and the other nine services
   (`full-family.yml`, DEP-1b).
-- [ ] **TUT-2 (M)** `tutorials/02-identity-lifecycle.md` — create →
+- [x] **TUT-2 (M)** `tutorials/02-identity-lifecycle.md` — create →
   409-duplicate → check-duplicates → match → merge → audit trail, curl +
   UI.
+
+  **Done 2026-08-04.** Uses **person-service**, not case (the family's
+  richest matching implementation, and the direct beneficiary of EX-1's
+  fixture + EX-4's seed task + the person front-end's `/review` screen).
+  Runs person-service + its Postgres directly (`scripts/test-db.sh up` +
+  `cargo run -- db migrate` / `-- start`), not in Podman — TUT-1 already
+  covered the container path, and a 3-minute rebuild per tutorial is
+  wasted reader time. Seeds via `cargo run -- task seed_examples` (real
+  50-person output captured), then walks `409` create →
+  `check-duplicates` (no side effect, confirmed by a follow-up empty
+  search) → `match` (Ren vs Kenji Nakamura scoring the fixture's
+  documented 0.9426 "probable") → `POST /deduplicate` (all 5 documented
+  pairs, all 5 documented scores) → `review-queue` decisions (reject the
+  ambiguous Nakamura pair, confirm the clear Okonkwo pair) → `merge` via
+  curl → the duplicate's `404` (not `active:false`) → the audit trail —
+  then the same review → confirm → merge sequence again through
+  `person-front-end-with-svelte`'s `/review` board, on a **different**
+  pair (Halloran), verified via the front-end's own BFF proxy
+  (`/api/proxy/...`) making the exact calls the UI's merge page makes.
+  Every curl response shown is real captured output from this run.
+
+  **Two real, live-verified findings, not assumptions:**
+
+  1. **Seeding also skips the search index**, not just audit/events
+     (the seed task's own doc comment only mentions the latter two).
+     `create`/`check-duplicates`/`match` all block on Tantivy before
+     matching, so a seeded pair is invisible to them until a no-op `PUT`
+     re-indexes it (`update_person` does index; the seed task's
+     model-layer insert does not). Confirmed live: `check-duplicates`
+     against seeded person #1's own exact data returned
+     `has_duplicates:false` before the `PUT`. The batch scan
+     (`POST /deduplicate`) is unaffected — it walks `list_active()`
+     directly.
+  2. **Merge was completely broken** — a defect this task found and
+     fixed rather than routed around, since there was no way to
+     demonstrate TUT-2's core walkthrough otherwise (every pair hit it,
+     unconditionally). See `PERSON-CONTACT-CASE` above for the full
+     writeup; the one-line summary is that `merge`'s `"old"`-aliased
+     name and `Replaces` link were written in a case its own CHECK
+     constraints reject. Fixed in a separate commit from the tutorial.
+
+  Also found and worked around, smaller: person-service's own
+  `README.md` documents `cargo loco start` for local dev, but no
+  `cargo-loco` shim is installed in this environment
+  (`cargo loco --version` → "no such command: `loco`"); the README's own
+  parenthetical alternative, `cargo run -- start` (and `-- task ...`,
+  `-- db migrate`), is what the tutorial uses throughout. And the front-end's
+  `.env.example` is stale in the same way TUT-1 found for case
+  (`PUBLIC_API_BASE_URL` vs. the real `PERSON_API_URL`/`AUTH_API_URL`).
 - [ ] **TUT-3 (M)** `tutorials/03-authentication-abac.md` — magic link
   (console), session cookie, `POST /token`, protected call, 401/403
   matrix, write + hot-reload a policy, `mask` obligation demo.
@@ -1544,7 +1593,7 @@
   truthfully until this lands. Found by EX-1's live verification,
   2026-08-04.
 
-- [ ] **PERSON-CONTACT-CASE (S) 🟠** person-service silently cannot store
+- [x] **PERSON-CONTACT-CASE (S) 🟠** person-service silently cannot store
   contact points. `repositories.rs` persists `ContactPointSystem`,
   `NameUse` and `IdentifierUse` via `format!("{:?}")` (PascalCase) into
   columns whose CHECK constraints only admit lowercase, so **every**
@@ -1557,6 +1606,41 @@
   round-trip test that posts a person **with** telecom and reads it
   back, and restore the contact fields to `examples/data/persons.jsonl`.
   Found by EX-1's live fixture verification, 2026-08-04.
+
+  **Done 2026-08-04**, forced by TUT-2's live verification: merge
+  unconditionally sets an `"old"`-aliased name and a `Replaces` link, so
+  this defect blocked *every* merge, not just fixtures carrying
+  `telecom` — there was no way to write TUT-2's merge step without
+  fixing it. `src/db/repositories.rs` write side switched from
+  `format!("{:?}")` to the pre-existing `enum_to_tag` helper (already
+  correct for `person_addresses`/emergency-contact tables) for
+  `NameUse`/`IdentifierUse`/`ContactPointSystem`/`ContactPointUse`/
+  `LinkType`/`IdentifierType`; the read side switched from hand-rolled
+  `PascalCase` match arms to `tag_to_enum`. `NameUse`, `LinkType`,
+  `ContactPointSystem`, `ContactPointUse`, `IdentifierUse` gained
+  `PartialEq, Eq` for the new tests' assertions. Two new DB-gated tests
+  in `tests/api_integration_test.rs`:
+  `test_merge_two_persons_round_trips_alias_name_and_replaces_link`
+  (merges two real persons, re-fetches the survivor, asserts the alias
+  name's `use_type` and the link's `link_type` both round-trip) and
+  `test_create_person_with_telecom_and_identifier_use_type_round_trips`
+  (posts a person with `telecom` + an identifier `use_type` set, reads
+  it back). Both green, alongside the full existing suite (23 request
+  tests, up from 21) and `cargo fmt --check` / `cargo clippy
+  --all-targets -- -D warnings` clean. **Not done**: restoring the
+  contact fields to `examples/data/persons.jsonl` — that fixture has
+  its own extensive, already-completed live-verification pass (EX-1),
+  and re-verifying it after an edit is out of scope for a fix found
+  while writing a tutorial. Also found, writing the new telecom test:
+  several *existing* tests (and `examples/api/person.http`) write
+  `"use": "official"` on a name, which silently no-ops — the wire field
+  is `use_type`, not `use`, and always was; left alone as pre-existing
+  and not asserted on by those tests. **Residual, narrower, not fixed:**
+  `LinkType::ReplacedBy`'s `#[serde(rename_all = "lowercase")]` produces
+  `"replacedby"`, not the CHECK's `'replaced_by'` — nothing in this
+  crate constructs that variant today. Landed as its own commit
+  (`person/person-service-with-loco` code + tests + `CHANGELOG.md`),
+  separate from the TUT-2 tutorial commit.
 - [x] **EX-2 (S)** `examples/policies/` — ABAC cookbook: dept-scoped
   read-deny, closed-case write-deny (`resource.status`), after-hours deny
   (`env.after_hours`), ownership (`$sub`), masked-read obligation,
