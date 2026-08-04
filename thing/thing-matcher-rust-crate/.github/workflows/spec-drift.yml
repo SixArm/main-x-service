@@ -1,10 +1,10 @@
-# Spec-drift CI check (spec.md §23 T-7).
+# Spec-drift CI check (spec/09-specification-code-drift-discipline.md).
 #
 # Fails a pull request that modifies a watched source file (currently
-# src/matcher.rs) without also updating spec.md, unless the changed
-# paths match an allowlist pattern in `.spec-allow`.
+# src/matcher.rs) without also updating a file under spec/, unless the
+# changed paths match an allowlist pattern in `.spec-allow`.
 #
-# Rationale: the crate practises spec-driven development — spec.md is
+# Rationale: the crate practises spec-driven development — spec/ is
 # the single source of truth.  Behaviour changes that land in code
 # without a matching spec update silently break the discipline.
 

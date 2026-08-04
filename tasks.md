@@ -4215,6 +4215,106 @@ committing (see plan.md §4).
     crate, out of this task's boundary). All edited files re-confirmed
     well under 40 KB.
 
+  - *`thing/thing-matcher-rust-crate` done 2026-08-04.* This crate's
+    spec follows its own §1–§13 shape (not the family's typical §1–§25
+    for matchers — `AGENTS/spec-driven-development.md` states this
+    explicitly, "the spec runs §1–§13," and it is internally
+    consistent, so nothing to fix there). `CLAUDE.md` was already the
+    thin `@AGENTS.md` one-liner (no DOC-2-style drift). Found the same
+    tags/relationships spec-ahead-of-code pattern as the case/
+    care-pathway/organization/course/person/worker matcher notes above,
+    confirmed independently by grep across every `src/*.rs` (zero
+    hits): `spec/03-data-model.md` (§3.1, §3.3.1, §3.4, §3.7),
+    `spec/05-matching-engine.md` (§5.9.1, §5.9.2, §5.10), and
+    `spec/06-per-field-scoring-algorithms.md` (§6.6, §6.8) described a
+    `relationships: Vec<RelationshipRef>` field, `RelationshipRef`/
+    `RelationKind` types, a `tags: Vec<String>` field,
+    `relationships_score`/`tags_score`, and `relationships_weight`/
+    `tags_weight` as though already shipped; `CHANGELOG.md
+    [Unreleased]` already honestly labels both "spec-only... Code
+    follow-up (not yet implemented)," but the spec sections themselves
+    carried no in-line signal. Annotated all eight sections
+    "**Not yet implemented**" (kept the design content, not deleted)
+    and added **OQ-E** to `spec/10-open-questions.md` — this crate has
+    no `§13`-as-tasks convention (§13 here is References; its own
+    `AGENTS/spec-driven-development.md` says outstanding work
+    consolidates into §10), so OQ-E is now the load-bearing pointer
+    back to the CHANGELOG follow-up. Fixed a genuine **internal
+    self-contradiction**: `spec/03-data-model.md` §3.7's own Rust code
+    block already correctly showed the real 10-field `MatchBreakdown`
+    (matching `src/matcher.rs` exactly), while the prose two lines
+    below asserted "carries **12** score fields" — the two disagreed
+    with each other, not just with the code. Fixed a **factual error**
+    in §7.3: it claimed `MatchBreakdown` (along with `Thing`) is
+    `#[non_exhaustive]`, but grepping `src/*.rs` shows only `Thing` and
+    `MatchingError` carry the attribute (confirmed against this same
+    crate's own `AGENTS.md`/`AGENTS/architecture.md`, which already
+    stated the correct two-item list) — means adding
+    `relationships_score`/`tags_score` later will actually be a
+    struct-literal-breaking change, now stated. Fixed a **stale
+    cross-reference** in `spec/04-normalisation.md` pointing the
+    phonetic-bonus reader at "§6.5" (same_as/additional_types Jaccard)
+    instead of the real §6.7 (phonetic).
+
+    Independently rediscovered the same **live CI bug** the
+    `place/place-matcher-rust-crate` sub-note above landed moments
+    earlier: `scripts/spec-drift-check.sh` (wired into
+    `.github/workflows/spec-drift.yml` on every PR) checked for a
+    changed file literally named `spec.md`, but this crate's spec is a
+    directory (`spec/*.md` — split from a single file in an earlier
+    revision per the repo-root `AGENTS.md` "Historical note");
+    reproduced the bug standalone (`grep -Fx "spec.md"` against a
+    fixture diff containing `spec/05-matching-engine.md` never
+    matches) before fixing it to check `^spec/` instead, and
+    re-confirmed the fix passes the same fixture — meaning **every
+    prior PR that touched `src/matcher.rs` would have failed this
+    check regardless of how thoroughly `spec/` was updated alongside
+    it**, the opposite of a silent gap. Also fixed the same script's
+    (and the workflow's) stale `spec.md §23 T-7` header-comment
+    reference — §23 doesn't exist in this crate's §1–§13 shape.
+    Also independently found the same **`cargo audit` vs `cargo deny`
+    mismatch**: `AGENTS/security-and-privacy.md` and `AGENTS/
+    release.md` both told contributors to run `cargo audit`, but this
+    crate's actual `.github/workflows/security.yml` runs `cargo deny
+    check` (confirmed by reading the workflow, whose own comment says
+    it supersedes `cargo-audit`) — fixed both docs and added the
+    missing `cargo deny check` line to the release checklist.
+
+    Also fixed: `spec/05-matching-engine.md` §5.6 omitted the public
+    `Scorer::optional_field_score` from its "Scorer exposes" list even
+    though `tests/adapter_contract.rs`'s own doc comment already cites
+    "spec §5.6" as documenting it; `spec/09` referenced "a task in
+    §13" for drift resolution when this crate's §13 is References, not
+    tasks (repointed to §10, matching its own `AGENTS/
+    spec-driven-development.md`); a stale "(10 tests)" adapter-contract
+    count in both `spec/09` and `AGENTS/testing.md` (real count is 11,
+    confirmed via `cargo test --test adapter_contract`); stray
+    double-curly-brace template artifacts (`MatchResult {{ score, ...
+    }}`) in `AGENTS/testing.md`; `mimalloc` missing from the dependency
+    lists in `AGENTS/security-and-privacy.md` and `AGENTS/release.md`
+    (it's a real `[dependencies]` entry, used only by the
+    `src/main.rs` demo binary's musl `#[global_allocator]`, not linked
+    into the library); and `fuzz/` (SEC-I2, already in `CHANGELOG.md
+    [Unreleased]`) missing from `AGENTS.md`'s file-layout diagram.
+    Rustdoc spot-check (`lib.rs`, `matcher.rs`, `scorer.rs`,
+    `normalizer.rs`, `models.rs`) found no other stale `///`/`//!`
+    comments — spot-verified the Soundex worked-example table in
+    `AGENTS/normalization.md` (Robert/Rupert → R163, Ashcraft → A261,
+    Smith/Smyth → S530) against the real `Normalizer::phonetic_code`
+    output via a throwaway example binary (deleted after) — all five
+    matched exactly. `README.md` is a real symlink to `index.md`;
+    neither mentions tags/relationships and every code snippet in
+    `index.md` uses real, current public API. `AGENTS/architecture.md`,
+    `AGENTS/matching-algorithm.md`, `AGENTS/coding-style.md` needed no
+    changes — all already accurate. Verified clean throughout:
+    `cargo test --lib` (86), `cargo test --test adapter_contract` (11),
+    `cargo test --doc` (67), full `cargo test` (all suites green). This
+    was a docs/CI-script-only change — no `src/` edits — so no clippy/
+    fmt re-check was needed beyond confirming the test suite still
+    passes. Did not touch `thing/thing-service-with-loco` (sibling
+    crate, out of this task's boundary). All edited files re-confirmed
+    well under 40 KB.
+
 - [ ] **DOC-4 (L)** Front-end crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: all 11 SvelteKit front-ends (person, worker,
   place, thing, event, course, organization, care-pathway, case,

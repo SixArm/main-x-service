@@ -60,6 +60,7 @@ The engine owns only a `MatchConfig`, so cloning is cheap. A consumer MAY hold o
 - `Scorer::exact_match(&a, &b)             -> f64`  // `1.0` or `0.0`
 - `Scorer::combined_similarity(&a, &b)     -> f64`  // `0.7·JW + 0.3·Lev`
 - `Scorer::jaccard_set_similarity(&[T], &[T]) -> f64`  // for `same_as`, `additional_types`
+- `Scorer::optional_field_score(&Option<String>, &Option<String>, SimilarityAlgorithm) -> f64`  // both-`None` ⇒ `1.0`, one-`None` ⇒ `0.0`, both-`Some` ⇒ the chosen algorithm. Published for downstream reuse; `MatchingEngine::match_things` does NOT call it — the engine skips a field when either side is absent (§5.10) rather than scoring it `0.0`.
 
 All similarity values are in `[0.0, 1.0]`. Empty-string handling: `jaro_winkler` / `levenshtein` / `combined` return `1.0` when both inputs are empty and `0.0` when exactly one is empty; `exact_match` returns `1.0` only when both inputs are equal (including both empty).
 
@@ -91,13 +92,19 @@ Note the **asymmetry vs. deterministic match**: an empty `identifiers` list on e
 
 ### 5.9.1 Relationships scoring
 
+**Not yet implemented** — `crate::matcher` has no `relationships_score` field or scoring helper today; this subsection is specified ahead of code (see §3.3.1, CHANGELOG.md `[Unreleased]`).
+
 `relationships_score` is typed-set **Jaccard** over the `(relation, thing_id)` pairs: `score = |A ∩ B| / |A ∪ B|`, where each side's set is `{ (r.relation, r.thing_id) for r in relationships }`. The relation kind is part of the key — a `Contains` reference only agrees with a `Contains` reference to the **same** thing id; `ContainedIn` / `SuperPart` / `SubPart` are compared as opaque, distinct kinds (no inversion, no transitive closure). `None` (does not participate) when **either** side has no relationships; otherwise a value in `[0.0, 1.0]`. A supporting signal weighted `relationships_weight` (§3.4, default `0.05`); shared references never single-handedly establish a match.
 
 ### 5.9.2 Tags scoring
 
+**Not yet implemented** — `crate::matcher` has no `tags_score` field or scoring helper today; this subsection is specified ahead of code (see §3.1, CHANGELOG.md `[Unreleased]`).
+
 `tags_score` is plain set **Jaccard** over the tag sets: `score = |A ∩ B| / |A ∪ B|`, where each side's set is the operator's `tags` after case-insensitive normalisation (trim + lowercase, de-duplicated). `None` (does not participate) when **either** side has an empty tag set; otherwise a value in `[0.0, 1.0]`. A supporting signal weighted `tags_weight` (§3.4, default `0.05`); shared tags never single-handedly establish a match.
 
 ### 5.10 Renormalised weighted sum
+
+`relationships` and `tags` in the loop below are **not yet implemented** (§5.9.1, §5.9.2) — today's `calculate_weighted_score` (`src/matcher.rs`) sums the other nine fields only.
 
 ```
 weighted_sum  = 0.0

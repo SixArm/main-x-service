@@ -7,7 +7,7 @@ All comparisons are done **after** normalisation. The normalisation routines liv
 | `Normalizer::normalize_name(&str)` | Names and alternate names. | NFKD decompose → drop combining marks → drop ASCII punctuation → lowercase → collapse and trim ASCII whitespace. |
 | `Normalizer::normalize_text(&str)` | `description`, `disambiguating_description`. | Lowercase → NFKD decompose → collapse whitespace → trim. Punctuation is **retained** so descriptions remain readable. |
 | `Normalizer::normalize_url(&str)` | `url`, `image`, `main_entity_of_page`, every entry of `same_as` and `additional_types`. | Lowercase scheme + host; drop trailing slash on the path root. No DNS-aware normalisation, no percent-encoding canonicalisation, no punycode decoding. |
-| `Normalizer::phonetic_code(&str)` | Soundex bonus (§6.5). | Classic 4-character Soundex code: first letter + three digits (`0` padding when fewer consonant digits are available). Diacritics are stripped via `normalize_name` first. |
+| `Normalizer::phonetic_code(&str)` | Soundex bonus (§6.7). | Classic 4-character Soundex code: first letter + three digits (`0` padding when fewer consonant digits are available). Diacritics are stripped via `normalize_name` first. |
 
 Detailed per-rule behaviour (every NFKD edge case, every URL handling exception, exact whitespace handling) lives in [`AGENTS/normalization.md`](../AGENTS/normalization.md). Behaviours that consumers MUST rely on:
 

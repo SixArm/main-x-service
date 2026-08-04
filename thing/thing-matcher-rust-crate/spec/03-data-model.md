@@ -17,8 +17,8 @@ The public types live in `crate::models`. All derive `Serialize + Deserialize`. 
 | `main_entity_of_page` | `Option<String>` | URL of the page for which this is the main entity (schema.org `mainEntityOfPage`). | Exact match after URL normalisation. |
 | `additional_types` | `Vec<String>` | Subtype URIs from external vocabularies (schema.org `additionalType`). | Jaccard set similarity after URL normalisation. |
 | `subject_of` | `Vec<String>` | URLs of works or events about this thing (schema.org `subjectOf`). | Data-only; not scored today. |
-| `relationships` | `Vec<RelationshipRef>` | Typed thing-to-thing references (containment / part-of). | Typed-set Jaccard over the `(relation, thing_id)` pairs (§3.10, §6.6); a supporting signal, not identifying on its own. `None` when either side is empty. |
-| `tags` | `Vec<String>` | Short free-text operational labels (grouping / triage / workflow). | Set Jaccard over the case-insensitively normalised tag sets (§6.8); a supporting signal, not identifying on its own. `None` when either side is empty. Defaults to empty. |
+| `relationships` | `Vec<RelationshipRef>` | Typed thing-to-thing references (containment / part-of). | **Not yet implemented in `crate::models` — spec-only.** Typed-set Jaccard over the `(relation, thing_id)` pairs (§3.10, §6.6) is specified; a supporting signal, not identifying on its own. `None` when either side is empty. See CHANGELOG.md `[Unreleased]` → "Added — relationships" for the pending code follow-up. |
+| `tags` | `Vec<String>` | Short free-text operational labels (grouping / triage / workflow). | **Not yet implemented in `crate::models` — spec-only.** Set Jaccard over the case-insensitively normalised tag sets (§6.8) is specified; a supporting signal, not identifying on its own. `None` when either side is empty. Defaults to empty. See CHANGELOG.md `[Unreleased]` → "Added — tags" for the pending code follow-up. |
 | `owner` | `Option<String>` | Owner — person or organisation (schema.org `owner`). | Data-only; not scored. The crate does not model `Person` / `Organization` separately. |
 | `local_id` | `Option<String>` | Local identifier issued by the originating system. | Data-only; not normalised, not scored. Different organisations may issue colliding values. |
 
@@ -46,6 +46,8 @@ Two `Identifier`s are equal iff both `property_id` and `value` are equal — equ
 The `property_id` SHOULD be a stable vocabulary name (`"wikidata"`, `"isbn"`, `"doi"`, `"gtin"`, `"openlibrary"`) or a fully-qualified URL. The matcher treats it as an opaque case-sensitive string — `"wikidata"` and `"WikiData"` are distinct schemes.
 
 ### 3.3.1 `RelationshipRef` and `RelationKind`
+
+**Not yet implemented.** Neither `RelationshipRef` nor `RelationKind` exists in `crate::models` today; this subsection specifies the intended shape, written ahead of code per the spec-first workflow (`AGENTS.md` Golden Rule 1). See CHANGELOG.md `[Unreleased]` → "Added — relationships" for the pending code follow-up.
 
 ```rust
 pub struct RelationshipRef {
@@ -85,6 +87,8 @@ Tunable configuration for the matching engine. All weights are dimensionless and
 | `use_phonetic_matching` | `bool` | `false` | `false` | `true` |
 | `name_algorithm` | `SimilarityAlgorithm` | `Combined` | `Combined` | `Combined` |
 | `strict_mode` | `bool` | `false` | `true` | `false` |
+
+**`relationships_weight` and `tags_weight` are not yet implemented** — `MatchConfig` in `src/matcher.rs` has no such fields today. Specified ahead of code per the spec-first workflow; see CHANGELOG.md `[Unreleased]` for the pending code follow-up. Every other row in this table is live in the current release.
 
 `MatchConfig` derives `Serialize + Deserialize` and carries `#[serde(default)]`, so partial JSON documents merge over `MatchConfig::default()`. The matcher MUST treat any negative weight as zero — but the public API SHOULD reject negative values at construction time.
 
@@ -133,7 +137,9 @@ pub struct MatchBreakdown {
 }
 ```
 
-`MatchBreakdown` carries **12 score fields**, each `Option<f64>`. Per field: `Some(s)` means the field was scored, `s ∈ [0.0, 1.0]`. `None` means at least one side was absent / empty, so the field did not participate in the weighted sum. Downstream services MUST NOT discard the breakdown — it is the audit trail for the `score`.
+`MatchBreakdown` carries **10 score fields** today, each `Option<f64>` — matching the `pub struct MatchBreakdown` above exactly. (Two more, `relationships_score` and `tags_score`, are specified in §5.9.1/§5.9.2 and §6.6/§6.8 but not yet implemented — see CHANGELOG.md `[Unreleased]`; landing them will bring the count to 12.) Per field: `Some(s)` means the field was scored, `s ∈ [0.0, 1.0]`. `None` means at least one side was absent / empty, so the field did not participate in the weighted sum. Downstream services MUST NOT discard the breakdown — it is the audit trail for the `score`.
+
+Note for implementers: unlike `Thing`, `MatchBreakdown` does **not** carry `#[non_exhaustive]` (§7.3), so adding `relationships_score` / `tags_score` will be a breaking change under strict SemVer, mitigated only by this crate's pre-1.0 "minor bumps may break" policy (`AGENTS/release.md`).
 
 ### 3.8 `Confidence`
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Spec-drift check (spec.md §23 T-7).
+# Spec-drift check (spec/09-specification-code-drift-discipline.md).
 #
 # Fail with a non-zero exit code if any "watched" source file changed in
-# the diff but `spec.md` did not — unless the changed paths match an
-# allowlist pattern in `.spec-allow`.
+# the diff but no file under `spec/` did — unless the changed paths match
+# an allowlist pattern in `.spec-allow`.
 #
 # Usage: spec-drift-check.sh [base-ref] [head-ref]
 #
@@ -25,7 +25,12 @@ head_ref="${2:-HEAD}"
 watched_pattern='^src/matcher\.rs$'
 
 allow_file=".spec-allow"
-spec_file="spec.md"
+# The spec is a directory (spec/01-scope.md … spec/13-references.md), not a
+# single spec.md file — it was split from one in an earlier revision (see
+# the "Historical note" in the repo-root AGENTS.md). A literal `spec.md`
+# path match here would never fire and this check would FAIL EVERY PR that
+# touches src/matcher.rs, however thoroughly spec/ was updated alongside it.
+spec_pattern='^spec/'
 
 # Resolve a base ref that exists locally.  In GitHub Actions PRs the
 # default checkout fetches `pull/<n>/merge`; on a contributor machine
@@ -49,10 +54,10 @@ if [ -z "${watched_changes}" ]; then
   exit 0
 fi
 
-spec_changed=$(printf '%s\n' "${changed_files}" | grep -Fx "${spec_file}" || true)
+spec_changed=$(printf '%s\n' "${changed_files}" | grep -E "${spec_pattern}" || true)
 
 if [ -n "${spec_changed}" ]; then
-  echo "spec-drift-check: watched files AND ${spec_file} both changed — OK."
+  echo "spec-drift-check: watched files AND spec/ both changed — OK."
   exit 0
 fi
 
@@ -71,11 +76,11 @@ if [ -f "${allow_file}" ]; then
   fi
 fi
 
-echo "spec-drift-check: FAIL — spec.md MUST be updated in the same PR as watched-file changes." >&2
+echo "spec-drift-check: FAIL — a file under spec/ MUST be updated in the same PR as watched-file changes." >&2
 echo "  Watched files changed in this PR:" >&2
 printf '    %s\n' ${watched_changes} >&2
 echo "" >&2
 echo "  To resolve, either:" >&2
-echo "    1. Update spec.md in the same PR (preferred — keeps spec authoritative)." >&2
+echo "    1. Update the relevant spec/*.md section(s) in the same PR (preferred — keeps spec authoritative)." >&2
 echo "    2. Add a path pattern to .spec-allow for genuinely spec-irrelevant changes." >&2
 exit 1

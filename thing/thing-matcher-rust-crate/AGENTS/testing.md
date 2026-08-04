@@ -110,7 +110,7 @@ breaks downstream services.
 
 Run with: `cargo test --test adapter_contract`
 
-### Coverage (10 tests)
+### Coverage (11 tests)
 
 The suite touches every symbol called by the service-side adapter:
 
@@ -119,14 +119,17 @@ The suite touches every symbol called by the service-side adapter:
 - ThingBuilder schema.org/Thing surface, Identifier::new fallibility (opaque property_id string), MatchBreakdown component fields (name, description, url, same_as, additional_types, image, main_entity_of_page, …).
 - `MatchingEngine::default_config`, `MatchingEngine::new`,
   `match_things`, `deterministic_match`, `match_one_to_many`.
-- `MatchResult {{ score, is_match, confidence, breakdown }}` field shape.
+- `MatchResult { score, is_match, confidence, breakdown }` field shape.
 - `MatchBreakdown` per-component `Option<f64>` fields used by the adapter
   for explainability.
 - `MatchConfig::strict / ::default / ::lenient` forming a monotonic
   threshold ladder (strict ≥ default ≥ lenient).
-- `Confidence::{{High, Medium, Low}}` variants and `from_score` bucketing.
+- `Confidence::{High, Medium, Low}` variants and `from_score` bucketing.
 - `MatchResult` round-trip through `serde_json` (services persist results).
 - Builder is `Sized` and returnable by value.
+- `Scorer`'s re-exported primitives (`jaro_winkler_similarity`,
+  `levenshtein_similarity`, `exact_match`, `combined_similarity`,
+  `jaccard_set_similarity`, `optional_field_score`) — spec §5.6.
 
 ### When to update this test
 

@@ -115,6 +115,7 @@ The `AGENTS/` directory contains topic-specific guidance. Read the one that matc
 ├── README.md                 ← user-facing
 ├── benches/                  ← criterion benchmarks
 ├── examples/                 ← runnable examples (basic_usage, custom_config)
+├── fuzz/                     ← cargo-fuzz targets (standalone, not a workspace member)
 ├── index.md                  ← documentation entry point (README.md symlinks here)
 ├── spec/                     ← LIVING SPECIFICATION (SSOT — start at spec/index.md)
 ├── scripts/                  ← spec-drift check
