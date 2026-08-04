@@ -7,6 +7,8 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+
+## [0.5.0] - 2026-08-04
 ### Fixed — `merge` (and any `use_type`/`telecom`) writes were rejected by the database (PERSON-CONTACT-CASE, 2026-08-04)
 
 Every merge of two *different* persons failed with `500 DATABASE_ERROR`
