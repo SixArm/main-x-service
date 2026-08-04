@@ -27,7 +27,12 @@ async function stubApi(page: Page) {
     const req = route.request();
     const url = new URL(req.url());
     const method = req.method();
-    const path = url.pathname;
+    // The browser calls the same-origin BFF proxy (`/api/proxy/...`), which
+    // forwards to the organization service — so a request's real `pathname`
+    // is `/api/proxy/api/organizations`, not `/api/organizations`. Strip the
+    // proxy prefix before dispatching so the (path, method) comparisons
+    // below match what the browser actually sends.
+    const path = url.pathname.replace(/^\/api\/proxy/, "");
 
     if (path === "/api/organizations" && method === "GET") {
       return route.fulfill({ json: [{ pid: PID, name: ORG.name }] });
