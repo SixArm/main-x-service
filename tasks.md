@@ -5098,6 +5098,80 @@ committing (see plan.md §4).
   (found during H-5) — decide whether that's a real gap to fix here or
   a separate call.
 
+  - [x] `integrity/integrity-mac-rust-crate` done 2026-08-04. Clean
+    bill of health — every claim checked turned out to already be
+    accurate; no `src/`/doc drift found, so no content was rewritten.
+    **Adoption-scope figure, verified by grep of every `Cargo.toml`
+    (not assumed from either doc):** exactly **12** crates carry a
+    `integrity-mac = { path = … }` dependency — the ten entity
+    registries (person, worker, place, thing, event, course,
+    organization, care-pathway, case, project-portfolio-management) +
+    `authentication-service` + `link-graph-service`. This matches
+    `agents/share/overview.md`'s current text
+    ("embedded family-wide (all ten entity registries,
+    authentication-service, and link-graph-service): person/worker/
+    care-pathway/case first, then organization/place/thing/portfolio/
+    event/course/authentication/link-graph (landed through
+    2026-07-28)") exactly — confirmed both halves by `git log` on each
+    crate's `src/compliance/mac.rs`: person/worker/care-pathway/case
+    first-landed 2026-07-27, the other eight 2026-07-28, extraction
+    itself 2026-07-27 (`b106dfb3`). So the mid-session correction this
+    task's brief warned about had *already* landed by the time this
+    audit ran; nothing further to fix in `overview.md`. Also confirmed
+    `content-management-system-service-with-rust` — which greps as a
+    Cargo.toml hit for "integrity-mac" — does **not** actually depend
+    on it: the string is a comment explaining why it deliberately uses
+    plain `hmac` instead (webhook-signing has a different key-sharing
+    model), consistent across its `Cargo.toml`, `spec/tasks.md`, and
+    `CHANGELOG.md`. `agents/share/configuration.md` §9's per-crate env
+    var table (all 12 `<PREFIX>_INTEGRITY_MAC_KEY[_FILE|_ID]`/
+    `_KEYS_RETIRED` names, including the one documented exception —
+    portfolio uses `PORTFOLIO_`, not `PROJECT_PORTFOLIO_MANAGEMENT_`)
+    verified byte-accurate against each crate's actual
+    `KeyConfig::new(env!("CARGO_PKG_NAME"), "<PREFIX>")` call. The root
+    `AGENTS.md` library-crates table's Spec/Index columns ("—") are
+    also already correct (see next point).
+    **Structural finding, not a drift:** this crate carries no
+    `spec/`, `AGENTS.md`, `CLAUDE.md`, `CHANGELOG.md`, or `index.md` at
+    all — only `README.md` + `src/lib.rs`'s module-level rustdoc, which
+    doubles as the design doc and carries a full runnable usage
+    example. This is the same shape `entity-ref` has (bare-minimum:
+    Cargo files, `deny.toml`, `README.md`, `src/`) and a real contrast
+    with `authentication-verifier-rust-crate`, which is fully
+    scaffolded (`spec/`, `AGENTS.md`, `CLAUDE.md`, `CHANGELOG.md`,
+    `index.md`, `LICENSE.md`). Not fabricating a `spec/`/`AGENTS.md`
+    from scratch here — that's authoring, not a doc-sync fix, and out
+    of a "lighter audit" scope — but flagging it alongside `entity-ref`'s
+    missing-`CHANGELOG.md` finding as the same open decision: whether
+    these two newer, thinner library crates should be brought up to the
+    four-file baseline `AGENTS.md`'s "Per-subproject docs" table
+    describes, in a separate call.
+    **Line-by-line doc-vs-code check:** every security-property claim
+    in `README.md`'s "What it provides" list and in `src/lib.rs`'s
+    module doc — HKDF-SHA256 subkeys per `mxi/<service>/<domain>/d1`;
+    key-file sourcing takes precedence over the inline env var with no
+    fallback on an unreadable file (`resolve_root_key`); root-key
+    zeroization after subkey derivation (`KeyMaterial::derive_all`);
+    placeholder refusal below `MIN_DISTINCT_BYTES = 8`; CSPRNG key
+    generation (`getrandom`) with owner-only (`0600`) create-new-only
+    key files; the `MacVerdict` vocabulary that never reports
+    `UnknownKey`/`UnknownScheme` as `Invalid` — is literally true
+    against `src/lib.rs`, confirmed by reading every function it
+    describes, not by re-reading the doc comment alone. `Debug` on
+    `KeySet` was independently checked to never print key material
+    (it doesn't; the crate's own test pins this too).
+    **Verified live:** `cargo test` (18 unit tests, including golden
+    HKDF vectors cross-checked against an independent implementation,
+    and the RFC 4231 HMAC vector) + 1 doctest, all green; `cargo test
+    --doc` separately confirmed; `cargo clippy --all-targets --
+    -D warnings` clean; `cargo deny check` clean (one pre-existing,
+    unrelated "unmatched license allowance" warning for `Unicode-3.0`
+    in `deny.toml` — no dependency uses it — left alone as out of a
+    docs-audit scope). No `Cargo.lock` changes made; five unrelated
+    `Cargo.lock` diffs already present in the working tree at audit
+    start (other consumer-app crates, from a concurrent sibling task)
+    were left untouched.
+
 - [ ] **DOC-6 (M)** `link-graph-service-with-loco`'s `spec/`,
   `AGENTS.md`, `README.md`/`index.md`. **Queue this after LNK-4's
   T-29..T-33 chain finishes** (active file conflicts otherwise) — by
