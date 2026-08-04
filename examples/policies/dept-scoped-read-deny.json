@@ -1,0 +1,9 @@
+{
+  "rules": [
+    {
+      "effect": "deny",
+      "actions": ["read"],
+      "when": { "dept": ["!cardiology"] }
+    }
+  ]
+}

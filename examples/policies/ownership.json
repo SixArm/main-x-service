@@ -1,0 +1,9 @@
+{
+  "rules": [
+    {
+      "effect": "allow",
+      "actions": ["read", "write"],
+      "when": { "resource.owner": ["$sub"] }
+    }
+  ]
+}

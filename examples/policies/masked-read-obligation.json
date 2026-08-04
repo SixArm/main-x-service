@@ -1,0 +1,15 @@
+{
+  "rules": [
+    {
+      "effect": "allow",
+      "actions": ["read"],
+      "when": { "dept": ["cardiology"] }
+    },
+    {
+      "effect": "allow",
+      "actions": ["read"],
+      "obligations": ["mask"],
+      "when": {}
+    }
+  ]
+}

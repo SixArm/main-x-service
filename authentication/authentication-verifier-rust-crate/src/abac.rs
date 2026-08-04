@@ -1259,4 +1259,32 @@ mod tests {
             policy.evaluate_with_resource(&writer, Action::Write, "case", &BTreeMap::new())
         );
     }
+
+    /// Every policy in the repo-root `examples/policies/` cookbook must be
+    /// valid, parseable `Policy` JSON — the cookbook is documentation that
+    /// nothing else re-checks, so a typo there would otherwise ship silently.
+    #[test]
+    fn every_example_policy_parses() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/policies");
+        let mut checked = 0;
+        for entry in
+            std::fs::read_dir(&dir).unwrap_or_else(|e| panic!("read_dir({}): {e}", dir.display()))
+        {
+            let entry = entry.expect("dir entry");
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+            let json = std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+            Policy::from_json(&json)
+                .unwrap_or_else(|e| panic!("{} failed to parse as a Policy: {e}", path.display()));
+            checked += 1;
+        }
+        assert!(
+            checked >= 6,
+            "expected at least 6 example policies in {}, found {checked}",
+            dir.display()
+        );
+    }
 }

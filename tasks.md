@@ -1410,12 +1410,16 @@
   persons (with duplicate pairs for the dedup tutorial), ~20
   organizations, ~10 cases with subject links. No real PII; documented
   provenance header in each file.
-- [ ] **EX-2 (S)** `examples/policies/` — ABAC cookbook: dept-scoped
+- [x] **EX-2 (S)** `examples/policies/` — ABAC cookbook: dept-scoped
   read-deny, closed-case write-deny (`resource.status`), after-hours deny
   (`env.after_hours`), ownership (`$sub`), masked-read obligation,
   machine-peer grant (`svc`). Each policy JSON + a three-line README
   entry; all validated by a small test in the verifier crate that parses
-  every example file.
+  every example file. Done: six policies under `examples/policies/` +
+  `examples/policies/README.md`; `authentication-verifier`'s
+  `abac::tests::every_example_policy_parses` reads and `Policy::from_json`
+  parses every file in the directory (`cargo test` green, 58 tests incl.
+  4 doctests, clippy clean).
 - [ ] **EX-3 (S)** `examples/api/` — per-service request collections
   (`.http` files or curl scripts) for the main endpoints incl. auth
   handshake. Spot-verified against a running compose.

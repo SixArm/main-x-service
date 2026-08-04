@@ -1,0 +1,9 @@
+{
+  "rules": [
+    {
+      "effect": "allow",
+      "actions": ["write", "destructive"],
+      "when": { "svc": ["true"] }
+    }
+  ]
+}

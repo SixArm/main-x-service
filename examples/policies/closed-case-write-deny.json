@@ -1,0 +1,14 @@
+{
+  "rules": [
+    {
+      "effect": "allow",
+      "actions": ["write", "destructive"],
+      "when": { "access": ["admin"] }
+    },
+    {
+      "effect": "deny",
+      "actions": ["write"],
+      "when": { "resource.status": ["closed"] }
+    }
+  ]
+}
