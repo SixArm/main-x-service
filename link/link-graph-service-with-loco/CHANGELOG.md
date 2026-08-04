@@ -13,6 +13,57 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > and [event-bus.md](../../agents/share/event-bus.md).
 
 ## [Unreleased]
+### Fixed — T-31's fetch source: `search?q=*` replaced with a real list endpoint (verified live)
+
+An independent live check of the T-31 landing below found its core
+enumeration claim empirically false: `GET /persons/search?q=*` on a real
+running person-service returned zero results against real indexed data.
+Root cause, isolated by instrumenting the real running server (not
+inferred): person's Tantivy search index is a separate artefact from
+its database and can drift from it (in this case, a stale `.env`
+`SEARCH_INDEX_PATH` pointing at a long-lived dev index directory with
+~900 orphaned documents no longer present in the attached database) —
+`q=*` correctly matched everything *in the index*, but a small `limit`
+page landed entirely on entries with no surviving database row, so
+every hit was dropped by the found-in-index-but-not-in-database guard.
+The query grammar's `q=*` → `AllQuery` mapping itself is correct
+(confirmed against the exact pinned `tantivy-query-grammar` 0.22.0
+source and reproduced with a minimal standalone Tantivy program), but a
+search index is the wrong foundation for a "list everything" primitive
+in *any* deployment, regardless of this one instance's specific cause.
+
+- **`src/suggest/job.rs`** — `HttpIdentitySource::fetch_all` now pages
+  `GET {base_url}?limit=&offset=` (person's/worker's new database-backed
+  collection-list endpoint — see `person-service`/`worker-service`'s own
+  `CHANGELOG.md` entries for that side of the fix) instead of
+  `search?q=*&…`. The Tantivy search index is no longer consulted by
+  this job at all. `SearchData` renamed `ListData` to match. Module docs
+  rewritten (the "Why `q=*`" section replaced with "Why `GET
+  {base_url}?limit=&offset=`, not `search?q=*`", documenting the live
+  finding and the correction).
+- **`tests/live_suggest_fetch.rs`** (new, `#[ignore]`d) — drives the
+  real `HttpIdentitySource::fetch_all` against a genuinely running
+  person-service or worker-service, asserting every returned id is
+  unique (no page double-counted) and the fetch is non-empty. Not part
+  of any automated CI stage — no CI job here brings up a second full
+  service. Run by hand against both services: 25 real persons and 21
+  real workers, each fully enumerated with zero loss/duplication.
+- **`tests/live_suggest_full_pipeline.rs`** (new, `#[ignore]`d) — drives
+  the complete real pipeline (`HttpIdentitySource` × 2 →
+  `run_suggestion_pass` → `HttpSuggestionSink`) against two real running
+  services sharing a seeded shared-identifier person/worker pair, then
+  independently `GET`s the person's `/links` to confirm the
+  `matcher_suggested` `same_identity` edge actually landed — not merely
+  that the POST returned 2xx. Run by hand: `SuggestionRunStats {
+  persons_fetched: 26, workers_fetched: 22, candidates: 1, posted: 1,
+  failed: 0 }`, edge confirmed present on read-back.
+- No unit-test count change (71 pre-existing + 14 from T-31 = 85 still)
+  — the fix is in the HTTP call shape (`HttpIdentitySource::fetch_all`'s
+  URL), which was never unit-tested directly (only the pure/mocked
+  logic was, per T-31's original note) — the two new `#[ignore]`d live
+  tests are what actually cover it. `cargo fmt --check` / `cargo clippy
+  --all-targets -- -D warnings` clean.
+
 ### Added — Cross-service suggestion job (LNK-4, spec T-31, 2026-08-04)
 
 - **`src/suggest/job.rs`** (new — `src/suggest.rs` became

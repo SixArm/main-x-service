@@ -416,6 +416,30 @@ round done and fully pinned 2026-08-04 — T-29 code may start.**
   to T-33's governance-test pass, which needs live services anyway to
   prove non-auto-promotion. T-32 (person's review-queue promotion) and
   T-33 (governance/scale/audit) build on this next.)*
+  **Correction, landed the same day, verified live:** the `q=*`
+  enumeration mechanism above turned out to be unreliable against a
+  real running person-service — a live test (not a mock) found a
+  small-`limit` `q=*` page could come back **empty** even with matching
+  data present, because person's Tantivy index (a separate artefact
+  from its database) had drifted from it. `HttpIdentitySource::fetch_all`
+  now pages person's and worker's new database-backed `GET
+  /<plural>?limit=&offset=` list endpoints instead
+  (`person-service`/`worker-service`'s own `CHANGELOG.md` entries carry
+  the investigation and the fix on that side); the Tantivy search index
+  is no longer consulted by this job at all. Also added: two
+  `#[ignore]`d live tests
+  (`tests/live_suggest_fetch.rs`, `tests/live_suggest_full_pipeline.rs`)
+  that drive this crate's real `HttpIdentitySource`/`HttpSuggestionSink`/
+  `run_suggestion_pass` against genuinely running peer services — proven
+  by hand against real person-service + worker-service instances: fetch
+  enumerated 25/21 real records across 4 pages each with zero loss/
+  duplication, and the full pipeline (fetch both sides → block/score →
+  POST) found the one seeded shared-identifier candidate and confirmed
+  the `matcher_suggested` `same_identity` edge landed on person's real
+  `entity_links` via an independent follow-up `GET .../links`. `cargo
+  test --lib`: still 85 passed (unit-test count unchanged — the fix is
+  in the HTTP call shape, not the pure logic). `cargo fmt --check` /
+  `cargo clippy --all-targets -- -D warnings` clean.
 - [ ] T-32: Review + promotion, reusing **person's existing
   `review_queue` table/endpoints** (OQ-9(b)) — no new aggregator
   endpoint. Suggestions land as ordinary review-queue rows

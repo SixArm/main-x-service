@@ -23,7 +23,7 @@
 //!
 //! - `LINK_GRAPH_SUGGEST_URL_PERSON` — person's **collection base** URL,
 //!   e.g. `http://127.0.0.1:5150/api/persons`. Doubles as both the fetch
-//!   source (`{url}/search?q=*&…`) and the write target
+//!   source (`GET {url}?limit=&offset=`) and the write target
 //!   (`{url}/{id}/links`), since person is this job's sole write target
 //!   (workers are read-only input — OQ-9's "who writes the edge" already
 //!   settled this on the originating-service side, and the originating
@@ -46,21 +46,34 @@
 //!   scoring work rather than a cheap diff (OQ-9(d)). Same skip-first-tick
 //!   pattern as [`crate::reconcile::run_periodic`].
 //!
-//! ## Why `q=*`
+//! ## Why `GET {base_url}?limit=&offset=`, not `search?q=*`
 //!
-//! Neither person's nor worker's REST API has a plain "list every record"
-//! endpoint — only `GET /<plural>/search?q=…`, backed by a Tantivy
-//! [`tantivy::query::QueryParser`]. An **empty** query string parses to an
-//! empty `BooleanQuery`, which matches nothing; the query grammar's
-//! dedicated **`*`** token, however, parses to `UserInputLeaf::All` and
-//! converts to `AllQuery`, matching every indexed document (verified
-//! against the vendored `tantivy-query-grammar` 0.22 source, since this is
-//! exactly the kind of behaviour worth confirming rather than assuming).
-//! `q=*` combined with the existing `limit`/`offset` pagination is
-//! therefore the only way to enumerate a service's full collection through
-//! its public API today — a real, load-bearing gap this job works around
-//! rather than one this crate can close (closing it is a
-//! `person`/`worker`-service change, out of this task's scope).
+//! The first landed version of this job paged `GET
+//! /<plural>/search?q=*&limit=&offset=`, reasoning that the query
+//! grammar's dedicated `*` token parses to `UserInputLeaf::All` /
+//! `AllQuery`, matching every indexed document — true in isolation
+//! (confirmed against the exact pinned `tantivy-query-grammar` 0.22.0
+//! source), but **wrong as a foundation for enumeration**: a live
+//! investigation (bring up a real person-service, create a real record,
+//! query it) found `q=*` could come back **empty** against a real
+//! running instance, because the Tantivy index is a separate artefact
+//! from the database and can legitimately drift from it — a dev index
+//! directory that outlives a database reset, entries surviving a delete
+//! the index was never told about, a partial reindex. The search-hit ids
+//! that no longer resolve to a database row are silently dropped by the
+//! found-in-index-but-not-in-database guard, so a small-`limit` `q=*`
+//! page can land entirely on stale entries and return nothing even
+//! though matching rows exist.
+//!
+//! person's and worker's REST APIs now each carry a genuine,
+//! database-backed `GET /<plural>?limit=&offset=` collection-list
+//! endpoint (`list_persons` / `list_workers`), added specifically to
+//! give this job — and any future caller with the same "enumerate
+//! everything" need — an answer that is only ever as stale as the
+//! database itself, never as stale as a second, independently
+//! lifecycled copy of the data. See `person-service`'s `CHANGELOG.md`
+//! for the full investigation and root cause. This job now pages that
+//! endpoint directly; the Tantivy search index is not consulted at all.
 //!
 //! ## Scale controls deferred to T-33
 //!
@@ -68,10 +81,10 @@
 //! (OQ-9(d)) are **not** implemented here — T-33's job, alongside the
 //! audit-every-POST trail and the non-auto-promotion governance test. This
 //! job does apply one defensive, non-configurable cap of its own
-//! ([`MAX_FETCH_OFFSET`]) on the fetch pagination loop, mirroring person's
-//! own SEC-G7 `MAX_SEARCH_OFFSET` bound — worker's search endpoint enforces
-//! no such bound itself, so this job imposes one rather than inheriting an
-//! unbounded loop from an unbounded peer.
+//! ([`MAX_FETCH_OFFSET`]) on the fetch pagination loop regardless — both
+//! person's and worker's list endpoints now bound `offset` themselves
+//! (`MAX_SEARCH_OFFSET` / `MAX_LIST_OFFSET`, both `10_000`), but this job
+//! does not rely on a peer enforcing that; it stops itself either way.
 
 use async_trait::async_trait;
 use chrono::NaiveDate;
@@ -112,15 +125,16 @@ pub trait SuggestionSink: Send + Sync {
 }
 
 /// The page size requested per fetch call — the same `100` both person's
-/// and worker's `search` handlers clamp `limit` to, so a page never comes
-/// back short of what was actually available.
+/// and worker's `list`/`search` handlers clamp `limit` to, so a page
+/// never comes back short of what was actually available.
 const PAGE_LIMIT: usize = 100;
 
 /// A defensive cap on the fetch pagination loop's offset, mirroring
-/// person's own SEC-G7 `MAX_SEARCH_OFFSET` (`10_000`). Worker's search
-/// handler enforces no such bound itself (drift-accepted between
-/// services), so this job applies the same number on both sides rather
-/// than looping without limit against whichever side lacks its own guard.
+/// person's own SEC-G7 `MAX_SEARCH_OFFSET` (`10_000`, also the bound
+/// person's and worker's `GET /<plural>` list endpoints themselves
+/// enforce). This job applies the same number independent of whatever a
+/// peer enforces, so it never loops without limit even against a peer
+/// that changes its own bound later.
 const MAX_FETCH_OFFSET: usize = 10_000;
 
 /// The `{"success":…, "data": T}` envelope every native REST response on
@@ -131,11 +145,11 @@ struct ApiEnvelope<T> {
     data: Option<T>,
 }
 
-/// The `data` payload of `GET /<plural>/search`: person's field is
-/// `persons`, worker's is `workers` — both alias onto `records` here so
-/// one type parses both services' response shape.
+/// The `data` payload of `GET /<plural>`: person's field is `persons`,
+/// worker's is `workers` — both alias onto `records` here so one type
+/// parses both services' response shape.
 #[derive(Debug, Default, Deserialize)]
-struct SearchData {
+struct ListData {
     #[serde(alias = "persons", alias = "workers")]
     records: Vec<WireRecord>,
 }
@@ -237,10 +251,11 @@ fn probe_from_wire(record: &WireRecord) -> IdentityProbe {
     }
 }
 
-/// The **real** identity source: pages `GET {base_url}/search?q=*&…`, the
-/// only way to enumerate a service's full collection today (see the module
-/// doc's "Why `q=*`" section), mapping each hit to an `(EntityRef,
-/// IdentityProbe)` via [`probe_from_wire`].
+/// The **real** identity source: pages `GET {base_url}?limit=&offset=`,
+/// person's and worker's database-backed collection-list endpoint (see the
+/// module doc's "Why `GET {base_url}?limit=&offset=`, not `search?q=*`"
+/// section), mapping each hit to an `(EntityRef, IdentityProbe)` via
+/// [`probe_from_wire`].
 pub struct HttpIdentitySource {
     entity_type: EntityType,
     base_url: String,
@@ -272,8 +287,7 @@ impl IdentitySource for HttpIdentitySource {
         let mut out = Vec::new();
         let mut offset = 0usize;
         loop {
-            let mut request = client.get(format!("{}/search", self.base_url)).query(&[
-                ("q", "*"),
+            let mut request = client.get(&self.base_url).query(&[
                 ("limit", &PAGE_LIMIT.to_string()),
                 ("offset", &offset.to_string()),
             ]);
@@ -286,7 +300,7 @@ impl IdentitySource for HttpIdentitySource {
                 .map_err(|e| ModelError::Any(Box::new(e)))?
                 .error_for_status()
                 .map_err(|e| ModelError::Any(Box::new(e)))?;
-            let body: ApiEnvelope<SearchData> = response
+            let body: ApiEnvelope<ListData> = response
                 .json()
                 .await
                 .map_err(|e| ModelError::Any(Box::new(e)))?;
