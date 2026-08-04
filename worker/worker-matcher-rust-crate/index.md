@@ -41,7 +41,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-worker-matcher = "0.1.0"
+worker-matcher = "0.6"
 ```
 
 ## Usage
@@ -58,14 +58,14 @@ fn main() {
         .given_name("John")
         .family_name("Smith")
         .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
-        .nhs_number("1234567890")
+        .uk_nhs_number("1234567890")
         .build();
 
     let worker2 = Worker::builder()
         .given_name("Jon")  // Typo
         .family_name("Smith")
         .date_of_birth(NaiveDate::from_ymd_opt(1980, 5, 15).unwrap())
-        .nhs_number("1234567890")
+        .uk_nhs_number("1234567890")
         .build();
 
     // Create matching engine with default config
@@ -94,7 +94,7 @@ let lenient_engine = MatchingEngine::new(MatchConfig::lenient());
 // Custom configuration
 let custom_config = MatchConfig {
     match_threshold: 0.90,
-    nhs_number_weight: 0.40,  // Increase NHS number importance
+    uk_nhs_number_weight: 0.40,  // Increase NHS number importance
     given_name_weight: 0.15,
     family_name_weight: 0.20,
     date_of_birth_weight: 0.15,
@@ -122,7 +122,7 @@ if is_deterministic_match {
 let result = engine.match_workers(&worker1, &worker2);
 
 println!("Overall score: {:.2}", result.score);
-println!("NHS number score: {:?}", result.breakdown.nhs_number_score);
+println!("NHS number score: {:?}", result.breakdown.uk_nhs_number_score);
 println!("Given name score: {:?}", result.breakdown.given_name_score);
 println!("Family name score: {:?}", result.breakdown.family_name_score);
 println!("Date of birth score: {:?}", result.breakdown.date_of_birth_score);
@@ -132,29 +132,39 @@ println!("Phonetic name score: {:?}", result.breakdown.phonetic_name_score);
 
 ## Worker Data Model
 
-The `Worker` struct supports:
+The `Worker` struct carries, in field groups (full list in
+[`spec/08-domain-model.md`](spec/08-domain-model.md)):
 
-- **NHS Number**: NHS-format 10-digit national personal identifier with Modulus-11 check digit
-- **Name Fields**: First, middle, and Family names
-- **Date of Birth**: Birth date for age verification
-- **Gender**: Male, Female, Other, Unknown
-- **Address**: Multi-line address with postcode
-- **Contact**: Phone, mobile, email
-- **Local ID**: Site / source-system-specific identifier
+- **National identifiers** -- one `Option<String>` field per **42 scheme**
+  (UK NHS Number, France NIR, US SSN, ... -- catalogue in
+  [`AGENTS/national-person-identifiers.md`](AGENTS/national-person-identifiers.md)),
+  each with its own check-digit parser, weight, and breakdown score.
+- **Passport books** -- `Vec<PassportBook>`, multi-country / historical.
+- **Names** -- `given_name`, `middle_name`, `family_name`.
+- **Demographics** -- `date_of_birth`, `death_date`, `gender`, `blood_type`, `multiple_birth`.
+- **Location** -- `address`, `previous_addresses`, `birth_place`, `death_place`.
+- **Contact** -- `phone`, `mobile`, `email`, plus an unscored `local_id`.
+
+All fields are optional; `Worker::validate()` requires at least one
+identifying field (a name, a national identifier, or a passport book).
 
 ## Matching Algorithm
 
-The matching engine uses a weighted scoring system:
+The matching engine uses a weighted scoring system. All 42 national
+identifiers plus `passport_book` default to a `0.30` weight each; the
+demographic / location / contact fields below default lower. This table
+is an illustrative subset -- the authoritative full weight table is
+[`spec/13-configuration-specification.md`](spec/13-configuration-specification.md):
 
 | Field         | Default Weight | Purpose                             |
 | ------------- | -------------- | ----------------------------------- |
-| NHS Number    | 30%            | Strongest identifier when available |
+| UK NHS Number (and any of the other 41 national identifiers) | 30% | Strongest signal when available; scheme-local, never cross-matches |
+| Passport book | 30%            | Shared `(country, number)` pair     |
 | Family Name   | 20%            | Critical demographic                |
 | Date of Birth | 20%            | Age verification                    |
 | Given Name    | 15%            | Important but subject to nicknames  |
-| Address       | 5%             | Supporting evidence                 |
-| Gender        | 5%             | Supporting evidence                 |
-| Phone         | 5%             | Supporting evidence                 |
+| Death Date    | 10%            | Deceased-worker records             |
+| Address, Gender, Blood Type, Multiple Birth, Birth Place, Death Place, Phone, Email | 5% each | Supporting evidence |
 
 **Phonetic Matching** provides bonus points when names sound similar (e.g., "Stephen" vs "Steven").
 
@@ -250,9 +260,9 @@ This runs example scenarios including:
 ## Limitations
 
 1. **No Machine Learning**: This is a rule-based system, not ML/AI
-2. **Single Identifier Scheme**: Optimised for NHS-format check-digit identifiers; other national identifier schemes are not currently validated
-3. **No Persistent Storage**: In-memory matching only
-4. **No Batch Processing**: Processes pairs of workers
+2. **No Persistent Storage**: Pure in-memory scoring library; no database, no IO
+3. **No Blocking / Candidate Generation**: `match_one_to_many` / `rank_one_to_many` (see [Batch Scoring](#batch-scoring) below) score every candidate you pass in — pre-filtering a large population (Soundex prefix, postcode, DOB year, …) is a caller concern, deliberately not baked into this crate
+4. **No Relationships / Tags Scoring Yet**: planned (spec §23 T-33 / T-34) but not yet implemented — see [`spec/08-domain-model.md`](spec/08-domain-model.md)
 
 ## International Phone Numbers
 
@@ -466,11 +476,19 @@ The matcher uses this internally so `"123 High St"` and `"123 High Street"` no l
 
 ## Future Enhancements
 
-- [ ] Support for other national identifiers (SSN, etc.)
-- [ ] Batch matching API for large datasets
-- [ ] Machine learning integration
-- [ ] Performance benchmarks
-- [ ] More sophisticated address parsing
+Delivered: 42 national identifier schemes ([Features](#features) above),
+the `match_one_to_many` / `rank_one_to_many` batch API ([Batch
+Scoring](#batch-scoring) above), and `criterion` benchmarks
+(`benches/match_pair.rs`, [Benchmarks](#benchmarks) above). What's
+genuinely still open (full list: [`spec/21-roadmap-and-future-work.md`](spec/21-roadmap-and-future-work.md),
+[`spec/23-tasks-and-acceptance-criteria.md`](spec/23-tasks-and-acceptance-criteria.md)):
+
+- [ ] Machine learning integration (not planned — this crate is
+      deliberately rule-based and explainable; see spec §5)
+- [ ] Relationships / tags as weighted matcher components (T-33 / T-34)
+- [ ] Locale-aware phonetic encoders behind an opt-in feature flag (T-9.1)
+- [ ] More sophisticated address parsing (structured line 1 + abbreviation
+      expansion already shipped — this is about further refinement)
 - [ ] Broader phone-number country coverage and mobile-vs-landline validation
 
 ## License

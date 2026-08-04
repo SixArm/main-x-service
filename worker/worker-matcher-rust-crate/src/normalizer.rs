@@ -29,10 +29,14 @@
 //!
 //! - It does not validate NHS numbers — that is delegated to the
 //!   `nhs-number` crate at the call-site (see [`crate::matcher`]).
-//! - It does not normalise email addresses or middle names (see spec
-//!   tasks T-11 and OQ-1 respectively).
 //! - It does not handle non-ASCII punctuation such as the curly apostrophe
 //!   `’` (U+2019). Upstream code should convert those to ASCII first.
+//!
+//! Email addresses (T-11, [`Normalizer::normalize_email`]) and middle
+//! names (OQ-1 — blended into the given-name score via the same
+//! [`Normalizer::normalize_name`] path as given/family names) were once
+//! deliberately out of scope; both have since shipped and are covered
+//! below.
 //!
 //! ## International phone numbers
 //!

@@ -4068,6 +4068,153 @@ committing (see plan.md §4).
     touch `course/course-service-with-loco` (sibling crate, out of this
     task's boundary). All edited files re-confirmed well under 40 KB.
 
+  - *`worker/worker-matcher-rust-crate` done 2026-08-04.* `CLAUDE.md`
+    already the thin `@AGENTS.md` one-liner (no drift to fix). Checked
+    the `link-graph-service-with-loco` LNK-4 note directly rather than
+    assuming symmetry with person-matcher's finding: `worker-matcher`
+    is genuinely **not** a link-graph dependency (its `Cargo.toml`
+    comment explicitly says "depended on (not `worker-matcher`)"
+    because `person-matcher`'s `Scorer`/`Gender` alone cover both sides
+    of the person/worker comparison, confirmed via grep of
+    `src/suggest/mod.rs` — zero `worker_matcher` references) — so no
+    doc change was needed on that point, and none was made. Found the
+    **same relationships/tags spec-ahead-of-code drift** person-matcher's
+    note above describes, independently in this crate:
+    `spec/08-domain-model.md` (§8.1, §8.5, §8.6a), `spec/12-algorithm-
+    specifications.md` (§12.2), and `spec/13-configuration-specification.md`
+    (§13.1) all described `relationships`/`tags` fields, a
+    `RelationshipRef`/`RelationKind` type, `relationships_score`/
+    `tags_score` breakdown fields, and `relationships_weight`/
+    `tags_weight` defaults as if already live, while `spec/23-tasks-
+    and-acceptance-criteria.md` correctly lists this as open (**T-33**/
+    **T-34**, unchecked) and neither the field, the type, nor the
+    weight exists anywhere in `src/` (confirmed by grep — zero hits).
+    Fixed all four sections to mark the feature explicitly **planned,
+    not yet implemented**, cross-referencing T-33/T-34, rather than
+    deleting the design content. Also fixed a genuine rustdoc-accuracy
+    gap of the kind this task's checklist item 2 targets:
+    `MatchingEngine::deterministic_match`'s doc comment enumerated only
+    12 of the 42 national-identifier schemes under "Returns `true` iff
+    **any** of the following hold," reading as an exhaustive list when
+    `deterministic_identifier_match`'s `schemes` slice in the same file
+    covers all 42 — reworded to state the true scope and point at
+    `AGENTS/matching-algorithm.md`'s full branch table. Fixed a second
+    stale rustdoc claim: `src/normalizer.rs`'s module doc said email
+    and middle-name normalisation were out of scope "(see spec tasks
+    T-11 and OQ-1 respectively)," but both shipped long ago
+    (`Normalizer::normalize_email` is implemented and tested;
+    `middle_name` runs through the same `Normalizer::normalize_name`
+    path as given/family names) — corrected. Fixed a wrong filename in
+    `spec/23` T-17.1: it pointed at `AGENTS/national-worker-
+    identifiers.tsv`, which doesn't exist — the real file is
+    `AGENTS/national-person-identifiers.md`'s companion
+    `national-person-identifiers.tsv` (confirmed the 7 T-17.1 scheme
+    rows are indeed still missing from it, so the task itself stays
+    open, just correctly named now). Checked `CHANGELOG.md`
+    `[Unreleased]` against spec per this task's item 1 and found three
+    landed-but-undocumented items: the `fuzz/` cargo-fuzz harness
+    (SEC-I2), the SEC-M2/M3 false-identity-match guards, and the
+    `.github/workflows/spec-drift.yml` T-7 CI check — none appeared in
+    `spec/18-testing-strategy.md`, `spec/19-build-tooling-and-release.md`,
+    or `spec/20-security-privacy-and-compliance.md` despite all three
+    being real, shipped, and (for T-7) actively enforcing the spec-first
+    discipline on every PR; added §18.6, §19.4, and a security
+    paragraph respectively. `index.md` had the more concrete bug this
+    task's item 4 exists to catch: three of its "Basic Example" /
+    "Configurable Matching" / "Detailed Match Breakdown" code blocks
+    called `.nhs_number(...)`, `nhs_number_weight`, and
+    `.nhs_number_score` — none of which exist (the real names are all
+    `uk_nhs_number*`, confirmed by grep of `src/models.rs` and
+    `src/matcher.rs`) — so those snippets would not compile; fixed all
+    three plus the `Cargo.toml` version pin (`"0.1.0"`, four majors
+    stale against the real `0.6.1`). Two more sections of the same file
+    flatly contradicted *other sections of the same file*: "Limitations"
+    claimed "Single Identifier Scheme: … other national identifier
+    schemes are not currently validated" and "No Batch Processing:
+    Processes pairs of workers," while the "Features" list eleven lines
+    above already documents 42 validated schemes and the file's own
+    "## Batch Scoring" section below demonstrates `match_one_to_many`/
+    `rank_one_to_many`; and "Future Enhancements" still listed "Support
+    for other national identifiers," "Batch matching API," and
+    "Performance benchmarks" as open `[ ]` TODOs when all three ship
+    (42 schemes, the batch API, and `benches/match_pair.rs` criterion
+    benchmarks — all documented elsewhere in the same file). Rewrote
+    both sections to state current reality and point at what's
+    genuinely still open (T-33/T-34, T-9.1, phone-country breadth).
+    Also refreshed the stale "Worker Data Model" / "Matching Algorithm"
+    sections (single-scheme-era content predating the 42-scheme
+    expansion) to summarise the real field groups and link the
+    authoritative spec tables rather than re-duplicating them. Verified
+    clean: `cargo build`, `cargo test --lib` (417 passed), `cargo test`
+    (176 doctests, including the edited `deterministic_match` example),
+    `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`.
+    Did not touch `worker/worker-service-with-loco` or
+    `link/link-graph-service-with-loco` (out of this task's boundary).
+    All edited files re-confirmed under 40 KB.
+
+  - *`place/place-matcher-rust-crate` done 2026-08-04.* `CLAUDE.md`
+    already the thin `@AGENTS.md` one-liner (no drift to fix).
+    Rustdoc/index.md/AGENTS quick-start examples spot-checked by
+    actually compiling and running them (temp `examples/*.rs`, deleted
+    after, `git status` confirmed clean) — all matched the code exactly
+    except the biggest finding: **spec §3.1/§6.10/§6.11/§7 described a
+    `setting`/`tags` matching component (fields, scorer algorithms,
+    `MatchConfig` weights, `MatchBreakdown` scores) as if shipped**,
+    but `src/models.rs`/`src/matcher.rs` have neither — `CHANGELOG.md`'s
+    own "Unreleased" section already (correctly) calls this
+    "implementation pending," but the spec's normative sections never
+    said so, so `Place` was documented as "17 fields" when the real
+    struct has 15, `MatchBreakdown` as "11 score fields" vs the real 9,
+    and a `PlaceBuilder` `tags()`/`add_tag()` API that doesn't exist —
+    exactly the self-contradiction-within-the-repo shape this audit
+    exists to catch, and directly against this crate's own spec §9.3
+    rule ("when spec and code disagree, the code is what shipped —
+    update the spec to match, flag the divergence in the CHANGELOG").
+    Fixed by demoting the design to a clearly marked "planned, not
+    implemented" subsection (new §3.1.3) in `spec/03`, `spec/06`,
+    `spec/07`, and fixing the same stale "17 fields" copy in
+    `spec/12-glossary-cross-reference.md`; the design itself was kept,
+    not deleted, since it's real forward work tracked in the
+    CHANGELOG — flagging per this task's instruction rather than
+    silently dropping it. Second finding, verified by actually running
+    the numbers: worked example §11.1 (Eiffel Tower / La Tour Eiffel)
+    claimed `name_score ≈ 1.00` ("the alternate matches exactly") and a
+    renormalised score of `≈ 0.984`; the real computed values are
+    `name_score ≈ 0.84` (`"la tour eiffel"` vs `"tour eiffel"` is not an
+    exact match) and `score ≈ 0.938` — fixed the arithmetic and the
+    claim; §11.2/§11.3 were independently verified correct via the same
+    compile-and-run method, no changes needed. Third: `scripts/
+    spec-drift-check.sh` still grepped `git diff --name-only` for an
+    exact-match file literally named `spec.md`, a leftover from before
+    the single-file-to-directory migration — since that filename can
+    never appear in a diff again, the CI drift gate would silently
+    FAIL every legitimate PR that updates `src/matcher.rs` and the
+    correct `spec/*.md` file together (it would misreport the spec as
+    unsynced) — fixed to match on the `^spec/` path prefix, and fixed
+    the same script's own stale `spec.md §23 T-7` comment (§23 doesn't
+    exist; `AGENTS/spec-driven-development.md` explicitly names this
+    exact stale-reference pattern as a thing to fix on sight). Fourth:
+    `AGENTS/release.md` and `AGENTS/security-and-privacy.md` both told
+    contributors to run `cargo audit` before release, but the crate's
+    actual CI gate (`.github/workflows/security.yml`) runs `cargo deny
+    check` instead (superseding `cargo audit` per that workflow's own
+    comment) — updated both, and added the missing checklist line.
+    Fifth: `mimalloc` is a real `Cargo.toml` runtime dependency (used by
+    `src/main.rs`'s musl-gated global allocator) absent from both
+    `AGENTS/coding-style.md`'s and `AGENTS/security-and-privacy.md`'s
+    "current direct runtime dependencies" lists — added, with the
+    demo-binary-only caveat. Sixth: `fuzz/` (SEC-I2, 3 libFuzzer
+    targets) and `deny.toml` (SEC-I1) are real, CI-wired additions with
+    zero mention anywhere in `AGENTS.md`/`AGENTS/testing.md` — added a
+    Fuzzing section to `AGENTS/testing.md` and both to `AGENTS.md`'s
+    file-layout tree (which also still said `spec.md` there — fixed to
+    `spec/`). Verified clean throughout: `cargo fmt --check`, `cargo
+    clippy --all-targets -- -D warnings`, `cargo test` (163 lib + 12
+    adapter-contract + 37 integration + 11 property + 97 doctest, all
+    passing). Did not touch `place/place-service-with-loco` (sibling
+    crate, out of this task's boundary). All edited files re-confirmed
+    well under 40 KB.
+
 - [ ] **DOC-4 (L)** Front-end crates' `spec/`, `AGENTS.md`,
   `README.md`/`index.md`: all 11 SvelteKit front-ends (person, worker,
   place, thing, event, course, organization, care-pathway, case,

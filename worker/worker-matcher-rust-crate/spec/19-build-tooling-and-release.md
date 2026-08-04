@@ -13,5 +13,18 @@ Bump `Cargo.toml` per SemVer → update `CHANGELOG.md` → update this spec if b
 - Pre-1.0: minor bumps MAY contain breaking changes (per Cargo convention) — document them prominently.
 - Post-1.0: strict SemVer.
 
+### 19.4 Spec-Drift CI Check (T-7)
+
+`.github/workflows/spec-drift.yml` runs on every pull request to `main`
+and invokes `scripts/spec-drift-check.sh`: any `src/matcher.rs` change
+in the diff MUST be accompanied by a `spec/` update in the same PR, or
+the PR fails. Path-pattern exceptions live in `.spec-allow` (ships
+empty). Runnable locally pre-push: `bash scripts/spec-drift-check.sh
+main HEAD`. This is the mechanical backstop for the spec-first
+discipline in [`AGENTS/spec-driven-development.md`](../AGENTS/spec-driven-development.md)
+— it catches a code change with no matching spec edit; it does not
+catch the opposite failure mode (a spec section describing behaviour
+the code doesn't have), which is a manual audit's job.
+
 ---
 

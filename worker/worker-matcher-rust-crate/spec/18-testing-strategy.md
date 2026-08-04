@@ -28,5 +28,18 @@ touched. Renaming or removing any of these symbols breaks the matcher's
 own CI before publish — making cross-crate breakage deliberate. See
 [`AGENTS/testing.md`](../AGENTS/testing.md) for the per-section breakdown.
 
+### 18.6 Fuzz Testing (SEC-I2)
+
+`fuzz/` (a standalone `cargo-fuzz` crate, not a workspace member, so it
+never affects the normal `cargo build`/`test`/`clippy` path) carries
+three coverage-guided libFuzzer targets: `match_workers` (arbitrary
+`[worker_a, worker_b]` JSON → `MatchingEngine::match_workers`; asserts a
+finite score in `[0.0, 1.0]` regardless of input), `normalizer` (every
+`Normalizer` helper over arbitrary UTF-8; never-panic), and `scorer`
+(the pure `Scorer` similarities; finite in `[0.0, 1.0]`). Run on
+nightly: `cargo +nightly fuzz run <target>` (see `fuzz/README.md`).
+This is the concrete instance of the family-wide never-panic-on-
+untrusted-input invariant (`agents/share/security.md` §3, invariant 2).
+
 ---
 

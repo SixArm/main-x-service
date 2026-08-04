@@ -13,7 +13,7 @@ Single source of truth for outstanding work; absorbs what an SDD workflow would 
 - **Acceptance:** Default-config behaviour and existing tests unchanged. New unit tests cover Double Metaphone primary/secondary equality (`Stephen`/`Steven`) and Daitch-Mokotoff Slavic-cluster equality (`Schwarz`/`Shvarts`). Documented "opt-in only" until T-9's corpus methodology is run.
 
 **T-17.1 (residual).**
-- [ ] TSV rows in `AGENTS/national-worker-identifiers.tsv` for the 7 FR-85..FR-91 schemes (parsers shipped without their TSV rows).
+- [ ] TSV rows in `AGENTS/national-person-identifiers.tsv` for the 7 FR-85..FR-91 schemes (parsers shipped without their TSV rows; verified missing — the file has no `br_cpf`/`cn_rrn`/`in_aadhaar`/`jp_my_number`/`mx_curp`/`nz_nhi`/`za_id` rows as of this audit).
 
 **T-33 — Relationships as a weighted component (§8.1 / §8.6a / §12.2 / §13.1).**
 - [ ] Add `relationships: Vec<RelationshipRef>` to `Worker` and the `RelationshipRef` / `RelationKind` types (`LineManagerOf`, `ReportsTo`; re-export from crate root).
