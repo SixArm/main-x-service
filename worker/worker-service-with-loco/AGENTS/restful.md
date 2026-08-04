@@ -158,6 +158,7 @@ denied (the body names the deciding rule).
 | Method | Path                   | Description                                        |
 | ------ | ---------------------- | -------------------------------------------------- |
 | POST   | `/api/workers`      | Create worker (with real-time duplicate detection) |
+| GET    | `/api/workers`      | **List** active workers, paginated (`?limit=&offset=&mask_sensitive=`) — database-backed via `WorkerRepository::list_active`, deliberately **not** the Tantivy index (see `CHANGELOG.md`) |
 | GET    | `/api/workers/{id}` | Get worker by ID                                   |
 | PUT    | `/api/workers/{id}` | Update worker                                      |
 | DELETE | `/api/workers/{id}` | Soft delete worker                                 |
@@ -169,6 +170,10 @@ denied (the body names the deciding rule).
 | GET    | `/api/workers/search` | Search workers (full-text, fuzzy, phonetic) |
 
 **Query Parameters:** `q` (query), `limit` (default 10, max 100), `offset`, `fuzzy` (bool), `phonetic` (bool), `mask_sensitive` (bool)
+
+**Not a list-all mechanism** — `q` has no "match everything" value and
+the Tantivy index can drift from the database. Use `GET /api/workers`
+(above) to enumerate the collection. See `CHANGELOG.md`.
 
 ### Matching & Deduplication
 

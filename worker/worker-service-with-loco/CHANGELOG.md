@@ -7,6 +7,45 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — `GET /api/workers`, a genuine database-backed list endpoint (link-graph T-31 follow-up)
+
+Mirrors the identical fix landed in the sibling `person-service` — see
+that crate's `CHANGELOG.md` for the full investigation (a live
+server test found `/persons/search?q=*` unreliable for enumeration
+because a Tantivy index can drift from the database it's paired with,
+regardless of whether the query grammar's `q=*`→`AllQuery` mapping
+itself is correct). `worker-service` had the identical gap: no
+database-backed way to list its own collection, only the
+Tantivy-backed `/workers/search`.
+
+- **`src/api/rest/handlers.rs`** — `list_workers` (`GET /api/workers`),
+  `ListQuery`, `ListResponse`, sourced from
+  [`WorkerRepository::list_active`](src/db/repositories.rs) — never the
+  search index. Mirrors `search_workers`'s existing `mask_sensitive`
+  masking; adds its own `MAX_LIST_OFFSET` (`10_000`) bound, since
+  `search_workers` predates that hardening pass and does not yet share
+  it (not touched here — a separate change).
+- **`src/db/repositories.rs`** — `WorkerRepository::list_active` gained
+  `.order_by_asc(workers::Column::Id)`, for the same reason as person's:
+  an unordered `LIMIT`/`OFFSET` can skip or duplicate rows across pages,
+  which is exactly the correctness property a "list everything" endpoint
+  exists to provide.
+- **`src/api/rest/mod.rs`** — `GET /api/workers` wired onto the existing
+  `POST /api/workers` route (both router surfaces) and the OpenAPI
+  registry.
+- Tests: `tests/api_integration_test.rs` —
+  `test_list_workers_paginates_every_created_record_exactly_once` (seven
+  workers with genuinely distinct surnames, paged with a smaller limit,
+  every id seen exactly once) and
+  `test_list_workers_rejects_out_of_bound_offset`. Both pass against a
+  real migrated Postgres. **Also verified against a live running
+  server**: 21 real workers created via `POST /api/workers`, enumerated
+  across 4 pages via `GET /api/workers?limit=6&offset=…`, all 21 seen,
+  zero missing, zero duplicates.
+- Consumed by `link-graph-service`'s T-31 suggestion job
+  (`src/suggest/job.rs`), which switched from `search?q=*&…` to this
+  endpoint in the same fix.
+
 ### Removed — dead `WorkerRepository::search` SQL method (QA-CUST-SQL)
 
 Audited for the same MySQL-placeholder footgun fixed in

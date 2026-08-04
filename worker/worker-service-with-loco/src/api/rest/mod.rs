@@ -51,6 +51,7 @@ pub use state::AppState;
         handlers::metrics_prom,
         auth::whoami,
         handlers::create_worker,
+        handlers::list_workers,
         handlers::get_worker,
         handlers::update_worker,
         handlers::delete_worker,
@@ -109,6 +110,8 @@ pub use state::AppState;
             crate::api::ApiError,
             handlers::HealthResponse,
             handlers::CreateWorkerRequest,
+            handlers::ListQuery,
+            handlers::ListResponse,
             handlers::SearchQuery,
             handlers::SearchResponse,
             handlers::MatchRequest,
@@ -166,8 +169,13 @@ pub fn create_router(state: AppState) -> Router {
         .route("/health", get(handlers::health_check))
         // Auth — echo verified bearer-token claims
         .route("/whoami", get(auth::whoami))
-        // Worker CRUD
-        .route("/workers", post(handlers::create_worker))
+        // Worker CRUD (+ the plain database-backed collection list, GET
+        // /workers — deliberately not Tantivy-backed; see
+        // `handlers::list_workers`'s doc comment)
+        .route(
+            "/workers",
+            post(handlers::create_worker).get(handlers::list_workers),
+        )
         .route("/workers/{id}", get(handlers::get_worker))
         .route("/workers/{id}", put(handlers::update_worker))
         .route("/workers/{id}", delete(handlers::delete_worker))
@@ -299,7 +307,10 @@ pub fn workers_routes() -> loco_rs::controller::Routes {
             "/workers/{id}/assessment-profile",
             get(assessments::assessment_profile),
         )
-        .add("/workers", post(handlers::create_worker))
+        .add(
+            "/workers",
+            post(handlers::create_worker).get(handlers::list_workers),
+        )
         .add(
             "/workers/{id}",
             get(handlers::get_worker)

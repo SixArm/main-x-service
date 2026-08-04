@@ -1473,9 +1473,19 @@ impl WorkerRepository for SeaOrmWorkerRepository {
     }
 
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Worker>> {
+        // `order_by_asc(Id)` is load-bearing, not cosmetic: without an
+        // explicit ORDER BY, Postgres does not guarantee a stable row
+        // order across repeated `LIMIT`/`OFFSET` queries, so a caller
+        // paginating through every page (the link-graph suggestion job's
+        // worker enumeration, T-31) could silently skip or duplicate rows
+        // between pages. Ordering by the primary key is cheap (already
+        // indexed) and gives every page a deterministic, non-overlapping
+        // slice. Mirrors the identical fix in person-service's
+        // `list_active` (see that crate's `CHANGELOG.md`).
         let db_workers: Vec<workers::Model> = workers::Entity::find()
             .filter(workers::Column::DeletedAt.is_null())
             .filter(workers::Column::Active.eq(true))
+            .order_by_asc(workers::Column::Id)
             .limit(limit)
             .offset(offset)
             .all(&self.db)

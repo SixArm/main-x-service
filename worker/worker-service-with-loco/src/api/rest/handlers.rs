@@ -188,6 +188,128 @@ pub async fn create_worker(
     }
 }
 
+/// Query parameters for `GET /api/workers` (the plain collection list).
+#[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+pub struct ListQuery {
+    /// Maximum number of results (default: 10, max: 100)
+    #[serde(default = "default_limit")]
+    pub limit: usize,
+
+    /// Offset for pagination (default: 0)
+    #[serde(default)]
+    pub offset: usize,
+
+    /// Mask sensitive data in response
+    #[serde(default)]
+    pub mask_sensitive: bool,
+}
+
+/// The maximum accepted pagination `offset` for [`list_workers`] — an
+/// unbounded offset would force the database to materialise and discard
+/// arbitrarily many rows (SEC-G7, `agents/share/security.md` invariant 3).
+/// `search_workers` predates this hardening pass and does not yet share
+/// the bound; not touched here since fixing that is a separate change.
+const MAX_LIST_OFFSET: usize = 10_000;
+
+/// Body of a successful `GET /api/workers` response.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct ListResponse {
+    /// The workers on this page (masked if `mask_sensitive` was set).
+    pub workers: Vec<Worker>,
+    /// Count of workers in this page (not the global total).
+    pub total: usize,
+    /// Offset applied for pagination.
+    pub offset: usize,
+    /// Page size applied (capped at 100).
+    pub limit: usize,
+}
+
+/// List every active worker, database-backed and paginated.
+///
+/// This is the genuine "enumerate the collection" endpoint — deliberately
+/// **not** built on the Tantivy search index the way `/workers/search` is.
+/// A search index can legitimately drift from the database (deletes that
+/// predate a given index generation, a dev index directory that outlives a
+/// database reset, …), so `list_workers` instead pages the repository
+/// directly ([`crate::db::repositories::WorkerRepository::list_active`],
+/// ordered by `id` for stable pagination) — its answer is only ever as
+/// stale as the database itself. Mirrors person-service's identical
+/// `list_persons` (see that crate's `CHANGELOG.md` for the investigation
+/// that motivated it) and worker's own `search_workers` for masking.
+#[utoipa::path(
+    get,
+    path = "/api/workers",
+    tag = "workers",
+    params(ListQuery),
+    responses(
+        (status = 200, description = "Page of active workers", body = ListResponse),
+        (status = 400, description = "Offset too large"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn list_workers(
+    State(state): State<AppState>,
+    Query(params): Query<ListQuery>,
+    caller: MaybeAuthUser,
+    access: AccessContext,
+) -> impl IntoResponse {
+    let limit = params.limit.min(100);
+
+    if params.offset > MAX_LIST_OFFSET {
+        let error = ApiResponse::<ListResponse>::error(
+            "OFFSET_TOO_LARGE",
+            format!("offset must not exceed {MAX_LIST_OFFSET}; narrow the query instead"),
+        );
+        return (StatusCode::BAD_REQUEST, Json(error));
+    }
+
+    // A list is a collection read, same disclosure posture as search
+    // (recorded against the nil id — it discloses many records, not one).
+    if disclosure::record_access(
+        &state.audit_log,
+        "Worker",
+        Uuid::nil(),
+        disclosure::action::LIST,
+        caller.claims().map(|c| c.sub.as_str()),
+        &access,
+    )
+    .await
+    .is_err()
+    {
+        return audit_unavailable::<ListResponse>();
+    }
+
+    let limit_u64 = u64::try_from(limit).unwrap_or(100);
+    let offset_u64 = u64::try_from(params.offset).unwrap_or(u64::MAX);
+    match state
+        .worker_repository
+        .list_active(limit_u64, offset_u64)
+        .await
+    {
+        Ok(rows) => {
+            let workers: Vec<Worker> = if params.mask_sensitive {
+                rows.iter().map(crate::privacy::mask_worker).collect()
+            } else {
+                rows
+            };
+            let response = ListResponse {
+                total: workers.len(),
+                workers,
+                offset: params.offset,
+                limit,
+            };
+            (StatusCode::OK, Json(ApiResponse::success(response)))
+        }
+        Err(e) => {
+            let error = ApiResponse::<ListResponse>::error(
+                "DATABASE_ERROR",
+                format!("Failed to list workers: {e}"),
+            );
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+        }
+    }
+}
+
 /// Fetches a single worker by UUID. `200` with the record, `404` if no
 /// active worker has that id, `500` on a database error.
 #[utoipa::path(

@@ -367,6 +367,137 @@ async fn test_search_workers() {
     assert!(body_str.contains(&family_name));
 }
 
+/// `GET /api/workers` is a genuine database-backed "list everything"
+/// endpoint — distinct from `/workers/search`, and added specifically
+/// because `/workers/search?q=*` is **not** a reliable way to enumerate a
+/// collection (a live investigation on the sibling person-service found
+/// the Tantivy index can carry stale entries the database no longer has;
+/// see `person-service`'s `CHANGELOG.md`). This test creates several
+/// workers with genuinely distinct family names (not just distinct
+/// suffixes of a shared prefix, which real-time duplicate detection would
+/// legitimately 409 on) and pages through the **entire** collection with a
+/// `limit` smaller than the created count, proving every created worker is
+/// found exactly once across the pages.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn test_list_workers_paginates_every_created_record_exactly_once() {
+    let app = common::create_test_router().await;
+
+    let run_suffix = chrono::Utc::now().timestamp_micros();
+    let surnames = [
+        "Abernathy",
+        "Blackwood",
+        "Cavendish",
+        "Dunmore",
+        "Ellsworth",
+        "Fitzgerald",
+        "Greenhalgh",
+    ];
+    let created_count = surnames.len();
+    let mut created_ids = std::collections::HashSet::new();
+
+    for (i, surname) in surnames.iter().enumerate() {
+        let family_name = format!("{surname}{run_suffix}");
+        let worker_json = json!({
+            "id": "00000000-0000-0000-0000-000000000000",
+            "name": { "family": family_name, "given": [format!("Page{i}")] },
+            "gender": "unknown",
+        });
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/workers")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&worker_json).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let created: ApiResponse<Worker> = serde_json::from_slice(&body).unwrap();
+        created_ids.insert(created.data.unwrap().id);
+    }
+    assert_eq!(created_ids.len(), created_count, "each POST made a new id");
+
+    // Page through the WHOLE collection (other tests' workers may
+    // coexist) with a limit smaller than what we created, exactly
+    // mirroring how link-graph's suggestion job (T-31) pages
+    // `GET /api/workers?limit=&offset=`.
+    let page_limit = 3usize;
+    let mut offset = 0usize;
+    let mut seen_ids: Vec<uuid::Uuid> = Vec::new();
+    loop {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/api/workers?limit={page_limit}&offset={offset}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let page: ApiResponse<worker_service::api::rest::handlers::ListResponse> =
+            serde_json::from_slice(&body).unwrap();
+        let data = page.data.unwrap();
+        let page_len = data.workers.len();
+        for w in data.workers {
+            seen_ids.push(w.id);
+        }
+        if page_len < page_limit {
+            break;
+        }
+        offset += page_limit;
+        assert!(offset < 100_000, "paginated far past any plausible total");
+    }
+
+    let seen_unique: std::collections::HashSet<_> = seen_ids.iter().copied().collect();
+    assert_eq!(
+        seen_ids.len(),
+        seen_unique.len(),
+        "a record was returned on more than one page — pagination is not stable"
+    );
+    for id in &created_ids {
+        assert!(
+            seen_unique.contains(id),
+            "created worker {id} was never seen while paginating /api/workers"
+        );
+    }
+}
+
+/// SEC-G7-style bound: `GET /api/workers` with an out-of-bound pagination
+/// `offset` is rejected with `400`.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn test_list_workers_rejects_out_of_bound_offset() {
+    let app = common::create_test_router().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/workers?offset=1000000000")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        response.status(),
+        StatusCode::BAD_REQUEST,
+        "an offset past the bound must be rejected"
+    );
+}
+
 /// `GET /workers/{id}` for an unknown id returns 404.
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL database"]
