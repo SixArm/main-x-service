@@ -81,6 +81,7 @@ plan-scoped sub-resources hang off `/api/plans/{pid}/...`. See
 | Strategy (PPM Phase C) | `/ideas` (+ `vote`/`dismiss`/`convert`) · `/scenarios` (+ `/{pid}/evaluate`/`commit`) · `/objectives` (+ `/{pid}/alignment`) · `/plans/{pid}/objectives` · `/plans/{pid}/benefits` (+ `/{b_pid}/realize`) |
 | Visibility (PPM Phase B) | `POST`/`GET /dependencies` (+ `DELETE /{pid}`) · `GET /plans/{pid}/schedule` · `/plans/{pid}/milestones` (+ `/{m_pid}/complete`) · `/plans/{pid}/allocations` (+ `DELETE /{a_pid}`) · `GET /capacity` · `/reports` (+ `/{pid}/run?format=json|csv`) · `GET /at-a-glance` (ETag) |
 | Governance (PPM Phase A) | `POST`/`GET /proposals` (+ `/{pid}` + `submit`/`review`/`approve`/`reject`/`promote`/`duplicates`) · `/plans/{pid}/gate-reviews` · `/risks` (+ `/{risk_pid}` + `escalate`) · `/budget-lines` (+ `/{line_pid}/actual` · `/{line_pid}/release` — stage-gated tranches) · `GET /plans/{pid}/governance` |
+| Integrity verification | `GET /compliance/records/verify` (recomputes each plan's SHA-256/SHA3-256/HMAC digests) · `GET /compliance/audit/verify` (recomputes each audit row's MAC) — `?limit=`, capped 10 000; `mac_absent` (not a mismatch) when `PORTFOLIO_INTEGRITY_MAC_KEY[_FILE]` is unset |
 | Executive insights | `GET /executive/{health,decisions,benefits,alignment}` · `/financials/{variance,exposure}` · `/technology/{dependency-risk,radar,debt,flow}` · `/scenarios/compare?a=&b=` (read-only derived views; ETag + `as_of`) |
 | Engineering | `POST`/`GET /plans/{pid}/tasks` (+ `PUT`/`PATCH`(move; WIP-limit env caps)/`DELETE /{t_pid}`; story points) · `/plans/{pid}/sprints` (+ `/{s_pid}/notes` retro/feedback + `convert`) · `GET /plans/{pid}/burndown?sprint=` (honest, done_at-only) · `GET /plans/{pid}/velocity` · `GET /plans/{pid}/standup` · `GET /engineering/{blocked,moscow,delivery-links,milestone-calendar}` |
 | DevOps | `POST /devops/events` (deploy/incident/recovery ingest) · `GET /devops/metrics` (from ingested events only) · `GET /devops/releases` |
@@ -185,15 +186,23 @@ src/
 ├── controllers/governance.rs PPM Phase A: proposals, gate reviews, risks, budget lines
 ├── controllers/visibility.rs PPM Phase B: dependencies, schedule, milestones, allocations, capacity, reports, at-a-glance
 ├── controllers/strategy.rs   PPM Phase C: ideas, scenarios, objectives, benefits
+├── controllers/insights.rs   executive insight areas: health/decisions/benefits/alignment, financials, technology
+├── controllers/oversight.rs  board/auditor/compliance-register/risk-heatmap/security/regulator views
+├── controllers/engineering.rs tasks board (+ move/story points/WIP limits), sprints, burndown, velocity, standup, DevOps events/metrics/releases, estate views
 ├── controllers/collaboration.rs  collaborative review + assignees + notifications
 ├── controllers/automation.rs PPM automations + runs + scheduled actions + sweep
 ├── controllers/prioritisation.rs Smart Score + ranked queue + bird's-eye lifecycle
+├── controllers/compliance.rs `/api/compliance/{records,audit}/verify` — row-level integrity verification
 ├── controllers/docs.rs       OpenAPI JSON + Swagger UI
 ├── controllers/metrics.rs    root /metrics.prom Prometheus endpoint
 ├── metrics.rs                process-wide Prometheus registry (plan counters)
 ├── auth.rs                   offline PASETO v4.public verification (AuthUser/MaybeAuthUser) via authentication-verifier
+├── version.rs                `Accepts-version` header negotiation middleware (agents/share/api-versioning.md)
 ├── merge.rs                  pure record-merge logic (any two plans; self-merge rejected)
 ├── governance.rs · visibility.rs · strategy.rs   pure domain logic for the three phases
+├── insights.rs               pure derivations behind the executive insight views (no I/O)
+├── engineering.rs            pure rules: task statuses, honest burndown, MoSCoW bands, milestone kinds
+├── snapshots.rs               point-in-time estate snapshots behind the board/CRO trend views (explicit capture or the optional ticker)
 ├── collaboration.rs          pure review state machine + consensus + assignee workload
 ├── automation.rs             pure trigger matching + action validation + due-ness
 ├── prioritisation.rs         the pure, explainable Smart Score (renormalised, self-describing)
@@ -201,11 +210,14 @@ src/
 ├── scheduler.rs              optional set-and-forget sweep ticker (env-gated, default off)
 ├── openapi.rs                OpenAPI 3 document
 ├── privacy.rs                field masking (lead_ref, owner org) + GDPR export envelope
+├── compliance/                keyed integrity: mac.rs (integrity-mac binding) + record_integrity.rs (plans) + audit_integrity.rs (audit_logs); default off without PORTFOLIO_INTEGRITY_MAC_KEY[_FILE]
 ├── relay.rs                  durable-bus Phase 2/3 outbox relay (poll/ack loop) + FluvioSink (fluvio feature, BUS-3)
 ├── search/                   Tantivy full-text/fuzzy/phonetic index (index.rs schema + mod.rs engine; kind is a search filter, never a dedup gate)
 ├── streaming.rs              CRUD/merge event stream — durable Envelope + EventPublisher seam (in-memory default, outbox transport); indexes/deindexes on every write
 ├── tasks/search.rs           `search_reindex` CLI task + boot-time rebuild-if-empty
 ├── validation.rs             name + goal-title + identifier + BCP-47 + parent_ref checks → 422
+├── initializers/              empty (loco extension point, reserved)
+├── workers/downloader.rs      loco worker-queue scaffold, carried over unwired (not real work; kept so the queue has a concrete worker to register)
 ├── models/
 │   ├── plans.rs              CRUD helpers over the stored payload
 │   ├── governance.rs · visibility.rs · strategy.rs   phase record helpers
@@ -217,7 +229,12 @@ src/
 migration/src/                …_000001_plans, …_000002_audit_logs,
                               …_000003_merge_records, …_000004_event_outbox,
                               …_000005_governance, …_000006_visibility,
-                              …_000007_strategy
+                              …_000007_strategy, m20260719_000002_insight_columns,
+                              m20260719_000003_insight_snapshots,
+                              m20260720_000001_engineering,
+                              m20260720_000002_engineering_moderate,
+                              m20260722_000001_capabilities,
+                              m20260728_000001_integrity_digests
 config/                       development/production/test yaml
 ```
 </content>

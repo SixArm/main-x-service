@@ -40,15 +40,16 @@ sub-resources hang off `/api/plans/{pid}/...`.
 | GET | `/api/plans/{pid}` | Fetch |
 | PUT | `/api/plans/{pid}` | Update |
 | DELETE | `/api/plans/{pid}` | Soft-delete |
-| GET | `/api/plans/search?q=` | Case-insensitive name search (`ILIKE`, cap 50) |
+| GET | `/api/plans/search?q=` | Tantivy full-text/fuzzy/phonetic search (`?fuzzy=`, `?phonetic=`, `?kind=`) |
 | POST | `/api/plans/match` | Rank `{query, candidates}` (kind-agnostic) |
-| POST | `/api/plans/check-duplicates` | Match a query vs stored plans |
-| POST | `/api/plans/deduplicate` | Batch scan → review queue |
+| POST | `/api/plans/check-duplicates` | Match a query vs stored plans (blocked on the Tantivy index) |
+| POST | `/api/plans/deduplicate` | Batch scan → review queue — **deferred, spec §13** |
 | POST | `/api/plans/merge` | Merge a duplicate into any survivor plan |
 | GET | `/api/plans/merges/recent` | Merge-history records |
-| * | `/api/plans/{pid}/goals` · `/tasks` · `/issues` | Operational sub-resource CRUD |
-| GET | `/api/plans/{pid}/timeline` · `/burndown` | Derived Gantt / burndown views |
-| POST·GET·DELETE | `/api/plans/{pid}/links` | Cross-service entity links |
+| GET | `/api/plans/{pid}/masked` · `/export` | Masked view (always redacted) · audited GDPR export |
+| * | `/api/plans/{pid}/tasks` | Task-board CRUD + Kanban `PATCH` move (story points, WIP limits) — `/goals` · `/issues` **deferred, spec §13** |
+| GET | `/api/plans/{pid}/sprints` · `/burndown` · `/velocity` · `/standup` | Sprint tooling — `/timeline` (Gantt) **deferred, spec §13** |
+| POST·GET·DELETE | `/api/plans/{pid}/links` | Cross-service entity links — **deferred, spec §13** |
 | POST·GET | `/api/reviews` (+ `/consensus`, `/{pid}/respond`, `/{pid}/submit`) | Collaborative review: delegate to internal or external experts |
 | POST | `/api/plans/{pid}/tasks/{t_pid}/assign` | Assign / unassign a task (`null` unassigns) |
 | GET | `/api/assignees/workload` | Open work per assignee, incl. the unassigned pile |
@@ -62,6 +63,20 @@ sub-resources hang off `/api/plans/{pid}/...`.
 | GET | `/api/plans/whoami` | Verified PASETO-token claims (`401` without one) |
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 | GET | `/metrics.prom` | Prometheus metrics (root path, public under auth enforcement) |
+
+The table above is the identity-registry core. This service is also a
+full **project-management tool**: PPM governance (`/api/proposals`,
+`/api/plans/{pid}/gate-reviews`, `/risks`, `/budget-lines`), visibility
+(`/api/dependencies`, `/plans/{pid}/schedule`, `/milestones`,
+`/allocations`, `/capacity`, `/at-a-glance`), strategy (`/api/ideas`,
+`/api/scenarios`, `/api/objectives`, `/api/plans/{pid}/benefits`),
+executive insights (`/api/executive/*`, `/financials/*`,
+`/technology/*`), oversight (`/api/board/*`, `/auditor/*`,
+`/compliance/*`, `/risk/heatmap`, `/security/register`,
+`/regulator/extract`), and row-level integrity verification
+(`/api/compliance/records/verify`, `/audit/verify`) — see
+[AGENTS.md](./AGENTS.md) for the full table and
+[spec §9.9–§9.15](./spec/index.md) for each area's contract.
 
 See [AGENTS.md](./AGENTS.md) and [spec §9](./spec/index.md) for the full
 route contract.
@@ -130,31 +145,42 @@ cargo clippy --all-targets
 
 ## Status
 
-Implemented (MVP, v0.1.0): CRUD + `ILIKE` name search + kind-agnostic
-matching + record merge + payload validation over one recursive `plans`
+Implemented (MVP, v0.1.0 + PPM Phases A/B/C): CRUD + Tantivy
+full-text/fuzzy/phonetic name search (`?fuzzy=`, `?phonetic=`, `?kind=`;
+replaced the earlier `ILIKE` search 2026-08-02) + kind-agnostic matching
++ record merge + payload validation over one recursive `plans`
 collection (`kind` is an optional Portfolio / Project / Product /
 Program / Practice / Process / Purpose / Pathway / Proposal label; one
 `plans` table with a nullable `kind` and a `parent_pid`), plus the
 governance / visibility / strategy phases (proposals, gate reviews,
 risks, budget lines; dependencies, milestones, allocations, capacity,
 reports, at-a-glance; ideas, scenarios, objectives, benefits), the
-collaboration / automation / prioritisation capabilities (collaborative
+engineering-team core (Kanban task board with WIP limits + story
+points, sprints, an honest `done_at`-only burndown, velocity, standup,
+DevOps deploy/incident ingest — spec §9.14), the executive insight areas
+(CEO/CFO/CTO views — spec §9.12) and oversight areas (board / auditor /
+compliance-register / risk-heatmap / security / regulator — spec §9.13),
+the collaboration / automation / prioritisation capabilities (collaborative
 review with strict-majority consensus, assignee management, workflow
 automation with a full run log, the claim-based set-and-forget
 scheduler, the explainable Smart Score, and bird's-eye lifecycle
-readiness — spec §9.4a), audit log
+readiness — spec §9.4a), field masking + audited GDPR export wired to
+the ABAC `mask` obligation (`lead_ref` dropped entirely, owner org
+masked — spec §12/§13, 2026-08-02), row-level integrity verification
+(SHA-256 + SHA3-256 digests + a keyed MAC over `plans` and `audit_logs`,
+default off without a configured MAC key — spec §9.15), audit log
 + event streaming (durable-bus Phase 2 outbox + Phase 3 relay/retention
 have landed; `src/relay.rs`, gated by
 `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TRANSPORT=outbox` +
-`PROJECT_PORTFOLIO_MANAGEMENT_EVENT_RELAY`) + OpenAPI/Swagger +
+`PROJECT_PORTFOLIO_MANAGEMENT_EVENT_RELAY`; the `FluvioSink` real-broker
+sink is feature-gated and off by default) + OpenAPI/Swagger +
 Prometheus metrics + offline PASETO v4.public verification (published
 Ed25519 key) + blanket `/api/*` auth enforcement (off by default, gated
 by `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`). Deferred (see [spec
-§13](./spec/index.md)): the operational sub-resources (goals / tasks /
-issues) + derived timeline / burndown views, `deduplicate` + the review
-queue, cross-service entity links, Tantivy full-text/fuzzy search, the
-durable bus's Fluvio broker sink, privacy, front-end merge action, bulk
-import/export, the `posts` / `comments` / `members` collaboration
+§13](./spec/index.md)): the `goals` / `issues` operational sub-resources
+(only `tasks` is wired) + the derived `/timeline` view, `deduplicate` +
+the review queue, cross-service entity links, front-end merge action,
+bulk import/export, the `posts` / `comments` / `members` collaboration
 sub-resources, gRPC. Auth credentials are issued by the central
 [authentication-service](../../authentication/authentication-service-with-loco):
 the human session is a server-side cookie session, and peers verify a

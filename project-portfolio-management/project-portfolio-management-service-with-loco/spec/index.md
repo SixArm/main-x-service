@@ -47,6 +47,12 @@ dropped, `owner_org_id`/`owner_org_name` masked to their tail) + the
 masked view + audited GDPR export, wired to the ABAC `mask` obligation
 — landed (§13 2026-08-02); the thinnest privacy module in the family,
 since most of a `Plan` is operational content, not personal data.
+Beyond the MVP, the crate is also a **full project-management tool**:
+the PPM governance / visibility / strategy phases (§9.9–§9.11), the
+executive insight and oversight views (§9.12–§9.13), the
+engineering-team core — task board, sprints, burndown, velocity,
+standup, DevOps ingest (§9.14) — and row-level integrity verification
+over `plans`/`audit_logs` (§9.15) have all landed.
 Deferred (§13): the goals/issues
 sub-resource tables + the derived
 timeline view (tasks + sprints + burndown landed 2026-07-20),
@@ -290,20 +296,22 @@ match, dedupe, and merge regardless of their (optional) `kind` labels.
 
 | Resource | Base path | Notable fields |
 |---|---|---|
-| Goals | `/api/plans/{pid}/goals` | title, target_date (also in payload via `data.goals[]`) |
-| Tasks | `/api/plans/{pid}/tasks` | title, assignee_ref, status, goal_id?, parent_task_id?, estimate, remaining, due_date |
-| Issues | `/api/plans/{pid}/issues` | title, kind, severity, status, assignee_ref |
+| Goals | `/api/plans/{pid}/goals` | title, target_date (also in payload via `data.goals[]`) — **deferred, §13**: not yet wired as a sub-resource; only goal titles exist today, via `data.goals[]` |
+| Tasks | `/api/plans/{pid}/tasks` | title, assignee_ref, status, goal_id?, parent_task_id?, estimate, remaining, due_date, story_points — **landed 2026-07-20**, §9.14 |
+| Issues | `/api/plans/{pid}/issues` | title, kind, severity, status, assignee_ref — **deferred, §13**: not yet wired |
 
-Each base path supports `POST` (create), `GET` (list), `GET /{sub_pid}`
-(fetch), `PUT /{sub_pid}` (update), `DELETE /{sub_pid}` (soft-delete).
-(`posts` / `comments` / `members` are deferred roadmap, §13.)
+Only **Tasks** are implemented today (§9.14 has the full route list,
+incl. the Kanban-move `PATCH` and WIP limits); it supports `POST`
+(create), `GET` (list), `PUT /{sub_pid}` (update), `PATCH /{sub_pid}`
+(move), `DELETE /{sub_pid}` (soft-delete). Goals and Issues remain
+deferred roadmap (§13), same as `posts` / `comments` / `members`.
 
 ### 9.4 Derived read views
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/plans/{pid}/timeline` | Goals-milestone + task date ranges → Gantt |
-| GET | `/api/plans/{pid}/burndown` | Remaining-vs-estimate over time |
+| GET | `/api/plans/{pid}/timeline` | Goals-milestone + task date ranges → Gantt — **deferred, §13** |
+| GET | `/api/plans/{pid}/burndown?sprint=` | Remaining-per-day from real `done_at` stamps only, no ideal line — **landed 2026-07-20**, §9.14 |
 
 ### 9.4a Collaboration, automation, and prioritisation
 
@@ -509,6 +517,156 @@ JSON-in-cell. Export is business/ops data (light masking) but **lead /
 assignee / person refs are personal data**, so any export carrying them
 is audited (even zero-row).
 
+### 9.9 Governance (PPM Phase A)
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST / GET | `/api/proposals` | Intake a plan candidate; list (draft→submitted→in_review→approved/rejected→promoted) |
+| GET / PUT | `/api/proposals/{pid}` | Fetch / edit a proposal |
+| POST | `/api/proposals/{pid}/submit` · `/review` · `/approve` · `/reject` | Pipeline transitions |
+| POST | `/api/proposals/{pid}/promote` | Mint the plan (`create_and_emit`, `provenance=intake`) |
+| GET | `/api/proposals/{pid}/duplicates` | Matcher-backed duplicate-demand check vs live plans + sibling proposals |
+| POST / GET | `/api/plans/{pid}/gate-reviews` | Strictly-ordered g0–g5 stage gates |
+| POST / GET | `/api/plans/{pid}/risks` | 1–5×1–5 exposure-ranked risks |
+| PUT | `/api/plans/{pid}/risks/{risk_pid}` | Update / `escalate` |
+| POST / GET | `/api/plans/{pid}/budget-lines` | ISO-4217 minor-unit planned/actual/variance |
+| POST | `/api/plans/{pid}/budget-lines/{line_pid}/actual` · `/release` | Accumulate actual; release a stage-gated tranche |
+| GET | `/api/plans/{pid}/governance` | Per-plan governance summary |
+
+Record-level ABAC (`auth::plan_resource_attrs` exposes `resource.stage`)
+gates plan `PUT` and gate-review `POST`, so gate-locking is policy, not
+code. Landed 2026-07-18 (T-PPM-A, §13).
+
+### 9.10 Visibility (PPM Phase B)
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST / GET | `/api/dependencies` | Plan-to-plan dependencies (self/duplicate/cycle refused) |
+| DELETE | `/api/dependencies/{pid}` | Remove a dependency |
+| GET | `/api/plans/{pid}/schedule` | Violations + critical path (memoised longest-duration DFS) + undated members |
+| POST / GET | `/api/plans/{pid}/milestones` | Milestones with overdue flags |
+| POST | `/api/plans/{pid}/milestones/{m_pid}/complete` | Mark complete (`done_at` stamped) |
+| POST / GET | `/api/plans/{pid}/allocations` | Per-person allocation |
+| DELETE | `/api/plans/{pid}/allocations/{a_pid}` | Remove an allocation |
+| GET | `/api/capacity` | Per-person rollup, flags > 100 % |
+| POST / GET | `/api/reports` | Saved report definitions |
+| DELETE | `/api/reports/{pid}` | Remove a saved report |
+| GET | `/api/reports/{pid}/run?format=json\|csv` | Run synchronously (row cap 1000; RFC-4180 CSV) |
+| GET | `/api/at-a-glance` | ETag-conditional dashboard: per-kind RAG/stage rollups + site tiles |
+
+Landed 2026-07-18 (T-PPM-B, §13). Scheduled/artifact report runs await
+the family bulk machinery (§9.8, deferred).
+
+### 9.11 Strategy (PPM Phase C)
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST / GET | `/api/ideas` | Capture ideas |
+| POST | `/api/ideas/{pid}/vote` · `/dismiss` · `/convert` | Vote; dismiss; convert to a draft proposal (`provenance=idea`) |
+| POST / GET | `/api/scenarios` | What-if scenarios over live budgets/risks/alignment |
+| GET | `/api/scenarios/{pid}/evaluate` | Evaluate (infeasible commits refused) |
+| POST | `/api/scenarios/{pid}/commit` | Commit; the evaluation snapshot is audited |
+| GET | `/api/scenarios/compare?a=&b=` | Two live evaluations side by side (per-currency deltas) |
+| POST / GET | `/api/objectives` | The OKR registry |
+| GET | `/api/objectives/{pid}/alignment` | Per-objective alignment rollup |
+| POST / GET | `/api/plans/{pid}/objectives` | Weighted plan↔objective links |
+| POST / GET | `/api/plans/{pid}/benefits` | Financial (minor-unit) or non-financial benefit targets |
+| POST | `/api/plans/{pid}/benefits/{b_pid}/realize` | Accumulate realized value; per-currency ROI vs budget actuals |
+
+Landed 2026-07-18 (T-PPM-C, §13). With Phases A/B/C landed, the full PPM
+catalogue is delivered service-side.
+
+### 9.12 Executive insights (read-only, derived)
+
+Seven ETag-conditional views (`as_of` watermark, mirroring
+`/at-a-glance`), deriving from existing tables:
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/executive/health` | Per-portfolio RAG briefing |
+| GET | `/api/executive/decisions` | Gate reviews + scenario commits + decided proposals + merges, newest first |
+| GET | `/api/executive/benefits` | Per-portfolio per-currency target vs realized |
+| GET | `/api/executive/alignment` | Per-kind aligned/unaligned spend via `objective_links` |
+| GET | `/api/financials/variance` | Minor-unit variance by kind/category/portfolio, one row per currency (no FX) |
+| GET | `/api/financials/exposure` | Per-currency estate totals + held (gated) amounts |
+| GET | `/api/technology/dependency-risk` | Top fan-out, cross-portfolio edges, RAG-red-predecessor edges |
+| GET | `/api/technology/radar` | `tech:<name>[:<ring>]` tag convention, majority-ring vote |
+| GET | `/api/technology/debt` | `risks.category` exposure-sorted register |
+| GET | `/api/technology/flow` | Delivery-flow throughput/month + median lead days |
+
+Landed 2026-07-19 (§13). Currencies are never summed across lines.
+
+### 9.13 Oversight (board / auditor / compliance / CRO / CISO / regulator)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/board/pack` | Period-scoped decisions/realizations/completions/releases + as-of-now health |
+| GET | `/api/board/investments` | Investment rollup |
+| POST | `/api/board/snapshots` | Capture an estate snapshot (also `src/snapshots.rs::spawn`, an optional ticker, `PROJECT_PORTFOLIO_MANAGEMENT_SNAPSHOT_HOURS`, default off) |
+| GET | `/api/board/trends` | Stored snapshot series (no interpolated history) |
+| GET | `/api/auditor/trail` | Filterable audit explorer + integrity stats |
+| GET | `/api/auditor/findings` | Segregation-of-duties over recorded audit actors only |
+| GET | `/api/auditor/evidence-pack` | JSON/CSV, capped 2000 rows |
+| GET | `/api/compliance/register` · `/findings` | Category register + rule-disclosed conformance checks |
+| GET | `/api/risk/heatmap` | Probability×impact cells, posture, declared appetite (`PROJECT_PORTFOLIO_MANAGEMENT_RISK_APPETITE`) |
+| GET | `/api/security/register` | + disclosed no-security-risk-at-late-stage heuristic |
+| GET | `/api/regulator/extract` | Deliberately coarse; honours the ABAC `mask` obligation (withholds names) |
+
+Landed 2026-07-19/20 (§13); one new table (`insight_snapshots`). Persona
+gating (board vs auditor vs regulator, …) is ABAC policy configuration
+(`dept=board|audit|…`), not new code. **Note**: this
+`/api/compliance/{register,findings}` regulatory-conformance register is
+distinct from the row-level integrity `/api/compliance/{records,audit}/verify`
+endpoints (§9.15) — the two happen to share the `compliance` path segment
+for unrelated reasons.
+
+### 9.14 Engineering-team features (tasks, sprints, DevOps)
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST / GET | `/api/plans/{pid}/tasks` | Create / list Kanban tasks (story points 0–100) |
+| PUT | `/api/plans/{pid}/tasks/{t_pid}` | Update (never changes status — flow stamps stay true) |
+| PATCH | `/api/plans/{pid}/tasks/{t_pid}` | Move (board column change; `status_changed_at` stamped; first `done` entry stamps `done_at`; `PROJECT_PORTFOLIO_MANAGEMENT_WIP_LIMITS` caps enforced, `422` on a full column) |
+| DELETE | `/api/plans/{pid}/tasks/{t_pid}` | Soft-delete |
+| POST / GET | `/api/plans/{pid}/sprints` | Time-boxed sprints (`ends_on >= starts_on`) |
+| GET | `/api/plans/{pid}/burndown?sprint=` | Remaining-per-day from real `done_at` stamps only — no ideal line |
+| GET | `/api/plans/{pid}/velocity` | Per-sprint done counts + point sums (never compare across teams/plans) |
+| POST / GET | `/api/plans/{pid}/sprints/{s_pid}/notes` | Retro (`went_well`/`improve`/`action`) + feedback; `action`/`feedback` convertible once into a task |
+| GET | `/api/plans/{pid}/standup` | Audit-derived last-24h digest |
+| POST | `/api/devops/events` | Ingest deploy / incident / recovery |
+| GET | `/api/devops/metrics` | DORA-style, derived only from ingested events |
+| GET | `/api/devops/releases` | Deploy-event release register |
+| GET | `/api/engineering/blocked` | Blocked-task aging |
+| GET | `/api/engineering/moscow` | `moscow:<band>` tag convention rollup |
+| GET | `/api/engineering/delivery-links` | External-tracker identifiers + untracked list |
+| GET | `/api/engineering/milestone-calendar` | Milestone kinds: milestone/demo/release/checkpoint |
+
+Landed 2026-07-20 (§13, "the operational core" + "moderate fits");
+migrations `…_000001_engineering` + `…_000002_engineering_moderate`.
+Tasks and sprints are operational data — **never** fed to the matcher
+(§5 partition rule). The `goals` and `issues` sub-resources (§9.3) and
+the `/{pid}/timeline` view (§9.4) remain deferred.
+
+### 9.15 Integrity verification (`src/compliance/`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/compliance/records/verify?limit=` | Recomputes each plan's SHA-256 + SHA3-256 digests and a keyed HMAC-SHA256 MAC over the same pre-image; names any row that differs |
+| GET | `/api/compliance/audit/verify?limit=` | Recomputes each `audit_logs` row's MAC; names any row whose content was altered |
+
+Landed 2026-07-27/28. `limit` defaults 1000, capped 10 000
+(`VERIFY_MAX_LIMIT` — an unbounded scan is a CPU DoS, the SEC-M1
+bound-every-input invariant). Both endpoints sit under the blanket
+`/api/*` guard (§9.6); as reads, the default policy admits any
+authenticated caller. **The digests are unkeyed** (their pre-image
+format is published here), so they catch careless modification; **the
+MAC is what defends against a deliberate edit**, and is written only
+when `PORTFOLIO_INTEGRITY_MAC_KEY` (or `..._KEY_FILE`) is configured —
+unset ⇒ rows report `mac_absent`, never a false mismatch. This crate has
+**no hash chain** (unlike person/worker/care-pathway/case): a MAC proves
+a row's content is unchanged since written, and says nothing about a row
+deleted wholesale.
+
 ## 10. Persistence
 
 PostgreSQL via SeaORM + `sea-orm-migration`. `auto_migrate` on in
@@ -567,8 +725,9 @@ plan metric name + `# HELP`/`# TYPE` preamble + content type), and the
 derived-view unit tests (timeline ordering, burndown remaining-vs-estimate
 from snapshots). Request-level tests (`tests/requests/plans.rs`, loco
 testing harness) cover CRUD + match + dedupe + merge over the plans
-collection, the sub-resource CRUD, the timeline/burndown views,
-`/links`, unknown-pid `404` on GET / PUT / DELETE (and the merge `404`),
+collection, the `tasks` sub-resource CRUD + Kanban move + the burndown
+view (`goals`/`issues` and `/timeline` remain deferred, §13),
+unknown-pid `404` on GET / PUT / DELETE (and the merge `404`),
 the `409` real-time create duplicate, the kind-agnostic matching
 (a plan matches a plan of any/other kind label), the `parent_ref`
 containment-cycle `422`, the `?parent=` child roll-up, the audit/event
@@ -690,12 +849,13 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   The denormalised column is `parent_pid` (was `portfolio_pid`) and the
   `kind` column is nullable. Merge proposals carry an optional
   `kind_target` label (blank = none). Builds and tests green.
-- [ ] loco boot + the single `plans` table/migration + a shared CRUD
+- [x] loco boot + the single `plans` table/migration + a shared CRUD
   controller core with `422` validation (blank `name`; UUID / PM-tool-id
   / URI `identifiers` shapes; blank goal titles; BCP-47 `in_language`
   syntax; `parent_ref` UUID + containment-cycle check — all problems
   reported together) + real-time create duplicate detection (`409`,
-  kind-agnostic).
+  kind-agnostic). Implemented: `controllers/plans.rs` + `validation.rs`
+  + `migration/…_000001_plans`.
 - [x] **SEC-M1 — input-size caps in `src/validation.rs`** (2026-07-13).
   Bound every scalar text field (`MAX_TEXT_LEN = 1024` chars), every
   array (`MAX_ARRAY_LEN = 256` entries), and every string entry inside
@@ -703,25 +863,33 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   `identifiers[i].value` / `relationships[i].plan_id`) → `422`, before
   store/match, to close the matcher's `O(n·m)` CPU/memory DoS vector
   (amplified by check-duplicates). `kind` is an enum, not capped.
-- [ ] Matching — embed `project-portfolio-management-matcher`
+- [x] Matching — embed `project-portfolio-management-matcher`
   (`MatchingEngine::new( MatchConfig::default())`); `POST /match`, `POST
-  /check-duplicates` (scan active plans), `POST /deduplicate` (batch →
-  review queue). Matching is **kind-agnostic** — no kind gate, so any
-  two plans may match regardless of their optional `kind` labels; cover
-  it in `tests/matching.rs`.
+  /check-duplicates` (blocked on the Tantivy index since 2026-08-02, §9.2).
+  Matching is **kind-agnostic** — no kind gate, so any
+  two plans may match regardless of their optional `kind` labels; covered
+  in `tests/matching.rs`.
+  - [ ] `POST /deduplicate` (batch scan → review queue) — not wired; no
+    `review_queue` table exists yet for this crate.
 - [x] Name search — `GET /search?q=` Tantivy full-text/fuzzy/phonetic
   search (§9.1, §13 2026-08-02), replacing the earlier Postgres `ILIKE`.
-- [ ] Operational sub-resources — `tasks` / `goals` / `issues` tables +
+- [x] Operational sub-resources — `tasks` / `goals` / `issues` tables +
   CRUD controllers, each keyed by the parent plan `pid`, audited,
-  emitting scoped events. (`posts` / `comments` / `members` deferred.)
-- [ ] Derived views — `GET /{pid}/timeline` (Gantt) + `/{pid}/burndown`
+  emitting scoped events. **`tasks` landed 2026-07-20** (§9.14 —
+  `controllers/engineering.rs`, incl. the Kanban `PATCH` move + WIP
+  limits + story points).
+  - [ ] `goals` / `issues` — not wired (`posts` / `comments` / `members`
+    also deferred).
+- [x] Derived views — `GET /{pid}/timeline` (Gantt) + `/{pid}/burndown`
   from task estimate/remaining snapshots; pure projection logic + unit
-  tests.
-- [ ] Record merge — `POST /merge` (union fields, former-name
+  tests. **`burndown` landed 2026-07-20** (§9.14 — honest, real
+  `done_at`-stamps-only derivation, no ideal line).
+  - [ ] `/{pid}/timeline` (Gantt) — not wired.
+- [x] Record merge — `POST /merge` (union fields, former-name
   alias, soft-delete, `merge_records` history + snapshot, `Replaces`
   link, `Merged` event); merge any two plans (no kind scoping);
-  `/merges/recent`; pure `src/merge.rs`.
-- [ ] Event streaming + audit log on CRUD (plan + sub-resources) —
+  `/merges/recent`; pure `src/merge.rs`. Implemented and tested.
+- [x] Event streaming + audit log on CRUD (plan + sub-resources) —
   `audit_logs` table + best-effort row per write; in-memory event
   stream; `/audit/recent`, `/{pid}/audit`, `/events/recent`. **Phase 1**
   of the durable event bus (canonical versioned `Envelope` +
@@ -792,14 +960,15 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   `unlinked`; optimistic write (no cross-service call); never a matcher
   signal. Contract:
   [`agents/share/cross-service-linking.md`](../../../agents/share/cross-service-linking.md).
-- [ ] OpenAPI/Swagger — `src/openapi.rs` (utoipa) served at
+- [x] OpenAPI/Swagger — `src/openapi.rs` (utoipa) served at
   `/api-docs/openapi.json` + `/swagger-ui` by `controllers/docs.rs`
-  (covering the plans collection).
-- [ ] Prometheus metrics — `GET /metrics.prom` (root path, `text/plain;
+  (covers the full surface, incl. the PPM phases / insights / oversight
+  / engineering tags — not just the plans collection).
+- [x] Prometheus metrics — `GET /metrics.prom` (root path, `text/plain;
   version=0.0.4`); process-wide `OnceLock` registry in `src/metrics.rs`
   (plan CRUD/merge counters + `http_requests_total`); public under
   blanket auth enforcement.
-- [ ] Offline PASETO v4 public verification (`authentication-verifier`);
+- [x] Offline PASETO v4 public verification (`authentication-verifier`);
   `src/auth.rs` per
   [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
   (supersedes the RS256-JWT model). `src/auth.rs` embeds
@@ -807,9 +976,11 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   Ed25519 verification via a process-wide `Verifier` (env-configured
   keys/issuer/audience); `AuthUser`/`MaybeAuthUser` extractors;
   `/whoami` protected; audit `actor` from the token.
-- [ ] Blanket `/api/*` enforcement — `auth::enforce(require_auth, path,
+- [x] Blanket `/api/*` enforcement — `auth::enforce(require_auth, path,
   headers, verifier)` + an `after_routes` layer, gated per-request by
-  `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` (off by default). Public
+  `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`. Wired and tested; **off by
+  default** per the family's activation-gate convention
+  (`agents/share/security.md` §4) — a deployment opts in. Public
   paths stay open. Family contract: `agents/share/jwt-enforcement.md`. -
   [x] paseto-keys-over-HTTP fetch at boot — done 2026-07-04.
   `PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS_URL` set (non-blank) ⇒
@@ -823,8 +994,21 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   ephemeral-port HTTP listener proves the fetch-built verifier accepts a
   token signed by the served key, and a fast-failing URL
   (`http://127.0.0.1:1/`) proves fallback without panic.
-- [ ] Privacy — masking of lead / assignee / person refs on read +
-  export; GDPR obligations for those people.
+- [x] Privacy — masking of lead / assignee / person refs on read +
+  export; GDPR obligations for those people. **Done 2026-08-02** — see
+  the dated entry near the top of this section (`src/privacy.rs`,
+  `GET /{pid}/masked`, `GET /{pid}/export`).
+- [x] **Integrity verification (2026-07-27/28) — not previously tracked
+  here.** `src/compliance/` (`mac.rs` binding the shared `integrity-mac`
+  crate, `record_integrity.rs` over `plans`, `audit_integrity.rs` over
+  `audit_logs`); `GET /api/compliance/records/verify` and
+  `GET /api/compliance/audit/verify` (§9.15). Default off without
+  `PORTFOLIO_INTEGRITY_MAC_KEY[_FILE]` (rows report `mac_absent`, never
+  a false mismatch). No hash chain (unlike person/worker/care-pathway/
+  case) — a MAC proves content integrity, not non-deletion. This landed
+  alongside the same-day integrity rollout across every remaining entity
+  service but had no `spec/13`/`spec/14`/`AGENTS.md` entry until this
+  pass.
 - [ ] Bulk import/export — `bulk_jobs` migration + the five endpoints on
   the plans collection (§9.8); `bg_pg` worker draining `queued → running
   → completed | completed_with_errors
@@ -1064,7 +1248,13 @@ default-off via `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TRANSPORT=memory`)
 proposals / gate reviews / risks / budget lines; Visibility:
 dependencies / schedule / milestones / allocations / capacity / reports
 / at-a-glance; Strategy: ideas / scenarios / objectives / benefits) and
-the engineering core (tasks / sprints / burndown / standup / DevOps).
+the engineering core (tasks / sprints / burndown / standup / DevOps),
+plus the executive insight areas (§9.12), the oversight areas — board /
+auditor / compliance-register / risk-heatmap / security / regulator
+(§9.13) — collaboration / automation / prioritisation (§9.4a), field
+masking + audited GDPR export wired to the ABAC `mask` obligation
+(§13, 2026-08-02), and row-level integrity verification (§9.15,
+2026-07-27/28, default off without a configured MAC key).
 Still open (§13): the remaining operational sub-resources (goals /
 issues) + the derived timeline view, `deduplicate` + review
 queue, cross-service `entity_links`, bulk import/export,
