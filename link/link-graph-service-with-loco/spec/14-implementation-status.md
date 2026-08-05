@@ -74,8 +74,20 @@ disagree, §13 wins.**
   per-source-entity (SEC-B1), authenticated (SEC-B7).
 - **Prometheus `/metrics.prom`** (T-21, `src/metrics.rs`) — consumer
   lag, edge counts by status, processed counters, plus the LNK-4
-  suggestion-run gauge (below). OTLP export (T-22) remains open — see
-  §14.3.
+  suggestion-run gauge (below).
+- **OpenTelemetry OTLP export** (T-22, `src/observability.rs`, landed
+  2026-08-05) — **the first working exporter anywhere in this family**;
+  the other services either carry a commented-out stub (person, worker,
+  event) or nothing. Traces and metrics over OTLP/**gRPC**, bridged from
+  `tracing` and installed through loco 1.0's `Hooks::init_logger` seam so
+  loco's own `EnvFilter` policy and log format are reused rather than
+  re-derived; flushed from `on_shutdown`; `trace_mw` adds a per-request
+  span, an `http.server.request.duration` histogram, and the W3C
+  `traceparent` response header. On by default (`OTLP_ENDPOINT`,
+  `OTLP_SERVICE_NAME`); `OTLP_ENDPOINT=""` turns it off. Proved against a
+  real in-process OTLP/gRPC collector in `tests/otlp_export.rs` +
+  `tests/otlp_middleware.rs` (neither `#[ignore]`d, neither needing a
+  database).
 - **Cross-service `same_identity` suggestion (LNK-4, T-29..T-33,
   `src/suggest/`, complete 2026-08-04)** — the pure `IdentityProbe`
   comparator + candidate blocking (`mod.rs`), the periodic fetch→block→
@@ -102,12 +114,12 @@ disagree, §13 wins.**
 
 Check [§13](13-tasks.md) directly for the current, authoritative list —
 it is kept current task-by-task; this is only a snapshot. As of
-2026-08-04: graph-read privacy-masking parity with the case service
-(T-18), OTLP wiring (T-22, blocked on a family-wide decision — no
-service anywhere has a working OTLP exporter to copy, see that task's
-own note), the durable-bus flip per entity (T-23), and the
+2026-08-05: graph-read privacy-masking parity with the case service
+(T-18), the durable-bus flip per entity (T-23), and the
 bus/governance/bench test tiers (T-26 Fluvio round-trip, T-27
-governance no-leak, T-28 Criterion benchmarks).
+governance no-leak, T-28 Criterion benchmarks). T-22's Podman
+health-check + non-root container hardening also remains, though its
+OTLP half landed 2026-08-05.
 
 ### 14.3 Upstream prerequisites — status as of 2026-08-04 (both resolved)
 

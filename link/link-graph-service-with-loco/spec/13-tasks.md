@@ -240,19 +240,70 @@
   `is_public_path`). Unit test (render) + DB-gated endpoint test.
   Reconciliation **divergence** is deferred with the reconciliation worker,
   T-20.)*
-- [ ] T-22: Tracing + OpenTelemetry OTLP wiring; loco `/_health` /
+- [x] T-22: Tracing + OpenTelemetry OTLP wiring; loco `/_health` /
   `/_ping`; graceful shutdown; Podman health check; non-root container.
-  *(2026-08-01, while completing AU-3: **there is no working OTLP export
-  anywhere in the family to copy**. Three crates — person, worker,
-  event — carry an `src/observability/` module that builds an OTel
-  `Resource` and then installs a plain JSON `tracing` subscriber, with
-  the exporter and the `tracing_opentelemetry` layer commented out
-  behind `// TODO: Initialize OTLP exporter`. Every other service,
-  including this one, has nothing. Wiring a real exporter is therefore
-  new work and a family-wide decision — which crate first, and what the
-  collector story is in compose — not a copy job, so it is left open
-  rather than half-done here. The shared capability matrix has been
-  corrected to stop claiming it.)*
+  *(Done 2026-08-05 — **the family's first working OTLP exporter**.)*
+
+  The 2026-08-01 note below was right that there was nothing to copy:
+  person, worker and event carry an `src/observability/` module whose
+  exporter and `tracing_opentelemetry` layer are commented out behind
+  `// TODO: Initialize OTLP exporter`, and every other service — this one
+  included — had no such module at all. So this is new work, written
+  against
+  [`rust-tracing-opentelemetry-stack.md`](../../../agents/share/rust-tracing-opentelemetry-stack.md)
+  rather than ported from a sibling.
+
+  **What landed** (`src/observability.rs`): `OTLP_SERVICE_NAME` /
+  `OTLP_ENDPOINT` config with the shared doc's defaults; one OTel
+  `Resource`; an OTLP/**gRPC** `SdkTracerProvider` (batch) and
+  `SdkMeterProvider` (periodic); a `tracing_opentelemetry` bridge layer
+  installed **alongside** loco's own fmt layer and `EnvFilter`, via loco
+  1.0's `Hooks::init_logger` seam (which exists precisely so an app can
+  compose its own layers — `logger::init_env_filter` / `init_layer` are
+  public for this); `Hooks::on_shutdown` flushing both providers; and a
+  `trace_mw` layer that opens one span per request, records an
+  `http.server.request.duration` histogram, and stamps the W3C
+  `traceparent` on the response (the shared doc's *Where to look first*
+  line, previously aspirational).
+
+  **Versions**: `opentelemetry`/`_sdk`/`-otlp`/`-semantic-conventions`
+  0.32, `tracing-opentelemetry` 0.33 — *not* the 0.27/0.28 person's
+  `Cargo.toml` pins. Those pins were never exercised (their exporter is
+  still commented out) and 0.27's `install_batch(runtime::Tokio)`
+  pipeline API no longer exists upstream.
+
+  **Two behaviours worth not re-litigating.** Export is **on by
+  default** (the shared doc's `OTLP_ENDPOINT` default is a real endpoint,
+  and it describes no activation flag — unlike `<ENTITY>_REQUIRE_AUTH`);
+  the escape hatch is `OTLP_ENDPOINT=""`, a value of the documented
+  variable rather than a second flag, and it makes `init_logger` return
+  `false` so loco's untouched logger runs. And **`RUST_LOG` now also
+  governs what is exported**, since the filter sits above both sinks:
+  loco's module whitelist is what keeps the trace stream to this
+  service's own spans.
+
+  **Verified, not inferred.** `tests/otlp_export.rs` and
+  `tests/otlp_middleware.rs` stand up a real in-process OTLP/gRPC
+  collector (the generated `TraceServiceServer`/`MetricsServiceServer`
+  on an ephemeral port) and assert on the decoded protobuf: the span
+  arrives with the configured `service.name`, its `tracing` fields as
+  OTel attributes, and a trace id that **matches the `traceparent` the
+  response carried**. Plus a live boot against Postgres with **no**
+  collector: `GET /_health` → `200` with a `traceparent`, and a clean
+  `SIGTERM` shutdown. Neither test is `#[ignore]`d and neither needs a
+  database, so both run in a plain `cargo test`.
+
+  **One thing this found.** With no collector, the first live boot logged
+  *nothing* — loco's `EnvFilter` whitelist has no `opentelemetry*` entry,
+  so every failed export was invisible, which looks exactly like success.
+  `with_exporter_diagnostics` widens the filter for those targets (only
+  when the operator has not supplied their own `RUST_LOG` /
+  `override_filter`); a failing export now logs
+  `BatchSpanProcessor.ExportError` once per batch interval.
+
+  *Still open from this task's original wording*: the Podman health check
+  and non-root container hardening (`/_health` / `/_ping` and graceful
+  shutdown are loco's and were already in place).
 - [ ] T-23: Flip transport to the durable bus per entity as Fluvio
   topics go live; retire lazy verify-on-read per entity (design §5.1,
   event-bus.md §8).

@@ -39,6 +39,35 @@ Tiered after the family convention: un-gated unit tests run DB-free in
   `compile_fail` doctest pins the §7 partition rule: `IdentityProbe`
   has no conversion to/from `person_matcher::Person` /
   `worker_matcher::Worker`.
+- **Telemetry config (T-22, `src/observability.rs`)** — the
+  `OTLP_SERVICE_NAME` / `OTLP_ENDPOINT` precedence (defaults, blank
+  service name, the `OTLP_ENDPOINT=""` off-switch), the resource's
+  `service.name` / `service.version`, that building an exporter against
+  an unreachable endpoint neither fails nor blocks, and that a failing
+  export is actually *visible* through the widened `EnvFilter`
+  (`with_exporter_diagnostics`).
+
+### 11.1a OTLP export (DB-free, **not** `#[ignore]`d)
+
+The one tier that would be worthless as a compile-check, because no
+service in this family had ever exported a span before T-22. Both
+binaries stand up a **real in-process OTLP/gRPC collector** — the
+generated `TraceServiceServer` / `MetricsServiceServer` on an ephemeral
+port (`tests/otlp_collector/`) — and assert on the decoded protobuf that
+crossed the socket, not on in-process SDK state.
+
+- **`tests/otlp_export.rs`** — a `tracing` span reaches the collector
+  carrying the configured `service.name`, the span name, its `tracing`
+  fields as OTel attributes, and non-empty trace/span ids; a recorded
+  instrument reaches it as a named metric; and with **no** collector
+  listening, building, emitting, flushing and shutting down all complete
+  promptly (the property that lets export default to on).
+- **`tests/otlp_middleware.rs`** — the mounted `trace_mw`, over a real
+  Axum server and a real HTTP request: the response's W3C `traceparent`
+  is well-formed **and its trace id equals the exported span's**, so the
+  header demonstrably points at the trace rather than merely looking
+  like one. Its own binary, because it installs a process-global
+  subscriber.
 
 ### 11.2 DB-gated (`#[ignore]`)
 

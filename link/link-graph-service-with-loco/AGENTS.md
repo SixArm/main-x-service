@@ -54,9 +54,11 @@ migrations (the last backs `src/models/suggestion_runs.rs`, one durable
 row per completed suggestion pass). The cross-service `same_identity`
 matcher round (LNK-4, T-29..33) is **complete** — see
 [`spec/13-tasks.md`](spec/13-tasks.md) and `spec/16-open-questions.md`
-OQ-9. `cargo test --lib`: 95 passed (2026-08-04). Remaining (see
+OQ-9. `cargo test --lib`: 103 passed (2026-08-05). Remaining (see
 [`spec/13-tasks.md`](spec/13-tasks.md) and spec §14): graph-read
-privacy-masking parity with the case service (T-18), OTLP wiring (T-22),
+privacy-masking parity with the case service (T-18), T-22's remaining
+container hardening (its **OTLP export landed 2026-08-05** —
+`src/observability.rs`, the family's first working exporter),
 the durable-bus flip (T-23), the bus/governance/bench test tiers
 (T-26..28), and (this pass) the documentation-harmonisation sweep
 LNK-4's completion unblocked (DOC-6).

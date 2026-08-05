@@ -61,7 +61,7 @@ about this service's own inbound surface (§1.3,
 | **Read API** | loco.rs controllers serving `/neighbors`, `/edges`, `/single-view`, `/health/freshness`; attaches `as_of`; enforces `case ↔ person` governance (§12). |
 | **Reconciliation worker** | Periodic Tokio task (`src/reconcile.rs`, `run_periodic`, spawned from `after_routes`, not a loco `worker` job); diffs read-model vs each service's authoritative `entity_links` via an authenticated `HttpAuthoritativeSource`; emits divergence; repairs. |
 | **Suggestion job (LNK-4)** | Periodic Tokio task (`src/suggest/job.rs`, `run_periodic`, spawned from `after_routes`); fetches person + worker via `HttpIdentitySource`, blocks + scores via `src/suggest/mod.rs`, `POST`s survivors to person via `HttpSuggestionSink`; writes one `suggestion_runs` row per completed pass (§6.8, §10.7). |
-| **Observability** | Prometheus metrics (`src/metrics.rs`: lag, divergence, status counts, suggestion-run gauge), tracing. No OTLP export yet (T-22 — see §14). |
+| **Observability** | Prometheus metrics (`src/metrics.rs`: lag, divergence, status counts, suggestion-run gauge) **and real OpenTelemetry OTLP export** (`src/observability.rs`, T-22 — the family's first): a `tracing_opentelemetry` bridge over an OTLP/gRPC `SdkTracerProvider` + `SdkMeterProvider`, installed through loco's `Hooks::init_logger` alongside loco's own fmt layer and `EnvFilter`, flushed from `on_shutdown`; `trace_mw` opens one span per request and returns its W3C `traceparent`. On by default at `OTLP_ENDPOINT` (`http://localhost:4317`); `OTLP_ENDPOINT=""` disables. |
 
 ### 8.2 Integrity lifecycle (state machine)
 

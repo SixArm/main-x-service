@@ -49,7 +49,8 @@ per-task status; treat the version labels here as a map of *what*, not
 ### v0.5.0 — Hardening
 
 - Reconciliation worker + divergence metric (T-20); Prometheus metrics
-  (T-21); tracing / OTLP / health / container hardening (T-22).
+  (T-21); tracing / OTLP / health (T-22 — **OTLP landed 2026-08-05**,
+  the family's first working exporter; container hardening still open).
 - Flip transport to the durable bus per entity as Fluvio topics go live;
   retire lazy verify-on-read per entity (T-23) — design §11 step 5.
 

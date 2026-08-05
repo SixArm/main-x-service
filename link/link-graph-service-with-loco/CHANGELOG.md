@@ -13,6 +13,84 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > and [event-bus.md](../../agents/share/event-bus.md).
 
 ## [Unreleased]
+### Added — real OpenTelemetry OTLP export (T-22 / repo AU-3, 2026-08-05)
+
+**The first working OTLP exporter anywhere in the Main X Index family.**
+The previous attempt at this task closed with the finding that there was
+nothing to copy, and that was correct: person, worker and event carry an
+`src/observability/` module that builds an OTel `Resource` and then
+installs a plain JSON `tracing` subscriber with the exporter and the
+`tracing_opentelemetry` layer commented out behind
+`// TODO: Initialize OTLP exporter`; every other service, this one
+included, had no such module at all. So this is new work written against
+[`rust-tracing-opentelemetry-stack.md`](../../agents/share/rust-tracing-opentelemetry-stack.md),
+not a port.
+
+- **`src/observability.rs`** — `OTLP_SERVICE_NAME` / `OTLP_ENDPOINT`
+  configuration with the shared doc's defaults; one OTel `Resource`
+  (`service.name`, `service.version`); an OTLP/**gRPC** batch
+  `SdkTracerProvider` and periodic `SdkMeterProvider`; a
+  `tracing_opentelemetry` bridge layer installed **alongside** loco's own
+  fmt layer, so local JSON/compact logs and remote export are both live
+  rather than either/or.
+- **Wired through loco's own seam.** `Hooks::init_logger` returns `true`
+  and composes `logger::init_env_filter` + `logger::init_layer` (public
+  in loco 1.0 precisely so an application can add its own layers), so
+  `RUST_LOG`, `logger.level`, `logger.format` and
+  `logger.override_filter` keep behaving exactly as before.
+  `Hooks::on_shutdown` flushes both providers, so the last batch is not
+  lost with the process.
+- **`trace_mw`** — one span per request (outermost layer, so a 401/403
+  from the read guard is inside the trace), an
+  `http.server.request.duration` histogram, and the W3C `traceparent`
+  response header the shared doc has always promised. The span is named
+  `http.server.request` rather than `{method} {route}`: a `from_fn` layer
+  runs outside routing, and this service's raw paths embed `EntityRef`s
+  including governed `case:{uuid}` ones, which must not become span names
+  or metric labels.
+- **Versions**: `opentelemetry` / `_sdk` / `-otlp` /
+  `-semantic-conventions` 0.32, `tracing-opentelemetry` 0.33 — *not*
+  person's 0.27/0.28 pins. Those were never exercised, and 0.27's
+  `install_batch(runtime::Tokio)` pipeline API no longer exists upstream;
+  pinning a dead API for symmetry with a stub would be the wrong kind of
+  consistency.
+
+**Export is on by default**, at `http://localhost:4317`, because that is
+what the shared doc specifies and it describes no activation flag (unlike
+`<ENTITY>_REQUIRE_AUTH`). Setting `OTLP_ENDPOINT=""` disables it, which
+makes `init_logger` return `false` so loco's untouched logger runs — the
+disabled path is loco's, not a re-implementation that could drift. Safe
+as a default because the tonic channel is built `connect_lazy()`, the
+batch processor owns a dedicated thread, and a full queue drops rather
+than blocks: verified by booting against Postgres with nothing listening
+on 4317 and getting a normal `200` with a `traceparent`, then a clean
+`SIGTERM`.
+
+**Verified against a real collector, not by compiling.** Given that no
+span had ever left any service in this family, a "it builds and does not
+panic" test would have proved exactly what the existing stubs prove.
+`tests/otlp_export.rs` and `tests/otlp_middleware.rs` therefore run a
+real in-process OTLP/gRPC collector (`tests/otlp_collector/`) and assert
+on the decoded protobuf: the span arrives with the configured
+`service.name`, its `tracing` fields as OTel attributes, and — for the
+mounted middleware — a trace id **equal to the `traceparent` the HTTP
+response carried**. Neither is `#[ignore]`d and neither needs a database.
+
+**One defect this surfaced.** The first live boot with no collector
+logged *nothing*: loco's `EnvFilter` is a module whitelist with no
+`opentelemetry*` entry, so every failed export was invisible — which
+reads exactly like success. `with_exporter_diagnostics` widens the filter
+for those targets, but only when the operator has not supplied their own
+`RUST_LOG` / `override_filter`; a failing export now logs
+`BatchSpanProcessor.ExportError` once per batch interval. Related and
+worth knowing: with the bridge installed, `RUST_LOG` also decides what is
+*exported*, so a blanket `RUST_LOG=trace` ships every internal `h2` /
+`hyper` / `sqlx` span to the collector too.
+
+Still open from T-22's original wording: the Podman health check and
+non-root container hardening (`/_health` / `/_ping` and graceful shutdown
+are loco's and were already in place).
+
 ### Fixed — DOC-6 doc audit (2026-08-04)
 
 Repo-wide task DOC-6, unblocked by LNK-4's completion (T-29..T-33,

@@ -31,6 +31,35 @@ async-trait = { version = "0.1" }
 axum = { version = "0.8" }
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Real OpenTelemetry OTLP export (T-22 / repo AU-3) — traces and metrics
+# over gRPC, per `agents/share/rust-tracing-opentelemetry-stack.md`. This
+# is the family's FIRST working exporter: person / worker / event carry an
+# `src/observability/` module whose exporter is commented out behind a
+# `// TODO: Initialize OTLP exporter`, so there was nothing to copy.
+#
+# Versions are the current line (0.32 / 0.33), not the 0.27 / 0.28 person's
+# `Cargo.toml` pins: those pins were never exercised (the exporter they were
+# added for is still commented out), and 0.27's `install_batch(runtime::Tokio)`
+# pipeline API no longer exists upstream. Pinning a dead API for symmetry
+# with a stub would be the wrong kind of consistency.
+#
+# `grpc-tonic` (not the crate's default `http-proto` + blocking reqwest):
+# the shared doc's `OTLP_ENDPOINT` default is `http://localhost:4317`, the
+# gRPC port. `internal-logs` is kept ON so a failing export is visible in
+# the log rather than silently dropped; the SDK's batch thread runs under
+# `Context::enter_telemetry_suppressed_scope`, so that cannot feed back.
+opentelemetry = { version = "0.32", features = ["trace", "metrics"] }
+opentelemetry_sdk = { version = "0.32", features = ["trace", "metrics"] }
+opentelemetry-otlp = { version = "0.32", default-features = false, features = [
+  "grpc-tonic",
+  "trace",
+  "metrics",
+  "internal-logs",
+] }
+opentelemetry-semantic-conventions = { version = "0.32" }
+tracing-opentelemetry = { version = "0.33" }
+
 migration = { path = "migration" }
 sea-orm = { version = "2.0", features = [
   "sqlx-sqlite",
@@ -103,7 +132,21 @@ serial_test = { version = "3.5.0" }
 tokio = { version = "1.53", default-features = false, features = [
   "macros",
   "rt-multi-thread",
+  "net",
 ] }
+# An in-process OTLP/gRPC collector for `tests/otlp_export.rs`: the
+# generated `TraceServiceServer` / `MetricsServiceServer` plus tonic's
+# server transport, so the export pipeline is proved against a real gRPC
+# listener in a normal `cargo test` run — no external collector, nothing
+# `#[ignore]`d. A test that only asserts "it compiles" would be worthless
+# here, since nothing in this family has ever actually exported a span.
+opentelemetry-proto = { version = "0.32", default-features = false, features = [
+  "gen-tonic",
+  "trace",
+  "metrics",
+] }
+tonic = { version = "0.14" }
+tokio-stream = { version = "0.1", features = ["net"] }
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process, so
 # the case↔person concealment can be proved end-to-end with real bearer
 # tokens (tests/concealment.rs) without the auth service.

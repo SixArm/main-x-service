@@ -428,8 +428,8 @@
   *Verified:* fmt + clippy clean in all four; DB-gated green vs
   Postgres 18 — organization 24, care-pathway 44, course 15,
   portfolio 37.
-- [~] **AU-3 (S)** link-graph auth completion. *(2026-08-01 — auth and
-  `user_ip` done; OTLP deliberately not)*
+- [x] **AU-3 (S)** link-graph auth completion. *(2026-08-01 — auth and
+  `user_ip`; OTLP closed 2026-08-05)*
 
   Done: the boot-time keys-over-HTTP fetch (there was **none** — the key
   set could only come from the environment), `spawn_key_refresh`, the
@@ -442,19 +442,63 @@
   none. 16 DB-gated green; the capture is pinned in
   `tests/concealment.rs`.
 
-  **Not done — OTLP (spec T-22), and the premise was wrong.** The task
-  assumed there was an OTLP pattern to adopt. There is not: person,
+  **Deferred then, on OTLP (spec T-22) — the premise was wrong.** The
+  task assumed there was an OTLP pattern to adopt. There is not: person,
   worker and event carry an `src/observability/` module that builds an
   OTel `Resource` and then installs a plain JSON `tracing` subscriber
   with the exporter and the `tracing_opentelemetry` layer commented out
   behind `// TODO: Initialize OTLP exporter`; every other service has
-  nothing. **No service in the family exports a span or a metric over
-  OTLP.** Porting that to link-graph would have moved a stub, so it is
+  nothing. **No service in the family exported a span or a metric over
+  OTLP.** Porting that to link-graph would have moved a stub, so it was
   left open and the shared capability baseline — which claimed
-  "Observability (tracing + OpenTelemetry OTLP)" for every crate — is
-  corrected to say what is actually there. Wiring a real exporter is
-  its own task: which crate first, and what the collector story is in
-  compose (DEP-1).
+  "Observability (tracing + OpenTelemetry OTLP)" for every crate — was
+  corrected to say what is actually there.
+
+  **Done — OTLP (spec T-22), 2026-08-05.** Built rather than copied,
+  since the note above is still an accurate description of the other
+  crates. link-graph now has `src/observability.rs`: OTLP/**gRPC** batch
+  traces + periodic metrics (`opentelemetry` 0.32 / `tracing-opentelemetry`
+  0.33 — not person's never-exercised 0.27/0.28 pins, whose
+  `install_batch(runtime::Tokio)` API no longer exists upstream), bridged
+  from `tracing` and installed through loco 1.0's `Hooks::init_logger`
+  seam so loco's own `EnvFilter` policy and log format are reused rather
+  than re-derived; flushed from `Hooks::on_shutdown`; and a `trace_mw`
+  layer adding a per-request span, an `http.server.request.duration`
+  histogram, and the W3C `traceparent` response header the shared doc has
+  promised since it was written.
+
+  **Export is on by default** — the shared doc's `OTLP_ENDPOINT` default
+  is a real endpoint and it describes no activation flag, unlike
+  `<ENTITY>_REQUIRE_AUTH`. The escape hatch is `OTLP_ENDPOINT=""`, a
+  value of the documented variable rather than a second flag, and it
+  makes `init_logger` return `false` so loco's untouched logger runs.
+  Safe as a default because the tonic channel is `connect_lazy()`, the
+  batch processor owns a dedicated thread, and a full queue drops rather
+  than blocking — verified by booting against Postgres with nothing on
+  4317: normal `200` with a `traceparent`, clean `SIGTERM`.
+
+  *Verified, not inferred:* `tests/otlp_export.rs` +
+  `tests/otlp_middleware.rs` run a **real in-process OTLP/gRPC
+  collector** and assert on the decoded protobuf — configured
+  `service.name`, span name, `tracing` fields as OTel attributes, and a
+  trace id equal to the `traceparent` the HTTP response carried. Neither
+  is `#[ignore]`d, neither needs a database. fmt + clippy
+  (`--all-targets --all-features -D warnings`) clean; `cargo test --lib`
+  103 passed; DB-gated suites green vs Postgres 18.
+
+  *One defect it surfaced:* with no collector the first live boot logged
+  **nothing** — loco's `EnvFilter` whitelist has no `opentelemetry*`
+  entry, so a failing export was invisible, which reads exactly like
+  success. `with_exporter_diagnostics` widens the filter for those
+  targets unless the operator supplied their own `RUST_LOG` /
+  `override_filter`.
+
+  **This unblocks the other crates**, which is deliberately *not* done
+  here: person / worker / event can replace their commented-out stubs
+  with this shape, and the nine services with no observability module can
+  adopt it wholesale. That is its own task (and still wants the compose
+  collector story, DEP-1) — a ten-crate rollout folded into this one
+  silently would be the same mistake as the stub it replaces.
 
 - [x] **PG-1 (L)** Pagination in the four newest loco services.
   *(done 2026-08-01 — all four services and all four front-ends; the

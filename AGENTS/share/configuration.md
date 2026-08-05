@@ -82,8 +82,8 @@ default.
 | `SEARCH_INDEX_PATH` | `./data/search_index` | Tantivy index directory |
 | `SEARCH_CACHE_SIZE_MB` | `512` | Tantivy cache budget |
 | `MATCHING_THRESHOLD` | `0.85` (`0.7` in some crates' own docs — check the crate) | Probabilistic match cutoff |
-| `OTLP_SERVICE_NAME` | `<entity>-service` | OTel resource name (built, never exported — see `overview.md`'s observability note) |
-| `OTLP_ENDPOINT` | `http://localhost:4317` | OTel collector endpoint (unused today, same caveat) |
+| `OTLP_SERVICE_NAME` | `<entity>-service` | OTel `service.name`. **Live in `link-graph-service` only** (`src/observability.rs`, 2026-08-05 — the family's only working exporter); in the ten entity registries the resource is built and never exported, see `overview.md`'s observability note |
+| `OTLP_ENDPOINT` | `http://localhost:4317` | OTLP/gRPC collector endpoint, same caveat. In link-graph this is **on by default** and export is disabled by setting it to the **empty string** — there is no separate activation flag |
 | `RUST_LOG` | `info` | Log level — also read directly by `tracing_subscriber` itself in every crate, not just this config struct |
 | `STREAMING_BROKER_URL` | `localhost:9003` | Legacy broker-URL field predating the durable-bus `FLUVIO_ENDPOINT` (§5) — check which your change actually needs |
 | `STREAMING_TOPIC` | `<entity>-events` | Legacy topic field, same caveat |

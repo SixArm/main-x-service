@@ -10,12 +10,13 @@ different services**: person *is the same human as* worker, person
 
 > **Status: read API + cross-service identity suggestion implemented.**
 > The read-model core, the four read endpoints, the real Fluvio bus
-> consumer (BUS-2), reconciliation, offline-PASETO auth, and the LNK-4
-> cross-service `same_identity` suggestion job are all live
-> ([`spec/`](spec/index.md), §1–§18; `cargo test --lib`: 95 passed,
-> 2026-08-04); the remaining work (graph-read masking parity with the
-> case service, OTLP wiring, the durable-bus flip, the bus/governance/
-> bench test tiers) is tracked in
+> consumer (BUS-2), reconciliation, offline-PASETO auth, the LNK-4
+> cross-service `same_identity` suggestion job, and real OpenTelemetry
+> OTLP export (T-22 — the family's first working exporter) are all live
+> ([`spec/`](spec/index.md), §1–§18; `cargo test --lib`: 103 passed,
+> 2026-08-05); the remaining work (graph-read masking parity with the
+> case service, container hardening, the durable-bus flip, the
+> bus/governance/bench test tiers) is tracked in
 > [`spec/13-tasks.md`](spec/13-tasks.md).
 
 ## What it is
