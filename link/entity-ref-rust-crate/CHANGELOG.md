@@ -12,6 +12,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-05
+
 > Reconstructed 2026-08-04 (DOC-5) from `git log` — this crate previously
 > shipped with no `CHANGELOG.md` at all.
 

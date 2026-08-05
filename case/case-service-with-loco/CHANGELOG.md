@@ -8,6 +8,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-08-05
 ### Added — `seed_examples` CLI task (EX-4, 2026-08-04)
 
 `cargo loco task seed_examples` loads the repository's shared demo

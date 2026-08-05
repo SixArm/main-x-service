@@ -10,6 +10,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-05
+
 ### Added — algorithm agility for the verifier
 
 - **`Verifier` dispatches on each key's *declared* algorithm** instead of

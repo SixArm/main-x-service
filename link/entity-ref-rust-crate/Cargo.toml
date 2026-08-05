@@ -1,6 +1,6 @@
 [package]
 name = "entity-ref"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "EntityRef — the shared cross-service-linking value type (entity_type:uuid URN) + edge-kind registry for the Main X Index family"

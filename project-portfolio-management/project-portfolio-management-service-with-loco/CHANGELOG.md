@@ -8,6 +8,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-08-05
 ### Added — pagination on the five operational sub-resource lists (PG-1, 2026-08-05)
 
 Closes the sub-bullet left open when `GET /api/plans` gained pagination

@@ -13,6 +13,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > and [event-bus.md](../../agents/share/event-bus.md).
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-08-05
 ### Added — real OpenTelemetry OTLP export (T-22 / repo AU-3, 2026-08-05)
 
 **The first working OTLP exporter anywhere in the Main X Index family.**
