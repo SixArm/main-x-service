@@ -460,6 +460,44 @@ links are **never** a match signal (entity spec §1).
 > This is the build queue for the implemented app (MVP shipped); check off
 > in three-part PRs (spec + code + test).
 
+- [x] **2026-08-05 — Pagination on the four consuming capability-view
+  lists (repo tasks.md PG-1's last sub-bullet).** The service's
+  `automations` / `automations/runs` / `scheduled-actions` / `reviews`
+  endpoints gained `?limit=&offset=` + `X-Total-Count`/`X-Limit`/
+  `X-Offset` (service spec §9.1/§9.4a); this app wires the two routes
+  that consume them:
+  - `src/lib/api/capabilities.ts` — five new `*Page` methods
+    (`listAutomationsPage`, `runsPage`, `listScheduledPage`,
+    `listReviewsPage`, `inboxPage`), each a thin `ApiClient.getPage()`
+    wrapper alongside its existing unpaginated sibling (same pattern as
+    `PlanRepository.listPage()` next to `list()`).
+  - `/automations` (`src/routes/automations/+page.svelte`) — all three
+    of its lists (rules, the deadline queue, the run log) now call the
+    `*Page` methods and show a `shown / total` count above each table
+    (hidden when the list is empty; matches the organization service's
+    front-end `/organizations` list-route convention).
+  - `/reviews` (`src/routes/reviews/+page.svelte`) — the delegation
+    list gets the same treatment.
+  - **`/api/notifications` stays unconsumed by any route** (documented
+    gap since the 2026-07-22 capability-views entry below); `inboxPage()`
+    exists for API-contract parity with the other four but nothing
+    calls it. No notifications inbox page was built here — that would
+    be new UI scope, not a mechanical pagination follow-up.
+  - **No pager controls (Prev/Next) were added.** The family convention
+    (`agents/share/restful.md`) is deliberately headers-plus-count, not
+    a cursor UI yet; `/organizations` and `/plans` show the same
+    restraint. A caller past the default page still reaches deeper rows
+    via `?limit=&offset=` directly.
+  - Tests: 3 new cases in `tests/unit/capabilities.test.ts` pinning the
+    five new methods' URLs and `Page<T>` parsing (reusing
+    `tests/unit/client.test.ts`'s `getPage` header-stub pattern). No
+    Playwright coverage added — `/plans`'s own `listPage()` has none
+    either (it is not wired into `/plans/+page.svelte`, a pre-existing
+    gap this task did not expand its scope to close), so there was no
+    established e2e depth to match.
+  - *Verified:* svelte-check 0 errors/0 warnings; 65 vitest pass
+    (62 → 65); `pnpm run build` green.
+
 - [x] **2026-08-03 — FE-1: the record-merge page (`/plans/merge`).**
   A standalone operator page for folding a confirmed-duplicate plan into
   a survivor: survivor pid + duplicate pid + optional reason, an optional

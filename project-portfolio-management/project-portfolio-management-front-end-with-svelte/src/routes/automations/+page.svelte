@@ -23,6 +23,12 @@
   let automations = $state<Automation[]>([]);
   let runs = $state<AutomationRun[]>([]);
   let scheduled = $state<ScheduledAction[]>([]);
+  // Rows matching overall, from `X-Total-Count` — not `<list>.length`,
+  // which is only this page. Shown so an operator can tell a short list
+  // from a first page of a long one (agents/share/restful.md).
+  let automationsTotal = $state(0);
+  let runsTotal = $state(0);
+  let scheduledTotal = $state(0);
   let error = $state<string | null>(null);
   let notice = $state<string | null>(null);
 
@@ -68,11 +74,17 @@
 
   async function refresh() {
     try {
-      [automations, runs, scheduled] = await Promise.all([
-        api.listAutomations(),
-        api.runs(),
-        api.listScheduled({ status: "pending" }),
+      const [automationsPage, runsPage, scheduledPage] = await Promise.all([
+        api.listAutomationsPage(),
+        api.runsPage(),
+        api.listScheduledPage({ status: "pending" }),
       ]);
+      automations = automationsPage.items;
+      automationsTotal = automationsPage.total;
+      runs = runsPage.items;
+      runsTotal = runsPage.total;
+      scheduled = scheduledPage.items;
+      scheduledTotal = scheduledPage.total;
       error = null;
     } catch (err) {
       error = err instanceof Error ? err.message : "Could not load automations";
@@ -220,6 +232,13 @@
 </form>
 
 <h2>Rules</h2>
+{#if automations.length > 0}
+  <p class="count">
+    {automations.length === automationsTotal
+      ? `${automationsTotal}`
+      : `${automations.length} / ${automationsTotal}`}
+  </p>
+{/if}
 <table>
   <thead>
     <tr><th>Name</th><th>Scope</th><th>Trigger</th><th>Action</th><th>State</th><th></th></tr>
@@ -267,6 +286,13 @@
     manual sweep race.
   </span>
 </div>
+{#if scheduled.length > 0}
+  <p class="count">
+    {scheduled.length === scheduledTotal
+      ? `${scheduledTotal}`
+      : `${scheduled.length} / ${scheduledTotal}`}
+  </p>
+{/if}
 <table>
   <thead><tr><th>Subject</th><th>Action</th><th>Due</th><th>Source</th><th></th></tr></thead>
   <tbody>
@@ -292,6 +318,11 @@
 {#if scheduled.length === 0}<p class="small muted">Nothing pending.</p>{/if}
 
 <h2>Runs</h2>
+{#if runs.length > 0}
+  <p class="count">
+    {runs.length === runsTotal ? `${runsTotal}` : `${runs.length} / ${runsTotal}`}
+  </p>
+{/if}
 <table>
   <thead><tr><th>When</th><th>Subject</th><th>Outcome</th><th>Detail</th></tr></thead>
   <tbody>
@@ -318,4 +349,15 @@
   .row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin: 0.8rem 0; }
   .actions { display: flex; gap: 0.25rem; flex-wrap: wrap; }
   .failed { color: #a4262c; font-weight: 700; }
+
+  /* The row count: just the total when the page holds everything, and
+     "shown / total" when it does not, so a first page of a long list
+     cannot be mistaken for a short list (same convention as the
+     organization service's front-end /organizations list route). */
+  .count {
+    margin: 0 0 0.3rem;
+    opacity: 0.75;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+  }
 </style>

@@ -9,7 +9,7 @@
 // extending the 13-locale catalogues to them is a documented follow-up.
 
 import { API_BASE_URL } from "$lib/config";
-import { ApiClient } from "./client";
+import { ApiClient, type Page, type PageRequest } from "./client";
 
 // ---- collaborative review ----
 
@@ -263,13 +263,31 @@ export class CapabilityClient {
   }
 
   // ---- collaborative review ----
-  listReviews(params: {
-    subject_kind?: ReviewSubjectKind;
-    subject_pid?: string;
-    reviewer?: string;
-    status?: ReviewStatus;
-  } = {}): Promise<Review[]> {
+  listReviews(
+    params: {
+      subject_kind?: ReviewSubjectKind;
+      subject_pid?: string;
+      reviewer?: string;
+      status?: ReviewStatus;
+    } = {},
+  ): Promise<Review[]> {
     return this.http.get(`/api/reviews${query(params)}`);
+  }
+  /**
+   * As {@link listReviews}, but paginated (`?limit=&offset=`) and
+   * returning the service's `X-Total-Count`/`X-Limit`/`X-Offset`
+   * alongside the page — see {@link ApiClient.getPage}.
+   */
+  listReviewsPage(
+    params: {
+      subject_kind?: ReviewSubjectKind;
+      subject_pid?: string;
+      reviewer?: string;
+      status?: ReviewStatus;
+    } = {},
+    page: PageRequest = {},
+  ): Promise<Page<Review>> {
+    return this.http.getPage(`/api/reviews${query(params)}`, page);
   }
   invite(body: {
     subject_kind: ReviewSubjectKind;
@@ -282,7 +300,9 @@ export class CapabilityClient {
     return this.http.post("/api/reviews", { body });
   }
   respond(pid: string, response: "accept" | "decline"): Promise<Review> {
-    return this.http.post(`/api/reviews/${pid}/respond`, { body: { response } });
+    return this.http.post(`/api/reviews/${pid}/respond`, {
+      body: { response },
+    });
   }
   submitVerdict(
     pid: string,
@@ -303,7 +323,9 @@ export class CapabilityClient {
   }
 
   // ---- assignees ----
-  workload(plan?: string): Promise<{ assignees: AssigneeLoad[]; as_of: string }> {
+  workload(
+    plan?: string,
+  ): Promise<{ assignees: AssigneeLoad[]; as_of: string }> {
     return this.http.get(`/api/assignees/workload${query({ plan })}`);
   }
   assign(
@@ -322,17 +344,51 @@ export class CapabilityClient {
       `/api/notifications${query({ recipient, unread: unread || undefined })}`,
     );
   }
+  /**
+   * As {@link inbox}, but paginated (`?limit=&offset=`) — see
+   * {@link ApiClient.getPage}. No route calls this yet (nor {@link inbox}
+   * itself — the notifications inbox has no consuming UI; see
+   * `spec/index.md` §13), but the API-client layer carries the same
+   * pagination contract as the other four sub-resource lists for when
+   * one is built.
+   */
+  inboxPage(
+    recipient: string,
+    unread = false,
+    page: PageRequest = {},
+  ): Promise<Page<Notification>> {
+    return this.http.getPage(
+      `/api/notifications${query({ recipient, unread: unread || undefined })}`,
+      page,
+    );
+  }
   markRead(pid: string): Promise<Notification> {
     return this.http.post(`/api/notifications/${pid}/read`, { body: {} });
   }
 
   // ---- workflow automation ----
-  listAutomations(params: {
-    plan?: string;
-    trigger?: TriggerKind;
-    enabled?: boolean;
-  } = {}): Promise<Automation[]> {
+  listAutomations(
+    params: {
+      plan?: string;
+      trigger?: TriggerKind;
+      enabled?: boolean;
+    } = {},
+  ): Promise<Automation[]> {
     return this.http.get(`/api/automations${query(params)}`);
+  }
+  /**
+   * As {@link listAutomations}, but paginated (`?limit=&offset=`) — see
+   * {@link ApiClient.getPage}.
+   */
+  listAutomationsPage(
+    params: {
+      plan?: string;
+      trigger?: TriggerKind;
+      enabled?: boolean;
+    } = {},
+    page: PageRequest = {},
+  ): Promise<Page<Automation>> {
+    return this.http.getPage(`/api/automations${query(params)}`, page);
   }
   createAutomation(body: {
     plan_pid?: string;
@@ -354,19 +410,47 @@ export class CapabilityClient {
   deleteAutomation(pid: string): Promise<void> {
     return this.http.delete(`/api/automations/${pid}`);
   }
-  runs(params: { automation?: string; subject?: string; outcome?: string } = {}): Promise<
-    AutomationRun[]
-  > {
+  runs(
+    params: { automation?: string; subject?: string; outcome?: string } = {},
+  ): Promise<AutomationRun[]> {
     return this.http.get(`/api/automations/runs${query(params)}`);
+  }
+  /**
+   * As {@link runs}, but paginated (`?limit=&offset=`) — see
+   * {@link ApiClient.getPage}.
+   */
+  runsPage(
+    params: { automation?: string; subject?: string; outcome?: string } = {},
+    page: PageRequest = {},
+  ): Promise<Page<AutomationRun>> {
+    return this.http.getPage(`/api/automations/runs${query(params)}`, page);
   }
 
   // ---- set and forget ----
-  listScheduled(params: {
-    status?: string;
-    subject?: string;
-    overdue?: boolean;
-  } = {}): Promise<ScheduledAction[]> {
+  listScheduled(
+    params: {
+      status?: string;
+      subject?: string;
+      overdue?: boolean;
+    } = {},
+  ): Promise<ScheduledAction[]> {
     return this.http.get(`/api/scheduled-actions${query(params)}`);
+  }
+  /**
+   * As {@link listScheduled}, but paginated (`?limit=&offset=`) — see
+   * {@link ApiClient.getPage}. The deadline queue stays soonest-first
+   * (`due_at` ascending) under paging: a page is a contiguous slice of
+   * that order, never a reshuffled one.
+   */
+  listScheduledPage(
+    params: {
+      status?: string;
+      subject?: string;
+      overdue?: boolean;
+    } = {},
+    page: PageRequest = {},
+  ): Promise<Page<ScheduledAction>> {
+    return this.http.getPage(`/api/scheduled-actions${query(params)}`, page);
   }
   schedule(body: {
     subject_kind: string;
@@ -386,7 +470,9 @@ export class CapabilityClient {
   }
 
   // ---- prioritisation + lifecycle ----
-  prioritisation(params: { limit?: number; band?: string } = {}): Promise<Prioritisation> {
+  prioritisation(
+    params: { limit?: number; band?: string } = {},
+  ): Promise<Prioritisation> {
     return this.http.get(`/api/prioritisation${query(params)}`);
   }
   smartScore(planPid: string): Promise<PlanSmartScore> {
@@ -401,7 +487,9 @@ export class CapabilityClient {
 }
 
 /** Build a query string from the set parameters (`?a=1&b=2`, or ``). */
-function query(params: Record<string, string | number | boolean | undefined>): string {
+function query(
+  params: Record<string, string | number | boolean | undefined>,
+): string {
   const pairs = Object.entries(params).filter(
     ([, value]) => value !== undefined && value !== "",
   );

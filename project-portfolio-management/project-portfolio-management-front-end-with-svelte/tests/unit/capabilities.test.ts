@@ -12,13 +12,15 @@ function recordingClient(): {
   calls: { url: string; method: string }[];
 } {
   const calls: { url: string; method: string }[] = [];
-  const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    calls.push({ url: String(input), method: init?.method ?? "GET" });
-    return new Response("{}", {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
-  }) as unknown as typeof fetch;
+  const fetchFn = vi.fn(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), method: init?.method ?? "GET" });
+      return new Response("{}", {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  ) as unknown as typeof fetch;
   const api = new CapabilityClient(
     new ApiClient({ baseUrl: "http://svc", fetch: fetchFn }),
   );
@@ -131,5 +133,75 @@ describe("CapabilityClient paths", () => {
       url: "http://svc/api/plans/p1/tasks/t1/assign",
       method: "POST",
     });
+  });
+});
+
+describe("CapabilityClient pagination (agents/share/restful.md)", () => {
+  /** A CapabilityClient whose fetch answers with `body` and `headers`. */
+  function pagedClient(body: unknown, headers: Record<string, string>) {
+    const fetchFn = (async () =>
+      new Response(JSON.stringify(body), {
+        status: 200,
+        headers,
+      })) as unknown as typeof fetch;
+    return new CapabilityClient(
+      new ApiClient({ baseUrl: "http://svc", fetch: fetchFn }),
+    );
+  }
+
+  it("paginates the delegation list and carries the filter through", async () => {
+    const calls: string[] = [];
+    const fetchFn = (async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      return new Response(JSON.stringify([{ pid: "r1" }]), {
+        status: 200,
+        headers: { "x-total-count": "9", "x-limit": "2", "x-offset": "1" },
+      });
+    }) as unknown as typeof fetch;
+    const api = new CapabilityClient(
+      new ApiClient({ baseUrl: "http://svc", fetch: fetchFn }),
+    );
+
+    const page = await api.listReviewsPage(
+      { status: "invited" },
+      { limit: 2, offset: 1 },
+    );
+
+    expect(calls).toEqual([
+      "http://svc/api/reviews?status=invited&limit=2&offset=1",
+    ]);
+    expect(page.items).toHaveLength(1);
+    expect(page.total).toBe(9);
+    expect(page.limit).toBe(2);
+    expect(page.offset).toBe(1);
+  });
+
+  it("paginates the automation rules, run log, and deadline queue", async () => {
+    const api = pagedClient([{ pid: "a1" }, { pid: "a2" }], {
+      "x-total-count": "5",
+      "x-limit": "2",
+      "x-offset": "0",
+    });
+
+    const rules = await api.listAutomationsPage();
+    expect(rules.items).toHaveLength(2);
+    expect(rules.total).toBe(5);
+
+    const runs = await api.runsPage();
+    expect(runs.total).toBe(5);
+
+    const queue = await api.listScheduledPage({ status: "pending" });
+    expect(queue.total).toBe(5);
+  });
+
+  it("paginates one recipient's notification inbox", async () => {
+    const api = pagedClient([{ pid: "n1" }], {
+      "x-total-count": "3",
+      "x-limit": "1",
+      "x-offset": "0",
+    });
+    const page = await api.inboxPage("person:u1", true, { limit: 1 });
+    expect(page.items).toHaveLength(1);
+    expect(page.total).toBe(3);
   });
 });

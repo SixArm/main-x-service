@@ -8,6 +8,37 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — pagination on the automation + review capability views (repo tasks.md PG-1, 2026-08-05)
+
+The service's `automations`, `automations/runs`, `scheduled-actions`,
+and `reviews` list endpoints gained real `?limit=&offset=` pagination
+(`X-Total-Count`/`X-Limit`/`X-Offset`), closing the last PG-1 sub-bullet
+left open on 2026-08-01. This wires the two consuming routes to it.
+
+- **`src/lib/api/capabilities.ts`** — `listAutomationsPage`, `runsPage`,
+  `listScheduledPage`, `listReviewsPage`, `inboxPage`: thin
+  `ApiClient.getPage()` wrappers alongside their existing unpaginated
+  siblings, same pattern as `PlanRepository.listPage()` next to `list()`.
+- **`/automations`** — the rules table, the deadline queue, and the run
+  log each show a `shown / total` count (hidden when the list is empty),
+  matching the organization service's front-end `/organizations`
+  convention.
+- **`/reviews`** — the delegation list gets the same count.
+- **Notifications stay unwired.** `inboxPage()` exists for contract
+  parity, but no route calls `inbox()`/`inboxPage()` — a documented gap
+  since the 2026-07-22 capability-views entry, and building a
+  notifications inbox page is new UI scope this task did not take on.
+- **No Prev/Next pager was added**, matching the family's headers-plus-
+  count convention (`agents/share/restful.md`) — deep paging past the
+  default page still works via `?limit=&offset=`, just not from a UI
+  control yet.
+- 3 new `tests/unit/capabilities.test.ts` cases (62 → 65 vitest total),
+  reusing `tests/unit/client.test.ts`'s `getPage` header-stub pattern.
+  No new Playwright coverage: `/plans`'s `listPage()` has none either
+  (it is not wired into `/plans/+page.svelte`), so there was no
+  established e2e depth for this change to match.
+- `svelte-check` 0/0; `pnpm run build` green.
+
 ### Fixed — doc/code reconciliation + e2e route staleness (2026-08-04, DOC-4 audit)
 
 - **`.env.example`** documented the decommissioned client-held-token

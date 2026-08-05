@@ -457,8 +457,8 @@
   compose (DEP-1).
 
 - [x] **PG-1 (L)** Pagination in the four newest loco services.
-  *(done 2026-08-01 — all four services and all four front-ends; one
-  sub-resource follow-up noted below.)*
+  *(done 2026-08-01 — all four services and all four front-ends; the
+  sub-resource follow-up noted below closed 2026-08-05.)*
 
   The convention is **headers, not an envelope**, written up in
   [`agents/share/restful.md`](agents/share/restful.md): `?limit=&offset=`
@@ -502,12 +502,23 @@
     `listPage()`, matching organization's. `svelte-check` clean and
     suites green in all three (48 / 37 / 55 tests).
 
-  - [ ] **Portfolio's operational sub-resource lists** still carry
-    `LIST_CAP = 200`: `automations`, automation runs, the deadline
-    queue, delegations, approvals. They are per-plan working lists
-    rather than the entity collection, and paginating them wants the
-    front-end screens that consume them (FE-4 territory), so they are
-    left capped rather than half-paged.
+  - [x] **Portfolio's operational sub-resource lists** *(2026-08-05)* —
+    `automations`, automation runs, the deadline queue, and delegations
+    (`/api/reviews`) now paginate exactly like `/api/plans`: `?limit=&offset=`,
+    `X-Total-Count`/`X-Limit`/`X-Offset`, `LIST_CAP` (200) kept as the
+    default page size, 500 clamp, `offset` past 10 000 → `400`. The
+    deadline queue keeps its soonest-first `due_at` order under paging
+    (pinned by a dedicated test). `Page`/`with_page_headers` were
+    promoted into a new `controllers::pagination` module shared by all
+    six paginated reads, including the original `/api/plans`. Front-end:
+    `/automations` and `/reviews` gained `*Page()` client methods and a
+    `shown / total` indicator, matching organization's convention; the
+    fifth endpoint, `/api/notifications` ("approvals"), stays unconsumed
+    by any route (a pre-existing, documented gap — no notifications
+    inbox page exists to wire up), though its client method gained the
+    same pagination contract for parity. 42 DB-gated backend (2 new) +
+    205 lib tests green; `svelte-check` 0/0 and 65 vitest (3 new) green
+    on the front-end.
 
 ## Phase 3 — Platform
 

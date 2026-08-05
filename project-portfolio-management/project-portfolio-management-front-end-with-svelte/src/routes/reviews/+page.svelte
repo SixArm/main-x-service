@@ -23,6 +23,9 @@
 
   const api = CapabilityClient.withFetch();
   let reviews = $state<Review[]>([]);
+  // Rows matching overall, from `X-Total-Count` — not `reviews.length`,
+  // which is only this page (agents/share/restful.md).
+  let reviewsTotal = $state(0);
   let error = $state<string | null>(null);
   let notice = $state<string | null>(null);
   let statusFilter = $state<ReviewStatus | "">("");
@@ -41,9 +44,11 @@
 
   async function refresh() {
     try {
-      reviews = await api.listReviews({
+      const page = await api.listReviewsPage({
         status: statusFilter || undefined,
       });
+      reviews = page.items;
+      reviewsTotal = page.total;
       error = null;
     } catch (err) {
       error = err instanceof Error ? err.message : "Could not load reviews";
@@ -192,6 +197,13 @@
   </div>
 {/if}
 
+{#if reviews.length > 0}
+  <p class="count">
+    {reviews.length === reviewsTotal
+      ? `${reviewsTotal}`
+      : `${reviews.length} / ${reviewsTotal}`}
+  </p>
+{/if}
 <table>
   <thead>
     <tr>
@@ -275,4 +287,15 @@
     font-size: 0.75rem;
   }
   .chip.external { color: #8a6d1d; font-weight: 700; }
+
+  /* The row count: just the total when the page holds everything, and
+     "shown / total" when it does not, so a first page of a long list
+     cannot be mistaken for a short list (same convention as the
+     organization service's front-end /organizations list route). */
+  .count {
+    margin: 0 0 0.3rem;
+    opacity: 0.75;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+  }
 </style>
