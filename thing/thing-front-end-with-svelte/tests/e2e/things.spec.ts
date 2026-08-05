@@ -45,4 +45,104 @@ test.describe("Thing front-end smoke", () => {
         await expect(page.getByLabel(/Main thing ID/)).toBeVisible();
         await expect(page.getByLabel(/Duplicate thing ID/)).toBeVisible();
     });
+
+    // Pins: the merge page seeds both ids from the query string, which is
+    // what the review board's post-confirmation deep link relies on
+    // (`$lib/review`'s `mergeHref`).
+    test("merge form pre-fills both IDs from the query string", async ({ page }) => {
+        await page.goto("/things/merge?main=main-111&duplicate=dup-222");
+        await expect(page.getByLabel(/Main thing ID/)).toHaveValue("main-111");
+        await expect(page.getByLabel(/Duplicate thing ID/)).toHaveValue("dup-222");
+    });
+
+    // Pins the FE-4 review screen: the board, the keyboard-reachable queue
+    // table, and the side-by-side comparison the Compare button opens. The
+    // queue and both sides of the pair are stubbed at the network layer so
+    // the smoke project keeps its "no service required" contract.
+    test("review board lists the queue and compares a pair on demand", async ({
+        page,
+    }) => {
+        const idA = "aaaaaaaa-0000-4000-8000-000000000001";
+        const idB = "bbbbbbbb-0000-4000-8000-000000000002";
+        const envelope = (data: unknown) =>
+            JSON.stringify({ success: true, data, error: null });
+
+        await page.route("**/api/things/review-queue**", (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: envelope({
+                    items: [
+                        {
+                            id: "r1",
+                            thing_id_a: idA,
+                            thing_id_b: idB,
+                            match_score: 0.91,
+                            match_quality: "probable",
+                            detection_method: "batch_deduplication",
+                            status: "pending",
+                            reviewed_by: null,
+                            created_at: "2026-08-04T09:00:00Z",
+                            reviewed_at: null,
+                        },
+                    ],
+                    total: 1,
+                }),
+            }),
+        );
+        await page.route(`**/api/things/${idA}`, (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: envelope({
+                    id: idA,
+                    name: "Acme Widget",
+                    additional_type: "Widget",
+                }),
+            }),
+        );
+        await page.route(`**/api/things/${idB}`, (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: envelope({
+                    id: idB,
+                    name: "Acme Widgett",
+                    additional_type: "Widget",
+                }),
+            }),
+        );
+
+        await page.goto("/review");
+        await expect(page.getByRole("heading", { name: "Review" })).toBeVisible();
+        await expect(page.getByTestId("review-board")).toBeVisible();
+        // The status filter must exist and default to every status.
+        await expect(page.getByLabel("Status")).toHaveValue("all");
+
+        // Thing has no provenance column on the wire (see `$lib/review`'s
+        // module doc) — the detection method is what the queue shows at a
+        // glance instead.
+        const list = page.getByTestId("review-list");
+        await expect(list).toBeVisible();
+        await expect(list.getByText("batch_deduplication")).toBeVisible();
+
+        // The keyboard-reachable path into the comparison: a real button,
+        // not a drag.
+        await list.getByRole("button", { name: /^Compare/ }).click();
+
+        const panel = page.getByTestId("review-compare");
+        await expect(panel).toBeVisible();
+        // Both stubbed records, side by side.
+        await expect(panel.getByText("Acme Widget", { exact: true })).toBeVisible();
+        await expect(panel.getByText("Acme Widgett")).toBeVisible();
+        // Thing-service never populates `score_breakdown` on the wire
+        // today (see `$lib/review`'s module doc), so the breakdown
+        // section always renders its documented empty state.
+        await expect(panel.getByTestId("review-no-breakdown")).toBeVisible();
+        // Both decisions are offered as real buttons for a pending item.
+        await expect(
+            panel.getByRole("button", { name: "Confirm duplicate" }),
+        ).toBeEnabled();
+        await expect(panel.getByRole("button", { name: "Reject" })).toBeEnabled();
+    });
 });
