@@ -8,6 +8,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — wire `/plans` itself to `listPage()` (2026-08-05)
+
+The sibling gap the entry directly below flagged and left open:
+`PlanRepository.listPage()` existed (and was tested at the repository
+level) but `src/routes/plans/+page.svelte` still called the unpaginated
+`list()`. Now it calls `listPage()` and shows the same `shown / total`
+count as `/organizations`, `/automations`, and `/reviews`.
+
+- **`src/routes/plans/+page.svelte`** — `onMount` calls `repo.listPage()`
+  instead of `repo.list()`; a `.count` paragraph shows `shown / total`
+  (hidden when the list is empty), reusing the exact style/markup
+  pattern from the organization front-end's `/organizations` list route.
+- No `?parent=` roll-up wiring added — the list route never took a
+  parent scope before this change either.
+- 3 new `tests/unit/plans.test.ts` cases (65 → 68 vitest total) pinning
+  `listPage()`'s URL, header parsing, and the header-absent fallback.
+  No new Playwright coverage needed: the existing `list page renders the
+  seeded plan` smoke test already exercises the now-paginated path.
+- `svelte-check` 0/0; `pnpm run build` green; 23/23 Playwright pass.
+
 ### Added — pagination on the automation + review capability views (repo tasks.md PG-1, 2026-08-05)
 
 The service's `automations`, `automations/runs`, `scheduled-actions`,

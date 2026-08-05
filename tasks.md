@@ -520,6 +520,15 @@
     205 lib tests green; `svelte-check` 0/0 and 65 vitest (3 new) green
     on the front-end.
 
+  - [x] **`/plans`'s own list screen** *(2026-08-05)* — the last piece
+    of this pagination effort: `PlanRepository.listPage()` had existed
+    and been backend-verified since the 2026-08-01 sub-bullet above, but
+    `src/routes/plans/+page.svelte` still called the unpaginated
+    `list()`. Now wired to `listPage()` with the same `shown / total`
+    indicator as `/organizations`/`/automations`/`/reviews`; no backend
+    change needed. 3 new front-end tests (68 vitest total); `svelte-check`
+    0/0, build green, 23/23 Playwright pass.
+
 ## Phase 3 — Platform
 
 - [x] **BUS-1 (L)** `FluvioSink` (feature `fluvio`) in **case** (the

@@ -460,6 +460,24 @@ links are **never** a match signal (entity spec §1).
 > This is the build queue for the implemented app (MVP shipped); check off
 > in three-part PRs (spec + code + test).
 
+- [x] **2026-08-05 — Wire `/plans` itself to `listPage()`.** The sibling
+  gap the entry directly below flagged and deliberately left open:
+  `PlanRepository.listPage()` existed and was tested at the repository
+  level, but `src/routes/plans/+page.svelte` still called the
+  unpaginated `list()`. Now it calls `listPage()` and shows the same
+  `shown / total` count (hidden when the list is empty) as
+  `/organizations`, `/automations`, and `/reviews`. No `?parent=`
+  roll-up wiring added here — the list route never took a parent scope
+  before this change either, so that stays out of scope (only
+  `/plans/[pid]`'s detail page passes a `parentRef`, and not to this
+  route). Tests: 3 new cases in `tests/unit/plans.test.ts` pinning
+  `listPage()`'s URL, header parsing, and the header-absent fallback.
+  No new Playwright coverage — the existing `list page renders the
+  seeded plan` smoke test already exercises the paginated path (its
+  stub has no pagination headers, so `total` falls back to the page
+  length, and the test's assertions were unaffected). svelte-check 0/0,
+  68 vitest pass (65 → 68), build green, 23/23 Playwright pass.
+
 - [x] **2026-08-05 — Pagination on the four consuming capability-view
   lists (repo tasks.md PG-1's last sub-bullet).** The service's
   `automations` / `automations/runs` / `scheduled-actions` / `reviews`
@@ -491,10 +509,11 @@ links are **never** a match signal (entity spec §1).
   - Tests: 3 new cases in `tests/unit/capabilities.test.ts` pinning the
     five new methods' URLs and `Page<T>` parsing (reusing
     `tests/unit/client.test.ts`'s `getPage` header-stub pattern). No
-    Playwright coverage added — `/plans`'s own `listPage()` has none
-    either (it is not wired into `/plans/+page.svelte`, a pre-existing
-    gap this task did not expand its scope to close), so there was no
-    established e2e depth to match.
+    Playwright coverage added — `/plans`'s own `listPage()` had none
+    either at the time (it was not yet wired into
+    `/plans/+page.svelte`, a pre-existing gap this task did not expand
+    its scope to close), so there was no established e2e depth to
+    match. **Closed by the entry directly above** (same day).
   - *Verified:* svelte-check 0 errors/0 warnings; 65 vitest pass
     (62 → 65); `pnpm run build` green.
 

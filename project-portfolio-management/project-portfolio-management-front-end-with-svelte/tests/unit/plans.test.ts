@@ -123,3 +123,62 @@ describe("PlanRepository", () => {
     expect(calls[0]?.url).toBe("http://svc.test/api/plans/merges/recent");
   });
 });
+
+// Pins the pagination contract (agents/share/restful.md) the `/plans`
+// list route relies on: `listPage()` sends `limit`/`offset` and reads
+// `X-Total-Count`/`X-Limit`/`X-Offset` off the response, falling back to
+// the page length when a header is absent (a service that predates the
+// headers still works).
+describe("PlanRepository.listPage", () => {
+  /** A PlanRepository whose fetch answers with `body` and `headers`. */
+  function pagedRepo(body: unknown, headers: Record<string, string>) {
+    const calls: string[] = [];
+    const fetchFn = (async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      return new Response(JSON.stringify(body), { status: 200, headers });
+    }) as unknown as typeof fetch;
+    const repo = new PlanRepository(
+      new ApiClient({ baseUrl: "http://svc.test", fetch: fetchFn }),
+    );
+    return { repo, calls };
+  }
+
+  it("GETs the collection and reads the pagination headers", async () => {
+    const { repo, calls } = pagedRepo(
+      [{ pid: "p1", name: "Apollo" }],
+      { "x-total-count": "12", "x-limit": "1", "x-offset": "0" },
+    );
+
+    const page = await repo.listPage();
+
+    expect(calls).toEqual(["http://svc.test/api/plans"]);
+    expect(page.items).toEqual([{ pid: "p1", name: "Apollo" }]);
+    expect(page.total).toBe(12);
+    expect(page.limit).toBe(1);
+    expect(page.offset).toBe(0);
+  });
+
+  it("sends limit/offset and carries the parent roll-up query through", async () => {
+    const { repo, calls } = pagedRepo([], {
+      "x-total-count": "0",
+      "x-limit": "5",
+      "x-offset": "10",
+    });
+
+    await repo.listPage({ limit: 5, offset: 10 }, "port-1");
+
+    expect(calls).toEqual([
+      "http://svc.test/api/plans?parent=port-1&limit=5&offset=10",
+    ]);
+  });
+
+  it("falls back to the page length when headers are absent", async () => {
+    const { repo } = pagedRepo([{ pid: "p1", name: "Apollo" }], {});
+
+    const page = await repo.listPage();
+
+    expect(page.total).toBe(1);
+    expect(page.limit).toBe(1);
+    expect(page.offset).toBe(0);
+  });
+});
