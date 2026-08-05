@@ -80,3 +80,92 @@ pub fn conditional_json<T: serde::Serialize>(
     )
         .into_response())
 }
+
+/// Family-wide `?limit=`/`?offset=` collection-read pagination
+/// (`agents/share/restful.md`): headers, not an envelope, so the body
+/// stays the bare array every caller already parses.
+///
+/// Introduced alongside `GET /api/plans`' pagination (2026-08-01) and
+/// promoted here so every other collection-read controller (automation
+/// runs, the deadline queue, delegations, approvals, …) shares one
+/// implementation instead of five copies drifting apart.
+pub mod pagination {
+    use axum::response::Response;
+    use loco_rs::controller::ErrorDetail;
+
+    /// Largest page any collection read will serve; a bigger `limit` is
+    /// clamped rather than refused.
+    pub const MAX_LIMIT: u64 = 500;
+
+    /// Largest accepted `offset`; past this a request is a `400` (SEC-G7)
+    /// rather than a query that makes the database materialise
+    /// arbitrarily many rows just to discard them.
+    pub const MAX_OFFSET: u64 = 10_000;
+
+    /// `?limit=` / `?offset=` on a collection read.
+    ///
+    /// Declare the two fields directly on each query-parameter struct
+    /// (as here) rather than `#[serde(flatten)]`-ing this type in:
+    /// flattening deserializes via a string-keyed map, so `limit=2`
+    /// arrives as the string `"2"` and fails to parse as a `u64` — a
+    /// `400` on an otherwise-valid request.
+    #[derive(Debug, Default, Clone, Copy)]
+    pub struct Page {
+        /// Page size; `None`/zero ⇒ the endpoint default.
+        pub limit: Option<u64>,
+        /// Rows to skip; `None` ⇒ 0.
+        pub offset: Option<u64>,
+    }
+
+    impl Page {
+        /// The clamped `(limit, offset)` this request will use.
+        #[must_use]
+        pub fn resolve(self, default_limit: u64) -> (u64, u64) {
+            let limit = self
+                .limit
+                .filter(|l| *l > 0)
+                .unwrap_or(default_limit)
+                .min(MAX_LIMIT);
+            (limit, self.offset.unwrap_or(0))
+        }
+
+        /// Reject an out-of-bound offset before it reaches the database.
+        ///
+        /// # Errors
+        ///
+        /// `400` when the offset exceeds [`MAX_OFFSET`].
+        pub fn check_offset(self) -> loco_rs::Result<()> {
+            if self.offset.unwrap_or(0) > MAX_OFFSET {
+                return Err(loco_rs::Error::CustomError(
+                    axum::http::StatusCode::BAD_REQUEST,
+                    ErrorDetail::new(
+                        "offset_too_large",
+                        format!("offset must not exceed {MAX_OFFSET}; narrow the query instead"),
+                    ),
+                ));
+            }
+            Ok(())
+        }
+    }
+
+    /// Stamp `X-Total-Count` / `X-Limit` / `X-Offset` onto a response.
+    #[must_use]
+    pub fn with_page_headers(
+        mut response: Response,
+        total: u64,
+        limit: u64,
+        offset: u64,
+    ) -> Response {
+        let headers = response.headers_mut();
+        for (name, value) in [
+            ("x-total-count", total),
+            ("x-limit", limit),
+            ("x-offset", offset),
+        ] {
+            if let Ok(value) = axum::http::HeaderValue::from_str(&value.to_string()) {
+                headers.insert(name, value);
+            }
+        }
+        response
+    }
+}

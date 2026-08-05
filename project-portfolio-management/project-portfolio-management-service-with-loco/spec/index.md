@@ -320,7 +320,7 @@ right internal or external expert:
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST / GET | `/api/reviews` | Invite an expert; list invitations (`?subject_kind=&subject_pid=&reviewer=&status=`) |
+| POST / GET | `/api/reviews` | Invite an expert; list invitations (`?subject_kind=&subject_pid=&reviewer=&status=&limit=&offset=`, paginated — §9.1's `X-Total-Count`/`X-Limit`/`X-Offset` contract) |
 | GET | `/api/reviews/consensus` | Aggregate verdict for one subject (`?subject_kind=&subject_pid=`) |
 | POST | `/api/reviews/{pid}/respond` | Accept / decline |
 | POST | `/api/reviews/{pid}/submit` | Verdict: `score` 0–100 (optional), `recommendation` advance/hold/reject, `comment` |
@@ -751,6 +751,28 @@ HIPAA/NHS/GDPR posture for audit and access controls.
 
 ## 13. Tasks (live work queue)
 
+- [x] **2026-08-05 — Pagination on the five operational sub-resource
+  lists (repo tasks.md PG-1, closing the sub-bullet left open on
+  2026-08-01).** `automations`, automation runs, the deadline queue,
+  delegations (`/api/reviews`), and one inbox (`/api/notifications`)
+  now take `?limit=`/`?offset=` and report `X-Total-Count`/`X-Limit`/
+  `X-Offset`, exactly like `GET /api/plans` (§9.1, 2026-08-01) — same
+  clamp (500), same out-of-bound-offset `400` (10 000), same
+  default-reproduces-the-old-cap rule (`LIST_CAP` = 200 stays the
+  default page size on all five). The `Page`/`with_page_headers`
+  mechanics were promoted out of `controllers/plans.rs` into a new
+  `controllers::pagination` module so five more call sites share one
+  implementation instead of copying it a fifth and sixth time;
+  `controllers/plans.rs` itself now imports from there too (no
+  behavioural change, confirmed by its own unchanged pagination test).
+  The deadline queue (`GET /api/scheduled-actions`) keeps its
+  soonest-first `due_at` order under paging — a page is a contiguous
+  slice of that order, not a reshuffled one, pinned by a dedicated
+  assertion. *Verified:* 42 DB-gated (2 new: `automation_lists_are_paginated`,
+  `collaboration_lists_are_paginated`) + 1 masking + 1 enforcement + 1
+  outbox-audit green vs Postgres 18; 205 lib tests; fmt + clippy clean.
+  Front-end: see the sibling `project-portfolio-management-front-end-with-svelte`
+  `spec/index.md` §13 for the consuming-route changes.
 - [x] **2026-08-02 — Privacy: field masking + GDPR export (repo
   tasks.md P-4, as P-1/organization; lower sensitivity).** The
   thinnest privacy module of the four in the family, by design: most

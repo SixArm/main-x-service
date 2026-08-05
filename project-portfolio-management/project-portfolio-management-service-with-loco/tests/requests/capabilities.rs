@@ -142,6 +142,89 @@ async fn collaborative_review_delegates_and_aggregates_honestly() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins pagination (agents/share/restful.md) on the two collaboration
+// list endpoints — the delegation list (`GET /api/reviews`) and one
+// inbox (`GET /api/notifications`): `limit`/`offset` window the rows,
+// `X-Total-Count` reports the whole match set, the limit clamps, and an
+// out-of-bound offset is a `400`. Mirrors `/api/plans`'s pagination
+// test (`tests/requests/plans.rs`).
+async fn collaboration_lists_are_paginated() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let reviewer = person("77777777-7777-7777-7777-777777777777");
+
+        macro_rules! header {
+            ($r:expr, $name:expr) => {
+                $r.headers()
+                    .get($name)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or_default()
+                    .to_string()
+            };
+        }
+
+        // Five plans, each delegated to the same reviewer: five live
+        // `reviews` rows, and five `review_invited` notifications land
+        // in that reviewer's inbox as a side effect.
+        for i in 0..5 {
+            let plan_pid = create_plan!(request, format!("Delegation roster plan {i}"));
+            request
+                .post("/api/reviews")
+                .json(&json!({
+                    "subject_kind": "plan",
+                    "subject_pid": plan_pid,
+                    "reviewer_ref": reviewer,
+                }))
+                .await
+                .assert_status_ok();
+        }
+
+        let page = request.get("/api/reviews?limit=2&offset=1").await;
+        assert_eq!(page.status_code(), 200);
+        assert_eq!(page.json::<Value>().as_array().expect("array").len(), 2);
+        assert_eq!(header!(page, "x-total-count"), "5");
+        assert_eq!(header!(page, "x-limit"), "2");
+        assert_eq!(header!(page, "x-offset"), "1");
+
+        let all = request.get("/api/reviews").await;
+        assert_eq!(all.json::<Value>().as_array().expect("array").len(), 5);
+        assert_eq!(header!(all, "x-limit"), "200", "the default is the old cap");
+
+        let clamped = request.get("/api/reviews?limit=100000").await;
+        assert_eq!(header!(clamped, "x-limit"), "500");
+
+        assert_eq!(
+            request.get("/api/reviews?offset=10001").await.status_code(),
+            400
+        );
+
+        let inbox = request
+            .get(&format!(
+                "/api/notifications?recipient={reviewer}&limit=2&offset=1"
+            ))
+            .await;
+        assert_eq!(inbox.status_code(), 200);
+        assert_eq!(inbox.json::<Value>().as_array().expect("array").len(), 2);
+        assert_eq!(header!(inbox, "x-total-count"), "5");
+        assert_eq!(header!(inbox, "x-limit"), "2");
+        assert_eq!(header!(inbox, "x-offset"), "1");
+
+        assert_eq!(
+            request
+                .get(&format!(
+                    "/api/notifications?recipient={reviewer}&offset=10001"
+                ))
+                .await
+                .status_code(),
+            400
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 // A rule configured once fires when the task crosses the board, logs
 // what it did, and a rule scoped to another plan stays out of it.
 async fn workflow_automation_fires_on_a_board_move_and_logs_the_run() {
@@ -354,6 +437,143 @@ async fn scheduled_actions_only_fire_when_due_and_only_once() {
         );
         let after: Value = request.post("/api/scheduled-actions/sweep").await.json();
         assert_eq!(after["fired"], 0, "a cancelled deadline never fires");
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Pins pagination (agents/share/restful.md) on the three automation
+// list endpoints — configured rules, their run log, and the deadline
+// queue: `limit`/`offset` window the rows, `X-Total-Count` reports the
+// whole match set, the limit clamps, and an out-of-bound offset is a
+// `400`. The deadline queue's soonest-first order must hold under
+// paging — a page must be a contiguous slice of the sorted order, not
+// a reshuffled one. Mirrors `/api/plans`'s pagination test
+// (`tests/requests/plans.rs`).
+async fn automation_lists_are_paginated() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let plan_pid = create_plan!(request, "Automation ruleset board");
+
+        macro_rules! header {
+            ($r:expr, $name:expr) => {
+                $r.headers()
+                    .get($name)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or_default()
+                    .to_string()
+            };
+        }
+
+        // Five automations, all scoped to this plan and all matching the
+        // same trigger, so one board move fires every one of them.
+        for i in 0..5 {
+            request
+                .post("/api/automations")
+                .json(&json!({
+                    "plan_pid": plan_pid,
+                    "name": format!("Rule {i}"),
+                    "trigger_kind": "task_moved",
+                    "to_status": "in_review",
+                    "action_kind": "add_label",
+                    "action_value": { "label": format!("paging-label-{i}") },
+                }))
+                .await
+                .assert_status_ok();
+        }
+
+        let page = request.get("/api/automations?limit=2&offset=1").await;
+        assert_eq!(page.status_code(), 200);
+        assert_eq!(page.json::<Value>().as_array().expect("array").len(), 2);
+        assert_eq!(header!(page, "x-total-count"), "5");
+        assert_eq!(header!(page, "x-limit"), "2");
+        assert_eq!(header!(page, "x-offset"), "1");
+
+        let all = request.get("/api/automations").await;
+        assert_eq!(all.json::<Value>().as_array().expect("array").len(), 5);
+        assert_eq!(header!(all, "x-limit"), "200", "the default is the old cap");
+
+        let clamped = request.get("/api/automations?limit=100000").await;
+        assert_eq!(header!(clamped, "x-limit"), "500");
+
+        assert_eq!(
+            request
+                .get("/api/automations?offset=10001")
+                .await
+                .status_code(),
+            400
+        );
+
+        // Firing every rule at once populates the run log.
+        let task: Value = request
+            .post(&format!("/api/plans/{plan_pid}/tasks"))
+            .json(&json!({ "title": "Trigger the rules" }))
+            .await
+            .json();
+        let task_pid = task["pid"].as_str().expect("task pid").to_string();
+        request
+            .patch(&format!("/api/plans/{plan_pid}/tasks/{task_pid}"))
+            .json(&json!({ "status": "in_review" }))
+            .await
+            .assert_status_ok();
+
+        let runs_page = request.get("/api/automations/runs?limit=2&offset=1").await;
+        assert_eq!(runs_page.status_code(), 200);
+        assert_eq!(
+            runs_page.json::<Value>().as_array().expect("array").len(),
+            2
+        );
+        assert_eq!(header!(runs_page, "x-total-count"), "5");
+        assert_eq!(header!(runs_page, "x-limit"), "2");
+        assert_eq!(header!(runs_page, "x-offset"), "1");
+
+        // Five deadlines at different horizons; the queue must page
+        // through them soonest-first.
+        for days in [10, 5, 20, 1, 15] {
+            request
+                .post("/api/scheduled-actions")
+                .json(&json!({
+                    "subject_kind": "plan",
+                    "subject_pid": plan_pid,
+                    "action_kind": "expire_review",
+                    "in_days": days,
+                }))
+                .await
+                .assert_status_ok();
+        }
+
+        let full: Value = request.get("/api/scheduled-actions?limit=10").await.json();
+        let full_rows = full.as_array().expect("rows");
+        assert_eq!(full_rows.len(), 5);
+        let due_ats: Vec<&str> = full_rows
+            .iter()
+            .map(|r| r["due_at"].as_str().expect("due_at"))
+            .collect();
+        let mut sorted = due_ats.clone();
+        sorted.sort_unstable();
+        assert_eq!(due_ats, sorted, "the unpaginated queue is soonest-first");
+
+        let queue_page = request.get("/api/scheduled-actions?limit=2&offset=2").await;
+        assert_eq!(queue_page.status_code(), 200);
+        let page_rows: Value = queue_page.json();
+        let page_arr = page_rows.as_array().expect("array");
+        assert_eq!(page_arr.len(), 2);
+        assert_eq!(header!(queue_page, "x-total-count"), "5");
+        assert_eq!(
+            page_arr[0]["due_at"], full_rows[2]["due_at"],
+            "page 2 (offset=2) starts where the unpaginated order says it should"
+        );
+        assert_eq!(page_arr[1]["due_at"], full_rows[3]["due_at"]);
+
+        assert_eq!(
+            request
+                .get("/api/scheduled-actions?offset=10001")
+                .await
+                .status_code(),
+            400
+        );
     })
     .await;
 }

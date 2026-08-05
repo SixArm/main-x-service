@@ -8,6 +8,39 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+### Added — pagination on the five operational sub-resource lists (PG-1, 2026-08-05)
+
+Closes the sub-bullet left open when `GET /api/plans` gained pagination
+(2026-08-01): `automations`, automation runs, the deadline queue,
+delegations, and one inbox were still hard-capped at `LIST_CAP = 200`.
+
+- **`GET /api/automations`, `GET /api/automations/runs`,
+  `GET /api/scheduled-actions`, `GET /api/reviews`, and
+  `GET /api/notifications` now take `?limit=`/`?offset=`**, reporting
+  `X-Total-Count`/`X-Limit`/`X-Offset` (`agents/share/restful.md`) —
+  the identical contract `GET /api/plans` already carries. Bodies stay
+  bare arrays. Defaults reproduce the old cap (`LIST_CAP` = 200 on all
+  five), `limit` clamps to 500, and an `offset` past 10 000 is a `400`.
+- **The deadline queue's soonest-first `due_at` order holds under
+  paging** — a page is a contiguous slice of the full sorted order, not
+  a reshuffled one; a dedicated test assertion pins this rather than
+  just re-checking the total count.
+- **`controllers::pagination`** (new `src/controllers/mod.rs` module) —
+  the `Page` struct and `with_page_headers` helper, promoted out of
+  `controllers/plans.rs` so all six paginated collection reads (the
+  original `/api/plans` + `/api/plans/search`, plus these five) share
+  one implementation. `controllers/plans.rs` now imports from the
+  shared module instead of carrying its own private copy; behaviour is
+  unchanged (its own `list_and_search_are_paginated` test still passes
+  untouched).
+- DB-gated: two new tests in `tests/requests/capabilities.rs` —
+  `automation_lists_are_paginated` (covers all three automation-side
+  endpoints, including the soonest-first-under-paging pin) and
+  `collaboration_lists_are_paginated` (delegations + one inbox).
+- Front-end: `project-portfolio-management-front-end-with-svelte` wires
+  the consuming routes to `ApiClient.getPage()`/`listPage()` — see that
+  crate's own `CHANGELOG.md`.
+
 ### Added — Durable event bus, real-broker sink (BUS-3, following BUS-1's case-service reference, 2026-08-03)
 
 `FluvioSink` (`src/relay.rs`) — the Phase-3 relay's real-broker

@@ -24,11 +24,12 @@
 use axum::http::{HeaderMap, StatusCode};
 use loco_rs::controller::ErrorDetail;
 use loco_rs::prelude::*;
-use sea_orm::{QueryOrder, QuerySelect};
+use sea_orm::{PaginatorTrait, QueryOrder, QuerySelect};
 use serde::Deserialize;
 use uuid::Uuid;
 
 use super::governance::valid_ref;
+use super::pagination::{Page, with_page_headers};
 use crate::auth::MaybeAuthUser;
 use crate::collaboration as rules;
 use crate::models::_entities::{ideas, notifications, plans, proposals, reviews, tasks};
@@ -36,7 +37,10 @@ use crate::models::audit_logs::Model as AuditModel;
 use crate::models::capabilities as cap_models;
 use crate::validation::MAX_TEXT_LEN;
 
-/// Highest number of rows any list endpoint here returns.
+/// Default page size for every list endpoint here — the cap each one
+/// applied before `?limit=`/`?offset=` pagination (agents/share/restful.md)
+/// landed; a bigger `limit` clamps rather than errors
+/// ([`super::pagination::MAX_LIMIT`]).
 pub const LIST_CAP: u64 = 200;
 
 fn unprocessable(message: &str) -> Error {
@@ -236,15 +240,34 @@ struct ReviewParams {
     reviewer: Option<String>,
     #[serde(default)]
     status: Option<String>,
+    /// Page size; absent ⇒ [`LIST_CAP`].
+    #[serde(default)]
+    limit: Option<u64>,
+    /// Rows to skip; absent ⇒ 0.
+    #[serde(default)]
+    offset: Option<u64>,
 }
 
-/// `GET /api/reviews?subject_kind=&subject_pid=&reviewer=&status=` —
-/// the delegation list, newest first (cap [`LIST_CAP`]).
+/// `GET /api/reviews?subject_kind=&subject_pid=&reviewer=&status=&limit=&offset=`
+/// — the delegation list, newest first. Paginated
+/// (agents/share/restful.md): `X-Total-Count`/`X-Limit`/`X-Offset` on
+/// the response.
+///
+/// # Errors
+///
+/// `400` when `offset` exceeds [`super::pagination::MAX_OFFSET`]; a DB
+/// error when the query fails.
 #[debug_handler]
 async fn list_reviews(
     State(ctx): State<AppContext>,
     Query(params): Query<ReviewParams>,
 ) -> Result<Response> {
+    let page = Page {
+        limit: params.limit,
+        offset: params.offset,
+    };
+    page.check_offset()?;
+    let (limit, offset) = page.resolve(LIST_CAP);
     let mut query = reviews::Entity::find().filter(reviews::Column::DeletedAt.is_null());
     if let Some(kind) = params.subject_kind.as_deref() {
         query = query.filter(reviews::Column::SubjectKind.eq(kind));
@@ -258,13 +281,15 @@ async fn list_reviews(
     if let Some(status) = params.status.as_deref() {
         query = query.filter(reviews::Column::Status.eq(status));
     }
+    let total = query.clone().count(&ctx.db).await.map_err(db_err)?;
     let rows = query
         .order_by_desc(reviews::Column::Id)
-        .limit(LIST_CAP)
+        .offset(offset)
+        .limit(limit)
         .all(&ctx.db)
         .await
         .map_err(db_err)?;
-    format::json(rows)
+    Ok(with_page_headers(format::json(rows)?, total, limit, offset))
 }
 
 /// `POST /api/reviews/{pid}/respond` body.
@@ -611,10 +636,23 @@ struct NotificationParams {
     /// `true` ⇒ only unread.
     #[serde(default)]
     unread: Option<bool>,
+    /// Page size; absent ⇒ [`LIST_CAP`].
+    #[serde(default)]
+    limit: Option<u64>,
+    /// Rows to skip; absent ⇒ 0.
+    #[serde(default)]
+    offset: Option<u64>,
 }
 
-/// `GET /api/notifications?recipient=&unread=` — one inbox, newest
-/// first (cap [`LIST_CAP`]).
+/// `GET /api/notifications?recipient=&unread=&limit=&offset=` — one
+/// inbox, newest first. Paginated (agents/share/restful.md):
+/// `X-Total-Count`/`X-Limit`/`X-Offset` on the response.
+///
+/// # Errors
+///
+/// `422` when `recipient` is not a valid actor ref; `400` when `offset`
+/// exceeds [`super::pagination::MAX_OFFSET`]; a DB error when the query
+/// fails.
 #[debug_handler]
 async fn list_notifications(
     State(ctx): State<AppContext>,
@@ -625,19 +663,27 @@ async fn list_notifications(
             "recipient must be a person:/worker:/organization: URN",
         ));
     }
+    let page = Page {
+        limit: params.limit,
+        offset: params.offset,
+    };
+    page.check_offset()?;
+    let (limit, offset) = page.resolve(LIST_CAP);
     let mut query = notifications::Entity::find()
         .filter(notifications::Column::RecipientRef.eq(params.recipient.as_str()))
         .filter(notifications::Column::DeletedAt.is_null());
     if params.unread.unwrap_or(false) {
         query = query.filter(notifications::Column::ReadAt.is_null());
     }
+    let total = query.clone().count(&ctx.db).await.map_err(db_err)?;
     let rows = query
         .order_by_desc(notifications::Column::Id)
-        .limit(LIST_CAP)
+        .offset(offset)
+        .limit(limit)
         .all(&ctx.db)
         .await
         .map_err(db_err)?;
-    format::json(rows)
+    Ok(with_page_headers(format::json(rows)?, total, limit, offset))
 }
 
 /// `POST /api/notifications/{pid}/read` — mark one notification read

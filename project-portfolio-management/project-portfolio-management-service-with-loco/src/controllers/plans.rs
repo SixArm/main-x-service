@@ -169,6 +169,12 @@ struct ListParams {
 }
 
 // ─── Pagination (agents/share/restful.md) ───────────────────────────────
+//
+// The `Page` / `with_page_headers` mechanics live in
+// [`super::pagination`], shared with every other collection-read
+// controller (automation, collaboration, …).
+
+use super::pagination::{Page, with_page_headers};
 
 /// Default page size for `GET /api/plans` — the cap this endpoint
 /// applied before pagination.
@@ -176,51 +182,6 @@ pub const LIST_DEFAULT_LIMIT: u64 = 100;
 
 /// Default page size for `GET /api/plans/search`.
 pub const SEARCH_DEFAULT_LIMIT: u64 = 50;
-
-/// Largest page any collection read will serve; a bigger `limit` is
-/// clamped rather than refused.
-pub const MAX_LIMIT: u64 = 500;
-
-/// Largest accepted `offset`; past this a request is a `400` (SEC-G7).
-pub const MAX_OFFSET: u64 = 10_000;
-
-/// `?limit=` / `?offset=` on a collection read. Declared inline on each
-/// query struct rather than `#[serde(flatten)]`-ed: a flattened struct
-/// deserializes from a string-keyed map, so `limit=2` arrives as the
-/// string `"2"` and fails to parse as a `u64`.
-#[derive(Debug, Default, Clone, Copy)]
-struct Page {
-    /// Page size; `None`/zero ⇒ the endpoint default.
-    limit: Option<u64>,
-    /// Rows to skip; `None` ⇒ 0.
-    offset: Option<u64>,
-}
-
-impl Page {
-    /// The clamped `(limit, offset)` this request will use.
-    fn resolve(self, default_limit: u64) -> (u64, u64) {
-        let limit = self
-            .limit
-            .filter(|l| *l > 0)
-            .unwrap_or(default_limit)
-            .min(MAX_LIMIT);
-        (limit, self.offset.unwrap_or(0))
-    }
-
-    /// Reject an out-of-bound offset before it reaches the database.
-    fn check_offset(self) -> Result<()> {
-        if self.offset.unwrap_or(0) > MAX_OFFSET {
-            return Err(Error::CustomError(
-                StatusCode::BAD_REQUEST,
-                ErrorDetail::new(
-                    "offset_too_large",
-                    format!("offset must not exceed {MAX_OFFSET}; narrow the query instead"),
-                ),
-            ));
-        }
-        Ok(())
-    }
-}
 
 /// Parse index hits into UUIDs, dropping any that will not parse.
 ///
@@ -237,21 +198,6 @@ fn parse_pids(hits: &[String]) -> Vec<uuid::Uuid> {
             }
         })
         .collect()
-}
-
-/// Stamp `X-Total-Count` / `X-Limit` / `X-Offset` onto a response.
-fn with_page_headers(mut response: Response, total: u64, limit: u64, offset: u64) -> Response {
-    let headers = response.headers_mut();
-    for (name, value) in [
-        ("x-total-count", total),
-        ("x-limit", limit),
-        ("x-offset", offset),
-    ] {
-        if let Ok(value) = axum::http::HeaderValue::from_str(&value.to_string()) {
-            headers.insert(name, value);
-        }
-    }
-    response
 }
 
 /// Query string for `GET /plans/search`: the `q` name term.
