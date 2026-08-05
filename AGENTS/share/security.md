@@ -52,7 +52,10 @@ narrative summary + the durable invariants those fixes establish.
   excepted), a timeout, and a response-size cap (SEC-V1, MITM key
   injection); the **vacuous-negation** escalation where a `!`-negated
   `resource.`/`env.` condition matched on the coarse no-record guard path
-  (SEC-V2). Remaining: malformed-key-entry load hardening (SEC-V3, partial).
+  (SEC-V2). Malformed-key-entry load resilience (SEC-V3) was an open
+  design call, not a gap — decided 2026-08-05 to keep the deliberate
+  fail-fast (a malformed key document refuses to load rather than
+  silently dropping the bad entry).
 - **F-guard — read-path masking & guard consistency.** Fixed: the blanket
   guard is now **guard-all / deny-unless-public** rather than prefix-gated
   (SEC-G5); `derive_action` normalises a trailing slash so it can't
@@ -209,11 +212,14 @@ deployment's policy is written), but it means:
 
 ## 7. Status snapshot
 
-Phase 5 is tracked in [tasks.md](../../tasks.md). As of 2026-07-14 the
-criticals and most of the program are **done**; the open items are the
+Phase 5 is tracked in [tasks.md](../../tasks.md). **As of 2026-08-05,
+every `SEC-*` item in tasks.md is `[x]`** — the criticals, the
 lower-severity authn hardening (SEC-A5/A6/A9/A10), the default-off pin
-(SEC-G8), `cargo-fuzz` (SEC-I2), and residuals noted `[~]` in tasks.md
-(SEC-M1 `limit_payload`, SEC-B8 follow-ups, SEC-G3, SEC-V3) — the SEC-B2
-streaming and SEC-B4 sweep residuals closed on 2026-08-05. Consult
+(SEC-G8), `cargo-fuzz` scaffolding (SEC-I2), and the last two residuals:
+SEC-B2 (bulk import now genuinely streams, memory peak measured flat
+regardless of file size) and SEC-B4 (bulk artifacts are now physically
+deleted on a TTL sweep, not just gated on read) both closed 2026-08-05,
+and SEC-V3 (malformed key-set load resilience) was resolved the same day
+as a **decision, not a code change** — fail-fast stays, see §2. Consult
 tasks.md for the authoritative, up-to-date checklist and each crate's
 `CHANGELOG.md` for the landed fix.

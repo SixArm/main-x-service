@@ -2446,11 +2446,19 @@
   rules still match (fail-closed); subject-attr negation unchanged. Test
   `negated_allow_does_not_match_vacuously_when_namespace_absent` (+ existing
   deny-rule test preserved).
-- [~] **SEC-V3 (S) ⚪** Key-set load resilience — **deferred**. Skipping a
-  malformed Ed25519 entry (vs the current deliberate fail-fast on a
-  malformed key set) contradicts a stated design decision + spec and is Low
-  severity; left as an open call (fail-fast surfaces misconfiguration;
-  skip-and-continue favours availability).
+- [x] **SEC-V3 (S) ⚪** Key-set load resilience. **Decided (2026-08-05):
+  keep fail-fast.** Skipping a malformed Ed25519 entry was the
+  alternative on the table — it would favour availability, at the cost
+  of silently narrowing the trusted key set on a config mistake — but it
+  contradicts this crate's own stated design decision and spec (a
+  malformed *supported*-algorithm entry is treated as a malformed key
+  set, not a droppable row — see `VerificationKey::from_jwk` in
+  `authentication-verifier`'s `src/lib.rs`, and `spec/index.md`'s FR4).
+  Fail-fast surfaces a misconfigured or tampered key document at load
+  time, where an operator can act on it, rather than quietly reducing
+  the anti-forgery surface a peer trusts. No code change: this closes
+  the open call, not an implementation gap — the behaviour asked about
+  is already what ships.
 - [x] **SEC-V4 (M) 🟠 (tests)** Forgery + robustness suite. *(done 2026-07-13)*
   Added the previously-missing **cross-key forgery** test (attacker sig +
   honest `kid` ⇒ `Paseto` Err), `token_missing_exp_is_rejected`, and
