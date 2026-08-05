@@ -284,44 +284,70 @@ struct ImportRow {
     parsed: std::result::Result<Person, String>,
 }
 
-/// Decode `input` per `format` into per-row [`ImportRow`]s, enforcing the
-/// SEC-B2 row cap uniformly regardless of format (`jsonl::split_lines_capped`
-/// does this inline for JSONL; CSV is checked here since `csv::decode` has
-/// no cap of its own).
-fn decode_import_rows(input: &[u8], format: BulkFormat) -> Result<Vec<ImportRow>> {
-    match format {
-        BulkFormat::Jsonl => Ok(
-            jsonl::split_lines_capped(input, crate::bulk::MAX_IMPORT_ROWS)?
-                .into_iter()
-                .map(|line| ImportRow {
+/// A **streaming** per-format source of [`ImportRow`]s (SEC-B2).
+///
+/// Replaced `decode_import_rows`, which materialised every row of the file
+/// as a `Vec<ImportRow>` before the first one was written — the second of
+/// the two full-file buffers the streaming work removed (the first being
+/// the upload itself). Both variants hold one row plus a small fixed
+/// buffer, so peak memory no longer scales with the file.
+enum ImportRowSource {
+    /// JSONL: [`jsonl::LineReader`] frames rows; each line is parsed here.
+    Jsonl(jsonl::LineReader<Box<dyn tokio::io::AsyncRead + Send + Unpin>>),
+    /// CSV: [`csv::RowStream`] frames **and** parses rows (framing is the
+    /// `csv` crate's job, on a blocking task).
+    Csv(csv::RowStream),
+}
+
+impl ImportRowSource {
+    /// Open a row source over `reader` for `format`, applying the SEC-B2
+    /// row cap uniformly regardless of format.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] for an export-only format.
+    fn open(
+        reader: Box<dyn tokio::io::AsyncRead + Send + Unpin>,
+        format: BulkFormat,
+    ) -> Result<Self> {
+        match format {
+            BulkFormat::Jsonl => Ok(Self::Jsonl(jsonl::LineReader::new(
+                reader,
+                crate::bulk::MAX_IMPORT_ROWS,
+            ))),
+            BulkFormat::Csv => Ok(Self::Csv(csv::RowStream::new(
+                reader,
+                crate::bulk::MAX_IMPORT_ROWS,
+            ))),
+            // §12 lean: Parquet is export-only. The handler already refuses
+            // this before a job is ever created (`BulkFormat::is_export_only`);
+            // this arm only guards a hand-edited `bulk_jobs.format` row.
+            BulkFormat::Parquet => Err(crate::Error::Validation(
+                "parquet import is not supported (export-only)".to_string(),
+            )),
+        }
+    }
+
+    /// The next row, or `None` at end of input. An `Err` item is fatal to
+    /// the whole job (unreadable input, the row cap); a per-row *parse*
+    /// failure is an `Ok` row carrying `parsed: Err` (§7).
+    async fn next(&mut self) -> Option<Result<ImportRow>> {
+        match self {
+            Self::Jsonl(reader) => match reader.next_line().await? {
+                Ok(line) => Some(Ok(ImportRow {
                     had_explicit_id: stable_key::row_has_explicit_id(&line),
                     parsed: jsonl::parse_line(&line).map_err(|e| e.to_string()),
-                })
-                .collect(),
-        ),
-        BulkFormat::Csv => {
-            let decoded = csv::decode(input)?;
-            if decoded.len() > crate::bulk::MAX_IMPORT_ROWS {
-                return Err(crate::Error::Validation(format!(
-                    "bulk import exceeds the row cap: {} rows > {}",
-                    decoded.len(),
-                    crate::bulk::MAX_IMPORT_ROWS
-                )));
-            }
-            Ok(decoded
-                .into_iter()
-                .map(|(had_explicit_id, parsed)| ImportRow {
+                })),
+                Err(e) => Some(Err(e)),
+            },
+            Self::Csv(stream) => match stream.next_row().await? {
+                Ok((had_explicit_id, parsed)) => Some(Ok(ImportRow {
                     had_explicit_id,
                     parsed: parsed.map_err(|e| e.to_string()),
-                })
-                .collect())
+                })),
+                Err(e) => Some(Err(e)),
+            },
         }
-        // §12 lean: Parquet is export-only. The handler already refuses
-        // this before a job is ever created (`BulkFormat::is_export_only`);
-        // this arm only guards a hand-edited `bulk_jobs.format` row.
-        BulkFormat::Parquet => Err(crate::Error::Validation(
-            "parquet import is not supported (export-only)".to_string(),
-        )),
     }
 }
 
@@ -415,9 +441,43 @@ async fn create_and_queue_for_review(
     Ok(saved)
 }
 
-/// Run a full import over an `input` byte buffer in the given `format`,
+/// Run a full import over an `input` byte buffer in the given `format`.
+///
+/// A thin wrapper over [`process_import_stream`], kept because a byte
+/// buffer is the natural shape for a test and for any caller that already
+/// holds the bytes. **The production path does not use it**: the worker
+/// streams the input artifact straight out of the artifact store
+/// (SEC-B2), so no stage of a real import holds the file.
+///
+/// # Errors
+///
+/// As [`process_import_stream`].
+#[allow(clippy::too_many_arguments)] // db/repo/search/matcher/input/format/params/ctx — each an independent collaborator
+pub async fn process_import_job(
+    db: &DatabaseConnection,
+    repo: &dyn PersonRepository,
+    search: &SearchEngine,
+    matcher: &dyn PersonMatcher,
+    input: &[u8],
+    format: BulkFormat,
+    params: &ImportParams,
+    ctx: &crate::db::AuditContext,
+) -> Result<ImportOutcome> {
+    // The CSV row source parses on a spawned blocking task, which needs an
+    // owned `'static` source; copying here costs one buffer in a caller
+    // that already holds one, and keeps the streaming path allocation-free.
+    let reader = Box::new(std::io::Cursor::new(input.to_vec()));
+    process_import_stream(db, repo, search, matcher, reader, format, params, ctx).await
+}
+
+/// Run a full import by **streaming** `reader` in the given `format`,
 /// returning the reconciled [`ImportOutcome`] (including the per-row error
 /// report).
+///
+/// Rows are framed, parsed, and written one at a time (SEC-B2): the input
+/// is never held in memory as bytes, and the decoded rows are never held
+/// as a collection, so peak memory is bounded by one row plus a fixed
+/// read buffer regardless of how large the import is.
 ///
 /// Each successfully written row is persisted through `repo`, which emits
 /// its normal `created`/`updated` event and audit record; the search
@@ -431,24 +491,30 @@ async fn create_and_queue_for_review(
 /// # Errors
 ///
 /// Returns an error only for a whole-job failure (e.g. non-UTF-8 input,
-/// an unreadable CSV header, or the SEC-B2 row cap); per-row failures are
-/// captured in [`ImportOutcome::errors`], not returned.
-#[allow(clippy::too_many_arguments)] // db/repo/search/matcher/input/format/params/ctx — each an independent collaborator
-pub async fn process_import_job(
+/// an unreadable CSV header, an oversized row, or the SEC-B2 row cap);
+/// per-row failures are captured in [`ImportOutcome::errors`], not
+/// returned. A whole-job failure is now raised **at the row that trips
+/// it**, so rows before it are already committed — an import was never
+/// atomic (§7), and re-running the corrected file is safe because keyed
+/// rows upsert idempotently (§6).
+#[allow(clippy::too_many_arguments)] // db/repo/search/matcher/reader/format/params/ctx — each an independent collaborator
+pub async fn process_import_stream(
     db: &DatabaseConnection,
     repo: &dyn PersonRepository,
     search: &SearchEngine,
     matcher: &dyn PersonMatcher,
-    input: &[u8],
+    reader: Box<dyn tokio::io::AsyncRead + Send + Unpin>,
     format: BulkFormat,
     params: &ImportParams,
     ctx: &crate::db::AuditContext,
 ) -> Result<ImportOutcome> {
-    let rows = decode_import_rows(input, format)?;
+    let mut source = ImportRowSource::open(reader, format)?;
     let mut outcome = ImportOutcome::default();
+    let mut row_number = 0usize;
 
-    for (idx, row) in rows.into_iter().enumerate() {
-        let row_number = idx + 1;
+    while let Some(row) = source.next().await {
+        let row = row?;
+        row_number += 1;
         outcome.rows_total += 1;
 
         // Parse (§7: a bad row is recorded, never fatal).
@@ -623,7 +689,7 @@ pub async fn process_export_job(
 mod db_tests {
     use super::{
         BulkFormat, ExportParams, ImportParams, MaskingProfile, process_export_job,
-        process_import_job,
+        process_import_job, process_import_stream,
     };
     use crate::bulk::{csv, jsonl};
     use crate::config::Config;
@@ -1131,6 +1197,84 @@ mod db_tests {
 
         let saved = repo.get_by_id(&p.id).await.unwrap().expect("persisted");
         assert_eq!(saved.tax_id, p.tax_id);
+    }
+
+    /// SEC-B2 end-to-end: the **worker's actual path** — an artifact
+    /// opened from the store as a stream and fed to
+    /// [`process_import_stream`] — not the `&[u8]` convenience wrapper the
+    /// other tests use. A file large enough to span many read chunks, so
+    /// rows are genuinely assembled across boundaries against a real
+    /// database.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn streaming_an_artifact_from_the_store_imports_every_row() {
+        use crate::bulk::store::{ArtifactStore, LocalFsArtifactStore};
+
+        let db = connect().await;
+        let repo = SeaOrmPersonRepository::new(db.clone());
+        let (_dir, search) = search_engine();
+
+        // Keyed rows, each with its own stable key, plus a malformed row in
+        // the middle: the per-row error contract (§7) must survive the
+        // streaming rewrite. The rows are *padded* rather than merely
+        // numerous, so the file spans several 64 KiB read chunks without
+        // paying for hundreds of per-row database round-trips (each is a
+        // locked upsert, and this suite runs in CI).
+        let padding = "P".repeat(500); // under the SEC-M1 per-item cap (512)
+        let mut people = Vec::new();
+        let mut input = Vec::new();
+        for i in 0..60 {
+            let mut p = person(&format!("Streamed{i:04}"));
+            p.tax_id = Some(format!("TAX-{}", uuid::Uuid::new_v4()));
+            p.name.given = (0..8).map(|_| padding.clone()).collect();
+            input.extend_from_slice(jsonl::to_line(&p).unwrap().as_bytes());
+            input.push(b'\n');
+            if i == 30 {
+                input.extend_from_slice(b"{ not json }\n");
+            }
+            people.push(p);
+        }
+        assert!(
+            input.len() > 3 * 64 * 1024,
+            "the fixture must span several read chunks, was {} bytes",
+            input.len()
+        );
+
+        let store_dir = tempfile::tempdir().unwrap();
+        let store = LocalFsArtifactStore::new(store_dir.path());
+        let reference = store
+            .put(
+                &format!("jobs/{}/input.jsonl", uuid::Uuid::new_v4()),
+                &input,
+            )
+            .await
+            .unwrap();
+        let reader = store.get_stream(&reference).await.unwrap();
+
+        let outcome = process_import_stream(
+            &db,
+            &repo,
+            &search,
+            &matcher(),
+            reader,
+            BulkFormat::Jsonl,
+            &ImportParams::default(),
+            &AuditContext::default(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(outcome.rows_total, 61, "60 good rows + 1 malformed");
+        assert_eq!(outcome.rows_created, 60, "errors: {:?}", outcome.errors);
+        assert_eq!(outcome.rows_errored, 1);
+        assert_eq!(outcome.errors.len(), 1);
+
+        // Spot-check both ends of the file, so a truncated stream or a
+        // dropped final row would be caught.
+        for p in [&people[0], &people[59]] {
+            let saved = repo.get_by_id(&p.id).await.unwrap().expect("persisted");
+            assert_eq!(saved.tax_id, p.tax_id);
+        }
     }
 
     /// The CSV export path round-trips a created record through

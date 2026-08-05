@@ -68,6 +68,55 @@ pub trait ArtifactStore: Send + Sync {
     /// Returns [`Error::Internal`] if the artifact is missing or unreadable.
     async fn get(&self, reference: &str) -> Result<Vec<u8>>;
 
+    /// Stream `src` into `key`, returning the same opaque reference
+    /// [`put`](ArtifactStore::put) would (SEC-B2).
+    ///
+    /// The import upload path uses this so an uploaded file is never held
+    /// in memory. The default implementation buffers and delegates to
+    /// `put`, so a backend that has no incremental write still works
+    /// (correctly, just not memory-bounded); the local-filesystem backend
+    /// — the default, and the one every dev/test/CI run uses — overrides
+    /// it with a real incremental copy.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Internal`] if the source cannot be read or the
+    /// artifact cannot be written.
+    async fn put_stream(
+        &self,
+        key: &str,
+        src: &mut (dyn tokio::io::AsyncRead + Send + Unpin),
+    ) -> Result<String> {
+        use tokio::io::AsyncReadExt;
+        let mut buf = Vec::new();
+        src.read_to_end(&mut buf)
+            .await
+            .map_err(|e| Error::Internal(format!("read artifact source for {key}: {e}")))?;
+        self.put(key, &buf).await
+    }
+
+    /// Open a previously-stored artifact for **incremental** reading
+    /// (SEC-B2), so a consumer can process it a chunk at a time instead of
+    /// materialising it.
+    ///
+    /// The import worker uses this to feed the streaming row source. The
+    /// default implementation reads the whole artifact and hands back a
+    /// cursor over it — correct for any backend, memory-bounded for none —
+    /// and the local-filesystem backend overrides it with a real file
+    /// handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Internal`] if the artifact is missing or cannot be
+    /// opened.
+    async fn get_stream(
+        &self,
+        reference: &str,
+    ) -> Result<Box<dyn tokio::io::AsyncRead + Send + Unpin>> {
+        let bytes = self.get(reference).await?;
+        Ok(Box::new(std::io::Cursor::new(bytes)))
+    }
+
     /// A short-lived URL a client may fetch the artifact from directly,
     /// when the backend supports one.
     ///
@@ -327,6 +376,57 @@ impl ArtifactStore for LocalFsArtifactStore {
         std::fs::read(&path).map_err(|e| Error::Internal(format!("read artifact {reference}: {e}")))
     }
 
+    /// SEC-B2: copy the source into the artifact file incrementally, so an
+    /// upload of any size costs one copy buffer rather than its own size
+    /// in memory. Same confinement rule and same returned reference shape
+    /// as [`put`](ArtifactStore::put) — the two must not diverge on where
+    /// they will write.
+    async fn put_stream(
+        &self,
+        key: &str,
+        src: &mut (dyn tokio::io::AsyncRead + Send + Unpin),
+    ) -> Result<String> {
+        if !is_safe_key(key) {
+            return Err(Error::Internal(format!(
+                "refusing unsafe artifact key: {key}"
+            )));
+        }
+        let path = self.path_for(key);
+        if let Some(parent) = path.parent() {
+            tokio::fs::create_dir_all(parent)
+                .await
+                .map_err(|e| Error::Internal(format!("create artifact dir: {e}")))?;
+        }
+        let mut file = tokio::fs::File::create(&path)
+            .await
+            .map_err(|e| Error::Internal(format!("create artifact {key}: {e}")))?;
+        tokio::io::copy(src, &mut file)
+            .await
+            .map_err(|e| Error::Internal(format!("write artifact {key}: {e}")))?;
+        // Flush before the reference is handed out: the job row that will
+        // carry it is written next, and a worker must never resolve a
+        // reference to a partially-written file.
+        tokio::io::AsyncWriteExt::flush(&mut file)
+            .await
+            .map_err(|e| Error::Internal(format!("flush artifact {key}: {e}")))?;
+        drop(file);
+        let abs = std::fs::canonicalize(&path).unwrap_or(path);
+        Ok(format!("file://{}", abs.display()))
+    }
+
+    /// SEC-B2: hand back a file handle rather than the file's bytes, so
+    /// the import worker reads the artifact a chunk at a time.
+    async fn get_stream(
+        &self,
+        reference: &str,
+    ) -> Result<Box<dyn tokio::io::AsyncRead + Send + Unpin>> {
+        let path = self.resolve_confined_path(reference)?;
+        let file = tokio::fs::File::open(&path)
+            .await
+            .map_err(|e| Error::Internal(format!("open artifact {reference}: {e}")))?;
+        Ok(Box::new(file))
+    }
+
     async fn delete(&self, reference: &str) -> Result<()> {
         let path = self.resolve_confined_path(reference)?;
         match std::fs::remove_file(&path) {
@@ -493,6 +593,34 @@ impl ArtifactStore for S3ArtifactStore {
         Ok(data.into_bytes().to_vec())
     }
 
+    /// SEC-B2: the SDK's response body is already a byte **stream**, so
+    /// the import worker reads an object incrementally rather than
+    /// collecting it — the same property the local backend gets from a
+    /// file handle.
+    ///
+    /// `put_stream` deliberately keeps the trait's buffering default: a
+    /// single S3 `PutObject` wants a known content length, and streaming
+    /// an unknown-length body means multipart upload — real work with real
+    /// failure modes (part sizing, abort-on-failure cleanup) that should
+    /// be written against a live endpoint, not blind. The upload path is
+    /// bounded by [`MAX_IMPORT_BYTES`](crate::bulk::MAX_IMPORT_BYTES)
+    /// either way, and this backend is off by default.
+    async fn get_stream(
+        &self,
+        reference: &str,
+    ) -> Result<Box<dyn tokio::io::AsyncRead + Send + Unpin>> {
+        let (_, key) = self.split_reference(reference)?;
+        let object = self
+            .client
+            .get_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .send()
+            .await
+            .map_err(|e| Error::Internal(format!("get artifact {reference}: {e}")))?;
+        Ok(Box::new(object.body.into_async_read()))
+    }
+
     async fn presigned_get(&self, reference: &str, ttl_secs: u64) -> Result<Option<String>> {
         let (_, key) = self.split_reference(reference)?;
         // Bounded: an unbounded TTL on a URL to a personal-data export is a
@@ -543,6 +671,58 @@ mod tests {
         assert!(reference.starts_with("file://"));
         let bytes = store.get(&reference).await.unwrap();
         assert_eq!(bytes, b"hello bulk");
+    }
+
+    /// SEC-B2: the streaming pair must be interchangeable with the
+    /// buffered pair — same reference shape, same bytes — or the upload
+    /// path and the worker path would disagree about what an artifact is.
+    #[tokio::test]
+    async fn put_stream_and_get_stream_round_trip_and_interoperate() {
+        use tokio::io::AsyncReadExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let store = LocalFsArtifactStore::new(dir.path());
+        // Larger than one internal copy buffer, so this is a genuine
+        // multi-chunk copy rather than a single write.
+        let payload: Vec<u8> = (0..512 * 1024)
+            .map(|i| u8::try_from(i % 251).unwrap())
+            .collect();
+
+        let mut src = std::io::Cursor::new(payload.clone());
+        let reference = store
+            .put_stream("jobs/abc/input.jsonl", &mut src)
+            .await
+            .unwrap();
+        assert!(reference.starts_with("file://"));
+
+        // Streamed in, read back whole.
+        assert_eq!(store.get(&reference).await.unwrap(), payload);
+
+        // Written whole, streamed back out.
+        let plain = store.put("jobs/abc/other.jsonl", &payload).await.unwrap();
+        let mut reader = store.get_stream(&plain).await.unwrap();
+        let mut back = Vec::new();
+        reader.read_to_end(&mut back).await.unwrap();
+        assert_eq!(back, payload);
+    }
+
+    /// The confinement rule (SEC-B4) must hold on the streaming methods
+    /// too — a second read path that skipped it would reopen the hole the
+    /// first one closed.
+    #[tokio::test]
+    async fn streaming_methods_honour_key_safety_and_confinement() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = LocalFsArtifactStore::new(dir.path());
+
+        let mut src = std::io::Cursor::new(b"x".to_vec());
+        assert!(
+            store.put_stream("../escape.jsonl", &mut src).await.is_err(),
+            "put_stream rejects an unsafe key"
+        );
+        assert!(
+            store.get_stream("file:///etc/passwd").await.is_err(),
+            "get_stream refuses a reference outside the base"
+        );
     }
 
     #[tokio::test]

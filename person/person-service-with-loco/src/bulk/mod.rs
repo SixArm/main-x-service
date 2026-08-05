@@ -77,12 +77,20 @@ use serde::{Deserialize, Serialize};
 /// SEC-B2 — the maximum size, in bytes, of an uploaded **import** artifact.
 ///
 /// The upload is read chunk-by-chunk and rejected with `413 Payload Too
-/// Large` the moment the running total exceeds this, so an oversized (or
-/// unbounded / chunked-transfer) upload can never be fully materialised in
-/// memory — the pre-materialisation guard against an out-of-memory
-/// denial-of-service. 64 MiB is a
-/// generous ceiling for a JSONL person load (tens of thousands of records)
-/// while staying comfortably bounded.
+/// Large` the moment the running total exceeds this, and each accepted
+/// chunk is written straight through to the spool file rather than
+/// accumulated (`handlers::spool_field_capped`).
+///
+/// **Kept at 64 MiB after the streaming rewrite** (SEC-B2, 2026-08-05),
+/// with a changed justification. It used to be a *memory* ceiling: the
+/// whole upload was buffered in one `Vec<u8>`, so the cap was the only
+/// thing standing between a large upload and an out-of-memory kill. The
+/// import path no longer holds the file in memory at any stage, so this is
+/// now a **work / storage** ceiling instead: an import still costs a
+/// per-row database round-trip and an artifact on disk, and an unbounded
+/// upload is a time- and space-based denial of service even when it is not
+/// a memory-based one. Defence in depth, and raising it is now a
+/// deployment decision with no memory consequence rather than a rewrite.
 pub const MAX_IMPORT_BYTES: usize = 64 * 1024 * 1024;
 
 /// SEC-B2 — the maximum number of record rows in a single **import**.
@@ -91,7 +99,35 @@ pub const MAX_IMPORT_BYTES: usize = 64 * 1024 * 1024;
 /// enqueue millions of per-row validate + database round-trips. The import
 /// pipeline rejects the whole job (marking it `failed`) when the non-blank
 /// row count exceeds this, bounding the per-job work.
+///
+/// **Kept at 1M after the streaming rewrite**, with one honest change in
+/// *when* the rejection is observed. The cap used to be checked against a
+/// fully-materialised row vector, so it rejected before any row was
+/// written; rows are now counted as they stream past, so the job fails at
+/// the row that crosses the cap with the preceding rows already committed.
+/// The cap's purpose — bounding the per-job work — is unchanged (the job
+/// still never does more than this many rows of work), and an import was
+/// never atomic anyway (§7: valid rows commit, invalid rows are recorded);
+/// re-running the file after trimming it is safe because the upsert is
+/// idempotent (§6).
 pub const MAX_IMPORT_ROWS: usize = 1_000_000;
+
+/// SEC-B2 — the maximum size, in bytes, of a single **import row**.
+///
+/// New with the streaming rewrite, and the reason the byte cap is no
+/// longer load-bearing for memory. A streaming line reader holds one
+/// in-progress row in its carry buffer; a file consisting of one
+/// enormous unterminated line would otherwise make that buffer grow to
+/// the whole file. 4 MiB is orders of magnitude above any legitimate
+/// person record (a fully-populated one is a few KB), so a row past this
+/// is malformed input, not a large record.
+///
+/// Applies to the **JSONL** reader, which owns its own line framing. The
+/// CSV path delegates framing to the `csv` crate, which has no per-record
+/// limit of its own, so a CSV record is bounded by [`MAX_IMPORT_BYTES`]
+/// alone — worth knowing rather than assuming both formats share the
+/// tighter bound.
+pub const MAX_IMPORT_ROW_BYTES: usize = 4 * 1024 * 1024;
 
 /// SEC-B2 — the maximum number of records a single **export** may
 /// materialise. A caller-supplied `limit` is clamped to this

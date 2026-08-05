@@ -9,6 +9,10 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+# The streaming line reader (SEC-B2) is `async` because its source is an
+# `AsyncRead`; the target drives it on a current-thread runtime. Only the
+# `rt` feature is needed — the target does no real I/O.
+tokio = { version = "1", features = ["rt"] }
 
 [dependencies.person-service]
 path = ".."

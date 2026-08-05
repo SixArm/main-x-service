@@ -74,11 +74,51 @@ pub fn encode(persons: &[Person]) -> Result<Vec<u8>> {
 /// Returns [`Error::Validation`] if the bytes are not a readable CSV (bad
 /// header / structurally broken record framing).
 pub fn decode(input: &[u8]) -> Result<Vec<(bool, serde_json::Result<Person>)>> {
+    let mut out = Vec::new();
+    let mut fatal = None;
+    read_records(input, usize::MAX, |item| match item {
+        Ok(row) => {
+            out.push(row);
+            true
+        }
+        Err(e) => {
+            fatal = Some(e);
+            false
+        }
+    });
+    match fatal {
+        Some(e) => Err(e),
+        None => Ok(out),
+    }
+}
+
+/// One decoded CSV data row: whether it carried its own non-empty `id`
+/// cell, and the person it parses to (or the per-row parse error, §7).
+pub type CsvRow = (bool, serde_json::Result<Person>);
+
+/// The **one** CSV reading implementation, generic over a blocking
+/// [`std::io::Read`] so both callers share it: [`decode`] (whole buffer,
+/// used by the export round-trip tests) and [`RowStream`] (the streaming
+/// import path, which runs this on a blocking task fed by an async
+/// source). Having one core is why a fix to the framing or the
+/// header-resolution rules cannot land in one path and miss the other.
+///
+/// `sink` receives each row; an `Err` item is **fatal to the whole load**
+/// (an unreadable header, broken record framing, or the SEC-B2 row cap),
+/// matching the pre-streaming contract. Returning `false` from `sink`
+/// stops the read (the consumer went away).
+fn read_records<R: std::io::Read>(
+    input: R,
+    max_rows: usize,
+    mut sink: impl FnMut(Result<CsvRow>) -> bool,
+) -> bool {
     let mut rdr = csv::Reader::from_reader(input);
-    let headers = rdr
-        .headers()
-        .map_err(|e| Error::Validation(format!("read CSV header: {e}")))?
-        .clone();
+    let headers = match rdr.headers() {
+        Ok(h) => h.clone(),
+        Err(e) => {
+            return sink(Err(Error::Validation(format!("read CSV header: {e}"))));
+        }
+    };
     // Resolve each expected column to its index in the actual header row.
     let indices: Vec<Option<usize>> = COLUMNS
         .iter()
@@ -86,16 +126,29 @@ pub fn decode(input: &[u8]) -> Result<Vec<(bool, serde_json::Result<Person>)>> {
         .collect();
     let id_col = COLUMNS.iter().position(|c| c.header == "id");
 
-    let mut out = Vec::new();
+    let mut rows = 0usize;
     for record in rdr.records() {
-        let record = record.map_err(|e| Error::Validation(format!("read CSV row: {e}")))?;
+        let record = match record {
+            Ok(r) => r,
+            Err(e) => {
+                return sink(Err(Error::Validation(format!("read CSV row: {e}"))));
+            }
+        };
+        rows += 1;
+        if rows > max_rows {
+            return sink(Err(Error::Validation(format!(
+                "bulk import exceeds the row cap: more than {max_rows} rows"
+            ))));
+        }
         let had_explicit_id = id_col
             .and_then(|ci| indices[ci])
             .and_then(|i| record.get(i))
             .is_some_and(|cell| !cell.is_empty());
-        out.push((had_explicit_id, record_to_person(&record, &indices)));
+        if !sink(Ok((had_explicit_id, record_to_person(&record, &indices)))) {
+            return false;
+        }
     }
-    Ok(out)
+    true
 }
 
 /// Rebuild one [`Person`] from a CSV record + the resolved column indices,
@@ -129,6 +182,129 @@ fn record_to_person(
         }
     }
     serde_json::from_value(Value::Object(map))
+}
+
+/// Bytes pulled from the async source per read in [`RowStream`].
+const READ_CHUNK_BYTES: usize = 64 * 1024;
+
+/// How many read chunks may be in flight between the async feeder and the
+/// blocking parser. Bounded, so a fast source cannot outrun the parser and
+/// queue the whole file in memory.
+const CHUNK_QUEUE: usize = 4;
+
+/// How many parsed rows may be in flight between the blocking parser and
+/// the async consumer. Bounded for the same reason, in the other
+/// direction: a slow per-row database write must not let parsed rows pile
+/// up.
+const ROW_QUEUE: usize = 32;
+
+/// A blocking [`std::io::Read`] fed by an async task over a bounded
+/// channel.
+///
+/// The `csv` crate's reader is synchronous and pull-based, and the import
+/// source is an async byte stream. Rather than materialise the file to
+/// satisfy the sync reader (which is exactly what SEC-B2's streaming work
+/// removes), the reader runs on a blocking task and takes its bytes from
+/// this bridge, blocking on the channel when the feeder is behind.
+struct ChannelReader {
+    /// Chunks from the async feeder; `Err` carries a source read failure
+    /// through to the CSV reader as an I/O error.
+    rx: tokio::sync::mpsc::Receiver<std::io::Result<Vec<u8>>>,
+    /// The chunk currently being handed out.
+    current: Vec<u8>,
+    /// How much of `current` has been handed out.
+    pos: usize,
+}
+
+impl std::io::Read for ChannelReader {
+    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+        while self.pos >= self.current.len() {
+            match self.rx.blocking_recv() {
+                Some(Ok(chunk)) => {
+                    self.current = chunk;
+                    self.pos = 0;
+                }
+                Some(Err(e)) => return Err(e),
+                None => return Ok(0), // feeder finished or went away
+            }
+        }
+        let n = out.len().min(self.current.len() - self.pos);
+        out[..n].copy_from_slice(&self.current[self.pos..self.pos + n]);
+        self.pos += n;
+        Ok(n)
+    }
+}
+
+/// A **streaming** CSV row source (SEC-B2): yields one decoded row at a
+/// time from an async byte source, never materialising the file or the
+/// full row set.
+///
+/// This is what replaced `decode`-then-iterate on the import path, where
+/// the whole file was read into a `Vec<u8>` and then decoded into a `Vec`
+/// of every parsed person before the first row was written.
+///
+/// Three bounded stages run concurrently: an async feeder reading
+/// [`READ_CHUNK_BYTES`] at a time, a blocking task running the `csv`
+/// reader over [`ChannelReader`], and the async consumer pulling rows.
+/// Peak memory is the two queue depths ([`CHUNK_QUEUE`], [`ROW_QUEUE`])
+/// times their element size — independent of the file size. Dropping the
+/// stream tears both tasks down: the row send fails, the parser returns,
+/// the chunk channel closes, and the feeder stops.
+pub struct RowStream {
+    /// Decoded rows from the blocking parser. An `Err` item is fatal to
+    /// the job, exactly as [`decode`] returning `Err` is.
+    rx: tokio::sync::mpsc::Receiver<Result<CsvRow>>,
+}
+
+impl RowStream {
+    /// Start streaming rows from `reader`, failing the job past `max_rows`
+    /// data rows.
+    ///
+    /// Must be called from within a Tokio runtime (it spawns the feeder
+    /// and the blocking parser).
+    #[must_use]
+    pub fn new<R>(mut reader: R, max_rows: usize) -> Self
+    where
+        R: tokio::io::AsyncRead + Unpin + Send + 'static,
+    {
+        let (chunk_tx, chunk_rx) = tokio::sync::mpsc::channel(CHUNK_QUEUE);
+        let (row_tx, row_rx) = tokio::sync::mpsc::channel(ROW_QUEUE);
+
+        tokio::spawn(async move {
+            use tokio::io::AsyncReadExt;
+            let mut buf = vec![0u8; READ_CHUNK_BYTES];
+            loop {
+                match reader.read(&mut buf).await {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        if chunk_tx.send(Ok(buf[..n].to_vec())).await.is_err() {
+                            break; // the parser went away
+                        }
+                    }
+                    Err(e) => {
+                        let _ = chunk_tx.send(Err(e)).await;
+                        break;
+                    }
+                }
+            }
+        });
+
+        tokio::task::spawn_blocking(move || {
+            let bridge = ChannelReader {
+                rx: chunk_rx,
+                current: Vec::new(),
+                pos: 0,
+            };
+            read_records(bridge, max_rows, |item| row_tx.blocking_send(item).is_ok());
+        });
+
+        Self { rx: row_rx }
+    }
+
+    /// The next decoded row, or `None` once the input is exhausted.
+    pub async fn next_row(&mut self) -> Option<Result<CsvRow>> {
+        self.rx.recv().await
+    }
 }
 
 #[cfg(test)]
@@ -349,5 +525,133 @@ mod tests {
         let rows = decode(no_id_col.as_bytes()).unwrap();
         assert!(!rows[0].0, "missing id column ⇒ no explicit id");
         assert!(rows[0].1.is_ok());
+    }
+
+    // ---- RowStream (the streaming import path) -------------------------
+
+    /// Drain a [`super::RowStream`] over `bytes` into its rows plus the
+    /// terminal error, if any.
+    #[allow(clippy::type_complexity)]
+    async fn drain(
+        bytes: &[u8],
+        max_rows: usize,
+    ) -> (Vec<(bool, bool)>, Option<String>, Vec<super::CsvRow>) {
+        let mut stream = super::RowStream::new(std::io::Cursor::new(bytes.to_vec()), max_rows);
+        let mut summary = Vec::new();
+        let mut rows = Vec::new();
+        let mut err = None;
+        while let Some(item) = stream.next_row().await {
+            match item {
+                Ok(row) => {
+                    summary.push((row.0, row.1.is_ok()));
+                    rows.push(row);
+                }
+                Err(e) => {
+                    err = Some(e.to_string());
+                    break;
+                }
+            }
+        }
+        (summary, err, rows)
+    }
+
+    /// The streaming reader and the whole-buffer [`decode`] share one core
+    /// (`read_records`), and this pins that they therefore agree row for
+    /// row — including the per-row `had_explicit_id` flag and which rows
+    /// parse.
+    #[tokio::test]
+    async fn row_stream_agrees_with_decode() {
+        let people = vec![fully_populated(), Person::new(sparse_name(), Gender::Male)];
+        let bytes = encode(&people).unwrap();
+
+        let buffered: Vec<(bool, bool)> = decode(&bytes)
+            .unwrap()
+            .into_iter()
+            .map(|(id, parsed)| (id, parsed.is_ok()))
+            .collect();
+        let (streamed, err, rows) = drain(&bytes, 1000).await;
+        assert_eq!(err, None);
+        assert_eq!(streamed, buffered, "streaming matches buffered decoding");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(
+            rows[0].1.as_ref().unwrap().name.family,
+            people[0].name.family
+        );
+    }
+
+    #[tokio::test]
+    async fn row_stream_keeps_a_bad_cell_as_a_per_row_error() {
+        // §7: a malformed row is a per-row error the stream still yields,
+        // never a whole-load abort.
+        let hdr = header().join(",");
+        let bad = format!(
+            "{hdr}\n11111111-1111-4111-8111-111111111111,true,X,,[],[],[],male,,,false,,,,,,,not-json,[],[],[],[],[],[],[]\n"
+        );
+        let (summary, err, _rows) = drain(bad.as_bytes(), 1000).await;
+        assert_eq!(err, None, "not a whole-load failure");
+        assert_eq!(
+            summary,
+            vec![(true, false)],
+            "one row, and it did not parse"
+        );
+    }
+
+    #[tokio::test]
+    async fn row_stream_rejects_past_the_row_cap() {
+        let people = vec![fully_populated(), fully_populated(), fully_populated()];
+        let bytes = encode(&people).unwrap();
+        let (summary, err, _rows) = drain(&bytes, 2).await;
+        assert_eq!(summary.len(), 2, "the allowed rows are still yielded");
+        assert!(
+            err.as_deref().is_some_and(|e| e.contains("row cap")),
+            "the cap failure is terminal: {err:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn row_stream_reports_an_unreadable_header() {
+        // An empty input has no header row at all.
+        let (summary, err, _rows) = drain(b"", 1000).await;
+        assert!(summary.is_empty());
+        // The `csv` crate treats an empty input as an empty header rather
+        // than an error, so the stream simply ends; what must not happen
+        // is a panic or a hang.
+        assert_eq!(err, None);
+    }
+
+    /// Many rows, well past one read chunk, so records are assembled from
+    /// several chunks crossing the async→blocking bridge. Every row must
+    /// arrive, in order, exactly once.
+    #[tokio::test]
+    async fn row_stream_handles_input_spanning_many_chunks() {
+        let people: Vec<Person> = (0..2000)
+            .map(|i| {
+                let mut p = Person::new(sparse_name(), Gender::Male);
+                p.name.family = format!("Family{i:05}");
+                p
+            })
+            .collect();
+        let bytes = encode(&people).unwrap();
+        assert!(
+            bytes.len() > super::READ_CHUNK_BYTES * 2,
+            "the fixture must span several read chunks"
+        );
+        let (_summary, err, rows) = drain(&bytes, 100_000).await;
+        assert_eq!(err, None);
+        assert_eq!(rows.len(), 2000);
+        for (i, row) in rows.iter().enumerate() {
+            assert_eq!(row.1.as_ref().unwrap().name.family, format!("Family{i:05}"));
+        }
+    }
+
+    /// A minimal name for fixtures that only care about row identity.
+    fn sparse_name() -> HumanName {
+        HumanName {
+            use_type: None,
+            family: "Solo".to_string(),
+            given: vec![],
+            prefix: vec![],
+            suffix: vec![],
+        }
     }
 }

@@ -2539,17 +2539,60 @@
   `reconcile_is_scoped_to_the_source_entity` (case pass leaves the person
   edge intact) + pure `from_ref_scoping_*` unit tests. Green: lib tests +
   `test --no-run` (DB-gated) + clippy + fmt.
-- [~] **SEC-B2 (M) 🟠** person bulk import caps. *(caps + fuzz done
-  2026-07-13; true streaming deferred)* Import upload read chunk-by-chunk
-  and rejected `413` past `MAX_IMPORT_BYTES` (64 MiB) **before**
-  materialisation (`read_field_capped`/`exceeds_cap`); pipeline rejects a
-  load over `MAX_IMPORT_ROWS` (1M) via `split_lines_capped`; export `limit`
-  clamped to `MAX_EXPORT_ROWS` (1M) via `clamp_export_limit` (worker mapping
-  + pipeline listing path). proptest fuzzes `parse_line`/`split_lines`/
-  `split_lines_capped` (random bytes / truncated UTF-8 / 2 MiB line never
-  panic); boundary `exceeds_cap` unit-tested incl. saturating-add overflow.
-  **Deferred:** true end-to-end streaming (never buffering the whole file,
-  so the caps can rise) — the caps make the current buffered path safe.
+- [x] **SEC-B2 (M) 🟠** person bulk import caps. *(caps + fuzz done
+  2026-07-13; end-to-end streaming done 2026-08-05)* Import upload read
+  chunk-by-chunk and rejected `413` past `MAX_IMPORT_BYTES` (64 MiB)
+  **before** materialisation (`read_field_capped`/`exceeds_cap`); pipeline
+  rejects a load over `MAX_IMPORT_ROWS` (1M); export `limit` clamped to
+  `MAX_EXPORT_ROWS` (1M) via `clamp_export_limit` (worker mapping +
+  pipeline listing path). proptest fuzzes `parse_line`/`split_lines`
+  (random bytes / truncated UTF-8 / 2 MiB line never panic); boundary
+  `exceeds_cap` unit-tested incl. saturating-add overflow.
+  **Done (2026-08-05):** the capped path was **bounded buffering**, not
+  streaming — the upload was accumulated into one `Vec<u8>`, stored, read
+  back whole by the worker, and decoded into a `Vec` of every parsed row
+  before the first row was written, so peak memory scaled with the file at
+  three stages. Now no stage holds the file, as bytes or as rows:
+  `spool_field_capped` writes each multipart chunk straight to a
+  drop-cleaned spool file (cap enforced before the write, so an oversized
+  upload is still `413` unread); `ArtifactStore` gained `put_stream` /
+  `get_stream` (local backend streams for real via `tokio::io::copy` and a
+  file handle, reusing the SEC-B4 confinement rules so the new pair is not
+  a laxer second path; S3's `get_stream` hands back the SDK's already-
+  streaming body, while its `put_stream` deliberately keeps the buffering
+  default because an unknown-length S3 put means multipart upload — real
+  failure modes that want writing against a live endpoint, not blind);
+  `jsonl::LineReader` frames rows from an `AsyncRead` with a carry buffer
+  (replacing `split_lines_capped`, deleted); `csv::RowStream` runs the
+  `csv` reader on a blocking task fed by bounded channels, sharing **one**
+  `read_records` core with the buffered `decode` so the two cannot drift;
+  and `process_import_stream` consumes one row at a time with the per-row
+  validate → dedupe → SEC-B3 locked-upsert logic untouched.
+  **Caps: both kept, one added.** `MAX_IMPORT_BYTES` stays 64 MiB but is
+  now a **work/storage** ceiling rather than a memory one (an import still
+  costs a per-row round-trip and an artifact on disk), so raising it is a
+  deployment decision with no memory consequence. `MAX_IMPORT_ROWS` stays
+  1M, with one honest change: rows are counted as they stream, so the job
+  now fails **at** the row that crosses the cap with earlier rows already
+  committed, where the buffered check rejected before any write — the
+  bounded-work purpose is unchanged, an import was never atomic (§7), and
+  re-running a corrected file is safe because keyed rows upsert
+  idempotently (§6). New `MAX_IMPORT_ROW_BYTES` (4 MiB) bounds a single
+  JSONL row, the one remaining way to grow a buffer without limit once the
+  file is not buffered; a CSV *record* is bounded by the byte cap alone
+  (the `csv` crate has no per-record limit — documented, not assumed).
+  **The memory claim is measured, not inferred**
+  (`tests/bulk_streaming_memory.rs`, its own binary with a counting
+  `#[global_allocator]`, since a behaviour test cannot tell a streaming
+  reader from a buffering one): ~312 MiB of JSONL peaks at **0.19 MiB**,
+  and at the same 0.19 MiB for a tenth of the input, so the curve is flat
+  rather than merely small; CSV peaks at 0.49 MiB on 61 MiB; the control —
+  the same rows through the old whole-buffer shape — peaks at 32.69 MiB on
+  a 31 MiB file. Large inputs are synthesised by an `AsyncRead` generator
+  and never materialised, or the test would allocate the thing it is
+  testing. Plus a DB-gated test over the worker's real path (store
+  artifact → `get_stream` → `process_import_stream`) on a multi-chunk file
+  with a malformed row in the middle.
 - [x] **SEC-B3 (M) 🟠** person bulk upsert idempotency race. *(done
   2026-07-13)* The per-row find→create/update runs under a
   transaction-scoped advisory lock on the stable key

@@ -209,15 +209,37 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   job's artifact survives, and re-running the sweep is a safe no-op (the
   swept row no longer qualifies). (Repo tasks.md Phase 5 SEC-B4.)
 
-- [x] **SEC-B2 (security): bound bulk import/export against OOM.** The
+- [x] **SEC-B2 (security): bound bulk import/export against OOM.** *(caps
+  + fuzz done 2026-07-13; end-to-end streaming done 2026-08-05)* The
   import upload is read chunk-by-chunk and rejected `413` past
-  `MAX_IMPORT_BYTES` (64 MiB) before materialisation (`read_field_capped`
+  `MAX_IMPORT_BYTES` (64 MiB) before materialisation (`spool_field_capped`
   / `exceeds_cap`); the pipeline rejects a load over `MAX_IMPORT_ROWS`
-  (1M) via `split_lines_capped`; a caller `limit` is clamped to
-  `MAX_EXPORT_ROWS` (1M) via `clamp_export_limit`. proptest fuzzes the
-  JSONL parse boundary (never panics on random / truncated-UTF-8 / giant
-  input). True end-to-end streaming deferred. (Repo tasks.md Phase 5
-  SEC-B2.)
+  (1M); a caller `limit` is clamped to `MAX_EXPORT_ROWS` (1M) via
+  `clamp_export_limit`. proptest fuzzes the JSONL parse boundary (never
+  panics on random / truncated-UTF-8 / giant input).
+
+  **The import read path is now streaming end to end** — no stage holds
+  the file, as bytes or as rows. Upload chunks go straight to a
+  `SpooledUpload` temp file and from there through
+  `ArtifactStore::put_stream` into the store; the worker opens the
+  artifact with `ArtifactStore::get_stream`; `jsonl::LineReader` frames
+  rows from an `AsyncRead` with a carry buffer; `csv::RowStream` runs the
+  `csv` reader on a blocking task fed by bounded channels; and
+  `process_import_stream` consumes one row at a time, applying the
+  unchanged validate → dedupe → SEC-B3 locked-upsert per row. The two
+  full-file buffers that made this "bounded buffering" rather than
+  streaming — the upload `Vec<u8>` and the decoded `Vec<ImportRow>` — are
+  gone. **Both caps were kept** (see `bulk::MAX_IMPORT_BYTES` /
+  `MAX_IMPORT_ROWS` for the reasoning: the byte cap is now a work/storage
+  ceiling rather than a memory one, and the row cap is now observed at the
+  row that crosses it rather than before the first row), and a new
+  `MAX_IMPORT_ROW_BYTES` (4 MiB) bounds a single JSONL row so one
+  enormous unterminated line cannot grow the carry buffer to the whole
+  file. `tests/bulk_streaming_memory.rs` **measures** the claim with a
+  counting global allocator: ~0.19 MiB peak streaming ~312 MiB of JSONL
+  (identical to the peak for a tenth of it), ~0.49 MiB for CSV, against
+  ~32.7 MiB for the same rows through the old whole-buffer shape.
+  (Repo tasks.md Phase 5 SEC-B2.)
 
 - [x] **SEC-B5 (security): reject self-merge + lock merge participants.**
   `POST /merge` now rejects `main == duplicate` with `422` before any

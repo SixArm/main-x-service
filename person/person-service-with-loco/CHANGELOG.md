@@ -7,6 +7,100 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Changed — SEC-B2 follow-up: the bulk import read path is streaming end to end
+
+Closes the piece the original SEC-B2 fix explicitly deferred. The caps
+landed in 2026-07-13 made the path *safe*, but it was **bounded
+buffering**, not streaming: the upload was accumulated into one
+`Vec<u8>` (up to 64 MiB per concurrent request), stored, read back whole
+by the worker, and then decoded into a `Vec` of every parsed row before
+the first row was written. Peak memory scaled with the file at three
+separate stages, and the caps existed to keep that survivable.
+
+No stage holds the file any more — neither as bytes nor as rows.
+
+- **Upload → store** (`src/bulk/handlers.rs`): `read_field_capped`
+  became `spool_field_capped`, writing each multipart chunk straight to
+  a `SpooledUpload` temp file (removed on drop, so every early return —
+  cap rejection, malformed body, failed enqueue — cleans up). The byte
+  cap is enforced exactly as before, *before* the chunk is written, so
+  an oversized upload is still `413` without being fully read.
+  `enqueue_import` then streams the spool file into the artifact store.
+- **`ArtifactStore` gains `put_stream` / `get_stream`**
+  (`src/bulk/store.rs`). `LocalFsArtifactStore` implements both for
+  real (`tokio::io::copy` into the artifact file; a `tokio::fs::File`
+  handle back out), reusing the same `is_safe_key` / confinement rules
+  as `put`/`get` so the streaming pair cannot become a second, laxer
+  path (SEC-B4). `S3ArtifactStore::get_stream` hands back the SDK's
+  response body directly (`into_async_read`), which is already a stream;
+  its `put_stream` keeps the trait's buffering default deliberately —
+  streaming an unknown-length body to S3 means multipart upload, which
+  is real work with real failure modes and wants writing against a live
+  endpoint rather than blind.
+- **JSONL framing** (`src/bulk/jsonl.rs`): new `LineReader` pulls 64 KiB
+  chunks from an `AsyncRead` and yields one row at a time, carrying a
+  partial row across chunk boundaries. It replaced `split_lines_capped`
+  (removed), which materialised every row of the file. Framing semantics
+  are pinned identical to `split_lines` by test (blank lines skipped,
+  CRLF tolerated, a final row without a trailing newline still yielded);
+  `split_lines` itself stays for encode-side round-trip checks.
+- **CSV framing** (`src/bulk/csv.rs`): new `RowStream`. The `csv` crate's
+  reader is synchronous and pull-based, so it runs on a blocking task
+  reading through a `ChannelReader` fed by a bounded channel from an
+  async feeder task, with parsed rows coming back over a second bounded
+  channel. Both the buffered `decode` and the stream now go through
+  **one** `read_records` core, so a change to header resolution or row
+  framing cannot land in one path and miss the other.
+- **Pipeline** (`src/bulk/pipeline.rs`): `decode_import_rows` (returning
+  `Vec<ImportRow>`) became the `ImportRowSource` enum, and
+  `process_import_stream` is the new entry point the worker uses.
+  `process_import_job(&[u8], …)` remains as a thin wrapper for tests and
+  buffer-holding callers. The per-row logic — validate, keyless
+  duplicate detection, review-queue routing, the SEC-B3 advisory-locked
+  upsert — is untouched; only what feeds it changed.
+
+**Caps: both kept, one added.**
+
+- `MAX_IMPORT_BYTES` stays 64 MiB, with a changed justification. It was
+  the memory ceiling; it is now a work/storage ceiling (an import still
+  costs a per-row database round-trip and an artifact on disk, so an
+  unbounded upload is a time- and space-based denial of service even
+  when it is no longer a memory-based one). Raising it is now a
+  deployment decision with no memory consequence.
+- `MAX_IMPORT_ROWS` stays 1M, with one honest behavioural change: rows
+  are counted as they stream past, so the job fails **at** the row that
+  crosses the cap, with earlier rows already committed — where the
+  buffered check rejected before any write. The cap's purpose (bounding
+  per-job work) is unchanged, an import was never atomic (§7: valid rows
+  commit, invalid rows are recorded), and re-running a corrected file is
+  safe because keyed rows upsert idempotently (§6). The same now applies
+  to a non-UTF-8 byte: it fails the job when the reader reaches it.
+- **New `MAX_IMPORT_ROW_BYTES` (4 MiB)** bounds a single JSONL row. With
+  the file no longer buffered, one enormous unterminated line was the
+  remaining way to grow a buffer without limit. A CSV *record* is
+  bounded by the byte cap alone, since the `csv` crate has no per-record
+  limit — documented rather than assumed to match.
+
+**Evidence, not inference** (`tests/bulk_streaming_memory.rs`, a new
+integration-test binary with a counting `#[global_allocator]`): a
+behaviour test cannot tell a streaming reader from a buffering one, so
+the memory claim is measured. Streaming ~312 MiB of JSONL peaks at
+**0.19 MiB** — and at exactly the same 0.19 MiB for a tenth of the
+input, so the curve is flat, not merely small. CSV: **0.49 MiB** for
+61 MiB of input. The control, the same rows through the old
+whole-buffer shape, peaks at **32.69 MiB** on a 31 MiB file. The large
+inputs are synthesised by an `AsyncRead` generator, never materialised,
+or the measurement would allocate the very thing it is testing.
+
+Also pinned: the JSONL never-panic proptest now fuzzes the streaming
+reader (random bytes, random cap) alongside `parse_line` /
+`split_lines`; a DB-gated test
+(`streaming_an_artifact_from_the_store_imports_every_row`) runs the
+worker's real path — store artifact → `get_stream` →
+`process_import_stream` — over a multi-chunk file with a malformed row
+in the middle, checking every row lands and the per-row error contract
+survives.
+
 ### Added — SEC-B4 follow-up: physical artifact deletion (object-store TTL sweep)
 
 Closes the piece the original SEC-B4 fix explicitly deferred: the status

@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::api::rest::AppState;
 use crate::bulk::pipeline::{
-    ExportParams, ImportOutcome, ImportParams, process_export_job, process_import_job,
+    ExportParams, ImportOutcome, ImportParams, process_export_job, process_import_stream,
 };
 use crate::bulk::{BulkFormat, BulkKind, JobStatus, MaskingProfile, error_report};
 use crate::db::bulk_jobs;
@@ -90,7 +90,10 @@ async fn run_import(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<(
         .input_url
         .as_deref()
         .ok_or_else(|| crate::Error::Validation("import job has no input artifact".to_string()))?;
-    let input = state.bulk_store.get(input_ref).await?;
+    // SEC-B2: open the artifact for incremental reading rather than
+    // loading it. The pipeline frames and writes one row at a time, so a
+    // large import costs a fixed buffer here, not its own size in memory.
+    let input = state.bulk_store.get_stream(input_ref).await?;
 
     let dry_run = job
         .params
@@ -109,12 +112,12 @@ async fn run_import(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<(
     // just the job-level summary row below — a bulk-imported record's
     // audit trail now names who ran the import.
     let ctx = actor_audit_context(job);
-    let outcome = process_import_job(
+    let outcome = process_import_stream(
         &state.db,
         state.person_repository.as_ref(),
         &state.search_engine,
         state.matcher.as_ref(),
-        &input,
+        input,
         format,
         &ImportParams { dry_run },
         &ctx,

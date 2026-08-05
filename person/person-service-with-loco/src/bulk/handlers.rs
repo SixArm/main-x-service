@@ -39,43 +39,100 @@ use crate::bulk::worker::{BulkJobArgs, BulkJobWorker};
 use crate::bulk::{BulkFormat, BulkKind, MAX_IMPORT_BYTES, MaskingProfile};
 use crate::db::bulk_jobs::{self, NewBulkJob};
 
-/// Outcome of reading a multipart field under a byte cap (SEC-B2).
+/// Outcome of spooling a multipart field to disk under a byte cap
+/// (SEC-B2).
 enum CappedRead {
-    /// The field was read in full (within the cap).
-    Ok(Vec<u8>),
+    /// The field was spooled in full (within the cap).
+    Ok,
     /// The running total exceeded the cap before the field ended — the
-    /// upload is rejected without being fully materialised.
+    /// upload is rejected without ever being fully materialised.
     TooLarge,
-    /// The multipart stream errored mid-field.
+    /// The multipart stream errored mid-field, or the spool file could not
+    /// be written.
     Read(String),
 }
 
-/// Would appending a `chunk_len`-byte chunk to a buffer already `have`
+/// Would appending a `chunk_len`-byte chunk to a stream already `have`
 /// bytes long push the running total past `max`? The pure boundary used by
-/// [`read_field_capped`] (SEC-B2). Uses a saturating add so a hostile
+/// [`spool_field_capped`] (SEC-B2). Uses a saturating add so a hostile
 /// length near `usize::MAX` trips the cap rather than overflowing.
 fn exceeds_cap(have: usize, chunk_len: usize, max: usize) -> bool {
     have.saturating_add(chunk_len) > max
 }
 
-/// Read a multipart field chunk-by-chunk, bailing the instant the running
-/// byte total exceeds `max` (SEC-B2). This is the pre-materialisation
-/// guard: an oversized or unbounded (chunked-transfer) upload never gets
-/// fully buffered in memory.
-async fn read_field_capped(
+/// A temporary file holding an uploaded import while the rest of the
+/// multipart body is parsed (SEC-B2).
+///
+/// The upload used to be accumulated into one `Vec<u8>` — capped, but
+/// still up to [`MAX_IMPORT_BYTES`] of resident memory per concurrent
+/// request. It is now written straight through to this spool file and
+/// later streamed into the artifact store, so the request handler's
+/// footprint is one chunk regardless of the upload's size.
+///
+/// The file is removed on drop, which covers every early return (a cap
+/// rejection, a malformed body, a failed enqueue) as well as the happy
+/// path.
+struct SpooledUpload {
+    /// Absolute path of the spool file.
+    path: std::path::PathBuf,
+}
+
+impl SpooledUpload {
+    /// Reserve a uniquely-named spool file under the system temp
+    /// directory. Nothing is created until the first write.
+    fn reserve() -> Self {
+        Self {
+            path: std::env::temp_dir().join(format!("person-bulk-upload-{}.part", Uuid::new_v4())),
+        }
+    }
+}
+
+impl Drop for SpooledUpload {
+    fn drop(&mut self) {
+        // Best-effort: a leftover spool file is harmless (it is in the
+        // system temp directory), and there is nothing useful to do with
+        // the error on a drop path.
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
+/// Spool a multipart field to `spool` chunk-by-chunk, bailing the instant
+/// the running byte total exceeds `max` (SEC-B2).
+///
+/// This is the pre-materialisation guard, and after the streaming rewrite
+/// it is a real one in both directions: an oversized or unbounded
+/// (chunked-transfer) upload is still rejected before it is fully read,
+/// and an accepted upload is never held in memory either — each chunk goes
+/// to disk and is dropped.
+async fn spool_field_capped(
     mut field: axum::extract::multipart::Field<'_>,
     max: usize,
+    spool: &SpooledUpload,
 ) -> CappedRead {
-    let mut buf = Vec::new();
+    use tokio::io::AsyncWriteExt;
+
+    let mut file = match tokio::fs::File::create(&spool.path).await {
+        Ok(f) => f,
+        Err(e) => return CappedRead::Read(format!("create upload spool file: {e}")),
+    };
+    let mut written = 0usize;
     loop {
         match field.chunk().await {
             Ok(Some(chunk)) => {
-                if exceeds_cap(buf.len(), chunk.len(), max) {
+                if exceeds_cap(written, chunk.len(), max) {
                     return CappedRead::TooLarge;
                 }
-                buf.extend_from_slice(&chunk);
+                if let Err(e) = file.write_all(&chunk).await {
+                    return CappedRead::Read(format!("write upload spool file: {e}"));
+                }
+                written += chunk.len();
             }
-            Ok(None) => return CappedRead::Ok(buf),
+            Ok(None) => {
+                return match file.flush().await {
+                    Ok(()) => CappedRead::Ok,
+                    Err(e) => CappedRead::Read(format!("flush upload spool file: {e}")),
+                };
+            }
             Err(e) => return CappedRead::Read(e.to_string()),
         }
     }
@@ -244,7 +301,10 @@ pub async fn import_person(
     mut multipart: Multipart,
 ) -> impl IntoResponse {
     let idempotency_key = idempotency_key_of(&headers);
-    let mut file_bytes: Option<Vec<u8>> = None;
+    // SEC-B2: the upload is spooled to disk as it arrives, never buffered.
+    // The guard removes the file on every exit path below.
+    let spool = SpooledUpload::reserve();
+    let mut have_file = false;
     let mut format_field: Option<String> = None;
     let mut dry_run = false;
 
@@ -253,8 +313,8 @@ pub async fn import_person(
             Ok(Some(field)) => {
                 let name = field.name().unwrap_or("").to_string();
                 match name.as_str() {
-                    "file" => match read_field_capped(field, MAX_IMPORT_BYTES).await {
-                        CappedRead::Ok(b) => file_bytes = Some(b),
+                    "file" => match spool_field_capped(field, MAX_IMPORT_BYTES, &spool).await {
+                        CappedRead::Ok => have_file = true,
                         CappedRead::TooLarge => {
                             return (
                                 StatusCode::PAYLOAD_TOO_LARGE,
@@ -304,7 +364,7 @@ pub async fn import_person(
         Err((status, body)) => return (status, Json(remap(body))),
     };
 
-    let Some(bytes) = file_bytes else {
+    if !have_file {
         return (
             StatusCode::BAD_REQUEST,
             Json(ApiResponse::<JobAccepted>::error(
@@ -312,13 +372,13 @@ pub async fn import_person(
                 "an import requires a 'file' multipart field",
             )),
         );
-    };
+    }
 
     match enqueue_import(
         &state,
         &ctx,
         format,
-        &bytes,
+        &spool,
         dry_run,
         actor_of(&caller),
         idempotency_key,
@@ -345,7 +405,7 @@ async fn enqueue_import(
     state: &AppState,
     ctx: &AppContext,
     format: BulkFormat,
-    bytes: &[u8],
+    spool: &SpooledUpload,
     dry_run: bool,
     actor: Option<String>,
     idempotency_key: Option<String>,
@@ -363,10 +423,18 @@ async fn enqueue_import(
         return Ok(job.id);
     }
 
-    // Store the uploaded input under the job id, then record it.
+    // Store the uploaded input under the job id, then record it. SEC-B2:
+    // streamed from the spool file, so neither the handler nor the store
+    // holds the upload in memory.
+    let mut source = tokio::fs::File::open(&spool.path)
+        .await
+        .map_err(|e| format!("open upload spool file: {e}"))?;
     let input_url = state
         .bulk_store
-        .put(&format!("jobs/{}/input.{}", job.id, format.as_str()), bytes)
+        .put_stream(
+            &format!("jobs/{}/input.{}", job.id, format.as_str()),
+            &mut source,
+        )
         .await
         .map_err(|e| e.to_string())?;
     bulk_jobs::set_input_url(&state.db, job.id, input_url)

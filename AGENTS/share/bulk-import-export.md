@@ -235,6 +235,18 @@ adds one section + a §13 task declaring only what differs:
 
 1. **Reference entity (person).** ✅ `bulk_jobs` + the job API + the
    worker + JSONL import/export, upsert-by-key, per-row error report.
+   The import **read path is streaming end to end** as of 2026-08-05
+   (SEC-B2): the upload spools chunk-by-chunk to disk and streams into
+   the artifact store (`ArtifactStore::put_stream`), the worker opens the
+   artifact with `get_stream`, and both codecs frame one row at a time
+   (`jsonl::LineReader`; `csv::RowStream`, which runs the sync `csv`
+   reader on a blocking task behind bounded channels) into a per-row
+   pipeline. Peak memory is a fixed buffer plus one row, measured rather
+   than asserted (`tests/bulk_streaming_memory.rs`, a counting global
+   allocator: ~0.19 MiB peak on ~312 MiB of JSONL). A crate adopting this
+   contract should copy that shape rather than the earlier
+   read-the-whole-file one — the per-row logic is identical either way,
+   but only one of them survives a large file.
 2. **CSV + review routing.** ✅ *(done 2026-08-02, person)* The CSV
    flattening convention (`src/bulk/csv.rs`) wired end-to-end into the
    import/export handlers + worker (`format: "jsonl" | "csv"`), and the

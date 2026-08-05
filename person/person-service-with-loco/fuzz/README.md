@@ -11,7 +11,7 @@ JSON parser are prime never-panic targets (SEC-B2).
 
 | Target | What it fuzzes |
 |---|---|
-| `parse_line` | `bulk::jsonl::split_lines` / `split_lines_capped` over raw upload bytes, and `bulk::jsonl::parse_line` over the whole blob plus each split line. Asserts the whole slice-then-deserialize path never panics (no overflow, no unbounded work) on hostile input — it returns a handled `Err` instead. Complements the crate's `parse_line_never_panics` proptest with coverage-guided input search. |
+| `parse_line` | `bulk::jsonl::LineReader` (the **streaming** framing the import worker actually uses, SEC-B2) and `bulk::jsonl::split_lines` over raw upload bytes, plus `bulk::jsonl::parse_line` over each framed row and the whole blob as one pathological line. Asserts the whole frame-then-deserialize path never panics (no overflow, no unbounded work) on hostile input — it returns a handled `Err` instead. Complements the crate's `parse_line_never_panics` / `line_reader_never_panics_on_random_bytes` proptests with coverage-guided input search. |
 
 ## Running
 

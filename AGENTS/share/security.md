@@ -69,10 +69,14 @@ narrative summary + the durable invariants those fixes establish.
   — the graph never converged) is now scoped per source entity (SEC-B1);
   merge TOCTOU + person self-merge (SEC-B5, lock participants + reject
   self-merge); the relay double-ship (SEC-B6, `FOR UPDATE SKIP LOCKED`);
-  bulk OOM caps (SEC-B2, byte + row caps, partial — true streaming
-  deferred); the SELECT-then-INSERT upsert race (SEC-B3, stable-key advisory
-  lock); artifact IDOR + TTL + `file://` confinement (SEC-B4, partial —
-  object-store sweep deferred); reconcile peer-trust (SEC-B7, token for
+  bulk OOM caps (SEC-B2, byte + row caps, **plus end-to-end streaming** as
+  of 2026-08-05 — the import path holds neither the uploaded file nor the
+  decoded rows, proved by an allocator-instrumented test, so the caps are
+  now work/storage ceilings rather than the only thing preventing an
+  out-of-memory kill); the SELECT-then-INSERT upsert race (SEC-B3,
+  stable-key advisory lock); artifact IDOR + TTL + `file://` confinement
+  (SEC-B4, plus the object-store sweep that physically deletes expired
+  artifact bytes as of 2026-08-05); reconcile peer-trust (SEC-B7, token for
   remote + edge-type validation); bulk audit gaps (SEC-B8, partial);
   idempotency key wiring (SEC-B9); person merge audit in-tx (SEC-B10);
   probe SSRF-via-redirect + freshness guard (SEC-B11).
@@ -209,6 +213,7 @@ Phase 5 is tracked in [tasks.md](../../tasks.md). As of 2026-07-14 the
 criticals and most of the program are **done**; the open items are the
 lower-severity authn hardening (SEC-A5/A6/A9/A10), the default-off pin
 (SEC-G8), `cargo-fuzz` (SEC-I2), and residuals noted `[~]` in tasks.md
-(SEC-M1 `limit_payload`, SEC-B2/B4/B8 follow-ups, SEC-G3, SEC-V3). Consult
+(SEC-M1 `limit_payload`, SEC-B8 follow-ups, SEC-G3, SEC-V3) — the SEC-B2
+streaming and SEC-B4 sweep residuals closed on 2026-08-05. Consult
 tasks.md for the authoritative, up-to-date checklist and each crate's
 `CHANGELOG.md` for the landed fix.
