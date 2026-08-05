@@ -104,6 +104,11 @@ async fn run_import(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<(
     // the whole job.
     let format = BulkFormat::parse(&job.format).unwrap_or(BulkFormat::Jsonl);
 
+    // SEC-B8: the job's actor (bearer `sub`, else "system") is threaded
+    // into every per-row CREATE/UPDATE audit record the import writes, not
+    // just the job-level summary row below — a bulk-imported record's
+    // audit trail now names who ran the import.
+    let ctx = actor_audit_context(job);
     let outcome = process_import_job(
         &state.db,
         state.person_repository.as_ref(),
@@ -112,6 +117,7 @@ async fn run_import(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<(
         &input,
         format,
         &ImportParams { dry_run },
+        &ctx,
     )
     .await?;
 
@@ -134,7 +140,6 @@ async fn run_import(state: &AppState, job: &bulk_jobs::Model) -> crate::Result<(
     // reconciled counts (best-effort; the rows are already committed with
     // their own per-row audit, so an audit-write failure must not fail the
     // whole import — it is logged instead).
-    let ctx = actor_audit_context(job);
     if let Err(e) = state
         .audit_log
         .log_import(

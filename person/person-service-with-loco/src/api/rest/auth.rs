@@ -605,6 +605,28 @@ pub fn read_visibility(caller: &MaybeAuthUser, person: &Person) -> Option<Vec<St
     authorize_record(caller, Action::Read, &person_resource_attrs(person)).ok()
 }
 
+/// Build a [`AuditContext`](crate::db::AuditContext) for a mutating
+/// request from the caller's verified claims (SEC-B8): `user_id` is the
+/// bearer `sub` when a valid token was presented, falling back to the
+/// `"system"` actor when the caller is anonymous (enforcement off, or a
+/// public/internal path) — the same fallback
+/// [`AuditContext::default()`](crate::db::AuditContext) already uses,
+/// spelled out here so the repository never has to fabricate an actor
+/// itself. No per-request IP/user-agent capture exists in this crate yet,
+/// so both stay `None`, matching the existing `review_decision` handler's
+/// pattern this helper generalizes.
+#[must_use]
+pub fn audit_context_of(caller: &MaybeAuthUser) -> crate::db::AuditContext {
+    crate::db::AuditContext {
+        user_id: caller
+            .claims()
+            .map(|c| c.sub.clone())
+            .or_else(|| Some("system".to_string())),
+        ip_address: None,
+        user_agent: None,
+    }
+}
+
 /// `GET /api/whoami` — echo the verified claims of the bearer token.
 /// Returns `401` when the token is missing, malformed, or fails
 /// verification. Useful for confirming peer PASETO verification end to
@@ -1321,5 +1343,40 @@ mod tests {
         for hour in [0, 7, 18, 23] {
             assert_eq!(env_attrs_at(hour)["after_hours"], vec!["true".to_string()]);
         }
+    }
+
+    /// SEC-B8: `audit_context_of` carries the bearer `sub` as the actor
+    /// when a valid token was presented, and falls back to `"system"` for
+    /// an anonymous caller — never a fabricated identity, never a silently
+    /// dropped one.
+    #[test]
+    fn audit_context_of_uses_the_real_actor_or_falls_back_to_system() {
+        let claims = Claims {
+            sub: "user-123".to_string(),
+            email: "user-123@example.com".to_string(),
+            name: "Test User".to_string(),
+            iss: ISSUER.to_string(),
+            aud: AUDIENCE.to_string(),
+            exp: 0,
+            iat: 0,
+            nbf: None,
+            sid: "test-sid".to_string(),
+            scope: Vec::new(),
+            roles: Vec::new(),
+            attrs: std::collections::BTreeMap::new(),
+        };
+        let authenticated = MaybeAuthUser(Some(claims));
+        assert_eq!(
+            audit_context_of(&authenticated).user_id.as_deref(),
+            Some("user-123"),
+            "the real bearer sub is threaded, not \"system\""
+        );
+
+        let anonymous = MaybeAuthUser(None);
+        assert_eq!(
+            audit_context_of(&anonymous).user_id.as_deref(),
+            Some("system"),
+            "no caller ⇒ the legitimate \"system\" fallback"
+        );
     }
 }

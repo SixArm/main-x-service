@@ -2605,17 +2605,25 @@
   cross-typed or foreign-origin edge (ill-typed edges skipped, stay as
   divergence). Pure helpers unit-tested (remote-needs-token, loopback-ok,
   ill-typed + foreign-origin rejected).
-- [~] **SEC-B8 (S) 🟡** Bulk audit gaps. *(job-level audit + fail-closed
-  export + actor threading done 2026-07-13; per-row actor deferred)* A
-  successful import now writes a job-level `IMPORT` audit row (`log_import`)
-  with the actor + reconciled counts; the export audit is written **before**
-  `finish_export` and its error **propagates**, so a failed audit marks the
-  job `failed` and never surfaces `download_url` (fail-closed delivery). The
-  actor is threaded into both rows (fallback `system` only when the job had
-  no caller). Pure `import_audit_summary`/`export_audit_summary` unit-tested.
-  **Deferred:** threading the real actor into each **per-row** create/update
-  audit — needs a `PersonRepository::create/update` signature change (they
-  build a default `system` `AuditContext` today).
+- [x] **SEC-B8 (S) 🟡** Bulk audit gaps. *(job-level audit + fail-closed
+  export + actor threading done 2026-07-13; per-row actor threading done
+  2026-08-05)* A successful import now writes a job-level `IMPORT` audit row
+  (`log_import`) with the actor + reconciled counts; the export audit is
+  written **before** `finish_export` and its error **propagates**, so a
+  failed audit marks the job `failed` and never surfaces `download_url`
+  (fail-closed delivery). The actor is threaded into both rows (fallback
+  `system` only when the job had no caller). Pure `import_audit_summary`/
+  `export_audit_summary` unit-tested. **Done (2026-08-05):** the real actor
+  is now threaded into each **per-row** create/update/delete/merge audit
+  too — `PersonRepository::create`/`update`/`delete`/`merge` each take an
+  `&AuditContext` (no more internal `AuditContext::default()`); every REST
+  and FHIR mutation handler builds it from the verified caller via the new
+  `auth::audit_context_of` helper, and the bulk pipeline threads the job's
+  own actor into every per-row write, including the keyless-duplicate →
+  review-queue path. `persons.created_by`/`updated_by`/`deleted_by` are
+  stamped from the same actor as a side benefit. DB-gated tests assert the
+  real actor (not `"system"`) on the audit rows for a direct create/update,
+  a merge, and a bulk-imported row.
 - [x] **SEC-B9 (S) 🟡** Wire the idempotency key. *(done 2026-07-13)* Both
   submit handlers read an `Idempotency-Key` header;
   `create_or_get_idempotent` returns the original job (no re-store /

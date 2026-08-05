@@ -20,7 +20,9 @@ use uuid::Uuid;
 
 use authentication_verifier::Action;
 
-use super::auth::{MaybeAuthUser, authorize_record, person_resource_attrs, read_visibility};
+use super::auth::{
+    MaybeAuthUser, audit_context_of, authorize_record, person_resource_attrs, read_visibility,
+};
 use super::links;
 use super::state::AppState;
 use crate::api::ApiResponse;
@@ -104,6 +106,7 @@ pub struct CreatePersonRequest {
 )]
 pub async fn create_person(
     State(state): State<AppState>,
+    caller: MaybeAuthUser,
     Json(mut payload): Json<Person>,
 ) -> impl IntoResponse {
     // Validate person data
@@ -147,7 +150,8 @@ pub async fn create_person(
     }
 
     // Insert into database
-    match state.person_repository.create(&payload).await {
+    let ctx = audit_context_of(&caller);
+    match state.person_repository.create(&payload, &ctx).await {
         Ok(person) => {
             // Index in search engine
             if let Err(e) = state.search_engine.index_person(&person) {
@@ -441,7 +445,8 @@ pub async fn update_person(
         }
     }
 
-    match state.person_repository.update(&payload).await {
+    let ctx = audit_context_of(&caller);
+    match state.person_repository.update(&payload, &ctx).await {
         Ok(person) => {
             // Update search index
             if let Err(e) = state.search_engine.index_person(&person) {
@@ -501,7 +506,8 @@ pub async fn delete_person(
         }
     }
 
-    match state.person_repository.delete(&id).await {
+    let ctx = audit_context_of(&caller);
+    match state.person_repository.delete(&id, &ctx).await {
         Ok(()) => {
             // Remove from search index
             if let Err(e) = state.search_engine.delete_person(&id.to_string()) {
@@ -1093,6 +1099,7 @@ fn merge_duplicate_into_main(
 /// snapshot of what was transferred. `404` if either id is missing.
 pub async fn merge_persons(
     State(state): State<AppState>,
+    caller: MaybeAuthUser,
     Json(req): Json<crate::models::MergeRequest>,
 ) -> impl IntoResponse {
     // SEC-B5: a record cannot be merged into itself. Without this guard,
@@ -1166,7 +1173,12 @@ pub async fn merge_persons(
     // outbox transport) a `Merged` + `Deleted` outbox row are enqueued on
     // that same transaction. The repository also publishes the in-memory
     // `Merged`/`Deleted` events, so the handler no longer publishes them.
-    if let Err(e) = state.person_repository.merge(&merged, &duplicate.id).await {
+    let ctx = audit_context_of(&caller);
+    if let Err(e) = state
+        .person_repository
+        .merge(&merged, &duplicate.id, &ctx)
+        .await
+    {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiResponse::<crate::models::MergeResponse>::error(

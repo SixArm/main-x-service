@@ -120,10 +120,14 @@ async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
 /// Apply a person's parent-row update and wholesale child-row replacement
 /// on `conn`. Shared by [`PersonRepository::update`] and
 /// [`PersonRepository::merge`]: preserves `created_*`, stamps `updated_at`
-/// to now, deletes every child row for the person, then re-inserts them
-/// from the domain model. Runs on the caller's connection/transaction so
-/// it shares that commit boundary.
-async fn apply_update_rows<C: ConnectionTrait>(conn: &C, person: &Person) -> Result<()> {
+/// to now and `updated_by` to `ctx`'s actor, deletes every child row for
+/// the person, then re-inserts them from the domain model. Runs on the
+/// caller's connection/transaction so it shares that commit boundary.
+async fn apply_update_rows<C: ConnectionTrait>(
+    conn: &C,
+    person: &Person,
+    ctx: &AuditContext,
+) -> Result<()> {
     // Update the parent `persons` row (only scalar fields; `..Default`
     // leaves created_* untouched).
     // The row's existing soft-delete stamp is bound into the digest, so
@@ -166,7 +170,10 @@ async fn apply_update_rows<C: ConnectionTrait>(conn: &C, person: &Person) -> Res
         multiple_birth: Set(person.multiple_birth),
         managing_organization_id: Set(person.managing_organization),
         updated_at: Set(OffsetDateTime::now_utc()),
-        updated_by: Set(None),
+        // SEC-B8: the real caller when one is known, instead of the
+        // previously-hard-coded `None` — every row now records who
+        // actually applied the update, not just that it happened.
+        updated_by: Set(ctx.user_id.clone()),
         ..Default::default()
     };
     update_model.update(conn).await?;
@@ -229,13 +236,15 @@ async fn apply_update_rows<C: ConnectionTrait>(conn: &C, person: &Person) -> Res
 }
 
 /// Soft-delete the person `id` on `conn` by stamping `deleted_at` /
-/// `deleted_by` and leaving every other column (and the child rows) in
-/// place. Factored from [`PersonRepository::delete`]'s soft-delete so
-/// [`PersonRepository::merge`] can reuse it on its own transaction.
+/// `deleted_by` (from `ctx`'s actor) and leaving every other column (and
+/// the child rows) in place. Factored from [`PersonRepository::delete`]'s
+/// soft-delete so [`PersonRepository::merge`] can reuse it on its own
+/// transaction.
 async fn apply_soft_delete_row<C: ConnectionTrait>(
     conn: &C,
     id: &Uuid,
     person: Option<&Person>,
+    ctx: &AuditContext,
 ) -> Result<()> {
     let deleted_at = OffsetDateTime::now_utc();
     // A soft delete changes the record's lifecycle state, which the digest
@@ -255,7 +264,9 @@ async fn apply_soft_delete_row<C: ConnectionTrait>(
     let row = persons::ActiveModel {
         id: Set(*id),
         deleted_at: Set(Some(deleted_at)),
-        deleted_by: Set(Some("system".to_string())),
+        // SEC-B8: the real caller when one is known, instead of the
+        // previously-hard-coded `"system"`.
+        deleted_by: Set(ctx.user_id.clone().or_else(|| Some("system".to_string()))),
         content_hash: content_hash
             .as_ref()
             .map_or(sea_orm::ActiveValue::NotSet, |h| {
@@ -309,14 +320,19 @@ impl Default for AuditContext {
 /// across async handlers.
 #[async_trait::async_trait]
 pub trait PersonRepository: Send + Sync {
-    /// Persist a new person (and its child rows) and return the stored form.
-    async fn create(&self, person: &Person) -> Result<Person>;
+    /// Persist a new person (and its child rows) and return the stored
+    /// form. `ctx` is the acting caller (SEC-B8): it is stamped onto the
+    /// row's `created_by` and carried into the `CREATE` audit row, instead
+    /// of the previously-hard-coded `"system"` actor.
+    async fn create(&self, person: &Person, ctx: &AuditContext) -> Result<Person>;
 
     /// Fetch a non-deleted person by id, or `None` if absent/soft-deleted.
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Person>>;
 
     /// Replace a person and all its child rows, returning the new state.
-    async fn update(&self, person: &Person) -> Result<Person>;
+    /// `ctx` is the acting caller (SEC-B8): stamped onto `updated_by` and
+    /// carried into the `UPDATE` audit row.
+    async fn update(&self, person: &Person, ctx: &AuditContext) -> Result<Person>;
 
     /// Merge the `duplicate_id` record into `survivor`: apply the
     /// survivor's parent + child row updates and soft-delete the duplicate
@@ -324,11 +340,22 @@ pub trait PersonRepository: Send + Sync {
     /// atomically. Under the outbox transport this enqueues a `Merged`
     /// outbox row for the survivor (carrying the duplicate's pid via
     /// `merged_from`) and a `Deleted` outbox row for the duplicate on the
-    /// same transaction. Returns the reloaded survivor.
-    async fn merge(&self, survivor: &Person, duplicate_id: &Uuid) -> Result<Person>;
+    /// same transaction. Returns the reloaded survivor. `ctx` is the
+    /// acting caller (SEC-B8): the one operator who initiated the merge,
+    /// stamped onto both the survivor's `updated_by` and the duplicate's
+    /// `deleted_by`, and carried into both the `UPDATE` and `DELETE`
+    /// audit rows.
+    async fn merge(
+        &self,
+        survivor: &Person,
+        duplicate_id: &Uuid,
+        ctx: &AuditContext,
+    ) -> Result<Person>;
 
-    /// Soft-delete a person (sets `deleted_at`; row is retained).
-    async fn delete(&self, id: &Uuid) -> Result<()>;
+    /// Soft-delete a person (sets `deleted_at`; row is retained). `ctx` is
+    /// the acting caller (SEC-B8): stamped onto `deleted_by` and carried
+    /// into the `DELETE` audit row.
+    async fn delete(&self, id: &Uuid, ctx: &AuditContext) -> Result<()>;
 
     /// Find persons whose family name matches `query` (case-insensitive).
     async fn search(&self, query: &str) -> Result<Vec<Person>>;
@@ -916,11 +943,14 @@ impl SeaOrmPersonRepository {
 impl PersonRepository for SeaOrmPersonRepository {
     /// Insert the person and all child rows in one transaction, then
     /// reload, publish a `Created` event, and write a CREATE audit row.
-    async fn create(&self, person: &Person) -> Result<Person> {
+    async fn create(&self, person: &Person, ctx: &AuditContext) -> Result<Person> {
         let txn = self.db.begin().await?;
 
-        let (new_person, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
+        let (mut new_person, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
             Self::to_active_models(person)?;
+        // SEC-B8: stamp the real caller when one is known, instead of the
+        // previously-hard-coded `None`.
+        new_person.created_by = Set(ctx.user_id.clone());
 
         // Insert person
         let db_person = new_person.insert(&txn).await?;
@@ -985,14 +1015,8 @@ impl PersonRepository for SeaOrmPersonRepository {
 
         // Log audit
         if let Ok(person_json) = serde_json::to_value(&result) {
-            self.log_audit(
-                "CREATE",
-                result.id,
-                None,
-                Some(person_json),
-                &AuditContext::default(),
-            )
-            .await;
+            self.log_audit("CREATE", result.id, None, Some(person_json), ctx)
+                .await;
         }
 
         Ok(result)
@@ -1027,7 +1051,7 @@ impl PersonRepository for SeaOrmPersonRepository {
     /// Update the parent row, then delete-and-reinsert all child rows in
     /// one transaction (a simple full-replace), publish an `Updated`
     /// event, and write an UPDATE audit row with the before/after JSON.
-    async fn update(&self, person: &Person) -> Result<Person> {
+    async fn update(&self, person: &Person, ctx: &AuditContext) -> Result<Person> {
         // Get old values for audit
         let old_person = self.get_by_id(&person.id).await?;
 
@@ -1035,7 +1059,7 @@ impl PersonRepository for SeaOrmPersonRepository {
 
         // Parent-row update + wholesale child-row replacement, shared with
         // `merge` (see `apply_update_rows`).
-        apply_update_rows(&txn, person).await?;
+        apply_update_rows(&txn, person, ctx).await?;
 
         // Outbox row shares the update transaction (see `create`).
         self.enqueue_outbox(&txn, person, EventKind::Updated)
@@ -1061,14 +1085,8 @@ impl PersonRepository for SeaOrmPersonRepository {
             .and_then(|p| serde_json::to_value(p).ok())
             && let Ok(new_json) = serde_json::to_value(&result)
         {
-            self.log_audit(
-                "UPDATE",
-                result.id,
-                Some(old_json),
-                Some(new_json),
-                &AuditContext::default(),
-            )
-            .await;
+            self.log_audit("UPDATE", result.id, Some(old_json), Some(new_json), ctx)
+                .await;
         }
 
         Ok(result)
@@ -1082,7 +1100,12 @@ impl PersonRepository for SeaOrmPersonRepository {
     /// same transaction, so the whole merge and both events commit (or
     /// roll back) together. Post-commit it publishes the in-memory
     /// `Merged` + `Deleted` events and writes the UPDATE/DELETE audit rows.
-    async fn merge(&self, survivor: &Person, duplicate_id: &Uuid) -> Result<Person> {
+    async fn merge(
+        &self,
+        survivor: &Person,
+        duplicate_id: &Uuid,
+        ctx: &AuditContext,
+    ) -> Result<Person> {
         // Snapshots for the audit trail: the survivor's pre-image for the
         // UPDATE row, the duplicate's pre-image for the DELETE row (and to
         // build the duplicate's `Deleted` outbox envelope).
@@ -1122,13 +1145,14 @@ impl PersonRepository for SeaOrmPersonRepository {
         }
 
         // Apply the survivor's parent + child rows (shared with `update`).
-        apply_update_rows(&txn, survivor).await?;
+        apply_update_rows(&txn, survivor, ctx).await?;
 
         // Soft-delete the duplicate (shared with `delete`). The
         // pre-image loaded above for the audit trail doubles as the record
         // to rehash, so the duplicate's tombstone carries a correct digest
-        // instead of reading as tampered.
-        apply_soft_delete_row(&txn, duplicate_id, old_duplicate.as_ref()).await?;
+        // instead of reading as tampered. The same `ctx` applies to both
+        // halves of the merge — one operator initiated the whole action.
+        apply_soft_delete_row(&txn, duplicate_id, old_duplicate.as_ref(), ctx).await?;
 
         // Durable event bus (Phase 2): a `Merged` outbox row for the
         // survivor (carrying the duplicate's pid via `merged_from`, so a
@@ -1152,6 +1176,8 @@ impl PersonRepository for SeaOrmPersonRepository {
         // logged post-commit, best-effort). An audit-write failure now rolls
         // the whole merge back. The survivor's new-value is its applied
         // payload (`survivor`), the same data written by `apply_update_rows`.
+        // SEC-B8: both rows now carry the real acting operator (`ctx`)
+        // rather than the previously-hard-coded `"system"` default.
         if let Some(ref audit_log) = self.audit_log {
             if let Some(old_json) = old_survivor
                 .as_ref()
@@ -1159,14 +1185,7 @@ impl PersonRepository for SeaOrmPersonRepository {
                 && let Ok(new_json) = serde_json::to_value(survivor)
             {
                 audit_log
-                    .log_update_on(
-                        &txn,
-                        "Person",
-                        survivor.id,
-                        old_json,
-                        new_json,
-                        &AuditContext::default(),
-                    )
+                    .log_update_on(&txn, "Person", survivor.id, old_json, new_json, ctx)
                     .await?;
             }
             if let Some(dup_json) = old_duplicate
@@ -1174,13 +1193,7 @@ impl PersonRepository for SeaOrmPersonRepository {
                 .and_then(|p| serde_json::to_value(p).ok())
             {
                 audit_log
-                    .log_delete_on(
-                        &txn,
-                        "Person",
-                        *duplicate_id,
-                        dup_json,
-                        &AuditContext::default(),
-                    )
+                    .log_delete_on(&txn, "Person", *duplicate_id, dup_json, ctx)
                     .await?;
             }
         }
@@ -1209,7 +1222,7 @@ impl PersonRepository for SeaOrmPersonRepository {
 
     /// Soft-delete by stamping `deleted_at`/`deleted_by`; child rows are
     /// retained. Publishes a `Deleted` event and writes a DELETE audit row.
-    async fn delete(&self, id: &Uuid) -> Result<()> {
+    async fn delete(&self, id: &Uuid, ctx: &AuditContext) -> Result<()> {
         // Get old values for audit
         let old_person = self.get_by_id(id).await?;
 
@@ -1220,13 +1233,13 @@ impl PersonRepository for SeaOrmPersonRepository {
         // the memory transport keeps the plain, tx-free update.
         if self.transport.is_outbox() {
             let txn = self.db.begin().await?;
-            apply_soft_delete_row(&txn, id, old_person.as_ref()).await?;
+            apply_soft_delete_row(&txn, id, old_person.as_ref(), ctx).await?;
             if let Some(old) = old_person.as_ref() {
                 self.enqueue_outbox(&txn, old, EventKind::Deleted).await?;
             }
             txn.commit().await?;
         } else {
-            apply_soft_delete_row(&self.db, id, old_person.as_ref()).await?;
+            apply_soft_delete_row(&self.db, id, old_person.as_ref(), ctx).await?;
         }
 
         // Publish event
@@ -1239,14 +1252,8 @@ impl PersonRepository for SeaOrmPersonRepository {
         if let Some(old_person) = old_person
             && let Ok(old_json) = serde_json::to_value(&old_person)
         {
-            self.log_audit(
-                "DELETE",
-                *id,
-                Some(old_json),
-                None,
-                &AuditContext::default(),
-            )
-            .await;
+            self.log_audit("DELETE", *id, Some(old_json), None, ctx)
+                .await;
         }
 
         Ok(())
@@ -1333,7 +1340,7 @@ fn escape_like(q: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{PersonRepository, SeaOrmPersonRepository, escape_like};
+    use super::{AuditContext, PersonRepository, SeaOrmPersonRepository, escape_like};
     use crate::db::models::event_outbox;
     use crate::models::{Gender, HumanName, Person};
     use crate::streaming::EventTransport;
@@ -1379,7 +1386,10 @@ mod tests {
         let db = connect().await;
         let repo = SeaOrmPersonRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
-        let person = repo.create(&a_person("Created")).await.unwrap();
+        let person = repo
+            .create(&a_person("Created"), &AuditContext::default())
+            .await
+            .unwrap();
 
         let rows = event_outbox::Entity::find()
             .filter(event_outbox::Column::EntityPid.eq(person.id))
@@ -1400,10 +1410,19 @@ mod tests {
         let db = connect().await;
         let repo = SeaOrmPersonRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
-        let survivor = repo.create(&a_person("Survivor")).await.unwrap();
-        let duplicate = repo.create(&a_person("Duplicate")).await.unwrap();
+        let survivor = repo
+            .create(&a_person("Survivor"), &AuditContext::default())
+            .await
+            .unwrap();
+        let duplicate = repo
+            .create(&a_person("Duplicate"), &AuditContext::default())
+            .await
+            .unwrap();
 
-        let merged = repo.merge(&survivor, &duplicate.id).await.unwrap();
+        let merged = repo
+            .merge(&survivor, &duplicate.id, &AuditContext::default())
+            .await
+            .unwrap();
         assert_eq!(merged.id, survivor.id);
 
         // Survivor: exactly one `merged` row, carrying the duplicate pid.
@@ -1437,7 +1456,8 @@ mod tests {
     /// SEC-B10: the merge audit rows commit **with** the merge — after a
     /// successful merge there is an `UPDATE` audit row for the survivor and a
     /// `DELETE` audit row for the duplicate (written in-transaction, not
-    /// best-effort post-commit).
+    /// best-effort post-commit). SEC-B8: both rows carry the real actor who
+    /// initiated the merge, not the hard-coded `"system"` default.
     #[tokio::test]
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn merge_writes_the_audit_rows_in_transaction() {
@@ -1448,10 +1468,23 @@ mod tests {
         let audit = std::sync::Arc::new(AuditLogRepository::new(db.clone()));
         let repo = SeaOrmPersonRepository::new(db.clone()).with_audit_log(audit);
 
-        let survivor = repo.create(&a_person("AuditSurvivor")).await.unwrap();
-        let duplicate = repo.create(&a_person("AuditDuplicate")).await.unwrap();
+        let survivor = repo
+            .create(&a_person("AuditSurvivor"), &AuditContext::default())
+            .await
+            .unwrap();
+        let duplicate = repo
+            .create(&a_person("AuditDuplicate"), &AuditContext::default())
+            .await
+            .unwrap();
 
-        repo.merge(&survivor, &duplicate.id).await.unwrap();
+        let actor_ctx = AuditContext {
+            user_id: Some("operator-merge-42".to_string()),
+            ip_address: None,
+            user_agent: None,
+        };
+        repo.merge(&survivor, &duplicate.id, &actor_ctx)
+            .await
+            .unwrap();
 
         let survivor_update = audit_log::Entity::find()
             .filter(audit_log::Column::EntityId.eq(survivor.id))
@@ -1463,6 +1496,11 @@ mod tests {
             !survivor_update.is_empty(),
             "an UPDATE audit row for the merged survivor must exist"
         );
+        assert_eq!(
+            survivor_update[0].user_id.as_deref(),
+            Some("operator-merge-42"),
+            "the merge's UPDATE audit row must carry the real actor, not \"system\""
+        );
 
         let duplicate_delete = audit_log::Entity::find()
             .filter(audit_log::Column::EntityId.eq(duplicate.id))
@@ -1473,6 +1511,69 @@ mod tests {
         assert!(
             !duplicate_delete.is_empty(),
             "a DELETE audit row for the merged-away duplicate must exist"
+        );
+        assert_eq!(
+            duplicate_delete[0].user_id.as_deref(),
+            Some("operator-merge-42"),
+            "the merge's DELETE audit row must carry the real actor, not \"system\""
+        );
+    }
+
+    /// SEC-B8: `create`/`update` thread the caller's real `AuditContext`
+    /// into the per-row `CREATE`/`UPDATE` audit rows, instead of the
+    /// previously-hard-coded `"system"` actor built inside the repository.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn create_and_update_audit_rows_carry_the_real_actor() {
+        use crate::db::audit::AuditLogRepository;
+        use crate::db::models::audit_log;
+
+        let db = connect().await;
+        let audit = std::sync::Arc::new(AuditLogRepository::new(db.clone()));
+        let repo = SeaOrmPersonRepository::new(db.clone()).with_audit_log(audit);
+
+        let create_ctx = AuditContext {
+            user_id: Some("operator-create-7".to_string()),
+            ip_address: None,
+            user_agent: None,
+        };
+        let mut person = repo
+            .create(&a_person("RealActorCreate"), &create_ctx)
+            .await
+            .unwrap();
+
+        let create_rows = audit_log::Entity::find()
+            .filter(audit_log::Column::EntityId.eq(person.id))
+            .filter(audit_log::Column::Action.eq("CREATE"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(create_rows.len(), 1, "one CREATE audit row");
+        assert_eq!(
+            create_rows[0].user_id.as_deref(),
+            Some("operator-create-7"),
+            "CREATE audit row must carry the real actor, not \"system\""
+        );
+
+        let update_ctx = AuditContext {
+            user_id: Some("operator-update-9".to_string()),
+            ip_address: None,
+            user_agent: None,
+        };
+        person.name.family = "RealActorCreateRenamed".to_string();
+        repo.update(&person, &update_ctx).await.unwrap();
+
+        let update_rows = audit_log::Entity::find()
+            .filter(audit_log::Column::EntityId.eq(person.id))
+            .filter(audit_log::Column::Action.eq("UPDATE"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(update_rows.len(), 1, "one UPDATE audit row");
+        assert_eq!(
+            update_rows[0].user_id.as_deref(),
+            Some("operator-update-9"),
+            "UPDATE audit row must carry the real actor, not \"system\""
         );
     }
 }

@@ -7,6 +7,64 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Fixed — SEC-B8 follow-up: per-row create/update audit rows carry the real actor
+
+Closes the item the original SEC-B8 fix (below) explicitly deferred:
+`PersonRepository::create`/`update`/`delete`/`merge` built their own
+`AuditContext::default()` internally, so every per-row `CREATE`/`UPDATE`/
+`DELETE` audit row — from a single `POST`/`PUT`/`DELETE
+/api/persons(/{id})`, a FHIR `Patient` write, a merge, or a bulk-imported
+row — was stamped `"system"` regardless of who actually made the request.
+The job-level bulk audit row already carried the real actor; the per-row
+rows underneath it did not, which is the gap a HIPAA §164.312(b) audit
+trail cannot have: it must say *who* touched a specific record.
+
+- **`PersonRepository` trait signature change** (`src/db/repositories.rs`):
+  `create`, `update`, `delete`, and `merge` each now take an
+  `&AuditContext` parameter instead of hard-coding
+  `AuditContext::default()` inside `SeaOrmPersonRepository`. The context
+  is threaded into the `CREATE`/`UPDATE`/`DELETE` audit-log writes and
+  also stamps the `persons.created_by`/`updated_by`/`deleted_by` columns
+  (previously always `None`, or a hard-coded `"system"` for
+  `deleted_by`) — neither column feeds the content-integrity digest, so
+  this is a pure provenance improvement with no compatibility impact on
+  `/api/records/verify` or `/api/audit/verify`. `merge` uses one actor
+  for both halves of the merge (the survivor's `UPDATE` row and the
+  duplicate's `DELETE` row) — one operator initiated the whole action.
+- **New helper `auth::audit_context_of`** (`src/api/rest/auth.rs`):
+  builds an `AuditContext` from a `MaybeAuthUser` — the bearer `sub` when
+  a valid token was presented, else the `"system"` fallback — generalizing
+  the pattern the existing `review_decision` handler already used inline.
+- **Call sites updated**: REST `create_person` (gained a `MaybeAuthUser`
+  extractor it did not previously take), `update_person`, `delete_person`,
+  `merge_persons` (also gained the extractor); the FHIR
+  `create_fhir_patient`/`update_fhir_patient`/`delete_fhir_patient`
+  handlers (none previously took a caller at all); the bulk import
+  pipeline (`src/bulk/pipeline.rs`: `process_import_job`,
+  `import_upsert_locked`, `create_and_queue_for_review` all now take an
+  `&AuditContext`), fed by `bulk::worker::run_import`'s existing
+  `actor_audit_context(job)` — so a bulk-imported record's per-row audit
+  row now names who ran the import, matching what the job-level row
+  already said. The CLI `seed_examples` task and the crate's own
+  DB-gated test fixtures use `AuditContext::default()` explicitly — a
+  legitimate `"system"` actor, not a gap (no authenticated caller
+  exists at those call sites).
+- *Tests:* two new DB-gated tests in `src/db/repositories.rs`
+  (`create_and_update_audit_rows_carry_the_real_actor`; the existing
+  `merge_writes_the_audit_rows_in_transaction` extended to assert the
+  real actor on both the survivor's `UPDATE` and the duplicate's
+  `DELETE` row) plus one extended in `src/bulk/pipeline.rs`
+  (`keyless_row_with_a_likely_duplicate_creates_and_queues_for_review`
+  now asserts the imported row's `CREATE` audit row carries the job's
+  actor, not `"system"`); a new DB-free unit test for
+  `audit_context_of` in `src/api/rest/auth.rs`.
+
+Verified against a real Postgres 18: full DB-gated suite green (22
+`--lib` + 25 `api_integration_test` + 5 `cross_service_link_review` + the
+other integration suites). `cargo test --lib`: 316 passed (up from 315:
++1 new DB-free unit test). `cargo fmt --check` / `cargo clippy
+--all-targets -- -D warnings` clean.
+
 ### Added — T-33 regression pin: `matcher_suggested` link creation is audited (link-graph T-33, OQ-9(d))
 
 link-graph's T-33 (governance + scale controls + audit for the

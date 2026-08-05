@@ -32,6 +32,7 @@ use uuid::Uuid;
 
 use super::{FhirOperationOutcome, FhirPerson, from_fhir_person, to_fhir_patient, to_fhir_person};
 use crate::api::rest::AppState;
+use crate::api::rest::auth::{MaybeAuthUser, audit_context_of};
 
 /// Max search hits requested from the index when `_count` is unset.
 const DEFAULT_SEARCH_COUNT: usize = 10;
@@ -159,6 +160,7 @@ fn render(person: &crate::models::Person, resource_type: &str) -> FhirPerson {
 /// database error. Persist reuses the repository, so audit + events fire.
 pub async fn create_fhir_patient(
     State(state): State<AppState>,
+    caller: MaybeAuthUser,
     body: axum::body::Bytes,
 ) -> Response {
     let fhir: FhirPerson = match serde_json::from_slice(&body) {
@@ -178,7 +180,8 @@ pub async fn create_fhir_patient(
     if person.id == Uuid::nil() {
         person.id = Uuid::new_v4();
     }
-    match state.person_repository.create(&person).await {
+    let ctx = audit_context_of(&caller);
+    match state.person_repository.create(&person, &ctx).await {
         Ok(created) => {
             if let Err(e) = state.search_engine.index_person(&created) {
                 tracing::warn!("Failed to index person in search engine: {}", e);
@@ -209,6 +212,7 @@ pub async fn create_fhir_patient(
 pub async fn update_fhir_patient(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    caller: MaybeAuthUser,
     body: axum::body::Bytes,
 ) -> Response {
     let Some(id) = parse_id(&id) else {
@@ -229,7 +233,8 @@ pub async fn update_fhir_patient(
         Err(e) => return fhir_error(StatusCode::BAD_REQUEST, "invalid", &e.to_string()),
     };
     person.id = id;
-    match state.person_repository.update(&person).await {
+    let ctx = audit_context_of(&caller);
+    match state.person_repository.update(&person, &ctx).await {
         Ok(updated) => {
             if let Err(e) = state.search_engine.index_person(&updated) {
                 tracing::warn!("Failed to update person in search engine: {}", e);
@@ -250,11 +255,13 @@ pub async fn update_fhir_patient(
 pub async fn delete_fhir_patient(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    caller: MaybeAuthUser,
 ) -> Response {
     let Some(id) = parse_id(&id) else {
         return bad_id();
     };
-    match state.person_repository.delete(&id).await {
+    let ctx = audit_context_of(&caller);
+    match state.person_repository.delete(&id, &ctx).await {
         Ok(()) => fhir_response(StatusCode::NO_CONTENT, Vec::new(), None),
         Err(e) => fhir_error(
             StatusCode::INTERNAL_SERVER_ERROR,

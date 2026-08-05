@@ -38,7 +38,7 @@ use loco_rs::prelude::*;
 use sea_orm::{DatabaseConnection, EntityTrait, PaginatorTrait};
 
 use crate::db::models::persons;
-use crate::db::repositories::{PersonRepository, SeaOrmPersonRepository};
+use crate::db::repositories::{AuditContext, PersonRepository, SeaOrmPersonRepository};
 use crate::models::Person;
 
 /// The fixture's location, relative to this crate's manifest directory
@@ -121,8 +121,10 @@ pub async fn seed(db: &DatabaseConnection, fixture: &[Person]) -> Result<SeedRep
     let repo = SeaOrmPersonRepository::new(db.clone());
     let mut created = 0usize;
     for person in fixture {
+        // A CLI seed task has no authenticated caller — `AuditContext::default()`
+        // ("system") is the legitimate actor here, not a gap SEC-B8 closes.
         let saved = repo
-            .create(person)
+            .create(person, &AuditContext::default())
             .await
             .map_err(|e| Error::string(&format!("creating person: {e}")))?;
         created += 1;

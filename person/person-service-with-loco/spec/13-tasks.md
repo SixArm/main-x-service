@@ -112,8 +112,20 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   reconciled counts; the export audit is written **before** the job finishes
   and its error **propagates**, so a failed audit blocks delivery (`failed`,
   no `download_url`). Actor threaded into both (fallback `system` only when
-  no caller). Pure summary builders unit-tested. **Deferred:** per-row audit
-  actor threading (needs a repo-signature change). (Repo tasks.md SEC-B8.)
+  no caller). Pure summary builders unit-tested. **Done (2026-08-05):**
+  per-row audit actor threading — `PersonRepository::create`/`update`/
+  `delete`/`merge` all now take an `&AuditContext` (no more hard-coded
+  `AuditContext::default()` inside the repository); every request handler
+  (REST `create_person`/`update_person`/`delete_person`/`merge_persons`,
+  the FHIR `Patient` create/update/delete) builds it from the verified
+  caller via the new `auth::audit_context_of` helper, and the bulk import
+  pipeline threads the job's own actor (`bulk::worker::actor_audit_context`)
+  into every per-row create/update it performs, including the keyless
+  duplicate → review-queue path. `persons.created_by`/`updated_by`/
+  `deleted_by` are stamped from the same actor (previously always `None`/
+  hard-coded `"system"`). DB-gated tests assert the real actor — not
+  `"system"` — lands on the `CREATE`/`UPDATE` audit rows for a direct
+  repository call, a merge, and a bulk import row. (Repo tasks.md SEC-B8.)
 
 - [x] **SEC-B3 (security): serialise bulk upsert (create-create race).**
   The per-row find→create/update now runs under a transaction-scoped

@@ -242,6 +242,7 @@ async fn import_upsert_locked(
     db: &DatabaseConnection,
     repo: &dyn PersonRepository,
     person: &mut Person,
+    ctx: &crate::db::AuditContext,
 ) -> Result<(Person, bool)> {
     let key = resolve_stable_key(person);
     let guard = db.begin().await?;
@@ -258,12 +259,12 @@ async fn import_upsert_locked(
         // Upsert in place: keep the existing record's pid so the stable key
         // maps to one record across re-imports and concurrent importers.
         person.id = existing.id;
-        repo.update(person).await.map(|saved| (saved, true))
+        repo.update(person, ctx).await.map(|saved| (saved, true))
     } else {
         if person.id == Uuid::nil() {
             person.id = Uuid::new_v4();
         }
-        repo.create(person).await.map(|saved| (saved, false))
+        repo.create(person, ctx).await.map(|saved| (saved, false))
     };
     // Commit the guard to release the advisory lock only after the write has
     // committed, so a waiter observes the row. On a write error the guard is
@@ -385,11 +386,12 @@ async fn create_and_queue_for_review(
     search: &SearchEngine,
     mut person: Person,
     duplicate: crate::matching::MatchResult,
+    ctx: &crate::db::AuditContext,
 ) -> std::result::Result<Person, String> {
     if person.id == Uuid::nil() {
         person.id = Uuid::new_v4();
     }
-    let saved = repo.create(&person).await.map_err(|e| e.to_string())?;
+    let saved = repo.create(&person, ctx).await.map_err(|e| e.to_string())?;
     if let Err(e) = search.index_person(&saved) {
         tracing::warn!("bulk import: failed to index person {}: {}", saved.id, e);
     }
@@ -419,7 +421,10 @@ async fn create_and_queue_for_review(
 ///
 /// Each successfully written row is persisted through `repo`, which emits
 /// its normal `created`/`updated` event and audit record; the search
-/// index is updated best-effort. On `params.dry_run`, rows are parsed,
+/// index is updated best-effort. `ctx` (SEC-B8) is the job's actor —
+/// threaded into every per-row `CREATE`/`UPDATE` audit row so a
+/// bulk-imported record's audit trail names who ran the import, not the
+/// repository's `"system"` fallback. On `params.dry_run`, rows are parsed,
 /// validated, and classified but nothing is written (including no
 /// review-queue row for a keyless duplicate).
 ///
@@ -428,6 +433,7 @@ async fn create_and_queue_for_review(
 /// Returns an error only for a whole-job failure (e.g. non-UTF-8 input,
 /// an unreadable CSV header, or the SEC-B2 row cap); per-row failures are
 /// captured in [`ImportOutcome::errors`], not returned.
+#[allow(clippy::too_many_arguments)] // db/repo/search/matcher/input/format/params/ctx — each an independent collaborator
 pub async fn process_import_job(
     db: &DatabaseConnection,
     repo: &dyn PersonRepository,
@@ -436,6 +442,7 @@ pub async fn process_import_job(
     input: &[u8],
     format: BulkFormat,
     params: &ImportParams,
+    ctx: &crate::db::AuditContext,
 ) -> Result<ImportOutcome> {
     let rows = decode_import_rows(input, format)?;
     let mut outcome = ImportOutcome::default();
@@ -482,7 +489,7 @@ pub async fn process_import_job(
                 outcome.rows_to_review += 1;
                 continue;
             }
-            match create_and_queue_for_review(db, repo, search, person, m).await {
+            match create_and_queue_for_review(db, repo, search, person, m, ctx).await {
                 Ok(_saved) => {
                     outcome.rows_created += 1;
                     outcome.rows_to_review += 1;
@@ -519,7 +526,7 @@ pub async fn process_import_job(
 
         // SEC-B3: find + create/update under a stable-key advisory lock so
         // concurrent importers of the same key produce exactly one record.
-        match import_upsert_locked(db, repo, &mut person).await {
+        match import_upsert_locked(db, repo, &mut person, ctx).await {
             Ok((saved, was_upsert)) => {
                 if let Err(e) = search.index_person(&saved) {
                     tracing::warn!("bulk import: failed to index person {}: {}", saved.id, e);
@@ -620,7 +627,7 @@ mod db_tests {
     };
     use crate::bulk::{csv, jsonl};
     use crate::config::Config;
-    use crate::db::{PersonRepository, SeaOrmPersonRepository};
+    use crate::db::{AuditContext, PersonRepository, SeaOrmPersonRepository};
     use crate::matching::ProbabilisticMatcher;
     use crate::models::{Gender, HumanName, Identifier, IdentifierType, Person};
     use crate::search::SearchEngine;
@@ -688,6 +695,7 @@ mod db_tests {
             &input,
             BulkFormat::Jsonl,
             &ImportParams::default(),
+            &AuditContext::default(),
         )
         .await
         .unwrap();
@@ -716,6 +724,7 @@ mod db_tests {
             &input,
             BulkFormat::Jsonl,
             &ImportParams::default(),
+            &AuditContext::default(),
         )
         .await
         .unwrap();
@@ -760,6 +769,7 @@ mod db_tests {
                     &input,
                     BulkFormat::Jsonl,
                     &ImportParams::default(),
+                    &AuditContext::default(),
                 )
                 .await
                 .unwrap();
@@ -818,6 +828,7 @@ mod db_tests {
             &input,
             BulkFormat::Jsonl,
             &ImportParams { dry_run: true },
+            &AuditContext::default(),
         )
         .await
         .unwrap();
@@ -835,7 +846,10 @@ mod db_tests {
         let db = connect().await;
         let repo = SeaOrmPersonRepository::new(db.clone());
 
-        let created = repo.create(&person("Exported")).await.unwrap();
+        let created = repo
+            .create(&person("Exported"), &AuditContext::default())
+            .await
+            .unwrap();
 
         // Default profile is Masked, so use Full here to round-trip the
         // record unchanged.
@@ -892,7 +906,7 @@ mod db_tests {
             "http://hl7.org/fhir/sid/us-ssn".to_string(),
             format!("SSN-{}", uuid::Uuid::new_v4()),
         ));
-        let created = repo.create(&p).await.unwrap();
+        let created = repo.create(&p, &AuditContext::default()).await.unwrap();
 
         let find = |bytes: &[u8], id| -> Person {
             jsonl::split_lines(bytes)
@@ -987,11 +1001,15 @@ mod db_tests {
     #[tokio::test]
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn keyless_row_with_a_likely_duplicate_creates_and_queues_for_review() {
+        use crate::db::audit::AuditLogRepository;
+        use crate::db::models::audit_log;
         use crate::db::review_queue;
         use chrono::NaiveDate;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
         let db = connect().await;
-        let repo = SeaOrmPersonRepository::new(db.clone());
+        let audit = std::sync::Arc::new(AuditLogRepository::new(db.clone()));
+        let repo = SeaOrmPersonRepository::new(db.clone()).with_audit_log(audit);
         let (_dir, search) = search_engine();
 
         // A unique family name (per test run) so this run's search-blocking
@@ -1005,7 +1023,10 @@ mod db_tests {
         );
         let mut existing = person(&family);
         existing.birth_date = Some(NaiveDate::from_ymd_opt(1980, 6, 15).unwrap());
-        let existing = repo.create(&existing).await.unwrap();
+        let existing = repo
+            .create(&existing, &AuditContext::default())
+            .await
+            .unwrap();
         search.index_person(&existing).unwrap();
 
         // The keyless row: same family name + birth date + given name, but
@@ -1019,6 +1040,14 @@ mod db_tests {
         let line = serde_json::to_string(&value).unwrap();
         let input = format!("{line}\n").into_bytes();
 
+        // SEC-B8: import runs as a specific job actor, not "system" — the
+        // per-row CREATE audit row for the keyless duplicate's create must
+        // carry it.
+        let job_ctx = AuditContext {
+            user_id: Some("import-job-actor-5".to_string()),
+            ip_address: None,
+            user_agent: None,
+        };
         let outcome = process_import_job(
             &db,
             &repo,
@@ -1027,6 +1056,7 @@ mod db_tests {
             &input,
             BulkFormat::Jsonl,
             &ImportParams::default(),
+            &job_ctx,
         )
         .await
         .unwrap();
@@ -1047,6 +1077,27 @@ mod db_tests {
         assert_eq!(pair.provenance, "import");
         assert_eq!(pair.detection_method, "import_duplicate_detection");
         assert!(pair.match_score >= crate::bulk::IMPORT_REVIEW_THRESHOLD);
+
+        // The newly imported (keyless) record is whichever side of the pair
+        // isn't the pre-existing one; its CREATE audit row must carry the
+        // job's actor, not the repository's "system" fallback.
+        let new_id = if pair.record_id_a == existing.id {
+            pair.record_id_b
+        } else {
+            pair.record_id_a
+        };
+        let create_rows = audit_log::Entity::find()
+            .filter(audit_log::Column::EntityId.eq(new_id))
+            .filter(audit_log::Column::Action.eq("CREATE"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(create_rows.len(), 1, "one CREATE audit row for the import");
+        assert_eq!(
+            create_rows[0].user_id.as_deref(),
+            Some("import-job-actor-5"),
+            "the imported row's CREATE audit must carry the job's actor, not \"system\""
+        );
     }
 
     /// The CSV import path: a header + one keyed row (via `tax_id`)
@@ -1071,6 +1122,7 @@ mod db_tests {
             &input,
             BulkFormat::Csv,
             &ImportParams::default(),
+            &AuditContext::default(),
         )
         .await
         .unwrap();
@@ -1089,7 +1141,10 @@ mod db_tests {
         let db = connect().await;
         let repo = SeaOrmPersonRepository::new(db.clone());
 
-        let created = repo.create(&person("CsvExported")).await.unwrap();
+        let created = repo
+            .create(&person("CsvExported"), &AuditContext::default())
+            .await
+            .unwrap();
 
         let (bytes, rows) = process_export_job(
             &repo,
@@ -1127,7 +1182,9 @@ mod db_tests {
         let db = connect().await;
         let repo = SeaOrmPersonRepository::new(db.clone());
 
-        repo.create(&person("ParquetExported")).await.unwrap();
+        repo.create(&person("ParquetExported"), &AuditContext::default())
+            .await
+            .unwrap();
 
         let (bytes, rows) = process_export_job(
             &repo,
