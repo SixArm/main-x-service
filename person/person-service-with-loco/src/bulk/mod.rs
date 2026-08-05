@@ -67,6 +67,8 @@ pub mod pipeline;
 pub mod stable_key;
 /// Artifact storage abstraction + local-filesystem implementation (§12).
 pub mod store;
+/// SEC-B4 follow-up: the periodic physical-artifact-deletion sweep.
+pub mod sweep;
 /// The loco `BackgroundWorker` draining `bulk_jobs`.
 pub mod worker;
 
@@ -102,9 +104,13 @@ pub const MAX_EXPORT_ROWS: u64 = 1_000_000;
 /// Set as `expires_at = created_at + this` when a job is created; a job (and
 /// its download / error-report URL) is treated as **gone** once past this,
 /// so a stale export of personal data is not indefinitely retrievable. 7
-/// days is a generous window for an operator to collect a result. Physical
-/// artifact deletion (a sweep of the object store) is a follow-up; the
-/// expiry gate at the status handler stops the reference being handed out.
+/// days is a generous window for an operator to collect a result. The
+/// expiry gate at the status handler (`bulk::handlers::artifact_expired`)
+/// stops the reference being handed out the instant this deadline passes;
+/// the periodic [`sweep`] (run via the `bulk_artifact_sweep` loco task)
+/// physically deletes the artifact bytes once past it, so the two halves
+/// of SEC-B4 — "stop handing it out" and "stop storing it" — are both
+/// covered rather than the store retaining expired bytes indefinitely.
 pub const BULK_ARTIFACT_TTL_SECS: i64 = 7 * 24 * 60 * 60;
 
 /// BLK-2 — the match-score threshold above which a **keyless** import

@@ -1,5 +1,7 @@
 //! CLI tasks (loco extension point).
 
+/// Physically delete artifacts of expired bulk jobs (SEC-B4 follow-up).
+pub mod bulk_artifact_sweep;
 /// Generate, check, or report the integrity MAC key.
 pub mod integrity_key;
 /// Re-MAC history under the current key after a rotation.

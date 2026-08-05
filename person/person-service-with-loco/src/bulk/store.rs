@@ -82,6 +82,20 @@ pub trait ArtifactStore: Send + Sync {
     async fn presigned_get(&self, _reference: &str, _ttl_secs: u64) -> Result<Option<String>> {
         Ok(None)
     }
+
+    /// Permanently delete the artifact `reference` points at (SEC-B4
+    /// physical-deletion sweep — `crate::bulk::sweep`).
+    ///
+    /// **Idempotent**: an artifact that is already gone (or was never
+    /// there) is success, not an error — a sweep retried after a partial
+    /// pass, or re-run against a row it already swept, must not fail on
+    /// its own prior work.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Internal`] if `reference` is unsafe/escapes the
+    /// store's confinement, or the artifact exists but cannot be removed.
+    async fn delete(&self, reference: &str) -> Result<()>;
 }
 
 /// Build the configured artifact store.
@@ -187,17 +201,19 @@ impl LocalFsArtifactStore {
         self.base.join(key)
     }
 
-    /// Resolve a `get` reference to a **confined** path (SEC-B4). A
+    /// Resolve a reference to a **confined** path (SEC-B4), shared by both
+    /// [`get`](ArtifactStore::get) and [`delete`](ArtifactStore::delete)
+    /// so the confinement rule has exactly one implementation. A
     /// `file://` reference must, once resolved, live under this store's base
     /// directory; anything else (`file:///etc/passwd`, a `..`-escape) is
-    /// rejected rather than read. A bare (non-`file://`) reference is
+    /// rejected rather than read/removed. A bare (non-`file://`) reference is
     /// treated as a key and validated with [`is_safe_key`].
     ///
     /// # Errors
     ///
     /// Returns [`Error::Internal`] if the reference is unsafe or escapes the
     /// base directory.
-    fn resolve_get_path(&self, reference: &str) -> Result<PathBuf> {
+    fn resolve_confined_path(&self, reference: &str) -> Result<PathBuf> {
         let candidate = if let Some(stripped) = reference.strip_prefix("file://") {
             Path::new(stripped).to_path_buf()
         } else {
@@ -209,10 +225,17 @@ impl LocalFsArtifactStore {
             self.path_for(reference)
         };
         // Confine to the base: compare canonicalised absolute paths so a
-        // symlink or `..` cannot escape. The base is canonicalised with a
-        // raw fallback so a not-yet-created base still yields a usable root.
-        let base_abs = std::fs::canonicalize(&self.base).unwrap_or_else(|_| self.base.clone());
-        let resolved = std::fs::canonicalize(&candidate).unwrap_or_else(|_| candidate.clone());
+        // symlink or `..` cannot escape. `canonicalize_lenient` (rather
+        // than a raw-fallback `unwrap_or_else`) canonicalises as much of
+        // each path as exists — needed because `delete` (unlike `get`) is
+        // routinely called on a reference whose file is already gone (an
+        // idempotent re-delete, or a leg — e.g. `error_report_url` — that
+        // was never written), and a *raw* fallback would compare a
+        // canonical base against a non-canonical candidate whenever the
+        // base is reached through a symlink (e.g. macOS's `/var` ->
+        // `/private/var`), rejecting an entirely legitimate reference.
+        let base_abs = canonicalize_lenient(&self.base);
+        let resolved = canonicalize_lenient(&candidate);
         if resolved.starts_with(&base_abs) {
             Ok(resolved)
         } else {
@@ -241,6 +264,45 @@ pub fn is_safe_key(key: &str) -> bool {
     path.components().all(|c| matches!(c, Component::Normal(_)))
 }
 
+/// Canonicalise `path` as far as possible: canonicalise the longest
+/// existing ancestor, then append the remaining (possibly nonexistent)
+/// components literally.
+///
+/// `std::fs::canonicalize` requires the *whole* path to exist, which is
+/// wrong for a confinement check run before `delete` — the reference
+/// being confined-checked is routinely one whose file is already gone
+/// (an idempotent re-delete) or was never written (an artifact leg the
+/// job never populated). Falling back to the *raw* path in that case (as
+/// a plain `unwrap_or_else` would) breaks the confinement comparison
+/// whenever the base itself is reached through a symlink — e.g. macOS
+/// resolves a `tempdir()`-issued path under `/var/…` to a canonical
+/// `/private/var/…` — because then a canonical base is compared against
+/// a non-canonical candidate that happens to share the same *logical*
+/// but not *string* prefix. Walking up to the nearest existing ancestor
+/// and re-appending the missing tail keeps both sides canonical.
+fn canonicalize_lenient(path: &Path) -> PathBuf {
+    let mut existing = path;
+    let mut missing_tail: Vec<std::ffi::OsString> = Vec::new();
+    loop {
+        if let Ok(mut canonical) = std::fs::canonicalize(existing) {
+            for component in missing_tail.into_iter().rev() {
+                canonical.push(component);
+            }
+            return canonical;
+        }
+        let Some(parent) = existing.parent() else {
+            // Nothing on the path canonicalises (not even `/`) — return
+            // it unchanged; the confinement comparison will simply fail
+            // to match the (canonical) base, which is the safe direction.
+            return path.to_path_buf();
+        };
+        if let Some(name) = existing.file_name() {
+            missing_tail.push(name.to_os_string());
+        }
+        existing = parent;
+    }
+}
+
 #[async_trait]
 impl ArtifactStore for LocalFsArtifactStore {
     async fn put(&self, key: &str, bytes: &[u8]) -> Result<String> {
@@ -261,8 +323,18 @@ impl ArtifactStore for LocalFsArtifactStore {
     }
 
     async fn get(&self, reference: &str) -> Result<Vec<u8>> {
-        let path = self.resolve_get_path(reference)?;
+        let path = self.resolve_confined_path(reference)?;
         std::fs::read(&path).map_err(|e| Error::Internal(format!("read artifact {reference}: {e}")))
+    }
+
+    async fn delete(&self, reference: &str) -> Result<()> {
+        let path = self.resolve_confined_path(reference)?;
+        match std::fs::remove_file(&path) {
+            Ok(()) => Ok(()),
+            // Idempotent: already gone (a retried/re-run sweep) is success.
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(Error::Internal(format!("delete artifact {reference}: {e}"))),
+        }
     }
 }
 
@@ -439,6 +511,21 @@ impl ArtifactStore for S3ArtifactStore {
             .map_err(|e| Error::Internal(format!("presign artifact {reference}: {e}")))?;
         Ok(Some(request.uri().to_string()))
     }
+
+    async fn delete(&self, reference: &str) -> Result<()> {
+        let (_, key) = self.split_reference(reference)?;
+        // S3's `DeleteObject` is already idempotent — it returns success
+        // whether or not the key exists — so no NotFound special-casing
+        // is needed here the way the local backend needs one.
+        self.client
+            .delete_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .send()
+            .await
+            .map_err(|e| Error::Internal(format!("delete artifact {reference}: {e}")))?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -496,6 +583,67 @@ mod tests {
         let store = LocalFsArtifactStore::new(dir.path());
         assert!(store.put("../escape.txt", b"x").await.is_err());
         assert!(store.put("/tmp/escape.txt", b"x").await.is_err());
+    }
+
+    /// SEC-B4 follow-up: `delete` actually removes the bytes, and a
+    /// subsequent `get` fails — the sweep's core promise.
+    #[tokio::test]
+    async fn delete_removes_the_artifact() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = LocalFsArtifactStore::new(dir.path());
+        let reference = store.put("jobs/abc/out.jsonl", b"bye").await.unwrap();
+        assert!(store.get(&reference).await.is_ok(), "sanity: exists first");
+        store.delete(&reference).await.expect("delete");
+        assert!(
+            store.get(&reference).await.is_err(),
+            "the artifact must be gone after delete"
+        );
+    }
+
+    /// **Idempotent**: deleting an artifact that is already gone is
+    /// success, not an error — a sweep retried, or run twice against the
+    /// same already-swept row, must not fail.
+    #[tokio::test]
+    async fn delete_is_idempotent_when_already_gone() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = LocalFsArtifactStore::new(dir.path());
+        let reference = store.put("jobs/abc/out.jsonl", b"bye").await.unwrap();
+        store.delete(&reference).await.expect("first delete");
+        store
+            .delete(&reference)
+            .await
+            .expect("second delete of the same reference must also succeed");
+    }
+
+    /// A reference that was never stored at all is likewise a no-op, not
+    /// an error (the artifact-less legs of a job, e.g. no error report).
+    #[tokio::test]
+    async fn delete_of_a_never_stored_key_is_a_no_op() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = LocalFsArtifactStore::new(dir.path());
+        store
+            .delete("jobs/never/existed.jsonl")
+            .await
+            .expect("deleting a never-stored key must not error");
+    }
+
+    /// SEC-B4: `delete` applies the same base-confinement as `get` — a
+    /// `file://` reference outside the store base must be refused rather
+    /// than deleted (an attacker-controlled row must not turn a sweep
+    /// into an arbitrary-file-delete primitive).
+    #[tokio::test]
+    async fn delete_refuses_a_reference_outside_the_base() {
+        let outside = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(outside.path(), b"do not delete me").unwrap();
+        let outside_ref = format!("file://{}", outside.path().display());
+
+        let dir = tempfile::tempdir().unwrap();
+        let store = LocalFsArtifactStore::new(dir.path());
+        assert!(
+            store.delete(&outside_ref).await.is_err(),
+            "a file:// reference outside the base must be refused"
+        );
+        assert!(outside.path().exists(), "the outside file must survive");
     }
 
     #[tokio::test]
@@ -611,6 +759,18 @@ mod tests {
             .expect("presign")
             .expect("the S3 backend issues presigned URLs");
         assert!(url.starts_with("http"), "presigned URL: {url}");
+
+        // SEC-B4 follow-up: delete actually removes the object, and is
+        // idempotent when run again against the same (now-gone) key.
+        store.delete(&reference).await.expect("delete");
+        assert!(
+            store.get(&reference).await.is_err(),
+            "the object must be gone after delete"
+        );
+        store
+            .delete(&reference)
+            .await
+            .expect("a second delete of an already-gone object must still succeed");
     }
 
     /// A reference naming a different bucket is refused rather than

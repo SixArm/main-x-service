@@ -104,6 +104,7 @@ pub async fn create(db: &DatabaseConnection, job: NewBulkJob) -> Result<Model> {
         created_at: Set(now),
         updated_at: Set(now),
         expires_at: Set(Some(expires_at)),
+        artifact_deleted_at: Set(None),
     };
     Ok(model.insert(db).await?)
 }
@@ -266,6 +267,50 @@ pub async fn finish_export(
     active.updated_at = Set(OffsetDateTime::now_utc());
     active.update(db).await?;
     Ok(())
+}
+
+/// Stamp `artifact_deleted_at = now` on a job (SEC-B4 follow-up): the
+/// periodic sweep ([`crate::bulk::sweep`]) has physically removed this
+/// job's artifacts from the store, so it must never be selected by
+/// [`list_artifact_sweep_candidates`] again.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the update fails.
+pub async fn mark_artifact_deleted(db: &DatabaseConnection, id: Uuid) -> Result<()> {
+    let mut active: bulk_jobs::ActiveModel = load_active(db, id).await?;
+    let now = OffsetDateTime::now_utc();
+    active.artifact_deleted_at = Set(Some(now));
+    active.updated_at = Set(now);
+    active.update(db).await?;
+    Ok(())
+}
+
+/// Jobs eligible for the physical-artifact sweep (SEC-B4 follow-up): past
+/// their retention deadline (`expires_at <= now`) and not yet swept
+/// (`artifact_deleted_at IS NULL`), oldest deadline first, capped at
+/// `limit`. A job with no deadline at all (a legacy row predating
+/// `expires_at`) is never selected — mirrors
+/// [`crate::bulk::handlers`]'s `artifact_expired`, which likewise never
+/// expires a deadline-less job.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the query fails.
+pub async fn list_artifact_sweep_candidates(
+    db: &DatabaseConnection,
+    now: OffsetDateTime,
+    limit: u64,
+) -> Result<Vec<Model>> {
+    use sea_orm::{ColumnTrait, QueryFilter, QueryOrder, QuerySelect};
+    Ok(bulk_jobs::Entity::find()
+        .filter(bulk_jobs::Column::ExpiresAt.is_not_null())
+        .filter(bulk_jobs::Column::ExpiresAt.lte(now))
+        .filter(bulk_jobs::Column::ArtifactDeletedAt.is_null())
+        .order_by_asc(bulk_jobs::Column::ExpiresAt)
+        .limit(limit)
+        .all(db)
+        .await?)
 }
 
 /// Load a job as an `ActiveModel` for update, erroring if it is gone.

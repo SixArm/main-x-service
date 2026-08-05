@@ -1206,6 +1206,10 @@ pub mod bulk_jobs {
         pub updated_at: TimeDateTimeWithTimeZone,
         /// Artifact + row TTL, if set.
         pub expires_at: Option<TimeDateTimeWithTimeZone>,
+        /// When the periodic sweep (SEC-B4 follow-up, `crate::bulk::sweep`)
+        /// physically deleted this job's artifacts from the store. `None`
+        /// means either not yet expired, or expired but not yet swept.
+        pub artifact_deleted_at: Option<TimeDateTimeWithTimeZone>,
     }
 
     /// `SeaORM` relations for the bulk-jobs entity (none defined).

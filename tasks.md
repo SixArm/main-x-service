@@ -2560,18 +2560,38 @@
   workflow), so a hard uniqueness constraint would reject legitimate data.
   DB-gated test: two concurrent imports of one SSN key ⇒ one distinct owner,
   one create + one upsert; plus a pure lock-key collision test.
-- [~] **SEC-B4 (M) 🟠** person bulk artifact hardening. *(store confinement +
-  IDOR + TTL done 2026-07-13; object-store sweep deferred)* (1) store `get`
-  **confined** to the canonicalised base + `is_safe_key` on `put`/`get`
+- [x] **SEC-B4 (M) 🟠** person bulk artifact hardening. *(store confinement +
+  IDOR + TTL done 2026-07-13; object-store sweep done 2026-08-05)* (1) store
+  `get` **confined** to the canonicalised base + `is_safe_key` on `put`/`get`
   (rejects `..`/absolute/`file://`-escape → closes arbitrary-file read);
   (2) job-status GET returns `404` unless the caller **owns** the job
   (`is_job_owner`, `actor == sub`) or is elevated (`access=admin`/`svc=true`)
   → closes IDOR/BOLA on status + download URL; (3) `create` stamps
   `expires_at = created_at + BULK_ARTIFACT_TTL_SECS` (7 days), status handler
   `404`s an expired job (`artifact_expired`). Pure cores unit-tested incl.
-  the outside-the-base `file://` refusal. **Deferred:** physical artifact
-  deletion (object-store TTL sweep) — the expiry gate stops the reference
-  being handed out.
+  the outside-the-base `file://` refusal. **Done (2026-08-05):** the
+  expiry gate only ever stopped the *reference* being handed out; the
+  artifact *bytes* stayed in the store indefinitely. `ArtifactStore` gained
+  an idempotent `delete` (already-gone or never-written ⇒ success, not an
+  error), confined to the same base as `get` for the local backend and via
+  `delete_object` — itself idempotent — for S3. Fixed a latent bug the new
+  `delete` path surfaced: the confinement check's canonicalisation fell
+  back to a *raw* path on failure, which wrongly rejected a legitimate
+  delete whenever the store base is reached through a symlink (macOS's
+  `tempdir()` under `/var/…` canonicalising to `/private/var/…`); replaced
+  with a lenient canonicaliser that walks up to the nearest existing
+  ancestor and re-appends the missing tail. A new `bulk::sweep` module
+  finds every job past its deadline with `artifact_deleted_at IS NULL`,
+  deletes its artifacts, and stamps the column so a swept row is never
+  reprocessed (new migration + partial index); a per-job failure is logged
+  and retried next pass rather than failing the whole sweep. Run via the
+  new `bulk_artifact_sweep` loco task (report-only by default, `op:apply`
+  to actually delete) — this crate has no in-process periodic-timer
+  convention, so scheduling is external (cron / `CronJob` / systemd timer),
+  matching how the family already treats other operator-triggered
+  maintenance (`integrity_resign`). DB-gated test proves an expired job's
+  artifact is physically gone after a sweep, a non-expired job's artifact
+  survives, and a second pass is a safe no-op.
 - [x] **SEC-B5 (M) 🔴/🟠** Merge TOCTOU + self-merge. *(done 2026-07-13)*
   person `POST /merge` had **no self-merge guard** (merged a record into
   itself → tombstoned + data loss) — now `422` before any fetch

@@ -7,6 +7,77 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+### Added — SEC-B4 follow-up: physical artifact deletion (object-store TTL sweep)
+
+Closes the piece the original SEC-B4 fix explicitly deferred: the status
+handler's `artifact_expired` gate already stopped an expired bulk job's
+download/error-report *reference* being handed out, but the artifact
+*bytes* stayed in the `ArtifactStore` indefinitely — a stale export of
+personal data was unreachable through the API but never actually gone.
+
+- **`ArtifactStore` gains a `delete` method** (`src/bulk/store.rs`):
+  `async fn delete(&self, reference: &str) -> Result<()>`, implemented
+  for both backends and **idempotent** — an artifact that is already
+  gone (or was never written) is success, not an error, so a retried or
+  re-run sweep never fails on its own prior work.
+  - `LocalFsArtifactStore::delete` reuses the same base-confinement path
+    resolution `get` already applies (`resolve_confined_path`, renamed
+    from `resolve_get_path` now that it backs both), so `delete` cannot
+    be turned into an arbitrary-file-delete primitive by a crafted
+    `file://` reference any more than `get` can be turned into an
+    arbitrary-file-read one.
+  - Fixed a latent bug this surfaced: the confinement check's base/
+    candidate canonicalisation fell back to the *raw* path when
+    `std::fs::canonicalize` failed (the normal case for a reference
+    whose file is already gone), which wrongly rejected a legitimate
+    delete whenever the store base is reached through a symlink (e.g.
+    macOS resolving a `tempdir()` path under `/var/…` to canonical
+    `/private/var/…`). Replaced with `canonicalize_lenient`, which
+    canonicalises the longest existing ancestor and re-appends the
+    missing tail, so both sides of the comparison stay canonical even
+    when the leaf does not exist.
+  - `S3ArtifactStore::delete` issues `delete_object`, which is already
+    idempotent against a missing key — no NotFound special-casing needed.
+- **New `src/bulk/sweep.rs`**: `sweep(db, store, limit)` finds every
+  `bulk_jobs` row past its `expires_at` deadline that has not yet been
+  physically swept (`artifact_deleted_at IS NULL`), deletes its
+  `input_url`/`result_url`/`error_report_url` artifacts, and stamps
+  `artifact_deleted_at`. A per-job failure (a delete, or the stamp
+  update) is logged at `warn` and leaves that row for the next pass to
+  retry — never a hard failure of the whole sweep. The pure
+  `job_needs_sweep(expires_at, artifact_deleted_at, now)` eligibility
+  check is unit tested standalone (deliberately not sharing code with
+  `bulk::handlers::artifact_expired` — the two gate different things:
+  handing out a reference vs. deleting bytes).
+- **New migration** `2026080500000001_bulk_jobs_artifact_deleted_at`:
+  adds `bulk_jobs.artifact_deleted_at TIMESTAMPTZ` plus a partial index
+  (`WHERE artifact_deleted_at IS NULL`) matching the sweep's own query
+  shape; `src/db/bulk_jobs.rs` gained `mark_artifact_deleted` and
+  `list_artifact_sweep_candidates`.
+- **New `bulk_artifact_sweep` loco task** (`src/tasks/bulk_artifact_sweep.rs`,
+  registered in `app.rs`): `cargo loco task bulk_artifact_sweep` reports
+  how many jobs currently qualify without deleting anything;
+  `op:apply` (optionally `limit:N`) actually sweeps. Defaults to
+  report-only — a task that physically deletes data must not run
+  destructively with no arguments — mirroring `integrity_resign`'s
+  dry-run-by-default posture. This crate has no in-process
+  periodic-timer convention (`BulkJobWorker` is dispatched per job via
+  `perform_later`, never on a clock), so scheduling this task is left to
+  an external scheduler (cron, a Kubernetes `CronJob`, a systemd timer
+  unit) rather than inventing a new in-process primitive for one
+  maintenance task.
+- **Tests**: unit tests for `delete` (removes the artifact; idempotent
+  on a second delete and on a never-stored key; refuses a reference
+  outside the base) in `src/bulk/store.rs`; unit tests for
+  `job_needs_sweep` and `delete_job_artifacts` (tolerates a missing
+  reference, no-op on a job with no references at all) in
+  `src/bulk/sweep.rs`; a DB-gated test
+  (`bulk::sweep::db_tests::sweep_deletes_only_expired_unswept_artifacts_and_is_idempotent`)
+  proving an expired job's artifact bytes are physically gone after a
+  sweep pass, a non-expired job's artifact survives, and a second sweep
+  pass is a safe no-op (the swept row no longer qualifies as a
+  candidate). (Repo tasks.md Phase 5 SEC-B4.)
+
 ### Fixed — SEC-B8 follow-up: per-row create/update audit rows carry the real actor
 
 Closes the item the original SEC-B8 fix (below) explicitly deferred:

@@ -173,16 +173,41 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   `422` before persist/match, closing the O(n·m) matcher `DoS`. Factored into
   `person_size_caps`/`cap_*`. Unit tested. (Repo tasks.md Phase 5 SEC-M1.)
 
-- [x] **SEC-B4 (security): bulk artifact hardening.** (1) `LocalFsArtifactStore`
-  now **confines** `get` to the store's canonicalised base and validates
-  keys with `is_safe_key` (no `..`/absolute), closing an arbitrary-file
-  read via a crafted `file://` reference. (2) `GET /import|export/{id}`
-  now returns `404` unless the caller **owns** the job (`is_job_owner`:
-  `actor == sub`) or is elevated (`access=admin`/`svc=true`), closing an
-  IDOR/BOLA on the status + download URL. (3) `create` stamps
+- [x] **SEC-B4 (security): bulk artifact hardening.** *(store confinement +
+  IDOR + TTL done 2026-07-13; physical artifact deletion done 2026-08-05)*
+  (1) `LocalFsArtifactStore` now **confines** `get` to the store's
+  canonicalised base and validates keys with `is_safe_key` (no
+  `..`/absolute), closing an arbitrary-file read via a crafted `file://`
+  reference. (2) `GET /import|export/{id}` now returns `404` unless the
+  caller **owns** the job (`is_job_owner`: `actor == sub`) or is elevated
+  (`access=admin`/`svc=true`), closing an IDOR/BOLA on the status +
+  download URL. (3) `create` stamps
   `expires_at = created_at + BULK_ARTIFACT_TTL_SECS` (7 days) and the
   status handler treats an expired job as `404` (`artifact_expired`).
-  Object-store artifact sweep deferred. (Repo tasks.md Phase 5 SEC-B4.)
+  **Done 2026-08-05:** `ArtifactStore` gained a `delete` method
+  (idempotent — an already-gone or never-written artifact is success, not
+  an error), implemented for both backends (`LocalFsArtifactStore`,
+  confined to the store base exactly like `get`; `S3ArtifactStore`, via
+  `delete_object`, itself naturally idempotent). A new `src/bulk/sweep.rs`
+  finds every `bulk_jobs` row past `expires_at` that has not yet been
+  physically swept (`artifact_deleted_at IS NULL`), deletes its
+  `input_url`/`result_url`/`error_report_url` artifacts, and stamps
+  `artifact_deleted_at` so a swept row is never reprocessed. A per-job
+  delete failure is logged and left unstamped for the next pass rather
+  than failing the whole sweep. Migration
+  `2026080500000001_bulk_jobs_artifact_deleted_at` adds the column plus a
+  partial index (`WHERE artifact_deleted_at IS NULL`) matching the
+  sweep's own query. Run via the new `bulk_artifact_sweep` loco task
+  (`cargo loco task bulk_artifact_sweep op:apply`; report-only by default,
+  mirroring `integrity_resign`'s dry-run posture) — this crate has no
+  in-process periodic-timer convention, so scheduling is external (cron /
+  a `CronJob` / a systemd timer), the same posture the family already
+  takes for other operator-triggered maintenance. Pure `job_needs_sweep`
+  eligibility logic and `delete`'s idempotency are unit tested; a
+  DB-gated test (`bulk::sweep::db_tests`) proves an expired job's
+  artifact bytes are physically gone after a sweep pass, a non-expired
+  job's artifact survives, and re-running the sweep is a safe no-op (the
+  swept row no longer qualifies). (Repo tasks.md Phase 5 SEC-B4.)
 
 - [x] **SEC-B2 (security): bound bulk import/export against OOM.** The
   import upload is read chunk-by-chunk and rejected `413` past
