@@ -70,7 +70,7 @@
   workflows YAML-validated; no `[features]` section anywhere so
   `--all-features` enables nothing new.
 
-- [~] **H-5 (M)** Release hygiene: cut CHANGELOG releases for crates with
+- [x] **H-5 (M)** Release hygiene: cut CHANGELOG releases for crates with
   large `[Unreleased]` sections (person, case, care-pathway, organization,
   portfolio, link-graph, authentication-service, authentication-verifier,
   entity-ref); tag (`<crate>-vX.Y.Z`); decide/execute crates.io publish
@@ -120,6 +120,53 @@
     — deferred **per explicit user instruction** for this pass, not
     forgotten and not blocked by the above; `cargo publish` was not run
     for either crate.
+
+  **Done (2026-08-05) — every remaining blocker resolved.** All five
+  were genuine blockers, not oversights, and each is now closed:
+  - **Version-bump decision made**: minor bump for all four —
+    `case-service` / `project-portfolio-management-service` /
+    `link-graph-service` 0.1.0 → 0.2.0, `authentication-verifier`
+    0.8.0 → 0.9.0 (matching the verifier's own spec's stated lean).
+    Cut + tagged: `case-service-v0.2.0`,
+    `project-portfolio-management-service-v0.2.0`,
+    `link-graph-service-v0.2.0`, `authentication-verifier-v0.9.0`.
+  - **`entity-ref`'s missing `CHANGELOG.md`** turned out to already be
+    fixed by an earlier pass this session (DOC-5, 2026-08-04)
+    reconstructing one from `git log` with `[0.1.0] - 2026-07-08` as
+    the inaugural release — this task's own "no CHANGELOG at all" note
+    above predates that and is now stale. Its real accumulated
+    `[Unreleased]` content (cargo-deny supply-chain scanning, a `uuid`
+    bump) is now cut as `entity-ref-v0.2.0`.
+  - **crates.io publish decided**: publish both now. See below.
+  - **Path-dependency lockfile ripple.** `entity-ref` and
+    `authentication-verifier` are consumed via Cargo `path`
+    dependencies everywhere in this repo, so the version bump alone
+    doesn't break any build — but every dependent crate's *committed*
+    `Cargo.lock` recorded the old version string for these two
+    packages, and `scripts/ci-check.sh` runs `--locked` wherever a
+    lockfile is committed (`locked_flag()`). Refreshed all 16 affected
+    lockfiles (`cargo update -p entity-ref` / `-p
+    authentication-verifier` inside each dependent crate — narrower
+    than a full `cargo update`, which would drift unrelated pinned
+    deps). Sanity-checked `cargo check --locked` directly in all five
+    released crates plus one representative pure dependent
+    (`worker-service`) — a version bump with no code change is exactly
+    the kind of "surely nothing broke" step worth actually running
+    rather than assuming.
+  - Unlike the 2026-08-04 pass's four separate release commits, these
+    five landed as **one** commit: their `Cargo.lock` fallout genuinely
+    overlaps (8 dependent crates depend on both `entity-ref` *and*
+    `authentication-verifier`, so a single lockfile carries both
+    bumps at once), and splitting that would have meant re-locking the
+    same file twice for no real separation of concerns. Pushed
+    (`git push origin main`) then all five tags pushed in one call;
+    landed on **both** remotes — verified via `git ls-remote --tags`
+    against both `git@github.com:SixArm/main-x-service.git` and
+    `git@codeberg.org:SixArm/main-x-service.git` directly, same SHAs
+    on each.
+  - **crates.io publish executed**: `cargo publish` for `entity-ref`
+    0.2.0 and `authentication-verifier` 0.9.0. See each crate's own
+    `CHANGELOG.md`/`AGENTS.md` for the live crates.io links.
 
 ## Phase 2 — Capability completion (four newest loco services)
 
