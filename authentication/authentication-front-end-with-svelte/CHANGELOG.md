@@ -199,7 +199,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   (2) `src/lib/api/{client,auth}.ts` is dead code (no route imports it,
   only its own 19 unit tests do). Both recorded in `spec/index.md`
   §11/§13/§14 as open work, not fixed in this pass.
-- Fixed `AGENTS/share/…` link casing to `agents/share/…` across `spec/`,
+- Fixed `agents/share/…` link casing to `agents/share/…` across `spec/`,
   `README.md`, `AGENTS.md`, `index.md`, `CHANGELOG.md` — this crate was
   the only one of the 11 front-ends using the uppercase form (431 other
   references repo-wide use lowercase; git tracks the directory itself as

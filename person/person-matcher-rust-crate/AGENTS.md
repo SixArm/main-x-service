@@ -62,20 +62,20 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 
 ## Detailed Guides
 
-The `AGENTS/` directory contains topic-specific guidance. Read the one that matches your task before editing:
+The `agents/` directory contains topic-specific guidance. Read the one that matches your task before editing:
 
-- [AGENTS/architecture.md](./AGENTS/architecture.md) — Module layout, layering rules, dependency graph.
-- [AGENTS/coding-style.md](./AGENTS/coding-style.md) — Rust style, naming, doc comments, error handling.
-- [AGENTS/testing.md](./AGENTS/testing.md) — Test pyramid, naming, fixtures, coverage expectations.
-- [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md) — Deterministic and probabilistic scoring, weights, phonetics. Includes the "Detailed Algorithm Specifications" appendix originally in `spec.md` §12.
-- [AGENTS/normalization.md](./AGENTS/normalization.md) — Name, postcode, phone, united-kingdom-national-health-service-number, and phonetic normalisation rules. Includes the "Detailed Normalisation Specifications" appendix originally in `spec.md` §14.
-- [AGENTS/security-and-privacy.md](./AGENTS/security-and-privacy.md) — PII, data protection, clinical-safety guardrails.
-- [AGENTS/release.md](./AGENTS/release.md) — Versioning, CHANGELOG, publishing checklist.
-- [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md) — How `spec.md` is maintained as the single source of truth.
-- [AGENTS/national-person-identifiers.md](./AGENTS/national-person-identifiers.md) — Reference table for the 42 supported national personal identifier schemes (jurisdiction, endonym, ISO 3166-1 code, format) plus the 9 passport-format validators (FR-77). The original 35 + the T-17.1 batch (BR CPF, CN RRN, IN Aadhaar, JP My Number, MX CURP, NZ NHI, ZA ID) bring the total to 42; per-parser algorithms live in this file and in `src/identifiers.rs` rustdoc.
-- [AGENTS/roadmap-research.md](./AGENTS/roadmap-research.md) — Long-form research-spike outcomes (T-9 phonetic encoder, T-14 address parser, T-17 next-batch identifiers, T-19 broader phone country table) originally in `spec.md` §21.4.
-- [AGENTS/delivered-tasks.md](./AGENTS/delivered-tasks.md) — Carry-over `[x]` list of shipped work that was previously in `spec.md` §23.1.
-- [AGENTS/delivered-tasks-detail.md](./AGENTS/delivered-tasks-detail.md) — Per-task acceptance criteria for every delivered task (originally in `spec.md` §23.2).
+- [agents/architecture.md](./agents/architecture.md) — Module layout, layering rules, dependency graph.
+- [agents/coding-style.md](./agents/coding-style.md) — Rust style, naming, doc comments, error handling.
+- [agents/testing.md](./agents/testing.md) — Test pyramid, naming, fixtures, coverage expectations.
+- [agents/matching-algorithm.md](./agents/matching-algorithm.md) — Deterministic and probabilistic scoring, weights, phonetics. Includes the "Detailed Algorithm Specifications" appendix originally in `spec.md` §12.
+- [agents/normalization.md](./agents/normalization.md) — Name, postcode, phone, united-kingdom-national-health-service-number, and phonetic normalisation rules. Includes the "Detailed Normalisation Specifications" appendix originally in `spec.md` §14.
+- [agents/security-and-privacy.md](./agents/security-and-privacy.md) — PII, data protection, clinical-safety guardrails.
+- [agents/release.md](./agents/release.md) — Versioning, CHANGELOG, publishing checklist.
+- [agents/spec-driven-development.md](./agents/spec-driven-development.md) — How `spec.md` is maintained as the single source of truth.
+- [agents/national-person-identifiers.md](./agents/national-person-identifiers.md) — Reference table for the 42 supported national personal identifier schemes (jurisdiction, endonym, ISO 3166-1 code, format) plus the 9 passport-format validators (FR-77). The original 35 + the T-17.1 batch (BR CPF, CN RRN, IN Aadhaar, JP My Number, MX CURP, NZ NHI, ZA ID) bring the total to 42; per-parser algorithms live in this file and in `src/identifiers.rs` rustdoc.
+- [agents/roadmap-research.md](./agents/roadmap-research.md) — Long-form research-spike outcomes (T-9 phonetic encoder, T-14 address parser, T-17 next-batch identifiers, T-19 broader phone country table) originally in `spec.md` §21.4.
+- [agents/delivered-tasks.md](./agents/delivered-tasks.md) — Carry-over `[x]` list of shipped work that was previously in `spec.md` §23.1.
+- [agents/delivered-tasks-detail.md](./agents/delivered-tasks-detail.md) — Per-task acceptance criteria for every delivered task (originally in `spec.md` §23.2).
 
 ---
 
@@ -107,7 +107,7 @@ The `AGENTS/` directory contains topic-specific guidance. Read the one that matc
 ```
 /
 ├── AGENTS.md                 ← this file
-├── AGENTS/                   ← topic-specific agent guides
+├── agents/                   ← topic-specific agent guides
 ├── CHANGELOG.md
 ├── CITATION.cff
 ├── CODE_OF_CONDUCT.md

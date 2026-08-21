@@ -22,12 +22,12 @@
 //! quietly skip it.
 
 use std::path::Path;
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 use loco_rs::Error;
 use organization_matcher::{Organization, phonetic::soundex};
 use tantivy::{
-    TantivyDocument,
+    IndexWriter, TantivyDocument,
     collector::TopDocs,
     doc,
     query::{BooleanQuery, FuzzyTermQuery, Occur, Query, QueryParser, TermQuery},
@@ -114,11 +114,33 @@ pub enum SearchMode {
 pub struct SearchEngine {
     /// The underlying Tantivy index wrapper.
     index: OrgIndex,
+    /// The single long-lived Tantivy writer.
+    ///
+    /// Held for the process rather than created per call. Tantivy's
+    /// `IndexWriter` allocates its whole `WRITER_HEAP_MB` arena and
+    /// spawns merge threads on construction, so building one per
+    /// indexed document put **~150 ms of pure setup on every create,
+    /// update, merge, and delete** — measured in `benches/`, not
+    /// guessed. It also took and released the index directory's
+    /// exclusive writer lock each time, so two concurrent writes could
+    /// collide on it; one owner cannot.
+    writer: Mutex<IndexWriter>,
     /// Filesystem path the index lives at (diagnostics / reopen).
     pub index_path: String,
 }
 
 impl SearchEngine {
+    /// The shared writer.
+    ///
+    /// A poisoned lock means an earlier write panicked. We recover the
+    /// guard rather than failing for ever: the only operations held
+    /// across it are `delete_term` / `add_document` / `commit`, and a
+    /// permanently dead index would be a worse outcome than a retry.
+    fn writer(&self) -> std::sync::MutexGuard<'_, IndexWriter> {
+        self.writer
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
     /// Open or create the index under `path`, creating the directory if
     /// it does not yet exist.
     ///
@@ -130,8 +152,11 @@ impl SearchEngine {
         let p = path.as_ref();
         std::fs::create_dir_all(p).map_err(|e| err(&format!("ensure index dir: {e}")))?;
         let index = OrgIndex::create_or_open(p)?;
+        // One writer for the process (see the field's docs).
+        let writer = Mutex::new(index.writer(WRITER_HEAP_MB)?);
         Ok(Self {
             index,
+            writer,
             index_path: p.to_string_lossy().into_owned(),
         })
     }
@@ -147,7 +172,7 @@ impl SearchEngine {
     ///
     /// When the writer cannot be acquired or the commit fails.
     pub fn index_organization(&self, pid: Uuid, org: &Organization) -> Result<()> {
-        let mut writer = self.index.writer(WRITER_HEAP_MB)?;
+        let mut writer = self.writer();
         let s = self.index.schema();
         let pid_str = pid.to_string();
         // Replace-in-place: same batch, so a crash between the two
@@ -180,7 +205,7 @@ impl SearchEngine {
     ///
     /// When the delete commit fails.
     pub fn delete_organization(&self, pid: Uuid) -> Result<()> {
-        let mut writer = self.index.writer(WRITER_HEAP_MB)?;
+        let mut writer = self.writer();
         let s = self.index.schema();
         writer.delete_term(Term::from_field_text(s.pid, &pid.to_string()));
         writer
@@ -197,7 +222,7 @@ impl SearchEngine {
     ///
     /// When the delete-all commit fails.
     pub fn clear(&self) -> Result<()> {
-        let mut writer = self.index.writer(WRITER_HEAP_MB)?;
+        let mut writer = self.writer();
         writer
             .delete_all_documents()
             .map_err(|e| err(&format!("delete all: {e}")))?;

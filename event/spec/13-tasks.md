@@ -55,7 +55,7 @@ Prefix `ET-` distinguishes these from per-crate task numbers.
     `rust-tracing-opentelemetry-stack.md`, `technology.md` →
     `loco.md`); plus pre-nesting rot in the service README/index
     (`ARCHITECTURE.md` → `spec/08-architecture.md`, `API_GUIDE.md` →
-    `AGENTS/restful.md`, `task-10.md` → `AGENTS/testing.md`,
+    `agents/restful.md`, `task-10.md` → `agents/testing.md`,
     dead `LICENSE*` file links de-linked).
 - [ ] **ET-4 — Decide convergence of the two matching algorithms** (§6.1, EOQ-1).
   - [ ] Decide: route `/events/match` scoring through the embedded
@@ -91,7 +91,7 @@ Prefix `ET-` distinguishes these from per-crate task numbers.
   the matcher treats the field as data-only and never scores it, so
   nothing breaks). Contract now documented **and** test-pinned.
   - [x] Documentation: §5.3 table row added; divergence note in
-    service spec §6.2 and service `AGENTS/matching.md`
+    service spec §6.2 and service `agents/matching.md`
     (2026-06-13, docs-only round).
   - [x] Bridge test pinning the projection + inertness
     (2026-06-13): `tests/duplicate_detection.rs` adds

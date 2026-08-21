@@ -93,7 +93,7 @@ Emerging AI tools:
 - Subproject specs: [service](../care-pathway-service-with-loco/spec/index.md),
   [matcher](../care-pathway-matcher-rust-crate/spec/index.md),
   [front-end](../care-pathway-front-end-with-svelte/spec/index.md).
-- Entity AGENTS reference set: [`AGENTS/index.md`](../AGENTS/index.md).
+- Entity AGENTS reference set: [`agents/index.md`](../agents/index.md).
 - Shared docs: [`agents/share/index.md`](../../agents/share/index.md);
   sibling entity-level spec exemplar:
   [person/spec](../../person/spec/index.md).

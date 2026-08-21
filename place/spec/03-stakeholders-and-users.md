@@ -10,7 +10,7 @@ The Place entity serves a worldwide public governmental deployment.
 | **Integrators** (peer Main X Index entities, third-party systems) | Stable REST contract, OpenAPI spec, event stream of CRUD / merge activity, eventually gRPC | Service REST API, Swagger UI, event streaming |
 | **Auditors / regulators** (GDPR supervisory authorities, ISO assessors) | Complete who / what / when audit trail; data-subject export; consent records; masking of personal place data | Audit API, GDPR export endpoint |
 | **Data subjects** (residents whose home addresses are place records) | Privacy: masking, consent, export, erasure via soft delete | Indirect — via operators and the privacy endpoints |
-| **Developers / agents** (human and AI contributors) | Single source of truth per subproject; explainable matching; three-part-PR discipline | Per-subproject `spec/` + `AGENTS/`; this entity spec |
+| **Developers / agents** (human and AI contributors) | Single source of truth per subproject; explainable matching; three-part-PR discipline | Per-subproject `spec/` + `agents/`; this entity spec |
 | **Operations / SRE** | Health checks, OTLP traces, Prometheus metrics, stateless horizontal scaling | Service `/api/health`, `/metrics.prom`, OTLP export |
 
 ### 3.1 Notes

@@ -84,7 +84,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   preview. FR-9 reworded to "MUST offer a per-ID GET preview"; §13
   T-23 captures the alternative (gate Merge on a successful preview)
   if that policy is ever wanted.
-- **Rewrote `AGENTS/testing.md` to match reality.** It documented a
+- **Rewrote `agents/testing.md` to match reality.** It documented a
   third "Integration" layer with a `tests/integration/` directory and
   a `pnpm test:integration` script (neither exists), named unit files
   `apiClient.test.ts` / `coursesRepository.test.ts` /
@@ -290,8 +290,8 @@ Initial scaffold for the Course Service front-end. SvelteKit 2 + Svelte 5 runes 
 ### Added
 
 - **Routes (MVP).** Dashboard with service-health + recent-audit feed; courses list with name / identifier / additional-type search and SVAR DataGrid (columns: ID, Name, schema.org Type, Primary identifier, URL); create with real-time 409 duplicate detection inline; detail view (identity, additional-type as schema.org URL, identifiers with deep links, alternate names, same-as URLs, images); edit; soft-delete with confirm; per-record audit log; match check (name + description + URL + identifiers + same-as); merge with two-ID preview.
-- **API layer.** `ApiClient` (envelope + error normalisation) + `ApiError`; `CourseRepository` binding the [Course Service REST surface](../course-service-with-loco/AGENTS/restful.md). **Note:** Course Service uses `POST /api/courses/duplicates` (not `/check-duplicates`).
-- **TypeScript types.** Snake-case domain types mirroring [`course-service-with-loco/AGENTS/models.md`](../course-service-with-loco/AGENTS/models.md): `Course` with all 13 schema.org/Course canonical properties (`name`, `alternate_names`, `description`, `disambiguating_description`, `additional_type`, `url`, `identifiers`, `images`, `main_entity_of_page`, `owner`, `same_as`, `subject_of`, `potential_action`); `CourseIdentifier` with schema.org [`PropertyValue`](https://schema.org/PropertyValue) shape (`property_id`, `value`, optional `name`/`url`); `IdentifierType` (Doi/Isbn/Issn/Gtin/Sku/Mpn/SerialNumber/Uri/Uuid/`{Custom: string}`); `DETERMINISTIC_TYPES` constant lists identifier types that short-circuit matching to score 1.0 (Doi/Isbn/Issn/Gtin/Mpn/SerialNumber/Uuid — Sku/Uri/Custom excluded); `MatchResult` + `MatchConfidence` + `MatchBreakdown` (per-component: name / identifier / description / url / same_as / phonetic flag / deterministic flag); `MergeRequest`/`Record`/`Response`; `BatchDeduplicationRequest`/`Response`; `AuditEntry`.
+- **API layer.** `ApiClient` (envelope + error normalisation) + `ApiError`; `CourseRepository` binding the [Course Service REST surface](../course-service-with-loco/agents/restful.md). **Note:** Course Service uses `POST /api/courses/duplicates` (not `/check-duplicates`).
+- **TypeScript types.** Snake-case domain types mirroring [`course-service-with-loco/agents/models.md`](../course-service-with-loco/agents/models.md): `Course` with all 13 schema.org/Course canonical properties (`name`, `alternate_names`, `description`, `disambiguating_description`, `additional_type`, `url`, `identifiers`, `images`, `main_entity_of_page`, `owner`, `same_as`, `subject_of`, `potential_action`); `CourseIdentifier` with schema.org [`PropertyValue`](https://schema.org/PropertyValue) shape (`property_id`, `value`, optional `name`/`url`); `IdentifierType` (Doi/Isbn/Issn/Gtin/Sku/Mpn/SerialNumber/Uri/Uuid/`{Custom: string}`); `DETERMINISTIC_TYPES` constant lists identifier types that short-circuit matching to score 1.0 (Doi/Isbn/Issn/Gtin/Mpn/SerialNumber/Uuid — Sku/Uri/Custom excluded); `MatchResult` + `MatchConfidence` + `MatchBreakdown` (per-component: name / identifier / description / url / same_as / phonetic flag / deterministic flag); `MergeRequest`/`Record`/`Response`; `BatchDeduplicationRequest`/`Response`; `AuditEntry`.
 - **Form primitives.** `LabeledField`, `FieldError`, `FieldRow`, `createForm` Svelte 5 rune-based store.
 - **Components.** `SearchBox`, `CourseGrid` (SVAR `Grid` with `select` + `init`/`select-row`), `CourseIdentifierInput` (dynamic add/remove, Custom-type label sub-field, optional per-identifier URL), `CourseForm` (name + additional_type URL + description + disambiguating description + URL + owner + multi-line alternate names + multi-line same_as URLs + identifier list; client-side validation of HTTP(S) URL fields), `MatchResultsList` with breakdown surfacing name / identifier / description / URL / same-as / phonetic / deterministic short-circuit.
 - **Tests.** 5 Vitest unit tests for `ApiClient`, 3 unit tests for `CourseRepository` (pins `/duplicates` not `/check-duplicates`), 5 Playwright smoke tests covering every MVP route shell.
@@ -305,6 +305,6 @@ Initial scaffold for the Course Service front-end. SvelteKit 2 + Svelte 5 runes 
 ### Cross-references
 
 - Service spec: [`../course-service-with-loco/spec.md`](../course-service-with-loco/spec/index.md).
-- Service REST contract: [`../course-service-with-loco/AGENTS/restful.md`](../course-service-with-loco/AGENTS/restful.md).
-- Service model types: [`../course-service-with-loco/AGENTS/models.md`](../course-service-with-loco/AGENTS/models.md).
-- Service matching reference: [`../course-service-with-loco/AGENTS/matching.md`](../course-service-with-loco/AGENTS/matching.md).
+- Service REST contract: [`../course-service-with-loco/agents/restful.md`](../course-service-with-loco/agents/restful.md).
+- Service model types: [`../course-service-with-loco/agents/models.md`](../course-service-with-loco/agents/models.md).
+- Service matching reference: [`../course-service-with-loco/agents/matching.md`](../course-service-with-loco/agents/matching.md).

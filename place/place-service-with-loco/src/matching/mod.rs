@@ -14,7 +14,7 @@
 //! - [`scoring`] — the [`compute_match`](scoring::compute_match) entry point.
 //! - [`adapter`] — projection to the canonical `place-matcher` crate.
 //!
-//! For the algorithm contract see `AGENTS/matching.md` and
+//! For the algorithm contract see `agents/matching.md` and
 //! `agents/share/match.md`.
 
 pub mod adapter;

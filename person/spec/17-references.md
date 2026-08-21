@@ -3,7 +3,7 @@
 ### Subproject documentation
 
 - Service: [spec](../person-service-with-loco/spec/index.md) ·
-  [AGENTS](../person-service-with-loco/AGENTS/index.md) ·
+  [AGENTS](../person-service-with-loco/agents/index.md) ·
   [README](../person-service-with-loco/README.md) ·
   [index](../person-service-with-loco/index.md)
 - Matcher: [spec](../person-matcher-rust-crate/spec/index.md) ·
@@ -17,7 +17,7 @@
 
 ### Entity-level
 
-- [`AGENTS/index.md`](../AGENTS/index.md) — entity agent reference set.
+- [`agents/index.md`](../agents/index.md) — entity agent reference set.
 - [`person-service-schema.sql`](../person-service-schema.sql) —
   reference schema dump.
 

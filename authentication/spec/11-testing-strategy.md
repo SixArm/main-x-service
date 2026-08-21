@@ -1,6 +1,6 @@
 ## 11. Testing Strategy
 
-Per-subproject detail: [`AGENTS/testing.md`](../AGENTS/testing.md).
+Per-subproject detail: [`agents/testing.md`](../agents/testing.md).
 
 ### 11.1 Service
 

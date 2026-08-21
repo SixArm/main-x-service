@@ -117,7 +117,7 @@
 //! `person-matcher`'s own private `score_dob_pair`
 //! (`person-matcher-rust-crate/src/matcher.rs`) only implements two of
 //! the six rows documented in
-//! `person-service-with-loco/AGENTS/matching.md`'s "Birth Date Matching"
+//! `person-service-with-loco/agents/matching.md`'s "Birth Date Matching"
 //! table (exact `1.0`, same-year transposition `0.5`, else `0.0`) — the
 //! doc and the code have drifted. Rather than reach into that private
 //! function (or make it `pub` to paper over a documented-but-unimplemented
@@ -316,7 +316,7 @@ fn score_name(a: &ProbeName, b: &ProbeName) -> Option<f64> {
 }
 
 /// Score a pair of birth dates against the documented six-row table
-/// (`person-service-with-loco/AGENTS/matching.md` "Birth Date Matching")
+/// (`person-service-with-loco/agents/matching.md` "Birth Date Matching")
 /// — see the module doc for why this is a fresh implementation rather
 /// than a reuse of `person-matcher`'s private, narrower `score_dob_pair`.
 ///
@@ -361,7 +361,7 @@ pub fn score_dob_pair(a: NaiveDate, b: NaiveDate) -> f64 {
 }
 
 /// Score two genders per the documented table
-/// (`person-service-with-loco/AGENTS/matching.md` "Gender Matching"):
+/// (`person-service-with-loco/agents/matching.md` "Gender Matching"):
 /// exact match `1.0`, either side `Unknown` `0.5`, mismatch `0.0`.
 ///
 /// The `Unknown` check runs **before** the equality check: two `Unknown`

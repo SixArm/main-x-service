@@ -751,6 +751,61 @@ HIPAA/NHS/GDPR posture for audit and access controls.
 
 ## 13. Tasks (live work queue)
 
+
+- [x] **2026-08-21 — FUZZ-2: cargo-fuzz harness for the request-path
+  logic.** Three coverage-guided targets over the pure, total code that
+  faces the network: `validate_json` (bytes → `serde_json` → `Plan` →
+  `validation::problems`), `validate_built` (the validator driven from
+  raw bytes, so the fuzzer controls array cardinality directly rather
+  than having to learn JSON first), and `merge_plans` (the merge fold over
+  two arbitrary payloads). Invariants pinned: never-panic; validation is
+  deterministic and its **problem report is bounded** independent of
+  payload size (the generalisation of SEC-M8, which the unit tests pin
+  only for one hand-written payload); merge keeps the survivor's
+  `name` and is **absorbing**, so a retried merge cannot inflate
+  the record. The sub-crate declares an empty `[workspace]` table
+  because this crate is a workspace root, and no `rust-version` because
+  cargo-fuzz is nightly-only. Verified: all three build and run clean,
+  and the bounded-report assertion was confirmed live by lowering its
+  ceiling until it fired.
+
+- [x] **2026-08-21 — SEC-M8b: the `422` report is bounded, not just the
+  work.** `validation::problems` reported an over-long array's
+  cardinality violation once and then still walked every entry, so a
+  payload with ten thousand blank/malformed entries returned ten thousand
+  problem strings in one `422` body — a small request buying a large
+  response. Thirteen per-entry loops across `problems` and
+  `push_size_cap_problems` were involved, which is why the cap is a
+  named helper rather than thirteen inline `.take(…)` calls. Every per-entry loop now walks the new `inspected()`
+  helper (at most `MAX_ARRAY_LEN` entries, index preserved): the
+  cardinality problem already rejects the payload, so inspecting the tail
+  decides nothing, and bounding the **report** is the same input-bounding
+  rule as bounding the work (SEC-M1). Named rather than inlined so a loop
+  added later without it reads as different. Pinned by a test, which was
+  confirmed to fail without the cap. Case was the reference
+  (repo `tasks.md` SEC-M8/SEC-M8b).
+
+- [x] **2026-08-20 — Search writer held for the process; Criterion
+  benchmarks; declared MSRV.** `SearchEngine::index_plan` (and the
+  delete/clear paths) built a **new Tantivy `IndexWriter` per call**.
+  That allocates the whole 50 MB `WRITER_HEAP_MB` arena and spawns merge
+  threads on construction, so every create / update / merge /
+  soft-delete paid it synchronously on the request path — ~155 ms per
+  indexed document, measured against a fresh index. It was also a
+  concurrency hazard: an `IndexWriter` holds the index directory's
+  exclusive lock, so taking and releasing it per call left two
+  simultaneous writes able to collide on it. The engine now holds one
+  `Mutex<IndexWriter>` created in `new()` (~78 ms per document; the
+  remainder is the durable `commit()` plus reader `reload()` that
+  read-after-write indexing inherently costs — see repo `tasks.md`
+  PERF-2 for the open design question). Found by `benches/service_bench.rs`,
+  new in the same pass: validation, merge, and search groups over the
+  CPU-bound halves of a request, compiled in CI by the new
+  `scripts/ci-check.sh bench` stage. `Cargo.toml` also declares
+  `rust-version = "1.95"` — the repository's current-stable-minus-three
+  floor (`spec/rust-msrv-n-minus-3.md`), enforced by
+  `scripts/ci-check.sh msrv`.
+
 - [x] **2026-08-05 — Pagination on the five operational sub-resource
   lists (repo tasks.md PG-1, closing the sub-bullet left open on
   2026-08-01).** `automations`, automation runs, the deadline queue,

@@ -4,7 +4,7 @@ Sibling to [`event-service-with-loco/`](../event-service-with-loco/). The Rust c
 
 ## Single source of truth
 
-- The service's [`spec.md`](../event-service-with-loco/spec/index.md) and [`AGENTS/`](../event-service-with-loco/AGENTS/) describe the API contract. If a field disappears from `Event` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
+- The service's [`spec.md`](../event-service-with-loco/spec/index.md) and [`agents/`](../event-service-with-loco/agents/) describe the API contract. If a field disappears from `Event` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
 - This project has its own [`spec.md`](spec/index.md) (§1–§18) for front-end-specific decisions: routes, components, design system, build.
 
 ## Three-part change rule

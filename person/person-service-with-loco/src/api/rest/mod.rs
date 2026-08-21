@@ -213,7 +213,7 @@ pub fn create_router(state: AppState) -> Router {
     // guard as `/api/*` (it is not on the public allow-list).
     let fhir_routes = crate::api::fhir::handlers::fhir_router(state);
 
-    // Mount under `/api`. Documented in AGENTS/restful.md and
+    // Mount under `/api`. Documented in agents/restful.md and
     // consumed by `../person-front-end-with-svelte` at `/api/persons`.
     // No service uses a `/api/v1` URL segment anymore; API
     // versioning is negotiated via the `Accepts-version` header.

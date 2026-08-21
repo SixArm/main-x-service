@@ -219,7 +219,7 @@ clearly described manual check confirms the acceptance criterion.
 - [x] **2026-07-27/28 — Keyed integrity verification (MAC + digests).**
   *Landed but never recorded here until this doc pass (2026-08-04)
   found the gap: shipped, tested, and reachable, with no `spec/13`
-  entry, no `spec/14` row, and no `spec/09`/`AGENTS/restful.md`
+  entry, no `spec/14` row, and no `spec/09`/`agents/restful.md`
   endpoint listing.* Adds `src/compliance/` (`mac`, `record_integrity`,
   `audit_integrity`): SHA-256 + SHA3-256 digests and a keyed
   HMAC-SHA256 MAC (this crate's binding to the shared

@@ -196,15 +196,26 @@ pub enum BulkFormat {
     /// CSV — the operator/spreadsheet format (§5 flattening convention;
     /// [`csv`] codec).
     Csv,
+    /// TSV — the same flattening convention and the same codec as
+    /// [`Csv`](BulkFormat::Csv), separated by tabs instead of commas.
+    ///
+    /// A separate format rather than a CSV option because it is what the
+    /// caller names on the wire, and because the two are not
+    /// interchangeable on read: a file's delimiter cannot be inferred
+    /// safely (a CSV whose fields contain tabs, or a TSV whose fields
+    /// contain commas, would each parse as one column under the wrong
+    /// guess — silently, producing rows that validate).
+    Tsv,
 }
 
 impl BulkFormat {
-    /// The persisted lowercase token (`jsonl` / `csv`).
+    /// The persisted lowercase token (`jsonl` / `csv` / `tsv`).
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             BulkFormat::Jsonl => "jsonl",
             BulkFormat::Csv => "csv",
+            BulkFormat::Tsv => "tsv",
         }
     }
 
@@ -214,7 +225,23 @@ impl BulkFormat {
         match s {
             "jsonl" => Some(BulkFormat::Jsonl),
             "csv" => Some(BulkFormat::Csv),
+            "tsv" => Some(BulkFormat::Tsv),
             _ => None,
+        }
+    }
+
+    /// The field delimiter for the delimited-text formats, or `None` for
+    /// a format that is not delimited text.
+    ///
+    /// Exists so the codec is chosen once, here, rather than by a `match`
+    /// at every call site — CSV and TSV differ in exactly this byte, and
+    /// a second place to decide it is a second place for them to drift.
+    #[must_use]
+    pub fn delimiter(self) -> Option<u8> {
+        match self {
+            BulkFormat::Jsonl => None,
+            BulkFormat::Csv => Some(b','),
+            BulkFormat::Tsv => Some(b'\t'),
         }
     }
 }
@@ -341,7 +368,15 @@ mod tests {
             "parquet is out of scope for BLK-5"
         );
         assert_eq!(BulkFormat::parse("xml"), None);
-        for f in [BulkFormat::Jsonl, BulkFormat::Csv] {
+        assert_eq!(BulkFormat::parse("tsv"), Some(BulkFormat::Tsv));
+        assert_eq!(
+            BulkFormat::Jsonl.delimiter(),
+            None,
+            "JSONL is not delimited text"
+        );
+        assert_eq!(BulkFormat::Csv.delimiter(), Some(b','));
+        assert_eq!(BulkFormat::Tsv.delimiter(), Some(b'\t'));
+        for f in [BulkFormat::Jsonl, BulkFormat::Csv, BulkFormat::Tsv] {
             assert_eq!(BulkFormat::parse(f.as_str()), Some(f), "round-trips");
         }
     }

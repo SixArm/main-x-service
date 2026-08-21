@@ -682,7 +682,7 @@ links are **never** a match signal (entity spec §1).
 
 - Sibling service spec: [project-portfolio-management-service-with-loco/spec](../../project-portfolio-management-service-with-loco/spec/index.md).
 - Entity umbrella: [portfolio/spec](../../spec/index.md);
-  [models](../../AGENTS/models.md); [matching](../../AGENTS/matching.md).
+  [models](../../agents/models.md); [matching](../../agents/matching.md).
 - Family layout shell + theming + locale conventions; SvelteKit 2 +
   Svelte 5 runes docs; SVAR Svelte DataGrid; Lily Design System Svelte
   Headless.

@@ -1,6 +1,6 @@
 ## 9. API Consumption
 
-The front-end binds 1:1 to the Worker Service REST surface (see [`worker-service-with-loco/AGENTS/restful.md`](../../worker-service-with-loco/AGENTS/restful.md)). Since T-22a (§8) every call is issued to the same-origin `/api/proxy/...` reverse proxy, which forwards to the Worker Service with a server-injected PASETO — the table below names the upstream Worker Service path each proxied call maps to (`/api/proxy/<path>` → `<path>` upstream):
+The front-end binds 1:1 to the Worker Service REST surface (see [`worker-service-with-loco/agents/restful.md`](../../worker-service-with-loco/agents/restful.md)). Since T-22a (§8) every call is issued to the same-origin `/api/proxy/...` reverse proxy, which forwards to the Worker Service with a server-injected PASETO — the table below names the upstream Worker Service path each proxied call maps to (`/api/proxy/<path>` → `<path>` upstream):
 
 | Endpoint | Used by |
 | --- | --- |

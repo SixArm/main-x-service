@@ -44,7 +44,7 @@ describe("ThingRepository", () => {
     });
 
     // Pins: checkDuplicates() uses /api/things/check-duplicates — the path the
-    // Thing Service actually serves (service spec §6 / AGENTS/restful.md;
+    // Thing Service actually serves (service spec §6 / agents/restful.md;
     // front-end spec §9). Guards against regressing to the wrong /duplicates path.
     it("uses /api/things/check-duplicates for duplicate check", async () => {
         let capturedUrl = "";

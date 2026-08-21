@@ -3,7 +3,7 @@
 //! The model surface is aligned with
 //! [schema.org/Course](https://schema.org/Course) and its parent
 //! `CreativeWork` + `Thing`. The full property mapping lives in
-//! [`AGENTS/models.md`](../../AGENTS/models.md).
+//! [`agents/models.md`](../../agents/models.md).
 
 pub mod course;
 pub mod course_instance;

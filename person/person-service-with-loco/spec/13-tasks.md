@@ -1,5 +1,19 @@
 ## 13. Tasks
 
+- [x] **2026-08-21 — TSV bulk format + fuzzed row decoders.**
+  `BulkFormat::Tsv` is accepted for import and export alongside `jsonl`,
+  `csv`, and (export-only) `parquet`. TSV shares the CSV codec rather
+  than forking it — the codec takes a `delimiter: u8` and
+  `BulkFormat::delimiter()` is the one place mapping format → byte. The
+  **streaming** import path (SEC-B2) threads the delimiter through
+  `RowStream::new` as well, since that is what actually runs for an
+  uploaded file; a TSV that only worked through the buffered `decode`
+  would pass tests and fail in production, so there is a streaming TSV
+  test specifically. The delimiter is declared by the caller, never
+  inferred. A new `bulk_decoders` fuzz target drives both delimiters and
+  the JSONL split/parse path over arbitrary bytes, pinning never-panic,
+  decode determinism, and the §7 per-row error contract.
+
 Spec-driven work breakdown. Each task has an acceptance criterion;
 tick the box when an automated test or clearly described manual check
 confirms the criterion is met. Tasks small enough to land in a single

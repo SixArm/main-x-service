@@ -1,6 +1,6 @@
 ## 9. API Surface
 
-Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
+Complete endpoint reference: [`agents/restful.md`](../agents/restful.md).
 
 API URLs are version-free (`/api/workers`, not `/api/v1/workers`);
 clients select the representation version with the `Accepts-version`

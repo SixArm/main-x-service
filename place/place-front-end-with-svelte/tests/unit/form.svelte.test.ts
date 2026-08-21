@@ -1,5 +1,5 @@
 // Unit tests for the rune-based form store (src/lib/forms/form.svelte.ts).
-// AGENTS/testing.md lists "form-store behaviour" as an intended unit-test
+// agents/testing.md lists "form-store behaviour" as an intended unit-test
 // scope. The file name ends in `.svelte.test.ts` so the SvelteKit Vite
 // plugin compiles the `$state` runes the store depends on.
 import { describe, expect, it, vi } from "vitest";

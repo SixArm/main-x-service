@@ -38,7 +38,7 @@ person/worker/event) — see the honest capability matrix in
 
 ## Quick start
 
-Prerequisites: Rust 1.93+ (2024 edition), PostgreSQL 18+.
+Prerequisites: Rust 1.95+ (2024 edition), PostgreSQL 18+.
 
 ```bash
 cd thing/thing-service-with-loco   # within the main-x-service monorepo
@@ -55,7 +55,7 @@ curl http://localhost:5150/api/health
 ## API
 
 REST routes mount under `/api/things/*`. See
-[`AGENTS/restful.md`](AGENTS/restful.md) for the full list. All
+[`agents/restful.md`](agents/restful.md) for the full list. All
 endpoints return the standard `{success, data, error}` envelope.
 Duplicate handling includes a stored review queue:
 `GET /api/things/review-queue` (filter `status`, `limit`) and
@@ -173,7 +173,7 @@ cargo test --tests
 cargo bench
 ```
 
-See [`AGENTS/testing.md`](AGENTS/testing.md) for the layout.
+See [`agents/testing.md`](agents/testing.md) for the layout.
 
 ## Matching at a glance
 
@@ -189,7 +189,7 @@ Deterministic short-circuit: any matched DOI / ISBN / ISSN / GTIN /
 MPN / SerialNumber / UUID → 1.0. (SKU / URI / Custom are evidence,
 not pins — they are not globally unique.)
 
-See [`AGENTS/matching.md`](AGENTS/matching.md) for the per-component
+See [`agents/matching.md`](agents/matching.md) for the per-component
 detail.
 
 ## Compliance

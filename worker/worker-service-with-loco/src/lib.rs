@@ -30,7 +30,7 @@
 //! business logic ([`matching`], [`search`], [`validation`], [`privacy`]),
 //! which operates on the [`models`] and is persisted through [`db`]. Every
 //! mutating operation also flows through [`streaming`] (events) and the audit
-//! log. See `AGENTS/architecture.md` for the full diagram.
+//! log. See `agents/architecture.md` for the full diagram.
 //!
 //! # Example
 //!

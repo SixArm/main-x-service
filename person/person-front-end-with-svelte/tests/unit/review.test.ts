@@ -67,7 +67,7 @@ describe("canDecide", () => {
 });
 
 describe("MATCH_COMPONENTS", () => {
-    // Pins the person matcher's published weights (AGENTS/matching.md).
+    // Pins the person matcher's published weights (agents/matching.md).
     // If they no longer sum to 1.00 the table is lying to the operator.
     it("weights sum to 1.00", () => {
         const total = MATCH_COMPONENTS.reduce((sum, c) => sum + c.weight, 0);

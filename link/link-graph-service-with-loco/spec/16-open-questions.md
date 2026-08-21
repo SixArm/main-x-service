@@ -106,7 +106,7 @@ opens a §13 task.
     `Identifier` system+value — NHS/SSN/other — present on both the
     person and the worker side) when one exists, mirroring the matcher
     family's existing deterministic identifier short-circuit
-    (`person/person-service-with-loco/AGENTS/matching.md` Rule 0/Rule 1:
+    (`person/person-service-with-loco/agents/matching.md` Rule 0/Rule 1:
     tax-ID / identifier exact match ⇒ short-circuit). Records sharing no
     identifier are blocked instead on **`Soundex(family)` + birth-year**
     (the same phonetic primitive the matcher's name component already

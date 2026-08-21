@@ -10,6 +10,33 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+
+
+### Added — Criterion benchmarks
+
+- `benches/match_pair.rs`, matching the harness the other matcher crates
+  carry. Four groups over the paths a downstream integrator actually
+  exercises: single-pair scoring in three regimes (identical clone,
+  fuzzy near-match through the full pipeline, unrelated pair), the
+  deterministic short-circuits (a shared docket, and a shared agency-scoped case number), `rank` at 10 / 100 / 1000
+  candidates with `Throughput::Elements` set so per-candidate cost and
+  any super-linear scaling are visible directly, and the same fuzzy pair
+  under each shipped config preset.
+- Fixtures are built from `Case::new` and derived deterministically from
+  an index, so a candidate list of any size is reproducible without
+  randomness.
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ### Added — cargo-fuzz harness (SEC-I2)
 
 - A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate adopting
@@ -50,13 +77,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   - Fixed `Cargo.toml` `repository` URL to the nested, valid GitHub tree
     path `…/tree/main/case/case-matcher-rust-crate`.
   - Quoted the clippy gate as `cargo clippy --all-targets --all-features
-    -- -D warnings` in spec §24, `AGENTS.md`, `AGENTS/testing.md`, and
+    -- -D warnings` in spec §24, `AGENTS.md`, `agents/testing.md`, and
     `README.md` to match CI and the repo-wide harmonization.
   - Classified `in_language` as a data-only field (spec §6/§14/§22,
-    `AGENTS.md`, `README.md`, `AGENTS/matching-algorithm.md`,
-    `AGENTS/spec-driven-development.md`): carried but never scored.
+    `AGENTS.md`, `README.md`, `agents/matching-algorithm.md`,
+    `agents/spec-driven-development.md`): carried but never scored.
   - Corrected `../spec.md` link display text to `../spec/index.md` in
-    `AGENTS/index.md` and `AGENTS/spec-driven-development.md`.
+    `agents/index.md` and `agents/spec-driven-development.md`.
 
 ### Added
 
@@ -78,7 +105,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   Lib unit tests 42 → 46; public-API integration tests 12 → 13.
 - Worked examples for the Soundex phonetic title bonus, renormalisation
   over partial components, and the strict/lenient threshold presets in
-  `index.md` and `AGENTS/matching-algorithm.md`.
+  `index.md` and `agents/matching-algorithm.md`.
 
 ## [0.1.0] - 2026-06-13
 

@@ -577,6 +577,7 @@ mod tests {
         assert_eq!(parse_format(None).unwrap(), BulkFormat::Jsonl);
         assert_eq!(parse_format(Some("jsonl")).unwrap(), BulkFormat::Jsonl);
         assert_eq!(parse_format(Some("csv")).unwrap(), BulkFormat::Csv);
+        assert_eq!(parse_format(Some("tsv")).unwrap(), BulkFormat::Tsv);
         assert!(parse_format(Some("parquet")).is_err());
         assert!(parse_format(Some("xml")).is_err());
     }

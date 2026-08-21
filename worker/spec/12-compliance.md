@@ -53,7 +53,7 @@ professional-status data**:
 The canonical matcher enforces privacy structurally: no IO, no
 logging, no `Debug`-formatting of records into traces, synthetic
 fixtures only ([matcher §20](../worker-matcher-rust-crate/spec/20-security-privacy-and-compliance.md),
-[matcher `AGENTS/security-and-privacy.md`](../worker-matcher-rust-crate/AGENTS/security-and-privacy.md)).
+[matcher `agents/security-and-privacy.md`](../worker-matcher-rust-crate/agents/security-and-privacy.md)).
 The service MUST preserve this when bridging — worker data passed to
 the matcher never gains a new egress path.
 

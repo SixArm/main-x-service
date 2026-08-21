@@ -69,7 +69,7 @@ but never scored.
 
 > **Implementation status.** `tags_score` and `relationships_score`
 > are specified ahead of the code (per this crate's spec-first
-> discipline — see `AGENTS/spec-driven-development.md`): §23 carries
+> discipline — see `agents/spec-driven-development.md`): §23 carries
 > the open task to add them. Until that task lands, `Case` has no
 > `tags` or `relationships` field, `MatchConfig` has no
 > `tags_weight`/`relationships_weight`, and `MatchBreakdown` has no

@@ -13,7 +13,7 @@ millions of users; stakeholders are correspondingly broad.
 | Compliance officers | GDPR export, consent records, soft delete, masking of party data | Service privacy layer |
 | Operations / DBA | PostgreSQL schema + migration discipline; availability and scaling | Service persistence + deployment |
 | Other Main X Index entities | Cross-references via `event_id`; `Party.id` into person / worker / organization; `Place.id` into place | Service models + REST API |
-| Developers / AI agents | Spec-driven workflow, per-subproject AGENTS docs, three-part PRs | This spec, [`AGENTS/`](../AGENTS/) |
+| Developers / AI agents | Spec-driven workflow, per-subproject AGENTS docs, three-part PRs | This spec, [`agents/`](../agents/) |
 
 ### 3.1 Privacy posture
 

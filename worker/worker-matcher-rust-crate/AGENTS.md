@@ -62,20 +62,20 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 
 ## Detailed Guides
 
-The `AGENTS/` directory contains topic-specific guidance. Read the one that matches your task before editing:
+The `agents/` directory contains topic-specific guidance. Read the one that matches your task before editing:
 
-- [AGENTS/architecture.md](./AGENTS/architecture.md) — Module layout, layering rules, dependency graph.
-- [AGENTS/coding-style.md](./AGENTS/coding-style.md) — Rust style, naming, doc comments, error handling.
-- [AGENTS/testing.md](./AGENTS/testing.md) — Test pyramid, naming, fixtures, coverage expectations.
-- [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md) — Deterministic and probabilistic scoring, weights, phonetics; carries the verbatim spec §12 detail.
-- [AGENTS/normalization.md](./AGENTS/normalization.md) — Name, postcode, phone, identifier, and phonetic normalisation rules; carries the verbatim spec §14 detail.
-- [AGENTS/security-and-privacy.md](./AGENTS/security-and-privacy.md) — PII, data protection, clinical-safety guardrails.
-- [AGENTS/release.md](./AGENTS/release.md) — Versioning, CHANGELOG, publishing checklist.
-- [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md) — How `spec.md` is maintained as the single source of truth.
-- [AGENTS/national-person-identifiers.md](./AGENTS/national-person-identifiers.md) — Reference table of the supported national identifier schemes (jurisdiction, endonym, ISO 3166-1 code, format). 42 schemes total.
-- [AGENTS/delivered-tasks.md](./AGENTS/delivered-tasks.md) — Archive of delivered §23.1 + T-1..T-16 tasks (originally inline in `spec.md §23`).
-- [AGENTS/delivered-tasks-2.md](./AGENTS/delivered-tasks-2.md) — Archive of delivered T-17..T-32 plus project-level acceptance criteria.
-- [AGENTS/roadmap-research.md](./AGENTS/roadmap-research.md) — Archive of research-spike outcomes (T-17, T-9, T-19, T-14) originally inline in `spec.md §21.4`.
+- [agents/architecture.md](./agents/architecture.md) — Module layout, layering rules, dependency graph.
+- [agents/coding-style.md](./agents/coding-style.md) — Rust style, naming, doc comments, error handling.
+- [agents/testing.md](./agents/testing.md) — Test pyramid, naming, fixtures, coverage expectations.
+- [agents/matching-algorithm.md](./agents/matching-algorithm.md) — Deterministic and probabilistic scoring, weights, phonetics; carries the verbatim spec §12 detail.
+- [agents/normalization.md](./agents/normalization.md) — Name, postcode, phone, identifier, and phonetic normalisation rules; carries the verbatim spec §14 detail.
+- [agents/security-and-privacy.md](./agents/security-and-privacy.md) — PII, data protection, clinical-safety guardrails.
+- [agents/release.md](./agents/release.md) — Versioning, CHANGELOG, publishing checklist.
+- [agents/spec-driven-development.md](./agents/spec-driven-development.md) — How `spec.md` is maintained as the single source of truth.
+- [agents/national-person-identifiers.md](./agents/national-person-identifiers.md) — Reference table of the supported national identifier schemes (jurisdiction, endonym, ISO 3166-1 code, format). 42 schemes total.
+- [agents/delivered-tasks.md](./agents/delivered-tasks.md) — Archive of delivered §23.1 + T-1..T-16 tasks (originally inline in `spec.md §23`).
+- [agents/delivered-tasks-2.md](./agents/delivered-tasks-2.md) — Archive of delivered T-17..T-32 plus project-level acceptance criteria.
+- [agents/roadmap-research.md](./agents/roadmap-research.md) — Archive of research-spike outcomes (T-17, T-9, T-19, T-14) originally inline in `spec.md §21.4`.
 
 ---
 
@@ -107,7 +107,7 @@ The `AGENTS/` directory contains topic-specific guidance. Read the one that matc
 ```
 /
 ├── AGENTS.md                 ← this file
-├── AGENTS/                   ← topic-specific agent guides
+├── agents/                   ← topic-specific agent guides
 ├── CHANGELOG.md
 ├── CITATION.cff
 ├── CODE_OF_CONDUCT.md

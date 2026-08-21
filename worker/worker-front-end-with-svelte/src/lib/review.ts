@@ -57,7 +57,7 @@ export function canDecide(item: Pick<ReviewQueueItem, "status">): boolean {
  * catalog key naming it, and its weight in the overall score.
  *
  * Weights are the worker in-service matcher's, per
- * `worker/AGENTS/matching.md` "Layer 1" (`worker-service-with-loco`'s own
+ * `worker/agents/matching.md` "Layer 1" (`worker-service-with-loco`'s own
  * `ProbabilisticMatcher`) — not the broader `worker-matcher` reference
  * crate's ~50-component breakdown, which is a different, unrelated struct.
  * They sum to 1.00, identical in name and weight to the person service's.

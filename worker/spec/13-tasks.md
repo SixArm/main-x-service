@@ -12,7 +12,7 @@ confirms the acceptance criterion.
   2026-06-13.)*
   - [x] Service [spec §6.8 / §9](../worker-service-with-loco/spec/09-api-surface.md)
     say `/fhir/Practitioner`; service
-    [`AGENTS/restful.md`](../worker-service-with-loco/AGENTS/restful.md)
+    [`agents/restful.md`](../worker-service-with-loco/agents/restful.md)
     documents `/fhir/Worker/{id}`. Determine which the code serves,
     fix the loser. *(Done 2026-06-13: the code's handlers and wire
     `resourceType` are `Worker` / `/fhir/Worker` — the spec was the
@@ -30,9 +30,9 @@ confirms the acceptance criterion.
   - [x] [matcher `spec/index.md`](../worker-matcher-rust-crate/spec/index.md)
     banner says `Version: 0.3.0`; `Cargo.toml` says `0.6.1`. *(Banner
     now 0.6.1; the stale "(0.6.0)" dependency-list label in
-    `AGENTS/release.md` was also refreshed.)*
+    `agents/release.md` was also refreshed.)*
   - **Acceptance:** banner matches `Cargo.toml` ✓; release checklist in
-    [matcher `AGENTS/release.md`](../worker-matcher-rust-crate/AGENTS/release.md)
+    [matcher `agents/release.md`](../worker-matcher-rust-crate/agents/release.md)
     gains a banner-bump step ✓.
 - [ ] **T-3 — Full-trio end-to-end test (seam 2, §11.3).**
   - [ ] Compose recipe that starts PostgreSQL + service, then runs a

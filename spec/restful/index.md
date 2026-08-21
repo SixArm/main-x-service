@@ -14,7 +14,7 @@ event, course) where they diverge.
 See also the brief shared note
 [`../../agents/share/restful.md`](../../agents/share/restful.md) and the
 per-entity API references such as
-[`../../person/person-service-with-loco/AGENTS/restful.md`](../../person/person-service-with-loco/AGENTS/restful.md)
+[`../../person/person-service-with-loco/agents/restful.md`](../../person/person-service-with-loco/agents/restful.md)
 and
 [`../../organization/organization-service-with-loco/AGENTS.md`](../../organization/organization-service-with-loco/AGENTS.md).
 
@@ -326,6 +326,6 @@ handler in `src/api/rest/handlers.rs`.
 - [`../search/index.md`](../search/index.md) — search params + pagination (planned sibling topic)
 - [`../index.md`](../index.md) — monorepo spec index
 - Per-entity API references, e.g.
-  [`../../person/person-service-with-loco/AGENTS/restful.md`](../../person/person-service-with-loco/AGENTS/restful.md)
+  [`../../person/person-service-with-loco/agents/restful.md`](../../person/person-service-with-loco/agents/restful.md)
   and
   [`../../organization/organization-service-with-loco/AGENTS.md`](../../organization/organization-service-with-loco/AGENTS.md)

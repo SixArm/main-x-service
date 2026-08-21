@@ -6,7 +6,7 @@
 >
 > **Three-part PRs.** A behavioural change is one PR: spec edit +
 > code edit + test edit. See
-> [`AGENTS/spec-driven-development.md`](../AGENTS/spec-driven-development.md).
+> [`agents/spec-driven-development.md`](../agents/spec-driven-development.md).
 
 ## Table of contents
 

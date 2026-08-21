@@ -28,7 +28,7 @@
 //! | [`matcher`]      | Orchestration: [`MatchingEngine`], [`MatchConfig`], [`MatchResult`]. |
 //! | [`error`]        | Error enum [`MatchingError`] and [`Result`] alias. |
 //!
-//! See [`AGENTS/architecture.md`](https://github.com/sixarm/person-matcher-rust-crate/blob/main/AGENTS/architecture.md)
+//! See [`agents/architecture.md`](https://github.com/sixarm/person-matcher-rust-crate/blob/main/agents/architecture.md)
 //! for the layering rules.
 //!
 //! ## Quick start — probabilistic match
@@ -130,8 +130,8 @@
 //! ## Further reading
 //!
 //! - [`spec/index.md`](https://github.com/sixarm/person-matcher-rust-crate/blob/main/spec/index.md) — the living specification.
-//! - [`AGENTS/matching-algorithm.md`](https://github.com/sixarm/person-matcher-rust-crate/blob/main/AGENTS/matching-algorithm.md) — practitioner's view of the algorithm.
-//! - [`AGENTS/normalization.md`](https://github.com/sixarm/person-matcher-rust-crate/blob/main/AGENTS/normalization.md) — text normalisation rules.
+//! - [`agents/matching-algorithm.md`](https://github.com/sixarm/person-matcher-rust-crate/blob/main/agents/matching-algorithm.md) — practitioner's view of the algorithm.
+//! - [`agents/normalization.md`](https://github.com/sixarm/person-matcher-rust-crate/blob/main/agents/normalization.md) — text normalisation rules.
 
 // Always start with high quality coding conventions.
 #![forbid(unsafe_code)]

@@ -13,7 +13,7 @@
 > silently rewrite either spec.
 >
 > **Three-part PRs.** A behavioural change is one PR: spec edit + code
-> edit + test edit. See [`AGENTS/spec-driven-development.md`](../AGENTS/spec-driven-development.md).
+> edit + test edit. See [`agents/spec-driven-development.md`](../agents/spec-driven-development.md).
 
 Subproject specs:
 
@@ -25,7 +25,7 @@ For shared infrastructure (technology stack, observability,
 compliance), see the project-root [`AGENTS.md`](../../AGENTS.md) and
 [`agents/share/*`](../../agents/share/). For entity-level agent
 reference (subproject map, models, matching, REST, testing), see
-[`AGENTS/`](../AGENTS/).
+[`agents/`](../agents/).
 
 ## Table of contents
 

@@ -18,7 +18,7 @@
   preserving, so the bonus only fires when both names share a first
   letter (`Smyth` ↔ `Smith` fires; `Catherine` ↔ `Katheryn` does
   not). Encoder details: [`src/phonetic.rs`](../src/phonetic.rs) and
-  [`AGENTS/matching-algorithm.md`](../AGENTS/matching-algorithm.md).
+  [`agents/matching-algorithm.md`](../agents/matching-algorithm.md).
 - Final score is in `[0.0, 1.0]`. Never `None` (every Course has a
   `name`).
 

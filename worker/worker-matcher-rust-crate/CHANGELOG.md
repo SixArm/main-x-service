@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ### Added — cargo-fuzz harness (SEC-I2)
 
 - A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate with
@@ -57,8 +69,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bumped to 0.6.0. The crate's date handling is fully on `chrono`
   (`chrono::NaiveDate`); every doc reference (`spec.md`, `index.md`,
-  `IMPLEMENTATION_SUMMARY.md`, `AGENTS/release.md`,
-  `AGENTS/roadmap-research.md`) now points to `chrono`. Date fields
+  `IMPLEMENTATION_SUMMARY.md`, `agents/release.md`,
+  `agents/roadmap-research.md`) now points to `chrono`. Date fields
   serialise as ISO-8601 via `chrono`'s `serde` feature, matching the
   prior wire format.
 
@@ -78,7 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   breakage deliberate. Precedent: worker-matcher 0.3.0 renamed
   `se_personnummer` → `se_workernummer`, silently breaking
   `person-service`; the contract test would have caught that.
-- Documented in `AGENTS/testing.md` and `index.md` (Common Tasks
+- Documented in `agents/testing.md` and `index.md` (Common Tasks
   table) and cross-referenced from `spec.md` (§18.5 for person /
   worker — full §1–§25 shape; §9 callout for place / thing / event —
   shorter §1–§13 shape).
@@ -135,7 +147,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (documentation harmonisation, T-12)
 - Every top-level doc (`README.md`, `AGENTS.md`, `spec.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `IMPLEMENTATION_SUMMARY.md`) now carries a banner pointing readers at `index.md` as the entry point. Previously several of those files had no intra-repo navigation.
-- `AGENTS/national-worker-identifiers.md` (35-scheme reference table) was orphaned — no doc linked to it. Now linked from both `AGENTS.md` and `index.md`.
+- `agents/national-worker-identifiers.md` (35-scheme reference table) was orphaned — no doc linked to it. Now linked from both `AGENTS.md` and `index.md`.
 - `IMPLEMENTATION_SUMMARY.md` carries an explicit "superseded by `spec.md`" banner so readers don't mistake the historical snapshot for current behaviour.
 - All 17 intra-repo doc paths verified to resolve.
 
@@ -205,7 +217,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Worker`, `WorkerBuilder`, `MatchConfig`, and `MatchBreakdown` each gain one new field. Code constructing `MatchConfig { … }` via struct-literal syntax MUST add `blood_type_weight` (or use `..MatchConfig::default()`). `Worker::blood_type` carries `#[serde(default)]` so legacy JSON payloads deserialise with `None`.
 
 ### Added (five further personal IDs + nine passport-format validators)
-- Driven by `AGENTS/national-worker-identifiers.tsv` (spec FR-72..77, task T-28). Total personal-identifier schemes supported: **35**.
+- Driven by `agents/national-worker-identifiers.tsv` (spec FR-72..77, task T-28). Total personal-identifier schemes supported: **35**.
   - **Greece DSS** (`gr_dss`) — 10-digit Hellenic Central Securities Depository investor share code, format-only.
   - **Liechtenstein National ID** (`li_id`) — 2 letters + 8–9 digits (spec text and example differ; parser accepts both), format-only with renewal caveat.
   - **Netherlands National ID** (`nl_id`) — 9-character `[A-Z\O]{2}[A-Z0-9\O]{6}[0-9]` (the `O` letter is banned to avoid confusion with the digit `0`), distinct from the BSN.

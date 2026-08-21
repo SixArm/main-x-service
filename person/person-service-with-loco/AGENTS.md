@@ -2,19 +2,19 @@
 
 How to work in this crate. The canonical artefact is
 [`spec.md`](spec/index.md). When in doubt, the spec wins. See
-[`AGENTS/spec-driven-development.md`](AGENTS/spec-driven-development.md)
+[`agents/spec-driven-development.md`](agents/spec-driven-development.md)
 for the discipline this crate practises.
 
-## Crate-local docs (`AGENTS/`)
+## Crate-local docs (`agents/`)
 
 | Document | Description |
 |----------|-------------|
-| [AGENTS/index.md](AGENTS/index.md) | Directory index |
-| [AGENTS/spec-driven-development.md](AGENTS/spec-driven-development.md) | SDD discipline — three-part PRs, section mapping, anti-patterns |
-| [AGENTS/models.md](AGENTS/models.md) | Domain model reference (`Person`, `HumanName`, supporting types) |
-| [AGENTS/matching.md](AGENTS/matching.md) | Matching algorithm reference (weights, rules, components) |
-| [AGENTS/restful.md](AGENTS/restful.md) | REST API + FHIR R5 + library API reference |
-| [AGENTS/testing.md](AGENTS/testing.md) | Testing strategy and guide |
+| [agents/index.md](agents/index.md) | Directory index |
+| [agents/spec-driven-development.md](agents/spec-driven-development.md) | SDD discipline — three-part PRs, section mapping, anti-patterns |
+| [agents/models.md](agents/models.md) | Domain model reference (`Person`, `HumanName`, supporting types) |
+| [agents/matching.md](agents/matching.md) | Matching algorithm reference (weights, rules, components) |
+| [agents/restful.md](agents/restful.md) | REST API + FHIR R5 + library API reference |
+| [agents/testing.md](agents/testing.md) | Testing strategy and guide |
 
 ## Shared docs (project root)
 
@@ -52,10 +52,10 @@ loads at start, beyond the tables above (which are plain links, for a
 human or agent to open on demand rather than always pull into context):
 
 @../../agents/share/overview.md
-@AGENTS/matching.md
-@AGENTS/models.md
-@AGENTS/restful.md
-@AGENTS/testing.md
+@agents/matching.md
+@agents/models.md
+@agents/restful.md
+@agents/testing.md
 @../../agents/share/architecture.md
 @../../agents/share/auditability.md
 @../../agents/share/availability.md
@@ -147,6 +147,6 @@ build artifacts). The wired multi-service `examples/compose/` stacks
 |------|------|
 | `spec.md` | **Single source of truth** — what, how, status, tasks (§13) |
 | `README.md` / `CLAUDE.md` | User-facing intro — must stay consistent with the spec |
-| `AGENTS.md` / `AGENTS/*.md` | How to work in the repo + per-topic reference |
+| `AGENTS.md` / `agents/*.md` | How to work in the repo + per-topic reference |
 | `index.md` | Navigation aid with worked examples |
 | `CHANGELOG.md` | Historical record of releases and changes |

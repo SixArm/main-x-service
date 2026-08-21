@@ -19,9 +19,9 @@
 
 ### Entity-level reference set
 
-- [`AGENTS/index.md`](../AGENTS/index.md) — directory of the
+- [`agents/index.md`](../agents/index.md) — directory of the
   entity-level reference docs.
-- [`AGENTS/verification.md`](../AGENTS/verification.md) — how peers
+- [`agents/verification.md`](../agents/verification.md) — how peers
   verify tokens (this entity's counterpart to siblings'
   `matching.md`).
 

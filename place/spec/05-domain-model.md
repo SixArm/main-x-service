@@ -8,7 +8,7 @@ and front-end representations are projections of it.
 
 Defined in the service crate (`src/models/place.rs`); field-by-field
 reference in
-[`place-service-with-loco/AGENTS/models.md`](../place-service-with-loco/AGENTS/models.md).
+[`place-service-with-loco/agents/models.md`](../place-service-with-loco/agents/models.md).
 Material aspects (service [spec §5](../place-service-with-loco/spec/05-domain-model.md)):
 
 - **Identity** — UUID `id` + `identifiers: Vec<PlaceIdentifier>`

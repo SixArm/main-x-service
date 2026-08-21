@@ -29,3 +29,10 @@ path = "fuzz_targets/parse_line.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "bulk_decoders"
+path = "fuzz_targets/bulk_decoders.rs"
+test = false
+doc = false
+bench = false

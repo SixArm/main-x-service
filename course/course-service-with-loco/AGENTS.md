@@ -2,19 +2,19 @@
 
 How to work in this crate. The canonical artefact is
 [`spec.md`](spec/index.md). When in doubt, the spec wins. See
-[`AGENTS/spec-driven-development.md`](AGENTS/spec-driven-development.md)
+[`agents/spec-driven-development.md`](agents/spec-driven-development.md)
 for the discipline this crate practises.
 
-## Crate-local docs (`AGENTS/`)
+## Crate-local docs (`agents/`)
 
 | Document | Description |
 |---|---|
-| [AGENTS/index.md](AGENTS/index.md) | Directory index |
-| [AGENTS/spec-driven-development.md](AGENTS/spec-driven-development.md) | SDD discipline — three-part PRs, section mapping, anti-patterns |
-| [AGENTS/models.md](AGENTS/models.md) | Domain model reference (`Course`, `CourseInstance`, schema.org property mapping) |
-| [AGENTS/matching.md](AGENTS/matching.md) | Matching algorithm reference (weights, rules, components) |
-| [AGENTS/restful.md](AGENTS/restful.md) | REST API + library API reference |
-| [AGENTS/testing.md](AGENTS/testing.md) | Testing strategy and guide |
+| [agents/index.md](agents/index.md) | Directory index |
+| [agents/spec-driven-development.md](agents/spec-driven-development.md) | SDD discipline — three-part PRs, section mapping, anti-patterns |
+| [agents/models.md](agents/models.md) | Domain model reference (`Course`, `CourseInstance`, schema.org property mapping) |
+| [agents/matching.md](agents/matching.md) | Matching algorithm reference (weights, rules, components) |
+| [agents/restful.md](agents/restful.md) | REST API + library API reference |
+| [agents/testing.md](agents/testing.md) | Testing strategy and guide |
 
 ## Shared docs (project root)
 

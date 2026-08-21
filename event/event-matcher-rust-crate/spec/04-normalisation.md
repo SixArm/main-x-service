@@ -2,7 +2,7 @@
 
 All normalisers in `Normalizer` are stateless associated functions and **idempotent**: `f(f(x)) == f(x)`. They are also **deterministic** (no clocks, no RNGs) and allocate at most a single new `String`.
 
-> Per-rule example tables are maintained in [`AGENTS/normalization.md`](../AGENTS/normalization.md); this section pins the algorithms.
+> Per-rule example tables are maintained in [`agents/normalization.md`](../agents/normalization.md); this section pins the algorithms.
 
 ### 4.1 Names — `Normalizer::normalize_name`
 
@@ -51,7 +51,7 @@ fn normalize_email(email: &str, gmail_dot_folding: bool) -> Option<String>;
 3. Reject inputs without exactly one `@`, or with an empty localpart or domain (return `None`).
 4. If `gmail_dot_folding` is `true` AND the domain is `gmail.com` or `googlemail.com`, strip every `.` from the localpart and drop any `+tag` suffix.
 
-Examples: `"  Alice@Example.ORG  "` → `Some("alice@example.org")`; `"j.smith+work@gmail.com"` with folding → `Some("jsmith@gmail.com")`; non-Gmail domains never fold; `"no-at-sign"` and `"a@b@c"` return `None`. See [`AGENTS/normalization.md`](../AGENTS/normalization.md) for the full table.
+Examples: `"  Alice@Example.ORG  "` → `Some("alice@example.org")`; `"j.smith+work@gmail.com"` with folding → `Some("jsmith@gmail.com")`; non-Gmail domains never fold; `"no-at-sign"` and `"a@b@c"` return `None`. See [`agents/normalization.md`](../agents/normalization.md) for the full table.
 
 ### 4.5 Address-line parsing — `ParsedAddressLine`, `Normalizer::parse_address_line`
 

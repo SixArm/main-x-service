@@ -1,6 +1,6 @@
 ## 24. Testing strategy
 
-See [`AGENTS/testing.md`](../AGENTS/testing.md). Summary:
+See [`agents/testing.md`](../agents/testing.md). Summary:
 
 - Unit tests in `#[cfg(test)] mod tests` blocks.
 - Tests pin the deliberately-unscored fields: `learning_resource_type`

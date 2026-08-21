@@ -14,7 +14,7 @@ reviewer can read in isolation.
   Resolved the outstanding compilation errors (missing `.await` on
   async repository / handler calls, type-reference and import fixes),
   then expanded unit / integration / benchmark coverage and filled out
-  the `AGENTS/` reference docs. Outcome is reflected in the current §11
+  the `agents/` reference docs. Outcome is reflected in the current §11
   (testing) and §14 (status); folded here from a former
   `docs/superpowers/plans/` implementation plan, now removed.
 

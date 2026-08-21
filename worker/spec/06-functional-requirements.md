@@ -7,7 +7,7 @@ Detail lives in the owner's spec — link down, don't duplicate.
 |---|---|---|---|
 | FR-1 | Create / read / update / soft-delete worker records, with audit trail on every mutation | service | [service §6.1](../worker-service-with-loco/spec/06-functional-requirements.md) |
 | FR-2 | Multiple professional identifiers per worker (type + system + value; NPI, DEA, employee #, ODS, national IDs) | service | service §6.1 |
-| FR-3 | Credential / identity documents with expiry tracking (passport, licence, permits, …) | service | service §6.1, [`AGENTS/models.md`](../worker-service-with-loco/AGENTS/models.md) |
+| FR-3 | Credential / identity documents with expiry tracking (passport, licence, permits, …) | service | service §6.1, [`agents/models.md`](../worker-service-with-loco/agents/models.md) |
 | FR-4 | Multiple addresses, telecom contacts, and emergency contacts per worker | service | service §6.1 |
 | FR-5 | Probabilistic matching — weighted fuzzy scoring with per-component breakdown | service (in-service) + matcher (canonical) | [service §6.2](../worker-service-with-loco/spec/06-functional-requirements.md), [matcher §12](../worker-matcher-rust-crate/spec/12-algorithm-specifications.md) |
 | FR-6 | Deterministic matching — rule-based with short-circuits (tax-ID, identifier, document exact match) | service + matcher | service §6.2, matcher §12 |

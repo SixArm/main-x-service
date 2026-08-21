@@ -36,6 +36,13 @@ steps:
       - rustup component add rustfmt
       - scripts/ci-check.sh fmt
 
+  # Repo-wide convention checks (no build): the agents directory is
+  # lowercase. Reads the git index, not the filesystem.
+  - name: docs
+    image: *rust_image
+    commands:
+      - scripts/ci-check.sh docs
+
   - name: clippy
     image: *rust_image
     commands:
@@ -46,6 +53,26 @@ steps:
     image: *rust_image
     commands:
       - scripts/ci-check.sh test
+
+  # Criterion harnesses, compile-only. Numbers measured on shared CI
+  # hardware would not be worth trusting; a bench that no longer builds
+  # is worth catching here.
+  - name: bench
+    image: *rust_image
+    commands:
+      - scripts/ci-check.sh bench
+
+  # Minimum Supported Rust Version — current stable minus three
+  # (spec/rust-msrv-n-minus-3.md). The stage asserts every crate's
+  # `rust-version` equals ci/msrv.txt, then compiles it against that
+  # toolchain; the version is read from the file rather than written here
+  # so a bump touches one place.
+  - name: msrv
+    image: *rust_image
+    commands:
+      - msrv=$(grep -v '^[[:space:]]*#' ci/msrv.txt | grep -v '^[[:space:]]*$' | head -1 | tr -d '[:space:]')
+      - rustup toolchain install "$msrv" --profile minimal
+      - scripts/ci-check.sh msrv
 
   # The `#[ignore]`-gated suites, against a real database. These are where
   # the compliance controls are actually proven; see ci/db-suites.txt for

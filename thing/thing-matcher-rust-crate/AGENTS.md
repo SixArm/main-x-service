@@ -14,7 +14,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 |---|---|
 | What does the crate do? | Pairwise matching of `schema.org/Thing` records (books, articles, products, landmarks, software, …), deterministic and probabilistic, for de-duplication and record linkage. |
 | Where is the canonical spec? | [`spec.md`](./spec/index.md). |
-| Where does new behaviour get specified? | In `spec.md` first, then code. See [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md). |
+| Where does new behaviour get specified? | In `spec.md` first, then code. See [agents/spec-driven-development.md](./agents/spec-driven-development.md). |
 | Build command | `cargo build` |
 | Test command | `cargo test` (unit + integration + property + doctest) |
 | Lint command | `cargo clippy --all-targets -- -D warnings` |
@@ -31,13 +31,13 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 
 ## Golden rules
 
-1. **Spec-first.** If you change observable behaviour, update [`spec.md`](./spec/index.md) in the same change. If the spec is silent, propose a spec update before writing code. (`spec.md` §9.3, [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md))
+1. **Spec-first.** If you change observable behaviour, update [`spec.md`](./spec/index.md) in the same change. If the spec is silent, propose a spec update before writing code. (`spec.md` §9.3, [agents/spec-driven-development.md](./agents/spec-driven-development.md))
 2. **Pure library.** No IO, no logging, no global state inside `src/` (excluding `src/main.rs`, which is a demo binary). (`spec.md` §8)
 3. **No `unsafe`.** Enforced by `#![forbid(unsafe_code)]` in `lib.rs`. Do not remove the attribute.
 4. **Deterministic.** No clocks, no RNGs, no environment variables. Same inputs => same outputs, byte-for-byte. (`spec.md` §8)
 5. **Explainability over cleverness.** Every probabilistic match returns a per-field `MatchBreakdown`. Don't add black boxes. (`spec.md` §3.7)
 6. **Diacritic-stable.** Name normalisation strips Latin diacritics (`é`, `ü`, `ó`, …) before similarity and Soundex scoring; this stripping is intentional and stable — don't change it casually. (`spec.md` §4)
-7. **No real personal data in tests.** A `Thing` record can carry associated personal data via `owner` (a person's name) or `local_id` (a CRM key); use synthetic examples only. Reuse existing illustrative fixtures (`example.org` / `example.com` URLs per RFC 2606; well-known cultural items — Eiffel Tower, Pride and Prejudice, Big Ben — for names). See [AGENTS/security-and-privacy.md](./AGENTS/security-and-privacy.md).
+7. **No real personal data in tests.** A `Thing` record can carry associated personal data via `owner` (a person's name) or `local_id` (a CRM key); use synthetic examples only. Reuse existing illustrative fixtures (`example.org` / `example.com` URLs per RFC 2606; well-known cultural items — Eiffel Tower, Pride and Prejudice, Big Ben — for names). See [agents/security-and-privacy.md](./agents/security-and-privacy.md).
 8. **No `println!` in `src/` except `src/main.rs`.**
 9. **Run the full test suite before declaring success.** `cargo test` must pass; `cargo clippy --all-targets -- -D warnings` must be clean; `cargo doc --no-deps` must build without warnings.
 
@@ -49,7 +49,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 2. **Decide** whether your change is editorial (docs / formatting only) or behavioural (touches what the library does).
 3. **For behavioural changes:**
    - Update `spec.md` first (or alongside) with the new wording.
-   - Update or add tests that pin the new behaviour. See [AGENTS/testing.md](./AGENTS/testing.md).
+   - Update or add tests that pin the new behaviour. See [agents/testing.md](./agents/testing.md).
    - Implement the change.
    - Update `CHANGELOG.md` under an "Unreleased" header.
 4. **For editorial changes:** small batched edits are fine; no spec update required.
@@ -65,16 +65,16 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 
 ## Detailed guides
 
-The `AGENTS/` directory contains topic-specific guidance. Read the one that matches your task before editing:
+The `agents/` directory contains topic-specific guidance. Read the one that matches your task before editing:
 
-- [AGENTS/architecture.md](./AGENTS/architecture.md) — module layout, layering rules, dependency graph. (`spec.md` §3, §8)
-- [AGENTS/coding-style.md](./AGENTS/coding-style.md) — Rust style, naming, doc comments, error handling. (`spec.md` §8, §9)
-- [AGENTS/testing.md](./AGENTS/testing.md) — test pyramid, fixtures, property tests, doctest hygiene.
-- [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md) — deterministic and probabilistic scoring, weights, phonetics, coordinates. (`spec.md` §5, §6, §7)
-- [AGENTS/normalization.md](./AGENTS/normalization.md) — name, postcode, phone, email, address, phonetic rules. (`spec.md` §4)
-- [AGENTS/security-and-privacy.md](./AGENTS/security-and-privacy.md) — personal-data handling, no-IO posture, threat model. (`spec.md` §8)
-- [AGENTS/release.md](./AGENTS/release.md) — versioning, CHANGELOG, publishing checklist. (`spec.md` §9)
-- [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md) — how `spec.md` is maintained as the single source of truth.
+- [agents/architecture.md](./agents/architecture.md) — module layout, layering rules, dependency graph. (`spec.md` §3, §8)
+- [agents/coding-style.md](./agents/coding-style.md) — Rust style, naming, doc comments, error handling. (`spec.md` §8, §9)
+- [agents/testing.md](./agents/testing.md) — test pyramid, fixtures, property tests, doctest hygiene.
+- [agents/matching-algorithm.md](./agents/matching-algorithm.md) — deterministic and probabilistic scoring, weights, phonetics, coordinates. (`spec.md` §5, §6, §7)
+- [agents/normalization.md](./agents/normalization.md) — name, postcode, phone, email, address, phonetic rules. (`spec.md` §4)
+- [agents/security-and-privacy.md](./agents/security-and-privacy.md) — personal-data handling, no-IO posture, threat model. (`spec.md` §8)
+- [agents/release.md](./agents/release.md) — versioning, CHANGELOG, publishing checklist. (`spec.md` §9)
+- [agents/spec-driven-development.md](./agents/spec-driven-development.md) — how `spec.md` is maintained as the single source of truth.
 
 ---
 
@@ -94,7 +94,7 @@ The `AGENTS/` directory contains topic-specific guidance. Read the one that matc
 
 ## When you are unsure
 
-- The spec wins. If the spec disagrees with the code, propose a fix in `spec.md` rather than silently realigning. Then bring the code in line in the same PR. See `spec.md` §9.3 and [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md).
+- The spec wins. If the spec disagrees with the code, propose a fix in `spec.md` rather than silently realigning. Then bring the code in line in the same PR. See `spec.md` §9.3 and [agents/spec-driven-development.md](./agents/spec-driven-development.md).
 - If the spec is silent, propose an update in `spec.md` and ask for human sign-off via a PR rather than guessing.
 - Prefer adding to `spec.md` §10 Open Questions over making a unilateral design decision.
 
@@ -105,7 +105,7 @@ The `AGENTS/` directory contains topic-specific guidance. Read the one that matc
 ```text
 /
 ├── AGENTS.md                 ← this file
-├── AGENTS/                   ← topic-specific agent guides
+├── agents/                   ← topic-specific agent guides
 ├── CHANGELOG.md              ← version history
 ├── CITATION.cff              ← citation metadata
 ├── CODE_OF_CONDUCT.md

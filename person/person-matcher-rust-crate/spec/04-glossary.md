@@ -10,7 +10,7 @@
 - **NFKD** — Unicode Normalization Form, Compatibility Decomposition.
 - **Confidence** — qualitative score bucket: `High` / `Medium` / `Low`.
 
-Per-scheme identifier definitions are in [AGENTS/national-person-identifiers.md](../AGENTS/national-person-identifiers.md).
+Per-scheme identifier definitions are in [agents/national-person-identifiers.md](../agents/national-person-identifiers.md).
 
 ---
 

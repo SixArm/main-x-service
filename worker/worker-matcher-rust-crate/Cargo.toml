@@ -2,6 +2,7 @@
 name = "worker-matcher"
 version = "0.6.1"
 edition = "2024"
+rust-version = "1.95"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "Worker matcher for healthcare information exchange: deterministic and probabilistic matching with multinational national identifiers (UK NHS / FR NIR / ES TSI / IE IHI / UK NI H&C / US SSN), E.164 phone normalisation, address parsing, nickname dictionary, email scoring, and explainable per-field breakdowns."
 license = "MIT OR Apache-2.0 OR GPL-2.0 OR GPL-3.0 OR BSD-3-Clause"

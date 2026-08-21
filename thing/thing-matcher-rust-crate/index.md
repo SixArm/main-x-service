@@ -37,14 +37,14 @@ batch jobs, or notebooks.
 |---|---|
 | [`spec/index.md`](./spec/index.md) | **Single source of truth.** Numbered §1–§13 specification; code conforms to it. |
 | [`AGENTS.md`](./AGENTS.md) | Working guide for AI coding agents and contributors. |
-| [`AGENTS/architecture.md`](./AGENTS/architecture.md) | Module layout, layering, dependency graph. |
-| [`AGENTS/matching-algorithm.md`](./AGENTS/matching-algorithm.md) | Deterministic + probabilistic scoring, weights, phonetics. |
-| [`AGENTS/normalization.md`](./AGENTS/normalization.md) | Name / text / URL normalisation rules. |
-| [`AGENTS/testing.md`](./AGENTS/testing.md) | Test pyramid, fixtures, property tests, the adapter contract. |
-| [`AGENTS/coding-style.md`](./AGENTS/coding-style.md) | Rust style, naming, doc comments, error handling. |
-| [`AGENTS/security-and-privacy.md`](./AGENTS/security-and-privacy.md) | Personal-data handling, no-IO posture, threat model. |
-| [`AGENTS/release.md`](./AGENTS/release.md) | Versioning, CHANGELOG, publishing checklist. |
-| [`AGENTS/spec-driven-development.md`](./AGENTS/spec-driven-development.md) | How `spec.md` is maintained as the SSOT. |
+| [`agents/architecture.md`](./agents/architecture.md) | Module layout, layering, dependency graph. |
+| [`agents/matching-algorithm.md`](./agents/matching-algorithm.md) | Deterministic + probabilistic scoring, weights, phonetics. |
+| [`agents/normalization.md`](./agents/normalization.md) | Name / text / URL normalisation rules. |
+| [`agents/testing.md`](./agents/testing.md) | Test pyramid, fixtures, property tests, the adapter contract. |
+| [`agents/coding-style.md`](./agents/coding-style.md) | Rust style, naming, doc comments, error handling. |
+| [`agents/security-and-privacy.md`](./agents/security-and-privacy.md) | Personal-data handling, no-IO posture, threat model. |
+| [`agents/release.md`](./agents/release.md) | Versioning, CHANGELOG, publishing checklist. |
+| [`agents/spec-driven-development.md`](./agents/spec-driven-development.md) | How `spec.md` is maintained as the SSOT. |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Version history (Keep a Changelog). |
 
 ## Common tasks
@@ -56,8 +56,8 @@ batch jobs, or notebooks.
 | Screen one record against many | [Batch scoring](#batch-scoring); `match_one_to_many` / `rank_one_to_many` ([`spec.md` §5.3](./spec/05-matching-engine.md)) |
 | Tune thresholds / weights | [Configuration presets](#configuration-presets); `MatchConfig` ([`spec.md` §3.4](./spec/03-data-model.md)) |
 | Understand a score | The per-field [`MatchBreakdown`](#the-match-pipeline) ([`spec.md` §3.7](./spec/03-data-model.md)) |
-| Add new behaviour | [`AGENTS/spec-driven-development.md`](./AGENTS/spec-driven-development.md) — spec first, then code + tests |
-| Guard the public API | [`tests/adapter_contract.rs`](./tests/adapter_contract.rs); see [`AGENTS/testing.md`](./AGENTS/testing.md) |
+| Add new behaviour | [`agents/spec-driven-development.md`](./agents/spec-driven-development.md) — spec first, then code + tests |
+| Guard the public API | [`tests/adapter_contract.rs`](./tests/adapter_contract.rs); see [`agents/testing.md`](./agents/testing.md) |
 | Run the worked examples | [`tests/integration_tests.rs`](./tests/integration_tests.rs); [`spec.md` §11](./spec/11-worked-examples.md) |
 
 ## Installation

@@ -4,6 +4,7 @@
 name = "link-graph-service"
 version = "0.2.0"
 edition = "2024"
+rust-version = "1.95"
 publish = false
 default-run = "link-graph-service"
 

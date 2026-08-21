@@ -1,6 +1,6 @@
 ## 9. API Consumption
 
-The front-end binds 1:1 to the Place Service REST surface (see [`place-service-with-loco/AGENTS/restful.md`](../../place-service-with-loco/AGENTS/restful.md)). Since T-22 (BFF auth), the browser calls these paths through the same-origin `/api/proxy/[...path]` reverse proxy rather than the Place Service directly — the SvelteKit server exchanges the session for a short-lived PASETO and forwards with `Authorization: Bearer <paseto>` (see `AGENTS.md` "Authentication — the BFF pattern"). The table below still names the upstream Place Service path each route ultimately reaches.
+The front-end binds 1:1 to the Place Service REST surface (see [`place-service-with-loco/agents/restful.md`](../../place-service-with-loco/agents/restful.md)). Since T-22 (BFF auth), the browser calls these paths through the same-origin `/api/proxy/[...path]` reverse proxy rather than the Place Service directly — the SvelteKit server exchanges the session for a short-lived PASETO and forwards with `Authorization: Bearer <paseto>` (see `AGENTS.md` "Authentication — the BFF pattern"). The table below still names the upstream Place Service path each route ultimately reaches.
 
 | Endpoint | Used by |
 | --- | --- |

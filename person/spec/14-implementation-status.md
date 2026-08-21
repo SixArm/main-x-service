@@ -29,10 +29,10 @@ Detail: [service spec §14](../person-service-with-loco/spec/14-implementation-s
 | 42 national personal-identifier schemes + 9 passport-format validators | ✔ delivered |
 | Normalisation: NFKD diacritics, postcode, E.164 phone (39 jurisdictions), nicknames | ✔ delivered |
 | Purity guarantees: no IO, no `unsafe`, deterministic, `Send + Sync` | ✔ delivered |
-| Open items | §22 OQ-7 (phonetic-bonus weighting documentation); roadmap research in `AGENTS/roadmap-research.md` |
+| Open items | §22 OQ-7 (phonetic-bonus weighting documentation); roadmap research in `agents/roadmap-research.md` |
 
 Detail: [matcher spec §23](../person-matcher-rust-crate/spec/23-tasks-and-acceptance-criteria.md)
-and [AGENTS/delivered-tasks.md](../person-matcher-rust-crate/AGENTS/delivered-tasks.md).
+and [agents/delivered-tasks.md](../person-matcher-rust-crate/agents/delivered-tasks.md).
 
 ### 14.3 person-front-end-with-svelte
 

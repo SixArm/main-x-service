@@ -2,19 +2,19 @@
 
 How to work in this crate. The canonical artefact is
 [`spec.md`](spec/index.md). When in doubt, the spec wins. See
-[`AGENTS/spec-driven-development.md`](AGENTS/spec-driven-development.md)
+[`agents/spec-driven-development.md`](agents/spec-driven-development.md)
 for the discipline this crate practises.
 
-## Crate-local docs (`AGENTS/`)
+## Crate-local docs (`agents/`)
 
 | Document | Description |
 |----------|-------------|
-| [AGENTS/index.md](AGENTS/index.md) | Directory index |
-| [AGENTS/spec-driven-development.md](AGENTS/spec-driven-development.md) | SDD discipline — three-part PRs, section mapping, anti-patterns |
-| [AGENTS/models.md](AGENTS/models.md) | Domain model reference (Thing-specific) |
-| [AGENTS/matching.md](AGENTS/matching.md) | Matching algorithm reference (weights, components, rules) |
-| [AGENTS/restful.md](AGENTS/restful.md) | REST API + library API reference |
-| [AGENTS/testing.md](AGENTS/testing.md) | Testing strategy and guide |
+| [agents/index.md](agents/index.md) | Directory index |
+| [agents/spec-driven-development.md](agents/spec-driven-development.md) | SDD discipline — three-part PRs, section mapping, anti-patterns |
+| [agents/models.md](agents/models.md) | Domain model reference (Thing-specific) |
+| [agents/matching.md](agents/matching.md) | Matching algorithm reference (weights, components, rules) |
+| [agents/restful.md](agents/restful.md) | REST API + library API reference |
+| [agents/testing.md](agents/testing.md) | Testing strategy and guide |
 
 ## Shared docs (project root)
 
@@ -82,7 +82,7 @@ cargo bench
 | `spec.md` | **Single source of truth** — what, how, status, tasks (§13) |
 | `README.md` (symlink to `index.md`) | User-facing intro — quick start, config, must stay consistent with the spec |
 | `CLAUDE.md` | A one-line `@AGENTS.md` include, loaded by Claude Code at session start (root `AGENTS.md`'s per-subproject convention) — not a second user-facing intro |
-| `AGENTS.md` / `AGENTS/*.md` | How to work in the repo + per-topic reference |
+| `AGENTS.md` / `agents/*.md` | How to work in the repo + per-topic reference |
 | `index.md` | Navigation aid with worked examples |
 | `CHANGELOG.md` | Historical record of releases and changes |
 

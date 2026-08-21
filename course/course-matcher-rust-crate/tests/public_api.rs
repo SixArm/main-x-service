@@ -23,7 +23,7 @@ fn ident(scheme: IdentifierScheme, value: &str) -> CourseIdentifier {
 
 #[test]
 fn worked_example_r1_same_provider_course_code() {
-    // The worked example from AGENTS/matching-algorithm.md.
+    // The worked example from agents/matching-algorithm.md.
     let engine = MatchingEngine::new(MatchConfig::default());
 
     let mut a = Course::new("Introduction to Computer Science");

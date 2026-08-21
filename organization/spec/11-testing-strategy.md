@@ -2,7 +2,7 @@
 
 Entity-level rule: **the cross-subproject contract must be pinned by
 tests on both sides of each seam.** Per-subproject detail:
-[`AGENTS/testing.md`](../AGENTS/testing.md).
+[`agents/testing.md`](../agents/testing.md).
 
 ### 11.1 Current inventory
 

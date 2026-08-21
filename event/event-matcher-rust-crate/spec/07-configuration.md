@@ -70,6 +70,6 @@ Under strict mode, `is_match` additionally requires `deterministic_match`. `scor
 
 ### 7.4 Tuning guidance
 
-Tuning recipes (false positives → raise `match_threshold`; recurring weekly series collapsing into one event → tighten `start_date_scale_seconds`; multi-room venue confusion → tighten `coordinates_scale_metres`; tour-stop collisions (same name + performers, different cities) → raise `location_weight`; etc.) live in [`AGENTS/matching-algorithm.md`](../AGENTS/matching-algorithm.md). The defaults table above remains normative.
+Tuning recipes (false positives → raise `match_threshold`; recurring weekly series collapsing into one event → tighten `start_date_scale_seconds`; multi-room venue confusion → tighten `coordinates_scale_metres`; tour-stop collisions (same name + performers, different cities) → raise `location_weight`; etc.) live in [`agents/matching-algorithm.md`](../agents/matching-algorithm.md). The defaults table above remains normative.
 
 ---

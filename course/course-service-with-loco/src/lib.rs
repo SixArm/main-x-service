@@ -7,7 +7,7 @@
 //!
 //! For the canonical behaviour reference, see [`../spec.md`](../spec.md).
 //! For per-area detail (domain model, matching, REST surface, testing),
-//! see the `AGENTS/*` files under [`AGENTS/`](../AGENTS/).
+//! see the `agents/*` files under [`agents/`](../agents/).
 
 // Always start with high quality coding conventions.
 #![forbid(unsafe_code)]

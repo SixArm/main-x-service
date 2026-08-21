@@ -8,8 +8,8 @@ be pinned by tests on at least one side.
 
 | Subproject | Layers | Reference |
 |---|---|---|
-| person-service | ~100 unit tests (matching, search, validation, privacy, models) + 7 HTTP integration tests + **14 bridge tests** + 3 Criterion benchmark suites | [service spec §11](../person-service-with-loco/spec/11-testing-strategy.md), [AGENTS/testing.md](../person-service-with-loco/AGENTS/testing.md) |
-| person-matcher | Pure-library suite: `cargo test` green on a fresh checkout, doctests compile, clippy `-D warnings` clean; no PII in fixtures | [matcher spec §18](../person-matcher-rust-crate/spec/18-testing-strategy.md), [AGENTS/testing.md](../person-matcher-rust-crate/AGENTS/testing.md) |
+| person-service | ~100 unit tests (matching, search, validation, privacy, models) + 7 HTTP integration tests + **14 bridge tests** + 3 Criterion benchmark suites | [service spec §11](../person-service-with-loco/spec/11-testing-strategy.md), [agents/testing.md](../person-service-with-loco/agents/testing.md) |
+| person-matcher | Pure-library suite: `cargo test` green on a fresh checkout, doctests compile, clippy `-D warnings` clean; no PII in fixtures | [matcher spec §18](../person-matcher-rust-crate/spec/18-testing-strategy.md), [agents/testing.md](../person-matcher-rust-crate/agents/testing.md) |
 | person-front-end | 8 vitest unit tests (ApiClient + PersonRepository, mocked fetch) + 6 playwright e2e smoke (API-down resilience) + 9 playwright integration golden-paths against a live service | [front-end spec §11](../person-front-end-with-svelte/spec/11-testing-strategy.md) |
 
 ### 11.2 Seam 1 — service ↔ matcher (bridge tests)

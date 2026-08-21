@@ -50,7 +50,7 @@ in [§15 Roadmap](15-roadmap.md), not here.
 
 | Capability | Status |
 |---|---|
-| This spec (§1–§18) + `AGENTS/` reference set | ✅ Inaugural |
+| This spec (§1–§18) + `agents/` reference set | ✅ Inaugural |
 | Seam tests (bridge + typed client) | ✅ |
 | Cross-entity link integrity after monorepo nesting | ❌ ET-3 |
 | Multi-region, durable bus, SSO, load-tested scale | ❌ Roadmap (§15) |

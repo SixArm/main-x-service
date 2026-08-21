@@ -42,8 +42,10 @@ fn render(value: &Value, kind: Kind) -> String {
 /// # Errors
 ///
 /// When a row fails to serialize or the CSV writer fails.
-pub fn encode(rows: &[(Option<Uuid>, Organization)]) -> loco_rs::Result<Vec<u8>> {
-    let mut wtr = csv::Writer::from_writer(Vec::new());
+pub fn encode(rows: &[(Option<Uuid>, Organization)], delimiter: u8) -> loco_rs::Result<Vec<u8>> {
+    let mut wtr = csv::WriterBuilder::new()
+        .delimiter(delimiter)
+        .from_writer(Vec::new());
     wtr.write_record(header())
         .map_err(|e| Error::Message(format!("write CSV header: {e}")))?;
     for (pid, org) in rows {
@@ -71,8 +73,10 @@ pub fn encode(rows: &[(Option<Uuid>, Organization)]) -> loco_rs::Result<Vec<u8>>
 /// Returns an error if the bytes are not a readable CSV (bad header /
 /// structurally broken record framing) — a whole-file failure, distinct
 /// from a per-row `Err` in the returned vector.
-pub fn decode(input: &[u8]) -> loco_rs::Result<Vec<RowResult>> {
-    let mut rdr = csv::Reader::from_reader(input);
+pub fn decode(input: &[u8], delimiter: u8) -> loco_rs::Result<Vec<RowResult>> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .delimiter(delimiter)
+        .from_reader(input);
     let headers = rdr
         .headers()
         .map_err(|e| Error::Message(format!("read CSV header: {e}")))?
@@ -170,8 +174,8 @@ mod tests {
     fn round_trips_a_fully_populated_organization_losslessly() {
         let pid = Uuid::new_v4();
         let org = fully_populated();
-        let bytes = encode(&[(Some(pid), org.clone())]).unwrap();
-        let rows = decode(&bytes).unwrap();
+        let bytes = encode(&[(Some(pid), org.clone())], b',').unwrap();
+        let rows = decode(&bytes, b',').unwrap();
         assert_eq!(rows.len(), 1);
         let (had_explicit_pid, parsed_pid, parsed) = rows.into_iter().next().unwrap().unwrap();
         assert!(had_explicit_pid, "the exported pid column round-trips");
@@ -189,9 +193,13 @@ mod tests {
     #[test]
     fn round_trips_a_sparse_organization() {
         let org = Organization::new("Solo Ltd");
-        let bytes = encode(&[(None, org.clone())]).unwrap();
-        let (had_explicit_pid, pid, back) =
-            decode(&bytes).unwrap().into_iter().next().unwrap().unwrap();
+        let bytes = encode(&[(None, org.clone())], b',').unwrap();
+        let (had_explicit_pid, pid, back) = decode(&bytes, b',')
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap()
+            .unwrap();
         assert!(!had_explicit_pid);
         assert_eq!(pid, None);
         assert_eq!(
@@ -207,7 +215,7 @@ mod tests {
     fn encodes_a_header_then_one_row_per_organization() {
         let a = fully_populated();
         let b = Organization::new("B, Inc.");
-        let bytes = encode(&[(None, a.clone()), (None, b.clone())]).unwrap();
+        let bytes = encode(&[(None, a.clone()), (None, b.clone())], b',').unwrap();
         let text = std::str::from_utf8(&bytes).unwrap();
         assert!(
             text.lines()
@@ -215,7 +223,7 @@ mod tests {
                 .unwrap()
                 .starts_with("pid,name,legal_name,")
         );
-        let rows = decode(&bytes).unwrap();
+        let rows = decode(&bytes, b',').unwrap();
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].as_ref().unwrap().2.name, "Acme, Inc.");
         assert_eq!(rows[1].as_ref().unwrap().2.name, "B, Inc.");
@@ -227,7 +235,7 @@ mod tests {
     fn decodes_reordered_and_extra_columns() {
         let csv = "jurisdiction,extra,name,identifiers,pid\n\
                    US,ignored,Vader Corp,[],11111111-1111-4111-8111-111111111111\n";
-        let rows = decode(csv.as_bytes()).unwrap();
+        let rows = decode(csv.as_bytes(), b',').unwrap();
         let (had_explicit_pid, pid, org) = rows.into_iter().next().unwrap().unwrap();
         assert!(had_explicit_pid);
         assert_eq!(
@@ -246,7 +254,7 @@ mod tests {
         // 17 columns; the `identifiers` column (index 13, 0-based) gets a
         // malformed JSON cell.
         let bad = format!("{hdr}\n,X,,,,,,,,,,,,not-json,[],[],[]\n");
-        let rows = decode(bad.as_bytes()).unwrap();
+        let rows = decode(bad.as_bytes(), b',').unwrap();
         assert_eq!(rows.len(), 1);
         assert!(rows[0].is_err(), "malformed identifiers cell ⇒ per-row Err");
     }
@@ -256,27 +264,54 @@ mod tests {
     #[test]
     fn had_explicit_pid_is_false_for_an_empty_or_missing_pid_cell() {
         let org = fully_populated();
-        let bytes = encode(&[(Some(Uuid::new_v4()), org)]).unwrap();
+        let bytes = encode(&[(Some(Uuid::new_v4()), org)], b',').unwrap();
         let text = std::str::from_utf8(&bytes).unwrap();
         let (header_line, row_line) = text.split_once('\n').unwrap();
 
-        let rows = decode(text.as_bytes()).unwrap();
+        let rows = decode(text.as_bytes(), b',').unwrap();
         assert!(rows[0].as_ref().unwrap().0, "populated pid cell ⇒ explicit");
 
         // Blank the leading pid cell only.
         let (_pid_cell, rest) = row_line.split_once(',').unwrap();
         let blanked = format!("{header_line}\n,{rest}\n");
-        let rows = decode(blanked.as_bytes()).unwrap();
+        let rows = decode(blanked.as_bytes(), b',').unwrap();
         let (had_explicit_pid, pid, _) = rows.into_iter().next().unwrap().unwrap();
         assert!(!had_explicit_pid, "empty pid cell ⇒ no explicit pid");
         assert_eq!(pid, None);
 
         // The pid column omitted entirely (operator-trimmed header).
         let no_pid_col = "name,jurisdiction\nY,US\n";
-        let rows = decode(no_pid_col.as_bytes()).unwrap();
+        let rows = decode(no_pid_col.as_bytes(), b',').unwrap();
         let (had_explicit_pid, pid, org) = rows.into_iter().next().unwrap().unwrap();
         assert!(!had_explicit_pid, "missing pid column ⇒ no explicit pid");
         assert_eq!(pid, None);
         assert_eq!(org.name, "Y");
+    }
+    /// TSV is the same codec with a different byte: a row round-trips
+    /// through tabs exactly as it does through commas.
+    #[test]
+    fn tsv_round_trips_a_fully_populated_row() {
+        let org = fully_populated();
+        let rows = vec![(Some(Uuid::new_v4()), org.clone())];
+        let bytes = encode(&rows, b'\t').unwrap();
+        assert!(
+            String::from_utf8_lossy(&bytes).contains('\t'),
+            "TSV output must be tab-separated"
+        );
+        let back = decode(&bytes, b'\t').unwrap();
+        assert_eq!(back.len(), 1);
+    }
+
+    /// A field containing the delimiter is quoted, not allowed to split
+    /// the record — the property that makes TSV safe for free text, and
+    /// the reason this uses the `csv` crate rather than `split('\t')`.
+    #[test]
+    fn a_tab_inside_a_field_is_quoted_and_survives_tsv() {
+        let mut org = fully_populated();
+        org.name = "Acme\tRoadrunner\tSupplies".to_string();
+        let rows = vec![(None, org)];
+        let bytes = encode(&rows, b'\t').unwrap();
+        let back = decode(&bytes, b'\t').unwrap();
+        assert_eq!(back.len(), 1, "the tab must not have split the record");
     }
 }

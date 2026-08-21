@@ -27,7 +27,9 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .get_connection()
-            .execute_unprepared(include_str!("../../migrations/2026072700000012_integrity_mac/up.sql"))
+            .execute_unprepared(include_str!(
+                "../../migrations/2026072700000012_integrity_mac/up.sql"
+            ))
             .await?;
         Ok(())
     }
@@ -40,7 +42,9 @@ impl MigrationTrait for Migration {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .get_connection()
-            .execute_unprepared(include_str!("../../migrations/2026072700000012_integrity_mac/down.sql"))
+            .execute_unprepared(include_str!(
+                "../../migrations/2026072700000012_integrity_mac/down.sql"
+            ))
             .await?;
         Ok(())
     }

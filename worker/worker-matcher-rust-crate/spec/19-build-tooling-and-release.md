@@ -2,7 +2,7 @@
 
 ### 19.1 Toolchain
 
-Rust edition **2024**. Commands: `cargo build` / `cargo build --release` / `cargo test` (unit + integration + doctests) / `cargo clippy --all-targets -- -D warnings` / `cargo fmt` / `cargo run` (demo) / `cargo run --example basic_usage`. Full release discipline in [`AGENTS/release.md`](../AGENTS/release.md).
+Rust edition **2024**. Commands: `cargo build` / `cargo build --release` / `cargo test` (unit + integration + doctests) / `cargo clippy --all-targets -- -D warnings` / `cargo fmt` / `cargo run` (demo) / `cargo run --example basic_usage`. Full release discipline in [`agents/release.md`](../agents/release.md).
 
 ### 19.2 Release Procedure
 
@@ -21,7 +21,7 @@ in the diff MUST be accompanied by a `spec/` update in the same PR, or
 the PR fails. Path-pattern exceptions live in `.spec-allow` (ships
 empty). Runnable locally pre-push: `bash scripts/spec-drift-check.sh
 main HEAD`. This is the mechanical backstop for the spec-first
-discipline in [`AGENTS/spec-driven-development.md`](../AGENTS/spec-driven-development.md)
+discipline in [`agents/spec-driven-development.md`](../agents/spec-driven-development.md)
 — it catches a code change with no matching spec edit; it does not
 catch the opposite failure mode (a spec section describing behaviour
 the code doesn't have), which is a manual audit's job.

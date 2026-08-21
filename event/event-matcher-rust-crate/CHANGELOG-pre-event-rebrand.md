@@ -63,7 +63,7 @@ For released place-matcher versions see
 
 ### Changed (documentation harmonisation, T-12)
 - Every top-level doc (`README.md`, `AGENTS.md`, `spec.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `IMPLEMENTATION_SUMMARY.md`) now carries a banner pointing readers at `index.md` as the entry point. Previously several of those files had no intra-repo navigation.
-- `AGENTS/national-place-identifiers.md` (35-scheme reference table) was orphaned — no doc linked to it. Now linked from both `AGENTS.md` and `index.md`.
+- `agents/national-place-identifiers.md` (35-scheme reference table) was orphaned — no doc linked to it. Now linked from both `AGENTS.md` and `index.md`.
 - `IMPLEMENTATION_SUMMARY.md` carries an explicit "superseded by `spec.md`" banner so readers don't mistake the historical snapshot for current behaviour.
 - All 17 intra-repo doc paths verified to resolve.
 
@@ -133,7 +133,7 @@ For released place-matcher versions see
 - `Place`, `PlaceBuilder`, `MatchConfig`, and `MatchBreakdown` each gain one new field. Code constructing `MatchConfig { … }` via struct-literal syntax MUST add `blood_type_weight` (or use `..MatchConfig::default()`). `Place::blood_type` carries `#[serde(default)]` so legacy JSON payloads deserialise with `None`.
 
 ### Added (five further placeal IDs + nine passport-format validators)
-- Driven by `AGENTS/national-place-identifiers.tsv` (spec FR-72..77, task T-28). Total placeal-identifier schemes supported: **35**.
+- Driven by `agents/national-place-identifiers.tsv` (spec FR-72..77, task T-28). Total placeal-identifier schemes supported: **35**.
   - **Greece DSS** (`gr_dss`) — 10-digit Hellenic Central Securities Depository investor share code, format-only.
   - **Liechtenstein National ID** (`li_id`) — 2 letters + 8–9 digits (spec text and example differ; parser accepts both), format-only with renewal caveat.
   - **Netherlands National ID** (`nl_id`) — 9-character `[A-Z\O]{2}[A-Z0-9\O]{6}[0-9]` (the `O` letter is banned to avoid confusion with the digit `0`), distinct from the BSN.

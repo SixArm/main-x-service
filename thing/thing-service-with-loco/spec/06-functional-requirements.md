@@ -9,7 +9,7 @@
 
 ### 6.2 Matching
 
-Algorithm reference: [`AGENTS/matching.md`](../AGENTS/matching.md).
+Algorithm reference: [`agents/matching.md`](../agents/matching.md).
 
 Default component weights (sum to 1.0):
 
@@ -66,7 +66,7 @@ projection lifts the service's `Thing` (schema.org-shaped with the
 
 Registry-only fields (`id`, `is_deleted`, `created_at`,
 `updated_at`, `potential_action`) are dropped — they have no
-matcher counterpart. See [`AGENTS/matching.md`](../AGENTS/matching.md)
+matcher counterpart. See [`agents/matching.md`](../agents/matching.md)
 for the in-service algorithm and the matcher crate's
 [`spec.md §5–§6`](../../thing-matcher-rust-crate/spec/index.md) for the
 canonical algorithm.

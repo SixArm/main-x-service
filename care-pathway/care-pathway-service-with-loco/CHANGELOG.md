@@ -9,6 +9,107 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+
+
+
+
+### Added — cargo-fuzz harness for the request-path logic (FUZZ-2)
+
+A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate with
+three coverage-guided libFuzzer targets. Until now the harnesses covered
+only the dependency-light libraries; the services had none, despite
+carrying the surface that actually faces the network.
+
+- **`validate_json`** — the real request path: arbitrary bytes →
+  `serde_json` → `CarePathway` → `validation::problems`. Never-panic,
+  deterministic, and a **bounded problem report**.
+- **`validate_built`** — the validator driven directly, building the
+  `CarePathway` from raw bytes so the fuzzer controls array cardinality and
+  entry contents without first having to learn JSON. A run of NUL bytes
+  becomes a run of blank entries — the exact SEC-M8 shape.
+- **`merge_pathways`** — the merge fold over two arbitrary payloads:
+  never-panic; the survivor keeps its `name`; deterministic; and
+  **absorbing**, so a retried merge cannot inflate the record.
+
+The sub-crate declares an empty `[workspace]` table: this crate is a
+workspace root, so `fuzz/` would otherwise be pulled in as a member, and
+a cargo-fuzz build needs its own sanitizer flags and lockfile. Nightly
+only, so it is exempt from the repo MSRV. See
+[`fuzz/README.md`](./fuzz/README.md).
+
+### Fixed — an over-long array produced one `422` problem string per entry (SEC-M8)
+
+`validation::problems` reported an over-long array's cardinality
+violation once and then still walked **every** entry, so a payload with
+ten thousand malformed `condition_codes` came back with ten thousand problem strings — which
+the controller joins into a single `422` body. A small request bought a
+large response. Worse here than a blank check: each entry also ran an
+ICD-10 / ICD-11 / SNOMED CT code validation, SNOMED including a Verhoeff
+check digit.
+
+Every per-entry loop now walks a new `inspected()` helper, which yields
+at most `MAX_ARRAY_LEN` entries. The cardinality problem already rejects
+the payload, so inspecting the tail decides nothing; bounding the
+**report** is the same input-bounding rule (SEC-M1) as bounding the work.
+The helper is named rather than inlined at each call site so a per-entry
+loop added later without it reads as different from the ones that have
+it. Pinned by a test.
+
+Case landed this first as the reference; this is the roll-out
+(repo `tasks.md` SEC-M8b).
+
+Measured with `benches/service_bench.rs`: the oversized-array rejection
+path went from **112 µs to 4.9 µs**, a ~96% reduction.
+
+### Fixed — the search index built a new Tantivy writer on every write
+
+`SearchEngine::index_pathway` (and `delete_*` / `clear`) called
+`self.index.writer(WRITER_HEAP_MB)` per call. Tantivy's `IndexWriter`
+allocates its whole 50 MB arena and spawns merge threads on
+construction, so **every create, update, merge, and soft-delete paid
+that setup synchronously**, on the request path. Measured at ~155 ms per
+indexed document against a fresh index; holding one writer for the
+process brings it to ~78 ms, the remainder being the durable commit and
+reader reload that indexing-on-write inherently costs.
+
+It was also a concurrency hazard, not only a slow one: an `IndexWriter`
+holds the index directory's exclusive lock, so taking and releasing it
+per call left two simultaneous writes able to collide on it. One owner
+for the process cannot.
+
+The engine now holds a `Mutex<IndexWriter>` created in `new()`. A
+poisoned lock recovers the guard rather than failing for ever — the only
+operations held across it are `delete_term` / `add_document` / `commit`,
+and a permanently dead index would be the worse outcome.
+
+Found by the new benchmark, which is the point of having one.
+
+### Added — Criterion benchmarks
+
+- `benches/service_bench.rs`, covering the CPU-bound halves of a request
+  — the part a database benchmark hides behind I/O. Three groups:
+  **validation** (every create and update pays it; the `oversized_arrays`
+  case exercises the SEC-M1 input caps, because rejecting an abusive
+  payload has to be cheap or the caps are not doing their job),
+  **merge** (a whole-record fold, with a scaling case showing the cost
+  sits in the collections it unions), and **search** (indexing one
+  document — what every write pays synchronously — plus exact / fuzzy /
+  phonetic retrieval and the `candidates` blocking query a duplicate
+  check actually calls, against a populated index). The validation group additionally prices `condition_code_issue` on its own, since it is the one rule whose cost grows with how thoroughly a pathway is coded. The SOUP register gained the `criterion` annotation — the crate's own IEC 62304 §8.1.2 gate caught the unannotated dependency, as designed.
+- `criterion` is a new dev-dependency; test-only, so it is not in any
+  release artefact.
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ## [0.1.0] - 2026-08-04
 ### Added — Durable event bus: real Fluvio broker sink (BUS-3, 2026-08-03)
 
@@ -490,7 +591,7 @@ medical-device qualification, or an ISO 14971 risk file. See spec
   is decommissioned. Front-ends adopt a BFF + httpOnly cookie + CSRF (the
   browser holds no token). The `CARE_PATHWAY_REQUIRE_AUTH` flag and
   blanket-enforcement semantics are unchanged — only the verified
-  credential changes. Human-facing docs (README/AGENTS/index) updated to
+  credential changes. Human-facing docs (README/agents/index) updated to
   describe the new model; runtime code follow-up is tracked in spec §13.
   Source of truth:
   [agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md).

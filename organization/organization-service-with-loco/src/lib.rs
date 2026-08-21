@@ -10,7 +10,7 @@
 //! `SeaORM` [`models`], the hand-written [`openapi`] document, and the
 //! in-memory [`streaming`] event buffer. For the canonical behaviour
 //! reference see [`../spec/index.md`](../spec/index.md); for per-area
-//! detail see the `AGENTS/*` files.
+//! detail see the `agents/*` files.
 
 // Always start with high quality coding conventions.
 #![warn(clippy::pedantic)]

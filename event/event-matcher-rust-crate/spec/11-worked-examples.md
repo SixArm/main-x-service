@@ -41,7 +41,7 @@ Renormalised: `weighted_sum / total_weight ≈ (0.20 + 0.235 + 0.05 + 0.08 + 0.0
 
 ### 11.2 Other illustrative scenarios
 
-The following pinned scenarios live as runnable tests in `tests/integration_tests.rs` and as worked examples in [`AGENTS/matching-algorithm.md`](../AGENTS/matching-algorithm.md):
+The following pinned scenarios live as runnable tests in `tests/integration_tests.rs` and as worked examples in [`agents/matching-algorithm.md`](../agents/matching-algorithm.md):
 
 - **RustConf 2024 / RustConf '24** — cartesian-product name scoring across `name` × `alternate_names` picks the best pair.
 - **Shared Eventbrite ID** — `deterministic_match` short-circuits to `true` even with wholly different names (`test_event_id_shared_scores_one_and_is_deterministic_match`); distinct schemes carrying the same value never match (`test_event_id_distinct_schemes_do_not_match`).

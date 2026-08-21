@@ -4,7 +4,7 @@ Sibling to [`person-service-with-loco/`](../person-service-with-loco/). The Rust
 
 ## Single source of truth
 
-- The service's [`spec.md`](../person-service-with-loco/spec/index.md) and [`AGENTS/`](../person-service-with-loco/AGENTS/) describe the API contract. If a field disappears from `Person` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
+- The service's [`spec.md`](../person-service-with-loco/spec/index.md) and [`agents/`](../person-service-with-loco/agents/) describe the API contract. If a field disappears from `Person` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
 - This project has its own [`spec.md`](spec/index.md) (§1–§18) for front-end-specific decisions: routes, components, design system, build.
 
 ## Three-part change rule

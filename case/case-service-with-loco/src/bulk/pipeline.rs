@@ -242,8 +242,10 @@ fn decode_import_rows(input: &[u8], format: BulkFormat) -> loco_rs::Result<Vec<I
                 })
                 .collect(),
         ),
-        BulkFormat::Csv => {
-            let decoded = csv::decode(input)?;
+        // CSV and TSV share the codec; the format supplies the byte.
+        BulkFormat::Csv | BulkFormat::Tsv => {
+            let delimiter = format.delimiter().unwrap_or(b',');
+            let decoded = csv::decode(input, delimiter)?;
             if decoded.len() > crate::bulk::MAX_IMPORT_ROWS {
                 return Err(loco_rs::Error::Message(format!(
                     "bulk import exceeds the row cap: {} rows > {}",
@@ -563,7 +565,9 @@ pub async fn process_export_job(
     let row_count = u64::try_from(rows.len()).unwrap_or(u64::MAX);
     let bytes = match params.format {
         BulkFormat::Jsonl => jsonl::encode(&rows)?,
-        BulkFormat::Csv => csv::encode(&rows)?,
+        BulkFormat::Csv | BulkFormat::Tsv => {
+            csv::encode(&rows, params.format.delimiter().unwrap_or(b','))?
+        }
     };
     Ok((bytes, row_count))
 }
@@ -858,7 +862,7 @@ mod db_tests {
         let db = connect().await;
         let agency = format!("agency-{}", Uuid::new_v4());
         let case = case_with_agency_number("CsvImported", &agency, "CN-1");
-        let input = csv::encode(&[BulkCaseRow::keyless(case)]).unwrap();
+        let input = csv::encode(&[BulkCaseRow::keyless(case)], b',').unwrap();
 
         let outcome =
             process_import_job(&db, &input, BulkFormat::Csv, &ImportParams::default(), None)
@@ -932,7 +936,7 @@ mod db_tests {
         .unwrap();
         assert!(rows >= 1);
 
-        let parsed = csv::decode(&bytes).unwrap();
+        let parsed = csv::decode(&bytes, b',').unwrap();
         assert!(
             parsed
                 .iter()

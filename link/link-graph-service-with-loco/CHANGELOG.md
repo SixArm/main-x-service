@@ -14,6 +14,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ## [0.2.0] - 2026-08-05
 ### Added — real OpenTelemetry OTLP export (T-22 / repo AU-3, 2026-08-05)
 
@@ -517,7 +529,7 @@ in *any* deployment, regardless of this one instance's specific cause.
   a perfect demographic match can never outrank a real identifier match.
   Full weight table and rationale in the module doc.
 - `score_dob_pair` here is a **fresh** implementation of the full
-  six-row table `AGENTS/matching.md` documents ("Birth Date Matching");
+  six-row table `agents/matching.md` documents ("Birth Date Matching");
   `person-matcher`'s own private `score_dob_pair` only implements two of
   those six rows (a pre-existing doc/code drift, left as-is rather than
   reached into or silently papered over).

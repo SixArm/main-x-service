@@ -55,7 +55,7 @@ export function canDecide(item: Pick<ReviewQueueItem, "status">): boolean {
  * catalog key naming it, and its weight in the overall score.
  *
  * Weights are the person matcher's, per
- * `person-service-with-loco/AGENTS/matching.md`; they sum to 1.00.
+ * `person-service-with-loco/agents/matching.md`; they sum to 1.00.
  */
 export interface MatchComponent {
   /** Field name in the service's `MatchScoreBreakdown`. */

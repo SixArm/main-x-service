@@ -28,9 +28,9 @@ The library supports **42 national identifier schemes**, each parsed by a functi
 
 **Cross-cutting identifier requirements:** **FR-13** same-scheme identifiers compare equal iff their parsers produce equal canonical forms; different-scheme identifiers MUST NEVER cross-match. **FR-14** a malformed identifier yields `<scheme>_score = None` (not `0.0`). **FR-29** `deterministic_match` returns `true` on any same-scheme equal canonical-form pair, on the passport-book branch (FR-52), or on the demographic-tuple branch (§12).
 
-**Per-scheme parser requirements** (FR-12, FR-25..FR-28, FR-32, FR-39..FR-44, FR-54..FR-76, FR-85..FR-91 — 42 schemes). Each MUST expose `parse_<cc>_<scheme>(&str) -> Option<String>`. Per-scheme algorithms, parser names, and per-FR cross-reference in [AGENTS/national-person-identifiers.md](../AGENTS/national-person-identifiers.md) and `src/identifiers.rs` rustdoc; behaviour pinned by per-parser unit + per-scheme integration tests.
+**Per-scheme parser requirements** (FR-12, FR-25..FR-28, FR-32, FR-39..FR-44, FR-54..FR-76, FR-85..FR-91 — 42 schemes). Each MUST expose `parse_<cc>_<scheme>(&str) -> Option<String>`. Per-scheme algorithms, parser names, and per-FR cross-reference in [agents/national-person-identifiers.md](../agents/national-person-identifiers.md) and `src/identifiers.rs` rustdoc; behaviour pinned by per-parser unit + per-scheme integration tests.
 
-- **FR-77 Passport-number format validators** in `identifiers` for CY / CZ / LI / LT / MT / NL / PT / RO / SK (rules in `AGENTS/national-person-identifiers.md`). No `Person` field — passport data flows through `Person::passport_books` per FR-50/51/52.
+- **FR-77 Passport-number format validators** in `identifiers` for CY / CZ / LI / LT / MT / NL / PT / RO / SK (rules in `agents/national-person-identifiers.md`). No `Person` field — passport data flows through `Person::passport_books` per FR-50/51/52.
 
 **Blood-type, FHIR, place fields** (all `#[serde(default)]`; excluded from `deterministic_match` and `Person::validate`):
 
@@ -40,7 +40,7 @@ The library supports **42 national identifier schemes**, each parsed by a functi
 - **FR-83** `Person::death_date: Option<NaiveDate>` (FHIR `Patient.deceasedDateTime`); reuses DOB transposition via `score_dob_pair`; weight `0.10`.
 
 ### 6.5 Normalization
-Full algorithms in §14 / `AGENTS/normalization.md`.
+Full algorithms in §14 / `agents/normalization.md`.
 - **FR-15** Names: lowercase + NFKD + drop combining marks + drop ASCII punctuation + collapse whitespace.
 - **FR-16** Postcodes: uppercase + drop whitespace.
 - **FR-31** Address lines: `Normalizer::normalize_address_line` (abbreviation expansion + name normalisation) and `parse_address_line` returning `ParsedAddressLine { house_number, unit, street }`.

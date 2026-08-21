@@ -78,36 +78,54 @@ pub fn problems(case: &Case) -> Vec<String> {
     check_array(&mut out, "same_as", case.same_as.len());
     check_array(&mut out, "in_language", case.in_language.len());
 
-    // Per-entry blank checks (existing) + size caps (SEC-M1).
-    for (i, ident) in case.identifiers.iter().enumerate() {
+    // Per-entry blank checks (existing) + size caps (SEC-M1). Every one
+    // walks `inspected`, not the whole array — see its docs (SEC-M8).
+    for (i, ident) in inspected(&case.identifiers) {
         if ident.value.trim().is_empty() {
             out.push(format!("identifiers[{i}]: value must not be blank"));
         }
         check_item(&mut out, "identifiers", i, &ident.value);
     }
-    for (i, subject) in case.subjects.iter().enumerate() {
+    for (i, subject) in inspected(&case.subjects) {
         if subject.trim().is_empty() {
             out.push(format!("subjects[{i}]: must not be blank"));
         }
         check_item(&mut out, "subjects", i, subject);
     }
-    for (i, keyword) in case.keywords.iter().enumerate() {
+    for (i, keyword) in inspected(&case.keywords) {
         if keyword.trim().is_empty() {
             out.push(format!("keywords[{i}]: must not be blank"));
         }
         check_item(&mut out, "keywords", i, keyword);
     }
-    for (i, title) in case.alternate_titles.iter().enumerate() {
+    for (i, title) in inspected(&case.alternate_titles) {
         check_item(&mut out, "alternate_titles", i, title);
     }
-    for (i, url) in case.same_as.iter().enumerate() {
+    for (i, url) in inspected(&case.same_as) {
         check_item(&mut out, "same_as", i, url);
     }
-    for (i, lang) in case.in_language.iter().enumerate() {
+    for (i, lang) in inspected(&case.in_language) {
         check_item(&mut out, "in_language", i, lang);
     }
 
     out
+}
+
+/// The entries a per-entry check actually inspects: at most
+/// [`MAX_ARRAY_LEN`] of them, paired with their index.
+///
+/// An array over the cardinality cap is **already rejected** by its own
+/// problem, so inspecting the tail decides nothing — while reporting a
+/// problem for every entry turns a small request into a large response
+/// (ten thousand blank entries produced ten thousand strings, all joined
+/// into one `422` body). Bounding the *report* is the same
+/// input-bounding rule as bounding the work (SEC-M1/SEC-M8).
+///
+/// Named rather than inlined as `.take(MAX_ARRAY_LEN)` at each call site
+/// so a per-entry loop added later without it reads as different from the
+/// ones that have it.
+fn inspected<T>(items: &[T]) -> impl Iterator<Item = (usize, &T)> {
+    items.iter().take(MAX_ARRAY_LEN).enumerate()
 }
 
 /// Push a problem when a scalar text `field` exceeds [`MAX_TEXT_LEN`]
@@ -377,5 +395,26 @@ mod tests {
             ..Case::new("placeholder")
         };
         assert!(problems(&case).is_empty());
+    }
+    /// SEC-M1: the *report* is bounded too, not just the work. A caller
+    /// sending ten thousand blank entries used to get ten thousand
+    /// problem strings back — a small request buying a large response.
+    /// The cardinality problem alone is enough to reject the payload.
+    #[test]
+    fn an_oversized_array_of_blanks_does_not_produce_a_problem_per_entry() {
+        let case = Case {
+            subjects: vec![String::new(); 10_000],
+            ..Case::new("Housing benefit appeal")
+        };
+        let out = problems(&case);
+        assert!(
+            out.len() <= MAX_ARRAY_LEN + 1,
+            "expected at most the cardinality problem plus one per inspected entry, got {}",
+            out.len()
+        );
+        assert!(
+            out.contains(&format!("subjects: exceeds {MAX_ARRAY_LEN} entries")),
+            "the cardinality problem must still be reported"
+        );
     }
 }

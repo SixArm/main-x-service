@@ -11,7 +11,7 @@
 
 ### 6.2 Matching
 
-Algorithm reference: [`AGENTS/matching.md`](../AGENTS/matching.md).
+Algorithm reference: [`agents/matching.md`](../agents/matching.md).
 
 | Strategy | Output | Use |
 |---|---|---|
@@ -69,7 +69,7 @@ Registry-only fields (`id`, `active`, `deceased_datetime`,
 `managing_organization`, `links`, `created_at`, …) are dropped — they
 have no matcher counterpart. The projection is **lossy by design** so
 callers can use the reference algorithm without rewriting their
-domain model. See [`AGENTS/matching.md`](../AGENTS/matching.md) for the
+domain model. See [`agents/matching.md`](../agents/matching.md) for the
 in-service algorithm and the matcher crate's
 [`spec.md §12`](../../person-matcher-rust-crate/spec/index.md) for the
 canonical algorithm.

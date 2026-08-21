@@ -315,9 +315,12 @@ impl ImportRowSource {
                 reader,
                 crate::bulk::MAX_IMPORT_ROWS,
             ))),
-            BulkFormat::Csv => Ok(Self::Csv(csv::RowStream::new(
+            // CSV and TSV share the streaming codec; the format supplies
+            // the byte.
+            BulkFormat::Csv | BulkFormat::Tsv => Ok(Self::Csv(csv::RowStream::new(
                 reader,
                 crate::bulk::MAX_IMPORT_ROWS,
+                format.delimiter().unwrap_or(b','),
             ))),
             // §12 lean: Parquet is export-only. The handler already refuses
             // this before a job is ever created (`BulkFormat::is_export_only`);
@@ -674,7 +677,9 @@ pub async fn process_export_job(
     let rows = u64::try_from(records.len()).unwrap_or(u64::MAX);
     let bytes = match params.format {
         BulkFormat::Jsonl => jsonl::encode(&records)?,
-        BulkFormat::Csv => csv::encode(&records)?,
+        BulkFormat::Csv | BulkFormat::Tsv => {
+            csv::encode(&records, params.format.delimiter().unwrap_or(b','))?
+        }
         BulkFormat::Parquet => encode_parquet(&records)?,
     };
     Ok((bytes, rows))
@@ -1178,7 +1183,7 @@ mod db_tests {
 
         let mut p = person("CsvImported");
         p.tax_id = Some(format!("TAX-{}", uuid::Uuid::new_v4()));
-        let input = csv::encode(std::slice::from_ref(&p)).unwrap();
+        let input = csv::encode(std::slice::from_ref(&p), b',').unwrap();
 
         let outcome = process_import_job(
             &db,
@@ -1303,7 +1308,7 @@ mod db_tests {
         .unwrap();
         assert!(rows >= 1);
 
-        let parsed = csv::decode(&bytes).unwrap();
+        let parsed = csv::decode(&bytes, b',').unwrap();
         assert!(
             parsed
                 .iter()

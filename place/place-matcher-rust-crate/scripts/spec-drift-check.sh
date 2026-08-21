@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Spec-drift check (see AGENTS/spec-driven-development.md).
+# Spec-drift check (see agents/spec-driven-development.md).
 #
 # Fail with a non-zero exit code if any "watched" source file changed in
 # the diff but the `spec/` directory did not — unless the changed paths

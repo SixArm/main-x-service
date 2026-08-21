@@ -972,10 +972,10 @@ impl MatchingEngine {
     /// - Both sides parse and are equal on the **same** national-identifier
     ///   scheme, for any of the **42 supported schemes** (one field per
     ///   scheme on [`crate::Worker`]; catalogue in
-    ///   `AGENTS/national-person-identifiers.md`) — e.g. both UK NHS
+    ///   `agents/national-person-identifiers.md`) — e.g. both UK NHS
     ///   Numbers, both France NIRs, both US Social Security Numbers, and
     ///   so on through the full list. See
-    ///   [`AGENTS/matching-algorithm.md`](https://github.com/sixarm/worker-matcher-rust-crate/blob/main/AGENTS/matching-algorithm.md)
+    ///   [`agents/matching-algorithm.md`](https://github.com/sixarm/worker-matcher-rust-crate/blob/main/agents/matching-algorithm.md)
     ///   for the exhaustive per-scheme branch table.
     /// - The workers share at least one `(country, number)` passport-book
     ///   pair after canonicalisation (see [`crate::PassportBook`]).

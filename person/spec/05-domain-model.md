@@ -8,7 +8,7 @@ and front-end representations are projections of it.
 
 Defined in the service crate (`src/models/person.rs`); field-by-field
 reference in
-[`person-service-with-loco/AGENTS/models.md`](../person-service-with-loco/AGENTS/models.md).
+[`person-service-with-loco/agents/models.md`](../person-service-with-loco/agents/models.md).
 Material aspects:
 
 - **Identity** — UUID `id` + `identifiers: Vec<Identifier>`

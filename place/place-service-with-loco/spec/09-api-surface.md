@@ -1,6 +1,6 @@
 ## 9. API Surface
 
-Complete reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
+Complete reference: [`agents/restful.md`](../agents/restful.md).
 
 | Tier | Surface |
 |---|---|
@@ -22,7 +22,7 @@ The 16 `/api` REST endpoints are: `GET /api/health`; `POST /api/places`;
 `GET /api/places/{id}/export`; `GET /api/places/{id}/masked`;
 `GET /api/places/{id}/audit`; `GET /api/audit/recent`
 (plus `GET /api/whoami` and the integrity-verify pair listed above as
-their own tiers). Full table: [`AGENTS/restful.md`](../AGENTS/restful.md).
+their own tiers). Full table: [`agents/restful.md`](../agents/restful.md).
 
 Search query parameters are `q`, `limit`, `fuzzy`, `mask_sensitive`.
 Geo-radius search (`nearby`), an `/api/audit/user` route, and search

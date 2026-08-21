@@ -1,0 +1,50 @@
+# Its own workspace root. The parent crate declares `[workspace]`, which
+# would otherwise pull `fuzz/` in as a member — and a cargo-fuzz build
+# needs its own sanitizer flags and lockfile, not the service's.
+[workspace]
+
+[package]
+name = "care-pathway-service-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+care-pathway-matcher = { path = "../../care-pathway-matcher-rust-crate" }
+
+[dependencies.care-pathway-service]
+path = ".."
+
+# cargo-fuzz scaffolding for this service's pure request-path logic
+# (SEC-I2 / FUZZ-2). `validation::problems` and `merge::merge_pathways` run on
+# the request body — attacker-controlled JSON — and are pure and total, so
+# they fuzz without a database. Not a member of any parent workspace, so it
+# never affects the crate's normal build/test/clippy, and it carries no
+# `rust-version`: cargo-fuzz is nightly-only
+# (spec/rust-msrv-n-minus-3.md §2).
+
+[[bin]]
+name = "validate_json"
+path = "fuzz_targets/validate_json.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "validate_built"
+path = "fuzz_targets/validate_built.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "merge_pathways"
+path = "fuzz_targets/merge_pathways.rs"
+test = false
+doc = false
+bench = false

@@ -9,6 +9,134 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+
+
+
+
+
+### Added — TSV bulk import/export, and fuzzed row decoders
+
+`BulkFormat` gains `Tsv`, accepted on the same `format` field as `jsonl`
+and `csv` for both import and export.
+
+TSV is CSV with a different delimiter, so it **shares the codec** rather
+than forking it: `csv::encode`/`decode` take a `delimiter: u8`, and
+`BulkFormat::delimiter()` is the single place that decides which byte a
+format uses. A second place to decide it would be a second place for the
+two to drift.
+
+The delimiter is **passed in, never sniffed**. Reading CSV as TSV
+resolves no column and reconstructs the row from nothing — which for this
+entity surfaces as a per-row parse error, and for an all-optional entity
+would be a silently empty record. Pinned by a test that asserts the data
+is not recovered either way.
+
+Also added: a `bulk_decoders` cargo-fuzz target driving `csv::decode`
+under **both** delimiters plus the JSONL split/parse path over arbitrary
+bytes. A bulk import is the one path that takes a whole file from a
+caller, so its decoders are the outermost parser in the service. The
+target pins never-panic, decode determinism, and the §7 per-row error
+contract — a malformed row must not abort the load, because the good rows
+are promised to commit.
+
+### Added — cargo-fuzz harness for the request-path logic (FUZZ-2)
+
+A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate with
+three coverage-guided libFuzzer targets. Until now the harnesses covered
+only the dependency-light libraries; the services had none, despite
+carrying the surface that actually faces the network.
+
+- **`validate_json`** — the real request path: arbitrary bytes →
+  `serde_json` → `Case` → `validation::problems`. Never-panic,
+  deterministic, and a **bounded problem report**.
+- **`validate_built`** — the validator driven directly, building the
+  `Case` from raw bytes so the fuzzer controls array cardinality and
+  entry contents without first having to learn JSON. A run of NUL bytes
+  becomes a run of blank entries — the exact SEC-M8 shape.
+- **`merge_cases`** — the merge fold over two arbitrary payloads:
+  never-panic; the survivor keeps its `title`; deterministic; and
+  **absorbing**, so a retried merge cannot inflate the record.
+
+The sub-crate declares an empty `[workspace]` table: this crate is a
+workspace root, so `fuzz/` would otherwise be pulled in as a member, and
+a cargo-fuzz build needs its own sanitizer flags and lockfile. Nightly
+only, so it is exempt from the repo MSRV. See
+[`fuzz/README.md`](./fuzz/README.md).
+
+### Changed — the SEC-M8 per-entry cap is now a named `inspected()` helper
+
+No behaviour change. The inline `.take(MAX_ARRAY_LEN)` this crate landed
+first has become the same `inspected()` helper the other three services
+adopted in the SEC-M8b roll-out, so all four read alike and a per-entry
+loop added without the cap is visibly different from the ones with it.
+
+### Fixed — the search index built a new Tantivy writer on every write
+
+`SearchEngine::index_case` (and `delete_*` / `clear`) called
+`self.index.writer(WRITER_HEAP_MB)` per call. Tantivy's `IndexWriter`
+allocates its whole 50 MB arena and spawns merge threads on
+construction, so **every create, update, merge, and soft-delete paid
+that setup synchronously**, on the request path. Measured at ~155 ms per
+indexed document against a fresh index; holding one writer for the
+process brings it to ~78 ms, the remainder being the durable commit and
+reader reload that indexing-on-write inherently costs.
+
+It was also a concurrency hazard, not only a slow one: an `IndexWriter`
+holds the index directory's exclusive lock, so taking and releasing it
+per call left two simultaneous writes able to collide on it. One owner
+for the process cannot.
+
+The engine now holds a `Mutex<IndexWriter>` created in `new()`. A
+poisoned lock recovers the guard rather than failing for ever — the only
+operations held across it are `delete_term` / `add_document` / `commit`,
+and a permanently dead index would be the worse outcome.
+
+Found by the new benchmark, which is the point of having one.
+
+### Fixed — an over-long array produced one problem string per entry
+
+`validation::problems` reported the array-cardinality violation once and
+then still walked every entry, so a payload with ten thousand blank
+`subjects` came back with ten thousand problem strings — which the
+controller joins into a single `422` body. A small request bought a
+large response.
+
+Each per-entry loop is now `.take(MAX_ARRAY_LEN)`. The cardinality
+problem alone already rejects the payload, so inspecting the tail
+decides nothing; bounding the **report** is part of the same
+input-bounding rule (SEC-M1) as bounding the work. Pinned by a test.
+
+Surfaced by the new `validation/oversized_arrays` benchmark. The same
+pattern exists in the organization, care-pathway, and portfolio
+services — see the repository `tasks.md`; case is the reference here, as
+it was for record-level ABAC.
+
+### Added — Criterion benchmarks
+
+- `benches/service_bench.rs`, covering the CPU-bound halves of a request
+  — the part a database benchmark hides behind I/O. Three groups:
+  **validation** (every create and update pays it; the `oversized_arrays`
+  case exercises the SEC-M1 input caps, because rejecting an abusive
+  payload has to be cheap or the caps are not doing their job),
+  **merge** (a whole-record fold, with a scaling case showing the cost
+  sits in the collections it unions), and **search** (indexing one
+  document — what every write pays synchronously — plus exact / fuzzy /
+  phonetic retrieval and the `candidates` blocking query a duplicate
+  check actually calls, against a populated index). Case's SOUP register gained the `criterion` annotation — its own IEC 62304 §8.1.2 gate caught the unannotated dependency, as designed.
+- `criterion` is a new dev-dependency; test-only, so it is not in any
+  release artefact.
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ## [0.2.0] - 2026-08-05
 ### Added — `seed_examples` CLI task (EX-4, 2026-08-04)
 

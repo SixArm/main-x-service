@@ -10,6 +10,33 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+
+
+### Added — Criterion benchmarks
+
+- `benches/match_pair.rs`, matching the harness the other matcher crates
+  carry. Four groups over the paths a downstream integrator actually
+  exercises: single-pair scoring in three regimes (identical clone,
+  fuzzy near-match through the full pipeline, unrelated pair), the
+  deterministic short-circuits (a shared DOI, and a shared provider-scoped pathway code), `rank` at 10 / 100 / 1000
+  candidates with `Throughput::Elements` set so per-candidate cost and
+  any super-linear scaling are visible directly, and the same fuzzy pair
+  under each shipped config preset.
+- Fixtures are built from `CarePathway::new` and derived deterministically from
+  an index, so a candidate list of any size is reproducible without
+  randomness.
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ### Added — cargo-fuzz harness (SEC-I2)
 
 - A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate adopting
@@ -56,7 +83,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - Documentation harmonization pass: fixed the `repository` URL in
   `Cargo.toml` to a valid `/tree/main/...` monorepo subpath; corrected
-  `../spec.md` link display text to `../spec/index.md` in `AGENTS/`;
+  `../spec.md` link display text to `../spec/index.md` in `agents/`;
   added spec notes clarifying that `Error`/`Result` are reserved for
   future fallible APIs (§21) and that `provider_name` is
   informational-only (§6); added a renormalised partial-score worked

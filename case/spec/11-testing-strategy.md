@@ -1,6 +1,6 @@
 ## 11. Testing Strategy
 
-Entity-level summary; detail in [`AGENTS/testing.md`](../AGENTS/testing.md).
+Entity-level summary; detail in [`agents/testing.md`](../agents/testing.md).
 
 ### 11.1 Per subproject
 

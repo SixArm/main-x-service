@@ -44,7 +44,7 @@ Open gaps drive tasks in §13 (entity-level) or the subproject queues.
 
 | Gap | Task |
 |---|---|
-| Service docs thin (single-file spec, no `AGENTS/`) | T-1 |
+| Service docs thin (single-file spec, no `agents/`) | T-1 |
 | Privacy: masking / GDPR export / consent | T-5 |
 | Merge, review queue, batch dedup | T-6 |
 | Duplicate check scans ≤ 1 000 rows in-process | T-7 |

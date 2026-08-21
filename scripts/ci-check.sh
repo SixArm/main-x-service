@@ -34,6 +34,26 @@
 #               locally: rustup toolchain install nightly && cargo install
 #               cargo-fuzz. Short smoke, not exhaustive fuzzing: no corpus
 #               is persisted between runs. See each crate's fuzz/README.md.
+#   msrv        Minimum Supported Rust Version: assert the crate declares
+#               `rust-version` equal to ci/msrv.txt, then `cargo +<msrv>
+#               check --all-targets` against that toolchain. A no-op for
+#               the nightly-only fuzz/ sub-crates. Needs the MSRV
+#               toolchain installed: rustup toolchain install <msrv>
+#               --profile minimal. See spec/rust-msrv-n-minus-3.md.
+#   bench       cargo bench --no-run, for crates declaring a [[bench]].
+#               Compiles and links the Criterion harnesses without
+#               running them: a benchmark nobody runs still rots, and a
+#               bench that no longer compiles is how you find out too
+#               late. Measuring on shared CI hardware would produce
+#               numbers not worth trusting, so this stage deliberately
+#               does not.
+#   docs        Repo-wide convention checks (runs once; ignores any crate
+#               argument). Today: the agents directory is lowercase —
+#               no tracked path and no tracked file content may name an
+#               uppercase `AGENTS/` directory. Reads the git index rather
+#               than the filesystem, because a case-insensitive
+#               filesystem answers for either spelling and hides the
+#               defect. See spec/agents-directory-name-is-lowercase.md.
 #
 # With no crate path, the stage runs across every crate from
 # scripts/ci-crates.sh.
@@ -59,6 +79,17 @@ enrolled_for_db() {
   grep -v '^[[:space:]]*#' ci/db-suites.txt \
     | grep -v '^[[:space:]]*$' \
     | grep -Fxq "${crate}"
+}
+
+# The declared MSRV, from its single source of truth. Every crate's
+# `rust-version` must equal this; keeping the number in one file is what
+# stops ~50 hand-edited manifests drifting apart.
+# (spec/rust-msrv-n-minus-3.md)
+msrv_version() {
+  grep -v '^[[:space:]]*#' ci/msrv.txt \
+    | grep -v '^[[:space:]]*$' \
+    | head -1 \
+    | tr -d '[:space:]'
 }
 
 # A Postgres-safe database name derived from the crate path.
@@ -184,12 +215,91 @@ run_stage() {
             -max_total_time="${seconds}" -rss_limit_mb=4096 )
       done
       ;;
+    bench)
+      # Same no-op shape as `deny` / `evidence`: a crate without a
+      # [[bench]] target has nothing to compile, and `cargo bench
+      # --no-run` on one would build the default libtest harness for
+      # every target instead, which is slow and proves nothing.
+      if ! grep -q '^\[\[bench\]\]' "${crate}/Cargo.toml"; then
+        echo "  (no [[bench]] target)"
+        return 0
+      fi
+      ( cd "${crate}" && cargo bench --no-run $(locked_flag "${crate}") )
+      ;;
+    msrv)
+      # The fuzz/ sub-crates are exempt: they are publish=false scaffolding
+      # that only ever builds under `cargo +nightly fuzz` with sanitizer
+      # instrumentation, so a stable floor would be a claim nothing checks.
+      if [[ "${crate}" == */fuzz ]]; then
+        echo "  (fuzz sub-crate — nightly only, exempt from the MSRV)"
+        return 0
+      fi
+      local msrv declared
+      msrv="$(msrv_version)"
+      # Consistency first, because it is instant and catches the common
+      # failure: a crate added without the field at all.
+      declared="$(sed -n 's/^rust-version *= *"\([^"]*\)".*/\1/p' \
+                    "${crate}/Cargo.toml" | head -1)"
+      if [[ -z "${declared}" ]]; then
+        echo "  ${crate}/Cargo.toml declares no rust-version (expected ${msrv})" >&2
+        return 1
+      fi
+      if [[ "${declared}" != "${msrv}" ]]; then
+        echo "  ${crate}/Cargo.toml rust-version = ${declared}, but ci/msrv.txt says ${msrv}" >&2
+        return 1
+      fi
+      if ! rustup toolchain list 2>/dev/null | grep -q "^${msrv}"; then
+        echo "  Rust ${msrv} is not installed:" >&2
+        echo "    rustup toolchain install ${msrv} --profile minimal" >&2
+        return 1
+      fi
+      # `--all-targets` on purpose: benches and tests reach for APIs the
+      # library does not, and an MSRV that only holds for src/ is not one
+      # a consumer can rely on.
+      ( cd "${crate}" && cargo "+${msrv}" check --all-targets $(locked_flag "${crate}") )
+      ;;
     *)
       echo "unknown stage: ${STAGE}" >&2
       exit 2
       ;;
   esac
 }
+
+# Repo-wide stages run once and ignore any crate argument: they check the
+# git index and tracked content, which have no per-crate slicing.
+if [[ "${STAGE}" == "docs" ]]; then
+  echo "==> docs: agents-directory-name-is-lowercase"
+  # Read the *index*, not the filesystem. On a case-insensitive
+  # filesystem `ls` happily answers for either spelling, which is exactly
+  # how 878 references to a path that did not exist survived three weeks
+  # unnoticed. See spec/agents-directory-name-is-lowercase.md.
+  docs_failed=0
+  bad_paths="$(git ls-files | grep -E '(^|/)AGENTS/' || true)"
+  if [[ -n "${bad_paths}" ]]; then
+    echo "  tracked paths with an uppercase AGENTS/ directory segment:" >&2
+    printf '    %s\n' ${bad_paths} >&2
+    echo "  rename via a temporary name (a case-only git mv is a silent" >&2
+    echo "  no-op otherwise) — see the spec, §3." >&2
+    docs_failed=1
+  fi
+  # A reference to a path that does not exist is the failure the rule
+  # exists to prevent, and it can reappear with no directory renamed —
+  # someone simply types the old spelling into a new link.
+  # Two files are excluded because they must spell the forbidden form in
+  # order to forbid it: this checker and the spec that defines the rule.
+  # Excluding anything else would be a hole rather than a base case.
+  bad_refs="$(git grep -lI 'AGENTS/' -- . \
+      ':(exclude)scripts/ci-check.sh' \
+      ':(exclude)spec/agents-directory-name-is-lowercase.md' || true)"
+  if [[ -n "${bad_refs}" ]]; then
+    echo "  files referencing an uppercase AGENTS/ directory:" >&2
+    printf '    %s\n' ${bad_refs} >&2
+    echo "  the directory is 'agents/'; AGENTS.md the *file* is unchanged." >&2
+    docs_failed=1
+  fi
+  [[ "${docs_failed}" == 0 ]] && echo "  ok: no uppercase AGENTS/ directory path or reference"
+  exit "${docs_failed}"
+fi
 
 if [[ -n "${CRATE}" ]]; then
   echo "==> ${STAGE}: ${CRATE}"

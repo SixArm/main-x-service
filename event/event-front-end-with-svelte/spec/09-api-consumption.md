@@ -1,6 +1,6 @@
 ## 9. API Consumption
 
-The front-end binds 1:1 to the Event Service REST surface (see [`event-service-with-loco/AGENTS/restful.md`](../../event-service-with-loco/AGENTS/restful.md)). URLs are version-free (`/api/events`, not `/api/v1/events` — Event is the family's [API-versioning reference](../../../agents/share/api-versioning.md)); the BFF proxy (`src/routes/api/proxy/[...path]/+server.ts`) sends `Accepts-version: 1.0` on every forwarded request instead.
+The front-end binds 1:1 to the Event Service REST surface (see [`event-service-with-loco/agents/restful.md`](../../event-service-with-loco/agents/restful.md)). URLs are version-free (`/api/events`, not `/api/v1/events` — Event is the family's [API-versioning reference](../../../agents/share/api-versioning.md)); the BFF proxy (`src/routes/api/proxy/[...path]/+server.ts`) sends `Accepts-version: 1.0` on every forwarded request instead.
 
 | Endpoint | Used by |
 | --- | --- |

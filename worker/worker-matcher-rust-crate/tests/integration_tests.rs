@@ -204,7 +204,7 @@ fn test_diacritic_names_with_apostrophes_normalise_together() {
 
 #[test]
 fn test_double_barrelled_surnames_normalise_to_a_single_word() {
-    // "Lloyd-Webber" → "lloydwebber"; documented in AGENTS/normalization.md.
+    // "Lloyd-Webber" → "lloydwebber"; documented in agents/normalization.md.
     let p1 = Worker::builder()
         .given_name("Andrew")
         .family_name("Lloyd-Webber")

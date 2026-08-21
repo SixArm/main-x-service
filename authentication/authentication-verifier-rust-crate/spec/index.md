@@ -520,7 +520,7 @@ major.
   contract.
 - [src/lib.rs](../src/lib.rs) — implementation + rustdoc.
 - [../../spec/index.md](../../spec/index.md) — entity-level contract.
-- [../../AGENTS/verification.md](../../AGENTS/verification.md) — peer
+- [../../agents/verification.md](../../agents/verification.md) — peer
   integration guide.
 - [PASETO](https://paseto.io/) — Platform-Agnostic Security Tokens;
   v4.public = Ed25519 (RFC 8032). `rusty_paseto` crate.

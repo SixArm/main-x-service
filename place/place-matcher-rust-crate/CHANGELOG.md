@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ### Added — cargo-fuzz harness (SEC-I2)
 
 - A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate with
@@ -100,7 +112,7 @@ tracks the code follow-up:
   healthcare identifier"; they now match the spec §4.3.2 framing of the
   supported countries as place-data-source jurisdictions. The email
   normaliser doc no longer references "healthcare data".
-- Corrected the `PlaceCategory` variant count in `AGENTS/testing.md`
+- Corrected the `PlaceCategory` variant count in `agents/testing.md`
   (35 unit variants + `Other` = 36 total) and reworded the adapter
   builder-surface description to the actual `Place` builder (name /
   alternate_names, coordinates, category, place_ids, address, phone /

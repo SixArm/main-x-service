@@ -4,6 +4,7 @@
 name = "organization-service"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.95"
 publish = false
 default-run = "organization-service"
 
@@ -82,6 +83,7 @@ path = "src/bin/main.rs"
 required-features = []
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
 loco-rs = { workspace = true, features = ["testing"] }
 # The `TestServer` loco's testing harness hands to a request test, and
 # `multipart::{MultipartForm, Part}` for the BLK-5 bulk-import request
@@ -112,3 +114,7 @@ tokio = { version = "1.53", default-features = false, features = [
   # instead of busy-waiting.
   "time",
 ] }
+
+[[bench]]
+name = "service_bench"
+harness = false

@@ -7,6 +7,18 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ### Removed — dead `EventRepository::search` SQL method (QA-CUST-SQL)
 
 Audited for the same MySQL-placeholder footgun fixed in
@@ -123,7 +135,7 @@ AU-1, completing the five axum-style services (person was the reference).
 *Landed but never recorded here until this DOC-2 docs pass
 (2026-08-04) found the gap — shipped, tested, and reachable, but with
 no `spec/13` task, no `spec/14` row, no `spec/12` compliance-table row,
-no `AGENTS/restful.md` endpoint entry, and no `CHANGELOG.md` entry.*
+no `agents/restful.md` endpoint entry, and no `CHANGELOG.md` entry.*
 
 - **`src/compliance/mac.rs`** — this crate's binding to the shared
   `integrity-mac` crate: SHA-256, SHA3-256, and (when a key is
@@ -401,7 +413,7 @@ no `AGENTS/restful.md` endpoint entry, and no `CHANGELOG.md` entry.*
 ### Changed — documentation
 
 - Reduced healthcare / clinical / patient / hospital / clinician /
-  practitioner framing across spec.md, AGENTS.md, AGENTS/*, README,
+  practitioner framing across spec.md, AGENTS.md, agents/*, README,
   CLAUDE.md, and index.md. Preserved: FHIR R5 resource and field
   names (e.g. `Patient.birthPlace`, `Practitioner` resource),
   national-identifier proper nouns (United Kingdom National Health
@@ -409,8 +421,8 @@ no `AGENTS/restful.md` endpoint entry, and no `CHANGELOG.md` entry.*
   `compliance-for-healthcare.md` doc, and `HIPAA` / `NHS` / `PHI`
   as compliance regimes.
 - `spec.md §11 Testing Strategy` now lists the bridge integration
-  tests; `AGENTS/testing.md` gained a `## Bridge Integration Tests`
-  section; `AGENTS/restful.md` gained adapter + Prometheus blocks;
+  tests; `agents/testing.md` gained a `## Bridge Integration Tests`
+  section; `agents/restful.md` gained adapter + Prometheus blocks;
   `index.md` gained a worked example showing the canonical bridge
   in action.
 
@@ -440,7 +452,7 @@ no `AGENTS/restful.md` endpoint entry, and no `CHANGELOG.md` entry.*
   (physical + virtual required) and the `remaining ≤ total` capacity
   invariant (`src/validation/mod.rs`); added a FHIR-501 integration
   test (`tests/api_integration_test.rs`). Refreshed stale test counts
-  in `AGENTS/testing.md`.
+  in `agents/testing.md`.
 
 ### Removed
 

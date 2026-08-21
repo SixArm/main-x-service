@@ -8,7 +8,7 @@ and front-end representations are projections of it.
 
 Defined in the service crate (`src/models/`); field-by-field
 schema.org → Rust reference in
-[`course-service-with-loco/AGENTS/models.md`](../course-service-with-loco/AGENTS/models.md).
+[`course-service-with-loco/agents/models.md`](../course-service-with-loco/agents/models.md).
 Material aspects:
 
 - **Course (the template)** — Thing + CreativeWork + LearningResource

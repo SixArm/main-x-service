@@ -4,6 +4,7 @@
 name = "care-pathway-service"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.95"
 publish = false
 default-run = "care-pathway-service"
 
@@ -118,6 +119,7 @@ s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-credential-types"]
 fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
 # Temp dirs for the artifact-store tests (SEC-B4 confinement).
 tempfile = "3"
 loco-rs = { workspace = true, features = ["testing"] }
@@ -145,3 +147,7 @@ tokio = { version = "1.53", default-features = false, features = [
   "net",
   "rt-multi-thread",
 ] }
+
+[[bench]]
+name = "service_bench"
+harness = false

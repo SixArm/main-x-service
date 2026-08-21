@@ -35,7 +35,7 @@ Open gaps drive tasks in §13. Live gap list:
 
 | Gap | Task |
 |---|---|
-| Single-file crate specs; no service `AGENTS/` reference set | T-1 |
+| Single-file crate specs; no service `agents/` reference set | T-1 |
 | Event streaming is in-memory only (process-local ring buffer); no durable broker, no cross-replica delivery | T-3 follow-up / §15 |
 | Request-level tests exist but are `#[ignore]`-gated; no DB-backed run in CI yet | T-4 follow-up |
 | Front-end tests run locally but aren't wired into CI; no merge-action UI yet | T-5 follow-up |

@@ -30,7 +30,7 @@ are marked and tracked in §13 / §15.
 ### 6.2 Matching — matcher (algorithm) + service (endpoints)
 
 Algorithm reference:
-[`AGENTS/matching.md`](../AGENTS/matching.md) and the matcher
+[`agents/matching.md`](../agents/matching.md) and the matcher
 [spec §5–§18](../case-matcher-rust-crate/spec/index.md).
 
 - **FR-6** Deterministic short-circuits (matcher): score pins to

@@ -99,17 +99,17 @@ pub fn problems(pathway: &CarePathway) -> Vec<String> {
     // O(n·m) matcher scores them — a single huge string or array is a
     // CPU/memory DoS, amplified by the `check-duplicates` scan.
     size_problems(pathway, &mut out);
-    for (i, code) in pathway.condition_codes.iter().enumerate() {
+    for (i, code) in inspected(&pathway.condition_codes) {
         if let Some(problem) = condition_code_problem(i, code) {
             out.push(problem);
         }
     }
-    for (i, id) in pathway.identifiers.iter().enumerate() {
+    for (i, id) in inspected(&pathway.identifiers) {
         if let Some(problem) = identifier_problem(i, id) {
             out.push(problem);
         }
     }
-    for (i, tag) in pathway.in_language.iter().enumerate() {
+    for (i, tag) in inspected(&pathway.in_language) {
         if !is_valid_bcp47(tag.trim()) {
             out.push(format!(
                 "in_language[{i}]: {tag:?} is not a valid BCP-47 language tag"
@@ -117,6 +117,23 @@ pub fn problems(pathway: &CarePathway) -> Vec<String> {
         }
     }
     out
+}
+
+/// The entries a per-entry check actually inspects: at most
+/// [`MAX_ARRAY_LEN`] of them, paired with their index.
+///
+/// An array over the cardinality cap is **already rejected** by its own
+/// problem, so inspecting the tail decides nothing — while reporting a
+/// problem for every entry turns a small request into a large response
+/// (ten thousand blank entries produced ten thousand strings, all joined
+/// into one `422` body). Bounding the *report* is the same
+/// input-bounding rule as bounding the work (SEC-M1/SEC-M8).
+///
+/// Named rather than inlined as `.take(MAX_ARRAY_LEN)` at each call site
+/// so a per-entry loop added later without it reads as different from the
+/// ones that have it.
+fn inspected<T>(items: &[T]) -> impl Iterator<Item = (usize, &T)> {
+    items.iter().take(MAX_ARRAY_LEN).enumerate()
 }
 
 /// Push a problem for every field, array, or array entry that exceeds an
@@ -142,7 +159,7 @@ fn size_problems(pathway: &CarePathway, out: &mut Vec<String>) {
     string_array_caps(out, "in_language", &pathway.in_language);
 
     array_len_cap(out, "condition_codes", pathway.condition_codes.len());
-    for (i, cc) in pathway.condition_codes.iter().enumerate() {
+    for (i, cc) in inspected(&pathway.condition_codes) {
         if cc.code.chars().count() > MAX_ITEM_LEN {
             out.push(format!(
                 "condition_codes[{i}].code: exceeds {MAX_ITEM_LEN} characters"
@@ -150,7 +167,7 @@ fn size_problems(pathway: &CarePathway, out: &mut Vec<String>) {
         }
     }
     array_len_cap(out, "identifiers", pathway.identifiers.len());
-    for (i, id) in pathway.identifiers.iter().enumerate() {
+    for (i, id) in inspected(&pathway.identifiers) {
         if id.value.chars().count() > MAX_ITEM_LEN {
             out.push(format!(
                 "identifiers[{i}].value: exceeds {MAX_ITEM_LEN} characters"
@@ -172,7 +189,7 @@ fn text_cap(out: &mut Vec<String>, field: &str, value: &str) {
 /// string array `field`.
 fn string_array_caps(out: &mut Vec<String>, field: &str, items: &[String]) {
     array_len_cap(out, field, items.len());
-    for (i, item) in items.iter().enumerate() {
+    for (i, item) in inspected(items) {
         if item.chars().count() > MAX_ITEM_LEN {
             out.push(format!("{field}[{i}]: exceeds {MAX_ITEM_LEN} characters"));
         }
@@ -768,5 +785,29 @@ mod tests {
             ..CarePathway::new("placeholder")
         };
         assert!(problems(&p).is_empty(), "{:?}", problems(&p));
+    }
+    /// SEC-M8: the *report* is bounded, not just the work. A caller
+    /// sending ten thousand malformed condition codes used to get ten
+    /// thousand problem strings back — a small request buying a large
+    /// response, and here each one also ran a SNOMED/ICD check. The
+    /// cardinality problem alone is enough to reject the payload.
+    #[test]
+    fn an_oversized_array_does_not_produce_a_problem_per_entry() {
+        let mut pathway = CarePathway::new("Acute Stroke Care Pathway");
+        pathway.condition_codes = vec![cc(CodeSystem::Icd10, "not a code"); 10_000];
+        pathway.keywords = vec![String::new(); 10_000];
+        let out = problems(&pathway);
+        assert!(
+            out.len() <= 2 * (MAX_ARRAY_LEN + 1),
+            "expected at most the two cardinality problems plus one per \
+             inspected entry, got {}",
+            out.len()
+        );
+        for field in ["condition_codes", "keywords"] {
+            assert!(
+                out.contains(&format!("{field}: exceeds {MAX_ARRAY_LEN} entries")),
+                "the {field} cardinality problem must still be reported"
+            );
+        }
     }
 }

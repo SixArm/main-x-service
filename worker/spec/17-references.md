@@ -4,13 +4,13 @@
 
 | Subproject | Spec | AGENTS | Intro |
 |---|---|---|---|
-| worker-service-with-loco | [spec](../worker-service-with-loco/spec/index.md) (§1–§18) | [AGENTS/](../worker-service-with-loco/AGENTS/index.md) | [README](../worker-service-with-loco/README.md) · [index](../worker-service-with-loco/index.md) |
+| worker-service-with-loco | [spec](../worker-service-with-loco/spec/index.md) (§1–§18) | [agents/](../worker-service-with-loco/agents/index.md) | [README](../worker-service-with-loco/README.md) · [index](../worker-service-with-loco/index.md) |
 | worker-matcher-rust-crate | [spec](../worker-matcher-rust-crate/spec/index.md) (§1–§25) | [AGENTS.md](../worker-matcher-rust-crate/AGENTS.md) | [README](../worker-matcher-rust-crate/README.md) · [index](../worker-matcher-rust-crate/index.md) |
 | worker-front-end-with-svelte | [spec](../worker-front-end-with-svelte/spec/index.md) (§1–§18) | [AGENTS.md](../worker-front-end-with-svelte/AGENTS.md) | [README](../worker-front-end-with-svelte/README.md) |
 
 ### Entity-level reference docs
 
-[`../AGENTS/`](../AGENTS/index.md) — subproject map, model shapes,
+[`../agents/`](../agents/index.md) — subproject map, model shapes,
 matching layers, REST summary, testing seams.
 
 ### Project-root shared docs

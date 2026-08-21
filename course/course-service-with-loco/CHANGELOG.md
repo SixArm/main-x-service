@@ -8,6 +8,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec.md](./spec/index.md) — single source of truth (numbered §1–§18; live work queue in §13); [README.md](./README.md) — user-facing intro; [AGENTS.md](./AGENTS.md) — agent guide.
 
 ## [Unreleased]
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ### Added — Durable event bus, real-broker sink (BUS-3, 2026-08-03)
 
 `FluvioSink` (`src/relay.rs`) — the Phase-3 relay's real-broker
@@ -210,7 +222,7 @@ five axum-style services landed the same day as AU-1).
 - **Doc-harmonization pass** reconciling the SDD artefacts with the
   shipped T-16 state and the version bump to 0.3.0:
   - **Unit-test count 35 → 42** everywhere it was quoted (spec §11,
-    §14, `index.md` ×2, `AGENTS/testing.md` ×2). The count had not
+    §14, `index.md` ×2, `agents/testing.md` ×2). The count had not
     been reconciled after T-16's metrics tests landed; this pass also
     adds three new DB-free tests (a live `GET /metrics.prom` via
     `tower::oneshot`, a `canonical_pair` order-independence pin, and a
@@ -229,7 +241,7 @@ five axum-style services landed the same day as AU-1).
   - **Worked examples added**: `GET /metrics.prom` scrape output and a
     `409 Conflict` duplicate-on-create response shape (FR-1 / FR-20,
     `ScoredCandidate[]` under `error.details`) in both `index.md` and
-    `AGENTS/restful.md`; `AGENTS/restful.md` Health & ops table gains a
+    `agents/restful.md`; `agents/restful.md` Health & ops table gains a
     `/metrics.prom` row.
   - **spec §10** documents why `sea-orm` retains the `with-time`
     feature (older-service convention shared across the first-converted
@@ -337,16 +349,16 @@ five axum-style services landed the same day as AU-1).
   bridge tests / integration tests / benchmarks / OpenAPI so the
   table maps the whole current surface.
 
-- **AGENTS/models.md `CourseInstanceStatus` column omitted the wire
+- **agents/models.md `CourseInstanceStatus` column omitted the wire
   shape.** Listed the Rust variants in PascalCase but didn't mention
   the snake_case JSON / DB encoding (`enrollment_open`, not
   `EnrollmentOpen` or `enrollmentopen`). A client writing
   `"status": "EnrollmentOpen"` from this table alone would have
   hit a serde-rejected payload. Added the JSON wire-shape note.
-- **AGENTS/models.md + AGENTS/matching.md "planned T-2 / T-6"
+- **agents/models.md + agents/matching.md "planned T-2 / T-6"
   pointers** dropped to "shipped" — both modules have been live
   for several iterations. Also added a Phonetic-bonus subsection
-  to AGENTS/matching.md pointing at the matcher's T-6 work
+  to agents/matching.md pointing at the matcher's T-6 work
   (`+0.05` capped at `0.95`, initial-letter-preserving).
 
 - **index.md curl examples were unreachable.** Used
@@ -361,7 +373,7 @@ five axum-style services landed the same day as AU-1).
   Added a Swagger UI / OpenAPI pointer to the bottom of the
   "worked examples" block.
 
-- **AGENTS/testing.md was advertising aspirational tests.** Unit-
+- **agents/testing.md was advertising aspirational tests.** Unit-
   test table marked `matching::adapter`, `validation`, `search`,
   `privacy` as "planned T-X" for tasks that all shipped; bench
   block tagged "planned T-13" though benches landed; integration
@@ -383,7 +395,7 @@ five axum-style services landed the same day as AU-1).
   against the current state and added the
   `/swagger-ui` + `/api-docs/openapi.json` pointers.
 
-- **AGENTS/restful.md SearchQuery table was aspirational.** Listed
+- **agents/restful.md SearchQuery table was aspirational.** Listed
   `educational_level` / `language` / `provider_id` query filters
   that were never implemented and described the handlers as "stubs
   in MVP". Rewrote against the actual `SearchQuery` struct: `q` /
@@ -606,7 +618,7 @@ per `spec.md §13` task queue.
   switch (2026-06-03). `docker-compose.yml` brings up Postgres +
   service on host port `8084` (sidesteps person-service's `8080` so
   both can run side-by-side).
-- **Docs.** `spec.md` §1–§18, `AGENTS.md` + `AGENTS/{index,
+- **Docs.** `spec.md` §1–§18, `AGENTS.md` + `agents/{index,
   spec-driven-development, models, matching, restful, testing}.md`,
   `README.md`, `CLAUDE.md`, `index.md` with worked curl examples.
 

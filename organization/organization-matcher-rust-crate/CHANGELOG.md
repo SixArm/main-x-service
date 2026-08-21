@@ -10,6 +10,33 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+
+
+### Added — Criterion benchmarks
+
+- `benches/match_pair.rs`, matching the harness the other matcher crates
+  carry. Four groups over the paths a downstream integrator actually
+  exercises: single-pair scoring in three regimes (identical clone,
+  fuzzy near-match through the full pipeline, unrelated pair), the
+  deterministic short-circuits (a shared LEI, and a jurisdiction-scoped tax id), `rank` at 10 / 100 / 1000
+  candidates with `Throughput::Elements` set so per-candidate cost and
+  any super-linear scaling are visible directly, and the same fuzzy pair
+  under each shipped config preset.
+- Fixtures are built from `Organization::new` and derived deterministically from
+  an index, so a candidate list of any size is reproducible without
+  randomness.
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ### Fixed — doc accuracy pass (DOC-3)
 
 - **`spec/index.md` §5/§6/§7/§14a/§14b/§21 described the planned
@@ -29,7 +56,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   (`tests/property_tests.rs`, SEC-M6) and the `cargo-fuzz` harness
   (`fuzz/`, SEC-I2), both already landed earlier in this same
   `[Unreleased]` section. Added both; mirrored into
-  `AGENTS/testing.md`, which had the identical gap.
+  `agents/testing.md`, which had the identical gap.
 - Confirmed **SEC-M5** (LEI ISO 7064 MOD 97-10 / GLN GS1 mod-10
   check-digit validation) lives entirely in
   `organization-service-with-loco`'s `src/validation.rs` — this crate
@@ -83,7 +110,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
-- **Doc harmonization pass.** Corrected `AGENTS/spec-driven-development.md`,
+- **Doc harmonization pass.** Corrected `agents/spec-driven-development.md`,
   which carried unadapted course-matcher residue: the "When To Update
   Which Section" table now maps §10 Address, §11 URL/domain, §12
   Jurisdiction, §13 Founding date, §14 Keywords (was course-matcher's

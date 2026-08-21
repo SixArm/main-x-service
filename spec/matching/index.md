@@ -258,7 +258,7 @@ the multi-country `PassportBook` model. Parsers canonicalise
 where one exists; two textual layouts of the same identifier
 canonicalise to the same string for byte-equality comparison. The
 reference table lives in
-[person-matcher `AGENTS/national-person-identifiers.tsv`](../../person/person-matcher-rust-crate/AGENTS/national-person-identifiers.tsv)
+[person-matcher `agents/national-person-identifiers.tsv`](../../person/person-matcher-rust-crate/agents/national-person-identifiers.tsv)
 (and the worker mirror).
 
 ### 6.1 Scheme routing in the adapter

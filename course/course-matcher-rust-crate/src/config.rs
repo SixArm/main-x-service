@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Per-component weights + the probable-match threshold. Defaults
-/// pin the weights documented in `AGENTS/matching-algorithm.md`.
+/// pin the weights documented in `agents/matching-algorithm.md`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchConfig {
     /// Probable-match cutoff (probabilistic strategy). Default 0.85.

@@ -39,10 +39,10 @@ Rust crate.
 
 ## Detailed guides
 
-- [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md)
-- [AGENTS/normalization.md](./AGENTS/normalization.md)
-- [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md)
-- [AGENTS/testing.md](./AGENTS/testing.md)
+- [agents/matching-algorithm.md](./agents/matching-algorithm.md)
+- [agents/normalization.md](./agents/normalization.md)
+- [agents/spec-driven-development.md](./agents/spec-driven-development.md)
+- [agents/testing.md](./agents/testing.md)
 
 ## File layout
 

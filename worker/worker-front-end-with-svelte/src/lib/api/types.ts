@@ -1,5 +1,5 @@
 // TypeScript domain types mirroring the Rust Worker Service models.
-// Reference: worker-service-with-loco/AGENTS/models.md.
+// Reference: worker-service-with-loco/agents/models.md.
 // Field names use snake_case to match the JSON wire format produced by
 // the Axum/SeaORM stack.
 

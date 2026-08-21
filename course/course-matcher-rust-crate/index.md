@@ -101,7 +101,7 @@ Match `is_match` threshold: 0.85. Confidence bands: ≥0.95 High,
 ≥0.70 Medium, otherwise Low.
 
 Full derivation: [`spec.md`](spec/index.md) +
-[`AGENTS/matching-algorithm.md`](AGENTS/matching-algorithm.md).
+[`agents/matching-algorithm.md`](agents/matching-algorithm.md).
 
 ## Public surface
 

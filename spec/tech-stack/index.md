@@ -42,7 +42,7 @@ representative service manifests
 
 | Concern | Technology | Purpose |
 |---|---|---|
-| Language | Rust 1.93+/1.95+, 2024 edition | Systems performance + memory safety |
+| Language | Rust, 2024 edition; MSRV **1.95** | Systems performance + memory safety |
 | Async runtime | Tokio | Async I/O and concurrency (NOT async_std) |
 | Web framework | Axum 0.8 + Loco.rs 1.0 | HTTP server, routing, config/hooks/CLI (backend-only) |
 | HTTP layer | hyper, tower, tower-http | CORS, compression, tracing middleware |
@@ -239,7 +239,7 @@ external contract (REST + OpenAPI + the matcher DTO).
 | Aspect | Value |
 |---|---|
 | Rust edition (target) | 2024 |
-| MSRV | Rust 1.93+ (READMEs); 1.95+ stated in `rust-loco-stack.md` |
+| MSRV | **Rust 1.95** — current stable minus three, declared per crate and enforced in CI ([`../rust-msrv-n-minus-3.md`](../rust-msrv-n-minus-3.md)) |
 | Loco.rs | 1.0 |
 | Axum | 0.8 |
 | SeaORM | 2.0 |
@@ -249,9 +249,21 @@ external contract (REST + OpenAPI + the matcher DTO).
 | License | dual / multi (MIT OR Apache-2.0, sometimes plus BSD-3-Clause / GPL) |
 
 Crate versions are independent: each service, matcher, library, and
-front-end carries its own SemVer in its manifest. The 2024 edition +
-MSRV 1.93/1.95 is the target; the `organization-service` `edition =
-"2021"` row in §2.1 is the one current edition deviation.
+front-end carries its own SemVer in its manifest.
+
+**MSRV is no longer a README claim.** It is the current stable minus
+three — **1.95** today, derived from stable 1.98.0 — declared as
+`rust-version` in all 46 non-`fuzz` manifests, sourced from
+[`ci/msrv.txt`](../../ci/msrv.txt), and checked by
+`scripts/ci-check.sh msrv`, which compiles every crate against that
+toolchain. The policy, including why N-3 and how to bump it, is
+[`../rust-msrv-n-minus-3.md`](../rust-msrv-n-minus-3.md). Note that the
+binding constraint is the dependency graph, not our code: `loco-rs`,
+`sea-orm`, and `sqlx` already require 1.94.
+
+The remaining edition deviation is the twelve `migration/` sub-crates,
+which are still `edition = "2021"` (a loco generator default). Every
+top-level crate is on 2024.
 
 ---
 

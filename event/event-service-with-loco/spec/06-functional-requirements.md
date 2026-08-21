@@ -9,7 +9,7 @@
 
 ### 6.2 Matching
 
-Algorithm reference: [`AGENTS/matching.md`](../AGENTS/matching.md).
+Algorithm reference: [`agents/matching.md`](../agents/matching.md).
 
 Default component weights (sum to 1.0):
 
@@ -104,7 +104,7 @@ Service-only fields (`id`, `active`, `duration`, `time_zone`,
 `attendees`, `sponsors`, `funders`, `contributors`, `about`,
 `works`, `sub_events`, `offers`, `links`, audit timestamps) are
 dropped — they have no matcher counterpart. See
-[`AGENTS/matching.md`](../AGENTS/matching.md) for the in-service
+[`agents/matching.md`](../agents/matching.md) for the in-service
 algorithm and the matcher crate's
 [`spec.md §5–§7`](../../event-matcher-rust-crate/spec/index.md) for the
 canonical algorithm.

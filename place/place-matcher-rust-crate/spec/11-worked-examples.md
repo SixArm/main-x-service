@@ -1,6 +1,6 @@
 ## 11. Worked examples
 
-The examples below trace the spec through realistic place data. They are illustrative; the authoritative pinned behaviour lives in `tests/integration_tests.rs`, `tests/property_tests.rs`, and the doctests under `src/*.rs`. Further worked examples (Big Ben / Elizabeth Tower, Mt Snowdon / Yr Wyddfa, Wembley Stadium, batch ranking, strict mode) live in [`AGENTS/matching-algorithm.md`](../AGENTS/matching-algorithm.md).
+The examples below trace the spec through realistic place data. They are illustrative; the authoritative pinned behaviour lives in `tests/integration_tests.rs`, `tests/property_tests.rs`, and the doctests under `src/*.rs`. Further worked examples (Big Ben / Elizabeth Tower, Mt Snowdon / Yr Wyddfa, Wembley Stadium, batch ranking, strict mode) live in [`agents/matching-algorithm.md`](../agents/matching-algorithm.md).
 
 ### 11.1 Eiffel Tower / La Tour Eiffel — probabilistic match
 

@@ -3,7 +3,7 @@
 //!
 //! Per-component weights and deterministic-rule semantics live in the
 //! matcher crate; this facade only configures the `is_match` threshold
-//! and re-exports the result shape. See `AGENTS/matching.md` for the
+//! and re-exports the result shape. See `agents/matching.md` for the
 //! field-routing rules.
 
 use course_matcher::{MatchConfig, MatchingEngine};

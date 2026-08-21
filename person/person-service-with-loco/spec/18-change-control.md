@@ -18,7 +18,7 @@ behavioural diffs.
   `crate::db::models::audit_log::Model` type-reference fix, an
   `i64`→`u64` audit-limit cast, and a missing `sea_orm::sea_query::Expr`
   import); then expanded unit / integration / benchmark coverage and
-  filled out the `AGENTS/` reference docs. Outcome is reflected in the
+  filled out the `agents/` reference docs. Outcome is reflected in the
   current §11 (testing) and §14 (status); folded here from a former
   `docs/superpowers/plans/` implementation plan, now removed.
 

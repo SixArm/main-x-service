@@ -10,6 +10,36 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+
+
+### Added — Criterion benchmarks
+
+- `benches/verify_and_authorize.rs`. This crate sits on the
+  **per-request** path of every service in the family — verify a PASETO
+  v4.public token offline, then evaluate an ABAC policy — so its cost is
+  a fixed tax on every request, and the kind of cost that goes unnoticed
+  until it is measured. The harness covers token verification (valid,
+  bad signature, malformed), the built-in default policy across all four
+  derived actions, record-level and environment-aware evaluation, and
+  evaluation against policies of 1 / 10 / 100 rules so the
+  first-match-wins O(rules) linearity is visible before a deployment
+  writes a hundred-rule policy.
+- One property worth reading off the results: a **bad signature costs
+  roughly what a good one does**, because the Ed25519 verify runs either
+  way. A much cheaper reject would mean something is short-circuiting
+  ahead of the cryptography.
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ## [0.9.0] - 2026-08-05
 
 ### Added — algorithm agility for the verifier

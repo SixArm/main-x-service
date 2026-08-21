@@ -2,7 +2,7 @@
 
 **Crate:** `event-matcher` &nbsp;·&nbsp; **Version targeted:** `0.6.1` &nbsp;·&nbsp; **Status:** living
 
-This document is the living, single source of truth (SSOT) for the event-matcher surface of the crate. Every other document in the repository (`README.md`, `index.md`, `AGENTS.md`, `AGENTS/*.md`, `CHANGELOG.md`) summarises or quotes this file — none contradicts or extends it. When prose elsewhere disagrees with this file, this file wins; when this file disagrees with the code, see §9.
+This document is the living, single source of truth (SSOT) for the event-matcher surface of the crate. Every other document in the repository (`README.md`, `index.md`, `AGENTS.md`, `agents/*.md`, `CHANGELOG.md`) summarises or quotes this file — none contradicts or extends it. When prose elsewhere disagrees with this file, this file wins; when this file disagrees with the code, see §9.
 
 The keywords **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** are to be interpreted in the sense of RFC 2119 / RFC 8174.
 

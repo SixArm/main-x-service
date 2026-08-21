@@ -59,7 +59,7 @@ relative to this landscape is §8.
 - Subproject specs: [service](../case-service-with-loco/spec/index.md),
   [matcher](../case-matcher-rust-crate/spec/index.md),
   [front-end](../case-front-end-with-svelte/spec/index.md).
-- Entity AGENTS reference set: [`AGENTS/index.md`](../AGENTS/index.md).
+- Entity AGENTS reference set: [`agents/index.md`](../agents/index.md).
 - Shared docs: [`agents/share/index.md`](../../agents/share/index.md);
   sibling entity-level spec exemplars:
   [person/spec](../../person/spec/index.md),

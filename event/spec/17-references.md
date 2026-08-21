@@ -4,7 +4,7 @@
 
 - [event-service-with-loco](../event-service-with-loco/) —
   [spec](../event-service-with-loco/spec/index.md) ·
-  [AGENTS](../event-service-with-loco/AGENTS/index.md) ·
+  [AGENTS](../event-service-with-loco/agents/index.md) ·
   [README](../event-service-with-loco/README.md)
 - [event-matcher-rust-crate](../event-matcher-rust-crate/) —
   [spec](../event-matcher-rust-crate/spec/index.md) ·
@@ -17,8 +17,8 @@
 
 ### Entity-level
 
-- [`AGENTS/index.md`](../AGENTS/index.md) — entity agent reference set.
-- [`AGENTS/spec-driven-development.md`](../AGENTS/spec-driven-development.md) — SDD discipline + authority model.
+- [`agents/index.md`](../agents/index.md) — entity agent reference set.
+- [`agents/spec-driven-development.md`](../agents/spec-driven-development.md) — SDD discipline + authority model.
 - [`../event-service-schema.sql`](../event-service-schema.sql) — schema snapshot (§10.1).
 
 ### Sibling entities

@@ -1172,7 +1172,7 @@
   earlier the same day, `git add agents/share/index.md` (lowercase) on
   this case-insensitive-but-case-preserving filesystem silently failed
   to stage that file's modifications against its index entry tracked as
-  `AGENTS/share/index.md` — a known trap, already in this repo's own
+  `agents/share/index.md` — a known trap, already in this repo's own
   memory notes, and still worth tripping over apparently. Two edits
   (the OPS-1 runbook links, the DEP-2 `configuration.md` link) sat
   unstaged through two "completed" commits until this pass's `git
@@ -1304,7 +1304,7 @@
   section always renders its "not recorded" note today, but
   `src/lib/review.ts`'s `breakdownRows`/`MATCH_COMPONENTS` (place-
   matcher's real default weights — name 0.35, geo 0.25, address 0.20,
-  place_type 0.10, identifier 0.10, per `AGENTS/matching.md`) are fully
+  place_type 0.10, identifier 0.10, per `agents/matching.md`) are fully
   generic and unit-tested so the panel activates automatically the day
   the service ships the field. `/places/merge?main=…&duplicate=…` deep
   link added in either order (the merge page had no query-param seeding
@@ -2379,7 +2379,7 @@
   (verified by grep before deciding this), unlike `search_reindex`
   (a real service capability, fully documented in spec + AGENTS +
   CHANGELOG). `seed_examples` is closer to `integrity_key` in kind, so
-  it got the lighter footprint: AGENTS/README + CHANGELOG, no spec
+  it got the lighter footprint: agents/README + CHANGELOG, no spec
   rewrite.
 
   **Not done, deliberately out of scope**: `TUT-1`/`TUT-2`/`TUT-4` do
@@ -3307,15 +3307,15 @@ committing (see plan.md §4).
   15/16 Playwright suites pass (case-folder needs its live backend);
   no `effect_update_depth_exceeded` in the browser.
 
-## Phase 6 — Documentation harmonization (spec/AGENTS/README audit, 2026-08-04)
+## Phase 6 — Documentation harmonization (spec/agents/README audit, 2026-08-04)
 
 > Repo-wide: every subproject's `spec/` (the SDD single source of
-> truth), `AGENTS.md`/`CLAUDE.md`/`AGENTS/*` (working agreements), and
+> truth), `AGENTS.md`/`CLAUDE.md`/`agents/*` (working agreements), and
 > `README.md`/`index.md` (navigation + quick start) checked against the
 > **current** code, not against what the doc itself claims — the same
 > discipline that caught root `index.md` being stale since before
 > `case`/`project-portfolio-management` shipped (DOC-1, below). Every
-> `AGENTS.md`/`CLAUDE.md`/`AGENTS/*.md` file stays **under 40 KB**
+> `AGENTS.md`/`CLAUDE.md`/`agents/*.md` file stays **under 40 KB**
 > (none currently exceed it — confirmed 2026-08-04 — so this is a
 > guardrail on the edits here, not a current violation to fix). The
 > family's own stated anti-pattern is the thing to watch for and
@@ -3386,13 +3386,13 @@ committing (see plan.md §4).
     table still listed T-2/T-3/T-4 as open, "15 endpoints" stale to
     35+, FHIR row didn't say Patient-primary) and `spec/16` (OQ-1
     resolved — FHIR Organization lives in organization-service, not
-    here). `AGENTS/restful.md`: added three entirely-missing endpoint
+    here). `agents/restful.md`: added three entirely-missing endpoint
     groups (cross-service links, bulk import/export, and
     audit/compliance/erasure — 15 real mounted routes with no table
     entry) and fixed the FHIR table, which still described the
     pre-T-11 non-standard `resourceType: "Person"` prototype instead of
     the shipped `Patient`-primary/`Person`-alias shape.
-    `AGENTS/testing.md`: bench/bridge-test counts were off by one file
+    `agents/testing.md`: bench/bridge-test counts were off by one file
     / one test. `index.md`: corrected an OpenTelemetry-export
     overclaim and a "Prometheus metrics — future enhancement" claim for
     an endpoint that already ships (both against the honest matrix in
@@ -3412,7 +3412,7 @@ committing (see plan.md §4).
     a full independent README (Quick Start, Project Structure,
     Configuration, curl examples, …) that near-duplicated `index.md`
     almost section-for-section, *plus* a scattered set of `@`-imports
-    (`AGENTS/matching.md`, `AGENTS/models.md`, `agents/share/*.md`,
+    (`agents/matching.md`, `agents/models.md`, `agents/share/*.md`,
     …) that `AGENTS.md` itself did not carry — so a Claude Code session
     here was pulling in "read-only reference" content only because it
     happened to be interleaved into the README-shaped file, not because
@@ -3437,11 +3437,11 @@ committing (see plan.md §4).
     already shipped 2026-07-07 via T-12 — split into done sub-items
     (CapabilityStatement, ad hoc Bundle) vs. remaining (typed
     `Bundle`/`BundleEntry`, `POST`/transaction bundles, Touchstone
-    validation); mirrored into §14/§15. (3) **`AGENTS/models.md`
+    validation); mirrored into §14/§15. (3) **`agents/models.md`
     missing the `Worker.worker_type` field** entirely — a real,
     persisted, Tantivy-indexed, erasure-scrubbed field
     (`src/models/worker.rs`), not scaffolding; added to the field
-    table + a new `WorkerType` enum entry. (4) **`AGENTS/restful.md`
+    table + a new `WorkerType` enum entry. (4) **`agents/restful.md`
     missing the cross-service links endpoints** (`POST`/`GET`/`DELETE
     /api/workers/{pid}/links` + the bulk `GET /api/workers/links`
     pull) even though `spec/09-api-surface.md` §9.1 documents them in
@@ -3467,12 +3467,12 @@ committing (see plan.md §4).
     as "user-facing intro"). The same resolution applies to
     person/place/thing/event when their DOC-2 passes run — no
     independent re-derivation needed. Everything else checked out:
-    `AGENTS/matching.md`'s weight/threshold/rule tables verified
+    `agents/matching.md`'s weight/threshold/rule tables verified
     byte-accurate against `src/matching/scoring.rs`; `README.md`
     already symlinks to `index.md` (not a duplicate); the workforce
     assessment capability (worker's most distinctive vs. its siblings)
     is accurately covered end-to-end in spec §5.5/§6.9/§9.2/§10.5 and
-    `AGENTS/models.md`/`AGENTS/restful.md`. One pre-existing item
+    `agents/models.md`/`agents/restful.md`. One pre-existing item
     surfaced but deliberately **not** touched: `src/models/ods.rs` /
     `geography.rs` / `codesystem.rs` plus ~15 matching `src/db/models.rs`
     tables (NHS ODS organization expansion) have real domain models,
@@ -3498,41 +3498,41 @@ committing (see plan.md §4).
     (`src/compliance/` — SHA-256 + SHA3-256 digests + an HMAC-SHA256
     MAC via the shared `integrity-mac` crate, `GET /api/records/verify`
     + `GET /api/audit/verify`, landed 2026-07-27/28) had no `spec/13`
-    task, no `spec/14` row, and wasn't in `AGENTS/restful.md`'s
+    task, no `spec/14` row, and wasn't in `agents/restful.md`'s
     endpoint table or `spec/09` at all — added all three. While
     tracking this down, found `agents/share/overview.md`'s
     `integrity-mac` row was itself stale, naming only "person, worker,
     care-pathway, case" when the capability is now family-wide (all
     ten entity registries + authentication + link-graph, verified by
     directory listing + `git log`) — fixed that one shared line too.
-    (3) **Stale test counts everywhere**: `AGENTS/testing.md` said 125
+    (3) **Stale test counts everywhere**: `agents/testing.md` said 125
     unit tests, `spec/14-implementation-status.md` said 151,
     `index.md` said "191+" — the live count (`cargo test --lib`) is
     205 (207 incl. 2 DB-gated `#[ignore]`); none of the three matched
-    each other, let alone reality. Rewrote `AGENTS/testing.md`'s
+    each other, let alone reality. Rewrote `agents/testing.md`'s
     per-module table against a live `--list` run (new modules since
     the 125-test snapshot: `api::rest::auth`, `fhir`, `compliance::*`,
     `config`, `db::outbox`, `relay` — none previously documented) and
     corrected the other two. Also documented three DB/broker-gated
     integration-test files (`api_integration_test.rs`,
     `enforcement.rs`, `fluvio_relay.rs`) that existed but weren't
-    mentioned in `AGENTS/testing.md` at all. (4) **`AGENTS/models.md`**
+    mentioned in `agents/testing.md` at all. (4) **`agents/models.md`**
     didn't note which `Place` fields are `#[serde(default)]` /
     server-managed post-QA-SERVER-FIELDS — added a column. (5) **The
     `CLAUDE.md`/`AGENTS.md` split**: same finding and same fix as
     worker's note above (place was one of the five still-bloated
     crates it named) — thinned place's 21 KB `CLAUDE.md` to
-    `@AGENTS.md` (nothing in it was absent from `index.md`/`AGENTS/`)
+    `@AGENTS.md` (nothing in it was absent from `index.md`/`agents/`)
     and corrected place's own "doc hierarchy" table, which had the
     same inverted `CLAUDE.md`-groups-with-`README.md` claim. Matching
-    weights/confidence thresholds (`AGENTS/matching.md`) verified
+    weights/confidence thresholds (`agents/matching.md`) verified
     byte-accurate against `src/matching/scoring.rs`; `README.md`
     already symlinks to `index.md`.
 
   - *`thing/thing-service-with-loco` done 2026-08-04.* Confirmed
     today's QA-SERVER-FIELDS fix (8fecaac7) was already documented
     accurately in `spec/09-api-surface.md` and `CHANGELOG.md`; added a
-    corresponding note to `AGENTS/models.md` (which fields are now
+    corresponding note to `agents/models.md` (which fields are now
     `#[serde(default)]`) since it had none. Found and fixed several
     other real gaps, the same shapes place and worker's passes turned
     up: (1) **`spec/02-scope.md` claimed "REST API (Axum) + gRPC
@@ -3547,7 +3547,7 @@ committing (see plan.md §4).
     (`src/compliance/mac.rs`+`record_integrity.rs`+`audit_integrity.rs`,
     `GET /api/records/verify` + `GET /api/audit/verify`, landed
     2026-07-28) had no `spec/13` task, no `spec/14` row, no
-    `CHANGELOG.md` entry, and wasn't in `AGENTS/restful.md`'s endpoint
+    `CHANGELOG.md` entry, and wasn't in `agents/restful.md`'s endpoint
     table (which also still listed a phantom `/api/audit/user` that
     doesn't exist in the router) — added all four. (3) **A large,
     previously-undiscovered dead-config surface**: `SERVER_HOST`,
@@ -3573,7 +3573,7 @@ committing (see plan.md §4).
     different trait name (`EventSink`, not `EventProducer`) —
     marked `[x]` with a note on what's actually still open (no
     deployment points `THING_FLUVIO_ENDPOINT` at a broker yet). (5)
-    **`AGENTS/testing.md`** was missing 4 of the 10 real `tests/*.rs`
+    **`agents/testing.md`** was missing 4 of the 10 real `tests/*.rs`
     files (`api_integration_test.rs`, `duplicate_detection.rs`,
     `enforcement.rs`, `fluvio_relay.rs`) — added rows for all four. (6)
     **The `CLAUDE.md`/`AGENTS.md` split**: same finding and fix as
@@ -3584,7 +3584,7 @@ committing (see plan.md §4).
     strict subset of `index.md`, so this pass expanded `index.md`
     rather than discarding that content), and corrected thing's own
     "doc hierarchy" table, which had the same inverted
-    `CLAUDE.md`-groups-with-`README.md` claim. `AGENTS/matching.md`'s
+    `CLAUDE.md`-groups-with-`README.md` claim. `agents/matching.md`'s
     weight/confidence tables and its cross-references into the
     *entity-level* `thing/spec/13-tasks.md` (T-8) and
     `thing/spec/16-open-questions.md` (OQ-2) — distinct from this
@@ -3593,7 +3593,7 @@ committing (see plan.md §4).
 
   - *`organization/organization-service-with-loco` done 2026-08-04.*
     Confirmed `CLAUDE.md` is still the documented thin `@AGENTS.md`
-    one-liner (no drift since worker's DOC-2 pass), no `AGENTS/`
+    one-liner (no drift since worker's DOC-2 pass), no `agents/`
     directory (correct for a newer loco-idiomatic crate — §5's domain
     model section is intentionally short because the API DTO **is**
     `organization_matcher::Organization`, nothing forked to describe),
@@ -3669,7 +3669,7 @@ committing (see plan.md §4).
     `CourseInstance` sub-resource and a deliberately **non-standard**
     FHIR surface (`/fhir/Basic`, per `agents/share/fhir.md` §3, since no
     FHIR R5 resource models a course) — both were already documented
-    accurately in `spec/13`/`AGENTS/restful.md` — but several other real
+    accurately in `spec/13`/`agents/restful.md` — but several other real
     gaps of the same "shipped feature with zero spec presence" shape
     surfaced: (1) **`spec/02-scope.md` directly contradicted `spec/13`
     T-20**: it still listed "FHIR resource mapping (no FHIR resource
@@ -3690,14 +3690,14 @@ committing (see plan.md §4).
     (`src/api/rest/version.rs`, `Accepts-version`, landed 2026-07-08
     alongside T-20, 5 tests) — both had **zero** `spec/13` task, no
     `spec/14` row, and the integrity one had no `spec/12` mention either
-    (versioning was already in `AGENTS/restful.md`, just not `spec/`).
+    (versioning was already in `agents/restful.md`, just not `spec/`).
     Added `spec/13` T-24/T-25 plus an `AU-2` task for key-rotation/policy
     hot-reload (landed 2026-08-01, also missing), `spec/12`, `spec/07`
     env-var tables (`COURSE_INTEGRITY_MAC_KEY[_FILE|_ID|S_RETIRED]`,
     `COURSE_PASETO_KEYS_REFRESH_SECS`), `spec/14`, `spec/15`'s stale v0.4
     entry (still called Fluvio "next" though T-23 shipped it 2026-08-03),
     `spec/09`'s tier table (no FHIR row, no `/api/whoami` or
-    `/api/records|audit/verify` mention), `AGENTS/restful.md` (missing
+    `/api/records|audit/verify` mention), `agents/restful.md` (missing
     `/api/whoami` + the two verify endpoints), and `spec/08`'s module
     tree (missing `streaming/`, `privacy/`, `validation/`, `fhir/`,
     `compliance/`, `relay.rs` entirely). (3) **A genuine spec bug, not
@@ -3708,10 +3708,10 @@ committing (see plan.md §4).
     exactly `!LmsCourseId.is_deterministic()`); the deterministic set is
     DOI/Wikidata/**LOM**/OER/URI/UUID, and "LOM" (IEEE Learning Object
     Metadata) appears to have been mistyped as "LMS id" at some point —
-    fixed both. (4) **Stale test counts everywhere**: `AGENTS/testing.md`
+    fixed both. (4) **Stale test counts everywhere**: `agents/testing.md`
     said "109+", `spec/11`/`spec/14` said 42 — the live count
     (`cargo test --lib`) is 125 (123 run + 2 DB-gated `#[ignore]`).
-    Rewrote `AGENTS/testing.md`'s per-module table against a live
+    Rewrote `agents/testing.md`'s per-module table against a live
     `--list` run (14 modules were entirely missing, `api::rest::auth`
     alone carrying 25 untabulated tests) and added the two missing
     `tests/*.rs` files (`enforcement.rs`, `fluvio_relay.rs`) that
@@ -3720,9 +3720,9 @@ committing (see plan.md §4).
     `bg_pg` worker feature; this crate is already on loco 1.0.1, which
     renamed it to `worker` (per `CHANGELOG.md` 2026-08-02) — fixed the
     stale name in design prose for code that doesn't exist yet.
-    Everything else checked out: `AGENTS/models.md`'s `Course` +
+    Everything else checked out: `agents/models.md`'s `Course` +
     `CourseInstance` field tables verified byte-accurate against
-    `src/models/course.rs`/`course_instance.rs`; `AGENTS/matching.md`'s
+    `src/models/course.rs`/`course_instance.rs`; `agents/matching.md`'s
     weights (0.35/0.15/0.15/0.10/0.10/0.15) verified against
     `course-matcher`'s `MatchConfig::default`; quick-start commands and
     the docker-compose port mapping (host 8084 → container 8080)
@@ -3730,7 +3730,7 @@ committing (see plan.md §4).
 
   - *`care-pathway/care-pathway-service-with-loco` done 2026-08-04.*
     Confirmed `CLAUDE.md` is still the documented thin `@AGENTS.md`
-    one-liner (no drift), no `AGENTS/` directory (correct for a newer
+    one-liner (no drift), no `agents/` directory (correct for a newer
     loco-idiomatic crate), and `spec/index.md` §12 already states this
     crate's most load-bearing claim — it is the family's **reference
     implementation** of all four control-driving compliance frameworks
@@ -3839,7 +3839,7 @@ committing (see plan.md §4).
 
   - *`event/event-service-with-loco` done 2026-08-04.* Confirmed it is
     genuinely the api-versioning reference `agents/share/api-versioning.md`
-    names it: `AGENTS/restful.md` already correctly documents the
+    names it: `agents/restful.md` already correctly documents the
     version-free `Accepts-version` header (no stale `/api/v1` in any
     live doc; the `/api/v1` strings that remain are historical, dated
     `CHANGELOG.md` entries, correctly left unedited). Found the same
@@ -3849,7 +3849,7 @@ committing (see plan.md §4).
     `integrity-mac` crate, `GET /api/records/verify` +
     `GET /api/audit/verify`, landed 2026-07-28) had no `spec/13` task,
     no `spec/14` row, no `spec/12` compliance-table row, no
-    `AGENTS/restful.md` endpoint entry, and no `CHANGELOG.md` entry —
+    `agents/restful.md` endpoint entry, and no `CHANGELOG.md` entry —
     added all five. Also found and fixed a genuine **superseded-task**
     case distinct from the others' "shipped but undocumented" shape:
     `spec/13` T-4 ("Production Fluvio publisher — implement
@@ -3878,7 +3878,7 @@ committing (see plan.md §4).
     path that actually shipped), and `spec/15`'s roadmap listing
     Prometheus, the FHIR capability statement/Bundle, and Fluvio
     production as all still-future when each had already landed —
-    fixed all four. `AGENTS/testing.md` and `spec/11` were missing
+    fixed all four. `agents/testing.md` and `spec/11` were missing
     `bridge_bench.rs` from the benchmarks table and
     `tests/enforcement.rs` / `tests/fluvio_relay.rs` from the
     integration-tests list entirely (same shape course's DOC-2 pass
@@ -3901,9 +3901,9 @@ committing (see plan.md §4).
     stub (per the honest matrix in `agents/share/overview.md`) — plus a
     stale "Authentication: planned" line under Security & Compliance
     when PASETO verification + the blanket guard shipped 2026-07-04.
-    Everything else checked out: `AGENTS/matching.md`'s weights
+    Everything else checked out: `agents/matching.md`'s weights
     verified byte-accurate against `src/matching/scoring.rs`;
-    `AGENTS/models.md`'s `EventType` 29-variant list verified against
+    `agents/models.md`'s `EventType` 29-variant list verified against
     `src/models/mod.rs`; `README.md` already symlinks to `index.md`;
     quick-start commands verified runnable (`.env.example` present,
     `cargo loco start` path matches `AGENTS.md`).
@@ -4078,20 +4078,20 @@ committing (see plan.md §4).
     legitimate forward design, just mis-shelved as current behaviour).
     Also found and fixed two rustdoc-adjacent drifts of the "code
     changed, doc didn't" kind DOC-3 is chiefly aimed at:
-    `AGENTS/matching-algorithm.md`'s "Deterministic Logic" quick-view
+    `agents/matching-algorithm.md`'s "Deterministic Logic" quick-view
     section listed only 6 of the 42 identifier schemes and omitted
     passport-book agreement entirely (the "Full Branch List" appendix
     lower in the same file was already complete and correct — only the
     top summary was stale), and its "Component Scoring — Full Table"
     likewise stopped at 12 of 42 schemes with no note; both now state
-    the true scope. `AGENTS/architecture.md`'s "Public Surface" code
+    the true scope. `agents/architecture.md`'s "Public Surface" code
     block was missing `BloodType`/`PassportBook` from the `models`
     re-export list (both real, both in `lib.rs` since T-26/T-29+), and
     its "God modules" guidance cited a stale "~1,000 lines" split
     threshold that `matcher.rs` (3,455 lines) and `identifiers.rs`
     (4,058 lines) have long since passed by design (42-scheme
     boilerplate reads best kept together) — reworded rather than
-    picking an equally-arbitrary new number. `AGENTS/testing.md` had
+    picking an equally-arbitrary new number. `agents/testing.md` had
     one stale "(planned, see spec §18.4)" marker on property-based
     tests that the same file's own "Property Tests" section, twenty
     lines down, already correctly marks delivered (T-6 ✅) — fixed the
@@ -4101,7 +4101,7 @@ committing (see plan.md §4).
     warnings`, `cargo run --example basic_usage`; `README.md` confirmed
     a real symlink to `index.md`; `index.md`'s weight table (30/20/20/
     15/5/5/5/5) verified byte-accurate against `MatchConfig::default()`
-    in `src/matcher.rs`; `AGENTS/national-person-identifiers.md`'s
+    in `src/matcher.rs`; `agents/national-person-identifiers.md`'s
     "42-scheme parser reference" section (the canonical one) checked
     accurate — its separate, older 14-row background table at the top
     of the same file is pre-existing research context, not a claim
@@ -4127,7 +4127,7 @@ committing (see plan.md §4).
     "Code implementation is tracked in spec §23." Fixed by annotating
     §5/§6/§7/§13.1/§13.2/§21 as **planned, not yet implemented**
     (cross-referenced to §23) rather than deleting the design content —
-    consistent with this crate's own `AGENTS/spec-driven-development.md`
+    consistent with this crate's own `agents/spec-driven-development.md`
     policy ("when spec and code disagree, the spec is right... open a
     task in §23," not silently rewritten to match code), and with the
     ground rule to flag rather than quietly change scoring behaviour
@@ -4144,7 +4144,7 @@ committing (see plan.md §4).
     found no stale `///`/`//!` comments — every one matches current
     behaviour. `CLAUDE.md` is already the documented one-line
     `@AGENTS.md` include (no drift to fix, unlike the six older service
-    crates DOC-2 found). `README.md`/`index.md`/`AGENTS.md`/`AGENTS/
+    crates DOC-2 found). `README.md`/`index.md`/`AGENTS.md`/`agents/
     *.md` needed no changes — none of them mention `tags`/
     `relationships` and their usage examples/weight tables already
     matched the code. Verified live: `cargo test` (10 unit-test modules
@@ -4175,16 +4175,16 @@ committing (see plan.md §4).
     `RelationKind` from the *current* re-export list (that part was a
     flat factual error, not just forward-looking). Also added the
     SEC-M2 trivial-identifier/trivial-`same_as` skip behaviour to §15/
-    §16 and `AGENTS/matching-algorithm.md` (landed per `CHANGELOG.md`
+    §16 and `agents/matching-algorithm.md` (landed per `CHANGELOG.md`
     `[Unreleased]`, previously undocumented in spec), and the `fuzz/`
     cargo-fuzz harness (SEC-I2, also in `CHANGELOG.md` `[Unreleased]`)
-    to spec §24 and `AGENTS/testing.md`. Verified: `CaseStatus` has no
+    to spec §24 and `agents/testing.md`. Verified: `CaseStatus` has no
     `#[serde(rename_all)]` and nothing in spec/README/index/AGENTS
     claims a lowercase wire form — spec §6 correctly states bare
     PascalCase (`"Docket"`, `"InProgress"`). `CLAUDE.md` was already
     the thin `@AGENTS.md` include (no DOC-2-style drift to fix).
     `README.md`/`index.md` are accurate, not symlinks, and all 7
-    doctests + `cargo test --doc` pass. `AGENTS/*.md` (index,
+    doctests + `cargo test --doc` pass. `agents/*.md` (index,
     matching-algorithm, normalization, spec-driven-development, testing)
     were otherwise accurate against the live code. `cargo test`,
     `cargo clippy --all-targets --all-features -- -D warnings`, and
@@ -4210,18 +4210,18 @@ committing (see plan.md §4).
     reading as normative present-tense fact with no cross-reference to
     §23. Annotated all six "planned, not yet implemented — see §23"
     (design content kept, not deleted, per this crate's own
-    `AGENTS/spec-driven-development.md` "spec is right, don't launder a
+    `agents/spec-driven-development.md` "spec is right, don't launder a
     gap into code" doctrine) and corrected §21 to the real `lib.rs`
     list (dropped the false `RelationshipRef`/`RelationKind`/
     `relationships_score`/`tags_score` claims). Also found and fixed a
     second, independent gap: `spec/§24` (Testing strategy) and
-    `AGENTS/testing.md` named only unit tests, `tests/public_api.rs`,
+    `agents/testing.md` named only unit tests, `tests/public_api.rs`,
     and doctests — both missing the `proptest` property suite
     (`tests/property_tests.rs`, SEC-M6, 7 tests) and the `cargo-fuzz`
     harness (`fuzz/`, SEC-I2, 2 targets), both already shipped earlier
     in the same `CHANGELOG.md [Unreleased]` section; added both to
     spec §24 and a new "Property-based tests" / "Fuzzing" pair of
-    sections in `AGENTS/testing.md`. Checked SEC-M5 (LEI ISO 7064 MOD
+    sections in `agents/testing.md`. Checked SEC-M5 (LEI ISO 7064 MOD
     97-10 / GLN GS1 mod-10 check-digit validation) specifically per
     this task's prompt: it lives entirely in the sibling
     `organization-service-with-loco`'s `src/validation.rs`, not in this
@@ -4233,8 +4233,8 @@ committing (see plan.md §4).
     Everything else checked out: `CLAUDE.md` is already the documented
     one-line `@AGENTS.md` include (no drift, unlike the six older
     *service* crates DOC-2 found — this newer matcher never had the
-    bloated version); `AGENTS.md`, `AGENTS/matching-algorithm.md`,
-    `AGENTS/normalization.md`, and `AGENTS/spec-driven-development.md`
+    bloated version); `AGENTS.md`, `agents/matching-algorithm.md`,
+    `agents/normalization.md`, and `agents/spec-driven-development.md`
     (already harmonized against course-matcher residue by an earlier
     session per `CHANGELOG.md`) are all byte-accurate against
     `src/matcher.rs`/`src/normalize.rs`/`src/config.rs`; `README.md`
@@ -4276,13 +4276,13 @@ committing (see plan.md §4).
     removal rather than rewriting history. (3) `src/lib.rs`'s crate-doc
     strategy summary said "parent portfolio" for the timeframe/parent
     component list — stale `portfolio_ref`-era wording; corrected to
-    "parent plan (`parent_ref`)". (4) **`AGENTS/testing.md` and
+    "parent plan (`parent_ref`)". (4) **`agents/testing.md` and
     `spec/index.md` §23/§24 didn't mention the `proptest` suite
     (`tests/property_tests.rs`, SEC-M6, 6 tests) or the `fuzz/`
     cargo-fuzz harness (SEC-I2, 2 targets) at all** — both real,
     shipped, and already in `CHANGELOG.md [Unreleased]` — added a
     "Property-based tests" / "Fuzzing" section pair to
-    `AGENTS/testing.md` and corresponding §23 task entries + an updated
+    `agents/testing.md` and corresponding §23 task entries + an updated
     §24/status-line test count in `spec/index.md` (55 unit + 10
     integration was stale; live count is 57 unit + 10 integration + 6
     property + 7 doctests). (5) `AGENTS.md`'s file-layout table said
@@ -4342,12 +4342,12 @@ committing (see plan.md §4).
     `IdentifierScheme::is_deterministic` in `src/course.rs` exactly (the
     provider-scoped `LmsCourseId` variant is separately, correctly
     listed as NOT deterministic). Separately found and fixed a stale
-    test count: `index.md` and `AGENTS/testing.md` both said "76 unit
+    test count: `index.md` and `agents/testing.md` both said "76 unit
     tests," but `cargo test --lib -- --list` reports 78 (confirmed by
     direct `#[test]` grep across `src/*.rs` too); also added the
     previously-undocumented `tests/proptests.rs` (6 SEC-M6 property
     tests) and the `fuzz/` cargo-fuzz harness (two libFuzzer targets,
-    SEC-I2) to `index.md`, `AGENTS/testing.md`, and spec §24 — both
+    SEC-I2) to `index.md`, `agents/testing.md`, and spec §24 — both
     shipped per `CHANGELOG.md` `[Unreleased]` with zero prior mention
     in any doc. Rustdoc spot-check (`lib.rs`, `matcher.rs`, `scoring.rs`,
     `course.rs`, `config.rs`, `normalize.rs`, `phonetic.rs`, `error.rs`)
@@ -4359,8 +4359,8 @@ committing (see plan.md §4).
     `README.md` is a real symlink to `index.md`; both `index.md` code
     blocks (deterministic + probabilistic worked examples) use real
     public-API calls and were hand-verified against `matcher.rs`/
-    `scoring.rs`. `AGENTS/index.md`, `AGENTS/normalization.md`, and
-    `AGENTS/spec-driven-development.md` needed no changes — none
+    `scoring.rs`. `agents/index.md`, `agents/normalization.md`, and
+    `agents/spec-driven-development.md` needed no changes — none
     mention `tags`/`relationships` and stayed accurate throughout.
     Verified live: `cargo test --lib` (78 passed), `cargo test --doc`
     (13 passed), `cargo test --test public_api` (16 passed),
@@ -4399,16 +4399,16 @@ committing (see plan.md §4).
     **any** of the following hold," reading as an exhaustive list when
     `deterministic_identifier_match`'s `schemes` slice in the same file
     covers all 42 — reworded to state the true scope and point at
-    `AGENTS/matching-algorithm.md`'s full branch table. Fixed a second
+    `agents/matching-algorithm.md`'s full branch table. Fixed a second
     stale rustdoc claim: `src/normalizer.rs`'s module doc said email
     and middle-name normalisation were out of scope "(see spec tasks
     T-11 and OQ-1 respectively)," but both shipped long ago
     (`Normalizer::normalize_email` is implemented and tested;
     `middle_name` runs through the same `Normalizer::normalize_name`
     path as given/family names) — corrected. Fixed a wrong filename in
-    `spec/23` T-17.1: it pointed at `AGENTS/national-worker-
+    `spec/23` T-17.1: it pointed at `agents/national-worker-
     identifiers.tsv`, which doesn't exist — the real file is
-    `AGENTS/national-person-identifiers.md`'s companion
+    `agents/national-person-identifiers.md`'s companion
     `national-person-identifiers.tsv` (confirmed the 7 T-17.1 scheme
     rows are indeed still missing from it, so the task itself stays
     open, just correctly named now). Checked `CHANGELOG.md`
@@ -4493,21 +4493,21 @@ committing (see plan.md §4).
     correct `spec/*.md` file together (it would misreport the spec as
     unsynced) — fixed to match on the `^spec/` path prefix, and fixed
     the same script's own stale `spec.md §23 T-7` comment (§23 doesn't
-    exist; `AGENTS/spec-driven-development.md` explicitly names this
+    exist; `agents/spec-driven-development.md` explicitly names this
     exact stale-reference pattern as a thing to fix on sight). Fourth:
-    `AGENTS/release.md` and `AGENTS/security-and-privacy.md` both told
+    `agents/release.md` and `agents/security-and-privacy.md` both told
     contributors to run `cargo audit` before release, but the crate's
     actual CI gate (`.github/workflows/security.yml`) runs `cargo deny
     check` instead (superseding `cargo audit` per that workflow's own
     comment) — updated both, and added the missing checklist line.
     Fifth: `mimalloc` is a real `Cargo.toml` runtime dependency (used by
     `src/main.rs`'s musl-gated global allocator) absent from both
-    `AGENTS/coding-style.md`'s and `AGENTS/security-and-privacy.md`'s
+    `agents/coding-style.md`'s and `agents/security-and-privacy.md`'s
     "current direct runtime dependencies" lists — added, with the
     demo-binary-only caveat. Sixth: `fuzz/` (SEC-I2, 3 libFuzzer
     targets) and `deny.toml` (SEC-I1) are real, CI-wired additions with
-    zero mention anywhere in `AGENTS.md`/`AGENTS/testing.md` — added a
-    Fuzzing section to `AGENTS/testing.md` and both to `AGENTS.md`'s
+    zero mention anywhere in `AGENTS.md`/`agents/testing.md` — added a
+    Fuzzing section to `agents/testing.md` and both to `AGENTS.md`'s
     file-layout tree (which also still said `spec.md` there — fixed to
     `spec/`). Verified clean throughout: `cargo fmt --check`, `cargo
     clippy --all-targets -- -D warnings`, `cargo test` (163 lib + 12
@@ -4518,7 +4518,7 @@ committing (see plan.md §4).
 
   - *`thing/thing-matcher-rust-crate` done 2026-08-04.* This crate's
     spec follows its own §1–§13 shape (not the family's typical §1–§25
-    for matchers — `AGENTS/spec-driven-development.md` states this
+    for matchers — `agents/spec-driven-development.md` states this
     explicitly, "the spec runs §1–§13," and it is internally
     consistent, so nothing to fix there). `CLAUDE.md` was already the
     thin `@AGENTS.md` one-liner (no DOC-2-style drift). Found the same
@@ -4538,7 +4538,7 @@ committing (see plan.md §4).
     "**Not yet implemented**" (kept the design content, not deleted)
     and added **OQ-E** to `spec/10-open-questions.md` — this crate has
     no `§13`-as-tasks convention (§13 here is References; its own
-    `AGENTS/spec-driven-development.md` says outstanding work
+    `agents/spec-driven-development.md` says outstanding work
     consolidates into §10), so OQ-E is now the load-bearing pointer
     back to the CHANGELOG follow-up. Fixed a genuine **internal
     self-contradiction**: `spec/03-data-model.md` §3.7's own Rust code
@@ -4549,7 +4549,7 @@ committing (see plan.md §4).
     in §7.3: it claimed `MatchBreakdown` (along with `Thing`) is
     `#[non_exhaustive]`, but grepping `src/*.rs` shows only `Thing` and
     `MatchingError` carry the attribute (confirmed against this same
-    crate's own `AGENTS.md`/`AGENTS/architecture.md`, which already
+    crate's own `AGENTS.md`/`agents/architecture.md`, which already
     stated the correct two-item list) — means adding
     `relationships_score`/`tags_score` later will actually be a
     struct-literal-breaking change, now stated. Fixed a **stale
@@ -4574,7 +4574,7 @@ committing (see plan.md §4).
     (and the workflow's) stale `spec.md §23 T-7` header-comment
     reference — §23 doesn't exist in this crate's §1–§13 shape.
     Also independently found the same **`cargo audit` vs `cargo deny`
-    mismatch**: `AGENTS/security-and-privacy.md` and `AGENTS/
+    mismatch**: `agents/security-and-privacy.md` and `agents/
     release.md` both told contributors to run `cargo audit`, but this
     crate's actual `.github/workflows/security.yml` runs `cargo deny
     check` (confirmed by reading the workflow, whose own comment says
@@ -4586,13 +4586,13 @@ committing (see plan.md §4).
     though `tests/adapter_contract.rs`'s own doc comment already cites
     "spec §5.6" as documenting it; `spec/09` referenced "a task in
     §13" for drift resolution when this crate's §13 is References, not
-    tasks (repointed to §10, matching its own `AGENTS/
+    tasks (repointed to §10, matching its own `agents/
     spec-driven-development.md`); a stale "(10 tests)" adapter-contract
-    count in both `spec/09` and `AGENTS/testing.md` (real count is 11,
+    count in both `spec/09` and `agents/testing.md` (real count is 11,
     confirmed via `cargo test --test adapter_contract`); stray
     double-curly-brace template artifacts (`MatchResult {{ score, ...
-    }}`) in `AGENTS/testing.md`; `mimalloc` missing from the dependency
-    lists in `AGENTS/security-and-privacy.md` and `AGENTS/release.md`
+    }}`) in `agents/testing.md`; `mimalloc` missing from the dependency
+    lists in `agents/security-and-privacy.md` and `agents/release.md`
     (it's a real `[dependencies]` entry, used only by the
     `src/main.rs` demo binary's musl `#[global_allocator]`, not linked
     into the library); and `fuzz/` (SEC-I2, already in `CHANGELOG.md
@@ -4600,13 +4600,13 @@ committing (see plan.md §4).
     Rustdoc spot-check (`lib.rs`, `matcher.rs`, `scorer.rs`,
     `normalizer.rs`, `models.rs`) found no other stale `///`/`//!`
     comments — spot-verified the Soundex worked-example table in
-    `AGENTS/normalization.md` (Robert/Rupert → R163, Ashcraft → A261,
+    `agents/normalization.md` (Robert/Rupert → R163, Ashcraft → A261,
     Smith/Smyth → S530) against the real `Normalizer::phonetic_code`
     output via a throwaway example binary (deleted after) — all five
     matched exactly. `README.md` is a real symlink to `index.md`;
     neither mentions tags/relationships and every code snippet in
-    `index.md` uses real, current public API. `AGENTS/architecture.md`,
-    `AGENTS/matching-algorithm.md`, `AGENTS/coding-style.md` needed no
+    `index.md` uses real, current public API. `agents/architecture.md`,
+    `agents/matching-algorithm.md`, `agents/coding-style.md` needed no
     changes — all already accurate. Verified clean throughout:
     `cargo test --lib` (86), `cargo test --test adapter_contract` (11),
     `cargo test --doc` (67), full `cargo test` (all suites green). This
@@ -4638,7 +4638,7 @@ committing (see plan.md §4).
     divergence"). Fixed with "planned, not yet implemented" callouts
     in all four files rather than deleting the design (real tracked
     work per the CHANGELOG). Second, much larger finding: **every file
-    in `AGENTS/` (architecture.md, coding-style.md,
+    in `agents/` (architecture.md, coding-style.md,
     matching-algorithm.md, normalization.md, release.md,
     security-and-privacy.md, spec-driven-development.md) was still
     describing the crate's pre-0.5.0 domain** — `Place`, `PlaceBuilder`,
@@ -4651,8 +4651,8 @@ committing (see plan.md §4).
     `normalize_email` are unused library-only utilities, per
     `spec/04-normalisation.md`'s own explicit note). `AGENTS.md` and
     `CLAUDE.md` themselves were already correctly rewritten for Event
-    at the 0.5.0 rebrand; only the `AGENTS/*.md` topic guides were
-    missed, for all seven files — the largest single-crate `AGENTS/`
+    at the 0.5.0 rebrand; only the `agents/*.md` topic guides were
+    missed, for all seven files — the largest single-crate `agents/`
     staleness found in this batch so far. Rewrote all seven files
     against the real `src/models.rs`/`src/matcher.rs` surface: correct
     default-weight table (name/start_date/end_date/location/category/
@@ -4931,7 +4931,7 @@ committing (see plan.md §4).
   server.ts`, `src/lib/server/`, the proxy route, or the board/
   calendar/signin/verify routes. (8) Test counts were stale
   everywhere they appeared (`spec/14-implementation-status.md`,
-  `README.md`, `AGENTS/testing.md` all said 27 vitest tests; a live
+  `README.md`, `agents/testing.md` all said 27 vitest tests; a live
   `pnpm test` run shows 35 across 6 files — `i18n.test.ts` and
   `layout.test.ts` were never counted). Verified live:
   `pnpm install`, `pnpm check` (446 files, 0 errors/0 warnings),
@@ -5042,7 +5042,7 @@ committing (see plan.md §4).
   three new screens and auth entirely, and named a `person-form-
   validation.test.ts` that has never existed (verified against the
   live `tests/unit/` directory — only 7 files exist); replaced with
-  the real file list. (8) `AGENTS/testing.md` still listed only 2 of
+  the real file list. (8) `agents/testing.md` still listed only 2 of
   7 unit-test files and said `pnpm svelte-check` where the documented
   script is `pnpm check`. Did not touch `person/person-service-with-
   loco` (out of this task's boundary) or any of the other ten
@@ -5265,7 +5265,7 @@ committing (see plan.md §4).
     prose update anywhere — `spec/`, `README.md`, `AGENTS.md`, `index.md`
     all still said "bilingual (English + Welsh)"; fixed throughout.
     Also fixed: this crate was the **only one of the 11** front-ends
-    using `AGENTS/share/…` (uppercase) link casing instead of the
+    using `agents/share/…` (uppercase) link casing instead of the
     `agents/share/…` all 431 other references repo-wide use — git
     tracks the directory as `AGENTS`, so the uppercase form isn't
     "wrong" in isolation, but macOS's case-insensitive filesystem was
@@ -6014,7 +6014,7 @@ committing (see plan.md §4).
   capability tables, stale `.env.example` files, "Backend-only"-style
   absolute claims that stopped being true) across anything DOC-2..7
   didn't individually call out, and confirm no `AGENTS.md`/`CLAUDE.md`/
-  `AGENTS/*.md` file crossed 40 KB as a result of this pass's edits.
+  `agents/*.md` file crossed 40 KB as a result of this pass's edits.
 
   **Done 2026-08-04.** First reconciled the one real inconsistency
   DOC-7 left open: two of its five audits (patient-flow,
@@ -6028,7 +6028,7 @@ committing (see plan.md §4).
   architecture, genuinely different shape).
 
   Then the sweep itself: **40 KB check** — zero `AGENTS.md`/
-  `CLAUDE.md`/`AGENTS/*.md` files exceed it repo-wide (confirmed via
+  `CLAUDE.md`/`agents/*.md` files exceed it repo-wide (confirmed via
   `find` + `stat`, not sampling). **"Backend-only" claim** — the only
   remaining hit is `tasks.md`'s own DOC-1 entry, which is the
   historical record of finding and fixing that exact claim in root
@@ -6051,3 +6051,270 @@ committing (see plan.md §4).
   and DOC-7/DOC-8 scope. **`DOC-6` (`link-graph-service-with-loco`)**
   was queued behind LNK-4's T-32/T-33 — both now landed (2026-08-04) —
   so `DOC-6` is unblocked but still not started.
+
+---
+
+## Phase 7 — MSRV policy, fuzz and benchmark coverage (2026-08-20)
+
+One pass in four parts: declare and enforce a Minimum Supported Rust
+Version, extend the fuzz harnesses to the two library crates that lacked
+one, extend the Criterion benchmarks to the crates that lacked one, and
+fix what the new benchmarks and fuzz targets found. The last part is the
+point: a benchmark nobody has ever run is a benchmark that has never told
+anyone anything, and both of the substantive defects below were found by
+running one.
+
+- [x] **MSRV-1 (M)** Declare and enforce the MSRV. *(done 2026-08-20)*
+  New [`spec/rust-msrv-n-minus-3.md`](spec/rust-msrv-n-minus-3.md): the
+  floor is the **current stable minus three**, today **1.95** (from
+  stable 1.98.0, released 2026-08-18). Single source of truth in
+  [`ci/msrv.txt`](ci/msrv.txt); `rust-version = "1.95"` added to all 46
+  non-`fuzz` `Cargo.toml` files (there is no root manifest to inherit
+  from). New `scripts/ci-check.sh msrv` stage asserts every manifest
+  agrees with `ci/msrv.txt` and then runs `cargo +1.95 check
+  --all-targets` per crate; wired into both pipelines as its own job so
+  it gets its own cache rather than thrashing the stable one. The
+  `fuzz/` sub-crates are exempt and say so — cargo-fuzz is nightly-only,
+  so a stable floor there would be a claim nothing checks.
+  *Verified:* all 46 crates compile on 1.95 (full sweep, not a sample).
+  *Worth knowing:* the binding constraint is not our code, which builds
+  far below the floor, but the dependency graph — `loco-rs` 1.0.1,
+  `sea-orm` 2.0.0 and `sqlx` 0.9.0 already require **1.94**, so N-3
+  clears the real floor by exactly one release. A dependency bump can
+  therefore raise the floor above N-3 without a line of our code
+  changing; the `msrv` stage is what turns that into a red build rather
+  than a surprise in a consumer's CI.
+
+- [x] **MSRV-2 (S)** Compile the benchmarks in CI. *(done 2026-08-20)*
+  New `scripts/ci-check.sh bench` stage: `cargo bench --no-run` for any
+  crate declaring a `[[bench]]`, a no-op otherwise. Compile-only on
+  purpose — Criterion numbers from a shared CI runner are not worth
+  trusting, but a benchmark that stopped compiling is worth catching
+  before someone wants a number from it. The stage table in `AGENTS.md`
+  also gained the `fuzz` row it had been missing.
+
+- [x] **FUZZ-1 (M)** Fuzz the two library crates that had no harness.
+  *(done 2026-08-20)* `entity-ref` and `integrity-mac` gained `fuzz/`
+  sub-crates on the matcher family's SEC-I2 scaffolding, three targets
+  each. Both are small and pure, which is exactly why they earn it:
+  `entity-ref` is a **parser eight crates depend on**, reached from a
+  stored `TEXT` column and from request bodies; `integrity-mac`'s verify
+  path takes its input from precisely the adversary it exists to defend
+  against — someone holding the database can rewrite a stored MAC to any
+  string, and `KeySet::verify` then parses it.
+  *Result:* found SEC-M7 below on the first run.
+
+- [x] **SEC-M7 (S)** `integrity-mac` panicked on a stored MAC containing
+  a multi-byte character. *(done 2026-08-20)*
+  `decode_hex` sliced its input as a `&str` (`&s[i..i + 2]`), which
+  panics when the boundary lands inside a multi-byte character. Reachable
+  from `KeySet::verify` (attacker-editable stored value) and
+  `assess_key_hex` (operator-supplied key), so
+  `verify(domain, Some("k1:€a"), …)` aborted the process instead of
+  returning `Malformed` — a database-write foothold turned into a crash
+  on every reader of that row. Violated
+  [`security.md`](agents/share/security.md) §3 invariant 2 (never-panic
+  on untrusted input). Fixed by decoding over bytes; pinned by a unit
+  test and by the `verify_tag` fuzz target that found it. Deliberate
+  behaviour change alongside: the replaced `u8::from_str_radix` accepted
+  a leading sign (`"+f"` → `0x0f`), which is a corrupted row rather than
+  a number, and is now rejected.
+
+- [x] **BENCH-1 (M)** Criterion coverage for the crates that had none.
+  *(done 2026-08-20)* Added to the five matcher crates that lacked one
+  (course, organization, care-pathway, case, portfolio — so all ten now
+  carry the same four-group harness), to `authentication-verifier` and
+  `integrity-mac` and `entity-ref`, and to the four loco services
+  (organization, care-pathway, case, portfolio) as a `service_bench.rs`
+  covering validation, merge, and search.
+
+- [x] **PERF-1 (M)** The Tantivy index built a new writer on every write.
+  *(done 2026-08-20)* All four loco services called
+  `self.index.writer(WRITER_HEAP_MB)` per indexed document. Tantivy's
+  `IndexWriter` allocates its whole 50 MB arena and spawns merge threads
+  on construction, so **every create, update, merge, and soft-delete paid
+  that setup synchronously on the request path** — measured at ~155 ms
+  per document against a fresh index. It was also a concurrency hazard:
+  an `IndexWriter` holds the index directory's exclusive lock, so taking
+  and releasing it per call left two simultaneous writes able to collide
+  on it. Each engine now holds one `Mutex<IndexWriter>` for the process:
+  ~78 ms per document, the remainder being the durable commit and reader
+  reload that indexing-on-write inherently costs.
+  *Verified:* `clippy -D warnings` clean and the full DB-free suite green
+  in all four services; re-measured with the same benchmark that found it.
+
+- [x] **SEC-M8 (S)** An over-long array produced one `422` problem string
+  per entry. *(done 2026-08-20, case only — see below)*
+  `validation::problems` reported the array-cardinality violation once and
+  then still walked every entry, so ten thousand blank `subjects` came
+  back as ten thousand problem strings, which the controller joins into a
+  single response body: a small request buying a large response. Each
+  per-entry loop is now `.take(MAX_ARRAY_LEN)` — the cardinality problem
+  alone already rejects the payload, so inspecting the tail decides
+  nothing, and bounding the **report** is part of the same input-bounding
+  rule (SEC-M1) as bounding the work. Pinned by a test.
+
+- [x] **SEC-M8b (S)** Roll SEC-M8 to organization, care-pathway, and
+  portfolio. *(done 2026-08-21)* All three had the same unbounded
+  per-entry loops, and two were worse than case: organization ran the
+  SEC-M5 check-digit validation per entry, care-pathway an
+  ICD-10/ICD-11/SNOMED CT check (SNOMED including a Verhoeff digit).
+  Portfolio had **thirteen** such loops across `problems` and
+  `push_size_cap_problems`.
+
+  Rather than sprinkle thirteen-plus inline `.take(MAX_ARRAY_LEN)` calls,
+  each crate gained a named `inspected()` helper carrying the rationale,
+  and **case was retrofitted to it** so all four read alike — a loop added
+  later without the cap is now visibly different from the ones with it.
+  Care-pathway's `string_array_caps` was capped inside the helper itself,
+  where the cardinality problem is emitted, so the two cannot separate.
+  Deliberately untouched: `is_valid_uuid`'s 36-byte loop and the Verhoeff
+  digit loop, neither of which is attacker-scaled.
+
+  *Verified:* the new test fails without the cap (10 002 problems, checked
+  by reverting) and passes with it; `clippy -D warnings` clean and the
+  full DB-free suite green in all four (190 / 254 / 209 / 252 passing).
+  *Measured:* care-pathway's `validation/oversized_arrays` benchmark went
+  **112 µs → 4.9 µs** (~96%).
+
+- [x] **DOC-9 (M)** The agents directory name is lowercase.
+  *(done 2026-08-21)* Git tracked the agent reference docs under an
+  uppercase directory while **878 files referenced the lowercase
+  `agents/`** — including `AGENTS.md` line 3, the
+  `@agents/share/overview.md` include itself. Only two references used the
+  tracked spelling. Invisible on macOS (`core.ignorecase = true`); on a
+  case-sensitive filesystem, and in both remotes' web UIs, those paths
+  simply did not exist — so every such link was dead where these docs are
+  actually read, and the root include **silently failed to resolve**,
+  meaning an agent session on Linux loaded the project instructions
+  without the capability matrix.
+
+  Resolved in favour of lowercase, which is what 878 references already
+  said against two: **34 directories renamed** (the shared `agents/share/`
+  plus 33 per-subproject `agents/`), and the 1509 references across 441
+  files rewritten. `AGENTS.md` and `CLAUDE.md` — the *files* — keep their
+  conventional uppercase names; only the directory changed. The rule and
+  its rationale are now
+  [`spec/agents-directory-name-is-lowercase.md`](spec/agents-directory-name-is-lowercase.md).
+
+  A case-only `git mv` is a silent no-op on a case-insensitive
+  filesystem, so each rename went through a temporary name; the spec §3
+  records that, because doing it the obvious way appears to succeed.
+
+  **Enforced, not merely fixed:** the new `scripts/ci-check.sh docs`
+  stage fails when any tracked *path* or tracked *file content* names an
+  uppercase agents directory. It reads the git index rather than the
+  filesystem, since the filesystem is the layer that hid this for three
+  weeks. Wired into both pipelines as a no-build job. Its own checker and
+  its spec are the only exclusions — they must spell the forbidden form
+  in order to forbid it.
+
+  *Verified:* the gate passes clean, fails on a deliberately planted bad
+  link, and passes again once removed; 253 paths staged as pure renames
+  with zero stray add/delete; all 34 tracked symlinks survived the
+  content sweep as symlinks; every one of the 33 `.rs` changes is inside
+  a comment (the substitution is length-preserving, so rustfmt cannot
+  reflow); `fmt` and `docs` green tree-wide, and two spot-checked swept
+  crates lint clean with 109 and 852 tests passing.
+
+- [x] **FUZZ-2 (M)** Extend fuzzing past the library crates.
+  *(done 2026-08-21)* The four loco services each gained a `fuzz/`
+  sub-crate with three coverage-guided targets over the pure, total code
+  that actually faces the network — `validate_json` (bytes →
+  `serde_json` → DTO → `validation::problems`), `validate_built` (the
+  validator driven from raw bytes so the fuzzer controls array
+  cardinality directly, instead of having to learn JSON first), and the
+  merge fold. Twelve targets; 18 fuzz crates now discovered by
+  `scripts/ci-crates.sh`, up from 14.
+
+  The invariants are the point, not the coverage. Never-panic, yes — but
+  also: validation is **deterministic** (a `422` body must not depend on
+  iteration chance), its **problem report is bounded** independent of
+  payload size (the generalisation of SEC-M8, which the unit tests pin
+  for exactly one hand-written payload), and merge is **absorbing** —
+  re-merging the same duplicate adds nothing, which is what stops a merge
+  retried after a failed transaction from inflating the record.
+
+  One structural wrinkle worth recording: unlike the matcher crates, each
+  service **is** a workspace root, so `fuzz/` was pulled in as a member
+  and the build failed outright. The fix is an empty `[workspace]` table
+  in the sub-crate's manifest, which the matcher fuzz crates do not need
+  and therefore do not show.
+
+  *Verified:* all twelve targets build and run clean; the bounded-report
+  assertion was confirmed **live** by lowering its ceiling until it
+  fired, rather than assumed from a passing run; `clippy -D warnings`
+  clean on the new sub-crates (CI lints them); the `msrv` stage exempts
+  them; and the parent crates are unaffected (case still 250 passing).
+
+  *Still uncovered, deliberately:* the bulk CSV/JSONL row decoders in
+  organization and case, and link-graph's edge/event ingestion. Both want
+  a database or a fixture store, so they are a different shape of target
+  from these — worth doing, not worth conflating with this.
+
+- [x] **PERF-2 (M)** Where the per-document indexing cost actually is.
+  *(done 2026-08-21)* **The premise was wrong.** This task was written
+  assuming the ~78 ms remaining after PERF-1 was an fsync, and that the
+  number was inflated by measuring on APFS. Measured rather than assumed:
+
+  | | |
+  |---|---|
+  | write + `fsync` of a 64 KiB file, macOS APFS | **0.14 ms** |
+  | write + `fsync` of a 64 KiB file, Linux (podman container) | **0.017 ms** |
+
+  So durability is between 0.02% and 0.2% of the cost, on either
+  platform, and "measure it on Linux before deciding" would have changed
+  nothing. Decomposing the write path instead
+  (`src/search/mod.rs::perf2_decompose_index_cost`, an `#[ignore]`d
+  diagnostic that prints rather than asserts):
+
+  | phase | per document |
+  |---|---|
+  | `add_document` | 0.02 ms |
+  | **`commit`** | **96 ms** |
+  | reader `reload` | 0.6 ms |
+
+  **It is `commit()`, and it is not durability.** Committing one tiny
+  document produces one tiny segment, and the per-commit segment
+  bookkeeping and merge-policy work dominate — costs that are per
+  *commit*, not per document or per byte. That reframes the decision
+  entirely: batching is not a durability trade-off, it is the whole fix,
+  because N documents in one commit pay the ~96 ms once rather than N
+  times.
+
+  **What is still a real trade-off** is read-after-write visibility. The
+  request suites, and the duplicate check, expect a record to be findable
+  immediately after it is created. That is the property batching spends,
+  and it is a product decision rather than a performance one — so the
+  options are recorded here rather than chosen unilaterally:
+
+  1. **Commit on a short window** (e.g. 100 ms or N rows, whichever
+     first). Amortises ~96 ms across a batch; a record becomes findable
+     within the window rather than immediately.
+  2. **Index off the request path** (outbox → worker). The write returns
+     as soon as Postgres commits; search catches up. Largest win, biggest
+     change, and it makes the index visibly eventually-consistent — which
+     it already is after a restart-triggered rebuild.
+  3. **Keep the guarantee and pay it.** Defensible only while write
+     volume is low; at ~96 ms per create it is a hard ceiling of ~10
+     writes/second per service, which is worth stating out loud.
+
+  Bulk import is the case that makes this urgent rather than theoretical:
+  it indexes per row, so a 10 000-row import currently spends ~16 minutes
+  in `commit()` alone.
+
+
+- [x] **FMT-1 (S)** The repo-wide `fmt` gate was red on `main`.
+  *(done 2026-08-20)* `scripts/ci-check.sh fmt` failed in
+  `person-service-with-loco/migration` and
+  `worker-service-with-loco/migration` — eight files from commit
+  `013a69a1` (2026-07-27, "Add BLAKE3 columns and wire the chain
+  append"), each an over-long `include_str!` line rustfmt wants wrapped.
+  Nothing to do with this pass; found because the new fuzz sub-crates
+  made running the whole gate worth doing. Fixed by `cargo fmt` in the
+  two migration crates. `scripts/ci-check.sh fmt` is now green across
+  all 58 crates.
+  *Worth asking:* H-1 pinned the toolchain in July precisely so this
+  could not drift, and the gate still spent three weeks red — so the
+  question is not "why did formatting drift" but "why did nobody see the
+  red", i.e. whether CI actually ran on that commit.

@@ -1,0 +1,44 @@
+[package]
+name = "integrity-mac-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.integrity-mac]
+path = ".."
+
+# cargo-fuzz scaffolding for the keyed-integrity MAC crate (SEC-I2).
+# `MacKeys::verify` parses a stored tag that an adversary holding only the
+# database can rewrite at will, and `assess_key_hex` / `MacKeys::load`
+# parse operator-supplied configuration — all three are never-panic
+# targets, and the verify path additionally must never accept a forged
+# tag. Not a member of any parent workspace, so it never affects the
+# crate's normal build/test/clippy, and it carries no `rust-version`:
+# cargo-fuzz is nightly-only (spec/rust-msrv-n-minus-3.md §2).
+
+[[bin]]
+name = "verify_tag"
+path = "fuzz_targets/verify_tag.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "assess_key"
+path = "fuzz_targets/assess_key.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "load_keys"
+path = "fuzz_targets/load_keys.rs"
+test = false
+doc = false
+bench = false

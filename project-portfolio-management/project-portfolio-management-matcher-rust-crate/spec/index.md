@@ -421,7 +421,7 @@ property suite (`tests/property_tests.rs`, SEC-M6) proving never-panic,
 bounded-score, symmetry, no-kind-gate, and reflexivity invariants over
 arbitrary input; rustdoc examples run as doctests. A standalone,
 nightly-only `cargo-fuzz` harness (`fuzz/`, SEC-I2, two libFuzzer
-targets — see [`AGENTS/testing.md`](../AGENTS/testing.md)) complements
+targets — see [`agents/testing.md`](../agents/testing.md)) complements
 `proptest` with coverage-guided search; it is not part of the stable
 gate below. Gate (mirrors CI): `cargo test`, `cargo clippy
 --all-targets --all-features -- -D warnings`, `cargo fmt --check`.

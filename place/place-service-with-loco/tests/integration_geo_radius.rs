@@ -11,7 +11,7 @@
 //!    `matching::geo::within_radius` Haversine primitive that the future
 //!    endpoint will use is exercised here over a small collection of
 //!    places so the filtering semantics are pinned end-to-end.
-//! 2. **Matcher-bridge worked example** (`AGENTS/restful.md`). Drives two
+//! 2. **Matcher-bridge worked example** (`agents/restful.md`). Drives two
 //!    service-side records through `adapter::to_matcher_place` and the
 //!    canonical `place_matcher::MatchingEngine`, asserting on the runnable
 //!    result the docs describe.
@@ -99,7 +99,7 @@ fn geo_radius_is_monotonic_in_radius() {
 
 /// Matcher-bridge worked example: two near-duplicate records score as a
 /// confident match through the canonical engine. This is the runnable
-/// counterpart of the snippet in `AGENTS/restful.md`.
+/// counterpart of the snippet in `agents/restful.md`.
 #[test]
 fn matcher_bridge_worked_example_scores_near_duplicate() {
     let engine = MatchingEngine::new(MatchConfig::default());

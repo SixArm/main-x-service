@@ -1,7 +1,7 @@
 # course-front-end-with-svelte — index
 
 Navigation aid + worked flow examples. The behavioural source of truth
-is [`spec.md`](spec/index.md); deep references live in [`AGENTS/`](AGENTS/).
+is [`spec.md`](spec/index.md); deep references live in [`agents/`](agents/).
 
 ## Top-level documents
 
@@ -13,17 +13,17 @@ is [`spec.md`](spec/index.md); deep references live in [`AGENTS/`](AGENTS/).
 | [AGENTS.md](AGENTS.md) | Agent guide (ground rules, drift policy, tech-stack rules) |
 | [CHANGELOG.md](CHANGELOG.md) | Keep-a-Changelog history |
 
-## AGENTS/ (per-area detail)
+## agents/ (per-area detail)
 
 | Document | Purpose |
 |---|---|
-| [AGENTS/index.md](AGENTS/index.md) | This directory's index |
-| [AGENTS/spec-driven-development.md](AGENTS/spec-driven-development.md) | SDD discipline (three-part PRs, front-end specifics) |
-| [AGENTS/testing.md](AGENTS/testing.md) | Vitest unit + Playwright smoke (live integration is manual) |
+| [agents/index.md](agents/index.md) | This directory's index |
+| [agents/spec-driven-development.md](agents/spec-driven-development.md) | SDD discipline (three-part PRs, front-end specifics) |
+| [agents/testing.md](agents/testing.md) | Vitest unit + Playwright smoke (live integration is manual) |
 
 ## Sibling service
 
-- [`../course-service-with-loco/`](../course-service-with-loco/) — the system of record this UI calls. Its [`spec.md`](../course-service-with-loco/spec/index.md) and [`AGENTS/restful.md`](../course-service-with-loco/AGENTS/restful.md) are the API contract.
+- [`../course-service-with-loco/`](../course-service-with-loco/) — the system of record this UI calls. Its [`spec.md`](../course-service-with-loco/spec/index.md) and [`agents/restful.md`](../course-service-with-loco/agents/restful.md) are the API contract.
 
 ## Route map
 

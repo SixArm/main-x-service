@@ -666,24 +666,55 @@ fn parse_retired(config: KeyConfig, raw: &str, domains: &[&str]) -> HashMap<Stri
 }
 
 /// Decode a hex string of even length.
+///
+/// Works over **bytes**, not `&str` slices. Slicing `&s[i..i + 2]` panics
+/// when the boundary lands inside a multi-byte character, and this runs on
+/// two inputs nobody here controls: the stored MAC string, which an
+/// adversary holding only the database can rewrite to anything, and an
+/// operator-supplied key. `decode_hex("€a")` used to abort the process
+/// (`agents/share/security.md` invariant 2 — never-panic on untrusted
+/// input); the SEC-I2 `verify_tag` fuzz target now pins it.
+///
+/// Also stricter than the `u8::from_str_radix` it replaces, which accepted
+/// a leading sign: `"+f"` decoded as `0x0f`. Nothing writes such a value,
+/// and a sign in the middle of a hex digest is a corrupted row, not a
+/// number.
 fn decode_hex(s: &str) -> Option<Vec<u8>> {
-    let s = s.trim();
-    if !s.len().is_multiple_of(2) {
+    let bytes = s.trim().as_bytes();
+    if !bytes.len().is_multiple_of(2) {
         return None;
     }
-    (0..s.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).ok())
+    bytes
+        .chunks_exact(2)
+        .map(|pair| Some((hex_nibble(pair[0])? << 4) | hex_nibble(pair[1])?))
         .collect()
 }
 
+/// One hex digit as its 0–15 value, or `None` for any other byte.
+const fn hex_nibble(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
+    }
+}
+
 /// Lowercase hex.
+///
+/// Nibble lookup with the output pre-allocated, rather than `write!`ing
+/// each byte into a growing `String`. Formatting machinery per byte cost
+/// most of a microsecond on every 32-byte digest, and this sits on the
+/// per-row path of every audited write — see `benches/mac.rs`, which is
+/// how that showed up at all.
 fn to_hex(bytes: &[u8]) -> String {
-    use std::fmt::Write as _;
-    bytes.iter().fold(String::new(), |mut acc, b| {
-        let _ = write!(acc, "{b:02x}");
-        acc
-    })
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for &b in bytes {
+        out.push(DIGITS[(b >> 4) as usize] as char);
+        out.push(DIGITS[(b & 0x0f) as usize] as char);
+    }
+    out
 }
 
 /// How many distinct byte values appear.
@@ -1071,5 +1102,46 @@ mod tests {
             MacVerdict::Invalid,
             "an on-demand domain must still be separated"
         );
+    }
+    /// A stored MAC is whatever whoever edited the row put there. Before
+    /// this, `decode_hex` sliced the `&str` by byte index, so a
+    /// multi-byte character straddling an even offset aborted the
+    /// process — a database-write adversary could crash every reader.
+    #[test]
+    fn a_stored_mac_containing_a_multibyte_character_is_rejected_not_a_panic() {
+        let keys = KeySet::load(&config(), Some(&root_hex()), None);
+        for stored in [
+            "k1:\u{20ac}a",
+            "d1.k1:\u{20ac}a",
+            "\u{20ac}\u{20ac}",
+            "d1.k1:\u{e9}\u{e9}",
+        ] {
+            assert!(
+                matches!(
+                    keys.verify(AUDIT, Some(stored), b"payload"),
+                    MacVerdict::Malformed
+                        | MacVerdict::UnknownKey(_)
+                        | MacVerdict::UnknownScheme(_)
+                ),
+                "{stored:?} must be reported, not panic"
+            );
+        }
+        assert_eq!(assess_key_hex("\u{20ac}a"), Assessment::NotHex);
+    }
+
+    /// `u8::from_str_radix` accepted a leading sign, so `"+f"` decoded as
+    /// `0x0f`. A sign inside a digest is a corrupted row, not a number.
+    #[test]
+    fn a_signed_hex_pair_is_not_a_digit() {
+        assert_eq!(decode_hex("+f"), None);
+        assert_eq!(decode_hex("-f"), None);
+        assert_eq!(decode_hex("0f"), Some(vec![0x0f]));
+        assert_eq!(
+            decode_hex("0F"),
+            Some(vec![0x0f]),
+            "uppercase still decodes"
+        );
+        assert_eq!(decode_hex("f"), None, "odd length");
+        assert_eq!(decode_hex(""), Some(vec![]));
     }
 }

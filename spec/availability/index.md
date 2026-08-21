@@ -139,7 +139,7 @@ if a contributor has it, but Podman is the supported runtime — see
 | Aspect | Choice | Rationale |
 |---|---|---|
 | Runtime | **Podman** (rootless) | no daemon, rootless by default, drop-in CLI |
-| Build | **multi-stage** | `rust:1.93-slim` builder stage → `debian:13-slim` runtime stage; the toolchain never ships in the runtime image |
+| Build | **multi-stage** | `rust:1.96-slim` builder stage → `debian:13-slim` runtime stage; the toolchain never ships in the runtime image |
 | Base image | **Debian 13 slim** (Trixie) | small, current stable, `libpq5`/`libssl3` available |
 | Allocator | **MiMalloc** for MUSL static builds | faster allocator under `cfg(target_env = "musl")`; see the global-allocator snippet in [`rust-loco-stack.md`](../../agents/share/rust-loco-stack.md) |
 | Health | container `HEALTHCHECK` | `curl --fail` the health endpoint (§3) |

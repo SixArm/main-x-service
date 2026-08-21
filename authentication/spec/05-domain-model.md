@@ -1,6 +1,6 @@
 ## 5. Domain Model
 
-Field-by-field reference: [`AGENTS/models.md`](../AGENTS/models.md).
+Field-by-field reference: [`agents/models.md`](../agents/models.md).
 Source: service
 [`src/models/users.rs`](../authentication-service-with-loco/src/models/users.rs),
 [`src/models/sessions.rs`](../authentication-service-with-loco/src/models/sessions.rs),

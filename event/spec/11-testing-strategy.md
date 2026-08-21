@@ -27,9 +27,9 @@ front-end against a running service yet — tracked as ET-7.
 
 | Subproject | Layers | Reference |
 |---|---|---|
-| Service | 62+ unit tests; integration tests against real PostgreSQL + Tantivy; 16 bridge tests; Criterion benches; CI (`test.yml`, `quality.yml`, `security.yml`) | [AGENTS/testing.md](../event-service-with-loco/AGENTS/testing.md) |
-| Matcher | Unit + integration + property tests + doctests; `cargo clippy -D warnings` clean; benches | [AGENTS/testing.md](../event-matcher-rust-crate/AGENTS/testing.md) |
-| Front-end | Vitest unit (mocked fetch) + Playwright e2e smoke; `svelte-check` | [AGENTS/testing.md](../event-front-end-with-svelte/AGENTS/testing.md) |
+| Service | 62+ unit tests; integration tests against real PostgreSQL + Tantivy; 16 bridge tests; Criterion benches; CI (`test.yml`, `quality.yml`, `security.yml`) | [agents/testing.md](../event-service-with-loco/agents/testing.md) |
+| Matcher | Unit + integration + property tests + doctests; `cargo clippy -D warnings` clean; benches | [agents/testing.md](../event-matcher-rust-crate/agents/testing.md) |
+| Front-end | Vitest unit (mocked fetch) + Playwright e2e smoke; `svelte-check` | [agents/testing.md](../event-front-end-with-svelte/agents/testing.md) |
 
 ### 11.4 Entity-level rules
 
@@ -38,7 +38,7 @@ front-end against a running service yet — tracked as ET-7.
 - No real personal data in any test fixture, in any subproject —
   synthetic parties only (RFC 2606 `example.org` emails, drama
   phone ranges). See matcher
-  [AGENTS/security-and-privacy.md](../event-matcher-rust-crate/AGENTS/security-and-privacy.md).
+  [agents/security-and-privacy.md](../event-matcher-rust-crate/agents/security-and-privacy.md).
 - Time fixtures use explicit UTC instants; tests that depend on
   wall-clock "now" are forbidden (the matcher forbids clocks
   outright).

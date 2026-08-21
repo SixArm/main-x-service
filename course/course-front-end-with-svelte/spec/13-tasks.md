@@ -1,7 +1,7 @@
 ## 13. Tasks
 
 - [x] T-1: Scaffold SvelteKit project (config, app shell, CSS).
-- [x] T-2: Wire TypeScript types matching `course-service-with-loco/AGENTS/models.md`.
+- [x] T-2: Wire TypeScript types matching `course-service-with-loco/agents/models.md`.
 - [x] T-3: `ApiClient` + `CourseRepository`.
 - [x] T-4: Form primitives (`LabeledField`, `FieldError`, `FieldRow`, `createForm`).
 - [x] T-5: List route with SVAR DataGrid + search box.

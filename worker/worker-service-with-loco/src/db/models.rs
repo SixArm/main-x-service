@@ -14,7 +14,7 @@
 //! and date columns use `time::Date` (`TimeDate`), since SeaORM 1.1 lacks
 //! native `chrono` interop here; the [`crate::db::convert`] helpers bridge to
 //! the domain `chrono` types. The authoritative column reference is
-//! `AGENTS/models.md`.
+//! `agents/models.md`.
 //!
 //! Soft-delete convention: tables carrying `deleted_at` / `deleted_by` are
 //! never physically deleted by the repository; a non-null `deleted_at` marks

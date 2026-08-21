@@ -1,11 +1,11 @@
 ## 9. API Surface
 
-Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
+Complete endpoint reference: [`agents/restful.md`](../agents/restful.md).
 
 | Tier | Surface |
 |---|---|
 | REST (loco.rs controllers on Axum) | endpoints under `/api/courses/*` + `/api/courses/{id}/instances/*` + `/api/audit/*` + `/api/records/verify` + `/api/audit/verify` + `/api/health` + `/api/whoami`, registered as a loco `Routes` table with prefix `/api`; version-negotiated via `Accepts-version` (T-25, [`api-versioning.md`](../../../agents/share/api-versioning.md)) |
-| FHIR (deliberately non-standard) | `/fhir/Basic{,/{id}}` + `/fhir/metadata` (T-20) — no FHIR R5 resource models a course, so this wraps the course DTO as a `Basic` resource; see [`AGENTS/restful.md`](../AGENTS/restful.md) §FHIR and [`fhir.md`](../../../agents/share/fhir.md) §3 |
+| FHIR (deliberately non-standard) | `/fhir/Basic{,/{id}}` + `/fhir/metadata` (T-20) — no FHIR R5 resource models a course, so this wraps the course DTO as a `Basic` resource; see [`agents/restful.md`](../agents/restful.md) §FHIR and [`fhir.md`](../../../agents/share/fhir.md) §3 |
 | Ops (loco built-ins) | `GET /_health` (DB + queue readiness) and `GET /_ping` (liveness), from loco's default routes — for orchestration probes, outside `/api` |
 | gRPC | Out of scope entirely — no `tonic`/`prost` dependency, not even a stub (§2.2). |
 | Docs | Swagger UI at `/swagger-ui`, raw OpenAPI 3 JSON at `/api-docs/openapi.json` (utoipa). |

@@ -36,5 +36,5 @@ This is the **verification** third of the authentication entity
 `Claims` struct and `kid` derivation are mirrored with the service by
 convention and pinned by the service crate's cross-crate contract
 test. See the entity docs: [spec](../spec/index.md) ·
-[verification guide](../AGENTS/verification.md) ·
-[subprojects](../AGENTS/subprojects.md).
+[verification guide](../agents/verification.md) ·
+[subprojects](../agents/subprojects.md).

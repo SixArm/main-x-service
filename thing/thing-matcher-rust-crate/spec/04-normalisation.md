@@ -9,7 +9,7 @@ All comparisons are done **after** normalisation. The normalisation routines liv
 | `Normalizer::normalize_url(&str)` | `url`, `image`, `main_entity_of_page`, every entry of `same_as` and `additional_types`. | Lowercase scheme + host; drop trailing slash on the path root. No DNS-aware normalisation, no percent-encoding canonicalisation, no punycode decoding. |
 | `Normalizer::phonetic_code(&str)` | Soundex bonus (§6.7). | Classic 4-character Soundex code: first letter + three digits (`0` padding when fewer consonant digits are available). Diacritics are stripped via `normalize_name` first. |
 
-Detailed per-rule behaviour (every NFKD edge case, every URL handling exception, exact whitespace handling) lives in [`AGENTS/normalization.md`](../AGENTS/normalization.md). Behaviours that consumers MUST rely on:
+Detailed per-rule behaviour (every NFKD edge case, every URL handling exception, exact whitespace handling) lives in [`agents/normalization.md`](../agents/normalization.md). Behaviours that consumers MUST rely on:
 
 - **Whitespace.** Inputs MAY contain leading, trailing, or internal runs of any whitespace; all of it is canonicalised to single ASCII spaces, then trimmed.
 - **Diacritics.** Latin diacritics (Spanish `ó`, German `ü`, French `é`, …) are stripped from names and Soundex codes; this is intentional and stable.

@@ -39,8 +39,10 @@ fn render(value: &Value, kind: Kind) -> String {
 ///
 /// Returns [`Error::Api`] if a person fails to serialize or the CSV writer
 /// fails.
-pub fn encode(persons: &[Person]) -> Result<Vec<u8>> {
-    let mut wtr = csv::Writer::from_writer(Vec::new());
+pub fn encode(persons: &[Person], delimiter: u8) -> Result<Vec<u8>> {
+    let mut wtr = csv::WriterBuilder::new()
+        .delimiter(delimiter)
+        .from_writer(Vec::new());
     wtr.write_record(header())
         .map_err(|e| Error::Api(format!("write CSV header: {e}")))?;
     for person in persons {
@@ -73,10 +75,10 @@ pub fn encode(persons: &[Person]) -> Result<Vec<u8>> {
 ///
 /// Returns [`Error::Validation`] if the bytes are not a readable CSV (bad
 /// header / structurally broken record framing).
-pub fn decode(input: &[u8]) -> Result<Vec<(bool, serde_json::Result<Person>)>> {
+pub fn decode(input: &[u8], delimiter: u8) -> Result<Vec<(bool, serde_json::Result<Person>)>> {
     let mut out = Vec::new();
     let mut fatal = None;
-    read_records(input, usize::MAX, |item| match item {
+    read_records(input, usize::MAX, delimiter, |item| match item {
         Ok(row) => {
             out.push(row);
             true
@@ -110,9 +112,12 @@ pub type CsvRow = (bool, serde_json::Result<Person>);
 fn read_records<R: std::io::Read>(
     input: R,
     max_rows: usize,
+    delimiter: u8,
     mut sink: impl FnMut(Result<CsvRow>) -> bool,
 ) -> bool {
-    let mut rdr = csv::Reader::from_reader(input);
+    let mut rdr = csv::ReaderBuilder::new()
+        .delimiter(delimiter)
+        .from_reader(input);
     let headers = match rdr.headers() {
         Ok(h) => h.clone(),
         Err(e) => {
@@ -263,7 +268,7 @@ impl RowStream {
     /// Must be called from within a Tokio runtime (it spawns the feeder
     /// and the blocking parser).
     #[must_use]
-    pub fn new<R>(mut reader: R, max_rows: usize) -> Self
+    pub fn new<R>(mut reader: R, max_rows: usize, delimiter: u8) -> Self
     where
         R: tokio::io::AsyncRead + Unpin + Send + 'static,
     {
@@ -295,7 +300,9 @@ impl RowStream {
                 current: Vec::new(),
                 pos: 0,
             };
-            read_records(bridge, max_rows, |item| row_tx.blocking_send(item).is_ok());
+            read_records(bridge, max_rows, delimiter, |item| {
+                row_tx.blocking_send(item).is_ok()
+            });
         });
 
         Self { rx: row_rx }
@@ -390,8 +397,8 @@ mod tests {
     #[test]
     fn round_trips_a_fully_populated_person_losslessly() {
         let p = fully_populated();
-        let bytes = encode(std::slice::from_ref(&p)).unwrap();
-        let rows = decode(&bytes).unwrap();
+        let bytes = encode(std::slice::from_ref(&p), b',').unwrap();
+        let rows = decode(&bytes, b',').unwrap();
         assert_eq!(rows.len(), 1);
         let (had_explicit_id, parsed) = rows.into_iter().next().unwrap();
         assert!(had_explicit_id, "the exported id column round-trips");
@@ -417,8 +424,8 @@ mod tests {
             },
             Gender::Male,
         );
-        let bytes = encode(std::slice::from_ref(&p)).unwrap();
-        let back = decode(&bytes)
+        let bytes = encode(std::slice::from_ref(&p), b',').unwrap();
+        let back = decode(&bytes, b',')
             .unwrap()
             .into_iter()
             .next()
@@ -446,7 +453,7 @@ mod tests {
             },
             Gender::Other,
         );
-        let bytes = encode(&[a.clone(), b.clone()]).unwrap();
+        let bytes = encode(&[a.clone(), b.clone()], b',').unwrap();
         // Header line first.
         let text = std::str::from_utf8(&bytes).unwrap();
         assert!(
@@ -455,7 +462,7 @@ mod tests {
                 .unwrap()
                 .starts_with("id,active,name.family,")
         );
-        let rows = decode(&bytes).unwrap();
+        let rows = decode(&bytes, b',').unwrap();
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].1.as_ref().unwrap().name.family, "Lovelace");
         assert_eq!(rows[1].1.as_ref().unwrap().name.family, "B");
@@ -467,7 +474,7 @@ mod tests {
     fn decodes_reordered_and_extra_columns() {
         let csv = "gender,extra,name.family,name.given,id,active\n\
                    male,ignored,Vader,[\"Anakin\"],11111111-1111-4111-8111-111111111111,true\n";
-        let rows = decode(csv.as_bytes()).unwrap();
+        let rows = decode(csv.as_bytes(), b',').unwrap();
         let (had_explicit_id, parsed) = rows.into_iter().next().unwrap();
         assert!(had_explicit_id, "the reordered id column is still found");
         let p = parsed.expect("parses");
@@ -486,7 +493,7 @@ mod tests {
         let bad = format!(
             "{hdr}\n11111111-1111-4111-8111-111111111111,true,X,,[],[],[],male,,,false,,,,,,,not-json,[],[],[],[],[],[],[]\n"
         );
-        let rows = decode(bad.as_bytes()).unwrap();
+        let rows = decode(bad.as_bytes(), b',').unwrap();
         assert_eq!(rows.len(), 1);
         assert!(
             rows[0].1.is_err(),
@@ -499,30 +506,30 @@ mod tests {
     /// UUID via the field's serde default, but callers need to know the
     /// row itself supplied none, so a keyless row can be routed through
     /// duplicate detection rather than a blind create. Built from a real
-    /// `encode()` row (blanking only the leading id cell) rather than a
+    /// `encode(, b',')` row (blanking only the leading id cell) rather than a
     /// hand-counted CSV literal, so the column count is never at risk of
     /// drifting from [`COLUMNS`].
     #[test]
     fn had_explicit_id_is_false_for_an_empty_or_missing_id_cell() {
         let p = fully_populated();
-        let bytes = encode(std::slice::from_ref(&p)).unwrap();
+        let bytes = encode(std::slice::from_ref(&p), b',').unwrap();
         let text = std::str::from_utf8(&bytes).unwrap();
         let (header_line, row_line) = text.split_once('\n').unwrap();
 
         // A populated id cell IS explicit (sanity check on the fixture).
-        let rows = decode(text.as_bytes()).unwrap();
+        let rows = decode(text.as_bytes(), b',').unwrap();
         assert!(rows[0].0, "populated id cell ⇒ explicit id");
 
         // Blank the leading id cell only.
         let (_id_cell, rest) = row_line.split_once(',').unwrap();
         let blanked = format!("{header_line}\n,{rest}\n");
-        let rows = decode(blanked.as_bytes()).unwrap();
+        let rows = decode(blanked.as_bytes(), b',').unwrap();
         assert!(!rows[0].0, "empty id cell ⇒ no explicit id");
         assert!(rows[0].1.is_ok());
 
         // The id column omitted entirely (operator-trimmed header).
         let no_id_col = "active,name.family,name.given,gender\ntrue,Y,[\"B\"],female\n";
-        let rows = decode(no_id_col.as_bytes()).unwrap();
+        let rows = decode(no_id_col.as_bytes(), b',').unwrap();
         assert!(!rows[0].0, "missing id column ⇒ no explicit id");
         assert!(rows[0].1.is_ok());
     }
@@ -536,7 +543,19 @@ mod tests {
         bytes: &[u8],
         max_rows: usize,
     ) -> (Vec<(bool, bool)>, Option<String>, Vec<super::CsvRow>) {
-        let mut stream = super::RowStream::new(std::io::Cursor::new(bytes.to_vec()), max_rows);
+        drain_with(bytes, max_rows, b',').await
+    }
+
+    /// [`drain`] with an explicit delimiter, so the TSV path exercises the
+    /// same streaming reader rather than a parallel one.
+    #[allow(clippy::type_complexity)]
+    async fn drain_with(
+        bytes: &[u8],
+        max_rows: usize,
+        delimiter: u8,
+    ) -> (Vec<(bool, bool)>, Option<String>, Vec<super::CsvRow>) {
+        let mut stream =
+            super::RowStream::new(std::io::Cursor::new(bytes.to_vec()), max_rows, delimiter);
         let mut summary = Vec::new();
         let mut rows = Vec::new();
         let mut err = None;
@@ -562,9 +581,9 @@ mod tests {
     #[tokio::test]
     async fn row_stream_agrees_with_decode() {
         let people = vec![fully_populated(), Person::new(sparse_name(), Gender::Male)];
-        let bytes = encode(&people).unwrap();
+        let bytes = encode(&people, b',').unwrap();
 
-        let buffered: Vec<(bool, bool)> = decode(&bytes)
+        let buffered: Vec<(bool, bool)> = decode(&bytes, b',')
             .unwrap()
             .into_iter()
             .map(|(id, parsed)| (id, parsed.is_ok()))
@@ -599,7 +618,7 @@ mod tests {
     #[tokio::test]
     async fn row_stream_rejects_past_the_row_cap() {
         let people = vec![fully_populated(), fully_populated(), fully_populated()];
-        let bytes = encode(&people).unwrap();
+        let bytes = encode(&people, b',').unwrap();
         let (summary, err, _rows) = drain(&bytes, 2).await;
         assert_eq!(summary.len(), 2, "the allowed rows are still yielded");
         assert!(
@@ -631,7 +650,7 @@ mod tests {
                 p
             })
             .collect();
-        let bytes = encode(&people).unwrap();
+        let bytes = encode(&people, b',').unwrap();
         assert!(
             bytes.len() > super::READ_CHUNK_BYTES * 2,
             "the fixture must span several read chunks"
@@ -653,5 +672,33 @@ mod tests {
             prefix: vec![],
             suffix: vec![],
         }
+    }
+    /// TSV is the same codec with a different byte: a person round-trips
+    /// through tabs exactly as through commas.
+    #[test]
+    fn tsv_round_trips_a_fully_populated_person() {
+        let person = fully_populated();
+        let bytes = encode(std::slice::from_ref(&person), b'\t').unwrap();
+        assert!(
+            String::from_utf8_lossy(&bytes).contains('\t'),
+            "TSV output must be tab-separated"
+        );
+        let rows = decode(&bytes, b'\t').unwrap();
+        assert_eq!(rows.len(), 1);
+        rows.into_iter().next().unwrap().1.expect("row parses");
+    }
+
+    /// The **streaming** import path (SEC-B2) honours the delimiter too.
+    /// This is the one that actually runs for an uploaded file, so a TSV
+    /// that only worked through the buffered `decode` would work in tests
+    /// and fail in production.
+    #[tokio::test]
+    async fn row_stream_reads_tsv() {
+        let people = vec![fully_populated(), Person::new(sparse_name(), Gender::Male)];
+        let bytes = encode(&people, b'\t').unwrap();
+        let (summary, err, rows) = drain_with(&bytes, usize::MAX, b'\t').await;
+        assert!(err.is_none(), "streaming TSV should not error: {err:?}");
+        assert_eq!(summary.len(), 2, "both rows should stream through");
+        assert_eq!(rows.len(), 2);
     }
 }

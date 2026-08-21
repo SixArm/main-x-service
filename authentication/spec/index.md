@@ -19,21 +19,21 @@
 >
 > **Three-part PRs.** A behavioural change is one PR: spec edit + code
 > edit + test edit. See
-> [`AGENTS/spec-driven-development.md`](../AGENTS/spec-driven-development.md).
+> [`agents/spec-driven-development.md`](../agents/spec-driven-development.md).
 
 The authentication entity is **different from its siblings**: there is
 no matcher crate and nothing to match. Instead of a
 service + matcher + front-end trio, it ships a
 service + **verifier library** + front-end trio — the verifier is what
 peer services embed to verify PASETO v4.public tokens offline. Where sibling
-entities carry `AGENTS/matching.md`, this entity carries
-[`AGENTS/verification.md`](../AGENTS/verification.md).
+entities carry `agents/matching.md`, this entity carries
+[`agents/verification.md`](../agents/verification.md).
 
 For shared infrastructure (technology stack, observability,
 compliance), see the project-root [`AGENTS.md`](../../AGENTS.md) and
 [`agents/share/*`](../../agents/share/). For entity-level reference
 detail (subproject map, models, verification contract), see
-[`AGENTS/`](../AGENTS/).
+[`agents/`](../agents/).
 
 ## Table of contents
 

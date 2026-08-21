@@ -195,7 +195,7 @@ async fn csv_import_and_export_round_trip() {
             jurisdiction: Some("US".to_string()),
             ..Organization::new("Csv Roundtrip Co")
         };
-        let bytes = csv::encode(&[(None, org)]).unwrap();
+        let bytes = csv::encode(&[(None, org)], b',').unwrap();
 
         let accepted = submit_import(&request, bytes, "csv").await;
         let job_id = accepted["job_id"].as_str().expect("job_id");
@@ -217,7 +217,7 @@ async fn csv_import_and_export_round_trip() {
                 .as_str()
                 .expect("download_url"),
         );
-        let rows = csv::decode(&bytes).unwrap();
+        let rows = csv::decode(&bytes, b',').unwrap();
         assert!(
             rows.iter().any(|r| r
                 .as_ref()

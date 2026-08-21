@@ -10,7 +10,7 @@ anything modelled by schema.org/Place.
 
 ## Quick start
 
-Prerequisites: Rust 1.93+ (2024 edition), PostgreSQL 18+ with PostGIS.
+Prerequisites: Rust 1.95+ (2024 edition), PostgreSQL 18+ with PostGIS.
 
 ```bash
 cd place/place-service-with-loco   # within the main-x-service monorepo
@@ -27,7 +27,7 @@ curl http://localhost:5150/api/health
 ## API
 
 REST routes mount under `/api/places/*`. See
-[`AGENTS/restful.md`](AGENTS/restful.md) for the full list. All
+[`agents/restful.md`](agents/restful.md) for the full list. All
 endpoints return the standard `{success, data, error}` envelope.
 Duplicate handling includes a stored review queue:
 `GET /api/places/review-queue` (filter `status`, `limit`) and
@@ -134,7 +134,7 @@ cargo test --tests
 cargo bench
 ```
 
-See [`AGENTS/testing.md`](AGENTS/testing.md) for the layout.
+See [`agents/testing.md`](agents/testing.md) for the layout.
 
 ## Matching at a glance
 
@@ -148,7 +148,7 @@ See [`AGENTS/testing.md`](AGENTS/testing.md) for the layout.
 
 Deterministic short-circuit: exact GLN match → 1.0.
 
-See [`AGENTS/matching.md`](AGENTS/matching.md) for the per-component
+See [`agents/matching.md`](agents/matching.md) for the per-component
 detail.
 
 ## Compliance

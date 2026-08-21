@@ -10,7 +10,7 @@
 - Matcher: [spec](../organization-matcher-rust-crate/spec/index.md) ·
   [README](../organization-matcher-rust-crate/README.md) ·
   [AGENTS.md](../organization-matcher-rust-crate/AGENTS.md) ·
-  [AGENTS/](../organization-matcher-rust-crate/AGENTS/index.md) ·
+  [agents/](../organization-matcher-rust-crate/agents/index.md) ·
   [CHANGELOG](../organization-matcher-rust-crate/CHANGELOG.md)
 - Front-end: [spec](../organization-front-end-with-svelte/spec/index.md) ·
   [README](../organization-front-end-with-svelte/README.md) ·

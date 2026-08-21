@@ -36,14 +36,20 @@ fn render(value: &Value, kind: Kind) -> String {
     }
 }
 
-/// Encode a slice of rows to a CSV byte buffer (a header row + one row
-/// per record), the export output shape.
+/// Encode a slice of rows to a delimited-text byte buffer (a header row +
+/// one row per record), the export output shape.
+///
+/// `delimiter` selects CSV (`b','`) or TSV (`b'\t'`) — the only
+/// difference between them. Quoting is the `csv` crate's, so a field
+/// containing the delimiter is quoted rather than corrupting the row.
 ///
 /// # Errors
 ///
 /// Returns an error if a row fails to serialize or the CSV writer fails.
-pub fn encode(rows: &[BulkCaseRow]) -> loco_rs::Result<Vec<u8>> {
-    let mut wtr = ::csv::Writer::from_writer(Vec::new());
+pub fn encode(rows: &[BulkCaseRow], delimiter: u8) -> loco_rs::Result<Vec<u8>> {
+    let mut wtr = ::csv::WriterBuilder::new()
+        .delimiter(delimiter)
+        .from_writer(Vec::new());
     wtr.write_record(header())
         .map_err(|e| loco_rs::Error::Message(format!("write CSV header: {e}")))?;
     for row in rows {
@@ -60,7 +66,14 @@ pub fn encode(rows: &[BulkCaseRow]) -> loco_rs::Result<Vec<u8>> {
         .map_err(|e| loco_rs::Error::Message(format!("finish CSV: {e}")))
 }
 
-/// Parse a CSV byte buffer into per-row parse results. Columns are
+/// Parse a delimited-text byte buffer into per-row parse results.
+///
+/// `delimiter` selects CSV (`b','`) or TSV (`b'\t'`). It is passed in,
+/// never sniffed: a CSV whose fields contain tabs and a TSV whose fields
+/// contain commas each parse as a single column under the wrong guess,
+/// silently producing rows that then validate.
+///
+/// Columns are
 /// matched by header name (order-independent; unknown columns ignored);
 /// an invalid row is an `Err` in its slot (§7 per-row error contract)
 /// rather than aborting the whole load.
@@ -69,8 +82,13 @@ pub fn encode(rows: &[BulkCaseRow]) -> loco_rs::Result<Vec<u8>> {
 ///
 /// Returns an error if the bytes are not a readable CSV (bad header /
 /// structurally broken record framing).
-pub fn decode(input: &[u8]) -> loco_rs::Result<Vec<serde_json::Result<BulkCaseRow>>> {
-    let mut rdr = ::csv::Reader::from_reader(input);
+pub fn decode(
+    input: &[u8],
+    delimiter: u8,
+) -> loco_rs::Result<Vec<serde_json::Result<BulkCaseRow>>> {
+    let mut rdr = ::csv::ReaderBuilder::new()
+        .delimiter(delimiter)
+        .from_reader(input);
     let headers = rdr
         .headers()
         .map_err(|e| loco_rs::Error::Message(format!("read CSV header: {e}")))?
@@ -156,8 +174,8 @@ mod tests {
     #[test]
     fn round_trips_a_fully_populated_row_losslessly() {
         let row = fully_populated();
-        let bytes = encode(std::slice::from_ref(&row)).unwrap();
-        let rows = decode(&bytes).unwrap();
+        let bytes = encode(std::slice::from_ref(&row), b',').unwrap();
+        let rows = decode(&bytes, b',').unwrap();
         assert_eq!(rows.len(), 1);
         let back = rows.into_iter().next().unwrap().expect("row parses");
         assert_eq!(
@@ -173,8 +191,13 @@ mod tests {
     #[test]
     fn round_trips_a_sparse_keyless_row() {
         let row = BulkCaseRow::keyless(Case::new("Bare"));
-        let bytes = encode(std::slice::from_ref(&row)).unwrap();
-        let back = decode(&bytes).unwrap().into_iter().next().unwrap().unwrap();
+        let bytes = encode(std::slice::from_ref(&row), b',').unwrap();
+        let back = decode(&bytes, b',')
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap()
+            .unwrap();
         assert_eq!(
             serde_json::to_value(&back).unwrap(),
             serde_json::to_value(&row).unwrap()
@@ -188,10 +211,10 @@ mod tests {
     fn encodes_a_header_then_one_row_per_record() {
         let a = fully_populated();
         let b = BulkCaseRow::keyless(Case::new("B"));
-        let bytes = encode(&[a.clone(), b.clone()]).unwrap();
+        let bytes = encode(&[a.clone(), b.clone()], b',').unwrap();
         let text = std::str::from_utf8(&bytes).unwrap();
         assert!(text.lines().next().unwrap().starts_with("pid,title,"));
-        let rows = decode(&bytes).unwrap();
+        let rows = decode(&bytes, b',').unwrap();
         assert_eq!(rows.len(), 2);
         assert_eq!(
             rows[0].as_ref().unwrap().case.title,
@@ -206,7 +229,7 @@ mod tests {
     fn decodes_reordered_and_extra_columns() {
         let csv = "case_number,extra,title,pid\n\
                    CN-1,ignored,Reordered,11111111-1111-4111-8111-111111111111\n";
-        let rows = decode(csv.as_bytes()).unwrap();
+        let rows = decode(csv.as_bytes(), b',').unwrap();
         let row = rows.into_iter().next().unwrap().expect("parses");
         assert_eq!(row.case.title, "Reordered");
         assert_eq!(row.case.case_number.as_deref(), Some("CN-1"));
@@ -223,7 +246,7 @@ mod tests {
         let hdr = header().join(",");
         // `subjects` (a Json-kind column) carries an unparseable cell.
         let bad = format!("{hdr}\n,Bad,[],,,,,,,,not-json,[],[],[],[]\n");
-        let rows = decode(bad.as_bytes()).unwrap();
+        let rows = decode(bad.as_bytes(), b',').unwrap();
         assert_eq!(rows.len(), 1);
         assert!(rows[0].is_err(), "malformed subjects cell ⇒ per-row Err");
     }
@@ -235,26 +258,87 @@ mod tests {
     #[test]
     fn empty_or_missing_pid_column_parses_to_none() {
         let row = fully_populated();
-        let bytes = encode(std::slice::from_ref(&row)).unwrap();
+        let bytes = encode(std::slice::from_ref(&row), b',').unwrap();
         let text = std::str::from_utf8(&bytes).unwrap();
         let (header_line, row_line) = text.split_once('\n').unwrap();
 
         // A populated pid cell IS explicit (sanity check on the fixture).
-        let rows = decode(text.as_bytes()).unwrap();
+        let rows = decode(text.as_bytes(), b',').unwrap();
         assert!(rows[0].as_ref().unwrap().pid.is_some());
 
         // Blank the leading pid cell only.
         let (_pid_cell, rest) = row_line.split_once(',').unwrap();
         let blanked = format!("{header_line}\n,{rest}\n");
-        let rows = decode(blanked.as_bytes()).unwrap();
+        let rows = decode(blanked.as_bytes(), b',').unwrap();
         assert!(rows[0].as_ref().unwrap().pid.is_none(), "empty pid cell");
 
         // The pid column omitted entirely (operator-trimmed header).
         let no_pid_col = "title\nNo Pid Column\n";
-        let rows = decode(no_pid_col.as_bytes()).unwrap();
+        let rows = decode(no_pid_col.as_bytes(), b',').unwrap();
         assert!(
             rows[0].as_ref().unwrap().pid.is_none(),
             "missing pid column"
         );
+    }
+    /// TSV is the same codec with a different byte: a row round-trips
+    /// through tabs exactly as it does through commas.
+    #[test]
+    fn tsv_round_trips_a_fully_populated_row() {
+        let row = fully_populated();
+        let bytes = encode(std::slice::from_ref(&row), b'\t').unwrap();
+        assert!(
+            String::from_utf8_lossy(&bytes).contains('\t'),
+            "TSV output must be tab-separated"
+        );
+        let rows = decode(&bytes, b'\t').unwrap();
+        assert_eq!(rows.len(), 1);
+        let back = rows.into_iter().next().unwrap().expect("row parses");
+        assert_eq!(
+            serde_json::to_value(&back).unwrap(),
+            serde_json::to_value(&row).unwrap(),
+            "TSV round-trip lost or changed a field"
+        );
+    }
+
+    /// A field containing the delimiter is quoted, not allowed to split
+    /// the record — the property that makes TSV safe for free text at
+    /// all, and the reason this uses the `csv` crate rather than
+    /// `split('\t')`.
+    #[test]
+    fn a_tab_inside_a_field_is_quoted_and_survives_tsv() {
+        let mut row = fully_populated();
+        row.case.title = "Housing\tbenefit\tappeal".to_string();
+        let bytes = encode(std::slice::from_ref(&row), b'\t').unwrap();
+        let back = decode(&bytes, b'\t').unwrap().pop().unwrap().unwrap();
+        assert_eq!(back.case.title, "Housing\tbenefit\tappeal");
+    }
+
+    /// Why the delimiter is passed in and never sniffed.
+    ///
+    /// Reading CSV as TSV resolves no known column, so the row is
+    /// reconstructed from nothing. For this entity that surfaces as a
+    /// per-row parse error, because `title` is required — a loud failure,
+    /// which is the good case. It is not guaranteed to be loud in
+    /// general: an entity whose fields were all optional would yield a
+    /// silently empty record instead. Either way the data is gone, which
+    /// is the point — a delimiter is a fact about the file the caller
+    /// must state, not something to infer.
+    #[test]
+    fn reading_csv_as_tsv_does_not_recover_the_data() {
+        let row = fully_populated();
+        let as_csv = encode(std::slice::from_ref(&row), b',').unwrap();
+        let misread = decode(&as_csv, b'\t').unwrap();
+        assert_eq!(misread.len(), 1, "framing still yields one record");
+        match misread.into_iter().next().unwrap() {
+            // What actually happens for `Case`: no column resolved, so
+            // the required `title` is missing and the row fails to parse.
+            Err(_) => {}
+            // Tolerated for the sake of the general claim, but it must
+            // never come back looking like the original record.
+            Ok(back) => assert_ne!(
+                back.case.title, row.case.title,
+                "misreading the delimiter must not appear to succeed"
+            ),
+        }
     }
 }

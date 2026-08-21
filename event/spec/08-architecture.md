@@ -53,7 +53,7 @@ front-end  →(HTTP)→  service  →(Cargo dep)→  matcher
 ### 8.3 API versioning
 
 The REST surface is versioned under **`/api`** (confirmed in the
-service [`AGENTS/restful.md`](../event-service-with-loco/AGENTS/restful.md)
+service [`agents/restful.md`](../event-service-with-loco/agents/restful.md)
 and the front-end
 [spec §9](../event-front-end-with-svelte/spec/09-api-consumption.md)).
 Breaking wire-format changes require a `/api/v2` — an entity-level

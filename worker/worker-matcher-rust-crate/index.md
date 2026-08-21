@@ -137,7 +137,7 @@ The `Worker` struct carries, in field groups (full list in
 
 - **National identifiers** -- one `Option<String>` field per **42 scheme**
   (UK NHS Number, France NIR, US SSN, ... -- catalogue in
-  [`AGENTS/national-person-identifiers.md`](AGENTS/national-person-identifiers.md)),
+  [`agents/national-person-identifiers.md`](agents/national-person-identifiers.md)),
   each with its own check-digit parser, weight, and breakdown score.
 - **Passport books** -- `Vec<PassportBook>`, multi-country / historical.
 - **Names** -- `given_name`, `middle_name`, `family_name`.

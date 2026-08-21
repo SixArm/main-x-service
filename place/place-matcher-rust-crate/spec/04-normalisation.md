@@ -2,7 +2,7 @@
 
 All normalisers in `Normalizer` are stateless associated functions and **idempotent** (`f(f(x)) == f(x)`), **deterministic** (no clocks, no RNGs), and allocate at most a single new `String`.
 
-Operational examples per rule, plus full input/output tables, live in [`AGENTS/normalization.md`](../AGENTS/normalization.md). The behaviour-defining contracts are summarised here.
+Operational examples per rule, plus full input/output tables, live in [`agents/normalization.md`](../agents/normalization.md). The behaviour-defining contracts are summarised here.
 
 ### 4.1 Names — `Normalizer::normalize_name`
 

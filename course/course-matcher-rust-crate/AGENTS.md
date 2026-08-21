@@ -82,19 +82,19 @@ at the keyboard.
 
 ## Detailed guides
 
-The `AGENTS/` directory contains topic-specific guidance. Read the one
+The `agents/` directory contains topic-specific guidance. Read the one
 that matches your task before editing:
 
-- [AGENTS/spec-driven-development.md](./AGENTS/spec-driven-development.md)
+- [agents/spec-driven-development.md](./agents/spec-driven-development.md)
   — How `spec.md` is maintained as the single source of truth;
   three-part PRs, section mapping, anti-patterns.
-- [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md) —
+- [agents/matching-algorithm.md](./agents/matching-algorithm.md) —
   The algorithm itself: per-component derivations, weights, deterministic
   short-circuits, renormalisation, confidence classification.
-- [AGENTS/normalization.md](./AGENTS/normalization.md) — String
+- [agents/normalization.md](./agents/normalization.md) — String
   normalisation rules (case-fold, NFKC, course-code shape, keyword /
   teaches tokenisation).
-- [AGENTS/testing.md](./AGENTS/testing.md) — Unit + bridge test
+- [agents/testing.md](./agents/testing.md) — Unit + bridge test
   strategy; what each layer pins.
 
 ---
@@ -137,7 +137,7 @@ that matches your task before editing:
 ```
 /
 ├── AGENTS.md                 ← this file
-├── AGENTS/                   ← topic-specific agent guides
+├── agents/                   ← topic-specific agent guides
 │   ├── index.md
 │   ├── spec-driven-development.md
 │   ├── matching-algorithm.md

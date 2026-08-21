@@ -37,7 +37,7 @@ Detail: [service §14](../worker-service-with-loco/spec/14-implementation-status
 | Spec banner version | ⚠️ stale — says 0.3.0 (§13 T-2) |
 
 Detail: matcher [§23](../worker-matcher-rust-crate/spec/23-tasks-and-acceptance-criteria.md)
-and delivered-task archives in its `AGENTS/`.
+and delivered-task archives in its `agents/`.
 
 ### 14.3 worker-front-end-with-svelte (MVP)
 

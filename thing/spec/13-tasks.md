@@ -11,7 +11,7 @@ clearly described manual check confirms the acceptance criterion.
     layout now dangle: e.g. service
     [`spec/17-references.md`](../thing-service-with-loco/spec/17-references.md)
     points at `../../person-service-with-loco/` and service
-    [`AGENTS/index.md`](../thing-service-with-loco/AGENTS/index.md)
+    [`agents/index.md`](../thing-service-with-loco/agents/index.md)
     points at `../../agents/share/` — both resolve inside `thing/`
     and miss.
   - **Acceptance:** a link-checker pass over `thing/**/*.md` reports
@@ -25,7 +25,7 @@ clearly described manual check confirms the acceptance criterion.
     `@`-includes resolve.*
 - [x] **T-2 — Fix duplicate-check endpoint doc drift.**
   - [x] Code and OpenAPI use `POST /api/things/check-duplicates`;
-    service [`AGENTS/restful.md`](../thing-service-with-loco/AGENTS/restful.md)
+    service [`agents/restful.md`](../thing-service-with-loco/agents/restful.md)
     says `POST /api/things/duplicates`.
   - **Acceptance:** restful.md matches the routes in
     `src/api/rest/mod.rs`.
@@ -35,7 +35,7 @@ clearly described manual check confirms the acceptance criterion.
   - [x] Matcher [`AGENTS.md`](../thing-matcher-rust-crate/AGENTS.md)
     quick-orientation table describes "geographic-place records",
     `Place` / `Address` types, and place-matcher rules.
-  - [x] Service [`AGENTS/spec-driven-development.md`](../thing-service-with-loco/AGENTS/spec-driven-development.md)
+  - [x] Service [`agents/spec-driven-development.md`](../thing-service-with-loco/agents/spec-driven-development.md)
     section-mapping table references Event-service concepts
     (`Location` / `Party` / `Offer`, time window, iCalendar, FHIR §6.8).
   - [x] Front-end [`README.md`](../thing-front-end-with-svelte/README.md)
@@ -93,9 +93,9 @@ clearly described manual check confirms the acceptance criterion.
     (0.95/0.80/0.60 vs 0.90/0.75), so e.g. matcher High spans service
     Certain plus the top of Probable. A score-range overlay table is
     documented in service
-    [`AGENTS/matching.md`](../thing-service-with-loco/AGENTS/matching.md)
+    [`agents/matching.md`](../thing-service-with-loco/agents/matching.md)
     ("Relationship to the embedded matcher's confidence bands"), with
-    a pointer from entity [`AGENTS/matching.md`](../AGENTS/matching.md).*
+    a pointer from entity [`agents/matching.md`](../agents/matching.md).*
   - *Progress 2026-06-13 (code): confirmed the service re-derives
     `MatchConfidence` solely via `MatchConfidence::from_score` from the
     raw score — `compute_match` (`src/matching/scoring.rs`) and

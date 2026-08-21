@@ -11,7 +11,7 @@ manual check confirms it. Split tasks too big for one PR
   - [ ] Split the service's single-file `spec/index.md` into the
     numbered §-per-file layout (the matcher and front-end carry the
     same task in their own §13 / §23).
-  - [ ] Add a service `AGENTS/` reference set (`models.md`,
+  - [ ] Add a service `agents/` reference set (`models.md`,
     `matching.md`, `restful.md`, `testing.md`,
     `spec-driven-development.md`) matching the person-service shape.
   - **Acceptance:** every link in this entity spec resolves to a

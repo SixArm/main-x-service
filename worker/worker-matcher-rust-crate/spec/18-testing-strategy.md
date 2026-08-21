@@ -2,11 +2,11 @@
 
 ### 18.1 Test Pyramid
 
-Unit tests in `src/*.rs` `#[cfg(test)]`; integration tests in `tests/integration_tests.rs`; doctests in `///` examples; smoke examples in `examples/basic_usage.rs` + `examples/custom_config.rs`. Full discipline in [`AGENTS/testing.md`](../AGENTS/testing.md).
+Unit tests in `src/*.rs` `#[cfg(test)]`; integration tests in `tests/integration_tests.rs`; doctests in `///` examples; smoke examples in `examples/basic_usage.rs` + `examples/custom_config.rs`. Full discipline in [`agents/testing.md`](../agents/testing.md).
 
 ### 18.2 Required Scenarios
 
-Each category MUST have at least one test (unit, integration, or doctest). The verbatim per-scenario list (50+ cases) is in [`AGENTS/testing.md`](../AGENTS/testing.md):
+Each category MUST have at least one test (unit, integration, or doctest). The verbatim per-scenario list (50+ cases) is in [`agents/testing.md`](../agents/testing.md):
 
 Demographic matching (perfect / typographic / phonetic / diacritic / apostrophe / missing-field / unrelated-low-score); address (abbreviated line 1, house-number extraction, unit prefix, directional, mismatching-house-number penalty); phone (country-code / trunk-prefix variants, E.164 within-country, cross-country disambiguation, legacy fallback); national identifiers (per-scheme of the 42 — deterministic-match on identifier alone, layout-variant equivalence, check-digit rejection, scheme-locality, embedded-date validity for CN RRN / MX CURP / ZA ID, structural-invalid rejection for US SSN); passport books (single-pair, multi-country, same-digits-different-country never match, historical pair, both-empty `None`, both-disjoint `0.0`); demographics-only deterministic match + `Worker::validate` empty / solo-identifier / solo-passport; modes & thresholds (strict rejects nicknames; lenient admits more; strict + deterministic clears); transposition heuristic (DD/MM ↔ MM/DD same-year `0.5`; cross-year `0.0`; deterministic still rejects); nicknames + email + `local_id` (English-table lifts `Mike`/`Michael` etc. to ≥ 0.9; boost never lowers; email exact / mismatch / `None`; Gmail dot-folding opt-in; `local_id` not scored); serialisation round-trip + partial-JSON merge + legacy-payload defaulting.
 
@@ -26,7 +26,7 @@ every `MatchingEngine` entry point, every `MatchBreakdown` field, every
 `MatchConfig` preset, and every enum variant the downstream calls is
 touched. Renaming or removing any of these symbols breaks the matcher's
 own CI before publish — making cross-crate breakage deliberate. See
-[`AGENTS/testing.md`](../AGENTS/testing.md) for the per-section breakdown.
+[`agents/testing.md`](../agents/testing.md) for the per-section breakdown.
 
 ### 18.6 Fuzz Testing (SEC-I2)
 

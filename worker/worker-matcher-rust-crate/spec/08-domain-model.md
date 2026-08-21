@@ -4,7 +4,7 @@
 
 Field naming for national identifiers: `<cc>_<scheme>` (lower-case ISO 3166-1 alpha-2). All fields optional (`Option` / `Vec`); `Worker::validate()` requires at least one identifying field (name, national identifier, or non-empty `passport_books`). `MatchConfig` in `src/matcher.rs` is the authoritative full field list. Field groups:
 
-**Identifying** — 42 `<cc>_<scheme>: Option<String>` per FR-12..FR-91 (catalogue [`AGENTS/national-person-identifiers.md`](../AGENTS/national-person-identifiers.md)); `passport_books: Vec<PassportBook>` (§8.6 / §6.4a); `given_name`, `family_name: Option<String>`.
+**Identifying** — 42 `<cc>_<scheme>: Option<String>` per FR-12..FR-91 (catalogue [`agents/national-person-identifiers.md`](../agents/national-person-identifiers.md)); `passport_books: Vec<PassportBook>` (§8.6 / §6.4a); `given_name`, `family_name: Option<String>`.
 
 **Demographic (scored, not identifying)** — `middle_name: Option<String>` (blend `0.05 × middle` per FR-49); `date_of_birth`, `death_date: Option<NaiveDate>`; `gender: Option<Gender>`; `blood_type: Option<BloodType>`; `multiple_birth: Option<u8>` (1-indexed birth order; twin disambiguation).
 

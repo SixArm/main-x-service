@@ -65,7 +65,7 @@ same plan:
   [service](../project-portfolio-management-service-with-loco/spec/index.md),
   [matcher](../project-portfolio-management-matcher-rust-crate/spec/index.md),
   [front-end](../project-portfolio-management-front-end-with-svelte/spec/index.md).
-- Entity AGENTS reference set: [`AGENTS/index.md`](../AGENTS/index.md).
+- Entity AGENTS reference set: [`agents/index.md`](../agents/index.md).
 - Adopted family designs:
   [cross-service-linking.md](../../agents/share/cross-service-linking.md),
   [bulk-import-export.md](../../agents/share/bulk-import-export.md),

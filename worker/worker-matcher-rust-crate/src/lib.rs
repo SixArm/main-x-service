@@ -27,7 +27,7 @@
 //! | [`matcher`]      | Orchestration: [`MatchingEngine`], [`MatchConfig`], [`MatchResult`]. |
 //! | [`error`]        | Error enum [`MatchingError`] and [`Result`] alias. |
 //!
-//! See [`AGENTS/architecture.md`](https://github.com/sixarm/worker-matcher/blob/main/AGENTS/architecture.md)
+//! See [`agents/architecture.md`](https://github.com/sixarm/worker-matcher/blob/main/agents/architecture.md)
 //! for the layering rules.
 //!
 //! ## Quick start — probabilistic match
@@ -128,8 +128,8 @@
 //! ## Further reading
 //!
 //! - [`spec.md`](https://github.com/sixarm/worker-matcher/blob/main/spec.md) — the living specification.
-//! - [`AGENTS/matching-algorithm.md`](https://github.com/sixarm/worker-matcher/blob/main/AGENTS/matching-algorithm.md) — practitioner's view of the algorithm.
-//! - [`AGENTS/normalization.md`](https://github.com/sixarm/worker-matcher/blob/main/AGENTS/normalization.md) — text normalisation rules.
+//! - [`agents/matching-algorithm.md`](https://github.com/sixarm/worker-matcher/blob/main/agents/matching-algorithm.md) — practitioner's view of the algorithm.
+//! - [`agents/normalization.md`](https://github.com/sixarm/worker-matcher/blob/main/agents/normalization.md) — text normalisation rules.
 
 // Always start with high quality coding conventions.
 #![forbid(unsafe_code)]

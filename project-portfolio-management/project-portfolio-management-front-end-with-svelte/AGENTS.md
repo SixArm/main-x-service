@@ -48,7 +48,7 @@ of the matching surface (except goal titles).
 ## Single source of truth
 
 - The service's [`spec.md`](../project-portfolio-management-service-with-loco/spec/index.md)
-  and [`AGENTS/`](../AGENTS/) describe the API contract. If a field
+  and [`agents/`](../agents/) describe the API contract. If a field
   changes in `Plan` (the matcher type) in the service, fix
   `src/lib/api/types.ts` here in the **same** change cycle — do not let
   the front-end drift.

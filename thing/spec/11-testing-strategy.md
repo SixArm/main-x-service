@@ -7,9 +7,9 @@ the **bridge tests** and (pending) live end-to-end runs.
 
 | Subproject | Layers | Guide |
 |---|---|---|
-| service | ~100 unit tests (`cargo test --lib`), `tests/integration_*.rs`, Criterion benchmarks, CI (`test.yml`, `quality.yml`, `security.yml`) | [service `AGENTS/testing.md`](../thing-service-with-loco/AGENTS/testing.md) |
-| matcher | Unit + integration + property tests + doctests (`cargo test`), Criterion benchmarks; clippy `-D warnings` and `cargo doc` clean as gates | [matcher `AGENTS/testing.md`](../thing-matcher-rust-crate/AGENTS/testing.md) |
-| front-end | 8 Vitest unit tests (`client.test.ts`, `things.test.ts`), 6 Playwright e2e smoke tests | [front-end `AGENTS/testing.md`](../thing-front-end-with-svelte/AGENTS/testing.md) |
+| service | ~100 unit tests (`cargo test --lib`), `tests/integration_*.rs`, Criterion benchmarks, CI (`test.yml`, `quality.yml`, `security.yml`) | [service `agents/testing.md`](../thing-service-with-loco/agents/testing.md) |
+| matcher | Unit + integration + property tests + doctests (`cargo test`), Criterion benchmarks; clippy `-D warnings` and `cargo doc` clean as gates | [matcher `agents/testing.md`](../thing-matcher-rust-crate/agents/testing.md) |
+| front-end | 8 Vitest unit tests (`client.test.ts`, `things.test.ts`), 6 Playwright e2e smoke tests | [front-end `agents/testing.md`](../thing-front-end-with-svelte/agents/testing.md) |
 
 ### 11.2 The integration-contract pin
 

@@ -3,7 +3,7 @@
 ### 9.1 Service REST API (summary)
 
 Complete reference:
-[`place-service-with-loco/AGENTS/restful.md`](../place-service-with-loco/AGENTS/restful.md)
+[`place-service-with-loco/agents/restful.md`](../place-service-with-loco/agents/restful.md)
 and service [spec §9](../place-service-with-loco/spec/09-api-surface.md).
 15 endpoints; standard response envelope; `409` on duplicate-detected
 create; `422` on validation failure.
@@ -28,7 +28,7 @@ Docs: Swagger UI at `/swagger-ui`. Metrics: Prometheus at
 `/metrics.prom`. gRPC (Tonic): stubbed.
 
 > Drift note (updated 2026-06-13): the code serves
-> `POST /api/places/check-duplicates`; the crate's `AGENTS/restful.md`
+> `POST /api/places/check-duplicates`; the crate's `agents/restful.md`
 > and spec §6.4 now both agree. Remaining: the front-end client calls
 > `/api/places/duplicates` and a service route test is missing —
 > tracked as [§13](13-tasks.md) E-1.

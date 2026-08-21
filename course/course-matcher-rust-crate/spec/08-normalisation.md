@@ -6,5 +6,5 @@
 - `course_code(s)` — strip whitespace → uppercase.
 - `fold_set(xs)` — fold each → drop empties → sort → dedup.
 
-Detailed rules: [`AGENTS/normalization.md`](../AGENTS/normalization.md).
+Detailed rules: [`agents/normalization.md`](../agents/normalization.md).
 

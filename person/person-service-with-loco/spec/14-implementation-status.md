@@ -8,7 +8,7 @@
 | Database schema | 12+ tables, SeaORM entities, indexes, audit triggers |
 | Matching | Probabilistic + deterministic; Jaro-Winkler + Levenshtein + Soundex; configurable weights |
 | Search | Tantivy 11-field index; fuzzy + phonetic + bulk + blocking |
-| REST API | 35+ endpoints (person CRUD, search, match/dedup/merge, review queue, links, bulk import/export, privacy, audit/compliance) + OpenAPI/Swagger + CORS + structured errors — see [AGENTS/restful.md](../AGENTS/restful.md) for the full table |
+| REST API | 35+ endpoints (person CRUD, search, match/dedup/merge, review queue, links, bulk import/export, privacy, audit/compliance) + OpenAPI/Swagger + CORS + structured errors — see [agents/restful.md](../agents/restful.md) for the full table |
 | FHIR R5 | `Patient` primary resource (full CRUD + search) + `Person` read-only alias, `GET /fhir/metadata` `CapabilityStatement`, searchset `Bundle`, `OperationOutcome` errors (T-11) |
 | Repository | SeaORM CRUD with transactions, soft delete |
 | Event streaming | In-memory publisher (default) or a Postgres transactional outbox (`PERSON_EVENT_TRANSPORT=outbox`) drained by a relay to `LoggingSink` or, behind the `fluvio` feature, a real-broker `FluvioSink` (Created / Updated / Deleted / Merged / Linked / Unlinked) |
@@ -25,7 +25,7 @@
 | Authorization (ABAC) | Inside the blanket guard: action derived from method + destructive named POSTs (`/merge`, `/deduplicate`, `/import`); shared `authentication-verifier` 0.3 engine evaluates `PERSON_ABAC_POLICY`/`_FILE` (else the built-in default policy) over the token's `attrs` claim; first-match-wins, default allow-read / deny-mutation; `401` vs `403` split with deciding-rule reason; DB-free §7 test matrix (T-1c) |
 | Containers | Multi-stage Dockerfile built with Podman, dev + test Compose |
 | Tests | Unit + integration + Criterion benchmarks; CI workflows |
-| Documentation | README, CLAUDE.md, AGENTS/* set, architecture, deploy guide, this spec |
+| Documentation | README, CLAUDE.md, agents/* set, architecture, deploy guide, this spec |
 
 ### 14.2 Open gaps
 

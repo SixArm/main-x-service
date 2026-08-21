@@ -451,7 +451,7 @@ fn sparse_records_do_not_panic_and_stay_in_range() {
 // probabilistic pipeline never reads it. The divergence is therefore inert.
 //
 // These two tests lock the documented contract (service spec §6.2,
-// `AGENTS/matching.md`, entity task ET-8) so a future change to either side
+// `agents/matching.md`, entity task ET-8) so a future change to either side
 // — scoring the field, or dropping the projection — fails here loudly.
 
 /// The adapter projects the FIRST `in_language` entry onto the matcher's

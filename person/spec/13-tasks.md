@@ -101,12 +101,12 @@ or clearly described manual check confirms it. Split oversized tasks
     rot in `person-service-with-loco/README.md` + `index.md`
     pointing at never-committed files — LICENSE / LICENSE-MIT /
     LICENSE-APACHE / ARCHITECTURE.md / API_GUIDE.md / task-10.md —
-    plus a pre-existing dangling `@AGENTS/architecture.md` include in
+    plus a pre-existing dangling `@agents/architecture.md` include in
     the service `CLAUDE.md`; left for a service-level task. **Resolved
     2026-06-13:** license links re-pointed to the `Cargo.toml` SPDX
     expression (no LICENSE files exist; crate is multi-licensed),
     `ARCHITECTURE.md`→`spec/08-architecture.md`,
-    `API_GUIDE.md`→`AGENTS/restful.md`, `task-10.md`→`spec/13-tasks.md`,
+    `API_GUIDE.md`→`agents/restful.md`, `task-10.md`→`spec/13-tasks.md`,
     and the `CLAUDE.md` include re-pointed to
     `../../agents/share/architecture.md`. Link-checker over
     `person/**/*.md`: 508 relative links resolve, zero dangling.)*

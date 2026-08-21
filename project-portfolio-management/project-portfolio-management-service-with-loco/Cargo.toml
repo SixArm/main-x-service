@@ -4,6 +4,7 @@
 name = "project-portfolio-management-service"
 version = "0.2.0"
 edition = "2024"
+rust-version = "1.95"
 publish = true
 default-run = "project-portfolio-management-service"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
@@ -81,6 +82,7 @@ path = "src/bin/main.rs"
 required-features = []
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
 loco-rs = { workspace = true, features = ["testing"] }
 # Name the `TestServer` type in shared request-test helpers.
 axum-test = { version = "17.3.0" }
@@ -101,3 +103,7 @@ sha2 = { version = "0.10" }
 base64 = { version = "0.22" }
 # Temp directories for the search-index tests.
 tempfile = { version = "3" }
+
+[[bench]]
+name = "service_bench"
+harness = false

@@ -39,7 +39,7 @@ therefore treats residence-linked places with person-grade controls:
   [spec §12](../place-service-with-loco/spec/12-compliance.md).
 - **Matcher** — never logs or `Debug`-formats place data; no real
   personal data in tests (synthetic fixtures only); see matcher
-  [`AGENTS/security-and-privacy.md`](../place-matcher-rust-crate/AGENTS/security-and-privacy.md).
+  [`agents/security-and-privacy.md`](../place-matcher-rust-crate/agents/security-and-privacy.md).
 - **Front-end** — never `console.log`s place values; confirm-before-
   delete; GDPR-export and masked-view UI are deferred tasks (front-end
   [spec §12](../place-front-end-with-svelte/spec/12-compliance.md), §13

@@ -57,7 +57,7 @@ impl ProbabilisticScorer {
         // gender/address/identifier/tax-ID are corroborating evidence at 0.10
         // each, and document is the lightest at 0.05 (it rarely differs between
         // records that already agree on the others). Keep these in sync with the
-        // table in `AGENTS/matching.md`.
+        // table in `agents/matching.md`.
         const NAME_WEIGHT: f64 = 0.30;
         const DOB_WEIGHT: f64 = 0.25;
         const GENDER_WEIGHT: f64 = 0.10;

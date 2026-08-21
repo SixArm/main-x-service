@@ -12,7 +12,7 @@ millions of users.
 | **Employers and verifiers** | Verify a professional's credentials and registry status before engagement | Search + match endpoints; credential-verification integrations (roadmap §15) |
 | **Workers (data subjects)** | Accuracy of their own record; GDPR rights — access, erasure, consent | GDPR export, soft delete, consent model, masked views |
 | **Auditors and regulators** | Who saw / changed what, when; HIPAA-grade trail; GDPR / UK DPA / ISO 27001 evidence | Audit log + audit query API; event stream |
-| **Developers and AI agents** | Clear contracts to build against; spec-driven discipline | This spec; per-crate specs and `AGENTS/` docs |
+| **Developers and AI agents** | Clear contracts to build against; spec-driven discipline | This spec; per-crate specs and `agents/` docs |
 
 ### 3.1 User roles (planned)
 

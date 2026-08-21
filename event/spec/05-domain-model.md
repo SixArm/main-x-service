@@ -2,7 +2,7 @@
 
 Three model surfaces exist; this section pins how they relate.
 Field-by-field references:
-service [`AGENTS/models.md`](../event-service-with-loco/AGENTS/models.md),
+service [`agents/models.md`](../event-service-with-loco/agents/models.md),
 matcher [`README.md`](../event-matcher-rust-crate/README.md) (0.5.0
 surface), front-end `src/lib/api/types.ts`.
 

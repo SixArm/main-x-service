@@ -29,12 +29,12 @@
 //! caller.
 
 use std::path::Path;
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 use case_matcher::{Case, phonetic::soundex};
 use loco_rs::Error;
 use tantivy::{
-    TantivyDocument,
+    IndexWriter, TantivyDocument,
     collector::TopDocs,
     doc,
     query::{BooleanQuery, FuzzyTermQuery, Occur, Query, QueryParser, TermQuery},
@@ -121,11 +121,33 @@ pub enum SearchMode {
 pub struct SearchEngine {
     /// The underlying Tantivy index wrapper.
     index: CaseIndex,
+    /// The single long-lived Tantivy writer.
+    ///
+    /// Held for the process rather than created per call. Tantivy's
+    /// `IndexWriter` allocates its whole `WRITER_HEAP_MB` arena and
+    /// spawns merge threads on construction, so building one per
+    /// indexed document put **~150 ms of pure setup on every create,
+    /// update, merge, and delete** — measured in `benches/`, not
+    /// guessed. It also took and released the index directory's
+    /// exclusive writer lock each time, so two concurrent writes could
+    /// collide on it; one owner cannot.
+    writer: Mutex<IndexWriter>,
     /// Filesystem path the index lives at (diagnostics / reopen).
     pub index_path: String,
 }
 
 impl SearchEngine {
+    /// The shared writer.
+    ///
+    /// A poisoned lock means an earlier write panicked. We recover the
+    /// guard rather than failing for ever: the only operations held
+    /// across it are `delete_term` / `add_document` / `commit`, and a
+    /// permanently dead index would be a worse outcome than a retry.
+    fn writer(&self) -> std::sync::MutexGuard<'_, IndexWriter> {
+        self.writer
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
     /// Open or create the index under `path`, creating the directory if
     /// it does not yet exist.
     ///
@@ -137,8 +159,11 @@ impl SearchEngine {
         let p = path.as_ref();
         std::fs::create_dir_all(p).map_err(|e| err(&format!("ensure index dir: {e}")))?;
         let index = CaseIndex::create_or_open(p)?;
+        // One writer for the process (see the field's docs).
+        let writer = Mutex::new(index.writer(WRITER_HEAP_MB)?);
         Ok(Self {
             index,
+            writer,
             index_path: p.to_string_lossy().into_owned(),
         })
     }
@@ -154,7 +179,7 @@ impl SearchEngine {
     ///
     /// When the writer cannot be acquired or the commit fails.
     pub fn index_case(&self, pid: Uuid, case: &Case) -> Result<()> {
-        let mut writer = self.index.writer(WRITER_HEAP_MB)?;
+        let mut writer = self.writer();
         let s = self.index.schema();
         let pid_str = pid.to_string();
         // Replace-in-place: same batch, so a crash between the two
@@ -197,7 +222,7 @@ impl SearchEngine {
     ///
     /// When the delete commit fails.
     pub fn delete_case(&self, pid: Uuid) -> Result<()> {
-        let mut writer = self.index.writer(WRITER_HEAP_MB)?;
+        let mut writer = self.writer();
         let s = self.index.schema();
         writer.delete_term(Term::from_field_text(s.pid, &pid.to_string()));
         writer
@@ -214,7 +239,7 @@ impl SearchEngine {
     ///
     /// When the delete-all commit fails.
     pub fn clear(&self) -> Result<()> {
-        let mut writer = self.index.writer(WRITER_HEAP_MB)?;
+        let mut writer = self.writer();
         writer
             .delete_all_documents()
             .map_err(|e| err(&format!("delete all: {e}")))?;
@@ -808,5 +833,73 @@ mod tests {
     fn tokenise_splits_on_punctuation() {
         assert_eq!(tokenise("Housing, Benefit."), vec!["housing", "benefit"]);
         assert_eq!(tokenise("   "), Vec::<String>::new());
+    }
+    /// **PERF-2 diagnostic**, not an assertion: decompose what one
+    /// indexed document actually costs.
+    ///
+    /// `index_case` does three things — `add_document`, `commit`, and a
+    /// reader `reload` — and the whole is ~78 ms per document after the
+    /// writer stopped being rebuilt per call. The open question was what
+    /// the remainder is, and the working assumption was fsync. It is not:
+    /// a write+fsync of a segment-sized file measures 0.14 ms on macOS
+    /// APFS and 0.017 ms on Linux, i.e. under a quarter of one percent of
+    /// the total. This prints where the time really goes.
+    ///
+    /// `#[ignore]`d because it measures rather than asserts; run it with
+    /// `cargo test --lib perf2 -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "diagnostic: prints timings, asserts nothing"]
+    fn perf2_decompose_index_cost() {
+        use std::time::Instant;
+        const N: u32 = 20;
+
+        let dir = tempfile::tempdir().expect("temp dir");
+        let engine = SearchEngine::new(dir.path()).expect("index opens");
+        let case = Case::new("Housing benefit appeal");
+
+        // Warm up: the first commit on a fresh index pays one-off setup.
+        engine.index_case(Uuid::new_v4(), &case).expect("warmup");
+
+        let mut add = std::time::Duration::ZERO;
+        let mut commit = std::time::Duration::ZERO;
+        let mut reload = std::time::Duration::ZERO;
+
+        for _ in 0..N {
+            let pid = Uuid::new_v4();
+            let s = self_schema(&engine);
+
+            let t = Instant::now();
+            {
+                let writer = engine.writer();
+                writer.delete_term(Term::from_field_text(s.pid, &pid.to_string()));
+                writer
+                    .add_document(
+                        doc!(s.pid => pid.to_string(), s.title => case.title.clone(),
+                                       s.active => "true"),
+                    )
+                    .expect("add");
+            }
+            add += t.elapsed();
+
+            let t = Instant::now();
+            engine.writer().commit().expect("commit");
+            commit += t.elapsed();
+
+            let t = Instant::now();
+            engine.index.reload().expect("reload");
+            reload += t.elapsed();
+        }
+
+        let per = |d: std::time::Duration| d.as_secs_f64() * 1000.0 / f64::from(N);
+        println!("PERF-2 per indexed document, {N} iterations:");
+        println!("  add_document : {:.2} ms", per(add));
+        println!("  commit       : {:.2} ms", per(commit));
+        println!("  reader reload: {:.2} ms", per(reload));
+        println!("  total        : {:.2} ms", per(add + commit + reload));
+    }
+
+    /// Borrow the engine's schema handles for the diagnostic above.
+    fn self_schema(engine: &SearchEngine) -> &CaseIndexSchema {
+        engine.index.schema()
     }
 }

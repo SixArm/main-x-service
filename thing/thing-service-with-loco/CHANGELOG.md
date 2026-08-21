@@ -7,6 +7,18 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ### Fixed — `POST /api/things` demanded server-owned fields (QA-SERVER-FIELDS)
 
 - **The JSON extractor required `id`, `is_deleted`, `created_at`,
@@ -418,7 +430,7 @@ several tables.
 ### Changed — documentation
 
 - Reduced healthcare / clinical / patient / hospital / clinician /
-  practitioner framing across spec.md, AGENTS.md, AGENTS/*, README,
+  practitioner framing across spec.md, AGENTS.md, agents/*, README,
   CLAUDE.md, and index.md. Preserved: FHIR R5 resource and field
   names (e.g. `Patient.birthPlace`, `Practitioner` resource),
   national-identifier proper nouns (United Kingdom National Health
@@ -426,8 +438,8 @@ several tables.
   `compliance-for-healthcare.md` doc, and `HIPAA` / `NHS` / `PHI`
   as compliance regimes.
 - `spec.md §11 Testing Strategy` now lists the bridge integration
-  tests; `AGENTS/testing.md` gained a `## Bridge Integration Tests`
-  section; `AGENTS/restful.md` gained adapter + Prometheus blocks;
+  tests; `agents/testing.md` gained a `## Bridge Integration Tests`
+  section; `agents/restful.md` gained adapter + Prometheus blocks;
   `index.md` gained a worked example showing the canonical bridge
   in action.
 

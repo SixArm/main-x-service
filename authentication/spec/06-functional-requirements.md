@@ -1,8 +1,8 @@
 ## 6. Functional Requirements
 
 Each requirement names its owning subproject. Endpoint detail:
-[`AGENTS/restful.md`](../AGENTS/restful.md); verification detail:
-[`AGENTS/verification.md`](../AGENTS/verification.md).
+[`agents/restful.md`](../agents/restful.md); verification detail:
+[`agents/verification.md`](../agents/verification.md).
 
 ### 6.1 Magic-link issuance (service)
 

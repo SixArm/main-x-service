@@ -1365,7 +1365,7 @@ mod tests {
     #[test]
     fn normalize_name_does_not_normalise_unicode_punctuation() {
         // Curly apostrophe (U+2019) is intentionally not stripped.
-        // This is documented in AGENTS/normalization.md as a known limitation.
+        // This is documented in agents/normalization.md as a known limitation.
         let with_curly = Normalizer::normalize_name("O\u{2019}Brien");
         assert!(with_curly.contains('\u{2019}'));
     }

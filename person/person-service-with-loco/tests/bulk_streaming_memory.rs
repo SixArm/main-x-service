@@ -294,7 +294,7 @@ async fn jsonl_line_reader_peak_is_flat_in_the_input_size() {
 async fn csv_row_stream_peak_is_flat_in_the_input_size() {
     let _guard = MEASURE.lock().await;
 
-    let encoded = csv::encode(&[sample_person()]).unwrap();
+    let encoded = csv::encode(&[sample_person()], b',').unwrap();
     let text = String::from_utf8(encoded).unwrap();
     let (header_line, row_line) = text.split_once('\n').unwrap();
     let header_bytes = format!("{header_line}\n").into_bytes();
@@ -305,7 +305,7 @@ async fn csv_row_stream_peak_is_flat_in_the_input_size() {
     for repeats in [20_000usize, 200_000] {
         let source = Generated::with_prefix(&header_bytes, &row_bytes, repeats);
         let baseline = reset_peak();
-        let mut stream = csv::RowStream::new(source, usize::MAX);
+        let mut stream = csv::RowStream::new(source, usize::MAX, b',');
         let mut rows = 0usize;
         while let Some(item) = stream.next_row().await {
             let (_had_id, parsed) = item.expect("no terminal error");

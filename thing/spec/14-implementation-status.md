@@ -47,7 +47,7 @@ Honest snapshot per subproject. Aspirational items live in
 
 | Capability | Status |
 |---|---|
-| This umbrella spec + `AGENTS/` reference set | ✅ (inaugural) |
+| This umbrella spec + `agents/` reference set | ✅ (inaugural) |
 | Cross-subproject link integrity post-nesting | ❌ (entity T-1) |
 | Doc drift (endpoint name, sibling prose, version banner) | ❌ (entity T-2–T-4) |
 | Confidence-vocabulary mapping | ❌ (entity T-8) |

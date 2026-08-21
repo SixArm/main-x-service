@@ -2,6 +2,7 @@
 name = "thing-service"
 version = "0.5.0"
 edition = "2024"
+rust-version = "1.95"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "Thing Service - A thing administration microservice that interoperates with the thing-matcher crate"
 license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"

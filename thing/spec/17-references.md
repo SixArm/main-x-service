@@ -3,7 +3,7 @@
 ### Subproject documentation
 
 - Service: [spec](../thing-service-with-loco/spec/index.md) ·
-  [AGENTS](../thing-service-with-loco/AGENTS/index.md) ·
+  [AGENTS](../thing-service-with-loco/agents/index.md) ·
   [README](../thing-service-with-loco/README.md) ·
   [index](../thing-service-with-loco/index.md)
 - Matcher: [spec](../thing-matcher-rust-crate/spec/index.md) ·
@@ -17,7 +17,7 @@
 
 ### Entity-level
 
-- Agent reference set: [`../AGENTS/index.md`](../AGENTS/index.md)
+- Agent reference set: [`../agents/index.md`](../agents/index.md)
 - Reference schema: [`../thing-service-schema.sql`](../thing-service-schema.sql)
 - DTO contract code: [`adapter.rs`](../thing-service-with-loco/src/matching/adapter.rs)
   and [`duplicate_detection.rs`](../thing-service-with-loco/tests/duplicate_detection.rs)

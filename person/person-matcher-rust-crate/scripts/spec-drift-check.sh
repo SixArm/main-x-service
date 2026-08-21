@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Spec-drift check (AGENTS/spec-driven-development.md; historically
+# Spec-drift check (agents/spec-driven-development.md; historically
 # spec.md §23 T-7, from before the spec was a single file).
 #
 # Fail with a non-zero exit code if any "watched" source file changed in

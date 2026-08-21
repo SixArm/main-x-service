@@ -770,6 +770,69 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
+
+- [x] **2026-08-21 — TSV bulk format + fuzzed row decoders.**
+  `BulkFormat::Tsv` is accepted for import and export alongside `jsonl`
+  and `csv`. TSV shares the CSV codec rather than forking it — the codec
+  takes a `delimiter: u8` and `BulkFormat::delimiter()` is the one place
+  that maps format → byte. The delimiter is declared by the caller, never
+  inferred: reading CSV as TSV resolves no column and reconstructs the
+  row from nothing (a per-row error here, since a required field is
+  missing; a silently empty record for an entity whose fields were all
+  optional), and a test pins that the data is not recovered either way.
+  Tab-containing fields are quoted by the `csv` crate, so free text is
+  safe. A new `bulk_decoders` fuzz target drives both delimiters and the
+  JSONL path over arbitrary bytes, pinning never-panic, determinism, and
+  the §7 per-row error contract.
+
+
+- [x] **2026-08-21 — FUZZ-2: cargo-fuzz harness for the request-path
+  logic.** Three coverage-guided targets over the pure, total code that
+  faces the network: `validate_json` (bytes → `serde_json` → `Case` →
+  `validation::problems`), `validate_built` (the validator driven from
+  raw bytes, so the fuzzer controls array cardinality directly rather
+  than having to learn JSON first), and `merge_cases` (the merge fold over
+  two arbitrary payloads). Invariants pinned: never-panic; validation is
+  deterministic and its **problem report is bounded** independent of
+  payload size (the generalisation of SEC-M8, which the unit tests pin
+  only for one hand-written payload); merge keeps the survivor's
+  `title` and is **absorbing**, so a retried merge cannot inflate
+  the record. The sub-crate declares an empty `[workspace]` table
+  because this crate is a workspace root, and no `rust-version` because
+  cargo-fuzz is nightly-only. Verified: all three build and run clean,
+  and the bounded-report assertion was confirmed live by lowering its
+  ceiling until it fired.
+
+- [x] **2026-08-20 — Search writer held for the process; Criterion
+  benchmarks; declared MSRV.** `SearchEngine::index_case` (and the
+  delete/clear paths) built a **new Tantivy `IndexWriter` per call**.
+  That allocates the whole 50 MB `WRITER_HEAP_MB` arena and spawns merge
+  threads on construction, so every create / update / merge /
+  soft-delete paid it synchronously on the request path — ~155 ms per
+  indexed document, measured against a fresh index. It was also a
+  concurrency hazard: an `IndexWriter` holds the index directory's
+  exclusive lock, so taking and releasing it per call left two
+  simultaneous writes able to collide on it. The engine now holds one
+  `Mutex<IndexWriter>` created in `new()` (~78 ms per document; the
+  remainder is the durable `commit()` plus reader `reload()` that
+  read-after-write indexing inherently costs — see repo `tasks.md`
+  PERF-2 for the open design question). Found by `benches/service_bench.rs`,
+  new in the same pass: validation, merge, and search groups over the
+  CPU-bound halves of a request, compiled in CI by the new
+  `scripts/ci-check.sh bench` stage. `Cargo.toml` also declares
+  `rust-version = "1.95"` — the repository's current-stable-minus-three
+  floor (`spec/rust-msrv-n-minus-3.md`), enforced by
+  `scripts/ci-check.sh msrv`. Additionally, `validation::problems` reported an
+  over-long array's cardinality violation once and then still walked
+  every entry, so a payload with ten thousand blank `subjects` returned
+  ten thousand problem strings in one `422` body — a small request
+  buying a large response. Each per-entry loop is now
+  `.take(MAX_ARRAY_LEN)`: the cardinality problem already rejects the
+  payload, so inspecting the tail decides nothing, and bounding the
+  **report** is the same input-bounding rule as bounding the work
+  (SEC-M1). Pinned by a test. This service is the reference; the roll-out
+  to organization / care-pathway / portfolio is repo `tasks.md` SEC-M8b.
+
 - [x] **2026-07-25..27 — Compliance: tamper-evident audit chain,
   read/disclosure auditing, row-level record integrity, GDPR Art. 17
   erasure, external-witness checkpoints, keyed integrity MAC, and the

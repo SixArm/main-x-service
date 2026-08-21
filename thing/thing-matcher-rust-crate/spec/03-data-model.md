@@ -139,7 +139,7 @@ pub struct MatchBreakdown {
 
 `MatchBreakdown` carries **10 score fields** today, each `Option<f64>` — matching the `pub struct MatchBreakdown` above exactly. (Two more, `relationships_score` and `tags_score`, are specified in §5.9.1/§5.9.2 and §6.6/§6.8 but not yet implemented — see CHANGELOG.md `[Unreleased]`; landing them will bring the count to 12.) Per field: `Some(s)` means the field was scored, `s ∈ [0.0, 1.0]`. `None` means at least one side was absent / empty, so the field did not participate in the weighted sum. Downstream services MUST NOT discard the breakdown — it is the audit trail for the `score`.
 
-Note for implementers: unlike `Thing`, `MatchBreakdown` does **not** carry `#[non_exhaustive]` (§7.3), so adding `relationships_score` / `tags_score` will be a breaking change under strict SemVer, mitigated only by this crate's pre-1.0 "minor bumps may break" policy (`AGENTS/release.md`).
+Note for implementers: unlike `Thing`, `MatchBreakdown` does **not** carry `#[non_exhaustive]` (§7.3), so adding `relationships_score` / `tags_score` will be a breaking change under strict SemVer, mitigated only by this crate's pre-1.0 "minor bumps may break" policy (`agents/release.md`).
 
 ### 3.8 `Confidence`
 

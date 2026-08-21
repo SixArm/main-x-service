@@ -1,6 +1,6 @@
 ## 9. API Consumption
 
-The front-end binds 1:1 to the Thing Service REST surface (see [`thing-service-with-loco/AGENTS/restful.md`](../../thing-service-with-loco/AGENTS/restful.md)). Calls do not go straight to the service: the browser calls the same-origin BFF proxy (`/api/proxy/...`, `src/routes/api/proxy/[...path]/+server.ts`), which exchanges the session for a short-lived PASETO and forwards to `THING_API_URL` (§8 Architecture). `ThingRepository`/`ApiClient` are unaware of this — their configured base URL is just `/api/proxy`.
+The front-end binds 1:1 to the Thing Service REST surface (see [`thing-service-with-loco/agents/restful.md`](../../thing-service-with-loco/agents/restful.md)). Calls do not go straight to the service: the browser calls the same-origin BFF proxy (`/api/proxy/...`, `src/routes/api/proxy/[...path]/+server.ts`), which exchanges the session for a short-lived PASETO and forwards to `THING_API_URL` (§8 Architecture). `ThingRepository`/`ApiClient` are unaware of this — their configured base URL is just `/api/proxy`.
 
 | Endpoint | Used by |
 | --- | --- |

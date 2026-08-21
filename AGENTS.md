@@ -25,7 +25,7 @@ buys nothing is churn.
 > directories now, and no live `spec.md` remains (the ones under
 > `target/package/` are packaging artifacts of old releases).
 
-See any per-crate `AGENTS/spec-driven-development.md` for the
+See any per-crate `agents/spec-driven-development.md` for the
 discipline, including the anti-patterns.
 
 ### Service crates
@@ -155,11 +155,26 @@ discovers the ~55 crates and feeds them to each stage.
 | Stage | Command | Notes |
 |---|---|---|
 | `fmt` | `cargo fmt --check` | one pass over every crate |
+| `docs` | index + content scan | repo-wide, no build: the agents directory is lowercase ([spec](spec/agents-directory-name-is-lowercase.md)) |
 | `clippy` | `cargo clippy --all-targets -- -D warnings` | `-D warnings` is what keeps `#![warn(clippy::pedantic)]` at zero |
 | `test` | `cargo test` | DB-gated suites stay skipped |
 | `test-db` | `cargo test -- --ignored` | only crates enrolled in [`ci/db-suites.txt`](ci/db-suites.txt), against a Postgres service |
 | `deny` | `cargo deny check` | advisories + licences, where a `deny.toml` exists |
 | `evidence` | SBOM render | IEC 62304 §8.1.2 / FD&C §524B |
+| `fuzz` | `cargo +nightly fuzz run <target>` | `FUZZ_SECONDS` (default 30) per target, for the `fuzz/` sub-crates; a short smoke, not exhaustive fuzzing |
+| `msrv` | `cargo +<msrv> check --all-targets` | asserts every `rust-version` equals [`ci/msrv.txt`](ci/msrv.txt), then compiles against that toolchain |
+| `bench` | `cargo bench --no-run` | compiles the Criterion benches (`--all-targets` already type-checks them; this proves they *link*) |
+
+**The MSRV is the current stable minus three** — today **1.95**, from
+stable 1.98. It is declared per crate (`rust-version` in every
+`[package]`, since there is no root manifest to inherit from), sourced
+from [`ci/msrv.txt`](ci/msrv.txt), and enforced by the `msrv` stage. It
+is deliberately a *different number* from the `rust-toolchain.toml` pin
+(1.96.1, what we build with) and from current stable. The binding
+constraint is the dependency graph, not our code: loco-rs / sea-orm /
+sqlx already require 1.94. See
+[`spec/rust-msrv-n-minus-3.md`](spec/rust-msrv-n-minus-3.md) for the
+policy and the bump procedure.
 
 **`ci/db-suites.txt` is an allowlist, not a denylist.** A crate joins it
 once its `--ignored` suite has been observed green, so CI starts green and
@@ -273,10 +288,10 @@ everywhere:
 > Some service crates' `README.md` is a **symlink to `index.md`** —
 > edit `index.md`.
 
-### The `AGENTS/` directory: older subprojects only
+### The `agents/` directory: older subprojects only
 
 The six original entity crates (person, worker, place, thing, event,
-course) and the matcher crates carry an `AGENTS/` directory of
+course) and the matcher crates carry an `agents/` directory of
 reference docs — `index.md`, `spec-driven-development.md`,
 `models.md`, `matching.md`, `restful.md`, `testing.md`. Twenty-two
 newer subprojects do not, and that is a decision rather than a gap:
@@ -286,7 +301,7 @@ exists to prevent. Newer subprojects keep the same material in
 `spec/` and point at it from `AGENTS.md`.
 
 If you are adding a subproject, follow the newer pattern. If you are
-editing an older one, keep its `AGENTS/` in step with its `spec/` —
+editing an older one, keep its `agents/` in step with its `spec/` —
 or delete the file rather than let it rot.
 
 ### Where planning lives

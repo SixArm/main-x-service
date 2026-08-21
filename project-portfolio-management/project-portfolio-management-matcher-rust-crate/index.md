@@ -14,9 +14,9 @@ optional descriptive metadata that does not gate matching.
 | [AGENTS.md](./AGENTS.md) | How to work in this crate; public API; layout. |
 | [README.md](./README.md) | User-facing intro + usage. |
 | [CHANGELOG.md](./CHANGELOG.md) | Release history. |
-| [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md) | No kind gate + per-component derivations + weights. |
-| [AGENTS/normalization.md](./AGENTS/normalization.md) | Fold / code rules. |
-| [AGENTS/testing.md](./AGENTS/testing.md) | Test layout. |
+| [agents/matching-algorithm.md](./agents/matching-algorithm.md) | No kind gate + per-component derivations + weights. |
+| [agents/normalization.md](./agents/normalization.md) | Fold / code rules. |
+| [agents/testing.md](./agents/testing.md) | Test layout. |
 
 The entity-level domain model lives in
 [`../spec/index.md`](../spec/index.md) §5.

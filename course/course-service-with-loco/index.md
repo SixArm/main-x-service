@@ -75,7 +75,7 @@ cargo loco db migrate
 ## API
 
 REST routes mount under `/api/courses/*` and `/api/courses/{id}/instances/*`.
-See [`AGENTS/restful.md`](AGENTS/restful.md) for the full list. All
+See [`agents/restful.md`](agents/restful.md) for the full list. All
 endpoints return the standard `{success, data, error}` envelope.
 URLs are version-free; negotiate the response shape with the
 `Accepts-version` header (default `1.0`) per
@@ -86,7 +86,7 @@ A separate, deliberately **non-standard FHIR** surface is served at
 an educational course, so a course is wrapped as a FHIR `Basic`
 resource rather than left unimplemented (see
 [`agents/share/fhir.md`](../../agents/share/fhir.md) §3 and
-`AGENTS/restful.md`).
+`agents/restful.md`).
 
 Interactive OpenAPI 3 documentation ships with the binary:
 
@@ -217,7 +217,7 @@ DATABASE_URL=postgres://course_user:course_password@localhost:5434/course \
 cargo bench
 ```
 
-See [`AGENTS/testing.md`](AGENTS/testing.md) for the layout and
+See [`agents/testing.md`](agents/testing.md) for the layout and
 [`docker-compose.yml`](docker-compose.yml) for the dev Postgres
 bring-up the integration suite expects to be migrated against.
 

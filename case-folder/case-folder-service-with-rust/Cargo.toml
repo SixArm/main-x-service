@@ -4,6 +4,7 @@
 name = "case-folder-service-with-rust"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.95"
 publish = false
 default-run = "case-folder-service-with-rust-cli"
 

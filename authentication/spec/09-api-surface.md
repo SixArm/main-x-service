@@ -1,6 +1,6 @@
 ## 9. API Surface
 
-Complete reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
+Complete reference: [`agents/restful.md`](../agents/restful.md).
 
 ### 9.1 Service REST API
 

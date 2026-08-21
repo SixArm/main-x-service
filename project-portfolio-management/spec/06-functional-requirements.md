@@ -45,7 +45,7 @@ gates nor scores.
 
 ### 6.3 Matching — matcher (algorithm) + service (endpoints)
 
-Algorithm reference: [`AGENTS/matching.md`](../AGENTS/matching.md) and
+Algorithm reference: [`agents/matching.md`](../agents/matching.md) and
 the matcher [spec §5–§18](../project-portfolio-management-matcher-rust-crate/spec/index.md).
 
 - **FR-6 (kind-agnostic matching)** The matcher compares any two plans

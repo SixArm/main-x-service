@@ -66,7 +66,7 @@ describe("canDecide", () => {
 
 describe("MATCH_COMPONENTS", () => {
     // Pins the place matcher's published default weights
-    // (AGENTS/matching.md). If they no longer sum to 1.00 the table is
+    // (agents/matching.md). If they no longer sum to 1.00 the table is
     // lying to the operator.
     it("weights sum to 1.00", () => {
         const total = MATCH_COMPONENTS.reduce((sum, c) => sum + c.weight, 0);

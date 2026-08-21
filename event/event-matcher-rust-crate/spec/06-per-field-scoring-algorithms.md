@@ -1,6 +1,6 @@
 ## 6. Per-field scoring algorithms
 
-Each component returns `Option<f64>` in `[0.0, 1.0]`. A `None` means the component did not participate (§5.4). Per-algorithm pseudocode, edge cases, and lookup tables are maintained in [`AGENTS/matching-algorithm.md`](../AGENTS/matching-algorithm.md); the contracts below are normative.
+Each component returns `Option<f64>` in `[0.0, 1.0]`. A `None` means the component did not participate (§5.4). Per-algorithm pseudocode, edge cases, and lookup tables are maintained in [`agents/matching-algorithm.md`](../agents/matching-algorithm.md); the contracts below are normative.
 
 ### 6.1 Name — `name_score`
 

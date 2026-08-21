@@ -10,7 +10,7 @@
 //!    weighted average over the *present* components.
 //!
 //! The full per-component formula lives in
-//! `AGENTS/matching-algorithm.md`.
+//! `agents/matching-algorithm.md`.
 
 use strsim::jaro_winkler;
 

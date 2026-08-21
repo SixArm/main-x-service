@@ -9,6 +9,33 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+
+
+### Added — Criterion benchmarks
+
+- `benches/match_pair.rs`, matching the harness the other matcher crates
+  carry. Four groups over the paths a downstream integrator actually
+  exercises: single-pair scoring in three regimes (identical clone,
+  fuzzy near-match through the full pipeline, unrelated pair), the
+  deterministic short-circuits (a shared DOI, and a shared provider-scoped course code), `rank` at 10 / 100 / 1000
+  candidates with `Throughput::Elements` set so per-candidate cost and
+  any super-linear scaling are visible directly, and the same fuzzy pair
+  under each shipped config preset.
+- Fixtures are built from `Course::new` and derived deterministically from
+  an index, so a candidate list of any size is reproducible without
+  randomness.
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ### Added — cargo-fuzz harness (SEC-I2)
 
 - A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate adopting
@@ -92,7 +119,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   (now includes `is_match`) and the file-layout block (`spec/` directory
   with §1–§25 section files, not a single `spec.md`). Corrected stale
   test counts (was "21 unit tests") across `index.md` / `README.md` and
-  `AGENTS/testing.md`; recorded the unscored-field invariant in
+  `agents/testing.md`; recorded the unscored-field invariant in
   `spec.md §24`.
 - **Expanded test coverage** (72 embedded unit tests, up from 21,
   plus a new 15-test integration suite). Filled the
@@ -132,7 +159,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   `usize` cast avoidance via `abs_diff`, explicit-import over
   glob) with no change to matching behaviour.
 - **Spec/code drift fixed.** `spec.md §9` now documents the Soundex
-  phonetic bonus (T-6) that the code and `AGENTS/matching-algorithm.md`
+  phonetic bonus (T-6) that the code and `agents/matching-algorithm.md`
   already described; §2.1 lists `match_one_to_many`; §4 notes the demo
   binary and that `mimalloc` is demo-only.
 - Removed the duplicate `serde_json` `[dev-dependencies]` entry (it is
@@ -163,7 +190,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   `match_one_to_many` block showing the input-order variant
   alongside `rank` so readers can pick the right shape for their
   use case.
-- **AGENTS/testing.md realigned post-T-6/T-10.** Coverage table
+- **agents/testing.md realigned post-T-6/T-10.** Coverage table
   was missing the `phonetic` module entirely (added with the four
   Russell-style tests + the homophone-pair helper) and didn't
   mention the new `match_one_to_many` / Soundex-bonus tests on
@@ -240,7 +267,7 @@ modelled on schema.org/Course.
 - `spec.md` §1–§25 — research basis, full per-component derivation,
   configuration table, normalisation rules, quality goals,
   consumption story, anti-patterns, change-control discipline.
-- `AGENTS.md` + `AGENTS/{index, spec-driven-development,
+- `AGENTS.md` + `agents/{index, spec-driven-development,
   matching-algorithm, normalization, testing}.md`.
 - `README.md` with quick-start, algorithm summary, public surface,
   build / test commands.

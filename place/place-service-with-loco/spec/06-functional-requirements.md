@@ -10,7 +10,7 @@
 
 ### 6.2 Matching
 
-Algorithm reference: [`AGENTS/matching.md`](../AGENTS/matching.md).
+Algorithm reference: [`agents/matching.md`](../agents/matching.md).
 
 Default component weights (sum to 1.0):
 
@@ -66,7 +66,7 @@ Registry-only fields (`id`, `is_deleted`, `created_at`, `keywords`,
 `amenity_features`, `opening_hours`, `description`, `fax_number`,
 `url`, `public_access`, `smoking_allowed`, …) are dropped — they
 have no matcher counterpart. See
-[`AGENTS/matching.md`](../AGENTS/matching.md) for the in-service
+[`agents/matching.md`](../agents/matching.md) for the in-service
 algorithm and the matcher crate's
 [`spec.md §5–§7`](../../place-matcher-rust-crate/spec/index.md) for the
 canonical algorithm.

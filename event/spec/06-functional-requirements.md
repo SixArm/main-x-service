@@ -9,9 +9,9 @@ capital-E **Event**; the CRUD-change records on the stream are
 | # | Requirement | Owner | Detail |
 |---|---|---|---|
 | FR-1 | Create / read / update / soft-delete Event records, with `422` on validation failure | Service | [spec §6.1, §6.5](../event-service-with-loco/spec/06-functional-requirements.md) |
-| FR-2 | Multiple typed, system-qualified identifiers per Event | Service | [AGENTS/models.md](../event-service-with-loco/AGENTS/models.md) |
+| FR-2 | Multiple typed, system-qualified identifiers per Event | Service | [agents/models.md](../event-service-with-loco/agents/models.md) |
 | FR-3 | Time-window handling: required UTC `start_date`, optional `end_date` / `door_time` / `duration`, IANA `time_zone` for display, reschedule tracking via `previous_start_date` | Service | [spec §5](../event-service-with-loco/spec/05-domain-model.md) |
-| FR-4 | Probabilistic matching with per-component score breakdown, including time-window components (start/end-date decay, window overlap as Jaccard of `[start, end)`) | Service + Matcher | [AGENTS/matching.md](../event-service-with-loco/AGENTS/matching.md) |
+| FR-4 | Probabilistic matching with per-component score breakdown, including time-window components (start/end-date decay, window overlap as Jaccard of `[start, end)`) | Service + Matcher | [agents/matching.md](../event-service-with-loco/agents/matching.md) |
 | FR-5 | Deterministic matching with short-circuits: strong-identifier exact match (service); shared `(scheme, value)` event ID or same normalised name + same `start_date` instant (matcher) | Service + Matcher | [matcher AGENTS.md](../event-matcher-rust-crate/AGENTS.md) |
 | FR-6 | The service MUST be able to score any persisted pair through the canonical matcher via `to_matcher_event`; the projection rules of §5.3 MUST hold | Service (adapter) | [§5.3](05-domain-model.md) |
 | FR-7 | Full-text + fuzzy search with date-range filter, facets, pagination, optional masking | Service | [spec §6.3](../event-service-with-loco/spec/06-functional-requirements.md) |

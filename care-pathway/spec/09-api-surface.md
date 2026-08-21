@@ -1,6 +1,6 @@
 ## 9. API Surface
 
-Endpoint detail: [`AGENTS/restful.md`](../AGENTS/restful.md); source:
+Endpoint detail: [`agents/restful.md`](../agents/restful.md); source:
 [`src/controllers/care_pathways.rs`](../care-pathway-service-with-loco/src/controllers/care_pathways.rs).
 
 ### 9.1 Service REST API

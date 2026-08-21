@@ -1,6 +1,6 @@
 ## 11. Testing Strategy
 
-Layered: [`AGENTS/testing.md`](../AGENTS/testing.md).
+Layered: [`agents/testing.md`](../agents/testing.md).
 
 - **Unit tests** — `#[cfg(test)]` modules; matching, scoring,
   validation (including attendance-mode/location coupling and capacity

@@ -1,7 +1,7 @@
 ## 9. API Surface
 
 Complete REST reference:
-[service `AGENTS/restful.md`](../thing-service-with-loco/AGENTS/restful.md).
+[service `agents/restful.md`](../thing-service-with-loco/agents/restful.md).
 Front-end consumption map:
 [front-end §9](../thing-front-end-with-svelte/spec/09-api-consumption.md).
 
@@ -30,7 +30,7 @@ at `/swagger-ui`. No FHIR surface — Things are not a FHIR-resource
 concern. gRPC is stubbed (service spec §13 T-3).
 
 > Note: code and OpenAPI use `/api/things/check-duplicates`; the
-> service's `AGENTS/restful.md` table says `/api/things/duplicates` —
+> service's `agents/restful.md` table says `/api/things/duplicates` —
 > doc drift tracked as §13 T-2.
 
 ### 9.2 Front-end routes

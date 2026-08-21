@@ -45,7 +45,7 @@ Each entity directory holds these parts:
 | Library crate | A **matcher** (dependency-light pairwise comparison lib) — except `authentication`, whose library is the **verifier** | `person/person-matcher-rust-crate/`, `authentication/authentication-verifier-rust-crate/` |
 | Service crate | The HTTP API service over PostgreSQL | `person/person-service-with-loco/` |
 | Entity `spec/` | Entity-level umbrella spec (§1–§18 SDD shape; §13 live task queue) | `person/spec/index.md` |
-| Entity `AGENTS/` | Entity-level agent guide index | `person/AGENTS/index.md` |
+| Entity `agents/` | Entity-level agent guide index | `person/agents/index.md` |
 
 The full entity → (front-end, library, service, umbrella) mapping is the
 table in [../index.md](../index.md). The matcher library is both usable

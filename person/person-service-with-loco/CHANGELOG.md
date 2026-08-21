@@ -7,6 +7,46 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 [`index.md`](./index.md), [`spec.md`](./spec/index.md), [`README.md`](./README.md).
 
 ## [Unreleased]
+
+
+### Added — TSV bulk import/export, and fuzzed row decoders
+
+`BulkFormat` gains `Tsv`, accepted on the same `format` field as `jsonl`
+and `csv` for both import and export.
+
+TSV is CSV with a different delimiter, so it **shares the codec** rather
+than forking it: `csv::encode`/`decode` take a `delimiter: u8`, and
+`BulkFormat::delimiter()` is the single place that decides which byte a
+format uses. A second place to decide it would be a second place for the
+two to drift. Person's **streaming** reader (SEC-B2) threads the
+delimiter through `RowStream::new` too — a TSV that only worked through
+the buffered `decode` would pass tests and fail on a real upload.
+
+The delimiter is **passed in, never sniffed**. Reading CSV as TSV
+resolves no column and reconstructs the row from nothing — which for this
+entity surfaces as a per-row parse error, and for an all-optional entity
+would be a silently empty record. Pinned by a test that asserts the data
+is not recovered either way.
+
+Also added: a `bulk_decoders` cargo-fuzz target driving `csv::decode`
+under **both** delimiters plus the JSONL split/parse path over arbitrary
+bytes. A bulk import is the one path that takes a whole file from a
+caller, so its decoders are the outermost parser in the service. The
+target pins never-panic, decode determinism, and the §7 per-row error
+contract — a malformed row must not abort the load, because the good rows
+are promised to commit.
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ### Changed — SEC-B2 follow-up: the bulk import read path is streaming end to end
 
 Closes the piece the original SEC-B2 fix explicitly deferred. The caps
@@ -382,7 +422,7 @@ primitive regardless of this one instance's specific cause.
   harness): 25 real persons created via `POST /api/persons`, then
   enumerated page-by-page via `GET /api/persons?limit=7&offset=…` —
   4 pages, all 25 seen, zero missing, zero duplicates.
-- `AGENTS/restful.md` documents the new endpoint and adds a "not a
+- `agents/restful.md` documents the new endpoint and adds a "not a
   list-all mechanism" note under `/persons/search` explaining why, so
   the next reader does not reach for `q=*` again. `spec/09-api-surface.md`
   endpoint count bumped 15 → 16.
@@ -1272,7 +1312,7 @@ loco-style one).
 ### Changed — documentation
 
 - Reduced healthcare / clinical / patient / hospital / clinician /
-  practitioner framing across spec.md, AGENTS.md, AGENTS/*, README,
+  practitioner framing across spec.md, AGENTS.md, agents/*, README,
   CLAUDE.md, and index.md. Preserved: FHIR R5 resource and field
   names (e.g. `Patient.birthPlace`, `Practitioner` resource),
   national-identifier proper nouns (United Kingdom National Health
@@ -1280,8 +1320,8 @@ loco-style one).
   `compliance-for-healthcare.md` doc, and `HIPAA` / `NHS` / `PHI`
   as compliance regimes.
 - `spec.md §11 Testing Strategy` now lists the bridge integration
-  tests; `AGENTS/testing.md` gained a `## Bridge Integration Tests`
-  section; `AGENTS/restful.md` gained adapter + Prometheus blocks;
+  tests; `agents/testing.md` gained a `## Bridge Integration Tests`
+  section; `agents/restful.md` gained adapter + Prometheus blocks;
   `index.md` gained a worked example showing the canonical bridge
   in action.
 

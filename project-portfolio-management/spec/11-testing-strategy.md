@@ -1,6 +1,6 @@
 ## 11. Testing Strategy
 
-Entity-level summary; detail in [`AGENTS/testing.md`](../AGENTS/testing.md).
+Entity-level summary; detail in [`agents/testing.md`](../agents/testing.md).
 The entity is **spec-only; no code exists yet** (§14), so every row
 below is **planned** — the table records the intended layers, not
 delivered suites.

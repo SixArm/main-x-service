@@ -331,13 +331,13 @@ round done and fully pinned 2026-08-04 — T-29 code may start.**
   services' records reduce to the same lean probe before scoring.
   Weights: name 0.45 (family 0.6 / given 0.4), DOB 0.45, gender 0.10
   (documented in the module doc, mirroring
-  `person-service-with-loco/AGENTS/matching.md`'s table style). A shared
+  `person-service-with-loco/agents/matching.md`'s table style). A shared
   coded identifier short-circuits to `IDENTIFIER_MATCH_CEILING` (`0.99`);
   the weighted probabilistic path is capped below that at
   `PROBABILISTIC_CEILING` (`0.97`) so a perfect demographic agreement can
   never outrank a real identifier match. `score_dob_pair` here is a
   **fresh** implementation of the full six-row table documented in
-  `AGENTS/matching.md` ("Birth Date Matching") rather than a reuse of
+  `agents/matching.md` ("Birth Date Matching") rather than a reuse of
   `person-matcher`'s own private `score_dob_pair`, which only implements
   two of those six rows — a pre-existing doc/code drift in person-matcher
   this task did not want to either propagate or silently fix by reaching

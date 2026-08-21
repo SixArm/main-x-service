@@ -48,7 +48,7 @@ export interface SearchOptions {
 }
 
 // REST client for Place Service. Endpoint shape per
-// place-service-with-loco/AGENTS/restful.md. Place Service uses
+// place-service-with-loco/agents/restful.md. Place Service uses
 // `/check-duplicates` for duplicate-check.
 /**
  * Typed REST client for the Place Service, wrapping an {@link ApiClient}.

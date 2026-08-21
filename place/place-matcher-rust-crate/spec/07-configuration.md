@@ -57,7 +57,7 @@ Overrides `match_threshold = 0.65` and `use_phonetic_matching = true`; every oth
 
 ### 7.4 Tuning guidance
 
-The "symptom → knob" tuning table is maintained in [`AGENTS/matching-algorithm.md`](../AGENTS/matching-algorithm.md) under "Tuning guidance".
+The "symptom → knob" tuning table is maintained in [`agents/matching-algorithm.md`](../agents/matching-algorithm.md) under "Tuning guidance".
 
 ---
 

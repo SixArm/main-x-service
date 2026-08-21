@@ -14,8 +14,8 @@ explicitly gated and opted into.
 Each subproject keeps its own testing doc as the local source of truth.
 The per-crate service docs are the most detailed:
 
-- [person-service AGENTS/testing.md](../../person/person-service-with-loco/AGENTS/testing.md)
-- [worker-service AGENTS/testing.md](../../worker/worker-service-with-loco/AGENTS/testing.md)
+- [person-service agents/testing.md](../../person/person-service-with-loco/agents/testing.md)
+- [worker-service agents/testing.md](../../worker/worker-service-with-loco/agents/testing.md)
 
 This page is the cross-cutting view that sits above them. Related
 monorepo docs: [matching](../matching/index.md),
@@ -74,7 +74,7 @@ Coverage tracks the business-logic layer from
 
 These are pure and deterministic: same input, same result, no ordering
 or environment sensitivity. See the per-module breakdown in
-[person-service AGENTS/testing.md](../../person/person-service-with-loco/AGENTS/testing.md).
+[person-service agents/testing.md](../../person/person-service-with-loco/agents/testing.md).
 
 ### 1.2 Bridge tests
 
@@ -270,7 +270,7 @@ formatting, lint, and binary-conformance gates. These are enforced in CI
 | Lints | `cargo clippy --all-targets --all-features -- -D warnings` (with `#![warn(clippy::pedantic)]` at each crate root) | Clippy clean across **every** crate — services, matchers, the verifier, migrations, and case-folder all produce zero output; `-D warnings` makes any warning fatal. `--all-targets` lints tests/examples/benches too, so the no-allow invariant covers the harness. This is the single, identical clippy command in every service CI workflow |
 | Binary conformance | (compile-time) | `#![forbid(unsafe_code)]`, `#![deny(missing_docs)]`, and the `target_env = "musl"` MiMalloc global allocator block at the top of `lib.rs` / `main.rs` |
 | Doc examples | `cargo test --doc` | `///` examples compile and pass |
-| Markdown links | link check | Cross-doc relative links in `spec/**` and `AGENTS/**` resolve on disk |
+| Markdown links | link check | Cross-doc relative links in `spec/**` and `agents/**` resolve on disk |
 
 The binary-conformance attributes are required at the top of every crate
 root (`#![forbid(unsafe_code)]` / `#![deny(missing_docs)]`), so `deny`

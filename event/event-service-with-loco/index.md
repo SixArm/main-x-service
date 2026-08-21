@@ -2,7 +2,7 @@
 
 A high-performance, enterprise-grade Event Service system built with Rust.
 
-[![Rust](https://img.shields.io/badge/rust-1.93%2B-orange.svg)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/rust-1.95%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![Podman](https://img.shields.io/badge/podman-ready-brightgreen.svg)](Dockerfile)
 
@@ -140,7 +140,7 @@ The Event Service is an identity-registry system that maintains a centralized re
 - ✅ CORS support for web applications
 - ✅ Comprehensive error handling
 - ✅ HTTP status codes following REST conventions
-- ✅ **Endpoints** (all under `/api`; full reference: [`AGENTS/restful.md`](AGENTS/restful.md)):
+- ✅ **Endpoints** (all under `/api`; full reference: [`agents/restful.md`](agents/restful.md)):
   - `GET /api/health` - Health check
   - `GET /api/whoami` - Echo the verified bearer-token claims
   - `POST /api/events` - Create event
@@ -218,7 +218,7 @@ See [DEPLOY.md](DEPLOY.md) for complete deployment guide.
 
 **Prerequisites:**
 
-- Rust 1.93+ ([Install Rust](https://rustup.rs/))
+- Rust 1.95+ ([Install Rust](https://rustup.rs/))
 - PostgreSQL 18+
 - No extra CLI tooling required: migrations run through the built-in
   loco CLI (`cargo loco db migrate`)
@@ -290,7 +290,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
 
 | Component            | Technology                           | Purpose                                  |
 | -------------------- | ------------------------------------ | ---------------------------------------- |
-| **Language**         | Rust 1.93+ 2024 Edition              | Systems programming, performance, safety |
+| **Language**         | Rust 1.95+ 2024 Edition              | Systems programming, performance, safety |
 | **Async Runtime**    | Tokio                                | Asynchronous I/O and concurrency         |
 | **Web Framework**    | Axum                                 | HTTP server and routing                  |
 | **Web Framework**    | Loco                                 | HTTP server and routing                  |
@@ -512,9 +512,9 @@ The adapter projects `DateTime<Utc>` → RFC 3339 strings, the first
 populated `Location` variant-aware, `organizers[0].name` → matcher
 `organizer`, `performers` → `Vec<String>`, and identifier `system`
 URIs → `EventIdScheme`. See [spec §6.2](spec/06-functional-requirements.md)
-and [`AGENTS/matching.md`](AGENTS/matching.md) for the full routing rules.
+and [`agents/matching.md`](agents/matching.md) for the full routing rules.
 
-See [AGENTS/restful.md](AGENTS/restful.md) for complete API documentation.
+See [agents/restful.md](agents/restful.md) for complete API documentation.
 
 ## Configuration
 
@@ -539,14 +539,14 @@ Configuration via environment variables or `.env` file:
 
 Match-component weights (name / start-date / end-date / location /
 organizer / performer / attendee / identifier) are documented in
-[`AGENTS/matching.md`](AGENTS/matching.md).
+[`agents/matching.md`](agents/matching.md).
 
 The table above is the core set; auth (`EVENT_REQUIRE_AUTH`,
 `EVENT_PASETO_KEYS[_URL]`, `EVENT_ABAC_POLICY[_FILE]`), the durable
 event bus (`EVENT_EVENT_TRANSPORT`, `EVENT_EVENT_RELAY*`,
 `EVENT_FLUVIO_ENDPOINT`), and row-level integrity
 (`EVENT_INTEGRITY_MAC_KEY[_FILE]`) each have their own env vars,
-documented in [`AGENTS/restful.md`](AGENTS/restful.md) and the family
+documented in [`agents/restful.md`](agents/restful.md) and the family
 [`configuration.md`](../../agents/share/configuration.md) reference.
 
 See `.env.example` for complete configuration template.
@@ -592,7 +592,7 @@ scripts/test-db.sh up event/event-service-with-loco --build
 - Integration Tests: `tests/api_integration_test.rs` (require a running
   PostgreSQL via `DATABASE_URL`)
 
-See [AGENTS/testing.md](AGENTS/testing.md) for the full layout and counts.
+See [agents/testing.md](agents/testing.md) for the full layout and counts.
 
 ## Deployment
 

@@ -1,6 +1,6 @@
 ## 22. Open Questions and Risks
 
-Resolved questions (OQ-1..OQ-6) are archived in [`AGENTS/delivered-tasks.md`](../AGENTS/delivered-tasks.md) alongside the closing tasks (T-25 / T-11 / T-8 / T-3 / T-4 / T-13). Still open:
+Resolved questions (OQ-1..OQ-6) are archived in [`agents/delivered-tasks.md`](../agents/delivered-tasks.md) alongside the closing tasks (T-25 / T-11 / T-8 / T-3 / T-4 / T-13). Still open:
 
 - **OQ-7** Should the phonetic bonus participate in `total_weight` only when applied (current behaviour) or always (skews the average down when phonetic is weak)? *Current behaviour is correct;* document explicitly.
 

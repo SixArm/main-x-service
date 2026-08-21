@@ -47,4 +47,4 @@ Open gaps drive tasks in §13. Live gap list:
 | No deeper validation (docket / case-number format, status transitions) | T-9 follow-up |
 | No real-time duplicate detection on create (`409`) | (roadmap §15; OQ-4) |
 | No localization of the operator UI | (roadmap §15; no task yet) |
-| Thin service / front-end `AGENTS/` reference sets | T-13 |
+| Thin service / front-end `agents/` reference sets | T-13 |

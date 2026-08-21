@@ -52,6 +52,16 @@ jobs:
       - run: rustup component add rustfmt
       - run: scripts/ci-check.sh fmt
 
+  # Repo-wide convention checks. No build, no matrix — it reads the git
+  # index, which is the only layer that tells the truth about path case
+  # on a contributor's case-insensitive filesystem.
+  docs:
+    name: docs conventions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/ci-check.sh docs
+
   check:
     name: ${{ matrix.crate }}
     needs: discover
@@ -74,6 +84,40 @@ jobs:
         run: scripts/ci-check.sh clippy '${{ matrix.crate }}'
       - name: test
         run: scripts/ci-check.sh test '${{ matrix.crate }}'
+      # Compile-only. Criterion numbers from a shared CI runner are not
+      # worth trusting, but a benchmark that stopped compiling is worth
+      # finding here rather than the next time someone wants a number.
+      - name: bench (compile only)
+        run: scripts/ci-check.sh bench '${{ matrix.crate }}'
+
+  # Minimum Supported Rust Version — the current stable minus three
+  # (spec/rust-msrv-n-minus-3.md). Its own job rather than a step inside
+  # `check`: it is a second full compile of every crate under a different
+  # toolchain, so it wants its own cache key instead of thrashing the
+  # stable one. The stage checks manifest consistency against ci/msrv.txt
+  # first, so a crate that simply forgot `rust-version` fails in seconds
+  # rather than after a build.
+  msrv:
+    name: msrv · ${{ matrix.crate }}
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crate: ${{ fromJson(needs.discover.outputs.crates) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: install the MSRV toolchain
+        run: |
+          msrv=$(grep -v '^[[:space:]]*#' ci/msrv.txt \
+                 | grep -v '^[[:space:]]*$' | head -1 | tr -d '[:space:]')
+          echo "installing Rust $msrv (from ci/msrv.txt)"
+          rustup toolchain install "$msrv" --profile minimal
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ matrix.crate }}
+          key: msrv-${{ matrix.crate }}
+      - run: scripts/ci-check.sh msrv '${{ matrix.crate }}'
 
   # The `#[ignore]`-gated suites. These are where the compliance controls
   # are actually proven — no unit test can show that an audit digest

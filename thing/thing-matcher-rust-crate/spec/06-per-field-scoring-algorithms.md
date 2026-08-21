@@ -1,6 +1,6 @@
 ## 6. Per-field scoring algorithms
 
-This section pins the exact algorithm for each scored field. Detailed pseudocode and edge-case tables are in [`AGENTS/matching-algorithm.md`](../AGENTS/matching-algorithm.md).
+This section pins the exact algorithm for each scored field. Detailed pseudocode and edge-case tables are in [`agents/matching-algorithm.md`](../agents/matching-algorithm.md).
 
 ### 6.1 `name_score`
 

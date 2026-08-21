@@ -2,19 +2,19 @@
 
 How to work in this crate. The canonical artefact is
 [`spec.md`](spec/index.md). When in doubt, the spec wins. See
-[`AGENTS/spec-driven-development.md`](AGENTS/spec-driven-development.md)
+[`agents/spec-driven-development.md`](agents/spec-driven-development.md)
 for the discipline this crate practises.
 
-## Crate-local docs (`AGENTS/`)
+## Crate-local docs (`agents/`)
 
 | Document | Description |
 |----------|-------------|
-| [AGENTS/index.md](AGENTS/index.md) | Directory index |
-| [AGENTS/spec-driven-development.md](AGENTS/spec-driven-development.md) | SDD discipline — three-part PRs, section mapping, anti-patterns |
-| [AGENTS/models.md](AGENTS/models.md) | Domain model reference (Place-specific) |
-| [AGENTS/matching.md](AGENTS/matching.md) | Matching algorithm reference (weights, components, rules) |
-| [AGENTS/restful.md](AGENTS/restful.md) | REST API + library API reference |
-| [AGENTS/testing.md](AGENTS/testing.md) | Testing strategy and guide |
+| [agents/index.md](agents/index.md) | Directory index |
+| [agents/spec-driven-development.md](agents/spec-driven-development.md) | SDD discipline — three-part PRs, section mapping, anti-patterns |
+| [agents/models.md](agents/models.md) | Domain model reference (Place-specific) |
+| [agents/matching.md](agents/matching.md) | Matching algorithm reference (weights, components, rules) |
+| [agents/restful.md](agents/restful.md) | REST API + library API reference |
+| [agents/testing.md](agents/testing.md) | Testing strategy and guide |
 
 ## Shared docs (project root)
 
@@ -79,7 +79,7 @@ commands.
 |------|------|
 | `spec.md` | **Single source of truth** — what, how, status, tasks (§13) |
 | `README.md` (symlink to `index.md`) | User-facing intro — must stay consistent with the spec |
-| `AGENTS.md` / `AGENTS/*.md` / `CLAUDE.md` | How to work in the repo + per-topic reference. `CLAUDE.md` is a one-line `@AGENTS.md` include (matching the family convention — see root `AGENTS.md`), not a second user-facing doc; its content used to duplicate `index.md` and has been folded/removed rather than kept in sync by hand. |
+| `AGENTS.md` / `agents/*.md` / `CLAUDE.md` | How to work in the repo + per-topic reference. `CLAUDE.md` is a one-line `@AGENTS.md` include (matching the family convention — see root `AGENTS.md`), not a second user-facing doc; its content used to duplicate `index.md` and has been folded/removed rather than kept in sync by hand. |
 | `index.md` | Navigation aid with worked examples |
 | `CHANGELOG.md` | Historical record of releases and changes |
 

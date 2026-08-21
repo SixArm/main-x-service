@@ -297,8 +297,9 @@ fn decode_import_rows(input: &[u8], format: BulkFormat) -> loco_rs::Result<Vec<I
                 })
                 .collect(),
         ),
-        BulkFormat::Csv => {
-            let decoded = csv::decode(input)?;
+        // CSV and TSV share the codec; the format supplies the byte.
+        BulkFormat::Csv | BulkFormat::Tsv => {
+            let decoded = csv::decode(input, format.delimiter().unwrap_or(b','))?;
             if decoded.len() > crate::bulk::MAX_IMPORT_ROWS {
                 return Err(Error::Message(format!(
                     "bulk import exceeds the row cap: {} rows > {}",
@@ -610,7 +611,9 @@ pub async fn process_export_job(
         .collect();
     let bytes = match params.format {
         BulkFormat::Jsonl => jsonl::encode(&export_rows)?,
-        BulkFormat::Csv => csv::encode(&export_rows)?,
+        BulkFormat::Csv | BulkFormat::Tsv => {
+            csv::encode(&export_rows, params.format.delimiter().unwrap_or(b','))?
+        }
     };
     Ok((bytes, count))
 }

@@ -1,6 +1,6 @@
 ## 9. API Surface
 
-Complete endpoint reference: [`AGENTS/restful.md`](../AGENTS/restful.md).
+Complete endpoint reference: [`agents/restful.md`](../agents/restful.md).
 
 | Tier | Surface |
 |---|---|

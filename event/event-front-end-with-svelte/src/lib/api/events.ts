@@ -32,7 +32,7 @@ export interface SearchOptions {
  * Construct one per page/component — there is no global HTTP store.
  */
 // REST client for Event Service. Endpoints are mounted under
-// `/api/` — see event-service-with-loco/AGENTS/restful.md.
+// `/api/` — see event-service-with-loco/agents/restful.md.
 export class EventRepository {
   /** @param http - The underlying {@link ApiClient} used for all calls. */
   constructor(private readonly http: ApiClient) {}

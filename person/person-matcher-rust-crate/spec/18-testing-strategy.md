@@ -26,7 +26,7 @@ every `MatchingEngine` entry point, every `MatchBreakdown` field, every
 `MatchConfig` preset, and every enum variant the downstream calls is
 touched. Renaming or removing any of these symbols breaks the matcher's
 own CI before publish — making cross-crate breakage deliberate. See
-[`AGENTS/testing.md`](../AGENTS/testing.md) for the per-section breakdown.
+[`agents/testing.md`](../agents/testing.md) for the per-section breakdown.
 
 ---
 

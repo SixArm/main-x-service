@@ -28,7 +28,7 @@
       "Bash(cargo check *)",
       "Bash(awk NR==2 || NR==14 || NR==33 || NR==45 *)",
       "Bash(awk -F'\\\\t' '{ if \\(NF != 10\\) print \"wrong column count on line\", NR, \"fields=\" NF }' /tmp/new-national-person-identifiers.tsv)",
-      "Read(//Users/jph/git/sixarm/main-x-service/worker-matcher-rust-crate/AGENTS/**)",
+      "Read(//Users/jph/git/sixarm/main-x-service/worker-matcher-rust-crate/agents/**)",
       "Bash(xargs -0 sed -i '' -e 's/placeal/personal/g' -e 's/Placeas/Personas/g' -e 's/placenummer/personnummer/g' -e 's/Placenummer/Personnummer/g')",
       "Bash(RUSTFLAGS=\"-W missing_docs\" cargo doc --no-deps --lib)",
       "Bash(RUSTDOCFLAGS=\"-W missing_docs\" cargo doc --no-deps --lib)",

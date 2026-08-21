@@ -1,6 +1,6 @@
 ## 9. Architecture
 
-Full per-file detail in [`AGENTS/architecture.md`](../AGENTS/architecture.md).
+Full per-file detail in [`agents/architecture.md`](../agents/architecture.md).
 
 ### 9.1 Module Layout
 

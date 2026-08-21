@@ -18,7 +18,7 @@ Identifiers use **MUST**/**SHOULD**/**MAY** (RFC 2119) semantics. FR numbering i
 
 ### 6.4 National Identifier Handling
 
-The library supports **42 national identifier schemes** (one parser per scheme in `src/identifiers.rs`; catalogue in [`AGENTS/national-person-identifiers.md`](../AGENTS/national-person-identifiers.md); algorithms in [`AGENTS/normalization.md`](../AGENTS/normalization.md) §14.5; check-digit rationale + sentinel-data rejections in [`AGENTS/roadmap-research.md`](../AGENTS/roadmap-research.md)). Each scheme has a `Worker` field (`Option<String>`), `WorkerBuilder` setter, `MatchConfig::<scheme>_weight` (default `0.30`), `MatchBreakdown::<scheme>_score` (with `#[serde(default)]`), `deterministic_match` branch, and `Worker::validate` inclusion.
+The library supports **42 national identifier schemes** (one parser per scheme in `src/identifiers.rs`; catalogue in [`agents/national-person-identifiers.md`](../agents/national-person-identifiers.md); algorithms in [`agents/normalization.md`](../agents/normalization.md) §14.5; check-digit rationale + sentinel-data rejections in [`agents/roadmap-research.md`](../agents/roadmap-research.md)). Each scheme has a `Worker` field (`Option<String>`), `WorkerBuilder` setter, `MatchConfig::<scheme>_weight` (default `0.30`), `MatchBreakdown::<scheme>_score` (with `#[serde(default)]`), `deterministic_match` branch, and `Worker::validate` inclusion.
 
 - **FR-13** Same-scheme equality only after the parser produces `Some(canonical)` for both AND the canonical strings agree. Different schemes MUST NEVER cross-match.
 - **FR-14** A malformed identifier on either side yields `<scheme>_score = None` (not `0.0`).

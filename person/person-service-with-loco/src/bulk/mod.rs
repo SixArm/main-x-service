@@ -203,18 +203,26 @@ pub enum BulkFormat {
     /// CSV — the operator/spreadsheet format (§5 flattening convention;
     /// [`csv`] codec).
     Csv,
+    /// TSV — the same flattening convention and the same codec as
+    /// [`Csv`](BulkFormat::Csv), separated by tabs instead of commas.
+    ///
+    /// A separate format rather than a CSV option because it is what the
+    /// caller names on the wire, and because a delimiter cannot be
+    /// inferred from the bytes safely.
+    Tsv,
     /// Parquet — columnar, analytics-oriented, **export-only**
     /// ([`parquet_format`] codec, behind the `parquet` Cargo feature).
     Parquet,
 }
 
 impl BulkFormat {
-    /// The persisted lowercase token (`jsonl` / `csv` / `parquet`).
+    /// The persisted lowercase token (`jsonl` / `csv` / `tsv` / `parquet`).
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             BulkFormat::Jsonl => "jsonl",
             BulkFormat::Csv => "csv",
+            BulkFormat::Tsv => "tsv",
             BulkFormat::Parquet => "parquet",
         }
     }
@@ -225,6 +233,7 @@ impl BulkFormat {
         match s {
             "jsonl" => Some(BulkFormat::Jsonl),
             "csv" => Some(BulkFormat::Csv),
+            "tsv" => Some(BulkFormat::Tsv),
             "parquet" => Some(BulkFormat::Parquet),
             _ => None,
         }
@@ -237,6 +246,21 @@ impl BulkFormat {
     #[must_use]
     pub fn is_export_only(self) -> bool {
         matches!(self, BulkFormat::Parquet)
+    }
+
+    /// The field delimiter for the delimited-text formats, or `None` for
+    /// a format that is not delimited text.
+    ///
+    /// Exists so the codec is chosen once, here, rather than by a `match`
+    /// at every call site — CSV and TSV differ in exactly this byte, and
+    /// a second place to decide it is a second place for them to drift.
+    #[must_use]
+    pub fn delimiter(self) -> Option<u8> {
+        match self {
+            BulkFormat::Jsonl | BulkFormat::Parquet => None,
+            BulkFormat::Csv => Some(b','),
+            BulkFormat::Tsv => Some(b'\t'),
+        }
     }
 }
 
@@ -370,6 +394,11 @@ mod tests {
     fn only_parquet_is_export_only() {
         assert!(!BulkFormat::Jsonl.is_export_only());
         assert!(!BulkFormat::Csv.is_export_only());
+        assert!(!BulkFormat::Tsv.is_export_only());
+        assert_eq!(BulkFormat::parse("tsv"), Some(BulkFormat::Tsv));
+        assert_eq!(BulkFormat::Tsv.delimiter(), Some(b'\t'));
+        assert_eq!(BulkFormat::Csv.delimiter(), Some(b','));
+        assert_eq!(BulkFormat::Jsonl.delimiter(), None);
         assert!(BulkFormat::Parquet.is_export_only());
     }
 

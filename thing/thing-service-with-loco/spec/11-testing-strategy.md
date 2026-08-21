@@ -1,6 +1,6 @@
 ## 11. Testing Strategy
 
-Layered: [`AGENTS/testing.md`](../AGENTS/testing.md).
+Layered: [`agents/testing.md`](../agents/testing.md).
 
 - **Unit tests** — `#[cfg(test)]` modules; models, matching,
   validation, privacy. ~100 tests.

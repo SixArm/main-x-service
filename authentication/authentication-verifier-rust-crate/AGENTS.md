@@ -105,5 +105,5 @@ fuzz/             standalone cargo-fuzz crate (SEC-I2); not a
 
 The spec wins. If the spec is silent, check the entity-level contract
 ([../spec/index.md](../spec/index.md)) and the peer-integration guide
-([../AGENTS/verification.md](../AGENTS/verification.md)); otherwise
+([../agents/verification.md](../agents/verification.md)); otherwise
 propose a spec update rather than guessing.

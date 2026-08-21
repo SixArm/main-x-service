@@ -1,6 +1,6 @@
 ## 5. Domain Model
 
-Field-by-field reference: [`AGENTS/models.md`](../AGENTS/models.md).
+Field-by-field reference: [`agents/models.md`](../agents/models.md).
 
 ### 5.1 `Place`
 

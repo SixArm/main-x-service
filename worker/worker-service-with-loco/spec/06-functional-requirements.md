@@ -10,7 +10,7 @@
 
 ### 6.2 Matching
 
-Algorithm reference: [`AGENTS/matching.md`](../AGENTS/matching.md).
+Algorithm reference: [`agents/matching.md`](../agents/matching.md).
 
 | Strategy | Output | Use |
 |---|---|---|
@@ -106,7 +106,7 @@ remaining fields) and
 code never short-circuits two different workers to a match). Revisit
 only if the matcher crate ever adds an organisation-affiliation
 signal (its spec §23). See
-[`AGENTS/matching.md`](../AGENTS/matching.md) for the in-service
+[`agents/matching.md`](../agents/matching.md) for the in-service
 algorithm and the matcher crate's
 [`spec.md §12`](../../worker-matcher-rust-crate/spec/index.md) for the
 canonical algorithm.

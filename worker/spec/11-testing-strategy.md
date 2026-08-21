@@ -14,8 +14,8 @@ Each subproject owns its own pyramid; the entity level owns the
 | front-end | unit (Vitest, mocked fetch) | `pnpm test` | 8 |
 | front-end | e2e smoke (Playwright, no live service) | `pnpm test:e2e` | 6 |
 
-Guides: [service `AGENTS/testing.md`](../worker-service-with-loco/AGENTS/testing.md),
-[matcher `AGENTS/testing.md`](../worker-matcher-rust-crate/AGENTS/testing.md),
+Guides: [service `agents/testing.md`](../worker-service-with-loco/agents/testing.md),
+[matcher `agents/testing.md`](../worker-matcher-rust-crate/agents/testing.md),
 [front-end §11](../worker-front-end-with-svelte/spec/11-testing-strategy.md).
 
 ### 11.2 Seam 1 — service↔matcher bridge tests (exists)
@@ -39,7 +39,7 @@ cargo test --test duplicate_detection
 Rule: a new adapter routing rule, a new matcher scoring component
 surfaced by the service, or a contract regression each REQUIRE a new
 bridge test (see the "when to add" list in
-[service `AGENTS/testing.md`](../worker-service-with-loco/AGENTS/testing.md)).
+[service `agents/testing.md`](../worker-service-with-loco/agents/testing.md)).
 
 ### 11.3 Seam 2 — front-end↔service contract (gap)
 

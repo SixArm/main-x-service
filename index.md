@@ -6,7 +6,7 @@
 
 Subprojects are grouped one directory per entity. Each entity
 directory holds a front-end web app, a matcher (or verifier) library
-crate, a service API crate, and entity-level `spec/` + `AGENTS/`
+crate, a service API crate, and entity-level `spec/` + `agents/`
 umbrella docs. The full, current entity / matcher / library / front-end
 / cross-cutting-service / consumer-app tables — including the **honest
 per-crate capability matrix** (which crate has Tantivy, FHIR, gRPC,
@@ -70,12 +70,12 @@ file's own table is the thing that stays current, and every doc it
 links to is `@`-included by the crate that needs it, not copy-pasted
 per crate.
 
-Some subprojects also carry a `<crate>/AGENTS/` directory of
+Some subprojects also carry a `<crate>/agents/` directory of
 crate-local reference docs (`index.md`, `models.md`, `matching.md`,
 `restful.md`, `testing.md`, …) — the six original entity crates
 (person, worker, place, thing, event, course) and the matcher crates,
 specifically; newer subprojects keep the equivalent material in their
-own `spec/` instead (see root [`AGENTS.md`](AGENTS.md)'s "The `AGENTS/`
+own `spec/` instead (see root [`AGENTS.md`](AGENTS.md)'s "The `agents/`
 directory: older subprojects only" for why that split is deliberate,
 not a gap).
 

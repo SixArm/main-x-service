@@ -1,0 +1,11 @@
+target
+corpus
+artifacts
+coverage
+
+# Not committed, matching every other fuzz sub-crate: scripts/ci-check.sh
+# passes `--locked` only where a lockfile is tracked, and a fuzz build
+# regenerates this. Listed explicitly because a *service* crate tracks its
+# own Cargo.lock, so unlike the matcher crates the parent .gitignore does
+# not cover this one.
+Cargo.lock

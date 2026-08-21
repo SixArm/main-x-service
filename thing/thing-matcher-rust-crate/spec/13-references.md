@@ -7,8 +7,8 @@
 - Winkler, W. E. (1990). *String comparator metrics and enhanced decision rules for the Fellegi-Sunter model of record linkage.* — Jaro-Winkler.
 - RFC 2119 / RFC 8174 — RFC keyword interpretation.
 - Sibling crate specs: [`person-matcher/spec.md`](../../../person/person-matcher-rust-crate/spec/index.md), [`worker-matcher/spec.md`](../../../worker/worker-matcher-rust-crate/spec/index.md), [`place-matcher/spec.md`](../../../place/place-matcher-rust-crate/spec/index.md), [`event-matcher/spec.md`](../../../event/event-matcher-rust-crate/spec/index.md).
-- [`AGENTS/matching-algorithm.md`](../AGENTS/matching-algorithm.md) — per-field algorithm detail.
-- [`AGENTS/normalization.md`](../AGENTS/normalization.md) — per-rule normalisation detail.
-- [`AGENTS/testing.md`](../AGENTS/testing.md) — test layout and CI.
-- [`AGENTS/spec-driven-development.md`](../AGENTS/spec-driven-development.md) — three-part-PR discipline.
+- [`agents/matching-algorithm.md`](../agents/matching-algorithm.md) — per-field algorithm detail.
+- [`agents/normalization.md`](../agents/normalization.md) — per-rule normalisation detail.
+- [`agents/testing.md`](../agents/testing.md) — test layout and CI.
+- [`agents/spec-driven-development.md`](../agents/spec-driven-development.md) — three-part-PR discipline.
 

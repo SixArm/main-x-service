@@ -1,7 +1,7 @@
 ## 5. Domain Model
 
 Field-by-field references:
-[service `AGENTS/models.md`](../thing-service-with-loco/AGENTS/models.md)
+[service `agents/models.md`](../thing-service-with-loco/agents/models.md)
 (registry shape) and
 [matcher spec §3](../thing-matcher-rust-crate/spec/03-data-model.md)
 (comparison shape). This section owns the **contract between the two**.
@@ -54,7 +54,7 @@ Jaccard over the case-insensitively normalised tag sets (weighted
 single-handedly establish a match, so do not treat tags as identifying.
 
 This canonical model is **upstream**: the service model
-([`AGENTS/models.md`](../thing-service-with-loco/AGENTS/models.md)),
+([`agents/models.md`](../thing-service-with-loco/agents/models.md)),
 the matcher DTO ([matcher spec §3](../thing-matcher-rust-crate/spec/03-data-model.md),
 which carries `tags` per §5.3), and the front-end types
 ([`src/lib/api/types.ts`](../thing-front-end-with-svelte/src/lib/api/types.ts))
@@ -123,7 +123,7 @@ The band edges **interleave** (0.95 / 0.80 / 0.60 vs 0.90 / 0.75), so
 there is **no 1:1 label mapping** — e.g. matcher High spans service
 Certain plus the top of Probable. The full score-range overlay table
 lives in service
-[`AGENTS/matching.md`](../thing-service-with-loco/AGENTS/matching.md).
+[`agents/matching.md`](../thing-service-with-loco/agents/matching.md).
 
 Normative rule: the service MUST **re-classify from the raw `f64`
 score**, never from the matcher's label. The adapter carries only the

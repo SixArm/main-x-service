@@ -6,12 +6,12 @@ or fix the integration contract. Tick the box when an automated test
 or clearly described manual check confirms the acceptance criterion.
 
 - [ ] **E-1 — Fix duplicate-check endpoint-name drift.**
-  - [x] Service `AGENTS/restful.md` lists `POST /api/places/duplicates`;
+  - [x] Service `agents/restful.md` lists `POST /api/places/duplicates`;
     service spec §6.4 says `POST /api/places/check-duplicates`; the
     front-end's deferred T-17 says `check-duplicates`. Establish which
     the code serves, fix the losing doc(s), and pin with a route test.
     *(2026-06-13: code serves `check-duplicates` — `src/api/rest/mod.rs`
-    routes + utoipa path; `AGENTS/restful.md` was the losing doc and is
+    routes + utoipa path; `agents/restful.md` was the losing doc and is
     fixed. Still open: a service route test, and a discovered front-end
     **code** bug — `place-front-end-with-svelte/src/lib/api/places.ts`
     POSTs `/api/places/duplicates` (its unit test pins the wrong path)

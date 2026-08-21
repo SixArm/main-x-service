@@ -12,6 +12,49 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+
+
+### Added — cargo-fuzz harness (SEC-I2)
+
+- A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate with
+  three coverage-guided libFuzzer targets. This crate is small and pure,
+  which is exactly why it is worth fuzzing: it is a **parser eight other
+  crates depend on**, reached from a stored `TEXT` column and from
+  request bodies naming a record in another service.
+  - `parse_ref` — `EntityRef::from_str` over arbitrary UTF-8:
+    never-panic, plus the **round-trip** invariant (anything that parses
+    must `Display` back to something that re-parses to the identical
+    value). A `Display`/parse asymmetry here would repoint an edge at a
+    different record rather than fail loudly.
+  - `deserialize_ref` — the `#[serde(try_from = "String")]` path via
+    `serde_json`, which is the entry point real callers use, plus
+    serialize → deserialize equality.
+  - `registry_tokens` — the closed `EntityType` / `EdgeKind` token
+    registries: `from_token` accepts only registry members and
+    round-trips, `is_symmetric` agrees with `inverse`, and `permits` is
+    order-symmetric for a symmetric kind.
+- Nightly only, so the sub-crate is exempt from the repository MSRV. See
+  [`fuzz/README.md`](./fuzz/README.md).
+
+### Added — Criterion benchmarks
+
+- `benches/entity_ref.rs`. These are tiny operations that run at graph
+  scale — the aggregator parses two refs per edge row — so the benchmark
+  covers parse (hit, worst-case registry lookup, and each reject path),
+  `Display`, the serde bridge, a whole page of rows with
+  `Throughput::Elements`, and the edge-kind registry lookups.
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ## [0.2.0] - 2026-08-05
 
 > Reconstructed 2026-08-04 (DOC-5) from `git log` — this crate previously

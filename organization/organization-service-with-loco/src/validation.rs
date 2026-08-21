@@ -76,7 +76,7 @@ pub fn problems(org: &Organization) -> Vec<String> {
 
     // Per-entry blank checks (existing intent) + size caps (SEC-M1) +
     // check-digit/format validation of the deterministic schemes (SEC-M5).
-    for (i, ident) in org.identifiers.iter().enumerate() {
+    for (i, ident) in inspected(&org.identifiers) {
         if ident.value.trim().is_empty() {
             out.push(format!("identifiers[{i}]: value must not be blank"));
         } else if let Some(msg) = identifier_problem(&ident.scheme, &ident.value) {
@@ -84,17 +84,34 @@ pub fn problems(org: &Organization) -> Vec<String> {
         }
         check_item(&mut out, "identifiers", i, &ident.value);
     }
-    for (i, alt) in org.alternate_names.iter().enumerate() {
+    for (i, alt) in inspected(&org.alternate_names) {
         check_item(&mut out, "alternate_names", i, alt);
     }
-    for (i, url) in org.same_as.iter().enumerate() {
+    for (i, url) in inspected(&org.same_as) {
         check_item(&mut out, "same_as", i, url);
     }
-    for (i, keyword) in org.keywords.iter().enumerate() {
+    for (i, keyword) in inspected(&org.keywords) {
         check_item(&mut out, "keywords", i, keyword);
     }
 
     out
+}
+
+/// The entries a per-entry check actually inspects: at most
+/// [`MAX_ARRAY_LEN`] of them, paired with their index.
+///
+/// An array over the cardinality cap is **already rejected** by its own
+/// problem, so inspecting the tail decides nothing — while reporting a
+/// problem for every entry turns a small request into a large response
+/// (ten thousand blank entries produced ten thousand strings, all joined
+/// into one `422` body). Bounding the *report* is the same
+/// input-bounding rule as bounding the work (SEC-M1/SEC-M8).
+///
+/// Named rather than inlined as `.take(MAX_ARRAY_LEN)` at each call site
+/// so a per-entry loop added later without it reads as different from the
+/// ones that have it.
+fn inspected<T>(items: &[T]) -> impl Iterator<Item = (usize, &T)> {
+    items.iter().take(MAX_ARRAY_LEN).enumerate()
 }
 
 /// Push a problem when a scalar text `field` exceeds [`MAX_TEXT_LEN`]
@@ -443,5 +460,29 @@ mod tests {
         assert_eq!(p.len(), 2);
         assert!(p.iter().any(|m| m.contains("name is required")));
         assert!(p.iter().any(|m| m.contains("identifiers[1]")));
+    }
+    /// SEC-M8: the *report* is bounded, not just the work. A caller
+    /// sending ten thousand blank entries used to get ten thousand
+    /// problem strings back — a small request buying a large response,
+    /// and here each one also ran a check-digit validation. The
+    /// cardinality problem alone is enough to reject the payload.
+    #[test]
+    fn an_oversized_array_of_blanks_does_not_produce_a_problem_per_entry() {
+        let mut org = Organization::new("Acme Health Services");
+        org.keywords = vec![String::new(); 10_000];
+        org.identifiers = vec![ident(""); 10_000];
+        let out = problems(&org);
+        assert!(
+            out.len() <= 2 * (MAX_ARRAY_LEN + 1),
+            "expected at most the two cardinality problems plus one per \
+             inspected entry, got {}",
+            out.len()
+        );
+        for field in ["keywords", "identifiers"] {
+            assert!(
+                out.contains(&format!("{field}: exceeds {MAX_ARRAY_LEN} entries")),
+                "the {field} cardinality problem must still be reported"
+            );
+        }
     }
 }

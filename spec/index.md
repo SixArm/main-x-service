@@ -3,20 +3,20 @@
 Monorepo for web services: the **Main X Index** family — a federated
 identity index, one entity per directory. Each entity directory holds
 a front-end web app, a matcher (or verifier) library crate, a service
-API crate, plus entity-level `spec/` and `AGENTS/` umbrella docs.
+API crate, plus entity-level `spec/` and `agents/` umbrella docs.
 
 | Entity | Front-end (Svelte) | Library crate | Service crate | Umbrella docs |
 | ------ | ------------------ | ------------- | ------------- | ------------- |
-| authentication | [authentication-front-end-with-svelte](../authentication/authentication-front-end-with-svelte/) | [authentication-verifier-rust-crate](../authentication/authentication-verifier-rust-crate/) | [authentication-service-with-loco](../authentication/authentication-service-with-loco/) | [spec](../authentication/spec/index.md) · [AGENTS](../authentication/AGENTS/index.md) |
-| care-pathway | [care-pathway-front-end-with-svelte](../care-pathway/care-pathway-front-end-with-svelte/) | [care-pathway-matcher-rust-crate](../care-pathway/care-pathway-matcher-rust-crate/) | [care-pathway-service-with-loco](../care-pathway/care-pathway-service-with-loco/) | [spec](../care-pathway/spec/index.md) · [AGENTS](../care-pathway/AGENTS/index.md) |
-| case | [case-front-end-with-svelte](../case/case-front-end-with-svelte/) | [case-matcher-rust-crate](../case/case-matcher-rust-crate/) | [case-service-with-loco](../case/case-service-with-loco/) | [spec](../case/spec/index.md) · [AGENTS](../case/AGENTS/index.md) |
-| course | [course-front-end-with-svelte](../course/course-front-end-with-svelte/) | [course-matcher-rust-crate](../course/course-matcher-rust-crate/) | [course-service-with-loco](../course/course-service-with-loco/) | [spec](../course/spec/index.md) · [AGENTS](../course/AGENTS/index.md) |
-| event | [event-front-end-with-svelte](../event/event-front-end-with-svelte/) | [event-matcher-rust-crate](../event/event-matcher-rust-crate/) | [event-service-with-loco](../event/event-service-with-loco/) | [spec](../event/spec/index.md) · [AGENTS](../event/AGENTS/index.md) |
-| organization | [organization-front-end-with-svelte](../organization/organization-front-end-with-svelte/) | [organization-matcher-rust-crate](../organization/organization-matcher-rust-crate/) | [organization-service-with-loco](../organization/organization-service-with-loco/) | [spec](../organization/spec/index.md) · [AGENTS](../organization/AGENTS/index.md) |
-| person | [person-front-end-with-svelte](../person/person-front-end-with-svelte/) | [person-matcher-rust-crate](../person/person-matcher-rust-crate/) | [person-service-with-loco](../person/person-service-with-loco/) | [spec](../person/spec/index.md) · [AGENTS](../person/AGENTS/index.md) |
-| place | [place-front-end-with-svelte](../place/place-front-end-with-svelte/) | [place-matcher-rust-crate](../place/place-matcher-rust-crate/) | [place-service-with-loco](../place/place-service-with-loco/) | [spec](../place/spec/index.md) · [AGENTS](../place/AGENTS/index.md) |
-| thing | [thing-front-end-with-svelte](../thing/thing-front-end-with-svelte/) | [thing-matcher-rust-crate](../thing/thing-matcher-rust-crate/) | [thing-service-with-loco](../thing/thing-service-with-loco/) | [spec](../thing/spec/index.md) · [AGENTS](../thing/AGENTS/index.md) |
-| worker | [worker-front-end-with-svelte](../worker/worker-front-end-with-svelte/) | [worker-matcher-rust-crate](../worker/worker-matcher-rust-crate/) | [worker-service-with-loco](../worker/worker-service-with-loco/) | [spec](../worker/spec/index.md) · [AGENTS](../worker/AGENTS/index.md) |
+| authentication | [authentication-front-end-with-svelte](../authentication/authentication-front-end-with-svelte/) | [authentication-verifier-rust-crate](../authentication/authentication-verifier-rust-crate/) | [authentication-service-with-loco](../authentication/authentication-service-with-loco/) | [spec](../authentication/spec/index.md) · [AGENTS](../authentication/agents/index.md) |
+| care-pathway | [care-pathway-front-end-with-svelte](../care-pathway/care-pathway-front-end-with-svelte/) | [care-pathway-matcher-rust-crate](../care-pathway/care-pathway-matcher-rust-crate/) | [care-pathway-service-with-loco](../care-pathway/care-pathway-service-with-loco/) | [spec](../care-pathway/spec/index.md) · [AGENTS](../care-pathway/agents/index.md) |
+| case | [case-front-end-with-svelte](../case/case-front-end-with-svelte/) | [case-matcher-rust-crate](../case/case-matcher-rust-crate/) | [case-service-with-loco](../case/case-service-with-loco/) | [spec](../case/spec/index.md) · [AGENTS](../case/agents/index.md) |
+| course | [course-front-end-with-svelte](../course/course-front-end-with-svelte/) | [course-matcher-rust-crate](../course/course-matcher-rust-crate/) | [course-service-with-loco](../course/course-service-with-loco/) | [spec](../course/spec/index.md) · [AGENTS](../course/agents/index.md) |
+| event | [event-front-end-with-svelte](../event/event-front-end-with-svelte/) | [event-matcher-rust-crate](../event/event-matcher-rust-crate/) | [event-service-with-loco](../event/event-service-with-loco/) | [spec](../event/spec/index.md) · [AGENTS](../event/agents/index.md) |
+| organization | [organization-front-end-with-svelte](../organization/organization-front-end-with-svelte/) | [organization-matcher-rust-crate](../organization/organization-matcher-rust-crate/) | [organization-service-with-loco](../organization/organization-service-with-loco/) | [spec](../organization/spec/index.md) · [AGENTS](../organization/agents/index.md) |
+| person | [person-front-end-with-svelte](../person/person-front-end-with-svelte/) | [person-matcher-rust-crate](../person/person-matcher-rust-crate/) | [person-service-with-loco](../person/person-service-with-loco/) | [spec](../person/spec/index.md) · [AGENTS](../person/agents/index.md) |
+| place | [place-front-end-with-svelte](../place/place-front-end-with-svelte/) | [place-matcher-rust-crate](../place/place-matcher-rust-crate/) | [place-service-with-loco](../place/place-service-with-loco/) | [spec](../place/spec/index.md) · [AGENTS](../place/agents/index.md) |
+| thing | [thing-front-end-with-svelte](../thing/thing-front-end-with-svelte/) | [thing-matcher-rust-crate](../thing/thing-matcher-rust-crate/) | [thing-service-with-loco](../thing/thing-service-with-loco/) | [spec](../thing/spec/index.md) · [AGENTS](../thing/agents/index.md) |
+| worker | [worker-front-end-with-svelte](../worker/worker-front-end-with-svelte/) | [worker-matcher-rust-crate](../worker/worker-matcher-rust-crate/) | [worker-service-with-loco](../worker/worker-service-with-loco/) | [spec](../worker/spec/index.md) · [AGENTS](../worker/agents/index.md) |
 
 ## Monorepo-wide topic specs
 
@@ -31,6 +31,8 @@ the family-wide source of truth; the briefer versions under
 | [architecture](architecture/index.md) | System architecture — the family shape, the two service generations (loco vs older Axum), layering, cross-service integration |
 | [dataflow](dataflow/index.md) | Request/data flows — create, match, merge, search, read/masked/export, auth |
 | [tech-stack](tech-stack/index.md) | Technology stack + hard constraints (Podman/Tokio/MiMalloc/PostgreSQL/chrono) and current drift |
+| [agents-directory-name-is-lowercase.md](agents-directory-name-is-lowercase.md) | The agent reference directories are named `agents`, lowercase — the rule, why a case-only mismatch hides on macOS, and the CI stage behind it |
+| [rust-msrv-n-minus-3.md](rust-msrv-n-minus-3.md) | Minimum Supported Rust Version — the N-3 policy, how it is declared and verified, and how to bump it |
 
 ### Data & persistence
 

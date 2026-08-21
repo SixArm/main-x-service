@@ -4,7 +4,7 @@
 
 The service's `Worker` is the system-of-record shape: FHIR-flavoured,
 with vector sub-records. Field-by-field reference:
-[service `AGENTS/models.md`](../worker-service-with-loco/AGENTS/models.md).
+[service `agents/models.md`](../worker-service-with-loco/agents/models.md).
 Summary:
 
 | Group | Fields |

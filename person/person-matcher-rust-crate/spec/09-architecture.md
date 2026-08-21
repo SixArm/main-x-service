@@ -2,7 +2,7 @@
 
 ### 9.1 Module Layout
 
-`src/lib.rs` (public API re-exports), `src/models.rs` (Person, PersonBuilder, Address, Gender, BloodType, PassportBook), `src/identifiers.rs` (42 per-scheme parsers + 9 passport-format validators), `src/matcher.rs` (MatchConfig, MatchingEngine, MatchResult, MatchBreakdown, Confidence), `src/scorer.rs` (similarity primitives), `src/nicknames.rs` (NicknameTable), `src/normalizer.rs` (name / postcode / phone / address / phonetic / email normalisation), `src/error.rs` (MatchingError, Result), `src/main.rs` (demo binary; not library API). See `AGENTS/architecture.md` for diagrams.
+`src/lib.rs` (public API re-exports), `src/models.rs` (Person, PersonBuilder, Address, Gender, BloodType, PassportBook), `src/identifiers.rs` (42 per-scheme parsers + 9 passport-format validators), `src/matcher.rs` (MatchConfig, MatchingEngine, MatchResult, MatchBreakdown, Confidence), `src/scorer.rs` (similarity primitives), `src/nicknames.rs` (NicknameTable), `src/normalizer.rs` (name / postcode / phone / address / phonetic / email normalisation), `src/error.rs` (MatchingError, Result), `src/main.rs` (demo binary; not library API). See `agents/architecture.md` for diagrams.
 
 ### 9.2 Dependency Graph
 

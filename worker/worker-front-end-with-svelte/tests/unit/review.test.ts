@@ -68,7 +68,7 @@ describe("canDecide", () => {
 
 describe("MATCH_COMPONENTS", () => {
     // Pins the worker in-service matcher's published weights
-    // (`worker-service-with-loco/AGENTS/matching.md`), identical in name
+    // (`worker-service-with-loco/agents/matching.md`), identical in name
     // and weight to the person service's own — a distinct, simpler struct
     // from the `worker-matcher` reference crate's ~50-component breakdown.
     // If they no longer sum to 1.00 the table is lying to the operator.

@@ -123,7 +123,7 @@ manual check confirms it. Split tasks too big for one PR
   - **Acceptance:** events survive a replica restart and are delivered
     cross-replica.
 - [ ] **T-13 — Thicken crate docs.**
-  - [ ] Add a service `AGENTS/` reference set (`models.md`,
+  - [ ] Add a service `agents/` reference set (`models.md`,
     `matching.md`, `restful.md`, `testing.md`,
     `spec-driven-development.md`) matching the sibling shape; split any
     single-file crate specs into the numbered layout.

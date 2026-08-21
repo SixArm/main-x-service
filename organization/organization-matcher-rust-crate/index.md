@@ -11,9 +11,9 @@ per [schema.org/Organization](https://schema.org/Organization).
 | [AGENTS.md](./AGENTS.md) | How to work in this crate; public API; layout. |
 | [README.md](./README.md) | User-facing intro + usage. |
 | [CHANGELOG.md](./CHANGELOG.md) | Release history. |
-| [AGENTS/matching-algorithm.md](./AGENTS/matching-algorithm.md) | Per-component derivations + weights. |
-| [AGENTS/normalization.md](./AGENTS/normalization.md) | Fold / legal-name / domain rules. |
-| [AGENTS/testing.md](./AGENTS/testing.md) | Test layout. |
+| [agents/matching-algorithm.md](./agents/matching-algorithm.md) | Per-component derivations + weights. |
+| [agents/normalization.md](./agents/normalization.md) | Fold / legal-name / domain rules. |
+| [agents/testing.md](./agents/testing.md) | Test layout. |
 
 ## Worked example
 

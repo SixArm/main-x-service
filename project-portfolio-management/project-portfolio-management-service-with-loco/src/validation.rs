@@ -49,19 +49,19 @@ pub fn problems(wi: &Plan) -> Vec<String> {
         out.push("name is required".to_string());
     }
 
-    for (i, alt) in wi.alternate_names.iter().enumerate() {
+    for (i, alt) in inspected(&wi.alternate_names) {
         if alt.trim().is_empty() {
             out.push(format!("alternate_names[{i}]: must not be blank"));
         }
     }
 
-    for (i, goal) in wi.goals.iter().enumerate() {
+    for (i, goal) in inspected(&wi.goals) {
         if goal.title.trim().is_empty() {
             out.push(format!("goals[{i}]: title must not be blank"));
         }
     }
 
-    for (i, ident) in wi.identifiers.iter().enumerate() {
+    for (i, ident) in inspected(&wi.identifiers) {
         let value = ident.value.trim();
         if value.is_empty() {
             out.push(format!("identifiers[{i}]: value must not be blank"));
@@ -90,17 +90,17 @@ pub fn problems(wi: &Plan) -> Vec<String> {
         out.push(format!("in_language: {lang:?} is not a valid BCP-47 tag"));
     }
 
-    for (i, kw) in wi.keywords.iter().enumerate() {
+    for (i, kw) in inspected(&wi.keywords) {
         if kw.trim().is_empty() {
             out.push(format!("keywords[{i}]: must not be blank"));
         }
     }
-    for (i, tag) in wi.tags.iter().enumerate() {
+    for (i, tag) in inspected(&wi.tags) {
         if tag.trim().is_empty() {
             out.push(format!("tags[{i}]: must not be blank"));
         }
     }
-    for (i, rel) in wi.relationships.iter().enumerate() {
+    for (i, rel) in inspected(&wi.relationships) {
         if rel.plan_id.trim().is_empty() {
             out.push(format!("relationships[{i}]: plan_id must not be blank"));
         }
@@ -109,6 +109,23 @@ pub fn problems(wi: &Plan) -> Vec<String> {
     push_size_cap_problems(wi, &mut out);
 
     out
+}
+
+/// The entries a per-entry check actually inspects: at most
+/// [`MAX_ARRAY_LEN`] of them, paired with their index.
+///
+/// An array over the cardinality cap is **already rejected** by its own
+/// problem, so inspecting the tail decides nothing — while reporting a
+/// problem for every entry turns a small request into a large response
+/// (ten thousand blank entries produced ten thousand strings, all joined
+/// into one `422` body). Bounding the *report* is the same
+/// input-bounding rule as bounding the work (SEC-M1/SEC-M8).
+///
+/// Named rather than inlined as `.take(MAX_ARRAY_LEN)` at each call site
+/// so a per-entry loop added later without it reads as different from the
+/// ones that have it.
+fn inspected<T>(items: &[T]) -> impl Iterator<Item = (usize, &T)> {
+    items.iter().take(MAX_ARRAY_LEN).enumerate()
 }
 
 /// SEC-M1 input-size caps (CPU/memory denial-of-service guard).
@@ -156,43 +173,43 @@ fn push_size_cap_problems(wi: &Plan, out: &mut Vec<String>) {
     }
 
     // String entries inside arrays (cap the matchable string member).
-    for (i, alt) in wi.alternate_names.iter().enumerate() {
+    for (i, alt) in inspected(&wi.alternate_names) {
         if alt.chars().count() > MAX_ITEM_LEN {
             out.push(format!(
                 "alternate_names[{i}]: exceeds {MAX_ITEM_LEN} characters"
             ));
         }
     }
-    for (i, kw) in wi.keywords.iter().enumerate() {
+    for (i, kw) in inspected(&wi.keywords) {
         if kw.chars().count() > MAX_ITEM_LEN {
             out.push(format!("keywords[{i}]: exceeds {MAX_ITEM_LEN} characters"));
         }
     }
-    for (i, tag) in wi.tags.iter().enumerate() {
+    for (i, tag) in inspected(&wi.tags) {
         if tag.chars().count() > MAX_ITEM_LEN {
             out.push(format!("tags[{i}]: exceeds {MAX_ITEM_LEN} characters"));
         }
     }
-    for (i, s) in wi.same_as.iter().enumerate() {
+    for (i, s) in inspected(&wi.same_as) {
         if s.chars().count() > MAX_ITEM_LEN {
             out.push(format!("same_as[{i}]: exceeds {MAX_ITEM_LEN} characters"));
         }
     }
-    for (i, goal) in wi.goals.iter().enumerate() {
+    for (i, goal) in inspected(&wi.goals) {
         if goal.title.chars().count() > MAX_ITEM_LEN {
             out.push(format!(
                 "goals[{i}].title: exceeds {MAX_ITEM_LEN} characters"
             ));
         }
     }
-    for (i, ident) in wi.identifiers.iter().enumerate() {
+    for (i, ident) in inspected(&wi.identifiers) {
         if ident.value.chars().count() > MAX_ITEM_LEN {
             out.push(format!(
                 "identifiers[{i}].value: exceeds {MAX_ITEM_LEN} characters"
             ));
         }
     }
-    for (i, rel) in wi.relationships.iter().enumerate() {
+    for (i, rel) in inspected(&wi.relationships) {
         if rel.plan_id.chars().count() > MAX_ITEM_LEN {
             out.push(format!(
                 "relationships[{i}].plan_id: exceeds {MAX_ITEM_LEN} characters"
@@ -382,5 +399,28 @@ mod tests {
         wi.keywords = vec!["x".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN]; // exactly at caps
         wi.tags = vec!["y".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN];
         assert!(problems(&wi).is_empty(), "{:?}", problems(&wi));
+    }
+    /// SEC-M8: the *report* is bounded, not just the work. A caller
+    /// sending ten thousand blank entries used to get ten thousand
+    /// problem strings back — a small request buying a large response.
+    /// The cardinality problem alone is enough to reject the payload.
+    #[test]
+    fn an_oversized_array_of_blanks_does_not_produce_a_problem_per_entry() {
+        let mut wi = project("Apollo platform migration");
+        wi.keywords = vec![String::new(); 10_000];
+        wi.tags = vec![String::new(); 10_000];
+        let out = problems(&wi);
+        assert!(
+            out.len() <= 2 * (MAX_ARRAY_LEN + 1),
+            "expected at most the two cardinality problems plus one per \
+             inspected entry, got {}",
+            out.len()
+        );
+        for field in ["keywords", "tags"] {
+            assert!(
+                out.contains(&format!("{field}: exceeds {MAX_ARRAY_LEN} entries")),
+                "the {field} cardinality problem must still be reported"
+            );
+        }
     }
 }

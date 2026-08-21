@@ -9,5 +9,5 @@
 | Fluvio round-trip | `cargo test --features fluvio --test fluvio_relay -- --ignored` | 1 feature-gated + `#[ignore]`-tagged test. Requires `DATABASE_URL` and a live Fluvio broker. |
 | Benchmarks | `cargo bench` | matching + search + validation (Criterion). |
 
-See [`AGENTS/testing.md`](../AGENTS/testing.md) for the full layout.
+See [`agents/testing.md`](../agents/testing.md) for the full layout.
 

@@ -11,7 +11,7 @@ oversized tasks (`T-2a`, `T-2b`).
 - [ ] **T-1 — Bring the service crate's doc set up to house shape.**
   - [ ] Split `spec/index.md` into the 18-file `spec/` layout used by
     the mature entities.
-  - [ ] Add the `AGENTS/` doc set (`index.md`,
+  - [ ] Add the `agents/` doc set (`index.md`,
     `spec-driven-development.md`, `models.md`, `matching.md`,
     `restful.md`, `testing.md`) per the root `AGENTS.md` contract.
   - **Acceptance:** the service crate matches the per-crate doc list

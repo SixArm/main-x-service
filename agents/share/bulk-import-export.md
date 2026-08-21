@@ -1,0 +1,360 @@
+# Bulk import / export — design
+
+How the Main X Index family loads and extracts records **in bulk** — initial
+migration, periodic syncs, analytics extracts, and bulk GDPR export. This is
+a design document: it fixes the execution model, the API surface, the file
+formats, the import dedupe semantics, the error contract, and the export
+privacy/audit posture, so every entity service adopts one uniform contract
+without re-litigating. Only the per-entity **stable key** and **CSV column
+mapping** differ (§10). It reuses the matcher + duplicate-review queue
+([match-search-merge.md](match-search-merge.md)), the event bus
+([event-bus.md](event-bus.md)), the audit trail
+([auditability.md](auditability.md)), and the privacy/masking rules
+([privacy.md](privacy.md)).
+
+## 1. Why change
+
+Today each service offers single-record CRUD and (per entity) a single-record
+GDPR export. There is no way to load a million rows from a legacy system, or
+extract a filtered set for a data platform. Bulk import/export is listed as a
+common capability every crate should provide ([overview.md](overview.md)); this
+fixes its shape once.
+
+## 2. Goals & non-goals
+
+**Goals**
+
+- **Async, job-based** bulk import and export that survives restarts and has
+  no request-timeout ceiling.
+- **JSONL, CSV, Parquet** formats, with JSONL as the lossless reference.
+- **Idempotent import**: re-running the same file does not duplicate — rows
+  with a stable key upsert in place; keyless rows run the normal duplicate
+  detection and route likely duplicates to the **review queue** (§6).
+- **Per-row best-effort**: valid rows commit, invalid rows land in a
+  downloadable error report (§7).
+- **Export honours read authorisation, field masking, and audit** (§8).
+- One uniform contract across every entity service (§10).
+
+**Non-goals**
+
+- Cross-entity bulk in one call — import/export is per entity service.
+- Streaming / real-time ingest — this is batch; the event bus is the
+  real-time path.
+- ETL transformation — records load as-is against the entity's validators;
+  reshaping is the caller's job.
+- A bulk backdoor around events or audit — every imported row emits its
+  normal event and audit record (§6, §9).
+
+## 3. Execution model — async jobs on the loco `worker` feature
+
+Bulk operations run as loco **Postgres-backed background jobs**
+(`queue.kind: Postgres`, [loco.md](loco.md)); no external broker.
+
+```
+POST /api/<plural>/import   ──202──▶ { job_id }
+                                          │  enqueue bulk_job (queued)
+                                          ▼
+                        worker drains: queued → running
+                          per-row pipeline (§6/§7), progress updates
+                          → completed | completed_with_errors | failed
+GET  /api/<plural>/import/{job_id} ──▶ status, counts, errors_url, review_url
+```
+
+### `bulk_jobs` table (per service)
+
+```sql
+CREATE TABLE bulk_jobs (
+    id            UUID PRIMARY KEY,
+    kind          TEXT NOT NULL,        -- import | export
+    entity        TEXT NOT NULL,
+    format        TEXT NOT NULL,        -- jsonl | csv | parquet
+    status        TEXT NOT NULL,        -- queued|running|completed|completed_with_errors|failed
+    params        JSONB NOT NULL,       -- dedupe mode, filter, masking profile, dry_run, …
+    rows_total    BIGINT,
+    rows_processed BIGINT NOT NULL DEFAULT 0,
+    rows_created  BIGINT NOT NULL DEFAULT 0,
+    rows_upserted BIGINT NOT NULL DEFAULT 0,
+    rows_to_review BIGINT NOT NULL DEFAULT 0,
+    rows_errored  BIGINT NOT NULL DEFAULT 0,
+    actor         TEXT,                 -- bearer sub
+    idempotency_key TEXT,               -- client-supplied; dedupes a retried submit
+    input_url     TEXT,                 -- uploaded source artifact
+    result_url    TEXT,                 -- export output / import receipt
+    error_report_url TEXT,              -- downloadable per-row errors (§7)
+    created_at    TIMESTAMPTZ NOT NULL,
+    updated_at    TIMESTAMPTZ NOT NULL,
+    expires_at    TIMESTAMPTZ,          -- artifact + row TTL
+    UNIQUE (entity, kind, idempotency_key)   -- retried submit ⇒ same job
+);
+```
+
+Artifacts (the uploaded file, the export output, the error report) live in an
+object store (S3-compatible in deployment, local fs in dev — config-driven,
+§12), referenced by short-lived, access-controlled URLs. Rows + artifacts are
+TTL'd (`expires_at`).
+
+## 4. API surface (uniform, per entity service)
+
+```
+POST   /api/<plural>/import        202 {job_id}  — body: format, dedupe_mode, dry_run; file upload
+GET    /api/<plural>/import/{id}    job status + counts + errors_url + review_url
+POST   /api/<plural>/export        202 {job_id}  — body: format, filter, fields, include_soft_deleted, masking_profile
+GET    /api/<plural>/export/{id}    job status + download_url
+GET    /api/<plural>/bulk-jobs      list (filter by kind/status); GET .../{id} for one
+```
+
+- **Import** accepts a `dedupe_mode` (default per §6), an optional `dry_run`
+  (validate + classify, commit nothing, return the would-be report), and the
+  file (multipart upload or a presigned-URL handoff for large files).
+- **Export** takes the entity's existing **list/search filter** (so "export
+  everything matching X"), an optional field projection, an
+  `include_soft_deleted` flag (default `false`, gated), and a
+  `masking_profile` (§8).
+
+## 5. File formats
+
+- **JSONL (reference, lossless).** One JSON record per line, each line the
+  entity's API wire type (same Serde shape as `GET /<plural>/{id}`).
+  Streaming read/write, bounded memory, round-trips losslessly including
+  nested identifiers / addresses / contacts / tags / relationships. **Prefer
+  JSONL when fidelity matters.**
+- **CSV (operator / spreadsheet).** Flat columns. Nested and repeated fields
+  need a documented flattening convention, fixed family-wide:
+  - **scalar fields** → one column each;
+  - **single nested object** (e.g. primary address) → dotted columns
+    (`address.postcode`);
+  - **arrays / arrays-of-objects** (identifiers, contacts, tags,
+    relationships, `entity_links`) → a single **JSON-encoded cell**.
+  CSV is inherently lossy for deep nesting; the per-entity spec (§10) lists
+  the exact column set, and the doc steers fidelity-sensitive use to JSONL.
+- **TSV (operator / spreadsheet, tab-separated).** The **same** flattening
+  convention, column set, and codec as CSV — they differ in exactly one
+  byte, the delimiter. Offered because tab-separated exports are what a
+  good deal of health and government tooling emits and ingests, and
+  because asking an operator to re-delimit a file by hand is how data
+  gets corrupted. Quoting is the CSV crate's, so a field containing a tab
+  is quoted rather than splitting the record.
+
+  **The delimiter is declared, never sniffed.** A CSV whose fields
+  contain tabs, and a TSV whose fields contain commas, each parse as a
+  single column under the wrong guess. For an entity with a required
+  field that surfaces as a per-row error; for one whose fields are all
+  optional it would be a silently empty record. Either way the caller
+  names the format, exactly as they already do for JSONL.
+
+- **Parquet (analytics / large export).** Columnar binary, same logical schema
+  as JSONL (nested via Parquet nested types or JSON-encoded columns). Heavier
+  dependency (`arrow`/`parquet`), **feature-gated** and **export-first** in v1
+  (import is roadmap, §12).
+
+## 6. Import semantics
+
+Per row, in the worker:
+
+```
+parse + validate (same validators as single create; §7 on failure)
+  │
+  ├─ stable key present (§10) AND matches an existing record
+  │     → UPSERT in place         (idempotent: re-running the file is safe)
+  │
+  └─ no stable key, or no match
+        → run the entity's duplicate detection (same path as create)
+            ├─ likely duplicate → REVIEW QUEUE, provenance = import
+            └─ otherwise        → CREATE
+```
+
+- **Stable key** is each entity's declared upsert key (§10) — typically a
+  scheme-scoped external identifier (often the same identifier the matcher
+  short-circuits on) or the record `pid` when present.
+- **Idempotency** falls out of upsert-by-key: re-submitting a file re-upserts
+  the same rows to the same state. Combined with the job `idempotency_key`
+  (§3), both the submission and the row effects are safe to retry.
+- **Events + audit are not bypassed.** Every created/upserted row emits its
+  normal `created`/`updated` event ([event-bus.md](event-bus.md), batched via
+  the outbox for large loads) and writes its audit record — so downstream
+  consumers (search re-index, the cross-service link aggregator) stay in sync.
+- **`provenance = import`** tags review-queue items (and matches the
+  cross-service-linking provenance vocabulary) so operators can tell bulk-
+  sourced candidates from interactive ones.
+- **Dry-run** runs parse + validate + dedupe-classification and returns the
+  would-be counts and error report without committing.
+
+## 7. Per-row error handling
+
+- Valid rows commit; invalid rows are **skipped and recorded** — one bad row
+  never aborts the load.
+- A downloadable **error report** (CSV, or JSONL mirroring input) lists
+  `row_number, source_line, field, code, message` for each failure (validation
+  `422` reasons reuse the single-create validators).
+- Final counts reconcile: `rows_total = rows_created + rows_upserted +
+  rows_to_review + rows_errored`. Status is `completed` (zero errors) or
+  `completed_with_errors`.
+- Recovery loop: operator fixes the error file and re-submits; idempotent
+  upsert means re-submitting the previously-good rows is harmless.
+
+## 8. Export — privacy & audit
+
+- **Authorisation + masking match the read API** ([privacy.md](privacy.md)).
+  A `masking_profile` selects masked (default) vs full output; full /
+  unmasked export requires elevated authorisation — a bulk export must never
+  reveal more than the caller could read one record at a time.
+- **`include_soft_deleted`** defaults `false` and is gated; soft-deleted rows
+  are exported only with explicit authorisation.
+- **Filtered** via the entity's existing list/search query, so exports are
+  scoped, not all-or-nothing.
+- **Every export is audited** — actor, filter, format, row count, masking
+  profile, timestamp — because a bulk extract of personal data is itself a
+  compliance event (HIPAA / GDPR; acute for person, worker, case). The audit
+  row is written even for a zero-row export.
+- The single-record **GDPR export** that some entities already provide becomes
+  the single-subject special case of this machinery (filter = one `pid`).
+- Output streams to the artifact store; the `download_url` is short-lived and
+  access-controlled.
+
+## 9. Relationship to other subsystems
+
+- **Matcher / review queue** — import dedupe reuses the existing duplicate
+  detection and review queue verbatim; no new matching logic, no new queue.
+- **Event bus** — bulk writes are a legitimate event source; they emit the
+  same envelopes (batched through the outbox), keeping consumers consistent.
+- **Cross-service links** — `entity_links`
+  ([cross-service-linking.md](cross-service-linking.md)) are bulk-importable
+  too: the `provenance = import` value and the idempotent upsert key
+  (`UNIQUE (from_pid, kind, to_ref, valid_from)`) already exist for exactly
+  this. A per-entity link-import is an optional extension of the same job.
+- **Audit** — import and export are first-class audited actions, not silent
+  batch paths.
+
+## 10. Per-entity adoption (what each service declares)
+
+The contract above is identical for every entity. Each entity service spec
+adds one section + a §13 task declaring only what differs:
+
+1. **Stable key(s)** — which identifier(s) drive upsert (e.g. person: a
+   national / scheme-scoped identifier or `pid`; organization: LEI / DUNS /
+   `pid`; course: provider-scoped course code / DOI; case: agency-scoped case
+   number / `pid`). Listed explicitly so re-import idempotency is well-defined.
+2. **CSV column set + flattening** — the exact flat columns and which fields
+   are dotted vs JSON-in-cell (§5), since CSV shape is entity-specific.
+3. **Export sensitivity** — any entity-specific masking/authorisation beyond
+   the default (personal-data entities — person, worker, case — and the
+   `case ↔ person` link especially).
+4. **§13 task** — the code follow-up: `bulk_jobs` migration, the five
+   endpoints (§4), the worker, the JSONL/CSV/Parquet codecs, the
+   per-row pipeline reusing the single-create validators + matcher + review
+   queue, the error report, export masking + audit, and tests (idempotent
+   re-import, per-row error report, dedupe-to-review, masked vs full export,
+   export audit).
+
+## 11. Rollout
+
+1. **Reference entity (person).** ✅ `bulk_jobs` + the job API + the
+   worker + JSONL import/export, upsert-by-key, per-row error report.
+   The import **read path is streaming end to end** as of 2026-08-05
+   (SEC-B2): the upload spools chunk-by-chunk to disk and streams into
+   the artifact store (`ArtifactStore::put_stream`), the worker opens the
+   artifact with `get_stream`, and both codecs frame one row at a time
+   (`jsonl::LineReader`; `csv::RowStream`, which runs the sync `csv`
+   reader on a blocking task behind bounded channels) into a per-row
+   pipeline. Peak memory is a fixed buffer plus one row, measured rather
+   than asserted (`tests/bulk_streaming_memory.rs`, a counting global
+   allocator: ~0.19 MiB peak on ~312 MiB of JSONL). A crate adopting this
+   contract should copy that shape rather than the earlier
+   read-the-whole-file one — the per-row logic is identical either way,
+   but only one of them survives a large file.
+2. **CSV + review routing.** ✅ *(done 2026-08-02, person)* The CSV
+   flattening convention (`src/bulk/csv.rs`) wired end-to-end into the
+   import/export handlers + worker (`format: "jsonl" | "csv"`), and the
+   keyless-row → duplicate-detection → review-queue path: a row with no
+   stable key of its own runs the entity's existing duplicate-check path,
+   and a likely duplicate still creates the row (never withhold legitimate
+   data) while queuing a `provenance = "import"` pair in the review queue.
+3. **Export hardening.** ✅ Masking profiles + per-export audit +
+   `include_soft_deleted` gating.
+4. **Parquet export** (feature-gated). ✅ *(done 2026-08-02, person)*
+   `format: "parquet"`, export-only, behind a `parquet` Cargo feature
+   (off by default; `arrow` + `parquet` 59.1.0). Reuses the CSV column
+   set exactly (extracted to a shared `src/bulk/columns.rs` so the two
+   formats cannot drift): `Scalar`/`Bool` → nullable Arrow `Utf8`/
+   `Boolean`, `Json` → non-nullable `Utf8` carrying the same JSON text
+   CSV cells hold. A build without the feature still recognises the
+   `format` token but returns a clean error rather than a silent JSONL
+   substitution. **Known gap:** the reference crate's own CI does not
+   pass `--features parquet`, so the feature is exercised by local runs
+   only today — a family-wide "does this crate's CI even build its
+   optional features" question, not specific to Parquet.
+5. **S3 artifact store** (feature-gated). ✅ *(done 2026-08-02, person, BLK-4)*
+   Ported care-pathway's §12-resolved async `ArtifactStore` design to
+   person's `src/bulk/store.rs`: `PERSON_BULK_ARTIFACT_BACKEND` selects
+   `local` (default) or `s3` (behind this crate's own `s3` Cargo feature,
+   off by default); `s3` without the feature is a clean error, never a
+   silent fallback to local storage. `AppState::new` became `async fn`
+   since the S3 client's credential resolution is async.
+6. **Roll across the other entities.** ✅ *(done 2026-08-03, organization +
+   case, BLK-5)* Both loco-idiomatic services, so the API DTO is the
+   matcher type stored verbatim as JSONB — no separate model to convert.
+   **Organization**: stable key LEI → DUNS → explicit `pid`; keyless rows
+   route through the existing `check-duplicates` path into the review
+   queue (`provenance` column added). **Known gap:** the per-row upsert
+   is not SEC-B3 advisory-lock-protected — a locked guard transaction
+   deadlocked under this crate's `max_connections: 1` test config because
+   `streaming::create_and_emit`/`update_and_emit` open their own internal
+   transaction and are not generic over `ConnectionTrait`; closing it
+   needs a `src/streaming.rs`-wide change, tracked as a follow-up rather
+   than half-built. **Case**: stable key is the **pair** `(agency_id,
+   case_number)` (case has no single scheme-scoped identifier the way
+   organization's LEI/DUNS are) → explicit `pid` → keyless; case had no
+   `review_queue` table at all, so one was added fresh (with `provenance`
+   from day one, no follow-up migration needed). Case's bulk export
+   reuses its existing inline `mask_case` redaction — case has no
+   dedicated `src/privacy` module (see the capability matrix in
+   [overview.md](overview.md)), but the existing masking is real and the
+   bulk path inherits it rather than adding an unmasked side door. Both:
+   **JSONL + CSV only** (no Parquet), **local-filesystem-only**
+   `ArtifactStore` (no S3 yet — the trait is async in both so a future S3
+   backend needs no signature change), and export audit gates delivery
+   (SEC-B8) exactly as person's does.
+
+## 12. Open questions
+
+- ~~**Artifact store**~~ — RESOLVED (2026-07-26), implemented in
+  care-pathway (`src/bulk/store.rs`) as the reference. `ArtifactStore` is
+  an **async** trait with two backends selected by
+  `<ENTITY>_BULK_ARTIFACT_BACKEND` (`local`, the default, or `s3`):
+  - **local** — writes under `<ENTITY>_BULK_ARTIFACT_DIR` (system temp dir
+    when unset), returns `file://` references confined to that base
+    (SEC-B4), and reports `presigned_get` as `None` because a `file://`
+    path is not fetchable by a remote client.
+  - **s3** — any S3-compatible store (AWS, `MinIO`, Ceph RGW, R2) via
+    `<ENTITY>_BULK_S3_{BUCKET,ENDPOINT,REGION,FORCE_PATH_STYLE}`, with
+    `presigned_get` issuing the short-lived download URL §3 requires
+    (TTL clamped to one hour). Credentials come from the standard AWS
+    chain, not bespoke variables, so existing secret management applies
+    and no long-lived key is minted for this service alone. Path-style
+    addressing defaults **on** because the common self-hosted targets
+    require it and virtual-hosted style against them fails with a DNS
+    error that reads like a network fault.
+
+  Three decisions worth not re-litigating. The trait is **async**: an
+  object store is inherently async, and bridging it under a sync
+  signature blocks a Tokio worker on every artifact write — a stalled
+  runtime under load, not an error any test would surface. The SDK is
+  **optional behind a cargo feature**, so the default dependency tree is
+  unchanged for deployments using local storage. And the SDK is used
+  **instead of hand-rolled SigV4**: signing is security-relevant code
+  that cannot be verified without a live endpoint or the published AWS
+  vectors, and unverified signing code that looks finished is the worse
+  risk. Asking for `s3` in a binary built without the feature is an
+  **error, not a fallback** — silently writing clinical export artifacts
+  to an ephemeral container disk would lose data and appear to work.
+- ~~**Parquet import**~~ — RESOLVED (2026-08-02): export-only. The
+  reference crate's `BulkFormat::is_export_only` enforces this at the
+  import handler regardless of build configuration; a real import path
+  is still roadmap, not merely deferred by omission.
+- **File-size ceiling** — max upload before requiring chunked / presigned
+  multipart, and a row cap per job.
+- **CSV nested convention** — JSON-in-cell for arrays/objects + dotted for
+  single nested is the proposed fix (§5); confirm before entities enumerate
+  columns.
+- **Event volume** — batch event emission for very large imports (one outbox
+  batch vs per-row) to avoid flooding consumers. (Lean: batch via the outbox.)

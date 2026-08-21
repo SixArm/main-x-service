@@ -2,7 +2,7 @@
 
 The model surface mirrors `schema.org/Course` field-for-field where
 sensible. The complete property table — schema.org → Rust mapping
-— is in [`AGENTS/models.md`](../AGENTS/models.md). High-level shape:
+— is in [`agents/models.md`](../agents/models.md). High-level shape:
 
 - `Course` (the template) — Thing + CreativeWork + LearningResource
   + Course-specific properties (course_code, number_of_credits,

@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
 ### Added — cargo-fuzz harness (SEC-I2)
 
 - A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate with
@@ -87,11 +99,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cited the old `0.6 × JaroWinkler + 0.4 × Levenshtein` weighting. The
   implementation (`Scorer::combined_similarity`) is and remains
   `0.7 × JaroWinkler + 0.3 × Levenshtein`; spec §5.6, spec §6.1, and
-  `AGENTS/matching-algorithm.md` now match the code and
+  `agents/matching-algorithm.md` now match the code and
   `AGENTS.md`.
 - Fixed the string-similarity primitive name in spec §5.6: the method is
   `Scorer::jaccard_set_similarity`, not `jaccard_similarity`.
-- Fixed `AGENTS/testing.md`: the property-test description referenced
+- Fixed `agents/testing.md`: the property-test description referenced
   `match_places`; the crate's method is `match_things`.
 - Rewrote `CHANGELOG.md` (this file) for the `thing-matcher` domain —
   the prior file documented a `Place` / `PlaceCategory` / `PlaceId`
@@ -133,7 +145,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A rename or removal of any of the above breaks this test, failing the
   matcher's own CI **before** publish — making cross-crate breakage
   deliberate.
-- Documented in `AGENTS/testing.md` and `index.md` (Common Tasks table)
+- Documented in `agents/testing.md` and `index.md` (Common Tasks table)
   and cross-referenced from `spec.md` §9.
 
 ### Added — spec/code drift CI check

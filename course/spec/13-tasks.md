@@ -7,23 +7,23 @@ is purely internal to one crate belongs in that crate's queue
 matcher [§23](../course-matcher-rust-crate/spec/23-tasks.md),
 front-end [§13](../course-front-end-with-svelte/spec/13-tasks.md)).
 
-- [x] T-1: Entity-level spec (§1–§18) + `AGENTS/` reference set
+- [x] T-1: Entity-level spec (§1–§18) + `agents/` reference set
       established (this document set).
 - [x] T-2: Bring the service crate's spec §8/§9 and
-      `AGENTS/restful.md` in line with the loco conversion — they
+      `agents/restful.md` in line with the loco conversion — they
       still described the pre-loco Axum boot (`main.rs` →
       `api::rest::serve`). Done 2026-06-13: §8 now documents the
       `src/app.rs` Hooks boot, `config/*.yaml`, the `/api` `Routes`
       prefix, the `FromRef<AppContext>` shared-store bridge, and the
       loco Migrator; §9 adds loco's `/_health` / `/_ping`; also
-      refreshed §2/§10/§11/§14, `AGENTS/restful.md`,
-      `AGENTS/spec-driven-development.md` section mapping, and the
+      refreshed §2/§10/§11/§14, `agents/restful.md`,
+      `agents/spec-driven-development.md` section mapping, and the
       crate `index.md` configuration section (server binding now
       owned by loco config, not `SERVER_HOST`/`SERVER_PORT`).
 - [x] T-3: Fix post-nesting link rot in the crate docs. Done
       2026-06-13: audited all three subprojects' markdown; fixed
       repo-root links (`../` → `../../` from top-level files,
-      `../../` → `../../../` from `spec/` and `AGENTS/` files),
+      `../../` → `../../../` from `spec/` and `agents/` files),
       cross-entity sibling links (now `../../../<entity>/<crate>/`),
       and renamed shared docs (`stack-for-rust-loco.md` →
       `rust-loco-stack.md`, `technology.md` → `loco.md`). Verified

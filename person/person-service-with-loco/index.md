@@ -2,7 +2,7 @@
 
 A high-performance, enterprise-grade Person Service system built with Rust.
 
-[![Rust](https://img.shields.io/badge/rust-1.93%2B-orange.svg)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/rust-1.95%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](Cargo.toml)
 [![Podman](https://img.shields.io/badge/podman-ready-brightgreen.svg)](Dockerfile)
 
@@ -124,7 +124,7 @@ The Person Service is an identity-registry system that maintains a centralized r
   - `GET /api/audit/user` - User audit logs
   - Plus cross-service links, bulk import/export, and compliance
     endpoints — see the full table in
-    [AGENTS/restful.md](AGENTS/restful.md)
+    [agents/restful.md](agents/restful.md)
 
 ### High Availability
 
@@ -186,7 +186,7 @@ See [DEPLOY.md](DEPLOY.md) for complete deployment guide.
 
 **Prerequisites:**
 
-- Rust 1.93+ ([Install Rust](https://rustup.rs/))
+- Rust 1.95+ ([Install Rust](https://rustup.rs/))
 - PostgreSQL 18+
 - No extra CLI tooling required: migrations run through the built-in
   loco CLI (`cargo loco db migrate`)
@@ -258,7 +258,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
 
 | Component            | Technology                           | Purpose                                  |
 | -------------------- | ------------------------------------ | ---------------------------------------- |
-| **Language**         | Rust 1.93+ 2024 Edition              | Systems programming, performance, safety |
+| **Language**         | Rust 1.95+ 2024 Edition              | Systems programming, performance, safety |
 | **Async Runtime**    | Tokio                                | Asynchronous I/O and concurrency         |
 | **Web Framework**    | Axum                                 | HTTP server and routing                  |
 | **Web Framework**    | Loco                                 | HTTP server and routing                  |
@@ -540,7 +540,7 @@ curl "http://localhost:8080/api/persons/{id}/masked"
 curl "http://localhost:8080/api/persons/{id}/audit?limit=50"
 ```
 
-See [AGENTS/restful.md](AGENTS/restful.md) for complete API documentation
+See [agents/restful.md](agents/restful.md) for complete API documentation
 (including the cross-service links, bulk import/export, and
 audit/compliance endpoints not shown above).
 

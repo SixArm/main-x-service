@@ -130,7 +130,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   front-end's own SvelteKit server exchanges the session for a
   short-lived **PASETO v4.public** token and calls the organization
   service server-side, and mutating requests are CSRF-protected. RS256
-  JWT + JWKS are decommissioned. Human-facing docs (README/AGENTS/index)
+  JWT + JWKS are decommissioned. Human-facing docs (README/agents/index)
   updated to describe the target model; the current runtime still uses
   the older client-held-token flow and the code follow-up is tracked in
   spec §13. Source of truth:

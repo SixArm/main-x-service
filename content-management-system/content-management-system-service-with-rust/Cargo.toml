@@ -4,6 +4,7 @@
 name = "content-management-system-service"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.95"
 publish = true
 default-run = "content-management-system-service"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]

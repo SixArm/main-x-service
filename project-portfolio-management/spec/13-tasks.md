@@ -31,7 +31,7 @@ described manual check confirms it. Split tasks too big for one PR
   - [ ] Each subproject ships its own `spec/` (matcher §1–§25; service
     + front-end §1–§18) referencing this entity spec's §5 as the
     canonical domain model rather than redefining it.
-  - [ ] Add the entity `AGENTS/` reference set (`index.md`,
+  - [ ] Add the entity `agents/` reference set (`index.md`,
     `models.md`, `matching.md`, `restful.md`, `testing.md`,
     `subprojects.md`, `spec-driven-development.md`).
   - [ ] Register the trio in the root `AGENTS.md`, `agents/share/overview.md`,

@@ -34,7 +34,7 @@
       0.05) to `MatchConfig` per §7 and include it in the renormalised
       weighted average (§5, §17). Update `CHANGELOG.md` under
       "Unreleased" and the detailed-algorithm doc
-      [`AGENTS/matching-algorithm.md`](../AGENTS/matching-algorithm.md)
+      [`agents/matching-algorithm.md`](../agents/matching-algorithm.md)
       (new probabilistic-components row). Extend the service-side
       bridge test in
       [`course-service-with-loco/tests/duplicate_detection.rs`](../../course-service-with-loco/tests/duplicate_detection.rs)
@@ -48,7 +48,7 @@
       0.05, supporting-signal cluster) to `MatchConfig` per §7 and
       include it in the renormalised weighted average (§5, §17). Update
       `CHANGELOG.md` under "Unreleased" and the detailed-algorithm doc
-      [`AGENTS/matching-algorithm.md`](../AGENTS/matching-algorithm.md)
+      [`agents/matching-algorithm.md`](../agents/matching-algorithm.md)
       (new probabilistic-components row). Extend the service-side bridge
       test in
       [`course-service-with-loco/tests/duplicate_detection.rs`](../../course-service-with-loco/tests/duplicate_detection.rs)
