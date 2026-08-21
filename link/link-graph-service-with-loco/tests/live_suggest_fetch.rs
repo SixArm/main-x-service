@@ -42,8 +42,21 @@ use link_graph_service::suggest::job::{HttpIdentitySource, IdentitySource};
 #[tokio::test]
 #[ignore = "requires a real running person-service or worker-service; see module docs"]
 async fn live_fetch_all_enumerates_a_real_running_service() {
-    let url = std::env::var("LIVE_LIST_URL")
-        .expect("set LIVE_LIST_URL, e.g. http://127.0.0.1:5150/api/persons");
+    // Skip rather than panic when the target is not configured.
+    //
+    // This test needs a *separately running* peer service, which no CI job
+    // brings up (see the module docs). But `scripts/ci-check.sh test-db`
+    // runs `cargo test -- --ignored`, which runs every ignored test — so
+    // `#[ignore]` does not keep it out of CI the way the docs assumed, and
+    // an `.expect()` here failed the whole DB stage for this crate.
+    // Absent configuration means "not this run", not "broken".
+    let Ok(url) = std::env::var("LIVE_LIST_URL") else {
+        eprintln!(
+            "skipping: set LIVE_LIST_URL (e.g. http://127.0.0.1:5150/api/persons) \
+             and run a peer service first — see this file's module docs"
+        );
+        return;
+    };
     let entity = std::env::var("LIVE_ENTITY_TYPE").unwrap_or_else(|_| "person".to_string());
     let entity_type = EntityType::from_token(&entity)
         .unwrap_or_else(|| panic!("unknown LIVE_ENTITY_TYPE {entity:?}"));

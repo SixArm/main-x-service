@@ -3,6 +3,7 @@
 //! funnel / member-health / consent-by-account views, the partnership
 //! lifecycle, memberships + renewals, and working groups.
 
+use chrono::{Duration, Utc};
 use contact_relationship_management_service::app::App;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
@@ -99,7 +100,13 @@ async fn engagement_round_trip() {
             .json(
                 &json!({ "subject_kind": "contact", "subject_pid": contact_pid,
                             "kind": "task", "summary": "renewal: MoU 2027",
-                            "due_on": "2026-08-15" }),
+                            // Relative, not absolute: `upcoming_30d` means
+                            // "due within the next 30 days", so a hardcoded
+                            // date silently stops being upcoming the day it
+                            // passes. This one did, on 2026-08-15, and the
+                            // suite had been failing every day since.
+                            "due_on": (Utc::now() + Duration::days(7))
+                                .format("%Y-%m-%d").to_string() }),
             )
             .await
             .assert_status_ok();

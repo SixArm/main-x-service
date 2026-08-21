@@ -3,7 +3,7 @@
 //!
 //! `m20260603_000001_rename_patient_tables_to_person` renamed the tables
 //! but not their FK columns, so the schema kept `patient_id` while the
-//! SeaORM entities declare `person_id` — every insert into a person child
+//! `SeaORM` entities declare `person_id` — every insert into a person child
 //! table failed. Wraps the hand-written SQL under
 //! `../../migrations/2026072600000002_rename_patient_id_columns/{up,down}.sql`,
 //! matching this crate's other migrations.

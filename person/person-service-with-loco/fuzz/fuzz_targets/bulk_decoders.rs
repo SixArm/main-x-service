@@ -27,20 +27,17 @@ use person_service::bulk::{csv, jsonl};
 
 fuzz_target!(|data: &[u8]| {
     for delimiter in [b',', b'\t'] {
-        match csv::decode(data, delimiter) {
-            // A readable file: one slot per row, each independently an
-            // `Ok` row or a per-row parse error.
-            Ok(rows) => {
-                let again = csv::decode(data, delimiter).expect("decode is deterministic");
-                assert_eq!(
-                    rows.len(),
-                    again.len(),
-                    "row count changed between identical decodes"
-                );
-            }
-            // Structurally unreadable (bad framing): a whole-file error is
-            // the documented outcome, not a panic.
-            Err(_) => {}
+        // A readable file yields one slot per row, each independently an
+        // `Ok` row or a per-row parse error. A structurally unreadable one
+        // (bad framing) is a whole-file `Err` — the documented outcome,
+        // not a panic — so there is nothing to assert on that arm.
+        if let Ok(rows) = csv::decode(data, delimiter) {
+            let again = csv::decode(data, delimiter).expect("decode is deterministic");
+            assert_eq!(
+                rows.len(),
+                again.len(),
+                "row count changed between identical decodes"
+            );
         }
     }
 
