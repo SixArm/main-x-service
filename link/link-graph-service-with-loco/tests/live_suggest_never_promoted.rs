@@ -79,16 +79,28 @@ impl IdentitySource for FixedWorkerSource {
 #[tokio::test]
 #[ignore = "requires one real running person-service with a seeded identifier-bearing person; see module docs"]
 async fn near_ceiling_identifier_match_is_never_auto_promoted() {
-    let person_url = std::env::var("LIVE_PERSON_URL")
-        .expect("set LIVE_PERSON_URL, e.g. http://127.0.0.1:5151/api/persons");
-    let person_id: Uuid = std::env::var("LIVE_PERSON_ID")
-        .expect("set LIVE_PERSON_ID to the seeded person's id")
+    // Skip rather than panic when the target is not configured — see the
+    // sibling note in `live_suggest_fetch.rs`: `#[ignore]` does not keep
+    // these out of CI, because `ci-check.sh test-db` runs
+    // `cargo test -- --ignored`. Absent configuration means "not this
+    // run", not "broken".
+    let (Ok(person_url), Ok(raw_person_id), Ok(identifier_value)) = (
+        std::env::var("LIVE_PERSON_URL"),
+        std::env::var("LIVE_PERSON_ID"),
+        std::env::var("LIVE_IDENTIFIER_VALUE"),
+    ) else {
+        eprintln!(
+            "skipping: set LIVE_PERSON_URL, LIVE_PERSON_ID and \
+             LIVE_IDENTIFIER_VALUE, and run a peer person-service first — \
+             see this file's module docs"
+        );
+        return;
+    };
+    let person_id: Uuid = raw_person_id
         .parse()
         .expect("LIVE_PERSON_ID must be a UUID");
     let identifier_system = std::env::var("LIVE_IDENTIFIER_SYSTEM")
         .unwrap_or_else(|_| "https://fhir.nhs.uk/Id/nhs-number".to_string());
-    let identifier_value =
-        std::env::var("LIVE_IDENTIFIER_VALUE").expect("set LIVE_IDENTIFIER_VALUE");
 
     let persons = HttpIdentitySource::new(EntityType::Person, person_url.clone(), None);
     let worker_ref = EntityRef::new(EntityType::Worker, Uuid::new_v4());

@@ -35,12 +35,24 @@ use uuid::Uuid;
 #[tokio::test]
 #[ignore = "requires two real running services sharing a matching person/worker pair; see module docs"]
 async fn live_pipeline_posts_a_real_suggested_edge() {
-    let person_url = std::env::var("LIVE_PERSON_URL")
-        .expect("set LIVE_PERSON_URL, e.g. http://127.0.0.1:5151/api/persons");
-    let worker_url = std::env::var("LIVE_WORKER_URL")
-        .expect("set LIVE_WORKER_URL, e.g. http://127.0.0.1:5150/api/workers");
-    let expect_person_id: Uuid = std::env::var("LIVE_EXPECT_PERSON_ID")
-        .expect("set LIVE_EXPECT_PERSON_ID to the seeded matching person's id")
+    // Skip rather than panic when the target is not configured — see the
+    // sibling note in `live_suggest_fetch.rs`: `#[ignore]` does not keep
+    // these out of CI, because `ci-check.sh test-db` runs
+    // `cargo test -- --ignored`. Absent configuration means "not this
+    // run", not "broken".
+    let (Ok(person_url), Ok(worker_url), Ok(expect_id)) = (
+        std::env::var("LIVE_PERSON_URL"),
+        std::env::var("LIVE_WORKER_URL"),
+        std::env::var("LIVE_EXPECT_PERSON_ID"),
+    ) else {
+        eprintln!(
+            "skipping: set LIVE_PERSON_URL, LIVE_WORKER_URL and \
+             LIVE_EXPECT_PERSON_ID, and run both peer services first — \
+             see this file's module docs"
+        );
+        return;
+    };
+    let expect_person_id: Uuid = expect_id
         .parse()
         .expect("LIVE_EXPECT_PERSON_ID must be a UUID");
 
