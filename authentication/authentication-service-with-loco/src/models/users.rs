@@ -6,8 +6,15 @@
 //! and `Model::create_passwordless` fills it with the hash of an
 //! unguessable random value. The loco-scaffold password/reset helpers
 //! (`RegisterParams`, `Model::create_with_password`,
-//! `Model::generate_jwt`, `ActiveModel::reset_password`, …) are kept
-//! for parity with the loco template but are not wired into any route.
+//! `ActiveModel::reset_password`, …) are kept for parity with the loco
+//! template but are not wired into any route.
+//!
+//! `Model::generate_jwt` was removed on 2026-08-21. It was the only
+//! reference to loco's `auth` feature anywhere in the family, and that
+//! feature pulls `jsonwebtoken` and so `rsa`, which carries
+//! RUSTSEC-2023-0071. This family issues PASETO v4.public and never JWT
+//! (`agents/share/jwt.md`), so scaffold parity was costing a standing
+//! security advisory for a function nothing called.
 //!
 //! The magic-link surface (`ActiveModel::create_magic_link` /
 //! `Model::find_by_magic_token` / `ActiveModel::clear_magic_link`)
@@ -20,7 +27,7 @@ use std::collections::BTreeMap;
 
 use async_trait::async_trait;
 use chrono::{Duration, offset::Local};
-use loco_rs::{auth::jwt, hash, prelude::*};
+use loco_rs::{hash, prelude::*};
 use sea_orm::FromQueryResult;
 use sea_orm::sea_query::{Expr, ExprTrait, Func};
 use serde::{Deserialize, Serialize};
@@ -483,17 +490,6 @@ impl Model {
         txn.commit().await?;
 
         Ok(user)
-    }
-
-    /// Creates a JWT
-    ///
-    /// # Errors
-    ///
-    /// when could not convert user claims to jwt token
-    pub fn generate_jwt(&self, secret: &str, expiration: u64) -> ModelResult<String> {
-        jwt::JWT::new(secret)
-            .generate_token(expiration, self.pid.to_string(), Map::new())
-            .map_err(ModelError::from)
     }
 
     /// Creates a passwordless user for the magic-link flow. The

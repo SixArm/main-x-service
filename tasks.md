@@ -6252,6 +6252,61 @@ running one.
   a database or a fixture store, so they are a different shape of target
   from these — worth doing, not worth conflating with this.
 
+- [x] **SEC-D1 (M)** Get the supply-chain gate green. *(done 2026-08-21)*
+  `scripts/ci-check.sh deny` had been failing on **21 advisory errors**,
+  all pre-existing and all in two advisories.
+
+  **RUSTSEC-2026-0258** (h2, unbounded empty DATA frames, low severity) —
+  six errors, patched upstream in 0.4.16, upgraded in the eight lockfiles
+  that pinned 0.4.15. Two crates carry both h2 0.3.27 and 0.4.15, so
+  `cargo update -p h2` is ambiguous there and needs `-p h2@0.4.15`; only
+  the 0.4 line is flagged.
+
+  **RUSTSEC-2023-0071** (Marvin timing attack, `rsa` 0.9.10) — fifteen
+  errors, and cargo-deny reports **no safe upgrade available**. Tracing it
+  gave the interesting answer: the path is `loco-rs` (default `auth`
+  feature) → `jsonwebtoken` → `rsa`. That is loco's **JWT** support, in a
+  family whose authentication design is PASETO v4.public *specifically
+  because* it does not trust JWT (`agents/share/jwt.md`). The vulnerable
+  crate was being linked into every service to support a mechanism the
+  specs forbid.
+
+  So it was **removed, not suppressed**. A `deny.toml` ignore would have
+  been defensible — Marvin is a timing sidechannel in RSA private-key
+  operations and this family performs none — but it leaves the crate in
+  the binary and the reasoning in a config file. Dropping the feature
+  makes the dependency graph match the documented design.
+
+  What that took: loco's `auth` feature is only `dep:jsonwebtoken` +
+  `jsonwebtoken/rust_crypto`, and nothing else in loco's feature graph
+  depends on it, so `cli` / `with-db` / `cache_inmem` / `worker` /
+  `testing` are unaffected. All 17 loco crates now declare
+  `default-features = false` with `auth` omitted and a comment saying why,
+  in two shapes: six listed features explicitly, eleven inherit
+  `[workspace.dependencies]`. The single blocker was
+  `authentication-service`'s `Model::generate_jwt` — the only reference to
+  loco's auth module anywhere in the family, never called, and already
+  documented as scaffold parity "not wired into any route". Deleted.
+
+  *The risk worth naming:* every service's `config/*.yaml` carries an
+  `auth.jwt:` block, so if loco's config schema were feature-gated this
+  would break boot. It is not — the feature gates the prelude, an
+  extractor, and two error variants. Confirmed empirically rather than by
+  reading: case-service boots against a real Postgres with its full
+  DB-gated suite green.
+
+  *Verified:* `cargo deny check` clean tree-wide (exit 0, zero advisory
+  errors, zero failing crates); no lockfile anywhere still contains `rsa`
+  or the `rust_crypto` `jsonwebtoken`; all 17 loco crates clippy-clean
+  with full suites passing (97 / 254 / 21 / 255 / 64 / 231 / 140 / 185 /
+  109 / 192 / 64 / 386 / 338 / 209 / 304 / 349 / 139 tests).
+
+  *Deliberately untouched:* `case-folder` declares `jsonwebtoken 9`
+  **directly**, not via loco. That is a documented, intentional use — its
+  `src/auth/mod.rs` cites `jwt.md`'s tolerance for short-lived signed
+  tokens and states the session is not a JWT — and it does not enable
+  `rust_crypto`, so it pulls no `rsa` and carries no advisory.
+
 - [x] **PERF-2 (M)** Where the per-document indexing cost actually is.
   *(done 2026-08-21)* **The premise was wrong.** This task was written
   assuming the ~78 ms remaining after PERF-1 was an fsync, and that the

@@ -11,7 +11,12 @@ default-run = "link-graph-service"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace.dependencies]
-loco-rs = { version = "1.0.1" }
+# `auth` is deliberately absent from this feature list. It is loco's JWT
+# support (`dep:jsonwebtoken`, and therefore `rsa` / RUSTSEC-2023-0071),
+# and this family issues PASETO v4.public rather than JWT — see
+# agents/share/jwt.md. Dropping it removes the vulnerable crate from the
+# dependency graph rather than suppressing the advisory.
+loco-rs = { version = "1.0.1", default-features = false, features = ["cli", "with-db", "cache_inmem", "worker"] }
 
 [dependencies]
 # Keyed integrity MACs with production-grade key handling — one audited

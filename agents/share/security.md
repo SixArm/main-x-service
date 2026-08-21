@@ -233,6 +233,27 @@ deployment's policy is written), but it means:
 > gained fuzz harnesses in the same pass, so SEC-I2's coverage is no
 > longer matcher-only.
 
+> **Update 2026-08-21 — the supply-chain gate is green again.** The
+> `deny` stage had been failing on 21 advisory errors. Six were
+> **RUSTSEC-2026-0258** (h2 unbounded empty DATA frames), fixed by taking
+> the patched 0.4.16. The other fifteen were **RUSTSEC-2023-0071** (the
+> Marvin timing attack in `rsa` 0.9.10), which cargo-deny reports as
+> having no safe upgrade — so it was **removed rather than suppressed**.
+> The path was `loco-rs` (default `auth` feature) → `jsonwebtoken` →
+> `rsa`, i.e. loco's JWT support, in a family whose whole authentication
+> design is PASETO v4.public precisely because it does not trust JWT
+> ([jwt.md](jwt.md)). Every loco crate now takes
+> `default-features = false` without `auth`, and the one reference that
+> blocked it — `authentication-service`'s never-called
+> `Model::generate_jwt`, documented as loco-scaffold parity — was
+> deleted. `cargo deny check` is clean across the tree.
+>
+> Worth keeping in view: this is what a dependency-driven advisory looks
+> like when the vulnerable code is genuinely unreachable. The temptation
+> is a `deny.toml` ignore, which leaves the crate linked in and the
+> reasoning in a config file. Removing the feature made the build match
+> what the specs already said the system does.
+
 Phase 5 is tracked in [tasks.md](../../tasks.md). **As of 2026-08-05,
 every `SEC-*` item in tasks.md is `[x]`** — the criticals, the
 lower-severity authn hardening (SEC-A5/A6/A9/A10), the default-off pin
