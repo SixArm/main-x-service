@@ -394,6 +394,102 @@ async fn get_stay(
     format::json(detail)
 }
 
+/// `GET /api/stays/{pid}/time-analysis` — this stay as one leg of a
+/// stitched patient journey.
+///
+/// Satisfies the timeline contract that `care-pathway-service` follows
+/// across a `continues_as` link (its `src/journey.rs`): four numbers —
+/// clock bounds, elapsed span, and value-adding time — so a journey
+/// that begins on a care pathway and continues into an inpatient stay
+/// can be measured end to end instead of stopping at the boundary.
+///
+/// **A green day is the value-adding time.** `Red2Green` already
+/// answers time-based analysis's question in the NHS's own vocabulary:
+/// a green day moves the patient toward discharge, a red day does not.
+/// Nothing new had to be invented, and nothing here is a clinical
+/// judgement this service is not entitled to make.
+///
+/// Unclassified days count as **non-value-adding**, matching the
+/// consuming service's denominator rule — elapsed calendar time is the
+/// denominator and unrecorded time counts against you, because the
+/// alternative rewards recording less. So the figure is a floor, and
+/// `coverage` / `confidence` say how much of the stay it rests on: an
+/// unclassified stay and a genuinely red one both report little
+/// value-adding time, and only that distinguishes them.
+///
+/// **A coverage ceiling worth knowing about.** `POST
+/// /api/stays/{pid}/red-green` classifies *today* and takes no `day`,
+/// so a stay admitted before the board was in use can never be fully
+/// classified retrospectively. Its coverage is capped by when
+/// classification started, not by how diligent the ward was — which is
+/// why the confidence label matters more here than a bare percentage.
+///
+/// A **sensitive read** like the MDT view: record-level ABAC, audited.
+/// The `mask` obligation is deliberately not applied — the response
+/// carries no identifiers, only durations, so there is nothing in it to
+/// redact.
+#[debug_handler]
+async fn stay_time_analysis(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path(pid): Path<String>,
+) -> Result<Response> {
+    let stay = records::find_stay(&ctx.db, records::parse_pid(&pid)?).await?;
+    auth::authorize_record(&caller, Action::Read, &auth::stay_resource_attrs(&stay))
+        .map_err(record_rejection)?;
+    let rows = red_green_days::Entity::find()
+        .filter(red_green_days::Column::StayPid.eq(stay.pid))
+        .order_by_asc(red_green_days::Column::Day)
+        .all(&ctx.db)
+        .await?;
+    let classifications: Vec<(chrono::NaiveDate, String)> = rows
+        .iter()
+        .map(|r| (r.day, r.classification.clone()))
+        .collect();
+    let now: chrono::DateTime<chrono::FixedOffset> = chrono::Utc::now().into();
+    let timeline =
+        journey::stay_timeline(stay.admitted_at, stay.discharged_at, now, &classifications);
+
+    // Reading a stay's timeline is reading the stay, so it is audited
+    // like the MDT view — a caller assembling a cross-service journey
+    // leaves the same trail as one opening the record.
+    Audit::record(
+        &ctx.db,
+        "stay",
+        stay.pid,
+        "stay_time_analysis_read",
+        caller.actor(),
+        None,
+    )
+    .await?;
+
+    format::json(serde_json::json!({
+        "as_of": now,
+        "stay": { "pid": stay.pid, "status": stay.status },
+        "note": "one leg of a stitched patient journey. A green Red2Green day \
+                 is value-adding time — the method already answers that \
+                 question in the NHS's own vocabulary. Unclassified days count \
+                 as non-value-adding, so value_time_ms is a floor; `coverage` \
+                 and `confidence` say how much of the stay it rests on. An \
+                 unclassified stay and a genuinely red one both report little \
+                 value-adding time, and only the confidence tells them apart.",
+        "clock": {
+            "start_ms": timeline.clock_start_ms,
+            "stop_ms": timeline.clock_stop_ms,
+            "start_source": "admitted_at",
+            "stop_source": if stay.discharged_at.is_some() { "discharged_at" } else { "as_of" },
+            "running": stay.discharged_at.is_none(),
+        },
+        "lead_time_ms": timeline.lead_time_ms,
+        "value_time_ms": timeline.value_time_ms,
+        "span_days": timeline.span_days,
+        "classified_days": timeline.classified_days,
+        "green_days": timeline.green_days,
+        "coverage": timeline.coverage_ratio(),
+        "confidence": timeline.confidence(),
+    }))
+}
+
 /// `PUT /api/stays/{pid}` — whiteboard-editable fields (EDD, CCD,
 /// named staff, alerts, senior review).
 #[debug_handler]
@@ -959,6 +1055,7 @@ pub fn routes() -> Routes {
         .prefix("/api")
         .add("/stays", post(admit))
         .add("/stays/{pid}", get(get_stay))
+        .add("/stays/{pid}/time-analysis", get(stay_time_analysis))
         .add("/stays/{pid}", put(update_stay))
         .add("/stays/{pid}/transfer", post(transfer))
         .add("/stays/{pid}/discharge-ready", post(discharge_ready))

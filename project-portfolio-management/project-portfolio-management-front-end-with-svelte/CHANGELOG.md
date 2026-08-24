@@ -8,6 +8,53 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+
+### Added — the time-based-analysis view (TBA-8)
+
+`/plans/{pid}/flow`, linked from the plan detail page: the delivery
+board read through the lens of time rather than of activity.
+
+- **The service level expectation first.** "85% of items finish within
+  11 days", with the sample size beside it — the number a team can
+  actually quote. Below the service's minimum sample it renders the
+  refusal, not a figure computed from noise.
+- **Aging work in progress** next, because it is the only thing on the
+  page whose outcome can still be changed. Items past the expectation
+  are flagged; cycle time, throughput and yield are all history.
+- **A cumulative flow diagram** (`src/lib/components/CumulativeFlow.svelte`):
+  an inline SVG stacked area chart, no charting dependency. Bands stack
+  with `done` at the bottom, so the vertical gap above it is work in
+  progress and the horizontal gap is roughly the cycle time — Little's
+  Law read off the picture.
+- **Constraints, flow rates and distributions** below, with cycle time
+  always shown beside lead time.
+
+Three things worth keeping:
+
+1. **A low flow efficiency is captioned as normal.** 5–15% is typical
+   for knowledge work, so a bare "7.1%" invites the wrong reaction. The
+   tile says which band the figure sits in — and calls a suspiciously
+   *high* one out as a stale board rather than as excellence.
+2. **A null ratio renders as an em-dash, never as 0%.** An item that
+   never started has no flow efficiency; "0%" would read as
+   catastrophically inefficient rather than as not-applicable. Pinned by
+   a unit test.
+3. **The chart carries a table view.** Three of the five palette slots
+   sit below 3:1 against the light surface, so the numbers must be
+   reachable without reading colour — the palette's relief rule, pinned
+   by an e2e test rather than left as intent.
+
+The palette is the validated categorical set, assigned to bands in a
+fixed order and never recycled when a band goes empty. It was run
+through the validator in both modes before use (worst adjacent CVD ΔE
+9.1 light / 8.4 dark). The figure paints its own surface **and its own
+ink**: the first dark-mode render lost the legend entirely, because a
+container that sets a background while inheriting the host page's text
+colour is only legible while the two themes agree.
+
+Nothing in the view is per-person. Assignees appear on an aging item so
+a reader knows who to ask, never as a ranked comparison.
+
 ### Added — wire `/plans` itself to `listPage()` (2026-08-05)
 
 The sibling gap the entry directly below flagged and left open:

@@ -9,6 +9,205 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — cross-plan rollup (TBA-9)
+
+`GET /api/plans/{pid}/rollup`: flow across a plan and everything it
+contains. This closes the last open TBA task.
+
+**The combined figures are the union of the subtree's tasks, not an
+average of the children's ratios.** Averaging ratios weights a
+five-task plan equally with a five-hundred-task one — the same error
+the item-level analysis already rejects.
+
+**The per-plan table always ships with it, and for a portfolio it is
+usually the more useful half.** A rollup mixes boards whose teams mean
+different things by `in_progress` — the classification is
+deployment-local by design, and nothing forces two teams to agree — so
+*which child differs* is a firmer finding than the combined number.
+That is what the §17 open question was really asking, and it is now
+recorded as resolved.
+
+**The walk is bounded three ways, for three different reasons.** A
+visited set, because a cycle in `parent_ref` would revisit nodes and
+expand exponentially rather than merely loop: the write path refuses a
+cycle, but a rollup that *trusts* that is one bulk import or one direct
+`UPDATE` away from hanging the service. A depth cap and a node cap, so
+one enormous portfolio cannot become an unbounded response. Neither is
+silent — `truncated` reports a cap firing and `revisits` reports
+containment that is not a tree, because a rollup that quietly covers
+half an estate reads as if it covered all of it.
+
+The walk itself is a **pure function over an adjacency map**, so the
+controller loads the containment map in one query rather than one per
+level, and the cycle, depth and cap behaviour is unit-tested without a
+database — including a self-parent, a diamond, and a 59-deep chain.
+
+### Added — Monte-Carlo delivery forecasting (TBA-11)
+
+`GET /api/plans/{pid}/forecast` answers both delivery questions at
+once, because quoting one without the other is how a forecast gets
+misread: *how long will these N items take* and *how many will land in
+N periods*.
+
+**It samples throughput, not cycle time — and this corrected an error
+in our own spec.** §17 had claimed "the cycle-time distribution is
+exactly the input a Monte-Carlo 'when will these 20 items be done'
+forecast needs". It is not, and it is the standard error in the field.
+Cycle time answers a question about **one item** — which is precisely
+what the service level expectation already reports. A **batch**
+forecast needs the **throughput** distribution: how many items the team
+actually finished per period. Building it from cycle times implicitly
+assumes items are worked one at a time, so summing twenty cycle times
+for a team running five in parallel is roughly five times too
+pessimistic. The spec entry is struck through rather than deleted, so
+the correction stays visible.
+
+Three properties are load-bearing:
+
+1. **The conservative percentile reverses between the two questions.**
+   For *how long*, higher is more conservative — 85% of simulated runs
+   finished by the p85. For *how many*, it is the **15th** percentile:
+   "at least this many, with 85% confidence". Quoting the p85 there
+   would promise the best case while sounding careful, so the field is
+   named `at_least_items` for what it means rather than for the
+   percentile it came from, and both responses repeat the direction.
+2. **It is deterministic.** The seed is an input, fixed unless
+   supplied. A forecast that changes every time you reload it is not
+   one anybody will act on — and determinism is what made the whole
+   simulation testable.
+3. **It refuses rather than guessing.** Below six periods of history it
+   returns a reason instead of a number; an all-zero history returns
+   *"the honest answer is `never`, not a number"*; and a per-trial
+   ceiling turns what would otherwise be an unbounded accumulation loop
+   into a reported `trials_hit_ceiling`, so a percentile that is really
+   a floor says so.
+
+Sampling is with replacement, which is what makes the output a
+distribution rather than a replay of the past in its original order. A
+zero seed is replaced, since xorshift from a zero state emits only
+zeroes and would collapse every trial to the same answer.
+
+### Added — time-based-analysis flow gauges (TBA-10)
+
+A default-off Prometheus gauge family, `ppm_flow_*`: flow efficiency,
+p85 cycle time, work in progress, first-pass yield and the over-cap
+column count per plan, refreshed by a background loop
+(`PROJECT_PORTFOLIO_MANAGEMENT_FLOW_METRICS_SECS`, unset ⇒ the loop
+never starts and the family never appears).
+
+**Periodic refresh, not scrape-time computation** — computing on scrape
+turns a 15-second scrape into a 15-second full-estate query on an
+endpoint that needs no token, and updating on write cannot work because
+these figures change as an item sits in a column, with no write to hang
+an update on.
+
+**Two bounds, because `/metrics.prom` is on the public allow-list.**
+Per-plan series are **capped** (default 50, largest board first), and
+small boards are **suppressed** (default floor 5): a flow efficiency
+over two tasks describes two people's week, which §12.4 refuses to
+measure, and reaching it by arithmetic through an unauthenticated
+endpoint is the same thing. Neither bound is silent.
+
+**Per-column occupancy is deliberately not exported.** It would be the
+most useful detail and also five series per plan — the single biggest
+cardinality contributor here. The over-cap *count* carries the
+alertable fact ("a column on this plan is over its limit") in one
+series, and the detail is one API call away.
+
+**The p85 gauge inherits the service level expectation's refusal.**
+Below `MIN_SLE_SAMPLE` finished items the SLE is null, and the gauge
+stays absent rather than re-deciding the question with a number from
+noise — rendering it as `0` would turn a refusal to forecast into a
+claim of instant delivery.
+
+The label is the plan **pid**, never its name (a rename would fork the
+series); labelled series are reset each pass, so a plan that drops out
+loses its series rather than keeping a stale value that looks live.
+
+### Added — time-based analysis (TBA-1 … TBA-7)
+
+The time dimension of delivery. `tasks` carried `status_changed_at` (when
+the *current* status began) and `done_at`, so the moment a task moved
+twice the first interval was gone — and the one question time-based
+analysis exists to ask, *of the time this took, how much was somebody
+actually working on it?*, could not be answered.
+
+Flow efficiency in knowledge work typically measures **5–15%**, the same
+order as Dr. R. C. Barker's finding that value-adding time is **8–14%**
+of an NHS patient journey. That figure inverts the usual improvement
+instinct: if an item is worked on 6% of its life, making the work 20%
+faster improves delivery by about 1%, while removing half the waiting
+improves it by nearly half. Velocity, utilisation and story points all
+measure the 6%. Full contract:
+[`spec/time-based-analysis.md`](../spec/time-based-analysis.md).
+
+- **`task_transitions`** — the durable, append-only status-transition
+  log, written by the **existing** `POST /api/plans/{pid}/tasks` and
+  `PATCH …/{t_pid}` calls, **in the same transaction** as the change
+  that caused it. No new recording endpoint, and no edit or delete: a
+  method that asks engineers to log hours gets logged hours, not true
+  ones, and an editable flow log measures whatever the editor wanted.
+- **A labelled backfill** — one synthetic transition per live task, so
+  an existing board is analysable immediately, flagged `backfilled` and
+  surfaced in every analysis. Writing it without the flag would have
+  been the same code and a lie.
+- **`src/tba.rs`** — the pure analysis: interval derivation, cycle
+  versus lead time, per-status and per-category splits, rework and
+  rolled first-pass yield, handoffs, nearest-rank percentiles, the
+  service level expectation, constraint ranking, aging WIP, and Little's
+  Law. No I/O and no clock read (`as_of` is a parameter), so all 24 of
+  its tests run without a database.
+- **Endpoints** — `GET /api/plans/{pid}/{time-analysis,constraints,aging-wip,flow,cumulative-flow}`,
+  `GET /api/plans/{pid}/tasks/{t_pid}/{transitions,time-analysis}`, and
+  `GET /api/flow-classes`. All read-only, OpenAPI-documented, behind the
+  blanket guard.
+- **`cumulative-flow`** — the board's composition sampled daily, added
+  with the front-end view. It is the one figure here that cannot be
+  assembled client-side: it needs every task's whole history at once,
+  and an API that shipped the log to the browser to re-derive it would
+  be sending far more data to compute what the server already indexes.
+  Every status band is present at every sample including at zero, so a
+  stacked chart never has to decide whether a missing band means zero;
+  a task does not appear before it was created, and one whose history
+  predates its first recorded transition reads as `todo` rather than
+  vanishing and reappearing mid-chart.
+
+Five decisions are load-bearing and pinned by tests rather than left to
+comments:
+
+1. **Cycle time and lead time are different numbers, and both are always
+   returned.** An item that sat in `todo` for three weeks and was built
+   in two days has a cycle time of 2 days and a lead time of 23. Quoting
+   the first as "our delivery time" is a tenfold flattering misreport
+   and the commonest error in flow reporting, so the API returns them
+   together and the response says why.
+2. **The statuses partition the lead time, not the cycle time.** The
+   backlog dwell is real time the requester waited and has to land
+   somewhere — time that belongs to no status is time a report can
+   quietly lose. Flow efficiency is still measured against cycle time,
+   since the team cannot be held to how long the backlog sat.
+3. **An unclassified status counts against you.** A board column nobody
+   classified falls back to `unnecessary_non_value_adding`, so adding a
+   column cannot silently improve the flow efficiency. The `in_review`
+   argument is real and local, so the whole map is overridable via
+   `PROJECT_PORTFOLIO_MANAGEMENT_FLOW_CLASSES` — applied whole or not at
+   all, and echoed on every response.
+4. **Throughput never travels without first-pass yield.** A team whose
+   throughput rises while yield falls is not going faster; it is
+   shipping work back to itself.
+5. **Nothing is per-person.** No per-assignee cycle time, throughput or
+   flow efficiency — a stated refusal, not an unbuilt feature. It
+   measures the wrong 6%, it is confounded by what the item was and who
+   else was needed, and — because collection is a by-product of moving
+   the card — it supplies the one reason anybody would have to distort
+   the data. Handoff counts describe the item's journey.
+
+There is no business-hours discounting and no clock pause: a weekend in
+review really was a weekend in review, and working-hours arithmetic is
+the standard way to make queues disappear from a report while the
+customer still waits.
+
+
 
 
 

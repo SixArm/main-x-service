@@ -68,11 +68,29 @@ pub enum EntityType {
     CourseInstance,
     /// Clinical care-pathway registry.
     CarePathway,
+    /// One subject's **enrolment** on a care pathway
+    /// (`care-pathway-service` sub-resource). A sub-resource type in the
+    /// same service as [`EntityType::CarePathway`], for the same reason
+    /// `CourseInstance` sits beside `Course`: the ref encodes the type,
+    /// not the service.
+    ///
+    /// This is the type a *journey* is named by — the template is a
+    /// document, the instance is a patient's passage through it.
+    CarePathwayInstance,
+    /// One inpatient **stay** — an admission → transfers → discharge
+    /// episode (`patient-flow-service`).
+    ///
+    /// The first type here owned by a **consumer application** rather
+    /// than by an index registry. That is deliberate and narrow: a
+    /// journey does not stop at the registry boundary, so the far end of
+    /// a journey edge has to be nameable. It does not make patient-flow
+    /// a registry, and nothing here is matchable.
+    PatientFlowStay,
 }
 
 impl EntityType {
     /// Every entity type, in a stable order (for iteration / tests).
-    pub const ALL: [EntityType; 10] = [
+    pub const ALL: [EntityType; 12] = [
         EntityType::Person,
         EntityType::Worker,
         EntityType::Organization,
@@ -83,6 +101,8 @@ impl EntityType {
         EntityType::Course,
         EntityType::CourseInstance,
         EntityType::CarePathway,
+        EntityType::CarePathwayInstance,
+        EntityType::PatientFlowStay,
     ];
 
     /// The lowercase wire token used in the URN (e.g. `"care_pathway"`,
@@ -100,6 +120,8 @@ impl EntityType {
             EntityType::Course => "course",
             EntityType::CourseInstance => "courseinstance",
             EntityType::CarePathway => "care_pathway",
+            EntityType::CarePathwayInstance => "care_pathway_instance",
+            EntityType::PatientFlowStay => "patient_flow_stay",
         }
     }
 
@@ -117,7 +139,8 @@ impl EntityType {
             EntityType::Thing => "thing-service",
             EntityType::Event => "event-service",
             EntityType::Course | EntityType::CourseInstance => "course-service",
-            EntityType::CarePathway => "care-pathway-service",
+            EntityType::CarePathway | EntityType::CarePathwayInstance => "care-pathway-service",
+            EntityType::PatientFlowStay => "patient-flow-service",
         }
     }
 
@@ -225,8 +248,10 @@ impl TryFrom<String> for EntityRef {
 pub enum Sensitivity {
     /// Affiliation / identity assertion (operator-asserted).
     Medium,
-    /// Asserts a person is the subject of a government case (§10) —
-    /// carries the case service's access-control / audit / masking rules.
+    /// Asserts something about a named person that carries the owning
+    /// service's full access-control / audit / masking rules: that they
+    /// are the subject of a government case, or that two clinical
+    /// episodes are the same person's journey (§10).
     High,
 }
 
@@ -248,16 +273,30 @@ pub enum EdgeKind {
     /// `case → person` — a case is about / has as its subject a person
     /// (**high** sensitivity — §10).
     SubjectOf,
+    /// The unit of work **continues as** another unit of work: one
+    /// person's journey passing from one episode into the next.
+    ///
+    /// Permitted between a care-pathway instance and another pathway
+    /// instance (a transfer between pathways), an inpatient stay, or a
+    /// case. It is what lets time-based analysis measure a journey that
+    /// crosses a service boundary instead of stopping at it
+    /// (`time-based-analysis.md`).
+    ///
+    /// **High** sensitivity: asserting that this patient's stroke
+    /// pathway continued as that inpatient stay is clinical data about
+    /// a named person, and at least as disclosive as `subject_of`.
+    ContinuesAs,
 }
 
 impl EdgeKind {
     /// Every edge kind, in a stable order.
-    pub const ALL: [EdgeKind; 5] = [
+    pub const ALL: [EdgeKind; 6] = [
         EdgeKind::SameIdentity,
         EdgeKind::WorksAt,
         EdgeKind::MemberOf,
         EdgeKind::EmployedBy,
         EdgeKind::SubjectOf,
+        EdgeKind::ContinuesAs,
     ];
 
     /// The wire token for this kind.
@@ -269,6 +308,7 @@ impl EdgeKind {
             EdgeKind::MemberOf => "member_of",
             EdgeKind::EmployedBy => "employed_by",
             EdgeKind::SubjectOf => "subject_of",
+            EdgeKind::ContinuesAs => "continues_as",
         }
     }
 
@@ -292,7 +332,11 @@ impl EdgeKind {
     pub const fn is_temporal(self) -> bool {
         matches!(
             self,
-            EdgeKind::WorksAt | EdgeKind::MemberOf | EdgeKind::EmployedBy | EdgeKind::SubjectOf
+            EdgeKind::WorksAt
+                | EdgeKind::MemberOf
+                | EdgeKind::EmployedBy
+                | EdgeKind::SubjectOf
+                | EdgeKind::ContinuesAs
         )
     }
 
@@ -305,6 +349,7 @@ impl EdgeKind {
             EdgeKind::WorksAt | EdgeKind::MemberOf => Some("has_member"),
             EdgeKind::EmployedBy => Some("employs"),
             EdgeKind::SubjectOf => Some("is_subject_of"),
+            EdgeKind::ContinuesAs => Some("continued_from"),
         }
     }
 
@@ -312,8 +357,14 @@ impl EdgeKind {
     #[must_use]
     pub const fn sensitivity(self) -> Sensitivity {
         match self {
-            EdgeKind::SubjectOf => Sensitivity::High,
-            _ => Sensitivity::Medium,
+            // Both assert something clinical or legal about a named
+            // person; neither may be disclosed on the lighter
+            // affiliation posture.
+            EdgeKind::SubjectOf | EdgeKind::ContinuesAs => Sensitivity::High,
+            EdgeKind::SameIdentity
+            | EdgeKind::WorksAt
+            | EdgeKind::MemberOf
+            | EdgeKind::EmployedBy => Sensitivity::Medium,
         }
     }
 
@@ -322,7 +373,9 @@ impl EdgeKind {
     /// `{person, worker}` is accepted.
     #[must_use]
     pub fn permits(self, from: EntityType, to: EntityType) -> bool {
-        use EntityType::{Case, Organization, Person, Worker};
+        use EntityType::{
+            CarePathwayInstance, Case, Organization, PatientFlowStay, Person, Worker,
+        };
         match self {
             EdgeKind::SameIdentity => {
                 matches!((from, to), (Person, Worker) | (Worker, Person))
@@ -330,6 +383,18 @@ impl EdgeKind {
             EdgeKind::WorksAt | EdgeKind::MemberOf => (from, to) == (Person, Organization),
             EdgeKind::EmployedBy => (from, to) == (Worker, Organization),
             EdgeKind::SubjectOf => (from, to) == (Case, Person),
+            // A journey continues **from** a pathway instance. The far
+            // end may be another pathway (a transfer), an inpatient
+            // stay, or a case. Deliberately not symmetric and not
+            // open-ended: a journey has a direction, and permitting any
+            // pair would make the edge mean nothing.
+            EdgeKind::ContinuesAs => matches!(
+                (from, to),
+                (
+                    CarePathwayInstance,
+                    CarePathwayInstance | PatientFlowStay | Case
+                )
+            ),
         }
     }
 }
@@ -421,13 +486,77 @@ mod tests {
         assert!(!EdgeKind::SameIdentity.is_temporal());
         assert_eq!(EdgeKind::EmployedBy.inverse(), Some("employs"));
         assert!(EdgeKind::EmployedBy.is_temporal());
-        // subject_of is the sole high-sensitivity kind.
-        assert_eq!(EdgeKind::SubjectOf.sensitivity(), Sensitivity::High);
+        // The high-sensitivity kinds are exactly those asserting
+        // something clinical or legal about a named person. Listed
+        // explicitly, so adding a kind forces a decision here rather
+        // than defaulting quietly into the lighter tier.
+        let high = [EdgeKind::SubjectOf, EdgeKind::ContinuesAs];
         for k in EdgeKind::ALL {
-            if k != EdgeKind::SubjectOf {
-                assert_eq!(k.sensitivity(), Sensitivity::Medium);
-            }
+            let expected = if high.contains(&k) {
+                Sensitivity::High
+            } else {
+                Sensitivity::Medium
+            };
+            assert_eq!(k.sensitivity(), expected, "sensitivity of {k}");
         }
+    }
+
+    #[test]
+    fn continues_as_names_a_journey_and_only_a_journey() {
+        use EntityType::{CarePathwayInstance, Case, PatientFlowStay, Person, Worker};
+        // A journey continues from a pathway instance into the next
+        // episode: another pathway (a transfer), an inpatient stay, or
+        // a case.
+        assert!(EdgeKind::ContinuesAs.permits(CarePathwayInstance, CarePathwayInstance));
+        assert!(EdgeKind::ContinuesAs.permits(CarePathwayInstance, PatientFlowStay));
+        assert!(EdgeKind::ContinuesAs.permits(CarePathwayInstance, Case));
+        // It is directed: a stay does not continue as a pathway.
+        assert!(!EdgeKind::ContinuesAs.permits(PatientFlowStay, CarePathwayInstance));
+        assert!(!EdgeKind::ContinuesAs.permits(Case, CarePathwayInstance));
+        // And it is not a general-purpose "related to": permitting any
+        // pair would make the edge mean nothing.
+        assert!(!EdgeKind::ContinuesAs.permits(Person, Worker));
+        assert!(!EdgeKind::ContinuesAs.permits(CarePathwayInstance, Person));
+        assert!(!EdgeKind::ContinuesAs.permits(Person, CarePathwayInstance));
+
+        assert!(EdgeKind::ContinuesAs.is_temporal(), "a journey has dates");
+        assert!(!EdgeKind::ContinuesAs.is_symmetric());
+        assert_eq!(EdgeKind::ContinuesAs.inverse(), Some("continued_from"));
+    }
+
+    #[test]
+    fn the_operational_sub_resource_types_route_to_their_owning_service() {
+        // A sub-resource type shares its service with the registry type
+        // beside it — the ref encodes the type, not the service, which
+        // is why this works at all.
+        assert_eq!(
+            EntityType::CarePathwayInstance.service(),
+            EntityType::CarePathway.service()
+        );
+        assert_eq!(
+            EntityType::PatientFlowStay.service(),
+            "patient-flow-service"
+        );
+        // Tokens are stable and distinct from the registry types'.
+        assert_eq!(
+            EntityType::CarePathwayInstance.as_str(),
+            "care_pathway_instance"
+        );
+        assert_eq!(EntityType::PatientFlowStay.as_str(), "patient_flow_stay");
+        assert_ne!(
+            EntityType::CarePathwayInstance.as_str(),
+            EntityType::CarePathway.as_str()
+        );
+    }
+
+    #[test]
+    fn every_entity_token_is_unique() {
+        // A duplicate token would make one type unparseable, silently.
+        let mut seen = std::collections::BTreeSet::new();
+        for t in EntityType::ALL {
+            assert!(seen.insert(t.as_str()), "duplicate token {t}");
+        }
+        assert_eq!(seen.len(), EntityType::ALL.len());
     }
 
     #[test]

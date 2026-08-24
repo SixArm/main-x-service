@@ -38,9 +38,10 @@ src/
 │   ├── api/
 │   │   ├── client.ts             lean fetch wrapper (+ ApiError); no browser-held bearer — the BFF proxy injects the PASETO server-side
 │   │   ├── types.ts              CarePathway + ConditionCode + CodeSystem + CareSetting + IdentifierScheme + PathwayIdentifier + PathwayRef + ScoredRef + MergeResult + AuditEntry + PathwayEvent + PathwayInstance/InstanceStatus/Urgency/InstanceDetail + the five insight response types
+│   │   ├── tba.ts                TbaRepository (timeline / instance + cohort analysis / constraints / standards / flow / segment + clock recording) + the presentation helpers
 │   │   └── care-pathways.ts      CarePathwayRepository (CRUD + search + checkDuplicates + merge + audit + recentEvents + insights{Directory,Coverage,Variants,Providers,Languages} + listInstances + getInstance + setInstanceStatus + caseload)
 │   ├── server/                   BFF-only (never bundled to the browser): auth.ts (magic-link + session→PASETO exchange), session.ts (cookie), config.ts (CARE_PATHWAY_API_URL / AUTH_API_URL)
-│   └── components/CarePathwayForm.svelte
+│   └── components/CarePathwayForm.svelte · JourneyTimeline.svelte (the timeline wall)
 └── routes/
     ├── +layout.svelte / +layout.ts / +layout.server.ts   nav + session panel
     ├── +page.svelte              registry grid (SVAR DataGrid + FilterBar); rows link to /{pid}
@@ -52,7 +53,8 @@ src/
     ├── insights/+page.svelte     the five registry lenses as tables (directory / coverage / variants / providers / languages)
     ├── board/+page.svelte        instance Kanban (one pathway; drag = POST /api/instances/{pid}/status)
     ├── gantt/+page.svelte        instance timeline Gantt (one pathway; enrolled_on → next_review/closed/today)
-    └── sequence/+page.svelte     intervention-sequence Gantt (a pathway template's interventions)
+    ├── sequence/+page.svelte     intervention-sequence Gantt (a pathway template's interventions)
+    └── time/+page.svelte         time-based analysis: cohort ratio + NHS access-standard score + constraints + Little's Law, and one journey's timeline wall
 ```
 
 ## API consumption
@@ -74,6 +76,10 @@ src/
 | Instance detail | `GET /api/instances/{pid}` → `{instance,steps,team,events,measures}` |
 | Instance status move | `POST /api/instances/{pid}/status` (body `{to}`) |
 | Caseload (board context) | `GET /api/instances/caseload` |
+| Time-based analysis — cohort (`/time`) | `GET /api/care-pathways/{pid}/time-analysis?standard=` · `GET /api/care-pathways/{pid}/constraints` |
+| Time-based analysis — journey (`/time`) | `GET /api/instances/{pid}/timeline` · `GET /api/instances/{pid}/time-analysis` |
+| Access-standard catalogue + flow | `GET /api/instances/time-standards` · `GET /api/instances/flow?window_days=&pathway=` |
+| Segment / clock recording (client methods; not yet wired to a route) | `POST /api/instances/{pid}/segments` · `POST /api/instances/{pid}/clock` |
 
 ## Commands
 

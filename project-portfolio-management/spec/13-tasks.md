@@ -189,3 +189,38 @@ described manual check confirms it. Split tasks too big for one PR
     the containment-cycle `422` and the child roll-up (`?parent=`) pass;
     `cargo test` / `clippy` / `fmt` clean and the front-end `pnpm run
     check` + build clean.
+
+- [x] **T-14 — Time-based analysis (TBA-1 … TBA-7).** The time dimension
+  of delivery: a durable, append-only **task transition log**, and the
+  derived per-task / plan / constraint / aging-WIP / flow views.
+  Unifies Barker's time-based analysis (the value-adding ratio), value
+  stream mapping (the VA / NNVA / UNVA classification and the LT / PT /
+  %A / #HO / RFPY metric names) and queueing theory (λ / μ / ρ / κ / τ,
+  Little's Law). Full contract, including the parts deliberately
+  refused, in the cross-cutting
+  [`time-based-analysis.md`](time-based-analysis.md).
+  - **Done (2026-08-23):** implemented in the service crate —
+    `migration/src/m20260823_000001_time_based_analysis.rs`,
+    `src/models/_entities/task_transitions.rs`, the pure `src/tba.rs`,
+    the transition writes inside `create_task` / `move_task`,
+    `src/controllers/tba.rs`, routes, OpenAPI, and
+    `tests/requests/tba.rs`.
+  - **Acceptance (met):** creating a task opens its log and each
+    accepted move appends exactly one transition, while a **no-op** move
+    and a **refused** move append none — the log records moves that
+    happened, not requests that were made; cycle time and lead time are
+    both returned and never one labelled as the other; statuses and
+    categories each sum to the lead time over a generated sweep;
+    an item that started and finished inside one millisecond reports a
+    zero cycle time rather than "never started"; a transition in the
+    future does not retroactively start the clock; the service level
+    expectation is refused below its minimum sample rather than computed
+    from noise; the new paths are `401` under
+    `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`. 44/44 `--ignored`
+    request tests green vs Postgres 18; 230 unit tests; clippy pedantic
+    clean.
+  - **Open (TBA-8 … TBA-11):** the front-end cumulative-flow diagram and
+    aging-WIP board, the cross-plan rollup over `parent_ref`, Prometheus
+    gauges, and Monte-Carlo delivery forecasting from the cycle-time
+    distribution.
+

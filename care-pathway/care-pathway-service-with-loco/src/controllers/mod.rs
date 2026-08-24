@@ -9,7 +9,12 @@ pub mod docs;
 pub mod fhir;
 pub mod insights;
 pub mod instances;
+/// Cross-service journey links (`entity_links` write side).
+pub mod links;
 pub mod metrics;
+/// Time-based analysis: segment + clock recording, and the derived
+/// per-instance, cohort, constraint and flow views.
+pub mod tba;
 
 /// Map a model-layer error to its HTTP shape: a missing record is
 /// `404 Not Found`; anything else stays a model error (500-class).

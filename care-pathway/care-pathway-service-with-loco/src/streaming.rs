@@ -37,6 +37,7 @@ use uuid::Uuid;
 
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::care_pathways::Model as PathwayModel;
+use crate::models::entity_links::{Model as EntityLinkModel, NewEdge};
 use crate::models::event_outbox::{Model as OutboxRow, OutboxInsert};
 
 /// Current envelope schema version. Bumped only on a breaking change to
@@ -67,6 +68,11 @@ pub enum EventKind {
     Deleted,
     /// A duplicate was merged into this (surviving) record.
     Merged,
+    /// A cross-service outbound edge was asserted
+    /// (`agents/share/cross-service-linking.md` §4.2).
+    Linked,
+    /// A cross-service outbound edge was withdrawn.
+    Unlinked,
 }
 
 /// The canonical, versioned event envelope (design §4).
@@ -96,6 +102,15 @@ pub struct Envelope {
     pub actor: Option<String>,
     /// The care pathway's name at the time of the event.
     pub name: String,
+    /// Kind-specific detail. Carries the §4.2 edge shape on
+    /// `linked` / `unlinked`, and is absent on everything else.
+    ///
+    /// **Additive**: `skip_serializing_if` keeps the CRUD envelopes
+    /// byte-identical to what they were before link events existed, so
+    /// nothing downstream that parses them has to change. `default`
+    /// keeps older stored outbox payloads deserializable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<serde_json::Value>,
 }
 
 /// Operator-facing projection of an [`Envelope`] (design §4).
@@ -215,6 +230,22 @@ fn envelope(kind: EventKind, pid: &str, name: &str, actor: Option<&str>) -> Enve
         seq: next_seq(),
         actor: actor.map(ToString::to_string),
         name: name.to_string(),
+        data: None,
+    }
+}
+
+/// Build an envelope carrying kind-specific `data` — the §4.2 edge
+/// detail for `linked` / `unlinked`.
+fn envelope_with_data(
+    kind: EventKind,
+    pid: &str,
+    name: &str,
+    actor: Option<&str>,
+    data: serde_json::Value,
+) -> Envelope {
+    Envelope {
+        data: Some(data),
+        ..envelope(kind, pid, name, actor)
     }
 }
 
@@ -525,6 +556,131 @@ pub async fn delete_and_emit(
     // a search hit too.
     deindex_best_effort(pid);
     Ok((pid, name))
+}
+
+/// The canonical §4.2 edge detail — **the same shape the `linked` /
+/// `unlinked` events carry**, so the link-graph aggregator deserializes
+/// it directly for reconciliation (§8). `from_ref` is this service's
+/// `care_pathway_instance:<pid>` URN: a journey belongs to an enrolment,
+/// not to the pathway template.
+fn edge_data(link: &EntityLinkModel) -> serde_json::Value {
+    serde_json::json!({
+        "edge_id": link.id.to_string(),
+        "from_ref": format!("care_pathway_instance:{}", link.from_pid),
+        "to_ref": link.to_ref,
+        "edge_kind": link.kind,
+        "role": link.role,
+        "confidence": link.confidence,
+        "provenance": link.provenance,
+        "valid_from": link.valid_from.map(|d| d.to_string()),
+        "valid_to": link.valid_to.map(|d| d.to_string()),
+    })
+}
+
+/// The `unlinked` detail: enough for the aggregator to find and remove
+/// the edge without re-deriving it.
+fn unlink_data(link: &EntityLinkModel) -> serde_json::Value {
+    serde_json::json!({
+        "edge_id": link.id.to_string(),
+        "from_ref": format!("care_pathway_instance:{}", link.from_pid),
+        "to_ref": link.to_ref,
+        "edge_kind": link.kind,
+    })
+}
+
+/// Assert a cross-service outbound edge and emit its `linked` event,
+/// atomically under the active transport.
+///
+/// Under `outbox` the edge row, the outbox row and the audit row share
+/// **one** transaction: a committed edge without its event would leave
+/// the aggregator permanently unaware of a link that exists, and nothing
+/// downstream could tell. `name` is the pathway template's name, carried
+/// on the envelope for the operator event view.
+///
+/// # Errors
+///
+/// When the upsert (or, under `outbox`, the transaction / outbox /
+/// audit insert) fails.
+pub async fn link_and_emit(
+    db: &DatabaseConnection,
+    edge: &NewEdge,
+    name: &str,
+    actor: Option<&str>,
+) -> ModelResult<EntityLinkModel> {
+    let from_pid = edge.from_pid;
+    let from_pid_str = from_pid.to_string();
+    match transport() {
+        EventTransport::Memory => {
+            let link = EntityLinkModel::upsert(db, edge).await?;
+            let data = edge_data(&link);
+            publisher().publish(envelope_with_data(
+                EventKind::Linked,
+                &from_pid_str,
+                name,
+                actor,
+                data.clone(),
+            ));
+            audit_best_effort(db, from_pid, "linked", actor, Some(data)).await;
+            Ok(link)
+        }
+        EventTransport::Outbox => {
+            let txn = db.begin().await?;
+            let link = EntityLinkModel::upsert(&txn, edge).await?;
+            let data = edge_data(&link);
+            let env =
+                envelope_with_data(EventKind::Linked, &from_pid_str, name, actor, data.clone());
+            OutboxPublisher.publish(&txn, &env).await?;
+            AuditModel::record(&txn, from_pid, "linked", actor, Some(data)).await?;
+            txn.commit().await?;
+            Ok(link)
+        }
+    }
+}
+
+/// Withdraw a cross-service outbound edge and emit its `unlinked` event,
+/// atomically under the active transport.
+///
+/// # Errors
+///
+/// When the soft-delete (or, under `outbox`, the transaction / outbox /
+/// audit insert) fails.
+pub async fn unlink_and_emit(
+    db: &DatabaseConnection,
+    link: EntityLinkModel,
+    name: &str,
+    actor: Option<&str>,
+) -> ModelResult<()> {
+    let from_pid = link.from_pid;
+    let from_pid_str = from_pid.to_string();
+    let data = unlink_data(&link);
+    match transport() {
+        EventTransport::Memory => {
+            link.soft_delete(db).await?;
+            publisher().publish(envelope_with_data(
+                EventKind::Unlinked,
+                &from_pid_str,
+                name,
+                actor,
+                data.clone(),
+            ));
+            audit_best_effort(db, from_pid, "unlinked", actor, Some(data)).await;
+        }
+        EventTransport::Outbox => {
+            let txn = db.begin().await?;
+            link.soft_delete(&txn).await?;
+            let env = envelope_with_data(
+                EventKind::Unlinked,
+                &from_pid_str,
+                name,
+                actor,
+                data.clone(),
+            );
+            OutboxPublisher.publish(&txn, &env).await?;
+            AuditModel::record(&txn, from_pid, "unlinked", actor, Some(data)).await?;
+            txn.commit().await?;
+        }
+    }
+    Ok(())
 }
 
 /// Fold a duplicate into a survivor and emit the pair of events (`Merged`

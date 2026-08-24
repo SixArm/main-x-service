@@ -36,6 +36,9 @@ pub mod controllers;
 pub mod data;
 /// Pure rules for the engineering-team features (tasks / burndown / MoSCoW).
 pub mod engineering;
+/// The time-based-analysis flow-gauge refresh loop: default-off,
+/// bounded by a series cap, and suppressed below a board-size floor.
+pub mod flow_metrics;
 /// Pure PPM governance rules (proposal pipeline, phase gates, risks, money).
 pub mod governance;
 pub mod initializers;
@@ -63,6 +66,11 @@ pub mod snapshots;
 pub mod strategy;
 pub mod streaming;
 pub mod tasks;
+/// Time-based analysis (TBA): pure computation over the task
+/// status-transition log — cycle versus lead time, flow efficiency,
+/// rework and first-pass yield, the service level expectation,
+/// constraint ranking, and queueing-theory flow.
+pub mod tba;
 pub mod validation;
 /// Header-based API versioning (`Accepts-version`) for the REST surface.
 pub mod version;

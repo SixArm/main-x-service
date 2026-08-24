@@ -36,9 +36,15 @@ pub mod data;
 /// HL7 FHIR R5 interop: the `PlanDefinition` resource + envelope wire
 /// types, and search-parameter parsing for the mounted `/fhir` endpoints.
 pub mod fhir;
+/// The time-based-analysis flow-gauge refresh loop: default-off,
+/// bounded by a series cap, and suppressed below a cohort floor.
+pub mod flow_metrics;
 pub mod initializers;
 /// Pure rules for the care-pathway instance layer.
 pub mod instances;
+/// Stitched journeys: following a `continues_as` chain across service
+/// boundaries so time-based analysis measures the whole journey.
+pub mod journey;
 pub mod merge;
 pub mod metrics;
 pub mod models;
@@ -52,6 +58,10 @@ pub mod relay;
 pub mod search;
 pub mod streaming;
 pub mod tasks;
+/// Time-based analysis (TBA): pure computation over an instance's
+/// clock and recorded segments — the value-adding ratio, constraint
+/// ranking, cohort percentiles, and queueing-theory flow.
+pub mod tba;
 pub mod validation;
 /// Header-based API versioning (`Accepts-version`) for the REST surface.
 pub mod version;

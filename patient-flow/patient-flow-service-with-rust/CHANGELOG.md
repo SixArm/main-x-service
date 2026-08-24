@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the stitched-journey timeline (`GET /api/stays/{pid}/time-analysis`)
+
+This service now serves the timeline contract `care-pathway-service`
+follows across a `continues_as` link, so a journey that begins on a care
+pathway and continues into an inpatient stay can be measured end to end
+instead of stopping at the service boundary.
+
+**A green Red2Green day is the value-adding time.** Nothing new had to
+be invented: time-based analysis asks what share of an episode was *the
+work*, and Red2Green already answers exactly that in the NHS's own
+vocabulary — a green day moves the patient toward discharge, a red day
+does not. Deriving it any other way would have meant this service making
+a clinical judgement it is not entitled to make.
+
+**Unclassified days count as non-value-adding**, matching the consuming
+service's denominator rule: elapsed calendar time is the denominator and
+unrecorded time counts against you, because the alternative rewards
+recording less. The figure is therefore a **floor**, and the response
+carries `coverage` and `confidence` — an unclassified stay and a
+genuinely red one both report little value-adding time, and only the
+confidence tells them apart. That distinction matters: one calls for
+filling in the board, the other for fixing the delay.
+
+Four edges are handled in the pure derivation rather than left to the
+caller: a same-day stay is one day of care and its value time is capped
+at the elapsed span (a whole green day would put the consuming ratio
+above 1); a classification outside the stay's own span is ignored rather
+than counted, which would push coverage past 1; a duplicated day counts
+once; and a reversed clock reports zero rather than a negative duration
+that would flow into a stitched journey's arithmetic.
+
+The endpoint is a **sensitive read** like the MDT view — record-level
+ABAC, audited — so a caller assembling a cross-service journey leaves
+the same trail as one opening the record. The `mask` obligation is
+deliberately not applied: the response carries no identifiers, only
+durations, so there is nothing in it to redact.
+
+**A coverage ceiling worth knowing about:** `red-green` classifies
+*today* and takes no `day`, so a stay admitted before the board was in
+use can never be fully classified retrospectively. Its coverage is
+capped by when classification started, not by ward diligence — which is
+why the confidence label matters more here than a bare percentage.
+
+
 
 ### Added — declared MSRV (Rust 1.95)
 

@@ -102,6 +102,7 @@ impl Hooks for App {
             .add_route(controllers::visibility::routes())
             .add_route(controllers::insights::routes())
             .add_route(controllers::oversight::routes())
+            .add_route(controllers::tba::routes())
             .add_route(controllers::engineering::routes())
             .add_route(controllers::strategy::routes())
             .add_route(controllers::collaboration::routes())
@@ -122,6 +123,9 @@ impl Hooks for App {
         // no-ops unless their source is configured.
         auth::spawn_key_refresh();
         auth::spawn_policy_watcher();
+        // Time-based-analysis gauges: a no-op unless
+        // `PROJECT_PORTFOLIO_MANAGEMENT_FLOW_METRICS_SECS` is set.
+        crate::flow_metrics::spawn(ctx);
         // Durable event bus Phase 3: start the outbox relay loop. A no-op
         // unless `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_TRANSPORT=outbox` AND `PROJECT_PORTFOLIO_MANAGEMENT_EVENT_RELAY`
         // are set, so the default `memory` transport never spawns it.

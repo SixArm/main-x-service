@@ -27,4 +27,5 @@ pub mod scenarios;
 pub mod scheduled_actions;
 pub mod sprint_notes;
 pub mod sprints;
+pub mod task_transitions;
 pub mod tasks;

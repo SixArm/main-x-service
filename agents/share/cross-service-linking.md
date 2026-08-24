@@ -333,17 +333,40 @@ whether it is time-bounded, and its sensitivity.
 | `same_identity` | person ↔ worker | symmetric | 1:1 | no | (self) | medium — identity assertion; operator-asserted/high-confidence |
 | `works_at` / `member_of` | person → organization | directed | M:N | yes | `has_member` | medium |
 | `employed_by` | worker → organization | directed | M:N | yes (+`role`) | `employs` | medium |
-| `subject_of` / `about` | case → person | directed | M:N | sometimes | `is_subject_of` | **high** — see §10 |
+| `subject_of` / `about` | case → person | directed | M:N | sometimes | `is_subject_of` | **high** — see §10.1 |
+| `continues_as` | care_pathway_instance → care_pathway_instance \| patient_flow_stay \| case | directed | M:N | yes | `continued_from` | **high** — see §10.2 |
 
 Notes:
 - `same_identity` is the **federation backbone**: it resolves one human
   across the general (person) and workforce (worker) registries and powers
   `single-view`. With `same_identity` + `employed_by`, a person's employer
   is *derivable* (person → worker → org).
+- `continues_as` is the **journey** edge: one subject's passage from one
+  episode into the next. It is what lets
+  [time-based analysis](time-based-analysis.md) measure a journey that
+  crosses a service boundary instead of stopping at it. It originates
+  from a care-pathway **instance** — an enrolment, not the template,
+  because a template is a document many journeys share and "this
+  document continues as that one" means nothing.
 - Adding a kind later (e.g. `course` `taught_by` `worker`) is just a new
   registry row + endpoint-type pair + inverse; the topology is unchanged.
+  Adding `continues_as` (2026-08-24) also required two new **entity
+  types** — `care_pathway_instance` and `patient_flow_stay` — the first
+  of which is a sub-resource type like `courseinstance`, and the second
+  of which is the first type owned by a **consumer application** rather
+  than an index registry. That is deliberate and narrow: a journey does
+  not stop at the registry boundary, so the far end has to be nameable.
+  It does not make patient-flow a registry, and nothing about it is
+  matchable.
 
-## 10. Governance — `case ↔ person`
+## 10. Governance — the high-sensitivity kinds
+
+Two v1 kinds are **high** sensitivity: `subject_of` (§10.1 below) and
+`continues_as` (§10.2). Both assert something clinical or legal about a
+named person, and both carry their owning service's full compliance
+posture rather than the lighter affiliation one.
+
+## 10.1 `case ↔ person`
 
 The `subject_of` edge is itself **sensitive data**: it asserts a person is
 the subject of a government case (benefits, legal, investigation). It
@@ -358,8 +381,52 @@ affiliation posture:
 - **Privacy masking**: the aggregator's `single-view` and `neighbors`
   responses MUST honour the same masking/authorisation as the case service;
   an unauthorised caller does not learn that the edge exists.
-- This is why `case ↔ person` is the highest-governance v1 kind even though
-  it is technically the same edge shape as the others.
+- This is why `case ↔ person` was the first highest-governance v1 kind even
+  though it is technically the same edge shape as the others.
+
+## 10.2 The journey edge (`continues_as`)
+
+"This patient's stroke pathway continued as that inpatient stay" is
+clinical data about a named person, and a *set* of such edges is a map
+of who moved between which services. It therefore carries the
+care-pathway service's posture, not the affiliation one:
+
+- **Authorised at the read-the-journey level.** Creating, listing and
+  withdrawing an edge authorise against the instance's own pathway
+  template attributes — including the `sensitive_setting` flag that
+  covers mental-health and palliative pathways — so an edge on a
+  mental-health journey is exactly as hard to touch as the journey.
+- **Every write is audited** (`linked` / `unlinked`), in the same
+  transaction as the edge under the durable transport. A committed edge
+  without its event would leave the aggregator permanently unaware of a
+  link that exists, and nothing downstream could tell.
+- **The bulk reconciliation pull is a privileged read.** Surfacing every
+  journey edge at once is a materially different disclosure from reading
+  one, so it is gated as `destructive` — granted by the built-in default
+  policy only to a machine peer (`svc=true`) or an admin. The same rule
+  the case service applies to its `subject_of` dump.
+- **The aggregator must honour the same masking.** A `single-view` or
+  `neighbors` response that surfaces a journey edge tells the reader
+  which services a patient passed through; an unauthorised caller must
+  not learn the edge exists.
+
+**A denial is reported as `404`, not `403`** (care-pathway, 2026-08-24).
+A `403` answers the question the caller was not allowed to ask: "this
+journey exists, and you may not see it" is itself a disclosure, and on a
+mental-health or palliative pathway it is *the* disclosure. An empty
+list and a denied read are deliberately indistinguishable, and the
+traversal collapses a peer's `403` and `404` into one leg status for the
+same reason — otherwise the leak reopens from the far side.
+
+The cost is real: a misconfigured operator sees `404` where the truthful
+answer is "your policy denies this". The **audit trail** carries the
+denial, so the information is moved rather than lost. A `401` is left
+alone — "you sent no credential" discloses nothing, and folding it into
+`404` would leave an unauthenticated client retrying forever.
+
+This trade is **not** made on the pathway record endpoints, which still
+return `403`: a care-pathway template is a document, not a person, and
+knowing one exists discloses nothing about anybody.
 
 ## 11. Rollout
 
@@ -402,6 +469,14 @@ affiliation posture:
    verify-on-read (§5.1).
 4. **Affiliations.** Add `person↔org` and `worker↔org`; then `case↔person`
    with its §10 authz/audit/masking story.
+   - **✅ care-pathway `continues_as` write-side landed 2026-08-24.** The
+     journey edge (§9), with `entity_links` + `POST`/`GET`/`DELETE
+     /api/instances/{pid}/links`, the aggregator's reconciliation pull
+     `GET /api/instances/links[?since=]`, idempotent upsert, and
+     `linked`/`unlinked` events emitted on the additive `Envelope.data`
+     through the transactional emit seam. This is the **third**
+     originating service, and the first whose edges exist to serve a
+     measurement rather than an identity or affiliation question.
 5. **Hardening.** Reconciliation worker (§8) + freshness metrics (§6); flip
    to the durable bus per entity as Fluvio topics go live (§5.1).
 

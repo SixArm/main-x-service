@@ -218,6 +218,34 @@ database cannot forge.
 Not every crate has every capability (`overview.md`'s honest capability
 matrix) — these vars only exist where the capability does.
 
+**Time-based-analysis flow gauges** (care-pathway, portfolio):
+
+| Variable | Default | Effect |
+|---|---|---|
+| `<P>_FLOW_METRICS_SECS` | **unset ⇒ off** | Refresh interval in seconds. `0`, blank or unparsable also reads as off — a typo must not become a busy loop against the database. The `*_flow_*` gauge family never appears until this is set. |
+| `CARE_PATHWAY_FLOW_METRICS_MAX_PATHWAYS` / `PROJECT_PORTFOLIO_MANAGEMENT_FLOW_METRICS_MAX_PLANS` | `50` | Cap on per-record gauge series. Zero falls back to the default rather than exporting nothing. |
+| `CARE_PATHWAY_FLOW_METRICS_MIN_COHORT` / `PROJECT_PORTFOLIO_MANAGEMENT_FLOW_METRICS_MIN_TASKS` | `5` | Records with a smaller cohort/board are counted but never labelled. |
+
+Two properties are worth understanding before turning these on, because
+**`/metrics.prom` is on the public allow-list** — it stays scrapeable
+with `<P>_REQUIRE_AUTH` on, so anything exported there is readable by
+whoever can reach the port:
+
+- The **suppression floor** is the same reasoning as the API's
+  small-cohort suppression. A p90 lead time over three patients *is* a
+  patient's lead time, and a flow efficiency over two tasks describes
+  two people's week; the API withholds both, so the exporter must too,
+  or the figure simply leaves by the side door.
+- The **series cap** exists because per-record labels are unbounded
+  cardinality, and a metric that takes the monitoring down is worse
+  than no metric. Neither bound is silent: `*_suppressed` and
+  `*_dropped` are exported beside the rows, and
+  `*_last_refresh_timestamp_seconds` is what a scraper alerts on to
+  tell a healthy zero from a refresh loop that died.
+
+Labels carry the record's **pid**, never its name — a rename would fork
+the series and silently reset its history.
+
 **Tantivy search** (organization, care-pathway, case, portfolio):
 
 | Variable | Default | Effect |

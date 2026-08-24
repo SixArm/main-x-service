@@ -33,6 +33,7 @@ fn created_envelope(model: &PathwayModel) -> Envelope {
         seq: 1,
         actor: None,
         name: model.name.clone(),
+        data: None,
     }
 }
 

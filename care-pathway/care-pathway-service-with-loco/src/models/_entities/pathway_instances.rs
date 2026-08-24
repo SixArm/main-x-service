@@ -23,6 +23,12 @@ pub struct Model {
     pub closed_on: Option<Date>,
     pub closure_reason: Option<String>,
     pub outcome: Option<String>,
+    /// Time-based-analysis clock start (spec `time-based-analysis.md`
+    /// §5.2). Falls back to `enrolled_on` at midnight UTC when unset.
+    pub clock_start_at: Option<DateTimeWithTimeZone>,
+    /// Time-based-analysis clock stop. Falls back to `closed_on` for a
+    /// terminal instance, or to the request's `as_of` while it runs.
+    pub clock_stop_at: Option<DateTimeWithTimeZone>,
     pub deleted_at: Option<DateTimeWithTimeZone>,
 }
 

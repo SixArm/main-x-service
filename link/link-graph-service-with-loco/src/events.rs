@@ -361,4 +361,35 @@ mod tests {
         .unwrap();
         assert!(presence_ref(&bad).is_none());
     }
+
+    /// A journey edge from the care-pathway service parses into the same
+    /// `LinkedEvent` as every other kind — the aggregator is generic over
+    /// the registry, so a new kind needs no consumer change. This pins
+    /// that, so a future narrowing of the parser would fail here rather
+    /// than silently dropping journey edges on the floor.
+    #[test]
+    fn a_journey_edge_parses_like_any_other_kind() {
+        let data = serde_json::json!({
+            "edge_id": "33333333-3333-4333-8333-333333333333",
+            "from_ref": "care_pathway_instance:44444444-4444-4444-8444-444444444444",
+            "to_ref": "patient_flow_stay:55555555-5555-4555-8555-555555555555",
+            "edge_kind": "continues_as",
+            "role": null,
+            "confidence": 1.0,
+            "provenance": "operator",
+            "valid_from": "2026-01-01",
+            "valid_to": null
+        });
+        let ev: LinkedEvent = serde_json::from_value(data).expect("journey edge parses");
+        assert_eq!(ev.edge_kind, EdgeKind::ContinuesAs);
+        assert_eq!(
+            ev.from_ref.entity_type,
+            entity_ref::EntityType::CarePathwayInstance
+        );
+        assert_eq!(
+            ev.to_ref.entity_type,
+            entity_ref::EntityType::PatientFlowStay
+        );
+        assert_eq!(ev.provenance, "operator");
+    }
 }

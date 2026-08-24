@@ -65,3 +65,49 @@ mutation ([audit.md](audit.md)), using the same
 `PATIENT_FLOW_EVENT_TRANSPORT=memory|outbox` seam as the entity
 services, so its stream can join the durable bus when Phase 3
 (Fluvio relay) lands family-wide.
+
+## Stitched-journey timeline (delivered 2026-08-24)
+
+`GET /api/stays/{pid}/time-analysis` serves the timeline contract that
+`care-pathway-service` follows across a `continues_as` link
+([`agents/share/time-based-analysis.md`](../../agents/share/time-based-analysis.md),
+[`cross-service-linking.md`](../../agents/share/cross-service-linking.md)
+§9). It lets a journey that begins on a care pathway and continues into
+an inpatient stay be measured end to end, instead of stopping at the
+service boundary.
+
+The contract is four numbers — clock bounds, elapsed span, value-adding
+time — deliberately too small to couple this service's domain model to
+anybody else's. What matters is what fills the fourth:
+
+**A green Red2Green day is the value-adding time.** Time-based analysis
+asks what share of an episode was *the work*, and Red2Green already
+answers exactly that in the NHS's own vocabulary: a green day moves the
+patient toward discharge, a red day does not. Deriving it any other way
+would have meant this service making a clinical judgement it is not
+entitled to make.
+
+**Unclassified days count as non-value-adding**, matching the consuming
+service's denominator rule — unrecorded time counts against you, because
+the alternative rewards recording less. The figure is a **floor**, and
+the response carries `coverage` and `confidence`: an unclassified stay
+and a genuinely red one both report little value-adding time, and only
+the confidence tells them apart. The distinction is the whole point —
+one calls for filling in the board, the other for fixing the delay.
+
+**A coverage ceiling.** `red-green` classifies *today* and takes no
+`day`, so a stay admitted before the board was in use can never be fully
+classified retrospectively. Coverage is capped by when classification
+started, not by ward diligence. Adding a `day` to the classification
+payload would lift the ceiling and is the obvious follow-up; it is not
+done here because backfilling a day is a data-quality decision with its
+own audit story.
+
+The endpoint is a **sensitive read** ([auth.md](auth.md)): record-level
+ABAC, audited, so a caller assembling a cross-service journey leaves the
+same trail as one opening the record. The `mask` obligation is not
+applied — the response carries durations and no identifiers, so there is
+nothing in it to redact. The far service (care-pathway) forwards the
+**caller's** credential rather than a service identity, so this
+service's own policy applies to the real caller.
+

@@ -45,6 +45,12 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | POST/GET | `/api/care-pathways/{pid}/instances` · `/{pid}/cohort` | Enrol a `person:` URN on a pathway; the chronic cohort view |
 | — | `/api/instances/{pid}` (+ `/status` `/review` `/urgency` `/team` `/events` `/steps/{s}/complete`) | Instance lifecycle, review cadence, urgency, care team, steps |
 | GET | `/api/instances/{caseload,overdue-reviews,care-team-load}` | Derived operational views |
+| POST/GET | `/api/instances/{pid}/segments` (+ `/segments/{seg}/close`, `/clock`) | **Time-based analysis**: record a journey segment (VA / NNVA / UNVA + stage + waste), close a running one, set the pathway clock (no pause, by design) |
+| GET | `/api/instances/{pid}/{time-analysis,timeline}` | Per-journey TBA: value-adding ratio, coverage, gaps, handoffs; and the segment/gap wall |
+| GET | `/api/care-pathways/{pid}/{time-analysis,constraints}` | Cohort TBA: nearest-rank lead-time percentiles vs an NHS access standard; ranked constraints |
+| GET | `/api/instances/{flow,time-standards}` | Little's Law flow (λ/μ/ρ/κ/τ) and the access-standard catalogue |
+| GET | `/api/instances/{pid}/journey` | **Stitched journey**: follows `continues_as` across services, each leg fetched under the *caller's* credential; combined figures withheld unless every leg resolved |
+| POST/GET/DELETE | `/api/instances/{pid}/links` (+ `/{id}`) · `GET /api/instances/links` | **Cross-service journey links**: the `continues_as` edge from a pathway instance into the next episode (another instance, a `patient_flow_stay`, or a `case`); high-sensitivity governance, audited; a denial is reported as `404` so it cannot disclose the journey's existence; the bulk pull is the aggregator's reconciliation source and is a privileged read |
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 | GET | `/metrics.prom` | Prometheus metrics (text-exposition; root path, public under auth enforcement) |
 
@@ -158,6 +164,7 @@ src/
 │   ├── fhir.rs             mounted FHIR R5 PlanDefinition CRUD/search + $validate + SMART + $export
 │   ├── insights.rs         directory/coverage/variants/providers/languages registry lenses
 │   ├── instances.rs        instance lifecycle/review/urgency/team/steps/outcomes + caseload/overdue/care-team-load
+│   ├── tba.rs              time-based analysis: segment + clock recording, per-instance and cohort views, constraints, flow
 │   ├── docs.rs             OpenAPI JSON + Swagger UI
 │   └── metrics.rs          root /metrics.prom Prometheus endpoint
 ├── compliance/
@@ -189,6 +196,10 @@ src/
 ├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) + ABAC, both reloadable (ReloadableVerifier/ReloadablePolicy — AU-2 key/policy hot-reload)
 ├── version.rs             `Accepts-version` header negotiation middleware (agents/share/api-versioning.md)
 ├── instances.rs            pure instance lifecycle state machine (active↔on_hold→terminal)
+├── tba.rs                 pure time-based analysis: interval union/subtract, the four-bucket
+│                          clock partition, gaps, handoffs, nearest-rank percentiles, the NHS
+│                          access-standard catalogue, cohort rollup, constraint ranking,
+│                          Little's Law. No I/O; `as_of` is a parameter, so it is deterministic
 ├── merge.rs               pure record-merge logic (merge_pathways)
 ├── openapi.rs             hand-written OpenAPI 3 document
 ├── privacy.rs             field masking (provider name/id) + GDPR export envelope
@@ -204,7 +215,7 @@ src/
 │   ├── merge_records.rs   merge-history record/query helpers
 │   ├── event_outbox.rs    durable-bus Phase 2: OutboxInsert::from_envelope mapping + enqueue (tx-generic) + relay poll/ack
 │   ├── bulk_jobs.rs        queued→running→terminal FHIR $export job lifecycle
-│   └── _entities/{care_pathways,audit_logs,merge_records,event_outbox,bulk_jobs,pathway_instances,instance_steps,instance_team,instance_events,instance_measures}.rs  SeaORM entities
+│   └── _entities/{care_pathways,audit_logs,merge_records,event_outbox,bulk_jobs,pathway_instances,instance_steps,instance_team,instance_events,instance_measures,instance_segments}.rs  SeaORM entities
 migration/src/            …care_pathways, …audit_logs, …merge_records, …event_outbox, …instances (m20260720_…), …outcomes, …compliance (m20260725_000007), …record_integrity, …bulk_jobs
 config/                   development/production/test yaml
 compose.fluvio.yaml        opt-in local Fluvio broker (`fluvio` feature, BUS-3; not part of CI)

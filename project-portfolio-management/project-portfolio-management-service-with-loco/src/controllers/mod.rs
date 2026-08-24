@@ -13,6 +13,9 @@ pub mod oversight;
 pub mod plans;
 pub mod prioritisation;
 pub mod strategy;
+/// Time-based analysis: the read surface over the task transition log —
+/// per-task and plan flow, constraints, aging WIP, and Little's Law.
+pub mod tba;
 pub mod visibility;
 
 /// Map a model-layer error to its HTTP shape: a missing record is

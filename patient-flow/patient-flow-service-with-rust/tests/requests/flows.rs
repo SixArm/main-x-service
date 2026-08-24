@@ -95,6 +95,41 @@ async fn full_journey_request_to_deep_clean() {
             .await;
         assert_eq!(too_many.status_code(), 422);
 
+        // ── The stitched-journey timeline contract. The stay has one
+        // red day so far and no discharge, so it reads as a running
+        // clock with no value-adding time yet — and, crucially, says
+        // that is a *classified* zero rather than an unfilled board.
+        let timeline: Value = request
+            .get(&format!("/api/stays/{stay_pid}/time-analysis"))
+            .await
+            .json();
+        for key in [
+            "lead_time_ms",
+            "value_time_ms",
+            "span_days",
+            "classified_days",
+        ] {
+            assert!(timeline[key].is_i64(), "missing {key} in {timeline}");
+        }
+        assert!(timeline["clock"]["start_ms"].is_i64());
+        assert!(timeline["clock"]["stop_ms"].is_i64());
+        assert_eq!(timeline["clock"]["start_source"], "admitted_at");
+        assert_eq!(timeline["clock"]["stop_source"], "as_of", "still admitted");
+        assert_eq!(timeline["clock"]["running"], true);
+        assert_eq!(timeline["classified_days"], 1);
+        assert_eq!(timeline["green_days"], 0);
+        assert_eq!(timeline["value_time_ms"], 0, "a red day adds no value time");
+        assert_eq!(
+            timeline["confidence"], "classified",
+            "the board was filled in — this zero is a finding, not a gap"
+        );
+
+        // A green day would be value-adding time, but `red-green` always
+        // classifies *today*, so a second day cannot be added within one
+        // test run — the green arithmetic is covered by the pure tests
+        // in `flow::journey`, and posting one here would overwrite the
+        // red day this test already asserts.
+
         // Raise a transmissible flag, then discharge: the vacated bed
         // owes a deep clean, and a routine clean-complete is refused.
         request

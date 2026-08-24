@@ -27,6 +27,11 @@ Aspirational items live in §15, not here.
 | front-end | API layer | Lean raw-JSON client, `CarePathwayRepository`, hand-mirrored TS types |
 | front-end | Form | Full-DTO editing incl. condition-code and identifier row editors |
 | front-end | Quality bar | `pnpm run check` strict 0/0; production build green |
+| service | Cross-service journey links | `entity_links` write-side for the `continues_as` edge (§9): `POST`/`GET`/`DELETE /api/instances/{pid}/links` plus the aggregator's reconciliation pull `GET /api/instances/links`. High-sensitivity governance — authorised at the read-the-journey level, audited, bulk pull privileged. The third originating service in the family |
+| service | Stitched journeys | `GET /api/instances/{pid}/journey` — follows `continues_as` across services, fetching each leg under the **caller's** credential (never a service identity), bounded and cycle-safe, withholding combined figures unless every leg resolved (`src/journey.rs`) |
+| service | Time-based analysis | `instance_segments` + the `clock_start_at`/`clock_stop_at` columns (backfilled); the pure `src/tba.rs` (interval union/subtract, the four-bucket clock partition, gaps, handoffs, nearest-rank percentiles, the NHS access-standard catalogue, cohort rollup, constraint ranking, Little's Law — no I/O, `as_of` a parameter); nine endpoints under `src/controllers/tba.rs`; OpenAPI-documented, guarded, audited. See [`time-based-analysis.md`](time-based-analysis.md) |
+| service | Flow gauges | `src/flow_metrics.rs` — a default-off refresh loop publishing the `care_pathway_flow_*` family: cohort %VA, p90 lead time, coverage and instance count per pathway, capped and small-cohort-suppressed because `/metrics.prom` is on the public allow-list. Neither bound is silent |
+| front-end | Time-based analysis | `/time`: the cohort ratio, coverage, lead-time percentiles, a score against a named NHS access standard, the constraint ranking, Little's-Law flow, and one journey's timeline wall (`src/lib/api/tba.ts` + `src/lib/components/JourneyTimeline.svelte`). `nav.time` translated across all 13 locales |
 | front-end | Tests | vitest units (`tests/unit/`, 16 — client + repository, `check-duplicates` regression) + Playwright smoke (`tests/e2e/`, 4 routes, API-stubbed, runs on `vite preview`) |
 
 ### 14.2 Open gaps
@@ -45,3 +50,5 @@ Open gaps drive tasks in §13. Live gap list:
 | No terminology-server check that codes exist in a published release (formats are validated; existence is not) | T-9 follow-up |
 | No privacy controls (none required while no restricted fields exist — §12.3) | (re-assess; no task) |
 | No localization of the operator UI | (roadmap §15; no task yet) |
+| `patient-flow` exposes no timeline endpoint, so a stay leg of a stitched journey reports `not_configured` — the contract it must satisfy is in `src/journey.rs` | patient-flow adoption |
+| The instance and insight endpoints are still absent from `openapi.json` (the TBA surface is documented; they are not) | time-based-analysis §17 |

@@ -5,6 +5,8 @@ mod compliance;
 mod event_outbox;
 mod insights;
 mod instances;
+mod links;
+mod tba;
 
 use std::sync::Once;
 

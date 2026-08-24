@@ -87,6 +87,7 @@
         { href: "/board", key: "nav.board" as const },
         { href: "/gantt", key: "nav.gantt" as const },
         { href: "/sequence", key: "nav.sequence" as const },
+        { href: "/time", key: "nav.time" as const },
     ];
 </script>
 

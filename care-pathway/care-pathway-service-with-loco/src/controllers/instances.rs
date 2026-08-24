@@ -104,6 +104,11 @@ async fn enroll(
         status: ActiveValue::set("active".to_string()),
         urgency: ActiveValue::set(urgency.clone()),
         enrolled_on: ActiveValue::set(chrono::Utc::now().date_naive()),
+        // The time-based-analysis clock starts at enrolment, at real
+        // resolution rather than the day resolution `enrolled_on`
+        // carries — see `spec/time-based-analysis.md` §5.2.
+        clock_start_at: ActiveValue::set(Some(chrono::Utc::now().into())),
+        clock_stop_at: ActiveValue::set(None),
         next_review_on: ActiveValue::set(payload.next_review_on),
         closed_on: ActiveValue::set(None),
         closure_reason: ActiveValue::set(None),
@@ -233,6 +238,11 @@ async fn set_status(
     active.status = ActiveValue::set(payload.to.clone());
     if rules::is_terminal(&payload.to) {
         active.closed_on = ActiveValue::set(Some(today));
+        // Closing the instance stops its time-based-analysis clock. The
+        // clock stops on a recorded lifecycle transition with its own
+        // audit row, never on a metric-only milestone — see
+        // `spec/time-based-analysis.md` §12.3.
+        active.clock_stop_at = ActiveValue::set(Some(chrono::Utc::now().into()));
         active.closure_reason = ActiveValue::set(payload.reason.clone());
         active.outcome = ActiveValue::set(payload.outcome.clone());
         active.next_review_on = ActiveValue::set(None);

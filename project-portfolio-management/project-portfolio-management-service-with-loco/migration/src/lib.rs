@@ -25,6 +25,7 @@ mod m20260720_000001_engineering;
 mod m20260720_000002_engineering_moderate;
 mod m20260722_000001_capabilities;
 mod m20260728_000001_integrity_digests;
+mod m20260823_000001_time_based_analysis;
 
 /// The crate's migrator: drives the ordered migration set for the loco
 /// CLI / boot-time migration.
@@ -50,6 +51,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260720_000002_engineering_moderate::Migration),
             Box::new(m20260722_000001_capabilities::Migration),
             Box::new(m20260728_000001_integrity_digests::Migration),
+            Box::new(m20260823_000001_time_based_analysis::Migration),
             // inject-above (do not remove this comment)
         ]
     }

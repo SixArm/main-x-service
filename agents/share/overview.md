@@ -58,7 +58,7 @@ matcher-backed entity.
 
 | Service | Purpose |
 |---------|---------|
-| [link-graph-service-with-loco](../../link/link-graph-service-with-loco) | Read-model **aggregator** for cross-service entity linking. Consumes every entity's event stream plus the new `linked`/`unlinked` events and serves the queryable cross-service graph (`neighbors` / `single-view` / freshness). The read side of the hybrid topology in [cross-service-linking.md](cross-service-linking.md); each entity service owns its link **writes** (`entity_links` + events). v1 edges: `same_identity` (person↔worker), `works_at`/`member_of` (person→org), `employed_by` (worker→org), `subject_of` (case→person). Cross-service links are deliberately **not** a matcher signal (separate from within-entity `relationships`). |
+| [link-graph-service-with-loco](../../link/link-graph-service-with-loco) | Read-model **aggregator** for cross-service entity linking. Consumes every entity's event stream plus the new `linked`/`unlinked` events and serves the queryable cross-service graph (`neighbors` / `single-view` / freshness). The read side of the hybrid topology in [cross-service-linking.md](cross-service-linking.md); each entity service owns its link **writes** (`entity_links` + events). v1 edges: `same_identity` (person↔worker), `works_at`/`member_of` (person→org), `employed_by` (worker→org), `subject_of` (case→person), `continues_as` (a care-pathway instance into the next episode — the journey edge time-based analysis follows across a service boundary). Cross-service links are deliberately **not** a matcher signal (separate from within-entity `relationships`). |
 
 ### Front-end projects
 
@@ -137,8 +137,15 @@ case, and portfolio each provide:
 | Real-broker relay sink (`FluvioSink`, Phase 3)⁴ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Boundary normalization (phone/address) | ✅ | ✅ | ✅ | – | ✅ | – | – | – | – | – |
 | Record-level ABAC + masking obligations | ✅ | ✅ | – | – | – | – | ✅ | ✅ | ✅ | ✅ |
-| Cross-service links (`entity_links` write-side) | ✅ | ✅ | – | – | – | – | – | – | ✅ | – |
+| Cross-service links (`entity_links` write-side) | ✅ | ✅ | – | – | – | – | – | ✅ | ✅ | – |
 | Bulk import/export³ | ✅ | – | – | – | – | – | ✅ | – | ✅ | – |
+| Time-based analysis⁵ | – | – | – | – | – | – | – | ✅ | – | ✅ |
+
+> The consumer application **patient-flow** also participates, though
+> it is not one of the ten registries and so has no column above: it
+> serves the stitched-journey timeline contract from
+> `GET /api/stays/{pid}/time-analysis`, deriving value-adding time from
+> its `Red2Green` day classifications.
 
 ¹ Every entity registry now indexes via Tantivy (fuzzy + phonetic
 retrieval, duplicate-check candidates blocked on the index rather than
@@ -162,7 +169,8 @@ SEC-B3 advisory-lock-protected (a documented, narrow TOCTOU gap — see
 its own spec §10.7); case's bulk export reuses its existing inline
 `mask_case` redaction rather than a dedicated privacy module, so the
 case ✗ in the privacy-masking row above does not mean its bulk export
-is unmasked. ⁴ `FluvioSink` — the durable bus's real-broker relay sink,
+is unmasked. ⁴ `FluvioSink` — the durable
+bus's real-broker relay sink,
 alongside the always-available no-broker `LoggingSink` — is behind each
 crate's own `fluvio` Cargo feature (off by default) and gated further
 by `<ENTITY>_FLUVIO_ENDPOINT`; unset ⇒ unchanged `LoggingSink`
@@ -176,6 +184,21 @@ up a broker. Only case's producer side is wired to a real deployment
 target today; the link-graph aggregator (BUS-2) already consumes all
 ten topics, so the other nine sinks are live but currently idle until
 a deployment actually points `<ENTITY>_FLUVIO_ENDPOINT` at a broker.
+
+⁵ **Time-based analysis** (`src/tba.rs` + `src/controllers/tba.rs`)
+measures elapsed calendar time through a process — the value-adding
+ratio, constraint ranking, and queueing-theory flow — per
+[time-based-analysis.md](time-based-analysis.md). Care-pathway (landed
+2026-08-23) records journey segments by hand and scores cohorts against
+NHS access standards; portfolio (2026-08-23/24) derives its intervals
+from a task-transition log written by the existing board-move endpoint,
+and adds rework/first-pass yield, throughput-based Monte-Carlo
+forecasting, and a cross-plan rollup. Both ship a default-off Prometheus
+gauge family. The other eight registries carry none, and that is a
+scope decision rather than a gap: TBA needs a unit that enters, waits,
+is worked on and leaves, and a registry of *identities* has records
+rather than journeys (see that doc's §12).
+
 
 ### The two cross-cutting services
 

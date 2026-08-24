@@ -202,8 +202,10 @@ impl Hooks for App {
         // service's authoritative entity_links and repair the read-model.
         // One worker per entity that sets `LINK_GRAPH_RECONCILE_URL_<ENTITY>`
         // (case ships `subject_of`; person + worker ship the two directions of
-        // `same_identity`); a no-op for any entity without a configured source.
-        for entity in ["case", "person", "worker"] {
+        // `same_identity`; care_pathway_instance ships `continues_as`, the
+        // journey edge time-based analysis follows across a service
+        // boundary); a no-op for any entity without a configured source.
+        for entity in ["case", "person", "worker", "care_pathway_instance"] {
             if let Some(source) = reconcile::HttpAuthoritativeSource::from_env_for(entity) {
                 tokio::spawn(reconcile::run_periodic(ctx.db.clone(), source));
             }

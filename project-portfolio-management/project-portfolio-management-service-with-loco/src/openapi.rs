@@ -31,6 +31,10 @@ fn paths() -> Value {
     merge_object(&mut paths, aux_paths());
     merge_object(&mut paths, insight_paths());
     merge_object(&mut paths, capability_paths());
+    merge_object(&mut paths, tba_paths());
+    merge_object(&mut paths, tba_plan_paths());
+    merge_object(&mut paths, tba_forecast_paths());
+    merge_object(&mut paths, tba_rollup_paths());
     paths
 }
 
@@ -384,6 +388,209 @@ fn components() -> Value {
     })
 }
 
+/// The time-based-analysis paths (`spec/time-based-analysis.md` §10).
+///
+/// Read-only by design. Transitions are written by the existing
+/// `POST /api/plans/{pid}/tasks` and `PATCH .../{t_pid}` calls, so the
+/// measurement is a by-product of moving the card rather than another
+/// thing to keep up to date — and there is deliberately no edit or
+/// delete, because an editable flow log measures whatever the editor
+/// wanted.
+fn tba_paths() -> Value {
+    let plan = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    let task = json!({
+        "name": "t_pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    json!({
+        "/api/flow-classes": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "The status → VSM category map in force, and the vocabularies behind it",
+                "description": "`todo` is inventory waste rather than merely not-started: work bought and not yet used, aging while it waits. An unclassified status falls back to unnecessary_non_value_adding, so adding a board column cannot silently improve the flow efficiency. Override with PROJECT_PORTFOLIO_MANAGEMENT_FLOW_CLASSES; an unparsable or unknown-category override falls back whole rather than half-applying.",
+                "responses": { "200": { "description": "The classification in force" } }
+            }
+        },
+        "/api/plans/{pid}/tasks/{t_pid}/transitions": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "The append-only status-transition log for one task",
+                "description": "Read-only: there is no edit or delete route. Correcting history means moving the card, which is itself recorded. `backfilled` marks a transition synthesised by the migration rather than observed.",
+                "parameters": [plan, task],
+                "responses": { "200": { "description": "Transitions in time order" },
+                               "404": { "description": "Unknown plan or task" } }
+            }
+        },
+        "/api/plans/{pid}/tasks/{t_pid}/time-analysis": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Per-task time-based analysis",
+                "description": "Cycle time is what the team controls (first started → finished); lead time is what the requester waits (created → finished). They are different numbers and the difference is the backlog dwell — quoting the first as delivery time is the commonest misreport in flow measurement, so both are always returned. flow_efficiency is work over cycle time; by_status and by_category partition the lead time, so no time is lost.",
+                "parameters": [plan, task],
+                "responses": { "200": { "description": "Analysis" },
+                               "404": { "description": "Unknown plan or task" } }
+            }
+        },
+    })
+}
+
+/// The **plan-level** time-based-analysis paths
+/// (`spec/time-based-analysis.md` §10.2).
+fn tba_plan_paths() -> Value {
+    let plan = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    let sprint = json!({
+        "name": "sprint", "in": "query",
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    let plan_for_cfd = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    json!({
+        "/api/plans/{pid}/time-analysis": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Plan-level flow: cycle/lead distributions, flow efficiency, first-pass yield, and the service level expectation",
+                "description": "Percentiles are nearest-rank, so every one is an observed item. The SLE — 'p% of items finish within N days' — is derived from the plan's own history and is refused below a minimum sample rather than computed from noise. Throughput is reported beside rolled_first_pass_yield: throughput rising while yield falls is not going faster, it is shipping work back to yourself.",
+                "parameters": [
+                    plan,
+                    { "name": "sle_percentile", "in": "query", "schema": { "type": "number", "default": 0.85, "minimum": 0, "maximum": 1 } },
+                    { "name": "target_days", "in": "query", "schema": { "type": "number" }, "description": "Score an existing commitment instead of, or as well as, the derived expectation" },
+                    sprint
+                ],
+                "responses": {
+                    "200": { "description": "Plan analysis" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "sle_percentile outside [0,1], a non-positive target_days, or a malformed sprint" }
+                }
+            }
+        },
+        "/api/plans/{pid}/constraints": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Ranked constraints: where the plan's time goes",
+                "description": "Disclosed-rule findings ordered by recoverable time. Deliberately not a composite score, and deliberately never per-person — flow is a property of the system, and measuring individuals on card movement destroys the data it depends on.",
+                "parameters": [plan, sprint],
+                "responses": { "200": { "description": "Findings" },
+                               "404": { "description": "Unknown plan" } }
+            }
+        },
+        "/api/plans/{pid}/aging-wip": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Open items ranked by age against the plan's service level expectation",
+                "description": "The only view here about work that can still be helped: cycle time, throughput and WIP are all history, while an item's age is a fact about today. Items with no expectation to compare against are listed with a null ratio rather than dropped.",
+                "parameters": [
+                    plan,
+                    { "name": "sle_percentile", "in": "query", "schema": { "type": "number", "default": 0.85 } },
+                    sprint
+                ],
+                "responses": { "200": { "description": "Aging work in progress" },
+                               "404": { "description": "Unknown plan" } }
+            }
+        },
+        "/api/plans/{pid}/cumulative-flow": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "The board's composition sampled daily — the cumulative flow diagram",
+                "description": "Every status band is present at every sample, including at zero, so a stacked chart never has to decide whether a missing band means zero. A task does not appear before it was created, and one whose history predates its first recorded transition reads as `todo` rather than vanishing and reappearing mid-chart. The vertical gap between the total and the done band is work in progress, and its width is approximately the cycle time — Little's Law read straight off the chart. Served here rather than assembled in the browser because it needs every task's whole history at once.",
+                "parameters": [
+                    plan_for_cfd,
+                    { "name": "days", "in": "query", "schema": { "type": "integer", "default": 60, "minimum": 1, "maximum": 365 } }
+                ],
+                "responses": {
+                    "200": { "description": "Daily samples" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "days out of range" }
+                }
+            }
+        },
+        "/api/plans/{pid}/flow": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Queueing-theory flow: arrival rate, throughput, utilisation, WIP, and Little's Law",
+                "description": "Little's Law κ = λτ used as a consistency check on observed figures, not as a forecast — it assumes arrivals and departures balance over the window. Column occupancy against the configured WIP limits is reported alongside, because lowering a cap shortens cycle time without anyone working faster.",
+                "parameters": [
+                    plan,
+                    { "name": "window_days", "in": "query", "schema": { "type": "integer", "default": 90, "minimum": 1, "maximum": 3650 } }
+                ],
+                "responses": {
+                    "200": { "description": "Flow analysis" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "Window out of range" }
+                }
+            }
+        }
+    })
+}
+
+/// The cross-plan rollup path (`spec/time-based-analysis.md` §15
+/// TBA-9).
+fn tba_rollup_paths() -> Value {
+    let plan_for_rollup = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    json!({
+        "/api/plans/{pid}/rollup": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Flow across a plan and everything it contains",
+                "description": "The combined figures are the **union of every task under this plan**, not an average of the children's ratios — averaging would weight a five-task plan equally with a five-hundred-task one. The per-plan table is returned alongside and, for a portfolio, is usually the more useful half: a rollup mixes boards whose teams mean different things by `in_progress`, so which child differs is a firmer finding than the combined number. The walk is bounded by depth and node caps and reports `truncated` when one fires; `revisits` is non-zero when containment is not a tree, which the write path should have refused.",
+                "parameters": [
+                    plan_for_rollup,
+                    { "name": "depth", "in": "query", "schema": { "type": "integer", "default": 32, "minimum": 1, "maximum": 32 } }
+                ],
+                "responses": {
+                    "200": { "description": "Combined figures, the walked tree, and the per-plan comparison" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "depth out of range" }
+                }
+            }
+        }
+    })
+}
+
+/// The Monte-Carlo forecasting path (`spec/time-based-analysis.md` §15
+/// TBA-11), its own function because the description carries the two
+/// things a reader gets wrong: the input is throughput, not cycle time,
+/// and the conservative percentile flips between its two answers.
+fn tba_forecast_paths() -> Value {
+    let plan_for_forecast = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    json!({
+        "/api/plans/{pid}/forecast": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Monte-Carlo delivery forecast: how long for N items, and how many in N periods",
+                "description": "Samples the plan's own **throughput** history — how many items it actually finished per period — not its cycle-time distribution. Cycle time answers a question about one item (that is the service level expectation); using it for a batch assumes items are worked one at a time, which for a team running several in parallel is pessimistic by roughly that factor. Both directions are returned together because quoting one without the other is how a forecast gets misread, and the percentile direction reverses between them: for `how long` the higher percentile is conservative, for `how many` it is the lower one (`at_least_items` is the 15th percentile, not the 85th). Sampling is with replacement and the seed is fixed unless supplied, so the same question gives the same answer — a forecast that moves on every reload is not one anybody will act on.",
+                "parameters": [
+                    plan_for_forecast,
+                    { "name": "items", "in": "query", "schema": { "type": "integer" }, "description": "Batch size; defaults to the plan's open items" },
+                    { "name": "periods", "in": "query", "schema": { "type": "integer", "default": 4 }, "description": "Horizon for the how-many forecast" },
+                    { "name": "history_periods", "in": "query", "schema": { "type": "integer", "default": 12, "minimum": 1, "maximum": 260 } },
+                    { "name": "period_days", "in": "query", "schema": { "type": "integer", "default": 7, "minimum": 1, "maximum": 90 } },
+                    { "name": "trials", "in": "query", "schema": { "type": "integer", "default": 10_000, "maximum": 100_000 } },
+                    { "name": "seed", "in": "query", "schema": { "type": "integer", "format": "int64" } }
+                ],
+                "responses": {
+                    "200": { "description": "Both forecasts, each carrying a `reason` instead of a figure when the history is too thin to forecast from" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "A parameter outside its range" }
+                }
+            }
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -398,6 +605,76 @@ mod tests {
         assert!(s["components"]["schemas"]["Plan"]["properties"]["name"].is_object());
         assert!(s["components"]["schemas"]["Plan"]["properties"]["kind"].is_object());
         assert!(s["components"]["schemas"]["PlanIdentifier"]["properties"]["value"].is_object());
+    }
+
+    /// Pins the time-based-analysis surface, including the two
+    /// statements the API makes about itself that a client needs: that
+    /// cycle and lead time are different numbers, and that the log is
+    /// append-only.
+    #[test]
+    fn spec_documents_the_time_based_analysis_surface() {
+        let s = spec();
+        let paths = &s["paths"];
+        for path in [
+            "/api/flow-classes",
+            "/api/plans/{pid}/tasks/{t_pid}/transitions",
+            "/api/plans/{pid}/tasks/{t_pid}/time-analysis",
+            "/api/plans/{pid}/time-analysis",
+            "/api/plans/{pid}/constraints",
+            "/api/plans/{pid}/aging-wip",
+            "/api/plans/{pid}/flow",
+            "/api/plans/{pid}/cumulative-flow",
+            "/api/plans/{pid}/forecast",
+            "/api/plans/{pid}/rollup",
+        ] {
+            assert!(paths[path]["get"].is_object(), "{path} is undocumented");
+        }
+        let task_analysis =
+            paths["/api/plans/{pid}/tasks/{t_pid}/time-analysis"]["get"]["description"]
+                .as_str()
+                .unwrap_or_default();
+        assert!(
+            task_analysis.contains("different numbers"),
+            "the cycle-versus-lead distinction must be stated, not assumed"
+        );
+        let log = paths["/api/plans/{pid}/tasks/{t_pid}/transitions"]["get"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            log.contains("no edit or delete"),
+            "the append-only property must be documented: it is what makes the \
+             figures trustworthy"
+        );
+        // Every path here is a GET; a write route would mean the log had
+        // gained an editing surface.
+        for (path, item) in paths.as_object().expect("paths") {
+            if path.contains("time-analysis") || path.contains("transitions") {
+                assert!(
+                    item.as_object().expect("item").keys().all(|m| m == "get"),
+                    "{path} must be read-only"
+                );
+            }
+        }
+    }
+
+    /// The forecast endpoint must document the two things a reader
+    /// gets wrong: that it samples throughput rather than cycle time,
+    /// and that the conservative percentile flips between its two
+    /// answers.
+    #[test]
+    fn the_forecast_documents_its_input_and_its_percentile_direction() {
+        let s = spec();
+        let description = s["paths"]["/api/plans/{pid}/forecast"]["get"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            description.contains("throughput"),
+            "the input must be named: {description}"
+        );
+        assert!(
+            description.contains("15th percentile"),
+            "the reversed direction must be stated, not left to the reader"
+        );
     }
 
     /// Pins that the seven core CRUD + matching operations are documented.

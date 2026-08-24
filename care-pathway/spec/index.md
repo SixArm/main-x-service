@@ -47,3 +47,14 @@ reference (subproject map, models, matching, REST, testing), see
 16. [Open Questions](16-open-questions.md)
 17. [References](17-references.md)
 18. [Change Control](18-change-control.md)
+
+## Cross-cutting sections
+
+Topics that span several numbered chapters at once and are therefore
+kept whole rather than split across them:
+
+- [Time-based analysis (TBA)](time-based-analysis.md) — the time
+  dimension of the pathway: recorded segments, the pathway clock, the
+  value-adding ratio, cohort percentiles against NHS access standards,
+  constraint ranking, and queueing-theory flow analysis. Spans §5, §9,
+  §10 and §12.

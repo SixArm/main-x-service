@@ -30,6 +30,8 @@ fn paths() -> Value {
     let mut paths = crud_paths();
     merge_object(&mut paths, aux_paths());
     merge_object(&mut paths, compliance_paths());
+    merge_object(&mut paths, tba_recording_paths());
+    merge_object(&mut paths, tba_analysis_paths());
     paths
 }
 
@@ -236,6 +238,23 @@ fn components() -> Value {
                     "description": "Short-lived PASETO v4.public (Ed25519) token minted by the authentication-service from a cookie session, verified offline against its published key set at /.well-known/paseto-keys. No shared secret and no introspection hop." }
             },
             "schemas": {
+                "SegmentPayload": { "type": "object",
+                    "required": ["label", "stage", "category", "started_at"],
+                    "description": "A recorded interval of the patient journey (spec/time-based-analysis.md §5.1).",
+                    "properties": {
+                        "label": { "type": "string", "description": "Human name — \"MRI\", \"await triage outcome\"" },
+                        "stage": { "type": "string", "enum": ["referral", "triage", "diagnostics", "treatment", "follow_up", "discharge", "other"] },
+                        "category": { "type": "string", "enum": ["value_adding", "necessary_non_value_adding", "unnecessary_non_value_adding"],
+                            "description": "The value-stream-mapping classification: VA / NNVA / UNVA." },
+                        "waste": { "type": "string", "nullable": true,
+                            "enum": ["waiting", "transportation", "motion", "over_processing", "defects", "inventory", "overproduction", "underutilised_people"],
+                            "description": "Refused on a value_adding segment; required on an unnecessary_non_value_adding one." },
+                        "started_at": { "type": "string", "format": "date-time" },
+                        "ended_at": { "type": "string", "format": "date-time", "nullable": true,
+                            "description": "Omit to open a running segment; only one may be open per instance." },
+                        "actor_ref": { "type": "string", "nullable": true, "description": "worker: / organization: URN — who" },
+                        "location_ref": { "type": "string", "nullable": true, "description": "place: / organization: URN — where" },
+                        "note": { "type": "string", "nullable": true } } },
                 "PathwayRef": { "type": "object", "required": ["pid", "name"], "properties": {
                     "pid": { "type": "string", "format": "uuid" }, "name": { "type": "string" } } },
                 "ScoredRef": { "type": "object", "properties": {
@@ -269,6 +288,158 @@ fn components() -> Value {
                     "same_as": { "type": "array", "items": { "type": "string" } },
                     "in_language": { "type": "array", "items": { "type": "string" }, "description": "BCP-47 language codes" } } }
             }
+    })
+}
+
+/// The instance-pid path parameter, shared by every per-instance
+/// time-based-analysis path.
+fn instance_pid_param() -> Value {
+    json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    })
+}
+
+/// The time-based-analysis **recording** paths
+/// (`spec/time-based-analysis.md` §10.1).
+///
+/// The sibling instance and insight endpoints are **not** documented
+/// here yet (a pre-existing gap noted in that spec's §17). Closing it
+/// means documenting those too, not undocumenting this.
+fn tba_recording_paths() -> Value {
+    let instance_pid = instance_pid_param();
+    json!({
+        "/api/instances/{pid}/segments": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "List a journey's recorded segments, in time order",
+                "parameters": [instance_pid],
+                "responses": { "200": { "description": "Segments" }, "404": { "description": "Unknown instance" } }
+            },
+            "post": {
+                "tags": ["time-based-analysis"],
+                "summary": "Record a segment of the patient journey",
+                "description": "A bounded interval classified value_adding / necessary_non_value_adding / unnecessary_non_value_adding. Omitting ended_at opens a running segment; only one may be open at a time. A waste type is refused on a value-adding segment and required on an unnecessary one.",
+                "parameters": [instance_pid],
+                "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SegmentPayload" } } } },
+                "responses": {
+                    "200": { "description": "Recorded" },
+                    "404": { "description": "Unknown instance" },
+                    "422": { "description": "Blank label, unknown stage/category/waste, reversed interval, or a second open segment" }
+                }
+            }
+        },
+        "/api/instances/{pid}/segments/{seg}/close": {
+            "post": {
+                "tags": ["time-based-analysis"],
+                "summary": "Close a running segment",
+                "parameters": [
+                    instance_pid,
+                    { "name": "seg", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+                ],
+                "responses": {
+                    "200": { "description": "Closed" },
+                    "404": { "description": "Unknown instance or segment" },
+                    "422": { "description": "Already closed, or the end precedes the start" }
+                }
+            }
+        },
+        "/api/instances/{pid}/clock": {
+            "post": {
+                "tags": ["time-based-analysis"],
+                "summary": "Set the pathway clock start or stop",
+                "description": "Events are `start` and `stop`. There is deliberately no `pause`: patient-caused delay is recorded as an unnecessary_non_value_adding segment so it stays visible, rather than silently shrinking the denominator every ratio is measured against.",
+                "parameters": [instance_pid],
+                "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                    "type": "object", "required": ["event"],
+                    "properties": {
+                        "event": { "type": "string", "enum": ["start", "stop"] },
+                        "at": { "type": "string", "format": "date-time", "description": "Defaults to now" }
+                    }
+                } } } },
+                "responses": {
+                    "200": { "description": "Clock set" },
+                    "404": { "description": "Unknown instance" },
+                    "422": { "description": "Unknown event, or a stop at or before the start" }
+                }
+            }
+        },
+    })
+}
+
+/// The time-based-analysis **read** paths
+/// (`spec/time-based-analysis.md` §10.2). Every figure is derived on
+/// read; nothing here is stored.
+fn tba_analysis_paths() -> Value {
+    let instance_pid = instance_pid_param();
+    json!({
+        "/api/instances/{pid}/time-analysis": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Per-instance time-based analysis",
+                "description": "Lead time, value time, process time, touch time, the value-adding ratio, and coverage. The denominator is elapsed calendar time, never the sum of recorded activity, so unrecorded time counts as non-value-adding; coverage_ratio and confidence say how much of the journey was mapped at all.",
+                "parameters": [instance_pid],
+                "responses": { "200": { "description": "Analysis" }, "404": { "description": "Unknown instance" } }
+            }
+        },
+        "/api/instances/{pid}/timeline": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "The mapped journey as an ordered wall of segments and gaps",
+                "parameters": [instance_pid],
+                "responses": { "200": { "description": "Timeline" }, "404": { "description": "Unknown instance" } }
+            }
+        },
+        "/api/instances/flow": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Queueing-theory flow analysis (Little's Law)",
+                "description": "Arrival rate, service rate, utilisation, work in progress, and the lead time Little's Law implies for a journey entering now, compared against the observed median. Used as a consistency check, not a forecast.",
+                "parameters": [
+                    { "name": "window_days", "in": "query", "schema": { "type": "integer", "default": 90, "minimum": 1, "maximum": 3650 } },
+                    { "name": "pathway", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+                ],
+                "responses": { "200": { "description": "Flow" }, "422": { "description": "Window out of range" } }
+            }
+        },
+        "/api/instances/time-standards": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "The access-standard catalogue and segment vocabularies",
+                "description": "NHS access standards with thresholds, operational targets, authority and citation date; plus the closed stage / category / waste vocabularies. Reference data, not an assertion that a pathway is subject to any of them.",
+                "responses": { "200": { "description": "Standards" } }
+            }
+        },
+        "/api/care-pathways/{pathway}/time-analysis": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Cohort time-based analysis for one pathway",
+                "description": "Nearest-rank lead-time percentiles, aggregate and median value-adding ratio, and compliance against a named standard. A cohort smaller than five withholds percentile detail, which would otherwise identify an individual journey.",
+                "parameters": [
+                    { "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                    { "name": "standard", "in": "query", "schema": { "type": "string", "example": "rtt_18_weeks" } },
+                    { "name": "target_days", "in": "query", "schema": { "type": "number" } },
+                    { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "closed", "all"] } }
+                ],
+                "responses": {
+                    "200": { "description": "Cohort analysis" },
+                    "404": { "description": "Unknown pathway" },
+                    "422": { "description": "Unknown standard, or a non-positive target_days" }
+                }
+            }
+        },
+        "/api/care-pathways/{pathway}/constraints": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Ranked constraints: where the cohort's time goes",
+                "description": "Disclosed-rule findings ordered by recoverable time. Deliberately not a composite score, and deliberately never per-clinician.",
+                "parameters": [
+                    { "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                    { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "closed", "all"] } }
+                ],
+                "responses": { "200": { "description": "Findings" }, "404": { "description": "Unknown pathway" } }
+            }
+        }
     })
 }
 
@@ -325,6 +496,51 @@ mod tests {
     /// The erasure endpoint's documentation must say it is irreversible
     /// and distinct from the soft delete — the single most consequential
     /// thing a caller could misread about this API.
+    #[test]
+    fn spec_documents_the_time_based_analysis_surface() {
+        let s = spec();
+        let paths = &s["paths"];
+        for path in [
+            "/api/instances/{pid}/segments",
+            "/api/instances/{pid}/segments/{seg}/close",
+            "/api/instances/{pid}/clock",
+            "/api/instances/{pid}/time-analysis",
+            "/api/instances/{pid}/timeline",
+            "/api/instances/flow",
+            "/api/instances/time-standards",
+            "/api/care-pathways/{pathway}/time-analysis",
+            "/api/care-pathways/{pathway}/constraints",
+        ] {
+            assert!(paths[path].is_object(), "{path} is undocumented");
+        }
+        assert!(paths["/api/instances/{pid}/segments"]["post"].is_object());
+        assert!(paths["/api/instances/{pid}/segments"]["get"].is_object());
+        // The segment payload schema is where the closed vocabularies
+        // are actually published to a client.
+        let segment = &s["components"]["schemas"]["SegmentPayload"];
+        assert!(segment["properties"]["category"]["enum"].is_array());
+        assert!(segment["properties"]["waste"]["enum"].is_array());
+        assert!(segment["properties"]["stage"]["enum"].is_array());
+    }
+
+    #[test]
+    fn the_clock_endpoint_documents_that_there_is_no_pause() {
+        // The absence of a pause is the anti-gaming property
+        // (spec/time-based-analysis.md §12.3), so it is documented
+        // rather than merely omitted — a client that looked for one and
+        // found nothing would assume an oversight.
+        let s = spec();
+        let op = &s["paths"]["/api/instances/{pid}/clock"]["post"];
+        let description = op["description"].as_str().unwrap_or_default();
+        assert!(
+            description.contains("no `pause`"),
+            "the clock endpoint must say why there is no pause: {description}"
+        );
+        let events = &op["requestBody"]["content"]["application/json"]["schema"]["properties"]["event"]
+            ["enum"];
+        assert_eq!(events, &json!(["start", "stop"]));
+    }
+
     #[test]
     fn erase_endpoint_is_documented_as_irreversible() {
         let s = spec();

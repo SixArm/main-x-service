@@ -8,6 +8,57 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+
+### Added — the time-based-analysis view (TBA-8)
+
+`/time`, in the main nav: a pathway's cohort measured against elapsed
+calendar time, and one patient journey drawn to scale.
+
+- **The cohort half** — the value-adding ratio, coverage, lead time by
+  percentile, and a score against a **named NHS access standard**
+  chosen from the service's catalogue (RTT 18 weeks, the cancer
+  standards, DM01, A&E). The tile carries the target verdict *and the
+  date the threshold was last checked*, because targets move and a
+  stale one silently mis-scores a cohort.
+- **The journey half** — `JourneyTimeline.svelte`, the timeline wall:
+  one row, every band sized in proportion to its duration and coloured
+  by whether it added value. Inline SVG-free flex layout, no charting
+  dependency. Below it, the longest queues, each named by what it sits
+  between.
+
+Three things the view is careful about:
+
+1. **Unrecorded time is a band, never a gap in the picture.** On a real
+   journey it is usually the widest one. Dropping it is precisely how a
+   journey nobody mapped comes to look efficient. It is drawn in a
+   neutral rather than a hue, because it means "nobody recorded this",
+   not "a fourth kind of activity".
+2. **An unmapped journey is never banded.** A journey with no segments
+   reports a ratio near zero that looks identical to a catastrophically
+   wasteful one. `valueAddingBand` returns `unknown` whenever coverage
+   says `unmapped`, whatever the number is, and the coverage tile spells
+   out what the figure can and cannot support. Pinned by a unit test.
+3. **A single-digit ratio is captioned as the norm.** Tracked NHS
+   journeys measure 8–14%, so "14.0%" with no context invites the wrong
+   reaction — and an implausibly *high* figure is called out as a
+   probably-unmapped journey rather than as excellence.
+
+The three hues are the validated categorical palette's first three
+slots, run through the validator in both modes on the **all-pairs**
+list, not merely adjacent pairs. Aqua sits below 3:1 on the light
+surface, so the wall ships a table view — the palette's relief rule,
+pinned by an e2e test. Every band is a `<button>`, so a keyboard reaches
+exactly what a pointer does; that too is pinned rather than assumed.
+
+`nav.time` was added to all 13 locale catalogues (the `StringKey` union
+makes a missing translation a type error, so there was no half-way
+option).
+
+Note for `/sequence`, whose comment says per-step durations are "the
+seam that would make this a real timeline": this does **not** close
+that. The pathway *template* still carries no durations. What TBA adds
+is a real timeline for an *instance*, which is a different object.
+
 ### Fixed — Playwright smoke suite broken by the 2026-08-03 BFF-proxy fix (2026-08-04)
 
 - `tests/e2e/smoke.spec.ts`'s API stub matched requests against the bare

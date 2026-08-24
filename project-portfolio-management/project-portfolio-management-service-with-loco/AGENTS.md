@@ -84,6 +84,7 @@ plan-scoped sub-resources hang off `/api/plans/{pid}/...`. See
 | Integrity verification | `GET /compliance/records/verify` (recomputes each plan's SHA-256/SHA3-256/HMAC digests) · `GET /compliance/audit/verify` (recomputes each audit row's MAC) — `?limit=`, capped 10 000; `mac_absent` (not a mismatch) when `PORTFOLIO_INTEGRITY_MAC_KEY[_FILE]` is unset |
 | Executive insights | `GET /executive/{health,decisions,benefits,alignment}` · `/financials/{variance,exposure}` · `/technology/{dependency-risk,radar,debt,flow}` · `/scenarios/compare?a=&b=` (read-only derived views; ETag + `as_of`) |
 | Engineering | `POST`/`GET /plans/{pid}/tasks` (+ `PUT`/`PATCH`(move; WIP-limit env caps)/`DELETE /{t_pid}`; story points) · `/plans/{pid}/sprints` (+ `/{s_pid}/notes` retro/feedback + `convert`) · `GET /plans/{pid}/burndown?sprint=` (honest, done_at-only) · `GET /plans/{pid}/velocity` · `GET /plans/{pid}/standup` · `GET /engineering/{blocked,moscow,delivery-links,milestone-calendar}` |
+| Time-based analysis | `GET /plans/{pid}/{time-analysis,constraints,aging-wip,flow,cumulative-flow,forecast,rollup}` · `GET /plans/{pid}/tasks/{t_pid}/{transitions,time-analysis}` · `GET /flow-classes` — cycle vs lead time, flow efficiency, rework/first-pass yield, the service level expectation from the plan's own history, aging WIP, and Little's Law. Read-only: transitions are written by the task create/move calls, in-transaction. `forecast` is Monte-Carlo over the plan's **throughput** history (not its cycle times), deterministic by seed |
 | DevOps | `POST /devops/events` (deploy/incident/recovery ingest) · `GET /devops/metrics` (from ingested events only) · `GET /devops/releases` |
 | Oversight areas | `GET /board/{pack,investments,trends}` + `POST /board/snapshots` · `/auditor/{trail,findings,evidence-pack}` · `/compliance/{register,findings}` · `/risk/heatmap` · `/security/register` · `/regulator/extract` (persona gating = ABAC policy config) |
 | Collaboration | `POST`/`GET /reviews` (+ `/consensus` · `/{pid}/respond` · `/{pid}/submit` · `DELETE /{pid}`) · `POST /plans/{pid}/tasks/{t_pid}/assign` · `GET /assignees/workload` · `GET /notifications` (+ `/{pid}/read`) |
@@ -189,6 +190,7 @@ src/
 ├── controllers/insights.rs   executive insight areas: health/decisions/benefits/alignment, financials, technology
 ├── controllers/oversight.rs  board/auditor/compliance-register/risk-heatmap/security/regulator views
 ├── controllers/engineering.rs tasks board (+ move/story points/WIP limits), sprints, burndown, velocity, standup, DevOps events/metrics/releases, estate views
+├── controllers/tba.rs        time-based analysis reads: per-task and plan flow, constraints, aging WIP, Little's Law
 ├── controllers/collaboration.rs  collaborative review + assignees + notifications
 ├── controllers/automation.rs PPM automations + runs + scheduled actions + sweep
 ├── controllers/prioritisation.rs Smart Score + ranked queue + bird's-eye lifecycle
@@ -202,6 +204,10 @@ src/
 ├── governance.rs · visibility.rs · strategy.rs   pure domain logic for the three phases
 ├── insights.rs               pure derivations behind the executive insight views (no I/O)
 ├── engineering.rs            pure rules: task statuses, honest burndown, MoSCoW bands, milestone kinds
+├── tba.rs                    pure time-based analysis over the task transition log: interval
+│                             derivation, cycle vs lead time, VA/NNVA/UNVA splits, rework and
+│                             rolled first-pass yield, nearest-rank percentiles, the service
+│                             level expectation, constraint ranking, Little's Law. No I/O
 ├── snapshots.rs               point-in-time estate snapshots behind the board/CRO trend views (explicit capture or the optional ticker)
 ├── collaboration.rs          pure review state machine + consensus + assignee workload
 ├── automation.rs             pure trigger matching + action validation + due-ness

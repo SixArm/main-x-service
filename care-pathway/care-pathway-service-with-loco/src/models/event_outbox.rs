@@ -29,6 +29,8 @@ const fn kind_token(kind: EventKind) -> &'static str {
         EventKind::Updated => "updated",
         EventKind::Deleted => "deleted",
         EventKind::Merged => "merged",
+        EventKind::Linked => "linked",
+        EventKind::Unlinked => "unlinked",
     }
 }
 
@@ -206,6 +208,7 @@ mod tests {
             seq: 7,
             actor: Some("user-1".to_string()),
             name: "Sepsis pathway".to_string(),
+            data: None,
         }
     }
 

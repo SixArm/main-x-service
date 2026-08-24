@@ -9,6 +9,240 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — stitched journeys, and a denial that no longer discloses
+
+Two fixes to the cross-service journey work.
+
+**`GET /api/instances/{pid}/journey`** follows a `continues_as` chain
+across services and reports the whole journey. Its three design
+questions, answered rather than deferred:
+
+- **This service fetches, server-side.** The aggregator was the obvious
+  alternative and is the wrong one: it is a link graph serving
+  neighbours, and giving it a timeline read-model would duplicate every
+  owning service's data to answer a question those services can already
+  answer. Making the browser fetch each leg would need a credential per
+  service, which is what the BFF pattern exists to avoid.
+- **Under the caller's credential**, forwarded verbatim. A service
+  identity would make this a **confused deputy**: a caller entitled to
+  the pathway journey but not the inpatient stay would receive the
+  stay's timeline anyway, because the far service would see only a
+  trusted peer asking. No bearer presented ⇒ none forwarded, so the
+  default-off posture is preserved rather than silently escalated.
+- **A partial answer publishes no total.** Every leg carries a status
+  and each resolved leg reports its own figures, but the combined
+  figures are `null` with a stated reason unless *every* leg resolved.
+  A stitched lead time missing a leg is not imprecise — it is wrong,
+  understated by exactly the part nobody could see.
+
+The stitched span runs earliest-start to latest-stop, **not** the sum of
+the legs: the gap *between* two episodes is real waiting and is usually
+the finding. A local leg (a transfer to another pathway) needs no HTTP
+and no configuration, so the commonest journey stitches out of the box.
+The peer contract is four numbers — clock bounds, lead time, value time
+— so participating does not couple a service to another's domain model.
+
+Safety: only operator-written URL templates are contacted (nothing is
+derived from a record), the client does not follow redirects so a peer
+cannot steer it at an internal address (SEC-B11), requests are
+timeout-bounded, and the walk is depth- and cycle-bounded — the write
+path refuses a self-link, but a longer ring is invisible from either end
+at write time, so the read terminates on its own.
+
+**A denied link request is now `404`, not `403`.** A `403` answers the
+question the caller was not allowed to ask: "this journey exists and you
+may not see it" is itself a disclosure, and on a mental-health or
+palliative pathway it is *the* disclosure. An empty list and a denied
+read are now indistinguishable, and the traversal collapses a peer's
+`403` and `404` into one leg status so the leak cannot reopen from the
+far side. A `401` is deliberately left alone — "you sent no credential"
+discloses nothing, and folding it into `404` would leave an
+unauthenticated client retrying forever.
+
+The cost is real and worth stating: a misconfigured operator sees `404`
+where the truthful answer is "your policy denies this". The audit trail
+carries the denial, so the information is moved somewhere the caller
+cannot read rather than lost. The trade is **not** made on the pathway
+record endpoints, which still return `403`: a template is a document,
+not a person, and knowing one exists discloses nothing about anybody.
+
+`reqwest` is registered in the SOUP register with its SSRF rationale.
+
+### Added — cross-service journey links (`continues_as`)
+
+This service now originates cross-service edges. The v1 kind is
+`continues_as` — one subject's journey passing from a care-pathway
+**instance** into the next episode: another pathway (a transfer), an
+inpatient stay, or a case.
+
+**It closed three blockers that had been recorded as one deferral.**
+
+1. **The edge kind existed nowhere.** The shared `entity-ref` registry
+   gained `continues_as` and two entity types: `care_pathway_instance`
+   and `patient_flow_stay`. The first matters because a journey belongs
+   to an *enrolment*, not to the template — linking templates would
+   assert that two documents continue into one another, which means
+   nothing. The second is the first type owned by a **consumer
+   application** rather than an index registry, which is deliberate and
+   narrow: a journey does not stop at the registry boundary, so its far
+   end has to be nameable. All eight existing dependents still compile —
+   the change is additive, and the registry's exhaustive `match` arms
+   are what forced each new variant to be given a sensitivity and an
+   endpoint rule rather than defaulting into the lighter tier.
+2. **This service originated no edges.** It now has the `entity_links`
+   write-side — migration, model, `POST`/`GET`/`DELETE
+   /api/instances/{pid}/links`, and the aggregator's reconciliation pull
+   `GET /api/instances/links[?since=]` — following the case service's
+   reference implementation. The `Envelope` gained the `Linked` /
+   `Unlinked` kinds and an **additive** `data` field
+   (`skip_serializing_if`, so existing CRUD envelopes stay
+   byte-identical and nothing downstream has to change), emitted through
+   the transactional seam so an edge and its event share one commit
+   boundary.
+3. **The governance was unwritten.** It is now
+   [cross-service-linking.md §10.2](../../agents/share/cross-service-linking.md).
+
+`continues_as` is **high** sensitivity, alongside `subject_of`:
+"this patient's stroke pathway continued as that inpatient stay" is
+clinical data about a named person. So edges are authorised at the
+**read-the-journey** level — against the instance's own pathway template
+attributes, including the `sensitive_setting` flag covering
+mental-health and palliative pathways, so a sensitive journey's edges
+are exactly as hard to touch as the journey. Every write is audited. The
+bulk pull is gated as a privileged read, because surfacing every journey
+edge at once maps which patients moved between which services, which is
+a materially different disclosure from reading one.
+
+Two smaller refusals: a journey cannot continue as itself (a one-node
+cycle would make a stitched timeline non-terminating), and re-asserting
+an edge is idempotent on `(from_pid, kind, to_ref, valid_from)` with
+`NULLS NOT DISTINCT`, so a retried write revives rather than duplicates
+and the aggregator's dedup on `edge_id` keeps working.
+
+The new dependency is registered in the IEC 62304 SOUP register — the
+build refused to proceed until it was, which is the compliance
+machinery working rather than a formality.
+
+**Known gap, named rather than implied:** a denied read of an edge is a
+`403`, distinguishable from an empty list, which leaks the edge's
+existence to a caller who may not read it. Closing it means `404` on a
+denied read.
+
+### Added — time-based-analysis flow gauges (TBA-11)
+
+A default-off Prometheus gauge family, `care_pathway_flow_*`: cohort
+value-adding ratio, p90 lead time, coverage and instance count per
+pathway, refreshed by a background loop
+(`CARE_PATHWAY_FLOW_METRICS_SECS`, unset ⇒ the loop never starts and
+the family never appears).
+
+**Periodic refresh, not scrape-time computation.** Computing on scrape
+would put a cohort analysis over the whole registry on the scrape path
+— a 15-second scrape interval quietly becoming a 15-second full-estate
+query, on an endpoint that needs no token. Updating on write cannot
+work at all: these are derived figures, and a journey's ratio changes
+when time passes and nothing is recorded, which is exactly the case
+with no write to hang an update on.
+
+**Two bounds, because `/metrics.prom` is on the public allow-list.** It
+stays scrapeable with `CARE_PATHWAY_REQUIRE_AUTH` on, so anything
+exported there is readable by whoever can reach the port.
+
+1. **Small cohorts are suppressed**, on the same reasoning as the API's
+   own suppression (spec §12.2). A p90 lead time over three patients
+   *is* a patient's lead time; withholding it from the API while the
+   exporter published it would be a side door.
+2. **Per-pathway series are capped** (default 50, largest cohort
+   first). One series per record is how a Prometheus install falls
+   over, and a metric that takes the monitoring down is worse than no
+   metric.
+
+Neither bound is silent — `..._suppressed` and `..._dropped` ship
+beside the rows, and `..._last_refresh_timestamp_seconds` is what a
+scraper alerts on to tell a healthy zero from a refresh loop that died.
+
+Three smaller decisions: the label is the pathway **pid**, never its
+name, because a rename would fork the series and silently reset its
+history; every labelled series is **reset** before each pass, so a
+pathway that drops out loses its series rather than keeping a stale
+value that looks live; and a `None` figure is left **absent** rather
+than written as zero, because an undefined ratio is not a ratio of
+nothing.
+
+The env parsers are pure functions over `Option<&str>` rather than
+env readers — this crate forbids `unsafe`, so a unit test cannot set a
+process variable, and the pure shape made the whole matrix testable
+instead of untested.
+
+### Added — time-based analysis (TBA-1 … TBA-7)
+
+The time dimension of the pathway. Everything the instance layer
+recorded before was either a point in time (`instance_events`) or a date
+with no start (`instance_steps`), so the one question time-based
+analysis exists to answer — *of the calendar time this patient spent on
+the pathway, how much of it was care?* — could not be asked at all.
+
+The method (Dr. R. C. Barker's time-based analysis, whose published NHS
+journeys measure **8–14%** value-adding time) is unified here with
+**value stream mapping** for the classification and metric names, and
+**queueing theory** for the flow mathematics. Full contract:
+[`spec/time-based-analysis.md`](../spec/time-based-analysis.md).
+
+- **`instance_segments`** — the new primitive: a bounded interval on one
+  instance, classified `value_adding` / `necessary_non_value_adding` /
+  `unnecessary_non_value_adding`, with a stage, an optional VSM waste
+  type, an actor and a location. A partial unique index enforces
+  at-most-one-open-segment in the database, so a concurrent double-POST
+  cannot open two.
+- **An explicit pathway clock** — `clock_start_at` / `clock_stop_at` on
+  `pathway_instances`, set at enrolment and at close, and **backfilled**
+  from `enrolled_on` / `closed_on` so instances predating the migration
+  are analysable at day resolution the moment it runs. Every response
+  declares which source each end came from, so a day-resolution figure
+  is never mistaken for a measured one.
+- **`src/tba.rs`** — the pure analysis: interval union and subtraction,
+  clipping, the four-bucket clock partition, gaps, handoffs, nearest-rank
+  percentiles, the NHS access-standard catalogue, cohort aggregation,
+  constraint ranking, and Little's Law. No I/O and no clock read
+  (`as_of` is a parameter), so all 30 of its tests run without a
+  database.
+- **Endpoints** — `POST`/`GET /api/instances/{pid}/segments`,
+  `POST …/segments/{seg}/close`, `POST …/clock`, plus the read-only
+  `…/time-analysis`, `…/timeline`,
+  `/api/care-pathways/{pathway}/time-analysis`, `…/constraints`,
+  `/api/instances/flow` and `/api/instances/time-standards`. Documented
+  in `openapi.json`, behind the same blanket guard, and audited.
+
+Three decisions are load-bearing and are pinned by tests rather than
+left to comments:
+
+1. **The denominator is elapsed calendar time**, never the sum of
+   recorded activity. Under the alternative, a service recording only
+   its value-adding work would score 100% — recording *less* would score
+   *better*, which is the exact inversion the method exists to expose.
+   Unrecorded time counts as non-value-adding, and `coverage_ratio` +
+   `confidence` disclose how much of the figure rests on that
+   assumption, so an unmapped journey reads as *"we do not know"* rather
+   than *"catastrophically inefficient"*.
+2. **Overlapping segments are unioned, not summed.** Two clinicians for
+   the same hour is one hour of wall-clock and two of effort; summing
+   would push the ratio above 1. The union feeds the ratios, the raw sum
+   is reported separately as touch time (φ).
+3. **There is no clock pause.** Waiting-time measurement is the most
+   gamed metric class in health systems, and the mechanisms are known:
+   pause the clock, stop it on a milestone that is not treatment,
+   exclude a category. Instead the clock runs start to stop, a
+   patient-caused delay is a *segment* that stays visible and
+   subtractable by the reader, and every millisecond lands in exactly
+   one of four buckets that sum to the lead time by construction — a
+   property test, not a promise.
+
+Cohorts below five instances withhold percentile detail, which would
+otherwise identify an individual journey by arithmetic. The output is
+never per-clinician: a method that turns frontline staff's own records
+into their appraisal destroys the data quality it depends on.
+
+
 
 
 

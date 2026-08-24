@@ -134,6 +134,31 @@ async fn enforcement_on_gates_the_real_router() {
             "a protected write without a token is 401"
         );
 
+        // The time-based-analysis surface says who moved what, when, so
+        // it is behind the same guard — pinned explicitly rather than
+        // assumed to be covered by the `/api/plans` check above.
+        {
+            let nil = "00000000-0000-0000-0000-000000000000";
+            for path in [
+                "/api/flow-classes".to_string(),
+                format!("/api/plans/{nil}/time-analysis"),
+                format!("/api/plans/{nil}/constraints"),
+                format!("/api/plans/{nil}/aging-wip"),
+                format!("/api/plans/{nil}/flow"),
+                format!("/api/plans/{nil}/cumulative-flow"),
+                format!("/api/plans/{nil}/forecast"),
+                format!("/api/plans/{nil}/rollup"),
+                format!("/api/plans/{nil}/tasks/{nil}/transitions"),
+                format!("/api/plans/{nil}/tasks/{nil}/time-analysis"),
+            ] {
+                assert_eq!(
+                    request.get(&path).await.status_code(),
+                    401,
+                    "un-authed {path} must be 401 when enforcement is on"
+                );
+            }
+        }
+
         // A garbage bearer is a 401, not a 500 — the guard must reject
         // malformed credentials rather than fall over on them.
         let (bk, bv) = auth_header("not-a-token");

@@ -151,6 +151,15 @@ async fn create_task(
     let item = super::governance::find_item(&ctx, &pid).await?;
     let status = validate_task(&ctx, item.pid, &payload).await?;
     let now = chrono::Utc::now();
+    // The task and its opening transition commit together: a task
+    // without one would have no measurable start, and the time-based
+    // analysis would silently begin its life at the first later move
+    // (spec `time-based-analysis.md` §5.1 invariant 3).
+    let txn = ctx
+        .db
+        .begin()
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?;
     let row = tasks::ActiveModel {
         pid: sea_orm::ActiveValue::set(Uuid::new_v4()),
         plan_pid: sea_orm::ActiveValue::set(item.pid),
@@ -165,9 +174,24 @@ async fn create_task(
         deleted_at: sea_orm::ActiveValue::set(None),
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&txn)
     .await
     .map_err(|e| Error::Model(ModelError::from(e)))?;
+    crate::tba::transition_row(
+        row.pid,
+        item.pid,
+        None,
+        status.clone(),
+        now,
+        caller.actor().map(ToString::to_string),
+        payload.assignee_ref.clone(),
+    )
+    .insert(&txn)
+    .await
+    .map_err(|e| Error::Model(ModelError::from(e)))?;
+    txn.commit()
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?;
     AuditModel::record(&ctx.db, row.pid, "task_created", caller.actor(), None)
         .await
         .ok();
@@ -284,15 +308,40 @@ async fn move_task(
     }
     let from = task.status.clone();
     let task_pid = task.pid;
+    let assignee = task.assignee_ref.clone();
     let first_done = task.done_at.is_none() && payload.status == "done";
+    let now = chrono::Utc::now();
+    // The move and its transition commit together. A refused move (an
+    // unknown status, a full WIP column) has already returned above, so
+    // the log never records a move that did not happen.
+    let txn = ctx
+        .db
+        .begin()
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?;
     let mut active: tasks::ActiveModel = task.into();
     active.status = sea_orm::ActiveValue::set(payload.status.clone());
-    active.status_changed_at = sea_orm::ActiveValue::set(chrono::Utc::now().into());
+    active.status_changed_at = sea_orm::ActiveValue::set(now.into());
     if first_done {
-        active.done_at = sea_orm::ActiveValue::set(Some(chrono::Utc::now().into()));
+        active.done_at = sea_orm::ActiveValue::set(Some(now.into()));
     }
     let row = active
-        .update(&ctx.db)
+        .update(&txn)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?;
+    crate::tba::transition_row(
+        task_pid,
+        item.pid,
+        Some(from.clone()),
+        payload.status.clone(),
+        now,
+        caller.actor().map(ToString::to_string),
+        assignee,
+    )
+    .insert(&txn)
+    .await
+    .map_err(|e| Error::Model(ModelError::from(e)))?;
+    txn.commit()
         .await
         .map_err(|e| Error::Model(ModelError::from(e)))?;
     AuditModel::record(

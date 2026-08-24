@@ -157,6 +157,7 @@ the Status note above).
 | Schedule | `GET /api/plans/{pid}/schedule` |
 | Tasks (board) | `GET / POST /api/plans/{pid}/tasks` · `PUT / PATCH /api/plans/{pid}/tasks/{tid}` (PATCH = status move) |
 | Sprints + burndown (board) | `GET / POST /api/plans/{pid}/sprints` · `GET /api/plans/{pid}/burndown?sprint=` |
+| Time-based analysis (`/plans/[pid]/flow`) | `GET /api/plans/{pid}/{time-analysis,constraints,aging-wip,flow,cumulative-flow}` · `GET /api/plans/{pid}/tasks/{tid}/{time-analysis,transitions}` · `GET /api/flow-classes` — all read-only; the transition log is written by the task create/move calls |
 | Collaborative review (`/reviews`) | `POST / GET /api/reviews` · `/{pid}/respond` · `/{pid}/submit` · `GET /api/reviews/consensus` |
 | Automations (`/automations`) | `POST / GET /api/automations` · `/{pid}/enable`·`/disable` · `GET /api/automations/runs` |
 | Scheduled actions (`/automations`) | `POST / GET /api/scheduled-actions` · `POST /api/scheduled-actions/sweep` |

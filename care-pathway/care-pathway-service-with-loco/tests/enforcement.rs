@@ -32,6 +32,26 @@ async fn require_auth_gates_api_but_not_openapi() {
             401,
             "un-authed /api/care-pathways must be 401 when enforcement is on"
         );
+        // The time-based-analysis surface is personal data (a segment
+        // says when a named subject was where, with whom), so it must
+        // be behind the same guard — the SEC-G8 default-off pin
+        // extended to the new paths rather than assumed to cover them.
+        for path in [
+            "/api/instances/flow",
+            "/api/instances/time-standards",
+            "/api/instances/00000000-0000-0000-0000-000000000000/segments",
+            "/api/instances/00000000-0000-0000-0000-000000000000/time-analysis",
+            "/api/instances/00000000-0000-0000-0000-000000000000/timeline",
+            "/api/care-pathways/00000000-0000-0000-0000-000000000000/time-analysis",
+            "/api/care-pathways/00000000-0000-0000-0000-000000000000/constraints",
+        ] {
+            assert_eq!(
+                request.get(path).await.status_code(),
+                401,
+                "un-authed {path} must be 401 when enforcement is on"
+            );
+        }
+
         let openapi = request.get("/api-docs/openapi.json").await;
         assert_eq!(
             openapi.status_code(),

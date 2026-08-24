@@ -184,3 +184,267 @@ mod tests {
         assert!(!edd_overdue(None, today));
     }
 }
+
+// ---------------------------------------------------------------------
+// The stitched-journey timeline contract
+// ---------------------------------------------------------------------
+
+/// Milliseconds in one day.
+pub const DAY_MS: i64 = 86_400_000;
+
+/// A stay's timeline, in the four numbers a stitched journey needs
+/// (`care-pathway-service`'s `src/journey.rs` contract).
+///
+/// # Why a green day is value-adding time
+///
+/// Time-based analysis asks what share of an episode was *the work*.
+/// `Red2Green` already answers exactly that question in the NHS's own
+/// vocabulary: a **green** day moves the patient toward discharge, a
+/// **red** day does not. So the value-adding time of a stay is its green
+/// days, and no new judgement had to be invented to say so.
+///
+/// # Unclassified days count as non-value-adding
+///
+/// A stay spanning ten days with three classified reports the green
+/// share of those three, not of the ten. That is deliberate and matches
+/// the consuming service's own denominator rule: elapsed calendar time
+/// is the denominator, and unrecorded time counts against you — because
+/// the alternative rewards recording less. The figure is therefore a
+/// **floor**, and [`StayTimeline::coverage_ratio`] says how much of the
+/// stay it rests on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StayTimeline {
+    /// Admission, epoch milliseconds.
+    pub clock_start_ms: i64,
+    /// Discharge, or `as_of` while the patient is still in.
+    pub clock_stop_ms: i64,
+    /// Elapsed span.
+    pub lead_time_ms: i64,
+    /// Green days, as milliseconds.
+    pub value_time_ms: i64,
+    /// Days classified red or green.
+    pub classified_days: i64,
+    /// Green days among them.
+    pub green_days: i64,
+    /// Whole days the stay spans (at least one — an admission and
+    /// discharge on the same day is a day of care, not zero).
+    pub span_days: i64,
+}
+
+impl StayTimeline {
+    /// The share of the stay that carries a `Red2Green` classification.
+    ///
+    /// Reported so a consumer can tell a genuinely red stay from an
+    /// unclassified one: both show little value-adding time, and only
+    /// this distinguishes them.
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)] // display ratio over a bounded count
+    pub fn coverage_ratio(&self) -> Option<f64> {
+        (self.span_days > 0)
+            .then(|| (self.classified_days as f64 / self.span_days as f64).clamp(0.0, 1.0))
+    }
+
+    /// `unclassified` | `partial` | `classified`, so a caller cannot
+    /// render "nobody filled this in" as "nothing valuable happened".
+    #[must_use]
+    pub fn confidence(&self) -> &'static str {
+        match self.coverage_ratio() {
+            None => "unclassified",
+            Some(c) if c < 0.20 => "unclassified",
+            Some(c) if c < 0.80 => "partial",
+            Some(_) => "classified",
+        }
+    }
+}
+
+/// Derive a stay's timeline from its admission, its discharge (or
+/// `now`), and its `Red2Green` classifications.
+///
+/// Pure — `now` is a parameter — so the whole matrix is unit-testable:
+/// an open stay, a same-day discharge, an unclassified stay, and a
+/// classification outside the stay's own span.
+#[must_use]
+pub fn stay_timeline(
+    admitted_at: DateTime<FixedOffset>,
+    discharged_at: Option<DateTime<FixedOffset>>,
+    now: DateTime<FixedOffset>,
+    classifications: &[(NaiveDate, String)],
+) -> StayTimeline {
+    let end = discharged_at.unwrap_or(now);
+    let clock_start_ms = admitted_at.timestamp_millis();
+    // A clock that ends before it starts is a data error, not a
+    // negative duration.
+    let clock_stop_ms = end.timestamp_millis().max(clock_start_ms);
+    let lead_time_ms = clock_stop_ms - clock_start_ms;
+
+    // A stay that opens and closes on one day is one day of care, not
+    // zero — the day count is inclusive.
+    let span_days = length_of_stay_days(admitted_at, discharged_at, now) + 1;
+
+    let (start_day, end_day) = (admitted_at.date_naive(), end.date_naive());
+    let mut classified_days = 0i64;
+    let mut green_days = 0i64;
+    let mut seen: std::collections::BTreeSet<NaiveDate> = std::collections::BTreeSet::new();
+    for (day, classification) in classifications {
+        // A classification outside the stay's own span is ignored
+        // rather than counted: it would push coverage above 1 and
+        // credit the stay with a day it did not have.
+        if *day < start_day || *day > end_day {
+            continue;
+        }
+        // One row per day, whatever the data says. A duplicated day
+        // must not count twice.
+        if !seen.insert(*day) {
+            continue;
+        }
+        classified_days += 1;
+        if classification == "green" {
+            green_days += 1;
+        }
+    }
+
+    StayTimeline {
+        clock_start_ms,
+        clock_stop_ms,
+        lead_time_ms,
+        // Capped at the elapsed span: more green days than the stay
+        // lasted would put the consuming ratio above 1.
+        value_time_ms: (green_days * DAY_MS).min(lead_time_ms.max(0)),
+        classified_days,
+        green_days,
+        span_days,
+    }
+}
+
+#[cfg(test)]
+mod timeline_tests {
+    use super::*;
+
+    fn at(day: u32, hour: u32) -> DateTime<FixedOffset> {
+        format!("2026-03-{day:02}T{hour:02}:00:00+00:00")
+            .parse()
+            .expect("timestamp")
+    }
+
+    fn d(day: u32) -> NaiveDate {
+        format!("2026-03-{day:02}").parse().expect("date")
+    }
+
+    fn green(day: u32) -> (NaiveDate, String) {
+        (d(day), "green".to_string())
+    }
+
+    fn red(day: u32) -> (NaiveDate, String) {
+        (d(day), "red".to_string())
+    }
+
+    #[test]
+    fn green_days_are_the_value_adding_time() {
+        // Admitted the 1st, discharged the 5th: a five-day span with
+        // two green days.
+        let t = stay_timeline(
+            at(1, 9),
+            Some(at(5, 15)),
+            at(9, 0),
+            &[green(1), red(2), red(3), green(4), red(5)],
+        );
+        assert_eq!(t.span_days, 5, "inclusive of both ends");
+        assert_eq!(t.classified_days, 5);
+        assert_eq!(t.green_days, 2);
+        assert_eq!(t.value_time_ms, 2 * DAY_MS);
+        assert_eq!(t.confidence(), "classified");
+        assert_eq!(t.coverage_ratio(), Some(1.0));
+    }
+
+    #[test]
+    fn an_unclassified_stay_says_so_rather_than_reading_as_all_waste() {
+        // Nobody filled in the board. That looks identical to a stay of
+        // pure red days unless the confidence says otherwise — and the
+        // two call for completely different responses.
+        let t = stay_timeline(at(1, 9), Some(at(11, 9)), at(12, 0), &[]);
+        assert_eq!(t.value_time_ms, 0);
+        assert_eq!(t.classified_days, 0);
+        assert_eq!(t.coverage_ratio(), Some(0.0));
+        assert_eq!(t.confidence(), "unclassified");
+
+        // A genuinely red stay reports the same zero but is *classified*.
+        let all_red: Vec<(NaiveDate, String)> = (1..=11).map(red).collect();
+        let red_stay = stay_timeline(at(1, 9), Some(at(11, 9)), at(12, 0), &all_red);
+        assert_eq!(red_stay.value_time_ms, 0);
+        assert_eq!(red_stay.confidence(), "classified");
+    }
+
+    #[test]
+    fn a_partly_classified_stay_reports_a_floor() {
+        // Three of eleven days classified. The green share is of the
+        // three, and the unclassified eight count as non-value-adding —
+        // the same denominator rule the consuming service applies.
+        let t = stay_timeline(
+            at(1, 9),
+            Some(at(11, 9)),
+            at(12, 0),
+            &[green(1), green(2), red(3)],
+        );
+        assert_eq!(t.value_time_ms, 2 * DAY_MS);
+        assert_eq!(t.confidence(), "partial");
+        assert!(t.coverage_ratio().unwrap_or(1.0) < 0.5);
+    }
+
+    #[test]
+    fn an_open_stay_runs_to_now() {
+        let t = stay_timeline(at(1, 0), None, at(4, 0), &[green(1), green(2)]);
+        assert_eq!(t.lead_time_ms, 3 * DAY_MS);
+        assert_eq!(t.clock_stop_ms, at(4, 0).timestamp_millis());
+        assert_eq!(t.value_time_ms, 2 * DAY_MS);
+    }
+
+    #[test]
+    fn a_same_day_stay_is_one_day_not_zero() {
+        // Admitted and discharged the same day is a day of care. A zero
+        // span would make every ratio undefined.
+        let t = stay_timeline(at(3, 8), Some(at(3, 20)), at(4, 0), &[green(3)]);
+        assert_eq!(t.span_days, 1);
+        assert_eq!(t.coverage_ratio(), Some(1.0));
+        // Value time is capped at the elapsed span: twelve hours, not a
+        // whole green day, or the consuming ratio would exceed 1.
+        assert_eq!(t.value_time_ms, t.lead_time_ms);
+        assert!(t.value_time_ms < DAY_MS);
+    }
+
+    #[test]
+    fn a_classification_outside_the_stay_is_ignored() {
+        // It would push coverage above 1 and credit the stay with a day
+        // it did not have.
+        let t = stay_timeline(
+            at(5, 9),
+            Some(at(6, 9)),
+            at(9, 0),
+            &[green(1), green(5), green(20)],
+        );
+        assert_eq!(t.classified_days, 1, "only the in-span day counts");
+        assert_eq!(t.green_days, 1);
+        assert!(t.coverage_ratio().unwrap_or(9.0) <= 1.0);
+    }
+
+    #[test]
+    fn a_duplicated_day_counts_once() {
+        let t = stay_timeline(
+            at(1, 0),
+            Some(at(3, 0)),
+            at(4, 0),
+            &[green(1), green(1), red(1)],
+        );
+        assert_eq!(t.classified_days, 1);
+        assert_eq!(t.green_days, 1);
+    }
+
+    #[test]
+    fn a_reversed_clock_is_zero_not_negative() {
+        // Bad data must not produce a negative duration that flows into
+        // a stitched journey's arithmetic.
+        let t = stay_timeline(at(9, 0), Some(at(1, 0)), at(9, 0), &[]);
+        assert_eq!(t.lead_time_ms, 0);
+        assert_eq!(t.value_time_ms, 0);
+        assert!(t.clock_stop_ms >= t.clock_start_ms);
+    }
+}

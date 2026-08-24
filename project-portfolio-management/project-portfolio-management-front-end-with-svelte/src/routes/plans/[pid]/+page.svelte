@@ -62,6 +62,7 @@
     <a class="button small" href={`/plans/${pid}/governance`}>{t("ppm.common.governance")}</a>
     <a class="button small" href={`/plans/${pid}/board`}>{t("ppm.common.board")}</a>
     <a class="button small" href={`/plans/${pid}/schedule`}>{t("ppm.common.schedule")}</a>
+    <a class="button small" href={`/plans/${pid}/flow`}>Flow</a>
   </p>
   <div class="surface stack">
     {#if record.kind}<div><strong>{t("detail.caseType")}</strong> {record.kind}</div>{/if}

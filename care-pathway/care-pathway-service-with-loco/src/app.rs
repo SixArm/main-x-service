@@ -108,7 +108,10 @@ impl Hooks for App {
     fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::insights::routes())
+            .add_route(controllers::tba::pathway_routes())
             .add_route(controllers::instances::pathway_routes())
+            .add_route(controllers::links::routes())
+            .add_route(controllers::tba::routes())
             .add_route(controllers::instances::routes())
             .add_route(controllers::care_pathways::routes())
             .add_route(controllers::fhir::routes())
@@ -136,6 +139,9 @@ impl Hooks for App {
         // (`CARE_PATHWAY_PASETO_KEYS_URL` / `CARE_PATHWAY_ABAC_POLICY_FILE`).
         auth::spawn_key_refresh();
         auth::spawn_policy_watcher();
+        // Time-based-analysis gauges: a no-op unless
+        // `CARE_PATHWAY_FLOW_METRICS_SECS` is set (see `flow_metrics`).
+        crate::flow_metrics::spawn(ctx);
         // Durable event bus Phase 3: spawn the outbox relay (drain → sink →
         // mark published + retention purge). A no-op unless the transport is
         // `outbox` and `CARE_PATHWAY_EVENT_RELAY` is truthy.

@@ -249,3 +249,32 @@ manual check confirms it. Split tasks too big for one PR
   Tracked in detail as the service spec's §13 T-15.
   - **Acceptance:** each sub-item closed with a test, or explicitly
     re-declared as an accepted limitation in §12.5.
+
+- [x] **T-13 — Time-based analysis (TBA-1 … TBA-7).** The time dimension
+  of the pathway: a recorded journey **segment** primitive, an explicit
+  pathway **clock**, and the derived per-instance / cohort / constraint /
+  flow views. Unifies Barker's time-based analysis (the value-adding
+  ratio), value stream mapping (the VA / NNVA / UNVA classification and
+  the VT / PT / LT / %A / #HO metric names) and queueing theory (λ / μ /
+  ρ / κ / τ, Little's Law). Full contract, including the parts
+  deliberately refused, in the cross-cutting
+  [`time-based-analysis.md`](time-based-analysis.md).
+  - **Done (2026-08-23):** implemented in the service crate —
+    `migration/src/m20260823_000014_time_based_analysis.rs`,
+    `src/models/_entities/instance_segments.rs`, the pure `src/tba.rs`,
+    `src/controllers/tba.rs`, routes, OpenAPI, and
+    `tests/requests/tba.rs`.
+  - **Acceptance (met):** a 100-day journey with 14 value-adding days
+    reports 0.14 — **and the same journey with only its value-adding
+    segments recorded still reports 0.14**, which is the regression test
+    that stops the calendar-time denominator being "simplified" into a
+    sum-of-recorded-activity denominator; the four category buckets sum
+    to the lead time over a generated sweep; ratios stay in `[0, 1]`
+    under overlapping and out-of-window segments; degenerate clocks
+    return a stated null rather than a panic; every §5.1 invariant is a
+    `422`; the new paths are `401` under `CARE_PATHWAY_REQUIRE_AUTH`.
+    48/48 `--ignored` request tests green vs Postgres 18; 279 unit
+    tests; clippy pedantic clean.
+  - **Open (TBA-8 … TBA-11):** the front-end timeline wall and cohort
+    view, cross-service journey stitching via the link-graph aggregator,
+    and Prometheus gauges for cohort %VA / p90 lead time.
