@@ -186,7 +186,7 @@ impl Default for Address {
 ///     .with_longitude(-2.586_2);
 ///
 /// assert_eq!(l.venue_name.as_deref(), Some("Worthy Farm"));
-/// assert_eq!(l.latitude, Some(51.150_3));
+/// assert_eq!(l.latitude_as_decimal_degrees, Some(51.150_3));
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -199,9 +199,9 @@ pub struct Location {
     /// Values outside that range or non-finite values are stored as
     /// supplied for round-trip honesty, but the coordinates scorer treats
     /// them as missing.
-    pub latitude: Option<f64>,
+    pub latitude_as_decimal_degrees: Option<f64>,
     /// Longitude in decimal degrees. Conventionally `[-180.0, 180.0]`.
-    pub longitude: Option<f64>,
+    pub longitude_as_decimal_degrees: Option<f64>,
     /// Join URL for a virtual event (schema.org `VirtualLocation.url`),
     /// e.g. `"https://zoom.us/j/123456"`. Compared by exact equality
     /// after trimming whitespace.
@@ -215,8 +215,8 @@ impl Location {
         Self {
             venue_name: None,
             address: None,
-            latitude: None,
-            longitude: None,
+            latitude_as_decimal_degrees: None,
+            longitude_as_decimal_degrees: None,
             virtual_url: None,
         }
     }
@@ -238,14 +238,14 @@ impl Location {
     /// Fluent setter for `latitude`.
     #[must_use]
     pub fn with_latitude(mut self, value: f64) -> Self {
-        self.latitude = Some(value);
+        self.latitude_as_decimal_degrees = Some(value);
         self
     }
 
     /// Fluent setter for `longitude`.
     #[must_use]
     pub fn with_longitude(mut self, value: f64) -> Self {
-        self.longitude = Some(value);
+        self.longitude_as_decimal_degrees = Some(value);
         self
     }
 
@@ -1014,8 +1014,8 @@ mod tests {
         let l = Location::new();
         assert!(l.venue_name.is_none());
         assert!(l.address.is_none());
-        assert!(l.latitude.is_none());
-        assert!(l.longitude.is_none());
+        assert!(l.latitude_as_decimal_degrees.is_none());
+        assert!(l.longitude_as_decimal_degrees.is_none());
         assert!(l.virtual_url.is_none());
     }
 
@@ -1031,8 +1031,8 @@ mod tests {
             .with_latitude(51.150_3)
             .with_longitude(-2.586_2);
         assert_eq!(l.venue_name.as_deref(), Some("Worthy Farm"));
-        assert_eq!(l.latitude, Some(51.150_3));
-        assert_eq!(l.longitude, Some(-2.586_2));
+        assert_eq!(l.latitude_as_decimal_degrees, Some(51.150_3));
+        assert_eq!(l.longitude_as_decimal_degrees, Some(-2.586_2));
     }
 
     #[test]

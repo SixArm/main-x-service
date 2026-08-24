@@ -264,11 +264,19 @@ fn map_location(l: &Location) -> Option<MLocation> {
             // return, not what we trigonometry over. A coordinate that
             // cannot be represented as `f64` is dropped rather than
             // approximated into a wrong position.
-            if let Some(lat) = p.latitude.as_ref().and_then(BigDecimal::to_f64) {
+            if let Some(lat) = p
+                .latitude_as_decimal_degrees
+                .as_ref()
+                .and_then(BigDecimal::to_f64)
+            {
                 m = m.with_latitude(lat);
                 any = true;
             }
-            if let Some(lon) = p.longitude.as_ref().and_then(BigDecimal::to_f64) {
+            if let Some(lon) = p
+                .longitude_as_decimal_degrees
+                .as_ref()
+                .and_then(BigDecimal::to_f64)
+            {
                 m = m.with_longitude(lon);
                 any = true;
             }
@@ -442,8 +450,8 @@ mod tests {
             id: None,
             name: "Greek Theatre".into(),
             address: None,
-            latitude: Some("37.8730".parse().unwrap()),
-            longitude: Some("-122.2547".parse().unwrap()),
+            latitude_as_decimal_degrees: Some("37.8730".parse().unwrap()),
+            longitude_as_decimal_degrees: Some("-122.2547".parse().unwrap()),
             url: None,
         })];
         let m = to_matcher_event(&e);

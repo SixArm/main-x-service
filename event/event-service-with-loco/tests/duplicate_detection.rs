@@ -51,8 +51,8 @@ fn conference() -> Event {
             postal_code: Some("94720".into()),
             country: Some("US".into()),
         }),
-        latitude: Some("37.873".parse().unwrap()),
-        longitude: Some("-122.255".parse().unwrap()),
+        latitude_as_decimal_degrees: Some("37.873".parse().unwrap()),
+        longitude_as_decimal_degrees: Some("-122.255".parse().unwrap()),
         url: None,
     })];
     e.organizers = vec![Party {
@@ -268,8 +268,8 @@ fn place_location_geo_propagates_into_matcher_location() {
         id: None,
         name: "Greek Theatre".into(),
         address: None,
-        latitude: Some("37.8730".parse().unwrap()),
-        longitude: Some("-122.2547".parse().unwrap()),
+        latitude_as_decimal_degrees: Some("37.8730".parse().unwrap()),
+        longitude_as_decimal_degrees: Some("-122.2547".parse().unwrap()),
         url: None,
     })];
 
@@ -352,8 +352,8 @@ fn completely_different_events_score_low_and_do_not_match() {
         id: None,
         name: "Bondi Beach".into(),
         address: None,
-        latitude: Some("-33.89".parse().unwrap()),
-        longitude: Some("151.27".parse().unwrap()),
+        latitude_as_decimal_degrees: Some("-33.89".parse().unwrap()),
+        longitude_as_decimal_degrees: Some("151.27".parse().unwrap()),
         url: None,
     })];
     b.event_type = EventType::Social;

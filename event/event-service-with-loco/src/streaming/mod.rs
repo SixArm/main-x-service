@@ -167,8 +167,8 @@ mod tests {
             id: None,
             name: "Zellerbach Hall".into(),
             address: None,
-            latitude: Some("37.87".parse().unwrap()),
-            longitude: Some("-122.254".parse().unwrap()),
+            latitude_as_decimal_degrees: Some("37.87".parse().unwrap()),
+            longitude_as_decimal_degrees: Some("-122.254".parse().unwrap()),
             url: None,
         }));
 
@@ -177,7 +177,10 @@ mod tests {
             timestamp: Utc.with_ymd_and_hms(2026, 1, 15, 9, 0, 0).unwrap(),
         };
         let json = serde_json::to_string(&published).unwrap();
-        assert!(json.contains(r#""latitude":37.87"#), "{json}");
+        assert!(
+            json.contains(r#""latitude_as_decimal_degrees":37.87"#),
+            "{json}"
+        );
 
         let consumed: EventEvent = serde_json::from_str(&json).unwrap();
         let EventEvent::Created { event, .. } = consumed else {
@@ -186,7 +189,13 @@ mod tests {
         let Some(Location::Place(place)) = event.location.first() else {
             panic!("expected a Place location");
         };
-        assert_eq!(place.latitude, Some("37.87".parse().unwrap()));
-        assert_eq!(place.longitude, Some("-122.254".parse().unwrap()));
+        assert_eq!(
+            place.latitude_as_decimal_degrees,
+            Some("37.87".parse().unwrap())
+        );
+        assert_eq!(
+            place.longitude_as_decimal_degrees,
+            Some("-122.254".parse().unwrap())
+        );
     }
 }

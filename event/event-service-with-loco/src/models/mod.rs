@@ -221,12 +221,12 @@ pub struct Place {
     /// unchanged from when this was an `f64`.
     #[serde(default, with = "bigdecimal::impl_serde::arbitrary_precision_option")]
     #[schema(value_type = Option<f64>)]
-    pub latitude: Option<BigDecimal>,
+    pub latitude_as_decimal_degrees: Option<BigDecimal>,
     /// Longitude in decimal degrees (`-180..=180`). Exact decimal; see
     /// [`Place::latitude`].
     #[serde(default, with = "bigdecimal::impl_serde::arbitrary_precision_option")]
     #[schema(value_type = Option<f64>)]
-    pub longitude: Option<BigDecimal>,
+    pub longitude_as_decimal_degrees: Option<BigDecimal>,
     /// Canonical URL for the venue.
     pub url: Option<String>,
 }

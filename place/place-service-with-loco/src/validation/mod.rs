@@ -39,7 +39,7 @@ use crate::models::place::Place;
 /// record is valid.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct ValidationError {
-    /// The offending field path (e.g. `"name"`, `"geo.latitude"`).
+    /// The offending field path (e.g. `"name"`, `"geo.latitude_as_decimal_degrees"`).
     pub field: String,
     /// A human-readable explanation suitable for an API error response.
     pub message: String,
@@ -207,6 +207,46 @@ fn place_size_caps(errors: &mut Vec<ValidationError>, place: &Place) {
 
     cap_array(errors, "opening_hours", place.opening_hours.len());
 }
+/// Range- and scale-check a set of coordinates.
+///
+/// Extracted from [`validate_place`] so that function stays readable:
+/// the coordinate field names carry their units now, which is worth the
+/// length at every call site but pushes one long function over the
+/// line limit.
+fn validate_geo(errors: &mut Vec<ValidationError>, geo: &crate::models::geo::GeoCoordinates) {
+    if !(BigDecimal::from(-90)..=BigDecimal::from(90)).contains(&geo.latitude_as_decimal_degrees) {
+        errors.push(ValidationError {
+            field: "geo.latitude_as_decimal_degrees".into(),
+            message: format!(
+                "Latitude must be between -90 and 90, got {}",
+                geo.latitude_as_decimal_degrees
+            ),
+        });
+    }
+    if !(BigDecimal::from(-180)..=BigDecimal::from(180)).contains(&geo.longitude_as_decimal_degrees)
+    {
+        errors.push(ValidationError {
+            field: "geo.longitude_as_decimal_degrees".into(),
+            message: format!(
+                "Longitude must be between -180 and 180, got {}",
+                geo.longitude_as_decimal_degrees
+            ),
+        });
+    }
+    check_coordinate_scale(
+        errors,
+        "geo.latitude_as_decimal_degrees",
+        &geo.latitude_as_decimal_degrees,
+    );
+    check_coordinate_scale(
+        errors,
+        "geo.longitude_as_decimal_degrees",
+        &geo.longitude_as_decimal_degrees,
+    );
+    if let Some(elevation) = geo.elevation_as_decimal_metres.as_ref() {
+        check_coordinate_scale(errors, "geo.elevation_as_decimal_metres", elevation);
+    }
+}
 
 /// Validate a place, returning all validation errors.
 ///
@@ -227,7 +267,7 @@ fn place_size_caps(errors: &mut Vec<ValidationError>, place: &Place) {
 /// let mut place = Place::new("Test");
 /// place.geo = Some(GeoCoordinates::new(91.0, 0.0)); // out of range
 /// let errors = validate_place(&place);
-/// assert!(errors.iter().any(|e| e.field == "geo.latitude"));
+/// assert!(errors.iter().any(|e| e.field == "geo.latitude_as_decimal_degrees"));
 /// ```
 #[must_use]
 pub fn validate_place(place: &Place) -> Vec<ValidationError> {
@@ -245,26 +285,7 @@ pub fn validate_place(place: &Place) -> Vec<ValidationError> {
 
     // Geo bounds: WGS-84 latitude/longitude ranges.
     if let Some(geo) = &place.geo {
-        if !(BigDecimal::from(-90)..=BigDecimal::from(90)).contains(&geo.latitude) {
-            errors.push(ValidationError {
-                field: "geo.latitude".into(),
-                message: format!("Latitude must be between -90 and 90, got {}", geo.latitude),
-            });
-        }
-        if !(BigDecimal::from(-180)..=BigDecimal::from(180)).contains(&geo.longitude) {
-            errors.push(ValidationError {
-                field: "geo.longitude".into(),
-                message: format!(
-                    "Longitude must be between -180 and 180, got {}",
-                    geo.longitude
-                ),
-            });
-        }
-        check_coordinate_scale(&mut errors, "geo.latitude", &geo.latitude);
-        check_coordinate_scale(&mut errors, "geo.longitude", &geo.longitude);
-        if let Some(elevation) = geo.elevation.as_ref() {
-            check_coordinate_scale(&mut errors, "geo.elevation", elevation);
-        }
+        validate_geo(&mut errors, geo);
     }
 
     // GLN must be exactly 13 ASCII digits with a valid GS1 mod-10 check digit.
@@ -535,7 +556,11 @@ mod tests {
         let mut place = Place::new("Test");
         place.geo = Some(GeoCoordinates::new(91.0, 0.0));
         let errors = validate_place(&place);
-        assert!(errors.iter().any(|e| e.field == "geo.latitude"));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "geo.latitude_as_decimal_degrees")
+        );
     }
 
     /// Longitude below -180 is flagged.
@@ -544,7 +569,11 @@ mod tests {
         let mut place = Place::new("Test");
         place.geo = Some(GeoCoordinates::new(0.0, -181.0));
         let errors = validate_place(&place);
-        assert!(errors.iter().any(|e| e.field == "geo.longitude"));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "geo.longitude_as_decimal_degrees")
+        );
     }
 
     /// A coordinate a hair outside the range is flagged.
@@ -555,16 +584,16 @@ mod tests {
     #[test]
     fn coordinates_just_outside_the_range_are_flagged() {
         for (lat, lon, field) in [
-            ("90.0000000001", "0", "geo.latitude"),
-            ("-90.0000000001", "0", "geo.latitude"),
-            ("0", "180.0000000001", "geo.longitude"),
-            ("0", "-180.0000000001", "geo.longitude"),
+            ("90.0000000001", "0", "geo.latitude_as_decimal_degrees"),
+            ("-90.0000000001", "0", "geo.latitude_as_decimal_degrees"),
+            ("0", "180.0000000001", "geo.longitude_as_decimal_degrees"),
+            ("0", "-180.0000000001", "geo.longitude_as_decimal_degrees"),
         ] {
             let mut place = Place::new("Test");
             place.geo = Some(GeoCoordinates {
-                latitude: lat.parse().unwrap(),
-                longitude: lon.parse().unwrap(),
-                elevation: None,
+                latitude_as_decimal_degrees: lat.parse().unwrap(),
+                longitude_as_decimal_degrees: lon.parse().unwrap(),
+                elevation_as_decimal_metres: None,
             });
             let errors = validate_place(&place);
             assert!(
@@ -585,12 +614,17 @@ mod tests {
         let places = usize::try_from(MAX_COORDINATE_SCALE).unwrap();
         let mut place = Place::new("Test");
         place.geo = Some(GeoCoordinates {
-            latitude: format!("40.{}", "1".repeat(places + 1)).parse().unwrap(),
-            longitude: "0".parse().unwrap(),
-            elevation: Some(format!("10.{}", "1".repeat(places + 1)).parse().unwrap()),
+            latitude_as_decimal_degrees: format!("40.{}", "1".repeat(places + 1)).parse().unwrap(),
+            longitude_as_decimal_degrees: "0".parse().unwrap(),
+            elevation_as_decimal_metres: Some(
+                format!("10.{}", "1".repeat(places + 1)).parse().unwrap(),
+            ),
         });
         let errors = validate_place(&place);
-        for field in ["geo.latitude", "geo.elevation"] {
+        for field in [
+            "geo.latitude_as_decimal_degrees",
+            "geo.elevation_as_decimal_metres",
+        ] {
             assert!(
                 errors
                     .iter()
@@ -603,9 +637,9 @@ mod tests {
         // matching how the text and array caps behave.
         let mut place = Place::new("Test");
         place.geo = Some(GeoCoordinates {
-            latitude: format!("40.{}", "1".repeat(places)).parse().unwrap(),
-            longitude: "0".parse().unwrap(),
-            elevation: None,
+            latitude_as_decimal_degrees: format!("40.{}", "1".repeat(places)).parse().unwrap(),
+            longitude_as_decimal_degrees: "0".parse().unwrap(),
+            elevation_as_decimal_metres: None,
         });
         let errors = validate_place(&place);
         assert!(

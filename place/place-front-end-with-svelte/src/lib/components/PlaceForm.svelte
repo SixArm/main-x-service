@@ -46,8 +46,8 @@
             if (!value.name.trim()) errors.name = translate("form.required");
             if (value.geo) {
                 // Only validate coords when the Geo section is present.
-                if (value.geo.latitude < -90 || value.geo.latitude > 90) errors.latitude = translate("form.latRange");
-                if (value.geo.longitude < -180 || value.geo.longitude > 180) errors.longitude = translate("form.lonRange");
+                if (value.geo.latitude_as_decimal_degrees < -90 || value.geo.latitude_as_decimal_degrees > 90) errors.latitude_as_decimal_degrees = translate("form.latRange");
+                if (value.geo.longitude_as_decimal_degrees < -180 || value.geo.longitude_as_decimal_degrees > 180) errors.longitude_as_decimal_degrees = translate("form.lonRange");
             }
             // GLN, when supplied, must be exactly 13 digits (GS1).
             if (value.global_location_number && !/^\d{13}$/.test(value.global_location_number)) {
@@ -86,7 +86,7 @@
     // Same pattern for Geo: zeroed coords when on, null when off.
     function toggleGeo(on: boolean) {
         hasGeo = on;
-        form.value.geo = on ? { latitude: 0, longitude: 0, elevation: null } : null;
+        form.value.geo = on ? { latitude_as_decimal_degrees: 0, longitude_as_decimal_degrees: 0, elevation_as_decimal_metres: null } : null;
     }
 
     // Suppress native submit and delegate to the form controller (which

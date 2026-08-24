@@ -189,8 +189,14 @@ fn test_mask_place_with_all_sensitive_fields() {
 
     // Geo rounded
     let geo = masked.geo.unwrap();
-    assert_eq!(geo.latitude, "40.78".parse::<BigDecimal>().unwrap());
-    assert_eq!(geo.longitude, "-73.97".parse::<BigDecimal>().unwrap());
+    assert_eq!(
+        geo.latitude_as_decimal_degrees,
+        "40.78".parse::<BigDecimal>().unwrap()
+    );
+    assert_eq!(
+        geo.longitude_as_decimal_degrees,
+        "-73.97".parse::<BigDecimal>().unwrap()
+    );
 
     // Non-sensitive unchanged
     assert_eq!(masked.name, "Full Privacy Test");

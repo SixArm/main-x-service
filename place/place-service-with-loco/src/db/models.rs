@@ -44,12 +44,12 @@ pub mod places {
         pub address_country: Option<String>,
         /// `PostalAddress.postal_code` (flattened).
         pub address_postal_code: Option<String>,
-        /// `GeoCoordinates.latitude` (flattened).
-        pub geo_latitude: Option<bigdecimal::BigDecimal>,
-        /// `GeoCoordinates.longitude` (flattened).
-        pub geo_longitude: Option<bigdecimal::BigDecimal>,
-        /// `GeoCoordinates.elevation` (flattened).
-        pub geo_elevation: Option<bigdecimal::BigDecimal>,
+        /// `GeoCoordinates.latitude_as_decimal_degrees` (flattened).
+        pub geo_latitude_as_decimal_degrees: Option<bigdecimal::BigDecimal>,
+        /// `GeoCoordinates.longitude_as_decimal_degrees` (flattened).
+        pub geo_longitude_as_decimal_degrees: Option<bigdecimal::BigDecimal>,
+        /// `GeoCoordinates.elevation_as_decimal_metres` (flattened).
+        pub geo_elevation_as_decimal_metres: Option<bigdecimal::BigDecimal>,
         /// Telephone number.
         pub telephone: Option<String>,
         /// Fax number.

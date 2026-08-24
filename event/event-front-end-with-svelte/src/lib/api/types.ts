@@ -163,8 +163,8 @@ export interface PlaceLocation {
   id?: string | null;
   name: string;
   address?: Address | null;
-  latitude?: number | null;
-  longitude?: number | null;
+  latitude_as_decimal_degrees?: number | null;
+  longitude_as_decimal_degrees?: number | null;
   url?: string | null;
 }
 

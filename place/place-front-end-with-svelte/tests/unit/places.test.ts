@@ -29,7 +29,7 @@ const samplePlace: Place = {
         address_country: "US",
         postal_code: "10022",
     },
-    geo: { latitude: 40.7829, longitude: -73.9654 },
+    geo: { latitude_as_decimal_degrees: 40.7829, longitude_as_decimal_degrees: -73.9654 },
 };
 
 describe("PlaceRepository", () => {

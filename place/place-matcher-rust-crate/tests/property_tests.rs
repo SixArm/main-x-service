@@ -57,10 +57,10 @@ fn place_strategy() -> impl Strategy<Value = Place> {
         .prop_map(|(name, alts, lat, lon, cat)| {
             let mut b = Place::builder().name(name).alternate_names(alts);
             if let Some(l) = lat {
-                b = b.latitude(l);
+                b = b.latitude_as_decimal_degrees(l);
             }
             if let Some(l) = lon {
-                b = b.longitude(l);
+                b = b.longitude_as_decimal_degrees(l);
             }
             if let Some(c) = cat {
                 b = b.category(c);
@@ -176,8 +176,8 @@ proptest! {
         prop_assert_eq!(&p.country_code_as_iso_3166_1_alpha_2, &back.country_code_as_iso_3166_1_alpha_2);
         prop_assert_eq!(p.maximum_capacity_count, back.maximum_capacity_count);
         for (a, b) in [
-            (p.latitude, back.latitude),
-            (p.longitude, back.longitude),
+            (p.latitude_as_decimal_degrees, back.latitude_as_decimal_degrees),
+            (p.longitude_as_decimal_degrees, back.longitude_as_decimal_degrees),
             (p.altitude_as_metre, back.altitude_as_metre),
             (p.elevation_as_metre, back.elevation_as_metre),
             (p.area_as_metre_2, back.area_as_metre_2),
@@ -202,8 +202,8 @@ proptest! {
         lon2 in lon_strategy(),
     ) {
         let engine = MatchingEngine::default_config();
-        let p1 = Place::builder().name("X").latitude(lat1).longitude(lon1).build();
-        let p2 = Place::builder().name("X").latitude(lat2).longitude(lon2).build();
+        let p1 = Place::builder().name("X").latitude_as_decimal_degrees(lat1).longitude_as_decimal_degrees(lon1).build();
+        let p2 = Place::builder().name("X").latitude_as_decimal_degrees(lat2).longitude_as_decimal_degrees(lon2).build();
         let forward = engine.match_places(&p1, &p2).breakdown.coordinates_score;
         let reverse = engine.match_places(&p2, &p1).breakdown.coordinates_score;
         match (forward, reverse) {

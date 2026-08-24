@@ -26,8 +26,8 @@ fn test_perfect_match_all_fields() {
     let p1 = Place::builder()
         .name("Eiffel Tower")
         .add_alternate_name("La Tour Eiffel")
-        .latitude(48.858_222)
-        .longitude(2.294_500)
+        .latitude_as_decimal_degrees(48.858_222)
+        .longitude_as_decimal_degrees(2.294_500)
         .category(PlaceCategory::Monument)
         .country_code_as_iso_3166_1_alpha_2("FR")
         .address(addr.clone())
@@ -86,8 +86,8 @@ fn test_name_match_returns_none_if_either_side_empty() {
 fn test_coordinates_score_identical_points() {
     let p1 = Place::builder()
         .name("X")
-        .latitude(48.85)
-        .longitude(2.29)
+        .latitude_as_decimal_degrees(48.85)
+        .longitude_as_decimal_degrees(2.29)
         .build();
     let p2 = p1.clone();
     let r = MatchingEngine::default_config().match_places(&p1, &p2);
@@ -98,13 +98,13 @@ fn test_coordinates_score_identical_points() {
 fn test_coordinates_score_far_apart_decays_to_zero() {
     let p1 = Place::builder()
         .name("X")
-        .latitude(0.0)
-        .longitude(0.0)
+        .latitude_as_decimal_degrees(0.0)
+        .longitude_as_decimal_degrees(0.0)
         .build();
     let p2 = Place::builder()
         .name("X")
-        .latitude(0.0)
-        .longitude(10.0)
+        .latitude_as_decimal_degrees(0.0)
+        .longitude_as_decimal_degrees(10.0)
         .build();
     let r = MatchingEngine::default_config().match_places(&p1, &p2);
     assert!(r.breakdown.coordinates_score.unwrap() < 1e-3);
@@ -114,13 +114,13 @@ fn test_coordinates_score_far_apart_decays_to_zero() {
 fn test_coordinates_score_none_when_out_of_range() {
     let p1 = Place::builder()
         .name("X")
-        .latitude(200.0)
-        .longitude(0.0)
+        .latitude_as_decimal_degrees(200.0)
+        .longitude_as_decimal_degrees(0.0)
         .build();
     let p2 = Place::builder()
         .name("X")
-        .latitude(0.0)
-        .longitude(0.0)
+        .latitude_as_decimal_degrees(0.0)
+        .longitude_as_decimal_degrees(0.0)
         .build();
     let r = MatchingEngine::default_config().match_places(&p1, &p2);
     assert!(r.breakdown.coordinates_score.is_none());
@@ -341,8 +341,8 @@ fn test_strict_preset_requires_deterministic_match() {
     let id = PlaceId::new(PlaceIdScheme::Wikidata, "Q243").unwrap();
     let p1 = Place::builder()
         .name("Eiffel Tower")
-        .latitude(48.858)
-        .longitude(2.2945)
+        .latitude_as_decimal_degrees(48.858)
+        .longitude_as_decimal_degrees(2.2945)
         .add_place_id(id.clone())
         .build();
     let p2 = p1.clone();
@@ -354,13 +354,13 @@ fn test_lenient_preset_lowers_threshold() {
     let lenient = MatchingEngine::new(MatchConfig::lenient());
     let p1 = Place::builder()
         .name("Cafe Centrale")
-        .latitude(48.0)
-        .longitude(2.0)
+        .latitude_as_decimal_degrees(48.0)
+        .longitude_as_decimal_degrees(2.0)
         .build();
     let p2 = Place::builder()
         .name("Cafe Central")
-        .latitude(48.0)
-        .longitude(2.0)
+        .latitude_as_decimal_degrees(48.0)
+        .longitude_as_decimal_degrees(2.0)
         .build();
     let r = lenient.match_places(&p1, &p2);
     assert!(r.score >= 0.65);
@@ -388,8 +388,8 @@ fn test_place_with_new_types_round_trips_through_json() {
     let p = Place::builder()
         .name("Eiffel Tower")
         .add_alternate_name("La Tour Eiffel")
-        .latitude(48.858_222)
-        .longitude(2.294_500)
+        .latitude_as_decimal_degrees(48.858_222)
+        .longitude_as_decimal_degrees(2.294_500)
         .category(PlaceCategory::Monument)
         .add_place_id(PlaceId::new(PlaceIdScheme::Wikidata, "Q243").unwrap())
         .country_code_as_iso_3166_1_alpha_2("FR")
@@ -438,8 +438,8 @@ fn test_validate_requires_a_name() {
 fn test_confidence_band_high_for_exact_clone() {
     let p = Place::builder()
         .name("Eiffel Tower")
-        .latitude(48.858_222)
-        .longitude(2.294_500)
+        .latitude_as_decimal_degrees(48.858_222)
+        .longitude_as_decimal_degrees(2.294_500)
         .build();
     let r = MatchingEngine::default_config().match_places(&p, &p.clone());
     assert_eq!(r.confidence, Confidence::High);

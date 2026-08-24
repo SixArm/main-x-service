@@ -411,8 +411,8 @@ mod tests {
                 postal_code: Some("94720".into()),
                 country: Some("US".into()),
             }),
-            latitude: Some("37.873".parse().unwrap()),
-            longitude: Some("-122.254".parse().unwrap()),
+            latitude_as_decimal_degrees: Some("37.873".parse().unwrap()),
+            longitude_as_decimal_degrees: Some("-122.254".parse().unwrap()),
             url: None,
         }));
         event.location.push(Location::Virtual(VirtualLocation {
@@ -474,8 +474,8 @@ mod tests {
             id: None,
             name: "Zellerbach Hall".into(),
             address: None,
-            latitude: Some(lat.parse().unwrap()),
-            longitude: Some(lon.parse().unwrap()),
+            latitude_as_decimal_degrees: Some(lat.parse().unwrap()),
+            longitude_as_decimal_degrees: Some(lon.parse().unwrap()),
             url: None,
         })
     }
@@ -489,8 +489,14 @@ mod tests {
     #[test]
     fn coordinates_serialize_as_json_numbers() {
         let json = serde_json::to_string(&place_at("37.87", "-122.254")).unwrap();
-        assert!(json.contains(r#""latitude":37.87"#), "{json}");
-        assert!(json.contains(r#""longitude":-122.254"#), "{json}");
+        assert!(
+            json.contains(r#""latitude_as_decimal_degrees":37.87"#),
+            "{json}"
+        );
+        assert!(
+            json.contains(r#""longitude_as_decimal_degrees":-122.254"#),
+            "{json}"
+        );
         assert!(!json.contains(r#""37.87""#), "quoted, not a number: {json}");
     }
 
@@ -508,8 +514,7 @@ mod tests {
         assert_eq!(back, loc);
 
         // ...and from a body written by hand, as a client sends it.
-        let raw =
-            r#"{"kind":"place","name":"Zellerbach Hall","latitude":37.87,"longitude":-122.254}"#;
+        let raw = r#"{"kind":"place","name":"Zellerbach Hall","latitude_as_decimal_degrees":37.87,"longitude_as_decimal_degrees":-122.254}"#;
         assert_eq!(serde_json::from_str::<Location>(raw).unwrap(), loc);
     }
 
@@ -527,8 +532,14 @@ mod tests {
             ("-90", "180"),
         ] {
             let json = serde_json::to_string(&place_at(lat, lon)).unwrap();
-            assert!(json.contains(&format!(r#""latitude":{lat}"#)), "{json}");
-            assert!(json.contains(&format!(r#""longitude":{lon}"#)), "{json}");
+            assert!(
+                json.contains(&format!(r#""latitude_as_decimal_degrees":{lat}"#)),
+                "{json}"
+            );
+            assert!(
+                json.contains(&format!(r#""longitude_as_decimal_degrees":{lon}"#)),
+                "{json}"
+            );
         }
     }
 
@@ -541,12 +552,15 @@ mod tests {
             id: None,
             name: "TBA".into(),
             address: None,
-            latitude: None,
-            longitude: None,
+            latitude_as_decimal_degrees: None,
+            longitude_as_decimal_degrees: None,
             url: None,
         });
         let json = serde_json::to_string(&loc).unwrap();
-        assert!(json.contains(r#""latitude":null"#), "{json}");
+        assert!(
+            json.contains(r#""latitude_as_decimal_degrees":null"#),
+            "{json}"
+        );
         assert_eq!(serde_json::from_str::<Location>(&json).unwrap(), loc);
 
         let missing = r#"{"kind":"place","name":"TBA"}"#;

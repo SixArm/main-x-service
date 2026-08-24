@@ -220,8 +220,12 @@ pub mod location_matching {
                 // floating-point, so convert at this boundary only.
                 let geo = |p: &Place| {
                     Some((
-                        p.latitude.as_ref().and_then(BigDecimal::to_f64)?,
-                        p.longitude.as_ref().and_then(BigDecimal::to_f64)?,
+                        p.latitude_as_decimal_degrees
+                            .as_ref()
+                            .and_then(BigDecimal::to_f64)?,
+                        p.longitude_as_decimal_degrees
+                            .as_ref()
+                            .and_then(BigDecimal::to_f64)?,
                     ))
                 };
                 let geo_score = match (geo(p1), geo(p2)) {
@@ -556,16 +560,16 @@ mod tests {
             id: Some(id),
             name: "x".into(),
             address: None,
-            latitude: None,
-            longitude: None,
+            latitude_as_decimal_degrees: None,
+            longitude_as_decimal_degrees: None,
             url: None,
         };
         let p2 = Place {
             id: Some(id),
             name: "y".into(),
             address: None,
-            latitude: None,
-            longitude: None,
+            latitude_as_decimal_degrees: None,
+            longitude_as_decimal_degrees: None,
             url: None,
         };
         assert!(

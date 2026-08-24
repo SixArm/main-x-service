@@ -74,11 +74,11 @@ export function blankPostalAddress(): PostalAddress {
  */
 export interface GeoCoordinates {
   /** Degrees north (−90 … 90). */
-  latitude: number;
+  latitude_as_decimal_degrees: number;
   /** Degrees east (−180 … 180). */
-  longitude: number;
+  longitude_as_decimal_degrees: number;
   /** Optional elevation in metres. */
-  elevation?: number | null;
+  elevation_as_decimal_metres?: number | null;
 }
 
 // ─── PlaceType ───────────────────────────────────────────────────────

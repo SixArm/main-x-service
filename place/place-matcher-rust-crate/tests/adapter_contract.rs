@@ -23,8 +23,8 @@ fn place_builder_demographic_and_contact_surface() {
         .name("Central Park")
         .add_alternate_name("The Park")
         .alternate_names(vec!["Manhattan Park".into()])
-        .latitude(40.7829)
-        .longitude(-73.9654)
+        .latitude_as_decimal_degrees(40.7829)
+        .longitude_as_decimal_degrees(-73.9654)
         .category(PlaceCategory::Park)
         .add_place_id(pid.clone())
         .place_ids(vec![pid])
@@ -40,8 +40,8 @@ fn place_builder_demographic_and_contact_surface() {
         .build();
 
     assert_eq!(p.name.as_deref(), Some("Central Park"));
-    assert_eq!(p.latitude, Some(40.7829));
-    assert_eq!(p.longitude, Some(-73.9654));
+    assert_eq!(p.latitude_as_decimal_degrees, Some(40.7829));
+    assert_eq!(p.longitude_as_decimal_degrees, Some(-73.9654));
     assert_eq!(p.category, Some(PlaceCategory::Park));
     assert!(!p.place_ids.is_empty());
     assert!(p.address.is_some());

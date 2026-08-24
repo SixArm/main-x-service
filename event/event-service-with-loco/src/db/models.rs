@@ -252,9 +252,9 @@ pub mod event_locations {
         /// Country.
         pub country: Option<String>,
         /// Latitude (for "place"). `NUMERIC` — exact decimal degrees.
-        pub latitude: Option<bigdecimal::BigDecimal>,
+        pub latitude_as_decimal_degrees: Option<bigdecimal::BigDecimal>,
         /// Longitude (for "place"). `NUMERIC` — exact decimal degrees.
-        pub longitude: Option<bigdecimal::BigDecimal>,
+        pub longitude_as_decimal_degrees: Option<bigdecimal::BigDecimal>,
         /// URL (for "place" or "virtual").
         pub url: Option<String>,
         /// Row creation timestamp.

@@ -266,14 +266,14 @@ mod tests {
     #[test]
     fn test_place_with_geo() {
         let geo = GeoCoordinates {
-            latitude: "40.7829".parse().unwrap(),
-            longitude: "-73.9654".parse().unwrap(),
-            elevation: None,
+            latitude_as_decimal_degrees: "40.7829".parse().unwrap(),
+            longitude_as_decimal_degrees: "-73.9654".parse().unwrap(),
+            elevation_as_decimal_metres: None,
         };
         let mut place = Place::new("Central Park");
         place.geo = Some(geo);
         assert_eq!(
-            place.geo.as_ref().unwrap().latitude,
+            place.geo.as_ref().unwrap().latitude_as_decimal_degrees,
             "40.7829".parse::<BigDecimal>().unwrap()
         );
     }

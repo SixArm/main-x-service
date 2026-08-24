@@ -27,7 +27,7 @@
 //! | `address.address_region` | `address.county` |
 //! | `address.postal_code` | `address.postcode` |
 //! | `address.address_country` | `address.country` + `country_code_as_iso_3166_1_alpha_2` if 2-char |
-//! | `geo.latitude` / `.longitude` / `.elevation` | `latitude`/`longitude`/`elevation_as_metre` |
+//! | `geo.latitude_as_decimal_degrees` / `.longitude_as_decimal_degrees` / `.elevation_as_decimal_metres` | `latitude`/`longitude`/`elevation_as_metre` |
 //! | `telephone` | `phone` |
 //! | `global_location_number` | `add_place_id(Other("GLN"), value)` |
 //! | `branch_code` | `add_place_id(Other("BranchCode"), value)` |
@@ -88,10 +88,17 @@ pub fn to_matcher_place(p: &Place) -> MPlace {
         // return, not what we trigonometry over. A coordinate that cannot
         // be represented as `f64` is dropped rather than approximated into
         // a wrong position.
-        if let (Some(lat), Some(lon)) = (geo.latitude.to_f64(), geo.longitude.to_f64()) {
+        if let (Some(lat), Some(lon)) = (
+            geo.latitude_as_decimal_degrees.to_f64(),
+            geo.longitude_as_decimal_degrees.to_f64(),
+        ) {
             b = b.latitude(lat).longitude(lon);
         }
-        if let Some(e) = geo.elevation.as_ref().and_then(BigDecimal::to_f64) {
+        if let Some(e) = geo
+            .elevation_as_decimal_metres
+            .as_ref()
+            .and_then(BigDecimal::to_f64)
+        {
             b = b.elevation_as_metre(e);
         }
     }
@@ -225,16 +232,16 @@ mod tests {
     use super::*;
     use crate::models::identifier::PlaceIdentifier;
 
-    /// Pins that `name` carries through verbatim and `geo.latitude` /
-    /// `geo.longitude` route to the matcher's bare `latitude` / `longitude`.
+    /// Pins that `name` carries through verbatim and `geo.latitude_as_decimal_degrees` /
+    /// `geo.longitude_as_decimal_degrees` route to the matcher's bare `latitude` / `longitude`.
     #[test]
     fn round_trip_basic_name_and_geo() {
         use crate::models::geo::GeoCoordinates;
         let mut svc = Place::new("Central Park");
         svc.geo = Some(GeoCoordinates {
-            latitude: "40.7829".parse().unwrap(),
-            longitude: "-73.9654".parse().unwrap(),
-            elevation: None,
+            latitude_as_decimal_degrees: "40.7829".parse().unwrap(),
+            longitude_as_decimal_degrees: "-73.9654".parse().unwrap(),
+            elevation_as_decimal_metres: None,
         });
         let m = to_matcher_place(&svc);
         assert_eq!(m.name.as_deref(), Some("Central Park"));

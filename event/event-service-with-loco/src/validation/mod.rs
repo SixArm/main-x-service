@@ -107,23 +107,31 @@ pub fn validate_event(event: &Event) -> Vec<ValidationError> {
                         "Place name is required",
                     ));
                 }
-                if let Some(lat) = place.latitude.as_ref() {
+                if let Some(lat) = place.latitude_as_decimal_degrees.as_ref() {
                     if !(BigDecimal::from(-90)..=BigDecimal::from(90)).contains(lat) {
                         errors.push(ValidationError::new(
-                            format!("{prefix}.latitude"),
+                            format!("{prefix}.latitude_as_decimal_degrees"),
                             "latitude must be between -90 and 90",
                         ));
                     }
-                    check_coordinate_scale(&mut errors, &format!("{prefix}.latitude"), lat);
+                    check_coordinate_scale(
+                        &mut errors,
+                        &format!("{prefix}.latitude_as_decimal_degrees"),
+                        lat,
+                    );
                 }
-                if let Some(lon) = place.longitude.as_ref() {
+                if let Some(lon) = place.longitude_as_decimal_degrees.as_ref() {
                     if !(BigDecimal::from(-180)..=BigDecimal::from(180)).contains(lon) {
                         errors.push(ValidationError::new(
-                            format!("{prefix}.longitude"),
+                            format!("{prefix}.longitude_as_decimal_degrees"),
                             "longitude must be between -180 and 180",
                         ));
                     }
-                    check_coordinate_scale(&mut errors, &format!("{prefix}.longitude"), lon);
+                    check_coordinate_scale(
+                        &mut errors,
+                        &format!("{prefix}.longitude_as_decimal_degrees"),
+                        lon,
+                    );
                 }
                 if let Some(ref addr) = place.address {
                     errors.extend(validate_address(addr, &format!("{prefix}.address")));
@@ -823,8 +831,8 @@ mod tests {
             id: None,
             name: "Main Hall".into(),
             address: None,
-            latitude: None,
-            longitude: None,
+            latitude_as_decimal_degrees: None,
+            longitude_as_decimal_degrees: None,
             url: None,
         }));
         let errors = validate_event(&event);
@@ -844,8 +852,8 @@ mod tests {
             id: None,
             name: "Main Hall".into(),
             address: None,
-            latitude: None,
-            longitude: None,
+            latitude_as_decimal_degrees: None,
+            longitude_as_decimal_degrees: None,
             url: None,
         }));
         event.location.push(Location::Virtual(VirtualLocation {
@@ -992,8 +1000,8 @@ mod tests {
             id: None,
             name: "Main Hall".into(),
             address: None,
-            latitude: Some(lat.parse().unwrap()),
-            longitude: Some(lon.parse().unwrap()),
+            latitude_as_decimal_degrees: Some(lat.parse().unwrap()),
+            longitude_as_decimal_degrees: Some(lon.parse().unwrap()),
             url: None,
         }));
         event
@@ -1018,10 +1026,26 @@ mod tests {
     #[test]
     fn coordinates_out_of_range_are_rejected() {
         for (lat, lon, field) in [
-            ("90.0000000001", "0", "location[0].latitude"),
-            ("-90.0000000001", "0", "location[0].latitude"),
-            ("0", "180.0000000001", "location[0].longitude"),
-            ("0", "-180.0000000001", "location[0].longitude"),
+            (
+                "90.0000000001",
+                "0",
+                "location[0].latitude_as_decimal_degrees",
+            ),
+            (
+                "-90.0000000001",
+                "0",
+                "location[0].latitude_as_decimal_degrees",
+            ),
+            (
+                "0",
+                "180.0000000001",
+                "location[0].longitude_as_decimal_degrees",
+            ),
+            (
+                "0",
+                "-180.0000000001",
+                "location[0].longitude_as_decimal_degrees",
+            ),
         ] {
             let errors = validate_event(&event_at(lat, lon));
             assert!(
@@ -1045,7 +1069,8 @@ mod tests {
         assert!(
             errors
                 .iter()
-                .any(|e| e.field == "location[0].latitude" && e.message.contains("decimal places")),
+                .any(|e| e.field == "location[0].latitude_as_decimal_degrees"
+                    && e.message.contains("decimal places")),
             "{too_fine} should exceed the scale cap, got {errors:?}"
         );
 

@@ -23,8 +23,8 @@ fn main() {
 fn demo_probabilistic_breakdown(engine: &MatchingEngine) -> place_matcher::MatchResult {
     let p1 = Place::builder()
         .name("Eiffel Tower")
-        .latitude(48.858_222)
-        .longitude(2.294_500)
+        .latitude_as_decimal_degrees(48.858_222)
+        .longitude_as_decimal_degrees(2.294_500)
         .category(PlaceCategory::Monument)
         .country_code_as_iso_3166_1_alpha_2("FR")
         .build();
@@ -32,8 +32,8 @@ fn demo_probabilistic_breakdown(engine: &MatchingEngine) -> place_matcher::Match
     let p2 = Place::builder()
         .name("La Tour Eiffel")
         .add_alternate_name("Tour Eiffel")
-        .latitude(48.858_3)
-        .longitude(2.294_5)
+        .latitude_as_decimal_degrees(48.858_3)
+        .longitude_as_decimal_degrees(2.294_5)
         .category(PlaceCategory::Monument)
         .country_code_as_iso_3166_1_alpha_2("FR")
         .build();
@@ -80,14 +80,14 @@ fn demo_aliases(engine: &MatchingEngine) {
     println!("=== Aliases (Big Ben / Elizabeth Tower) ===");
     let b1 = Place::builder()
         .name("Big Ben")
-        .latitude(51.500_7)
-        .longitude(-0.124_7)
+        .latitude_as_decimal_degrees(51.500_7)
+        .longitude_as_decimal_degrees(-0.124_7)
         .build();
     let b2 = Place::builder()
         .name("Elizabeth Tower")
         .add_alternate_name("Big Ben")
-        .latitude(51.500_72)
-        .longitude(-0.124_65)
+        .latitude_as_decimal_degrees(51.500_72)
+        .longitude_as_decimal_degrees(-0.124_65)
         .build();
     let r = engine.match_places(&b1, &b2);
     println!("Score: {:.2}   is_match: {}", r.score, r.is_match);
@@ -98,15 +98,15 @@ fn demo_chain_stores(engine: &MatchingEngine) {
     println!("\n=== Chain Stores: Same Name, Different Cities ===");
     let s1 = Place::builder()
         .name("Starbucks")
-        .latitude(40.7589)
-        .longitude(-73.9851)
+        .latitude_as_decimal_degrees(40.7589)
+        .longitude_as_decimal_degrees(-73.9851)
         .category(PlaceCategory::Cafe)
         .country_code_as_iso_3166_1_alpha_2("US")
         .build();
     let s2 = Place::builder()
         .name("Starbucks")
-        .latitude(34.0522)
-        .longitude(-118.2437)
+        .latitude_as_decimal_degrees(34.0522)
+        .longitude_as_decimal_degrees(-118.2437)
         .category(PlaceCategory::Cafe)
         .country_code_as_iso_3166_1_alpha_2("US")
         .build();
@@ -121,13 +121,13 @@ fn demo_same_coordinates(engine: &MatchingEngine) {
     println!("\n=== Same Coordinates, Different Names ===");
     let v1 = Place::builder()
         .name("Old Cafe Name")
-        .latitude(48.858_222)
-        .longitude(2.294_500)
+        .latitude_as_decimal_degrees(48.858_222)
+        .longitude_as_decimal_degrees(2.294_500)
         .build();
     let v2 = Place::builder()
         .name("New Cafe Name")
-        .latitude(48.858_222)
-        .longitude(2.294_500)
+        .latitude_as_decimal_degrees(48.858_222)
+        .longitude_as_decimal_degrees(2.294_500)
         .build();
     let r = engine.match_places(&v1, &v2);
     println!("Score: {:.2}   is_match: {}", r.score, r.is_match);

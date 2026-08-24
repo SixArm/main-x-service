@@ -27,7 +27,7 @@
 //! assert!(masked.telephone.unwrap().ends_with("****"));
 //! // Exactly two decimals — not `40.78000000000000113…`, which is what
 //! // rounding an `f64` used to leave behind.
-//! assert_eq!(masked.geo.unwrap().latitude, "40.78".parse::<BigDecimal>().unwrap());
+//! assert_eq!(masked.geo.unwrap().latitude_as_decimal_degrees, "40.78".parse::<BigDecimal>().unwrap());
 //! ```
 
 use crate::models::place::Place;
@@ -75,8 +75,12 @@ pub fn mask_place(place: &Place) -> Place {
         // `40.78499999…` as an `f64`, so it rounded *down*). Half-up here
         // is the rule a reader expects, applied to the digits actually
         // stored.
-        geo.latitude = geo.latitude.with_scale_round(2, RoundingMode::HalfUp);
-        geo.longitude = geo.longitude.with_scale_round(2, RoundingMode::HalfUp);
+        geo.latitude_as_decimal_degrees = geo
+            .latitude_as_decimal_degrees
+            .with_scale_round(2, RoundingMode::HalfUp);
+        geo.longitude_as_decimal_degrees = geo
+            .longitude_as_decimal_degrees
+            .with_scale_round(2, RoundingMode::HalfUp);
     }
 
     masked
@@ -155,8 +159,14 @@ mod tests {
         // Exact: masking now yields the two-decimal value and nothing
         // more. The float version returned `40.78000000000000113686…`,
         // which only an epsilon comparison could assert against.
-        assert_eq!(geo.latitude, "40.78".parse::<BigDecimal>().unwrap());
-        assert_eq!(geo.longitude, "-73.97".parse::<BigDecimal>().unwrap());
+        assert_eq!(
+            geo.latitude_as_decimal_degrees,
+            "40.78".parse::<BigDecimal>().unwrap()
+        );
+        assert_eq!(
+            geo.longitude_as_decimal_degrees,
+            "-73.97".parse::<BigDecimal>().unwrap()
+        );
     }
 
     /// Non-sensitive fields like the name are preserved.

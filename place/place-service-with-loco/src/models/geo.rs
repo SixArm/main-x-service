@@ -85,11 +85,11 @@ fn decimal_from_f64(value: f64, field: &str) -> BigDecimal {
 ///
 /// // Summit of Mount Everest, including elevation in meters.
 /// let everest = GeoCoordinates {
-///     latitude: "27.9881".parse().unwrap(),
-///     longitude: "86.9250".parse().unwrap(),
-///     elevation: Some("8848.86".parse().unwrap()),
+///     latitude_as_decimal_degrees: "27.9881".parse().unwrap(),
+///     longitude_as_decimal_degrees: "86.9250".parse().unwrap(),
+///     elevation_as_decimal_metres: Some("8848.86".parse().unwrap()),
 /// };
-/// assert_eq!(everest.elevation, Some("8848.86".parse::<BigDecimal>().unwrap()));
+/// assert_eq!(everest.elevation_as_decimal_metres, Some("8848.86".parse::<BigDecimal>().unwrap()));
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct GeoCoordinates {
@@ -97,18 +97,18 @@ pub struct GeoCoordinates {
     /// negative is south. Expected range: `-90..=90`.
     #[serde(with = "bigdecimal::impl_serde::arbitrary_precision")]
     #[schema(value_type = f64)]
-    pub latitude: BigDecimal,
+    pub latitude_as_decimal_degrees: BigDecimal,
     /// Longitude in decimal degrees. Positive is east of the prime
     /// meridian, negative is west. Expected range: `-180..=180`.
     #[serde(with = "bigdecimal::impl_serde::arbitrary_precision")]
     #[schema(value_type = f64)]
-    pub longitude: BigDecimal,
+    pub longitude_as_decimal_degrees: BigDecimal,
     /// Optional elevation above the WGS 84 ellipsoid, in meters. `None`
     /// when the source data did not supply an elevation; elevation does
     /// not participate in [`distance_to`](Self::distance_to).
     #[serde(default, with = "bigdecimal::impl_serde::arbitrary_precision_option")]
     #[schema(value_type = Option<f64>)]
-    pub elevation: Option<BigDecimal>,
+    pub elevation_as_decimal_metres: Option<BigDecimal>,
 }
 
 impl GeoCoordinates {
@@ -125,8 +125,8 @@ impl GeoCoordinates {
     ///
     /// // The stored value is the decimal the literal denotes, exactly.
     /// let p = GeoCoordinates::new(40.7829, -73.9654);
-    /// assert_eq!(p.latitude, "40.7829".parse::<BigDecimal>().unwrap());
-    /// assert!(p.elevation.is_none());
+    /// assert_eq!(p.latitude_as_decimal_degrees, "40.7829".parse::<BigDecimal>().unwrap());
+    /// assert!(p.elevation_as_decimal_metres.is_none());
     /// ```
     ///
     /// # Panics
@@ -137,14 +137,20 @@ impl GeoCoordinates {
     /// deserialization or the database, never through here. (`std` takes
     /// the same line with `Duration::from_secs_f64`.)
     #[must_use]
-    pub fn new(latitude: f64, longitude: f64) -> Self {
+    pub fn new(latitude_as_decimal_degrees: f64, longitude_as_decimal_degrees: f64) -> Self {
         Self {
-            latitude: decimal_from_f64(latitude, "latitude"),
-            longitude: decimal_from_f64(longitude, "longitude"),
+            latitude_as_decimal_degrees: decimal_from_f64(
+                latitude_as_decimal_degrees,
+                "latitude_as_decimal_degrees",
+            ),
+            longitude_as_decimal_degrees: decimal_from_f64(
+                longitude_as_decimal_degrees,
+                "longitude_as_decimal_degrees",
+            ),
             // Default to "unknown elevation" rather than 0.0, since 0.0 is a
             // valid sea-level reading and would be indistinguishable from
             // missing data.
-            elevation: None,
+            elevation_as_decimal_metres: None,
         }
     }
 
@@ -186,10 +192,10 @@ impl GeoCoordinates {
         // Coordinates are exact decimals; Haversine is trigonometry, so
         // convert at this boundary only.
         let (Some(self_lat), Some(self_lon), Some(other_lat), Some(other_lon)) = (
-            self.latitude.to_f64(),
-            self.longitude.to_f64(),
-            other.latitude.to_f64(),
-            other.longitude.to_f64(),
+            self.latitude_as_decimal_degrees.to_f64(),
+            self.longitude_as_decimal_degrees.to_f64(),
+            other.latitude_as_decimal_degrees.to_f64(),
+            other.longitude_as_decimal_degrees.to_f64(),
         ) else {
             return f64::NAN;
         };
@@ -223,21 +229,27 @@ mod tests {
         let geo = GeoCoordinates::new(40.7829, -73.9654);
         // Exact, not epsilon-tolerant: the point of the decimal is that
         // `40.7829` stores as `40.7829`, not `40.78289999999999793…`.
-        assert_eq!(geo.latitude, "40.7829".parse::<BigDecimal>().unwrap());
-        assert_eq!(geo.longitude, "-73.9654".parse::<BigDecimal>().unwrap());
-        assert!(geo.elevation.is_none());
+        assert_eq!(
+            geo.latitude_as_decimal_degrees,
+            "40.7829".parse::<BigDecimal>().unwrap()
+        );
+        assert_eq!(
+            geo.longitude_as_decimal_degrees,
+            "-73.9654".parse::<BigDecimal>().unwrap()
+        );
+        assert!(geo.elevation_as_decimal_metres.is_none());
     }
 
     /// Elevation can be supplied via a struct literal and round-trips.
     #[test]
     fn test_geo_with_elevation() {
         let geo = GeoCoordinates {
-            latitude: "27.9881".parse().unwrap(),
-            longitude: "86.9250".parse().unwrap(),
-            elevation: Some("8848.86".parse().unwrap()),
+            latitude_as_decimal_degrees: "27.9881".parse().unwrap(),
+            longitude_as_decimal_degrees: "86.9250".parse().unwrap(),
+            elevation_as_decimal_metres: Some("8848.86".parse().unwrap()),
         };
         assert_eq!(
-            geo.elevation,
+            geo.elevation_as_decimal_metres,
             Some("8848.86".parse::<BigDecimal>().unwrap())
         );
     }
@@ -253,8 +265,14 @@ mod tests {
     fn new_stores_the_decimal_the_literal_denotes() {
         for (lat, lon) in [(40.7829, -73.9654), (0.1, 0.2), (-90.0, 180.0)] {
             let geo = GeoCoordinates::new(lat, lon);
-            assert_eq!(geo.latitude.to_string(), format!("{lat}"));
-            assert_eq!(geo.longitude.to_string(), format!("{lon}"));
+            assert_eq!(
+                geo.latitude_as_decimal_degrees.to_string(),
+                format!("{lat}")
+            );
+            assert_eq!(
+                geo.longitude_as_decimal_degrees.to_string(),
+                format!("{lon}")
+            );
         }
     }
 
@@ -267,14 +285,23 @@ mod tests {
     #[test]
     fn coordinates_serialize_as_json_numbers() {
         let geo = GeoCoordinates {
-            latitude: "27.9881".parse().unwrap(),
-            longitude: "86.9250".parse().unwrap(),
-            elevation: Some("8848.86".parse().unwrap()),
+            latitude_as_decimal_degrees: "27.9881".parse().unwrap(),
+            longitude_as_decimal_degrees: "86.9250".parse().unwrap(),
+            elevation_as_decimal_metres: Some("8848.86".parse().unwrap()),
         };
         let json = serde_json::to_string(&geo).unwrap();
-        assert!(json.contains(r#""latitude":27.9881"#), "{json}");
-        assert!(json.contains(r#""longitude":86.9250"#), "{json}");
-        assert!(json.contains(r#""elevation":8848.86"#), "{json}");
+        assert!(
+            json.contains(r#""latitude_as_decimal_degrees":27.9881"#),
+            "{json}"
+        );
+        assert!(
+            json.contains(r#""longitude_as_decimal_degrees":86.9250"#),
+            "{json}"
+        );
+        assert!(
+            json.contains(r#""elevation_as_decimal_metres":8848.86"#),
+            "{json}"
+        );
         assert!(
             !json.contains(r#""27.9881""#),
             "quoted, not a number: {json}"
@@ -288,14 +315,17 @@ mod tests {
     fn coordinates_round_trip_exactly() {
         for lat in ["40.7829", "0.1", "40.78290000000000001", "-90"] {
             let geo = GeoCoordinates {
-                latitude: lat.parse().unwrap(),
-                longitude: "0".parse().unwrap(),
-                elevation: None,
+                latitude_as_decimal_degrees: lat.parse().unwrap(),
+                longitude_as_decimal_degrees: "0".parse().unwrap(),
+                elevation_as_decimal_metres: None,
             };
             let json = serde_json::to_string(&geo).unwrap();
-            assert!(json.contains(&format!(r#""latitude":{lat}"#)), "{json}");
+            assert!(
+                json.contains(&format!(r#""latitude_as_decimal_degrees":{lat}"#)),
+                "{json}"
+            );
             let back: GeoCoordinates = serde_json::from_str(&json).unwrap();
-            assert_eq!(back.latitude.to_string(), lat);
+            assert_eq!(back.latitude_as_decimal_degrees.to_string(), lat);
         }
     }
 
@@ -305,10 +335,14 @@ mod tests {
     fn absent_elevation_is_null_not_omitted() {
         let geo = GeoCoordinates::new(40.7829, -73.9654);
         let json = serde_json::to_string(&geo).unwrap();
-        assert!(json.contains(r#""elevation":null"#), "{json}");
+        assert!(
+            json.contains(r#""elevation_as_decimal_metres":null"#),
+            "{json}"
+        );
         assert_eq!(serde_json::from_str::<GeoCoordinates>(&json).unwrap(), geo);
 
-        let missing = r#"{"latitude":40.7829,"longitude":-73.9654}"#;
+        let missing =
+            r#"{"latitude_as_decimal_degrees":40.7829,"longitude_as_decimal_degrees":-73.9654}"#;
         assert_eq!(
             serde_json::from_str::<GeoCoordinates>(missing).unwrap(),
             geo
@@ -321,7 +355,7 @@ mod tests {
     /// and `NaN` compares false against both range bounds, so it also
     /// passed validation.
     #[test]
-    #[should_panic(expected = "latitude must be finite")]
+    #[should_panic(expected = "latitude_as_decimal_degrees must be finite")]
     fn new_rejects_non_finite_latitude() {
         let _ = GeoCoordinates::new(f64::NAN, 0.0);
     }

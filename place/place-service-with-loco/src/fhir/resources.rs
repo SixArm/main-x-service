@@ -153,10 +153,10 @@ pub struct FhirAddress {
 pub struct FhirPosition {
     /// Longitude in decimal degrees.
     #[serde(with = "bigdecimal::impl_serde::arbitrary_precision")]
-    pub longitude: BigDecimal,
+    pub longitude_as_decimal_degrees: BigDecimal,
     /// Latitude in decimal degrees.
     #[serde(with = "bigdecimal::impl_serde::arbitrary_precision")]
-    pub latitude: BigDecimal,
+    pub latitude_as_decimal_degrees: BigDecimal,
     /// Altitude (elevation) in meters, when known.
     #[serde(
         skip_serializing_if = "Option::is_none",

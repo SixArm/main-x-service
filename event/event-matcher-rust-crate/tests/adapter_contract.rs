@@ -152,8 +152,8 @@ fn location_builder_surface() {
         .with_longitude(-73.0)
         .with_virtual_url("https://zoom.example/123");
     assert_eq!(l.venue_name.as_deref(), Some("Venue"));
-    assert_eq!(l.latitude, Some(40.0));
-    assert_eq!(l.longitude, Some(-73.0));
+    assert_eq!(l.latitude_as_decimal_degrees, Some(40.0));
+    assert_eq!(l.longitude_as_decimal_degrees, Some(-73.0));
     assert_eq!(l.virtual_url.as_deref(), Some("https://zoom.example/123"));
 }
 
