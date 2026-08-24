@@ -251,10 +251,10 @@ pub mod event_locations {
         pub postal_code: Option<String>,
         /// Country.
         pub country: Option<String>,
-        /// Latitude (for "place").
-        pub latitude: Option<f64>,
-        /// Longitude (for "place").
-        pub longitude: Option<f64>,
+        /// Latitude (for "place"). `NUMERIC` — exact decimal degrees.
+        pub latitude_as_decimal_degrees: Option<bigdecimal::BigDecimal>,
+        /// Longitude (for "place"). `NUMERIC` — exact decimal degrees.
+        pub longitude_as_decimal_degrees: Option<bigdecimal::BigDecimal>,
         /// URL (for "place" or "virtual").
         pub url: Option<String>,
         /// Row creation timestamp.

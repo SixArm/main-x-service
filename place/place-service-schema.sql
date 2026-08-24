@@ -36,9 +36,9 @@ CREATE TABLE places (
     address_country             VARCHAR(64),
     address_postal_code         VARCHAR(32),
     -- GeoCoordinates (Option) flattened (WGS 84)
-    geo_latitude                DOUBLE PRECISION,
-    geo_longitude               DOUBLE PRECISION,
-    geo_elevation               DOUBLE PRECISION,
+    geo_latitude_as_decimal_degrees                DOUBLE PRECISION,
+    geo_longitude_as_decimal_degrees               DOUBLE PRECISION,
+    geo_elevation_as_decimal_metres               DOUBLE PRECISION,
     -- Contact
     telephone                   VARCHAR(64),
     fax_number                  VARCHAR(64),
@@ -57,8 +57,8 @@ CREATE TABLE places (
     deleted_at                  TIMESTAMP WITH TIME ZONE,
     created_at                  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at                  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_places_latitude  CHECK (geo_latitude  IS NULL OR (geo_latitude  BETWEEN -90  AND 90)),
-    CONSTRAINT chk_places_longitude CHECK (geo_longitude IS NULL OR (geo_longitude BETWEEN -180 AND 180))
+    CONSTRAINT chk_places_latitude  CHECK (geo_latitude_as_decimal_degrees  IS NULL OR (geo_latitude_as_decimal_degrees  BETWEEN -90  AND 90)),
+    CONSTRAINT chk_places_longitude CHECK (geo_longitude_as_decimal_degrees IS NULL OR (geo_longitude_as_decimal_degrees BETWEEN -180 AND 180))
 );
 CREATE INDEX idx_places_name               ON places (LOWER(name));
 CREATE INDEX idx_places_gln                ON places (global_location_number);
@@ -66,7 +66,7 @@ CREATE INDEX idx_places_contained_in_place ON places (contained_in_place);
 CREATE INDEX idx_places_is_deleted         ON places (is_deleted);
 CREATE INDEX idx_places_created_at         ON places (created_at);
 CREATE INDEX idx_places_locality           ON places (LOWER(address_locality));
-CREATE INDEX idx_places_geo                ON places (geo_latitude, geo_longitude);
+CREATE INDEX idx_places_geo                ON places (geo_latitude_as_decimal_degrees, geo_longitude_as_decimal_degrees);
 
 -- ----------------------------------------------------------------------------
 -- Keywords: Vec<String>

@@ -730,13 +730,15 @@ impl MatchingEngine {
         let mut weighted_sum = 0.0_f64;
         let mut total_weight = 0.0_f64;
 
-        if let (Some(lat1), Some(lon1), Some(lat2), Some(lon2)) =
-            (l1.latitude, l1.longitude, l2.latitude, l2.longitude)
-            && let (Some((la1, lo1)), Some((la2, lo2))) = (
-                valid_coords(Some(lat1), Some(lon1)),
-                valid_coords(Some(lat2), Some(lon2)),
-            )
-        {
+        if let (Some(lat1), Some(lon1), Some(lat2), Some(lon2)) = (
+            l1.latitude_as_decimal_degrees,
+            l1.longitude_as_decimal_degrees,
+            l2.latitude_as_decimal_degrees,
+            l2.longitude_as_decimal_degrees,
+        ) && let (Some((la1, lo1)), Some((la2, lo2))) = (
+            valid_coords(Some(lat1), Some(lon1)),
+            valid_coords(Some(lat2), Some(lon2)),
+        ) {
             let d = Scorer::haversine_metres(la1, lo1, la2, lo2);
             weighted_sum +=
                 Scorer::coordinates_score(d, self.config.coordinates_scale_metres) * 0.5;

@@ -8,6 +8,7 @@ use crate::models::{
     Address, ContactPoint, ContactPointSystem, Event, EventAttendanceMode, Location, Offer,
     VirtualLocation,
 };
+use bigdecimal::BigDecimal;
 
 /// A single field-level validation failure.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -55,6 +56,17 @@ const MAX_ARRAY_LEN: usize = 256;
 /// single string entry inside an array field.
 const MAX_ITEM_LEN: usize = 512;
 
+/// Maximum number of decimal places accepted on a geo coordinate.
+///
+/// Coordinates are exact decimals ([`BigDecimal`]), not `f64`, so the
+/// digit count is no longer capped by the 17 significant digits a binary
+/// float could hold — a caller could otherwise post a latitude with
+/// thousands of fraction digits and have every one of them stored. Ten
+/// places is roughly 10 µm at the equator: far past any real positioning
+/// system, and well inside what an `f64` used to carry, so nothing a
+/// client could previously send is newly rejected.
+const MAX_COORDINATE_SCALE: i64 = 10;
+
 /// Validate an event, collecting every error rather than returning early.
 #[must_use]
 pub fn validate_event(event: &Event) -> Vec<ValidationError> {
@@ -95,21 +107,31 @@ pub fn validate_event(event: &Event) -> Vec<ValidationError> {
                         "Place name is required",
                     ));
                 }
-                if let Some(lat) = place.latitude
-                    && !(-90.0..=90.0).contains(&lat)
-                {
-                    errors.push(ValidationError::new(
-                        format!("{prefix}.latitude"),
-                        "latitude must be between -90 and 90",
-                    ));
+                if let Some(lat) = place.latitude_as_decimal_degrees.as_ref() {
+                    if !(BigDecimal::from(-90)..=BigDecimal::from(90)).contains(lat) {
+                        errors.push(ValidationError::new(
+                            format!("{prefix}.latitude_as_decimal_degrees"),
+                            "latitude must be between -90 and 90",
+                        ));
+                    }
+                    check_coordinate_scale(
+                        &mut errors,
+                        &format!("{prefix}.latitude_as_decimal_degrees"),
+                        lat,
+                    );
                 }
-                if let Some(lon) = place.longitude
-                    && !(-180.0..=180.0).contains(&lon)
-                {
-                    errors.push(ValidationError::new(
-                        format!("{prefix}.longitude"),
-                        "longitude must be between -180 and 180",
-                    ));
+                if let Some(lon) = place.longitude_as_decimal_degrees.as_ref() {
+                    if !(BigDecimal::from(-180)..=BigDecimal::from(180)).contains(lon) {
+                        errors.push(ValidationError::new(
+                            format!("{prefix}.longitude_as_decimal_degrees"),
+                            "longitude must be between -180 and 180",
+                        ));
+                    }
+                    check_coordinate_scale(
+                        &mut errors,
+                        &format!("{prefix}.longitude_as_decimal_degrees"),
+                        lon,
+                    );
                 }
                 if let Some(ref addr) = place.address {
                     errors.extend(validate_address(addr, &format!("{prefix}.address")));
@@ -460,6 +482,17 @@ fn cap_item(errs: &mut Vec<ValidationError>, field: &str, index: usize, value: &
     }
 }
 
+/// Push an error when a geo coordinate carries more than
+/// [`MAX_COORDINATE_SCALE`] decimal places.
+fn check_coordinate_scale(errs: &mut Vec<ValidationError>, field: &str, value: &BigDecimal) {
+    if value.fractional_digit_count() > MAX_COORDINATE_SCALE {
+        errs.push(ValidationError::new(
+            field.to_string(),
+            format!("exceeds {MAX_COORDINATE_SCALE} decimal places"),
+        ));
+    }
+}
+
 /// Cap a `Vec<String>` array `field` on both cardinality ([`cap_array`])
 /// and per-entry length ([`cap_item`]).
 fn cap_string_array(errs: &mut Vec<ValidationError>, field: &str, values: &[String]) {
@@ -798,8 +831,8 @@ mod tests {
             id: None,
             name: "Main Hall".into(),
             address: None,
-            latitude: None,
-            longitude: None,
+            latitude_as_decimal_degrees: None,
+            longitude_as_decimal_degrees: None,
             url: None,
         }));
         let errors = validate_event(&event);
@@ -819,8 +852,8 @@ mod tests {
             id: None,
             name: "Main Hall".into(),
             address: None,
-            latitude: None,
-            longitude: None,
+            latitude_as_decimal_degrees: None,
+            longitude_as_decimal_degrees: None,
             url: None,
         }));
         event.location.push(Location::Virtual(VirtualLocation {
@@ -955,6 +988,99 @@ mod tests {
         assert!(
             !errors.iter().any(|e| e.message.contains("exceeds")),
             "unexpected cap errors: {errors:?}"
+        );
+    }
+
+    // ---- Geo coordinates (exact decimal) --------------------------------
+
+    /// Build an event whose sole location is a place at `lat`/`lon`.
+    fn event_at(lat: &str, lon: &str) -> Event {
+        let mut event = Event::new("Test", start());
+        event.location.push(Location::Place(Place {
+            id: None,
+            name: "Main Hall".into(),
+            address: None,
+            latitude_as_decimal_degrees: Some(lat.parse().unwrap()),
+            longitude_as_decimal_degrees: Some(lon.parse().unwrap()),
+            url: None,
+        }));
+        event
+    }
+
+    /// In-range coordinates, including the exact endpoints, validate
+    /// cleanly. The bounds are inclusive, as they were for `f64`.
+    #[test]
+    fn coordinates_in_range_pass() {
+        for (lat, lon) in [("37.87", "-122.254"), ("-90", "-180"), ("90", "180")] {
+            let errors = validate_event(&event_at(lat, lon));
+            assert!(
+                !errors.iter().any(|e| e.field.contains("itude")),
+                "{lat},{lon} should validate, got {errors:?}"
+            );
+        }
+    }
+
+    /// Out-of-range coordinates are rejected — including values only a
+    /// hair outside, which is where an exact decimal differs from a
+    /// float that might have rounded back into range.
+    #[test]
+    fn coordinates_out_of_range_are_rejected() {
+        for (lat, lon, field) in [
+            (
+                "90.0000000001",
+                "0",
+                "location[0].latitude_as_decimal_degrees",
+            ),
+            (
+                "-90.0000000001",
+                "0",
+                "location[0].latitude_as_decimal_degrees",
+            ),
+            (
+                "0",
+                "180.0000000001",
+                "location[0].longitude_as_decimal_degrees",
+            ),
+            (
+                "0",
+                "-180.0000000001",
+                "location[0].longitude_as_decimal_degrees",
+            ),
+        ] {
+            let errors = validate_event(&event_at(lat, lon));
+            assert!(
+                errors.iter().any(|e| e.field == field),
+                "{lat},{lon} should fail on {field}, got {errors:?}"
+            );
+        }
+    }
+
+    /// A coordinate carrying more than [`MAX_COORDINATE_SCALE`] decimal
+    /// places is rejected.
+    ///
+    /// An `f64` bounded the digit count implicitly; an exact decimal
+    /// does not, so without this a caller could post a latitude with
+    /// thousands of fraction digits and have every one stored.
+    #[test]
+    fn coordinate_scale_is_capped() {
+        let places = usize::try_from(MAX_COORDINATE_SCALE).unwrap();
+        let too_fine = format!("37.{}", "1".repeat(places + 1));
+        let errors = validate_event(&event_at(&too_fine, "0"));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "location[0].latitude_as_decimal_degrees"
+                    && e.message.contains("decimal places")),
+            "{too_fine} should exceed the scale cap, got {errors:?}"
+        );
+
+        // Exactly at the cap is allowed; only strictly-over is rejected,
+        // matching how the text and array caps behave.
+        let at_cap = format!("37.{}", "1".repeat(places));
+        let errors = validate_event(&event_at(&at_cap, "0"));
+        assert!(
+            !errors.iter().any(|e| e.message.contains("decimal places")),
+            "{at_cap} sits at the cap and should pass, got {errors:?}"
         );
     }
 }

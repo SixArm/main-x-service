@@ -32,14 +32,14 @@
 //! let a = Place::builder()
 //!     .name("Eiffel Tower")
 //!     .add_alternate_name("La Tour Eiffel")
-//!     .latitude(48.858_222)
-//!     .longitude(2.294_500)
+//!     .latitude_as_decimal_degrees(48.858_222)
+//!     .longitude_as_decimal_degrees(2.294_500)
 //!     .build();
 //!
 //! let b = Place::builder()
 //!     .name("Tour Eiffel")
-//!     .latitude(48.858_3)
-//!     .longitude(2.294_5)
+//!     .latitude_as_decimal_degrees(48.858_3)
+//!     .longitude_as_decimal_degrees(2.294_5)
 //!     .build();
 //!
 //! let engine = MatchingEngine::new(MatchConfig::default());
@@ -59,8 +59,8 @@
 //!
 //! let p = Place::builder()
 //!     .name("Big Ben")
-//!     .latitude(51.500_7)
-//!     .longitude(-0.124_7)
+//!     .latitude_as_decimal_degrees(51.500_7)
+//!     .longitude_as_decimal_degrees(-0.124_7)
 //!     .build();
 //! let q = p.clone();
 //!

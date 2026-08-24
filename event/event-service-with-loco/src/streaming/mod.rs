@@ -140,3 +140,62 @@ pub trait EventConsumer {
     /// Returns an error if reading the next event from the stream fails.
     fn next_event(&mut self) -> Result<Option<EventEvent>>;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::EventEvent;
+    use crate::models::{Event, Location, Place};
+    use chrono::{TimeZone, Utc};
+
+    /// A `Created` envelope carrying geo coordinates round-trips.
+    ///
+    /// [`EventEvent`] is internally tagged (`#[serde(tag =
+    /// "event_type")]`) and carries a whole [`Event`], so it buffers
+    /// through serde's `Content` exactly as [`Location`] does. Under
+    /// `serde_json`'s `arbitrary_precision` an `f64` coordinate read
+    /// back from that buffer fails with `invalid type: map, expected
+    /// f64` — which would have broken every bus consumer for any event
+    /// with a venue position, silently, since nothing covered this path.
+    /// Exact decimals have no such problem.
+    #[test]
+    fn created_envelope_with_coordinates_round_trips() {
+        let mut event = Event::new(
+            "Concert",
+            Utc.with_ymd_and_hms(2026, 1, 15, 9, 0, 0).unwrap(),
+        );
+        event.location.push(Location::Place(Place {
+            id: None,
+            name: "Zellerbach Hall".into(),
+            address: None,
+            latitude_as_decimal_degrees: Some("37.87".parse().unwrap()),
+            longitude_as_decimal_degrees: Some("-122.254".parse().unwrap()),
+            url: None,
+        }));
+
+        let published = EventEvent::Created {
+            event,
+            timestamp: Utc.with_ymd_and_hms(2026, 1, 15, 9, 0, 0).unwrap(),
+        };
+        let json = serde_json::to_string(&published).unwrap();
+        assert!(
+            json.contains(r#""latitude_as_decimal_degrees":37.87"#),
+            "{json}"
+        );
+
+        let consumed: EventEvent = serde_json::from_str(&json).unwrap();
+        let EventEvent::Created { event, .. } = consumed else {
+            panic!("expected Created");
+        };
+        let Some(Location::Place(place)) = event.location.first() else {
+            panic!("expected a Place location");
+        };
+        assert_eq!(
+            place.latitude_as_decimal_degrees,
+            Some("37.87".parse().unwrap())
+        );
+        assert_eq!(
+            place.longitude_as_decimal_degrees,
+            Some("-122.254".parse().unwrap())
+        );
+    }
+}

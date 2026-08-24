@@ -73,8 +73,8 @@ Fluent builder for `Event`. All string setters accept `impl Into<String>`. Sette
 pub struct Location {
     pub venue_name: Option<String>,
     pub address: Option<Address>,
-    pub latitude: Option<f64>,
-    pub longitude: Option<f64>,
+    pub latitude_as_decimal_degrees: Option<f64>,
+    pub longitude_as_decimal_degrees: Option<f64>,
     pub virtual_url: Option<String>,
 }
 ```

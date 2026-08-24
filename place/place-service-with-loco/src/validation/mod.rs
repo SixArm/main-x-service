@@ -27,6 +27,7 @@
 //! assert!(validate_place(&place).is_empty());
 //! ```
 
+use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -38,7 +39,7 @@ use crate::models::place::Place;
 /// record is valid.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct ValidationError {
-    /// The offending field path (e.g. `"name"`, `"geo.latitude"`).
+    /// The offending field path (e.g. `"name"`, `"geo.latitude_as_decimal_degrees"`).
     pub field: String,
     /// A human-readable explanation suitable for an API error response.
     pub message: String,
@@ -55,6 +56,28 @@ const MAX_TEXT_LEN: usize = 1024;
 const MAX_ARRAY_LEN: usize = 256;
 /// SEC-M1 — maximum length of any single string entry inside an array.
 const MAX_ITEM_LEN: usize = 512;
+
+/// Maximum number of decimal places accepted on a geo coordinate.
+///
+/// Coordinates are exact decimals ([`BigDecimal`]), not `f64`, so the digit
+/// count is no longer capped by the ~17 significant digits a binary float
+/// could hold — a caller could otherwise post a latitude with thousands of
+/// fraction digits and have every one stored. Ten places is roughly 10 µm
+/// at the equator: far past any real positioning system, and well inside
+/// what an `f64` used to carry, so nothing a client could previously send
+/// is newly rejected.
+const MAX_COORDINATE_SCALE: i64 = 10;
+
+/// Push an error when a geo coordinate carries more than
+/// [`MAX_COORDINATE_SCALE`] decimal places.
+fn check_coordinate_scale(errors: &mut Vec<ValidationError>, field: &str, value: &BigDecimal) {
+    if value.fractional_digit_count() > MAX_COORDINATE_SCALE {
+        errors.push(ValidationError {
+            field: field.into(),
+            message: format!("Must not exceed {MAX_COORDINATE_SCALE} decimal places"),
+        });
+    }
+}
 
 /// SEC-M1: push an error when a scalar text `field` exceeds [`MAX_TEXT_LEN`].
 fn cap_text(errors: &mut Vec<ValidationError>, field: &str, value: &str) {
@@ -162,8 +185,10 @@ fn place_amenity_caps(errors: &mut Vec<ValidationError>, place: &Place) {
 /// `global_location_number` (exactly 13 digits), and each
 /// `opening_hours` entry's `opens`/`closes` (exactly 5 chars via
 /// [`time_is_valid`]) — so only `opening_hours` cardinality is capped here.
-/// Numeric fields (geo lat/lon/elevation, capacity) carry no text and are not
-/// capped. The `place_type` `Other(String)` enum payload is not a plain text
+/// Capacity carries no text and is not capped. Geo lat/lon/elevation are
+/// exact decimals rather than text, and are bounded on *scale* by
+/// [`check_coordinate_scale`] instead — an `f64` capped their digit count
+/// implicitly, a `BigDecimal` does not. The `place_type` `Other(String)` enum payload is not a plain text
 /// field and is left uncapped.
 fn place_size_caps(errors: &mut Vec<ValidationError>, place: &Place) {
     cap_text(errors, "name", &place.name);
@@ -181,6 +206,46 @@ fn place_size_caps(errors: &mut Vec<ValidationError>, place: &Place) {
     place_amenity_caps(errors, place);
 
     cap_array(errors, "opening_hours", place.opening_hours.len());
+}
+/// Range- and scale-check a set of coordinates.
+///
+/// Extracted from [`validate_place`] so that function stays readable:
+/// the coordinate field names carry their units now, which is worth the
+/// length at every call site but pushes one long function over the
+/// line limit.
+fn validate_geo(errors: &mut Vec<ValidationError>, geo: &crate::models::geo::GeoCoordinates) {
+    if !(BigDecimal::from(-90)..=BigDecimal::from(90)).contains(&geo.latitude_as_decimal_degrees) {
+        errors.push(ValidationError {
+            field: "geo.latitude_as_decimal_degrees".into(),
+            message: format!(
+                "Latitude must be between -90 and 90, got {}",
+                geo.latitude_as_decimal_degrees
+            ),
+        });
+    }
+    if !(BigDecimal::from(-180)..=BigDecimal::from(180)).contains(&geo.longitude_as_decimal_degrees)
+    {
+        errors.push(ValidationError {
+            field: "geo.longitude_as_decimal_degrees".into(),
+            message: format!(
+                "Longitude must be between -180 and 180, got {}",
+                geo.longitude_as_decimal_degrees
+            ),
+        });
+    }
+    check_coordinate_scale(
+        errors,
+        "geo.latitude_as_decimal_degrees",
+        &geo.latitude_as_decimal_degrees,
+    );
+    check_coordinate_scale(
+        errors,
+        "geo.longitude_as_decimal_degrees",
+        &geo.longitude_as_decimal_degrees,
+    );
+    if let Some(elevation) = geo.elevation_as_decimal_metres.as_ref() {
+        check_coordinate_scale(errors, "geo.elevation_as_decimal_metres", elevation);
+    }
 }
 
 /// Validate a place, returning all validation errors.
@@ -202,7 +267,7 @@ fn place_size_caps(errors: &mut Vec<ValidationError>, place: &Place) {
 /// let mut place = Place::new("Test");
 /// place.geo = Some(GeoCoordinates::new(91.0, 0.0)); // out of range
 /// let errors = validate_place(&place);
-/// assert!(errors.iter().any(|e| e.field == "geo.latitude"));
+/// assert!(errors.iter().any(|e| e.field == "geo.latitude_as_decimal_degrees"));
 /// ```
 #[must_use]
 pub fn validate_place(place: &Place) -> Vec<ValidationError> {
@@ -220,21 +285,7 @@ pub fn validate_place(place: &Place) -> Vec<ValidationError> {
 
     // Geo bounds: WGS-84 latitude/longitude ranges.
     if let Some(geo) = &place.geo {
-        if geo.latitude < -90.0 || geo.latitude > 90.0 {
-            errors.push(ValidationError {
-                field: "geo.latitude".into(),
-                message: format!("Latitude must be between -90 and 90, got {}", geo.latitude),
-            });
-        }
-        if geo.longitude < -180.0 || geo.longitude > 180.0 {
-            errors.push(ValidationError {
-                field: "geo.longitude".into(),
-                message: format!(
-                    "Longitude must be between -180 and 180, got {}",
-                    geo.longitude
-                ),
-            });
-        }
+        validate_geo(&mut errors, geo);
     }
 
     // GLN must be exactly 13 ASCII digits with a valid GS1 mod-10 check digit.
@@ -505,7 +556,11 @@ mod tests {
         let mut place = Place::new("Test");
         place.geo = Some(GeoCoordinates::new(91.0, 0.0));
         let errors = validate_place(&place);
-        assert!(errors.iter().any(|e| e.field == "geo.latitude"));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "geo.latitude_as_decimal_degrees")
+        );
     }
 
     /// Longitude below -180 is flagged.
@@ -514,7 +569,83 @@ mod tests {
         let mut place = Place::new("Test");
         place.geo = Some(GeoCoordinates::new(0.0, -181.0));
         let errors = validate_place(&place);
-        assert!(errors.iter().any(|e| e.field == "geo.longitude"));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field == "geo.longitude_as_decimal_degrees")
+        );
+    }
+
+    /// A coordinate a hair outside the range is flagged.
+    ///
+    /// Exact decimals make this testable: as an `f64`, `90.0000000001`
+    /// and values near it are subject to representation error, so a
+    /// "just outside" case could round back into range.
+    #[test]
+    fn coordinates_just_outside_the_range_are_flagged() {
+        for (lat, lon, field) in [
+            ("90.0000000001", "0", "geo.latitude_as_decimal_degrees"),
+            ("-90.0000000001", "0", "geo.latitude_as_decimal_degrees"),
+            ("0", "180.0000000001", "geo.longitude_as_decimal_degrees"),
+            ("0", "-180.0000000001", "geo.longitude_as_decimal_degrees"),
+        ] {
+            let mut place = Place::new("Test");
+            place.geo = Some(GeoCoordinates {
+                latitude_as_decimal_degrees: lat.parse().unwrap(),
+                longitude_as_decimal_degrees: lon.parse().unwrap(),
+                elevation_as_decimal_metres: None,
+            });
+            let errors = validate_place(&place);
+            assert!(
+                errors.iter().any(|e| e.field == field),
+                "{lat},{lon} should fail on {field}, got {errors:?}"
+            );
+        }
+    }
+
+    /// A coordinate carrying more than [`MAX_COORDINATE_SCALE`] decimal
+    /// places is rejected.
+    ///
+    /// An `f64` bounded the digit count implicitly; an exact decimal does
+    /// not, so without this a caller could post a latitude with thousands
+    /// of fraction digits and have every one stored.
+    #[test]
+    fn coordinate_scale_is_capped() {
+        let places = usize::try_from(MAX_COORDINATE_SCALE).unwrap();
+        let mut place = Place::new("Test");
+        place.geo = Some(GeoCoordinates {
+            latitude_as_decimal_degrees: format!("40.{}", "1".repeat(places + 1)).parse().unwrap(),
+            longitude_as_decimal_degrees: "0".parse().unwrap(),
+            elevation_as_decimal_metres: Some(
+                format!("10.{}", "1".repeat(places + 1)).parse().unwrap(),
+            ),
+        });
+        let errors = validate_place(&place);
+        for field in [
+            "geo.latitude_as_decimal_degrees",
+            "geo.elevation_as_decimal_metres",
+        ] {
+            assert!(
+                errors
+                    .iter()
+                    .any(|e| e.field == field && e.message.contains("decimal places")),
+                "{field} should exceed the scale cap, got {errors:?}"
+            );
+        }
+
+        // Exactly at the cap passes; only strictly-over is rejected,
+        // matching how the text and array caps behave.
+        let mut place = Place::new("Test");
+        place.geo = Some(GeoCoordinates {
+            latitude_as_decimal_degrees: format!("40.{}", "1".repeat(places)).parse().unwrap(),
+            longitude_as_decimal_degrees: "0".parse().unwrap(),
+            elevation_as_decimal_metres: None,
+        });
+        let errors = validate_place(&place);
+        assert!(
+            !errors.iter().any(|e| e.message.contains("decimal places")),
+            "a coordinate at the cap should pass, got {errors:?}"
+        );
     }
 
     /// Boundary coordinates (90, 180) are valid.

@@ -10,6 +10,27 @@ PostgreSQL 18+ via SeaORM.
 `organizations`, `organization_addresses`,
 `place_match_scores`, `audit_log`.
 
+> **Drift, noted not fixed (2026-08-22):** the shipped schema does not
+> have a separate `place_geo_coordinates` table — geo is flattened into
+> `places` as `geo_latitude` / `geo_longitude` / `geo_elevation`, with
+> `idx_places_geo` over the first two. Recorded here because the geo
+> columns were being edited anyway; reconciling the rest of this list
+> against the migrations is its own task.
+
+#### Geo columns
+
+`places.geo_latitude` / `.geo_longitude` / `.geo_elevation` are
+**`NUMERIC`**, not `DOUBLE PRECISION` (§5.2.1). No scale is declared:
+`NUMERIC(9,6)` is the usual geo choice but would silently round anything
+finer, and the previous `DOUBLE PRECISION` column accepted ~15
+significant digits. An unconstrained `NUMERIC` keeps every value a client
+could previously send, and the service caps decimal places at validation
+time rather than letting the database truncate without saying so. The
+widening migration is exact (every double has a `NUMERIC` form); existing
+rows keep the float artefacts they were stored with, since back-filling a
+rounder number would invent precision the caller never sent.
+`idx_places_geo` is rebuilt by Postgres as part of the type change.
+
 ### 10.2 Extensions
 
 Required: `pg_stat_statements`, `uuid-ossp`, `pgcrypto`, `pg_trgm`,

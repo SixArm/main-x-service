@@ -20,8 +20,8 @@
 //! let p = Place::builder()
 //!     .name("Eiffel Tower")
 //!     .add_alternate_name("La Tour Eiffel")
-//!     .latitude(48.858_222)
-//!     .longitude(2.294_500)
+//!     .latitude_as_decimal_degrees(48.858_222)
+//!     .longitude_as_decimal_degrees(2.294_500)
 //!     .build();
 //!
 //! assert_eq!(p.name.as_deref(), Some("Eiffel Tower"));
@@ -371,8 +371,8 @@ impl PlaceId {
 /// let p = Place::builder()
 ///     .name("Big Ben")
 ///     .add_alternate_name("Elizabeth Tower")
-///     .latitude(51.500_7)
-///     .longitude(-0.124_7)
+///     .latitude_as_decimal_degrees(51.500_7)
+///     .longitude_as_decimal_degrees(-0.124_7)
 ///     .build();
 ///
 /// assert_eq!(p.name.as_deref(), Some("Big Ben"));
@@ -402,13 +402,13 @@ pub struct Place {
     /// outside that range or non-finite values are stored as supplied for
     /// round-trip honesty, but the coordinates scorer treats them as
     /// missing.
-    pub latitude: Option<f64>,
+    pub latitude_as_decimal_degrees: Option<f64>,
 
     /// Longitude in decimal degrees. Conventionally `[-180.0, 180.0]`.
     /// Values outside that range or non-finite values are stored as
     /// supplied for round-trip honesty, but the coordinates scorer treats
     /// them as missing.
-    pub longitude: Option<f64>,
+    pub longitude_as_decimal_degrees: Option<f64>,
 
     /// Coarse-grained category of the place (see [`PlaceCategory`]).
     pub category: Option<PlaceCategory>,
@@ -524,8 +524,8 @@ impl Place {
 /// let p: Place = PlaceBuilder::default()
 ///     .name(String::from("Eiffel Tower"))
 ///     .add_alternate_name("La Tour Eiffel")
-///     .latitude(48.858_222)
-///     .longitude(2.294_500)
+///     .latitude_as_decimal_degrees(48.858_222)
+///     .longitude_as_decimal_degrees(2.294_500)
 ///     .category(PlaceCategory::Monument)
 ///     .build();
 ///
@@ -536,8 +536,8 @@ impl Place {
 pub struct PlaceBuilder {
     name: Option<String>,
     alternate_names: Vec<String>,
-    latitude: Option<f64>,
-    longitude: Option<f64>,
+    latitude_as_decimal_degrees: Option<f64>,
+    longitude_as_decimal_degrees: Option<f64>,
     category: Option<PlaceCategory>,
     place_ids: Vec<PlaceId>,
     address: Option<Address>,
@@ -600,12 +600,12 @@ impl PlaceBuilder {
     ///
     /// ```
     /// # use place_matcher::Place;
-    /// let p = Place::builder().latitude(48.858_222).build();
-    /// assert_eq!(p.latitude, Some(48.858_222));
+    /// let p = Place::builder().latitude_as_decimal_degrees(48.858_222).build();
+    /// assert_eq!(p.latitude_as_decimal_degrees, Some(48.858_222));
     /// ```
     #[must_use]
-    pub fn latitude(mut self, value: f64) -> Self {
-        self.latitude = Some(value);
+    pub fn latitude_as_decimal_degrees(mut self, value: f64) -> Self {
+        self.latitude_as_decimal_degrees = Some(value);
         self
     }
 
@@ -613,12 +613,12 @@ impl PlaceBuilder {
     ///
     /// ```
     /// # use place_matcher::Place;
-    /// let p = Place::builder().longitude(2.294_500).build();
-    /// assert_eq!(p.longitude, Some(2.294_500));
+    /// let p = Place::builder().longitude_as_decimal_degrees(2.294_500).build();
+    /// assert_eq!(p.longitude_as_decimal_degrees, Some(2.294_500));
     /// ```
     #[must_use]
-    pub fn longitude(mut self, value: f64) -> Self {
-        self.longitude = Some(value);
+    pub fn longitude_as_decimal_degrees(mut self, value: f64) -> Self {
+        self.longitude_as_decimal_degrees = Some(value);
         self
     }
 
@@ -788,15 +788,15 @@ impl PlaceBuilder {
     /// ```
     /// # use place_matcher::Place;
     /// let p = Place::builder().name("Big Ben").build();
-    /// assert!(p.latitude.is_none());
+    /// assert!(p.latitude_as_decimal_degrees.is_none());
     /// ```
     #[must_use]
     pub fn build(self) -> Place {
         Place {
             name: self.name,
             alternate_names: self.alternate_names,
-            latitude: self.latitude,
-            longitude: self.longitude,
+            latitude_as_decimal_degrees: self.latitude_as_decimal_degrees,
+            longitude_as_decimal_degrees: self.longitude_as_decimal_degrees,
             category: self.category,
             place_ids: self.place_ids,
             address: self.address,
@@ -862,8 +862,8 @@ mod tests {
         let p = Place::builder().build();
         assert!(p.name.is_none());
         assert!(p.alternate_names.is_empty());
-        assert!(p.latitude.is_none());
-        assert!(p.longitude.is_none());
+        assert!(p.latitude_as_decimal_degrees.is_none());
+        assert!(p.longitude_as_decimal_degrees.is_none());
         assert!(p.category.is_none());
         assert!(p.place_ids.is_empty());
         assert!(p.address.is_none());
@@ -925,8 +925,8 @@ mod tests {
         let p = Place::builder()
             .name("Eiffel Tower")
             .add_alternate_name("La Tour Eiffel")
-            .latitude(48.858_222)
-            .longitude(2.294_500)
+            .latitude_as_decimal_degrees(48.858_222)
+            .longitude_as_decimal_degrees(2.294_500)
             .category(PlaceCategory::Monument)
             .add_place_id(PlaceId::new(PlaceIdScheme::Wikidata, "Q243").unwrap())
             .country_code_as_iso_3166_1_alpha_2("FR")

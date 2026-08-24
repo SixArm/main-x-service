@@ -21,15 +21,15 @@
 //!
 //! let a = Place::builder()
 //!     .name("Eiffel Tower")
-//!     .latitude(48.858_222)
-//!     .longitude(2.294_500)
+//!     .latitude_as_decimal_degrees(48.858_222)
+//!     .longitude_as_decimal_degrees(2.294_500)
 //!     .build();
 //!
 //! let b = Place::builder()
 //!     .name("La Tour Eiffel")
 //!     .add_alternate_name("Eiffel Tower")
-//!     .latitude(48.858_3)
-//!     .longitude(2.294_5)
+//!     .latitude_as_decimal_degrees(48.858_3)
+//!     .longitude_as_decimal_degrees(2.294_5)
 //!     .build();
 //!
 //! let engine = MatchingEngine::default_config();
@@ -432,8 +432,8 @@ impl MatchingEngine {
     ///
     /// let p = Place::builder()
     ///     .name("Eiffel Tower")
-    ///     .latitude(48.858_222)
-    ///     .longitude(2.294_500)
+    ///     .latitude_as_decimal_degrees(48.858_222)
+    ///     .longitude_as_decimal_degrees(2.294_500)
     ///     .build();
     ///
     /// let result = MatchingEngine::default_config().match_places(&p, &p);
@@ -753,8 +753,14 @@ impl MatchingEngine {
     /// [`Scorer::coordinates_score`] using the configured
     /// `coordinates_scale_metres`.
     fn score_coordinates(&self, place1: &Place, place2: &Place) -> Option<f64> {
-        let (lat1, lon1) = valid_coords(place1.latitude, place1.longitude)?;
-        let (lat2, lon2) = valid_coords(place2.latitude, place2.longitude)?;
+        let (lat1, lon1) = valid_coords(
+            place1.latitude_as_decimal_degrees,
+            place1.longitude_as_decimal_degrees,
+        )?;
+        let (lat2, lon2) = valid_coords(
+            place2.latitude_as_decimal_degrees,
+            place2.longitude_as_decimal_degrees,
+        )?;
         let d = Scorer::haversine_metres(lat1, lon1, lat2, lon2);
         Some(Scorer::coordinates_score(
             d,
@@ -1065,8 +1071,8 @@ mod tests {
     fn exact_clone_is_a_match() {
         let p = Place::builder()
             .name("Eiffel Tower")
-            .latitude(48.858_222)
-            .longitude(2.294_500)
+            .latitude_as_decimal_degrees(48.858_222)
+            .longitude_as_decimal_degrees(2.294_500)
             .build();
         let result = MatchingEngine::default_config().match_places(&p, &p.clone());
         assert!(result.is_match);
@@ -1092,13 +1098,13 @@ mod tests {
     fn unrelated_places_do_not_match() {
         let a = Place::builder()
             .name("Eiffel Tower")
-            .latitude(48.858_222)
-            .longitude(2.294_500)
+            .latitude_as_decimal_degrees(48.858_222)
+            .longitude_as_decimal_degrees(2.294_500)
             .build();
         let b = Place::builder()
             .name("Sydney Opera House")
-            .latitude(-33.856_8)
-            .longitude(151.215_3)
+            .latitude_as_decimal_degrees(-33.856_8)
+            .longitude_as_decimal_degrees(151.215_3)
             .build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
         assert!(!r.is_match);
@@ -1119,13 +1125,13 @@ mod tests {
     fn coordinates_score_present_when_both_sides_have_coords() {
         let a = Place::builder()
             .name("X")
-            .latitude(0.0)
-            .longitude(0.0)
+            .latitude_as_decimal_degrees(0.0)
+            .longitude_as_decimal_degrees(0.0)
             .build();
         let b = Place::builder()
             .name("X")
-            .latitude(0.0)
-            .longitude(0.0)
+            .latitude_as_decimal_degrees(0.0)
+            .longitude_as_decimal_degrees(0.0)
             .build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
         assert!((r.breakdown.coordinates_score.unwrap() - 1.0).abs() < 1e-9);
@@ -1135,13 +1141,13 @@ mod tests {
     fn coordinates_score_none_when_out_of_range() {
         let a = Place::builder()
             .name("X")
-            .latitude(91.0)
-            .longitude(0.0)
+            .latitude_as_decimal_degrees(91.0)
+            .longitude_as_decimal_degrees(0.0)
             .build();
         let b = Place::builder()
             .name("X")
-            .latitude(0.0)
-            .longitude(0.0)
+            .latitude_as_decimal_degrees(0.0)
+            .longitude_as_decimal_degrees(0.0)
             .build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
         assert!(r.breakdown.coordinates_score.is_none());
@@ -1151,8 +1157,8 @@ mod tests {
     fn coordinates_score_none_when_one_side_missing() {
         let a = Place::builder()
             .name("X")
-            .latitude(48.0)
-            .longitude(2.0)
+            .latitude_as_decimal_degrees(48.0)
+            .longitude_as_decimal_degrees(2.0)
             .build();
         let b = Place::builder().name("X").build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
@@ -1163,13 +1169,13 @@ mod tests {
     fn coordinates_score_none_when_nonfinite() {
         let a = Place::builder()
             .name("X")
-            .latitude(f64::NAN)
-            .longitude(0.0)
+            .latitude_as_decimal_degrees(f64::NAN)
+            .longitude_as_decimal_degrees(0.0)
             .build();
         let b = Place::builder()
             .name("X")
-            .latitude(0.0)
-            .longitude(0.0)
+            .latitude_as_decimal_degrees(0.0)
+            .longitude_as_decimal_degrees(0.0)
             .build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
         assert!(r.breakdown.coordinates_score.is_none());
@@ -1352,14 +1358,14 @@ mod tests {
         let a = Place::builder()
             .name(".")
             .address(Address::new().with_postcode(" "))
-            .latitude(51.5)
-            .longitude(-0.1)
+            .latitude_as_decimal_degrees(51.5)
+            .longitude_as_decimal_degrees(-0.1)
             .build();
         let b = Place::builder()
             .name("--")
             .address(Address::new().with_postcode("   "))
-            .latitude(40.7)
-            .longitude(-74.0)
+            .latitude_as_decimal_degrees(40.7)
+            .longitude_as_decimal_degrees(-74.0)
             .build();
         // Sanity: both names and both postcodes normalise to empty.
         assert_eq!(Normalizer::normalize_name("."), "");
@@ -1379,13 +1385,13 @@ mod tests {
         };
         let p1 = Place::builder()
             .name("Cafe Centrale")
-            .latitude(48.0)
-            .longitude(2.0)
+            .latitude_as_decimal_degrees(48.0)
+            .longitude_as_decimal_degrees(2.0)
             .build();
         let p2 = Place::builder()
             .name("Cafe Central") // close but not equal under normalisation
-            .latitude(48.0)
-            .longitude(2.0)
+            .latitude_as_decimal_degrees(48.0)
+            .longitude_as_decimal_degrees(2.0)
             .build();
         let engine = MatchingEngine::new(cfg);
         let r = engine.match_places(&p1, &p2);

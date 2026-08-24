@@ -16,14 +16,14 @@ fn main() {
     // penalise it noticeably.
     let p1 = Place::builder()
         .name("Cafe Centrale")
-        .latitude(48.858_222)
-        .longitude(2.294_500)
+        .latitude_as_decimal_degrees(48.858_222)
+        .longitude_as_decimal_degrees(2.294_500)
         .category(PlaceCategory::Cafe)
         .build();
     let p2 = Place::builder()
         .name("Cafe Central")
-        .latitude(48.858_85) // ~70m north of p1
-        .longitude(2.294_500)
+        .latitude_as_decimal_degrees(48.858_85) // ~70m north of p1
+        .longitude_as_decimal_degrees(2.294_500)
         .category(PlaceCategory::Cafe)
         .build();
 
@@ -64,8 +64,8 @@ fn main() {
     // Category disagreement is more punitive when its weight is raised.
     let p3 = Place::builder()
         .name("Cafe Centrale")
-        .latitude(48.858_222)
-        .longitude(2.294_500)
+        .latitude_as_decimal_degrees(48.858_222)
+        .longitude_as_decimal_degrees(2.294_500)
         .category(PlaceCategory::Hotel) // disagrees with p1's Cafe
         .build();
 

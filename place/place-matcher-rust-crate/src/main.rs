@@ -28,8 +28,8 @@ fn main() {
     println!("Example 1: Perfect Match (identical clone)");
     let eiffel = Place::builder()
         .name("Eiffel Tower")
-        .latitude(48.858_222)
-        .longitude(2.294_500)
+        .latitude_as_decimal_degrees(48.858_222)
+        .longitude_as_decimal_degrees(2.294_500)
         .category(PlaceCategory::Monument)
         .country_code_as_iso_3166_1_alpha_2("FR")
         .build();
@@ -41,8 +41,8 @@ fn main() {
     let eiffel_fr = Place::builder()
         .name("La Tour Eiffel")
         .add_alternate_name("Tour Eiffel")
-        .latitude(48.858_3)
-        .longitude(2.294_5)
+        .latitude_as_decimal_degrees(48.858_3)
+        .longitude_as_decimal_degrees(2.294_5)
         .category(PlaceCategory::Monument)
         .country_code_as_iso_3166_1_alpha_2("FR")
         .build();
@@ -87,15 +87,15 @@ fn main() {
     println!("\nExample 5: Category Mismatch");
     let same_name_hotel = Place::builder()
         .name("The Grand")
-        .latitude(40.7)
-        .longitude(-74.0)
+        .latitude_as_decimal_degrees(40.7)
+        .longitude_as_decimal_degrees(-74.0)
         .category(PlaceCategory::Hotel)
         .country_code_as_iso_3166_1_alpha_2("US")
         .build();
     let same_name_cafe = Place::builder()
         .name("The Grand")
-        .latitude(40.7)
-        .longitude(-74.0)
+        .latitude_as_decimal_degrees(40.7)
+        .longitude_as_decimal_degrees(-74.0)
         .category(PlaceCategory::Cafe)
         .country_code_as_iso_3166_1_alpha_2("US")
         .build();
@@ -109,14 +109,14 @@ fn main() {
     let lenient = MatchingEngine::new(MatchConfig::lenient());
     let p1 = Place::builder()
         .name("Big Ben")
-        .latitude(51.500_7)
-        .longitude(-0.124_7)
+        .latitude_as_decimal_degrees(51.500_7)
+        .longitude_as_decimal_degrees(-0.124_7)
         .build();
     let p2 = Place::builder()
         .name("Elizabeth Tower")
         .add_alternate_name("Big Ben")
-        .latitude(51.500_72)
-        .longitude(-0.124_65)
+        .latitude_as_decimal_degrees(51.500_72)
+        .longitude_as_decimal_degrees(-0.124_65)
         .build();
     let rs = strict.match_places(&p1, &p2);
     let rl = lenient.match_places(&p1, &p2);

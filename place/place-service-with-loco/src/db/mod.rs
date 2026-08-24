@@ -245,12 +245,17 @@ impl SeaOrmPlaceRepository {
             .collect();
 
         let address = build_address(&row);
-        let geo = match (row.geo_latitude, row.geo_longitude) {
-            (Some(latitude), Some(longitude)) => Some(GeoCoordinates {
-                latitude,
-                longitude,
-                elevation: row.geo_elevation,
-            }),
+        let geo = match (
+            row.geo_latitude_as_decimal_degrees,
+            row.geo_longitude_as_decimal_degrees,
+        ) {
+            (Some(latitude_as_decimal_degrees), Some(longitude_as_decimal_degrees)) => {
+                Some(GeoCoordinates {
+                    latitude_as_decimal_degrees,
+                    longitude_as_decimal_degrees,
+                    elevation_as_decimal_metres: row.geo_elevation_as_decimal_metres,
+                })
+            }
             _ => None,
         };
         let place_type = row
@@ -516,9 +521,18 @@ fn to_active(place: &Place) -> places::ActiveModel {
             .as_ref()
             .and_then(|a| a.address_country.clone())),
         address_postal_code: Set(place.address.as_ref().and_then(|a| a.postal_code.clone())),
-        geo_latitude: Set(place.geo.as_ref().map(|g| g.latitude)),
-        geo_longitude: Set(place.geo.as_ref().map(|g| g.longitude)),
-        geo_elevation: Set(place.geo.as_ref().and_then(|g| g.elevation)),
+        geo_latitude_as_decimal_degrees: Set(place
+            .geo
+            .as_ref()
+            .map(|g| g.latitude_as_decimal_degrees.clone())),
+        geo_longitude_as_decimal_degrees: Set(place
+            .geo
+            .as_ref()
+            .map(|g| g.longitude_as_decimal_degrees.clone())),
+        geo_elevation_as_decimal_metres: Set(place
+            .geo
+            .as_ref()
+            .and_then(|g| g.elevation_as_decimal_metres.clone())),
         telephone: Set(place.telephone.clone()),
         fax_number: Set(place.fax_number.clone()),
         url: Set(place.url.clone()),

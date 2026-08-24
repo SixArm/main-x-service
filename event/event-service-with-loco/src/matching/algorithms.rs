@@ -21,10 +21,11 @@
 //! assert_eq!(match_titles("", "Concert"), 0.0);
 //! ```
 
+use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::{DateTime, Utc};
 use strsim::{jaro_winkler, normalized_levenshtein};
 
-use crate::models::{Address, Identifier, Location, Party, Reference};
+use crate::models::{Address, Identifier, Location, Party, Place, Reference};
 
 // ============================================================================
 // Name / title matching
@@ -167,7 +168,7 @@ pub mod time_matching {
 
 /// Location matching, dispatched by [`Location`] variant.
 pub mod location_matching {
-    use super::{Address, Location, jaro_winkler, name_matching};
+    use super::{Address, BigDecimal, Location, Place, ToPrimitive, jaro_winkler, name_matching};
 
     /// Score the best pairwise location match across two lists.
     ///
@@ -215,10 +216,20 @@ pub mod location_matching {
                     (Some(a1), Some(a2)) => match_address(a1, a2),
                     _ => 0.0,
                 };
-                let geo_score = match (p1.latitude, p1.longitude, p2.latitude, p2.longitude) {
-                    (Some(la1), Some(lo1), Some(la2), Some(lo2)) => {
-                        geo_proximity(la1, lo1, la2, lo2)
-                    }
+                // Coordinates are stored as exact decimals; Haversine is
+                // floating-point, so convert at this boundary only.
+                let geo = |p: &Place| {
+                    Some((
+                        p.latitude_as_decimal_degrees
+                            .as_ref()
+                            .and_then(BigDecimal::to_f64)?,
+                        p.longitude_as_decimal_degrees
+                            .as_ref()
+                            .and_then(BigDecimal::to_f64)?,
+                    ))
+                };
+                let geo_score = match (geo(p1), geo(p2)) {
+                    (Some((la1, lo1)), Some((la2, lo2))) => geo_proximity(la1, lo1, la2, lo2),
                     _ => 0.0,
                 };
                 let combined = (name_score * 0.4) + (addr_score * 0.4) + (geo_score * 0.2);
@@ -549,16 +560,16 @@ mod tests {
             id: Some(id),
             name: "x".into(),
             address: None,
-            latitude: None,
-            longitude: None,
+            latitude_as_decimal_degrees: None,
+            longitude_as_decimal_degrees: None,
             url: None,
         };
         let p2 = Place {
             id: Some(id),
             name: "y".into(),
             address: None,
-            latitude: None,
-            longitude: None,
+            latitude_as_decimal_degrees: None,
+            longitude_as_decimal_degrees: None,
             url: None,
         };
         assert!(

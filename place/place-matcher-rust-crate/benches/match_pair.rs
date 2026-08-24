@@ -18,8 +18,8 @@ fn build_eiffel() -> Place {
         .name("Eiffel Tower")
         .add_alternate_name("La Tour Eiffel")
         .add_alternate_name("Tour Eiffel")
-        .latitude(48.858_222)
-        .longitude(2.294_500)
+        .latitude_as_decimal_degrees(48.858_222)
+        .longitude_as_decimal_degrees(2.294_500)
         .category(PlaceCategory::Monument)
         .country_code_as_iso_3166_1_alpha_2("FR")
         .add_place_id(PlaceId::new(PlaceIdScheme::Wikidata, "Q243").unwrap())
@@ -38,8 +38,8 @@ fn build_eiffel_fuzzy(_seed: &Place) -> Place {
     Place::builder()
         .name("Tour Eiffel")
         .add_alternate_name("Eiffel Tower")
-        .latitude(48.858_3)
-        .longitude(2.294_5)
+        .latitude_as_decimal_degrees(48.858_3)
+        .longitude_as_decimal_degrees(2.294_5)
         .category(PlaceCategory::Monument)
         .country_code_as_iso_3166_1_alpha_2("FR")
         .add_place_id(PlaceId::new(PlaceIdScheme::Wikidata, "Q243").unwrap())
@@ -57,8 +57,8 @@ fn build_eiffel_fuzzy(_seed: &Place) -> Place {
 fn build_unrelated() -> Place {
     Place::builder()
         .name("Sydney Opera House")
-        .latitude(-33.856_8)
-        .longitude(151.215_3)
+        .latitude_as_decimal_degrees(-33.856_8)
+        .longitude_as_decimal_degrees(151.215_3)
         .category(PlaceCategory::Theatre)
         .country_code_as_iso_3166_1_alpha_2("AU")
         .build()
@@ -70,8 +70,8 @@ fn make_candidate(idx: usize) -> Place {
     let offset = f64::from(u32::try_from(idx).unwrap_or(u32::MAX)) * 1e-4;
     Place::builder()
         .name(names[idx % names.len()])
-        .latitude(48.858_222 + offset)
-        .longitude(2.294_500 + offset)
+        .latitude_as_decimal_degrees(48.858_222 + offset)
+        .longitude_as_decimal_degrees(2.294_500 + offset)
         .category(if idx.is_multiple_of(2) {
             PlaceCategory::Cafe
         } else {

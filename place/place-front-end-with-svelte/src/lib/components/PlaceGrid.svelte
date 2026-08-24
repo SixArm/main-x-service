@@ -55,7 +55,7 @@
             place_type: placeTypeLabel(p),
             locality: p.address?.address_locality ?? "",
             country: p.address?.address_country ?? "",
-            geo: p.geo ? `${p.geo.latitude.toFixed(4)}, ${p.geo.longitude.toFixed(4)}` : "",
+            geo: p.geo ? `${p.geo.latitude_as_decimal_degrees.toFixed(4)}, ${p.geo.longitude_as_decimal_degrees.toFixed(4)}` : "",
         })),
     );
 

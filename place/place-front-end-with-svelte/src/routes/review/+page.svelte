@@ -239,7 +239,7 @@
     /** `"lat, lon"`; `null` when there is no geo. */
     function geoLine(place: Place | null): string | null {
         const geo = place?.geo;
-        return geo ? `${geo.latitude}, ${geo.longitude}` : null;
+        return geo ? `${geo.latitude_as_decimal_degrees}, ${geo.longitude_as_decimal_degrees}` : null;
     }
 
     /** Renders a possibly-absent field as an explicit "not recorded". */

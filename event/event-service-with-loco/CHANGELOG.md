@@ -8,6 +8,67 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Changed — geo coordinates are exact decimals, not floats
+
+`Place::latitude` / `Place::longitude` move from `f64` to `BigDecimal`,
+and `event_locations.latitude` / `.longitude` from `DOUBLE PRECISION` to
+`NUMERIC` (migration `m20260822_000001_location_coordinates_to_numeric`).
+
+A coordinate is a decimal quantity. `DOUBLE PRECISION` cannot hold
+`37.87` — it holds `37.869999999999997` — and cannot tell `37.87` from
+`37.8700000000000001` at all. Coordinates now round-trip as the digits
+the caller sent.
+
+The immediate trigger was a real failure, not a tidy-up. The repository
+adopted `serde_json`'s `arbitrary_precision` feature
+(`spec/serde-json-float-roundtrip-arbitrary-precision`), under which
+every number is represented internally as a one-key map. `Location` is an
+internally-tagged enum (`#[serde(tag = "kind")]`), so serde buffers the
+variant's fields through `Content` — and an `f64` read back from that
+buffer fails with `invalid type: map, expected f64`. Concretely,
+`POST /api/events` with real coordinates stopped deserializing;
+`models::event::tests::roundtrip_serde` was the only thing in the tree
+that caught it. An exact decimal has no such problem.
+
+**The wire format is unchanged.** `BigDecimal`'s default serde impl emits
+a quoted string, which would have broken every client; these fields opt
+into `bigdecimal::impl_serde::arbitrary_precision_option` instead, so the
+JSON stays `"latitude":37.87` (and `null` when absent), exactly as the
+`f64` produced. The SvelteKit front-end types these as `number | null`
+and needs no change. OpenAPI continues to advertise a number
+(`#[schema(value_type = Option<f64>)]`).
+
+Matching is unaffected in substance: the matcher scores geo distance with
+Haversine, which is floating-point, so the adapter converts at that
+boundary. A coordinate not representable as `f64` is dropped from scoring
+rather than approximated into a wrong position — exactness is a property
+of what is stored and returned, not of the distance score.
+
+Also added, because the type change removes a bound that used to exist by
+accident: `MAX_COORDINATE_SCALE` (10 decimal places, ~10 µm). An `f64`
+capped the digit count implicitly at ~17 significant digits; an exact
+decimal does not, so without this a caller could post a latitude with
+thousands of fraction digits and have every one stored. Nothing a client
+could previously send is newly rejected.
+
+The migration widens exactly — every double has a `NUMERIC` form, so no
+stored value is lost. Existing rows keep the float artefacts they were
+written with (`37.869999999999997` stays); only values written from here
+on are exact. Back-filling a rounder number would be inventing precision
+the caller never sent. Rolling back is lossy by nature, which is the
+argument for the direction taken.
+
+Three parts, per this crate's SDD discipline: spec (§5.2.1, §5.3
+invariants, §10.1), code, and tests — seven new cases pinning the JSON
+number representation, the tagged-enum round-trip that regressed, exact
+decimal round-tripping, `null`/absent handling, inclusive range bounds,
+and the scale cap, plus one on the event-stream envelope (`EventEvent` is
+also internally tagged and carries a whole `Event`, so bus consumers had
+the identical latent break with nothing covering it).
+`cargo test --all-targets` 159/159,
+`cargo clippy --all-targets -- -D warnings` clean, `cargo fmt --check`
+clean.
+
 ### Added — declared MSRV (Rust 1.95)
 
 - `Cargo.toml` now declares `rust-version = "1.95"`, the repository's

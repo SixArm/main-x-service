@@ -7,6 +7,7 @@
 //! masking of all sensitive fields, and full end-to-end pipelines that chain
 //! validate → normalize → match / mask → export.
 
+use bigdecimal::BigDecimal;
 use place_service::matching::scoring::{MatchWeights, compute_match};
 use place_service::models::address::PostalAddress;
 use place_service::models::geo::GeoCoordinates;
@@ -188,8 +189,14 @@ fn test_mask_place_with_all_sensitive_fields() {
 
     // Geo rounded
     let geo = masked.geo.unwrap();
-    assert!((geo.latitude - 40.78).abs() < 0.01);
-    assert!((geo.longitude - (-73.97)).abs() < 0.01);
+    assert_eq!(
+        geo.latitude_as_decimal_degrees,
+        "40.78".parse::<BigDecimal>().unwrap()
+    );
+    assert_eq!(
+        geo.longitude_as_decimal_degrees,
+        "-73.97".parse::<BigDecimal>().unwrap()
+    );
 
     // Non-sensitive unchanged
     assert_eq!(masked.name, "Full Privacy Test");

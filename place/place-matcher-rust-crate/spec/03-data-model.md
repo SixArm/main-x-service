@@ -9,8 +9,8 @@ All public types are `#[derive(Serialize, Deserialize)]` and round-trip through 
 pub struct Place {
     pub name: Option<String>,
     pub alternate_names: Vec<String>,
-    pub latitude: Option<f64>,
-    pub longitude: Option<f64>,
+    pub latitude_as_decimal_degrees: Option<f64>,
+    pub longitude_as_decimal_degrees: Option<f64>,
     pub category: Option<PlaceCategory>,
     pub place_ids: Vec<PlaceId>,
     pub address: Option<Address>,

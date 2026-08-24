@@ -101,9 +101,9 @@
         <section class="surface stack">
             <h2>{t("detail.geo")}</h2>
             <dl class="kv">
-                <dt>{t("detail.latitude")}</dt><dd>{place.geo.latitude}</dd>
-                <dt>{t("detail.longitude")}</dt><dd>{place.geo.longitude}</dd>
-                {#if place.geo.elevation != null}<dt>{t("detail.elevation")}</dt><dd>{place.geo.elevation} m</dd>{/if}
+                <dt>{t("detail.latitude_as_decimal_degrees")}</dt><dd>{place.geo.latitude_as_decimal_degrees}</dd>
+                <dt>{t("detail.longitude_as_decimal_degrees")}</dt><dd>{place.geo.longitude_as_decimal_degrees}</dd>
+                {#if place.geo.elevation_as_decimal_metres != null}<dt>{t("detail.elevation_as_decimal_metres")}</dt><dd>{place.geo.elevation_as_decimal_metres} m</dd>{/if}
             </dl>
         </section>
     {/if}

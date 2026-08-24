@@ -217,6 +217,7 @@ impl Place {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bigdecimal::BigDecimal;
 
     /// `new` sets the name, a non-nil id, and a not-deleted record.
     #[test]
@@ -265,13 +266,16 @@ mod tests {
     #[test]
     fn test_place_with_geo() {
         let geo = GeoCoordinates {
-            latitude: 40.7829,
-            longitude: -73.9654,
-            elevation: None,
+            latitude_as_decimal_degrees: "40.7829".parse().unwrap(),
+            longitude_as_decimal_degrees: "-73.9654".parse().unwrap(),
+            elevation_as_decimal_metres: None,
         };
         let mut place = Place::new("Central Park");
         place.geo = Some(geo);
-        assert!((place.geo.as_ref().unwrap().latitude - 40.7829).abs() < f64::EPSILON);
+        assert_eq!(
+            place.geo.as_ref().unwrap().latitude_as_decimal_degrees,
+            "40.7829".parse::<BigDecimal>().unwrap()
+        );
     }
 
     /// A place survives a JSON serialization round-trip, id included.

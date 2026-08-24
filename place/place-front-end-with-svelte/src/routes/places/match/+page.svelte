@@ -24,7 +24,7 @@
     let name = $state("");
     let threshold = $state(0.7);
     let address = $state<PostalAddress>(blankPostalAddress());
-    let geo = $state<GeoCoordinates>({ latitude: 0, longitude: 0, elevation: null });
+    let geo = $state<GeoCoordinates>({ latitude_as_decimal_degrees: 0, longitude_as_decimal_degrees: 0, elevation_as_decimal_metres: null });
     let useGeo = $state(false);
 
     let results = $state<MatchResult[]>([]);

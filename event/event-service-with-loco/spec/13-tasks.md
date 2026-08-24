@@ -3,6 +3,34 @@
 Spec-driven work breakdown. Tick the box when an automated test or
 clearly described manual check confirms the acceptance criterion.
 
+- [x] **2026-08-22 — Geo coordinates as exact decimals (`f64` →
+  `BigDecimal`, `DOUBLE PRECISION` → `NUMERIC`).** `Place::latitude` /
+  `Place::longitude` and `event_locations.latitude` / `.longitude`
+  (migration `m20260822_000001_location_coordinates_to_numeric`). A
+  coordinate is a decimal quantity: `DOUBLE PRECISION` cannot hold
+  `37.87` (it holds `37.869999999999997`) and cannot distinguish it from
+  `37.8700000000000001`. Forced by a real break, not preference — the
+  repository adopted `serde_json`'s `arbitrary_precision`
+  (`spec/serde-json-float-roundtrip-arbitrary-precision`), under which
+  serde's `Content` buffer represents a number as a map, so an `f64`
+  field inside an internally-tagged enum fails to deserialize. Both
+  `Location` (`tag = "kind"`) and the bus envelope `EventEvent` (`tag =
+  "event_type"`) are such enums; `POST /api/events` with coordinates and
+  every bus consumer of an event with a venue position were affected.
+  **Wire format deliberately unchanged** — the fields use
+  `bigdecimal::impl_serde::arbitrary_precision_option`, so JSON stays a
+  number (`"latitude":37.87`, `null` when absent) and the SvelteKit
+  front-end (`number | null`) needs no change. Matching converts to
+  `f64` at the Haversine boundary only. Adds `MAX_COORDINATE_SCALE`
+  (10 places), replacing the digit bound `f64` used to provide by
+  accident. **Acceptance:** coordinates serialize as JSON numbers, not
+  strings; a fractional coordinate round-trips through both tagged
+  enums; `37.8700000000000001` survives verbatim; absent stays `null`;
+  range bounds inclusive; over-scale → `422`. §5.2.1, §5.3, §10.1.
+  Verified: 159/159 unit + integration, DB-gated suite green against
+  Postgres 18 with the column confirmed `numeric`, clippy `-D warnings`,
+  fmt, MSRV 1.95, bench link, `cargo deny`.
+
 - [x] **SEC-M1 (security): input-size caps on the `Event` payload.**
   `validate_event` bounds scalar text (`MAX_TEXT_LEN = 1024`), string-array
   cardinality + per-entry (`MAX_ARRAY_LEN = 256` / `MAX_ITEM_LEN = 512`), and

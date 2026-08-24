@@ -50,6 +50,7 @@
 //! assert!(json.contains("\"kind\":\"virtual\""));
 //! ```
 
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -211,10 +212,21 @@ pub struct Place {
     pub name: String,
     /// Structured postal address of the venue.
     pub address: Option<Address>,
-    /// Latitude in decimal degrees (`-90.0..=90.0`).
-    pub latitude: Option<f64>,
-    /// Longitude in decimal degrees (`-180.0..=180.0`).
-    pub longitude: Option<f64>,
+    /// Latitude in decimal degrees (`-90..=90`).
+    ///
+    /// Exact decimal, not binary float: `37.87` stores and returns as
+    /// `37.87`, where an `f64` holds `37.869999999999997…`. Stays a JSON
+    /// **number** on the wire — `serde_json`'s `arbitrary_precision`
+    /// carries the digits through verbatim, so the API shape is
+    /// unchanged from when this was an `f64`.
+    #[serde(default, with = "bigdecimal::impl_serde::arbitrary_precision_option")]
+    #[schema(value_type = Option<f64>)]
+    pub latitude_as_decimal_degrees: Option<BigDecimal>,
+    /// Longitude in decimal degrees (`-180..=180`). Exact decimal; see
+    /// [`Place::latitude`].
+    #[serde(default, with = "bigdecimal::impl_serde::arbitrary_precision_option")]
+    #[schema(value_type = Option<f64>)]
+    pub longitude_as_decimal_degrees: Option<BigDecimal>,
     /// Canonical URL for the venue.
     pub url: Option<String>,
 }

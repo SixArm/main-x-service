@@ -56,6 +56,8 @@ matcher's flat builder shape:
 - `place_type` → `category` (12-variant service enum → 34-variant matcher vocabulary, with `Other(s)` flowing through)
 - `address.street_address` → `line1`; `address_locality` → `city`; `address_region` → `county`; `postal_code` → `postcode`; `address_country` → `country` (and `country_code_as_iso_3166_1_alpha_2` if 2-character)
 - `geo.latitude` / `.longitude` / `.elevation` → bare `f64` slots + `elevation_as_metre`
+  (converted from the stored exact decimals at this boundary; Haversine is
+  floating-point — see spec §5.2.1)
 - `telephone` → `phone`
 - `global_location_number` → `add_place_id(Other("GLN"), value)`
 - `branch_code` → `add_place_id(Other("BranchCode"), value)`
