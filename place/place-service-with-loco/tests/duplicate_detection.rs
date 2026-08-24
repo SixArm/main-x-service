@@ -42,8 +42,8 @@ fn central_park() -> Place {
         postal_code: Some("10022".into()),
     });
     p.geo = Some(GeoCoordinates {
-        latitude: 40.7829,
-        longitude: -73.9654,
+        latitude: "40.7829".parse().unwrap(),
+        longitude: "-73.9654".parse().unwrap(),
         elevation: None,
     });
     p
@@ -103,26 +103,26 @@ fn closer_geo_outscores_farther_geo_for_same_name() {
     let mut close_a = central_park();
     let mut close_b = central_park();
     close_a.geo = Some(GeoCoordinates {
-        latitude: 40.7829,
-        longitude: -73.9654,
+        latitude: "40.7829".parse().unwrap(),
+        longitude: "-73.9654".parse().unwrap(),
         elevation: None,
     });
     close_b.geo = Some(GeoCoordinates {
-        latitude: 40.78294, // ~5m north
-        longitude: -73.9654,
+        latitude: "40.78294".parse().unwrap(), // ~5m north
+        longitude: "-73.9654".parse().unwrap(),
         elevation: None,
     });
 
     let mut far_a = central_park();
     let mut far_b = central_park();
     far_a.geo = Some(GeoCoordinates {
-        latitude: 40.7829,
-        longitude: -73.9654,
+        latitude: "40.7829".parse().unwrap(),
+        longitude: "-73.9654".parse().unwrap(),
         elevation: None,
     });
     far_b.geo = Some(GeoCoordinates {
-        latitude: 41.7829, // ~111km north
-        longitude: -73.9654,
+        latitude: "41.7829".parse().unwrap(), // ~111km north
+        longitude: "-73.9654".parse().unwrap(),
         elevation: None,
     });
 
@@ -242,8 +242,8 @@ fn place_type_mismatch_lowers_overall_score() {
 fn completely_different_places_score_low_and_do_not_match() {
     let mut a = place("Eiffel Tower");
     a.geo = Some(GeoCoordinates {
-        latitude: 48.8584,
-        longitude: 2.2945,
+        latitude: "48.8584".parse().unwrap(),
+        longitude: "2.2945".parse().unwrap(),
         elevation: None,
     });
     a.address = Some(PostalAddress {
@@ -271,14 +271,14 @@ fn same_name_far_geo_does_not_falsely_match() {
     // must prevent the name-only match from short-circuiting.
     let mut a = place("Main Street");
     a.geo = Some(GeoCoordinates {
-        latitude: 40.7,
-        longitude: -74.0,
+        latitude: "40.7".parse().unwrap(),
+        longitude: "-74.0".parse().unwrap(),
         elevation: None,
     });
     let mut b = place("Main Street");
     b.geo = Some(GeoCoordinates {
-        latitude: -33.9,
-        longitude: 151.2, // Sydney
+        latitude: "-33.9".parse().unwrap(),
+        longitude: "151.2".parse().unwrap(), // Sydney
         elevation: None,
     });
 
@@ -326,9 +326,9 @@ fn address_field_names_map_correctly() {
 fn geo_elevation_propagates_when_present() {
     let mut a = place("Mauna Kea Summit");
     a.geo = Some(GeoCoordinates {
-        latitude: 19.8207,
-        longitude: -155.4681,
-        elevation: Some(4205.0),
+        latitude: "19.8207".parse().unwrap(),
+        longitude: "-155.4681".parse().unwrap(),
+        elevation: Some("4205.0".parse().unwrap()),
     });
     let m = to_matcher_place(&a);
     assert_eq!(m.elevation_as_metre, Some(4205.0));

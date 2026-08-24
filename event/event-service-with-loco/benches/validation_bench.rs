@@ -47,8 +47,8 @@ fn bench_validate_rich_event(c: &mut Criterion) {
             postal_code: Some("94720".into()),
             country: Some("US".into()),
         }),
-        latitude: Some(37.873),
-        longitude: Some(-122.254),
+        latitude: Some("37.873".parse().unwrap()),
+        longitude: Some("-122.254".parse().unwrap()),
         url: None,
     }));
     event.location.push(Location::Virtual(VirtualLocation {

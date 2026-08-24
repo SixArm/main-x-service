@@ -3,6 +3,44 @@
 Spec-driven work breakdown. Tick the box when an automated test or
 clearly described manual check confirms the acceptance criterion.
 
+- [x] **2026-08-22 — Geo coordinates as exact decimals (`f64` →
+  `BigDecimal`, `DOUBLE PRECISION` → `NUMERIC`).**
+  `GeoCoordinates::latitude` / `longitude` / `elevation` and
+  `places.geo_latitude` / `.geo_longitude` / `.geo_elevation` (migration
+  `m20260822_000001_geo_coordinates_to_numeric`). A coordinate is a
+  decimal quantity: `DOUBLE PRECISION` cannot hold `40.7829` (it holds
+  `40.78289999999999793…`) and cannot distinguish it from
+  `40.78290000000000001`. Applied after the equivalent change in
+  event-service, but **not** a bug fix here: event's `Location` is an
+  internally-tagged enum whose `f64` fields broke under `serde_json`'s
+  `arbitrary_precision`, whereas place-service has no tagged enum or
+  flattened struct in its request path. Same correctness argument, for
+  its own sake and for consistency between the two services that model
+  geography. **Wire format deliberately unchanged** — the fields use
+  `bigdecimal::impl_serde::arbitrary_precision[_option]`, so JSON stays a
+  number, including on the FHIR `Location.position` surface (FHIR
+  `decimal` is arbitrary-precision by spec). `distance_to` and the
+  matcher adapter convert to `f64` at the Haversine boundary and yield
+  `NaN` for an unrepresentable coordinate, so proximity fails closed.
+  `GeoCoordinates::new` keeps its `f64` signature (92 call sites, all
+  literal constants, no production callers) and stores the decimal each
+  literal denotes via the shortest round-tripping string — **not**
+  `BigDecimal::from_f64`, which would expand the binary approximation to
+  forty-six digits. Privacy masking now rounds exactly
+  (`with_scale_round(2, HalfUp)`) instead of `(x * 100.0).round() /
+  100.0`. Adds `MAX_COORDINATE_SCALE` (10 places), replacing the digit
+  bound `f64` provided by accident, and closes a latent hole: `NaN`
+  compared false against both range bounds, so a `NaN` latitude passed
+  validation — a decimal cannot represent one. **Acceptance:**
+  coordinates serialize as JSON numbers, not strings; exact round-trip
+  including `40.78290000000000001`; `new` stores `40.7829` as `40.7829`;
+  absent elevation stays `null`; range bounds inclusive and enforced a
+  hair outside; over-scale → `422`; non-finite → panic in `new`. §4,
+  §5.2.1, §5.3, §6, §10.1. Verified: 212 unit + integration + 47
+  doctests, DB-gated suite green against Postgres 18 with all three
+  columns confirmed `numeric` and `idx_places_geo` intact, clippy `-D
+  warnings`, fmt, MSRV 1.95, bench link, `cargo deny`.
+
 - [x] **SEC-M1 (security): input-size caps on the `Place` payload.**
   `validate_place` bounds scalar text (`MAX_TEXT_LEN = 1024`, incl. nested
   `address.*`), string-array cardinality + per-entry (`MAX_ARRAY_LEN = 256`

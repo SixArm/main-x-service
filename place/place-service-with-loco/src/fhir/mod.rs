@@ -234,9 +234,9 @@ pub fn to_fhir_location(place: &Place, last_updated: Option<String>) -> FhirLoca
 
     if let Some(ref geo) = place.geo {
         fhir.position = Some(FhirPosition {
-            longitude: geo.longitude,
-            latitude: geo.latitude,
-            altitude: geo.elevation,
+            longitude: geo.longitude.clone(),
+            latitude: geo.latitude.clone(),
+            altitude: geo.elevation.clone(),
         });
     }
 
@@ -312,9 +312,9 @@ pub fn from_fhir_location(fhir: &FhirLocation) -> Result<Place, String> {
 
     if let Some(pos) = fhir.position.as_ref() {
         place.geo = Some(GeoCoordinates {
-            latitude: pos.latitude,
-            longitude: pos.longitude,
-            elevation: pos.altitude,
+            latitude: pos.latitude.clone(),
+            longitude: pos.longitude.clone(),
+            elevation: pos.altitude.clone(),
         });
     }
 
@@ -381,9 +381,9 @@ mod tests {
             postal_code: Some("10022".to_string()),
         });
         place.geo = Some(GeoCoordinates {
-            latitude: 40.7829,
-            longitude: -73.9654,
-            elevation: Some(10.0),
+            latitude: "40.7829".parse().unwrap(),
+            longitude: "-73.9654".parse().unwrap(),
+            elevation: Some("10.0".parse().unwrap()),
         });
 
         let fhir = to_fhir_location(&place, None);

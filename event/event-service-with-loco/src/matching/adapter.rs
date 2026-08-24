@@ -24,6 +24,7 @@
 //! See `agents/share/match.md` and the matcher crate's `spec.md §5–§7` for
 //! the algorithm contract this adapter feeds.
 
+use bigdecimal::{BigDecimal, ToPrimitive};
 use event_matcher::{
     Address as MAddress, Event as MEvent, EventAttendanceMode as MMode, EventCategory as MCategory,
     EventId as MEventId, EventIdScheme as MScheme, EventStatus as MStatus, Location as MLocation,
@@ -258,11 +259,16 @@ fn map_location(l: &Location) -> Option<MLocation> {
                 m = m.with_address(a);
                 any = true;
             }
-            if let Some(lat) = p.latitude {
+            // The matcher scores geo distance with Haversine, which is
+            // floating-point work; the exact decimal is what we store and
+            // return, not what we trigonometry over. A coordinate that
+            // cannot be represented as `f64` is dropped rather than
+            // approximated into a wrong position.
+            if let Some(lat) = p.latitude.as_ref().and_then(BigDecimal::to_f64) {
                 m = m.with_latitude(lat);
                 any = true;
             }
-            if let Some(lon) = p.longitude {
+            if let Some(lon) = p.longitude.as_ref().and_then(BigDecimal::to_f64) {
                 m = m.with_longitude(lon);
                 any = true;
             }
@@ -436,14 +442,14 @@ mod tests {
             id: None,
             name: "Greek Theatre".into(),
             address: None,
-            latitude: Some(37.8730),
-            longitude: Some(-122.2547),
+            latitude: Some("37.8730".parse().unwrap()),
+            longitude: Some("-122.2547".parse().unwrap()),
             url: None,
         })];
         let m = to_matcher_event(&e);
         let loc = m.location.as_ref().unwrap();
         assert_eq!(loc.venue_name.as_deref(), Some("Greek Theatre"));
-        assert_eq!(loc.latitude, Some(37.8730));
+        assert_eq!(loc.latitude, Some("37.8730".parse().unwrap()));
     }
 
     /// A `Virtual` location carries its URL into `virtual_url`.

@@ -411,8 +411,8 @@ mod tests {
                 postal_code: Some("94720".into()),
                 country: Some("US".into()),
             }),
-            latitude: Some(37.873),
-            longitude: Some(-122.254),
+            latitude: Some("37.873".parse().unwrap()),
+            longitude: Some("-122.254".parse().unwrap()),
             url: None,
         }));
         event.location.push(Location::Virtual(VirtualLocation {
@@ -466,5 +466,90 @@ mod tests {
             let back: Location = serde_json::from_str(&json).unwrap();
             assert_eq!(back, loc);
         }
+    }
+
+    /// Build a `Place` location carrying just the two coordinates.
+    fn place_at(lat: &str, lon: &str) -> Location {
+        Location::Place(Place {
+            id: None,
+            name: "Zellerbach Hall".into(),
+            address: None,
+            latitude: Some(lat.parse().unwrap()),
+            longitude: Some(lon.parse().unwrap()),
+            url: None,
+        })
+    }
+
+    /// Coordinates stay JSON **numbers** on the wire.
+    ///
+    /// `BigDecimal`'s default serde impl emits a quoted string; this
+    /// type opts into `arbitrary_precision_option` precisely so the
+    /// representation is unchanged from when these were `f64`. A client
+    /// or front-end parsing `latitude` as a number must keep working.
+    #[test]
+    fn coordinates_serialize_as_json_numbers() {
+        let json = serde_json::to_string(&place_at("37.87", "-122.254")).unwrap();
+        assert!(json.contains(r#""latitude":37.87"#), "{json}");
+        assert!(json.contains(r#""longitude":-122.254"#), "{json}");
+        assert!(!json.contains(r#""37.87""#), "quoted, not a number: {json}");
+    }
+
+    /// A fractional coordinate survives the internally-tagged enum.
+    ///
+    /// This is the regression that made the change necessary: `Location`
+    /// is `#[serde(tag = "kind")]`, so serde buffers the variant's
+    /// fields through `Content`, and under `serde_json`'s
+    /// `arbitrary_precision` an `f64` field there fails with
+    /// `invalid type: map, expected f64`. An exact decimal does not.
+    #[test]
+    fn fractional_coordinates_deserialize_through_the_kind_tag() {
+        let loc = place_at("37.87", "-122.254");
+        let back: Location = serde_json::from_str(&serde_json::to_string(&loc).unwrap()).unwrap();
+        assert_eq!(back, loc);
+
+        // ...and from a body written by hand, as a client sends it.
+        let raw =
+            r#"{"kind":"place","name":"Zellerbach Hall","latitude":37.87,"longitude":-122.254}"#;
+        assert_eq!(serde_json::from_str::<Location>(raw).unwrap(), loc);
+    }
+
+    /// Coordinates round-trip as the exact decimal the caller sent.
+    ///
+    /// The point of the type: an `f64` cannot hold `37.87` (it holds
+    /// `37.869999999999997`), and cannot tell `37.87` from
+    /// `37.8700000000000001` at all.
+    #[test]
+    fn coordinates_round_trip_exactly() {
+        for (lat, lon) in [
+            ("37.87", "-122.254"),
+            ("0.1", "0.2"),
+            ("37.8700000000000001", "-122.2540000000000001"),
+            ("-90", "180"),
+        ] {
+            let json = serde_json::to_string(&place_at(lat, lon)).unwrap();
+            assert!(json.contains(&format!(r#""latitude":{lat}"#)), "{json}");
+            assert!(json.contains(&format!(r#""longitude":{lon}"#)), "{json}");
+        }
+    }
+
+    /// An absent coordinate stays `null` on the wire, and reads back as
+    /// `None` whether the key is `null` or missing entirely — the
+    /// behaviour the bare `Option<f64>` had.
+    #[test]
+    fn absent_coordinates_are_null_not_omitted() {
+        let loc = Location::Place(Place {
+            id: None,
+            name: "TBA".into(),
+            address: None,
+            latitude: None,
+            longitude: None,
+            url: None,
+        });
+        let json = serde_json::to_string(&loc).unwrap();
+        assert!(json.contains(r#""latitude":null"#), "{json}");
+        assert_eq!(serde_json::from_str::<Location>(&json).unwrap(), loc);
+
+        let missing = r#"{"kind":"place","name":"TBA"}"#;
+        assert_eq!(serde_json::from_str::<Location>(missing).unwrap(), loc);
     }
 }

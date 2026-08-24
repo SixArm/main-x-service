@@ -45,11 +45,11 @@ pub mod places {
         /// `PostalAddress.postal_code` (flattened).
         pub address_postal_code: Option<String>,
         /// `GeoCoordinates.latitude` (flattened).
-        pub geo_latitude: Option<f64>,
+        pub geo_latitude: Option<bigdecimal::BigDecimal>,
         /// `GeoCoordinates.longitude` (flattened).
-        pub geo_longitude: Option<f64>,
+        pub geo_longitude: Option<bigdecimal::BigDecimal>,
         /// `GeoCoordinates.elevation` (flattened).
-        pub geo_elevation: Option<f64>,
+        pub geo_elevation: Option<bigdecimal::BigDecimal>,
         /// Telephone number.
         pub telephone: Option<String>,
         /// Fax number.

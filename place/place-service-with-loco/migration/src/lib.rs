@@ -17,6 +17,7 @@ mod m20260608_000002_create_audit_and_merge;
 mod m20260708_000001_create_event_outbox;
 mod m20260719_000001_create_review_queue;
 mod m20260728_000001_add_integrity_digests;
+mod m20260822_000001_geo_coordinates_to_numeric;
 
 /// The migration runner this crate exposes to loco / `sea-orm-migration`.
 pub struct Migrator;
@@ -30,6 +31,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260708_000001_create_event_outbox::Migration),
             Box::new(m20260719_000001_create_review_queue::Migration),
             Box::new(m20260728_000001_add_integrity_digests::Migration),
+            Box::new(m20260822_000001_geo_coordinates_to_numeric::Migration),
         ]
     }
 }

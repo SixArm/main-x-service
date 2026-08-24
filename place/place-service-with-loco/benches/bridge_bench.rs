@@ -46,9 +46,9 @@ fn rich_place() -> Place {
         postal_code: Some("10022".into()),
     });
     p.geo = Some(GeoCoordinates {
-        latitude: 40.7829,
-        longitude: -73.9654,
-        elevation: Some(10.0),
+        latitude: "40.7829".parse().unwrap(),
+        longitude: "-73.9654".parse().unwrap(),
+        elevation: Some("10.0".parse().unwrap()),
     });
     p.telephone = Some("+1-212-310-6600".into());
     p.global_location_number = Some("0614141999996".into());

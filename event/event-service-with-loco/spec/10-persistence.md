@@ -9,6 +9,17 @@ PostgreSQL 18+ via SeaORM.
   `alternate_names`, `image`, `same_as`, `keywords`, `in_language`.
 - `event_identifiers`, `event_locations`, `event_parties`,
   `event_offers`, `event_links`, `event_sub_events`.
+  - `event_locations.latitude` / `.longitude` are **`NUMERIC`**, not
+    `DOUBLE PRECISION` (§5.2.1). No scale is declared: `NUMERIC(9,6)` is
+    the usual geo choice but would silently round anything finer, and the
+    previous `DOUBLE PRECISION` column accepted ~15 significant digits.
+    An unconstrained `NUMERIC` keeps every value a client could
+    previously send, and the service caps decimal places at validation
+    time rather than letting the database truncate without saying so.
+    The widening migration is exact (every double has a `NUMERIC` form);
+    existing rows keep the float artefacts they were stored with, since
+    back-filling a rounder number would invent precision the caller never
+    sent.
 - `organizations`, `organization_addresses`,
   `organization_contacts`, `organization_identifiers`.
 - `audit_log`.

@@ -8,6 +8,82 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Changed — geo coordinates are exact decimals, not floats
+
+`GeoCoordinates::latitude` / `longitude` / `elevation` move from `f64` to
+`BigDecimal`, and `places.geo_latitude` / `.geo_longitude` /
+`.geo_elevation` from `DOUBLE PRECISION` to `NUMERIC` (migration
+`m20260822_000001_geo_coordinates_to_numeric`).
+
+A coordinate is a decimal quantity. `DOUBLE PRECISION` cannot hold
+`40.7829` — it holds `40.78289999999999793…` — and cannot tell `40.7829`
+from `40.78290000000000001` at all. Coordinates now round-trip as the
+digits the caller sent, verified against Postgres 18.
+
+**This is not a bug fix, unlike the same change in event-service.** That
+crate's `Location` is an internally-tagged enum, so its `f64` coordinates
+failed to deserialize once the repository adopted `serde_json`'s
+`arbitrary_precision` feature. place-service has no tagged enum or
+flattened struct in its request path and was never affected. This is the
+same correctness argument applied for its own sake, and so the two
+services that model geography agree.
+
+**The wire format is unchanged.** `BigDecimal`'s default serde impl emits
+a quoted string, which would have broken every client; the fields opt into
+`bigdecimal::impl_serde::arbitrary_precision` (and
+`arbitrary_precision_option` for `elevation`) so JSON stays
+`"latitude":40.7829`, with `null` for an absent elevation. That holds for
+the FHIR `Location.position` surface too, where FHIR's own `decimal` is
+arbitrary-precision by spec — leaving it `f64` would have silently thrown
+away the precision this change just gained.
+
+Four things worth knowing:
+
+- **`GeoCoordinates::new` keeps its `f64` signature.** All 92 call sites
+  are tests, benches, and doctests over literal constants; production
+  builds this type from the database and from serde. The constructor
+  stores the decimal each literal *denotes*, via Rust's shortest
+  round-tripping `Display`. `BigDecimal::from_f64` is deliberately not
+  used: it expands the binary approximation to
+  `40.7828999999999979308995534665882587432861328125` — forty-six digits
+  of representation noise, worse than the `f64` it replaces.
+- **Distance is still floating-point.** Haversine is trigonometry, so
+  `distance_to` and the matcher adapter convert at that boundary. An
+  unrepresentable coordinate yields `NaN`, and every comparison against
+  `NaN` is false, so a proximity check fails closed rather than returning
+  a plausible wrong distance.
+- **Privacy masking now rounds exactly.** `with_scale_round(2, HalfUp)`
+  replaces `(x * 100.0).round() / 100.0`, which returned values like
+  `40.78000000000000113686…` and whose half-way behaviour depended on
+  binary representation rather than the decimal the caller sent (`40.785`
+  is really `40.78499999…` as an `f64`, so it rounded *down*). The masked
+  radius is unchanged at ~1 km; the tests assert exact values now instead
+  of an epsilon.
+- **A latent validation hole closes.** `NaN` compares false against both
+  range bounds, so a `NaN` latitude passed `validate_place` unnoticed. A
+  decimal cannot represent `NaN`, so the type makes it unreachable; `new`
+  panics on a non-finite argument rather than inventing a value.
+
+Also added, because the type change removes a bound that used to exist by
+accident: `MAX_COORDINATE_SCALE` (10 decimal places, ~10 µm), applied to
+latitude, longitude, and elevation. An `f64` capped the digit count
+implicitly at ~17 significant digits; an exact decimal does not. Nothing a
+client could previously send is newly rejected.
+
+The migration widens exactly — every double has a `NUMERIC` form, so no
+stored value is lost, and `idx_places_geo` is rebuilt by Postgres as part
+of the type change. Existing rows keep the float artefacts they were
+written with; only values written from here on are exact. Rolling back is
+lossy by nature.
+
+Three parts, per this crate's SDD discipline: spec (§4 glossary, §5.2.1,
+§5.3 invariants, §6, §10.1 — which also records a pre-existing drift found
+in passing: the spec lists a `place_geo_coordinates` table the shipped
+schema does not have), code, and tests. `cargo test --all-targets`
+212/212 plus 47 doctests, DB-gated suite green with all three columns
+confirmed `numeric`, `cargo clippy --all-targets -- -D warnings` clean,
+`cargo fmt --check`, MSRV 1.95, bench link, `cargo deny`.
+
 ### Added — declared MSRV (Rust 1.95)
 
 - `Cargo.toml` now declares `rust-version = "1.95"`, the repository's

@@ -12,6 +12,7 @@
 //! These types are **copied per project** (drift-accepted, the family's
 //! `mxi-events`/`EntityRef` posture); they are not a shared crate.
 
+use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 
 /// A FHIR R5 `Location` resource (the elements this service maps).
@@ -151,12 +152,18 @@ pub struct FhirAddress {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FhirPosition {
     /// Longitude in decimal degrees.
-    pub longitude: f64,
+    #[serde(with = "bigdecimal::impl_serde::arbitrary_precision")]
+    pub longitude: BigDecimal,
     /// Latitude in decimal degrees.
-    pub latitude: f64,
+    #[serde(with = "bigdecimal::impl_serde::arbitrary_precision")]
+    pub latitude: BigDecimal,
     /// Altitude (elevation) in meters, when known.
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub altitude: Option<f64>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        with = "bigdecimal::impl_serde::arbitrary_precision_option"
+    )]
+    pub altitude: Option<BigDecimal>,
 }
 
 /// FHIR `CodeableConcept` — one or more codings plus display text.

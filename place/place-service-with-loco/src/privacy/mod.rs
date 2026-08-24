@@ -14,6 +14,7 @@
 //! # Examples
 //!
 //! ```
+//! use bigdecimal::BigDecimal;
 //! use place_service::models::place::Place;
 //! use place_service::models::geo::GeoCoordinates;
 //! use place_service::privacy::mask_place;
@@ -24,10 +25,13 @@
 //!
 //! let masked = mask_place(&place);
 //! assert!(masked.telephone.unwrap().ends_with("****"));
-//! assert!((masked.geo.unwrap().latitude - 40.78).abs() < 0.01);
+//! // Exactly two decimals — not `40.78000000000000113…`, which is what
+//! // rounding an `f64` used to leave behind.
+//! assert_eq!(masked.geo.unwrap().latitude, "40.78".parse::<BigDecimal>().unwrap());
 //! ```
 
 use crate::models::place::Place;
+use bigdecimal::RoundingMode;
 use serde_json::Value;
 
 /// Mask sensitive fields in a Place for privacy.
@@ -62,8 +66,17 @@ pub fn mask_place(place: &Place) -> Place {
     }
     if let Some(geo) = &mut masked.geo {
         // Round to two decimals (~1 km) so the exact location is obscured.
-        geo.latitude = (geo.latitude * 100.0).round() / 100.0;
-        geo.longitude = (geo.longitude * 100.0).round() / 100.0;
+        //
+        // Exact decimal rounding, so the result is the two-decimal value
+        // and nothing more: the old `(x * 100.0).round() / 100.0` on `f64`
+        // returned things like `40.78000000000000113686837721616029739`,
+        // and its half-way behaviour depended on binary representation
+        // rather than on the decimal the caller sent (`40.785` is really
+        // `40.78499999…` as an `f64`, so it rounded *down*). Half-up here
+        // is the rule a reader expects, applied to the digits actually
+        // stored.
+        geo.latitude = geo.latitude.with_scale_round(2, RoundingMode::HalfUp);
+        geo.longitude = geo.longitude.with_scale_round(2, RoundingMode::HalfUp);
     }
 
     masked
@@ -109,6 +122,7 @@ pub fn gdpr_export(place: &Place) -> Value {
 mod tests {
     use super::*;
     use crate::models::geo::GeoCoordinates;
+    use bigdecimal::BigDecimal;
 
     /// Telephone is masked, hiding the trailing digits.
     #[test]
@@ -138,8 +152,11 @@ mod tests {
         place.geo = Some(GeoCoordinates::new(40.782_934_56, -73.965_432_10));
         let masked = mask_place(&place);
         let geo = masked.geo.unwrap();
-        assert!((geo.latitude - 40.78).abs() < 0.01);
-        assert!((geo.longitude - (-73.97)).abs() < 0.01);
+        // Exact: masking now yields the two-decimal value and nothing
+        // more. The float version returned `40.78000000000000113686…`,
+        // which only an epsilon comparison could assert against.
+        assert_eq!(geo.latitude, "40.78".parse::<BigDecimal>().unwrap());
+        assert_eq!(geo.longitude, "-73.97".parse::<BigDecimal>().unwrap());
     }
 
     /// Non-sensitive fields like the name are preserved.

@@ -97,8 +97,8 @@ Mirrors `schema.org/Event.location` which is a union of `Place`,
 | `id` | `Option<Uuid>` (external place-service ref) |
 | `name` | `String` |
 | `address` | `Option<Address>` |
-| `latitude` | `Option<f64>` |
-| `longitude` | `Option<f64>` |
+| `latitude` | `Option<BigDecimal>` — exact decimal degrees; a JSON **number** on the wire |
+| `longitude` | `Option<BigDecimal>` — exact decimal degrees; a JSON **number** on the wire |
 | `url` | `Option<String>` |
 
 ### VirtualLocation

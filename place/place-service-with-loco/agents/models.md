@@ -72,11 +72,16 @@ Methods: `Place::new(name)`, `place.soft_delete()`
 
 | Field | Type | Range |
 |-------|------|-------|
-| `latitude` | `f64` | -90.0 to 90.0 |
-| `longitude` | `f64` | -180.0 to 180.0 |
-| `elevation` | `Option<f64>` | Meters |
+| `latitude` | `BigDecimal` | -90 to 90; exact decimal degrees, a JSON **number** on the wire |
+| `longitude` | `BigDecimal` | -180 to 180; exact decimal degrees, a JSON **number** on the wire |
+| `elevation` | `Option<BigDecimal>` | Meters; exact decimal |
 
-Methods: `GeoCoordinates::new(lat, lon)`, `geo.distance_to(&other)` (Haversine, returns meters)
+Methods: `GeoCoordinates::new(lat, lon)` (takes `f64` literals and stores the
+decimal each denotes — via the shortest round-tripping string, **not**
+`BigDecimal::from_f64`, which would expand the binary approximation; panics on
+a non-finite argument), `geo.distance_to(&other)` (Haversine, returns meters;
+converts to `f64` at that boundary and yields `NaN` for a coordinate too large
+to represent, so proximity checks fail closed).
 
 ## PlaceType
 

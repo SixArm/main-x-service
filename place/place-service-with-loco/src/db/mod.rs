@@ -516,9 +516,9 @@ fn to_active(place: &Place) -> places::ActiveModel {
             .as_ref()
             .and_then(|a| a.address_country.clone())),
         address_postal_code: Set(place.address.as_ref().and_then(|a| a.postal_code.clone())),
-        geo_latitude: Set(place.geo.as_ref().map(|g| g.latitude)),
-        geo_longitude: Set(place.geo.as_ref().map(|g| g.longitude)),
-        geo_elevation: Set(place.geo.as_ref().and_then(|g| g.elevation)),
+        geo_latitude: Set(place.geo.as_ref().map(|g| g.latitude.clone())),
+        geo_longitude: Set(place.geo.as_ref().map(|g| g.longitude.clone())),
+        geo_elevation: Set(place.geo.as_ref().and_then(|g| g.elevation.clone())),
         telephone: Set(place.telephone.clone()),
         fax_number: Set(place.fax_number.clone()),
         url: Set(place.url.clone()),

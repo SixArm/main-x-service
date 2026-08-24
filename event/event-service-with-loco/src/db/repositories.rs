@@ -544,8 +544,8 @@ fn location_to_row(
                 row.postal_code = Set(addr.postal_code.clone());
                 row.country = Set(addr.country.clone());
             }
-            row.latitude = Set(p.latitude);
-            row.longitude = Set(p.longitude);
+            row.latitude = Set(p.latitude.clone());
+            row.longitude = Set(p.longitude.clone());
             row.url = Set(p.url.clone());
         }
         Location::PostalAddress(addr) => {
@@ -756,8 +756,8 @@ fn row_to_location(row: &event_locations::Model) -> Option<Location> {
             id: row.place_id,
             name: row.name.clone().unwrap_or_default(),
             address: address_from_row(row),
-            latitude: row.latitude,
-            longitude: row.longitude,
+            latitude: row.latitude.clone(),
+            longitude: row.longitude.clone(),
             url: row.url.clone(),
         })),
         "postal_address" => address_from_row(row).map(Location::PostalAddress),

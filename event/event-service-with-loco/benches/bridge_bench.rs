@@ -53,8 +53,8 @@ fn rich_event() -> Event {
             postal_code: Some("94720".into()),
             country: Some("US".into()),
         }),
-        latitude: Some(37.873),
-        longitude: Some(-122.255),
+        latitude: Some("37.873".parse().unwrap()),
+        longitude: Some("-122.255".parse().unwrap()),
         url: None,
     })];
     e.organizers = vec![Party {

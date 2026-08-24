@@ -34,6 +34,7 @@
 //! | `identifiers[]` | mapped via [`map_identifier_scheme`] |
 //! | `maximum_attendee_capacity` | `maximum_capacity_count` |
 
+use bigdecimal::{BigDecimal, ToPrimitive};
 use place_matcher::{
     Address as MAddress, Place as MPlace, PlaceCategory as MCategory, PlaceId as MPlaceId,
     PlaceIdScheme as MScheme,
@@ -82,8 +83,15 @@ pub fn to_matcher_place(p: &Place) -> MPlace {
     }
 
     if let Some(geo) = &p.geo {
-        b = b.latitude(geo.latitude).longitude(geo.longitude);
-        if let Some(e) = geo.elevation {
+        // The matcher scores geo distance with Haversine, which is
+        // floating-point work; the exact decimal is what we store and
+        // return, not what we trigonometry over. A coordinate that cannot
+        // be represented as `f64` is dropped rather than approximated into
+        // a wrong position.
+        if let (Some(lat), Some(lon)) = (geo.latitude.to_f64(), geo.longitude.to_f64()) {
+            b = b.latitude(lat).longitude(lon);
+        }
+        if let Some(e) = geo.elevation.as_ref().and_then(BigDecimal::to_f64) {
             b = b.elevation_as_metre(e);
         }
     }
@@ -224,8 +232,8 @@ mod tests {
         use crate::models::geo::GeoCoordinates;
         let mut svc = Place::new("Central Park");
         svc.geo = Some(GeoCoordinates {
-            latitude: 40.7829,
-            longitude: -73.9654,
+            latitude: "40.7829".parse().unwrap(),
+            longitude: "-73.9654".parse().unwrap(),
             elevation: None,
         });
         let m = to_matcher_place(&svc);
