@@ -14,7 +14,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-serde_json = "1"
+serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 case-matcher = { path = "../../case-matcher-rust-crate" }
 
 [dependencies.case-service]

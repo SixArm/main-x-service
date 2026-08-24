@@ -31,11 +31,11 @@ tower-http = { version = "0.6", features = ["cors", "trace", "compression-full"]
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde_json = { version = "1.0", features = ["float_roundtrip", "arbitrary_precision"] }
 
 # Database (PostgreSQL ORM)
 sea-orm = { version = "2.0", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-uuid", "with-json", "with-bigdecimal"] }
-bigdecimal = { version = "0.4", features = ["serde"] }
+bigdecimal = { version = "0.4", features = ["serde", "serde-json"] }
 
 # Web Framework (Loco conventions; web/template tier removed)
 # `auth` is deliberately absent from this feature list. It is loco's JWT
@@ -43,7 +43,7 @@ bigdecimal = { version = "0.4", features = ["serde"] }
 # and this family issues PASETO v4.public rather than JWT — see
 # agents/share/jwt.md. Dropping it removes the vulnerable crate from the
 # dependency graph rather than suppressing the advisory.
-loco-rs = { version = "1.0.1", default-features = false, features = ["cli", "with-db", "cache_inmem", "worker"] }
+loco-rs = { version = "1.1.0", default-features = false, features = ["cli", "with-db", "cache_inmem", "worker"] }
 migration = { path = "migration" }
 
 # Search Engine

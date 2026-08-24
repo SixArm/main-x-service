@@ -24,12 +24,12 @@ include = ["src/**/*", "README.md"]
 # and this family issues PASETO v4.public rather than JWT — see
 # agents/share/jwt.md. Dropping it removes the vulnerable crate from the
 # dependency graph rather than suppressing the advisory.
-loco-rs = { version = "1.0.1", default-features = false, features = ["cli", "with-db", "cache_inmem", "worker"] }
+loco-rs = { version = "1.1.0", default-features = false, features = ["cli", "with-db", "cache_inmem", "worker"] }
 
 [dependencies]
 loco-rs = { workspace = true  }
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1" }
+serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 # CSV codec for the bulk import/export operator/spreadsheet format
 # (BLK-5; `agents/share/bulk-import-export.md` §5). Same version the
 # person reference implementation uses, for one family-wide RFC 4180

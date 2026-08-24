@@ -20,7 +20,7 @@ path = "src/main.rs"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde_json = { version = "1.0", features = ["float_roundtrip", "arbitrary_precision"] }
 strsim = "0.11"
 unicode-normalization = "0.1"
 thiserror = "2.0"

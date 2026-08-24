@@ -14,7 +14,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-serde_json = "1"
+serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 project-portfolio-management-matcher = { path = "../../project-portfolio-management-matcher-rust-crate" }
 
 [dependencies.project-portfolio-management-service]
