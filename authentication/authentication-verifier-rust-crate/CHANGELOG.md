@@ -33,7 +33,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
   **current stable minus three** floor
-  (`spec/rust-msrv-n-minus-3.md`). Sourced from `ci/msrv.txt` and
+  (`spec/rust-msrv-n-minus-3/index.md`). Sourced from `ci/msrv.txt` and
   enforced by `scripts/ci-check.sh msrv`, which asserts the declared
   value matches that file and then compiles the crate — `--all-targets`,
   so benches and tests count — against the 1.95 toolchain. Behaviour is

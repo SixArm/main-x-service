@@ -6065,7 +6065,7 @@ anyone anything, and both of the substantive defects below were found by
 running one.
 
 - [x] **MSRV-1 (M)** Declare and enforce the MSRV. *(done 2026-08-20)*
-  New [`spec/rust-msrv-n-minus-3.md`](spec/rust-msrv-n-minus-3.md): the
+  New [`spec/rust-msrv-n-minus-3/index.md`](spec/rust-msrv-n-minus-3/index.md): the
   floor is the **current stable minus three**, today **1.95** (from
   stable 1.98.0, released 2026-08-18). Single source of truth in
   [`ci/msrv.txt`](ci/msrv.txt); `rust-version = "1.95"` added to all 46
@@ -6195,7 +6195,7 @@ running one.
   files rewritten. `AGENTS.md` and `CLAUDE.md` — the *files* — keep their
   conventional uppercase names; only the directory changed. The rule and
   its rationale are now
-  [`spec/agents-directory-name-is-lowercase.md`](spec/agents-directory-name-is-lowercase.md).
+  [`spec/agents-directory-name-is-lowercase/index.md`](spec/agents-directory-name-is-lowercase/index.md).
 
   A case-only `git mv` is a silent no-op on a case-insensitive
   filesystem, so each rename went through a temporary name; the spec §3
@@ -6373,3 +6373,367 @@ running one.
   could not drift, and the gate still spent three weeks red — so the
   question is not "why did formatting drift" but "why did nobody see the
   red", i.e. whether CI actually ran on that commit.
+
+## Phase 8 — Professionalization audit (2026-08-26)
+
+> **Provenance.** A repo-wide professionalization pass ran 2026-08-26:
+> per-family research + audit + test, one auditor per project family,
+> against the working tree (which at the time carried the uncommitted
+> portfolio PM-suite WIP and the in-flight `spec/` reorg). Gates
+> actually run per crate: `cargo fmt --check`, `cargo clippy
+> --all-targets -- -D warnings`, `cargo test` (non-DB), and per
+> front-end `pnpm check` + `pnpm test` (vitest). **Every crate and
+> front-end passed every gate run.** Not run this pass: DB-gated
+> `--ignored` suites, fuzz targets, Playwright e2e (needs live
+> services). Findings below are verified against code (file:line
+> evidence gathered per family), not inferred from docs.
+
+### Verification snapshot (all green, 2026-08-26)
+
+| Family | Matcher/lib tests | Service tests (pass/ignored) | Front-end (svelte-check / vitest) |
+|---|---|---|---|
+| person | 850 | 386 / 57 | 0 err / 69 |
+| worker | 852 | 349 / 36 | 0 err / 56 |
+| place | 320 | 345 / 6 | 0 err / 55 |
+| thing | 210 | 304 / 6 | 0 err / 63 |
+| event | 296 | 193 / 7 | 0 err / 34 |
+| course | 113 | 140 / 15 | 0 err / 35 |
+| organization | 70 | 192 / 34 | 0 err / 72 |
+| care-pathway | 64 | 314 / 55 | 0 err / 57 |
+| case | 76 | 255 / 51 | 0 err / 61 |
+| portfolio (incl. WIP) | 80 | 351 / 74 | 0 err / 75 |
+| authentication | 58 (verifier) | 97 / 38 | 0 err / 36 |
+| entity-ref / integrity-mac | 12 / 21 | — | — |
+| link-graph | — | 110 / 9 | — |
+| case-folder | — | 21 / 50 | 0 err / 48 |
+| patient-flow | — | 72 / 9 | 0 err / 22 |
+| workforce-planning-mgmt | — | 139 / 20 | 0 err / 10 |
+| contact-relationship-mgmt | — | 64 / 8 | 0 err / 5 |
+| content-management-system | — | 231 / 64 | 0 err / 28 |
+
+All migration sub-crates: fmt + clippy clean. fmt/clippy clean on every
+crate above.
+
+### PRO-R — repo root & CI (do first; two are red/blocking)
+
+- [x] **PRO-R1 (S)** *(done 2026-08-26)* Fix the red `docs` CI stage: the staged rename
+  `spec/agents-directory-name-is-lowercase/index.md` →
+  `spec/agents-directory-name-is-lowercase/index.md` broke the checker's
+  self-exclusion (`scripts/ci-check.sh:293` still excludes the old
+  path), so the stage now flags the spec's own examples and exits 1.
+  Update the exclude pathspec (and any doc links to the old path).
+- [x] **PRO-R2 (S)** *(done 2026-08-26 — index.md convention; ~50 files swept; new spec dirs indexed in spec/index.md)* Finish the in-flight `spec/` reorg consistently:
+  `spec/rust-msrv-n-minus-3/` holds `rust-msrv-n-minus-3.md` where the
+  sibling rename used `index.md`; `ci/msrv.txt`, root `AGENTS.md`, and
+  ~10 crate CHANGELOGs still link `spec/rust-msrv-n-minus-3/index.md` (now a
+  deleted path). Pick the `index.md` convention, move the file, sweep
+  the links. Also decide/track the other two new untracked spec dirs
+  (`latitude-longitude-altitude-elevation/`, `special-files-for-public-repos/`).
+- [x] **PRO-R3 (M)** *(done 2026-08-26 — all 14 files created; AI_STATEMENT.md adapted from the spec template to this repo's facts: merge rule, gates, fixtures, Co-Authored-By convention)* Special files for a public repo, per the new
+  `spec/special-files-for-public-repos/index.md`: **the repo has no
+  LICENSE at all** — add `LICENSE.md` (SPDX) first, matching the
+  license expressions the crates already declare; then `CITATION.cff`,
+  `CONTRIBUTING.md`, `SECURITY.md`, `MAINTAINERS.md`, `GOVERNANCE.md`,
+  `AI_STATEMENT.md` (a full template is already drafted in that spec
+  dir), `NEWS.md`, `INSTALL.md`, `COMPARISONS.md`, `BENCHMARKS.md`,
+  `RFC.md`, `CODEOWNERS`, root `CHANGELOG.md`.
+- [x] **PRO-R4 (S)** *(done 2026-08-26)* Delete `task.org` from the repo root — committed
+  editor scratch ("foo/bar/alpha/bravo/charlie"), superseded by this
+  file and the per-crate spec queues.
+- [ ] **PRO-R5 (S)** CI-platform parity: `.woodpecker.yml` runs the
+  `evidence` stage (SBOM render) but no GitHub workflow does — either
+  add it to `.github/workflows/ci.yml` or document the divergence; fix
+  root AGENTS.md's "byte-identical commands" claim either way.
+- [ ] **PRO-R6 (S)** Root `AGENTS.md` corrections found by audit:
+  (a) "matchers run to §25" is false for thing-matcher (13 topic
+  sections, documented) and organization/care-pathway matchers (single
+  `spec/index.md`, each with an open split task) — state the real
+  spread; (b) the Library-crates table header says "published to
+  crates.io" while 2 of 3 rows are unpublished (entity-ref noted
+  in-row, integrity-mac not noted) — reword, and decide
+  `publish = false` vs intent-to-publish for both unpublished crates.
+
+### PRO-H — family-wide hygiene sweeps
+
+- [ ] **PRO-H1 (M)** **Release-cut sweep.** Nearly every CHANGELOG has a
+  large `[Unreleased]` backlog; several crates have *never* cut a dated
+  release despite real versions. Worst offenders: worker-service
+  (639-line Unreleased, **no release section ever**, Cargo 0.5.0),
+  event-service (531, none ever), thing-service (462), person-service
+  (~440 since 0.5.0), care-pathway-service (337 since 0.1.0 — skipped
+  by the 2026-08-05 H-5 release pass), person-matcher and worker-matcher
+  (0.4→0.6.x releases recorded only as prose *inside* Unreleased),
+  plus first-ever release cuts owed by most front-ends and the
+  authentication trio. Also: **integrity-mac ships the SEC-M7
+  security fix unreleased** (cut 0.2.0 + tag), and link-graph's
+  CHANGELOG has **two `[Unreleased]` headings** (lines 15 and 868 —
+  retire the historic one). One sweep, one convention, tags included.
+- [ ] **PRO-H2 (M)** **Repair the fa0d2c0f coordinate-rename aftermath**
+  (a three-part-change violation: code landed, docs/changelogs didn't):
+  place-matcher and event-matcher are 0.7.0 with a breaking field
+  rename (`latitude` → `latitude_as_decimal_degrees` etc.) recorded in
+  **no CHANGELOG**; event-service still consumes crates.io
+  `event-matcher = "0.6.1"` instead of the renamed sibling 0.7.0;
+  place-service `index.md:74` shows a curl example that no longer
+  round-trips (no serde alias for old keys); place matcher+service
+  specs and `agents/` docs half-updated; place's raw-SQL `migrations/`
+  mirror lacks the 2026-08-24 rename migration. Fix all of it in one
+  pass and record the rename where it happened.
+- [ ] **PRO-H3 (M)** **Cargo metadata sweep.** (a) `license` +
+  `description` missing in ~20 manifests: organization-, care-pathway-,
+  case-folder-, link-graph-adjacent service crates and **every**
+  migration sub-crate; (b) malformed `repository` URLs of the shape
+  `github.com/sixarm/main-x-service/<crate>` (missing the entity
+  subdirectory; not a valid repo URL) in at least course ×2, person-,
+  place-, case-, patient-flow-service; (c) person-matcher's deprecated
+  SPDX `GPL-2.0 OR GPL-3.0` → `GPL-2.0-only OR GPL-3.0-only`;
+  (d) migration crates on `edition = "2021"` while their services are
+  2024 (person, patient-flow, WPM, CRM, CMS at minimum) — bump in one
+  sweep; (e) broken publishability flags: patient-flow-service and
+  CMS-service set `publish = true` yet depend on `publish = false` /
+  unpublished path deps, so `cargo publish` cannot succeed — set
+  `publish = false` or fix the deps; (f) stale portfolio-service
+  description (pre-unification "portfolio / project / product /
+  program" wording).
+- [ ] **PRO-H4 (S)** **Delete committed junk & dead scaffolding.**
+  Tracked stray rustup homes `thing/thing-service-with-loco/200/` and
+  `place/place-service-with-loco/200/`; `diesel.toml` +
+  `docker-compose.yml` in person- and worker-service (Podman-only
+  family) and person's diesel-era raw `migrations/` mislabeled sea-orm
+  (`index.md:750`); worker's empty `data/`; matcher
+  `IMPLEMENTATION_SUMMARY.md` snapshots (person, worker); thing-matcher
+  `help/` patient-matching PDFs (wrong domain, binary blobs); the loco
+  scaffold `src/workers/downloader.rs` TODO stub registered in
+  authentication-, case-, and care-pathway-service; event's dead
+  `todo!()` `FluvioProducer`/`FluvioConsumer` + observability `todo!()`;
+  CRM's `_touch` dead fn; WPM's `ensure_employee` dead helper; duplicate
+  `package-lock.json` beside `pnpm-lock.yaml` in case-folder and
+  patient-flow front-ends.
+- [ ] **PRO-H5 (M)** **CSRF on front-end BFF mutations, family-wide.**
+  `authentication-sessions.md` §4 makes it mandatory once cookie auth
+  exists; it is missing in person, worker (T-22b), thing (no open task
+  line at all — add one), event (T-23b), and course (T-26, which also
+  lacks any route-level auth guard). Implement the synchroniser-token
+  pattern once, roll it, and close the per-FE tasks.
+- [ ] **PRO-H6 (M)** **gRPC promote-or-drop, decided once.** person
+  (commented-out `serve` body since 2025), worker (stub), event (no-op
+  `serve` while AGENTS.md advertises "REST + gRPC API" and `GRPC_PORT`
+  is documented), thing (tonic/tonic-build deps with **no gRPC code at
+  all** + vestigial `grpc_port` config). Either implement or delete the
+  stubs, deps, config, and docs — then update the overview capability
+  matrix row.
+- [ ] **PRO-H7 (L)** **Matcher component parity: `relationships` +
+  `tags`.** Specified (often fully, with weights) but unimplemented in
+  worker (T-33/T-34), thing (OQ-E), event (Unreleased prose), course
+  (T-11/T-12), organization (§13), care-pathway (§23) — person has
+  them. Implement family-wide (breaking minor bumps) or formally
+  re-scope; today the shared docs advertise components most matchers
+  don't have.
+- [ ] **PRO-H8 (M)** **Consumer-app edition-spec truth sweep.** CMS's
+  service `spec/index.md` claims "No feed yet… T23/T24 remain" — all
+  delivered 2026-07-30/31; patient-flow's FE spec promises topic files
+  that never grew; both edition specs' Delivery sections trail
+  `spec/tasks.md`. Audit all five consumer apps' per-edition
+  `spec/index.md` against their `spec/tasks.md` and fix (CMS and
+  patient-flow findings enumerated below are part of this).
+- [ ] **PRO-H9 (M)** **OTLP rollout (subsumes AU-3).** person, worker,
+  event still carry the commented-out exporter stubs; link-graph's
+  `src/observability.rs` is the proven reference. Roll it (or delete
+  the stubs and update the matrix) — the stubs have been "TODO" since
+  the family began.
+
+### PRO-P — per-family targeted fixes
+
+**person**
+- [ ] **PRO-P1 (M)** `from_fhir` silently drops `additional_names`,
+  `marital_status`, `multiple_birth`, `managing_organization`, and
+  identifier-type coding (`src/api/fhir/mod.rs:375-417`) — a FHIR `PUT`
+  can erase native-API data. Parse them or reject with
+  `OperationOutcome`; list the gap in spec §14.2 until closed.
+- [ ] **PRO-P2 (S)** `LinkType::ReplacedBy` serializes `"replacedby"`
+  vs DB CHECK `'replaced_by'` (`src/models/person.rs:208` vs the
+  2024-12-28 migration) — fix the serde rename with a DB-gated pin;
+  close the §13 residual. Also expose the hardcoded `0.85` matcher
+  threshold (`src/matching/mod.rs:162`).
+- [ ] **PRO-P3 (S)** worker-matcher TSV: add the 7 missing scheme rows
+  (`br_cpf`, `cn_rrn`, `in_aadhaar`, `jp_my_number`, `mx_curp`,
+  `nz_nhi`, `za_id`) to `agents/national-person-identifiers.tsv`
+  (T-17.1 residual). *(filed under person for the shared TSV; code is
+  worker's)*
+- [ ] **PRO-P4 (M)** person FE: stabilize the 3 documented failing
+  live-integration tests (duplicate-detector test-data interactions).
+
+**worker**
+- [ ] **PRO-P5 (S)** Close/re-point stale §13 T-2 (superseded by BUS-3's
+  `FluvioSink`); fix §14.1's `Worker`→`Practitioner` wording and rename
+  `test_fhir_worker_route_is_mounted` accordingly.
+
+**thing**
+- [ ] **PRO-P6 (S)** Fix FE `spec/14-implementation-status.md` E2E row
+  (actual: 7 tests, `/review` covered; T-23 now `/signin`+`/verify`
+  only).
+
+**event**
+- [ ] **PRO-P7 (S)** Fix spec §14.1's stale "`/fhir/*` stubs out of
+  scope" enforcement wording (guard covers `/fhir/*`; T-8 landed) and
+  clarify that the dedup review queue is ephemeral (no `review_queue`
+  table) or add the table to match siblings.
+
+**course**
+- [ ] **PRO-P8 (S)** FE AGENTS.md falsely claims "the service has no
+  FHIR surface" (`/fhir/Basic` shipped with T-20) — restate as a scope
+  choice or open a viewer task. Decide T-28: `COURSE_API_URL` fallback
+  is `localhost:5150` but the service runs on 8084 (the documented
+  port-collision hazard). Implement T-18: observe the registered-but-
+  never-observed `http_requests_total` or unregister it.
+
+**organization**
+- [ ] **PRO-P9 (S)** TSV truth sweep: spec §2/§9/§10.7 still say
+  "JSONL + CSV only" / "`format` accepts only jsonl/csv (400
+  otherwise)" while `BulkFormat::Tsv` shipped 2026-08-21; AGENTS.md /
+  index.md / README never mention TSV. Also refresh AGENTS.md (loco
+  1.0.1→1.1.0, verifier 0.2→0.9, missing `src/compliance/` +
+  integrity-digests migration in the layout map).
+- [ ] **PRO-P10 (M)** Promote the buried SEC-B3 TOCTOU follow-up
+  (ConnectionTrait-generic `streaming::*_and_emit` + advisory-locked
+  bulk upsert) from `[x]`-entry prose to a first-class open §13 item.
+  Re-triage the FE "search box once the service ships search" task —
+  the precondition has been met since Tantivy landed.
+
+**place**
+- [ ] **PRO-P11 (S)** Beyond PRO-H2: reconcile matcher `spec/index.md`
+  "Version targeted: 0.6.1" → 0.7.0 and the stale §3 field-table rows;
+  update service `spec/05-domain-model.md` + `10-persistence.md` to the
+  renamed fields/columns; refresh `spec/14` test counts (212 lib / 86
+  integration).
+- [ ] **PRO-P12 (M)** Land T-9 (geo-radius `nearby` endpoint + search
+  `offset`) — the smallest open functional gap; both halves have
+  primitives in `matching::geo` and `SearchQuery`.
+
+**care-pathway**
+- [ ] **PRO-P13 (M)** The crate spec (self-declared single source of
+  truth) has **zero coverage of TBA and the `continues_as`/journey/
+  links surface** — `src/tba.rs`, `src/journey.rs`,
+  `controllers/{tba,links}.rs`, two migrations, and the 404-not-403
+  rule exist only in the umbrella spec + CHANGELOG + AGENTS. Backport
+  into spec §2/§6/§11/§13/§14/§15 (or add an explicit delegation
+  pointer to the umbrella docs). Sweep the stale "front-end merge
+  action deferred" claim (×3 in spec + AGENTS — the FE ships merge);
+  add the TBA/journey/links endpoint tables to `index.md`/`README.md`;
+  add `/time` to the FE spec route list; fix the verifier 0.2→0.9
+  citation; add the instance + insight endpoints to `openapi.rs`.
+
+**case**
+- [ ] **PRO-P14 (M)** Rewrite the stale **entity-level** umbrella spec:
+  `case/spec/13-tasks.md` lists Tantivy/privacy/bus as open (all landed
+  2026-08-02/03) and `14-implementation-status.md` contradicts itself
+  on PASETO (line 25 vs 44) while omitting entity_links, FHIR,
+  compliance, bulk, and ABAC. Also tick the two implemented FHIR
+  sub-tasks in the crate spec (`spec/index.md:1225,1231`), close the
+  stale line-1029 privacy checkbox, and close/rescope entity T-13 (it
+  conflicts with the root no-`agents/` decision).
+- [ ] **PRO-P15 (M)** case FE: add the search box + audit/event views —
+  the shipped Tantivy search unblocked T-11 weeks ago.
+
+**project-portfolio-management (the uncommitted PM-suite WIP — verified
+green as it sits; these finish it)**
+- [ ] **PRO-P16 (S)** OpenAPI: add `workflow`/`effort`/`ceremony`/
+  `value` path groups to `src/openapi.rs` (~20 mounted routes are
+  undocumented) and make the parity test genuinely two-way (today
+  documented ⊆ checked, so undocumented mounted routes pass silently);
+  correct §14.1's claim meanwhile.
+- [ ] **PRO-P17 (S)** CHANGELOGs: the WIP (10 features, 9 migrations)
+  has zero service CHANGELOG lines, and the matcher's `Plan.phase`
+  wire-format addition is unrecorded — write both, then make the
+  version-bump call (service 0.3.0, matcher 0.2.0).
+- [ ] **PRO-P18 (S)** Docs: replace the `spec/total-project-control/`
+  raw-field-notes stub with the mapping doc `prince2/` claims to
+  mirror; refresh service AGENTS.md (knows nothing of the PM suite);
+  regenerate the §14 snapshot on land; fix the stale Cargo description
+  (also in PRO-H3f).
+- [ ] **PRO-P19 (M)** Run `scripts/ci-check.sh test-db` on the 74-test
+  DB-gated suite **before committing the WIP** (T-27's green claim
+  predates the effort/value/ceremony additions); then land T-26's
+  remainder (action→task conversion; register the pre-existing implicit
+  controls).
+- [ ] **PRO-P20 (L)** T-21 triggers (field-change/date/SLE + multi-action
+  rules); FE adoption of the PM suite (workflows, OKR, distribution,
+  TPC/controls, effort/ceremony views — all honestly "Not built");
+  standing pre-WIP gaps (goals FR-12, issues FR-14, review-queue table,
+  T-7 links, T-8 bulk).
+
+**authentication**
+- [ ] **PRO-P21 (S)** Verifier `spec/index.md` §13/§14 still says the
+  0.9.0 release is pending — it was cut 2026-08-05. Refresh.
+- [ ] **PRO-P22 (S)** Sweep the stale RS256-JWT/JWKS doc-comments (8
+  files: `lib.rs:5-7,18`, `app.rs:6`, `controllers/{auth,mod,metrics}`,
+  `models/users.rs:217`, migration `sessions.rs:2`) to PASETO wording —
+  the comments describe the model `jwt.md` forbids.
+- [ ] **PRO-P23 (M)** Decide + implement auth on the unauthenticated
+  `GET /api/compliance/audit/verify` (or record the leave-open decision
+  in §16) and add it to `openapi.rs`.
+- [ ] **PRO-P24 (M)** FE: repair the E2E suite (silently red since
+  ~2026-06-17; `page.route()` can't intercept BFF server-side fetch;
+  delete the two obsolete `return_to`/localStorage cases). Delete or
+  wire the dead `src/lib/api/{client,auth}.ts` + `config.ts` (~19 of 36
+  unit tests exercise code no route imports) and reconcile the "no
+  data-grid dependency" claim with the six unused SVAR deps.
+
+**link-graph / libraries**
+- [ ] **PRO-P25 (S)** link-graph: refresh AGENTS.md ground rules that
+  contradict the code (still says copy-EntityRef + Utoipa; reality is
+  the entity-ref path dep + hand-written OpenAPI); update spec §13
+  T-22's residual note (Dockerfile already has `USER` + `HEALTHCHECK`)
+  and the stale test counts.
+- [ ] **PRO-P26 (M)** integrity-mac: decide its documentation tier — a
+  minimal `spec/` (it is the family's tamper-evidence keystone and the
+  only crate with neither spec nor an explicit waiver) or an
+  entity-ref-style waiver paragraph.
+
+**consumer apps**
+- [ ] **PRO-P27 (M)** CRM: build the code sides of gates CRM-G1/G2 by
+  copy-adapting WPM-T30/T31 (reference ABAC policy + activation
+  runbook; subject-access export, erasure/anonymise, retention sweep —
+  resolving the append-only consent-history vs erasure collision
+  explicitly). CRM holds consented personal data and currently has
+  neither the code nor a queued task for it.
+- [ ] **PRO-P28 (S)** patient-flow: drop the `sqlx-sqlite` sea-orm
+  feature (family rule: PostgreSQL NOT SQLite); fix
+  `publish`/repository metadata (PRO-H3e); add the `[x]` PF-T19 row for
+  the delivered `time-analysis` endpoint (the queue is the single
+  source of truth and its newest capability is invisible there);
+  correct PF-T17's 9→8 count; commit the verified-additive staff-
+  utilisation spec hunks (owner decision).
+- [ ] **PRO-P29 (S)** case-folder: add `license`+`description` to the
+  service manifest; tick delivered-but-open ST-14/ST-16 in the FE queue
+  (contradicts the cross-cutting queue); fix the `lib.rs` ownership
+  doc-comment (claims local tables; the migration registers none);
+  correct the 43→48 vitest count; queue or de-flag
+  tag-it/receive-it/batch drafts.
+- [ ] **PRO-P30 (S)** WPM: migration-manifest metadata + edition (with
+  PRO-H3); drop the dead `ensure_employee` helper; convert the 4
+  seed-task `.unwrap()`s to contextful errors.
+- [ ] **PRO-P31 (S)** CMS: rewrite the service edition spec's Delivery
+  section to the delivered state (feed included, T23/T24 landed,
+  231/60 counts); drop the FE "(planned)" heading; reword both
+  editions' "grow topic files" promises; `publish = false` (PRO-H3e).
+
+### Suggested execution order
+
+1. **PRO-R1, PRO-R2** — CI is red on the working tree; nothing else
+   should land on top of a red `docs` gate.
+2. **PRO-R3 (LICENSE.md first)** — a public monorepo with no license is
+   the single largest professionalism gap found.
+3. **PRO-P16–P19** — finish and land the portfolio WIP before it
+   drifts (it is green today; every day unlanded is merge risk).
+4. **PRO-H1 + PRO-H2** — release hygiene and the rename repair
+   (PRO-H2's event-service matcher-pin is the only place the audit
+   found shipped code diverging from its sibling source).
+5. **PRO-H3, PRO-H4, PRO-R4–R6** — metadata + junk sweeps (cheap,
+   mechanical, high polish-per-hour).
+6. **PRO-P13, PRO-P14** — the two [high] spec-truth findings
+   (care-pathway crate spec, case umbrella spec).
+7. **PRO-H5 (CSRF), PRO-P27 (CRM gates), PRO-P23** — the
+   security-relevant functional gaps.
+8. Everything else in per-family order; PRO-H6/H7/H9 as capacity
+   allows.

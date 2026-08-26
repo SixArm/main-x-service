@@ -39,7 +39,7 @@
 #               check --all-targets` against that toolchain. A no-op for
 #               the nightly-only fuzz/ sub-crates. Needs the MSRV
 #               toolchain installed: rustup toolchain install <msrv>
-#               --profile minimal. See spec/rust-msrv-n-minus-3.md.
+#               --profile minimal. See spec/rust-msrv-n-minus-3/index.md.
 #   bench       cargo bench --no-run, for crates declaring a [[bench]].
 #               Compiles and links the Criterion harnesses without
 #               running them: a benchmark nobody runs still rots, and a
@@ -53,7 +53,7 @@
 #               uppercase `AGENTS/` directory. Reads the git index rather
 #               than the filesystem, because a case-insensitive
 #               filesystem answers for either spelling and hides the
-#               defect. See spec/agents-directory-name-is-lowercase.md.
+#               defect. See spec/agents-directory-name-is-lowercase/index.md.
 #
 # With no crate path, the stage runs across every crate from
 # scripts/ci-crates.sh.
@@ -84,7 +84,7 @@ enrolled_for_db() {
 # The declared MSRV, from its single source of truth. Every crate's
 # `rust-version` must equal this; keeping the number in one file is what
 # stops ~50 hand-edited manifests drifting apart.
-# (spec/rust-msrv-n-minus-3.md)
+# (spec/rust-msrv-n-minus-3/index.md)
 msrv_version() {
   grep -v '^[[:space:]]*#' ci/msrv.txt \
     | grep -v '^[[:space:]]*$' \
@@ -272,7 +272,7 @@ if [[ "${STAGE}" == "docs" ]]; then
   # Read the *index*, not the filesystem. On a case-insensitive
   # filesystem `ls` happily answers for either spelling, which is exactly
   # how 878 references to a path that did not exist survived three weeks
-  # unnoticed. See spec/agents-directory-name-is-lowercase.md.
+  # unnoticed. See spec/agents-directory-name-is-lowercase/index.md.
   docs_failed=0
   bad_paths="$(git ls-files | grep -E '(^|/)AGENTS/' || true)"
   if [[ -n "${bad_paths}" ]]; then
@@ -290,7 +290,7 @@ if [[ "${STAGE}" == "docs" ]]; then
   # Excluding anything else would be a hole rather than a base case.
   bad_refs="$(git grep -lI 'AGENTS/' -- . \
       ':(exclude)scripts/ci-check.sh' \
-      ':(exclude)spec/agents-directory-name-is-lowercase.md' || true)"
+      ':(exclude)spec/agents-directory-name-is-lowercase/index.md' || true)"
   if [[ -n "${bad_refs}" ]]; then
     echo "  files referencing an uppercase AGENTS/ directory:" >&2
     printf '    %s\n' ${bad_refs} >&2

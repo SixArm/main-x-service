@@ -1,6 +1,6 @@
 # The declared Minimum Supported Rust Version for every Rust crate here.
 #
-# Policy: current stable minus three (N-3). See spec/rust-msrv-n-minus-3.md
+# Policy: current stable minus three (N-3). See spec/rust-msrv-n-minus-3/index.md
 # for why, what it does and does not promise, and how to bump it.
 #
 # Derived 2026-08-20 from stable 1.98.0 (2026-08-18).

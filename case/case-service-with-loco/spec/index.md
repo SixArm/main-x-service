@@ -821,7 +821,7 @@ the other v1 edge kinds even though it shares the same edge shape.
   CPU-bound halves of a request, compiled in CI by the new
   `scripts/ci-check.sh bench` stage. `Cargo.toml` also declares
   `rust-version = "1.95"` — the repository's current-stable-minus-three
-  floor (`spec/rust-msrv-n-minus-3.md`), enforced by
+  floor (`spec/rust-msrv-n-minus-3/index.md`), enforced by
   `scripts/ci-check.sh msrv`. Additionally, `validation::problems` reported an
   over-long array's cardinality violation once and then still walked
   every entry, so a payload with ten thousand blank `subjects` returned

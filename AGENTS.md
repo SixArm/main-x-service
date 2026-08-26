@@ -155,7 +155,7 @@ discovers the ~55 crates and feeds them to each stage.
 | Stage | Command | Notes |
 |---|---|---|
 | `fmt` | `cargo fmt --check` | one pass over every crate |
-| `docs` | index + content scan | repo-wide, no build: the agents directory is lowercase ([spec](spec/agents-directory-name-is-lowercase.md)) |
+| `docs` | index + content scan | repo-wide, no build: the agents directory is lowercase ([spec](spec/agents-directory-name-is-lowercase/index.md)) |
 | `clippy` | `cargo clippy --all-targets -- -D warnings` | `-D warnings` is what keeps `#![warn(clippy::pedantic)]` at zero |
 | `test` | `cargo test` | DB-gated suites stay skipped |
 | `test-db` | `cargo test -- --ignored` | only crates enrolled in [`ci/db-suites.txt`](ci/db-suites.txt), against a Postgres service |
@@ -173,7 +173,7 @@ is deliberately a *different number* from the `rust-toolchain.toml` pin
 (1.96.1, what we build with) and from current stable. The binding
 constraint is the dependency graph, not our code: loco-rs / sea-orm /
 sqlx already require 1.94. See
-[`spec/rust-msrv-n-minus-3.md`](spec/rust-msrv-n-minus-3.md) for the
+[`spec/rust-msrv-n-minus-3/index.md`](spec/rust-msrv-n-minus-3/index.md) for the
 policy and the bump procedure.
 
 **`ci/db-suites.txt` is an allowlist, not a denylist.** A crate joins it
