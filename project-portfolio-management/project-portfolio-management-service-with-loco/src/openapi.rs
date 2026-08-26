@@ -35,6 +35,15 @@ fn paths() -> Value {
     merge_object(&mut paths, tba_plan_paths());
     merge_object(&mut paths, tba_forecast_paths());
     merge_object(&mut paths, tba_rollup_paths());
+    merge_object(&mut paths, tpc_paths());
+    merge_object(&mut paths, control_paths());
+    merge_object(&mut paths, phase_paths());
+    merge_object(&mut paths, distribution_paths());
+    merge_object(&mut paths, okr_paths());
+    merge_object(&mut paths, workflow_paths());
+    merge_object(&mut paths, effort_paths());
+    merge_object(&mut paths, ceremony_paths());
+    merge_object(&mut paths, value_paths());
     paths
 }
 
@@ -591,6 +600,535 @@ fn tba_forecast_paths() -> Value {
     })
 }
 
+/// The Total Project Control paths (entity spec §9.2c / FR-37).
+fn tpc_paths() -> Value {
+    let plan = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    json!({
+        "/api/plans/{pid}/tpc": {
+            "post": {
+                "tags": ["total-project-control"],
+                "summary": "Record a TPC observation (EMV, cost estimate to complete, DIPP)",
+                "description": "Money in minor units, ratios in basis points — no float touches a currency figure. A negative expected monetary value is accepted deliberately: a project can be worth less than nothing to finish, and refusing to record that would hide the one case the metric exists to expose. A negative cost estimate to complete is refused.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Recorded" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "Bad currency, or a negative cost estimate to complete" }
+                }
+            },
+            "get": {
+                "tags": ["total-project-control"],
+                "summary": "TPC observation history, newest first",
+                "parameters": [plan],
+                "responses": { "200": { "description": "Observations" }, "404": { "description": "Unknown plan" } }
+            }
+        },
+        "/api/plans/{pid}/tpc/report": {
+            "get": {
+                "tags": ["total-project-control"],
+                "summary": "DIPP, the progress index, and the stored-versus-computed divergence",
+                "description": "DIPP = EMV / CEC asks whether the value still to come is worth the money still to spend; sunk cost appears nowhere in it. A cost estimate to complete of zero reports null with a reason, never infinity. A plan with no observation reports unmeasured, never a zero.",
+                "parameters": [plan],
+                "responses": { "200": { "description": "Derived report" }, "404": { "description": "Unknown plan" } }
+            }
+        },
+        "/api/tpc": {
+            "get": {
+                "tags": ["total-project-control"],
+                "summary": "Portfolio triage ranked by DIPP descending, within one currency",
+                "description": "Plans recorded in another currency and plans whose DIPP is undefined are excluded and reported, rather than sorted last as though measured and bad. This service never converts currency.",
+                "parameters": [
+                    { "name": "currency", "in": "query", "schema": { "type": "string", "default": "GBP" } }
+                ],
+                "responses": { "200": { "description": "Ranked triage" } }
+            }
+        }
+    })
+}
+
+/// The Controlling-process paths (entity spec §9.2c / FR-38, FR-39).
+fn control_paths() -> Value {
+    let plan = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    json!({
+        "/api/plans/{pid}/controls": {
+            "post": {
+                "tags": ["controls"],
+                "summary": "Register a control: standard, timing, source, cadence",
+                "description": "The timing decides what a failing control may do: feedforward may block a write, concurrent may warn and escalate but never silently undo the operator's action, feedback may only record. A control naming a metric this service does not produce is refused here rather than left registered — a check nobody can evaluate is indistinguishable from one that passes.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Registered, with the response its timing permits" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "Unknown metric, bad timing or comparator, or a within-control with no tolerance" }
+                }
+            },
+            "get": {
+                "tags": ["controls"],
+                "summary": "The control register for one plan",
+                "parameters": [plan],
+                "responses": { "200": { "description": "Controls" }, "404": { "description": "Unknown plan" } }
+            }
+        },
+        "/api/controls/{pid}": {
+            "delete": {
+                "tags": ["controls"],
+                "summary": "Withdraw a control",
+                "description": "Soft-delete. The readings stay: they are the history of what was measured, and withdrawing a control does not unmeasure the past.",
+                "parameters": [plan],
+                "responses": { "204": { "description": "Withdrawn" }, "404": { "description": "Unknown control" } }
+            }
+        },
+        "/api/controls/{pid}/readings": {
+            "post": {
+                "tags": ["controls"],
+                "summary": "Measure and compare in one step",
+                "description": "The verdict is derived at write from the standard in force, so a reading can never disagree with the standard it was taken against. A reading with no value is unmeasured — a third verdict, never a pass — and is excluded from pass rates rather than counted as either half.",
+                "parameters": [plan],
+                "responses": { "200": { "description": "Reading with verdict and gap" }, "404": { "description": "Unknown control" } }
+            },
+            "get": {
+                "tags": ["controls"],
+                "summary": "Readings for one control, newest first",
+                "description": "Append-only: correcting a reading means recording another one, because a control history that can be rewritten measures whatever the editor wanted.",
+                "parameters": [plan],
+                "responses": { "200": { "description": "Readings" }, "404": { "description": "Unknown control" } }
+            }
+        },
+        "/api/readings/{pid}/actions": {
+            "post": {
+                "tags": ["controls"],
+                "summary": "Record what a failing reading provoked",
+                "description": "The fourth step of the Controlling process. An action of kind accept also stamps the reading as explicitly accepted, which is what stops it being reported as unanswered.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Action recorded" },
+                    "404": { "description": "Unknown reading" },
+                    "422": { "description": "Bad kind, or a missing description" }
+                }
+            }
+        },
+        "/api/plans/{pid}/controls/coverage": {
+            "get": {
+                "tags": ["controls"],
+                "summary": "What is not being controlled on one plan",
+                "description": "Controls that have never produced a reading, controls whose cadence has lapsed, unanswered failures, and the count per timing with every timing present even at zero — an empty cell is a finding, not a row to omit.",
+                "parameters": [plan],
+                "responses": { "200": { "description": "Coverage" }, "404": { "description": "Unknown plan" } }
+            }
+        },
+        "/api/controls/coverage": {
+            "get": {
+                "tags": ["controls"],
+                "summary": "Portfolio-wide control coverage, naming plans with no controls at all",
+                "responses": { "200": { "description": "Coverage" } }
+            }
+        }
+    })
+}
+
+/// The project-phase paths (entity spec §9.2b / FR-30).
+fn phase_paths() -> Value {
+    let plan = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    json!({
+        "/api/plans/{pid}/phase": {
+            "put": {
+                "tags": ["phase"],
+                "summary": "Advance one step, or move back with a stated reason",
+                "description": "Advancement is one step at a time and a skip is refused, naming the phase that would have been jumped. A backward move is permitted but must carry a reason: re-planning is normal, an unexplained regression is not. The phase never gates an operational write — tasks may be created in initiating and issues raised in closing, because refusing writes on that basis teaches operators to misreport the phase. An unrecognised token is refused, never coerced to a default.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "New phase, and the next one available" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "A skipped phase, a silent regression, no change, or an unknown token" }
+                }
+            }
+        },
+        "/api/plans/{pid}/phase-history": {
+            "get": {
+                "tags": ["phase"],
+                "summary": "Transitions and time spent in each phase",
+                "description": "The log is append-only — there is no edit or delete route, because a phase history that can be rewritten cannot support a duration claim. Every phase is reported even at zero, and a phase entered more than once reports its visit count: two visits of 50 and one of 100 are different stories that the total alone would hide.",
+                "parameters": [plan],
+                "responses": { "200": { "description": "History and durations" }, "404": { "description": "Unknown plan" } }
+            }
+        }
+    })
+}
+
+/// The Flow Distribution path (entity spec §9.2b / FR-31).
+fn distribution_paths() -> Value {
+    json!({
+        "/api/plans/{pid}/flow-distribution": {
+            "get": {
+                "tags": ["flow-distribution"],
+                "summary": "The feature / defect / risk / debt mix of completed work",
+                "description": "The fifth Flow Framework metric, and the only one not already computed under time-based-analysis vocabulary — Flow Time, Velocity, Efficiency and Load are served by /api/plans/{pid}/time-analysis and /flow, and are deliberately not republished here under Flow-Framework names. Work with no declared type is reported as unclassified and counted separately, never folded into feature, because absorbing it would flatter the share a reader is most likely to act on. An intended mix is reported against only when a deployment declares one: absent that, the mix is reported without judgement, since an unlabelled target is how a measurement becomes a quota.",
+                "parameters": [
+                    { "name": "pid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                    { "name": "window_days", "in": "query", "schema": { "type": "integer", "default": 90, "minimum": 1, "maximum": 3650 } },
+                    { "name": "rollup", "in": "query", "schema": { "type": "boolean", "default": false } },
+                    { "name": "depth", "in": "query", "schema": { "type": "integer" } }
+                ],
+                "responses": { "200": { "description": "The mix" }, "404": { "description": "Unknown plan" } }
+            }
+        }
+    })
+}
+
+/// The OKR-engine paths (entity spec §9.2b / FR-27).
+fn okr_paths() -> Value {
+    let id = |name: &str| {
+        json!({ "name": name, "in": "path", "required": true,
+                "schema": { "type": "string", "format": "uuid" } })
+    };
+    json!({
+        "/api/objectives/{pid}/key-results": {
+            "post": {
+                "tags": ["okr"],
+                "summary": "Declare a key result on an objective",
+                "description": "Key results hang off an objective, which has a pid, a period and weighted plan alignment — not off a plan's goals[], whose entries carry no identifier and would be orphaned by any reordering. current_value starts at the baseline, so a key result running from 100 defects to 0 reads 0% on the day it is created rather than complete. A maintain key result needs a tolerance band, a currency-valued one must name its currency, and one whose start equals its target is refused: it has no distance to travel and could never report progress.",
+                "parameters": [id("pid")],
+                "responses": {
+                    "200": { "description": "Declared" },
+                    "404": { "description": "Unknown objective" },
+                    "422": { "description": "Unmeasurable: no range, no tolerance, or no currency" }
+                }
+            },
+            "get": {
+                "tags": ["okr"],
+                "summary": "Key results with derived progress, and the reason where absent",
+                "parameters": [id("pid")],
+                "responses": { "200": { "description": "Key results" }, "404": { "description": "Unknown objective" } }
+            }
+        },
+        "/api/key-results/{pid}/check-ins": {
+            "post": {
+                "tags": ["okr"],
+                "summary": "Record an observation",
+                "description": "Advances current_value and never start_value: progress measured from a moving baseline is not progress, so there is no path here that touches it. Confidence is recorded and never blended into any score — a self-report and a measurement are different kinds of evidence, and averaging them would make the measured half unfalsifiable.",
+                "parameters": [id("pid")],
+                "responses": {
+                    "200": { "description": "Recorded, with recomputed progress" },
+                    "404": { "description": "Unknown key result" },
+                    "422": { "description": "Confidence out of range" }
+                }
+            },
+            "get": {
+                "tags": ["okr"],
+                "summary": "Check-ins, newest first",
+                "parameters": [id("pid")],
+                "responses": { "200": { "description": "Check-ins" }, "404": { "description": "Unknown key result" } }
+            }
+        },
+        "/api/plans/{pid}/okr": {
+            "get": {
+                "tags": ["okr"],
+                "summary": "The plan's alignment-weighted OKR score",
+                "description": "Weighted by the existing objective_links weight rather than a second notion of importance. An objective with no measurable key result reports unmeasured and is excluded from both halves of the mean — it must neither drag the plan down nor silently lift it — and is reported rather than hidden. Every score is derived on read, so recording a check-in corrects every figure resting on it.",
+                "parameters": [id("pid")],
+                "responses": { "200": { "description": "Score and the objectives behind it" }, "404": { "description": "Unknown plan" } }
+            }
+        }
+    })
+}
+
+/// The custom-workflow paths (entity spec §9.2b / FR-26).
+fn workflow_paths() -> Value {
+    let plan = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    json!({
+        "/api/workflows": {
+            "post": {
+                "tags": ["workflow"],
+                "summary": "Register a state vocabulary for a plan's tasks or issues",
+                "description": "Every state must declare a category (todo, active, waiting, done): the board, the burndown and every flow figure are computed from what a state means, not its name, so a state without one is refused by name here and by the schema too. A plan-scoped workflow is never the deployment default — default means the fallback when a plan has none.",
+                "responses": {
+                    "200": { "description": "Registered" },
+                    "404": { "description": "plan_pid names no live plan" },
+                    "422": { "description": "applies_to not task or issue, a blank or over-long name, a state without a recognised category, or a workflow that fails validation" }
+                }
+            },
+            "get": {
+                "tags": ["workflow"],
+                "summary": "Every registered workflow",
+                "responses": { "200": { "description": "Workflows" } }
+            }
+        },
+        "/api/workflows/{pid}": {
+            "delete": {
+                "tags": ["workflow"],
+                "summary": "Withdraw a workflow",
+                "description": "Refused while any live task sits in a state only this workflow declares: withdrawing it would leave that work in a state no vocabulary explains — exactly the uncategorised-state problem the category column exists to prevent.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Withdrawn (soft-delete)" },
+                    "404": { "description": "Unknown workflow" },
+                    "422": { "description": "Live work sits in a state only this workflow declares" }
+                }
+            }
+        },
+        "/api/plans/{pid}/workflow": {
+            "get": {
+                "tags": ["workflow"],
+                "summary": "The vocabulary actually in force, and where it came from",
+                "description": "Resolution order: the plan's own workflow if it has one, else the deployment default, else the built-in vocabulary — never none, which is what keeps every existing board working with nothing configured. The source is named because 'why can I not move this card' is answered by which vocabulary is in force, not by the vocabulary alone.",
+                "parameters": [
+                    plan,
+                    { "name": "applies_to", "in": "query",
+                      "schema": { "type": "string", "enum": ["task", "issue"], "default": "task" } }
+                ],
+                "responses": {
+                    "200": { "description": "Derived view (ETag-conditional)" },
+                    "304": { "description": "Not modified" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "applies_to not task or issue" }
+                }
+            }
+        }
+    })
+}
+
+/// The recorded-effort and utilisation paths (entity spec §9.2c /
+/// FR-28, FR-35; `agents/share/time-based-analysis.md` §7.1).
+fn effort_paths() -> Value {
+    let plan = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    json!({
+        "/api/plans/{pid}/time-entries": {
+            "post": {
+                "tags": ["effort"],
+                "summary": "Record effort against a plan (and optionally one task)",
+                "description": "actor_ref is a person: or worker: URN, never a raw name. Minutes are capped at 1440 — a single day cannot hold more, so anything above is a typo or a fabrication, and either way it is not effort.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Recorded" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "actor_ref not a person:/worker: URN, or minutes outside 1..=1440" }
+                }
+            },
+            "get": {
+                "tags": ["effort"],
+                "summary": "The plan's time entries, newest first (cap 5000)",
+                "parameters": [plan],
+                "responses": { "200": { "description": "Entries" }, "404": { "description": "Unknown plan" } }
+            }
+        },
+        "/api/plans/{pid}/effort": {
+            "get": {
+                "tags": ["effort"],
+                "summary": "Effort roll-ups per plan, per task and per assignee — every figure labelled asserted",
+                "description": "Recorded effort is what people said they spent, not an observation, so the roll-up says asserted rather than presenting it as measurement. The per-assignee table returns in stable actor order and is deliberately not sorted by size — a size-ranked effort table is a league table.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Derived view (ETag-conditional; carries as_of)" },
+                    "304": { "description": "Not modified" },
+                    "404": { "description": "Unknown plan" }
+                }
+            }
+        },
+        "/api/working-time": {
+            "post": {
+                "tags": ["effort"],
+                "summary": "Declare the capacity basis: minutes per day and working days per week",
+                "description": "The denominator every utilisation figure divides by. Declared, not inferred — a capacity basis reverse-engineered from effort entries would make 100% true by construction.",
+                "responses": {
+                    "200": { "description": "Declared" },
+                    "422": { "description": "minutes_per_day outside 1..=1440, or working_days_per_week outside 1..=7" }
+                }
+            }
+        },
+        "/api/non-working": {
+            "post": {
+                "tags": ["effort"],
+                "summary": "Record leave, holiday, study leave or non-project duty",
+                "description": "This is what stops somebody on leave reporting 0% utilisation, which would read as measured idleness. The period's minutes are deducted from the person's denominator, and a person entirely absent still appears in the utilisation view — precisely so the answer is 'on leave' rather than a silent absence.",
+                "responses": {
+                    "200": { "description": "Recorded" },
+                    "422": { "description": "kind not leave, holiday, study_leave or non_project_duty, or ends_on precedes starts_on" }
+                }
+            }
+        },
+        "/api/capacity/utilization": {
+            "get": {
+                "tags": ["effort"],
+                "summary": "Recorded effort against declared capacity, by plan, team or person",
+                "description": "Per-person utilisation is served under the five stated obligations (time-based-analysis §7.1): each figure ships beside its numerator, its denominator and the non-working deduction that produced the denominator; the per-person view returns in stable actor order, never sorted by utilisation; a person under the suppression floor is withheld rather than reported on noise; and utilisation near or above 100% is a warning about the queue, not an achievement. No per-person cycle time, throughput or flow efficiency is served here or derivable from what it returns — that refusal was narrowed, not repealed.",
+                "parameters": [
+                    { "name": "by", "in": "query",
+                      "schema": { "type": "string", "enum": ["plan", "team", "person"], "default": "team" } },
+                    { "name": "window_days", "in": "query",
+                      "schema": { "type": "integer", "default": 28, "minimum": 1, "maximum": 366 } },
+                    { "name": "plan_pid", "in": "query",
+                      "schema": { "type": "string", "format": "uuid" } }
+                ],
+                "responses": {
+                    "200": { "description": "Derived view (ETag-conditional)" },
+                    "304": { "description": "Not modified" },
+                    "422": { "description": "by is not plan, team or person" }
+                }
+            }
+        }
+    })
+}
+
+/// The sprint-ceremony and commitment paths (entity spec §9.2b /
+/// FR-29).
+fn ceremony_paths() -> Value {
+    let sprint = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    json!({
+        "/api/sprints/{pid}/ceremonies": {
+            "post": {
+                "tags": ["ceremony"],
+                "summary": "Hold a ceremony: planning, daily, review or retrospective",
+                "description": "A second planning or review on the same sprint is refused — that is a re-plan, which is a new sprint. Dailies and retrospectives may repeat.",
+                "parameters": [sprint],
+                "responses": {
+                    "200": { "description": "Held" },
+                    "404": { "description": "Unknown sprint" },
+                    "422": { "description": "Unknown kind, or a second planning/review on the same sprint" }
+                }
+            },
+            "get": {
+                "tags": ["ceremony"],
+                "summary": "The sprint's ceremonies, with per-kind counts and the retrospective notes",
+                "description": "Every kind is reported even at zero — a sprint that never held a retrospective is a finding, not a missing row.",
+                "parameters": [sprint],
+                "responses": { "200": { "description": "Ceremonies" }, "404": { "description": "Unknown sprint" } }
+            }
+        },
+        "/api/sprints/{pid}/commit": {
+            "post": {
+                "tags": ["ceremony"],
+                "summary": "Snapshot the committed task set — once",
+                "description": "Refuses a second call: a rewritable commitment is not a commitment, and a sprint that grew by half would otherwise look like one that was always that size.",
+                "parameters": [sprint],
+                "responses": {
+                    "200": { "description": "The count committed" },
+                    "404": { "description": "Unknown sprint" },
+                    "422": { "description": "Already committed" }
+                }
+            }
+        },
+        "/api/sprints/{pid}/commitment": {
+            "get": {
+                "tags": ["ceremony"],
+                "summary": "The committed set beside the current one, so a scope change reads as a change",
+                "description": "Tasks added or removed after commitment are named, not just counted — 'what was added' is the question. Sprint velocity and burndown are sprint-scoped and count-based; the Flow Framework metrics are item-scoped and time-based. Neither is derived from the other.",
+                "parameters": [sprint],
+                "responses": {
+                    "200": { "description": "Derived view (ETag-conditional)" },
+                    "304": { "description": "Not modified" },
+                    "404": { "description": "Unknown sprint" }
+                }
+            }
+        }
+    })
+}
+
+/// The realized-gains and strategic-performance paths (entity spec
+/// §9.2c / FR-33, FR-34, FR-36).
+fn value_paths() -> Value {
+    let plan = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    json!({
+        "/api/plans/{pid}/business-case": {
+            "post": {
+                "tags": ["value"],
+                "summary": "Record a promised business-case target",
+                "description": "approved_at is stamped here and has no update path: it is the Time-to-Value clock start, and a clock start that can move is not a measurement.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Recorded" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "source not charter or gate_review, or a blank metric" }
+                }
+            }
+        },
+        "/api/plans/{pid}/value-points": {
+            "post": {
+                "tags": ["value"],
+                "summary": "Record observed value",
+                "description": "A second first-measurable point is refused: the Time-to-Value clock stops once.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Recorded" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "A second first-measurable value point" }
+                }
+            }
+        },
+        "/api/plans/{pid}/adoption": {
+            "post": {
+                "tags": ["value"],
+                "summary": "Record an adoption snapshot",
+                "description": "A zero or negative target is refused here rather than divided at read, and the definition of 'active user' is required and stored beside the rate — it is the term most easily redefined between two readings.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Recorded" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "Non-positive target_users or window_days, negative active_users, or a blank definition" }
+                }
+            }
+        },
+        "/api/plans/{pid}/satisfaction": {
+            "post": {
+                "tags": ["value"],
+                "summary": "Record a satisfaction response (NPS or CSAT)",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Recorded" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "instrument not nps or csat, score outside 0..=10, or an unknown respondent_role" }
+                }
+            }
+        },
+        "/api/plans/{pid}/value-realization": {
+            "get": {
+                "tags": ["value"],
+                "summary": "The realized-gains view: transformation ROI, Time-to-Value, adoption, performance to business case",
+                "description": "Every figure is derived on read, so recording a value point corrects every number resting on it. Investment is actual cost, not planned — ROI on money not yet spent is a forecast, and this view reports what happened. A mixed-currency plan has no single investment figure, so the ROI is withheld with mixed_currency rather than silently adding pounds to euros. Absent evidence reports null with a reason and sorts last, never 0: a plan with no value points has not failed to deliver — it has not been measured, and those are different findings.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Derived view (ETag-conditional; carries as_of)" },
+                    "304": { "description": "Not modified" },
+                    "404": { "description": "Unknown plan" }
+                }
+            }
+        },
+        "/api/plans/{pid}/performance": {
+            "get": {
+                "tags": ["value"],
+                "summary": "The strategic-performance view: stakeholder NPS, schedule and financial indices",
+                "description": "SPI and CPI need a phased budget baseline this service does not yet hold, so they are reported as unmeasured with the reason — rather than omitted (which would look like nothing to say) or defaulted to 1.0 (which would say 'exactly on plan').",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Derived view (ETag-conditional; carries as_of)" },
+                    "304": { "description": "Not modified" },
+                    "404": { "description": "Unknown plan" }
+                }
+            }
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -765,6 +1303,437 @@ mod tests {
         assert_eq!(
             s["components"]["securitySchemes"]["bearer"]["scheme"],
             "bearer"
+        );
+    }
+
+    /// Every Total Project Control and Controlling-process route is
+    /// documented, and the two properties a reader must not have to
+    /// guess at are stated rather than implied: that DIPP excludes sunk
+    /// cost, and that the timing decides what a failing control may do.
+    #[test]
+    fn spec_documents_the_tpc_and_control_surface() {
+        let s = spec();
+        let paths = &s["paths"];
+        for (path, method) in [
+            ("/api/plans/{pid}/tpc", "post"),
+            ("/api/plans/{pid}/tpc", "get"),
+            ("/api/plans/{pid}/tpc/report", "get"),
+            ("/api/tpc", "get"),
+            ("/api/plans/{pid}/controls", "post"),
+            ("/api/plans/{pid}/controls", "get"),
+            ("/api/controls/{pid}", "delete"),
+            ("/api/controls/{pid}/readings", "post"),
+            ("/api/controls/{pid}/readings", "get"),
+            ("/api/readings/{pid}/actions", "post"),
+            ("/api/plans/{pid}/controls/coverage", "get"),
+            ("/api/controls/coverage", "get"),
+        ] {
+            assert!(
+                paths[path][method].is_object(),
+                "{method} {path} is undocumented"
+            );
+        }
+
+        let report = paths["/api/plans/{pid}/tpc/report"]["get"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            report.contains("sunk cost"),
+            "DIPP's whole point is that sunk cost appears nowhere; say so"
+        );
+        assert!(
+            report.contains("never infinity"),
+            "a zero cost estimate to complete must document its null, not leave a sentinel implied"
+        );
+
+        let register = paths["/api/plans/{pid}/controls"]["post"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            register.contains("feedforward") && register.contains("feedback"),
+            "the timing decides what a failing control may do: state it"
+        );
+
+        let reading = paths["/api/controls/{pid}/readings"]["get"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            reading.contains("Append-only"),
+            "the append-only property is what makes a control history trustworthy"
+        );
+    }
+
+    /// The phase surface is documented, and the two properties a reader
+    /// must not have to guess are stated: that the log is append-only,
+    /// and that the phase does not gate operational writes.
+    #[test]
+    fn spec_documents_the_phase_surface() {
+        let s = spec();
+        let paths = &s["paths"];
+        assert!(paths["/api/plans/{pid}/phase"]["put"].is_object());
+        assert!(paths["/api/plans/{pid}/phase-history"]["get"].is_object());
+
+        let set = paths["/api/plans/{pid}/phase"]["put"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            set.contains("never gates an operational write"),
+            "a reader must not have to discover that phase does not block work"
+        );
+        assert!(
+            set.contains("must carry a reason"),
+            "the regression rule is the non-obvious half of the contract"
+        );
+
+        let history = paths["/api/plans/{pid}/phase-history"]["get"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            history.contains("append-only"),
+            "the append-only property is what makes a duration claim trustworthy"
+        );
+    }
+
+    /// Flow Distribution is documented, and says both of the things a
+    /// reader would otherwise have to discover: that unclassified work
+    /// is counted separately, and that the other four Flow Framework
+    /// metrics are not republished here under new names.
+    #[test]
+    fn spec_documents_flow_distribution() {
+        let s = spec();
+        let d = s["paths"]["/api/plans/{pid}/flow-distribution"]["get"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(!d.is_empty(), "flow-distribution is undocumented");
+        assert!(
+            d.contains("never folded into feature"),
+            "the unclassified rule is the one that keeps the mix honest"
+        );
+        assert!(
+            d.contains("not republished here"),
+            "say that the other four metrics live elsewhere, or they get built twice"
+        );
+    }
+
+    /// The OKR surface is documented, and states the two rules a reader
+    /// would otherwise have to discover: the baseline never moves, and
+    /// an unmeasured objective is excluded rather than scored zero.
+    #[test]
+    fn spec_documents_the_okr_surface() {
+        let s = spec();
+        let paths = &s["paths"];
+        for (path, method) in [
+            ("/api/objectives/{pid}/key-results", "post"),
+            ("/api/objectives/{pid}/key-results", "get"),
+            ("/api/key-results/{pid}/check-ins", "post"),
+            ("/api/key-results/{pid}/check-ins", "get"),
+            ("/api/plans/{pid}/okr", "get"),
+        ] {
+            assert!(
+                paths[path][method].is_object(),
+                "{method} {path} is undocumented"
+            );
+        }
+
+        let check_in = paths["/api/key-results/{pid}/check-ins"]["post"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            check_in.contains("never start_value"),
+            "the immutable baseline is the rule most worth stating"
+        );
+        assert!(
+            check_in.contains("never blended"),
+            "confidence not entering the score must be documented, not assumed"
+        );
+
+        let plan = paths["/api/plans/{pid}/okr"]["get"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            plan.contains("excluded from both halves"),
+            "an unmeasured objective is neither a drag nor a lift; say so"
+        );
+    }
+
+    /// The workflow, effort/utilisation, ceremony and value surfaces are
+    /// documented, and each states the rule a reader would otherwise
+    /// have to discover: every state declares a category, per-person
+    /// flow figures are refused, the commitment is written once, and
+    /// absent evidence is null with a reason.
+    #[test]
+    fn spec_documents_the_workflow_effort_ceremony_value_surfaces() {
+        let s = spec();
+        let paths = &s["paths"];
+        for (path, method) in [
+            ("/api/workflows", "post"),
+            ("/api/workflows", "get"),
+            ("/api/workflows/{pid}", "delete"),
+            ("/api/plans/{pid}/workflow", "get"),
+            ("/api/plans/{pid}/time-entries", "post"),
+            ("/api/plans/{pid}/time-entries", "get"),
+            ("/api/plans/{pid}/effort", "get"),
+            ("/api/working-time", "post"),
+            ("/api/non-working", "post"),
+            ("/api/capacity/utilization", "get"),
+            ("/api/sprints/{pid}/ceremonies", "post"),
+            ("/api/sprints/{pid}/ceremonies", "get"),
+            ("/api/sprints/{pid}/commit", "post"),
+            ("/api/sprints/{pid}/commitment", "get"),
+            ("/api/plans/{pid}/business-case", "post"),
+            ("/api/plans/{pid}/value-points", "post"),
+            ("/api/plans/{pid}/adoption", "post"),
+            ("/api/plans/{pid}/satisfaction", "post"),
+            ("/api/plans/{pid}/value-realization", "get"),
+            ("/api/plans/{pid}/performance", "get"),
+        ] {
+            assert!(
+                paths[path][method].is_object(),
+                "{method} {path} is undocumented"
+            );
+        }
+
+        let register = paths["/api/workflows"]["post"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            register.contains("Every state must declare a category"),
+            "the category rule is what every flow figure rests on: state it"
+        );
+
+        let utilization = paths["/api/capacity/utilization"]["get"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            utilization.contains("No per-person cycle time, throughput or flow efficiency"),
+            "the §7.1 refusal was narrowed, not repealed — the doc must say so"
+        );
+        assert!(
+            utilization.contains("never sorted by utilisation"),
+            "obligation 4: utilisation is never the sole ranking key"
+        );
+
+        let commit = paths["/api/sprints/{pid}/commit"]["post"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            commit.contains("rewritable commitment is not a commitment"),
+            "the once-only rule is the whole point of the snapshot"
+        );
+
+        let realization = paths["/api/plans/{pid}/value-realization"]["get"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            realization.contains("mixed_currency"),
+            "the ROI is withheld, never converted; a reader must not have to discover that"
+        );
+        assert!(
+            realization.contains("has not been measured"),
+            "no-evidence is a different finding from no-delivery; say so"
+        );
+
+        let performance = paths["/api/plans/{pid}/performance"]["get"]["description"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            performance.contains("no_baseline") || performance.contains("phased budget baseline"),
+            "SPI/CPI absence must carry its reason, not default to on-plan"
+        );
+    }
+
+    /// Mounted-but-undocumented paths: the pre-existing gap
+    /// (governance / strategy / visibility, the compliance verifiers,
+    /// the masked/export views, and the docs surface itself, which
+    /// documents the API rather than its own pages).
+    const KNOWN_UNDOCUMENTED: &[&str] = &[
+        // docs surface
+        "/api-docs/openapi.json",
+        "/swagger-ui",
+        // privacy views on the plan record
+        "/api/plans/{pid}/masked",
+        "/api/plans/{pid}/export",
+        // integrity verification
+        "/api/compliance/records/verify",
+        "/api/compliance/audit/verify",
+        // governance (PPM Phase A)
+        "/api/proposals",
+        "/api/proposals/{pid}",
+        "/api/proposals/{pid}/submit",
+        "/api/proposals/{pid}/review",
+        "/api/proposals/{pid}/approve",
+        "/api/proposals/{pid}/reject",
+        "/api/proposals/{pid}/promote",
+        "/api/proposals/{pid}/duplicates",
+        "/api/plans/{pid}/gate-reviews",
+        "/api/plans/{pid}/risks",
+        "/api/plans/{pid}/risks/{risk_pid}",
+        "/api/plans/{pid}/risks/{risk_pid}/escalate",
+        "/api/plans/{pid}/budget-lines",
+        "/api/plans/{pid}/budget-lines/{line_pid}/actual",
+        "/api/plans/{pid}/budget-lines/{line_pid}/release",
+        "/api/plans/{pid}/governance",
+        // strategy (PPM Phase C)
+        "/api/ideas",
+        "/api/ideas/{pid}/vote",
+        "/api/ideas/{pid}/dismiss",
+        "/api/ideas/{pid}/convert",
+        "/api/scenarios",
+        "/api/scenarios/{pid}/evaluate",
+        "/api/scenarios/{pid}/commit",
+        "/api/objectives",
+        "/api/objectives/{pid}/alignment",
+        "/api/plans/{pid}/objectives",
+        "/api/plans/{pid}/benefits",
+        "/api/plans/{pid}/benefits/{b_pid}/realize",
+        // visibility (PPM Phase B)
+        "/api/dependencies",
+        "/api/dependencies/{pid}",
+        "/api/plans/{pid}/schedule",
+        "/api/plans/{pid}/milestones",
+        "/api/plans/{pid}/milestones/{m_pid}/complete",
+        "/api/plans/{pid}/allocations",
+        "/api/plans/{pid}/allocations/{a_pid}",
+        "/api/capacity",
+        "/api/reports",
+        "/api/reports/{pid}",
+        "/api/reports/{pid}/run",
+        "/api/at-a-glance",
+    ];
+
+    /// Every route the controllers mount, as `(path, method)` pairs —
+    /// the same `routes()` functions `app.rs` wires, so the list below
+    /// is kept in step with `App::routes`. (Loco's default `/_health`
+    /// and `/_ping` are added by `AppRoutes`, not a controller, and are
+    /// out of scope here.)
+    fn mounted_routes() -> std::collections::BTreeSet<(String, String)> {
+        let groups = [
+            crate::controllers::plans::routes(),
+            crate::controllers::compliance::routes(),
+            crate::controllers::governance::routes(),
+            crate::controllers::visibility::routes(),
+            crate::controllers::insights::routes(),
+            crate::controllers::oversight::routes(),
+            crate::controllers::tba::routes(),
+            crate::controllers::tpc::routes(),
+            crate::controllers::controls::routes(),
+            crate::controllers::phase::routes(),
+            crate::controllers::distribution::routes(),
+            crate::controllers::workflow::routes(),
+            crate::controllers::okr::routes(),
+            crate::controllers::effort::routes(),
+            crate::controllers::ceremony::routes(),
+            crate::controllers::value::routes(),
+            crate::controllers::engineering::routes(),
+            crate::controllers::strategy::routes(),
+            crate::controllers::collaboration::routes(),
+            crate::controllers::automation::routes(),
+            crate::controllers::prioritisation::routes(),
+            crate::controllers::docs::routes(),
+            crate::controllers::metrics::routes(),
+        ];
+        let mut mounted = std::collections::BTreeSet::new();
+        for group in &groups {
+            let prefix = group.prefix.as_deref().unwrap_or("");
+            for handler in &group.handlers {
+                let mut path = format!("{prefix}/{}", handler.uri.trim_start_matches('/'));
+                while path.len() > 1 && path.ends_with('/') {
+                    path.pop();
+                }
+                for action in &handler.actions {
+                    mounted.insert((path.clone(), action.as_str().to_lowercase()));
+                }
+            }
+        }
+        mounted
+    }
+
+    /// Every documented `(path, method)` pair in the spec's `paths`
+    /// object (non-operation keys such as `parameters` are skipped).
+    fn documented_routes(s: &Value) -> std::collections::BTreeSet<(String, String)> {
+        let mut documented = std::collections::BTreeSet::new();
+        for (path, item) in s["paths"].as_object().expect("paths") {
+            for method in item.as_object().expect("path item").keys() {
+                if ["get", "post", "put", "patch", "delete"].contains(&method.as_str()) {
+                    documented.insert((path.clone(), method.clone()));
+                }
+            }
+        }
+        documented
+    }
+
+    /// Two-way parity between the mounted router and this document.
+    ///
+    /// **Forward**: every route the controllers mount (enumerated by
+    /// [`mounted_routes`]) appears in the document, unless its
+    /// path sits in the explicit `KNOWN_UNDOCUMENTED` register.
+    /// **Reverse**: every documented path + method is actually mounted,
+    /// so the doc cannot describe a route that does not exist.
+    ///
+    /// The register is a debt list, not an allowance: an entry must be
+    /// genuinely mounted (a stale entry fails) and must stay
+    /// undocumented (documenting one without removing it fails), so it
+    /// can only shrink as documentation lands. A brand-new route is
+    /// therefore documented or explicitly registered — never silent.
+    #[test]
+    fn spec_and_mounted_routes_agree_both_ways() {
+        use std::collections::BTreeSet;
+
+        let mounted = mounted_routes();
+        assert!(!mounted.is_empty(), "route enumeration returned nothing");
+        let documented = documented_routes(&spec());
+
+        let registered: BTreeSet<&str> = KNOWN_UNDOCUMENTED.iter().copied().collect();
+        let mounted_paths: BTreeSet<&str> = mounted.iter().map(|(path, _)| path.as_str()).collect();
+        let documented_paths: BTreeSet<&str> =
+            documented.iter().map(|(path, _)| path.as_str()).collect();
+
+        // Forward: mounted ⇒ documented or registered.
+        let missing: Vec<String> = mounted
+            .iter()
+            .filter(|(path, _)| !registered.contains(path.as_str()))
+            .filter(|entry| !documented.contains(*entry))
+            .map(|(path, method)| format!("{method} {path}"))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "mounted but neither documented nor registered as known debt:\n{}",
+            missing.join("\n")
+        );
+
+        // Reverse: documented ⇒ mounted (exact path + method).
+        let phantom: Vec<String> = documented
+            .iter()
+            .filter(|entry| !mounted.contains(*entry))
+            .map(|(path, method)| format!("{method} {path}"))
+            .collect();
+        assert!(
+            phantom.is_empty(),
+            "documented but not mounted (a doc typo, or a removed route):\n{}",
+            phantom.join("\n")
+        );
+
+        // The register can only shrink: every entry is really mounted…
+        let stale: Vec<&str> = registered
+            .iter()
+            .filter(|path| !mounted_paths.contains(**path))
+            .copied()
+            .collect();
+        assert!(
+            stale.is_empty(),
+            "registered as undocumented but not mounted at all — remove:\n{}",
+            stale.join("\n")
+        );
+        // …and still undocumented (documenting one must delete its entry).
+        let done: Vec<&str> = registered
+            .iter()
+            .filter(|path| documented_paths.contains(**path))
+            .copied()
+            .collect();
+        assert!(
+            done.is_empty(),
+            "registered as undocumented but now documented — remove from the register:\n{}",
+            done.join("\n")
         );
     }
 }

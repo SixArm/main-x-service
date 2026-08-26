@@ -21,6 +21,51 @@ use uuid::Uuid;
 use crate::models::_entities::{plans, task_transitions, tasks};
 use crate::tba;
 
+/// The flow classes in force for one plan.
+///
+/// Precedence: an explicit `PROJECT_PORTFOLIO_MANAGEMENT_FLOW_CLASSES`
+/// override wins outright; otherwise the plan's **workflow** supplies
+/// the classes its own vocabulary implies
+/// (`crate::workflow::default_flow_classes`), falling back to the
+/// built-in map.
+///
+/// Without this, a board that renamed `in_progress` to `hacking` would
+/// report **no value-adding time at all** — the classes are keyed on
+/// status names, and a custom vocabulary matches none of the built-in
+/// keys. A silently empty figure is worse than a missing one.
+async fn classes_for(
+    ctx: &AppContext,
+    plan_pid: Uuid,
+) -> std::collections::BTreeMap<String, String> {
+    if let Some(override_map) = tba::parse_classes(
+        std::env::var("PROJECT_PORTFOLIO_MANAGEMENT_FLOW_CLASSES")
+            .ok()
+            .as_deref(),
+    ) {
+        return override_map;
+    }
+    match super::workflow::in_force(ctx, plan_pid, "task").await {
+        Ok(def) => {
+            // Derivation fills the gaps; the **disclosed default map
+            // still wins for any status it names**. Otherwise adopting
+            // this would silently reclassify existing boards: the
+            // built-in `in_review` is *necessary* non-value-adding,
+            // while a four-category derivation can only call it
+            // `active` and therefore value-adding. That would have
+            // raised every untouched board's flow efficiency for no
+            // reason anyone asked for — a measurement changing because
+            // of an unrelated feature.
+            let mut classes = crate::workflow::default_flow_classes(&def);
+            classes.extend(tba::default_classes());
+            classes
+        }
+        // A resolution failure falls back to the disclosed default
+        // rather than failing the read: an analysis with the built-in
+        // classification is still an analysis.
+        Err(_) => tba::default_classes(),
+    }
+}
+
 /// Plan reads are capped so an unbounded board cannot become an
 /// unbounded query (spec §11).
 const MAX_TASKS: u64 = 1000;
@@ -192,7 +237,7 @@ async fn task_time_analysis(
         .await
         .map_err(|e| Error::Model(ModelError::from(e)))?;
     let transitions: Vec<tba::Transition> = rows.iter().map(tba::to_transition).collect();
-    let classes = tba::classes_in_force();
+    let classes = classes_for(&ctx, item.pid).await;
     let analysis = tba::analyze(
         &transitions,
         clock_of(&task),
@@ -265,7 +310,7 @@ async fn plan_time_analysis(
     }
     let item = super::governance::find_item(&ctx, &pid).await?;
     let (rows, transitions) = load_board(&ctx, item.pid, sprint).await?;
-    let classes = tba::classes_in_force();
+    let classes = classes_for(&ctx, item.pid).await;
     let paired = analyze_board(&rows, &transitions, &classes, now.timestamp_millis());
     let analyses: Vec<tba::TaskAnalysis> = paired.iter().map(|(_, a)| a.clone()).collect();
     let summary = tba::plan(&analyses);
@@ -304,7 +349,7 @@ async fn plan_constraints(
     let sprint = query.sprint()?;
     let item = super::governance::find_item(&ctx, &pid).await?;
     let (rows, transitions) = load_board(&ctx, item.pid, sprint).await?;
-    let classes = tba::classes_in_force();
+    let classes = classes_for(&ctx, item.pid).await;
     let paired = analyze_board(&rows, &transitions, &classes, now.timestamp_millis());
     let analyses: Vec<tba::TaskAnalysis> = paired.iter().map(|(_, a)| a.clone()).collect();
     let summary = tba::plan(&analyses);
@@ -338,7 +383,7 @@ async fn aging_wip(
     let sprint = query.sprint()?;
     let item = super::governance::find_item(&ctx, &pid).await?;
     let (rows, transitions) = load_board(&ctx, item.pid, sprint).await?;
-    let classes = tba::classes_in_force();
+    let classes = classes_for(&ctx, item.pid).await;
     let paired = analyze_board(&rows, &transitions, &classes, now.timestamp_millis());
 
     let cycle_times: Vec<i64> = paired
@@ -400,7 +445,7 @@ async fn plan_flow(
     let since = now - chrono::Duration::days(window_days);
     let item = super::governance::find_item(&ctx, &pid).await?;
     let (rows, transitions) = load_board(&ctx, item.pid, None).await?;
-    let classes = tba::classes_in_force();
+    let classes = classes_for(&ctx, item.pid).await;
     let paired = analyze_board(&rows, &transitions, &classes, now.timestamp_millis());
 
     let arrivals = rows.iter().filter(|t| t.created_at >= since).count();
@@ -583,7 +628,7 @@ async fn rollup(
         .collect();
 
     let walk = tba::walk_descendants(&children, root.pid, tba::MAX_ROLLUP_NODES, depth);
-    let classes = tba::classes_in_force();
+    let classes = classes_for(&ctx, root.pid).await;
 
     // Per plan: its own board only. The union is assembled from the
     // same analyses, so the two halves cannot disagree.
@@ -706,7 +751,7 @@ async fn forecast(
 
     let item = super::governance::find_item(&ctx, &pid).await?;
     let (rows, transitions) = load_board(&ctx, item.pid, None).await?;
-    let classes = tba::classes_in_force();
+    let classes = classes_for(&ctx, item.pid).await;
     let paired = analyze_board(&rows, &transitions, &classes, now.timestamp_millis());
 
     // Completion instants, from the tasks' own `done_at` stamps.

@@ -10,7 +10,29 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-26
 
+### Added — `Plan.phase` + `PlanPhase` (wire-format addition; never a matcher signal)
+
+- 2026-08-25 — **`Plan` gains an optional `phase` field and the
+  `PlanPhase` enum** (`Initiating` / `Planning` / `Executing` /
+  `Controlling` / `Closing` — the classic five process groups), following
+  the `PlanStatus` precedent exactly: `#[serde(default)]`, so every
+  stored payload and old peer round-trips unchanged, and
+  **informational-only — never scored**. Two records of one initiative
+  routinely sit in different phases, and the phase is precisely the
+  field most likely to differ between two systems describing one plan;
+  scoring it would make the matcher worse exactly where records are
+  hardest to reconcile. Pinned by the `phase_is_not_scored` test, the
+  same pin `status` carries.
+- `PlanPhase` ships `ALL` (process order), `ordinal()`, `token()` (the
+  wire tokens `initiating` … `closing`), and `parse()` — unknown input is
+  `None`, refused by the caller rather than coerced, so a typo can never
+  silently place a plan in `Initiating`. Re-exported from `lib.rs`
+  alongside the other domain types.
+- No weights, thresholds, deterministic rules, or scoring behaviour
+  changed. The bump to 0.2 marks the DTO wire-format addition, not any
+  matching change.
 
 ### Added — Criterion benchmarks
 

@@ -22,6 +22,20 @@ kind label — **and** a project-management tool.
 > sub-resources (goals / tasks / issues) + derived views, `deduplicate` +
 > review queue, cross-service links, bulk import/export.
 >
+> **Project-management suite (v0.3.0, 2026-08-25/26).** Spec §13
+> T-15 … T-27: custom workflows (the task board validates against the
+> workflow in force), the OKR engine, project phases (a fourth ordered
+> vocabulary — see §1.5.1: lifecycle funnel, gate stage, phase, and the
+> task workflow are deliberately uncoupled), Flow Distribution, effort /
+> time tracking with per-person **utilisation** (under the
+> `time-based-analysis.md` §7.1 obligations — never per-person cycle
+> time or throughput), sprint ceremonies with a once-only commitment
+> snapshot, Total Project Control (Devaux's DIPP), the controls
+> register, and value realization / strategic performance. Nine
+> migrations (`m20260825_000001` … `m20260826_000003`); the embedded
+> matcher is 0.2 (`Plan.phase`, pinned never-scored). See the API
+> surface below and `CHANGELOG.md` 0.3.0.
+>
 > **Durable event bus, real-broker sink (BUS-3, 2026-08-03).** Following
 > BUS-1's case-service reference, `src/relay.rs` gained `FluvioSink` — a
 > real-broker `impl EventSink` behind this crate's own `fluvio` Cargo
@@ -85,6 +99,15 @@ plan-scoped sub-resources hang off `/api/plans/{pid}/...`. See
 | Executive insights | `GET /executive/{health,decisions,benefits,alignment}` · `/financials/{variance,exposure}` · `/technology/{dependency-risk,radar,debt,flow}` · `/scenarios/compare?a=&b=` (read-only derived views; ETag + `as_of`) |
 | Engineering | `POST`/`GET /plans/{pid}/tasks` (+ `PUT`/`PATCH`(move; WIP-limit env caps)/`DELETE /{t_pid}`; story points) · `/plans/{pid}/sprints` (+ `/{s_pid}/notes` retro/feedback + `convert`) · `GET /plans/{pid}/burndown?sprint=` (honest, done_at-only) · `GET /plans/{pid}/velocity` · `GET /plans/{pid}/standup` · `GET /engineering/{blocked,moscow,delivery-links,milestone-calendar}` |
 | Time-based analysis | `GET /plans/{pid}/{time-analysis,constraints,aging-wip,flow,cumulative-flow,forecast,rollup}` · `GET /plans/{pid}/tasks/{t_pid}/{transitions,time-analysis}` · `GET /flow-classes` — cycle vs lead time, flow efficiency, rework/first-pass yield, the service level expectation from the plan's own history, aging WIP, and Little's Law. Read-only: transitions are written by the task create/move calls, in-transaction. `forecast` is Monte-Carlo over the plan's **throughput** history (not its cycle times), deterministic by seed |
+| Workflows | `POST`/`GET /workflows` · `DELETE /workflows/{pid}` · `GET /plans/{pid}/workflow` — per-plan status vocabularies (resolution: plan's own, else deployment default, else built-in; empty transition set = unconstrained). The task create/move paths validate against the workflow in force |
+| Phases | `PUT /plans/{pid}/phase` (one-step advance; a skip is `422` naming the skipped phase; a backward move needs a reason) · `GET /plans/{pid}/phase-history` (append-only; `DELETE` is `405`). The `phase` payload field and `plans.phase` column agree by invariant |
+| OKR | `POST`/`GET /objectives/{pid}/key-results` · `POST`/`GET /key-results/{pid}/check-ins` · `GET /plans/{pid}/okr` — key results anchor to `objectives` (never `goals[]`, which carry no id); the plan score is weighted by the existing `objective_links` weight |
+| Flow Distribution | `GET /plans/{pid}/flow-distribution` — the feature/defect/risk/tech-debt mix over **declared** `tasks.flow_type`, with the subtree rollup; `unclassified` stands alone and is not storable |
+| Effort / utilisation | `POST`/`GET /plans/{pid}/time-entries` · `GET /plans/{pid}/effort` (per plan/task/assignee; labelled asserted) · `POST /working-time` · `POST /non-working` · `GET /capacity/utilization?by=plan\|team\|person` (leave leaves the denominator — `null` with a reason, never 0%) |
+| Ceremonies | `POST`/`GET /sprints/{pid}/ceremonies` (planning/daily/review; retro stays `sprint_notes`) · `POST /sprints/{pid}/commit` (once-only commitment snapshot) · `GET /sprints/{pid}/commitment` (names scope added/removed afterwards) |
+| Total Project Control | `POST`/`GET /plans/{pid}/tpc` · `GET /plans/{pid}/tpc/report` (DIPP, band, progress index, stored-vs-computed divergence) · `GET /tpc?currency=` (triage, highest DIPP first; foreign-currency and undefined entries set aside, never ranked as zero) |
+| Controls | `POST`/`GET /plans/{pid}/controls` · `GET /plans/{pid}/controls/coverage` · `GET /controls/coverage` · `DELETE /controls/{pid}` · `POST`/`GET /controls/{pid}/readings` · `POST /readings/{pid}/actions` — feedforward may block, feedback may only record; `unmeasured` is a real third verdict, never a pass |
+| Value realization | `POST /plans/{pid}/{business-case,value-points,adoption,satisfaction}` · `GET /plans/{pid}/value-realization` (Time-to-Value as a p50/p85 distribution; single-currency ROI or withheld) · `GET /plans/{pid}/performance` (NPS with response count; SPI/CPI `null` with `no_baseline`, never `1.0`) |
 | DevOps | `POST /devops/events` (deploy/incident/recovery ingest) · `GET /devops/metrics` (from ingested events only) · `GET /devops/releases` |
 | Oversight areas | `GET /board/{pack,investments,trends}` + `POST /board/snapshots` · `/auditor/{trail,findings,evidence-pack}` · `/compliance/{register,findings}` · `/risk/heatmap` · `/security/register` · `/regulator/extract` (persona gating = ABAC policy config) |
 | Collaboration | `POST`/`GET /reviews` (+ `/consensus` · `/{pid}/respond` · `/{pid}/submit` · `DELETE /{pid}`) · `POST /plans/{pid}/tasks/{t_pid}/assign` · `GET /assignees/workload` · `GET /notifications` (+ `/{pid}/read`) |
@@ -191,6 +214,15 @@ src/
 ├── controllers/oversight.rs  board/auditor/compliance-register/risk-heatmap/security/regulator views
 ├── controllers/engineering.rs tasks board (+ move/story points/WIP limits), sprints, burndown, velocity, standup, DevOps events/metrics/releases, estate views
 ├── controllers/tba.rs        time-based analysis reads: per-task and plan flow, constraints, aging WIP, Little's Law
+├── controllers/workflow.rs   custom workflow registry + the per-plan resolved vocabulary
+├── controllers/phase.rs      project phase set (one-step / reasoned regression) + append-only history
+├── controllers/okr.rs        key results + check-ins + the alignment-weighted per-plan OKR view
+├── controllers/distribution.rs  Flow Distribution over declared tasks.flow_type + subtree rollup
+├── controllers/effort.rs     time entries, effort roll-ups, working time, non-working periods, utilisation
+├── controllers/ceremony.rs   sprint ceremonies + the once-only commitment snapshot
+├── controllers/tpc.rs        Total Project Control: observations, derived report, portfolio triage
+├── controllers/controls.rs   controls register: standards, readings, actions, coverage
+├── controllers/value.rs      business-case targets, value points, adoption, satisfaction, performance
 ├── controllers/collaboration.rs  collaborative review + assignees + notifications
 ├── controllers/automation.rs PPM automations + runs + scheduled actions + sweep
 ├── controllers/prioritisation.rs Smart Score + ranked queue + bird's-eye lifecycle
@@ -208,6 +240,15 @@ src/
 │                             derivation, cycle vs lead time, VA/NNVA/UNVA splits, rework and
 │                             rolled first-pass yield, nearest-rank percentiles, the service
 │                             level expectation, constraint ranking, Little's Law. No I/O
+├── flow_metrics.rs           default-off `ppm_flow_*` Prometheus gauge refresh loop (TBA-10; env-gated, capped, small-board-suppressed)
+├── workflow.rs               pure workflow resolution (plan → default → built-in) + category-derived flow classes
+├── phase.rs                  pure one-step phase advancement, reasoned regression, per-phase durations
+├── okr.rs                    pure key-result progress + the objective-link-weighted plan score
+├── distribution.rs           pure Flow Distribution shares + range-guarded intended-mix gaps
+├── effort.rs                 pure effort roll-ups + integer capacity/utilisation arithmetic (leave leaves the denominator)
+├── tpc.rs                    pure DIPP / progress index / banding / triage — minor units + basis points, no float, undefined ≠ zero
+├── controls.rs               pure control timings, comparators, verdict derivation, coverage rollup
+├── value.rs                  pure value realization: time-to-value distribution, single-currency ROI, NPS, SPI/CPI refusals
 ├── snapshots.rs               point-in-time estate snapshots behind the board/CRO trend views (explicit capture or the optional ticker)
 ├── collaboration.rs          pure review state machine + consensus + assignee workload
 ├── automation.rs             pure trigger matching + action validation + due-ness
@@ -240,10 +281,19 @@ migration/src/                …_000001_plans, …_000002_audit_logs,
                               m20260720_000001_engineering,
                               m20260720_000002_engineering_moderate,
                               m20260722_000001_capabilities,
-                              m20260728_000001_integrity_digests
+                              m20260728_000001_integrity_digests,
+                              m20260823_000001_time_based_analysis,
+                              m20260825_000001_total_project_control,
+                              m20260825_000002_controls,
+                              m20260825_000003_phase_transitions,
+                              m20260825_000004_flow_type,
+                              m20260825_000005_workflows,
+                              m20260825_000006_key_results,
+                              m20260826_000001_effort,
+                              m20260826_000002_ceremonies,
+                              m20260826_000003_value
 config/                       development/production/test yaml
 ```
-</content>
 
 ## Container image
 

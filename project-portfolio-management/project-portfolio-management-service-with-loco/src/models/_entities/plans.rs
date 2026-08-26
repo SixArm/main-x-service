@@ -40,6 +40,16 @@ pub struct Model {
     /// (`g0_concept` … `g5_benefits`), `None` before the first
     /// approved gate review. Governance state, not matcher payload.
     pub stage: Option<String>,
+    /// The sequential project phase (`initiating` … `closing`),
+    /// denormalised from the payload so a list or funnel read need not
+    /// open every JSONB blob. `None` until an operator sets one — never
+    /// back-filled, because inventing `initiating` for a plan already in
+    /// delivery would be a fabricated history.
+    ///
+    /// Distinct from `stage` above: that is the last approved
+    /// *governance* decision. The two are deliberately uncoupled
+    /// (entity spec §1.5.1).
+    pub phase: Option<String>,
     /// Soft-delete timestamp; `None` while active.
     pub deleted_at: Option<DateTimeWithTimeZone>,
     /// SHA-256 (FIPS 180-4) over this row's integrity pre-image.

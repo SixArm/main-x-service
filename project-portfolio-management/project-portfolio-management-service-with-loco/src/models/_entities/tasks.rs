@@ -26,6 +26,11 @@ pub struct Model {
     pub points: Option<i32>,
     pub status_changed_at: DateTimeWithTimeZone,
     pub done_at: Option<DateTimeWithTimeZone>,
+    /// The declared Flow Framework work-item type (`feature` /
+    /// `defect` / `risk` / `debt`). `None` means **nobody declared
+    /// one**, reported as `unclassified` and counted separately — never
+    /// folded into `feature`.
+    pub flow_type: Option<String>,
     pub deleted_at: Option<DateTimeWithTimeZone>,
 }
 

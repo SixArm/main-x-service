@@ -42,7 +42,7 @@
 //!
 //! ## Public types
 //!
-//! - [`Plan`], [`PlanKind`], [`PlanStatus`], [`Goal`],
+//! - [`Plan`], [`PlanKind`], [`PlanStatus`], [`PlanPhase`], [`Goal`],
 //!   [`GoalStatus`], [`PlanIdentifier`], [`IdentifierScheme`],
 //!   [`PlanRelationship`], [`RelationKind`].
 //! - [`MatchingEngine`], [`MatchConfig`], [`MatchResult`],
@@ -81,7 +81,7 @@ pub use config::MatchConfig;
 pub use error::{Error, Result};
 pub use matcher::MatchingEngine;
 pub use plan::{
-    Goal, GoalStatus, IdentifierScheme, Plan, PlanIdentifier, PlanKind, PlanRelationship,
-    PlanStatus, RelationKind,
+    Goal, GoalStatus, IdentifierScheme, Plan, PlanIdentifier, PlanKind, PlanPhase,
+    PlanRelationship, PlanStatus, RelationKind,
 };
 pub use scoring::{Confidence, MatchBreakdown, MatchResult};

@@ -81,6 +81,24 @@ pub struct RecordInput<'a> {
     /// The workflow stage. In the pre-image because advancing a plan past
     /// a gate is exactly the edit worth falsifying.
     pub stage: Option<&'a str>,
+    // NOTE: the **project phase** (`plans.phase`, added 2026-08-25) is
+    // deliberately *not* a separate pre-image field, unlike `kind`,
+    // `name`, `parent_pid` and `stage` above. It rides in the payload
+    // (`data.phase`), so its authoritative value **is** covered by the
+    // `data` field below.
+    //
+    // The residual gap, stated rather than left for a reader to
+    // discover: a raw-SQL edit of the denormalised `plans.phase` column
+    // that leaves `data.phase` untouched would not break the digest. It
+    // would instead break the payload-equals-column invariant (entity
+    // spec §5.8), which is the check that catches it.
+    //
+    // Closing the gap properly means adding a field here, which changes
+    // the pre-image and therefore requires bumping
+    // `RECORD_HASH_VERSION` — invalidating every stored digest across
+    // the estate. A false "tampered" reading on every existing record
+    // is a worse outcome than this narrow gap, so the bump waits for a
+    // change that needs one anyway.
     /// The stored payload.
     pub data: &'a serde_json::Value,
     /// Whether the row is active.
@@ -348,6 +366,7 @@ mod tests {
             kind: None,
             parent_pid: None,
             stage: None,
+            phase: None,
             data: serde_json::json!({ "name": name, "keywords": ["a", "b"] }),
             active: true,
             deleted_at: None,

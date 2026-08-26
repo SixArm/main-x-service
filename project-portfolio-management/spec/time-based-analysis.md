@@ -186,8 +186,16 @@ the team's own data** rather than imposed, so it cannot be argued with on
 grounds of local difficulty (§7.3).
 
 Deliberately *not* adopted: velocity and utilisation as improvement
-targets. Both measure the 6% (§1), both are trivially inflated, and
+**targets**. Both measure the 6% (§1), both are trivially inflated, and
 neither is a time.
+
+> **Amended 2026-08-25.** Utilisation is now *measured*, including per
+> person (§12.4a, entity spec FR-35). The sentence above still stands as
+> written: measuring it is not the same as adopting it as an improvement
+> target, and this document continues to decline the latter. Utilisation
+> is reported beside the wait and queue figures precisely because a
+> reading near 100% is a warning about the queue (§2.3), not a score to
+> maximise.
 
 ### 2.5 What differs from the care-pathway sibling
 
@@ -223,7 +231,7 @@ keeps the two from being wrongly unified later:
 |---|---|
 | Time tracking / timesheets | Self-reported effort is the data quality problem this design exists to avoid. Transitions are observed, not attested. |
 | Estimation, velocity forecasting, Monte Carlo | Worth having, a different feature, and dependent on this one landing first (§17). |
-| Per-person throughput or cycle time | §12.4. Not an oversight. |
+| Per-person throughput or cycle time | §12.4. Not an oversight. (Per-person **utilisation** *is* computed — §12.4a.) |
 | Backfilling history before the transition log | There is nothing to backfill from: `tasks` kept only the *current* status's start. The migration seeds one synthetic transition per live task and labels it `backfilled` so nobody reads an invented history as observed (§5.4). |
 | DORA metrics | Already served by `/api/devops/metrics` from `devops_events`. TBA cross-references it rather than recomputing it. |
 | Calendar/working-hours arithmetic | An item that sits over a weekend really did sit over a weekend. Business-hours discounting is exactly the kind of adjustment that makes queues invisible (§12.3). |
@@ -726,7 +734,59 @@ feature. Three reasons, in order of how much they cost:
 
 Handoff *counts* are reported as a property of the item's journey.
 Assignee identity is available for audit and for the aging-WIP view
-("who should be asked about this"), never as a ranked league table.
+("who should be asked about this").
+
+#### 12.4a Per-person utilisation — the one carve-out (2026-08-25)
+
+**Per-person utilisation is now computed** (entity spec FR-35): recorded
+effort against declared available capacity, per person. This is a
+deliberate owner decision, taken after the conflict with this section
+was raised, and it narrows the refusal rather than repealing it.
+
+**What is now permitted:** a per-person utilisation figure — effort
+against capacity, from `time_entries` over `allocations`.
+
+**What stays refused:** per-assignee **cycle time, throughput, and flow
+efficiency**. The three reasons above are unchanged for those, and the
+carve-out does not reach them, because utilisation and flow are
+different measurements: utilisation asks how full someone's declared
+capacity is, which is a **capacity-planning input the roster already
+implies**, while cycle time asks how fast work moved, which is a
+property of the queue rather than of whoever held the card.
+
+**What the carve-out does not fix, stated plainly**, because a spec that
+records only the decision and not its cost is the thing §12.3 exists to
+prevent:
+
+- The third reason above — *it destroys the data* — applies to
+  utilisation too, in its own currency. A person measured on utilisation
+  can raise the number by logging more hours or by declaring less
+  capacity. Recorded effort is an **assertion**, not a by-product of the
+  work (entity spec §5.9.3), so unlike the transition log it was never
+  protected by being collected incidentally.
+- A high-utilisation reading is **also** what a queueing system looks
+  like just before it stops coping (§2.3: ρ near 1 and long queues are
+  the same observation). Utilisation near 100% is therefore a warning,
+  not an achievement, and the service reports it beside the wait figures
+  for that reason.
+
+**The obligations that follow** are requirements, not preferences, and
+they are what keep the figure honest rather than merely available:
+
+1. **The denominator is declared and returned with the number.**
+   Available capacity comes from `allocations` and the deployment's
+   working-time configuration, never assumed at 100%.
+2. **Non-working time is excluded from the denominator**, not counted as
+   idle. Leave, holiday and non-project duty are absence of capacity,
+   not failure to use it.
+3. **Small denominators are suppressed.** Below a configured floor of
+   capacity-days in the window, the figure is `null` with a reason —
+   the same posture as the flow gauges' small-board suppression.
+4. **It is never the sole ranking key of a person list**, and it ships
+   beside its numerator, its denominator, and the queue figures for the
+   same period.
+5. **Effort remains an assertion and is labelled as one** wherever the
+   figure appears.
 
 ### 12.5 Audit
 

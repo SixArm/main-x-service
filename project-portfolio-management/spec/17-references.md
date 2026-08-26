@@ -38,17 +38,23 @@ against its registry twin in the `plans` collection (§8.7):
 
 ### 17.3 Methodology landscape (informative)
 
-Charter-level planning concepts the sub-resources echo — out of
-matching scope, useful when judging whether two records describe the
-same plan:
+Planning concepts the sub-resources implement — out of matching scope,
+useful when judging whether two records describe the same plan:
 
-- **Goals / OKRs** — objectives and key results; `goals[]` is the
-  charter-level objective list (not a full OKR engine).
+- **Goals / OKRs** — **a full OKR engine** (§5.9.2). `goals[]` in the
+  payload is the *objective*, the identity-bearing half whose titles
+  feed matching; the measurable half — key results with a metric,
+  baseline, target and direction, plus dated check-ins with an optional
+  confidence — lives in its own tables and never reaches the matcher.
+  Progress, objective score and plan score are **derived on read**, so
+  they cannot drift from the evidence. Alignment rolls up through the
+  existing `parent_ref` containment tree rather than a second OKR
+  hierarchy that could disagree with it.
 - **Work breakdown** — tasks under goals, tasks under tasks
   (`parent_task_id`); a shallow hierarchy, not a full WBS tool.
 - **Issue / risk tracking** — `Issue { kind, severity, status }`
-  covers bug / risk / blocker / question / improvement at charter
-  level.
+  covers bug / risk / blocker / question / improvement, and feeds the
+  Flow Distribution work-type classification (§5.9.5).
 - **Portfolio / programme management** — recursive containment via
   `parent_ref` (any plan may contain any other plan) models the
   portfolio → programme → project hierarchy, with the optional `kind`

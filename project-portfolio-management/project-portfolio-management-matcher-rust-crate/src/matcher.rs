@@ -481,7 +481,7 @@ fn jaccard(a_set: &[String], b_set: &[String]) -> f64 {
 mod tests {
     use super::*;
     use crate::plan::{
-        Goal, IdentifierScheme, PlanIdentifier, PlanKind, PlanRelationship, PlanStatus,
+        Goal, IdentifierScheme, PlanIdentifier, PlanKind, PlanPhase, PlanRelationship, PlanStatus,
     };
 
     fn ident(scheme: IdentifierScheme, value: &str) -> PlanIdentifier {
@@ -729,6 +729,24 @@ mod tests {
         b.status = Some(PlanStatus::Completed);
         let differing = engine.match_plans(&a, &b).score;
         b.status = Some(PlanStatus::Active);
+        let same = engine.match_plans(&a, &b).score;
+        assert!((differing - same).abs() < 1e-9);
+    }
+
+    // Pins that the project phase is never scored, for the same reason
+    // status is not: two systems describing one initiative routinely
+    // disagree about which phase it is in, and the phase is the field
+    // most likely to differ. Scoring it would make the matcher worse
+    // exactly where records are hardest to reconcile.
+    #[test]
+    fn phase_is_not_scored() {
+        let engine = MatchingEngine::default_config();
+        let mut a = project("Apollo platform migration");
+        let mut b = project("Apollo platform migration");
+        a.phase = Some(PlanPhase::Initiating);
+        b.phase = Some(PlanPhase::Closing);
+        let differing = engine.match_plans(&a, &b).score;
+        b.phase = Some(PlanPhase::Initiating);
         let same = engine.match_plans(&a, &b).score;
         assert!((differing - same).abs() < 1e-9);
     }

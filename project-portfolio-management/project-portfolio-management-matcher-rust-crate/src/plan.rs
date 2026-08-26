@@ -56,6 +56,13 @@ pub struct Plan {
     /// initiative routinely sits at different statuses).
     #[serde(default)]
     pub status: Option<PlanStatus>,
+    /// The sequential project phase this plan is being *managed*
+    /// through. Informational-only — **never scored**, for exactly the
+    /// reason `status` is not: two records of one initiative may sit in
+    /// different phases, and the phase is precisely the field most
+    /// likely to differ between two systems describing one plan.
+    #[serde(default)]
+    pub phase: Option<PlanPhase>,
     /// Plan objectives. **Part of the payload**; the goal *titles*
     /// feed the `goals` component.
     #[serde(default)]
@@ -142,6 +149,77 @@ pub enum PlanKind {
     /// Note: this is only a descriptive label on a `Plan`; it is
     /// unrelated to the service's separate `proposals` intake pipeline.
     Proposal,
+}
+
+/// The sequential project phase a plan is managed through — the
+/// classic five process groups. Data only — **never scored**.
+///
+/// This is one of **three ordered vocabularies** in this entity and
+/// they are deliberately uncoupled (entity spec §1.5.1): the lifecycle
+/// funnel (`idea` … `closed`) says where an item of demand sits
+/// portfolio-wide, the gate stage (`g0` … `g5`) says what the last
+/// approved governance decision was, and this says where management of
+/// the plan has got to. No constraint is enforced between them: a rule
+/// such as "not Executing before g3" would make a true state
+/// unrecordable whenever governance lags delivery, which is the case
+/// most worth being able to see.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum PlanPhase {
+    /// Should this exist? Sponsor, purpose, lead.
+    Initiating,
+    /// What is the work, in what order, at what cost, with what risks?
+    Planning,
+    /// Doing it — where the board, sprints and effort belong.
+    Executing,
+    /// Is it going as planned, and what is being changed in response?
+    Controlling,
+    /// Formal completion — acceptance, handover, lessons, release.
+    Closing,
+}
+
+impl PlanPhase {
+    /// Every phase, in process order.
+    pub const ALL: [Self; 5] = [
+        Self::Initiating,
+        Self::Planning,
+        Self::Executing,
+        Self::Controlling,
+        Self::Closing,
+    ];
+
+    /// Position in the sequence, `0`-based.
+    #[must_use]
+    pub const fn ordinal(self) -> usize {
+        match self {
+            Self::Initiating => 0,
+            Self::Planning => 1,
+            Self::Executing => 2,
+            Self::Controlling => 3,
+            Self::Closing => 4,
+        }
+    }
+
+    /// The wire token (`initiating`, `planning`, …).
+    #[must_use]
+    pub const fn token(self) -> &'static str {
+        match self {
+            Self::Initiating => "initiating",
+            Self::Planning => "planning",
+            Self::Executing => "executing",
+            Self::Controlling => "controlling",
+            Self::Closing => "closing",
+        }
+    }
+
+    /// Parse a wire token. Unknown input is `None` — refused by the
+    /// caller rather than coerced to a default, so a typo can never
+    /// silently place a plan in Initiating.
+    #[must_use]
+    pub fn parse(raw: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|phase| phase.token() == raw.trim().to_ascii_lowercase())
+    }
 }
 
 /// The lifecycle status of a plan. Data only — never scored.

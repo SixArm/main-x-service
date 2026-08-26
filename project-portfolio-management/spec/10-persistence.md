@@ -2,8 +2,12 @@
 
 PostgreSQL via SeaORM 1.1 + `sea-orm-migration`, owned entirely by the
 service crate. Family conventions:
-[`agents/share/postgresql.md`](../../agents/share/postgresql.md). All
-tables below are **planned** — the entity is spec-only (§14).
+[`agents/share/postgresql.md`](../../agents/share/postgresql.md).
+
+> **Corrected 2026-08-25.** This paragraph read *"All tables below are
+> **planned** — the entity is spec-only (§14)"*, which §14 contradicts:
+> the service is implemented and green. The tables in §10.1–§10.5 exist;
+> §10.6 is the one section that is genuinely still planned, and says so.
 
 ### 10.1 Tables
 
@@ -144,3 +148,58 @@ Five tables behind §6.4a, none of them part of the matcher payload:
 **No Smart Score table.** The score (§6.4e) is derived on read from rows
 the service already stores, so it can never drift from the evidence it
 claims to summarise.
+
+
+### 10.6 Full-suite tables (§1.4–§1.6, §6.4c) — planned
+
+**Not yet built** (§2.3). Every table carries `pid UUID unique` and
+`deleted_at` for soft delete; every plan-scoped table carries an indexed
+`plan_pid UUID`. **None is serialised into any `data` column and none
+reaches the matcher** (§5.6).
+
+| Table | Holds | FR |
+|---|---|---|
+| `workflows` | One configuration: optional `plan_pid` scope, `applies_to` (task \| issue), `is_default` | FR-26 |
+| `workflow_states` | `workflow_pid`, `key`, `label`, **`category`** (`todo`\|`active`\|`waiting`\|`done`, NOT NULL), `wip_limit?`, `is_initial`, `is_terminal` | FR-26 |
+| `workflow_transitions` | `workflow_pid`, `from_key`, `to_key` | FR-26 |
+| `key_results` | `goal_id`, `title`, `metric`, `start_value`, `target_value`, `current_value`, `direction`, `unit?`, `currency?`, `owner_ref?`, `due_date?`, `status` | FR-27 |
+| `key_result_check_ins` | `key_result_pid`, `observed_at`, `value`, `confidence?`, `note?`, `actor` | FR-27 |
+| `time_entries` | `plan_pid`, `task_pid?`, `actor_ref`, `spent_on`, `minutes`, `category`, `billable`, `note?` | FR-28 |
+| `sprints` | `plan_pid`, `name`, `starts_on`, `ends_on`, `goal?`, `status` | FR-29 |
+| `sprint_commitments` | `sprint_pid`, `task_pid`, `committed_at` — the planning snapshot | FR-29 |
+| `ceremonies` | `sprint_pid`, `kind`, `held_at`, `facilitator_ref?` | FR-29 |
+| `ceremony_notes` | `ceremony_pid`, `category`, `text`, `converted_task_pid?` | FR-29 |
+| `phase_transitions` | `plan_pid`, `from?`, `to`, `occurred_at`, `actor?`, `reason?` — append-only | FR-30 |
+| `business_case_targets` | `plan_pid`, `metric`, `baseline_value`, `target_value`, `unit?`, `currency?`, `promised_by`, `source`, `approved_at`, `approved_by_ref?` | FR-33 |
+| `value_points` | `plan_pid`, `benefit_pid?`, `observed_at`, `value`, `is_first_measurable`, `method`, `evidence_ref?`, `actor` | FR-33 |
+| `adoption_snapshots` | `plan_pid`, `observed_at`, `active_users`, `target_users`, `window_days`, `definition` | FR-33 |
+| `satisfaction_responses` | `plan_pid`, `surveyed_at`, `instrument`, `score`, `respondent_role`, `comment?` — **no respondent identity** | FR-36 |
+| `working_time_configs` | `scope_ref?`, `hours_per_day`, `working_days`, `holidays` — the declared capacity basis | FR-35 |
+| `non_working_periods` | `person_ref`, `starts_on`, `ends_on`, `kind`, `note?` — **subtracts from the denominator**, never counted as idle | FR-35 |
+| `total_project_control` | `plan_pid`, `currency`, `observed_at`, `dipp`, `dipp_progress_index_numerator`, `dipp_progress_index_denominator`, `dipp_progress_index_ratio` (**`GENERATED ALWAYS`**), `expected_monetary_value`, `cost_estimate_to_complete` | FR-37 |
+| `controls` | `plan_pid`, `name`, `timing`, `metric`, `target_value`, `unit?`, `currency?`, `comparator`, `tolerance?`, `source_kind`, `source_ref?`, `cadence?`, `owner_ref?`, `enabled` | FR-38 |
+| `control_readings` | `control_pid`, `observed_at`, `value?`, `verdict`, `gap?`, `method` — **append-only** | FR-38 |
+| `control_actions` | `reading_pid`, `kind`, `description`, `owner_ref?`, `due_date?`, `converted_task_pid?`, `converted_issue_pid?`, `closed_at?`, `outcome?` | FR-38 |
+
+Schema-level constraints that enforce spec rules rather than trusting
+the handlers:
+
+- `workflow_states.category` is `NOT NULL` with a CHECK on the four
+  values, so an uncategorised state cannot exist even by direct SQL
+  (§5.9.1). A partial unique index enforces one `is_initial` state per
+  workflow.
+- `phase_transitions` is **append-only** — no update or delete path,
+  matching `task_transitions`
+  ([time-based-analysis.md](time-based-analysis.md) §5.1) — because a
+  phase history that can
+  be rewritten cannot support a duration claim.
+- `business_case_targets.approved_at` has no update path once set: the
+  Time-to-Value clock start must not move (§5.9.6).
+- `adoption_snapshots` requires `target_users > 0`; a rate with a zero
+  denominator is refused at write, not divided at read.
+
+**No table for any derived figure.** Transformation ROI, Value
+Realization Rate, Time to Value, Adoption Rate, SPI, CPI, NPV, Flow
+Distribution and the OKR scores are all computed on read from the rows
+above, so none can drift from its evidence — the rule §10.5 already
+applies to Smart Score.

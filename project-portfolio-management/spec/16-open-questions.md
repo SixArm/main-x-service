@@ -54,10 +54,15 @@ spec §16 once that crate is scaffolded.
 - **OQ-8 — Sub-resource volume vs the matcher boundary.** Confirm the
   partition holds under load: a plan with thousands of tasks /
   issues must not bloat the matchable `data` (it does not — they are
-  separate tables, §5.6 / §10.1), and `goals[]` must stay bounded
-  (charter-level, not task-level). Should the spec cap `goals[]` length
-  to keep the match input small? (Lean: soft cap with a warning;
-  revisit with data.)
+  separate tables, §5.6 / §10.1), and `goals[]` must stay bounded.
+  Should the spec cap `goals[]` length to keep the match input small?
+  (Lean: soft cap with a warning; revisit with data.) **Sharpened
+  2026-08-25 by the OKR engine (§5.9.2):** the pressure on `goals[]` is
+  now lower, not higher, because the volume an OKR practice generates —
+  key results and dated check-ins — lives in its own tables. What rides
+  in the payload is still one line per objective. The open part is
+  whether an objective *title* set large enough to matter for Jaccard
+  scoring is reachable in practice.
 - **OQ-9 — Cross-label near-duplicates (kind gate removed).** With the
   kind gate gone (§5.5), two plans labelled `Project` and `Product`
   that describe the "same" initiative now **match directly** on their

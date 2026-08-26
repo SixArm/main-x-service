@@ -6637,21 +6637,21 @@ crate above.
 
 **project-portfolio-management (the uncommitted PM-suite WIP — verified
 green as it sits; these finish it)**
-- [ ] **PRO-P16 (S)** OpenAPI: add `workflow`/`effort`/`ceremony`/
+- [x] **PRO-P16 (S)** *(done 2026-08-26 — 20 routes documented; parity test now genuinely two-way with a shrink-only KNOWN_UNDOCUMENTED register of 48 pre-existing paths)* OpenAPI: add `workflow`/`effort`/`ceremony`/
   `value` path groups to `src/openapi.rs` (~20 mounted routes are
   undocumented) and make the parity test genuinely two-way (today
   documented ⊆ checked, so undocumented mounted routes pass silently);
   correct §14.1's claim meanwhile.
-- [ ] **PRO-P17 (S)** CHANGELOGs: the WIP (10 features, 9 migrations)
+- [x] **PRO-P17 (S)** *(done 2026-08-26 — service 0.3.0 + matcher 0.2.0 cut and tagged; matcher dep is path-only so nothing repins)* CHANGELOGs: the WIP (10 features, 9 migrations)
   has zero service CHANGELOG lines, and the matcher's `Plan.phase`
   wire-format addition is unrecorded — write both, then make the
   version-bump call (service 0.3.0, matcher 0.2.0).
-- [ ] **PRO-P18 (S)** Docs: replace the `spec/total-project-control/`
+- [x] **PRO-P18 (S)** *(done 2026-08-26 — TPC mapping doc written in the prince2 pattern; AGENTS.md +9 API groups; §14 regenerated at 353u/74r)* Docs: replace the `spec/total-project-control/`
   raw-field-notes stub with the mapping doc `prince2/` claims to
   mirror; refresh service AGENTS.md (knows nothing of the PM suite);
   regenerate the §14 snapshot on land; fix the stale Cargo description
   (also in PRO-H3f).
-- [ ] **PRO-P19 (M)** Run `scripts/ci-check.sh test-db` on the 74-test
+- [~] **PRO-P19 (M)** *(test-db run 2026-08-26: 74/74 request + 3 gated singles green against a fresh Postgres; WIP landed. T-26 remainder still open)* Run `scripts/ci-check.sh test-db` on the 74-test
   DB-gated suite **before committing the WIP** (T-27's green claim
   predates the effort/value/ceremony additions); then land T-26's
   remainder (action→task conversion; register the pre-existing implicit

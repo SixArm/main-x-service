@@ -1,22 +1,45 @@
 //! HTTP controllers for the portfolio service.
 
 pub mod automation;
+/// Sprint ceremonies and the commitment snapshot.
+pub mod ceremony;
 pub mod collaboration;
 /// Integrity-verification endpoints.
 pub mod compliance;
+/// The Controlling-process register: standards, readings, actions, and
+/// the coverage report of what is **not** being controlled.
+pub mod controls;
+/// Flow Distribution: the feature / defect / risk / debt mix.
+pub mod distribution;
 pub mod docs;
+/// Recorded effort and utilisation, including per person.
+pub mod effort;
 pub mod engineering;
 pub mod governance;
 pub mod insights;
 pub mod metrics;
+/// The OKR engine: key results, check-ins, and the derived objective
+/// and alignment-weighted plan scores.
+pub mod okr;
 pub mod oversight;
+/// The sequential project phase: one-step advancement, explicitly
+/// reasoned regression, and per-phase durations.
+pub mod phase;
 pub mod plans;
 pub mod prioritisation;
 pub mod strategy;
 /// Time-based analysis: the read surface over the task transition log —
 /// per-task and plan flow, constraints, aging WIP, and Little's Law.
 pub mod tba;
+/// Total Project Control: DIPP, expected monetary value, cost estimate
+/// to complete, and portfolio triage by DIPP.
+pub mod tpc;
+/// Realized gains and strategic performance.
+pub mod value;
 pub mod visibility;
+/// Custom workflows: the configurable task and issue state
+/// vocabularies, and the resolution of which one is in force.
+pub mod workflow;
 
 /// Map a model-layer error to its HTTP shape: a missing record is
 /// `404 Not Found`; anything else stays a model error (500-class).
