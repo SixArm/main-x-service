@@ -176,6 +176,42 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    unknown `pid`; `503` when the export could not be recorded on the
    audit trail (`CARE_PATHWAY_AUDIT_FAIL_CLOSED`).
 
+### 6.x Per-clinician utilisation (permitted, not yet buildable)
+
+**Decision 2026-08-25.** Per-person utilisation — recorded effort
+against declared available capacity — is **permitted** in this service,
+extending the exception in
+[`agents/share/time-based-analysis.md` §7.1](../../../agents/share/time-based-analysis.md).
+The family refusal to compute **per-clinician cycle time, throughput or
+efficiency** is **unchanged** and still binds here: this reverses one
+narrow thing, and utilisation does not reach the others.
+
+**It cannot be computed today, and that is a data gap rather than a
+policy one.** This service records a **care team with roles**
+(`lead_clinician`, `gp`, `specialist`, `nurse`, `mental_health`,
+`coordinator`) on a pathway instance, which is an attribution point —
+but it holds **no recorded effort and no declared capacity**. Both are
+new: a roster (who is available, for how much of a week) and an effort
+source (time against a pathway instance, or a sessions/job-plan feed).
+Until both exist there is no numerator and no denominator, and the
+figure is absent rather than zero.
+
+When built, it adopts all **five obligations** in §7.1 — declared
+denominator returned with the number; non-working time (leave, study
+leave, non-clinical duty) excluded from the denominator rather than
+counted as idle; small denominators suppressed; never the sole ranking
+key, and shipped beside the same period's queue and wait figures;
+effort labelled **asserted** — plus two that bind harder here than in a
+project portfolio:
+
+- **Suppression is a privacy control, not only a statistical one.** A
+  ward of four nurses makes a per-person figure identifying at almost
+  any aggregation, so the §8 re-identification rules of the family doc
+  govern the floor.
+- **A high reading is a warning, not an achievement.** Utilisation near
+  100% is what a queueing system looks like just before it stops coping,
+  which in a clinical setting is a safety observation.
+
 ## 7. Non-functional requirements
 
 loco-idiomatic; Postgres persistence; deterministic matching via the
@@ -581,6 +617,26 @@ the evidence bundle.
   supplies the technical controls they cite.
 
 ## 13. Tasks (live work queue)
+
+- [ ] **UTIL-1 — Per-clinician utilisation (§6.x).** Permitted by the
+  2026-08-25 decision; **blocked on two absent inputs**, so this task is
+  the inputs before it is the figure.
+  - [ ] A **roster / capacity source**: who is available to this
+    service, for how much of a period, with a working-time
+    configuration and recorded non-working time (leave, study leave,
+    non-clinical duty) that **subtracts from the denominator**.
+  - [ ] An **effort source**: time recorded against a pathway instance,
+    or a sessions / job-plan feed. Labelled **asserted**, never inferred
+    from status changes.
+  - [ ] The figure itself, with the five §7.1 obligations.
+  - **Acceptance:** a clinician on leave for the whole window reports
+    `null` with a reason, **not 0%**; a window below the suppression
+    floor is `null` — and the floor is justified as a
+    re-identification control, not only a statistical one; the response
+    carries effective time, available capacity, and the configuration
+    that produced them; **no endpoint returns per-clinician cycle time,
+    throughput or flow efficiency**, and none can be derived by
+    arithmetic from what is returned.
 
 
 - [x] **2026-08-21 — FUZZ-2: cargo-fuzz harness for the request-path

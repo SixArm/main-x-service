@@ -252,7 +252,72 @@ reasons, in ascending order of cost:
 
 Handoff *counts* are a property of the unit's journey and are reported.
 Actor identity is available for audit and for "who should be asked about
-this", never as a ranked comparison.
+this".
+
+### 7.1 The utilisation exception (2026-08-25)
+
+**Per-person utilisation is computed** — recorded effort against
+declared available capacity — by owner decision, in **portfolio,
+care-pathway, and patient-flow**. It was taken for portfolio first and
+extended to the two clinical services the same day, after the conflict
+with this section was raised in each case.
+
+**What stays refused, everywhere, including in those three services:**
+per-person **cycle time, throughput, and efficiency**. The three reasons
+above are unchanged for those. Utilisation does not reach them, and the
+distinction is the whole basis of the exception: utilisation asks how
+full a declared capacity is, which the roster already implies, while
+cycle time asks how fast work moved, which is a property of the queue
+rather than of whoever held the item last.
+
+#### The five obligations
+
+A service computing per-person utilisation adopts all five. They are
+what keep the figure honest rather than merely available:
+
+1. **The denominator is declared and returned with the number.**
+   Available capacity comes from a roster or allocation and a
+   working-time configuration, never assumed at 100%.
+2. **Non-working time is excluded from the denominator**, not counted as
+   idle. Leave, holiday, study leave, and non-clinical or non-project
+   duty are absence of capacity, not failure to use it.
+3. **Small denominators are suppressed.** Below a configured floor of
+   capacity-days in the window the figure is `null` with a reason —
+   which is also the §8 re-identification rule, since a utilisation
+   figure over one person's fortnight *is* that person.
+4. **It is never the sole ranking key**, and ships beside its numerator,
+   its denominator, and the same period's queue and wait figures.
+5. **Effort is labelled asserted.** It is entered by a person, unlike a
+   transition timestamp, so it was never protected by incidental
+   collection.
+
+#### What the exception costs, stated rather than assumed
+
+The third reason above applies to utilisation in its own currency: a
+person measured on it can raise the number by logging more hours or by
+declaring less capacity. And a high reading is **also** what a queueing
+system looks like just before it stops coping (§2.3 — ρ near 1 and long
+queues are the same observation), so utilisation near 100% is a warning
+rather than an achievement, and is reported beside the wait figures for
+that reason.
+
+#### The clinical services carry two further obligations
+
+Per-clinician utilisation is **employment-adjacent data about a named
+person in a care setting**, which per-assignee utilisation in a project
+portfolio is not. Two consequences that do not apply to portfolio:
+
+- **§8's re-identification rules bind harder.** A ward of four nurses
+  makes a per-person figure identifying at almost any aggregation, so
+  the suppression floor in obligation 3 is a privacy control there, not
+  only a statistical one.
+- **Neither service can compute it today.** Care-pathway records a care
+  team with roles (`lead_clinician`, `gp`, `nurse`, …) on an instance
+  but has **no recorded effort and no declared capacity**; patient-flow
+  has neither, and its `allocation` module is **bed** allocation, not
+  staff. Both therefore need a roster and an effort source before the
+  figure exists at all — this exception permits the measurement, it does
+  not conjure the inputs. See each service's own spec for the tasks.
 
 ## 8. Privacy, and the exporter side door
 

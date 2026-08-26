@@ -132,6 +132,26 @@ code + tests in one PR.
   `PATIENT_FLOW_REQUIRE_AUTH` + the auth service are deployed; no
   token ever reaches browser JS. (spec auth.md)
 
+## Staff utilisation (permitted 2026-08-25, blocked on inputs)
+
+- [ ] PF-T-U1 **Roster / staff-capacity source**: who is on shift, for
+  how long, with non-working time (leave, study leave, non-clinical
+  duty) that **subtracts from the denominator** rather than counting as
+  idle. Distinct from the `allocation` module, which is **beds**.
+- [ ] PF-T-U2 **Effort source**, labelled **asserted** — never inferred
+  from bed moves or Red2Green day classifications, which are by-products
+  of the work and must stay trustworthy.
+- [ ] PF-T-U3 The utilisation figure with the five obligations in
+  [`agents/share/time-based-analysis.md` §7.1](../../agents/share/time-based-analysis.md).
+  (capacity.md)
+  — **Acceptance:** a nurse off for the whole window reports `null` with
+  a reason, **not 0%**; a window below the suppression floor is `null`,
+  justified as a re-identification control; the response carries
+  numerator, denominator and the configuration behind them, and ships
+  beside occupancy and the open-request escalation signal; **no endpoint
+  returns per-person cycle time, throughput or flow efficiency**, and
+  none is derivable by arithmetic from what is returned.
+
 ## Production gates (P0 — design-only until a real deployment)
 
 - [ ] PF-T-G1 Clinical safety case (DCB0129/0160) + named CSO.
