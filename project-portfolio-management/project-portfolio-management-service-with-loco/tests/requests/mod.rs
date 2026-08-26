@@ -4,13 +4,17 @@
 //! suite (intake / gates / risks / budgets) in [`governance`].
 
 mod capabilities;
+mod effort;
 mod event_outbox;
 mod governance;
 mod insights;
+mod metrics_control;
 mod plans;
 mod strategy;
 mod tba;
+mod value_ceremony;
 mod visibility;
+mod workflow_phase;
 
 use std::sync::Once;
 

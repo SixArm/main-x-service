@@ -98,21 +98,49 @@ struct TaskPayload {
     /// Optional story points (team-local; 0–100).
     #[serde(default)]
     points: Option<i32>,
+    /// The declared Flow Framework work-item type — `feature`,
+    /// `defect`, `risk` or `debt` (FR-31). Absent means **nobody
+    /// declared one**, which Flow Distribution reports as
+    /// `unclassified` and counts separately; it is deliberately not
+    /// defaulted to `feature`.
+    #[serde(default)]
+    flow_type: Option<String>,
 }
 
 /// Validate the shared task fields; returns the resolved status.
-async fn validate_task(ctx: &AppContext, plan_pid: Uuid, payload: &TaskPayload) -> Result<String> {
+async fn validate_task(
+    ctx: &AppContext,
+    plan_pid: Uuid,
+    payload: &TaskPayload,
+) -> Result<(String, crate::workflow::WorkflowDef)> {
     if payload.title.trim().is_empty() {
         return Err(refuse("title is required"));
     }
     if payload.title.len() > crate::validation::MAX_TEXT_LEN {
         return Err(refuse("title exceeds the text cap"));
     }
-    let status = payload.status.clone().unwrap_or_else(|| "todo".to_string());
-    if !rules::TASK_STATUSES.contains(&status.as_str()) {
+    // The vocabulary comes from the workflow in force, not from a
+    // compile-time constant: a plan with a custom workflow is validated
+    // against *its* states, and a plan with none falls back to the
+    // built-in vocabulary, so existing boards are unaffected (FR-26).
+    let workflow = super::workflow::in_force(ctx, plan_pid, "task").await?;
+    let initial = workflow
+        .states
+        .iter()
+        .find(|state| state.is_initial)
+        .map_or("todo", |state| state.key.as_str());
+    let status = payload
+        .status
+        .clone()
+        .unwrap_or_else(|| initial.to_string());
+    if crate::workflow::category_of(&workflow, &status).is_none() {
+        let declared: Vec<&str> = workflow
+            .states
+            .iter()
+            .map(|state| state.key.as_str())
+            .collect();
         return Err(refuse(&format!(
-            "status must be one of {:?}",
-            rules::TASK_STATUSES
+            "status must be one of {declared:?} (the workflow in force for this plan)"
         )));
     }
     if let Some(assignee) = payload.assignee_ref.as_deref()
@@ -125,6 +153,17 @@ async fn validate_task(ctx: &AppContext, plan_pid: Uuid, payload: &TaskPayload) 
     {
         return Err(refuse("points must be between 0 and 100"));
     }
+    // `unclassified` is deliberately not accepted: it is the *absence*
+    // of a declaration, and letting a caller spell it would allow a row
+    // to claim it had been classified as unclassified.
+    if let Some(flow_type) = payload.flow_type.as_deref()
+        && !["feature", "defect", "risk", "debt"].contains(&flow_type)
+    {
+        return Err(refuse(
+            "flow_type must be feature, defect, risk or debt; omit it to leave the \
+             item unclassified",
+        ));
+    }
     if let Some(sprint_pid) = payload.sprint_pid {
         let sprint = sprints::Entity::find()
             .filter(sprints::Column::Pid.eq(sprint_pid))
@@ -136,11 +175,13 @@ async fn validate_task(ctx: &AppContext, plan_pid: Uuid, payload: &TaskPayload) 
             return Err(refuse("sprint_pid must name a sprint of this plan"));
         }
     }
-    Ok(status)
+    Ok((status, workflow))
 }
 
-/// `POST /api/plans/{pid}/tasks` — create a task (default
-/// status `todo`; `done` on create stamps `done_at`).
+/// `POST /api/plans/{pid}/tasks` — create a task.
+///
+/// The default status is the workflow's **initial** state, and creating
+/// straight into a state whose category is `done` stamps `done_at`.
 #[debug_handler]
 async fn create_task(
     State(ctx): State<AppContext>,
@@ -149,7 +190,7 @@ async fn create_task(
     Json(payload): Json<TaskPayload>,
 ) -> Result<Response> {
     let item = super::governance::find_item(&ctx, &pid).await?;
-    let status = validate_task(&ctx, item.pid, &payload).await?;
+    let (status, workflow) = validate_task(&ctx, item.pid, &payload).await?;
     let now = chrono::Utc::now();
     // The task and its opening transition commit together: a task
     // without one would have no measurable start, and the time-based
@@ -170,7 +211,16 @@ async fn create_task(
         assignee_ref: sea_orm::ActiveValue::set(payload.assignee_ref.clone()),
         points: sea_orm::ActiveValue::set(payload.points),
         status_changed_at: sea_orm::ActiveValue::set(now.into()),
-        done_at: sea_orm::ActiveValue::set((status == "done").then(|| now.into())),
+        flow_type: sea_orm::ActiveValue::set(payload.flow_type.clone()),
+        // Stamped from the state's **category**, not from the literal
+        // string "done". A custom vocabulary finishes in whatever it
+        // calls finished (`shipped`, `closed`, …), and matching on the
+        // name would leave the burndown blind to every board that
+        // renamed its final column — the exact failure the mandatory
+        // category exists to prevent.
+        done_at: sea_orm::ActiveValue::set(
+            crate::workflow::is_done(&workflow, &status).then(|| now.into()),
+        ),
         deleted_at: sea_orm::ActiveValue::set(None),
         ..Default::default()
     }
@@ -263,9 +313,52 @@ struct MovePayload {
     status: String,
 }
 
+/// Refuse a move into a capped column that is already full.
+///
+/// Caps declared on the workflow's own states win over the
+/// deployment-wide env map: a plan that configured its board said
+/// something more specific than the environment did. No cap from
+/// either source means no limit.
+///
+/// A refused move writes **no** transition row — the log must not
+/// record work that did not happen.
+async fn check_wip(
+    ctx: &AppContext,
+    plan_pid: Uuid,
+    status: &str,
+    workflow: &crate::workflow::WorkflowDef,
+) -> Result<()> {
+    let workflow_caps = crate::workflow::wip_limits(workflow);
+    let env_caps = rules::parse_wip_limits(
+        std::env::var("PROJECT_PORTFOLIO_MANAGEMENT_WIP_LIMITS")
+            .ok()
+            .as_deref(),
+    );
+    let Some(cap) = workflow_caps
+        .get(status)
+        .or_else(|| env_caps.as_ref().and_then(|l| l.get(status)))
+    else {
+        return Ok(());
+    };
+    let occupancy = tasks::Entity::find()
+        .filter(tasks::Column::PlanPid.eq(plan_pid))
+        .filter(tasks::Column::Status.eq(status))
+        .filter(tasks::Column::DeletedAt.is_null())
+        .count(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?;
+    if usize::try_from(occupancy).unwrap_or(usize::MAX) >= *cap {
+        return Err(refuse(&format!(
+            "WIP limit reached: `{status}` is capped at {cap} for this item"
+        )));
+    }
+    Ok(())
+}
+
 /// `PATCH /api/plans/{pid}/tasks/{t_pid}` — the board move.
-/// Stamps `status_changed_at`; first entry into `done` stamps
-/// `done_at` (kept thereafter — the completion history stays true).
+/// Stamps `status_changed_at`; first entry into a state whose
+/// **category** is `done` stamps `done_at` (kept thereafter — the
+/// completion history stays true).
 #[debug_handler]
 async fn move_task(
     State(ctx): State<AppContext>,
@@ -273,43 +366,45 @@ async fn move_task(
     Path((pid, t_pid)): Path<(String, String)>,
     Json(payload): Json<MovePayload>,
 ) -> Result<Response> {
-    if !rules::TASK_STATUSES.contains(&payload.status.as_str()) {
-        return Err(refuse(&format!(
-            "status must be one of {:?}",
-            rules::TASK_STATUSES
-        )));
-    }
     let item = super::governance::find_item(&ctx, &pid).await?;
     let task = find_task(&ctx, item.pid, &t_pid).await?;
+
+    // The workflow in force decides both the vocabulary and the legal
+    // moves (FR-26). A plan with none falls back to the built-in, whose
+    // transition set is empty — meaning unconstrained — so existing
+    // boards behave exactly as before.
+    let workflow = super::workflow::in_force(&ctx, item.pid, "task").await?;
+    if crate::workflow::category_of(&workflow, &payload.status).is_none() {
+        let declared: Vec<&str> = workflow
+            .states
+            .iter()
+            .map(|state| state.key.as_str())
+            .collect();
+        return Err(refuse(&format!(
+            "status must be one of {declared:?} (the workflow in force for this plan)"
+        )));
+    }
     if task.status == payload.status {
         return format::json(task_view(&task));
     }
+    if !crate::workflow::may_transition(&workflow, &task.status, &payload.status) {
+        // A refused move writes **no** transition row — the log must
+        // not record work that did not happen
+        // (`spec/time-based-analysis.md` §6), the same rule the WIP-limit
+        // refusal below already honours.
+        return Err(refuse(&format!(
+            "the workflow in force does not permit `{}` -> `{}`",
+            task.status, payload.status
+        )));
+    }
     // WIP limits (env-configured, per plan board): refuse a move
     // into a capped column that is already full. No config ⇒ no caps.
-    if let Some(limits) = rules::parse_wip_limits(
-        std::env::var("PROJECT_PORTFOLIO_MANAGEMENT_WIP_LIMITS")
-            .ok()
-            .as_deref(),
-    ) && let Some(cap) = limits.get(payload.status.as_str())
-    {
-        let occupancy = tasks::Entity::find()
-            .filter(tasks::Column::PlanPid.eq(item.pid))
-            .filter(tasks::Column::Status.eq(payload.status.as_str()))
-            .filter(tasks::Column::DeletedAt.is_null())
-            .count(&ctx.db)
-            .await
-            .map_err(|e| Error::Model(ModelError::from(e)))?;
-        if usize::try_from(occupancy).unwrap_or(usize::MAX) >= *cap {
-            return Err(refuse(&format!(
-                "WIP limit reached: `{}` is capped at {cap} for this item",
-                payload.status
-            )));
-        }
-    }
+    check_wip(&ctx, item.pid, &payload.status, &workflow).await?;
     let from = task.status.clone();
     let task_pid = task.pid;
     let assignee = task.assignee_ref.clone();
-    let first_done = task.done_at.is_none() && payload.status == "done";
+    // Category, not the literal string — see `create_task`.
+    let first_done = task.done_at.is_none() && crate::workflow::is_done(&workflow, &payload.status);
     let now = chrono::Utc::now();
     // The move and its transition commit together. A refused move (an
     // unknown status, a full WIP column) has already returned above, so

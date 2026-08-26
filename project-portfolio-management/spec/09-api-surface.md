@@ -82,6 +82,60 @@ Delivered 2026-07-22 (§6.4a; service spec §9.4a). Derived views carry
 | GET | `/api/plans/{pid}/smart-score` · `/api/prioritisation` | Smart Score + ranked queue (with breakdown) |
 | GET | `/api/lifecycle` · `/api/plans/{pid}/lifecycle` | Funnel + next-phase readiness checklist |
 
+### 9.2b Service REST API — full-suite capabilities (§1.4–§1.6)
+
+Committed, **not yet built** (§2.3 / §6.4b). Derived views carry `as_of`
+and are ETag-conditional, matching §9.2a.
+
+| Method | Path | Purpose | FR |
+|---|---|---|---|
+| GET/POST | `/api/workflows` · PUT/DELETE `…/{pid}` | Workflow configuration (task / issue states, categories, transitions, WIP limits) | FR-26 |
+| GET | `/api/plans/{pid}/workflow?applies_to=task\|issue` | The workflow in force for this plan (its own, else the default) | FR-26 |
+| GET/POST | `/api/plans/{pid}/goals/{gid}/key-results` · PUT/DELETE `…/{kr_pid}` | Key results under an objective | FR-27 |
+| GET/POST | `/api/key-results/{kr_pid}/check-ins` | Dated check-ins (value + optional confidence) | FR-27 |
+| GET | `/api/plans/{pid}/okr` | Derived objective and plan scores with per-key-result breakdown; `unmeasured` where no metric exists | FR-27 |
+| GET/POST | `/api/plans/{pid}/time-entries` · PUT/DELETE `…/{te_pid}` | Recorded effort | FR-28 |
+| GET | `/api/plans/{pid}/effort` | Roll-ups per task / plan / assignee, labelled **asserted** | FR-28 |
+| GET/POST | `/api/plans/{pid}/sprints` · PUT/DELETE `…/{s_pid}` | Sprints | FR-29 |
+| GET/POST | `/api/sprints/{s_pid}/ceremonies` · PUT/DELETE `…/{c_pid}` | Planning / daily / review / retrospective + notes | FR-29 |
+| POST | `/api/sprints/{s_pid}/commit` | Write the planning commitment snapshot | FR-29 |
+| POST | `/api/ceremony-notes/{n_pid}/convert` | Note → task (`action`/`feedback`) or → issue (`blocker`) | FR-29 |
+| PUT | `/api/plans/{pid}/phase` | Advance or (with a reason) move back; a skip is `422` | FR-30 |
+| GET | `/api/plans/{pid}/phase-history` | Transitions + duration per phase, every phase present at zero | FR-30 |
+| GET | `/api/plans/{pid}/flow-distribution` | Feature / defect / risk / debt mix, `unclassified` counted separately; `?rollup=true` walks the subtree | FR-31 |
+
+**Not added, deliberately.** There is no endpoint for Flow Time,
+Velocity, Efficiency or Load: those are already served by
+`GET /api/plans/{pid}/{time-analysis,flow,constraints,aging-wip}`
+([time-based-analysis.md](time-based-analysis.md) §10). Adding
+Flow-Framework-named aliases would put the same number behind two names,
+which §1.6 exists to prevent.
+
+### 9.2c Service REST API — value realization and performance (§6.4c)
+
+| Method | Path | Purpose | FR |
+|---|---|---|---|
+| GET/POST | `/api/plans/{pid}/business-case` · PUT/DELETE `…/{t_pid}` | Charter / gate-approved targets, with the approval that set them | FR-33 |
+| GET/POST | `/api/plans/{pid}/value-points` | Observed value, each carrying its `method` and the first-measurable flag | FR-33 |
+| GET/POST | `/api/plans/{pid}/adoption` | Adoption snapshots (active ÷ target, with definition + window) | FR-33 |
+| GET | `/api/plans/{pid}/value-realization` | Transformation ROI · Value Realization Rate · Time to Value · Adoption Rate · Performance to Business Case; `?rollup=true` walks the subtree | FR-33 |
+| GET | `/api/plans/{pid}/performance` · `/api/performance` | The six-dimension metric set, per plan and portfolio-wide | FR-34 |
+| GET | `/api/capacity/utilization?by=plan\|team\|person` | Effort against declared capacity at all three levels, each with its numerator, denominator and the period's queue figures; suppressed below the capacity floor. Per-assignee cycle time / throughput / flow efficiency remain **absent** | FR-35 |
+| GET/POST | `/api/plans/{pid}/satisfaction` | NPS / CSAT responses; the aggregate always carries response count and rate | FR-36 |
+| GET/POST | `/api/plans/{pid}/tpc` · DELETE `…/{t_pid}` | TPC observations: DIPP, EMV, CEC, PI numerator/denominator | FR-37 |
+| GET | `/api/plans/{pid}/tpc/report` | Derived DIPP + progress index + the stored-vs-computed divergence finding | FR-37 |
+| GET | `/api/tpc` | Portfolio triage ranked by DIPP descending, within one currency | FR-37 |
+| GET/POST | `/api/plans/{pid}/controls` · PUT/DELETE `…/{c_pid}` | Control register: standard, timing, source, cadence | FR-38 |
+| GET/POST | `/api/controls/{c_pid}/readings` | Append-only readings with verdict + gap | FR-38 |
+| GET/POST | `/api/readings/{r_pid}/actions` · POST `…/{a_pid}/close` | The action a failing reading provoked; converts to a task or issue | FR-38 |
+| GET | `/api/plans/{pid}/controls/coverage` · `/api/controls/coverage` | What is **not** controlled: never-read controls, overdue cadences, phases with no controls, unanswered failures | FR-39 |
+
+**Response conventions**, uniform across both: every ratio ships its
+numerator and denominator; a null figure carries a `reason` rather than
+a sentinel zero; every derived view carries `as_of` and is
+ETag-conditional (§9.2a); and any monetary figure names its currency,
+since none of these metrics converts between them.
+
 ### 9.3 Front-end routes
 
 The front-end serves the plans collection at `/plans`.
@@ -98,6 +152,13 @@ The front-end serves the plans collection at `/plans`.
 | `/lifecycle` | Bird's-eye phase funnel | `GET /api/lifecycle` |
 | `/reviews` | Delegate, respond, submit a verdict, consensus | the §9.2a review endpoints |
 | `/automations` | Rules, deadline queue + sweep, run log | the §9.2a automation endpoints |
+| `/plans/[pid]/okr` | Objectives, key results, check-ins, derived scores *(planned, FR-27)* | the §9.2b OKR endpoints |
+| `/plans/[pid]/sprints` | Sprints + the four ceremonies *(planned, FR-29)* | the §9.2b sprint endpoints |
+| `/plans/[pid]/effort` | Time entry + roll-ups *(planned, FR-28)* | the §9.2b effort endpoints |
+| `/plans/[pid]/distribution` | Flow Distribution mix *(planned, FR-31)* | `GET …/flow-distribution` |
+| `/workflows` | Workflow configuration *(planned, FR-26)* | the §9.2b workflow endpoints |
+| `/plans/[pid]/value` | Realized gains + business-case performance *(planned, FR-33)* | `GET …/value-realization` |
+| `/performance` | The six-dimension metric board *(planned, FR-34)* | `GET /api/performance` |
 
 ### 9.4 Library API (matcher)
 

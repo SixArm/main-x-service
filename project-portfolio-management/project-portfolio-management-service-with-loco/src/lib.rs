@@ -33,8 +33,19 @@ pub mod collaboration;
 /// Compliance controls: row-level integrity and keyed MACs.
 pub mod compliance;
 pub mod controllers;
+/// Pure rules for the **Controlling process** — set a standard,
+/// measure, compare, act — and the three control timings
+/// (feedforward / concurrent / feedback) that fix what a failing
+/// control may do.
+pub mod controls;
 pub mod data;
 /// Pure rules for the engineering-team features (tasks / burndown / MoSCoW).
+/// Flow Distribution: the mix of work types completed — feature,
+/// defect, risk, debt, and the honest fifth, `unclassified`.
+pub mod distribution;
+/// Recorded effort and utilisation — including per person, under the
+/// five obligations in `agents/share/time-based-analysis.md` §7.1.
+pub mod effort;
 pub mod engineering;
 /// The time-based-analysis flow-gauge refresh loop: default-off,
 /// bounded by a series cap, and suppressed below a board-size floor.
@@ -49,8 +60,15 @@ pub mod lifecycle;
 pub mod merge;
 pub mod metrics;
 pub mod models;
+/// The OKR engine: key-result progress, objective scores, and the
+/// alignment-weighted plan score — all derived on read.
+pub mod okr;
 pub mod openapi;
 /// The pure, explainable Smart Score behind data-driven prioritisation.
+/// Pure rules for the sequential project phase — Initiating through
+/// Closing: one-step advancement, explicitly-reasoned regression, and
+/// per-phase durations from the transition log.
+pub mod phase;
 pub mod prioritisation;
 /// Field masking (owner org, lead ref) + the GDPR right-of-access export envelope.
 pub mod privacy;
@@ -71,9 +89,21 @@ pub mod tasks;
 /// rework and first-pass yield, the service level expectation,
 /// constraint ranking, and queueing-theory flow.
 pub mod tba;
+/// Total Project Control (TPC): pure rules for Devaux's Index of
+/// Project Performance (DIPP), Expected Monetary Value, and Cost
+/// Estimate to Complete — is the value still to come worth the money
+/// still to spend?
+pub mod tpc;
 pub mod validation;
+/// Realized gains and strategic performance: transformation ROI, value
+/// realization rate, time to value, adoption, earned-value indices and
+/// stakeholder sentiment — every one derived, never stored.
+pub mod value;
 /// Header-based API versioning (`Accepts-version`) for the REST surface.
 pub mod version;
 /// Pure PPM visibility rules (schedule math, RAG, capacity, CSV).
 pub mod visibility;
 pub mod workers;
+/// Custom workflows: configurable task and issue state vocabularies,
+/// each state declaring the category every derived view computes from.
+pub mod workflow;

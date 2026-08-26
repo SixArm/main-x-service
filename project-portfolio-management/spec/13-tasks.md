@@ -23,6 +23,350 @@ described manual check confirms it. Split tasks too big for one PR
   Not built: email / push transport, a `votes` Smart Score component,
   record-level ABAC on the new endpoints, and a notifications page.
 
+- [x] **T-15 — Custom workflows (§5.9.1 / FR-26).** **Landed 2026-08-25.**
+  - Pure `src/workflow.rs` (12 tests); migration
+    `m20260825_000005_workflows` (three tables); three entities;
+    `src/controllers/workflow.rs` (4 routes); the task **create** and
+    **move** paths now validate against the workflow in force rather
+    than a compile-time constant.
+  - **Resolution order:** the plan's own workflow, else the deployment
+    default, else the built-in vocabulary — so a plan with nothing
+    configured behaves exactly as before. Nothing is seeded; the
+    built-ins stay code defaults.
+  - **An empty transition set means unconstrained**, preserving today's
+    open board. Constraint is opt-in.
+  - **Schema-enforced, verified against raw SQL:** `category` is
+    `NOT NULL` + CHECK (an uncategorised state is impossible even by
+    direct insert), an invented category is refused, and a partial
+    unique index makes two initial states impossible.
+  - **Verified end to end:** a custom vocabulary takes force
+    (`source: plan`); the old vocabulary is then refused on that plan;
+    creation defaults to the workflow's initial state; an undeclared
+    transition is refused **and writes no transition row**; the
+    workflow's own WIP cap bites ahead of the env map.
+
+  **Two defects found by testing, both fixed:**
+
+  - **`done_at` was stamped on the literal string `"done"`.** A custom
+    vocabulary finishing in `shipped` never stamped it, leaving the
+    burndown blind to every board that renamed its final column —
+    precisely the failure the mandatory category exists to prevent. Now
+    stamped from the state's **category** on both the create and move
+    paths.
+  - **The TBA flow classes are keyed on status names**, so a custom
+    vocabulary arrived with **no** classification and would have
+    reported no value-adding time at all. `workflow::default_flow_classes`
+    now derives classes from the categories, resolved per plan by
+    `controllers::tba::classes_for`.
+
+  **A regression I introduced and then caught**, worth recording because
+  the first test missed it: four categories cannot express *necessary*
+  non-value-adding, so the derivation called the built-in `in_review`
+  **value-adding** where the disclosed default map calls it
+  *necessary*. Every untouched board's flow efficiency would have risen
+  because of an unrelated feature. Fixed by overlaying
+  `tba::default_classes()` on top of the derivation, and the
+  disagreement is now pinned by a test whose doc comment says why —
+  the earlier version checked only three keys, passed, and let the
+  regression reach a running service.
+
+  **Not built:** issue workflows are resolvable but unused (there is no
+  issues sub-resource — §14.2); no workflow **edit** route (withdraw and
+  re-register); the withdraw guard checks tasks only; front-end
+  `/workflows`. Request tests committed
+  (`tests/requests/workflow_phase.rs`).
+
+- [x] **T-16 — OKR engine (§5.9.2 / FR-27).** **Landed 2026-08-25.**
+  Completes the "create a full OKR engine" reversal (§17.3).
+  - **The spec was corrected first.** It anchored key results to a
+    plan's `goals[]` via a `goal_id`. `Goal` carries **no identifier** —
+    a bare struct in the JSONB payload, addressable only by array
+    position — and **no goals sub-resource exists** (FR-12 specified,
+    built nowhere; now recorded in §14.2). A key result bound to an
+    array index would be orphaned by any reordering. Key results now
+    hang off **`objectives`**, which already has a `pid`, a `period`
+    (the OKR cycle) and weighted plan alignment through
+    `objective_links` — the O in OKR, and the correct anchor.
+  - Pure `src/okr.rs` (9 tests); migration
+    `m20260825_000006_key_results`; two entities;
+    `src/controllers/okr.rs` (5 routes); OpenAPI + pinning test.
+  - **The plan score is weighted by the existing `objective_links`
+    weight**, not by a second notion of importance invented for OKRs.
+  - Schema-enforced: `maintain` without a tolerance and a `currency`
+    metric without a currency code are both CHECK-refused, as well as
+    validated in the handler.
+  - **Verified end to end** (`tests/requests/metrics_control.rs`, three
+    tests): a `decrease` key result starts at its baseline and reads
+    **0%**, not 100% (seeding `current_value` at zero would have
+    reported it complete on the day it was created); a check-in moves
+    `current_value` and **leaves `start_value` untouched**; an
+    unmeasured objective weighted 5× does **not** drag the plan score
+    down and is still reported; a key result whose start equals its
+    target is refused at write rather than reading `unmeasured` for a
+    quarter.
+  - **A test assumption of mine was wrong, not the code:** alignment
+    weight is capped 1–5 (`strategy::valid_weight`), so my first
+    version's `weight: 99` was refused and the link never landed. Fixed
+    in the test.
+  - **Not built:** no key-result **edit** route (a check-in is the way
+    to move a value, which is deliberate — but title and target are also
+    currently immutable); no objective-level `period` rollup; front-end
+    `/plans/[pid]/okr`.
+
+- [x] **T-17 — Time tracking (§5.9.3 / FR-28).** **Landed 2026-08-26.**
+  Pure `src/effort.rs` (9 tests), migration `m20260826_000001_effort`,
+  three entities, `src/controllers/effort.rs`. Roll-ups per plan, task
+  and assignee, every one labelled **asserted**; uncategorised effort
+  reported separately rather than folded into `opex`, which would
+  flatter the capitalisable share. An entry over 1440 minutes for one
+  date is refused — a day cannot hold more. Verified in
+  `tests/requests/effort.rs`.
+
+- [x] **T-18 — Sprint ceremonies (§5.9.3 / FR-29).** **Landed
+  2026-08-26.** Migration `m20260826_000002_ceremonies`, two entities,
+  `src/controllers/ceremony.rs`. The retrospective already existed as
+  `sprint_notes`; this adds planning, daily and review, and the
+  commitment snapshot.
+  - **The commitment is written once**, and a second `commit` is
+    refused: a rewritable commitment would let mid-sprint scope look
+    like scope committed at the outset. The view **names** what was
+    added and removed afterwards rather than only counting it.
+  - A second planning or review is refused in the handler *and* by a
+    partial unique index — that is a re-plan, which is a new sprint.
+  - Every ceremony kind is reported even at zero, so a sprint that never
+    retrospected is a finding rather than a missing row.
+
+- [x] **T-19 — Project phases (§5.9.4 / FR-30).** **Landed 2026-08-25.**
+  - Matcher crate: `PlanPhase` + `Plan.phase`, informational-only and
+    **pinned never-scored** (`phase_is_not_scored`), following the
+    `PlanStatus` precedent exactly. 58 unit + 6 integration tests green,
+    clippy and fmt clean.
+  - Service: pure `src/phase.rs` (8 tests) — one-step advancement,
+    explicitly-reasoned regression, per-phase durations that partition
+    the elapsed time exactly and survive unsorted input and clock skew;
+    migration `m20260825_000003_phase_transitions` (denormalised
+    `plans.phase` with a CHECK, append-only log, **no backfill**);
+    entity; `src/controllers/phase.rs`; OpenAPI + pinning test.
+  - **Verified end to end** against Postgres 18: a skip is `422` **and
+    names the phase skipped**; a backward move is `422` without a reason
+    and `200` with one; an unknown token is refused, not coerced; the
+    history reports all five phases with the revisit counted separately
+    (2 visits, not merged into one total); payload and column agree
+    (§5.8); `DELETE` on the history is `405`, the append-only property
+    expressed as an absent route.
+  - **Known gap, recorded not hidden:** `plans.phase` is **not** a
+    separate field in the integrity pre-image, unlike `kind` / `name` /
+    `parent_pid` / `stage`. Its authoritative value rides in `data`, so
+    it *is* covered — but a raw-SQL edit of the column alone would not
+    break the digest (it would break the §5.8 payload-equals-column
+    invariant instead). Closing it means bumping `RECORD_HASH_VERSION`,
+    which invalidates **every** stored digest estate-wide and would read
+    as a false tamper alarm on every record. The bump waits for a change
+    that needs one anyway. Reasoning is in
+    `src/compliance/record_integrity.rs`.
+  - **Not built:** phase-transition automation triggers (FR-32).
+    Request tests committed (`tests/requests/workflow_phase.rs`).
+
+- [x] **T-20 — Flow Distribution (§5.9.5 / FR-31).** **Landed 2026-08-25.**
+  - **The spec was corrected first.** §5.9.5 had said the work type
+    could be *derived* — feature from a task's `goal_id`, defect from an
+    issue's `kind`. Checking the tree found `tasks` has no `goal_id`
+    (objectives link to **plans**) and **there is no `issues` table at
+    all** (FR-14 specified in §6/§9/§10, built nowhere — now recorded in
+    §14.2). The derivation would have classified everything
+    `unclassified` while appearing to work. The type is now **declared**,
+    which is also what the Flow Framework itself assumes.
+  - Pure `src/distribution.rs` (8 tests); migration
+    `m20260825_000004_flow_type` adding a nullable CHECK-constrained
+    `tasks.flow_type`; `src/controllers/distribution.rs` with the
+    subtree rollup; OpenAPI + pinning test.
+  - **Verified end to end** against Postgres 18: `unclassified` is
+    **not storable** (the CHECK refuses it — it is the *absence* of a
+    declaration, and a spelling would let a row claim to have been
+    classified as unclassified); a mix of 2 feature / 1 defect / 1
+    undeclared / 1 closed `tech_debt` risk reported 40/20/0/20/20 with
+    `unclassified` standing alone; a closed `delivery` risk was
+    correctly excluded; a declared intent produced gaps only for the
+    types it named; a malformed intent was warned about, ignored
+    **wholesale**, and the service still booted.
+  - **A bug the tests caught:** an out-of-range intended share did not
+    overflow `checked_sub`, so `i64::MAX` produced a gap of ≈ -9.2e18 —
+    a nonsense number that looks like a measurement. Fixed in
+    `distribution()` by range-guarding the intent where the arithmetic
+    is, rather than trusting every caller to have come through
+    `parse_intent`.
+  - **Not built:** the front-end `/plans/[pid]/distribution` route.
+    Request tests committed (`tests/requests/metrics_control.rs`).
+
+- [~] **T-21 — Automation breadth (FR-32).** **Partially landed
+  2026-08-26.**
+  - [x] **`plan_phase_changed` trigger**, wired into the phase
+    controller. Deliberately its **own** trigger rather than folded into
+    `plan_stage_changed`: the gate stage and the project phase are
+    separate ordered vocabularies (§1.5.1), and one rule firing on both
+    would fire on the wrong kind of change half the time.
+  - [x] Phase filters validate against **phases**, not task statuses —
+    the two vocabularies are disjoint, so validating one against the
+    other would reject every legitimate rule. Pinned by
+    `a_phase_trigger_filters_on_phases_not_task_statuses`.
+  - [x] The existing invariant holds unchanged: the phase change is
+    committed before the rule fires, so a failing rule is logged as a
+    `failed` run and **never undoes the operator's move**.
+  - [ ] Field-change, date-arrival and SLE-breach triggers.
+  - [ ] **Multi-action rules** applied in declared order with per-action
+    outcomes logged. This is the larger half of FR-32 and is untouched:
+    the schema holds one action per rule, so it is a migration plus an
+    engine change, not a validation tweak.
+
+- [x] **T-22 — Realized gains (§5.9.6 / FR-33).** **Landed 2026-08-26.**
+  Pure `src/value.rs` (11 tests), migration `m20260826_000003_value`,
+  four entities, `src/controllers/value.rs`.
+  - **A plan with no value points is `unrealized`, never a total loss.**
+  - `approved_at` has no update path, and a **second first-measurable
+    value point is refused by a partial unique index** — the
+    Time-to-Value clock stops once.
+  - Time to Value is a **distribution** (nearest-rank p50/p85), never a
+    mean.
+  - Adoption refuses a zero denominator **at write**, and stores its own
+    `definition` and `window_days` — "active user" is the term most
+    easily redefined between two readings.
+  - **Investment is actual cost, and mixed currencies withhold the ROI**
+    rather than adding pounds to euros. This came from checking the
+    `budget_lines` shape: it carries a currency *per line*, so a
+    plan-level sum needed the single-currency rule enforced.
+  - The evidence mix (`measured_share_basis_points`) is disclosed, so a
+    realized-value figure says how much of itself was measured.
+
+- [x] **T-23 — Strategic performance (FR-34 / FR-36), partial.**
+  **Landed 2026-08-26.** `satisfaction_responses` + the six-dimension
+  view skeleton.
+  - **NPS always carries its response count** — 100 from two
+    respondents is not a finding — and reports `null` with
+    `no_responses` rather than a score of zero.
+  - Responses store a **role, never an identity**.
+  - **SPI and CPI report `null` with `no_baseline`, never `1.0`.** A
+    plan without a phased budget baseline is *unmeasured*, not on plan.
+  - **Not built:** the phased budget baseline itself, so SPI/CPI are
+    permanently unmeasured today; NPV; Strategic Alignment Index;
+    defect density. Each needs an input the service does not hold, and
+    reporting them from absent inputs is what this row refuses to do.
+
+- [x] **T-24 — Per-person utilisation (FR-35).** **Landed 2026-08-26.**
+  `working_time_configs` + `non_working_periods`;
+  `GET /api/capacity/utilization?by=plan|team|person`.
+  - **The obligation-2 test is the load-bearing one:** somebody on leave
+    for the whole window reports `null` with `all_non_working`, **never
+    0%** — leave leaves the denominator rather than sitting in it, and
+    0% would read as measured idleness. A person entirely on leave is
+    still listed, so the answer is "on leave" rather than a silent
+    absence.
+  - No declared capacity is its own reason (`no_declared_capacity`),
+    distinct from leave: the denominator is unknown, not zero.
+  - Below the suppression floor the figure is withheld **with its inputs
+    still returned**, so suppression is visible rather than looking like
+    missing data.
+  - Team utilisation **sums** the numerator and denominator; it is not a
+    mean of individual ratios, which over unequal denominators is a
+    different and wrong number.
+  - At or over 100% is flagged as a **warning** — what a queueing system
+    looks like just before it stops coping — and is not clamped.
+  - Per-person cycle time, throughput and flow efficiency remain
+    **absent from every endpoint**, and the capacity arithmetic is
+    integer throughout (a float denominator would not reconcile against
+    a payroll system).
+
+- [ ] **T-25 — Total Project Control (§5.9.7 / FR-37).**
+  - [x] Pure `src/tpc.rs`: DIPP, the progress index, banding, the
+    stored-vs-computed divergence, and currency-scoped triage. Money in
+    minor units, ratios in basis points, **no float**; 11 unit tests
+    including the never-panic and sunk-cost pins.
+  - [x] Migration `m20260825_000001_total_project_control` with
+    `dipp_progress_index_ratio` as a Postgres **`GENERATED ALWAYS`**
+    column (`NULLIF` on the denominator, so a zero baseline is `NULL`
+    rather than an insert-time division error) and a `CHECK` refusing a
+    negative cost-estimate-to-complete.
+  - [x] SeaORM entity `models/_entities/total_project_control.rs`.
+  - [x] Controller `src/controllers/tpc.rs` + the four routes (§9.2c),
+    **verified mounted** via `cargo run -- routes`, and OpenAPI with a
+    test pinning that the sunk-cost and never-infinity properties are
+    documented rather than implied.
+  - [x] Verified end to end against Postgres 18: the generated ratio
+    computes (1.2), a zero baseline yields `NULL` rather than an insert
+    error, **the ratio cannot be written by hand** (Postgres refuses a
+    non-DEFAULT value), a negative CEC is refused by CHECK **and** by
+    the handler (`422`), a negative EMV is accepted and bands
+    `value_destroying`, and triage reports its exclusions.
+  - [x] `#[ignore]`d request tests committed
+    (`tests/requests/metrics_control.rs`), so the checks above run in CI
+    rather than only in a terminal session.
+  - **Acceptance:** `CEC = 0` reports `null` **with a reason**, never
+    infinity; a negative EMV is **not** clamped and bands as
+    `value_destroying`; the generated ratio cannot be written by the
+    handler and cannot disagree with its numerator and denominator;
+    triage sets aside a foreign currency and an undefined DIPP rather
+    than ranking them as zero; two plans with equal remaining value and
+    cost rank identically however much has been sunk into either.
+
+- [ ] **T-26 — Controls / the Controlling process (§5.9.8 / FR-38,
+  FR-39).**
+  - [x] Pure `src/controls.rs`: the three timings and the response each
+    permits, standard validation against the metrics the service
+    actually produces, the four comparators, and the coverage rollup;
+    11 unit tests.
+  - [x] Migration `m20260825_000002_controls` — three tables, with
+    CHECKs on `timing`, `comparator`, `verdict` and `kind`, and a
+    `controls_within_needs_tolerance` constraint. The `verdict` CHECK
+    is the load-bearing one: it keeps `unmeasured` a real third value,
+    so a typo cannot fall through as "not a fail".
+  - [x] Three SeaORM entities; controller `src/controllers/controls.rs`
+    + eight routes (§9.2c), **verified mounted**; OpenAPI + pinning
+    test.
+  - [x] Verified end to end: an unknown metric is `422` at registration;
+    a feedforward control reports `block` and a feedback control
+    `record`; a failing reading derives verdict and gap at write; a
+    valueless reading is `unmeasured`, **not** a pass, and is excluded
+    from the pass rate; coverage names never-read controls and
+    unanswered failures, and shows every timing at zero; an `accept`
+    action clears the unanswered count.
+  - [ ] Action → task / issue conversion (the `converted_*_pid` columns
+    exist and are always `NULL` today).
+  - [x] `#[ignore]`d request tests committed
+    (`tests/requests/metrics_control.rs`).
+  - [ ] Register the controls that already exist in all but name — gate
+    readiness (feedforward), WIP limits and the SLE (concurrent),
+    retrospectives and the variance views (feedback) — so coverage
+    reports reality rather than only newly-authored controls.
+  - **Acceptance:** a feedforward control may block a write and a
+    feedback control may not; a control naming an unknown metric is
+    refused at **write**, not left permanently `Unmeasured`; an
+    unmeasured reading is excluded from the pass rate rather than
+    counted either way, and an all-unmeasured control reports `null`
+    rather than 0%; a failing reading with no action and no explicit
+    `Accept` appears as **unanswered**; every timing appears in coverage
+    even at zero; a disabled control is never reported as overdue.
+
+- [x] **T-27 — Request tests for T-15/T-19/T-20/T-25/T-26.**
+  **Landed 2026-08-25.** Fourteen `#[ignore]`d request tests in
+  `tests/requests/workflow_phase.rs` and
+  `tests/requests/metrics_control.rs`, taking the DB-gated suite from
+  **47 to 61**. `scripts/ci-check.sh test-db` green.
+
+  Written because those five features had been verified only by hand
+  against a running service — a session nobody can re-run, which by
+  §14.3 rule 1 is not a status claim at all. Each test is one check that
+  was performed manually and now runs in CI, and the assertions are
+  chosen for the *refusals*: undefined is not zero, unmeasured is not a
+  pass, unclassified is not a feature, a skip names what it skipped.
+
+  **It immediately found a real gap.** `tasks.flow_type` existed, the
+  migration constrained it, and Flow Distribution read it — but
+  **nothing could set it**: the field was never added to the task-create
+  payload. The manual pass missed it precisely because that verification
+  seeded rows with `psql` and only exercised the read path. Fixed:
+  `flow_type` is now accepted and validated on create (`unclassified`
+  deliberately not accepted as an input, since it is the *absence* of a
+  declaration).
+
 - [ ] **T-1 — Scaffold the trio.**
   - [ ] Create `project-portfolio-management-matcher-rust-crate/`,
     `project-portfolio-management-service-with-loco/`, and

@@ -20,7 +20,17 @@ use serde_json::Value;
 use uuid::Uuid;
 
 /// What can fire an automation.
-pub const TRIGGER_KINDS: &[&str] = &["task_moved", "review_submitted", "plan_stage_changed"];
+pub const TRIGGER_KINDS: &[&str] = &[
+    "task_moved",
+    "review_submitted",
+    "plan_stage_changed",
+    // Added 2026-08-26 with the project phase (FR-30 / FR-32). Distinct
+    // from `plan_stage_changed`, which is the **governance gate**: the
+    // two are separate ordered vocabularies (entity spec §1.5.1), and
+    // collapsing them into one trigger would make a rule fire on the
+    // wrong kind of change.
+    "plan_phase_changed",
+];
 
 /// What an automation may do when it fires.
 pub const ACTION_KINDS: &[&str] = &[
@@ -244,9 +254,24 @@ pub fn validate_trigger(
                 return Err(format!("{field} must be one of {task_statuses:?}"));
             }
         }
+    } else if trigger_kind == "plan_phase_changed" {
+        // A phase trigger filters on phases, not task statuses. The
+        // vocabularies are disjoint, so validating one against the
+        // other would reject every legitimate rule.
+        for (field, phase) in [("from_status", from_status), ("to_status", to_status)] {
+            if let Some(phase) = phase
+                && project_portfolio_management_matcher::PlanPhase::parse(phase).is_none()
+            {
+                return Err(format!(
+                    "{field} must be a project phase (initiating, planning, executing, \
+                     controlling, closing) for a `plan_phase_changed` trigger"
+                ));
+            }
+        }
     } else if from_status.is_some() || to_status.is_some() {
         return Err(format!(
-            "from_status / to_status only apply to a `task_moved` trigger, not `{trigger_kind}`"
+            "from_status / to_status only apply to `task_moved` or \
+             `plan_phase_changed`, not `{trigger_kind}`"
         ));
     }
     Ok(())
@@ -266,6 +291,52 @@ pub fn is_due(
 
 #[cfg(test)]
 mod tests {
+    /// A phase trigger filters on **phases**, and a task trigger on
+    /// **task statuses**. The two vocabularies are disjoint, so each
+    /// must be validated against its own — validating a phase against
+    /// the task statuses would reject every legitimate phase rule, and
+    /// the reverse would let a typo through.
+    #[test]
+    fn a_phase_trigger_filters_on_phases_not_task_statuses() {
+        use super::validate_trigger;
+        let task_statuses = ["todo", "in_progress", "done"];
+
+        assert!(
+            validate_trigger(
+                "plan_phase_changed",
+                None,
+                Some("executing"),
+                &task_statuses
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_trigger("plan_phase_changed", Some("planning"), None, &task_statuses).is_ok()
+        );
+        // A task status is not a phase.
+        assert!(
+            validate_trigger(
+                "plan_phase_changed",
+                None,
+                Some("in_progress"),
+                &task_statuses
+            )
+            .is_err()
+        );
+        // And a phase is not a task status.
+        assert!(validate_trigger("task_moved", None, Some("executing"), &task_statuses).is_err());
+        // The gate vocabulary is a third thing, and takes no filters.
+        assert!(
+            validate_trigger(
+                "plan_stage_changed",
+                None,
+                Some("g2_definition"),
+                &task_statuses
+            )
+            .is_err()
+        );
+    }
+
     use super::*;
     use serde_json::json;
 

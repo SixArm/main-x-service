@@ -2,13 +2,13 @@
 
 [package]
 name = "project-portfolio-management-service"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.95"
 publish = true
 default-run = "project-portfolio-management-service"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
-description = "Portfolio service: portfolio / project / product / program work-item registry"
+description = "Project portfolio management service — plan registry (one recursive plan tree; kind is an optional label, no gate) and full project-management suite: workflows, OKRs, phases, flow, effort, ceremonies, controls, TPC, value realization"
 readme = "README.md"
 repository = "https://github.com/sixarm/main-x-service/project-portfolio-management-service-with-loco"
 license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"

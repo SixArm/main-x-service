@@ -67,3 +67,18 @@ kept whole rather than split across them:
   time, flow efficiency, rework and first-pass yield, cycle-time
   percentiles and the service level expectation, aging WIP, constraint
   ranking, and queueing-theory flow. Spans §5, §9, §10 and §12.
+- [PRINCE2](prince2/index.md) — the UK-government project management
+  method (PRINCE2 7): its seven principles, practices and processes
+  mapped onto what this entity already provides and what it would have
+  to build, plus **the vocabulary trap** — a PRINCE2 management stage is
+  a *fourth* ordered sequence, not the gate stage and not the project
+  phase.
+- [Total Project Control](total-project-control/index.md) — Devaux's
+  DIPP, expected monetary value and cost estimate to complete: is the
+  value still to come worth the money still to spend? Implemented in
+  `src/tpc.rs`.
+- [Flow Framework metrics](flow-framework-metrics/index.md) — the five
+  value-stream metrics (Flow Time, Velocity, Efficiency, Load,
+  Distribution) and their source. Four are delivered under TBA
+  vocabulary; **Flow Distribution** — the mix of feature / defect /
+  risk / debt work — is the new one. Committed in §1.6.

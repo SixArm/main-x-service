@@ -63,28 +63,59 @@ relational CRUD with events + audit. The one bridge is `goals[]`
 (§5.3): goal sub-resource writes mutate `data.goals[]` so the matchable
 payload stays current.
 
-### 8.3 Service layout (loco.rs) — planned
+### 8.3 Service layout (loco.rs)
+
+> **Corrected 2026-08-25.** This section was headed "— planned" and drew
+> a layout that never landed: a controller per sub-resource
+> (`goals.rs`, `tasks.rs`, `issues.rs`, `timeline.rs`, `burndown.rs`),
+> plus `links.rs` and `bulk.rs` for features §14 lists as **open gaps**
+> (T-7, T-8). The real crate groups controllers by *capability* rather
+> than by resource. Drawn from the tree, not from the plan:
 
 ```
 project-portfolio-management-service-with-loco/
 ├── src/
-│   ├── app.rs                       loco Hooks (routes, truncate)
-│   ├── bin/main.rs                  loco CLI entrypoint
+│   ├── app.rs                       loco Hooks (routes, workers, boot init)
+│   ├── bin/                         loco CLI entrypoint
 │   ├── controllers/
 │   │   ├── plans.rs                 CRUD + match + check-duplicates + merge + search
-│   │   ├── goals.rs tasks.rs issues.rs   sub-resources
-│   │   ├── timeline.rs burndown.rs  derived, read-only
-│   │   ├── links.rs                 entity_links write-side
-│   │   ├── bulk.rs                  import/export jobs
-│   │   └── docs.rs                  OpenAPI + Swagger UI
-│   ├── models/                      plans + sub-resource CRUD helpers
-│   ├── matching helpers, merge.rs, validation.rs, streaming.rs, auth.rs
-│   └── workers/bulk.rs              bg_pg drain
-├── migration/src/                   plans, sub-resources, audit_logs, merge_records,
-│                                    entity_links, bulk_jobs
+│   │   ├── engineering.rs           tasks, board, sprints, milestones, burndown
+│   │   ├── governance.rs            proposals, gates, risks, budget, benefits
+│   │   ├── strategy.rs              ideas, scenarios, objectives
+│   │   ├── collaboration.rs         reviews, assignment, notifications
+│   │   ├── automation.rs            rules, runs, scheduled actions
+│   │   ├── prioritisation.rs        Smart Score + ranked queue
+│   │   ├── visibility.rs            lifecycle funnel + readiness
+│   │   ├── insights.rs              executive / financial / technology views
+│   │   ├── oversight.rs             auditor, compliance, regulator extracts
+│   │   ├── tba.rs                   time-based analysis (§12)
+│   │   ├── compliance.rs            integrity + evidence
+│   │   ├── metrics.rs docs.rs       Prometheus · OpenAPI + Swagger UI
+│   ├── models/                      plans + sub-resource CRUD helpers, _entities/
+│   ├── pure rule modules            governance.rs · engineering.rs · strategy.rs ·
+│   │                                collaboration.rs · automation.rs ·
+│   │                                prioritisation.rs · lifecycle.rs · insights.rs ·
+│   │                                visibility.rs · tba.rs · merge.rs · validation.rs
+│   ├── auth.rs streaming.rs relay.rs search/ privacy.rs compliance/
+│   ├── flow_metrics.rs scheduler.rs snapshots.rs version.rs
+│   └── workers/                     loco background jobs
+├── migration/src/                   plans, audit_logs, merge_records, event_outbox,
+│                                    governance, visibility, strategy, engineering,
+│                                    capabilities, insight_snapshots,
+│                                    integrity_digests, time_based_analysis
 ├── config/{development,production,test}.yaml
-└── tests/                           matcher-embedding + request-level
+└── tests/                           matcher-embedding + request-level + enforcement + masking
 ```
+
+**The pattern worth noting:** each capability is a **pure, DB-free rule
+module** (`governance.rs`, `tba.rs`, `lifecycle.rs`, …) with a thin
+controller over it. That is what makes the rules exhaustively
+unit-testable without a database, and it is the shape the §6.4b / §6.4c
+work should follow — a `workflow.rs`, an `okr.rs`, a `value.rs`, each
+pure.
+
+**Not present, and tracked as gaps rather than drawn as if built:**
+`links.rs` / `entity_links` (T-7) and `bulk.rs` / `bulk_jobs` (T-8).
 
 Run with `cargo loco start` (needs PostgreSQL; `auto_migrate` on in
 development). The front-end runs with `pnpm dev` against
@@ -141,14 +172,33 @@ and [`agents/share/availability.md`](../../agents/share/availability.md):
 
 ### 8.7 Positioning vs full PM suites
 
-This entity is a **registry of plan identities (organised into
-recursive containment trees) with a charter-level PM tool attached**,
-not a replacement for Jira / Asana / MS Project / Linear / GitHub
-Projects. Those tools own deep workflow, automation, and sprint
-mechanics; this registry tells the portfolio *which* plan is which,
-dedupes them, and tracks the charter-level goals / tasks / issues.
-Interop is via identifiers: a Jira project key maps to a
-`JiraProjectKey` identifier, an Asana GID to `AsanaGid`, and so on (the
-deterministic R-0 schemes), so a project synced from a source tool
-deduplicates against its registry twin in the `plans` collection. See
-§17.
+> **Reversed 2026-08-25**, in step with §1.3. This section read: *"not a
+> replacement for Jira / Asana / MS Project / Linear / GitHub Projects.
+> Those tools own deep workflow, automation, and sprint mechanics."*
+> They no longer do — §1.4 makes custom workflows, automation rules,
+> time tracking, and sprint ceremonies capabilities this entity owns.
+
+This entity is a **registry of plan identities (organised into recursive
+containment trees) that is also a full project-management suite**. Both
+faces are first-class (§1.1), and the second is no longer scoped to
+charter level: the operational record covers goals, tasks, issues,
+sprints and their ceremonies, recorded effort, configurable workflows,
+automation rules, and the sequential project phase a plan is managed
+through (§1.5), with derived views over all of it — timeline / Gantt,
+burndown, and the Flow Framework metrics (§1.6).
+
+**Architecturally the two faces stay separate**, and that is what makes
+one record able to carry both: the thin matchable `Plan` is the API DTO,
+the JSONB payload, and the matcher input, while the operational
+sub-resources live in their own tables and never enter the matcher
+payload (§5.6, §8.2). Adding suite depth therefore adds tables and
+endpoints; it does not widen what matching sees.
+
+**Interop is unchanged in mechanism and changed in purpose.** A Jira
+project key still maps to a `JiraProjectKey` identifier, an Asana GID to
+`AsanaGid`, and so on (the deterministic R-0 schemes), so a plan synced
+from a source tool still deduplicates against its registry twin in the
+`plans` collection. What those identifiers are *for* is now **migration
+and coexistence** — running alongside a tool a department has not left
+yet, and identifying the same initiative on both sides — rather than
+delegating the parts this entity declined to build. See §17.

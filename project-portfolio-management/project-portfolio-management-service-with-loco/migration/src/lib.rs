@@ -26,6 +26,15 @@ mod m20260720_000002_engineering_moderate;
 mod m20260722_000001_capabilities;
 mod m20260728_000001_integrity_digests;
 mod m20260823_000001_time_based_analysis;
+mod m20260825_000001_total_project_control;
+mod m20260825_000002_controls;
+mod m20260825_000003_phase_transitions;
+mod m20260825_000004_flow_type;
+mod m20260825_000005_workflows;
+mod m20260825_000006_key_results;
+mod m20260826_000001_effort;
+mod m20260826_000002_ceremonies;
+mod m20260826_000003_value;
 
 /// The crate's migrator: drives the ordered migration set for the loco
 /// CLI / boot-time migration.
@@ -52,6 +61,15 @@ impl MigratorTrait for Migrator {
             Box::new(m20260722_000001_capabilities::Migration),
             Box::new(m20260728_000001_integrity_digests::Migration),
             Box::new(m20260823_000001_time_based_analysis::Migration),
+            Box::new(m20260825_000001_total_project_control::Migration),
+            Box::new(m20260825_000002_controls::Migration),
+            Box::new(m20260825_000003_phase_transitions::Migration),
+            Box::new(m20260825_000004_flow_type::Migration),
+            Box::new(m20260825_000005_workflows::Migration),
+            Box::new(m20260825_000006_key_results::Migration),
+            Box::new(m20260826_000001_effort::Migration),
+            Box::new(m20260826_000002_ceremonies::Migration),
+            Box::new(m20260826_000003_value::Migration),
             // inject-above (do not remove this comment)
         ]
     }

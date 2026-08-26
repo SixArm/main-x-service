@@ -1,7 +1,7 @@
 //! Pure rules for the engineering-team features — task statuses, the
-//! honest burndown derivation, the MoSCoW tag convention, and the
+//! honest burndown derivation, the `MoSCoW` tag convention, and the
 //! milestone kinds — behind `controllers::engineering`. No I/O: the
-//! burndown only ever counts real completion stamps, and the MoSCoW
+//! burndown only ever counts real completion stamps, and the `MoSCoW`
 //! bands come from an explicit, disclosed tag convention.
 
 use std::collections::BTreeMap;

@@ -9,6 +9,251 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-26
+
+The project-management suite (entity spec §13 T-15 … T-27, landed
+2026-08-25/26): custom workflows, the OKR engine, effort and time
+tracking with per-person utilisation, sprint ceremonies, project
+phases, Flow Distribution, Total Project Control, the controls
+register, and value realization / strategic performance — plus the
+time-based-analysis completions (TBA-9/10/11) and the earlier
+unreleased hardening below. Nine migrations
+(`m20260825_000001` … `000006`, `m20260826_000001` … `000003`); the
+embedded matcher moves to 0.2 for the `Plan.phase` wire addition.
+
+### Added — custom workflows (T-15 / FR-26)
+
+Pure `src/workflow.rs`; migration `m20260825_000005_workflows` (three
+tables: `workflows`, `workflow_states`, `workflow_transitions`);
+`src/controllers/workflow.rs` — `POST`/`GET /api/workflows`,
+`DELETE /api/workflows/{pid}`, `GET /api/plans/{pid}/workflow`. The
+task **create** and **move** paths now validate against the workflow in
+force rather than a compile-time constant.
+
+- **Resolution order:** the plan's own workflow, else the deployment
+  default, else the built-in vocabulary — a plan with nothing
+  configured behaves exactly as before. **An empty transition set means
+  unconstrained**; constraint is opt-in.
+- **Schema-enforced:** every state's `category` is `NOT NULL` + CHECK
+  (an uncategorised state is impossible even by direct insert), and a
+  partial unique index makes two initial states impossible.
+- **Two defects found by testing, both fixed:** `done_at` was stamped
+  on the literal string `"done"`, so a board whose final column was
+  renamed (`shipped`) never stamped it — now stamped from the state's
+  **category** on both paths. And the TBA flow classes were keyed on
+  status names, so a custom vocabulary arrived with no classification;
+  `workflow::default_flow_classes` now derives classes from the
+  categories, overlaid with `tba::default_classes()` so the built-in
+  `in_review` stays *necessary* non-value-adding rather than silently
+  raising every untouched board's flow efficiency (pinned by a test).
+- **Not built:** a workflow edit route (withdraw and re-register);
+  issue workflows are resolvable but unused (no issues sub-resource).
+
+### Added — the OKR engine (T-16 / FR-27)
+
+Pure `src/okr.rs`; migration `m20260825_000006_key_results`
+(`key_results` + `key_result_check_ins`); `src/controllers/okr.rs` —
+`POST`/`GET /api/objectives/{pid}/key-results`,
+`POST`/`GET /api/key-results/{pid}/check-ins`,
+`GET /api/plans/{pid}/okr`.
+
+- **Key results hang off `objectives`, not `goals[]`** — the spec was
+  corrected first: `Goal` carries no identifier (addressable only by
+  array position, so a `goal_id` binding would be orphaned by any
+  reorder), while an objective has a `pid`, a `period` (the OKR cycle),
+  and weighted plan alignment through `objective_links`. The plan score
+  is weighted by that existing link weight, not a second notion of
+  importance invented for OKRs.
+- A `decrease` key result starts at its baseline and reads **0%**, not
+  100%; a check-in moves `current_value` and leaves `start_value`
+  untouched; an unmeasured objective is reported, never scored as
+  zero; start-equals-target is refused at write. `maintain` without a
+  tolerance and a `currency` metric without a currency code are
+  CHECK-refused as well as handler-validated.
+
+### Added — effort / time tracking (T-17 / FR-28)
+
+Pure `src/effort.rs`; migration `m20260826_000001_effort`
+(`time_entries`, `working_time_configs`, `non_working_periods`);
+`src/controllers/effort.rs` — `POST`/`GET
+/api/plans/{pid}/time-entries`, `GET /api/plans/{pid}/effort`,
+`POST /api/working-time`, `POST /api/non-working`,
+`GET /api/capacity/utilization`. Roll-ups per plan, task and assignee,
+every one labelled **asserted**; uncategorised effort is reported
+separately rather than folded into `opex` (which would flatter the
+capitalisable share); an entry over 1440 minutes for one date is
+refused — a day cannot hold more.
+
+### Added — per-person utilisation (T-24 / FR-35)
+
+`GET /api/capacity/utilization?by=plan|team|person`, under the five
+stated obligations of `agents/share/time-based-analysis.md` §7.1.
+
+- Somebody on leave for the whole window reports `null` with
+  `all_non_working`, **never 0%** — leave leaves the denominator, and
+  0% would read as measured idleness. No declared capacity is its own
+  reason (`no_declared_capacity`): an unknown denominator, not zero.
+- Below the suppression floor the figure is withheld with its inputs
+  still returned; team utilisation sums numerator and denominator
+  (never a mean of ratios); at or over 100% is flagged, not clamped.
+- Per-person cycle time, throughput and flow efficiency remain
+  **absent from every endpoint** — the family-wide refusal stands.
+
+### Added — sprint ceremonies (T-18 / FR-29)
+
+Migration `m20260826_000002_ceremonies` (`ceremonies` +
+`sprint_commitments`); `src/controllers/ceremony.rs` — `POST`/`GET
+/api/sprints/{pid}/ceremonies`, `POST /api/sprints/{pid}/commit`,
+`GET /api/sprints/{pid}/commitment`. The retrospective already existed
+as `sprint_notes`; this adds planning, daily and review, and the
+commitment snapshot. **The commitment is written once** — a second
+`commit` is refused (handler *and* partial unique index), because a
+rewritable commitment would let mid-sprint scope look like scope
+committed at the outset; the view **names** what was added and removed
+afterwards. Every ceremony kind is reported even at zero, so a sprint
+that never retrospected is a finding, not a missing row.
+
+### Added — project phases (T-19 / FR-30)
+
+Pure `src/phase.rs`; migration `m20260825_000003_phase_transitions`
+(denormalised `plans.phase` with a CHECK, an append-only
+`phase_transitions` log, no backfill); `src/controllers/phase.rs` —
+`PUT /api/plans/{pid}/phase`, `GET /api/plans/{pid}/phase-history`.
+
+- One-step advancement; a skip is `422` **and names the phase
+  skipped**; a backward move needs an explicit reason; an unknown token
+  is refused, not coerced. Per-phase durations partition the elapsed
+  time exactly and survive unsorted input and clock skew. `DELETE` on
+  the history is `405` — append-only expressed as an absent route.
+- The matcher gains `PlanPhase` + `Plan.phase` (0.2), informational-only
+  and pinned never-scored, following the `PlanStatus` precedent.
+- **Known gap, recorded not hidden:** `plans.phase` is not a separate
+  field in the integrity pre-image (its authoritative value rides in
+  `data`, which *is* covered); closing it means a
+  `RECORD_HASH_VERSION` bump that would read as a false tamper alarm
+  estate-wide, so it waits for a change that needs one anyway.
+
+### Added — Flow Distribution (T-20 / FR-31)
+
+Pure `src/distribution.rs`; migration `m20260825_000004_flow_type`
+(nullable CHECK-constrained `tasks.flow_type`);
+`src/controllers/distribution.rs` —
+`GET /api/plans/{pid}/flow-distribution` with the subtree rollup.
+
+- **The work type is declared, not derived** — the spec was corrected
+  first: the specified derivation read fields that do not exist
+  (`tasks` has no `goal_id`; there is no `issues` table), and would
+  have classified everything `unclassified` while appearing to work.
+- `unclassified` is **not storable** (it is the *absence* of a
+  declaration); a declared intended mix produces gaps only for the
+  types it names; a malformed intent is warned about and ignored
+  wholesale. **A bug the tests caught:** an out-of-range intended share
+  produced a gap of ≈ −9.2e18 via unchecked arithmetic — now
+  range-guarded where the arithmetic is.
+
+### Added — Total Project Control (T-25 / FR-37)
+
+Pure `src/tpc.rs` — DIPP (EMV / CEC), the progress index, banding, the
+stored-vs-computed divergence, and currency-scoped triage; money in
+minor units, ratios in basis points, **no float**. Migration
+`m20260825_000001_total_project_control` with
+`dipp_progress_index_ratio` as a Postgres **`GENERATED ALWAYS`** column
+(`NULLIF` denominator, so a zero baseline is `NULL` rather than an
+insert-time division error, and the ratio can never disagree with its
+own inputs) and a CHECK refusing a negative cost-estimate-to-complete.
+`src/controllers/tpc.rs` — `POST`/`GET /api/plans/{pid}/tpc`,
+`GET /api/plans/{pid}/tpc/report`, `GET /api/tpc` (triage).
+
+- `CEC = 0` reports `null` **with a reason**, never infinity; a
+  negative EMV is not clamped and bands `value_destroying`; triage sets
+  aside a foreign currency and an undefined DIPP rather than ranking
+  them as zero; two plans with equal remaining value and cost rank
+  identically however much has been sunk into either — the property
+  the whole metric exists for. Mapping doc:
+  `../spec/total-project-control/index.md`.
+
+### Added — the controls register (T-26 / FR-38, FR-39)
+
+Pure `src/controls.rs` — the three timings (feedforward / concurrent /
+feedback) and the response each permits, standard validation against
+the metrics the service actually produces, four comparators, and the
+coverage rollup. Migration `m20260825_000002_controls` (three tables;
+CHECKs on `timing`, `comparator`, `verdict`, `kind` — the `verdict`
+CHECK keeps `unmeasured` a real third value, so a typo cannot fall
+through as "not a fail"). `src/controllers/controls.rs` — `POST`/`GET
+/api/plans/{pid}/controls`, `GET /api/plans/{pid}/controls/coverage`,
+`GET /api/controls/coverage`, `DELETE /api/controls/{pid}`,
+`POST`/`GET /api/controls/{pid}/readings`,
+`POST /api/readings/{pid}/actions`.
+
+- An unknown metric is refused at **registration**, not left
+  permanently unmeasured; a valueless reading is `unmeasured`, not a
+  pass, and is excluded from the pass rate; a failing reading with no
+  action and no explicit `accept` appears as **unanswered**; every
+  timing appears in coverage even at zero.
+- **Open:** action → task/issue conversion (the `converted_*_pid`
+  columns exist, always `NULL` today), and registering the controls
+  that already exist in all but name (gate readiness, WIP limits, the
+  SLE, retrospectives).
+
+### Added — value realization + strategic performance (T-22 / T-23, FR-33 / FR-34 / FR-36)
+
+Pure `src/value.rs`; migration `m20260826_000003_value`
+(`business_case_targets`, `value_points`, `adoption_snapshots`,
+`satisfaction_responses`); `src/controllers/value.rs` — `POST
+/api/plans/{pid}/{business-case,value-points,adoption,satisfaction}`,
+`GET /api/plans/{pid}/{value-realization,performance}`.
+
+- **A plan with no value points is `unrealized`, never a total loss.**
+  `approved_at` has no update path, and a second first-measurable value
+  point is refused by a partial unique index — the Time-to-Value clock
+  stops once, and Time to Value is a distribution (nearest-rank
+  p50/p85), never a mean.
+- Adoption refuses a zero denominator at write and stores its own
+  `definition` and `window_days`; investment is actual cost, and
+  **mixed currencies withhold the ROI** rather than adding pounds to
+  euros (the `budget_lines` shape carries a currency per line). The
+  evidence mix (`measured_share_basis_points`) is disclosed.
+- Strategic performance: NPS always carries its response count and
+  reports `null` with `no_responses` rather than zero; responses store
+  a **role, never an identity**; **SPI and CPI report `null` with
+  `no_baseline`, never `1.0`** — a plan without a phased budget
+  baseline is unmeasured, not on plan. Not built: the phased baseline
+  itself, NPV, Strategic Alignment Index, defect density — each needs
+  an input the service does not hold.
+
+### Added — `plan_phase_changed` automation trigger (T-21 partial / FR-32)
+
+Wired into the phase controller; deliberately its **own** trigger
+rather than folded into `plan_stage_changed` — the gate stage and the
+project phase are separate ordered vocabularies, and one rule firing on
+both would fire on the wrong kind of change half the time. Phase
+filters validate against **phases**, not task statuses (pinned by
+test); the phase change commits before the rule fires, so a failing
+rule never undoes the operator's move. **Open:** field-change,
+date-arrival and SLE-breach triggers, and multi-action rules.
+
+### Added — request tests for the suite (T-27)
+
+Fourteen `#[ignore]`d request tests (`tests/requests/workflow_phase.rs`,
+`tests/requests/metrics_control.rs`, `tests/requests/effort.rs`),
+taking the DB-gated suite from 47 to 61 — each one a check previously
+performed only by hand against a running service, now in CI, with the
+assertions chosen for the *refusals*: undefined is not zero, unmeasured
+is not a pass, unclassified is not a feature, a skip names what it
+skipped. **It immediately found a real gap:** `tasks.flow_type` existed
+and Flow Distribution read it, but nothing could set it — the field was
+never added to the task-create payload (the manual pass seeded rows
+with `psql`). Fixed: `flow_type` is accepted and validated on create,
+with `unclassified` deliberately not accepted as an input.
+
+### Changed — embedded matcher 0.1 → 0.2
+
+`project-portfolio-management-matcher` 0.2.0: `Plan.phase` /
+`PlanPhase` (an additive, `#[serde(default)]` wire-format field, pinned
+never-scored). No matching behaviour changes; stored payloads
+round-trip unchanged.
+
 ### Added — cross-plan rollup (TBA-9)
 
 `GET /api/plans/{pid}/rollup`: flow across a plan and everything it
@@ -967,5 +1212,6 @@ case.
   roadmap).
 
 [Unreleased]: #unreleased
+[0.3.0]: #030---2026-08-26
+[0.2.0]: #020---2026-08-05
 [0.1.0]: #010---2026-06-18
-</content>
