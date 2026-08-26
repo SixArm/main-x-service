@@ -2,7 +2,7 @@
 
 | Component            | Technology                                        | Purpose                                     |
 | -------------------- | ------------------------------------------------- | ------------------------------------------- |
-| **Language**         | Rust 2024 Edition; MSRV **1.95** (N-3, `spec/rust-msrv-n-minus-3.md`) | Systems programming, performance, safety    |
+| **Language**         | Rust 2024 Edition; MSRV **1.95** (N-3, `spec/rust-msrv-n-minus-3/index.md`) | Systems programming, performance, safety    |
 | **Async Runtime**    | Tokio                                             | Asynchronous I/O and concurrency            |
 | **HTTP**             | tower-http                                        | HTTP layer, CORS, compression               |
 | **Web Framework**    | Axum, Loco                                        | HTTP server and routing (backend-only)      |

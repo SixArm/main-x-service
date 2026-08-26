@@ -525,7 +525,7 @@ organization is not a data subject.
   CPU-bound halves of a request, compiled in CI by the new
   `scripts/ci-check.sh bench` stage. `Cargo.toml` also declares
   `rust-version = "1.95"` — the repository's current-stable-minus-three
-  floor (`spec/rust-msrv-n-minus-3.md`), enforced by
+  floor (`spec/rust-msrv-n-minus-3/index.md`), enforced by
   `scripts/ci-check.sh msrv`.
 
 - [x] **BLK-5: async bulk import/export (organization half).** Delivers

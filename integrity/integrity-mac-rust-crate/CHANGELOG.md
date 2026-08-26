@@ -78,7 +78,7 @@ Output is byte-identical.
 ### Added — declared MSRV (Rust 1.95)
 
 `Cargo.toml` declares `rust-version = "1.95"`, the repository's current
-stable minus three floor (`spec/rust-msrv-n-minus-3.md`), sourced from
+stable minus three floor (`spec/rust-msrv-n-minus-3/index.md`), sourced from
 `ci/msrv.txt` and enforced by `scripts/ci-check.sh msrv`.
 
 ## [0.1.0] - 2026-07-27

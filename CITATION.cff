@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+title: Main X Index (main-x-service)
+message: >-
+  If you use this work and you want to cite it,
+  then you can use the metadata from this file.
+type: software
+authors:
+  - given-names: Joel Parker
+    family-names: Henderson
+    email: joel@joelparkerhenderson.com
+    affiliation: joelparkerhenderson.com
+    orcid: 'https://orcid.org/0009-0000-4681-282X'
+identifiers:
+  - type: url
+    value: 'https://github.com/sixarm/main-x-service/'
+    description: Main X Index monorepo
+repository-code: 'https://github.com/sixarm/main-x-service/'
+abstract: >-
+  Main X Index: a federated identity index implemented as a family of
+  Rust services (loco.rs, Axum, SeaORM, PostgreSQL) — entity
+  registries with probabilistic and deterministic matching, full-text
+  search, record merge, audit trails, event streaming, and SvelteKit
+  operator front-ends.
+license: See LICENSE.md

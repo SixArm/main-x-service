@@ -14,7 +14,47 @@
 > code edit + test edit) inside that crate, with its §13 updated. Do not
 > create plan/tasks files inside any crate.
 
-## 1. Current state (as of 2026-08-04, `main`)
+## 1. Current state (as of 2026-08-26, working tree)
+
+> **Refreshed 2026-08-26 by a repo-wide professionalization audit** —
+> one auditor per project family, each running research + doc/spec
+> drift audit + the real gates (`cargo fmt --check`, `clippy
+> --all-targets -- -D warnings`, `cargo test` non-DB, `pnpm check` +
+> vitest). **Every crate and front-end in the tree passed every gate
+> run** — including the uncommitted portfolio PM-suite WIP, which is
+> coherent, fully wired, and green (351 service unit tests). The
+> findings are all *truth and hygiene*, not broken code, and are
+> queued as **`tasks.md` Phase 8 (PRO-\*)** with per-item evidence.
+> The headline items:
+>
+> 1. **The `docs` CI stage is red on the working tree** (the in-flight
+>    `spec/` rename broke `scripts/ci-check.sh`'s self-exclusion) —
+>    PRO-R1/R2.
+> 2. **The repo has no LICENSE file**, and none of the special files
+>    the new `spec/special-files-for-public-repos/` calls for exist —
+>    PRO-R3.
+> 3. **Release hygiene collapsed family-wide**: multi-hundred-line
+>    `[Unreleased]` backlogs, several crates with no dated release
+>    ever, one *unreleased security fix* (integrity-mac SEC-M7), and
+>    one breaking rename (fa0d2c0f, coordinates) recorded in **no
+>    CHANGELOG** with event-service still pinned to the pre-rename
+>    crates.io matcher — PRO-H1/H2.
+> 4. **Spec-truth drift concentrated in two places**: the care-pathway
+>    crate spec has zero coverage of its two newest major features
+>    (TBA, journey links), and the case *entity-level* umbrella spec
+>    contradicts both the crate spec and itself — PRO-P13/P14; the
+>    consumer-app edition specs show the same pattern (PRO-H8).
+> 5. **Security-relevant functional gaps, all documented-but-open**:
+>    CSRF missing on five front-end BFFs (PRO-H5), CRM's privacy/ABAC
+>    production gates have no code side (PRO-P27), and one
+>    unauthenticated audit-verify endpoint (PRO-P23).
+>
+> The 2026-08-04 refresh notice below is retained as history; its
+> gap table is superseded where Phase 8 says otherwise (in
+> particular: the version-bump row — case, portfolio, link-graph and
+> the verifier all cut releases 2026-08-05, but new unreleased
+> backlogs have accumulated since, and care-pathway was skipped by
+> that pass entirely).
 
 > **This section was last refreshed 2026-08-04** (a full pass through
 > `agents/share/overview.md`'s live capability matrix, `tasks.md`'s

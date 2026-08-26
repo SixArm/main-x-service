@@ -31,8 +31,9 @@ the family-wide source of truth; the briefer versions under
 | [architecture](architecture/index.md) | System architecture — the family shape, the two service generations (loco vs older Axum), layering, cross-service integration |
 | [dataflow](dataflow/index.md) | Request/data flows — create, match, merge, search, read/masked/export, auth |
 | [tech-stack](tech-stack/index.md) | Technology stack + hard constraints (Podman/Tokio/MiMalloc/PostgreSQL/chrono) and current drift |
-| [agents-directory-name-is-lowercase.md](agents-directory-name-is-lowercase.md) | The agent reference directories are named `agents`, lowercase — the rule, why a case-only mismatch hides on macOS, and the CI stage behind it |
-| [rust-msrv-n-minus-3.md](rust-msrv-n-minus-3.md) | Minimum Supported Rust Version — the N-3 policy, how it is declared and verified, and how to bump it |
+| [agents-directory-name-is-lowercase](agents-directory-name-is-lowercase/index.md) | The agent reference directories are named `agents`, lowercase — the rule, why a case-only mismatch hides on macOS, and the CI stage behind it |
+| [rust-msrv-n-minus-3](rust-msrv-n-minus-3/index.md) | Minimum Supported Rust Version — the N-3 policy, how it is declared and verified, and how to bump it |
+| [special-files-for-public-repos](special-files-for-public-repos/index.md) | The special top-level files every public repo carries (LICENSE.md, CITATION.cff, SECURITY.md, AI_STATEMENT.md, …) |
 
 ### Data & persistence
 
@@ -41,6 +42,9 @@ the family-wide source of truth; the briefer versions under
 | [postgresql](postgresql/index.md) | PostgreSQL — version, per-service DBs, pooling, the two persistence styles, extensions, JSONB, locks, migrations, ops |
 | [data-modeling.md](data-modeling.md) | Data-modeling rules (SQL-first, child tables, discriminators, JSONB policy) |
 | [data.md](data.md) | Data conventions |
+| [latitude-longitude-as-decimal-degrees](latitude-longitude-as-decimal-degrees/index.md) | Store coordinates as decimal (NUMERIC), never float |
+| [latitude-longitude-altitude-elevation](latitude-longitude-altitude-elevation/index.md) | Geo field naming: `*_as_decimal_degrees` / `*_as_decimal_metres` |
+| [serde-json-float-roundtrip-arbitrary-precision](serde-json-float-roundtrip-arbitrary-precision/index.md) | Serde JSON float round-trip rules (arbitrary precision) |
 
 ### Domain capabilities
 
