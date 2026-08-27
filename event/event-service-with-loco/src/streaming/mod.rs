@@ -5,11 +5,11 @@
 //! downstream consumers (indexers, caches, analytics) can react.
 //! Publishing goes through the
 //! [`EventProducer`](crate::streaming::EventProducer) trait (default
-//! impl: [`InMemoryEventPublisher`](crate::streaming::producer::InMemoryEventPublisher));
-//! consumption goes through
-//! [`EventConsumer`](crate::streaming::EventConsumer). The backend is
-//! intended to be Fluvio in production but is abstracted behind the
-//! traits.
+//! impl: [`InMemoryEventPublisher`](crate::streaming::producer::InMemoryEventPublisher)).
+//! [`EventConsumer`](crate::streaming::EventConsumer) is the read-side
+//! counterpart; it currently has no implementation in this crate.
+//! Durable production delivery to Fluvio is handled separately by the
+//! outbox + relay (`src/relay.rs`), not by these two traits.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -18,8 +18,6 @@ use uuid::Uuid;
 use crate::Result;
 use crate::models::Event;
 
-/// Consumer implementations (stub).
-pub mod consumer;
 /// Canonical durable-bus envelope + transport selector (event-bus.md
 /// §4/§7). Sits alongside the legacy [`EventEvent`] ring buffer.
 pub mod envelope;

@@ -42,8 +42,8 @@ src/
 |---|---|
 | `EventRepository` | `SeaOrmEventRepository` |
 | `EventMatcher` | `ProbabilisticMatcher`, `DeterministicMatcher` |
-| `EventProducer` (legacy in-process ring buffer) | `InMemoryEventPublisher`; `FluvioProducer` also exists but is dead code (`todo!()`, never constructed) — production delivery went a different route, below |
-| `EventConsumer` | stub |
+| `EventProducer` (legacy in-process ring buffer) | `InMemoryEventPublisher` — production delivery went a different route, below (the dead `FluvioProducer` stub was removed, PRO-H4) |
+| `EventConsumer` | none — the dead `FluvioConsumer` stub was removed (PRO-H4) |
 | `EventSink` (durable-bus relay, `src/relay.rs`, T-11) | `LoggingSink` (default, no broker); `FluvioSink` (BUS-3, real broker, behind the `fluvio` Cargo feature — off by default) |
 
 ### 8.4 Application state

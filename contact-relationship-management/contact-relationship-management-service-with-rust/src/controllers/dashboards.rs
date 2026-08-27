@@ -7,12 +7,12 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::IntoResponse;
 use loco_rs::prelude::*;
-use sea_orm::{PaginatorTrait, QueryOrder, QuerySelect};
+use sea_orm::{QueryOrder, QuerySelect};
 use serde::Deserialize;
 
 use super::sales;
 use crate::metrics::Metrics;
-use crate::models::_entities::{accounts, activities, deals, pipeline_stages, tickets};
+use crate::models::_entities::{activities, deals, tickets};
 use crate::models::records;
 use crate::rules::{analytics, sla};
 
@@ -183,15 +183,6 @@ async fn activity_dashboard(
         "by_kind": by_kind,
         "as_of": chrono::Utc::now(),
     }))
-}
-
-/// Keep the helper imports honest (`accounts` + `pipeline_stages` are
-/// used through the finders).
-#[allow(dead_code)]
-async fn _touch(db: &DatabaseConnection) -> Result<u64> {
-    let a = accounts::Entity::find().count(db).await?;
-    let s = pipeline_stages::Entity::find().count(db).await?;
-    Ok(a + s)
 }
 
 /// The dashboard routes.

@@ -50,5 +50,3 @@ pub mod secret_hash;
 pub mod tasks;
 /// HTTP response view types.
 pub mod views;
-/// Background workers.
-pub mod workers;
