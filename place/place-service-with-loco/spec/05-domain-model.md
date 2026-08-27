@@ -18,7 +18,8 @@ Material aspects:
 - **Address** — `PostalAddress` (`street_address`,
   `address_locality`, `address_region`, `address_country`,
   `postal_code`).
-- **Geo** — `GeoCoordinates` (`latitude`, `longitude`, `elevation`),
+- **Geo** — `GeoCoordinates` (`latitude_as_decimal_degrees`,
+  `longitude_as_decimal_degrees`, `elevation_as_decimal_metres`),
   exact decimals — see §5.2.1.
 - **Hierarchy** — `contained_in_place` (parent UUID) + transitive
   `contains_place` (children).
@@ -40,7 +41,8 @@ Material aspects:
 
 #### 5.2.1 Geo coordinates are exact decimals
 
-`GeoCoordinates::latitude` / `longitude` / `elevation` are
+`GeoCoordinates::latitude_as_decimal_degrees` /
+`longitude_as_decimal_degrees` / `elevation_as_decimal_metres` are
 **`BigDecimal`**, stored in `NUMERIC` columns — not `f64` /
 `DOUBLE PRECISION`.
 
@@ -62,8 +64,9 @@ Four consequences the implementation MUST preserve:
 - **The wire format is a JSON number, not a string.** `BigDecimal`'s
   default serde representation is a quoted string; these fields opt into
   `bigdecimal::impl_serde::arbitrary_precision` (and
-  `arbitrary_precision_option` for `elevation`) so the JSON is unchanged
-  from when they were `f64`. This holds for the FHIR `Location.position`
+  `arbitrary_precision_option` for `elevation_as_decimal_metres`) so the
+  JSON is unchanged from when they were `f64`. This holds for the FHIR
+  `Location.position`
   surface too, where FHIR's own `decimal` type is arbitrary-precision by
   spec.
 - **Matching converts at the boundary.** Haversine is trigonometry, so
@@ -88,10 +91,12 @@ Four consequences the implementation MUST preserve:
 The implementation MUST enforce:
 
 - `name` is non-empty.
-- `geo.latitude ∈ [-90, 90]`, `geo.longitude ∈ [-180, 180]` when
-  present, inclusive.
+- `geo.latitude_as_decimal_degrees ∈ [-90, 90]`,
+  `geo.longitude_as_decimal_degrees ∈ [-180, 180]` when present,
+  inclusive.
 - A geo coordinate carries at most `MAX_COORDINATE_SCALE` (10) decimal
-  places — `latitude`, `longitude`, and `elevation` alike. An `f64`
+  places — `latitude_as_decimal_degrees`, `longitude_as_decimal_degrees`,
+  and `elevation_as_decimal_metres` alike. An `f64`
   bounded the digit count implicitly; an exact decimal does not, so the
   cap is enforced rather than left to the database to truncate silently.
   Ten places is ~10 µm — past any real positioning system, and inside

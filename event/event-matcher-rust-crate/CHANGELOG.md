@@ -10,6 +10,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+### Added — `tags` weighted component (spec-first; implementation pending)
+
+Spec added the operator-applied **tags** match component
+([§3 `Event.tags` field](./spec/03-data-model.md),
+[§6.12 `tags_score`](./spec/06-per-field-scoring-algorithms.md),
+[§7 `tags_weight` = 0.05](./spec/07-configuration.md), and
+`MatchBreakdown::tags_score`). **Implementation is pending** — this
+entry tracks the code follow-up:
+
+- Add `tags: Vec<String>` to `Event` (default empty); add the `tags` /
+  `add_tag` builder setters mirroring `keywords`.
+- Implement `tags_score`: plain set Jaccard over case-insensitively
+  normalised tags (trim + ASCII lowercase, empties dropped); `None`
+  when either side empty (§6.12).
+- Add `tags_weight` (default `0.05`) to `MatchConfig`; include `tags`
+  in the renormalised weighted average; add `tags_score` to
+  `MatchBreakdown`.
+- Wire the service adapter (`to_matcher_event`) to route the service
+  `tags` field (event-entity spec §5.3) + a bridge test.
+- Unit tests (overlap Jaccard, empty-skip); `cargo test` +
+  `cargo clippy --all-targets -- -D warnings` clean.
+
+### Added — `relationships` weighted component (spec-first; implementation pending)
+
+Spec added the typed event-to-event **relationships** match component
+([§3 `Event.relationships` field + `RelationshipRef` / `RelationKind`](./spec/03-data-model.md),
+[§6.11 `relationships_score`](./spec/06-per-field-scoring-algorithms.md),
+[§7 `relationships_weight` = 0.05](./spec/07-configuration.md), and
+`MatchBreakdown::relationships_score`). **Implementation is pending** — this
+entry tracks the code follow-up:
+
+- Add `relationships: Vec<RelationshipRef>` to `Event` + `RelationshipRef`
+  / `RelationKind` (`Outer` / `Inner` / `ImmediatelyBefore` /
+  `ImmediatelyAfter`; `#[non_exhaustive]`); re-export from `lib.rs`; add the
+  `relationships` / `add_relationship` builder setters.
+- Implement `relationships_score`: typed-set Jaccard over `(relation,
+  event_id)` pairs; `None` when either side empty (§6.11).
+- Add `relationships_weight` (default `0.05`) to `MatchConfig`; include
+  `relationships` in the renormalised weighted average; add
+  `relationships_score` to `MatchBreakdown`.
+- Wire the service adapter (`to_matcher_event`) to route the service
+  `relationships` field (event-entity spec §5.3) + a bridge test.
+- Unit tests (kind-keyed agreement, empty-skip); `cargo test` +
+  `cargo clippy --all-targets -- -D warnings` clean.
+
+## [0.7.0] - 2026-08-24
+
+### Changed — coordinate fields named for their units (BREAKING)
+
+- **`Location::latitude` / `Location::longitude` renamed to
+  `latitude_as_decimal_degrees` / `longitude_as_decimal_degrees`**,
+  across the Rust struct, the `Location` builder setters
+  (`with_latitude`/`with_longitude` keep their names but now set the
+  renamed field), and the serde JSON wire format — there is no serde
+  alias for the old keys, so this is a breaking change for any caller
+  constructing a `Location` by struct literal (blocked by
+  `#[non_exhaustive]`) or deserialising JSON that used the old field
+  names.
+- The companion to the place-matcher rename landing the same day (same
+  commit, both matcher crates): the fields now say what unit they hold,
+  so a reader cannot mistake degrees for radians without opening the
+  spec.
+- Version bumped `0.6.1` → `0.7.0` under semver: a public field rename
+  is breaking.
+
 ### Added — declared MSRV (Rust 1.95)
 
 - `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
@@ -82,51 +147,6 @@ the family-wide matcher-crate doc audit:
   `tests/integration_tests.rs` (builder chains and long `println!`/
   `assert!` lines were not rustfmt-formatted); `cargo fmt --check` is
   clean again. No behaviour change.
-
-### Added — `tags` weighted component (spec-first; implementation pending)
-
-Spec added the operator-applied **tags** match component
-([§3 `Event.tags` field](./spec/03-data-model.md),
-[§6.12 `tags_score`](./spec/06-per-field-scoring-algorithms.md),
-[§7 `tags_weight` = 0.05](./spec/07-configuration.md), and
-`MatchBreakdown::tags_score`). **Implementation is pending** — this
-entry tracks the code follow-up:
-
-- Add `tags: Vec<String>` to `Event` (default empty); add the `tags` /
-  `add_tag` builder setters mirroring `keywords`.
-- Implement `tags_score`: plain set Jaccard over case-insensitively
-  normalised tags (trim + ASCII lowercase, empties dropped); `None`
-  when either side empty (§6.12).
-- Add `tags_weight` (default `0.05`) to `MatchConfig`; include `tags`
-  in the renormalised weighted average; add `tags_score` to
-  `MatchBreakdown`.
-- Wire the service adapter (`to_matcher_event`) to route the service
-  `tags` field (event-entity spec §5.3) + a bridge test.
-- Unit tests (overlap Jaccard, empty-skip); `cargo test` +
-  `cargo clippy --all-targets -- -D warnings` clean.
-
-### Added — `relationships` weighted component (spec-first; implementation pending)
-
-Spec added the typed event-to-event **relationships** match component
-([§3 `Event.relationships` field + `RelationshipRef` / `RelationKind`](./spec/03-data-model.md),
-[§6.11 `relationships_score`](./spec/06-per-field-scoring-algorithms.md),
-[§7 `relationships_weight` = 0.05](./spec/07-configuration.md), and
-`MatchBreakdown::relationships_score`). **Implementation is pending** — this
-entry tracks the code follow-up:
-
-- Add `relationships: Vec<RelationshipRef>` to `Event` + `RelationshipRef`
-  / `RelationKind` (`Outer` / `Inner` / `ImmediatelyBefore` /
-  `ImmediatelyAfter`; `#[non_exhaustive]`); re-export from `lib.rs`; add the
-  `relationships` / `add_relationship` builder setters.
-- Implement `relationships_score`: typed-set Jaccard over `(relation,
-  event_id)` pairs; `None` when either side empty (§6.11).
-- Add `relationships_weight` (default `0.05`) to `MatchConfig`; include
-  `relationships` in the renormalised weighted average; add
-  `relationships_score` to `MatchBreakdown`.
-- Wire the service adapter (`to_matcher_event`) to route the service
-  `relationships` field (event-entity spec §5.3) + a bridge test.
-- Unit tests (kind-keyed agreement, empty-skip); `cargo test` +
-  `cargo clippy --all-targets -- -D warnings` clean.
 
 ## [0.6.1] - 2026-06-15
 

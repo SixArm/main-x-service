@@ -41,8 +41,8 @@ The "Scored" column distinguishes fields the probabilistic matcher uses (§6) fr
 |---|---|---|---|
 | `name` | `Option<String>` | yes (§6.1) | Primary canonical name, e.g. `"Eiffel Tower"`. |
 | `alternate_names` | `Vec<String>` | yes (§6.1) | Aliases / endonyms / translations, e.g. `["La Tour Eiffel", "Tour Eiffel"]`. Default empty. |
-| `latitude` | `Option<f64>` | yes (§6.3) | Decimal degrees. Conventionally `[-90.0, 90.0]`. |
-| `longitude` | `Option<f64>` | yes (§6.3) | Decimal degrees. Conventionally `[-180.0, 180.0]`. |
+| `latitude_as_decimal_degrees` | `Option<f64>` | yes (§6.3) | Decimal degrees. Conventionally `[-90.0, 90.0]`. |
+| `longitude_as_decimal_degrees` | `Option<f64>` | yes (§6.3) | Decimal degrees. Conventionally `[-180.0, 180.0]`. |
 | `category` | `Option<PlaceCategory>` | yes (§6.5) | Coarse-grained classification (§3.4). |
 | `place_ids` | `Vec<PlaceId>` | yes (§6.7) | External scheme-scoped identifiers. Sharing any pair is a deterministic match. |
 | `address` | `Option<Address>` | yes (§6.4) | Postal address (§3.3). Optional; partial addresses are first-class. |

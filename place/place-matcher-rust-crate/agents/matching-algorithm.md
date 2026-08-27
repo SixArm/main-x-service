@@ -93,7 +93,7 @@ The default scale `50` m is tuned for venue precision (cafes, monuments) where m
 
 `Scorer::haversine_metres` uses the great-circle formula on a sphere of mean Earth radius `6_371_000` m. It is total over `f64`: non-finite inputs produce `NaN` (no panic). The implementation handles equator and date-line crossings correctly.
 
-The matcher only produces a coordinates score when both records carry finite `latitude`, `longitude` values inside the conventional `[-90, 90]` / `[-180, 180]` ranges. Anything else yields `coordinates_score = None`.
+The matcher only produces a coordinates score when both records carry finite `latitude_as_decimal_degrees`, `longitude_as_decimal_degrees` values inside the conventional `[-90, 90]` / `[-180, 180]` ranges. Anything else yields `coordinates_score = None`.
 
 ## Best-of-cartesian-product name scoring
 
@@ -138,13 +138,13 @@ The full set of worked examples lives in `spec.md` §11. Two highlights:
 let a = Place::builder()
     .name("Eiffel Tower")
     .add_alternate_name("La Tour Eiffel")
-    .latitude(48.858_222).longitude(2.294_500)
+    .latitude_as_decimal_degrees(48.858_222).longitude_as_decimal_degrees(2.294_500)
     .category(PlaceCategory::Monument)
     .country_code_as_iso_3166_1_alpha_2("FR")
     .build();
 let b = Place::builder()
     .name("Tour Eiffel")
-    .latitude(48.858_3).longitude(2.294_5)
+    .latitude_as_decimal_degrees(48.858_3).longitude_as_decimal_degrees(2.294_5)
     .category(PlaceCategory::Monument)
     .country_code_as_iso_3166_1_alpha_2("FR")
     .build();
@@ -157,13 +157,13 @@ assert!(r.is_match);
 ```rust
 let manhattan = Place::builder()
     .name("Starbucks")
-    .latitude(40.7589).longitude(-73.9851)
+    .latitude_as_decimal_degrees(40.7589).longitude_as_decimal_degrees(-73.9851)
     .category(PlaceCategory::Cafe)
     .country_code_as_iso_3166_1_alpha_2("US")
     .build();
 let los_angeles = Place::builder()
     .name("Starbucks")
-    .latitude(34.0522).longitude(-118.2437)
+    .latitude_as_decimal_degrees(34.0522).longitude_as_decimal_degrees(-118.2437)
     .category(PlaceCategory::Cafe)
     .country_code_as_iso_3166_1_alpha_2("US")
     .build();

@@ -457,7 +457,10 @@ mod tests {
         let m = to_matcher_event(&e);
         let loc = m.location.as_ref().unwrap();
         assert_eq!(loc.venue_name.as_deref(), Some("Greek Theatre"));
-        assert_eq!(loc.latitude, Some("37.8730".parse().unwrap()));
+        assert_eq!(
+            loc.latitude_as_decimal_degrees,
+            Some("37.8730".parse().unwrap())
+        );
     }
 
     /// A `Virtual` location carries its URL into `virtual_url`.

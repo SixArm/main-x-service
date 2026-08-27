@@ -82,9 +82,10 @@ feature-gated, `#[ignore]`d live-broker round-trip.
 `Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's
 production image. **Build context must be the repository root**, not
 this directory — this crate's sibling path dependencies
-(`integrity-mac`, `authentication-verifier`; its matcher,
-`event-matcher`, is a crates.io registry dependency, not a path
-dependency) live outside `event/event-service-with-loco/`:
+(`integrity-mac`, `authentication-verifier`, and — since the
+coordinate-field rename, PRO-H2 — its matcher `event-matcher`, pending
+a 0.7.0 crates.io publish, see `Cargo.toml`) live outside
+`event/event-service-with-loco/`:
 
 ```sh
 podman build -f event/event-service-with-loco/Dockerfile \

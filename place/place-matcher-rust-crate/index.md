@@ -29,15 +29,15 @@ use place_matcher::{MatchingEngine, Place};
 
 let a = Place::builder()
     .name("Eiffel Tower")
-    .latitude(48.858_222)
-    .longitude(2.294_500)
+    .latitude_as_decimal_degrees(48.858_222)
+    .longitude_as_decimal_degrees(2.294_500)
     .build();
 
 let b = Place::builder()
     .name("La Tour Eiffel")
     .add_alternate_name("Eiffel Tower")
-    .latitude(48.858_3)
-    .longitude(2.294_5)
+    .latitude_as_decimal_degrees(48.858_3)
+    .longitude_as_decimal_degrees(2.294_5)
     .build();
 
 let engine = MatchingEngine::default_config();
@@ -75,7 +75,7 @@ Identical normalised name plus identical normalised postcode is also accepted as
 |---|---|---|
 | `name` | `Option<String>` | Primary canonical name. |
 | `alternate_names` | `Vec<String>` | Aliases, endonyms, translations. The matcher takes the best score across the cartesian product. |
-| `latitude`, `longitude` | `Option<f64>` | Decimal degrees. Non-finite or out-of-range values are treated as missing by the coordinates scorer. |
+| `latitude_as_decimal_degrees`, `longitude_as_decimal_degrees` | `Option<f64>` | Decimal degrees. Non-finite or out-of-range values are treated as missing by the coordinates scorer. |
 | `category` | `Option<PlaceCategory>` | Coarse-grained category (Hotel, Restaurant, Museum, …). `#[non_exhaustive]`. |
 | `place_ids` | `Vec<PlaceId>` | External scheme-scoped identifiers (Google, OSM, Wikidata, GeoNames, Foursquare, Here, Mapbox, Other). |
 | `address` | `Option<Address>` | Postal address. Partial addresses (postcode only, say) are first-class. |
