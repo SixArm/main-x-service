@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-08-21
 
 ### Added — declared MSRV (Rust 1.95)
 
@@ -55,7 +56,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so a `"0000000"` sentinel shared by two people cannot short-circuit to
   a 1.0 match. New unit tests pin all three guards.
 
-### Changed — date handling on `chrono` (0.6.0)
+## [0.6.1] - 2026-06-10
+
+### Fixed
+
+- Moved `#![forbid(unsafe_code)]`, `#![deny(missing_docs)]`, and
+  `#![warn(clippy::pedantic)]` — plus the MUSL-target `MiMalloc`
+  `#[global_allocator]` wiring — from `src/lib.rs` to `src/main.rs`,
+  where they belong for a library-plus-demo-binary crate; the library
+  itself installs no global allocator. Along the way, fixed a doubled
+  lint path, `clippy::clippy::pedantic`, that had been silently
+  swallowing the intended `clippy::pedantic` lint. No change to the
+  library's public API or behaviour for downstream consumers; the demo
+  binary (`cargo run`) now correctly picks up MiMalloc under MUSL and
+  runs under the intended pedantic lint.
+
+## [0.6.0] - 2026-06-09
+
+### Changed — date handling on `chrono`
 
 - Bumped to 0.6.0. The crate's date handling is fully on `chrono`
   (`chrono::NaiveDate`); every doc reference (`spec.md`, `index.md`,
@@ -84,6 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   table) and cross-referenced from `spec.md` (§18.5 for person /
   worker — full §1–§25 shape; §9 callout for place / thing / event —
   shorter §1–§13 shape).
+
+## [0.5.0] - 2026-06-01
 
 ### Added (spec/code drift CI check, T-7)
 - First CI workflow in the repo: `.github/workflows/spec-drift.yml`. Runs on every pull request to `main`. Fetches full git history and invokes `scripts/spec-drift-check.sh` to enforce that any `src/matcher.rs` change is accompanied by a `spec.md` update in the same PR.
