@@ -8,6 +8,7 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-27
 
 ### Added — TSV bulk import/export, and fuzzed row decoders
 
