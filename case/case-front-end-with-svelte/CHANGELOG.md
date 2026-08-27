@@ -8,6 +8,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-08-04
 ### Fixed — Playwright stub matched the pre-BFF path (DOC-4, 2026-08-04)
 
 - **All 8 e2e smoke tests were silently broken.** `stubApi()` in

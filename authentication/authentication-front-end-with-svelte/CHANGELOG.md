@@ -10,6 +10,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-08-04
+
 ### Added
 
 - 2026-07-19 — SVAR component seams: **@svar-ui/svelte-calendar**,
