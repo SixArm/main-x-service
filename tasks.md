@@ -6455,30 +6455,45 @@ crate above.
 
 ### PRO-H — family-wide hygiene sweeps
 
-- [ ] **PRO-H1 (M)** **Release-cut sweep.** Nearly every CHANGELOG has a
-  large `[Unreleased]` backlog; several crates have *never* cut a dated
-  release despite real versions. Worst offenders: worker-service
-  (639-line Unreleased, **no release section ever**, Cargo 0.5.0),
-  event-service (531, none ever), thing-service (462), person-service
-  (~440 since 0.5.0), care-pathway-service (337 since 0.1.0 — skipped
-  by the 2026-08-05 H-5 release pass), person-matcher and worker-matcher
-  (0.4→0.6.x releases recorded only as prose *inside* Unreleased),
-  plus first-ever release cuts owed by most front-ends and the
-  authentication trio. Also: **integrity-mac ships the SEC-M7
-  security fix unreleased** (cut 0.2.0 + tag), and link-graph's
-  CHANGELOG has **two `[Unreleased]` headings** (lines 15 and 868 —
-  retire the historic one). One sweep, one convention, tags included.
-- [ ] **PRO-H2 (M)** **Repair the fa0d2c0f coordinate-rename aftermath**
-  (a three-part-change violation: code landed, docs/changelogs didn't):
-  place-matcher and event-matcher are 0.7.0 with a breaking field
-  rename (`latitude` → `latitude_as_decimal_degrees` etc.) recorded in
-  **no CHANGELOG**; event-service still consumes crates.io
-  `event-matcher = "0.6.1"` instead of the renamed sibling 0.7.0;
-  place-service `index.md:74` shows a curl example that no longer
-  round-trips (no serde alias for old keys); place matcher+service
-  specs and `agents/` docs half-updated; place's raw-SQL `migrations/`
-  mirror lacks the 2026-08-24 rename migration. Fix all of it in one
-  pass and record the rename where it happened.
+- [x] **PRO-H1 (M)** *(done 2026-08-27)* **Release-cut sweep.** Cut in
+  five landed batches, each independently re-verified (fmt + clippy
+  `-D warnings` + `cargo test` green) before merge: worker-service
+  0.5.0→**0.6.0**, thing-service 0.5.0→**0.6.0**, person-service
+  0.5.0→**0.6.0**, event-service 0.5.0→**0.6.0**, care-pathway-service
+  0.1.0→**0.2.0** (bringing it in line with the 2026-08-05 sibling
+  pass); person-matcher and worker-matcher both 0.6.1→**0.6.2**, with
+  their whole 0.5.0/0.6.0/0.6.1 history reconstructed into proper dated
+  sections from `git log` evidence (0.4.0 never existed — the version
+  jumped 0.3.0→0.5.0 directly, confirmed rather than assumed);
+  organization-matcher, organization-front-end, case-front-end, and
+  authentication-front-end each cut their **first-ever** release at
+  their existing manifest version, dated from internal CHANGELOG
+  evidence; authentication-service 0.1.0→**0.1.1** (an MSRV-only
+  Unreleased folded into a patch); integrity-mac 0.1.0→**0.2.0** for
+  the previously-unreleased SEC-M7 security fix (now under its own
+  `### Security` heading); link-graph's duplicate `[Unreleased]`
+  heading (lines 15 and 868) retired to exactly one, at the top, no
+  version change (already correctly 0.2.0 from 2026-08-05). Not tagged
+  yet — see the next session for `git tag` + `cargo publish` on the
+  crates.io-eligible matchers (person, worker; organization is a new
+  publish candidate now that it has real release hygiene).
+- [x] **PRO-H2 (M)** *(done 2026-08-27)* **Repair the fa0d2c0f
+  coordinate-rename aftermath.** place-matcher and event-matcher both
+  gained a proper `## [0.7.0] - 2026-08-24` CHANGELOG entry for the
+  breaking rename; event-service switched off the stale crates.io
+  `event-matcher = "0.6.1"` pin to a path dependency on the renamed
+  sibling (0.7.0 is not yet published — noted in AGENTS.md as a future
+  revert-to-version-pin candidate), and its two call sites still using
+  bare `latitude`/`longitude` were fixed; place-service's broken
+  `index.md` curl example, both crates' half-updated specs and
+  `agents/` docs, and place's raw-SQL `migrations/` mirror (missing the
+  2026-08-24 rename migration) are all fixed. place-service's own
+  0.6.1 pin on place-matcher is deliberately untouched (documented in
+  its AGENTS.md, out of scope). Verified: all four crates + two
+  migration sub-crates green (fmt, clippy `-D warnings`, cargo test —
+  place-matcher 320, event-matcher 296, place-service 345, event-service
+  193, all 0 failures) both by the landing agent and independently by
+  the merging session.
 - [ ] **PRO-H3 (M)** **Cargo metadata sweep.** (a) `license` +
   `description` missing in ~20 manifests: organization-, care-pathway-,
   case-folder-, link-graph-adjacent service crates and **every**
