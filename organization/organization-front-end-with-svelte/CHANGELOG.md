@@ -8,6 +8,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md), [README.md](./README.md), [AGENTS.md](./AGENTS.md).
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-08-04
 ### Added — `/review` upgraded to the person T-25 standard (2026-08-04, FE-4)
 
 - `?status=`/`?limit=` filters on `GET /api/organizations/review-queue`
