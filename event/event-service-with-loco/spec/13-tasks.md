@@ -95,13 +95,17 @@ clearly described manual check confirms the acceptance criterion.
   transaction as the entity change) + relay (`src/relay.rs`) +
   `EventSink` trait, with `FluvioSink` as the real-broker
   implementation (BUS-3, behind the `fluvio` Cargo feature, off by
-  default). **`FluvioProducer`** (`src/streaming/producer.rs`) is
-  therefore dead code: it still carries its original `todo!()` body,
-  is not constructed anywhere (`AppState` only ever builds
-  `InMemoryEventPublisher`), and is not reachable from any router.
-  Left in place rather than deleted by this docs-only pass — a code
-  change belongs to a follow-up cleanup PR, not a spec/doc audit — but
-  the acceptance below is retargeted to what actually ships.
+  default). **`FluvioProducer`** (`src/streaming/producer.rs`) was
+  therefore dead code: it still carried its original `todo!()` body,
+  was not constructed anywhere (`AppState` only ever builds
+  `InMemoryEventPublisher`), and was not reachable from any router.
+  The follow-up cleanup PR promised in the prior DOC-2 pass landed
+  (PRO-H4): `FluvioProducer` and the equally-dead `FluvioConsumer`
+  (`src/streaming/consumer.rs`, same `todo!()` shape, also never
+  constructed) are both deleted, along with the now-empty
+  `consumer.rs` module. `EventProducer`/`EventConsumer` and
+  `InMemoryEventPublisher` are unaffected; the acceptance below is
+  retargeted to what actually ships.
   - **Acceptance:** met via T-11 — `tests/fluvio_relay.rs` is a
     `#[cfg(feature = "fluvio")]`, `#[ignore]`d round-trip (create under
     `EventTransport::Outbox` → `FluvioSink` → `drain_once` → assert

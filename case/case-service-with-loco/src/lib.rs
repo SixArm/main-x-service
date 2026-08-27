@@ -49,4 +49,3 @@ pub mod tasks;
 pub mod validation;
 /// Header-based API versioning (`Accepts-version`) for the REST surface.
 pub mod version;
-pub mod workers;

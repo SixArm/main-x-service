@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use loco_rs::{
     Result,
     app::{AppContext, Hooks, Initializer},
-    bgworker::{BackgroundWorker, Queue},
+    bgworker::Queue,
     boot::{BootResult, StartMode, create_app},
     config::Config,
     controller::AppRoutes,
@@ -26,7 +26,6 @@ use crate::{
     controllers,
     models::_entities::{auth_events, sessions, users},
     tasks,
-    workers::downloader::DownloadWorker,
 };
 
 /// Loco application type. Implements [`Hooks`] to wire up routes,
@@ -92,14 +91,13 @@ impl Hooks for App {
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
     }
-    /// Register background workers on the Postgres-backed queue. Only the
-    /// scaffold [`DownloadWorker`] is wired today.
+    /// Register background workers on the Postgres-backed queue. None are
+    /// wired today; the queue config stays in place for a future worker.
     ///
     /// # Errors
     ///
     /// Propagates queue registration failures.
-    async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
-        queue.register(DownloadWorker::build(ctx)).await?;
+    async fn connect_workers(_ctx: &AppContext, _queue: &Queue) -> Result<()> {
         Ok(())
     }
 

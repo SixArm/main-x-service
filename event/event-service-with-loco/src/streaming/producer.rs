@@ -1,9 +1,10 @@
 //! [`EventProducer`](crate::streaming::EventProducer) implementations.
 //!
 //! [`InMemoryEventPublisher`](crate::streaming::producer::InMemoryEventPublisher)
-//! keeps published events in a `Mutex<Vec>` for development and tests;
-//! [`FluvioProducer`](crate::streaming::producer::FluvioProducer) is the
-//! production placeholder backed by Fluvio.
+//! keeps published events in a `Mutex<Vec>` for development and tests.
+//! Production delivery to Fluvio is handled by the durable outbox +
+//! relay (`src/relay.rs`, `EventSink`/`FluvioSink`) instead of this
+//! trait — see spec §13 T-4.
 
 use super::{EventEvent, EventProducer};
 use crate::Result;
@@ -82,18 +83,5 @@ impl EventProducer for InMemoryEventPublisher {
 
         self.events.lock().unwrap().push(event);
         Ok(())
-    }
-}
-
-/// Production [`EventProducer`] backed by Fluvio (not yet implemented).
-pub struct FluvioProducer {
-    // Fluvio producer will be initialized here
-}
-
-impl EventProducer for FluvioProducer {
-    /// Publish to Fluvio. Currently unimplemented (`todo!`).
-    fn publish(&self, _event: EventEvent) -> Result<()> {
-        // TODO: Implement Fluvio event publishing
-        todo!("Implement Fluvio event publishing")
     }
 }

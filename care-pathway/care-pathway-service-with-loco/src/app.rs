@@ -28,7 +28,7 @@ use crate::{
     auth, controllers,
     models::_entities::{audit_logs, care_pathways, merge_records},
     tasks,
-    workers::{bulk_export::BulkExportWorker, downloader::DownloadWorker},
+    workers::bulk_export::BulkExportWorker,
 };
 
 /// Blanket `/api/*` auth-enforcement middleware. Reads the flag,
@@ -163,14 +163,13 @@ impl Hooks for App {
             )))
     }
 
-    /// Register background workers with the queue — currently just the
-    /// placeholder [`DownloadWorker`].
+    /// Register background workers with the queue — currently just
+    /// [`BulkExportWorker`].
     ///
     /// # Errors
     ///
     /// Propagates queue-registration errors.
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
-        queue.register(DownloadWorker::build(ctx)).await?;
         queue.register(BulkExportWorker::build(ctx)).await?;
         Ok(())
     }

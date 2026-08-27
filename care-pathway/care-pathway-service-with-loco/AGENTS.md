@@ -186,8 +186,7 @@ src/
 │   ├── mod.rs               durable bulk_jobs table + artifact store, shared by FHIR $export (native bulk import/export is future work)
 │   └── store.rs              ArtifactStore trait + local-filesystem dev backend
 ├── workers/
-│   ├── bulk_export.rs        bg_pg worker materialising FHIR $export NDJSON off the request path
-│   └── downloader.rs         placeholder worker
+│   └── bulk_export.rs        bg_pg worker materialising FHIR $export NDJSON off the request path
 ├── tasks/
 │   ├── search.rs             `cargo loco task` Tantivy reindex + boot-time reindex-if-empty
 │   ├── integrity_key.rs      generate/check/report the MAC root key (never logs the key)

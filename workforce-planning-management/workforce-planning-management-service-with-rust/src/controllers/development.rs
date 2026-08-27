@@ -11,8 +11,8 @@ use uuid::Uuid;
 use super::{ensure_valid, unprocessable};
 use crate::auth::MaybeAuthUser;
 use crate::models::_entities::{
-    employees, feedback_entries, goals, review_cycles, reviews, succession_candidates,
-    succession_plans, training_enrollments,
+    feedback_entries, goals, review_cycles, reviews, succession_candidates, succession_plans,
+    training_enrollments,
 };
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
@@ -922,13 +922,6 @@ async fn update_succession_candidate(
     )
     .await?;
     format::json(updated)
-}
-
-/// Employee-existence helper used by list handlers above (kept for
-/// symmetry with the sibling controllers).
-#[allow(dead_code)]
-async fn ensure_employee(db: &DatabaseConnection, pid: Uuid) -> Result<employees::Model> {
-    records::find_employee(db, pid).await
 }
 
 /// The development routes.

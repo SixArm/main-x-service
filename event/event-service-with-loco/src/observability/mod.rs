@@ -5,10 +5,8 @@
 //! attributes;
 //! [`shutdown_telemetry`](crate::observability::shutdown_telemetry)
 //! flushes the tracer provider on shutdown. OTLP export wiring is
-//! stubbed pending exporter selection.
-//! [`custom_metrics`](crate::observability::custom_metrics) sketches the
-//! OpenTelemetry metric set (the live Prometheus metrics are in
-//! [`crate::metrics`]).
+//! stubbed pending exporter selection. The live Prometheus metrics are
+//! in [`crate::metrics`].
 
 use opentelemetry::{KeyValue, global};
 use opentelemetry_sdk::Resource;
@@ -58,43 +56,4 @@ pub fn init_telemetry(config: &ObservabilityConfig) -> Result<()> {
 /// Flush and shut down the global OpenTelemetry tracer provider.
 pub fn shutdown_telemetry() {
     global::shutdown_tracer_provider();
-}
-
-/// OpenTelemetry custom-metric definitions for the service.
-pub mod custom_metrics {
-    use opentelemetry::metrics::{Counter, Histogram};
-
-    /// Bundle of OpenTelemetry instruments for service operations.
-    pub struct EventMetrics {
-        /// Count of events created.
-        pub event_created: Counter<u64>,
-        /// Count of events updated.
-        pub event_updated: Counter<u64>,
-        /// Count of events deleted.
-        pub event_deleted: Counter<u64>,
-        /// Count of match operations.
-        pub event_matched: Counter<u64>,
-        /// Distribution of match scores.
-        pub match_score: Histogram<f64>,
-        /// Distribution of API request durations.
-        pub api_request_duration: Histogram<f64>,
-        /// Distribution of search-query durations.
-        pub search_query_duration: Histogram<f64>,
-    }
-
-    impl EventMetrics {
-        /// Build the instrument set. Currently unimplemented (`todo!`).
-        #[must_use]
-        pub fn new() -> Self {
-            // TODO: Initialize metrics
-            todo!("Initialize OpenTelemetry metrics")
-        }
-    }
-
-    impl Default for EventMetrics {
-        /// Same as [`EventMetrics::new`].
-        fn default() -> Self {
-            Self::new()
-        }
-    }
 }

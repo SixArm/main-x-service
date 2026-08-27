@@ -28,7 +28,6 @@ use crate::{
     auth, controllers,
     models::_entities::{audit_logs, cases, entity_links, merge_records},
     tasks,
-    workers::downloader::DownloadWorker,
 };
 
 /// Blanket auth-enforcement middleware. Reads the `CASE_REQUIRE_AUTH`
@@ -140,7 +139,6 @@ impl Hooks for App {
             )))
     }
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
-        queue.register(DownloadWorker::build(ctx)).await?;
         queue
             .register(crate::bulk::worker::BulkJobWorker::build(ctx))
             .await?;
