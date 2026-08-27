@@ -865,15 +865,6 @@ and a family-wide decision, not a copy — see the note on T-22.
   - DB-gated `tests/graph_endpoints.rs`: repoint-onto-survivor and
     collision-de-dup.
 
-## [Unreleased]
-
-- Build-out is enumerated as unchecked tasks in
-  [`spec/13-tasks.md`](./spec/13-tasks.md) (T-1 … T-28), ordered after
-  the design rollout: contracts → `same_identity` backbone → reads →
-  affiliations + `case ↔ person` governance → hardening / durable-bus
-  flip. No code yet (see
-  [`spec/14-implementation-status.md`](./spec/14-implementation-status.md)).
-
 ## [0.1.0] — 2026-06-16
 
 Inaugural **spec-only** scaffold for the Link Graph Service — the
@@ -936,3 +927,9 @@ code: this release is the specification and doc set.
   per-service `entity_links` on person + worker) are themselves at
   design / rollout stage; the interim path is in-memory transport +
   lazy verify-on-read.
+- Build-out is enumerated as unchecked tasks in
+  [`spec/13-tasks.md`](./spec/13-tasks.md) (T-1 … T-28), ordered after
+  the design rollout: contracts → `same_identity` backbone → reads →
+  affiliations + `case ↔ person` governance → hardening / durable-bus
+  flip. No code yet at this release (see
+  [`spec/14-implementation-status.md`](./spec/14-implementation-status.md)).
