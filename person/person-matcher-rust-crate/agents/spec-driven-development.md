@@ -79,7 +79,6 @@ spec.md            ← what the library is, how it is built, and what is queued
                      (consolidates specification, plan, and tasks — authoritative)
 README.md          ← user-facing intro (must stay consistent with spec)
 CHANGELOG.md       ← what changed when (history)
-IMPLEMENTATION_SUMMARY.md  ← historical snapshot; do not edit (superseded by spec)
 AGENTS.md + agents/*.md   ← how to work in the repo
 index.md           ← navigation aid
 ```

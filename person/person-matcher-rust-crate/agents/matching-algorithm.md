@@ -67,7 +67,7 @@ The `Confidence` band is **independent of `match_threshold`**: `score >= 0.90 �
 
 ## When You Change Weights
 
-- The default weight table is part of the documented behaviour (spec §13.1, README, IMPLEMENTATION_SUMMARY). Touch all three when you change defaults.
+- The default weight table is part of the documented behaviour (spec §13.1, README). Touch both when you change defaults.
 - Add a `### Behaviour Change` subsection under the next CHANGELOG entry.
 - Bump the minor version (pre-1.0 minor bumps may carry breaking behaviour by convention).
 

@@ -113,7 +113,6 @@ The `agents/` directory contains topic-specific guidance. Read the one that matc
 ├── CODE_OF_CONDUCT.md
 ├── CONTRIBUTING.md
 ├── Cargo.toml
-├── IMPLEMENTATION_SUMMARY.md ← historical; superseded by spec.md
 ├── README.md                 ← user-facing
 ├── examples/
 ├── help/                     ← source research papers
