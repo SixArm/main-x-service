@@ -3,7 +3,7 @@
 //! writes one row here recording the action, the (optional) actor, and a
 //! snapshot of the record at that time.
 
-use loco_rs::schema::{create_table, drop_table, ColType};
+use loco_rs::schema::{ColType, create_table, drop_table};
 use sea_orm_migration::prelude::*;
 
 /// The `audit_logs`-table migration. `DeriveMigrationName` derives the
