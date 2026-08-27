@@ -747,7 +747,7 @@ person-service-with-loco/
 │   ├── error.rs             # Error types
 │   ├── app.rs               # loco `Hooks` (boot, routes, workers)
 │   └── lib.rs                # Library root
-├── migrations/             # Database migrations (sea-orm-migration)
+├── migrations/             # Raw SQL, wrapped via include_str! by migration/
 ├── migration/              # Migrator crate root
 ├── tests/                  # Integration tests (api_integration_test, duplicate_detection, enforcement, review_queue_db, seed_examples_db, fluvio_relay)
 ├── benches/                # Criterion benchmarks (matching, search, validation)
