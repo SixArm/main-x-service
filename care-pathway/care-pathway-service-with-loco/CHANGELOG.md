@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-27
+
 ### Added — stitched journeys, and a denial that no longer discloses
 
 Two fixes to the cross-service journey work.

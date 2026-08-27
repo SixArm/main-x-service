@@ -1399,7 +1399,7 @@ dependencies = [
 
 [[package]]
 name = "care-pathway-service"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "authentication-verifier",
@@ -3899,7 +3899,7 @@ dependencies = [
 
 [[package]]
 name = "integrity-mac"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "getrandom 0.2.17",
  "hkdf 0.12.4",
