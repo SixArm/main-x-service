@@ -82,7 +82,14 @@ strsim = "0.11"
 prometheus = "0.13"
 
 # Sibling matcher crate
-event-matcher = "0.6.1"
+#
+# Path dependency, not a crates.io version pin: the local event-matcher
+# is 0.7.0 (coordinate fields renamed for their units, fa0d2c0f), and
+# crates.io's newest published event-matcher is still 0.6.1 with the
+# pre-rename field names. Pinning "0.6.1" here would compile against
+# the old field names and silently diverge from the sibling source.
+# Revert to a version pin once event-matcher 0.7.0 is published.
+event-matcher = { path = "../event-matcher-rust-crate" }
 
 # Security
 # Offline PASETO v4.public verification of authentication-service tokens

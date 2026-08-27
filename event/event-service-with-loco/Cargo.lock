@@ -1969,9 +1969,7 @@ dependencies = [
 
 [[package]]
 name = "event-matcher"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ba46c68970dd9cdbca21fd7f887e04a422aed42573c1b9cd8316cc19a865f3a"
+version = "0.7.0"
 dependencies = [
  "mimalloc",
  "serde",
@@ -3275,7 +3273,7 @@ dependencies = [
 
 [[package]]
 name = "integrity-mac"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "getrandom 0.2.17",
  "hkdf 0.12.4",

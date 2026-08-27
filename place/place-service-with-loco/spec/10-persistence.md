@@ -12,15 +12,19 @@ PostgreSQL 18+ via SeaORM.
 
 > **Drift, noted not fixed (2026-08-22):** the shipped schema does not
 > have a separate `place_geo_coordinates` table — geo is flattened into
-> `places` as `geo_latitude` / `geo_longitude` / `geo_elevation`, with
+> `places` as `geo_latitude_as_decimal_degrees` /
+> `geo_longitude_as_decimal_degrees` / `geo_elevation_as_decimal_metres`
+> (renamed from `geo_latitude` / `geo_longitude` / `geo_elevation` by
+> `m20260824_000001_coordinate_columns_name_their_units`), with
 > `idx_places_geo` over the first two. Recorded here because the geo
 > columns were being edited anyway; reconciling the rest of this list
 > against the migrations is its own task.
 
 #### Geo columns
 
-`places.geo_latitude` / `.geo_longitude` / `.geo_elevation` are
-**`NUMERIC`**, not `DOUBLE PRECISION` (§5.2.1). No scale is declared:
+`places.geo_latitude_as_decimal_degrees` /
+`.geo_longitude_as_decimal_degrees` / `.geo_elevation_as_decimal_metres`
+are **`NUMERIC`**, not `DOUBLE PRECISION` (§5.2.1). No scale is declared:
 `NUMERIC(9,6)` is the usual geo choice but would silently round anything
 finer, and the previous `DOUBLE PRECISION` column accepted ~15
 significant digits. An unconstrained `NUMERIC` keeps every value a client
@@ -70,7 +74,8 @@ reference — prefer it when fidelity matters):
   - address → `address.street_address`, `address.address_locality`,
     `address.address_region`, `address.address_country`,
     `address.postal_code`;
-  - geo → `geo.latitude`, `geo.longitude`, `geo.elevation`.
+  - geo → `geo.latitude_as_decimal_degrees`,
+    `geo.longitude_as_decimal_degrees`, `geo.elevation_as_decimal_metres`.
 - **Arrays / arrays-of-objects** → one **JSON-encoded cell** each:
   `identifiers` (type + system + value, incl. GLN / FIPS / GNIS / OSM),
   `keywords`, `alternate_names`, `same_as`, `amenity_feature`,

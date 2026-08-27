@@ -10,51 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
-### Added — declared MSRV (Rust 1.95)
-
-- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
-  **current stable minus three** floor
-  (`spec/rust-msrv-n-minus-3/index.md`). Sourced from `ci/msrv.txt` and
-  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
-  value matches that file and then compiles the crate — `--all-targets`,
-  so benches and tests count — against the 1.95 toolchain. Behaviour is
-  unchanged; what changes is that the floor is now a checked claim
-  rather than an unstated assumption.
-
-### Added — cargo-fuzz harness (SEC-I2)
-
-- A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate with
-  three coverage-guided libFuzzer targets, adopting the person-matcher
-  reference scaffolding: `match_places` (deserialize a JSON `[place_a, place_b]`
-  tuple → `MatchingEngine::match_places`; finite score in `[0,1]`, both orders),
-  `normalizer` (the pure `Normalizer` helpers — name / postcode / phone / E.164 / address / phonetic / email — over arbitrary
-  UTF-8, never-panic), and `scorer` (the pure `Scorer` similarities;
-  finite in `[0,1]`). Run on nightly: `cargo +nightly fuzz run <target>`
-  (see `fuzz/README.md`). The `fuzz/` crate is standalone (not a workspace
-  member), so it never affects the crate’s normal stable build/test/clippy.
-  Verified: `cargo +nightly fuzz build` compiles all three targets and
-  short time-boxed campaigns run clean (millions of execs, no panics).
-
-### Security
-
-- **SEC-M2 (High): empty-normalisation guard on the `name` + `postcode`
-  deterministic short-circuit.** The `name_and_postcode_match` rule
-  (`src/matcher.rs`) compared normalised name and postcode with no
-  post-normalisation empty check, so two unrelated places whose name and
-  postcode both normalise to the empty string (e.g. `name="."`,
-  `postcode=" "`) satisfied `"" == ""` twice and short-circuited to a
-  spurious `1.0` identity match. The rule now returns `false` when either
-  the normalised name OR the normalised postcode is empty — a value that
-  normalises to empty is not identity evidence. Same bug class as the
-  person-matcher `passport_books_share_pair` fix. No weight/threshold or
-  other behaviour change.
-
-### Fixed
-
-- Formatting drift in `src/matcher.rs` (one test's builder chain was not
-  rustfmt-formatted); `cargo fmt --check` is clean again. No behaviour
-  change.
-
 ### Added — `tags` weighted component (spec-first; implementation pending)
 
 Spec added the **tags** match component
@@ -100,6 +55,75 @@ tracks the code follow-up:
   `setting` field (place-entity spec §5.3) + a bridge test.
 - Unit tests for the four score cases; `cargo test` +
   `cargo clippy --all-targets -- -D warnings` clean.
+
+## [0.7.0] — 2026-08-24
+
+### Changed — coordinate fields named for their units (BREAKING)
+
+- **`Place::latitude` / `Place::longitude` renamed to
+  `latitude_as_decimal_degrees` / `longitude_as_decimal_degrees`**,
+  across the Rust struct, the `PlaceBuilder` setters
+  (`latitude`/`longitude` → `latitude_as_decimal_degrees`/
+  `longitude_as_decimal_degrees`), and the serde JSON wire format —
+  there is no serde alias for the old keys, so this is a breaking
+  change for any caller constructing a `Place` by struct literal
+  (blocked by `#[non_exhaustive]`), calling the old builder methods, or
+  deserialising JSON that used the old field names. `altitude`/
+  `elevation` were already named `altitude_as_metre`/`elevation_as_metre`
+  and are unchanged.
+- The companion to storing coordinates as exact decimals (0.6.0): that
+  change made the values exact; this one makes the names say what they
+  are, so a reader cannot mistake degrees for radians without opening
+  the spec.
+- `spec/03-data-model.md` §3.1 updated to match (struct listing and
+  field table).
+- Version bumped `0.6.1` → `0.7.0` under semver: a public field rename
+  is breaking.
+
+### Added — declared MSRV (Rust 1.95)
+
+- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
+  **current stable minus three** floor
+  (`spec/rust-msrv-n-minus-3/index.md`). Sourced from `ci/msrv.txt` and
+  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
+  value matches that file and then compiles the crate — `--all-targets`,
+  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  unchanged; what changes is that the floor is now a checked claim
+  rather than an unstated assumption.
+
+### Added — cargo-fuzz harness (SEC-I2)
+
+- A `fuzz/` [`cargo-fuzz`](https://rust-fuzz.github.io/book/) crate with
+  three coverage-guided libFuzzer targets, adopting the person-matcher
+  reference scaffolding: `match_places` (deserialize a JSON `[place_a, place_b]`
+  tuple → `MatchingEngine::match_places`; finite score in `[0,1]`, both orders),
+  `normalizer` (the pure `Normalizer` helpers — name / postcode / phone / E.164 / address / phonetic / email — over arbitrary
+  UTF-8, never-panic), and `scorer` (the pure `Scorer` similarities;
+  finite in `[0,1]`). Run on nightly: `cargo +nightly fuzz run <target>`
+  (see `fuzz/README.md`). The `fuzz/` crate is standalone (not a workspace
+  member), so it never affects the crate’s normal stable build/test/clippy.
+  Verified: `cargo +nightly fuzz build` compiles all three targets and
+  short time-boxed campaigns run clean (millions of execs, no panics).
+
+### Security
+
+- **SEC-M2 (High): empty-normalisation guard on the `name` + `postcode`
+  deterministic short-circuit.** The `name_and_postcode_match` rule
+  (`src/matcher.rs`) compared normalised name and postcode with no
+  post-normalisation empty check, so two unrelated places whose name and
+  postcode both normalise to the empty string (e.g. `name="."`,
+  `postcode=" "`) satisfied `"" == ""` twice and short-circuited to a
+  spurious `1.0` identity match. The rule now returns `false` when either
+  the normalised name OR the normalised postcode is empty — a value that
+  normalises to empty is not identity evidence. Same bug class as the
+  person-matcher `passport_books_share_pair` fix. No weight/threshold or
+  other behaviour change.
+
+### Fixed
+
+- Formatting drift in `src/matcher.rs` (one test's builder chain was not
+  rustfmt-formatted); `cargo fmt --check` is clean again. No behaviour
+  change.
 
 ## [0.6.1] — 2026-06-15
 

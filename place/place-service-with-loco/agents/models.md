@@ -72,9 +72,9 @@ Methods: `Place::new(name)`, `place.soft_delete()`
 
 | Field | Type | Range |
 |-------|------|-------|
-| `latitude` | `BigDecimal` | -90 to 90; exact decimal degrees, a JSON **number** on the wire |
-| `longitude` | `BigDecimal` | -180 to 180; exact decimal degrees, a JSON **number** on the wire |
-| `elevation` | `Option<BigDecimal>` | Meters; exact decimal |
+| `latitude_as_decimal_degrees` | `BigDecimal` | -90 to 90; exact decimal degrees, a JSON **number** on the wire |
+| `longitude_as_decimal_degrees` | `BigDecimal` | -180 to 180; exact decimal degrees, a JSON **number** on the wire |
+| `elevation_as_decimal_metres` | `Option<BigDecimal>` | Meters; exact decimal |
 
 Methods: `GeoCoordinates::new(lat, lon)` (takes `f64` literals and stores the
 decimal each denotes — via the shortest round-tripping string, **not**
