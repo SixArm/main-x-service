@@ -3,7 +3,7 @@
 //! read** (patient locate, stay detail) writes one row here recording
 //! the entity kind, the action, the (optional) actor, and a snapshot.
 
-use loco_rs::schema::{create_table, drop_table, ColType};
+use loco_rs::schema::{ColType, create_table, drop_table};
 use sea_orm_migration::prelude::*;
 
 /// The `audit_logs`-table migration (name derived from the module path).
