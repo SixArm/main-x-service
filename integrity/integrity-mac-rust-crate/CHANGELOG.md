@@ -9,7 +9,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-### Fixed — a stored MAC containing a multi-byte character crashed the reader
+## [0.2.0] - 2026-08-21
+
+### Security — a stored MAC containing a multi-byte character crashed the reader (SEC-M7)
 
 `decode_hex` indexed the input as a `&str` (`&s[i..i + 2]`), which
 panics when the boundary lands inside a multi-byte character. It runs on
