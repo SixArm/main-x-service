@@ -3,7 +3,7 @@
 //! machine columns (`state`, `state_since`, `closure_reason`,
 //! `deep_clean_required`) plus the allocation-rule attributes.
 
-use loco_rs::schema::{create_table, drop_table, ColType};
+use loco_rs::schema::{ColType, create_table, drop_table};
 use sea_orm_migration::prelude::*;
 
 /// The topology-tables migration (name derived from the module path).

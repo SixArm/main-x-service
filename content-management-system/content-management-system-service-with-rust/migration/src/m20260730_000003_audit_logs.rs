@@ -5,7 +5,7 @@
 //! snapshot carrying the reason where the action requires one
 //! (spec `audit.md`).
 
-use loco_rs::schema::{create_table, drop_table, ColType};
+use loco_rs::schema::{ColType, create_table, drop_table};
 use sea_orm_migration::prelude::*;
 
 /// The `audit_logs`-table migration (name derived from the module path).

@@ -3,7 +3,7 @@
 //! (`senior_review_at`, `edd`, `ccd`, `ccd_met`) and the DTOC clock
 //! anchor (`discharge_ready_at`), plus the immutable per-move record.
 
-use loco_rs::schema::{create_table, drop_table, ColType};
+use loco_rs::schema::{ColType, create_table, drop_table};
 use sea_orm_migration::prelude::*;
 
 /// The stays/transfers migration (name derived from the module path).
