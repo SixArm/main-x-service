@@ -6494,36 +6494,53 @@ crate above.
   place-matcher 320, event-matcher 296, place-service 345, event-service
   193, all 0 failures) both by the landing agent and independently by
   the merging session.
-- [ ] **PRO-H3 (M)** **Cargo metadata sweep.** (a) `license` +
-  `description` missing in ~20 manifests: organization-, care-pathway-,
-  case-folder-, link-graph-adjacent service crates and **every**
-  migration sub-crate; (b) malformed `repository` URLs of the shape
-  `github.com/sixarm/main-x-service/<crate>` (missing the entity
-  subdirectory; not a valid repo URL) in at least course ×2, person-,
-  place-, case-, patient-flow-service; (c) person-matcher's deprecated
-  SPDX `GPL-2.0 OR GPL-3.0` → `GPL-2.0-only OR GPL-3.0-only`;
-  (d) migration crates on `edition = "2021"` while their services are
-  2024 (person, patient-flow, WPM, CRM, CMS at minimum) — bump in one
-  sweep; (e) broken publishability flags: patient-flow-service and
-  CMS-service set `publish = true` yet depend on `publish = false` /
-  unpublished path deps, so `cargo publish` cannot succeed — set
-  `publish = false` or fix the deps; (f) stale portfolio-service
-  description (pre-unification "portfolio / project / product /
-  program" wording).
-- [ ] **PRO-H4 (S)** **Delete committed junk & dead scaffolding.**
-  Tracked stray rustup homes `thing/thing-service-with-loco/200/` and
-  `place/place-service-with-loco/200/`; `diesel.toml` +
-  `docker-compose.yml` in person- and worker-service (Podman-only
-  family) and person's diesel-era raw `migrations/` mislabeled sea-orm
-  (`index.md:750`); worker's empty `data/`; matcher
-  `IMPLEMENTATION_SUMMARY.md` snapshots (person, worker); thing-matcher
-  `help/` patient-matching PDFs (wrong domain, binary blobs); the loco
-  scaffold `src/workers/downloader.rs` TODO stub registered in
-  authentication-, case-, and care-pathway-service; event's dead
-  `todo!()` `FluvioProducer`/`FluvioConsumer` + observability `todo!()`;
-  CRM's `_touch` dead fn; WPM's `ensure_employee` dead helper; duplicate
+- [x] **PRO-H3 (M)** *(done 2026-08-27)* **Cargo metadata sweep.** A
+  full repo-wide re-audit (not just the example list) found a larger
+  scope: **38 manifests** touched across 5 sub-items. (a) license +
+  description added to 4 service crates (link-graph, organization,
+  care-pathway, case-folder) + **15 migration crates**; (b) 13
+  malformed `repository` URLs fixed; (c) 6 crates' deprecated SPDX
+  `GPL-2.0`/`GPL-3.0` → `-only` (person-matcher plus 5 siblings the
+  task didn't name: thing-, worker-, place-matcher, authentication-
+  verifier, event-matcher); (d) **11 migration crates** bumped
+  `edition` 2021→2024 (not just the 5 named) — this changed rustfmt's
+  style-edition (import-sort order) for 5 of them, so their migration
+  source files needed reformatting too, included rather than left as a
+  new fmt-gate failure; (e) `publish = true`→`false` on patient-flow-
+  and CMS-service, the only two with broken publishability; (f) the
+  stale portfolio description was already fixed by the earlier
+  PM-suite landing. Verified: fmt + build clean on all 38 crates,
+  `cargo test` green on all 11 edition-bumped migration crates, zero
+  failures. (Landed across two commits — `190db156`/`49ba02a9` and a
+  small `8c04e251` follow-up for one migration crate's fmt drift the
+  first pass's spot-check sample missed.)
+- [x] **PRO-H4 (S)** *(done 2026-08-27)* **Delete committed junk & dead
+  scaffolding.** Split into two verified batches. Non-code deletions:
+  tracked stray rustup homes `thing/thing-service-with-loco/200/` and
+  `place/place-service-with-loco/200/`; `diesel.toml` in person- and
+  worker-service (confirmed no diesel dependency exists — the family
+  uses SeaORM); matcher `IMPLEMENTATION_SUMMARY.md` snapshots (person,
+  worker) plus the doc references to each; thing-matcher `help/`
+  patient-matching PDFs (wrong domain, binary blobs); duplicate
   `package-lock.json` beside `pnpm-lock.yaml` in case-folder and
-  patient-flow front-ends.
+  patient-flow front-ends; person's `index.md:750` mislabel fixed
+  (the raw `migrations/` dir and `docker-compose.yml` in person/worker
+  turned out to be load-bearing on inspection — `migrations/` is
+  compiled in via `include_str!` by the real `migration/` crate, and
+  `docker-compose.yml` is the real dev/prod stack documented in each
+  crate's `DEPLOY.md` — both left alone). Compiler-verified deletions:
+  the loco scaffold `src/workers/downloader.rs` TODO stub registered in
+  authentication-, case-, and care-pathway-service (authentication and
+  case had nothing else left in `src/workers/`, so the whole module
+  went with it; care-pathway keeps the module for its real
+  `BulkExportWorker`); event's dead `todo!()`
+  `FluvioProducer`/`FluvioConsumer` + observability `todo!()` — the
+  cleanup event's own spec §13 T-4 promised and never delivered, now
+  ticked done there; CRM's `_touch` dead fn (plus the two imports it
+  was only propping up); WPM's `ensure_employee` dead helper (zero
+  callers, no sibling `ensure_*` pattern it paralleled). Verified: all
+  six touched crates green (fmt, clippy `-D warnings`, full test suite
+  — 97+314+255+193+64+139 = 1062 tests, 0 failures).
 - [ ] **PRO-H5 (M)** **CSRF on front-end BFF mutations, family-wide.**
   `authentication-sessions.md` §4 makes it mandatory once cookie auth
   exists; it is missing in person, worker (T-22b), thing (no open task
