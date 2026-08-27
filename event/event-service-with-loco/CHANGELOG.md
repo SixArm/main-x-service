@@ -8,6 +8,8 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-27
+
 ### Changed — geo coordinates are exact decimals, not floats
 
 `Place::latitude` / `Place::longitude` move from `f64` to `BigDecimal`,
