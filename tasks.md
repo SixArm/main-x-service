@@ -6672,11 +6672,19 @@ crate above.
   case-folder audited and found clean (thin nav-only specs, zero stale
   prose). 7 files changed, each fix dated and citing the task IDs/counts
   verified.
-- [ ] **PRO-H9 (M)** **OTLP rollout (subsumes AU-3).** person, worker,
+- [~] **PRO-H9 (M)** **OTLP rollout (subsumes AU-3).** person, worker,
   event still carry the commented-out exporter stubs; link-graph's
   `src/observability.rs` is the proven reference. Roll it (or delete
   the stubs and update the matrix) — the stubs have been "TODO" since
-  the family began.
+  the family began. **person DONE 2026-08-28**: real exporter ported
+  from link-graph, replacing the dead stub outright; two adaptations
+  documented in person's `AGENTS.md` for worker/event to reuse (the
+  tower middleware on two router-construction surfaces instead of
+  one; a package-renamed `tonic` dev-dependency to dodge an
+  extern-prelude collision with the crate's own gRPC-stub `tonic`).
+  350 lib tests (was 340) + 4 new in-process-collector tests proving
+  real export, all independently reverified. **worker + event
+  remain** — copy person's port (not link-graph's directly).
 
 ### PRO-P — per-family targeted fixes
 
