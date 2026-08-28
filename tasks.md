@@ -6769,12 +6769,24 @@ green as it sits; these finish it)**
   entity-ref-style waiver paragraph.
 
 **consumer apps**
-- [ ] **PRO-P27 (M)** CRM: build the code sides of gates CRM-G1/G2 by
-  copy-adapting WPM-T30/T31 (reference ABAC policy + activation
-  runbook; subject-access export, erasure/anonymise, retention sweep —
-  resolving the append-only consent-history vs erasure collision
-  explicitly). CRM holds consented personal data and currently has
-  neither the code nor a queued task for it.
+- [x] **PRO-P27 (M)** *(done 2026-08-28, CRM-T21/T22)* CRM: built the
+  code sides of gates CRM-G1/G2, copy-adapting WPM-T30/T31 but
+  grounded in CRM's own schema rather than copied verbatim — real
+  finding: `Contact::status` is set once at creation and never
+  transitions (unlike WPM's genuinely-transitioning employment
+  status), so `erasable()` gates on live-engagement signals (open
+  deal/ticket/nurture enrolment) instead. Resolved the append-only
+  consent-history vs erasure collision the same way WPM did: consent
+  history and deal/ticket rows survive erasure, keyed to a tombstoned
+  pid that no longer identifies anyone. Subject-access refuses a
+  masked caller (403 — a full export can't be "masked"). Destructive
+  actions (`/erase`, `/sweep`) limited to `svc`/`admin` in the new
+  reference ABAC policy. CRM-G1/G2 flipped `[ ]`→`[~]` (code done,
+  activation-flag flip + PECR/GDPR legal review correctly still not
+  done — deployment/legal decisions, not code). Verified including a
+  **live** Postgres run of the DB-gated round-trip test (not just
+  compiled): fmt/clippy clean, 67 unit tests, `subject_rights_round_trip`
+  passed live, front-end 0 svelte-check errors + 5/5 vitest.
 - [ ] **PRO-P28 (S)** patient-flow: drop the `sqlx-sqlite` sea-orm
   feature (family rule: PostgreSQL NOT SQLite); fix
   `publish`/repository metadata (PRO-H3e); add the `[x]` PF-T19 row for
