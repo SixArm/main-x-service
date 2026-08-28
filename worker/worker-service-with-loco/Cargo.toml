@@ -76,7 +76,7 @@ strsim = "0.11"
 prometheus = "0.13"
 
 # Sibling matcher crate
-worker-matcher = { version = "0.6.1", path = "../worker-matcher-rust-crate" }
+worker-matcher = { version = "0.7.0", path = "../worker-matcher-rust-crate" }
 
 # Security
 # Offline PASETO v4.public verification of authentication-service tokens

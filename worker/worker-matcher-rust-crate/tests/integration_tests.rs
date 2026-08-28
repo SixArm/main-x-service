@@ -843,6 +843,8 @@ fn test_custom_weights_can_swing_outcome() {
         death_place_weight: 0.05,
         phone_weight: 0.05,
         email_weight: 0.05,
+        relationships_weight: 0.0,
+        tags_weight: 0.0,
         use_phonetic_matching: false,
         name_algorithm: SimilarityAlgorithm::JaroWinkler,
         strict_mode: false,

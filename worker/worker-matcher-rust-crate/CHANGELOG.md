@@ -9,6 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-28
+
+### Added — relationships and tags as weighted supporting components (T-33 / T-34)
+
+- **`RelationshipRef` / `RelationKind` (T-33).** New public types
+  `RelationKind` (`LineManagerOf`, `ReportsTo` — inverses, extensible)
+  and `RelationshipRef { relation: RelationKind, worker_id: String }`,
+  re-exported from the crate root. `RelationshipRef::new` trims
+  `worker_id` and rejects an empty result. `Worker` gains
+  `relationships: Vec<RelationshipRef>` (default empty,
+  `#[serde(default)]`), with `WorkerBuilder::add_relationship` /
+  `::relationships` setters. Scored as typed-set Jaccard over
+  `(relation, worker_id)` pairs (`|A ∩ B| / |A ∪ B|`) into the new
+  `MatchBreakdown::relationships_score` (`#[serde(default)]`), `None`
+  when either side's list is empty. New `MatchConfig::relationships_weight`
+  (default `0.05`) joins the supporting-signal cluster in the
+  weighted-average renormalisation.
+- **`tags` (T-34).** `Worker` gains `tags: Vec<String>` (default empty,
+  `#[serde(default)]`), with `WorkerBuilder::add_tag` / `::tags`
+  setters. Tags are stored verbatim and compared case-insensitively at
+  scoring time (consistent with the crate's normalise-at-match-time
+  convention for names / emails / identifiers) as set Jaccard
+  (`|A ∩ B| / |A ∪ B|`) into the new `MatchBreakdown::tags_score`
+  (`#[serde(default)]`), `None` when either side's list is empty. New
+  `MatchConfig::tags_weight` (default `0.05`) joins the supporting-signal
+  cluster alongside `relationships_weight`.
+- Both fields are purely additive and **not** identifying on their own
+  (`Worker::validate` is unchanged) and **not** consulted by
+  `deterministic_match`. Neither field participates in the weighted
+  average unless populated on *both* sides, so existing callers that
+  never set `relationships`/`tags` see byte-identical scores before and
+  after this release — the two new default weights simply never enter
+  the denominator for them.
+- `agents/matching-algorithm.md`'s "Component Scoring At-a-Glance" table
+  gains Relationships / Tags rows. `spec/08-domain-model.md` §8.1 /
+  §8.5 / §8.6a and `spec/12-algorithm-specifications.md` §12.2 /
+  `spec/13-configuration-specification.md` §13.1 move from "planned,
+  not yet implemented" to current behaviour.
+- Minor version bump (pre-1.0): per `agents/release.md`, a default-weight
+  addition that changes computed behaviour once the new fields are
+  populated — plus two new public types and four new public struct
+  fields — is a minor bump, not a patch.
+
 ## [0.6.2] - 2026-08-21
 
 ### Added — declared MSRV (Rust 1.95)

@@ -12,9 +12,9 @@ Field naming for national identifiers: `<cc>_<scheme>` (lower-case ISO 3166-1 al
 
 **Contact** — `phone: Option<String>` (E.164 + legacy fallback per FR-30); `mobile: Option<String>` (fallback when `phone` is `None`); `email: Option<String>` (canonical form per FR-35/FR-36). `local_id: Option<String>` carried but deliberately NOT scored (OQ-2 cross-org collision risk).
 
-**Relationships (planned, not yet implemented — T-33)** — the design calls for `relationships: Vec<RelationshipRef>` (default empty; §8.6a): typed references to other workers by registry id, as a **supporting** signal (not identifying on its own): two records that reference the **same** related workers (same line-manager / report ids) would be more likely the same worker, scored by typed-set Jaccard (§12.2) and weighted `relationships_weight` (§13.1). **Not yet on `Worker`** — see the open task at §23 T-33; do not assume this field exists in the current API.
+**Relationships (implemented — T-33, v0.7.0)** — `relationships: Vec<RelationshipRef>` (default empty; §8.6a): typed references to other workers by registry id, as a **supporting** signal (not identifying on its own): two records that reference the **same** related workers (same line-manager / report ids) are more likely the same worker, scored by typed-set Jaccard (§12.2) and weighted `relationships_weight` (§13.1).
 
-**Tags (planned, not yet implemented — T-34)** — the design calls for `tags: Vec<String>` (default empty): operator-applied free-text labels, normalised case-insensitively, as a **supporting** signal (not identifying on its own): two records carrying the **same** tags would be weakly more likely the same worker, scored by set Jaccard (§12.2) and weighted `tags_weight` (§13.1). **Not yet on `Worker`** — see the open task at §23 T-34; do not assume this field exists in the current API.
+**Tags (implemented — T-34, v0.7.0)** — `tags: Vec<String>` (default empty): operator-applied free-text labels, stored verbatim and normalised case-insensitively at scoring time, as a **supporting** signal (not identifying on its own): two records carrying the **same** tags are weakly more likely the same worker, scored by set Jaccard (§12.2) and weighted `tags_weight` (§13.1).
 
 ### 8.2 `Gender`
 
@@ -36,13 +36,13 @@ All fields are `Option<String>`: `line1`, `line2`, `city`, `county`, `postcode`,
 
 `PassportBook { country: String (ISO 3166-1 alpha-2, 2 ASCII letters), number: String (non-empty, uppercased), issued, expires: Option<NaiveDate> }`. `PassportBook::new` canonicalises both fields and rejects invalid input. Dates are metadata only — NOT used in matching. `Debug + Clone + PartialEq + Eq + Serialize + Deserialize`.
 
-### 8.6a `RelationshipRef` / `RelationKind` (planned — T-33)
+### 8.6a `RelationshipRef` / `RelationKind` (implemented — T-33, v0.7.0)
 
-**Not yet implemented** — see §23 T-33. The design: `RelationshipRef { relation: RelationKind, worker_id: String }` would reference another worker in the consuming registry by **opaque id**; `worker_id` whitespace-trimmed and non-empty. `RelationKind` an enum mirroring the service `Worker`: `LineManagerOf`, `ReportsTo` (inverses — A `LineManagerOf` B ⇔ B `ReportsTo` A); extensible (e.g. `MentorOf`, `ColleagueOf` later). The matcher would **not** resolve the references (it has no registry) — it would only compare the two workers' relationship **sets** (§12.2).
+`RelationshipRef { relation: RelationKind, worker_id: String }` references another worker in the consuming registry by **opaque id**; `worker_id` whitespace-trimmed and non-empty via `RelationshipRef::new`. `RelationKind` mirrors the service `Worker`: `LineManagerOf`, `ReportsTo` (inverses — A `LineManagerOf` B ⇔ B `ReportsTo` A); extensible (e.g. `MentorOf`, `ColleagueOf` later). The matcher does **not** resolve the references (it has no registry) — it only compares the two workers' relationship **sets** (§12.2).
 
 ### 8.5 `MatchBreakdown`
 
-Each field `Option<f64>` (`None` = not scored; `Some(v)` ∈ `[0.0, 1.0]`). One field per scoring axis: 42 `<cc>_<scheme>_score` + `passport_book_score` + demographic + address + contact scores (`given_name_score`, `family_name_score`, `date_of_birth_score`, `gender_score`, `blood_type_score`, `multiple_birth_score`, `address_score`, `birth_place_score`, `death_date_score`, `death_place_score`, `phone_score`, `email_score`, `phonetic_name_score`). All `#[serde(default)]` so legacy payloads deserialise with `None` for later-added fields. `relationships_score` / `tags_score` are **not yet present** — planned alongside the T-33/T-34 fields above.
+Each field `Option<f64>` (`None` = not scored; `Some(v)` ∈ `[0.0, 1.0]`). One field per scoring axis: 42 `<cc>_<scheme>_score` + `passport_book_score` + demographic + address + contact scores (`given_name_score`, `family_name_score`, `date_of_birth_score`, `gender_score`, `blood_type_score`, `multiple_birth_score`, `address_score`, `birth_place_score`, `death_date_score`, `death_place_score`, `phone_score`, `email_score`, `relationships_score`, `tags_score`, `phonetic_name_score`). All `#[serde(default)]` so legacy payloads deserialise with `None` for later-added fields.
 
 ---
 
