@@ -6579,13 +6579,32 @@ crate above.
   explicit decision recorded in `agents/share/authentication-sessions.md`
   or a family-wide spec, then applied uniformly if a guard is wanted,
   rather than left to accumulate per-crate drift. Found during PRO-H5.
-- [ ] **PRO-H6 (M)** **gRPC promote-or-drop, decided once.** person
-  (commented-out `serve` body since 2025), worker (stub), event (no-op
-  `serve` while AGENTS.md advertises "REST + gRPC API" and `GRPC_PORT`
-  is documented), thing (tonic/tonic-build deps with **no gRPC code at
-  all** + vestigial `grpc_port` config). Either implement or delete the
-  stubs, deps, config, and docs — then update the overview capability
-  matrix row.
+- [~] **PRO-H6 (M)** *(decided 2026-08-28 — owner chose "implement",
+  not "drop"; scoped as PRO-H11 below rather than done inline, since
+  real Tonic servers across four services is a multi-week feature
+  build, not a same-session cleanup)* **gRPC promote-or-drop, decided
+  once.** person (commented-out `serve` body since 2025), worker
+  (stub, its own spec T-6), event (no-op `serve` while AGENTS.md
+  advertises "REST + gRPC API" and `GRPC_PORT` is documented), thing
+  (tonic/tonic-build deps with **no gRPC code at all** + vestigial
+  `grpc_port` config, its own spec T-3 — thing is marked "–" i.e. no
+  gRPC in the family capability matrix today, so T-3/PRO-H11 also
+  needs to settle whether thing joins the other three or its dead
+  deps get dropped instead, rather than assuming either way).
+- [ ] **PRO-H11 (L)** **Design and build real gRPC servers for
+  person/worker/event (thing's inclusion TBD — see PRO-H6).** Today
+  all four crates carry only stubs or dead dependencies; nothing
+  serves real gRPC anywhere in the family. Scope: a `.proto` surface
+  per service (mirroring the REST CRUD/match/merge/search endpoints
+  worth exposing over gRPC — not necessarily 1:1 with REST), wiring
+  `tonic-build` codegen into each crate's `build.rs`, a real
+  `tonic::transport::Server` bound to `GRPC_PORT` delegating to the
+  same domain logic the REST handlers already call (no duplicated
+  business logic between the two API surfaces), and at least one
+  integration test per crate making a real gRPC call against a
+  running server. Close each crate's own T-3/T-6-equivalent task on
+  landing, and flip the `overview.md` capability-matrix gRPC row from
+  "stub" language to real ✅/– once decided and (where chosen) built.
 - [ ] **PRO-H7 (L)** **Matcher component parity: `relationships` +
   `tags`.** Specified (often fully, with weights) but unimplemented in
   worker (T-33/T-34), thing (OQ-E), event (Unreleased prose), course
