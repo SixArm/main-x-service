@@ -60,6 +60,20 @@ never sees a token or calls the Thing Service directly:
 - Env vars are read server-side only, in `src/lib/server/config.ts`
   (`THING_API_URL`, `AUTH_API_URL`) — see `.env.example`.
 
+**CSRF** (2026-08-28, closes the gap T-22 flagged, tracked family-wide as
+PRO-H5): a double-submit cookie protects mutating browser→BFF calls.
+`/verify` sets a second, **non-httpOnly** cookie `__Host-mxi_csrf`
+alongside the session cookie (`generateCsrfToken()`/`CSRF_COOKIE`/
+`CSRF_COOKIE_OPTIONS` in `src/lib/server/session.ts`); the `ApiClient`
+reads it from `document.cookie` (guarded — a no-op server-side) and
+echoes it as `X-CSRF-Token` on every non-GET/HEAD request; the proxy
+(`src/routes/api/proxy/[...path]/+server.ts`) rejects a mismatch with
+`403 {"error":"csrf"}` before forwarding upstream, backstopped by an
+Origin/Referer check (only rejects when one is present and disagrees).
+Sign-out clears both cookies. See
+`../../agents/share/authentication-sessions.md` §4 for the design this
+implements.
+
 ## What does NOT live here
 
 - FHIR Thing UI. Out of scope for MVP.
