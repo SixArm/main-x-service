@@ -1,6 +1,31 @@
 import type { ApiErrorBody, ApiResponse } from "./types.js";
 
 /**
+ * Name of the browser-readable CSRF double-submit cookie. Must match
+ * `CSRF_COOKIE` in `$lib/server/session.ts` — duplicated here (rather
+ * than imported) because that module is server-only and SvelteKit
+ * refuses to bundle it into browser code.
+ */
+const CSRF_COOKIE_NAME = "__Host-mxi_csrf";
+
+/**
+ * Read `CSRF_COOKIE_NAME`'s value out of `document.cookie`, or `null`
+ * when absent or not running in a browser (e.g. an SSR load function
+ * that injected `event.fetch` — see {@link ClientOptions.fetch}).
+ */
+function readCsrfCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const prefix = `${CSRF_COOKIE_NAME}=`;
+  for (const part of document.cookie.split(";")) {
+    const trimmed = part.trim();
+    if (trimmed.startsWith(prefix)) {
+      return decodeURIComponent(trimmed.slice(prefix.length));
+    }
+  }
+  return null;
+}
+
+/**
  * Construction options for {@link ApiClient}.
  *
  * @property baseUrl - Origin the client targets; trailing slashes are stripped.
@@ -143,9 +168,25 @@ export class ApiClient {
     opts: RequestOptions = {},
   ): Promise<T> {
     const url = this.buildUrl(path, opts.query);
+    const headers: Record<string, string> = {
+      ...this.defaultHeaders,
+      ...opts.headers,
+    };
+    // CSRF double-submit (agents/share/authentication-sessions.md §4):
+    // every mutating browser-issued request echoes the readable
+    // `__Host-mxi_csrf` cookie in a header, which the BFF proxy verifies
+    // against the same cookie before forwarding upstream. GET/HEAD are
+    // safe methods and carry no such header. `readCsrfCookie` returns
+    // `null` server-side (no `document`), so an SSR load's mutating call
+    // — there are none today, but if one appears — simply omits the
+    // header rather than throwing.
+    if (method !== "GET" && method !== "HEAD") {
+      const csrfToken = readCsrfCookie();
+      if (csrfToken) headers["x-csrf-token"] = csrfToken;
+    }
     const init: RequestInit = {
       method,
-      headers: { ...this.defaultHeaders, ...opts.headers },
+      headers,
       signal: opts.signal,
     };
     if (opts.body !== undefined) {

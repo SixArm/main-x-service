@@ -14,6 +14,16 @@ export default defineConfig({
     test: {
         include: ["tests/unit/**/*.{test,spec}.{ts,js}"],
         environment: "jsdom",
+        // https, not the jsdom default http://localhost:3000: the
+        // `__Host-mxi_csrf` cookie carries the `__Host-` prefix, which a
+        // browser (and jsdom, faithfully) only accepts from a secure
+        // origin. Without this, `document.cookie = "__Host-…"` silently
+        // no-ops in tests/unit/client.test.ts's CSRF-header suite.
+        environmentOptions: {
+            jsdom: {
+                url: "https://localhost:5173",
+            },
+        },
         globals: true,
     },
 });
