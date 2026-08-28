@@ -53,5 +53,18 @@ project-portfolio-management front-end's Kanban board, i18n, and
 
 ## Delivery
 
-CRM-T17/T18 **delivered 2026-07-18** — see
-[../../spec/tasks.md](../../spec/tasks.md).
+<!-- PRO-H8, 2026-08-28: was stale at "CRM-T17/T18 delivered 2026-07-18"
+     only. spec/tasks.md shows this edition also received the front-end
+     halves of CRM-T19 (insight boards: /leads/board, /tickets/board,
+     /followups, /executive, /dpo) and CRM-T20 (/engagement + /partners,
+     deal-board pipeline selector), both delivered 2026-07-20 — confirmed
+     against this edition's own CHANGELOG.md "Unreleased" entries for
+     CRM-T19/T20. CRM-T21/T22 (2026-08-28) are service-only; tasks.md's
+     own follow-up note names the front-end "Download my data"/Erase
+     work as CRM-T23, explicitly not done yet. -->
+CRM-T17/T18 **delivered 2026-07-18**; the front-end halves of CRM-T19
+(insight boards) and CRM-T20 (engagement/partners) **delivered
+2026-07-20** — see [../../spec/tasks.md](../../spec/tasks.md). CRM-T21/
+CRM-T22 (2026-08-28) were service-only; the matching front-end
+"Download my data" + confirm-gated Erase action is tracked as CRM-T23
+and **not yet started**.

@@ -3,8 +3,16 @@
 Stack-specific specification for the Svelte edition. The
 **cross-cutting spec at [`../../spec/`](../../spec/index.md) is the
 single source of truth**; this file adds only what is specific to
-this edition, and grows topic files (routes, components,
-ui-conventions, i18n) as PF-T15/T16 land.
+this edition. PF-T15/T16 landed 2026-07-18 (PF-T15a followed
+2026-07-19) with the edition's whole scope fitting in this one file,
+so it stayed `index.md` rather than splitting into topic files.
+<!-- PRO-H8, 2026-08-28: this paragraph previously promised to "grow
+topic files (routes, components, ui-conventions, i18n) as PF-T15/T16
+land"; per spec/tasks.md both landed in July 2026 and no topic-file
+split ever followed — the split was never mechanically small enough
+to be worth doing for one page's worth of content, so the promise is
+corrected to match reality rather than fulfilled. Corrected during
+the PRO-H8 professionalization sweep. -->
 
 ## Stack
 

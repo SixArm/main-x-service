@@ -4,9 +4,14 @@ Stack-specific specification for the Loco edition. The
 **cross-cutting spec at [`../../spec/`](../../spec/index.md) is the
 single source of truth** for the domain (model, pillars, state
 machines, auth posture); this file adds only what is specific to
-this edition. It will grow topic files (routes, api-contract,
-database, examples) as implementation phases land — each WPM-T* task
-adds its spec detail here in the same PR as the code.
+this edition.
+
+<!-- PRO-H8, 2026-08-28: removed the stale "will grow topic files
+     ... as implementation phases land" promise — spec/tasks.md shows
+     all phases (WPM-T1–T36) landed 2026-07-18 → 2026-07-25 and no
+     topic files (routes/api-contract/database/examples) were ever
+     added; this index.md stayed the single edition-spec file
+     throughout, by outcome rather than by plan. -->
 
 ## Stack
 

@@ -3,8 +3,14 @@
 Stack-specific specification for the Svelte edition. The
 **cross-cutting spec at [`../../spec/`](../../spec/index.md) is the
 single source of truth**; this file adds only what is specific to
-this edition, and grows topic files (routes, components, i18n) as
-WPM-T18/T19 land.
+this edition.
+
+<!-- PRO-H8, 2026-08-28: removed the stale "grows topic files ... as
+     WPM-T18/T19 land" promise — WPM-T18/T19 delivered 2026-07-18 and
+     the whole T20–T36 front-end run delivered through 2026-07-25
+     (spec/tasks.md) with no topic files (routes/components/i18n)
+     ever split out; this index.md stayed the single edition-spec
+     file throughout, by outcome rather than by plan. -->
 
 ## Stack
 
