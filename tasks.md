@@ -6541,12 +6541,44 @@ crate above.
   callers, no sibling `ensure_*` pattern it paralleled). Verified: all
   six touched crates green (fmt, clippy `-D warnings`, full test suite
   — 97+314+255+193+64+139 = 1062 tests, 0 failures).
-- [ ] **PRO-H5 (M)** **CSRF on front-end BFF mutations, family-wide.**
-  `authentication-sessions.md` §4 makes it mandatory once cookie auth
-  exists; it is missing in person, worker (T-22b), thing (no open task
-  line at all — add one), event (T-23b), and course (T-26, which also
-  lacks any route-level auth guard). Implement the synchroniser-token
-  pattern once, roll it, and close the per-FE tasks.
+- [x] **PRO-H5 (M)** *(done 2026-08-28)* **CSRF on front-end BFF
+  mutations, family-wide.** Implemented the double-submit cookie
+  pattern once in person (reference, commit `e73931b2`: a
+  non-httpOnly `__Host-mxi_csrf` cookie minted alongside the session
+  at `/verify`, echoed as `X-CSRF-Token` by the browser-side client on
+  every non-GET/HEAD request, verified by the BFF proxy before
+  forwarding upstream — reject-before-forward, backstopped by an
+  Origin/Referer check — with a `proxy.test.ts` suite asserting the
+  upstream `fetch` is never called on any rejection path), then rolled
+  identically to worker (closing its real T-22b), thing (no
+  pre-existing task — added T-25), event (closing its real T-23b,
+  while preserving its unrelated `Accepts-version` header logic
+  untouched), and course (closing T-26's CSRF half). Every crate
+  independently verified: `pnpm run check` 0 errors/0 warnings and
+  `pnpm test` all-green across all five (person 89, worker 76, thing
+  83, event 54, course 55 — 357 tests total).
+
+  **New finding, not pre-existing scope:** course's T-26 also named a
+  route-level guard redirecting an unauthenticated *visitor* away from
+  a page. Investigated and left open — the reference (person) has no
+  such guard either (`+layout.server.ts` exposes `signedIn` for chrome
+  display only), and a BFF-side session check on mutations was
+  considered and rejected as diverging from the family's documented
+  activation-gate design (`agents/share/security.md` §4: the entity
+  service's own `<ENTITY>_REQUIRE_AUTH` is the intended enforcement
+  point, not the BFF). This is a genuine **family-wide gap across all
+  five front-ends**, not course-specific — tracked as **PRO-H10**
+  below rather than solved once, differently, in one crate.
+- [ ] **PRO-H10 (S)** **Decide the family's page-visit auth-guard
+  posture.** None of the five BFF front-ends (person, worker, thing,
+  event, course) redirect an unauthenticated visitor away from a
+  page — `locals.sessionId`/`signedIn` is exposed to the layout for
+  chrome display only, and every route renders regardless. This may
+  be intentional (read pages are public by design, matching the
+  family's default-allow-read ABAC posture) or an oversight — needs an
+  explicit decision recorded in `agents/share/authentication-sessions.md`
+  or a family-wide spec, then applied uniformly if a guard is wanted,
+  rather than left to accumulate per-crate drift. Found during PRO-H5.
 - [ ] **PRO-H6 (M)** **gRPC promote-or-drop, decided once.** person
   (commented-out `serve` body since 2025), worker (stub), event (no-op
   `serve` while AGENTS.md advertises "REST + gRPC API" and `GRPC_PORT`
