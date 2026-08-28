@@ -77,6 +77,73 @@ default `cargo test --lib` / `--features fluvio` variants and the
 DB-gated suite as usual, and see `tests/fluvio_relay.rs` for the
 feature-gated, `#[ignore]`d live-broker round-trip.
 
+## OpenTelemetry OTLP export
+
+`src/observability.rs` (repo `tasks.md` PRO-H9, landed 2026-08-28) is a
+close port of person-service's `src/observability.rs` (itself ported
+from link-graph-service, the family's first working exporter). It
+**replaces** the earlier `src/observability/` stub outright (a JSON
+`tracing` subscriber with the OTLP exporter commented out behind
+`// TODO: Initialize OTLP exporter`, spread across `mod.rs` +
+`metrics.rs` + `traces.rs`, and never wired into `App`'s `Hooks` impl
+at all — `init_telemetry`/`shutdown_telemetry` had no caller) rather
+than filling the stub in place. `App::init_logger` installs it (loco's
+own `EnvFilter` + formatted layer, plus the `tracing-opentelemetry`
+bridge over an OTLP/gRPC exporter); `App::on_shutdown` flushes it.
+Export is **on by default** — set `OTLP_ENDPOINT=""` to disable it —
+at `OTLP_ENDPOINT` (default `http://localhost:4317`) with
+`service.name` from `OTLP_SERVICE_NAME` (default `event-service`);
+both variables are **deliberately unprefixed**, matching
+link-graph-service/person-service and
+`agents/share/rust-tracing-opentelemetry-stack.md`'s config table, not
+the per-service `EVENT_*` convention `EVENT_REQUIRE_AUTH` and its
+siblings use.
+
+**This crate's shape matched person's almost exactly** (both are
+"person-style" crates per `agents/share/architecture.md`), so the port
+needed the same two adaptations, confirmed rather than assumed:
+
+- **Two router-construction surfaces**, not link-graph-service's one:
+  the loco-native one (`api::rest::events_routes()` +
+  `controllers::fhir::routes()`, mounted via `App::routes`/
+  `App::after_routes`) and a standalone hand-rolled one
+  (`api::rest::create_router`, used by the DB-gated integration tests
+  and by `controllers::fhir::axum_router` for its FHIR surface). Event
+  was flagged as possibly "mid-conversion" with an additional
+  `src/controllers/` route-registration surface beyond person's two —
+  verified directly rather than assumed, and it does **not** add a
+  third: `controllers::fhir` contributes routes to *both* of the
+  existing two surfaces (a loco `routes()` registered in `App::routes`,
+  and an `axum_router` merged inside `create_router`) rather than
+  booting its own router. `observability::trace_mw` is layered as the
+  outermost middleware on both surfaces, exactly as person's is.
+- **A renamed `tonic` dev-dependency.** This crate already depends on
+  `tonic = "0.12"` for its own gRPC stub (`src/api/grpc/`), so the
+  in-process OTLP collector tests' `tonic = "0.14"` dev-dependency (used
+  to serve the fake collector) is declared as
+  `otlp-test-tonic = { package = "tonic", version = "0.14" }` — an
+  unrenamed second `tonic` dependency at a different version collides
+  in a test binary's extern prelude (`E0464: multiple candidates for
+  rlib dependency tonic`).
+
+**One difference from person's port**: this crate has **no
+`src/compliance/soup.rs`** — its `src/compliance/` module covers only
+row-level integrity (`mac.rs`, `audit_integrity.rs`,
+`record_integrity.rs`; see that module's doc comment), with no SOUP
+register or SBOM endpoint at all. Person's `renamed_package` parser fix
+for a `package = "…"` inline-table rename therefore has nothing to
+port here — checked directly rather than assumed absent.
+
+`tests/otlp_export.rs` and `tests/otlp_middleware.rs` (ported from
+person-service, with `tests/otlp_collector/` — an in-process OTLP/gRPC
+collector, unchanged) prove real export against a real gRPC listener
+in a normal `cargo test` run: a `tracing` span and a metric both reach
+the collector's decoded protobuf, and a served HTTP request returns a
+`traceparent` whose trace id matches the exported span's. None of this
+needs a database. `cargo test --lib` grew from 159 to 167 (the eight
+new `observability::tests` unit tests); `cargo test --test otlp_export
+--test otlp_middleware` is 4 further tests, all green.
+
 ## Container image
 
 `Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's

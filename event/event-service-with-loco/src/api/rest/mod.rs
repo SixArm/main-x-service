@@ -204,6 +204,14 @@ pub fn create_router(state: AppState) -> Router {
         // Permissive CORS: this is a backend service fronted elsewhere;
         // tighten if exposed directly to browsers.
         .layer(CorsLayer::permissive())
+        // Outermost layer runs first, so the request span wraps CORS,
+        // versioning, and the auth guard too (PRO-H9). Wired onto this
+        // standalone surface as well as `App::after_routes` — the two
+        // router-construction paths this crate carries (see
+        // `crate::observability::trace_mw`'s doc comment) must behave
+        // identically, the same precedent `auth::require_auth_mw` already
+        // set by being layered on both.
+        .layer(axum::middleware::from_fn(crate::observability::trace_mw))
 }
 
 /// Native loco controller routes (idiomatic path): the `/api` surface
