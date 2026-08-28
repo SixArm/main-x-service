@@ -14,7 +14,7 @@ service.
 ## 2. Scope
 
 In scope: the routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`, `/insights`,
-`/board`, `/gantt`, `/sequence`, `/signin`, `/verify`), the API client,
+`/board`, `/gantt`, `/sequence`, `/time`, `/signin`, `/verify`), the API client,
 the care-pathway form, the SVAR **DataGrid + FilterBar** registry (`/`),
 the five read-only **insights** lenses, the **instances** layer (the
 detail page's instances section, the SVAR **Kanban** board, and the SVAR
