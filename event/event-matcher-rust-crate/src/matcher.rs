@@ -35,10 +35,11 @@
 //! assert!(result.is_match);
 //! ```
 
-use crate::models::{Address, Event, Location};
+use crate::models::{Address, Event, Location, RelationKind, RelationshipRef};
 use crate::normalizer::Normalizer;
 use crate::scorer::{Scorer, SimilarityAlgorithm};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// Tunable configuration for the matching engine.
 ///
@@ -73,6 +74,8 @@ use serde::{Deserialize, Serialize};
 ///     organizer_weight: 0.04,
 ///     performers_weight: 0.02,
 ///     url_weight: 0.02,
+///     relationships_weight: 0.05,
+///     tags_weight: 0.05,
 ///     use_phonetic_matching: true,
 ///     name_algorithm: SimilarityAlgorithm::Combined,
 ///     strict_mode: false,
@@ -133,6 +136,24 @@ pub struct MatchConfig {
     /// Weight for canonical-URL exact match after trimming whitespace.
     pub url_weight: f64,
 
+    /// Weight for relationship-set similarity: typed-set Jaccard over
+    /// `(relation, event_id)` pairs (see [`crate::RelationshipRef`]).
+    /// Defaults to `0.05` — a **supporting** signal only: two records
+    /// referencing the same related events are weakly more likely the
+    /// same event, but the field never identifies on its own and does
+    /// not participate when either side has no relationships recorded.
+    /// See spec §6.11.
+    pub relationships_weight: f64,
+
+    /// Weight for tag-set similarity: set Jaccard over the
+    /// case-insensitively normalised tag sets. Defaults to `0.05` — a
+    /// **supporting** signal only, analogous to
+    /// [`Self::relationships_weight`]: two records sharing the same
+    /// operator-applied tags are weakly more likely the same event, but
+    /// does not participate when either side has no tags recorded. See
+    /// spec §6.12.
+    pub tags_weight: f64,
+
     /// Whether to add a phonetic-name bonus when both names sound alike.
     pub use_phonetic_matching: bool,
 
@@ -169,6 +190,8 @@ impl Default for MatchConfig {
             organizer_weight: 0.04,
             performers_weight: 0.02,
             url_weight: 0.02,
+            relationships_weight: 0.05,
+            tags_weight: 0.05,
             use_phonetic_matching: false,
             name_algorithm: SimilarityAlgorithm::Combined,
             strict_mode: false,
@@ -348,6 +371,17 @@ pub struct MatchBreakdown {
     /// `1.0` if both URLs set and equal after trimming, else `0.0`. `None`
     /// if either is absent.
     pub url_score: Option<f64>,
+    /// Score for relationship-set similarity: typed-set Jaccard over
+    /// `(relation, event_id)` pairs, `|A ∩ B| / |A ∪ B|`. `None` when
+    /// either side has no relationships recorded. See
+    /// [`crate::RelationshipRef`]; spec §6.11.
+    #[serde(default)]
+    pub relationships_score: Option<f64>,
+    /// Score for tag-set similarity: set Jaccard over the
+    /// case-insensitively normalised tag sets, `|A ∩ B| / |A ∪ B|`.
+    /// `None` when either side has no tags recorded. Spec §6.12.
+    #[serde(default)]
+    pub tags_score: Option<f64>,
 }
 
 /// Event matcher engine.
@@ -515,6 +549,8 @@ impl MatchingEngine {
             organizer_score: Self::score_organizer(event1, event2),
             performers_score: Self::score_performers(event1, event2),
             url_score: score_url(event1, event2),
+            relationships_score: score_relationships(&event1.relationships, &event2.relationships),
+            tags_score: score_tags(&event1.tags, &event2.tags),
         }
     }
 
@@ -556,6 +592,11 @@ impl MatchingEngine {
         accumulate(breakdown.organizer_score, self.config.organizer_weight);
         accumulate(breakdown.performers_score, self.config.performers_weight);
         accumulate(breakdown.url_score, self.config.url_weight);
+        accumulate(
+            breakdown.relationships_score,
+            self.config.relationships_weight,
+        );
+        accumulate(breakdown.tags_score, self.config.tags_weight);
 
         // Phonetic match is a bonus only — never lowers the score. It is
         // added with a deliberately small weight (`0.05`) so a phonetic
@@ -902,6 +943,59 @@ fn score_url(e1: &Event, e2: &Event) -> Option<f64> {
     let u1 = e1.url.as_deref()?;
     let u2 = e2.url.as_deref()?;
     Some(f64::from(u1.trim() == u2.trim()))
+}
+
+/// Score a pair of relationship-reference lists for the probabilistic
+/// breakdown: typed-set **Jaccard** over `(relation, event_id)` pairs —
+/// `|A ∩ B| / |A ∪ B|` — so an `Outer` reference only agrees with an
+/// `Outer` reference to the **same** event id. Returns `None` if either
+/// side has no relationships recorded at all (the field is irrelevant
+/// for this pair, not evidence of non-match). See spec §6.11.
+fn score_relationships(a: &[RelationshipRef], b: &[RelationshipRef]) -> Option<f64> {
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    let set_a: HashSet<(RelationKind, &str)> = a
+        .iter()
+        .map(|r| (r.relation, r.event_id.as_str()))
+        .collect();
+    let set_b: HashSet<(RelationKind, &str)> = b
+        .iter()
+        .map(|r| (r.relation, r.event_id.as_str()))
+        .collect();
+    Some(jaccard(&set_a, &set_b))
+}
+
+/// Score a pair of tag lists for the probabilistic breakdown: set
+/// **Jaccard** over the case-insensitively normalised tag sets —
+/// `|A ∩ B| / |A ∪ B|`. Normalisation happens here, at scoring time,
+/// consistent with the crate's verbatim-storage convention for names /
+/// organizer / performers — [`crate::Event::tags`] stores tags exactly
+/// as provided. Returns `None` if either side has no tags recorded at
+/// all. See spec §6.12.
+fn score_tags(a: &[String], b: &[String]) -> Option<f64> {
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    let set_a: HashSet<String> = a.iter().map(|t| t.to_lowercase()).collect();
+    let set_b: HashSet<String> = b.iter().map(|t| t.to_lowercase()).collect();
+    Some(jaccard(&set_a, &set_b))
+}
+
+/// Jaccard index `|A ∩ B| / |A ∪ B|` over two hash sets. Callers are
+/// required to have already checked both inputs are non-empty (see
+/// [`score_relationships`] / [`score_tags`]), so the union here is
+/// never zero-sized.
+///
+/// Set sizes in practice are small (an event's relationship or tag
+/// list), so the `usize` counts are routed through `u32` (exact,
+/// lint-free `u32 -> f64`) rather than a direct `usize -> f64` cast;
+/// `unwrap_or(u32::MAX)` is a non-panicking saturating fallback for a
+/// pathologically large set rather than a realistic code path.
+fn jaccard<T: Eq + std::hash::Hash>(a: &HashSet<T>, b: &HashSet<T>) -> f64 {
+    let intersection = u32::try_from(a.intersection(b).count()).unwrap_or(u32::MAX);
+    let union = u32::try_from(a.union(b).count()).unwrap_or(u32::MAX);
+    f64::from(intersection) / f64::from(union)
 }
 
 /// Deterministic rule: do both events share an identical normalised
@@ -1466,5 +1560,126 @@ mod tests {
         })
         .match_events(&p, &q);
         assert!(r.breakdown.name_phonetic_score.is_some());
+    }
+
+    // ---------- relationships & tags ----------
+
+    #[test]
+    fn config_default_relationships_and_tags_weight_is_005() {
+        let c = MatchConfig::default();
+        assert!((c.relationships_weight - 0.05).abs() < 1e-9);
+        assert!((c.tags_weight - 0.05).abs() < 1e-9);
+    }
+
+    #[test]
+    fn score_relationships_identical_sets_scores_one() {
+        let a = vec![RelationshipRef::new(RelationKind::Outer, "e1").unwrap()];
+        let b = a.clone();
+        assert_eq!(score_relationships(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn score_relationships_disjoint_sets_scores_zero() {
+        let a = vec![RelationshipRef::new(RelationKind::Outer, "e1").unwrap()];
+        let b = vec![RelationshipRef::new(RelationKind::Inner, "e1").unwrap()];
+        // Same event id, different relation kind: not the same pair.
+        assert_eq!(score_relationships(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn score_relationships_partial_overlap_scores_jaccard_ratio() {
+        let a = vec![
+            RelationshipRef::new(RelationKind::Outer, "e1").unwrap(),
+            RelationshipRef::new(RelationKind::ImmediatelyBefore, "e2").unwrap(),
+        ];
+        let b = vec![
+            RelationshipRef::new(RelationKind::Outer, "e1").unwrap(),
+            RelationshipRef::new(RelationKind::ImmediatelyBefore, "e3").unwrap(),
+        ];
+        // intersection = {(Outer, e1)} = 1; union = 3.
+        let score = score_relationships(&a, &b).unwrap();
+        assert!(approx_eq(score, 1.0 / 3.0));
+    }
+
+    #[test]
+    fn score_relationships_empty_either_side_is_none() {
+        let empty: Vec<RelationshipRef> = vec![];
+        let some = vec![RelationshipRef::new(RelationKind::Outer, "e1").unwrap()];
+        assert_eq!(score_relationships(&empty, &some), None);
+        assert_eq!(score_relationships(&some, &empty), None);
+        assert_eq!(score_relationships(&empty, &empty), None);
+    }
+
+    #[test]
+    fn score_tags_case_insensitive_identical_scores_one() {
+        let a = vec!["VIP".to_string(), "Review".to_string()];
+        let b = vec!["vip".to_string(), "review".to_string()];
+        assert_eq!(score_tags(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn score_tags_disjoint_sets_scores_zero() {
+        let a = vec!["vip".to_string()];
+        let b = vec!["fast-track".to_string()];
+        assert_eq!(score_tags(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn score_tags_partial_overlap_scores_jaccard_ratio() {
+        let a = vec!["vip".to_string(), "review".to_string()];
+        let b = vec!["VIP".to_string(), "fast-track".to_string()];
+        // intersection = {"vip"} = 1; union = {"vip", "review", "fast-track"} = 3.
+        let score = score_tags(&a, &b).unwrap();
+        assert!(approx_eq(score, 1.0 / 3.0));
+    }
+
+    #[test]
+    fn score_tags_empty_either_side_is_none() {
+        let empty: Vec<String> = vec![];
+        let some = vec!["vip".to_string()];
+        assert_eq!(score_tags(&empty, &some), None);
+        assert_eq!(score_tags(&some, &empty), None);
+        assert_eq!(score_tags(&empty, &empty), None);
+    }
+
+    #[test]
+    fn relationships_and_tags_absent_do_not_enter_the_weighted_average() {
+        // Renormalisation sanity check: with neither field populated on
+        // either side, `relationships_score`/`tags_score` are `None` and
+        // neither weight enters the denominator — an exact name +
+        // start_date match still scores a clean 1.0, not diluted by two
+        // "missing" components treated as zero.
+        let engine = MatchingEngine::default_config();
+        let a = Event::builder()
+            .name("RustConf 2024")
+            .start_date("2024-09-10T09:00:00Z")
+            .build();
+        let b = a.clone();
+        let result = engine.match_events(&a, &b);
+        assert_eq!(result.breakdown.relationships_score, None);
+        assert_eq!(result.breakdown.tags_score, None);
+        assert!(approx_eq(result.score, 1.0));
+    }
+
+    #[test]
+    fn relationships_and_tags_participate_when_present_and_agree() {
+        let engine = MatchingEngine::default_config();
+        let rel = RelationshipRef::new(RelationKind::Outer, "event-42").unwrap();
+        let a = Event::builder()
+            .name("RustConf 2024")
+            .start_date("2024-09-10T09:00:00Z")
+            .add_relationship(rel.clone())
+            .add_tag("vip")
+            .build();
+        let b = Event::builder()
+            .name("RustConf 2024")
+            .start_date("2024-09-10T09:00:00Z")
+            .add_relationship(rel)
+            .add_tag("VIP")
+            .build();
+        let result = engine.match_events(&a, &b);
+        assert_eq!(result.breakdown.relationships_score, Some(1.0));
+        assert_eq!(result.breakdown.tags_score, Some(1.0));
+        assert!(approx_eq(result.score, 1.0));
     }
 }

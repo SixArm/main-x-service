@@ -30,7 +30,7 @@ Produces a `MatchResult { score, is_match, confidence, breakdown }`:
 
 #### 5.2.1 Per-field scoring
 
-Each field is scored as described in §6. A `None` from any component means "did not participate"; the field is skipped by the renormaliser. The ten weighted components implemented today are name, start date, end date, location, category, country code, event IDs, organizer, performers, and URL. Two further supporting components, relationships (§6.11) and tags (§6.12), are specified but not yet implemented (§3.1).
+Each field is scored as described in §6. A `None` from any component means "did not participate"; the field is skipped by the renormaliser. The twelve weighted components implemented today are name, start date, end date, location, category, country code, event IDs, organizer, performers, URL, relationships (§6.11), and tags (§6.12).
 
 #### 5.2.2 Weighted-sum reducer
 

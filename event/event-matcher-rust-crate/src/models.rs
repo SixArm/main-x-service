@@ -469,6 +469,101 @@ impl EventId {
     }
 }
 
+/// The kind of typed relationship one [`Event`] asserts toward another,
+/// carried on a [`RelationshipRef`].
+///
+/// Mirrors the consuming service's own `Event` relationship vocabulary:
+/// `Outer` / `Inner` are inverses of each other describing containment
+/// (e.g. a festival's day-stage sub-event is `Inner` to the festival,
+/// which is `Outer` to it), and `ImmediatelyBefore` / `ImmediatelyAfter`
+/// are inverses describing temporal adjacency (e.g. back-to-back
+/// conference sessions). The matcher does **not** resolve or cross-check
+/// the inverse relationship; it only compares the raw `(relation,
+/// event_id)` pairs each side asserts (spec §6.11). The enum is
+/// `#[non_exhaustive]` so a new variant is purely additive.
+///
+/// # Example
+///
+/// ```
+/// use event_matcher::RelationKind;
+///
+/// let k = RelationKind::Outer;
+/// assert_eq!(k, RelationKind::Outer);
+/// assert_ne!(k, RelationKind::Inner);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum RelationKind {
+    /// This event contains the referenced event (the referenced event is
+    /// a sub-event of this one).
+    Outer,
+    /// This event is contained by the referenced event (this event is a
+    /// sub-event of the referenced one).
+    Inner,
+    /// This event takes place immediately before the referenced event.
+    ImmediatelyBefore,
+    /// This event takes place immediately after the referenced event.
+    ImmediatelyAfter,
+}
+
+/// A typed reference from one [`Event`] to another, by opaque id in the
+/// consuming registry (e.g. "this event's outer event is event `X`").
+///
+/// `RelationshipRef` is a **supporting** matching signal, not an
+/// identifying one: the matcher never resolves `event_id` against a
+/// registry (it has none) — it only compares the two events'
+/// relationship **sets** via typed-set Jaccard over `(relation,
+/// event_id)` pairs (spec §3.1 / §6.11).
+///
+/// Construct via [`RelationshipRef::new`], which trims `event_id` and
+/// rejects an empty result, so two records carrying different incidental
+/// whitespace around the same id compare equal.
+///
+/// # Example
+///
+/// ```
+/// use event_matcher::{RelationKind, RelationshipRef};
+///
+/// let r = RelationshipRef::new(RelationKind::Outer, " event-42 ").unwrap();
+/// assert_eq!(r.event_id, "event-42");
+/// assert_eq!(r.relation, RelationKind::Outer);
+///
+/// assert!(RelationshipRef::new(RelationKind::Inner, "   ").is_none());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RelationshipRef {
+    /// The kind of relationship this side asserts. See [`RelationKind`].
+    pub relation: RelationKind,
+    /// Opaque id of the related event in the consuming registry.
+    /// Whitespace-trimmed and non-empty — see [`RelationshipRef::new`].
+    pub event_id: String,
+}
+
+impl RelationshipRef {
+    /// Construct a relationship reference, trimming `event_id` and
+    /// rejecting an empty result.
+    ///
+    /// Returns `None` when `event_id` is empty after trimming.
+    ///
+    /// ```
+    /// use event_matcher::{RelationKind, RelationshipRef};
+    /// let r = RelationshipRef::new(RelationKind::ImmediatelyAfter, "event-7").unwrap();
+    /// assert_eq!(r.event_id, "event-7");
+    /// assert!(RelationshipRef::new(RelationKind::ImmediatelyAfter, "").is_none());
+    /// ```
+    #[must_use]
+    pub fn new(relation: RelationKind, event_id: impl AsRef<str>) -> Option<Self> {
+        let event_id = event_id.as_ref().trim();
+        if event_id.is_empty() {
+            return None;
+        }
+        Some(Self {
+            relation,
+            event_id: event_id.to_string(),
+        })
+    }
+}
+
 /// Core event data structure — corresponds to schema.org `Event`.
 ///
 /// Every field is optional (or defaults to empty). The matcher tolerates
@@ -625,6 +720,27 @@ pub struct Event {
     /// Identifier of the parent event (`schema:superEvent`). Stored as a
     /// free-form string so callers can carry whichever scheme they need.
     pub super_event_id: Option<String>,
+
+    /// Typed references to other events (by opaque id) in the consuming
+    /// registry — e.g. "this event's outer event is event X". A
+    /// **supporting** signal only: never identifying on its own, and the
+    /// matcher never resolves the reference (it has no registry) — it
+    /// only compares the two events' relationship **sets** via typed-set
+    /// Jaccard. Default empty. See [`RelationshipRef`] / [`RelationKind`];
+    /// spec §3.1 / §6.11.
+    #[serde(default)]
+    pub relationships: Vec<RelationshipRef>,
+
+    /// Operator-applied free-text labels (e.g. `"vip"`, `"review"`,
+    /// `"fast-track"`). Stored verbatim; compared case-insensitively at
+    /// match time, consistent with the crate's normalise-at-match-time
+    /// convention for names / organizer / performers. Distinct from
+    /// [`Self::keywords`] (descriptive terms about what the record is):
+    /// tags are user-applied operational labels. A **supporting** signal
+    /// only: never identifying on its own. Default empty. See spec
+    /// §3.1 / §6.12.
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 impl Event {
@@ -725,6 +841,8 @@ pub struct EventBuilder {
     maximum_virtual_attendee_capacity: Option<u32>,
     is_accessible_for_free: Option<bool>,
     super_event_id: Option<String>,
+    relationships: Vec<RelationshipRef>,
+    tags: Vec<String>,
 }
 
 impl EventBuilder {
@@ -931,6 +1049,63 @@ impl EventBuilder {
         self
     }
 
+    /// Append a single relationship reference. Chainable; call multiple
+    /// times to record several relationships.
+    ///
+    /// ```
+    /// # use event_matcher::{RelationKind, RelationshipRef, Event};
+    /// let e = Event::builder()
+    ///     .add_relationship(RelationshipRef::new(RelationKind::Outer, "event-42").unwrap())
+    ///     .build();
+    /// assert_eq!(e.relationships.len(), 1);
+    /// ```
+    #[must_use]
+    pub fn add_relationship(mut self, relationship: RelationshipRef) -> Self {
+        self.relationships.push(relationship);
+        self
+    }
+
+    /// Replace the entire relationship list.
+    ///
+    /// ```
+    /// # use event_matcher::{RelationKind, RelationshipRef, Event};
+    /// let refs = vec![RelationshipRef::new(RelationKind::Inner, "event-1").unwrap()];
+    /// let e = Event::builder().relationships(refs).build();
+    /// assert_eq!(e.relationships.len(), 1);
+    /// ```
+    #[must_use]
+    pub fn relationships(mut self, value: Vec<RelationshipRef>) -> Self {
+        self.relationships = value;
+        self
+    }
+
+    /// Append a single tag. Chainable; call multiple times to record
+    /// several tags.
+    ///
+    /// ```
+    /// # use event_matcher::Event;
+    /// let e = Event::builder().add_tag("vip").add_tag("review").build();
+    /// assert_eq!(e.tags, vec!["vip".to_string(), "review".to_string()]);
+    /// ```
+    #[must_use]
+    pub fn add_tag<S: Into<String>>(mut self, value: S) -> Self {
+        self.tags.push(value.into());
+        self
+    }
+
+    /// Replace the entire tag list.
+    ///
+    /// ```
+    /// # use event_matcher::Event;
+    /// let e = Event::builder().tags(vec!["vip".to_string()]).build();
+    /// assert_eq!(e.tags.len(), 1);
+    /// ```
+    #[must_use]
+    pub fn tags(mut self, value: Vec<String>) -> Self {
+        self.tags = value;
+        self
+    }
+
     /// Consume the builder and produce the [`Event`].
     #[must_use]
     pub fn build(self) -> Event {
@@ -960,6 +1135,8 @@ impl EventBuilder {
             maximum_virtual_attendee_capacity: self.maximum_virtual_attendee_capacity,
             is_accessible_for_free: self.is_accessible_for_free,
             super_event_id: self.super_event_id,
+            relationships: self.relationships,
+            tags: self.tags,
         }
     }
 }
@@ -1187,5 +1364,76 @@ mod tests {
         let json = serde_json::to_string(&m).expect("serialise");
         let back: EventAttendanceMode = serde_json::from_str(&json).expect("deserialise");
         assert_eq!(m, back);
+    }
+
+    // ---------- relationships & tags ----------
+
+    #[test]
+    fn relationship_ref_trims_event_id() {
+        let r = RelationshipRef::new(RelationKind::Outer, "  event-42 ").unwrap();
+        assert_eq!(r.event_id, "event-42");
+        assert_eq!(r.relation, RelationKind::Outer);
+    }
+
+    #[test]
+    fn relationship_ref_rejects_empty_event_id() {
+        assert!(RelationshipRef::new(RelationKind::Inner, "").is_none());
+        assert!(RelationshipRef::new(RelationKind::Inner, "   ").is_none());
+    }
+
+    #[test]
+    fn event_builder_starts_with_empty_relationships_and_tags() {
+        let e = Event::builder().build();
+        assert!(e.relationships.is_empty());
+        assert!(e.tags.is_empty());
+    }
+
+    #[test]
+    fn relationships_and_tags_setters_replace_vec() {
+        let e = Event::builder()
+            .add_relationship(RelationshipRef::new(RelationKind::Outer, "e1").unwrap())
+            .add_relationship(RelationshipRef::new(RelationKind::Inner, "e2").unwrap())
+            .add_tag("vip")
+            .add_tag("review")
+            .build();
+        assert_eq!(e.relationships.len(), 2);
+        assert_eq!(e.tags, vec!["vip".to_string(), "review".to_string()]);
+
+        let e2 = Event::builder()
+            .relationships(vec![
+                RelationshipRef::new(RelationKind::ImmediatelyBefore, "e3").unwrap(),
+            ])
+            .tags(vec!["fast-track".to_string()])
+            .build();
+        assert_eq!(e2.relationships.len(), 1);
+        assert_eq!(e2.tags, vec!["fast-track".to_string()]);
+    }
+
+    #[test]
+    fn event_with_relationships_and_tags_round_trips_through_serde() {
+        let e = Event::builder()
+            .name("RustConf 2024")
+            .add_relationship(RelationshipRef::new(RelationKind::Outer, "event-1").unwrap())
+            .add_tag("vip")
+            .build();
+        let json = serde_json::to_string(&e).expect("serialise");
+        let back: Event = serde_json::from_str(&json).expect("deserialise");
+        assert_eq!(e, back);
+    }
+
+    #[test]
+    fn event_without_relationships_or_tags_keys_still_deserialises() {
+        // #[serde(default)] on `relationships`/`tags` means legacy JSON
+        // predating these fields still deserialises, defaulting to empty
+        // vecs, rather than failing with a "missing field" error.
+        let e = Event::builder().name("RustConf 2024").build();
+        let value = serde_json::to_value(&e).expect("serialise to value");
+        let mut object = value.as_object().expect("object").clone();
+        object.remove("relationships");
+        object.remove("tags");
+        let json = serde_json::Value::Object(object);
+        let back: Event = serde_json::from_value(json).expect("deserialise");
+        assert!(back.relationships.is_empty());
+        assert!(back.tags.is_empty());
     }
 }

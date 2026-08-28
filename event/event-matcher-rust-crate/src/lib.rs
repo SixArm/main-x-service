@@ -114,7 +114,7 @@ pub use error::{MatchingError, Result};
 pub use matcher::{Confidence, MatchBreakdown, MatchConfig, MatchResult, MatchingEngine};
 pub use models::{
     Address, Event, EventAttendanceMode, EventBuilder, EventCategory, EventId, EventIdScheme,
-    EventStatus, Location,
+    EventStatus, Location, RelationKind, RelationshipRef,
 };
 pub use normalizer::{Normalizer, ParsedAddressLine};
 pub use scorer::{Scorer, SimilarityAlgorithm};

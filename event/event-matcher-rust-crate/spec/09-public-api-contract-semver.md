@@ -12,7 +12,7 @@ The crate follows Semantic Versioning. Pre-1.0, minor bumps MAY contain breaking
 The following items carry `#[non_exhaustive]`:
 
 - `Event`, `Address`, and `Location` — adding fields is non-breaking. Downstream code MUST construct via the builder / `new` rather than struct-literal syntax.
-- `EventCategory`, `EventStatus`, `EventAttendanceMode`, and `EventIdScheme` — adding variants is non-breaking. Downstream `match` statements MUST include a `_ => ...` arm.
+- `EventCategory`, `EventStatus`, `EventAttendanceMode`, `EventIdScheme`, and `RelationKind` — adding variants is non-breaking. Downstream `match` statements MUST include a `_ => ...` arm.
 - `MatchingError` — adding variants is non-breaking.
 
 Removing fields or variants is breaking.
