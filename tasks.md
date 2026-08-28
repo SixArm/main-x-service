@@ -6643,27 +6643,41 @@ crate above.
   primitives in `matching::geo` and `SearchQuery`.
 
 **care-pathway**
-- [ ] **PRO-P13 (M)** The crate spec (self-declared single source of
-  truth) has **zero coverage of TBA and the `continues_as`/journey/
-  links surface** — `src/tba.rs`, `src/journey.rs`,
-  `controllers/{tba,links}.rs`, two migrations, and the 404-not-403
-  rule exist only in the umbrella spec + CHANGELOG + AGENTS. Backport
-  into spec §2/§6/§11/§13/§14/§15 (or add an explicit delegation
-  pointer to the umbrella docs). Sweep the stale "front-end merge
-  action deferred" claim (×3 in spec + AGENTS — the FE ships merge);
-  add the TBA/journey/links endpoint tables to `index.md`/`README.md`;
-  add `/time` to the FE spec route list; fix the verifier 0.2→0.9
-  citation; add the instance + insight endpoints to `openapi.rs`.
+- [x] **PRO-P13 (M)** *(done 2026-08-28)* The crate spec (self-declared
+  single source of truth) had **zero coverage of TBA and the
+  `continues_as`/journey/links surface** — backported into spec
+  §2/§6 (new §6.18–§6.20, incl. the 404-not-403 rule as a named
+  subsection)/§11/§13/§14/§15, `AGENTS.md`, `README.md`, `index.md`;
+  swept the stale "front-end merge action deferred" claim everywhere
+  it appeared; fixed the verifier 0.2→0.9 citation. Closed
+  `src/openapi.rs`'s own acknowledged gap — added the operational
+  instance layer + the five registry-insight lenses (18 routes,
+  split into three functions for `too_many_lines`), every path
+  verified against the controllers' actual `Routes::new()`
+  registration before landing. Verified: fmt clean, clippy
+  `-D warnings` clean, 315 tests green.
+  The front-end's `/time` route existed in code but was found missing
+  from `care-pathway-front-end-with-svelte/spec/index.md` §2's route
+  list (a genuine gap, not stale-audit noise — AGENTS.md already had
+  it right); fixed as a one-line addition alongside.
 
 **case**
-- [ ] **PRO-P14 (M)** Rewrite the stale **entity-level** umbrella spec:
-  `case/spec/13-tasks.md` lists Tantivy/privacy/bus as open (all landed
-  2026-08-02/03) and `14-implementation-status.md` contradicts itself
-  on PASETO (line 25 vs 44) while omitting entity_links, FHIR,
-  compliance, bulk, and ABAC. Also tick the two implemented FHIR
-  sub-tasks in the crate spec (`spec/index.md:1225,1231`), close the
-  stale line-1029 privacy checkbox, and close/rescope entity T-13 (it
-  conflicts with the root no-`agents/` decision).
+- [x] **PRO-P14 (M)** *(done 2026-08-28)* Rewrote the stale
+  **entity-level** umbrella spec, grounded against `CHANGELOG.md`
+  dates and a fresh grep of `src/` rather than the earlier audit
+  summary: `case/spec/13-tasks.md` closed T-6/T-10/T-12 (Tantivy,
+  privacy, durable bus — all landed 2026-08-02/03) with dated,
+  file-cited entries, honestly leaving genuine sub-gaps open (e.g.
+  multi-case subject-scoped export, live-broker Fluvio round-trip);
+  `14-implementation-status.md` resolved its own PASETO self-
+  contradiction and added the capabilities it omitted entirely
+  (entity_links, FHIR, compliance suite, bulk, record-level ABAC),
+  with a dated §14.3 explaining what was corrected and why. Ticked
+  the two implemented FHIR sub-tasks in the crate spec
+  (`spec/index.md:1225,1231`) and the stale line-1029 privacy
+  checkbox, each with a file/line citation. Closed entity T-13 as
+  won't-do, citing the root AGENTS.md no-`agents/`-for-newer-
+  subprojects decision. Docs-only; `scripts/ci-check.sh docs` green.
 - [ ] **PRO-P15 (M)** case FE: add the search box + audit/event views —
   the shipped Tantivy search unblocked T-11 weeks ago.
 
