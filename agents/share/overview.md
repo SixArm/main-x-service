@@ -110,19 +110,29 @@ case, and portfolio each provide:
   (`<ENTITY>_REQUIRE_AUTH`, default-off), via the shared
   `authentication-verifier`
 - **Observability** — structured `tracing` and a Prometheus
-  `/metrics.prom` endpoint. **Not** OpenTelemetry export: person, worker
-  and event carry an `src/observability/` module that builds an OTel
-  `Resource` and then installs a plain JSON subscriber, with the exporter
-  commented out (`// TODO: Initialize OTLP exporter`); the other seven
-  have no such module. **None of the ten entity registries exports a span
-  or a metric over OTLP** (re-verified 2026-08-05). The cross-cutting
-  **link-graph-service does** — as of 2026-08-05 it is the family's only
-  working exporter (`src/observability.rs`: OTLP/gRPC traces + metrics
+  `/metrics.prom` endpoint. OpenTelemetry OTLP export is **rolling out
+  but not yet family-wide** (repo `tasks.md` PRO-H9, subsuming the
+  earlier AU-3): as of 2026-08-28, **person** carries a real exporter
+  (`src/observability.rs`, ported from link-graph-service — see below),
+  while **worker and event** still carry the original `src/observability/`
+  stub that builds an OTel `Resource` and then installs a plain JSON
+  subscriber, with the exporter commented out
+  (`// TODO: Initialize OTLP exporter`); the other seven registries have
+  no such module at all. Copy person's `src/observability.rs` for worker
+  and event, not their own stub — see that file's module docs and
+  person's `AGENTS.md` "OpenTelemetry OTLP export" section for the two
+  adaptations person's port needed beyond link-graph-service's shape (the
+  tower middleware wired onto **two** router-construction surfaces
+  instead of one, and a renamed `tonic` dev-dependency to avoid an
+  extern-prelude collision with the crate's own gRPC-stub dependency —
+  both apply to worker and event too, since both also carry a `tonic`
+  gRPC stub). The cross-cutting **link-graph-service** carries the
+  original reference (`src/observability.rs`: OTLP/gRPC traces + metrics
   bridged from `tracing` through loco's `Hooks::init_logger` seam, with a
   per-request span, an `http.server.request.duration` histogram, and a
   W3C `traceparent` response header, proved against a real in-process
-  collector). Rolling that shape across the registries is queued work,
-  not something done here (repo `tasks.md` AU-3)
+  collector). Rolling this across the remaining nine registries (seven
+  with no module yet, plus worker and event's stubs) is queued work.
 - **PostgreSQL** persistence via SeaORM + migrations
 
 ### Capabilities that vary by crate
@@ -212,10 +222,10 @@ These are **not** entity registries and share little of the matrix above:
   world: it consumes every entity's event stream, serves the cross-service
   graph (`neighbors` / `single-view` / freshness), reconciles against each
   service's `entity_links`, audits, and sits behind the blanket guard. No
-  CRUD writes / matching / FHIR. Carries the family's **only working
-  OpenTelemetry OTLP exporter** (2026-08-05, `src/observability.rs`) —
-  the reference the other crates' commented-out stubs should be replaced
-  with.
+  CRUD writes / matching / FHIR. Carries the family's original working
+  OpenTelemetry OTLP exporter (2026-08-05, `src/observability.rs`) — the
+  reference person's own exporter (2026-08-28, PRO-H9) was ported from,
+  and worker's / event's commented-out stubs should be replaced with next.
 
 See [rust-loco-stack.md](rust-loco-stack.md) for the dependency stack.
 

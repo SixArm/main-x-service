@@ -98,6 +98,67 @@ published without reaching a real broker). `compose.fluvio.yaml` +
 `Dockerfile.fluvio-cli` provision a local broker for opt-in manual runs
 (not part of any automated CI stage).
 
+## OpenTelemetry OTLP export
+
+`src/observability.rs` (repo `tasks.md` PRO-H9, landed 2026-08-28) is a
+close port of link-graph-service's `src/observability.rs` — the
+family's first working exporter and this crate's reference. It
+**replaces** the earlier `src/observability/` stub outright (a JSON
+`tracing` subscriber with the OTLP exporter commented out behind
+`// TODO: Initialize OTLP exporter`, never wired into `App`'s `Hooks`
+impl at all) rather than filling the stub in place. `App::init_logger`
+installs it (loco's own `EnvFilter` + formatted layer, plus the
+`tracing-opentelemetry` bridge over an OTLP/gRPC exporter);
+`App::on_shutdown` flushes it. Export is **on by default** — set
+`OTLP_ENDPOINT=""` to disable it — at `OTLP_ENDPOINT` (default
+`http://localhost:4317`) with `service.name` from `OTLP_SERVICE_NAME`
+(default `person-service`); both variables are **deliberately
+unprefixed**, matching link-graph-service and
+`agents/share/rust-tracing-opentelemetry-stack.md`'s config table, not
+the per-service `PERSON_*` convention `PERSON_REQUIRE_AUTH` and its
+siblings use.
+
+**Where this crate's shape forced real adaptation**, beyond the
+`Hooks::init_logger`/`on_shutdown` seam (which ported close to
+verbatim): this crate carries **two** router-construction surfaces —
+the loco-native one (`api::rest::persons_routes()`, mounted via
+`App::routes`/`App::after_routes`) and a standalone hand-rolled one
+(`api::rest::create_router`, used only by the DB-gated integration
+tests) — where link-graph-service has exactly one (pure loco). The
+`observability::trace_mw` tower middleware (per-request span +
+`http.server.request.duration` histogram + W3C `traceparent` response
+header) is layered onto **both**, as the outermost layer in each, so
+tracing behaves identically regardless of which router a caller or
+test builds — the same precedent `auth::require_auth_middleware`
+already set by being layered on both surfaces.
+
+A second, narrower adaptation: this crate already depends on
+`tonic = "0.12"` for its own gRPC stub (`src/api/grpc/`), so the
+in-process OTLP collector tests' `tonic = "0.14"` dev-dependency (used
+to serve the fake collector) is declared as
+`otlp-test-tonic = { package = "tonic", version = "0.14" }` — an
+unrenamed second `tonic` dependency at a different version collides in
+a test binary's extern prelude (`E0464: multiple candidates for rlib
+dependency tonic`). link-graph-service has no gRPC stub of its own, so
+this collision — and the rename — has no analogue there; worker and
+event both carry the same `tonic = "0.12"` gRPC-stub dependency
+(`agents/share/overview.md`'s capability matrix) and will need the same
+rename when this pattern rolls to them. The rename also required
+teaching `src/compliance/soup.rs`'s SOUP-register parser to resolve a
+`package = "…"` inline-table rename to its target crate name — the
+unrenamed manifest alias satisfies neither the "every direct dependency
+is annotated" check (which wants the alias annotated) nor the "no stale
+register entries" check (which wants the annotated name to exist in
+`Cargo.lock`, where only the resolved name appears) at once.
+
+`tests/otlp_export.rs` and `tests/otlp_middleware.rs` (ported from
+link-graph-service, with `tests/otlp_collector/` — an in-process
+OTLP/gRPC collector, unchanged) prove real export against a real gRPC
+listener in a normal `cargo test` run: a `tracing` span and a metric
+both reach the collector's decoded protobuf, and a served HTTP request
+returns a `traceparent` whose trace id matches the exported span's.
+None of this needs a database.
+
 ## Container image
 
 `Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's

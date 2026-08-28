@@ -18,9 +18,13 @@ and accept.
   deployment policies are configuration — `PERSON_ABAC_POLICY*` — not
   code; record-level resource attributes are a shared-design open
   question), rate limiting, user endpoints, security headers.
-- **Observability** — Prometheus alongside OTLP, complete OTLP trace
-  exporter, custom metrics (`person_created`, `match_score_histogram`,
-  …), Grafana dashboards + alerting.
+- **Observability** — the real OTLP trace + metric exporter landed
+  2026-08-28 (PRO-H9, ported from link-graph-service's
+  `src/observability.rs` — see `agents/share/rust-tracing-opentelemetry-stack.md`),
+  replacing the earlier commented-out stub. Still open: custom
+  business metrics (`person_created`, `match_score_histogram`, …)
+  alongside the generic `http.server.request.duration` histogram,
+  Grafana dashboards + alerting.
 - **Performance** — query caching (in-memory), N+1 batch
   fixes, load test at realistic person volumes, profile matching hot
   paths.
