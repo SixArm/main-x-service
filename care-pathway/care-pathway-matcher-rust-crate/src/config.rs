@@ -23,6 +23,23 @@ pub struct MatchConfig {
     pub interventions_weight: f64,
     /// Weight of the keywords (Jaccard) component. Default 0.10.
     pub keywords_weight: f64,
+
+    /// Weight of the relationship-set similarity component: typed-set
+    /// Jaccard over `(relation, pathway_id)` pairs (see
+    /// [`crate::RelationshipRef`]). Default `0.05` — a **supporting**
+    /// signal only: two records referencing the same related pathways
+    /// are weakly more likely the same pathway, but the field never
+    /// identifies on its own and does not participate when either side
+    /// has no relationships recorded. See spec §13.1 / §23.
+    pub relationships_weight: f64,
+    /// Weight of the tag-set similarity component: set Jaccard over the
+    /// case-insensitively normalised tag sets. Default `0.05` — a
+    /// **supporting** signal only, analogous to
+    /// [`Self::relationships_weight`]: two records sharing the same
+    /// operator-applied tags are weakly more likely the same pathway,
+    /// but does not participate when either side has no tags recorded.
+    /// See spec §13.2 / §23.
+    pub tags_weight: f64,
 }
 
 impl Default for MatchConfig {
@@ -42,6 +59,8 @@ impl Default for MatchConfig {
             care_setting_weight: 0.10,
             interventions_weight: 0.10,
             keywords_weight: 0.10,
+            relationships_weight: 0.05,
+            tags_weight: 0.05,
         }
     }
 }
@@ -123,5 +142,15 @@ mod tests {
         assert!((l.threshold - 0.70).abs() < 1e-9);
         assert!((s.weight_total() - d.weight_total()).abs() < 1e-9);
         assert!((l.name_weight - d.name_weight).abs() < 1e-9);
+    }
+
+    // The two supporting-signal weights (§13.1/§13.2, §23) default to
+    // 0.05 each and layer on top of the core six, which is why
+    // `weight_total` (the core-six sum) still pins to exactly 1.0 above.
+    #[test]
+    fn default_relationships_and_tags_weight_is_005() {
+        let c = MatchConfig::default();
+        assert!((c.relationships_weight - 0.05).abs() < 1e-9);
+        assert!((c.tags_weight - 0.05).abs() < 1e-9);
     }
 }

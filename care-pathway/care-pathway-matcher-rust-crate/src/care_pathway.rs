@@ -48,6 +48,26 @@ pub struct CarePathway {
     /// BCP-47 language codes.
     #[serde(default)]
     pub in_language: Vec<String>,
+    /// Typed references to other pathways (by opaque id) in the
+    /// consuming registry — e.g. "this pathway supersedes pathway X".
+    /// A **supporting** signal only: never identifying on its own, and
+    /// the matcher never resolves the reference (it has no registry) —
+    /// it only compares the two pathways' relationship **sets** via
+    /// typed-set Jaccard. Default empty. See [`RelationshipRef`] /
+    /// [`RelationKind`]; spec §6 / §13.1 / §23.
+    #[serde(default)]
+    pub relationships: Vec<RelationshipRef>,
+    /// Operator-applied free-text labels (e.g. `"vip"`, `"review"`,
+    /// `"fast-track"`) for grouping / workflow. Stored verbatim;
+    /// compared case-insensitively at match time via
+    /// [`crate::normalize::fold`], consistent with the crate's
+    /// normalise-at-match-time convention (`name`, `pathway_code`,
+    /// identifier values). Distinct from [`Self::keywords`] (descriptive
+    /// terms about *what the pathway is*): tags are user-applied
+    /// operational labels. A **supporting** signal only: never
+    /// identifying on its own. Default empty. See spec §6 / §13.2 / §23.
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 impl CarePathway {
@@ -180,4 +200,76 @@ impl IdentifierScheme {
                 | IdentifierScheme::Uuid
         )
     }
+}
+
+/// The kind of typed relationship one [`CarePathway`] asserts toward
+/// another, carried on a [`RelationshipRef`].
+///
+/// Mirrors the consuming service's own pathway-relationship vocabulary.
+/// `PrecededBy`/`FollowedBy` and `Supersedes`/`SupersededBy` are inverse
+/// pairs — if pathway A holds `Supersedes` pointing at pathway B, the
+/// converse fact is that B is `SupersededBy` A — but the matcher does
+/// **not** resolve or cross-check that inverse; it only compares the raw
+/// `(relation, pathway_id)` pairs each side asserts (spec §13.1).
+/// `#[non_exhaustive]` (plus the open `Custom` variant) so a consuming
+/// service can add relation kinds without a breaking change here.
+///
+/// # Examples
+///
+/// ```
+/// use care_pathway_matcher::RelationKind;
+///
+/// let k = RelationKind::Supersedes;
+/// assert_eq!(k, RelationKind::Supersedes);
+/// assert_ne!(k, RelationKind::SupersededBy);
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum RelationKind {
+    /// This pathway is preceded by the referenced pathway (sequencing).
+    PrecededBy,
+    /// This pathway is followed by the referenced pathway (sequencing).
+    FollowedBy,
+    /// This pathway is clinically similar to the referenced pathway
+    /// (symmetric — either side may assert it).
+    SimilarTo,
+    /// This pathway supersedes the referenced pathway (versioning).
+    Supersedes,
+    /// This pathway is superseded by the referenced pathway (versioning).
+    SupersededBy,
+    /// Free-form custom relation kind with a caller-supplied label.
+    Custom(String),
+}
+
+/// A typed reference from one [`CarePathway`] to another, by opaque id in
+/// the consuming registry (e.g. "this pathway supersedes pathway `X`").
+///
+/// `RelationshipRef` is a **supporting** matching signal, not an
+/// identifying one: the matcher never resolves `pathway_id` against a
+/// registry (it has none) — it only compares the two pathways'
+/// relationship **sets** via typed-set Jaccard over `(relation,
+/// pathway_id)` pairs (spec §13.1). `pathway_id` is stored verbatim and
+/// folded (trimmed, case-normalised) at scoring time, consistent with
+/// the crate's normalise-at-match-time convention; an entry whose id
+/// folds to empty carries no identity and is dropped from the
+/// comparison rather than spuriously matching another blank id.
+///
+/// # Examples
+///
+/// ```
+/// use care_pathway_matcher::{RelationKind, RelationshipRef};
+///
+/// let r = RelationshipRef {
+///     relation: RelationKind::Supersedes,
+///     pathway_id: "pathway-42".into(),
+/// };
+/// assert_eq!(r.relation, RelationKind::Supersedes);
+/// assert_eq!(r.pathway_id, "pathway-42");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RelationshipRef {
+    /// The kind of relationship this side asserts. See [`RelationKind`].
+    pub relation: RelationKind,
+    /// Opaque id of the related pathway in the consuming registry.
+    pub pathway_id: String,
 }

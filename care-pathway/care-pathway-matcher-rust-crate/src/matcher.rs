@@ -9,9 +9,11 @@
 //! 2. **Probabilistic scoring.** Per-component scores, then a weighted
 //!    average over the *present* components.
 
+use std::collections::HashSet;
+
 use strsim::jaro_winkler;
 
-use crate::care_pathway::{CarePathway, CodeSystem, ConditionCode};
+use crate::care_pathway::{CarePathway, CodeSystem, ConditionCode, RelationKind, RelationshipRef};
 use crate::config::MatchConfig;
 use crate::normalize;
 use crate::phonetic;
@@ -107,6 +109,8 @@ impl MatchingEngine {
         let care_setting_score = care_setting_score(a, b);
         let interventions_score = set_jaccard(&a.interventions, &b.interventions);
         let keywords_score = set_jaccard(&a.keywords, &b.keywords);
+        let relationships_score = relationships_score(&a.relationships, &b.relationships);
+        let tags_score = tags_score(&a.tags, &b.tags);
 
         // Renormalised weighted average over the present components only.
         let score = weighted_average(&[
@@ -116,6 +120,8 @@ impl MatchingEngine {
             (care_setting_score, self.config.care_setting_weight),
             (interventions_score, self.config.interventions_weight),
             (keywords_score, self.config.keywords_weight),
+            (relationships_score, self.config.relationships_weight),
+            (tags_score, self.config.tags_weight),
         ]);
 
         // `is_match` is purely threshold-driven; the band in `confidence`
@@ -132,6 +138,8 @@ impl MatchingEngine {
                 care_setting_score,
                 interventions_score,
                 keywords_score,
+                relationships_score,
+                tags_score,
                 deterministic_match: false,
             },
         }
@@ -417,6 +425,97 @@ fn set_jaccard(a: &[String], b: &[String]) -> Option<f64> {
     }
 }
 
+/// Relationship-set component: typed-set **Jaccard** over `(relation,
+/// pathway_id)` pairs — `|A ∩ B| / |A ∪ B|` — so a `Supersedes`
+/// reference only agrees with a `Supersedes` reference to the **same**
+/// pathway. `pathway_id` is folded (trimmed, case-normalised) before
+/// comparison, consistent with the crate's normalise-at-match-time
+/// convention; an entry whose id folds to empty carries no identity and
+/// is dropped rather than spuriously matching another blank id (the
+/// same SEC-M2 discipline the deterministic rules apply to identifier
+/// values and pathway codes).
+///
+/// Returns `None` when **either** side has no relationships recorded at
+/// all — the field is irrelevant for this pair, not evidence of
+/// non-match. Unlike [`set_jaccard`] (interventions/keywords, `None`
+/// only when *both* sides are empty), a relationship set's total
+/// absence on either side is "no signal": relationships are far
+/// sparser data than interventions/keywords, so one side never having
+/// recorded any is common and must not read as active disagreement.
+/// See spec §13.1.
+fn relationships_score(a: &[RelationshipRef], b: &[RelationshipRef]) -> Option<f64> {
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    let set_a = relationship_set(a);
+    let set_b = relationship_set(b);
+    // Both raw lists were non-empty, but folding may have dropped every
+    // entry (blank pathway ids on both sides) — re-check before dividing.
+    if set_a.is_empty() || set_b.is_empty() {
+        return None;
+    }
+    Some(jaccard(&set_a, &set_b))
+}
+
+/// Fold a relationship list into a `(relation, pathway_id)` hash set for
+/// [`relationships_score`]. Entries whose `pathway_id` folds to empty
+/// are dropped (SEC-M2 discipline — see [`relationships_score`]); the
+/// hash set itself absorbs any exact-duplicate entries.
+fn relationship_set(items: &[RelationshipRef]) -> HashSet<(RelationKind, String)> {
+    items
+        .iter()
+        .filter_map(|r| {
+            let id = normalize::fold(&r.pathway_id);
+            if id.is_empty() {
+                None
+            } else {
+                Some((r.relation.clone(), id))
+            }
+        })
+        .collect()
+}
+
+/// Jaccard index `|A ∩ B| / |A ∪ B|` over two hash sets. Callers are
+/// required to have already checked both inputs are non-empty (see
+/// [`relationships_score`]), so the union here is never zero-sized.
+///
+/// Set sizes in practice are small (a pathway's relationship list), so
+/// the `usize` counts are routed through `u32` (exact, lint-free
+/// `u32 -> f64`) rather than a direct `usize -> f64` cast;
+/// `unwrap_or(u32::MAX)` is a non-panicking saturating fallback for a
+/// pathologically large set rather than a realistic code path.
+fn jaccard<T: Eq + std::hash::Hash>(a: &HashSet<T>, b: &HashSet<T>) -> f64 {
+    let intersection = u32::try_from(a.intersection(b).count()).unwrap_or(u32::MAX);
+    let union = u32::try_from(a.union(b).count()).unwrap_or(u32::MAX);
+    f64::from(intersection) / f64::from(union)
+}
+
+/// Tag-set component: set **Jaccard** over the case-insensitively
+/// normalised (folded) tag sets — `|A ∩ B| / |A ∪ B|`. Normalisation
+/// happens here, at scoring time — [`CarePathway::tags`] stores tags
+/// exactly as provided, consistent with the crate's
+/// normalise-at-match-time convention for `name` / `pathway_code` /
+/// identifier values.
+///
+/// Returns `None` when **either** side has no tags recorded at all,
+/// mirroring [`relationships_score`]'s "no signal" rule rather than
+/// [`set_jaccard`]'s "both empty" rule — a tag is an operator-applied,
+/// opt-in label, so one side never having any is not evidence of
+/// disagreement. See spec §13.2.
+fn tags_score(a: &[String], b: &[String]) -> Option<f64> {
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    let a_set: HashSet<String> = normalize::fold_set(a).into_iter().collect();
+    let b_set: HashSet<String> = normalize::fold_set(b).into_iter().collect();
+    // Both raw lists were non-empty, but folding may have reduced an
+    // all-blank list to empty — re-check before dividing.
+    if a_set.is_empty() || b_set.is_empty() {
+        return None;
+    }
+    Some(jaccard(&a_set, &b_set))
+}
+
 // ─── Tests ───────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -690,5 +789,161 @@ mod tests {
         let matches = engine.find_matches(&query, &cands);
         assert!(matches.iter().all(|(_, r)| r.is_match));
         assert!(engine.match_one_to_many(&query, &[]).is_empty());
+    }
+
+    // ---------- relationships & tags (§13.1 / §13.2, §23) ----------
+
+    fn rel(relation: RelationKind, pathway_id: &str) -> RelationshipRef {
+        RelationshipRef {
+            relation,
+            pathway_id: pathway_id.into(),
+        }
+    }
+
+    #[test]
+    fn relationships_score_identical_sets_scores_one() {
+        let a = vec![rel(RelationKind::Supersedes, "p1")];
+        let b = a.clone();
+        assert_eq!(relationships_score(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn relationships_score_disjoint_sets_scores_zero() {
+        let a = vec![rel(RelationKind::Supersedes, "p1")];
+        // Same pathway id, different relation kind: not the same pair.
+        let b = vec![rel(RelationKind::SupersededBy, "p1")];
+        assert_eq!(relationships_score(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn relationships_score_partial_overlap_scores_jaccard_ratio() {
+        let a = vec![
+            rel(RelationKind::Supersedes, "p1"),
+            rel(RelationKind::SimilarTo, "p2"),
+        ];
+        let b = vec![
+            rel(RelationKind::Supersedes, "p1"),
+            rel(RelationKind::SimilarTo, "p3"),
+        ];
+        // intersection = {(Supersedes, p1)} = 1; union = 3.
+        let score = relationships_score(&a, &b).unwrap();
+        assert!((score - 1.0 / 3.0).abs() < 1e-9, "got {score}");
+    }
+
+    #[test]
+    fn relationships_score_empty_either_side_is_none() {
+        let empty: Vec<RelationshipRef> = vec![];
+        let some = vec![rel(RelationKind::Supersedes, "p1")];
+        assert_eq!(relationships_score(&empty, &some), None);
+        assert_eq!(relationships_score(&some, &empty), None);
+        assert_eq!(relationships_score(&empty, &empty), None);
+    }
+
+    // A pathway_id that folds to empty (blank/whitespace-only) on both
+    // sides carries no identity — SEC-M2 discipline — so the sets end up
+    // empty after folding and the component drops to `None`, not a
+    // spurious match.
+    #[test]
+    fn relationships_score_blank_pathway_id_is_none() {
+        let a = vec![rel(RelationKind::Supersedes, "   ")];
+        let b = vec![rel(RelationKind::Supersedes, "  ")];
+        assert_eq!(relationships_score(&a, &b), None);
+    }
+
+    #[test]
+    fn tags_score_case_insensitive_identical_scores_one() {
+        let a = vec!["Fast-Track".to_string(), "VIP".to_string()];
+        let b = vec!["fast-track".to_string(), "vip".to_string()];
+        assert_eq!(tags_score(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn tags_score_disjoint_sets_scores_zero() {
+        let a = vec!["vip".to_string()];
+        let b = vec!["review".to_string()];
+        assert_eq!(tags_score(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn tags_score_partial_overlap_scores_jaccard_ratio() {
+        let a = vec!["vip".to_string(), "review".to_string()];
+        let b = vec!["VIP".to_string(), "fast-track".to_string()];
+        // intersection = {"vip"} = 1; union = {"vip", "review", "fast-track"} = 3.
+        let score = tags_score(&a, &b).unwrap();
+        assert!((score - 1.0 / 3.0).abs() < 1e-9, "got {score}");
+    }
+
+    #[test]
+    fn tags_score_empty_either_side_is_none() {
+        let empty: Vec<String> = vec![];
+        let some = vec!["vip".to_string()];
+        assert_eq!(tags_score(&empty, &some), None);
+        assert_eq!(tags_score(&some, &empty), None);
+        assert_eq!(tags_score(&empty, &empty), None);
+    }
+
+    // Renormalisation sanity check: with neither field populated on
+    // either side, `relationships_score`/`tags_score` are `None` and
+    // neither weight enters the denominator — an exact-name match still
+    // scores a clean 1.0, not diluted by two "missing" components
+    // treated as zero.
+    #[test]
+    fn relationships_and_tags_absent_do_not_enter_the_weighted_average() {
+        let engine = MatchingEngine::default_config();
+        let a = CarePathway::new("Acute Stroke Care Pathway");
+        let b = a.clone();
+        let r = engine.match_care_pathways(&a, &b);
+        assert_eq!(r.breakdown.relationships_score, None);
+        assert_eq!(r.breakdown.tags_score, None);
+        assert!((r.score - 1.0).abs() < 1e-9, "got {}", r.score);
+    }
+
+    // Both fields present and agreeing: they participate at their
+    // default 0.05 weight each and the score stays a clean 1.0.
+    #[test]
+    fn relationships_and_tags_participate_when_present_and_agree() {
+        let engine = MatchingEngine::default_config();
+        let shared_rel = rel(RelationKind::Supersedes, "pathway-42");
+        let mut a = CarePathway::new("Acute Stroke Care Pathway");
+        a.relationships = vec![shared_rel.clone()];
+        a.tags = vec!["VIP".into()];
+        let mut b = CarePathway::new("Acute Stroke Care Pathway");
+        b.relationships = vec![shared_rel];
+        b.tags = vec!["vip".into()];
+        let r = engine.match_care_pathways(&a, &b);
+        assert_eq!(r.breakdown.relationships_score, Some(1.0));
+        assert_eq!(r.breakdown.tags_score, Some(1.0));
+        assert!((r.score - 1.0).abs() < 1e-9, "got {}", r.score);
+    }
+
+    // Both fields present but disagreeing entirely: the weighted-average
+    // renormalisation must still land in [0.0, 1.0], and a strong
+    // multi-component match (name + condition + care setting — kept
+    // clear of provider_id/pathway_code so R-1 does not short-circuit)
+    // should still outweigh two small (0.05 default) supporting-signal
+    // misses.
+    #[test]
+    fn relationships_and_tags_disagreement_pulls_score_down_but_stays_bounded() {
+        let engine = MatchingEngine::default_config();
+        let mut a = CarePathway::new("Acute Stroke Care Pathway");
+        a.condition_codes = vec![cond(CodeSystem::Icd10, "I63")];
+        a.care_setting = Some(CareSetting::Inpatient);
+        a.relationships = vec![rel(RelationKind::Supersedes, "p1")];
+        a.tags = vec!["vip".into()];
+        let mut b = CarePathway::new("Acute Stroke Care Pathway");
+        b.condition_codes = vec![cond(CodeSystem::Icd10, "I63")];
+        b.care_setting = Some(CareSetting::Inpatient);
+        b.relationships = vec![rel(RelationKind::Supersedes, "p2")];
+        b.tags = vec!["review".into()];
+        let r = engine.match_care_pathways(&a, &b);
+        assert_eq!(r.breakdown.relationships_score, Some(0.0));
+        assert_eq!(r.breakdown.tags_score, Some(0.0));
+        assert!((0.0..=1.0).contains(&r.score));
+        assert!(r.score < 1.0, "got {}", r.score);
+        assert!(
+            r.is_match,
+            "a strong multi-component match should still clear the default 0.85 threshold, got {}",
+            r.score
+        );
     }
 }

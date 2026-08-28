@@ -82,6 +82,17 @@ pub struct MatchBreakdown {
     pub interventions_score: Option<f64>,
     /// Keywords (Jaccard) similarity.
     pub keywords_score: Option<f64>,
+    /// Relationship-set similarity: typed-set Jaccard over `(relation,
+    /// pathway_id)` pairs, `|A ∩ B| / |A ∪ B|`. `None` when either side
+    /// has no relationships recorded. See
+    /// [`crate::RelationshipRef`]; spec §13.1.
+    #[serde(default)]
+    pub relationships_score: Option<f64>,
+    /// Tag-set similarity: set Jaccard over the case-insensitively
+    /// normalised tag sets, `|A ∩ B| / |A ∪ B|`. `None` when either side
+    /// has no tags recorded. Spec §13.2.
+    #[serde(default)]
+    pub tags_score: Option<f64>,
     /// True when the deterministic short-circuit fired.
     pub deterministic_match: bool,
 }

@@ -28,9 +28,13 @@ Deterministic schemes (`IdentifierScheme::is_deterministic`): `Doi`,
 | Care setting | 0.10 | Exact enum match → 1.0 else 0.0. `None` if either unset. |
 | Interventions | 0.10 | Jaccard on `fold_set(interventions)`. |
 | Keywords | 0.10 | Jaccard on `fold_set(keywords)`. |
+| Relationships | 0.05 | Typed-set Jaccard over `(relation, pathway_id)` pairs — `\|A ∩ B\| / \|A ∪ B\|` — see spec §13.1. `None` when either side's `relationships` list is empty. Supporting signal, never resolved against a registry. |
+| Tags | 0.05 | Set Jaccard over case-insensitively normalised tag sets — `\|A ∩ B\| / \|A ∪ B\|` — see spec §13.2. `None` when either side's `tags` list is empty. Normalisation happens at scoring time, not on construction. |
 
-Weights sum to 1.0; the weighted average is renormalised over the
-`Some` components only.
+The core six weights sum to 1.0; relationships/tags are two further
+**supporting** signals that layer on top at 0.05 each. The weighted
+average is renormalised over the `Some` components only, so their
+presence never changes the score of records that never populate them.
 
 ## Confidence band
 
