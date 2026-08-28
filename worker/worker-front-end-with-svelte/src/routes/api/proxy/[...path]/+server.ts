@@ -6,10 +6,37 @@
 // with `Authorization: Bearer <paseto>`. The browser thus never holds a
 // token, and pages keep using the existing client unchanged (its base URL
 // points here).
+//
+// Mutating requests additionally require CSRF double-submit proof
+// (agents/share/authentication-sessions.md §4): the `X-CSRF-Token` header
+// must match the `__Host-mxi_csrf` cookie, plus an Origin/Referer
+// backstop. A request that fails either check is rejected before it ever
+// reaches the worker service.
 
 import type { RequestHandler } from "./$types";
 import { WORKER_API_URL } from "$lib/server/config";
 import { exchangeToken } from "$lib/server/auth";
+import { CSRF_COOKIE, verifyCsrf } from "$lib/server/session";
+
+/** Methods that mutate state and therefore require CSRF proof. */
+const SAFE_METHODS = new Set(["GET", "HEAD"]);
+
+function csrfRejection(): Response {
+  return new Response(JSON.stringify({ error: "csrf" }), {
+    status: 403,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+/** The origin of a `Referer` header value, or `null` if absent/unparseable. */
+function refererOrigin(referer: string | null): string | null {
+  if (!referer) return null;
+  try {
+    return new URL(referer).origin;
+  } catch {
+    return null;
+  }
+}
 
 const proxy: RequestHandler = async ({
   request,
@@ -17,7 +44,26 @@ const proxy: RequestHandler = async ({
   url,
   locals,
   fetch,
+  cookies,
 }) => {
+  if (!SAFE_METHODS.has(request.method)) {
+    // 1. Double-submit token check.
+    const cookieToken = cookies.get(CSRF_COOKIE);
+    const headerToken = request.headers.get("x-csrf-token");
+    if (!verifyCsrf(cookieToken, headerToken)) {
+      return csrfRejection();
+    }
+    // 2. Origin/Referer backstop. Only rejects when a value is present
+    //    and disagrees — some legitimate same-origin requests omit both
+    //    headers, and the token check above is the primary defense.
+    const origin = request.headers.get("origin");
+    const referer = request.headers.get("referer");
+    const sourceOrigin = origin ?? refererOrigin(referer);
+    if (sourceOrigin && sourceOrigin !== url.origin) {
+      return csrfRejection();
+    }
+  }
+
   const target = `${WORKER_API_URL}/${params.path}${url.search}`;
 
   // Copy request headers, but drop hop-by-hop / origin-specific ones and
