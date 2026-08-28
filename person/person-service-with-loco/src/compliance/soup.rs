@@ -130,6 +130,16 @@ fn locked_packages() -> Vec<(String, String)> {
 
 /// The crate's **declared direct** dependencies, from the `[dependencies]`
 /// and `[dev-dependencies]` tables of `Cargo.toml`.
+///
+/// A dependency declared as `alias = { package = "real-name", … }` renames
+/// the crate — the manifest key (`alias`) is a local name that appears
+/// nowhere in `Cargo.lock` or on crates.io; the name that must match the
+/// SOUP register and the lockfile is the `package` value. Both checks below
+/// (`unannotated_direct_dependencies` against the register,
+/// `stale_register_entries` against `Cargo.lock`) key on this same name, so
+/// resolving the rename here — rather than at either call site — is what
+/// keeps a renamed dependency satisfiable by exactly one register row
+/// instead of failing one check or the other no matter what is annotated.
 fn declared_dependencies() -> Vec<String> {
     let mut names = Vec::new();
     let mut in_deps = false;
@@ -142,14 +152,31 @@ fn declared_dependencies() -> Vec<String> {
         if !in_deps || trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
-        if let Some((key, _)) = trimmed.split_once('=') {
+        if let Some((key, value)) = trimmed.split_once('=') {
             let key = key.trim().trim_matches('"');
-            if !key.is_empty() && !names.iter().any(|n| n == key) {
-                names.push(key.to_string());
+            if key.is_empty() {
+                continue;
+            }
+            let name = renamed_package(value).unwrap_or_else(|| key.to_string());
+            if !names.iter().any(|n| n == &name) {
+                names.push(name);
             }
         }
     }
     names
+}
+
+/// If `value` (the right-hand side of a `Cargo.toml` dependency line)
+/// contains an inline-table `package = "…"` entry, return that crate name —
+/// the target of a `alias = { package = "real-name", … }` rename. `None`
+/// for an ordinary `"1.2.3"` or `{ version = "1.2.3", … }` dependency with
+/// no rename.
+fn renamed_package(value: &str) -> Option<String> {
+    let after_key = value.split_once("package")?.1;
+    let after_eq = after_key.trim_start().strip_prefix('=')?.trim_start();
+    let quoted = after_eq.strip_prefix('"')?;
+    let end = quoted.find('"')?;
+    Some(quoted[..end].to_string())
 }
 
 /// Extract `key = "value"` from a lockfile line.
@@ -397,6 +424,40 @@ mod tests {
         assert!(
             !direct.contains(&"name".to_string()),
             "leaked [package] key"
+        );
+    }
+
+    /// A `alias = { package = "real-name", … }` dependency (PRO-H9's
+    /// `otlp-test-tonic = { package = "tonic", … }`, renamed to avoid an
+    /// extern-prelude collision with the main `tonic = "0.12"` dependency)
+    /// is reported under its **resolved** crate name, not the manifest
+    /// alias — otherwise no single register row could satisfy both
+    /// `unannotated_direct_dependencies` (which wants the alias annotated)
+    /// and `stale_register_entries` (which wants the annotated name to
+    /// exist in `Cargo.lock`, where only the resolved name appears).
+    #[test]
+    fn renamed_dependencies_report_their_resolved_package_name() {
+        let direct = declared_dependencies();
+        assert!(
+            direct.contains(&"tonic".to_string()),
+            "expected the resolved name `tonic`, not the manifest alias: {direct:?}"
+        );
+        assert!(
+            !direct.contains(&"otlp-test-tonic".to_string()),
+            "the manifest alias must not itself appear: {direct:?}"
+        );
+    }
+
+    #[test]
+    fn renamed_package_extracts_the_package_value() {
+        assert_eq!(
+            renamed_package(r#" { package = "tonic", version = "0.14" }"#).as_deref(),
+            Some("tonic")
+        );
+        assert_eq!(renamed_package(r#" "1.2.3""#), None);
+        assert_eq!(
+            renamed_package(r#" { version = "1.2.3", features = ["a"] }"#),
+            None
         );
     }
 

@@ -43,7 +43,8 @@ pub mod matching;
 pub mod metrics;
 /// Domain models (Person, Identifier, Organization, Consent, …).
 pub mod models;
-/// OpenTelemetry/tracing initialization and custom metrics.
+/// Structured logging + real OpenTelemetry OTLP export (traces + metrics),
+/// ported from link-graph-service (PRO-H9).
 pub mod observability;
 /// Data masking, GDPR export, and consent checking.
 pub mod privacy;

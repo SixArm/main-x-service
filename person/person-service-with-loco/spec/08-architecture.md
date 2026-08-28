@@ -19,7 +19,8 @@ src/
 ├── validation/              # boundary validators + normalisers
 ├── privacy/                 # masking + GDPR export + consent
 ├── config/                  # env loading + Config struct
-├── observability/           # OTLP setup
+├── observability.rs         # real OTLP export (traces + metrics), ported
+                              # from link-graph-service (PRO-H9)
 ├── error.rs
 └── lib.rs
 ```
