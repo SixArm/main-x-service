@@ -6,6 +6,15 @@
 use serde::{Deserialize, Serialize};
 
 /// Per-component weights + the probable-match threshold.
+///
+/// The original six components (`name` through `keywords`) sum to
+/// `1.0` by convention. `relationships_weight` and `tags_weight` are
+/// **additive supporting weights** on top of that total, not part of
+/// it — the weighted average ([`crate::scoring::weighted_average`]) is
+/// renormalised over whichever components actually scored on both
+/// records, so a combined sum greater than `1.0` does not push any
+/// score outside `[0.0, 1.0]`; it only sets the two new fields'
+/// relative share when they participate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchConfig {
     /// Probable-match cutoff (probabilistic strategy). Default 0.85.
@@ -23,6 +32,27 @@ pub struct MatchConfig {
     pub founding_date_weight: f64,
     /// Weight of the keywords (Jaccard) component. Default 0.10.
     pub keywords_weight: f64,
+
+    /// Weight of the relationships component: typed-set Jaccard over
+    /// `(relation, organization_id)` pairs (see
+    /// [`crate::RelationshipRef`]). Default `0.05` — a **supporting**
+    /// signal only: two records referencing the same related
+    /// organizations are weakly more likely the same organization, but
+    /// the field never identifies on its own and does not participate
+    /// when either side has no relationships recorded. This weight is
+    /// additive on top of the original six components (§7); see
+    /// [`MatchConfig`] docs for why the combined total need not sum to
+    /// `1.0`. Spec §14a / §23.
+    pub relationships_weight: f64,
+
+    /// Weight of the tags component: plain set Jaccard over the
+    /// case-insensitively normalised tag sets. Default `0.05` — a
+    /// **supporting** signal only, analogous to
+    /// [`Self::relationships_weight`]: two records sharing the same
+    /// operator-applied tags are weakly more likely the same
+    /// organization, but does not participate when either side has no
+    /// tags recorded. Spec §14b / §23.
+    pub tags_weight: f64,
 }
 
 impl Default for MatchConfig {
@@ -35,6 +65,8 @@ impl Default for MatchConfig {
             jurisdiction_weight: 0.10,
             founding_date_weight: 0.10,
             keywords_weight: 0.10,
+            relationships_weight: 0.05,
+            tags_weight: 0.05,
         }
     }
 }
@@ -78,8 +110,11 @@ impl MatchConfig {
         }
     }
 
-    /// Sum of every per-component weight (1.0 for the documented
-    /// defaults). Test-only invariant check; not part of the public API.
+    /// Sum of the original six per-component weights (1.0 for the
+    /// documented defaults) — deliberately **excludes**
+    /// `relationships_weight` / `tags_weight`, which are additive
+    /// supporting weights layered on top (see the [`MatchConfig`] docs).
+    /// Test-only invariant check; not part of the public API.
     #[cfg(test)]
     fn weight_total(&self) -> f64 {
         self.name_weight
@@ -129,5 +164,17 @@ mod tests {
         assert!((l.threshold - 0.70).abs() < 1e-9);
         assert!((s.weight_total() - d.weight_total()).abs() < 1e-9);
         assert!((l.name_weight - d.name_weight).abs() < 1e-9);
+    }
+
+    /// Pins the two new supporting weights (relationships, tags) to
+    /// their documented default of `0.05` each (spec §14a / §14b).
+    /// These are additive on top of the original six components' `1.0`
+    /// total — see the [`MatchConfig`] docs for why a combined
+    /// sum-to-`1.0` across all eight is not required for correctness.
+    #[test]
+    fn default_relationships_and_tags_weight_is_005() {
+        let c = MatchConfig::default();
+        assert!((c.relationships_weight - 0.05).abs() < 1e-9);
+        assert!((c.tags_weight - 0.05).abs() < 1e-9);
     }
 }

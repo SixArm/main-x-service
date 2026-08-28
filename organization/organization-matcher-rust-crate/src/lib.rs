@@ -31,7 +31,7 @@
 //! ## Public types
 //!
 //! - [`Organization`], [`OrgIdentifier`], [`IdentifierScheme`],
-//!   [`PostalAddress`].
+//!   [`PostalAddress`], [`RelationshipRef`], [`RelationKind`].
 //! - [`MatchingEngine`], [`MatchConfig`], [`MatchResult`],
 //!   [`MatchBreakdown`], [`Confidence`].
 
@@ -51,5 +51,7 @@ pub mod scoring;
 pub use config::MatchConfig;
 pub use error::{Error, Result};
 pub use matcher::MatchingEngine;
-pub use organization::{IdentifierScheme, OrgIdentifier, Organization, PostalAddress};
+pub use organization::{
+    IdentifierScheme, OrgIdentifier, Organization, PostalAddress, RelationKind, RelationshipRef,
+};
 pub use scoring::{Confidence, MatchBreakdown, MatchResult};

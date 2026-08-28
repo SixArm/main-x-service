@@ -79,6 +79,15 @@ pub struct MatchBreakdown {
     pub founding_date_score: Option<f64>,
     /// Keywords (Jaccard) similarity.
     pub keywords_score: Option<f64>,
+    /// Relationships (typed-set Jaccard over `(relation,
+    /// organization_id)` pairs) similarity, `|A ∩ B| / |A ∪ B|`. `None`
+    /// when either side has no relationships recorded. See
+    /// [`crate::RelationshipRef`]; spec §14a.
+    pub relationships_score: Option<f64>,
+    /// Tags (plain set Jaccard over the case-insensitively normalised
+    /// tag sets) similarity, `|A ∩ B| / |A ∪ B|`. `None` when either
+    /// side has no tags recorded. Spec §14b.
+    pub tags_score: Option<f64>,
     /// True when the deterministic short-circuit fired.
     pub deterministic_match: bool,
 }

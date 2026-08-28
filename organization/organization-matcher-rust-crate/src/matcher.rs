@@ -9,11 +9,13 @@
 //! 2. **Probabilistic scoring.** Per-component scores, then a weighted
 //!    average over the *present* components.
 
+use std::collections::HashSet;
+
 use strsim::jaro_winkler;
 
 use crate::config::MatchConfig;
 use crate::normalize;
-use crate::organization::{IdentifierScheme, Organization};
+use crate::organization::{IdentifierScheme, Organization, RelationKind, RelationshipRef};
 use crate::phonetic;
 use crate::scoring::{Confidence, MatchBreakdown, MatchResult, weighted_average};
 
@@ -109,6 +111,8 @@ impl MatchingEngine {
         let jurisdiction_score = jurisdiction_score(a, b);
         let founding_date_score = founding_date_score(a, b);
         let keywords_score = set_jaccard(&a.keywords, &b.keywords);
+        let relationships_score = relationships_score(&a.relationships, &b.relationships);
+        let tags_score = tags_score(&a.tags, &b.tags);
 
         // Renormalised weighted average: absent components drop out of
         // both numerator and denominator, so missing data neither helps
@@ -120,6 +124,8 @@ impl MatchingEngine {
             (jurisdiction_score, self.config.jurisdiction_weight),
             (founding_date_score, self.config.founding_date_weight),
             (keywords_score, self.config.keywords_weight),
+            (relationships_score, self.config.relationships_weight),
+            (tags_score, self.config.tags_weight),
         ]);
 
         // A match is declared when the renormalised score clears the
@@ -136,6 +142,8 @@ impl MatchingEngine {
                 jurisdiction_score,
                 founding_date_score,
                 keywords_score,
+                relationships_score,
+                tags_score,
                 deterministic_match: false,
             },
         }
@@ -469,6 +477,66 @@ fn set_jaccard(a: &[String], b: &[String]) -> Option<f64> {
     }
 }
 
+/// Relationships component score: typed-set **Jaccard** over
+/// `(relation, organization_id)` pairs — `|A ∩ B| / |A ∪ B|` — so a
+/// `SubOrganizationOf` reference only agrees with a `SubOrganizationOf`
+/// reference to the **same** organization. `None` when either side has
+/// no relationships recorded at all (the field is irrelevant for this
+/// pair, not evidence of non-match). See spec §14a.
+fn relationships_score(a: &[RelationshipRef], b: &[RelationshipRef]) -> Option<f64> {
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    let set_a: HashSet<(RelationKind, &str)> = a
+        .iter()
+        .map(|r| (r.relation, r.organization_id.as_str()))
+        .collect();
+    let set_b: HashSet<(RelationKind, &str)> = b
+        .iter()
+        .map(|r| (r.relation, r.organization_id.as_str()))
+        .collect();
+    Some(jaccard(&set_a, &set_b))
+}
+
+/// Tags component score: plain set **Jaccard** over the
+/// case-insensitively normalised (folded) tag sets — `|A ∩ B| / |A ∪
+/// B|`. Normalisation happens here, at scoring time — [`Organization::
+/// tags`](crate::Organization::tags) stores tags verbatim. Unlike the
+/// `keywords` component (§14, [`set_jaccard`]), which returns
+/// `Some(0.0)` for a present-vs-absent disagreement, `tags_score`
+/// returns `None` when either side has no tags recorded at all —
+/// consistent with the equally-sparse, equally-supporting
+/// `relationships_score` above. See spec §14b.
+fn tags_score(a: &[String], b: &[String]) -> Option<f64> {
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    let a_set: HashSet<String> = normalize::fold_set(a).into_iter().collect();
+    let b_set: HashSet<String> = normalize::fold_set(b).into_iter().collect();
+    // A list that folds down to nothing (e.g. only blank strings) still
+    // carries no signal, mirroring the raw-emptiness guard above.
+    if a_set.is_empty() || b_set.is_empty() {
+        return None;
+    }
+    Some(jaccard(&a_set, &b_set))
+}
+
+/// Jaccard index `|A ∩ B| / |A ∪ B|` over two hash sets. Callers are
+/// required to have already checked both inputs are non-empty (see
+/// [`relationships_score`] / [`tags_score`]), so the union here is
+/// never zero-sized.
+///
+/// Set sizes in practice are small (an organization's relationship or
+/// tag list), so the `usize` counts are routed through `u32` (exact,
+/// lint-free `u32 -> f64`) rather than a direct `usize -> f64` cast;
+/// `unwrap_or(u32::MAX)` is a non-panicking saturating fallback for a
+/// pathologically large set rather than a realistic code path.
+fn jaccard<T: Eq + std::hash::Hash>(a: &HashSet<T>, b: &HashSet<T>) -> f64 {
+    let intersection = u32::try_from(a.intersection(b).count()).unwrap_or(u32::MAX);
+    let union = u32::try_from(a.union(b).count()).unwrap_or(u32::MAX);
+    f64::from(intersection) / f64::from(union)
+}
+
 // ─── Tests ───────────────────────────────────────────────────────
 
 /// Unit tests for the matching engine and its per-component scorers.
@@ -774,5 +842,94 @@ mod tests {
         let out = engine.match_one_to_many(&query, &cands);
         assert_eq!(out.len(), 2);
         assert!(out[1].score > out[0].score);
+    }
+
+    // ---------- relationships & tags (§14a / §14b) ----------
+
+    #[test]
+    fn relationships_score_identical_sets_scores_one() {
+        let a = vec![RelationshipRef::new(RelationKind::SubOrganizationOf, "org-1").unwrap()];
+        let b = a.clone();
+        assert_eq!(relationships_score(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn relationships_score_disjoint_sets_scores_zero() {
+        let a = vec![RelationshipRef::new(RelationKind::SubOrganizationOf, "org-1").unwrap()];
+        let b = vec![RelationshipRef::new(RelationKind::ParentOrganizationOf, "org-1").unwrap()];
+        // Same organization id, different relation kind: not the same pair.
+        assert_eq!(relationships_score(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn relationships_score_partial_overlap_scores_jaccard_ratio() {
+        let a = vec![
+            RelationshipRef::new(RelationKind::SubOrganizationOf, "org-1").unwrap(),
+            RelationshipRef::new(RelationKind::SuccessorOf, "org-2").unwrap(),
+        ];
+        let b = vec![
+            RelationshipRef::new(RelationKind::SubOrganizationOf, "org-1").unwrap(),
+            RelationshipRef::new(RelationKind::SuccessorOf, "org-3").unwrap(),
+        ];
+        // intersection = {(SubOrganizationOf, org-1)} = 1; union = 3.
+        let score = relationships_score(&a, &b).expect("some");
+        assert!((score - 1.0 / 3.0).abs() < 1e-9, "got {score}");
+    }
+
+    #[test]
+    fn relationships_score_empty_either_side_is_none() {
+        let empty: Vec<RelationshipRef> = vec![];
+        let some = vec![RelationshipRef::new(RelationKind::SubOrganizationOf, "org-1").unwrap()];
+        assert_eq!(relationships_score(&empty, &some), None);
+        assert_eq!(relationships_score(&some, &empty), None);
+        assert_eq!(relationships_score(&empty, &empty), None);
+    }
+
+    #[test]
+    fn tags_score_case_insensitive_identical_scores_one() {
+        let a = vec!["Vendor".to_string(), "Tier1".to_string()];
+        let b = vec!["vendor".to_string(), "tier1".to_string()];
+        assert_eq!(tags_score(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn tags_score_disjoint_sets_scores_zero() {
+        let a = vec!["vendor".to_string()];
+        let b = vec!["customer".to_string()];
+        assert_eq!(tags_score(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn tags_score_partial_overlap_scores_jaccard_ratio() {
+        let a = vec!["vendor".to_string(), "tier1".to_string()];
+        let b = vec!["Vendor".to_string(), "tier2".to_string()];
+        // intersection = {"vendor"} = 1; union = {"vendor", "tier1", "tier2"} = 3.
+        let score = tags_score(&a, &b).expect("some");
+        assert!((score - 1.0 / 3.0).abs() < 1e-9, "got {score}");
+    }
+
+    #[test]
+    fn tags_score_empty_either_side_is_none() {
+        let empty: Vec<String> = vec![];
+        let some = vec!["vendor".to_string()];
+        assert_eq!(tags_score(&empty, &some), None);
+        assert_eq!(tags_score(&some, &empty), None);
+        assert_eq!(tags_score(&empty, &empty), None);
+    }
+
+    /// Renormalisation sanity check: with neither field populated on
+    /// either side, `relationships_score`/`tags_score` are `None` and
+    /// neither weight enters the denominator — a name-only exact match
+    /// still scores a clean ~1.0, not diluted by two "missing"
+    /// components treated as zero.
+    #[test]
+    fn relationships_and_tags_absent_do_not_enter_the_weighted_average() {
+        let engine = MatchingEngine::default_config();
+        let a = Organization::new("Acme Corporation");
+        let b = Organization::new("Acme Corporation");
+        let r = engine.match_organizations(&a, &b);
+        assert!(r.score >= 0.99, "expected ~1.0, got {}", r.score);
+        assert_eq!(r.breakdown.relationships_score, None);
+        assert_eq!(r.breakdown.tags_score, None);
     }
 }

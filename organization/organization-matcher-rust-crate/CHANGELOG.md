@@ -10,6 +10,77 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-28
+
+### Added — relationships and tags implemented in code (PRO-H7)
+
+- **`RelationshipRef` / `RelationKind` (§14a).** New public types
+  `RelationKind` (`#[non_exhaustive]`: `SubOrganizationOf`,
+  `ParentOrganizationOf`, `SuccessorOf`, `PredecessorOf`) and
+  `RelationshipRef { relation: RelationKind, organization_id: String }`,
+  re-exported from the crate root. `RelationshipRef::new` trims
+  `organization_id` and rejects an empty result. `Organization` gains
+  `relationships: Vec<RelationshipRef>` (default empty,
+  `#[serde(default)]`). Scored as typed-set Jaccard over `(relation,
+  organization_id)` pairs (`|A ∩ B| / |A ∪ B|`) into the new
+  `MatchBreakdown::relationships_score`, `None` when either side's list
+  is empty. New `MatchConfig::relationships_weight` (default `0.05`)
+  folded into the renormalised weighted average alongside the original
+  six components.
+- **`tags` (§14b).** `Organization` gains `tags: Vec<String>` (default
+  empty, `#[serde(default)]`), stored verbatim and compared
+  case-insensitively at scoring time via the existing `normalize::
+  fold_set`. Scored as plain set Jaccard into the new
+  `MatchBreakdown::tags_score`. Unlike the pre-existing `keywords`
+  component (which returns `Some(0.0)` for a present-vs-absent
+  disagreement), `tags_score` is `None` when either side's tag set is
+  empty — matching `relationships_score`'s rule, not `keywords_score`'s.
+  New `MatchConfig::tags_weight` (default `0.05`).
+- Both fields are purely additive and **not** identifying on their own
+  and **not** consulted by the deterministic short-circuit (§15/§16).
+  Neither field participates in the weighted average unless populated
+  on *both* sides, so existing callers that never set
+  `relationships`/`tags` see byte-identical scores before and after
+  this release.
+- **Weight total is 1.10 across all eight `MatchConfig` fields, not
+  1.0** — deliberate, not a rounding slip. The original six components
+  are untouched at their documented values (still summing to 1.0
+  themselves); `relationships_weight`/`tags_weight` are additive
+  supporting weights layered on top. The renormalised weighted average
+  (`weighted_average`) divides by the sum of *participating* weights, so
+  this never pushes a score outside `[0.0, 1.0]` — it only means the two
+  new components' contribution is proportionally smaller (~4.5% each
+  rather than 5%) in the rare case all eight components score. See
+  `MatchConfig`'s own rustdoc and spec §7 for the full reasoning; the
+  `weight_total()` test-only invariant is scoped to the original six so
+  it still asserts exactly 1.0, with a new, separate test pinning the
+  two new weights' `0.05` defaults.
+- Spec `spec/index.md` §5/§6/§7/§14a/§14b/§21/§23 move from "planned,
+  not yet implemented" to current behaviour (§23's two task entries
+  ticked). `agents/matching-algorithm.md`'s component table gains
+  Relationships / Tags rows.
+- 14 new tests: 8 unit tests in `src/matcher.rs` (relationships:
+  identical/disjoint/partial-overlap/empty-either-side; tags: same four
+  shapes) + 1 renormalisation sanity test pinning that an
+  identical-name match still scores ~1.0 when both new fields are
+  absent, + 1 new `config.rs` test pinning the `0.05` defaults, + 1
+  `tests/public_api.rs` end-to-end case (absent → `None`, populated
+  identically → `Some(1.0)` on both), + 3 new rustdoc doctests on the
+  new types. 84/84 tests green (up from 70), fmt clean, clippy clean.
+- Minor version bump (pre-1.0): per this crate's own precedent (the
+  `weight_total()` / config default tests already distinguish additive
+  vs core weights) and worker-matcher's identical T-33/T-34 rollout —
+  two new public types, two new public struct fields on `Organization`,
+  two new `MatchConfig` fields, and two new `MatchBreakdown` fields that
+  change computed behaviour once populated is a minor bump, not a
+  patch. `organization-service-with-loco`'s `Cargo.toml` declares this
+  crate as an unconstrained path dependency
+  (`organization-matcher = { path = "../organization-matcher-rust-crate" }`,
+  no version string), so — unlike worker-matcher's 0.6.1→0.7.0 rollout,
+  which broke `worker-service`'s pinned caret requirement — no
+  downstream fix was needed; verified with a full `cargo check` /
+  `cargo test` pass on `organization-service-with-loco` after the bump.
+
 ## [0.1.0] - 2026-08-26
 
 ### Added — Criterion benchmarks
