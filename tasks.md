@@ -6672,19 +6672,52 @@ crate above.
   case-folder audited and found clean (thin nav-only specs, zero stale
   prose). 7 files changed, each fix dated and citing the task IDs/counts
   verified.
-- [~] **PRO-H9 (M)** **OTLP rollout (subsumes AU-3).** person, worker,
-  event still carry the commented-out exporter stubs; link-graph's
-  `src/observability.rs` is the proven reference. Roll it (or delete
-  the stubs and update the matrix) — the stubs have been "TODO" since
-  the family began. **person DONE 2026-08-28**: real exporter ported
-  from link-graph, replacing the dead stub outright; two adaptations
-  documented in person's `AGENTS.md` for worker/event to reuse (the
-  tower middleware on two router-construction surfaces instead of
-  one; a package-renamed `tonic` dev-dependency to dodge an
-  extern-prelude collision with the crate's own gRPC-stub `tonic`).
-  350 lib tests (was 340) + 4 new in-process-collector tests proving
-  real export, all independently reverified. **worker + event
-  remain** — copy person's port (not link-graph's directly).
+- [x] **PRO-H9 (M)** **OTLP rollout (subsumes AU-3).** DONE 2026-08-28.
+  person, worker, event all carried the commented-out exporter stub;
+  link-graph's `src/observability.rs` was the proven reference. Rolled
+  to all three — person first (ported from link-graph, replacing the
+  dead stub outright; 350 lib tests, was 340, +4 in-process-collector
+  tests), then worker and event in parallel copying person's
+  already-adapted port (not link-graph's directly): worker 312 lib
+  tests (was 302, +10) + 4 OTLP tests; event 167 lib tests (was 159,
+  +8) + 4 OTLP tests. Every crate independently reverified (fmt,
+  clippy -D warnings, cargo test --lib, and the two new
+  otlp_export/otlp_middleware integration binaries proving real
+  protobuf crossing a real in-process gRPC socket, not just
+  compilation). Two adaptations recurred across all three
+  person-style crates: `trace_mw` layered on both router-construction
+  surfaces (confirmed exactly two in each, not assumed), and a
+  package-renamed `otlp-test-tonic` dev-dependency to dodge an
+  extern-prelude collision with each crate's own gRPC-stub `tonic`
+  dependency — which in turn needed the same SOUP-register
+  `package = "…"` rename-resolution fix in person's and worker's
+  `soup.rs` (event carries no SOUP register at all). `agents/share/
+  {overview.md,observability.md,rust-tracing-opentelemetry-stack.md}`
+  updated to reflect all three as working exporters alongside
+  link-graph. Remaining seven registries (place, thing, course,
+  organization, care-pathway, case, portfolio) carry no observability
+  module at all — not part of this task's scope (it targeted the
+  three stubs specifically); a family-wide rollout to the rest is
+  unqueued follow-up work, not a gap in this task's closure.
+- [ ] **PRO-H12 (L)** **OTLP rollout, remaining seven registries.**
+  place, thing, course, organization, care-pathway, case, portfolio
+  carry no `src/observability` module at all (unlike PRO-H9's three,
+  which had a dead stub to replace). Bigger lift than PRO-H9: each
+  needs `src/observability.rs` added from scratch (copy person's
+  port — see its `AGENTS.md` "OpenTelemetry OTLP export" section),
+  `Hooks::init_logger`/`on_shutdown` wired into `src/app.rs`,
+  `trace_mw` layered on every router-construction surface (verify the
+  actual count per crate — organization/care-pathway/case/portfolio
+  are loco-style `src/controllers/`, not person-style, so the
+  surface count and the exact layering point will differ from
+  PRO-H9's three and need working out fresh rather than assumed
+  identical), and the in-process-collector tests ported. Check each
+  crate's own `tonic`/gRPC-stub status before assuming the
+  package-rename collision applies — per `overview.md`'s capability
+  matrix only person/worker/event carry a gRPC stub at all, so most
+  of these seven likely need no `otlp-test-tonic` rename. Update
+  `agents/share/{overview.md,observability.md,rust-tracing-
+  opentelemetry-stack.md}` once all seven land.
 
 ### PRO-P — per-family targeted fixes
 
