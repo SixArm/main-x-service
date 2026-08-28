@@ -216,3 +216,28 @@ system guessing at any of it.*
   the stakeholder register + grid, the partnership register,
   membership renewals) plus a `kind` filter on the CRM-R18
   follow-ups view for the renewals convention.
+
+## CRM-R20 — Subject rights & retention (the code side of CRM-G2)
+
+*As a DPO I can answer a subject-access request for one contact, honour
+an erasure request once no live commercial reason remains to keep the
+data, and show that data past its retention horizon does not linger.*
+
+- `GET /api/contacts/{pid}/subject-access`: one audited JSON export of
+  every table keyed to the contact (consent history, activities, leads,
+  deals as primary contact, tickets, nurture enrolments), with genuine
+  exclusions named in the payload rather than silently omitted.
+- `POST /api/contacts/{pid}/erase`: anonymise — identity fields
+  scrubbed to a tombstone `person:` URN, linked free text scrubbed,
+  the row soft-deleted. Refused `422` while the contact has an open
+  deal, an open support ticket, or an active nurture enrolment
+  ([design.md](design.md) CRM-D14): the field that gates this is
+  **not** `Contact::status`, which no endpoint ever transitions.
+  Destructive-classified; audited with per-table counts.
+- `GET /api/retention` / `POST /api/retention/sweep`: the floored
+  horizon report (`CRM_RETENTION_DAYS`, default 365, floor 30) and the
+  matching hard-delete sweep across every soft-deleting table, plus a
+  read-only count of contacts whose consent has stood withdrawn since
+  before the horizon (informational — never auto-scrubbed, since a
+  contact always carries the erasure gate above). Destructive-classified;
+  audited even when it deletes nothing.

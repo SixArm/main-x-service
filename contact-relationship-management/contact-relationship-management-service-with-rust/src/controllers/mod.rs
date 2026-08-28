@@ -12,6 +12,7 @@ pub mod engagement;
 pub mod insights;
 pub mod marketing;
 pub mod metrics;
+pub mod privacy;
 pub mod relationships;
 pub mod sales;
 pub mod support;

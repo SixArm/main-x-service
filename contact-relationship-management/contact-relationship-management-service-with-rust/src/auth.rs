@@ -92,9 +92,12 @@ pub const ENTITY: &str = "crm";
 /// (`POST /api/wards/merge`, live today), batch deduplicate, and bulk
 /// import — the latter two listed ahead of the corresponding features
 /// (dedup scan and bulk import are §13 work), so the guard is already
-/// correct when they land. A POST whose path ends with one of these
-/// derives [`Action::Destructive`] instead of [`Action::Write`].
-pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 3] = ["/merge", "/deduplicate", "/import"];
+/// correct when they land — plus contact erasure (`/erase`) and the
+/// retention sweep (`/sweep`, CRM-R20). A POST whose path ends with
+/// one of these derives [`Action::Destructive`] instead of
+/// [`Action::Write`].
+pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 5] =
+    ["/merge", "/deduplicate", "/import", "/erase", "/sweep"];
 
 /// Default issuer expected in tokens (`iss`).
 const DEFAULT_ISSUER: &str = "authentication-service";
@@ -1034,6 +1037,8 @@ mod tests {
             "/api/wards/merge",
             "/api/wards/deduplicate",
             "/api/wards/import",
+            "/api/contacts/1/erase",
+            "/api/retention/sweep",
         ] {
             assert_eq!(derive_action(&Method::POST, path), Action::Destructive);
         }
@@ -1050,6 +1055,10 @@ mod tests {
             derive_action(&Method::GET, "/api/wards/merge"),
             Action::Read
         );
+        assert_eq!(
+            derive_action(&Method::GET, "/api/contacts/1/erase"),
+            Action::Read
+        );
         // SEC-G6: a trailing slash must NOT downgrade a destructive POST to
         // Write (a non-admin `access=write` caller must not reach merge).
         for path in [
@@ -1057,6 +1066,8 @@ mod tests {
             "/api/wards/merge//",
             "/api/wards/deduplicate/",
             "/api/wards/import/",
+            "/api/contacts/1/erase/",
+            "/api/retention/sweep/",
         ] {
             assert_eq!(
                 derive_action(&Method::POST, path),

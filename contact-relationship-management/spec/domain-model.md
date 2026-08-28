@@ -147,6 +147,22 @@ the stakeholder register + power–interest grid (declared scores
 only), the partnership register, membership renewals; follow-ups
 (above) gains a `kind` filter for the renewals convention.
 
+## Subject rights & retention (CRM-R20 — CRM-D14)
+
+Not record types but the lifecycle over all of them: the
+**subject-access export** gathers every table keyed to one contact
+(exclusions named in the payload); **erasure anonymises** (identity
+fields scrubbed to a tombstone `person:` URN, linked free text
+scrubbed, row soft-deleted; deals/tickets/consent history remain —
+CRM has no monetary field on Contact itself, so nothing analogous to
+a salary field needs clearing) and is refused while the contact holds
+an open deal, an open ticket, or an active nurture enrolment (its
+`status` field is not the gate — see CRM-D14); the **retention sweep**
+hard-deletes soft-deleted rows past the floored horizon
+(`CRM_RETENTION_DAYS`, default 365, floor 30) across the 19-table
+list, and the report separately discloses (never auto-scrubs) contacts
+whose consent has stood withdrawn since before the horizon.
+
 ## Event kinds
 
 `lead_captured`, `lead_scored`, `lead_converted`, `deal_opened`,

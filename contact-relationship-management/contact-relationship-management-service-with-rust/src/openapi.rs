@@ -105,6 +105,10 @@ pub fn spec() -> Value {
             "/api/dashboards/sales": { "get": { "tags": ["analytics"], "summary": "Win rate + pipeline by stage (per currency; ETag conditional)", "responses": ok("SalesDashboard") } },
             "/api/dashboards/sla": { "get": { "tags": ["analytics"], "summary": "Open tickets by priority × breach (ETag conditional)", "responses": ok("SlaDashboard") } },
             "/api/dashboards/activity": { "get": { "tags": ["analytics"], "summary": "Activity counts by kind (?days=)", "responses": ok("ActivityDashboard") } },
+            "/api/contacts/{pid}/subject-access": { "get": { "tags": ["privacy"], "summary": "GDPR subject-access export: every table keyed to the contact, in one audited document (exclusions named)", "responses": ok("SubjectAccessExport") } },
+            "/api/contacts/{pid}/erase": { "post": { "tags": ["privacy"], "summary": "Erase (anonymise): refused 422 while an open deal, open ticket, or active nurture enrolment exists; destructive-classified", "responses": transition } },
+            "/api/retention": { "get": { "tags": ["privacy"], "summary": "Retention report: soft-deleted rows past the floored horizon, per table", "responses": ok("RetentionReport") } },
+            "/api/retention/sweep": { "post": { "tags": ["privacy"], "summary": "Hard-delete soft-deleted rows past the horizon; destructive-classified, audited with counts", "responses": ok("Sweep result") } },
             "/api/audits/recent": { "get": { "tags": ["audit"], "summary": "Recent audit entries", "responses": ok("Audit entries") } },
             "/api/audits": { "get": { "tags": ["audit"], "summary": "Owner-scoped trail (?owner=&since=)", "responses": ok("Audit entries") } },
             "/api/audits/{entity_pid}": { "get": { "tags": ["audit"], "summary": "One record's audit trail", "responses": ok("Audit entries") } },
@@ -132,6 +136,10 @@ mod tests {
             "/api/tickets/{pid}/priority",
             "/api/dashboards/sales",
             "/api/accounts/{pid}/clv",
+            "/api/contacts/{pid}/subject-access",
+            "/api/contacts/{pid}/erase",
+            "/api/retention",
+            "/api/retention/sweep",
         ] {
             assert!(paths.contains_key(p), "missing {p}");
         }

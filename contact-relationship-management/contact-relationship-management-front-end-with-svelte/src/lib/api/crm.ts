@@ -160,6 +160,15 @@ export function recordConsent(pid: string, action: "granted" | "withdrawn"): Pro
   });
 }
 
+/**
+ * Erase (anonymise) a contact (CRM-R20). Destructive; the service
+ * refuses `422` while an open deal, an open ticket, or an active
+ * nurture enrolment exists.
+ */
+export function eraseContact(pid: string): Promise<{ erased: string; note: string }> {
+  return api(`/contacts/${pid}/erase`, { method: "POST" });
+}
+
 /** Accounts. */
 export function listAccounts(init?: FetchLike): Promise<Account[]> {
   return api("/accounts", init);

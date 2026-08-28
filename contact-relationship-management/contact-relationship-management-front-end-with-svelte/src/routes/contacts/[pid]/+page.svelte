@@ -1,13 +1,24 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { getContact, money, recordConsent } from "$lib/api/crm";
+  import { eraseContact, getContact, money, recordConsent } from "$lib/api/crm";
   import { i18n, t } from "$lib/i18n.svelte";
 
   let detail = $state<Awaited<ReturnType<typeof getContact>> | null>(null);
   let error = $state<string | null>(null);
   let actionError = $state<string | null>(null);
+  let erasing = $state(false);
 
   const pid = $derived(page.params.pid ?? "");
+  // Rough client-side gate from data already on the page — the
+  // service is the authority (CRM-R20 also checks nurture
+  // enrolments, which this page does not load); this only avoids
+  // offering the button when it would obviously be refused.
+  const hasOpenEngagement = $derived(
+    (detail?.deals.some((deal) => deal.closed_at === null) ?? false) ||
+      (detail?.tickets.some((ticket) => ticket.status === "open" || ticket.status === "pending") ??
+        false),
+  );
 
   async function load() {
     try {
@@ -28,6 +39,20 @@
       await load();
     } catch (cause) {
       actionError = cause instanceof Error ? cause.message : String(cause);
+    }
+  }
+
+  async function erase() {
+    if (!confirm(t("contact.eraseConfirm"))) return;
+    actionError = null;
+    erasing = true;
+    try {
+      await eraseContact(pid);
+      await goto("/contacts");
+    } catch (cause) {
+      actionError = cause instanceof Error ? cause.message : String(cause);
+    } finally {
+      erasing = false;
     }
   }
 </script>
@@ -52,6 +77,22 @@
     {/if}
     {#if actionError}
       <p class="error" data-testid="action-error">{actionError}</p>
+    {/if}
+  </div>
+
+  <div class="panel">
+    <a
+      href={`/api/proxy/contacts/${pid}/subject-access`}
+      target="_blank"
+      rel="noreferrer"
+      data-testid="subject-access"
+    >
+      {t("contact.subjectAccess")}
+    </a>
+    {#if !hasOpenEngagement}
+      <button onclick={() => void erase()} disabled={erasing} data-testid="erase">
+        {t("contact.erase")}
+      </button>
     {/if}
   </div>
 

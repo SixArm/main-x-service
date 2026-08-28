@@ -97,3 +97,25 @@ computed. The distinction matters for the insight/engagement views
 (CRM-R18/R19): every one of them is either a pure derivation over
 recorded facts, or a verbatim echo of a declared field — never a
 blend of the two presented as one number.
+
+## CRM-D14 — Erasure gates on live engagement, not on `Contact::status`
+
+WPM's analogous rule (WPM-D22) gates employee erasure on the
+employment `status` field, because that field genuinely transitions
+through an offboarding lifecycle and *is* the lawful basis. CRM's
+`Contact::status` (`active`/`inactive`) is not that: it is set once at
+creation and no endpoint in this crate ever transitions it, so gating
+erasure on it would refuse erasure forever. CRM-R20's `erasable`
+predicate instead checks the signals that actually change over a
+contact's lifetime and actually represent a live reason to keep the
+data: an open deal naming the contact primary contact, an open
+support ticket, or an active nurture enrolment. Erasure anonymises
+(tombstone `person:` URN, scrubbed identity fields and linked free
+text, soft-deleted row) rather than deletes, mirroring WPM-D22's
+"neither pretends" framing: deals/tickets/consent history remain for
+reporting and compliance-evidence continuity, keyed to a pid that no
+longer identifies anyone, and the retention sweep (floored horizon,
+`CRM_RETENTION_DAYS`) is the separate, generic hard-delete path for
+soft-deleted rows past that horizon — it never bulk-anonymises a
+contact, because a contact carries the erasure gate above and the
+sweep has no way to evaluate it per row.

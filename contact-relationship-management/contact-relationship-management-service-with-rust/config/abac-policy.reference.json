@@ -1,0 +1,47 @@
+{
+  "rules": [
+    { "effect": "allow",
+      "actions": ["read", "write", "delete", "destructive"],
+      "when": { "svc": ["true"] } },
+
+    { "effect": "allow",
+      "actions": ["read", "write", "delete", "destructive"],
+      "when": { "access": ["admin"] } },
+
+    { "effect": "allow",
+      "actions": ["read", "write"],
+      "when": { "resource.owner": ["$sub"] } },
+
+    { "effect": "allow",
+      "actions": ["write"],
+      "when": { "manager": ["true"] } },
+    { "effect": "allow",
+      "actions": ["read"],
+      "when": { "manager": ["true"] } },
+
+    { "effect": "allow",
+      "actions": ["write"],
+      "when": { "rep": ["true"] } },
+
+    { "effect": "allow",
+      "actions": ["write"],
+      "when": { "marketing": ["true"] } },
+    { "effect": "allow",
+      "actions": ["read"],
+      "when": { "marketing": ["true"] },
+      "obligations": ["mask"] },
+
+    { "effect": "allow",
+      "actions": ["write"],
+      "when": { "support": ["true"] } },
+    { "effect": "allow",
+      "actions": ["read"],
+      "when": { "support": ["true"] },
+      "obligations": ["mask"] },
+
+    { "effect": "allow",
+      "actions": ["read"],
+      "when": {},
+      "obligations": ["mask"] }
+  ]
+}
