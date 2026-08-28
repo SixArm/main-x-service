@@ -39,7 +39,10 @@ issue reports, and feedback are welcome.
 See [AI_STATEMENT.md](AI_STATEMENT.md) — it binds contributors as well
 as the maintainer.
 
-## Donations
+## Funding
 
-There is no donation mechanism; the useful contribution is code,
-review, or a well-written issue.
+You can sponsor ongoing work on this project through
+[GitHub Sponsors](https://github.com/sponsors/joelparkerhenderson).
+There is no Open Collective yet. Financial support is welcome but
+never required — the most useful contribution remains code, review,
+or a well-written issue.

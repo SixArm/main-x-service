@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `.github/FUNDING.yml`: GitHub Sponsors enabled (`joelparkerhenderson`).
+  Open Collective intentionally omitted — no collective exists yet.
+  CONTRIBUTING.md and NEWS.md updated to match (`spec/free-open-source-funding`).
 - Root special files per `spec/special-files-for-public-repos`:
   LICENSE.md, CITATION.cff, CONTRIBUTING.md, SECURITY.md,
   MAINTAINERS.md, GOVERNANCE.md, CODEOWNERS, AI_STATEMENT.md, NEWS.md,

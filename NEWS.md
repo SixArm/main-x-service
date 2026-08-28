@@ -8,8 +8,16 @@ subproject's `CHANGELOG.md`; the repo-level summary is
 
 Joel Parker Henderson — <joel@joelparkerhenderson.com>.
 
+## Funding
+
+This project now accepts sponsorship through
+[GitHub Sponsors](https://github.com/sponsors/joelparkerhenderson).
+See [CONTRIBUTING.md](CONTRIBUTING.md#funding).
+
 ## Milestones
 
+- **2026-08-28** — GitHub Sponsors enabled as a funding channel
+  ([.github/FUNDING.yml](.github/FUNDING.yml)).
 - **2026-08-26** — Repo-wide professionalization audit: every crate
   and front-end verified green on fmt/clippy/test/svelte-check;
   root special files (this file among them) added.
