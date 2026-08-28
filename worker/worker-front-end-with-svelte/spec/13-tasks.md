@@ -40,10 +40,27 @@
   bearer, no fragment handoff (per
   [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
   Landed 2026-06-18 (`f66ff50f`); see `CHANGELOG.md`.
-- [ ] T-22b: CSRF protection on mutating browser→BFF calls
-  (`authentication-sessions.md` §4 — synchroniser token echoed in an
-  `X-CSRF-Token` header) is not yet implemented. Every `POST`/`PUT`/
-  `DELETE` under `/api/proxy` today relies on `SameSite=Lax` alone.
+- [x] T-22b (2026-08-28, PRO-H5): CSRF protection on mutating
+  browser→BFF calls (`authentication-sessions.md` §4). `/verify`
+  additionally sets a second, **non-httpOnly**, Secure, `SameSite=Lax`
+  cookie `__Host-mxi_csrf` (`generateCsrfToken()`/`CSRF_COOKIE`/
+  `CSRF_COOKIE_OPTIONS`, `src/lib/server/session.ts`); `ApiClient`
+  (`src/lib/api/client.ts`) reads it from `document.cookie` when
+  running in the browser and echoes it as `X-CSRF-Token` on every
+  non-GET/HEAD request; the proxy verifies the header matches the
+  cookie (`verifyCsrf`, constant-value equality — both sides are
+  BFF-issued, so no timing-safe compare is needed) and additionally
+  rejects a present-but-mismatched `Origin`/`Referer`, returning
+  `403 {"error":"csrf"}` **without forwarding upstream** on either
+  failure. Sign-out (root `+page.server.ts`'s `signout` action) clears
+  both cookies. Tests: `tests/unit/session.test.ts` (10,
+  `verifyCsrf`/`generateCsrfToken`/cookie-option pins),
+  `tests/unit/proxy.test.ts` (7, the route handler exercised directly
+  — GET always passes, missing/mismatched token 403s, Origin/Referer
+  backstop), `tests/unit/client.test.ts` (+3, the browser
+  header-attach path via jsdom's real `document.cookie`, which
+  required pointing `vite.config.ts`'s jsdom `testURL` at `https://`
+  since a `__Host-`-prefixed cookie only sets over a secure origin).
 - [x] T-25 (repo FE-4): **Duplicate review-queue screen** at `/review` —
   2026-08-04. The board itself predates this task and was never fully
   specified. What landed now closes the board's gaps, mirroring the

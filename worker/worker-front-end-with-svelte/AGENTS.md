@@ -48,9 +48,21 @@ This front-end is a **Backend-For-Frontend**, per
 - Server-side base URLs (`WORKER_API_URL`, `AUTH_API_URL`) live in
   `src/lib/server/config.ts`, read from the environment — see
   `.env.example`. Never import `src/lib/server/*` from browser code.
-- **Known gap**: CSRF protection on mutating browser→BFF calls
-  (`authentication-sessions.md` §4) is not yet implemented — see
-  `spec/13-tasks.md` T-22.
+
+**CSRF** (2026-08-28, closes the prior gap noted in `spec/13-tasks.md`
+T-22b / `spec/16-open-questions.md` OQ-3): a double-submit cookie
+protects mutating browser→BFF calls. `/verify` sets a second,
+**non-httpOnly** cookie `__Host-mxi_csrf` alongside the session cookie
+(`generateCsrfToken()`/`CSRF_COOKIE`/`CSRF_COOKIE_OPTIONS` in
+`src/lib/server/session.ts`); `src/lib/api/client.ts`'s `ApiClient`
+reads it from `document.cookie` (guarded — a no-op server-side) and
+echoes it as `X-CSRF-Token` on every non-GET/HEAD request; the proxy
+(`src/routes/api/proxy/[...path]/+server.ts`) rejects a mismatch with
+`403 {"error":"csrf"}` before forwarding upstream, backstopped by an
+Origin/Referer check (only rejects when one is present and disagrees).
+Sign-out clears both cookies. See
+`agents/share/authentication-sessions.md` §4 for the design this
+implements.
 
 ## What lives where
 
