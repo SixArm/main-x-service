@@ -32,7 +32,20 @@ docs     ──>  GET    /api-docs/openapi.json  ·  /swagger-ui               -
 metrics  ──>  GET    /metrics.prom                                        -> Prometheus text (public)
 compliance ──> GET   /api/compliance  ·  /sbom  ·  /audit/verify  ·  /records/verify  ·  /checkpoint{,/verify}
 fhir     ──>  GET/POST/PUT/DELETE /fhir/PlanDefinition{,/{id}}  ·  /metadata  ·  $validate  ·  $export
+segment  ──>  POST   /api/instances/{pid}/segments             {SegmentPayload}   -> segment (+ /segments/{seg}/close, /clock)
+tba      ──>  GET    /api/instances/{pid}/{time-analysis,timeline}                -> per-journey TBA / segment+gap wall
+cohort-tba ──> GET   /api/care-pathways/{pid}/{time-analysis,constraints}?standard= -> cohort TBA / ranked constraints
+flow     ──>  GET    /api/instances/{flow,time-standards}                         -> Little's Law flow / access-standard catalogue
+link     ──>  POST   /api/instances/{pid}/links   {kind, to_ref}                  -> continues_as edge (+ GET/DELETE, /{id})
+journey  ──>  GET    /api/instances/{pid}/journey                                 -> the journey stitched across continues_as links
 ```
+
+`link` and `journey` are governed reads: a policy denial is `404`, not
+`403` (spec §6.20) — see [spec §6.18–§6.19](./spec/index.md) for the
+full time-based-analysis / journey-links contract, and
+[`agents/share/time-based-analysis.md`](../../agents/share/time-based-analysis.md) /
+[`../spec/time-based-analysis.md`](../spec/time-based-analysis.md) for
+the design.
 
 `compliance` and `fhir` are the family's reference-implementation
 surfaces for the four control-driving frameworks in

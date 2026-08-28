@@ -36,6 +36,44 @@ specific condition over a defined episode.
 `?limit=`/`?offset=` and report `X-Total-Count`/`X-Limit`/`X-Offset`
 response headers (defaults reproduce the old hard caps of 100/50).
 
+### Time-based analysis ([spec §6.18](./spec/index.md))
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST/GET | `/api/instances/{pid}/segments` | Record / list a journey's VA / NNVA / UNVA segments |
+| POST | `/api/instances/{pid}/segments/{seg}/close` | Close a running segment |
+| POST | `/api/instances/{pid}/clock` | Set the pathway clock `start`/`stop` (no `pause`, by design) |
+| GET | `/api/instances/{pid}/time-analysis` | Per-instance TBA: lead time, value-adding ratio, coverage |
+| GET | `/api/instances/{pid}/timeline` | The mapped journey as an ordered wall of segments and gaps |
+| GET | `/api/care-pathways/{pid}/time-analysis` | Cohort TBA: nearest-rank lead-time percentiles vs. an NHS access standard |
+| GET | `/api/care-pathways/{pid}/constraints` | Ranked constraint findings, by recoverable time |
+| GET | `/api/instances/flow` | Queueing-theory flow (Little's Law: λ/μ/ρ/κ/τ) |
+| GET | `/api/instances/time-standards` | The NHS access-standard catalogue + segment vocabularies |
+
+Every figure is derived on read — nothing is stored — and the
+denominator is always elapsed calendar time, never the sum of recorded
+activity. Full design:
+[`agents/share/time-based-analysis.md`](../../agents/share/time-based-analysis.md),
+[`../spec/time-based-analysis.md`](../spec/time-based-analysis.md).
+
+### Cross-service journey links ([spec §6.19](./spec/index.md))
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST/GET | `/api/instances/{pid}/links` | Assert / list a journey instance's outbound `continues_as` edges |
+| DELETE | `/api/instances/{pid}/links/{id}` | Withdraw an edge |
+| GET | `/api/instances/links` | Bulk reconciliation pull (privileged; `?since=` for an incremental pull) |
+| GET | `/api/instances/{pid}/journey` | The whole journey, stitched across every `continues_as` link |
+
+`continues_as` links a pathway **instance** (an enrolment, never the
+template) into its next episode — another instance, a
+`patient_flow_stay`, or a `case`. High-sensitivity governance alongside
+`subject_of`: authorised at the read-the-journey level, every write
+audited, the bulk pull gated as a privileged read. **A policy denial on
+any of these endpoints is reported as `404`, not `403`** — see
+[spec §6.20](./spec/index.md) for why a `403` here would itself be a
+disclosure.
+
 ### Compliance ([spec §12](./spec/index.md))
 
 | Method | Path | Purpose |
@@ -181,7 +219,13 @@ validation (ICD/SNOMED/UUID/DOI/BCP-47) + `?limit=`/`?offset=`
 pagination on list and search + boot-time published-key fetch over HTTP
 plus a background refresh loop (`CARE_PATHWAY_PASETO_KEYS_URL` /
 `_REFRESH_SECS`) and ABAC-policy hot-reload
-(`CARE_PATHWAY_ABAC_POLICY_FILE`), all without a restart.
+(`CARE_PATHWAY_ABAC_POLICY_FILE`), all without a restart; **time-based
+analysis** (segment/clock recording, per-instance and cohort TBA,
+ranked constraints, Little's-Law flow, a default-off Prometheus
+flow-gauge family) and **cross-service journey links** (`continues_as`
+write side + bulk reconciliation pull + the stitched
+`GET /api/instances/{pid}/journey` read, each leg fetched under the
+caller's own credential) — see the two tables above.
 
 **Compliance (2026-07-25 through 2026-08-04)** — this crate is the
 family's reference implementation of the four control-driving
@@ -207,8 +251,8 @@ for the order. See [spec §12](./spec/index.md) — including §12.5, which
 states the limits plainly.
 
 Deferred (see [spec §13](./spec/index.md)): instance-layer
-privacy/authz for `pathway_instances.subject_ref`, front-end merge
-action, terminology-server code-existence checks, the native (non-FHIR)
+privacy/authz for `pathway_instances.subject_ref`, terminology-server
+code-existence checks, the native (non-FHIR)
 bulk import/export API, and the remaining compliance follow-ups in T-15
 (lifting `compliance/` to the repo root once a second crate adopts it,
 an Inferno-style `/fhir` conformance run). Token issuance is

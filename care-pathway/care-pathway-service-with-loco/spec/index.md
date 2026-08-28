@@ -23,9 +23,19 @@ ABAC `mask` obligation (§13 2026-08-02; thin by design — a pathway
 *template* names no patient, see §12.2) + the durable event bus's real
 `FluvioSink` broker sink (BUS-3, §13 2026-08-03; all three phases —
 transactional outbox, relay/retention, and the real-broker sink — are
-now done). Deferred (§13):
+now done). Also in scope, landed later: **time-based analysis (TBA)** —
+elapsed-calendar-time measurement of a patient's journey through the
+pathway (value-adding ratio, cohort NHS-access-standard compliance,
+ranked constraints, Little's-Law flow; §6.18, §13 T-13 2026-08-23) — and
+the cross-service **`continues_as` journey edge**, which lets TBA follow
+a journey across a service boundary instead of stopping at it (§6.19,
+§13 2026-08-24 through 2026-08-27). Full design:
+[`agents/share/time-based-analysis.md`](../../../agents/share/time-based-analysis.md)
+and
+[`../../spec/time-based-analysis.md`](../../spec/time-based-analysis.md).
+Deferred (§13):
 instance-layer masking/authz for `pathway_instances.subject_ref` (the
-patient-identifying linkage — see §16), front-end merge action,
+patient-identifying linkage — see §16),
 terminology-server code-existence checks, gRPC, and the native
 (non-FHIR) bulk import/export API (§13). The PASETO key-set refresh loop
 and ABAC policy hot-reload are **done** (§9/§13, 2026-08-01) — a rotated
@@ -175,6 +185,85 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    redactions must never look like a complete answer. `404` for an
    unknown `pid`; `503` when the export could not be recorded on the
    audit trail (`CARE_PATHWAY_AUDIT_FAIL_CLOSED`).
+18. **Time-based analysis (TBA).** `POST`/`GET
+   /api/instances/{pid}/segments` (+ `/segments/{seg}/close`, `/clock`)
+   record a journey's segments (classified `value_adding` /
+   `necessary_non_value_adding` / `unnecessary_non_value_adding`, with a
+   stage and an optional VSM waste type) and the pathway's explicit
+   clock (`start`/`stop`; deliberately **no** `pause` — a patient-caused
+   delay is a visible, subtractable segment instead, per §12.3 of the
+   umbrella doc below). `GET /api/instances/{pid}/{time-analysis,timeline}`
+   derive, on every read (nothing is stored), the per-journey lead time,
+   value-adding ratio, coverage, gaps and handoffs — the denominator is
+   **elapsed calendar time**, never the sum of recorded activity.
+   `GET /api/care-pathways/{pid}/{time-analysis,constraints}` roll a
+   pathway's instances into nearest-rank lead-time percentiles against
+   an NHS access standard (small cohorts, `<5`, withhold percentile
+   detail) and a ranked list of constraint findings.
+   `GET /api/instances/{flow,time-standards}` serve Little's-Law flow
+   (λ/μ/ρ/κ/τ) and the access-standard catalogue. Never per-clinician:
+   see [`agents/share/time-based-analysis.md`](../../../agents/share/time-based-analysis.md)
+   §7 for the family-wide refusal and §6.x above for this crate's one
+   permitted, not-yet-buildable exception (utilisation). Pure
+   computation: [`src/tba.rs`](../src/tba.rs); HTTP surface:
+   [`src/controllers/tba.rs`](../src/controllers/tba.rs). Full design:
+   [`agents/share/time-based-analysis.md`](../../../agents/share/time-based-analysis.md),
+   [`../../spec/time-based-analysis.md`](../../spec/time-based-analysis.md).
+   Landed §13 T-13, 2026-08-23.
+19. **Cross-service journey links (`continues_as`).** `POST`/`GET`/`DELETE
+   /api/instances/{pid}/links` (+ `/{id}`) assert, list, and withdraw the
+   outbound `continues_as` edge from a pathway **instance** (never a
+   template — a journey belongs to an enrolment, and the template is a
+   document many journeys share) into the next episode: another pathway
+   instance, a `patient_flow_stay`, or a `case`. `GET
+   /api/instances/links[?since=]` is the aggregator's bulk reconciliation
+   pull. `GET /api/instances/{pid}/journey` walks the chain
+   breadth-first, resolving each leg — local legs from this database,
+   remote legs from the far service under **the caller's own credential**
+   (never a service identity, which would make this a confused deputy) —
+   and withholds the combined totals unless every leg resolved (a
+   stitched total missing a leg is a wrong number, not an imprecise one).
+   `continues_as` is a **high**-sensitivity kind alongside `subject_of`
+   ([`agents/share/cross-service-linking.md`](../../../agents/share/cross-service-linking.md)
+   §10.2): edges are authorised at the read-the-journey level against the
+   instance's own pathway template (including its `sensitive_setting`
+   flag), every write is audited, and the bulk pull is gated as a
+   privileged (`destructive`) read. **See §6.20 for the denial rule.**
+   Write side: [`src/controllers/links.rs`](../src/controllers/links.rs);
+   stitching read: [`src/journey.rs`](../src/journey.rs). Landed §13
+   2026-08-24 through 2026-08-27 (`0.2.0`, CHANGELOG.md).
+
+### 6.20 Rule: a denied journey-link request is `404`, not `403`
+
+On every `/api/instances/{pid}/links*` and `/api/instances/{pid}/journey`
+endpoint (§6.19), a record-level authorization denial is reported as
+**`404 Not Found`**, never `403 Forbidden`. This is a deliberate
+governance decision, distinct from the rest of the API, not an
+inconsistency:
+
+- A `403` answers a question the caller was not allowed to ask in the
+  first place. "This journey exists, and you may not see it" is itself
+  a disclosure — and on a mental-health or palliative pathway, it *is*
+  the disclosure that matters.
+- An empty list and a denied read are therefore made **deliberately
+  indistinguishable**. The stitched `/journey` traversal collapses a
+  peer's `403` and `404` into one leg status for the same reason, so the
+  leak cannot reopen from the far side of a cross-service hop.
+- `401` is left alone: "you sent no credential" discloses nothing about
+  what exists, and folding it into `404` would leave an unauthenticated
+  client retrying forever against a URL it should be authenticating to.
+
+The cost is real and stated rather than hidden: a misconfigured operator
+sees `404` where the true answer is "your policy denies this," which is
+harder to debug. The **audit trail** carries the denial, so the
+information is moved somewhere the caller cannot read, not lost. This
+trade is deliberately **not** made on the pathway *record* endpoints
+(`/api/care-pathways/*`), which still return `403`: a care-pathway
+template is a document, not a person, and knowing one exists discloses
+nothing about anybody. Enforced in
+[`src/controllers/links.rs::record_rejection`](../src/controllers/links.rs)
+and pinned by `a_denied_request_is_reported_as_not_found` and
+`a_missing_credential_stays_unauthorized`.
 
 ### 6.x Per-clinician utilisation (permitted, not yet buildable)
 
@@ -373,6 +462,29 @@ step completion, outcomes, and the derived caseload/overdue-review/
 care-team-load/cohort views) and
 [`tests/requests/insights.rs`](../tests/requests/insights.rs) (the five
 registry lenses in §13's 2026-07-20 entry).
+
+**Time-based analysis and journey links.** [`src/tba.rs`](../src/tba.rs)
+carries its own DB-free unit suite — interval union/subtraction, the
+four-category clock partition summing to the lead time under
+overlapping and out-of-window segments, gaps, handoffs, nearest-rank
+percentiles, cohort rollup, constraint ranking, Little's Law — with no
+I/O and no clock read (`as_of` is always a parameter), so all of it runs
+without a database; the calendar-time-not-recorded-activity property
+(§6.18) is pinned by a dedicated regression test. Exercised end-to-end,
+DB-gated, by [`tests/requests/tba.rs`](../tests/requests/tba.rs)
+(segment/clock recording `422`s, small-cohort percentile suppression,
+`401` under `CARE_PATHWAY_REQUIRE_AUTH`).
+[`src/controllers/links.rs`](../src/controllers/links.rs) unit-tests the
+`continues_as` accept/reject matrix (permitted vs. refused far-end
+types, self-link refusal, URN canonicalisation) and — the property this
+crate treats as load-bearing — that a record-level `403` is remapped to
+`404` while a `401` is left alone (§6.20:
+`a_denied_request_is_reported_as_not_found`,
+`a_missing_credential_stays_unauthorized`).
+[`tests/requests/links.rs`](../tests/requests/links.rs) covers the
+write/list/delete/bulk-pull endpoints against Postgres, and
+[`src/journey.rs`](../src/journey.rs) the stitched-journey combine logic
+(withheld totals unless every leg resolved).
 [`tests/requests/event_outbox.rs`](../tests/requests/event_outbox.rs)
 and [`tests/outbox_audit.rs`](../tests/outbox_audit.rs) cover the
 durable-bus outbox path and its audit-in-same-transaction property;
@@ -638,6 +750,89 @@ the evidence bundle.
     throughput or flow efficiency**, and none can be derived by
     arithmetic from what is returned.
 
+- [x] **2026-08-28 — PRO-P13: backport TBA + journey-links into this
+  spec, and close the instances/insights OpenAPI gap.** This spec
+  (§1–§18) had zero coverage of time-based analysis and the
+  `continues_as` journey/links surface even though both had shipped —
+  the umbrella `spec/time-based-analysis.md`, the CHANGELOG, and
+  AGENTS.md were the only places that said so. Backported into §2, §6
+  (new §6.18–§6.20), §11, §13 (this entry plus the two below), §14, and
+  §15. Also closed `src/openapi.rs`'s own pre-existing,
+  spec-acknowledged gap (its module doc used to read "the sibling
+  instance and insight endpoints are not documented here yet"): the
+  operational instance layer (`src/controllers/instances.rs`) and the
+  five registry-insight lenses (`src/controllers/insights.rs`) are now
+  in `openapi.json`, pinned by
+  `spec_documents_the_instance_and_insight_surface`. Swept the stale
+  "front-end merge action deferred" claim (the two-step merge UI has
+  been live in `care-pathway-front-end-with-svelte`'s `[pid]/+page.svelte`
+  since before this spec last touched it) from this file, `AGENTS.md`,
+  and `README.md`, and corrected `AGENTS.md`'s stale
+  `authentication-verifier` version citation (`0.2` → `0.9.0`, this
+  crate's actual `Cargo.toml` dependency).
+
+- [x] **2026-08-23 — T-13: Time-based analysis (TBA-1 … TBA-7, §6.18).**
+  The time dimension of the pathway — of the calendar time a patient
+  spent on it, how much was care? Unifies Barker's time-based analysis
+  (the value-adding ratio; published NHS journeys measure 8–14%), value
+  stream mapping (VA/NNVA/UNVA classification, VT/PT/LT/%A/#HO metric
+  names), and queueing theory (λ/μ/ρ/κ/τ, Little's Law). New primitive
+  `instance_segments` (migration
+  `m20260823_000014_time_based_analysis`) plus an explicit
+  `clock_start_at`/`clock_stop_at` on `pathway_instances`, backfilled
+  from `enrolled_on`/`closed_on` so pre-migration instances are
+  analysable at day resolution immediately. Pure analysis in
+  `src/tba.rs` (interval union/subtraction, the four-bucket clock
+  partition, gaps, handoffs, nearest-rank percentiles, the NHS
+  access-standard catalogue, cohort rollup, constraint ranking, Little's
+  Law — no I/O, `as_of` always a parameter); HTTP surface in
+  `src/controllers/tba.rs`; documented in `openapi.json`. Full contract:
+  [`agents/share/time-based-analysis.md`](../../../agents/share/time-based-analysis.md),
+  [`../../spec/time-based-analysis.md`](../../spec/time-based-analysis.md).
+  **Acceptance:** a 100-day journey with 14 value-adding days reports
+  0.14 — and the same journey with only its value-adding segments
+  *recorded* still reports 0.14, the regression pin against
+  "simplifying" the denominator into a sum of recorded activity; the
+  four category buckets sum to the lead time over a generated sweep;
+  ratios stay in `[0, 1]` under overlapping/out-of-window segments;
+  degenerate clocks return a stated `null` rather than panic; every
+  §5.1 invariant is a `422`; `401` under `CARE_PATHWAY_REQUIRE_AUTH`.
+  48/48 `--ignored` request tests green vs Postgres 18; 279 unit tests;
+  clippy pedantic clean. TBA-9 (cross-service stitching) followed as the
+  `continues_as` journey work below; TBA-11 (flow gauges) followed with
+  it.
+
+- [x] **2026-08-24 through 2026-08-27 — Cross-service journey links
+  (`continues_as`, §6.19) + stitched journeys + TBA flow gauges
+  (TBA-11).** This service's first originated cross-service edge:
+  `entity_links` write-side (migration
+  `m20260824_000015_entity_links`), `POST`/`GET`/`DELETE
+  /api/instances/{pid}/links` (+ `/{id}`), and the aggregator's bulk
+  reconciliation pull `GET /api/instances/links[?since=]`
+  (`src/controllers/links.rs`); the read side,
+  `GET /api/instances/{pid}/journey`, follows the chain breadth-first
+  under the *caller's* credential and withholds combined totals unless
+  every leg resolved (`src/journey.rs`). The shared `entity-ref`
+  registry gained `continues_as` and two entity types,
+  `care_pathway_instance` and `patient_flow_stay` (the second the first
+  type owned by a consumer application rather than an index registry);
+  the `Envelope` gained `Linked`/`Unlinked` kinds plus an additive
+  `data` field (`skip_serializing_if`, so existing CRUD envelopes stay
+  byte-identical). **A denied link/journey request is reported as
+  `404`, not `403`** — the named rule at §6.20. A default-off Prometheus
+  gauge family (`care_pathway_flow_*`, TBA-11) reports cohort
+  value-adding ratio / p90 lead time / coverage / instance count per
+  pathway on a background refresh loop
+  (`CARE_PATHWAY_FLOW_METRICS_SECS`), with the same small-cohort
+  suppression the API itself applies and a per-pathway series cap
+  (default 50) so one metric family cannot take a Prometheus install
+  down. **Acceptance:** the `continues_as` accept/reject matrix for
+  permitted far-end types is unit-pinned, as are the self-link refusal
+  and the idempotent-reassert-on-`(from_pid, kind, to_ref, valid_from)`
+  case; `a_denied_request_is_reported_as_not_found` and
+  `a_missing_credential_stays_unauthorized` pin the §6.20 rule;
+  `tests/requests/links.rs` green vs Postgres 18. Released as `0.2.0`
+  (CHANGELOG.md, tag `care-pathway-service-v0.2.0`).
 
 - [x] **2026-08-21 — FUZZ-2: cargo-fuzz harness for the request-path
   logic.** Three coverage-guided targets over the pure, total code that
@@ -801,7 +996,10 @@ the evidence bundle.
 - [x] Record merge — `POST /merge` folds a duplicate into a survivor
   (union fields, former-title alias, soft-delete, `merge_records`
   history + snapshot, `Merged` event); pure `src/merge.rs`;
-  `/merges/recent`. Front-end merge action is a follow-up.
+  `/merges/recent`. Front-end merge action shipped in
+  care-pathway-front-end-with-svelte's `[pid]/+page.svelte` (inline
+  two-step "merge into this record" → "confirm merge" flow after a
+  duplicate check).
 - [x] OpenAPI/Swagger — hand-written `src/openapi.rs` (matcher DTO is
   dependency-light, so no utoipa, matching the organization service)
   served at `/api-docs/openapi.json` + `/swagger-ui` by
@@ -1159,8 +1357,18 @@ witness checkpoints, row-level record integrity, read/disclosure
 auditing, GDPR Art. 17 erasure, SOUP register + CycloneDX SBOM,
 machine-checked requirement→test traceability; the FHIR R5
 `PlanDefinition` surface (§12.3) with `$validate`, conditional SMART
-discovery, and Bulk Data `$export` (durable, on the `bg_pg` worker); DB-free
-tests + gated request-level tests; green build + clippy.
+discovery, and Bulk Data `$export` (durable, on the `bg_pg` worker);
+**time-based analysis** (§6.18) — segment/clock recording, per-instance
+and cohort TBA, ranked constraints, Little's-Law flow, a default-off
+Prometheus flow-gauge family; **cross-service journey links** (§6.19) —
+the `continues_as` edge write side, the bulk reconciliation pull, and
+the stitched `GET /api/instances/{pid}/journey` read (each leg fetched
+under the caller's own credential; combined totals withheld unless
+every leg resolved) — with the §6.20 rule that a denial is reported as
+`404`, never `403`; the operational instance layer and the five
+registry-insight lenses are now also in `openapi.json` (closing that
+crate's own pre-existing gap); DB-free tests + gated request-level
+tests; green build + clippy.
 
 ## 15. Roadmap
 
@@ -1181,9 +1389,12 @@ export wired to the ABAC `mask` obligation
 (2026-08-02; §13), keyed integrity MACs + external-witness checkpoints
 (2026-07-27; §12.1/§13), pagination on list/search (2026-08-01; §13),
 and the durable event bus's real `FluvioSink` broker
-sink (BUS-3, 2026-08-03; §13) — all three bus phases are now done. Next
+sink (BUS-3, 2026-08-03; §13) — all three bus phases are now done. Time-based
+analysis (§6.18, §13 T-13 2026-08-23) and the cross-service `continues_as`
+journey edge + stitched journeys + flow gauges (§6.19, §13
+2026-08-24 through 2026-08-27, `0.2.0`) have also since landed. Next
 (deferred, §13): instance-layer privacy for
-`pathway_instances.subject_ref` (§16), front-end merge action, and the
+`pathway_instances.subject_ref` (§16), and the
 native (non-FHIR) bulk import/export API.
 
 ## 16. Open questions

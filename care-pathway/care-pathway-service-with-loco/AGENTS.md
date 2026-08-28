@@ -98,10 +98,15 @@ why, and for the explicit note that the patient-identifying linkage
 surface. The durable bus's real broker sink (BUS-3, `FluvioSink` in
 `src/relay.rs`, behind this crate's own `fluvio` Cargo feature, off by
 default) landed 2026-08-03, ported from case-service's BUS-1 reference —
-see `agents/share/event-bus.md`. Deferred
+see `agents/share/event-bus.md`. **Time-based analysis** (`src/tba.rs` +
+`src/controllers/tba.rs`, spec §6.18, T-13) and **cross-service journey
+links** (`continues_as`; `src/journey.rs` + `src/controllers/links.rs`,
+spec §6.19) landed 2026-08-23 through 2026-08-27 — see the API surface
+table above and `agents/share/time-based-analysis.md` /
+`../../spec/time-based-analysis.md` for the full contract. Deferred
 (spec §13): instance-layer
-masking/authz for `subject_ref`, front-end merge
-action, terminology-server code-existence checks, and the native
+masking/authz for `subject_ref`, terminology-server code-existence
+checks, and the native
 (non-FHIR) bulk import/export API. The published key set
 is fetched over HTTP once at boot when `CARE_PATHWAY_PASETO_KEYS_URL` is
 set (fetched set wins; warn + env fallback via
@@ -139,7 +144,7 @@ published Ed25519 key (RS256/JWKS decommissioned); the
 only the credential changed. See
 [agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md)
 (source of truth); `src/auth.rs` verifies PASETO via the
-`authentication-verifier` crate (0.2, `from_paseto_keys_*`).
+`authentication-verifier` crate (0.9.0, `from_paseto_keys_*`).
 
 ## Golden rules
 
