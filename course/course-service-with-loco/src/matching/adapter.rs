@@ -18,6 +18,12 @@
 //! - `service::Course.identifiers` → `matcher::Course.identifiers` (scheme + value)
 //! - `service::Course.same_as` → `matcher::Course.same_as`
 //! - `service::Course.in_language` → `matcher::Course.in_language`
+//!
+//! `matcher::Course.relationships` / `.tags` (course-matcher 0.7.0,
+//! T-11 / T-12) have no routing yet — the service domain `Course` does
+//! not carry either field today, so both are passed through empty.
+//! Wiring a service-side `relationships`/`tags` field through this
+//! adapter is a follow-up, not part of the matcher-only PRO-H7 change.
 
 use course_matcher as cm;
 
@@ -44,6 +50,10 @@ pub fn to_matcher_course(c: &ServiceCourse) -> cm::Course {
         identifiers: c.identifiers.iter().map(ident_to_matcher).collect(),
         same_as: c.same_as.clone(),
         in_language: c.in_language.clone(),
+        // Not yet modelled on the service domain `Course` — see the
+        // module doc comment above.
+        relationships: Vec::new(),
+        tags: Vec::new(),
     }
 }
 

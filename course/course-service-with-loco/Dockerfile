@@ -8,9 +8,11 @@
 # crate's own directory. This crate's Cargo.toml (like every crate in
 # the family — there is no root Cargo.toml, so no shared vendor/lock
 # step) depends on sibling crates by path: `integrity-mac`,
-# `authentication-verifier` (its matcher, `course-matcher`, is a
-# crates.io registry dependency, not a path dependency, so it needs no
-# sibling COPY — unlike an earlier version of this Dockerfile assumed).
+# `authentication-verifier`, and (as of course-matcher 0.7.0) its
+# matcher `course-matcher` itself — previously a crates.io-only
+# registry dependency with no sibling COPY, now a `path` dependency
+# (PRO-H7) so local matcher changes reach this service without a
+# publish round-trip first.
 # Build with:
 #
 #   podman build -f course/course-service-with-loco/Dockerfile \
@@ -40,6 +42,7 @@ WORKDIR /app
 # so they layer-cache independently of day-to-day edits here.
 COPY integrity/integrity-mac-rust-crate integrity/integrity-mac-rust-crate
 COPY authentication/authentication-verifier-rust-crate authentication/authentication-verifier-rust-crate
+COPY course/course-matcher-rust-crate course/course-matcher-rust-crate
 
 # This crate itself: manifests first (better layer caching), then the
 # nested `migration` sub-crate (loco's sea-orm-migration bridge —

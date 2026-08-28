@@ -12,6 +12,8 @@ match_courses(A, B):
     (educational_level_score(A, B),  educational_level_weight),
     (set_jaccard(A.keywords, B.k),   keywords_weight),
     (set_jaccard(A.teaches, B.t),    teaches_weight),
+    (relationships_score(A, B),      relationships_weight),
+    (tags_score(A.tags, B.tags),     tags_weight),
   ]
 
   score = weighted_average(components)   # ignores None entries
@@ -19,17 +21,12 @@ match_courses(A, B):
   return MatchResult { score, is_match, confidence, breakdown }
 ```
 
-This is the **shipped** algorithm (`src/matcher.rs::MatchingEngine::match_courses`).
-§5.1 and §5.2 below specify two additional components —
-`relationships_score` and `tags_score` — that are **design-ahead: spec'd
-but not yet implemented**. They are tracked as open tasks §23 T-11
-(relationships) and T-12 (tags); until those land, `Course` carries no
-`relationships`/`tags` fields, `MatchConfig` carries no
-`relationships_weight`/`tags_weight`, `MatchBreakdown` carries no
-`relationships_score`/`tags_score`, and the pseudocode above (six
-components, not eight) is what the code actually runs.
+This is the **shipped** algorithm (`src/matcher.rs::MatchingEngine::match_courses`),
+eight components. §5.1 and §5.2 below specify the two supporting
+components — `relationships_score` and `tags_score` — landed by §23
+T-11 (relationships) and T-12 (tags).
 
-### 5.1 Relationships — `relationships_score` (planned, §23 T-11 — not yet implemented)
+### 5.1 Relationships — `relationships_score` (shipped — §23 T-11)
 
 Typed-set **Jaccard** over the `(relation, course_id)` pairs:
 
@@ -55,7 +52,7 @@ references (it has no registry) — `HigherLevelThan` and `LowerLevelThan` are
 compared as opaque, distinct relation kinds. The consuming service owns the
 inverse-consistency and acyclicity invariants (course-entity spec §5.5).
 
-### 5.2 Tags — `tags_score` (planned, §23 T-12 — not yet implemented)
+### 5.2 Tags — `tags_score` (shipped — §23 T-12)
 
 Plain set **Jaccard** over the case-insensitively normalised tag sets —
 identical to how `keywords` (§13) is scored:

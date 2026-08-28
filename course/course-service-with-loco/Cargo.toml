@@ -74,8 +74,11 @@ thiserror = "2.0"
 dotenvy = "0.15"
 
 # Sibling matcher crate (embedded via re-export so the service uses the
-# canonical algorithm rather than maintaining a fork).
-course-matcher = "0.6.1"
+# canonical algorithm rather than maintaining a fork). `path` makes
+# local matcher changes reach this service without a crates.io publish
+# round-trip first; `version` is kept alongside for crates.io publish
+# parity (mirrors worker-service-with-loco's `worker-matcher` dependency).
+course-matcher = { version = "0.7.0", path = "../course-matcher-rust-crate" }
 
 # `dyn CourseRepository` needs object-safe async via async_trait.
 async-trait = "0.1"

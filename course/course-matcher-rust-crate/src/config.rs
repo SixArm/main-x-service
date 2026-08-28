@@ -24,6 +24,25 @@ pub struct MatchConfig {
     pub keywords_weight: f64,
     /// Weight of the teaches / competencies (Jaccard) component. Default 0.15.
     pub teaches_weight: f64,
+
+    /// Weight of the relationships (typed-set Jaccard over `(relation,
+    /// course_id)` pairs) component. Default 0.05 — a **supporting**
+    /// signal only: two records that reference the same related
+    /// courses are weakly more likely the same course, but the field
+    /// never identifies on its own and does not participate when
+    /// either side has no relationships recorded. Sits in the
+    /// supporting-signal cluster alongside [`Self::tags_weight`] and is
+    /// intentionally NOT part of the six identifying weights that sum
+    /// to 1.0 (§7). See spec §5.1 / §7 / §23 T-11.
+    pub relationships_weight: f64,
+
+    /// Weight of the tags (plain set Jaccard) component. Default
+    /// 0.05 — a **supporting** signal only, analogous to
+    /// [`Self::relationships_weight`]: two records sharing the same
+    /// operator-applied tags are weakly more likely the same course,
+    /// but does not participate when either side has no tags
+    /// recorded. See spec §5.2 / §13a / §7 / §23 T-12.
+    pub tags_weight: f64,
 }
 
 impl Default for MatchConfig {
@@ -36,6 +55,8 @@ impl Default for MatchConfig {
             educational_level_weight: 0.10,
             keywords_weight: 0.10,
             teaches_weight: 0.15,
+            relationships_weight: 0.05,
+            tags_weight: 0.05,
         }
     }
 }
@@ -80,12 +101,16 @@ impl MatchConfig {
         }
     }
 
-    /// Sum of every per-component weight. The renormalised weighted
-    /// average doesn't require this to equal 1.0 (it divides by the
-    /// weights that actually contributed), but the documented default
-    /// weights do — see the `default_weights_sum_to_one` test. Exists
-    /// only under `cfg(test)` because nothing in the runtime path needs
-    /// the raw total.
+    /// Sum of the six **identifying** per-component weights (name,
+    /// course code, provider, educational level, keywords, teaches).
+    /// The renormalised weighted average doesn't require this to equal
+    /// 1.0 (it divides by the weights that actually contributed), but
+    /// the documented defaults do — see the `default_weights_sum_to_one`
+    /// test. Deliberately excludes `relationships_weight` /
+    /// `tags_weight`: those sit in a separate low-weight
+    /// **supporting-signal** cluster (§7) and are not part of the
+    /// six-weight partition of unity. Exists only under `cfg(test)`
+    /// because nothing in the runtime path needs the raw total.
     #[cfg(test)]
     fn weight_total(&self) -> f64 {
         self.name_weight
@@ -126,6 +151,19 @@ mod tests {
         assert!((c.educational_level_weight - 0.10).abs() < 1e-9);
         assert!((c.keywords_weight - 0.10).abs() < 1e-9);
         assert!((c.teaches_weight - 0.15).abs() < 1e-9);
+        assert!((c.relationships_weight - 0.05).abs() < 1e-9);
+        assert!((c.tags_weight - 0.05).abs() < 1e-9);
+    }
+
+    // Pins that the relationships/tags supporting-signal weights are
+    // NOT part of the six-weight partition of unity (§7) — adding them
+    // to `weight_total()` would break `default_weights_sum_to_one`.
+    #[test]
+    fn default_relationships_and_tags_weight_is_005_and_excluded_from_weight_total() {
+        let c = MatchConfig::default();
+        assert!((c.relationships_weight - 0.05).abs() < 1e-9);
+        assert!((c.tags_weight - 0.05).abs() < 1e-9);
+        assert!((c.weight_total() - 1.0).abs() < 1e-9);
     }
 
     // Pins that the `strict` preset moves ONLY the threshold (to 0.95)
