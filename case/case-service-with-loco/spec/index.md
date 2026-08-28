@@ -1026,7 +1026,15 @@ the other v1 edge kinds even though it shares the same edge shape.
   incremented in the cases controller, plus an `http_requests_total`
   label vec. Documented in OpenAPI under `observability`. Parity with the
   older Axum services.
-- [ ] Privacy controls if any restricted fields appear.
+- [x] Privacy controls if any restricted fields appear. *(closed
+  2026-08 professionalization audit — landed 2026-08-02, was already
+  partially true before this checkbox was ever ticked: `mask_case`
+  (`src/controllers/cases.rs`) redacts `subjects` / `identifiers` /
+  `same_as` / `case_number` and is wired to the ABAC `mask` obligation
+  on `GET /{pid}`; the 2026-08-02 pass added the always-masked
+  `GET /{pid}/masked` view and the audited `GET /{pid}/export` GDPR
+  envelope — see CHANGELOG "Added — Privacy: masked view + GDPR export
+  (2026-08-02)" and `tests/export_masking.rs`.)*
 - [x] Record merge — `POST /merge` folds a duplicate into a survivor
   (union fields, former-title alias, soft-delete, `merge_records`
   history + snapshot, `Merged` event); pure `src/merge.rs`;
@@ -1222,15 +1230,30 @@ the other v1 edge kinds even though it shares the same edge shape.
   (`src/streaming.rs`, `models/audit_logs.rs`), and the blanket
   auth+ABAC guard (§12.1; `/fhir/*` guarded, not on the public
   allow-list, action derived from HTTP method).
-  - [ ] **Elevated governance ([fhir §8](../../../agents/share/fhir.md),
+  - [x] **Elevated governance ([fhir §8](../../../agents/share/fhir.md),
     [cross-service linking §10](../../../agents/share/cross-service-linking.md)):**
     the `for`/subject person reference inherits the `case ↔ person`
     (`subject_of`) sensitivity — access control + audit on read AND
     write, and the subject reference is masked for unauthorised callers
-    (who must not even learn the edge exists).
-  - [ ] Supported search params (§6, reflected in the
+    (who must not even learn the edge exists). *(closed 2026-08
+    professionalization audit — done as SEC-G2/G3: record-level ABAC
+    (`crate::auth::authorize_record`) + the `mask` obligation gate the
+    FHIR `read` handler (`src/controllers/fhir.rs` ~L91–136) and the
+    `search` handler (~L273–328), matching the native
+    `GET /api/cases/{pid}` contract — a denied caller gets `403`
+    (`404`-style concealment is the native list/search path's
+    treatment, not FHIR's) and a `mask`-obligation allow redacts
+    `Task.for`. Pinned by the DB-gated `tests/masking.rs`. See
+    CHANGELOG "SEC-G2/G3: record-level authorization + masking on every
+    read path" under `[0.2.0]`.)*
+  - [x] Supported search params (§6, reflected in the
     `CapabilityStatement`): `_id`, `_lastUpdated`, `_count`,
-    `identifier`, `status`, `priority`.
+    `identifier`, `status`, `priority`. *(closed 2026-08
+    professionalization audit — implemented in `src/fhir/search.rs`
+    (`FhirTaskSearchParams`: `_id`, `_lastUpdated` accepted-and-ignored,
+    `_count`, `identifier` as a token `system|value`, `status`,
+    `priority`), matching the doc-comment's declared subset, which is
+    what the `CapabilityStatement` reflects.)*
   - **Acceptance:** DTO↔`Task` round-trip; each interaction (read /
     create / update / delete / search); search → searchset `Bundle`;
     `OperationOutcome` on 404 / 400 / 422; `CapabilityStatement` matches
