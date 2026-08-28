@@ -25,7 +25,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 | What's the probabilistic-match pipeline? | Weighted, weight-renormalised sum across name / description / disambiguatingDescription / identifiers / url / sameAs / image / mainEntityOfPage / additionalType; missing fields skip. Optional Soundex bonus when phonetic gating clears. See [`spec.md` §5.2, §6](./spec/index.md). |
 | Default match threshold | `0.80`. Strict: `0.95`. Lenient: `0.65`. See [`spec.md` §3.4](./spec/03-data-model.md). |
 | Default name similarity | `SimilarityAlgorithm::Combined` = 0.7 × Jaro-Winkler + 0.3 × Levenshtein, best-of cartesian product over primary + alternate names. See [`spec.md` §3.5, §6](./spec/03-data-model.md). |
-| `#[non_exhaustive]` items | `Thing`, `MatchingError`. Construct via `Thing::builder()` / `Identifier::new`. See [`spec.md` §7.3](./spec/07-quality-attributes-and-tuning.md). |
+| `#[non_exhaustive]` items | `Thing`, `MatchingError`, `RelationKind`. Construct via `Thing::builder()` / `Identifier::new` / `RelationshipRef::new`. See [`spec.md` §7.3](./spec/07-quality-attributes-and-tuning.md). |
 
 ---
 

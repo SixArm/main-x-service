@@ -91,9 +91,10 @@ cargo bench
 `Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's
 production image. **Build context must be the repository root**, not
 this directory — this crate's sibling path dependencies
-(`integrity-mac`, `authentication-verifier`) live outside
-`thing/thing-service-with-loco/` (its matcher, `thing-matcher`, is
-pulled from crates.io, not a path dependency):
+(`integrity-mac`, `authentication-verifier`, and — since 2026-08-28 /
+T-PRO-H7 — `thing-matcher`, now `../thing-matcher-rust-crate` rather
+than a crates.io dependency) live outside
+`thing/thing-service-with-loco/`:
 
 ```sh
 podman build -f thing/thing-service-with-loco/Dockerfile \

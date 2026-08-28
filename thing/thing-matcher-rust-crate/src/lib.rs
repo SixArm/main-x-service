@@ -116,6 +116,6 @@ pub mod scorer;
 
 pub use error::{MatchingError, Result};
 pub use matcher::{Confidence, MatchBreakdown, MatchConfig, MatchResult, MatchingEngine};
-pub use models::{Identifier, Thing, ThingBuilder};
+pub use models::{Identifier, RelationKind, RelationshipRef, Thing, ThingBuilder};
 pub use normalizer::Normalizer;
 pub use scorer::{Scorer, SimilarityAlgorithm};

@@ -2,7 +2,7 @@
 
 | Item | Module | Kind |
 |---|---|---|
-| `Thing`, `ThingBuilder`, `Identifier` | `crate::models` | structs |
+| `Thing`, `ThingBuilder`, `Identifier`, `RelationshipRef`, `RelationKind` | `crate::models` | structs + `#[non_exhaustive]` enum |
 | `MatchingEngine`, `MatchConfig`, `MatchResult`, `MatchBreakdown`, `Confidence` | `crate::matcher` | structs + enum |
 | `Normalizer` | `crate::normalizer` | unit type with associated fns |
 | `Scorer`, `SimilarityAlgorithm` | `crate::scorer` | unit type + enum |

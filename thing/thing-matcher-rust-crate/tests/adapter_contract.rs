@@ -6,8 +6,8 @@
 //! its `to_matcher_thing` adapter.
 
 use thing_matcher::{
-    Confidence, Identifier, MatchConfig, MatchingEngine, Scorer, SimilarityAlgorithm, Thing,
-    ThingBuilder,
+    Confidence, Identifier, MatchConfig, MatchingEngine, RelationKind, RelationshipRef, Scorer,
+    SimilarityAlgorithm, Thing, ThingBuilder,
 };
 
 // =============================================================================
@@ -40,6 +40,12 @@ fn thing_builder_full_surface() {
         .add_subject_of("https://example.com/review")
         .owner("Penguin")
         .local_id("LOCAL-1")
+        .add_relationship(RelationshipRef::new(RelationKind::SuperPart, "thing-1").unwrap())
+        .relationships(vec![
+            RelationshipRef::new(RelationKind::SuperPart, "thing-1").unwrap(),
+        ])
+        .add_tag("classic")
+        .tags(vec!["classic".to_string()])
         .build();
 
     assert_eq!(t.name.as_deref(), Some("Pride and Prejudice"));
@@ -47,6 +53,8 @@ fn thing_builder_full_surface() {
     assert_eq!(t.identifiers[0].property_id, "isbn");
     assert!(!t.same_as.is_empty());
     assert!(!t.additional_types.is_empty());
+    assert!(!t.relationships.is_empty());
+    assert!(!t.tags.is_empty());
 }
 
 // =============================================================================
@@ -101,6 +109,8 @@ fn matching_engine_match_things_returns_match_result() {
     let _ = result.breakdown.image_score;
     let _ = result.breakdown.main_entity_of_page_score;
     let _ = result.breakdown.additional_types_score;
+    let _ = result.breakdown.relationships_score;
+    let _ = result.breakdown.tags_score;
 }
 
 /// Pins that `deterministic_match` returns a plain `bool` and fires on a

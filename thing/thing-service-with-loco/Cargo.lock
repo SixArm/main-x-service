@@ -6557,9 +6557,7 @@ checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
 
 [[package]]
 name = "thing-matcher"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f72ad9682f1e102d719eb56741e495134f272530c063fae61e44106f028a80ce"
+version = "0.7.0"
 dependencies = [
  "mimalloc",
  "serde",

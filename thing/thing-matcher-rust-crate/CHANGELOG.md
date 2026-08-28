@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-28
 
 ### Added — declared MSRV (Rust 1.95)
 
@@ -49,44 +50,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   real URLs is unchanged; no weights or thresholds altered. (Same bug class as
   person-matcher's `passport_books_share_pair` fix.)
 
-### Added — tags (operator labels) as a supporting match signal
+### Added — relationships and tags as weighted supporting components (T-PRO-H7)
 
-- Spec-only addition (§3.1, §3.4, §3.7, §5.9.2, §5.10, §6.8): a
-  `tags: Vec<String>` field on `Thing` (defaults to empty).
-- New scoring component `tags_score`: plain set **Jaccard** over the
-  case-insensitively normalised tag sets (`None` when either side empty);
-  added to `MatchBreakdown` (now **12** score fields).
-- New config weight `tags_weight` (default `0.05`), added to the
-  renormalised weighted sum. A **supporting** signal, never identifying on
-  its own.
-- Entity domain model (`thing/spec/05-domain-model.md`) flipped: tags is now
-  a routed match signal (§5.3 routes `tags` → matcher `tags`, scored by set
-  Jaccard, weighted `tags_weight`; removed from the lossy-drop list), no
-  longer a registry-only attribute.
-- **Code follow-up (not yet implemented):** add the `tags` field to
-  `crate::models`, the `tags_score` field + case-insensitive set-Jaccard
-  scorer, the `tags_weight` config field, and tests pinning the Jaccard
-  behaviour and the renormalisation.
-
-### Added — relationships (typed thing-to-thing references)
-
-- Spec-only addition (§3.1, §3.3.1, §3.4, §3.7, §5.9.1, §5.10, §6.6):
-  a `relationships: Vec<RelationshipRef>` field on `Thing`, a
-  `RelationshipRef { relation: RelationKind, thing_id: String }` type, and
-  a `#[non_exhaustive]` `RelationKind` enum (`Contains` / `ContainedIn`
-  containment inverses; `SuperPart` / `SubPart` part-of inverses per
-  schema.org `hasPart` / `isPartOf`; extensible).
-- New scoring component `relationships_score`: typed-set **Jaccard** over
-  the `(relation, thing_id)` pairs (`None` when either side empty); added
-  to `MatchBreakdown` (now **11** score fields).
-- New config weight `relationships_weight` (default `0.05`), added to the
-  renormalised weighted sum. A **supporting** signal, never identifying on
-  its own.
-- **Code follow-up (not yet implemented):** add the `relationships` field +
-  `RelationshipRef` / `RelationKind` types to `crate::models`, the
-  `relationships_score` field + Jaccard scorer, the `relationships_weight`
-  config field, and tests pinning the typed-set Jaccard behaviour and the
-  renormalisation.
+- **`RelationshipRef` / `RelationKind` (§3.3.1, §5.9.1, §6.6).** New public
+  types `RelationKind` (`#[non_exhaustive]`; `Contains` / `ContainedIn`
+  containment inverses, `SuperPart` / `SubPart` part-of inverses per
+  schema.org `hasPart` / `isPartOf`) and
+  `RelationshipRef { relation: RelationKind, thing_id: String }`,
+  re-exported from the crate root. `RelationshipRef::new` trims `thing_id`
+  and rejects an empty result. `Thing` gains
+  `relationships: Vec<RelationshipRef>` (default empty,
+  `#[serde(default)]`), with `ThingBuilder::add_relationship` /
+  `::relationships` setters. Scored as typed-set Jaccard over `(relation,
+  thing_id)` pairs (`|A ∩ B| / |A ∪ B|`) into the new
+  `MatchBreakdown::relationships_score` (`#[serde(default)]`), `None`
+  when either side's list is empty. New `MatchConfig::relationships_weight`
+  (default `0.05`) joins the supporting-signal cluster in the
+  weighted-average renormalisation.
+- **`tags` (§3.1, §5.9.2, §6.8).** `Thing` gains `tags: Vec<String>`
+  (default empty, `#[serde(default)]`), with `ThingBuilder::add_tag` /
+  `::tags` setters. Tags are stored verbatim and compared
+  case-insensitively at scoring time (consistent with the crate's
+  normalise-at-match-time convention for names / URLs) as set Jaccard
+  (`|A ∩ B| / |A ∪ B|`) into the new `MatchBreakdown::tags_score`
+  (`#[serde(default)]`), `None` when either side's list is empty. New
+  `MatchConfig::tags_weight` (default `0.05`) joins the supporting-signal
+  cluster alongside `relationships_weight`. `MatchBreakdown` now carries
+  **12** score fields.
+- Both fields are purely additive and **not** identifying on their own
+  (`Thing::validate` is unchanged) and **not** consulted by
+  `deterministic_match`. Neither field participates in the weighted
+  average unless populated on *both* sides, so existing callers that
+  never set `relationships`/`tags` see byte-identical scores before and
+  after this release — the two new default weights simply never enter
+  the denominator for them.
+- `agents/matching-algorithm.md`'s "Component Scoring At-a-Glance" and
+  `None`-when tables gain Relationships / Tags rows.
+  `spec/03-data-model.md` §3.1 / §3.3.1 / §3.4 / §3.7,
+  `spec/05-matching-engine.md` §5.9.1 / §5.9.2 / §5.10, and
+  `spec/06-per-field-scoring-algorithms.md` §6.6 / §6.8 move from
+  "not yet implemented, spec-only" to current behaviour; OQ-E
+  (`spec/10-open-questions.md`) is resolved.
+- Entity domain model (`thing/spec/05-domain-model.md`) flipped: tags is
+  now a routed match signal (§5.3 routes `tags` → matcher `tags`, scored
+  by set Jaccard, weighted `tags_weight`; removed from the lossy-drop
+  list), no longer a registry-only attribute.
+- Minor version bump (pre-1.0): per `agents/release.md`, a default-weight
+  addition that changes computed behaviour once the new fields are
+  populated — plus two new public types and four new public struct
+  fields — is a minor bump, not a patch.
 
 ## [0.6.1] — 2026-06-15
 

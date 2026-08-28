@@ -31,7 +31,7 @@ Jaccard set similarity (`|A ∩ B| / |A ∪ B|`) over the URL lists after `Norma
 
 ### 6.6 `relationships_score`
 
-**Not yet implemented** (§5.9.1, §3.3.1). See §5.9.1 — typed-set Jaccard (`|A ∩ B| / |A ∪ B|`) over the `(relation, thing_id)` pairs, where `relation` is part of the key. `None` only when either side has no relationships. A supporting signal weighted `relationships_weight` (default `0.05`); not identifying on its own.
+Landed in v0.7.0 (§5.9.1, §3.3.1). Typed-set Jaccard (`|A ∩ B| / |A ∪ B|`) over the `(relation, thing_id)` pairs, where `relation` is part of the key. `None` only when either side has no relationships. A supporting signal weighted `relationships_weight` (default `0.05`); not identifying on its own.
 
 ### 6.7 `name_phonetic_score`
 
@@ -39,7 +39,7 @@ See §5.7. `None` when `use_phonetic_matching` is `false` or either side has no 
 
 ### 6.8 `tags_score`
 
-**Not yet implemented** (§5.9.2, §3.1). See §5.9.2 — plain set Jaccard (`|A ∩ B| / |A ∪ B|`) over the tag sets after case-insensitive normalisation (trim + lowercase, de-duplicated). `None` when either side has an empty tag set. A supporting signal weighted `tags_weight` (default `0.05`); not identifying on its own.
+Landed in v0.7.0 (§5.9.2, §3.1). Plain set Jaccard (`|A ∩ B| / |A ∪ B|`) over the tag sets after case-insensitive normalisation (trim + lowercase, de-duplicated). `None` when either side has an empty tag set. A supporting signal weighted `tags_weight` (default `0.05`); not identifying on its own.
 
 ---
 
