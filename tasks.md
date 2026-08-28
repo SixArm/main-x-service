@@ -6605,13 +6605,59 @@ crate above.
   running server. Close each crate's own T-3/T-6-equivalent task on
   landing, and flip the `overview.md` capability-matrix gRPC row from
   "stub" language to real ✅/– once decided and (where chosen) built.
-- [ ] **PRO-H7 (L)** **Matcher component parity: `relationships` +
-  `tags`.** Specified (often fully, with weights) but unimplemented in
-  worker (T-33/T-34), thing (OQ-E), event (Unreleased prose), course
-  (T-11/T-12), organization (§13), care-pathway (§23) — person has
-  them. Implement family-wide (breaking minor bumps) or formally
-  re-scope; today the shared docs advertise components most matchers
-  don't have.
+- [x] **PRO-H7 (L)** *(done 2026-08-28)* **Matcher component parity:
+  `relationships` + `tags`.** Verified fact before starting: person did
+  **not** actually have this implemented either — the earlier audit's
+  "person has them" claim was wrong, so this was a genuine build from
+  each crate's own already-written spec (each fully specified the
+  algorithm and weight defaults), not a copy-roll from an existing
+  reference. Built worker-matcher first as the reference (0.6.2→0.7.0:
+  `RelationKind`/`RelationshipRef`, Jaccard scoring, `None` on
+  either-side-empty, 0.05 default weights wired into the existing
+  renormalization loop, 24 new tests incl. a sanity check that absent
+  fields never dilute an otherwise-perfect match), independently
+  verified (876/876 tests), then rolled to all five siblings — each
+  agent instructed to use the *domain-appropriate* vocabulary from its
+  own spec, not copy worker's names verbatim:
+  - **thing** (0.6.1→0.7.0): `Contains`/`ContainedIn`/`SuperPart`/`SubPart`
+    (schema.org `hasPart`/`isPartOf`).
+  - **event** (0.7.0→0.8.0): `Outer`/`Inner`/`ImmediatelyBefore`/
+    `ImmediatelyAfter` (containment/sequencing); also caught and fixed
+    a real spec inaccuracy in the tags-normalisation wording along the way.
+  - **course** (0.6.1→0.7.0): `SimilarTo`/`HigherLevelThan`/`LowerLevelThan`.
+  - **organization** (0.1.0→0.2.0): `SubOrganizationOf`/
+    `ParentOrganizationOf`/`SuccessorOf`/`PredecessorOf`; added the two
+    new weights purely additively (declared total 1.10) rather than
+    force a fake rescale of the existing six-weights-sum-to-1.0
+    invariant — verified directly against the renormalization code
+    that this is mathematically inert (it divides by *participating*
+    weights only, never a fixed denominator).
+  - **care-pathway** (no version bump — this crate's own precedent is
+    one accumulating `[Unreleased]`, not per-change releases):
+    `PrecededBy`/`FollowedBy`/`SimilarTo`/`Supersedes`/`SupersededBy`/
+    `Custom(String)`; `pathway_id` confirmed to reference a template,
+    never a patient, before implementing — the family's compliance
+    reference crate.
+
+  **A genuine, repo-wide bug found and fixed along the way**: three
+  services (worker, thing, course) pinned their sibling matcher via a
+  bare crates.io version string (`thing-matcher = "0.6.1"`, no
+  `path =`) rather than the family's usual path dependency — meaning
+  the matcher bump would have silently never reached the service at
+  all (thing/course) or broken the build outright on a caret-version
+  mismatch (worker, verified: `cargo check` failed with "candidate
+  versions found which didn't match: 0.7.0" before the fix). All three
+  switched to `{ version = "<new>", path = "../<matcher>" }`, matching
+  organization/care-pathway/event's existing correct pattern; course's
+  fix also surfaced a stale Dockerfile `COPY` gap and a service-side
+  adapter compile break (routed as empty `Vec` — the service domain
+  `Course` has no `relationships`/`tags` field yet, tracked as a
+  follow-up, not silently dropped).
+
+  Every one of the twelve crates (6 matchers + 6 services) touched was
+  independently re-verified (fmt, clippy `-D warnings`, full test
+  suite) before merging, on top of what each landing agent already
+  confirmed.
 - [ ] **PRO-H8 (M)** **Consumer-app edition-spec truth sweep.** CMS's
   service `spec/index.md` claims "No feed yet… T23/T24 remain" — all
   delivered 2026-07-30/31; patient-flow's FE spec promises topic files
