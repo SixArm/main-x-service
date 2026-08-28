@@ -9,8 +9,11 @@
 import type { PageServerLoad } from "./$types";
 import { redirect } from "@sveltejs/kit";
 import {
+  CSRF_COOKIE,
+  CSRF_COOKIE_OPTIONS,
   SESSION_COOKIE,
   SESSION_COOKIE_OPTIONS,
+  generateCsrfToken,
   sessionIdFromResponse,
 } from "$lib/server/session";
 import { verifyMagicLink } from "$lib/server/auth";
@@ -29,5 +32,6 @@ export const load: PageServerLoad = async ({ url, fetch, cookies }) => {
     return { error: "noSession" as const };
   }
   cookies.set(SESSION_COOKIE, sid, SESSION_COOKIE_OPTIONS);
+  cookies.set(CSRF_COOKIE, generateCsrfToken(), CSRF_COOKIE_OPTIONS);
   redirect(303, "/");
 };
