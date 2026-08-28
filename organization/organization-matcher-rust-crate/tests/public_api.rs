@@ -4,7 +4,7 @@
 
 use organization_matcher::{
     Confidence, IdentifierScheme, MatchConfig, MatchingEngine, OrgIdentifier, Organization,
-    PostalAddress,
+    PostalAddress, RelationKind, RelationshipRef,
 };
 
 /// Test helper: build an `OrgIdentifier` from a scheme + string value.
@@ -220,4 +220,35 @@ fn match_result_serialises_to_json() {
     let json = serde_json::to_string(&r).expect("serialize");
     assert!(json.contains("score"));
     assert!(json.contains("breakdown"));
+}
+
+// ─── Relationships + tags (§14a / §14b) ───────────────────────────────
+
+/// Pins the relationships + tags surface end-to-end: both components
+/// are `None` when absent (renormalised out, not diluting the score),
+/// and populating identical relationship/tag sets on both sides yields
+/// perfect `Some(1.0)` per-component scores in the breakdown.
+#[test]
+fn relationships_and_tags_score_end_to_end() {
+    let engine = MatchingEngine::default_config();
+
+    // Absent on both sides: `None`, not a penalising `0.0`.
+    let a = Organization::new("Acme Corporation");
+    let b = Organization::new("Acme Corporation");
+    let r = engine.match_organizations(&a, &b);
+    assert_eq!(r.breakdown.relationships_score, None);
+    assert_eq!(r.breakdown.tags_score, None);
+    assert!(r.score >= 0.99, "got {}", r.score);
+
+    // Populated identically on both sides: perfect per-component scores.
+    let mut a = Organization::new("Acme Corporation");
+    let mut b = Organization::new("Acme Corporation");
+    a.relationships =
+        vec![RelationshipRef::new(RelationKind::SubOrganizationOf, "org-parent").unwrap()];
+    b.relationships = a.relationships.clone();
+    a.tags = vec!["vendor".to_string()];
+    b.tags = vec!["Vendor".to_string()];
+    let r = engine.match_organizations(&a, &b);
+    assert_eq!(r.breakdown.relationships_score, Some(1.0));
+    assert_eq!(r.breakdown.tags_score, Some(1.0));
 }

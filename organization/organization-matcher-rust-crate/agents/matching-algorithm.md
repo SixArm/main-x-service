@@ -28,10 +28,14 @@ deterministic: `TaxId` (jurisdiction-scoped, R-1 only), `Naics` /
 | URL / domain | 0.15 | Registered domain equal → 1.0, else Jaro-Winkler on the domains. `None` if either url absent. |
 | Jurisdiction | 0.10 | Case-folded country equal → 1.0 else 0.0. `None` if either absent. |
 | Founding date | 0.10 | Year equal → 1.0, ±1 → 0.5, else 0.0. `None` if either absent/unparseable. |
-| Keywords | 0.10 | Jaccard on `fold_set(keywords)`. Skipped if both empty. |
+| Keywords | 0.10 | Jaccard on `fold_set(keywords)`. Skipped if both empty; `Some(0.0)` when exactly one side has keywords. |
+| Relationships | 0.05 | Typed-set Jaccard on `(relation, organization_id)` pairs. `None` (skipped) when **either** side has no relationships. |
+| Tags | 0.05 | Jaccard on `fold_set(tags)`. `None` (skipped) when **either** side has no tags — unlike Keywords above. |
 
-Weights sum to 1.0; the weighted average is renormalised over the
-`Some` components only.
+The original six components sum to 1.0; `relationships`/`tags` are
+additive supporting weights on top (declared total 1.10) — see spec §7
+for why this does not push any score outside `[0.0, 1.0]`. The weighted
+average is renormalised over the `Some` components only.
 
 ## Confidence band
 

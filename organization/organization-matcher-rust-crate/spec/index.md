@@ -62,14 +62,15 @@ Input: Organization A, Organization B, MatchConfig
   ├─ jurisdiction_score  (both set)  exact country (1.0/0.0)
   ├─ founding_date_score (both set)  same year 1.0, ±1yr 0.5, else 0.0
   ├─ keywords_score      (≥1 set)    Jaccard
+  ├─ relationships_score (both set)  typed-set Jaccard over (relation, organization_id)
+  ├─ tags_score          (both set)  Jaccard over folded tags
   └─ renormalised weighted average over present components
 ```
 
-**Planned, not yet implemented (§23):** `relationships_score` (typed-set
-Jaccard over `(relation, organization_id)`) and `tags_score` (Jaccard
-over normalised tags) are specced in §14a/§14b as future components of
-the same pipeline, but neither field exists on `Organization` or
-`MatchBreakdown` in code today — see the note at the head of §14a.
+`relationships_score` and `tags_score` (§14a/§14b) are **supporting**
+components only: each is `None` unless both sides carry at least one
+entry, so an organization pair with neither field populated scores
+exactly as it did before these two components existed.
 
 ## 6. Domain model
 
@@ -79,24 +80,23 @@ the same pipeline, but neither field exists on `Organization` or
 (ISO-8601), `telephone`, `email`, `keywords`. This is the complete field
 list in `src/organization.rs` today.
 
-**Planned, not yet implemented (§23):** a `tags: Vec<String>` field of
-short, operator-applied free-text labels (grouping / triage / workflow),
-distinct from the descriptive `keywords`; defaults empty. A
-**supporting** signal, meant to be scored by set Jaccard (§14b), never
-identifying on its own.
+`Organization` also carries `tags: Vec<String>` (default empty), a
+**supporting** signal of short, operator-applied free-text labels
+(grouping / triage / workflow), distinct from the descriptive
+`keywords`; scored by set Jaccard (§14b), never identifying on its own.
 
-Also planned: a `relationships: Vec<RelationshipRef>` field, where
+`Organization` also carries `relationships: Vec<RelationshipRef>`, where
 `RelationshipRef { relation: RelationKind, organization_id: String }`
-would hold a typed organization-to-organization reference.
-`RelationKind` is designed as a `#[non_exhaustive]` enum mirroring the
-service: `SubOrganizationOf` / `ParentOrganizationOf` (containment) and
+holds a typed organization-to-organization reference.
+`RelationshipRef::new` trims `organization_id` and rejects an empty
+result. `RelationKind` is a `#[non_exhaustive]` enum:
+`SubOrganizationOf` / `ParentOrganizationOf` (schema.org
+`subOrganization` / `parentOrganization`, containment) and
 `SuccessorOf` / `PredecessorOf` (mergers / renames / reorganisations).
-`organization_id` would be an opaque registry id (whitespace-trimmed,
-non-empty); the matcher is designed to **not** resolve, invert, or
-transitively close the references — only compare the two records'
-relationship **sets** (§14a). A supporting signal, not an identifying
-field on its own. Neither `RelationshipRef` nor `RelationKind` exists in
-`src/organization.rs` yet.
+`organization_id` is an opaque registry id; the matcher does **not**
+resolve, invert, or transitively close the references — it only
+compares the two records' relationship **sets** (§14a). A supporting
+signal, not an identifying field on its own.
 
 `IdentifierScheme`: deterministic — `Lei`, `Duns`, `Iso6523`, `Gln`,
 `Wikidata`, `Ror`, `Isni`, `Vat`; scoped — `TaxId`; classification —
@@ -110,15 +110,24 @@ contribute.
 
 `MatchConfig` weights (default): name 0.35, address 0.20, url 0.15,
 jurisdiction 0.10, founding_date 0.10, keywords 0.10 — these six weights
-are the whole of `MatchConfig` today and sum to 1.0. The renormaliser
-(§17) divides by the sum of the weights whose component actually
-participated, so absent data never drags the score down.
+sum to 1.0 by convention. The renormaliser (§17) divides by the sum of
+the weights whose component actually participated, so absent data never
+drags the score down — and, by the same mechanism, the total need not be
+exactly 1.0 for scores to stay bounded in `[0.0, 1.0]`.
 Threshold 0.85. Presets: `strict()` 0.95, `lenient()` 0.70.
 
-**Planned, not yet implemented (§23):** a supporting `relationships_weight`
-(default `0.05`, §14a) and `tags_weight` (default `0.05`, §14b) alongside
-the six weights above, summing to 1.0 across eight weights once landed.
-Neither field exists on `MatchConfig` yet — do not assume they are read.
+`MatchConfig` also carries two **additive supporting** weights layered
+on top of the six above: `relationships_weight` (default `0.05`, §14a)
+and `tags_weight` (default `0.05`, §14b) — bringing the declared total
+across all eight fields to 1.10, not 1.0. This is deliberate, not a
+rounding slip: `relationships`/`tags` are sparse, rarely-populated
+fields, so the renormalised average excludes their weight from the
+denominator whenever either side has none recorded (§14a/§14b), and
+when both sides do carry data the two weights simply claim their
+(slightly reduced, ~4.5% each rather than an idealised 5%) share of a
+total that is not forced back down to 1.0. The original six components'
+own sum-to-1.0 property (and every score they alone produce) is
+unaffected — see `MatchConfig`'s own rustdoc for the full reasoning.
 
 ## 8. Normalisation
 
@@ -162,13 +171,6 @@ when exactly one side has keywords.
 
 ## 14a. Relationships — `relationships_score`
 
-> **Planned, not yet implemented — see §23.** This section is a design
-> spec for a future component; `relationships`/`RelationshipRef` do not
-> exist on `Organization` (§6), `relationships_weight` does not exist on
-> `MatchConfig` (§7), and `relationships_score` does not exist on
-> `MatchBreakdown` today. Written in the present tense below because it
-> describes the intended behaviour once §23's task lands.
-
 Typed-set **Jaccard** over the `(relation, organization_id)` pairs:
 `score = |A ∩ B| / |A ∪ B|`, where each side's set is
 `{ (r.relation, r.organization_id) for r in relationships }`. So a
@@ -183,18 +185,16 @@ single-handedly establish a match.
 
 ## 14b. Tags — `tags_score`
 
-> **Planned, not yet implemented — see §23.** Same status as §14a:
-> `tags` does not exist on `Organization` (§6), `tags_weight` does not
-> exist on `MatchConfig` (§7), and `tags_score` does not exist on
-> `MatchBreakdown` today.
-
 Plain set **Jaccard** over `fold_set(tags)` (case-insensitively
-normalised tag sets): `score = |A ∩ B| / |A ∪ B|`. Identical to the
-`keywords` component (§14) in mechanism, but over the operator-applied
-`tags` set rather than descriptive keywords. `None` (does not
-participate) when **either** side has an empty tag set; otherwise a value
-in `[0.0, 1.0]`. A **supporting** signal weighted `tags_weight` (§7,
-default `0.05`); shared tags never single-handedly establish a match.
+normalised tag sets): `score = |A ∩ B| / |A ∪ B|`. The Jaccard mechanism
+is identical to the `keywords` component (§14), over the operator-applied
+`tags` set rather than descriptive keywords — but the **empty-side
+rule differs**: unlike `keywords_score`, which returns `Some(0.0)` for a
+present-vs-absent disagreement, `tags_score` returns `None` (does not
+participate) when **either** side has an empty tag set, matching
+`relationships_score`'s rule (§14a); otherwise a value in `[0.0, 1.0]`.
+A **supporting** signal weighted `tags_weight` (§7, default `0.05`);
+shared tags never single-handedly establish a match.
 
 ## 15. Deterministic identifier short-circuits
 
@@ -238,12 +238,9 @@ the contract.
 
 Semantic versioning. Every re-export from `lib.rs` is part of the
 contract — the actual list today: `Organization`, `OrgIdentifier`,
-`IdentifierScheme`, `PostalAddress`, `MatchingEngine`, `MatchConfig`,
-`MatchResult`, `MatchBreakdown`, `Confidence`, `Error`, `Result`.
-`RelationshipRef`/`RelationKind` and the `relationships_score`/
-`tags_score` `MatchBreakdown` fields are planned (§14a, §14b, §23), not
-yet part of the public surface — do not assume a downstream consumer can
-import them.
+`IdentifierScheme`, `PostalAddress`, `RelationshipRef`, `RelationKind`,
+`MatchingEngine`, `MatchConfig`, `MatchResult`, `MatchBreakdown`,
+`Confidence`, `Error`, `Result`.
 
 ## 22. Anti-patterns
 
@@ -253,21 +250,23 @@ async, or panics to library code.
 
 ## 23. Tasks (live work queue)
 
-- [ ] Implement the relationships component in code: add
-      `relationships: Vec<RelationshipRef>` to `Organization`, the
-      `RelationshipRef { relation: RelationKind, organization_id }` +
-      `#[non_exhaustive] RelationKind` (`SubOrganizationOf` /
-      `ParentOrganizationOf` / `SuccessorOf` / `PredecessorOf`) types, the
-      typed-set Jaccard `relationships_score` (§14a), the
-      `relationships_weight` (default `0.05`, §7) in `MatchConfig`, and the
-      `relationships_score: Option<f64>` field in `MatchBreakdown`; pin it
-      with a `tests/public_api.rs` case.
-- [ ] Implement the tags component in code: add `tags: Vec<String>`
-      (default empty) to `Organization`, the plain set Jaccard
-      `tags_score` over `fold_set(tags)` (§14b, `None` when either side
-      empty), the `tags_weight` (default `0.05`, §7) in `MatchConfig`, and
-      the `tags_score: Option<f64>` field in `MatchBreakdown`; pin it with
-      a `tests/public_api.rs` case.
+- [x] Implement the relationships component in code (PRO-H7, rolled from
+      the worker-matcher T-33 reference): `relationships:
+      Vec<RelationshipRef>` on `Organization`, the `RelationshipRef {
+      relation: RelationKind, organization_id }` + `#[non_exhaustive]
+      RelationKind` (`SubOrganizationOf` / `ParentOrganizationOf` /
+      `SuccessorOf` / `PredecessorOf`) types, the typed-set Jaccard
+      `relationships_score` (§14a), `relationships_weight` (default
+      `0.05`, §7) on `MatchConfig`, and `relationships_score:
+      Option<f64>` on `MatchBreakdown`; pinned by unit tests in
+      `src/matcher.rs` and a `tests/public_api.rs` case.
+- [x] Implement the tags component in code (PRO-H7): `tags: Vec<String>`
+      (default empty) on `Organization`, the plain set Jaccard
+      `tags_score` over the folded tag sets (§14b, `None` when either
+      side empty — note the empty-side rule differs from `keywords`),
+      `tags_weight` (default `0.05`, §7) on `MatchConfig`, and
+      `tags_score: Option<f64>` on `MatchBreakdown`; pinned by unit
+      tests in `src/matcher.rs` and a `tests/public_api.rs` case.
 - [ ] Optional `phone`/`email` exact-match component.
 - [ ] Consider a configurable legal-suffix list (currently a const).
 - [ ] Address: postal-code exact-anchor boost.
