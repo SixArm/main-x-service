@@ -6658,13 +6658,20 @@ crate above.
   independently re-verified (fmt, clippy `-D warnings`, full test
   suite) before merging, on top of what each landing agent already
   confirmed.
-- [ ] **PRO-H8 (M)** **Consumer-app edition-spec truth sweep.** CMS's
-  service `spec/index.md` claims "No feed yet… T23/T24 remain" — all
-  delivered 2026-07-30/31; patient-flow's FE spec promises topic files
-  that never grew; both edition specs' Delivery sections trail
-  `spec/tasks.md`. Audit all five consumer apps' per-edition
-  `spec/index.md` against their `spec/tasks.md` and fix (CMS and
-  patient-flow findings enumerated below are part of this).
+- [x] **PRO-H8 (M)** **Consumer-app edition-spec truth sweep.** DONE
+  2026-08-28. Audited all five consumer apps' per-edition `spec/index.md`
+  against `spec/tasks.md`. Fixed: CMS service edition ("No feed yet"
+  stale — CMS-T18 closed 2026-07-31; "T23/T24 remain" stale — both
+  landed 2026-07-30; test counts 215/53 → 231/60, verified live) + CMS
+  front-end (stale "(planned)" heading); patient-flow front-end (dropped
+  the "will grow topic files as PF-T15/T16 land" promise — both landed,
+  no topic files ever grew, restated as the actual outcome); WPM service
+  + front-end (same stale "will grow topic files" promise, all
+  WPM-T1–T36 landed with no topic files added); CRM service + front-end
+  (Delivery sections frozen at 2026-07-18, missing CRM-T19–T22).
+  case-folder audited and found clean (thin nav-only specs, zero stale
+  prose). 7 files changed, each fix dated and citing the task IDs/counts
+  verified.
 - [ ] **PRO-H9 (M)** **OTLP rollout (subsumes AU-3).** person, worker,
   event still carry the commented-out exporter stubs; link-graph's
   `src/observability.rs` is the proven reference. Roll it (or delete
