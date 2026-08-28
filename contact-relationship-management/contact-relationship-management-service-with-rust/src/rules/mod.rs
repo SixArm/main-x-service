@@ -8,6 +8,7 @@
 pub mod analytics;
 pub mod engagement;
 pub mod lifecycle;
+pub mod privacy;
 pub mod scoring;
 pub mod segment;
 pub mod sla;

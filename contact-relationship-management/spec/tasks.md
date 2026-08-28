@@ -137,12 +137,22 @@ code + tests in one PR.
 
 ## Production gates (before any non-demo exposure)
 
-- [ ] CRM-G1 Activate `CRM_REQUIRE_AUTH` + mount a real ABAC
+- [~] CRM-G1 Activate `CRM_REQUIRE_AUTH` + mount a real ABAC
   policy; verify the persona matrix against the deployment's
-  attributes.
-- [ ] CRM-G2 GDPR/PECR review of the real send path (ESP adapter,
+  attributes. **Code side landed as CRM-T22 (2026-08-28)** — the
+  shipped reference policy and the activation runbook (spec
+  `auth.md`), including an honest statement of the engine's current
+  wiring limits. The remaining act — setting the flag and attributes
+  on a real deployment, and extending the enforcement matrix beyond
+  the shipped reader/writer pins — is operational by design.
+- [~] CRM-G2 GDPR/PECR review of the real send path (ESP adapter,
   lawful basis, unsubscribe in-message), retention schedules,
   subject-access/erasure flows ([regulatory.md](regulatory.md)).
+  **Subject-access/erasure/retention code side landed as CRM-T21
+  (2026-08-28)**; the remaining items — the ESP-adapter/send-path
+  legal review, jurisdiction-correct data residency, and coordination
+  of subject rights with the upstream identity services — are
+  operational/legal work, not code.
 
 - [x] CRM-T19 (2026-07-20) **Insight views + boards.** (CRM-R18;
   design CRM-D4, CRM-D12 — CRM-R18 was backfilled during the DOC-7
@@ -195,4 +205,84 @@ code + tests in one PR.
   seeded engagement round-trip green first run — full `--ignored`
   suite 8/8 vs Postgres 18; clippy pedantic clean; svelte-check 0;
   vitest 5; Playwright 12.
+
+- [x] CRM-T21 (2026-08-28) **Subject rights & retention (the code
+  side of CRM-G2).** `rules/privacy.rs` (pure): `erasable` (no open
+  deal naming the contact primary contact, no open support ticket, no
+  active nurture enrolment — deliberately **not** gated on
+  `Contact::status`, which no endpoint ever transitions; CRM-D14), the
+  floored retention horizon (`CRM_RETENTION_DAYS`, default 365, floor
+  30), and the 19-table sweep list (sorted, deduped, pinned; excludes
+  the append-only `consent_events` and the plain roster join
+  `working_group_members`, neither of which has a `deleted_at`
+  column). `controllers/privacy.rs`:
+  `GET /api/contacts/{pid}/subject-access` (one audited JSON document
+  across every table keyed to the contact — consent history,
+  activities, leads, deals as primary contact, tickets, nurture
+  enrolments — with exclusions named: campaign counters are aggregate
+  simulated data with no per-recipient log, the account is a separate
+  subject, upstream identity records are the deployment's coordination
+  duty; refused `403` to a masked caller, since a masked export
+  contradicts its own purpose); `POST …/erase` (anonymise per CRM-D14:
+  identity fields scrubbed + tombstone `person:` URN, `marketing_consent`
+  set `withdrawn`, row soft-deleted, linked activity summaries and the
+  lead record's name/email scrubbed, working-group roster entries
+  removed — deals/tickets/consent history remain, since CRM has no
+  monetary field on Contact itself the way WPM's `salary_minor` needed
+  clearing; refused `422` on an open deal/ticket/active nurture
+  enrolment; audited with counts); `GET /api/retention` +
+  `POST /api/retention/sweep` (hard-delete past-horizon soft-deletes
+  across the 19-table list; the report additionally discloses, but
+  never auto-scrubs, contacts whose consent has stood withdrawn since
+  before the horizon — unlike WPM's candidates, a CRM contact always
+  carries the `/erase` gate, so the sweep has no ungated bulk-anonymise
+  path; audited with counts, including an empty sweep). `/erase` and
+  `/sweep` join `DESTRUCTIVE_POST_SUFFIXES` (⇒ `access=admin` or
+  `svc=true` under enforcement). **Acceptance:** 3 pure pins (erasable
+  matrix, horizon default/floor, sweep-list soundness) + the DB-gated
+  `subject_rights_round_trip` (export gathers the footprint + names
+  exclusions + audited; erase refused in turn by an open deal, an open
+  ticket, and an active nurture enrolment, then anonymises after
+  consent withdrawal exits the enrolment, with counts in the audit
+  snapshot; report/sweep both audited even at zero) — full `--ignored`
+  suite 9/9 vs Postgres 18 (67 unit); clippy pedantic clean; fmt clean.
+  Front-end deferred (see CRM-T23 follow-up note below). (CRM-D14;
+  CRM-R20, CRM-G2)
+
+- [x] CRM-T22 (2026-08-28) **Auth activation surface (the code side
+  of CRM-G1).** Ships `config/abac-policy.reference.json` — the spec
+  `auth.md` personas as policy: svc/admin everything;
+  `resource.owner = $sub` reads/writes the caller's own record
+  unmasked (record-level — reaches only the two CRM-T21 handlers
+  today); `manager=true` writes and reads unmasked; `rep=true` writes
+  (coarse — CRM has no ownership-enforcing write handler yet, so this
+  is a plain grant, not a scoped one); `marketing=true` /
+  `support=true` write and read masked; everyone else authenticated
+  gets the masked-read fallback — plus the **activation runbook** in
+  `auth.md` (mount → keys → flag → verify). Unlike WPM-T31, this task
+  states its engine limits are **narrower**, not just "known": the
+  `mask` obligation is defined and unit-tested
+  (`auth::mask_json`) and is honoured by exactly one consumer
+  (`subject_access`'s outright refusal) — no list/get handler yet
+  redacts a deal amount, forecast value, campaign ROI, or contact
+  channel detail on an ordinary read, so the sensitivity-map masking
+  in `auth.md` is a policy contract still being wired, not a control
+  already in force everywhere it is described. `DESTRUCTIVE_POST_SUFFIXES`
+  extended (`/erase`, `/sweep`) with a `derive_action` pin (incl. the
+  SEC-G6 trailing-slash case) for each. **Acceptance:** `cargo test`
+  green (67 unit) + the DB-gated `enforcement` suite (1/1) and the
+  full `--ignored` suite (9/9) vs Postgres 18; clippy pedantic clean;
+  fmt clean. Extending `tests/enforcement.rs` with the full persona
+  matrix (manager vs marketing/support masking, `/erase`+`/sweep`
+  admin/svc-only, subject-access masked-403) is noted in `auth.md`
+  as the next step before relying on this in a real deployment, not
+  done here. (CRM-R20, CRM-G1)
+
+> **Follow-up (not done here, CRM-T23):** a front-end "Download my
+> data" link + confirm-gated Erase action on the contact detail page,
+> matching WPM-T32's shape. Skipped in CRM-T21/T22 to keep this round
+> scoped to the service-side code the two gates were actually missing;
+> the front-end pages/routes this would touch
+> (`contact-relationship-management-front-end-with-svelte`) were not
+> otherwise touched by this round.
 

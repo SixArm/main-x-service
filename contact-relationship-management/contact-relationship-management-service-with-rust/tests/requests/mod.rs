@@ -5,6 +5,7 @@
 mod engagement;
 mod insights;
 mod marketing;
+mod privacy;
 mod sales;
 mod support;
 
