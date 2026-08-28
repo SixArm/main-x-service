@@ -22,6 +22,11 @@ env:
   CARGO_TERM_COLOR: always
   # Cut link time and disk use; nothing here needs a debugger.
   CARGO_PROFILE_TEST_DEBUG: 0
+  # Incremental state is pure disk cost here: every job is a from-scratch
+  # checkout, so there is never a prior compilation to incrementally build
+  # on, only megabytes of state nobody reads. Standard CI advice, not
+  # specific to this repo.
+  CARGO_INCREMENTAL: 0
 
 jobs:
   discover:
@@ -75,6 +80,14 @@ jobs:
         crate: ${{ fromJson(needs.discover.outputs.crates) }}
     steps:
       - uses: actions/checkout@v4
+      - name: free disk space (drop preinstalled runner bloat this repo never touches)
+        run: |
+          echo "before:"; df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/.ghcup /usr/local/share/boost /usr/share/swift \
+            /opt/hostedtoolcache/CodeQL "${AGENT_TOOLSDIRECTORY:-}" \
+            2>/dev/null || true
+          echo "after:"; df -h /
       - run: rustup component add clippy
       - uses: Swatinem/rust-cache@v2
         with:
@@ -89,6 +102,17 @@ jobs:
       # finding here rather than the next time someone wants a number.
       - name: bench (compile only)
         run: scripts/ci-check.sh bench '${{ matrix.crate }}'
+      # Runs after every check above, not between them: the cache-save
+      # step below is a `post:` hook that Swatinem/rust-cache registers
+      # automatically and fires after this job's last explicit step, so
+      # cleaning here — rather than after just clippy or just test — is
+      # what actually gives the archive step headroom, at the cost of the
+      # crate's own build output not surviving into next run's cache
+      # (external dependency artifacts, the part worth reusing, live under
+      # `~/.cargo` and are unaffected).
+      - name: clean this crate's target/ (headroom for the cache-save step)
+        if: always()
+        run: rm -rf '${{ matrix.crate }}/target'
 
   # Minimum Supported Rust Version — the current stable minus three
   # (spec/rust-msrv-n-minus-3.md). Its own job rather than a step inside
@@ -107,6 +131,14 @@ jobs:
         crate: ${{ fromJson(needs.discover.outputs.crates) }}
     steps:
       - uses: actions/checkout@v4
+      - name: free disk space (drop preinstalled runner bloat this repo never touches)
+        run: |
+          echo "before:"; df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/.ghcup /usr/local/share/boost /usr/share/swift \
+            /opt/hostedtoolcache/CodeQL "${AGENT_TOOLSDIRECTORY:-}" \
+            2>/dev/null || true
+          echo "after:"; df -h /
       - name: install the MSRV toolchain
         run: |
           msrv=$(grep -v '^[[:space:]]*#' ci/msrv.txt \
@@ -118,6 +150,11 @@ jobs:
           workspaces: ${{ matrix.crate }}
           key: msrv-${{ matrix.crate }}
       - run: scripts/ci-check.sh msrv '${{ matrix.crate }}'
+      # See the `check` job's identical step for why this runs last, once,
+      # rather than between steps.
+      - name: clean this crate's target/ (headroom for the cache-save step)
+        if: always()
+        run: rm -rf '${{ matrix.crate }}/target'
 
   # The `#[ignore]`-gated suites. These are where the compliance controls
   # are actually proven — no unit test can show that an audit digest
@@ -150,12 +187,25 @@ jobs:
       POSTGRES_PASSWORD: loco
     steps:
       - uses: actions/checkout@v4
+      - name: free disk space (drop preinstalled runner bloat this repo never touches)
+        run: |
+          echo "before:"; df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/.ghcup /usr/local/share/boost /usr/share/swift \
+            /opt/hostedtoolcache/CodeQL "${AGENT_TOOLSDIRECTORY:-}" \
+            2>/dev/null || true
+          echo "after:"; df -h /
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ${{ matrix.crate }}
           key: db-${{ matrix.crate }}
       - run: scripts/ci-check.sh test-db '${{ matrix.crate }}'
+      # See the `check` job's identical step for why this runs last, once,
+      # rather than between steps.
+      - name: clean this crate's target/ (headroom for the cache-save step)
+        if: always()
+        run: rm -rf '${{ matrix.crate }}/target'
 
   # IEC 62304 / FD&C §524B supply-chain evidence. The SOUP-annotation gate
   # and the requirement->test traceability check are ordinary tests, so
@@ -166,6 +216,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: free disk space (drop preinstalled runner bloat this repo never touches)
+        run: |
+          echo "before:"; df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/.ghcup /usr/local/share/boost /usr/share/swift \
+            /opt/hostedtoolcache/CodeQL "${AGENT_TOOLSDIRECTORY:-}" \
+            2>/dev/null || true
+          echo "after:"; df -h /
       - uses: Swatinem/rust-cache@v2
       - name: install cargo-deny
         run: cargo install cargo-deny --locked
@@ -179,3 +237,8 @@ jobs:
         with:
           name: care-pathway-sbom
           path: ${{ runner.temp }}/sbom.cdx.json
+      # The SBOM is already written to $RUNNER_TEMP above, outside target/,
+      # so this can run after — headroom for the cache-save step.
+      - name: clean care-pathway's target/ (headroom for the cache-save step)
+        if: always()
+        run: rm -rf care-pathway/care-pathway-service-with-loco/target
