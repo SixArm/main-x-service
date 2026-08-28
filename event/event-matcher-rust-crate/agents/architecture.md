@@ -60,7 +60,7 @@ Anything not re-exported is private to the crate and may be refactored freely.
 
 ## The `Event` data model
 
-`Event` carries 24 fields today, every one optional or defaulting to empty. The canonical field list and which fields are scored (vs data-only) lives in `spec.md` §3.1.1. Two further fields, `relationships` and `tags`, are specified but not yet implemented (`spec.md` §3.1) — do not assume they exist in `src/models.rs` without checking.
+`Event` carries 26 fields today, every one optional or defaulting to empty. The canonical field list and which fields are scored (vs data-only) lives in `spec.md` §3.1.1, including `relationships: Vec<RelationshipRef>` and `tags: Vec<String>` (both supporting-only signals, never consulted by `deterministic_match`).
 
 `#[non_exhaustive]` on `Event`, `Address`, `Location`, `EventCategory`, `EventStatus`, `EventAttendanceMode`, `EventIdScheme`, and `MatchingError` formalises that adding variants / fields is a non-breaking change (`spec.md` §9.1). Downstream code MUST construct via `Event::builder()`, `Address::new()`, and `Location::new()` (plus fluent `with_*` setters), not struct-literal syntax.
 

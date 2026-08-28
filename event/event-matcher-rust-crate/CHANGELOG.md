@@ -9,51 +9,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-28
 
-### Added — `tags` weighted component (spec-first; implementation pending)
+### Added — `relationships` and `tags` as weighted supporting components
 
-Spec added the operator-applied **tags** match component
-([§3 `Event.tags` field](./spec/03-data-model.md),
-[§6.12 `tags_score`](./spec/06-per-field-scoring-algorithms.md),
-[§7 `tags_weight` = 0.05](./spec/07-configuration.md), and
-`MatchBreakdown::tags_score`). **Implementation is pending** — this
-entry tracks the code follow-up:
+Implements the design this crate's own spec had already recorded as
+"planned, not yet implemented" ([§3 `Event.relationships` / `Event.tags`
+fields](./spec/03-data-model.md), [§6.11 `relationships_score` / §6.12
+`tags_score`](./spec/06-per-field-scoring-algorithms.md), [§7
+`relationships_weight` / `tags_weight` = 0.05
+each](./spec/07-configuration.md)). Follows the identical pattern landed
+in `worker-matcher` 0.7.0 (T-33 / T-34), adapted to this crate's own
+event-to-event vocabulary:
 
-- Add `tags: Vec<String>` to `Event` (default empty); add the `tags` /
-  `add_tag` builder setters mirroring `keywords`.
-- Implement `tags_score`: plain set Jaccard over case-insensitively
-  normalised tags (trim + ASCII lowercase, empties dropped); `None`
-  when either side empty (§6.12).
-- Add `tags_weight` (default `0.05`) to `MatchConfig`; include `tags`
-  in the renormalised weighted average; add `tags_score` to
-  `MatchBreakdown`.
-- Wire the service adapter (`to_matcher_event`) to route the service
-  `tags` field (event-entity spec §5.3) + a bridge test.
-- Unit tests (overlap Jaccard, empty-skip); `cargo test` +
-  `cargo clippy --all-targets -- -D warnings` clean.
-
-### Added — `relationships` weighted component (spec-first; implementation pending)
-
-Spec added the typed event-to-event **relationships** match component
-([§3 `Event.relationships` field + `RelationshipRef` / `RelationKind`](./spec/03-data-model.md),
-[§6.11 `relationships_score`](./spec/06-per-field-scoring-algorithms.md),
-[§7 `relationships_weight` = 0.05](./spec/07-configuration.md), and
-`MatchBreakdown::relationships_score`). **Implementation is pending** — this
-entry tracks the code follow-up:
-
-- Add `relationships: Vec<RelationshipRef>` to `Event` + `RelationshipRef`
-  / `RelationKind` (`Outer` / `Inner` / `ImmediatelyBefore` /
-  `ImmediatelyAfter`; `#[non_exhaustive]`); re-export from `lib.rs`; add the
-  `relationships` / `add_relationship` builder setters.
-- Implement `relationships_score`: typed-set Jaccard over `(relation,
-  event_id)` pairs; `None` when either side empty (§6.11).
-- Add `relationships_weight` (default `0.05`) to `MatchConfig`; include
-  `relationships` in the renormalised weighted average; add
-  `relationships_score` to `MatchBreakdown`.
-- Wire the service adapter (`to_matcher_event`) to route the service
-  `relationships` field (event-entity spec §5.3) + a bridge test.
-- Unit tests (kind-keyed agreement, empty-skip); `cargo test` +
-  `cargo clippy --all-targets -- -D warnings` clean.
+- **`RelationshipRef` / `RelationKind` (§6.11).** New public types
+  `RelationKind` (`#[non_exhaustive]`: `Outer` / `Inner` — containment
+  — and `ImmediatelyBefore` / `ImmediatelyAfter` — temporal adjacency)
+  and `RelationshipRef { relation: RelationKind, event_id: String }`,
+  re-exported from the crate root. `RelationshipRef::new` trims
+  `event_id` and rejects an empty result. `Event` gains
+  `relationships: Vec<RelationshipRef>` (default empty,
+  `#[serde(default)]`), with `EventBuilder::add_relationship` /
+  `::relationships` setters. Scored as typed-set Jaccard over
+  `(relation, event_id)` pairs (`|A ∩ B| / |A ∪ B|`) into the new
+  `MatchBreakdown::relationships_score` (`#[serde(default)]`), `None`
+  when either side's list is empty. New
+  `MatchConfig::relationships_weight` (default `0.05`) joins the
+  renormalised weighted average.
+- **`tags` (§6.12).** `Event` gains `tags: Vec<String>` (default empty,
+  `#[serde(default)]`), with `EventBuilder::add_tag` / `::tags` setters
+  mirroring `keywords`. Tags are stored verbatim and compared
+  case-insensitively at scoring time (consistent with the crate's
+  normalise-at-match-time convention for names / organizer / performers)
+  as set Jaccard (`|A ∩ B| / |A ∪ B|`) into the new
+  `MatchBreakdown::tags_score` (`#[serde(default)]`), `None` when either
+  side's list is empty. New `MatchConfig::tags_weight` (default `0.05`)
+  joins `relationships_weight` in the renormalised average.
+- Both fields are purely additive and **not** identifying on their own
+  (`Event::validate` is unchanged — still just `name`) and **not**
+  consulted by `deterministic_match`. Neither field participates in the
+  weighted average unless populated on *both* sides, so existing callers
+  that never set `relationships`/`tags` see byte-identical scores before
+  and after this release — the two new default weights simply never
+  enter the denominator for them.
+- `agents/matching-algorithm.md`'s default-weight table gains
+  Relationships / Tags rows. `spec/03-data-model.md`,
+  `spec/05-matching-pipeline.md`, `spec/06-per-field-scoring-algorithms.md`,
+  and `spec/07-configuration.md` drop their "planned, not yet
+  implemented" callouts — `Event` now carries 26 fields,
+  `MatchBreakdown` 13, and twelve weighted components participate in
+  the pipeline.
+- Minor version bump (pre-1.0): per `agents/release.md`, a
+  default-weight addition that changes computed behaviour once the new
+  fields are populated — plus two new public types and four new public
+  struct fields — is a minor bump, not a patch.
 
 ## [0.7.0] - 2026-08-24
 

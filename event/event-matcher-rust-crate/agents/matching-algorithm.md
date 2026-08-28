@@ -34,7 +34,8 @@ The engine is immutable and `Send + Sync`, so consumers can wrap the batch entry
 │  / end_date / location /      │
 │  category / country_code /    │
 │  event_ids / organizer /      │
-│  performers / url             │
+│  performers / url /           │
+│  relationships / tags         │
 │  → MatchBreakdown             │
 └───────────────────────────────┘
      │
@@ -72,9 +73,9 @@ The canonical table lives in `spec.md` §7.1. Reproduced here for convenience:
 | Organizer | `0.04` | `Scorer::combined_similarity` on `normalize_name(organizer)` from each side. `None` if either side has no organizer. |
 | Performers | `0.02` | Best-of cartesian product across performer lists after `normalize_name`. `None` if either list is empty. |
 | URL | `0.02` | Exact equality after trimming whitespace. `None` if either is absent. |
+| Relationships | `0.05` | Typed-set Jaccard `\|A ∩ B\| / \|A ∪ B\|` over `(relation, event_id)` pairs (`RelationshipRef` / `RelationKind`: `Outer` / `Inner` / `ImmediatelyBefore` / `ImmediatelyAfter`). `None` if either side has no relationships. A supporting signal, never identifying. See `spec.md` §6.11. |
+| Tags | `0.05` | Plain set Jaccard `\|A ∩ B\| / \|A ∪ B\|` over the case-insensitively normalised (`str::to_lowercase`) tag sets. `None` if either side has no tags. A supporting signal, never identifying. See `spec.md` §6.12. |
 | Phonetic bonus | `+0.05`-weighted when gated | Soundex via `Normalizer::phonetic_code`, max equality across the name × alternate-name cartesian product. Bonus only — never lowers a score. Only computed when `MatchConfig::use_phonetic_matching = true`. |
-
-Two further supporting components — **relationships** (weight `0.05`) and **tags** (weight `0.05`) — are specified (`spec.md` §6.11, §6.12, §7.1) but **not yet implemented**; `MatchConfig` carries no `relationships_weight`/`tags_weight` field today. Do not write code against them without checking `src/matcher.rs` first.
 
 ## Presets
 
