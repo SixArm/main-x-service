@@ -35,10 +35,11 @@
 //! assert!(result.is_match);
 //! ```
 
-use crate::models::Thing;
+use crate::models::{RelationKind, RelationshipRef, Thing};
 use crate::normalizer::Normalizer;
 use crate::scorer::{Scorer, SimilarityAlgorithm};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// Tunable configuration for the matching engine.
 ///
@@ -70,6 +71,8 @@ use serde::{Deserialize, Serialize};
 ///     image_weight: 0.03,
 ///     main_entity_of_page_weight: 0.02,
 ///     additional_types_weight: 0.05,
+///     relationships_weight: 0.05,
+///     tags_weight: 0.05,
 ///     use_phonetic_matching: true,
 ///     name_algorithm: SimilarityAlgorithm::Combined,
 ///     strict_mode: false,
@@ -112,6 +115,24 @@ pub struct MatchConfig {
     /// Weight for `additionalType` URI set similarity (Jaccard).
     pub additional_types_weight: f64,
 
+    /// Weight for relationship-set similarity: typed-set Jaccard over
+    /// `(relation, thing_id)` pairs (see [`crate::RelationshipRef`]).
+    /// Defaults to `0.05` — a **supporting** signal only: two records
+    /// referencing the same related things are weakly more likely the
+    /// same thing, but the field never identifies on its own and does
+    /// not participate when either side has no relationships recorded.
+    /// See spec §5.9.1 / §6.6.
+    pub relationships_weight: f64,
+
+    /// Weight for tag-set similarity: set Jaccard over the
+    /// case-insensitively normalised tag sets. Defaults to `0.05` — a
+    /// **supporting** signal only, analogous to
+    /// [`Self::relationships_weight`]: two records sharing the same
+    /// operator-applied tags are weakly more likely the same thing, but
+    /// does not participate when either side has no tags recorded. See
+    /// spec §5.9.2 / §6.8.
+    pub tags_weight: f64,
+
     /// Whether to add a phonetic-name bonus when both names sound alike.
     pub use_phonetic_matching: bool,
 
@@ -143,6 +164,8 @@ impl Default for MatchConfig {
             image_weight: 0.03,
             main_entity_of_page_weight: 0.02,
             additional_types_weight: 0.05,
+            relationships_weight: 0.05,
+            tags_weight: 0.05,
             use_phonetic_matching: false,
             name_algorithm: SimilarityAlgorithm::Combined,
             strict_mode: false,
@@ -354,6 +377,17 @@ pub struct MatchBreakdown {
     /// Jaccard set similarity over the union of `additionalType` URIs
     /// after `normalize_url`. `None` if both sides are empty.
     pub additional_types_score: Option<f64>,
+    /// Score for relationship-set similarity: typed-set Jaccard over
+    /// `(relation, thing_id)` pairs, `|A ∩ B| / |A ∪ B|`. `None` when
+    /// either side has no relationships recorded. See
+    /// [`crate::RelationshipRef`]; spec §5.9.1 / §6.6.
+    #[serde(default)]
+    pub relationships_score: Option<f64>,
+    /// Score for tag-set similarity: set Jaccard over the
+    /// case-insensitively normalised tag sets, `|A ∩ B| / |A ∪ B|`.
+    /// `None` when either side has no tags recorded. Spec §5.9.2 / §6.8.
+    #[serde(default)]
+    pub tags_score: Option<f64>,
 }
 
 /// Thing matcher engine.
@@ -588,6 +622,8 @@ impl MatchingEngine {
                 &thing1.additional_types,
                 &thing2.additional_types,
             ),
+            relationships_score: score_relationships(&thing1.relationships, &thing2.relationships),
+            tags_score: score_tags(&thing1.tags, &thing2.tags),
         }
     }
 
@@ -630,6 +666,11 @@ impl MatchingEngine {
             breakdown.additional_types_score,
             self.config.additional_types_weight,
         );
+        add(
+            breakdown.relationships_score,
+            self.config.relationships_weight,
+        );
+        add(breakdown.tags_score, self.config.tags_weight);
 
         // Phonetic match is a bonus only — never lowers the score. The
         // `> 0.9` gate means it fires only on a near-certain Soundex match
@@ -827,6 +868,59 @@ fn shares_same_as(thing1: &Thing, thing2: &Thing) -> bool {
     false
 }
 
+/// Score a pair of relationship-reference lists for the probabilistic
+/// breakdown: typed-set **Jaccard** over `(relation, thing_id)` pairs —
+/// `|A ∩ B| / |A ∪ B|` — so a `Contains` reference only agrees with a
+/// `Contains` reference to the **same** thing. Returns `None` if either
+/// side has no relationships recorded at all (the field is irrelevant
+/// for this pair, not evidence of non-match). See spec §5.9.1 / §6.6.
+fn score_relationships(a: &[RelationshipRef], b: &[RelationshipRef]) -> Option<f64> {
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    let set_a: HashSet<(RelationKind, &str)> = a
+        .iter()
+        .map(|r| (r.relation, r.thing_id.as_str()))
+        .collect();
+    let set_b: HashSet<(RelationKind, &str)> = b
+        .iter()
+        .map(|r| (r.relation, r.thing_id.as_str()))
+        .collect();
+    Some(jaccard(&set_a, &set_b))
+}
+
+/// Score a pair of tag lists for the probabilistic breakdown: set
+/// **Jaccard** over the case-insensitively normalised tag sets —
+/// `|A ∩ B| / |A ∪ B|`. Normalisation happens here, at scoring time,
+/// consistent with the crate's normalise-at-match-time convention for
+/// names / URLs — [`crate::Thing::tags`] stores tags exactly as
+/// provided. Returns `None` if either side has no tags recorded at all.
+/// See spec §5.9.2 / §6.8.
+fn score_tags(a: &[String], b: &[String]) -> Option<f64> {
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    let set_a: HashSet<String> = a.iter().map(|t| t.to_lowercase()).collect();
+    let set_b: HashSet<String> = b.iter().map(|t| t.to_lowercase()).collect();
+    Some(jaccard(&set_a, &set_b))
+}
+
+/// Jaccard index `|A ∩ B| / |A ∪ B|` over two hash sets. Callers are
+/// required to have already checked both inputs are non-empty (see
+/// [`score_relationships`] / [`score_tags`]), so the union here is never
+/// zero-sized.
+///
+/// Set sizes in practice are small (a thing's relationship or tag list),
+/// so the `usize` counts are routed through `u32` (exact, lint-free
+/// `u32 -> f64`) rather than a direct `usize -> f64` cast;
+/// `unwrap_or(u32::MAX)` is a non-panicking saturating fallback for a
+/// pathologically large set rather than a realistic code path.
+fn jaccard<T: Eq + std::hash::Hash>(a: &HashSet<T>, b: &HashSet<T>) -> f64 {
+    let intersection = u32::try_from(a.intersection(b).count()).unwrap_or(u32::MAX);
+    let union = u32::try_from(a.union(b).count()).unwrap_or(u32::MAX);
+    f64::from(intersection) / f64::from(union)
+}
+
 /// `true` iff both things have a `url` and the two normalise to the same
 /// non-empty canonical string. A thing missing its `url` can never
 /// canonical-URL-match. A `url` whose normalised form is empty (blank or
@@ -883,6 +977,162 @@ mod tests {
         let c = MatchConfig::lenient();
         assert!((c.match_threshold - 0.65).abs() < 1e-9);
         assert!(c.use_phonetic_matching);
+    }
+
+    /// Pins the default `relationships_weight` / `tags_weight`.
+    #[test]
+    fn config_default_relationships_and_tags_weight_is_005() {
+        let c = MatchConfig::default();
+        assert!((c.relationships_weight - 0.05).abs() < 1e-9);
+        assert!((c.tags_weight - 0.05).abs() < 1e-9);
+    }
+
+    // ---------- relationships & tags (T-PRO-H7) ----------
+
+    #[test]
+    fn score_relationships_identical_sets_scores_one() {
+        let a = vec![RelationshipRef::new(RelationKind::Contains, "t1").unwrap()];
+        let b = a.clone();
+        assert_eq!(score_relationships(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn score_relationships_disjoint_sets_scores_zero() {
+        let a = vec![RelationshipRef::new(RelationKind::Contains, "t1").unwrap()];
+        let b = vec![RelationshipRef::new(RelationKind::ContainedIn, "t1").unwrap()];
+        // Same thing id, different relation kind: not the same pair.
+        assert_eq!(score_relationships(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn score_relationships_partial_overlap_scores_jaccard_ratio() {
+        let a = vec![
+            RelationshipRef::new(RelationKind::Contains, "t1").unwrap(),
+            RelationshipRef::new(RelationKind::SubPart, "t2").unwrap(),
+        ];
+        let b = vec![
+            RelationshipRef::new(RelationKind::Contains, "t1").unwrap(),
+            RelationshipRef::new(RelationKind::SubPart, "t3").unwrap(),
+        ];
+        // intersection = {(Contains, t1)} = 1; union = 3.
+        let score = score_relationships(&a, &b).unwrap();
+        assert!(approx_eq(score, 1.0 / 3.0));
+    }
+
+    #[test]
+    fn score_relationships_empty_either_side_is_none() {
+        let empty: Vec<RelationshipRef> = vec![];
+        let some = vec![RelationshipRef::new(RelationKind::Contains, "t1").unwrap()];
+        assert_eq!(score_relationships(&empty, &some), None);
+        assert_eq!(score_relationships(&some, &empty), None);
+        assert_eq!(score_relationships(&empty, &empty), None);
+    }
+
+    #[test]
+    fn score_tags_case_insensitive_identical_scores_one() {
+        let a = vec!["Landmark".to_string(), "Unesco".to_string()];
+        let b = vec!["landmark".to_string(), "unesco".to_string()];
+        assert_eq!(score_tags(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn score_tags_disjoint_sets_scores_zero() {
+        let a = vec!["landmark".to_string()];
+        let b = vec!["museum".to_string()];
+        assert_eq!(score_tags(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn score_tags_partial_overlap_scores_jaccard_ratio() {
+        let a = vec!["landmark".to_string(), "unesco".to_string()];
+        let b = vec!["Landmark".to_string(), "museum".to_string()];
+        // intersection = {"landmark"} = 1; union = {"landmark", "unesco", "museum"} = 3.
+        let score = score_tags(&a, &b).unwrap();
+        assert!(approx_eq(score, 1.0 / 3.0));
+    }
+
+    #[test]
+    fn score_tags_empty_either_side_is_none() {
+        let empty: Vec<String> = vec![];
+        let some = vec!["landmark".to_string()];
+        assert_eq!(score_tags(&empty, &some), None);
+        assert_eq!(score_tags(&some, &empty), None);
+        assert_eq!(score_tags(&empty, &empty), None);
+    }
+
+    #[test]
+    fn relationships_and_tags_absent_do_not_enter_the_weighted_average() {
+        // Renormalisation sanity check: with neither field populated on
+        // either side, `relationships_score`/`tags_score` are `None` and
+        // neither weight enters the denominator — an exact name match
+        // still scores a clean 1.0, not diluted by two "missing"
+        // components treated as zero.
+        let engine = MatchingEngine::default_config();
+        let a = Thing::builder().name("Eiffel Tower").build();
+        let b = a.clone();
+        let result = engine.match_things(&a, &b);
+        assert_eq!(result.breakdown.relationships_score, None);
+        assert_eq!(result.breakdown.tags_score, None);
+        assert!(approx_eq(result.score, 1.0));
+    }
+
+    #[test]
+    fn relationships_and_tags_participate_when_present_and_agree() {
+        let engine = MatchingEngine::default_config();
+        let rel = RelationshipRef::new(RelationKind::Contains, "thing-42").unwrap();
+        let a = Thing::builder()
+            .name("Eiffel Tower")
+            .add_relationship(rel.clone())
+            .add_tag("landmark")
+            .build();
+        let b = Thing::builder()
+            .name("Eiffel Tower")
+            .add_relationship(rel)
+            .add_tag("Landmark")
+            .build();
+        let result = engine.match_things(&a, &b);
+        assert_eq!(result.breakdown.relationships_score, Some(1.0));
+        assert_eq!(result.breakdown.tags_score, Some(1.0));
+        assert!(approx_eq(result.score, 1.0));
+    }
+
+    #[test]
+    fn relationships_and_tags_disagreement_pulls_score_down_but_stays_bounded() {
+        // Both sides carry data (so the components participate) but
+        // disagree entirely: the weighted-average renormalisation must
+        // still land in [0.0, 1.0], and a strong name+description+url
+        // match should outweigh two small (0.05 default) supporting-
+        // signal misses. (Name alone, at the default `name_weight =
+        // 0.30` with no phonetic bonus — `use_phonetic_matching` is
+        // `false` by default — would land at `0.30 / 0.40 = 0.75`,
+        // *below* the default `0.80` threshold; description + url push
+        // the participating weight up so the assertion below is
+        // meaningful rather than accidentally true.)
+        let engine = MatchingEngine::default_config();
+        let a = Thing::builder()
+            .name("Eiffel Tower")
+            .description("Iron tower in Paris.")
+            .url("https://example.org/eiffel")
+            .add_relationship(RelationshipRef::new(RelationKind::Contains, "t1").unwrap())
+            .add_tag("landmark")
+            .build();
+        let b = Thing::builder()
+            .name("Eiffel Tower")
+            .description("Iron tower in Paris.")
+            .url("https://example.org/eiffel")
+            .add_relationship(RelationshipRef::new(RelationKind::Contains, "t2").unwrap())
+            .add_tag("museum")
+            .build();
+        let result = engine.match_things(&a, &b);
+        assert_eq!(result.breakdown.relationships_score, Some(0.0));
+        assert_eq!(result.breakdown.tags_score, Some(0.0));
+        assert!((0.0..=1.0).contains(&result.score));
+        assert!(result.score < 1.0);
+        assert!(
+            result.is_match,
+            "strong name+description+url match should still clear the default 0.80 threshold: {}",
+            result.score
+        );
     }
 
     // ---------- MatchConfig serde ----------

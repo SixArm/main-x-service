@@ -92,19 +92,19 @@ Note the **asymmetry vs. deterministic match**: an empty `identifiers` list on e
 
 ### 5.9.1 Relationships scoring
 
-**Not yet implemented** — `crate::matcher` has no `relationships_score` field or scoring helper today; this subsection is specified ahead of code (see §3.3.1, CHANGELOG.md `[Unreleased]`).
+Landed in v0.7.0 (see §3.3.1, CHANGELOG.md).
 
 `relationships_score` is typed-set **Jaccard** over the `(relation, thing_id)` pairs: `score = |A ∩ B| / |A ∪ B|`, where each side's set is `{ (r.relation, r.thing_id) for r in relationships }`. The relation kind is part of the key — a `Contains` reference only agrees with a `Contains` reference to the **same** thing id; `ContainedIn` / `SuperPart` / `SubPart` are compared as opaque, distinct kinds (no inversion, no transitive closure). `None` (does not participate) when **either** side has no relationships; otherwise a value in `[0.0, 1.0]`. A supporting signal weighted `relationships_weight` (§3.4, default `0.05`); shared references never single-handedly establish a match.
 
 ### 5.9.2 Tags scoring
 
-**Not yet implemented** — `crate::matcher` has no `tags_score` field or scoring helper today; this subsection is specified ahead of code (see §3.1, CHANGELOG.md `[Unreleased]`).
+Landed in v0.7.0 (see §3.1, CHANGELOG.md).
 
 `tags_score` is plain set **Jaccard** over the tag sets: `score = |A ∩ B| / |A ∪ B|`, where each side's set is the operator's `tags` after case-insensitive normalisation (trim + lowercase, de-duplicated). `None` (does not participate) when **either** side has an empty tag set; otherwise a value in `[0.0, 1.0]`. A supporting signal weighted `tags_weight` (§3.4, default `0.05`); shared tags never single-handedly establish a match.
 
 ### 5.10 Renormalised weighted sum
 
-`relationships` and `tags` in the loop below are **not yet implemented** (§5.9.1, §5.9.2) — today's `calculate_weighted_score` (`src/matcher.rs`) sums the other nine fields only.
+`relationships` and `tags` landed in v0.7.0 (§5.9.1, §5.9.2) — `calculate_weighted_score` (`src/matcher.rs`) sums all eleven fields below.
 
 ```
 weighted_sum  = 0.0

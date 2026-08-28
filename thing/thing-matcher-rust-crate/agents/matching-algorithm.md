@@ -72,6 +72,8 @@ The canonical table lives in `spec.md` §3.4. Reproduced here for convenience:
 | Image | `0.03` | Exact equality after `normalize_url`. |
 | mainEntityOfPage | `0.02` | Exact equality after `normalize_url`. |
 | Additional types | `0.05` | Jaccard set similarity over `additional_types` URIs after `normalize_url`. `None` only when both empty. |
+| Relationships | `0.05` | Typed-set Jaccard over `(relation, thing_id)` pairs — `\|A ∩ B\| / \|A ∪ B\|` — see spec §5.9.1 / §6.6. `None` when either side's `relationships` list is empty; supporting signal, never resolved against a registry. |
+| Tags | `0.05` | Set Jaccard over case-insensitively normalised tag sets — `\|A ∩ B\| / \|A ∪ B\|` — see spec §5.9.2 / §6.8. `None` when either side's `tags` list is empty; supporting signal, normalisation happens at scoring time, not on construction. |
 | Phonetic bonus | `+0.05`-weighted when gated | Soundex via `Normalizer::phonetic_code`, max equality across the name × alternate-name cartesian product. Bonus only — never lowers a score. Fires only when score > `0.9`. |
 
 ## Presets
@@ -120,6 +122,8 @@ Per-field rules:
 | `image_score` | Either side has `image = None`. |
 | `main_entity_of_page_score` | Either side has `main_entity_of_page = None`. |
 | `additional_types_score` | BOTH sides have an empty `additional_types` list. |
+| `relationships_score` | Either side has an empty `relationships` list. |
+| `tags_score` | Either side has an empty `tags` list. |
 
 Note the **single-side / both-sides asymmetry** for the set-similarity fields (`same_as_score`, `additional_types_score`): if one side has entries and the other has none, the score is `Some(0.0)` (intersection is empty), which is intentional — an empty alternate vocabulary on one side cannot match anything from the other, so it gets a real zero, not a "skip".
 

@@ -108,6 +108,102 @@ impl Identifier {
     }
 }
 
+/// The kind of typed relationship one [`Thing`] asserts toward another,
+/// carried on a [`RelationshipRef`].
+///
+/// `Contains` / `ContainedIn` are containment inverses — if thing A holds
+/// `Contains` pointing at thing B, the converse fact is that B is
+/// `ContainedIn` A — and `SuperPart` / `SubPart` are part-of inverses
+/// (schema.org `hasPart` / `isPartOf`: A `SuperPart` B means A is the
+/// whole and B the sub-part). The matcher does **not** resolve, invert,
+/// or transitively close these references; it only compares the raw
+/// `(relation, thing_id)` pairs each side asserts (spec §5.9.1). The enum
+/// is `#[non_exhaustive]` because it is expected to grow (e.g.
+/// `SimilarTo`, `Replaces` / `ReplacedBy`) as consuming services add
+/// relationship kinds; a new variant is purely additive.
+///
+/// # Example
+///
+/// ```
+/// use thing_matcher::RelationKind;
+///
+/// let k = RelationKind::Contains;
+/// assert_eq!(k, RelationKind::Contains);
+/// assert_ne!(k, RelationKind::ContainedIn);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum RelationKind {
+    /// This thing contains the referenced thing.
+    Contains,
+    /// This thing is contained in the referenced thing.
+    ContainedIn,
+    /// This thing is the whole of which the referenced thing is a part
+    /// (schema.org `hasPart`).
+    SuperPart,
+    /// This thing is a part of the referenced thing (schema.org
+    /// `isPartOf`).
+    SubPart,
+}
+
+/// A typed reference from one [`Thing`] to another, by opaque id in the
+/// consuming registry (e.g. "this thing contains thing `X`").
+///
+/// `RelationshipRef` is a **supporting** matching signal, not an
+/// identifying one: the matcher never resolves `thing_id` against a
+/// registry (it has none) — it only compares the two things'
+/// relationship **sets** via typed-set Jaccard over `(relation,
+/// thing_id)` pairs (spec §5.9.1 / §6.6).
+///
+/// Construct via [`RelationshipRef::new`], which trims `thing_id` and
+/// rejects an empty result, so two records carrying different incidental
+/// whitespace around the same id compare equal.
+///
+/// # Example
+///
+/// ```
+/// use thing_matcher::{RelationKind, RelationshipRef};
+///
+/// let r = RelationshipRef::new(RelationKind::Contains, " thing-42 ").unwrap();
+/// assert_eq!(r.thing_id, "thing-42");
+/// assert_eq!(r.relation, RelationKind::Contains);
+///
+/// assert!(RelationshipRef::new(RelationKind::ContainedIn, "   ").is_none());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RelationshipRef {
+    /// The kind of relationship this side asserts. See [`RelationKind`].
+    pub relation: RelationKind,
+    /// Opaque id of the related thing in the consuming registry.
+    /// Whitespace-trimmed and non-empty — see [`RelationshipRef::new`].
+    pub thing_id: String,
+}
+
+impl RelationshipRef {
+    /// Construct a relationship reference, trimming `thing_id` and
+    /// rejecting an empty result.
+    ///
+    /// Returns `None` when `thing_id` is empty after trimming.
+    ///
+    /// ```
+    /// use thing_matcher::{RelationKind, RelationshipRef};
+    /// let r = RelationshipRef::new(RelationKind::SubPart, "thing-7").unwrap();
+    /// assert_eq!(r.thing_id, "thing-7");
+    /// assert!(RelationshipRef::new(RelationKind::SubPart, "").is_none());
+    /// ```
+    #[must_use]
+    pub fn new(relation: RelationKind, thing_id: impl AsRef<str>) -> Option<Self> {
+        let thing_id = thing_id.as_ref().trim();
+        if thing_id.is_empty() {
+            return None;
+        }
+        Some(Self {
+            relation,
+            thing_id: thing_id.to_string(),
+        })
+    }
+}
+
 /// Core data structure for a thing, aligned with `schema.org/Thing`.
 ///
 /// Every field is optional (or defaults to empty). The matcher tolerates
@@ -200,6 +296,24 @@ pub struct Thing {
     /// normalised, not scored — different organisations may issue
     /// colliding values. Kept for round-trip honesty.
     pub local_id: Option<String>,
+
+    /// Typed references to other things (by opaque id) in the consuming
+    /// registry — e.g. "this thing contains thing X". A **supporting**
+    /// signal only: never identifying on its own, and the matcher never
+    /// resolves the reference (it has no registry) — it only compares
+    /// the two things' relationship **sets** via typed-set Jaccard.
+    /// Default empty. See [`RelationshipRef`] / [`RelationKind`]; spec
+    /// §3.3.1 / §5.9.1 / §6.6.
+    #[serde(default)]
+    pub relationships: Vec<RelationshipRef>,
+
+    /// Operator-applied free-text labels (e.g. `"landmark"`,
+    /// `"unesco"`). Stored verbatim; compared case-insensitively at
+    /// match time, consistent with the crate's normalise-at-match-time
+    /// convention. A **supporting** signal only: never identifying on
+    /// its own. Default empty. See spec §3.1 / §5.9.2 / §6.8.
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 impl Thing {
@@ -309,6 +423,10 @@ pub struct ThingBuilder {
     owner: Option<String>,
     /// Pending originating-system local id; populates [`Thing::local_id`].
     local_id: Option<String>,
+    /// Pending relationship references; populates [`Thing::relationships`].
+    relationships: Vec<RelationshipRef>,
+    /// Pending operator tags; populates [`Thing::tags`].
+    tags: Vec<String>,
 }
 
 impl ThingBuilder {
@@ -577,6 +695,63 @@ impl ThingBuilder {
         self
     }
 
+    /// Append a single relationship reference. Chainable; call multiple
+    /// times to record several relationships.
+    ///
+    /// ```
+    /// # use thing_matcher::{RelationKind, RelationshipRef, Thing};
+    /// let t = Thing::builder()
+    ///     .add_relationship(RelationshipRef::new(RelationKind::Contains, "thing-42").unwrap())
+    ///     .build();
+    /// assert_eq!(t.relationships.len(), 1);
+    /// ```
+    #[must_use]
+    pub fn add_relationship(mut self, relationship: RelationshipRef) -> Self {
+        self.relationships.push(relationship);
+        self
+    }
+
+    /// Replace the entire relationship list.
+    ///
+    /// ```
+    /// # use thing_matcher::{RelationKind, RelationshipRef, Thing};
+    /// let refs = vec![RelationshipRef::new(RelationKind::SubPart, "thing-1").unwrap()];
+    /// let t = Thing::builder().relationships(refs).build();
+    /// assert_eq!(t.relationships.len(), 1);
+    /// ```
+    #[must_use]
+    pub fn relationships(mut self, value: Vec<RelationshipRef>) -> Self {
+        self.relationships = value;
+        self
+    }
+
+    /// Append a single tag. Chainable; call multiple times to record
+    /// several tags.
+    ///
+    /// ```
+    /// # use thing_matcher::Thing;
+    /// let t = Thing::builder().add_tag("landmark").add_tag("unesco").build();
+    /// assert_eq!(t.tags, vec!["landmark".to_string(), "unesco".to_string()]);
+    /// ```
+    #[must_use]
+    pub fn add_tag<S: Into<String>>(mut self, value: S) -> Self {
+        self.tags.push(value.into());
+        self
+    }
+
+    /// Replace the entire tag list.
+    ///
+    /// ```
+    /// # use thing_matcher::Thing;
+    /// let t = Thing::builder().tags(vec!["landmark".to_string()]).build();
+    /// assert_eq!(t.tags.len(), 1);
+    /// ```
+    #[must_use]
+    pub fn tags(mut self, value: Vec<String>) -> Self {
+        self.tags = value;
+        self
+    }
+
     /// Consume the builder and produce the [`Thing`].
     ///
     /// ```
@@ -600,6 +775,8 @@ impl ThingBuilder {
             subject_of: self.subject_of,
             owner: self.owner,
             local_id: self.local_id,
+            relationships: self.relationships,
+            tags: self.tags,
         }
     }
 }
@@ -626,6 +803,8 @@ mod tests {
         assert!(t.subject_of.is_empty());
         assert!(t.owner.is_none());
         assert!(t.local_id.is_none());
+        assert!(t.relationships.is_empty());
+        assert!(t.tags.is_empty());
     }
 
     /// Pins the `impl Into<String>` ergonomics: setters accept both `&str`
@@ -723,5 +902,61 @@ mod tests {
         let json = serde_json::to_string(&id).expect("serialise");
         let back: Identifier = serde_json::from_str(&json).expect("deserialise");
         assert_eq!(id, back);
+    }
+
+    // ---------- relationships & tags (T-PRO-H7) ----------
+
+    /// Pins the trim + empty-rejection behaviour of `RelationshipRef::new`.
+    #[test]
+    fn relationship_ref_trims_and_rejects_empty_thing_id() {
+        let r = RelationshipRef::new(RelationKind::Contains, "  thing-42  ").unwrap();
+        assert_eq!(r.thing_id, "thing-42");
+        assert_eq!(r.relation, RelationKind::Contains);
+        assert!(RelationshipRef::new(RelationKind::ContainedIn, "   ").is_none());
+        assert!(RelationshipRef::new(RelationKind::ContainedIn, "").is_none());
+    }
+
+    /// Pins that `RelationKind` variants are distinct.
+    #[test]
+    fn relation_kind_variants_are_distinct() {
+        assert_ne!(RelationKind::Contains, RelationKind::ContainedIn);
+        assert_ne!(RelationKind::SuperPart, RelationKind::SubPart);
+        assert_eq!(RelationKind::Contains, RelationKind::Contains);
+    }
+
+    /// Pins that a freshly built thing carries no relationships or tags.
+    #[test]
+    fn thing_builder_relationships_and_tags_start_empty() {
+        let t = Thing::builder().build();
+        assert!(t.relationships.is_empty());
+        assert!(t.tags.is_empty());
+    }
+
+    /// Pins the `add_relationship` / `add_tag` chainable-append setters.
+    #[test]
+    fn thing_builder_carries_relationships_and_tags() {
+        let t = Thing::builder()
+            .add_relationship(RelationshipRef::new(RelationKind::Contains, "thing-1").unwrap())
+            .add_relationship(RelationshipRef::new(RelationKind::SubPart, "thing-2").unwrap())
+            .add_tag("landmark")
+            .add_tag("unesco")
+            .build();
+        assert_eq!(t.relationships.len(), 2);
+        assert_eq!(t.tags, vec!["landmark".to_string(), "unesco".to_string()]);
+    }
+
+    /// Pins that the plural `relationships` / `tags` setters *replace* the
+    /// whole vec (as opposed to `add_relationship` / `add_tag`, which
+    /// append).
+    #[test]
+    fn relationships_and_tags_setters_replace_vec() {
+        let refs = vec![RelationshipRef::new(RelationKind::Contains, "thing-9").unwrap()];
+        let tags = vec!["days".to_string()];
+        let t = Thing::builder()
+            .relationships(refs.clone())
+            .tags(tags.clone())
+            .build();
+        assert_eq!(t.relationships, refs);
+        assert_eq!(t.tags, tags);
     }
 }
