@@ -98,8 +98,14 @@ pub struct MatchingConfig {
 
 /// Observability/telemetry configuration.
 ///
-/// `log_level` is the fallback when `RUST_LOG` is unset (see
-/// [`crate::observability::init_telemetry`]).
+/// Predates [`crate::observability`]'s real OTLP pipeline (PRO-H9) and is
+/// not read by it — that module reads `OTLP_SERVICE_NAME` /
+/// `OTLP_ENDPOINT` directly via [`crate::observability::TelemetryConfig::from_env`],
+/// deliberately unprefixed to match the family's shared config table
+/// rather than this crate's `WORKER_`-prefixed convention. This struct
+/// and that pipeline are two independent readers of related-looking
+/// environment variables, not a layering; nothing in the pipeline
+/// consults this struct.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObservabilityConfig {
     /// `service.name` resource attribute reported to the OTLP collector.

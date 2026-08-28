@@ -77,6 +77,75 @@ cargo build --lib --features fluvio     # proves the real fluvio 0.50 API compil
 cargo clippy --all-targets --features fluvio -- -D warnings
 ```
 
+## OpenTelemetry OTLP export
+
+`src/observability.rs` (repo `tasks.md` PRO-H9, landed 2026-08-28) is a
+close port of person-service's `src/observability.rs` — itself a port of
+link-graph-service's, the family's first working exporter. Person, not
+link-graph-service, was the copy source here because person had already
+solved the two adaptations this crate's shape needs (below); porting
+person's already-adapted file was less work and less risk than
+re-deriving the same two fixes independently. This module **replaces**
+the earlier `src/observability/` stub outright (a JSON `tracing`
+subscriber with the OTLP exporter commented out behind
+`// TODO: Initialize OTLP exporter`, never wired into `App`'s `Hooks`
+impl at all, plus a `custom_metrics::WorkerMetrics::new` that `todo!()`d)
+rather than filling the stub in place. `App::init_logger` installs it
+(loco's own `EnvFilter` + formatted layer, plus the `tracing-opentelemetry`
+bridge over an OTLP/gRPC exporter); `App::on_shutdown` flushes it. Export
+is **on by default** — set `OTLP_ENDPOINT=""` to disable it — at
+`OTLP_ENDPOINT` (default `http://localhost:4317`) with `service.name`
+from `OTLP_SERVICE_NAME` (default `worker-service`); both variables are
+**deliberately unprefixed**, matching link-graph-service, person-service,
+and `agents/share/rust-tracing-opentelemetry-stack.md`'s config table,
+not the per-service `WORKER_*` convention `WORKER_REQUIRE_AUTH` and its
+siblings use. This crate already carried a `Config.observability`
+substructure reading the same three variable names into
+`WORKER_*`-adjacent config — that struct predates this module, was never
+consulted by the (dead) exporter it was added for, and stays that way:
+the two are independent readers of the same three variables, not a
+layering (see `src/config/mod.rs`'s `ObservabilityConfig` doc comment).
+
+**Where this crate's shape forced real adaptation** — both exactly as
+person-service anticipated, confirmed rather than assumed:
+
+- **Two router-construction surfaces.** This crate carries the
+  loco-native one (`api::rest::workers_routes()`, mounted via
+  `App::routes`/`App::after_routes`) and a standalone hand-rolled one
+  (`api::rest::create_router`, used only by the DB-gated integration
+  tests) — where link-graph-service has exactly one (pure loco). The
+  `observability::trace_mw` tower middleware (per-request span +
+  `http.server.request.duration` histogram + W3C `traceparent` response
+  header) is layered onto **both**, as the outermost layer in each, so
+  tracing behaves identically regardless of which router a caller or
+  test builds — the same precedent `auth::apply_enforcement` already set
+  by being layered on both surfaces. No third surface exists (verified
+  by grepping for `Router::new` and `create_router` rather than assumed).
+- **A renamed `tonic` dev-dependency.** This crate already depends on
+  `tonic = "0.12"` for its own gRPC stub (`src/api/grpc/`), so the
+  in-process OTLP collector tests' `tonic = "0.14"` dev-dependency (used
+  to serve the fake collector) is declared as
+  `otlp-test-tonic = { package = "tonic", version = "0.14" }` — an
+  unrenamed second `tonic` dependency at a different version collides in
+  a test binary's extern prelude (`E0464: multiple candidates for rlib
+  dependency tonic`). The rename also required teaching
+  `src/compliance/soup.rs`'s SOUP-register parser to resolve a
+  `package = "…"` inline-table rename to its target crate name — this
+  crate's parser had the identical gap person-service's did (an earlier,
+  unpatched copy of the same `declared_dependencies` function), fixed the
+  identical way rather than needing a new approach.
+
+`tests/otlp_export.rs` and `tests/otlp_middleware.rs` (ported from
+person-service, with `tests/otlp_collector/` — an in-process OTLP/gRPC
+collector, unchanged from link-graph-service's original) prove real
+export against a real gRPC listener in a normal `cargo test` run: a
+`tracing` span and a metric both reach the collector's decoded protobuf,
+and a served HTTP request returns a `traceparent` whose trace id matches
+the exported span's. None of this needs a database. Landing this raised
+`cargo test --lib` from 302 to 312 (8 new `src/observability.rs` unit
+tests + 2 new `soup.rs` rename-resolution tests), plus 4 new tests across
+the two `tests/otlp_*.rs` binaries.
+
 ## Container image
 
 `Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's

@@ -52,14 +52,31 @@ utoipa-swagger-ui = { version = "9", features = ["axum"] }
 
 # Data Streaming
 
-# OpenTelemetry (Observability)
-opentelemetry = { version = "0.27", features = ["trace", "metrics", "logs"] }
-opentelemetry-otlp = { version = "0.27", features = ["trace", "metrics", "logs"] }
-opentelemetry_sdk = { version = "0.27", features = ["rt-tokio", "trace", "metrics", "logs"] }
-opentelemetry-semantic-conventions = "0.27"
+# OpenTelemetry (Observability) — real OTLP export (PRO-H9), ported from
+# person-service's src/observability.rs (itself ported from
+# link-graph-service, the family's first working exporter). Versions
+# match person's exactly (0.32 / 0.33), not this crate's former 0.27 /
+# 0.28 pins: those were never exercised (the exporter they were added
+# for was commented out), and 0.27's `install_batch(runtime::Tokio)`
+# pipeline API no longer exists upstream.
+#
+# `grpc-tonic` (not the crate's default `http-proto` + blocking reqwest):
+# the shared doc's `OTLP_ENDPOINT` default is `http://localhost:4317`, the
+# gRPC port. `internal-logs` is kept ON so a failing export is visible in
+# the log rather than silently dropped. No `logs` feature — the reference
+# pipeline is traces + metrics only, and nothing here uses OTel logs.
+opentelemetry = { version = "0.32", features = ["trace", "metrics"] }
+opentelemetry_sdk = { version = "0.32", features = ["trace", "metrics"] }
+opentelemetry-otlp = { version = "0.32", default-features = false, features = [
+  "grpc-tonic",
+  "trace",
+  "metrics",
+  "internal-logs",
+] }
+opentelemetry-semantic-conventions = { version = "0.32" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-tracing-opentelemetry = "0.28"
+tracing-opentelemetry = { version = "0.33" }
 
 # Utilities
 uuid = { version = "1.24", features = ["v4", "serde"] }
@@ -150,6 +167,47 @@ tempfile = "3.27"
 ed25519-dalek = { version = "2.2" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
 base64 = { version = "0.22" }
+
+# An in-process OTLP/gRPC collector for `tests/otlp_export.rs` /
+# `tests/otlp_middleware.rs` (PRO-H9, ported from person-service): the
+# generated `TraceServiceServer` / `MetricsServiceServer` plus tonic's
+# server transport, so the export pipeline is proved against a real gRPC
+# listener in a normal `cargo test` run — no external collector, nothing
+# `#[ignore]`d. This `tonic` (0.14, from opentelemetry-otlp's own
+# `grpc-tonic` line) is deliberately a different major version from this
+# crate's main `tonic = "0.12"` (the gRPC stub, `src/api/grpc/`) — Cargo
+# links both without conflict since they are separate crates to the
+# compiler; there is no version to unify.
+opentelemetry-proto = { version = "0.32", default-features = false, features = [
+  "gen-tonic",
+  "trace",
+  "metrics",
+] }
+# Renamed (`package = "tonic"`), not a plain `tonic = "0.14"` dev-dependency:
+# this crate's *main* dependencies already include `tonic = "0.12"` (the
+# gRPC stub, `src/api/grpc/`), and a regular dependency plus a dev-dependency
+# sharing the unrenamed name `tonic` at two different versions makes rustc
+# refuse the test binary with `E0464: multiple candidates for rlib
+# dependency tonic` — both register into the same extern prelude with no
+# way to disambiguate `use tonic::...`. person-service hit the same
+# collision (it also carries a `tonic = "0.12"` gRPC stub) and resolved it
+# the same way; link-graph-service has no gRPC stub of its own, so the
+# collision — and the rename — has no analogue there. The renamed crate is
+# still exactly `tonic` 0.14.6 underneath — the same build
+# `opentelemetry-proto`'s own `tonic` 0.14 dependency resolves to — so
+# `otlp_test_tonic::Response<T>` and the generated
+# `opentelemetry_proto::tonic::...` types are the same types; only the
+# `use` path in the test files changes.
+otlp-test-tonic = { package = "tonic", version = "0.14" }
+tokio-stream = { version = "0.1", features = ["net"] }
+# The mounted-middleware test (`tests/otlp_middleware.rs`) makes a real
+# HTTP request against a served router; this crate has no other direct
+# `reqwest` dependency (only a transitive one via
+# `authentication-verifier`'s `fetch` feature).
+reqwest = { version = "0.12", default-features = false, features = [
+  "rustls-tls",
+  "json",
+] }
 
 # Benchmarking
 criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
