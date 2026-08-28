@@ -32,6 +32,8 @@ fn paths() -> Value {
     merge_object(&mut paths, compliance_paths());
     merge_object(&mut paths, tba_recording_paths());
     merge_object(&mut paths, tba_analysis_paths());
+    merge_object(&mut paths, instance_paths());
+    merge_object(&mut paths, insight_paths());
     paths
 }
 
@@ -302,10 +304,6 @@ fn instance_pid_param() -> Value {
 
 /// The time-based-analysis **recording** paths
 /// (`spec/time-based-analysis.md` §10.1).
-///
-/// The sibling instance and insight endpoints are **not** documented
-/// here yet (a pre-existing gap noted in that spec's §17). Closing it
-/// means documenting those too, not undocumenting this.
 fn tba_recording_paths() -> Value {
     let instance_pid = instance_pid_param();
     json!({
@@ -443,6 +441,289 @@ fn tba_analysis_paths() -> Value {
     })
 }
 
+/// The **operational instance layer** — a patient enrolled on a
+/// pathway template, its status/urgency lifecycle, care team, step
+/// completion, outcomes, and the derived caseload/overdue/cohort views
+/// (`src/controllers/instances.rs`). Was the pre-existing `OpenAPI` gap
+/// (`spec/time-based-analysis.md` §17); closed by documenting these
+/// alongside the TBA surface rather than by undocumenting that one.
+/// Split across three functions purely to stay under the crate's
+/// `too_many_lines` lint; together they are one logical path set.
+fn instance_paths() -> Value {
+    let mut paths = instance_pathway_paths();
+    merge_object(&mut paths, instance_action_paths());
+    merge_object(&mut paths, instance_record_and_view_paths());
+    paths
+}
+
+/// The pathway-scoped instance paths: enrolment, the chronic cohort, and
+/// outcome analytics.
+fn instance_pathway_paths() -> Value {
+    json!({
+        "/api/care-pathways/{pathway}/instances": {
+            "parameters": [{ "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "post": {
+                "tags": ["instances"],
+                "summary": "Enrol a subject on a pathway template",
+                "description": "Copies the template's declared steps into the new instance's checklist and starts its time-based-analysis clock. subject_ref must be a person:<uuid> URN.",
+                "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                    "type": "object", "required": ["subject_ref"],
+                    "properties": {
+                        "subject_ref": { "type": "string", "description": "person:<uuid> URN" },
+                        "urgency": { "type": "string", "enum": ["routine", "urgent", "emergency"], "default": "routine" },
+                        "next_review_on": { "type": "string", "format": "date", "nullable": true },
+                        "steps": { "type": "array", "items": { "type": "string" }, "description": "Optional initial step labels, in order" }
+                    }
+                } } } },
+                "responses": {
+                    "200": { "description": "The enrolled instance" },
+                    "404": { "description": "Unknown pathway" },
+                    "422": { "description": "subject_ref is not a person:<uuid> URN, or urgency is unknown" }
+                }
+            },
+            "get": {
+                "tags": ["instances"],
+                "summary": "This template's live instances, newest first",
+                "responses": { "200": { "description": "Instances" }, "404": { "description": "Unknown pathway" } }
+            }
+        },
+        "/api/care-pathways/{pathway}/cohort": {
+            "get": {
+                "tags": ["instances"],
+                "summary": "The chronic cohort on one pathway: counts by status/urgency + step completion",
+                "parameters": [{ "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                "responses": { "200": { "description": "Cohort summary" }, "404": { "description": "Unknown pathway" } }
+            }
+        },
+        "/api/care-pathways/{pathway}/outcomes": {
+            "get": {
+                "tags": ["instances"],
+                "summary": "Outcome analytics for the pathway's closed instances",
+                "description": "The recorded-outcome distribution (declared outcomes only; unrecorded counted separately) plus, per recorded measure name, the count and latest-value-per-instance average.",
+                "parameters": [{ "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                "responses": { "200": { "description": "Outcome analytics" }, "404": { "description": "Unknown pathway" } }
+            }
+        }
+    })
+}
+
+/// The `{pid}`-scoped instance-action paths: fetch, the lifecycle move,
+/// review, and urgency.
+fn instance_action_paths() -> Value {
+    let instance_pid = instance_pid_param();
+    json!({
+        "/api/instances/{pid}": {
+            "get": {
+                "tags": ["instances"],
+                "summary": "One instance with its steps, care team, events, and measures",
+                "parameters": [instance_pid.clone()],
+                "responses": { "200": { "description": "Instance detail" }, "404": { "description": "Unknown instance" } }
+            }
+        },
+        "/api/instances/{pid}/status": {
+            "post": {
+                "tags": ["instances"],
+                "summary": "The enrolment lifecycle move (active <-> on_hold -> a terminal status)",
+                "description": "Closing (to completed or discontinued) stamps closed_on, stops the time-based-analysis clock, and accepts an optional declared outcome.",
+                "parameters": [instance_pid.clone()],
+                "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                    "type": "object", "required": ["to"],
+                    "properties": {
+                        "to": { "type": "string", "enum": ["active", "on_hold", "completed", "discontinued"] },
+                        "reason": { "type": "string", "nullable": true },
+                        "outcome": { "type": "string", "nullable": true,
+                            "enum": ["improved", "stable", "deteriorated", "deceased", "transferred", "not_achieved", "other"],
+                            "description": "Only accepted when `to` is a terminal status" }
+                    }
+                } } } },
+                "responses": {
+                    "200": { "description": "Updated instance" },
+                    "404": { "description": "Unknown instance" },
+                    "422": { "description": "Not a permitted transition, unknown outcome, or an outcome on a non-terminal move" }
+                }
+            }
+        },
+        "/api/instances/{pid}/review": {
+            "post": {
+                "tags": ["instances"],
+                "summary": "Record a review and reschedule the next one (the chronic-management cadence)",
+                "parameters": [instance_pid.clone()],
+                "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                    "type": "object", "required": ["next_review_on"],
+                    "properties": {
+                        "next_review_on": { "type": "string", "format": "date" },
+                        "note": { "type": "string", "nullable": true }
+                    }
+                } } } },
+                "responses": {
+                    "200": { "description": "Updated instance" },
+                    "404": { "description": "Unknown instance" },
+                    "422": { "description": "A closed instance is not reviewed" }
+                }
+            }
+        },
+        "/api/instances/{pid}/urgency": {
+            "post": {
+                "tags": ["instances"],
+                "summary": "Change urgency; records an escalation/de_escalation event by direction",
+                "parameters": [instance_pid.clone()],
+                "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                    "type": "object", "required": ["to"],
+                    "properties": {
+                        "to": { "type": "string", "enum": ["routine", "urgent", "emergency"] },
+                        "note": { "type": "string", "nullable": true }
+                    }
+                } } } },
+                "responses": { "200": { "description": "Updated instance" }, "404": { "description": "Unknown instance" }, "422": { "description": "Unknown urgency level" } }
+            }
+        }
+    })
+}
+
+/// The `{pid}`-scoped instance record paths (team, events, measures,
+/// step completion) plus the derived, unparameterised views (caseload,
+/// overdue reviews, care-team load).
+fn instance_record_and_view_paths() -> Value {
+    let instance_pid = instance_pid_param();
+    json!({
+        "/api/instances/{pid}/team": {
+            "post": {
+                "tags": ["instances"],
+                "summary": "Add a care-team member",
+                "parameters": [instance_pid.clone()],
+                "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                    "type": "object", "required": ["member_ref", "role"],
+                    "properties": {
+                        "member_ref": { "type": "string", "description": "worker: / person: / organization: URN" },
+                        "role": { "type": "string", "enum": ["lead_clinician", "gp", "specialist", "nurse", "mental_health", "coordinator", "other"] }
+                    }
+                } } } },
+                "responses": {
+                    "200": { "description": "The added team-member row" },
+                    "404": { "description": "Unknown instance" },
+                    "422": { "description": "Invalid member_ref/role, or that (member, role) pair already holds the team" }
+                }
+            }
+        },
+        "/api/instances/{pid}/events": {
+            "post": {
+                "tags": ["instances"],
+                "summary": "Record a free event (note, referral, ...); reviews and escalations have their own endpoints",
+                "parameters": [instance_pid.clone()],
+                "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                    "type": "object", "required": ["kind"],
+                    "properties": {
+                        "kind": { "type": "string", "enum": ["note", "review", "escalation", "de_escalation", "referral"] },
+                        "note": { "type": "string", "nullable": true }
+                    }
+                } } } },
+                "responses": { "200": { "description": "The recorded event" }, "404": { "description": "Unknown instance" }, "422": { "description": "Unknown event kind" } }
+            }
+        },
+        "/api/instances/{pid}/measures": {
+            "post": {
+                "tags": ["instances"],
+                "summary": "Record a clinical / PROM measure",
+                "parameters": [instance_pid.clone()],
+                "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                    "type": "object", "required": ["name"],
+                    "properties": {
+                        "name": { "type": "string" },
+                        "value_numeric": { "type": "number", "nullable": true },
+                        "value_text": { "type": "string", "nullable": true },
+                        "unit": { "type": "string", "nullable": true },
+                        "recorded_on": { "type": "string", "format": "date", "nullable": true, "description": "Defaults to today" }
+                    }
+                } } } },
+                "responses": {
+                    "200": { "description": "The recorded measure" },
+                    "404": { "description": "Unknown instance" },
+                    "422": { "description": "Blank name, or neither value_numeric nor value_text given" }
+                }
+            }
+        },
+        "/api/instances/{pid}/steps/{step}/complete": {
+            "post": {
+                "tags": ["instances"],
+                "summary": "Mark a checklist step done (stamps done_on; idempotent)",
+                "parameters": [
+                    instance_pid.clone(),
+                    { "name": "step", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+                ],
+                "responses": { "200": { "description": "The step" }, "404": { "description": "Unknown instance or step" } }
+            }
+        },
+        "/api/instances/caseload": {
+            "get": {
+                "tags": ["instances"],
+                "summary": "Open instances (active + on_hold) by care setting and urgency",
+                "responses": { "200": { "description": "Caseload summary" } }
+            }
+        },
+        "/api/instances/overdue-reviews": {
+            "get": {
+                "tags": ["instances"],
+                "summary": "Open instances whose next_review_on has passed (or is unset) — the chronic review register",
+                "responses": { "200": { "description": "Overdue reviews, most overdue first" } }
+            }
+        },
+        "/api/instances/care-team-load": {
+            "get": {
+                "tags": ["instances"],
+                "summary": "Open-instance count per care-team member, with their roles",
+                "responses": { "200": { "description": "Per-member load" } }
+            }
+        },
+    })
+}
+
+/// The registry-insight lenses (`src/controllers/insights.rs`): derived,
+/// read-only facets over the stored `CarePathway` templates. No
+/// migration, no matcher change — facets come from existing DTO fields
+/// plus disclosed keyword conventions (`specialty:<x>`,
+/// `jurisdiction:<x>`).
+fn insight_paths() -> Value {
+    json!({
+        "/api/care-pathways/insights/directory": {
+            "get": {
+                "tags": ["insights"],
+                "summary": "Pathways faceted by care setting, each with specialty:<x> facet counts",
+                "responses": { "200": { "description": "Directory" } }
+            }
+        },
+        "/api/care-pathways/insights/coverage": {
+            "get": {
+                "tags": ["insights"],
+                "summary": "Per condition code, which settings have a pathway; disclosed gap findings",
+                "description": "Names conditions with no primary-care pathway and no emergency pathway.",
+                "responses": { "200": { "description": "Coverage" } }
+            }
+        },
+        "/api/care-pathways/insights/variants": {
+            "get": {
+                "tags": ["insights"],
+                "summary": "Conditions offered by 2+ providers, with the jurisdiction:<x> facet",
+                "description": "A comparison directory. Never a matching signal.",
+                "responses": { "200": { "description": "Variants" } }
+            }
+        },
+        "/api/care-pathways/insights/providers": {
+            "get": {
+                "tags": ["insights"],
+                "summary": "Pathways per issuing provider, counted by setting",
+                "responses": { "200": { "description": "Providers" } }
+            }
+        },
+        "/api/care-pathways/insights/languages": {
+            "get": {
+                "tags": ["insights"],
+                "summary": "Pathways per BCP-47 language, plus the single-language-condition equity lens",
+                "responses": { "200": { "description": "Languages" } }
+            }
+        },
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -521,6 +802,47 @@ mod tests {
         assert!(segment["properties"]["category"]["enum"].is_array());
         assert!(segment["properties"]["waste"]["enum"].is_array());
         assert!(segment["properties"]["stage"]["enum"].is_array());
+    }
+
+    /// The instance layer and the registry-insight lenses were a
+    /// pre-existing, spec-acknowledged `OpenAPI` gap
+    /// (`spec/time-based-analysis.md` §17) — the TBA surface was
+    /// documented and these were not. This pins that they now are.
+    #[test]
+    fn spec_documents_the_instance_and_insight_surface() {
+        let s = spec();
+        let paths = &s["paths"];
+        for path in [
+            "/api/care-pathways/{pathway}/instances",
+            "/api/care-pathways/{pathway}/cohort",
+            "/api/care-pathways/{pathway}/outcomes",
+            "/api/instances/{pid}",
+            "/api/instances/{pid}/status",
+            "/api/instances/{pid}/review",
+            "/api/instances/{pid}/urgency",
+            "/api/instances/{pid}/team",
+            "/api/instances/{pid}/events",
+            "/api/instances/{pid}/measures",
+            "/api/instances/{pid}/steps/{step}/complete",
+            "/api/instances/caseload",
+            "/api/instances/overdue-reviews",
+            "/api/instances/care-team-load",
+            "/api/care-pathways/insights/directory",
+            "/api/care-pathways/insights/coverage",
+            "/api/care-pathways/insights/variants",
+            "/api/care-pathways/insights/providers",
+            "/api/care-pathways/insights/languages",
+        ] {
+            assert!(paths[path].is_object(), "{path} is undocumented");
+        }
+        assert!(paths["/api/care-pathways/{pathway}/instances"]["post"].is_object());
+        assert!(paths["/api/care-pathways/{pathway}/instances"]["get"].is_object());
+        // The enrolment payload's URN convention and closed vocabularies
+        // are where a client actually learns the wire contract.
+        let enroll = &paths["/api/care-pathways/{pathway}/instances"]["post"]["requestBody"]["content"]
+            ["application/json"]["schema"];
+        assert_eq!(enroll["properties"]["subject_ref"]["type"], "string");
+        assert!(enroll["properties"]["urgency"]["enum"].is_array());
     }
 
     #[test]
