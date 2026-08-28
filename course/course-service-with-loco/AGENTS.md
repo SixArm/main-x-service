@@ -60,10 +60,10 @@ Shared reference docs live at the project root under
 `Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's
 production image. **Build context must be the repository root**, not
 this directory — this crate's sibling path dependencies
-(`integrity-mac`, `authentication-verifier`; its matcher,
-`course-matcher`, is a crates.io registry dependency, not a path
-dependency, despite an earlier version of this Dockerfile assuming
-otherwise) live outside `course/course-service-with-loco/`:
+(`integrity-mac`, `authentication-verifier`, and — as of
+`course-matcher` 0.7.0 / PRO-H7 — its matcher `course-matcher` itself,
+previously a crates.io-only registry dependency with no sibling COPY)
+live outside `course/course-service-with-loco/`:
 
 ```sh
 podman build -f course/course-service-with-loco/Dockerfile \

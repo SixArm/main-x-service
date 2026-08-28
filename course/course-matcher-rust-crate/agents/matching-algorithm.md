@@ -29,8 +29,12 @@ deterministic — `CS101` exists at many universities.
 | Educational level | 0.10 | Exact enum match = 1.0. One step apart on the same ladder (skill / school / degree) = 0.5. Else 0.0. |
 | Keywords | 0.10 | Jaccard on `normalize::fold_set(keywords)`. Skipped if both sides empty. |
 | Teaches | 0.15 | Jaccard on `normalize::fold_set(teaches)`. Skipped if both sides empty. |
+| Relationships | 0.05 | Typed-set Jaccard over `(relation, course_id)` pairs — `\|A ∩ B\| / \|A ∪ B\|` — see §5.1 / T-11. `None` when either side's `relationships` list is empty. Supporting signal, never resolved against a registry. |
+| Tags | 0.05 | Set Jaccard on `normalize::fold_set(tags)` — `\|A ∩ B\| / \|A ∪ B\|` — see §5.2 / §13a / T-12. `None` when either side has no usable tags (before or after folding), unlike keywords/teaches (`Some(0.0)` when only one side is empty). Supporting signal. |
 
-Weights sum to 1.0.
+The first six weights (Name … Teaches) sum to 1.0; Relationships and
+Tags are an additional low-weight supporting-signal cluster,
+deliberately excluded from that partition of unity (§7).
 
 ### Renormalisation
 
@@ -66,6 +70,8 @@ Input: Course A, Course B, MatchConfig
   ├─ educational_level_score (Some when both sides set)
   ├─ keywords_score          (Some when at least one side has keywords)
   ├─ teaches_score           (Some when at least one side has teaches)
+  ├─ relationships_score     (Some when both sides have relationships)
+  ├─ tags_score              (Some when both sides have usable tags)
   │
   ├─ Renormalised weighted average over Some components
   └─ MatchResult { score, is_match, confidence, breakdown }

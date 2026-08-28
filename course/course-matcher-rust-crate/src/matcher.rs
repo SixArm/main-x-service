@@ -12,10 +12,12 @@
 //! The full per-component formula lives in
 //! `agents/matching-algorithm.md`.
 
+use std::collections::HashSet;
+
 use strsim::jaro_winkler;
 
 use crate::config::MatchConfig;
-use crate::course::{Course, CourseIdentifier, EducationalLevel};
+use crate::course::{Course, CourseIdentifier, EducationalLevel, RelationKind, RelationshipRef};
 use crate::normalize;
 use crate::phonetic;
 use crate::scoring::{Confidence, MatchBreakdown, MatchResult, weighted_average};
@@ -99,6 +101,8 @@ impl MatchingEngine {
         let educational_level_score = educational_level_score(a, b);
         let keywords_score = set_jaccard(&a.keywords, &b.keywords);
         let teaches_score = set_jaccard(&a.teaches, &b.teaches);
+        let relationships_score = relationships_score(&a.relationships, &b.relationships);
+        let tags_score = tags_score(&a.tags, &b.tags);
 
         let score = weighted_average(&[
             (name_score, self.config.name_weight),
@@ -110,6 +114,8 @@ impl MatchingEngine {
             ),
             (keywords_score, self.config.keywords_weight),
             (teaches_score, self.config.teaches_weight),
+            (relationships_score, self.config.relationships_weight),
+            (tags_score, self.config.tags_weight),
         ]);
 
         let is_match = score >= self.config.threshold;
@@ -124,6 +130,8 @@ impl MatchingEngine {
                 educational_level_score,
                 keywords_score,
                 teaches_score,
+                relationships_score,
+                tags_score,
                 deterministic_match: false,
             },
         }
@@ -458,6 +466,68 @@ fn set_jaccard(a: &[String], b: &[String]) -> Option<f64> {
     }
 }
 
+/// Score a pair of relationship-reference lists for the probabilistic
+/// breakdown: typed-set **Jaccard** over `(relation, course_id)` pairs
+/// — `|A ∩ B| / |A ∪ B|` — so a `SimilarTo` reference only agrees with
+/// a `SimilarTo` reference to the **same** course id. Returns `None` if
+/// either side has no relationships recorded at all (the field is
+/// irrelevant for this pair, not evidence of non-match). See spec
+/// §5.1 / §23 T-11.
+fn relationships_score(a: &[RelationshipRef], b: &[RelationshipRef]) -> Option<f64> {
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    let set_a: HashSet<(RelationKind, &str)> = a
+        .iter()
+        .map(|r| (r.relation, r.course_id.as_str()))
+        .collect();
+    let set_b: HashSet<(RelationKind, &str)> = b
+        .iter()
+        .map(|r| (r.relation, r.course_id.as_str()))
+        .collect();
+    Some(jaccard(&set_a, &set_b))
+}
+
+/// Score a pair of tag lists for the probabilistic breakdown: plain
+/// set **Jaccard** over the case-insensitively normalised tag sets —
+/// `|A ∩ B| / |A ∪ B|` — computed identically to how `keywords` /
+/// `teaches` are folded (via [`normalize::fold_set`]). Unlike
+/// [`set_jaccard`] (used for `keywords` / `teaches`, where exactly one
+/// side present scores `Some(0.0)`), this returns `None` whenever
+/// either side has no usable tags at all — before *or* after folding
+/// — mirroring the sibling matcher crates (`worker-matcher`,
+/// `person-matcher`, `event-matcher`): a tag list is a **supporting**
+/// signal that simply doesn't participate when one side never recorded
+/// any tags, rather than counting as negative evidence. See spec §5.2
+/// / §13a / §23 T-12.
+fn tags_score(a: &[String], b: &[String]) -> Option<f64> {
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    let set_a: HashSet<String> = normalize::fold_set(a).into_iter().collect();
+    let set_b: HashSet<String> = normalize::fold_set(b).into_iter().collect();
+    if set_a.is_empty() || set_b.is_empty() {
+        // Every entry folded away to blank (e.g. whitespace-only tags).
+        return None;
+    }
+    Some(jaccard(&set_a, &set_b))
+}
+
+/// Jaccard index `|A ∩ B| / |A ∪ B|` over two hash sets. Returns `0.0`
+/// on an empty union rather than dividing by zero, though
+/// [`relationships_score`] / [`tags_score`] are the only callers and
+/// both already guard against an empty union before calling in.
+fn jaccard<T: Eq + std::hash::Hash>(a: &HashSet<T>, b: &HashSet<T>) -> f64 {
+    let intersection = a.intersection(b).count();
+    let union = a.union(b).count();
+    if union == 0 {
+        return 0.0;
+    }
+    let inter_f64 = f64::from(u32::try_from(intersection).unwrap_or(u32::MAX));
+    let union_f64 = f64::from(u32::try_from(union).unwrap_or(u32::MAX));
+    inter_f64 / union_f64
+}
+
 // Anonymous (`as _`) import of `CourseIdentifier`: it keeps the type
 // in scope for trait/path resolution without binding a usable name,
 // so it cannot collide with anything. `#[allow(unused_imports)]`
@@ -473,6 +543,7 @@ use CourseIdentifier as _;
 mod tests {
     use super::*;
     use crate::course::IdentifierScheme;
+    use crate::{RelationKind, RelationshipRef};
 
     /// Test helper: build a `CourseIdentifier` from a scheme + value.
     fn ident(scheme: IdentifierScheme, value: &str) -> crate::CourseIdentifier {
@@ -968,6 +1039,119 @@ mod tests {
         let a = vec![" Alpha ".to_string(), "BETA".to_string()];
         let b = vec!["alpha".to_string(), "beta".to_string()];
         assert_eq!(set_jaccard(&a, &b), Some(1.0));
+    }
+
+    // ─── relationships & tags (T-11 / T-12) ──────────────────────
+
+    #[test]
+    fn relationships_score_identical_sets_scores_one() {
+        let a = vec![RelationshipRef::new(RelationKind::SimilarTo, "c1").unwrap()];
+        let b = a.clone();
+        assert_eq!(relationships_score(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn relationships_score_disjoint_sets_scores_zero() {
+        let a = vec![RelationshipRef::new(RelationKind::SimilarTo, "c1").unwrap()];
+        let b = vec![RelationshipRef::new(RelationKind::HigherLevelThan, "c1").unwrap()];
+        // Same course id, different relation kind: not the same pair.
+        assert_eq!(relationships_score(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn relationships_score_partial_overlap_scores_jaccard_ratio() {
+        let a = vec![
+            RelationshipRef::new(RelationKind::SimilarTo, "c1").unwrap(),
+            RelationshipRef::new(RelationKind::HigherLevelThan, "c2").unwrap(),
+        ];
+        let b = vec![
+            RelationshipRef::new(RelationKind::SimilarTo, "c1").unwrap(),
+            RelationshipRef::new(RelationKind::HigherLevelThan, "c3").unwrap(),
+        ];
+        // intersection = {(SimilarTo, c1)} = 1; union = 3.
+        let score = relationships_score(&a, &b).unwrap();
+        assert!((score - 1.0 / 3.0).abs() < 1e-9, "got {score}");
+    }
+
+    #[test]
+    fn relationships_score_empty_either_side_is_none() {
+        let empty: Vec<RelationshipRef> = vec![];
+        let some = vec![RelationshipRef::new(RelationKind::SimilarTo, "c1").unwrap()];
+        assert_eq!(relationships_score(&empty, &some), None);
+        assert_eq!(relationships_score(&some, &empty), None);
+        assert_eq!(relationships_score(&empty, &empty), None);
+    }
+
+    #[test]
+    fn tags_score_case_insensitive_identical_scores_one() {
+        let a = vec!["Online".to_string(), "SelfPaced".to_string()];
+        let b = vec!["online".to_string(), "selfpaced".to_string()];
+        assert_eq!(tags_score(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn tags_score_disjoint_sets_scores_zero() {
+        let a = vec!["online".to_string()];
+        let b = vec!["in-person".to_string()];
+        assert_eq!(tags_score(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn tags_score_partial_overlap_scores_jaccard_ratio() {
+        let a = vec!["online".to_string(), "self-paced".to_string()];
+        let b = vec!["Online".to_string(), "cohort".to_string()];
+        // intersection = {"online"} = 1; union = {"online", "self-paced", "cohort"} = 3.
+        let score = tags_score(&a, &b).unwrap();
+        assert!((score - 1.0 / 3.0).abs() < 1e-9, "got {score}");
+    }
+
+    #[test]
+    fn tags_score_empty_either_side_is_none() {
+        let empty: Vec<String> = vec![];
+        let some = vec!["online".to_string()];
+        assert_eq!(tags_score(&empty, &some), None);
+        assert_eq!(tags_score(&some, &empty), None);
+        assert_eq!(tags_score(&empty, &empty), None);
+    }
+
+    #[test]
+    fn tags_score_all_blank_entries_is_none() {
+        // Non-empty Vec, but every entry folds to blank — still "no
+        // usable tags", not a spurious 0.0.
+        let a = vec!["   ".to_string()];
+        let b = vec!["online".to_string()];
+        assert_eq!(tags_score(&a, &b), None);
+    }
+
+    #[test]
+    fn relationships_and_tags_absent_do_not_enter_the_weighted_average() {
+        // Renormalisation sanity check: with neither field populated on
+        // either side, `relationships_score`/`tags_score` are `None`
+        // and neither weight enters the denominator — an exact name +
+        // provider match still scores a clean 1.0, not diluted by two
+        // "missing" components treated as zero.
+        let engine = MatchingEngine::default_config();
+        let mut a = Course::new("Quantum Mechanics");
+        a.provider_id = Some("prov-9".into());
+        let mut b = a.clone();
+        b.provider_id = Some("prov-9".into());
+        let r = engine.match_courses(&a, &b);
+        assert_eq!(r.breakdown.relationships_score, None);
+        assert_eq!(r.breakdown.tags_score, None);
+        assert!(r.score >= 0.99, "expected ~1.0, got {}", r.score);
+    }
+
+    #[test]
+    fn relationships_and_tags_populated_are_wired_into_the_breakdown_and_score() {
+        let engine = MatchingEngine::default_config();
+        let mut a = Course::new("Quantum Mechanics");
+        a.relationships = vec![RelationshipRef::new(RelationKind::SimilarTo, "c1").unwrap()];
+        a.tags = vec!["online".into()];
+        let b = a.clone();
+        let r = engine.match_courses(&a, &b);
+        assert_eq!(r.breakdown.relationships_score, Some(1.0));
+        assert_eq!(r.breakdown.tags_score, Some(1.0));
+        assert!(r.score >= 0.99, "expected ~1.0, got {}", r.score);
     }
 
     // ─── Name scoring ────────────────────────────────────────────

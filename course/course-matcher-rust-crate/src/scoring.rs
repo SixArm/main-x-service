@@ -87,6 +87,18 @@ pub struct MatchBreakdown {
     pub keywords_score: Option<f64>,
     /// Teaches / competencies (Jaccard) similarity.
     pub teaches_score: Option<f64>,
+    /// Relationship-set similarity: typed-set Jaccard over `(relation,
+    /// course_id)` pairs, `|A ∩ B| / |A ∪ B|`. `None` when either side
+    /// has no relationships recorded. See [`crate::RelationshipRef`];
+    /// spec §5.1 / §23 T-11.
+    #[serde(default)]
+    pub relationships_score: Option<f64>,
+    /// Tag-set similarity: plain set Jaccard over the case-
+    /// insensitively normalised tag sets, `|A ∩ B| / |A ∪ B|`. `None`
+    /// when either side has no tags recorded. Spec §5.2 / §13a /
+    /// §23 T-12.
+    #[serde(default)]
+    pub tags_score: Option<f64>,
     /// True when the deterministic short-circuit fired.
     pub deterministic_match: bool,
 }

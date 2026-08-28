@@ -50,6 +50,7 @@ pub mod scoring;
 pub use config::MatchConfig;
 pub use course::{
     Course, CourseIdentifier, EducationalLevel, IdentifierScheme, LearningResourceType,
+    RelationKind, RelationshipRef,
 };
 pub use error::{Error, Result};
 pub use matcher::MatchingEngine;

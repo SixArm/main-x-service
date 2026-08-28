@@ -9,7 +9,59 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-28
 
+### Added — relationships and tags as weighted matcher components (T-11 / T-12)
+
+- **`RelationshipRef` / `RelationKind` (T-11).** New public types
+  `RelationKind` (`SimilarTo`, `HigherLevelThan`, `LowerLevelThan` —
+  `SimilarTo` symmetric, the other two inverses, extensible) and
+  `RelationshipRef { relation: RelationKind, course_id: String }`,
+  re-exported from the crate root. `RelationshipRef::new` trims
+  `course_id` and rejects an empty result. `Course` gains
+  `relationships: Vec<RelationshipRef>` (default empty,
+  `#[serde(default)]`). Scored as typed-set Jaccard over `(relation,
+  course_id)` pairs (`|A ∩ B| / |A ∪ B|`) into the new
+  `MatchBreakdown::relationships_score`, `None` when either side's list
+  is empty. New `MatchConfig::relationships_weight` (default `0.05`)
+  joins the supporting-signal cluster in the weighted-average
+  renormalisation.
+- **`tags` (T-12).** `Course` gains `tags: Vec<String>` (default
+  empty, `#[serde(default)]`). Tags are stored verbatim and compared
+  case-insensitively at scoring time via `normalize::fold_set` — the
+  same folding `keywords`/`teaches` use — as set Jaccard (`|A ∩ B| /
+  |A ∪ B|`) into the new `MatchBreakdown::tags_score`. Unlike
+  `keywords`/`teaches` (`Some(0.0)` when only one side is populated),
+  `tags_score` returns `None` whenever either side has no *usable*
+  tags — empty `Vec`, or every entry folds away to blank — mirroring
+  the sibling matcher crates (`worker-matcher`/`person-matcher`/
+  `event-matcher`) rather than the keywords/teaches convention. New
+  `MatchConfig::tags_weight` (default `0.05`) joins the supporting-
+  signal cluster alongside `relationships_weight`. Completes the spec
+  addition recorded further down this file under "Tags match
+  component (spec)".
+- Both fields are purely additive and **not** identifying on their own
+  and **not** consulted by the deterministic short-circuit
+  (`deterministic_match`). Neither field participates in the weighted
+  average unless populated on *both* sides, so existing callers that
+  never set `relationships`/`tags` see byte-identical scores before and
+  after this release — the two new default weights simply never enter
+  the denominator for them.
+- `relationships_weight`/`tags_weight` are deliberately **excluded**
+  from `MatchConfig::weight_total()` (test-only) and from the "six
+  identifying weights sum to 1.00" invariant (§7) — they sit in a
+  separate low-weight supporting-signal cluster.
+- `agents/matching-algorithm.md`'s probabilistic-components table and
+  algorithm trace gain Relationships / Tags rows. `spec/05-algorithm-
+  overview.md` §5.1/§5.2, `spec/06-domain-model.md` §6/§6.1/§6.2,
+  `spec/07-configuration.md`, and `spec/13a-tags.md` move from
+  "planned, not yet implemented" to current behaviour; `spec/23-
+  tasks.md` T-11/T-12 marked done.
+- Minor version bump (pre-1.0): per the family's release convention
+  (see `worker-matcher` 0.7.0), a default-weight addition that changes
+  computed behaviour once the new fields are populated — plus two new
+  public types and two new public struct fields — is a minor bump, not
+  a patch.
 
 ### Added — Criterion benchmarks
 

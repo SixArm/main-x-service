@@ -47,6 +47,26 @@ pub struct Course {
     /// schema.org/inLanguage — BCP-47 codes.
     #[serde(default)]
     pub in_language: Vec<String>,
+    /// Typed references to other courses (by opaque id) in the
+    /// consuming registry — e.g. "this course is similar to course
+    /// X". A **supporting** signal only: never identifying on its
+    /// own, and the matcher never resolves the reference (it has no
+    /// registry) — it only compares the two courses' relationship
+    /// **sets** via typed-set Jaccard. Default empty. See
+    /// [`RelationshipRef`] / [`RelationKind`]; spec §5.1 / §6.1 /
+    /// §23 T-11.
+    #[serde(default)]
+    pub relationships: Vec<RelationshipRef>,
+    /// Operator-applied free-text labels (e.g. `"online"`,
+    /// `"self-paced"`). Stored verbatim; compared case-insensitively
+    /// at match time, consistent with the crate's normalise-at-
+    /// match-time convention for names / keywords. A **supporting**
+    /// signal only: never identifying on its own. Distinct from
+    /// [`Course::keywords`] (descriptive subject terms) but scored
+    /// the same way. Default empty. See spec §5.2 / §6 / §13a /
+    /// §23 T-12.
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 impl Course {
@@ -68,6 +88,95 @@ impl Course {
             name: name.into(),
             ..Default::default()
         }
+    }
+}
+
+/// The kind of typed relationship one [`Course`] asserts toward
+/// another, carried on a [`RelationshipRef`].
+///
+/// Mirrors the consuming service's own `Course` relationship
+/// vocabulary. `SimilarTo` is symmetric; `HigherLevelThan` /
+/// `LowerLevelThan` are inverses of each other — but the matcher does
+/// **not** resolve or cross-check that inverse relationship; it only
+/// compares the raw `(relation, course_id)` pairs each side asserts
+/// (spec §5.1 / §6.1). The enum is expected to grow as consuming
+/// services add relationship kinds; a new variant is purely additive.
+///
+/// # Examples
+///
+/// ```
+/// use course_matcher::RelationKind;
+///
+/// let k = RelationKind::SimilarTo;
+/// assert_eq!(k, RelationKind::SimilarTo);
+/// assert_ne!(k, RelationKind::HigherLevelThan);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum RelationKind {
+    /// This course is similar to the referenced course (symmetric).
+    SimilarTo,
+    /// This course is at a higher educational level than the referenced course.
+    HigherLevelThan,
+    /// This course is at a lower educational level than the referenced course.
+    LowerLevelThan,
+}
+
+/// A typed reference from one [`Course`] to another, by opaque id in
+/// the consuming registry (e.g. "this course is similar to course
+/// `X`").
+///
+/// `RelationshipRef` is a **supporting** matching signal, not an
+/// identifying one: the matcher never resolves `course_id` against a
+/// registry (it has none) — it only compares the two courses'
+/// relationship **sets** via typed-set Jaccard over `(relation,
+/// course_id)` pairs (spec §5.1 / §6.1 / §23 T-11).
+///
+/// Construct via [`RelationshipRef::new`], which trims `course_id` and
+/// rejects an empty result, so two records carrying different
+/// incidental whitespace around the same id compare equal.
+///
+/// # Examples
+///
+/// ```
+/// use course_matcher::{RelationKind, RelationshipRef};
+///
+/// let r = RelationshipRef::new(RelationKind::SimilarTo, " course-42 ").unwrap();
+/// assert_eq!(r.course_id, "course-42");
+/// assert_eq!(r.relation, RelationKind::SimilarTo);
+///
+/// assert!(RelationshipRef::new(RelationKind::HigherLevelThan, "   ").is_none());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RelationshipRef {
+    /// The kind of relationship this side asserts. See [`RelationKind`].
+    pub relation: RelationKind,
+    /// Opaque id of the related course in the consuming registry.
+    /// Whitespace-trimmed and non-empty — see [`RelationshipRef::new`].
+    pub course_id: String,
+}
+
+impl RelationshipRef {
+    /// Construct a relationship reference, trimming `course_id` and
+    /// rejecting an empty result.
+    ///
+    /// Returns `None` when `course_id` is empty after trimming.
+    ///
+    /// ```
+    /// use course_matcher::{RelationKind, RelationshipRef};
+    /// let r = RelationshipRef::new(RelationKind::LowerLevelThan, "course-7").unwrap();
+    /// assert_eq!(r.course_id, "course-7");
+    /// assert!(RelationshipRef::new(RelationKind::LowerLevelThan, "").is_none());
+    /// ```
+    #[must_use]
+    pub fn new(relation: RelationKind, course_id: impl AsRef<str>) -> Option<Self> {
+        let course_id = course_id.as_ref().trim();
+        if course_id.is_empty() {
+            return None;
+        }
+        Some(Self {
+            relation,
+            course_id: course_id.to_string(),
+        })
     }
 }
 
@@ -236,6 +345,8 @@ mod tests {
         assert!(c.identifiers.is_empty());
         assert!(c.same_as.is_empty());
         assert!(c.in_language.is_empty());
+        assert!(c.relationships.is_empty());
+        assert!(c.tags.is_empty());
     }
 
     #[test]
@@ -294,6 +405,8 @@ mod tests {
         }];
         c.same_as = vec!["https://www.wikidata.org/wiki/Q123".into()];
         c.in_language = vec!["en".into()];
+        c.relationships = vec![RelationshipRef::new(RelationKind::SimilarTo, "course-2").unwrap()];
+        c.tags = vec!["online".into()];
 
         let json = serde_json::to_string(&c).expect("serialize");
         let back: Course = serde_json::from_str(&json).expect("deserialize");
@@ -308,9 +421,33 @@ mod tests {
         assert_eq!(back.teaches, c.teaches);
         assert_eq!(back.same_as, c.same_as);
         assert_eq!(back.in_language, c.in_language);
+        assert_eq!(back.relationships, c.relationships);
+        assert_eq!(back.tags, c.tags);
         assert_eq!(back.identifiers.len(), 1);
         assert_eq!(back.identifiers[0].scheme, IdentifierScheme::Doi);
         assert_eq!(back.identifiers[0].value, "10.1234/abc");
+    }
+
+    #[test]
+    fn relationship_ref_new_trims_and_rejects_empty() {
+        let r = RelationshipRef::new(RelationKind::SimilarTo, "  course-42  ").unwrap();
+        assert_eq!(r.course_id, "course-42");
+        assert_eq!(r.relation, RelationKind::SimilarTo);
+        assert!(RelationshipRef::new(RelationKind::HigherLevelThan, "").is_none());
+        assert!(RelationshipRef::new(RelationKind::LowerLevelThan, "   ").is_none());
+    }
+
+    #[test]
+    fn relation_kind_round_trips_through_json() {
+        for k in [
+            RelationKind::SimilarTo,
+            RelationKind::HigherLevelThan,
+            RelationKind::LowerLevelThan,
+        ] {
+            let json = serde_json::to_string(&k).expect("serialize");
+            let back: RelationKind = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(back, k);
+        }
     }
 
     #[test]
@@ -328,5 +465,7 @@ mod tests {
         assert_eq!(c.name, "Lone Course");
         assert!(c.keywords.is_empty());
         assert!(c.identifiers.is_empty());
+        assert!(c.relationships.is_empty());
+        assert!(c.tags.is_empty());
     }
 }
