@@ -3,8 +3,14 @@
 Stack-specific specification for the Svelte edition. The
 **cross-cutting spec at [`../../spec/`](../../spec/index.md) is the
 single source of truth**; this file adds only what is specific to
-this edition, and grows topic files (routes, components, i18n) as
-CMS-T25/T26 land.
+this edition. CMS-T25 and CMS-T26 (see Delivery, below) both landed
+2026-07-31 — the edition's whole scope shipped before this file grew
+past `index.md`, so it stays one file rather than splitting into
+topic files that would each hold a paragraph.
+<!-- PRO-H8, 2026-08-28: this paragraph previously promised to "grow
+topic files … as CMS-T25/T26 land"; spec/tasks.md shows both landed
+2026-07-31 and no topic-file split followed. Corrected during the
+professionalization sweep rather than left as an open promise. -->
 
 ## Stack
 
@@ -15,7 +21,12 @@ BFF proxy + i18n and the PPM front-end's board/grid patterns are
 the closest sources). BFF auth per
 [../../spec/auth.md](../../spec/auth.md).
 
-## Edition-specific decisions (planned)
+## Edition-specific decisions
+
+<!-- PRO-H8, 2026-08-28: heading previously read "(planned)"; every
+bullet below is delivered — see Delivery below (CMS-T25/T26, both
+landed 2026-07-31 per spec/tasks.md). Corrected during the
+professionalization sweep. -->
 
 - **Block editor**, not a rich-text blob: the editor manipulates
   the structured block model directly and posts blocks; no

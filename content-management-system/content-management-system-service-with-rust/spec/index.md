@@ -202,8 +202,12 @@ CMS-T8, preview tokens with CMS-T22, and so on).
   context**, and the response declares `Vary`; a personalized page must
   not share a cache entry with an unpersonalized one.
 - **References expand one hop, as summaries.**
-- **No feed yet** (CMS-R19 lists one alongside the sitemap); the
-  sitemap derivation is what it would reuse.
+- **The Atom feed is built** — `GET /delivery/{site}/{locale}/feed.xml`
+  serves Atom 1.0, reusing the sitemap derivation, `noindex`-excluded,
+  falling back cleanly to an empty feed. CMS-T18's feed residual closed
+  2026-07-31 (CMS-R19; `../../spec/tasks.md` CMS-T18).
+  <!-- PRO-H8, 2026-08-28: this bullet previously read "No feed yet" —
+  stale; the feed landed 2026-07-31 per spec/tasks.md CMS-T18. -->
 
 ### Phase 7 (insights)
 
@@ -233,9 +237,22 @@ CMS-T8, preview tokens with CMS-T22, and so on).
 
 ## Delivery
 
-The queue is [../../spec/tasks.md](../../spec/tasks.md): **CMS-T1–T22
-delivered 2026-07-30** (T18 without a feed); CMS-T23 (webhooks) and
-CMS-T24 (the full seed) remain for this edition. Tests per
-[../../spec/testing.md](../../spec/testing.md) — 215 DB-free unit
-tests, 53 request tests, 1 enforcement binary, all green against
-Postgres 18.
+The queue is [../../spec/tasks.md](../../spec/tasks.md): **CMS-T1–T24,
+this edition's full scope, are all delivered** — T1–T22 landed
+2026-07-30 (T18's feed residual closed 2026-07-31), CMS-T23 (webhooks)
+landed 2026-07-30, and CMS-T24 (the full seed corpus: a synthetic
+site, ~3 content types, ~40 entries per `tasks.md`, realized as 29
+entries / 50 variants / 90 revisions) completed 2026-07-30. Nothing
+remains open for this edition (CMS-T25/T26, Phase 9, are the sibling
+front-end edition's tasks — see
+[../../content-management-system-front-end-with-svelte/spec/index.md](../../content-management-system-front-end-with-svelte/spec/index.md)).
+Tests per [../../spec/testing.md](../../spec/testing.md)
+— 231 DB-free unit tests, 60 request tests, plus 3 webhook-delivery
+integration tests and 1 enforcement binary, all green against
+Postgres 18 (counts verified 2026-08-28 via `cargo test --lib -- --list`
+and `cargo test --test '*' -- --list`).
+<!-- PRO-H8, 2026-08-28: this section previously said CMS-T23/T24
+"remain" and cited stale 215/53 test counts; both tasks were already
+complete per spec/tasks.md (CMS-T23 2026-07-30, CMS-T24 2026-07-30) and
+the current counts are higher. Corrected during the professionalization
+sweep. -->

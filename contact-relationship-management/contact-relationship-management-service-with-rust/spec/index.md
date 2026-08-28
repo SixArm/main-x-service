@@ -63,6 +63,17 @@ OTLP, Podman.
 
 ## Delivery
 
+<!-- PRO-H8, 2026-08-28: was stale at "CRM-T1-T16 delivered 2026-07-18" only.
+     spec/tasks.md shows four further service-side rounds landed since:
+     CRM-T19 (insights) + CRM-T20 (engagement), both 2026-07-20; CRM-T21
+     (subject rights/retention) + CRM-T22 (auth activation surface), both
+     2026-08-28. Verified against tasks.md and `cargo test --lib -- --list`
+     (67 unit tests, matching CRM-T21/T22's stated count). -->
 The queue is [../../spec/tasks.md](../../spec/tasks.md): CRM-T1–T16
-**delivered 2026-07-18**. Tests per
+**delivered 2026-07-18**; CRM-T19 (insight views) and CRM-T20
+(engagement/partnership/confederation) **delivered 2026-07-20**;
+CRM-T21 (subject rights & retention) and CRM-T22 (auth activation
+surface) **delivered 2026-08-28**. Production gates CRM-G1/CRM-G2
+remain partially open — see tasks.md for what each gate's code side
+did and did not land. Tests per
 [../../spec/testing.md](../../spec/testing.md).
