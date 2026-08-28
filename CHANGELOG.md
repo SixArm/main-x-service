@@ -14,6 +14,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `.github/FUNDING.yml`: GitHub Sponsors enabled (`joelparkerhenderson`).
   Open Collective intentionally omitted — no collective exists yet.
   CONTRIBUTING.md and NEWS.md updated to match (`spec/free-open-source-funding`).
+- Documented the Trusted Publishing intent (`spec/trusted-publishing`):
+  a "Publishing" section in README.md and SECURITY.md stating the
+  current manual `cargo publish` reality and the plan to adopt
+  OIDC-based publishing once it's production-ready across every forge
+  and target we use. No publishing behaviour changed.
 - Root special files per `spec/special-files-for-public-repos`:
   LICENSE.md, CITATION.cff, CONTRIBUTING.md, SECURITY.md,
   MAINTAINERS.md, GOVERNANCE.md, CODEOWNERS, AI_STATEMENT.md, NEWS.md,

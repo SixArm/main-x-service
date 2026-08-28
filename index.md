@@ -118,6 +118,21 @@ front-end projects landed. See `overview.md`'s capability matrix for
 what's actually implemented per crate today, and
 [`tasks.md`](tasks.md) for the live work queue.
 
+## Publishing
+
+Published crates (currently `authentication-verifier` and the
+matcher crates — see `AGENTS.md`'s Library/Matcher crate tables for
+which ones) are released to crates.io with `cargo publish`, run
+locally by the maintainer against a stored API token; no publish step
+runs in CI today. We intend to move to **Trusted Publishing** (OIDC,
+no long-lived tokens stored anywhere) once it is production-ready
+across every code forge we use (GitHub.com, Codeberg.org) and every
+target registry (crates.io, npm) — see
+[`spec/trusted-publishing/index.md`](spec/trusted-publishing/index.md).
+
 ## License
 
-Each crate is multi-licensed; see the individual `Cargo.toml` for terms.
+See [`LICENSE.md`](LICENSE.md). Each crate declares its own SPDX
+license expression in its manifest — `LICENSE.md` documents the two
+expressions in use (Rust crates, front-end packages) and how they
+relate.

@@ -34,3 +34,13 @@ enumerated in [tasks.md](tasks.md) Phase 5; all items are closed.
 Supply-chain gating runs in CI (`cargo deny`), every crate root
 declares `#![forbid(unsafe_code)]`, and fuzz targets cover the
 matchers, `entity-ref`, and `integrity-mac`.
+
+## Publishing
+
+Published crates go to crates.io via a maintainer-run `cargo publish`
+against a long-lived personal API token — the exact class of secret
+this policy's "no secret in logs, no usable default outside dev"
+posture (`agents/share/security.md` §5) exists to minimize. We intend
+to adopt **Trusted Publishing** (OIDC-based, no stored token at all)
+once it is production-ready across every forge and target we use; see
+[`spec/trusted-publishing/index.md`](spec/trusted-publishing/index.md).
