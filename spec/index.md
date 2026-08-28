@@ -34,6 +34,7 @@ the family-wide source of truth; the briefer versions under
 | [agents-directory-name-is-lowercase](agents-directory-name-is-lowercase/index.md) | The agent reference directories are named `agents`, lowercase — the rule, why a case-only mismatch hides on macOS, and the CI stage behind it |
 | [rust-msrv-n-minus-3](rust-msrv-n-minus-3/index.md) | Minimum Supported Rust Version — the N-3 policy, how it is declared and verified, and how to bump it |
 | [special-files-for-public-repos](special-files-for-public-repos/index.md) | The special top-level files every public repo carries (LICENSE.md, CITATION.cff, SECURITY.md, AI_STATEMENT.md, …) |
+| [free-open-source-funding](free-open-source-funding/index.md) | Funding channels for a free/open-source repo (GitHub Sponsors, Open Collective, `.github/FUNDING.yml`) |
 
 ### Data & persistence
 
