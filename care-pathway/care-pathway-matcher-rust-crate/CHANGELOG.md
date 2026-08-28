@@ -10,7 +10,64 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — relationships and tags as weighted components (§13.1 / §13.2, §23)
 
+- **`RelationshipRef` / `RelationKind` (§13.1).** New public types
+  `RelationKind` (`#[non_exhaustive]`: `PrecededBy` / `FollowedBy`
+  sequencing inverses, `SimilarTo` symmetric, `Supersedes` /
+  `SupersededBy` versioning inverses, plus `Custom(String)`) and
+  `RelationshipRef { relation: RelationKind, pathway_id: String }`,
+  re-exported from the crate root. `CarePathway` gains `relationships:
+  Vec<RelationshipRef>` (default empty, `#[serde(default)]`). Scored as
+  typed-set Jaccard over `(relation, pathway_id)` pairs
+  (`|A ∩ B| / |A ∪ B|`) into the new
+  `MatchBreakdown::relationships_score` (`#[serde(default)]`), `None`
+  when either side's list is empty. `pathway_id` is folded (trimmed,
+  case-normalised) at scoring time — consistent with the crate's
+  normalise-at-match-time convention — and an entry whose id folds to
+  empty is dropped from the comparison set rather than spuriously
+  matching another blank id (SEC-M2 discipline, same as the R-0/R-1
+  deterministic rules). New `MatchConfig::relationships_weight`
+  (default `0.05`) joins the supporting-signal cluster in the
+  weighted-average renormalisation. `RelationshipRef` deliberately
+  references another pathway **template** (or a template-derived
+  instance a consuming service names by the same id space) — it never
+  carries patient-identifying data.
+- **`tags` (§13.2).** `CarePathway` gains `tags: Vec<String>` (default
+  empty, `#[serde(default)]`). Tags are stored verbatim and compared
+  case-insensitively (folded) at scoring time, distinct from `keywords`
+  (descriptive terms about what the pathway *is*, not operator-applied
+  labels), as set Jaccard (`|A ∩ B| / |A ∪ B|`) into the new
+  `MatchBreakdown::tags_score` (`#[serde(default)]`), `None` when
+  either side's list is empty. New `MatchConfig::tags_weight` (default
+  `0.05`) joins the supporting-signal cluster alongside
+  `relationships_weight`.
+- Both fields are purely additive and **not** identifying on their own
+  and **not** consulted by any deterministic short-circuit (R-0/R-1/R-2).
+  Neither field participates in the weighted average unless populated on
+  *both* sides, so existing callers that never set `relationships`/`tags`
+  see byte-identical scores before and after this change — the two new
+  default weights simply never enter the denominator for them. This
+  differs from the existing `interventions`/`keywords` Jaccard
+  components (`None` only when *both* sides are empty): relationships
+  and tags are sparser, opt-in data, so "no signal on either side" is
+  the "does not participate" case per spec §13.1/§13.2, matching the
+  `worker-matcher` T-33/T-34 precedent.
+- `agents/matching-algorithm.md`'s component table gains Relationships /
+  Tags rows. `spec/index.md` §5 / §6 / §7 / §13.1 / §13.2 / §21 / §23
+  move from "planned, not yet implemented" to current behaviour.
+- No `Cargo.toml` version bump: this crate has carried an accumulating
+  `[Unreleased]` section since `0.1.0` (2026-06-15) rather than cutting a
+  release per change (unlike `worker-matcher`'s per-change minor bumps),
+  so this entry joins that section per the crate's own established
+  precedent; the next release cut will fold it in.
+- New tests: `relationships_score` / `tags_score` unit tests (identical,
+  disjoint, partial-overlap-Jaccard-ratio, empty-either-side, plus a
+  blank-pathway-id SEC-M2 case for relationships), a default-weight pin,
+  and three engine-level tests (absent fields don't enter the weighted
+  average; present + agreeing fields score 1.0; present + disagreeing
+  fields pull the score down but a strong multi-component match still
+  clears the default threshold).
 
 ### Added — Criterion benchmarks
 
@@ -99,7 +156,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   pathway_id)` pairs (§13.1) and weighted `relationships_weight`
   (default `0.05`, §7) as a supporting signal in the renormalised
   weighted average (§17). Re-exports `RelationshipRef` / `RelationKind`
-  (§21). Code implementation is tracked in spec §23.
+  (§21). This was the design-only entry; the code implementation landed
+  later in this same `[Unreleased]` section — see "relationships and
+  tags as weighted components" above.
 - Tests closing documented coverage gaps: phonetic (Soundex) +0.05
   bonus wiring in `name_score` (lift but never reaching the High band);
   `set_jaccard` `Some(0.0)` one-side-populated branch; an

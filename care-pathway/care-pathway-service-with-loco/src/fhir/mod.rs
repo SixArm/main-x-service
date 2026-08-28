@@ -519,6 +519,11 @@ mod tests {
             }],
             same_as: vec!["https://www.nice.org.uk/guidance/ng128".to_string()],
             in_language: vec!["en".to_string()],
+            // `relationships`/`tags` are new supporting-signal matcher
+            // fields (spec §13.1/§13.2) with no FHIR PlanDefinition
+            // mapping yet; default them so this literal survives future
+            // matcher field additions too.
+            ..Default::default()
         };
 
         let fhir = to_fhir_plan_definition(&pathway, "pid-123", true, None);

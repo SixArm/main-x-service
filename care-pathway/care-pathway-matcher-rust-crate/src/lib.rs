@@ -33,7 +33,8 @@
 //! ## Public types
 //!
 //! - [`CarePathway`], [`PathwayIdentifier`], [`IdentifierScheme`],
-//!   [`ConditionCode`], [`CodeSystem`], [`CareSetting`].
+//!   [`ConditionCode`], [`CodeSystem`], [`CareSetting`],
+//!   [`RelationshipRef`], [`RelationKind`].
 //! - [`MatchingEngine`], [`MatchConfig`], [`MatchResult`],
 //!   [`MatchBreakdown`], [`Confidence`].
 //! - [`Error`], [`Result`] — the crate error type and its `Result` alias.
@@ -69,6 +70,7 @@ pub mod scoring; // result shape + renormalised weighted average
 // Domain model — the input records and their value types.
 pub use care_pathway::{
     CarePathway, CareSetting, CodeSystem, ConditionCode, IdentifierScheme, PathwayIdentifier,
+    RelationKind, RelationshipRef,
 };
 // Configuration — weights and probable-match threshold.
 pub use config::MatchConfig;
