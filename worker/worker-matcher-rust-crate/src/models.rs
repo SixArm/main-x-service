@@ -559,6 +559,95 @@ impl PassportBook {
     }
 }
 
+/// The kind of typed relationship one [`Worker`] asserts toward
+/// another, carried on a [`RelationshipRef`].
+///
+/// Mirrors the consuming service's own `Worker` relationship
+/// vocabulary. The two seed variants are inverses of each other — if
+/// worker A holds `LineManagerOf` pointing at worker B, the converse
+/// fact is that B `ReportsTo` A — but the matcher does **not** resolve
+/// or cross-check that inverse relationship; it only compares the raw
+/// `(relation, worker_id)` pairs each side asserts (spec §12.2). The
+/// enum is expected to grow (e.g. `MentorOf`, `ColleagueOf`) as
+/// consuming services add relationship kinds; a new variant is purely
+/// additive.
+///
+/// # Example
+///
+/// ```
+/// use worker_matcher::RelationKind;
+///
+/// let k = RelationKind::LineManagerOf;
+/// assert_eq!(k, RelationKind::LineManagerOf);
+/// assert_ne!(k, RelationKind::ReportsTo);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum RelationKind {
+    /// This worker is the line manager of the referenced worker.
+    LineManagerOf,
+    /// This worker reports to the referenced worker.
+    ReportsTo,
+}
+
+/// A typed reference from one [`Worker`] to another, by opaque id in
+/// the consuming registry (e.g. "this worker's line manager is worker
+/// `X`").
+///
+/// `RelationshipRef` is a **supporting** matching signal, not an
+/// identifying one: the matcher never resolves `worker_id` against a
+/// registry (it has none) — it only compares the two workers'
+/// relationship **sets** via typed-set Jaccard over `(relation,
+/// worker_id)` pairs (spec §8.6a / §12.2 / T-33).
+///
+/// Construct via [`RelationshipRef::new`], which trims `worker_id` and
+/// rejects an empty result, so two records carrying different
+/// incidental whitespace around the same id compare equal.
+///
+/// # Example
+///
+/// ```
+/// use worker_matcher::{RelationKind, RelationshipRef};
+///
+/// let r = RelationshipRef::new(RelationKind::LineManagerOf, " worker-42 ").unwrap();
+/// assert_eq!(r.worker_id, "worker-42");
+/// assert_eq!(r.relation, RelationKind::LineManagerOf);
+///
+/// assert!(RelationshipRef::new(RelationKind::ReportsTo, "   ").is_none());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RelationshipRef {
+    /// The kind of relationship this side asserts. See [`RelationKind`].
+    pub relation: RelationKind,
+    /// Opaque id of the related worker in the consuming registry.
+    /// Whitespace-trimmed and non-empty — see [`RelationshipRef::new`].
+    pub worker_id: String,
+}
+
+impl RelationshipRef {
+    /// Construct a relationship reference, trimming `worker_id` and
+    /// rejecting an empty result.
+    ///
+    /// Returns `None` when `worker_id` is empty after trimming.
+    ///
+    /// ```
+    /// use worker_matcher::{RelationKind, RelationshipRef};
+    /// let r = RelationshipRef::new(RelationKind::ReportsTo, "worker-7").unwrap();
+    /// assert_eq!(r.worker_id, "worker-7");
+    /// assert!(RelationshipRef::new(RelationKind::ReportsTo, "").is_none());
+    /// ```
+    #[must_use]
+    pub fn new(relation: RelationKind, worker_id: impl AsRef<str>) -> Option<Self> {
+        let worker_id = worker_id.as_ref().trim();
+        if worker_id.is_empty() {
+            return None;
+        }
+        Some(Self {
+            relation,
+            worker_id: worker_id.to_string(),
+        })
+    }
+}
+
 /// Core worker demographic data structure.
 ///
 /// Every field is optional. The matcher tolerates missing data field-by-field
@@ -939,6 +1028,26 @@ pub struct Worker {
     /// Local hospital or practice identifier. Not normalised — different
     /// organisations may issue colliding values.
     pub local_id: Option<String>,
+
+    /// Typed references to other workers (by opaque id) in the
+    /// consuming registry — e.g. "this worker's line manager is worker
+    /// X". A **supporting** signal only: never identifying on its own,
+    /// and the matcher never resolves the reference (it has no
+    /// registry) — it only compares the two workers' relationship
+    /// **sets** via typed-set Jaccard. Default empty. See
+    /// [`RelationshipRef`] / [`RelationKind`]; spec §8.1 / §8.6a /
+    /// §12.2 / §13.1 (T-33).
+    #[serde(default)]
+    pub relationships: Vec<RelationshipRef>,
+
+    /// Operator-applied free-text labels (e.g. `"ICU"`, `"Nights"`).
+    /// Stored verbatim; compared case-insensitively at match time,
+    /// consistent with the crate's normalise-at-match-time convention
+    /// for names / emails / identifiers. A **supporting** signal only:
+    /// never identifying on its own. Default empty. See spec §8.1 /
+    /// §8.5 / §12.2 / §13.1 (T-34).
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 impl Worker {
@@ -1134,6 +1243,8 @@ pub struct WorkerBuilder {
     mobile: Option<String>,
     email: Option<String>,
     local_id: Option<String>,
+    relationships: Vec<RelationshipRef>,
+    tags: Vec<String>,
 }
 
 impl WorkerBuilder {
@@ -1821,6 +1932,63 @@ impl WorkerBuilder {
         self
     }
 
+    /// Append a single relationship reference. Chainable; call multiple
+    /// times to record several relationships.
+    ///
+    /// ```
+    /// # use worker_matcher::{RelationKind, RelationshipRef, Worker};
+    /// let p = Worker::builder()
+    ///     .add_relationship(RelationshipRef::new(RelationKind::LineManagerOf, "worker-42").unwrap())
+    ///     .build();
+    /// assert_eq!(p.relationships.len(), 1);
+    /// ```
+    #[must_use]
+    pub fn add_relationship(mut self, relationship: RelationshipRef) -> Self {
+        self.relationships.push(relationship);
+        self
+    }
+
+    /// Replace the entire relationship list.
+    ///
+    /// ```
+    /// # use worker_matcher::{RelationKind, RelationshipRef, Worker};
+    /// let refs = vec![RelationshipRef::new(RelationKind::ReportsTo, "worker-1").unwrap()];
+    /// let p = Worker::builder().relationships(refs).build();
+    /// assert_eq!(p.relationships.len(), 1);
+    /// ```
+    #[must_use]
+    pub fn relationships(mut self, value: Vec<RelationshipRef>) -> Self {
+        self.relationships = value;
+        self
+    }
+
+    /// Append a single tag. Chainable; call multiple times to record
+    /// several tags.
+    ///
+    /// ```
+    /// # use worker_matcher::Worker;
+    /// let p = Worker::builder().add_tag("ICU").add_tag("Nights").build();
+    /// assert_eq!(p.tags, vec!["ICU".to_string(), "Nights".to_string()]);
+    /// ```
+    #[must_use]
+    pub fn add_tag<S: Into<String>>(mut self, value: S) -> Self {
+        self.tags.push(value.into());
+        self
+    }
+
+    /// Replace the entire tag list.
+    ///
+    /// ```
+    /// # use worker_matcher::Worker;
+    /// let p = Worker::builder().tags(vec!["ICU".to_string()]).build();
+    /// assert_eq!(p.tags.len(), 1);
+    /// ```
+    #[must_use]
+    pub fn tags(mut self, value: Vec<String>) -> Self {
+        self.tags = value;
+        self
+    }
+
     /// Consume the builder and produce the [`Worker`].
     ///
     /// ```
@@ -1890,6 +2058,8 @@ impl WorkerBuilder {
             mobile: self.mobile,
             email: self.email,
             local_id: self.local_id,
+            relationships: self.relationships,
+            tags: self.tags,
         }
     }
 }
@@ -2241,6 +2411,52 @@ mod tests {
             .add_passport_book(PassportBook::new("GB", "123456789").unwrap())
             .build();
         assert!(p.validate().is_ok());
+    }
+
+    #[test]
+    fn relationship_ref_trims_and_rejects_empty_worker_id() {
+        let r = RelationshipRef::new(RelationKind::LineManagerOf, "  worker-42  ").unwrap();
+        assert_eq!(r.worker_id, "worker-42");
+        assert_eq!(r.relation, RelationKind::LineManagerOf);
+        assert!(RelationshipRef::new(RelationKind::ReportsTo, "   ").is_none());
+        assert!(RelationshipRef::new(RelationKind::ReportsTo, "").is_none());
+    }
+
+    #[test]
+    fn relation_kind_variants_are_distinct() {
+        assert_ne!(RelationKind::LineManagerOf, RelationKind::ReportsTo);
+        assert_eq!(RelationKind::LineManagerOf, RelationKind::LineManagerOf);
+    }
+
+    #[test]
+    fn worker_builder_relationships_and_tags_start_empty() {
+        let p = Worker::builder().build();
+        assert!(p.relationships.is_empty());
+        assert!(p.tags.is_empty());
+    }
+
+    #[test]
+    fn worker_builder_carries_relationships_and_tags() {
+        let p = Worker::builder()
+            .add_relationship(RelationshipRef::new(RelationKind::LineManagerOf, "w1").unwrap())
+            .add_relationship(RelationshipRef::new(RelationKind::ReportsTo, "w2").unwrap())
+            .add_tag("ICU")
+            .add_tag("Nights")
+            .build();
+        assert_eq!(p.relationships.len(), 2);
+        assert_eq!(p.tags, vec!["ICU".to_string(), "Nights".to_string()]);
+    }
+
+    #[test]
+    fn relationships_and_tags_setters_replace_vec() {
+        let refs = vec![RelationshipRef::new(RelationKind::LineManagerOf, "w9").unwrap()];
+        let tags = vec!["days".to_string()];
+        let p = Worker::builder()
+            .relationships(refs.clone())
+            .tags(tags.clone())
+            .build();
+        assert_eq!(p.relationships, refs);
+        assert_eq!(p.tags, tags);
     }
 
     #[test]

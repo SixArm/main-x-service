@@ -146,7 +146,9 @@ pub mod scorer;
 
 pub use error::{MatchingError, Result};
 pub use matcher::{Confidence, MatchBreakdown, MatchConfig, MatchResult, MatchingEngine};
-pub use models::{Address, BloodType, Gender, PassportBook, Worker, WorkerBuilder};
+pub use models::{
+    Address, BloodType, Gender, PassportBook, RelationKind, RelationshipRef, Worker, WorkerBuilder,
+};
 pub use nicknames::NicknameTable;
 pub use normalizer::{Normalizer, ParsedAddressLine};
 pub use scorer::{Scorer, SimilarityAlgorithm};

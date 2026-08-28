@@ -38,12 +38,13 @@
 //! ```
 
 use crate::identifiers;
-use crate::models::{Address, PassportBook, Worker};
+use crate::models::{Address, PassportBook, RelationKind, RelationshipRef, Worker};
 use crate::nicknames::NicknameTable;
 use crate::normalizer::Normalizer;
 use crate::scorer::{Scorer, SimilarityAlgorithm};
 use chrono::{Datelike, NaiveDate};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// Tunable configuration for the matching engine.
 ///
@@ -120,6 +121,8 @@ use serde::{Deserialize, Serialize};
 ///     death_place_weight: 0.05,
 ///     phone_weight: 0.025,
 ///     email_weight: 0.05,
+///     relationships_weight: 0.05,
+///     tags_weight: 0.05,
 ///     use_phonetic_matching: true,
 ///     name_algorithm: SimilarityAlgorithm::JaroWinkler,
 ///     strict_mode: false,
@@ -293,6 +296,24 @@ pub struct MatchConfig {
     /// [`crate::Normalizer::normalize_email`]).
     pub email_weight: f64,
 
+    /// Weight for relationship-set similarity: typed-set Jaccard over
+    /// `(relation, worker_id)` pairs (see [`crate::RelationshipRef`]).
+    /// Defaults to `0.05` — a **supporting** signal only: two records
+    /// referencing the same related workers are weakly more likely the
+    /// same worker, but the field never identifies on its own and does
+    /// not participate when either side has no relationships recorded.
+    /// See spec §12.2 / §13.1 (T-33).
+    pub relationships_weight: f64,
+
+    /// Weight for tag-set similarity: set Jaccard over the
+    /// case-insensitively normalised tag sets. Defaults to `0.05` — a
+    /// **supporting** signal only, analogous to
+    /// [`Self::relationships_weight`]: two records sharing the same
+    /// operator-applied tags are weakly more likely the same worker,
+    /// but does not participate when either side has no tags recorded.
+    /// See spec §12.2 / §13.1 (T-34).
+    pub tags_weight: f64,
+
     /// Whether to add a phonetic-name bonus when both names sound alike.
     pub use_phonetic_matching: bool,
 
@@ -411,6 +432,8 @@ impl Default for MatchConfig {
             death_place_weight: 0.05,
             phone_weight: 0.05,
             email_weight: 0.05,
+            relationships_weight: 0.05,
+            tags_weight: 0.05,
             use_phonetic_matching: true,
             name_algorithm: SimilarityAlgorithm::Combined,
             strict_mode: false,
@@ -770,6 +793,17 @@ pub struct MatchBreakdown {
     /// `None` if either side is absent or fails to parse as an email.
     #[serde(default)]
     pub email_score: Option<f64>,
+    /// Score for relationship-set similarity: typed-set Jaccard over
+    /// `(relation, worker_id)` pairs, `|A ∩ B| / |A ∪ B|`. `None` when
+    /// either side has no relationships recorded. See
+    /// [`crate::RelationshipRef`]; spec §12.2 (T-33).
+    #[serde(default)]
+    pub relationships_score: Option<f64>,
+    /// Score for tag-set similarity: set Jaccard over the
+    /// case-insensitively normalised tag sets, `|A ∩ B| / |A ∪ B|`.
+    /// `None` when either side has no tags recorded. Spec §12.2 (T-34).
+    #[serde(default)]
+    pub tags_score: Option<f64>,
     /// Mean Soundex match across given and family names (`0.0`, `0.5`, or `1.0`).
     pub phonetic_name_score: Option<f64>,
 }
@@ -1168,6 +1202,11 @@ impl MatchingEngine {
             death_place_score: Self::score_death_place(worker1, worker2),
             phone_score: self.score_phone(worker1, worker2),
             email_score: self.score_email(worker1, worker2),
+            relationships_score: score_relationships(
+                &worker1.relationships,
+                &worker2.relationships,
+            ),
+            tags_score: score_tags(&worker1.tags, &worker2.tags),
             phonetic_name_score: if self.config.use_phonetic_matching {
                 Self::score_phonetic_names(worker1, worker2)
             } else {
@@ -1532,6 +1571,8 @@ impl MatchingEngine {
         add(breakdown.death_place_score, c.death_place_weight);
         add(breakdown.phone_score, c.phone_weight);
         add(breakdown.email_score, c.email_weight);
+        add(breakdown.relationships_score, c.relationships_weight);
+        add(breakdown.tags_score, c.tags_weight);
     }
 
     fn score_given_name(&self, worker1: &Worker, worker2: &Worker) -> Option<f64> {
@@ -1853,6 +1894,60 @@ fn score_passport_books(a: &[PassportBook], b: &[PassportBook]) -> Option<f64> {
     Some(f64::from(passport_books_share_pair(a, b)))
 }
 
+/// Score a pair of relationship-reference lists for the probabilistic
+/// breakdown: typed-set **Jaccard** over `(relation, worker_id)` pairs
+/// — `|A ∩ B| / |A ∪ B|` — so a `LineManagerOf` reference only agrees
+/// with a `LineManagerOf` reference to the **same** worker. Returns
+/// `None` if either side has no relationships recorded at all (the
+/// field is irrelevant for this pair, not evidence of non-match). See
+/// spec §12.2 / T-33.
+fn score_relationships(a: &[RelationshipRef], b: &[RelationshipRef]) -> Option<f64> {
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    let set_a: HashSet<(RelationKind, &str)> = a
+        .iter()
+        .map(|r| (r.relation, r.worker_id.as_str()))
+        .collect();
+    let set_b: HashSet<(RelationKind, &str)> = b
+        .iter()
+        .map(|r| (r.relation, r.worker_id.as_str()))
+        .collect();
+    Some(jaccard(&set_a, &set_b))
+}
+
+/// Score a pair of tag lists for the probabilistic breakdown: set
+/// **Jaccard** over the case-insensitively normalised tag sets —
+/// `|A ∩ B| / |A ∪ B|`. Normalisation happens here, at scoring time,
+/// consistent with the crate's verbatim-storage convention for names /
+/// emails / identifiers — [`crate::Worker::tags`] stores tags exactly
+/// as provided. Returns `None` if either side has no tags recorded at
+/// all. See spec §12.2 / T-34.
+fn score_tags(a: &[String], b: &[String]) -> Option<f64> {
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    let set_a: HashSet<String> = a.iter().map(|t| t.to_lowercase()).collect();
+    let set_b: HashSet<String> = b.iter().map(|t| t.to_lowercase()).collect();
+    Some(jaccard(&set_a, &set_b))
+}
+
+/// Jaccard index `|A ∩ B| / |A ∪ B|` over two hash sets. Callers are
+/// required to have already checked both inputs are non-empty (see
+/// [`score_relationships`] / [`score_tags`]), so the union here is
+/// never zero-sized.
+///
+/// Set sizes in practice are small (a worker's relationship or tag
+/// list), so the `usize` counts are routed through `u32` (exact,
+/// lint-free `u32 -> f64`) rather than a direct `usize -> f64` cast;
+/// `unwrap_or(u32::MAX)` is a non-panicking saturating fallback for a
+/// pathologically large set rather than a realistic code path.
+fn jaccard<T: Eq + std::hash::Hash>(a: &HashSet<T>, b: &HashSet<T>) -> f64 {
+    let intersection = u32::try_from(a.intersection(b).count()).unwrap_or(u32::MAX);
+    let union = u32::try_from(a.union(b).count()).unwrap_or(u32::MAX);
+    f64::from(intersection) / f64::from(union)
+}
+
 /// Score a pair of `NaiveDate` values for the date-of-birth component.
 ///
 /// - `1.0` when the dates are exactly equal.
@@ -2013,6 +2108,162 @@ mod tests {
         let c = MatchConfig::lenient();
         assert!((c.match_threshold - 0.75).abs() < 1e-9);
         assert!(c.use_phonetic_matching);
+    }
+
+    #[test]
+    fn config_default_relationships_and_tags_weight_is_005() {
+        let c = MatchConfig::default();
+        assert!((c.relationships_weight - 0.05).abs() < 1e-9);
+        assert!((c.tags_weight - 0.05).abs() < 1e-9);
+    }
+
+    // ---------- relationships & tags (T-33 / T-34) ----------
+
+    #[test]
+    fn score_relationships_identical_sets_scores_one() {
+        let a = vec![RelationshipRef::new(RelationKind::LineManagerOf, "w1").unwrap()];
+        let b = a.clone();
+        assert_eq!(score_relationships(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn score_relationships_disjoint_sets_scores_zero() {
+        let a = vec![RelationshipRef::new(RelationKind::LineManagerOf, "w1").unwrap()];
+        let b = vec![RelationshipRef::new(RelationKind::ReportsTo, "w1").unwrap()];
+        // Same worker id, different relation kind: not the same pair.
+        assert_eq!(score_relationships(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn score_relationships_partial_overlap_scores_jaccard_ratio() {
+        let a = vec![
+            RelationshipRef::new(RelationKind::LineManagerOf, "w1").unwrap(),
+            RelationshipRef::new(RelationKind::ReportsTo, "w2").unwrap(),
+        ];
+        let b = vec![
+            RelationshipRef::new(RelationKind::LineManagerOf, "w1").unwrap(),
+            RelationshipRef::new(RelationKind::ReportsTo, "w3").unwrap(),
+        ];
+        // intersection = {(LineManagerOf, w1)} = 1; union = 3.
+        let score = score_relationships(&a, &b).unwrap();
+        approx(score, 1.0 / 3.0);
+    }
+
+    #[test]
+    fn score_relationships_empty_either_side_is_none() {
+        let empty: Vec<RelationshipRef> = vec![];
+        let some = vec![RelationshipRef::new(RelationKind::LineManagerOf, "w1").unwrap()];
+        assert_eq!(score_relationships(&empty, &some), None);
+        assert_eq!(score_relationships(&some, &empty), None);
+        assert_eq!(score_relationships(&empty, &empty), None);
+    }
+
+    #[test]
+    fn score_tags_case_insensitive_identical_scores_one() {
+        let a = vec!["ICU".to_string(), "Nights".to_string()];
+        let b = vec!["icu".to_string(), "nights".to_string()];
+        assert_eq!(score_tags(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn score_tags_disjoint_sets_scores_zero() {
+        let a = vec!["icu".to_string()];
+        let b = vec!["oncology".to_string()];
+        assert_eq!(score_tags(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn score_tags_partial_overlap_scores_jaccard_ratio() {
+        let a = vec!["icu".to_string(), "nights".to_string()];
+        let b = vec!["ICU".to_string(), "days".to_string()];
+        // intersection = {"icu"} = 1; union = {"icu", "nights", "days"} = 3.
+        let score = score_tags(&a, &b).unwrap();
+        approx(score, 1.0 / 3.0);
+    }
+
+    #[test]
+    fn score_tags_empty_either_side_is_none() {
+        let empty: Vec<String> = vec![];
+        let some = vec!["icu".to_string()];
+        assert_eq!(score_tags(&empty, &some), None);
+        assert_eq!(score_tags(&some, &empty), None);
+        assert_eq!(score_tags(&empty, &empty), None);
+    }
+
+    #[test]
+    fn relationships_and_tags_absent_do_not_enter_the_weighted_average() {
+        // Renormalisation sanity check: with neither field populated on
+        // either side, `relationships_score`/`tags_score` are `None`
+        // and neither weight enters the denominator — an exact name +
+        // DOB match still scores a clean 1.0, not diluted by two
+        // "missing" components treated as zero.
+        let engine = MatchingEngine::default_config();
+        let a = Worker::builder()
+            .given_name("Ann")
+            .family_name("Lee")
+            .date_of_birth(dob(1990, 1, 1))
+            .build();
+        let b = a.clone();
+        let result = engine.match_workers(&a, &b);
+        assert_eq!(result.breakdown.relationships_score, None);
+        assert_eq!(result.breakdown.tags_score, None);
+        approx(result.score, 1.0);
+    }
+
+    #[test]
+    fn relationships_and_tags_participate_when_present_and_agree() {
+        let engine = MatchingEngine::default_config();
+        let rel = RelationshipRef::new(RelationKind::LineManagerOf, "worker-42").unwrap();
+        let a = Worker::builder()
+            .given_name("Ann")
+            .family_name("Lee")
+            .date_of_birth(dob(1990, 1, 1))
+            .add_relationship(rel.clone())
+            .add_tag("ICU")
+            .build();
+        let b = Worker::builder()
+            .given_name("Ann")
+            .family_name("Lee")
+            .date_of_birth(dob(1990, 1, 1))
+            .add_relationship(rel)
+            .add_tag("icu")
+            .build();
+        let result = engine.match_workers(&a, &b);
+        assert_eq!(result.breakdown.relationships_score, Some(1.0));
+        assert_eq!(result.breakdown.tags_score, Some(1.0));
+        approx(result.score, 1.0);
+    }
+
+    #[test]
+    fn relationships_and_tags_disagreement_pulls_score_down_but_stays_bounded() {
+        // Both sides carry data (so the components participate) but
+        // disagree entirely: the weighted-average renormalisation must
+        // still land in [0.0, 1.0], and a strong name+DOB match should
+        // outweigh two small (0.05 default) supporting-signal misses.
+        let engine = MatchingEngine::default_config();
+        let a = Worker::builder()
+            .given_name("Ann")
+            .family_name("Lee")
+            .date_of_birth(dob(1990, 1, 1))
+            .add_relationship(RelationshipRef::new(RelationKind::LineManagerOf, "w1").unwrap())
+            .add_tag("icu")
+            .build();
+        let b = Worker::builder()
+            .given_name("Ann")
+            .family_name("Lee")
+            .date_of_birth(dob(1990, 1, 1))
+            .add_relationship(RelationshipRef::new(RelationKind::LineManagerOf, "w2").unwrap())
+            .add_tag("oncology")
+            .build();
+        let result = engine.match_workers(&a, &b);
+        assert_eq!(result.breakdown.relationships_score, Some(0.0));
+        assert_eq!(result.breakdown.tags_score, Some(0.0));
+        assert!((0.0..=1.0).contains(&result.score));
+        assert!(result.score < 1.0);
+        assert!(
+            result.is_match,
+            "strong name+DOB match should still clear the default 0.85 threshold"
+        );
     }
 
     // ---------- probabilistic match ----------
