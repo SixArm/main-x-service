@@ -41,7 +41,22 @@ Per repo decision (2026-06-02), each `*-front-end-with-svelte` project keeps its
 
 ## Authentication (BFF)
 
-Sign-in is landed: `/signin` + `/verify` (magic-link, per-app), `src/lib/server/{session,auth,config}.ts`, and the `/api/proxy/[...path]` reverse proxy that injects a server-exchanged PASETO — the browser holds only the httpOnly `__Host-mxi_session` cookie, never a token. See [`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md). **CSRF protection on mutating browser→BFF calls is not yet implemented** (spec §13 T-23, §16 OQ-3) — do not treat the auth story as complete until that lands.
+Sign-in is landed: `/signin` + `/verify` (magic-link, per-app), `src/lib/server/{session,auth,config}.ts`, and the `/api/proxy/[...path]` reverse proxy that injects a server-exchanged PASETO — the browser holds only the httpOnly `__Host-mxi_session` cookie, never a token. See [`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
+
+**CSRF** (2026-08-28, closes T-23b / the CSRF half of §16 OQ-3): a
+double-submit cookie protects mutating browser→BFF calls. `/verify` sets
+a second, **non-httpOnly** cookie `__Host-mxi_csrf` alongside the session
+cookie (`generateCsrfToken()`/`CSRF_COOKIE`/`CSRF_COOKIE_OPTIONS` in
+`src/lib/server/session.ts`); `src/lib/api/client.ts`'s `ApiClient` reads
+it from `document.cookie` (guarded — a no-op server-side) and echoes it
+as `X-CSRF-Token` on every non-GET/HEAD request; the proxy
+(`src/routes/api/proxy/[...path]/+server.ts`) rejects a mismatch with
+`403 {"error":"csrf"}` before forwarding upstream, backstopped by an
+Origin/Referer check (only rejects when one is present and disagrees).
+Sign-out clears both cookies. See
+`agents/share/authentication-sessions.md` §4 for the design this
+implements. The 401/403 redirect UX (the other half of OQ-3) is still
+open.
 
 ## What does NOT live here
 
