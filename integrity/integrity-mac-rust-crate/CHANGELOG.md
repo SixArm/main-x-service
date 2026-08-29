@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 > See also: [README.md](./README.md), [fuzz/README.md](./fuzz/README.md).
+>
+> **Documentation-tier waiver (PRO-P26, 2026-08-29).** This crate has no
+> `spec/`, `AGENTS.md`, `CLAUDE.md`, or `index.md` — the same posture as
+> [`link/entity-ref-rust-crate`](../../link/entity-ref-rust-crate). The
+> reason is not the same reason, though: entity-ref is waived because it
+> is trivially small; this crate is waived because its design rationale
+> is *already* written down in full prose, not scattered code comments —
+> and a `spec/` would duplicate that prose rather than add to it. The
+> `src/lib.rs` module doc (`//! Why this is a crate rather than a copy`,
+> `//! What the MAC defends against, stated plainly`, `//! Domain
+> separation`) covers the threat model, the HKDF-SHA256 per-(service,
+> domain) derivation design and the two failure modes it closes, and the
+> extraction rationale; the doc comments on every public item cover the
+> fail-closed posture item by item (key-file-over-inline sourcing with no
+> silent fallback, root-key zeroization, placeholder refusal, the
+> scheme-tag migration story). The README repeats the same design as a
+> non-rustdoc entry point plus an explicit "what it does not defend
+> against" section. The family-wide integration story — which services
+> embed this crate, in what order, and how to activate the MAC in
+> production — lives in
+> [`agents/share/security.md`](../../agents/share/security.md) invariant 1
+> and [`agents/share/runbooks/integrity-activation.md`](../../agents/share/runbooks/integrity-activation.md),
+> which is where that cross-crate narrative belongs rather than in a
+> single library's own spec. If this crate's design ever grows a facet
+> that isn't yet prose anywhere — a new key scheme, a new sourcing
+> precedence rule — the obligation is to extend that prose (rustdoc,
+> README, or this file), not to open a `spec/` that would need to be kept
+> in lock-step with it.
 
 ## [Unreleased]
 
