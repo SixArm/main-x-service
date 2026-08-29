@@ -491,6 +491,123 @@ mod tests {
         assert_eq!(back.gender, Gender::Male);
     }
 
+    /// PRO-P1: the five fields `from_fhir_person` used to silently drop —
+    /// additional names, marital status, multiple birth, managing
+    /// organization, and identifier-type coding — all round-trip
+    /// domain → `Patient` → domain.
+    #[test]
+    fn test_round_trip_previously_lossy_fields() {
+        use crate::api::fhir::resources;
+        use crate::models::{Identifier, IdentifierType, NameUse};
+        use uuid::Uuid;
+
+        let mut person = sample_person();
+        person.additional_names.push(HumanName {
+            use_type: Some(NameUse::Maiden),
+            family: "Doe".to_string(),
+            given: vec!["Jane".to_string()],
+            prefix: vec![],
+            suffix: vec![],
+        });
+        person.marital_status = Some("M".to_string());
+        person.multiple_birth = Some(true);
+        let org_id = Uuid::new_v4();
+        person.managing_organization = Some(org_id);
+        person.identifiers.push(Identifier::new(
+            IdentifierType::SSN,
+            "http://hl7.org/fhir/sid/us-ssn".to_string(),
+            "123-45-6789".to_string(),
+        ));
+
+        let fhir: resources::FhirPerson = to_fhir_patient(&person);
+        let back = from_fhir_person(&fhir).expect("valid round-trip");
+
+        assert_eq!(back.additional_names.len(), 1);
+        assert_eq!(back.additional_names[0].family, "Doe");
+        assert_eq!(back.additional_names[0].given, vec!["Jane".to_string()]);
+        assert_eq!(back.additional_names[0].use_type, Some(NameUse::Maiden));
+
+        assert_eq!(back.marital_status, Some("M".to_string()));
+        assert_eq!(back.multiple_birth, Some(true));
+        assert_eq!(back.managing_organization, Some(org_id));
+
+        assert_eq!(back.identifiers.len(), 1);
+        assert_eq!(back.identifiers[0].identifier_type, IdentifierType::SSN);
+    }
+
+    /// `multipleBirthInteger` (birth order) has no domain field to carry
+    /// the order in, but its mere presence is still unambiguous evidence
+    /// of a multiple birth — it parses to `Some(true)` rather than being
+    /// dropped.
+    #[test]
+    fn test_multiple_birth_integer_parses_to_true() {
+        use crate::api::fhir::resources;
+
+        let mut fhir = FhirPerson::new();
+        fhir.name = Some(vec![resources::FhirHumanName {
+            use_: None,
+            text: None,
+            family: Some("Smith".to_string()),
+            given: Some(vec!["John".to_string()]),
+            prefix: None,
+            suffix: None,
+        }]);
+        fhir.multiple_birth = Some(resources::FhirMultipleBirth::Integer(2));
+
+        let person = from_fhir_person(&fhir).expect("valid");
+        assert_eq!(person.multiple_birth, Some(true));
+    }
+
+    /// A `managingOrganization` reference with no literal `reference`
+    /// (display-only) cannot be mapped to the domain's `Uuid` field and
+    /// is rejected with a `Validation` error rather than silently
+    /// dropped.
+    #[test]
+    fn test_managing_organization_display_only_reference_rejected() {
+        use crate::api::fhir::resources;
+
+        let mut fhir = FhirPerson::new();
+        fhir.name = Some(vec![resources::FhirHumanName {
+            use_: None,
+            text: None,
+            family: Some("Smith".to_string()),
+            given: Some(vec!["John".to_string()]),
+            prefix: None,
+            suffix: None,
+        }]);
+        fhir.managing_organization = Some(resources::FhirReference {
+            reference: None,
+            display: Some("Some Org".to_string()),
+        });
+
+        let err = from_fhir_person(&fhir).expect_err("display-only reference must be rejected");
+        assert!(matches!(err, crate::Error::Validation(_)));
+    }
+
+    /// A `managingOrganization` reference to a different resource type
+    /// (not `Organization/<uuid>`) is rejected rather than silently
+    /// coerced or dropped.
+    #[test]
+    fn test_managing_organization_wrong_resource_type_rejected() {
+        use crate::api::fhir::resources;
+
+        let mut fhir = FhirPerson::new();
+        fhir.name = Some(vec![resources::FhirHumanName {
+            use_: None,
+            text: None,
+            family: Some("Smith".to_string()),
+            given: Some(vec!["John".to_string()]),
+            prefix: None,
+            suffix: None,
+        }]);
+        fhir.managing_organization = Some(resources::FhirReference {
+            reference: Some("Practitioner/1234".to_string()),
+            display: None,
+        });
+
+        assert!(from_fhir_person(&fhir).is_err());
+    }
+
     /// A FHIR resource with no `name` entry is rejected by the inbound
     /// conversion (maps to a `400 invalid` `OperationOutcome`).
     #[test]

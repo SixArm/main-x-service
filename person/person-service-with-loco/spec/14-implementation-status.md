@@ -9,7 +9,7 @@
 | Matching | Probabilistic + deterministic; Jaro-Winkler + Levenshtein + Soundex; configurable weights |
 | Search | Tantivy 11-field index; fuzzy + phonetic + bulk + blocking |
 | REST API | 35+ endpoints (person CRUD, search, match/dedup/merge, review queue, links, bulk import/export, privacy, audit/compliance) + OpenAPI/Swagger + CORS + structured errors — see [agents/restful.md](../agents/restful.md) for the full table |
-| FHIR R5 | `Patient` primary resource (full CRUD + search) + `Person` read-only alias, `GET /fhir/metadata` `CapabilityStatement`, searchset `Bundle`, `OperationOutcome` errors (T-11) |
+| FHIR R5 | `Patient` primary resource (full CRUD + search) + `Person` read-only alias, `GET /fhir/metadata` `CapabilityStatement`, searchset `Bundle`, `OperationOutcome` errors (T-11); inbound `from_fhir_person` parses every field FHIR carries an equivalent for — the name array beyond the first (`additional_names`), `maritalStatus`, `multipleBirth[x]`, the `managingOrganization` reference, and identifier-type coding — rather than silently dropping them, with a malformed `managingOrganization` reference rejected via `OperationOutcome` instead of coerced (PRO-P1) |
 | Repository | SeaORM CRUD with transactions, soft delete |
 | Event streaming | In-memory publisher (default) or a Postgres transactional outbox (`PERSON_EVENT_TRANSPORT=outbox`) drained by a relay to `LoggingSink` or, behind the `fluvio` feature, a real-broker `FluvioSink` (Created / Updated / Deleted / Merged / Linked / Unlinked) |
 | Audit log | AuditLogRepository with old / new JSON + user context; hash-chained with checkpointing and out-of-band-edit / wholesale-deletion detection (`src/compliance/`) |
@@ -37,9 +37,13 @@ Open gaps drive tasks in §13. Live gap list:
 | gRPC API (Tonic stub, no working server) | T-6 |
 | Dedup / merge / privacy integration tests (a dedicated end-to-end suite; individual paths are covered by scattered tests today) | T-5 |
 | Spec-drift CI guard | T-7 |
+| FHIR `multipleBirthInteger` (birth order) has no domain field to carry the order in — `from_fhir_person` maps its mere presence to `multiple_birth = Some(true)` (unambiguous), but the order itself is lost; a genuine model gap, not a parsing ambiguity | (no task yet) |
 
 Closed since the last full pass: FHIR capability statement + bundle
-handling (T-3, T-4 — delivered by T-11, 2026-07-07) and the Fluvio
-production sink (T-2 — delivered by BUS-3, 2026-08-03). See §13 for the
+handling (T-3, T-4 — delivered by T-11, 2026-07-07), the Fluvio
+production sink (T-2 — delivered by BUS-3, 2026-08-03), and the
+`from_fhir_person` silent-drop of `additional_names` / `marital_status`
+/ `multiple_birth` / `managing_organization` / identifier-type coding
+(PRO-P1, 2026-08-29 — see the FHIR R5 row in §14.1). See §13 for the
 detail on each.
 
