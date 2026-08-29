@@ -165,6 +165,13 @@ pub fn create_router(state: AppState) -> Router {
         // Prometheus metrics at the application root (not under `/api`),
         // alongside the docs. Public — no bearer token needed to scrape.
         .route("/metrics.prom", get(handlers::metrics_prom))
+        // Observe every request on `http_requests_total{path,status}`
+        // (T-18). `route_layer`, not `layer`: it must run after route
+        // matching so `MatchedPath` resolves — see
+        // `crate::metrics::track_http_requests_mw`.
+        .route_layer(axum::middleware::from_fn(
+            crate::metrics::track_http_requests_mw,
+        ))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         // Blanket auth enforcement (default-off; scoped to /api + /fhir by
         // `auth::enforce`); layered inside CORS so preflights pass.

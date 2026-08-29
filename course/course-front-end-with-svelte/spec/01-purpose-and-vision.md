@@ -17,5 +17,10 @@ A web interface that:
 
 - **Not** a public-facing portal — assumes authenticated operator users. BFF magic-link sign-in (`/signin`, `/verify`) landed 2026-06-18; no route currently redirects an unauthenticated visitor away (§13 T-24).
 - **Not** a substitute for direct API access — power users use Swagger UI / curl.
-- **Not** a FHIR client — the Course Service exposes no FHIR surface (no FHIR resource fits Course cleanly; service spec §2.2).
+- **Not** a FHIR client — a scope choice, not a backend gap. The Course
+  Service does mount `/fhir/Basic{,/{id}}` + `/fhir/metadata` (T-20,
+  landed), but wraps `Course` in a deliberately non-standard `Basic`
+  resource because no FHIR R5 resource fits it cleanly (service spec
+  §2.1b, `agents/share/fhir.md` §3); this app builds no viewer for it,
+  same as every sibling front-end.
 

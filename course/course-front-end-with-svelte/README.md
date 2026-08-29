@@ -49,7 +49,7 @@ The browser calls the same-origin BFF proxy at `/api/proxy` — there is no publ
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `COURSE_API_URL` | `http://localhost:8084` (real service default; the code's own fallback is `5150` — see spec §13 T-28, always set this var) | Course Service base URL — the proxy injects a server-exchanged PASETO and forwards |
+| `COURSE_API_URL` | `http://localhost:8084` (the code's own fallback matches this, T-28) | Course Service base URL — the proxy injects a server-exchanged PASETO and forwards |
 | `AUTH_API_URL` | `http://localhost:5150` | Authentication Service base URL — magic-link login + session→PASETO exchange |
 
 Set in `.env` (`cp .env.example .env` gets the right defaults). Both are read server-side in `src/lib/server/config.ts` and are never exposed to the client bundle.

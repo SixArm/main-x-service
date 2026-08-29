@@ -56,8 +56,9 @@ course_merged_total 3
 Counters: `course_created_total`, `course_updated_total`,
 `course_deleted_total`, `course_merged_total` (incremented one-per-success
 in the create / update / delete / merge handlers) plus a labelled
-`http_requests_total{path,status}` registered for a future request-path
-middleware (emits no sample line until a label combination is observed).
+`http_requests_total{path,status}`, observed on every request by a
+`route_layer` middleware (T-18) labelled by the matched route template
+(emits no sample line until the first request is served).
 Configure the scraper with `metrics_path: /metrics.prom`.
 
 ## Course CRUD

@@ -153,9 +153,10 @@ course_created_total 12
 course_merged_total 3
 ```
 
-The labelled `http_requests_total{path,status}` family is registered
-but emits no sample line until a request-path middleware records one
-(reserved; see spec §15 v0.4).
+The labelled `http_requests_total{path,status}` family is observed on
+every request by a `route_layer` middleware (T-18), labelled by the
+matched route template (e.g. `/api/courses/{id}`, not the concrete id).
+It emits no sample line until the first request is served.
 
 ## Configuration
 
@@ -256,8 +257,8 @@ bring-up the integration suite expects to be migrated against.
 - **API versioning**: `Accepts-version` header negotiation (T-25),
   `/api/*` only.
 - **Metrics**: Prometheus `GET /metrics.prom` (T-16) — process-wide
-  registry, CRUD/merge counters, reserved labelled
-  `http_requests_total`.
+  registry, CRUD/merge counters, labelled `http_requests_total`
+  observed on the live request path (T-18).
 - **Tests**: 123 unit + 2 DB-gated #[ignore] unit + 14 bridge + 12
   #[ignore]-tagged integration (T-12) + 1 #[ignore] auth-activation +
   1 feature-gated #[ignore] Fluvio round-trip + 3 criterion benches

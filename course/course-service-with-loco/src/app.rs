@@ -98,6 +98,13 @@ impl Hooks for App {
         // Swagger UI + blanket auth enforcement + permissive CORS layered
         // on top of the controllers.
         let router = router
+            // Observe every request on `http_requests_total{path,status}`
+            // (T-18), before merging in Swagger UI. `route_layer`, not
+            // `layer`: it must run after route matching so `MatchedPath`
+            // resolves — see `crate::metrics::track_http_requests_mw`.
+            .route_layer(axum::middleware::from_fn(
+                crate::metrics::track_http_requests_mw,
+            ))
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
             // Blanket auth enforcement (default-off; a near-noop unless
             // `COURSE_REQUIRE_AUTH` was truthy at construction; layered

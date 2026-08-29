@@ -41,7 +41,18 @@ Per repo decision (2026-06-02), each `*-front-end-with-svelte` project keeps its
 
 ## What does NOT live here
 
-- FHIR Course UI. Out of scope — the service has no FHIR surface (service spec §2.2).
+- FHIR Course UI. Out of scope for MVP — **a front-end scope choice, not
+  a backend gap.** The service does mount a FHIR surface
+  (`/fhir/Basic{,/{id}}` + `/fhir/metadata`, T-20, landed and tested;
+  service spec §2.1b), but it is a deliberately **non-standard**
+  best-effort wrapper: no FHIR R5 resource models an educational course,
+  so a `Course` is exposed as a generic `Basic` resource
+  (`agents/share/fhir.md` §3) rather than a first-class typed resource.
+  Building a viewer for that non-standard shape carries little operator
+  value over the native `/courses` UI this app already has, so — same as
+  every sibling front-end's FHIR UI (person/worker/place/thing/event) —
+  it stays unbuilt. Not queued as a task here; revisit if a real FHIR
+  client consumer appears.
 - Consent management UI. Out of scope for MVP (the Course Service exposes no consent endpoints).
 - GDPR-export download UI. Out of scope for MVP.
 
