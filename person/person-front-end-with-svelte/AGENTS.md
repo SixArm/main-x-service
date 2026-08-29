@@ -77,6 +77,30 @@ Sign-out clears both cookies. See
 `agents/share/authentication-sessions.md` §4 for the design this
 implements.
 
+## Page-visit guard (PRO-H10, 2026-08-29)
+
+Every page whose sole purpose is submitting a mutation
+(`/persons/new`, `/persons/[id]/edit`, `/persons/merge`,
+`/persons/bulk`, `/review`) carries a `+page.server.ts` load function
+calling `requireSignedIn(locals)` (`src/lib/server/session.ts`), which
+redirects an unauthenticated visitor to `/signin` (303) rather than
+render a form whose submit would fail. Read/list/search/view pages
+(`/persons`, `/persons/[id]`, `/persons/[id]/audit`, `/persons/match`)
+stay public — this mirrors the backend's own default-allow-read /
+mutation-deny ABAC posture
+(`agents/share/authorization-attributes.md` §5) rather than inventing
+a separate front-end policy. `locals.sessionId` is presence-only (set
+from the httpOnly cookie, never re-validated here) — a UX convenience
+in front of the backend's real enforcement, not a substitute for it.
+
+**Known v1 limitation, not an oversight**: no `next`-param round trip
+back to the originally-requested page after signing in — the
+magic-link flow only preserves `return_url`'s origin today
+(`src/lib/server/auth.ts::requestMagicLink`), and carrying a return
+path through it would touch the authentication-service contract, not
+just this app. A visitor who signs in from a guarded page lands on
+`/` and navigates back manually.
+
 ## What does NOT live here
 
 - FHIR Person UI. Out of scope for MVP.
