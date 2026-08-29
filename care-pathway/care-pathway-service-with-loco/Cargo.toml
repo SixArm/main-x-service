@@ -69,7 +69,7 @@ sha2 = { version = "0.10" }
 # structurally unrelated to SHA-256's Merkle-Damgard chaining, so a
 # cryptanalytic advance against one design family does not transfer to
 # it. See spec/12-compliance.md §12.4z.
-sha3 = { version = "0.10" }
+sha3 = { version = "0.12" }
 # Keyed integrity (HMAC-SHA256, FIPS 198-1) over the same pre-image, with
 # a key the database never holds — see spec/12-compliance.md §12.4z. This
 # is what raises tamper detection above "careless modification": the
