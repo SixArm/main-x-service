@@ -161,4 +161,70 @@ describe("CaseRepository", () => {
     await repo.deleteLink("a/b", "c d");
     expect(calls[0]?.url).toBe("http://svc.test/api/cases/a%2Fb/links/c%20d");
   });
+
+  // Full-text search (spec §13, PRO-P15). Pins the query string shape:
+  // `q` first, then `fuzzy`/`phonetic` only when set, then `limit`/`offset`
+  // appended by the shared `getPage()` pager.
+  it("search() GETs the search endpoint with just q", async () => {
+    const { repo, calls } = spyClient();
+    await repo.search({ q: "housing" });
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe("http://svc.test/api/cases/search?q=housing");
+  });
+
+  it("search() includes fuzzy/phonetic only when true", async () => {
+    const { repo, calls } = spyClient();
+    await repo.search({ q: "housing", fuzzy: true, phonetic: true });
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/cases/search?q=housing&fuzzy=true&phonetic=true",
+    );
+  });
+
+  it("search() omits fuzzy/phonetic when false", async () => {
+    const { repo, calls } = spyClient();
+    await repo.search({ q: "housing", fuzzy: false, phonetic: false });
+    expect(calls[0]?.url).toBe("http://svc.test/api/cases/search?q=housing");
+  });
+
+  it("search() appends limit/offset via the page window", async () => {
+    const { repo, calls } = spyClient();
+    await repo.search({ q: "housing", limit: 10, offset: 20 });
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/cases/search?q=housing&limit=10&offset=20",
+    );
+  });
+
+  it("search() URL-encodes the query", async () => {
+    const { repo, calls } = spyClient();
+    await repo.search({ q: "a b&c" });
+    expect(calls[0]?.url).toBe("http://svc.test/api/cases/search?q=a+b%26c");
+  });
+
+  // Audit / events (spec §13, PRO-P15).
+  it("audit() GETs the case's audit trail", async () => {
+    const { repo, calls } = spyClient();
+    await repo.audit("p1");
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe("http://svc.test/api/cases/p1/audit");
+  });
+
+  it("audit() URL-encodes the pid", async () => {
+    const { repo, calls } = spyClient();
+    await repo.audit("a/b 1");
+    expect(calls[0]?.url).toBe("http://svc.test/api/cases/a%2Fb%201/audit");
+  });
+
+  it("recentAudit() GETs the system-wide recent audit log", async () => {
+    const { repo, calls } = spyClient();
+    await repo.recentAudit();
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe("http://svc.test/api/cases/audit/recent");
+  });
+
+  it("recentEvents() GETs the recent event stream", async () => {
+    const { repo, calls } = spyClient();
+    await repo.recentEvents();
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe("http://svc.test/api/cases/events/recent");
+  });
 });

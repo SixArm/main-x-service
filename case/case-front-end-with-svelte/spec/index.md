@@ -13,11 +13,14 @@ service.
 
 ## 2. Scope
 
-In scope: the routes (`/`, `/cases`, `/board`, `/new`, `/merge`,
-`/[pid]`, `/[pid]/edit`, `/signin`, `/verify`), the
+In scope: the routes (`/`, `/cases`, `/board`, `/new`, `/merge`, `/audit`,
+`/[pid]`, `/[pid]/edit`, `/[pid]/audit`, `/signin`, `/verify`), the
 API client, the case form, and a BFF + httpOnly-cookie session (§6.7/§6.8,
 per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
-Out of scope: full-text search UI, audit views.
+Full-text search (`/`) and audit views (`/[pid]/audit`, `/audit`) landed
+2026-08-29 (PRO-P15), once the service shipped Tantivy search
+(2026-08-02). Out of scope: consent/GDPR export UI (the service exposes
+no such endpoints for case).
 
 ## 3. Stakeholders and users
 
@@ -32,13 +35,15 @@ Caseworkers and case administrators across governmental agencies.
 ## 5. Information architecture
 
 ```
-/            list of cases
-/cases       SVAR DataGrid + FilterBar index (client-side filtering)
-/board       SVAR Kanban board, one column per status; drag-to-change-status
-/new         create form
-/[pid]       detail + delete + check-duplicates + "subject of this case" links panel
-/[pid]/edit  edit form
-/merge       merge a duplicate into a survivor + recent merge history
+/               list of cases + full-text search box (fuzzy/phonetic toggles)
+/cases          SVAR DataGrid + FilterBar index (client-side filtering)
+/board          SVAR Kanban board, one column per status; drag-to-change-status
+/new            create form
+/[pid]          detail + delete + check-duplicates + "subject of this case" links panel + link to audit trail
+/[pid]/edit     edit form
+/[pid]/audit    one case's audit trail, newest first
+/merge          merge a duplicate into a survivor + recent merge history
+/audit          system-wide recent activity: recent audit entries + recent events
 ```
 
 ### Layout shell & navigation
@@ -105,6 +110,29 @@ Cross-cutting UI rule for every `*-front-end-with-svelte` app:
 11. Layout shell: global navigation is a full-width **top bar** (header)
    with a **hamburger** toggle on narrow viewports — NOT a left sidebar —
    and the main content area is **full-width**.
+12. Full-text search (`/`, PRO-P15): a search box (`SearchBox.svelte`,
+   copy-adapted from the course front-end's dependency-light pattern —
+   the reference for a lightweight search box in this family) above the
+   list, with **fuzzy** and **phonetic** checkboxes. A non-blank query
+   runs `GET /api/cases/search?q=&fuzzy=&phonetic=&limit=&offset=`
+   (Tantivy, service spec T-6); a blank query falls back to the plain
+   list (`GET /api/cases`) — the service rejects a blank `q` with `400`,
+   so the client never sends one. The result count reads `{shown} /
+   {total}` from the paginated response when the page is partial (same
+   convention as `/cases`' FilterBar count).
+13. Audit trail (`/[pid]/audit`, PRO-P15): one case's audit-log rows,
+   newest first (`GET /api/cases/{pid}/audit`) — action, timestamp,
+   actor (or none), and an expandable JSON snapshot where present.
+   Linked from the detail route's action row. Modelled on the
+   `[id]/audit` dedicated-route pattern the majority of sibling
+   front-ends use (course/event/person/place/thing/worker), rather than
+   care-pathway's inline toggle, since it matches this app's own
+   `/[pid]/edit` routing convention.
+14. Recent activity (`/audit`, PRO-P15): system-wide, across every case
+   — recent audit-log entries (`GET /api/cases/audit/recent`, cap 100)
+   and the recent CRUD/merge event stream (`GET
+   /api/cases/events/recent`, cap 100), each panel loading and failing
+   independently. Reachable from the top nav.
 
 ## 7. Non-functional requirements
 
@@ -143,6 +171,10 @@ calling the service; no token is read or attached in browser JS.
 | `/[pid]` links list | `GET /api/cases/{pid}/links` |
 | `/[pid]` link assert | `POST /api/cases/{pid}/links` |
 | `/[pid]` link withdraw | `DELETE /api/cases/{pid}/links/{id}` |
+| `/` search | `GET /api/cases/search?q=&fuzzy=&phonetic=&limit=&offset=` |
+| `/[pid]/audit` | `GET /api/cases/{pid}/audit` |
+| `/audit` recent audit | `GET /api/cases/audit/recent` |
+| `/audit` recent events | `GET /api/cases/events/recent` |
 
 The privileged cross-case dump `GET /api/cases/links` (the aggregator's
 reconciliation pull, gated as a destructive governed read) is deliberately
@@ -156,11 +188,14 @@ None client-side beyond in-memory route state.
 ## 11. Testing strategy
 
 `pnpm run check` (svelte-check strict, 0/0). **vitest** unit tests
-(`tests/unit/`, 61 tests across 7 files) cover: `client.test.ts` (the
+(`tests/unit/`, 70 tests across 7 files) cover: `client.test.ts` (the
 `ApiClient` — verb/body/headers, per-call `token` override, `getPage()`
 pagination-header parsing, error-classification/empty-body);
 `cases.test.ts` (`CaseRepository` — every method's path + verb, incl. a
-regression pinning `check-duplicates`, and the merge/links methods);
+regression pinning `check-duplicates`, the merge/links methods, and
+(PRO-P15) `search()`'s query-string shape — `q` alone, `fuzzy`/`phonetic`
+included only when `true`, `limit`/`offset` via the shared pager, and
+URL-encoding — plus `audit()`/`recentAudit()`/`recentEvents()`);
 `case-form.test.ts` (form-to-`Case` assembly); `i18n.test.ts` (13-locale
 parity — every locale covers every key with no extras, RTL detection,
 English fallback, plus dedicated coverage assertions for the `merge.*`
@@ -207,23 +242,44 @@ access/audit requirements.
   `createLink()` / `deleteLink()`, the pure `validateLink` guard,
   13-locale strings, unit + smoke tests.
 - [ ] `Custom(label)` editing for case type / status / schemes.
-- [ ] Search box once the service ships search.
+- [x] **PRO-P15** *(done 2026-08-29)* Search box + audit/event views —
+  the service's Tantivy search (T-6, landed 2026-08-02) had unblocked
+  this weeks earlier. Added: a `SearchBox.svelte` (copy-adapted from the
+  course front-end's dependency-light pattern) on `/` with fuzzy/phonetic
+  toggles, wired to `CaseRepository.search()` (`GET
+  /api/cases/search?q=&fuzzy=&phonetic=&limit=&offset=`; a blank query
+  falls back to `listPage()` since the service 400s a blank `q`); a
+  dedicated `/[pid]/audit` route (`CaseRepository.audit()`, `GET
+  /api/cases/{pid}/audit`), linked from the detail page's action row;
+  and a system-wide `/audit` "recent activity" route combining
+  `recentAudit()` (`GET /api/cases/audit/recent`) and `recentEvents()`
+  (`GET /api/cases/events/recent`), reachable from the top nav. New
+  `AuditEntry`/`CaseEvent`/`SearchParams` types mirror the service's
+  `audit_logs` entity and `EventView` (`src/lib/api/types.ts`). 9 new
+  vitest cases pin `search()`'s query-string shape and the three new GET
+  paths (`tests/unit/cases.test.ts`, 61→70); 21 new i18n keys
+  (`search.*`, `audit.*`, `activity.*`, `nav.audit`,
+  `detail.viewAudit`) added across all 13 locales, `i18n.test.ts`'s
+  full-coverage assertion still passes. `pnpm run check` clean (0/0).
 - [x] Auth — adopt BFF + httpOnly cookie + CSRF; remove
   `mxi_access_token`/`localStorage` bearer + fragment handoff (per
   [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
 
 ## 14. Implementation status
 
-Done: the eight routes in §5 (list, `/cases` SVAR grid, `/board` SVAR
-Kanban, create, detail + delete + check-duplicates + links panel, edit,
-merge + recent-merges); lean client + `CaseRepository` (CRUD,
-check-duplicates, merge/recentMerges, listLinks/createLink/deleteLink);
-form (case type / status / priority dropdowns + identifiers editor); SPA
-config; full BFF auth (session cookie → PASETO exchange → server-side
-proxy, CSRF on mutating calls, per-app `/signin`+`/verify` magic-link —
-no client-held token); 13-locale i18n throughout, including the merge
-and links blocks. `pnpm run check` clean (0/0); vitest 61/61; Playwright
-8/8; production build succeeds.
+Done: the eleven routes in §5 (list + search, `/cases` SVAR grid,
+`/board` SVAR Kanban, create, detail + delete + check-duplicates + links
+panel + audit link, edit, `/[pid]/audit`, merge + recent-merges,
+`/audit` recent activity); lean client + `CaseRepository` (CRUD,
+check-duplicates, merge/recentMerges, listLinks/createLink/deleteLink,
+search/audit/recentAudit/recentEvents — PRO-P15, 2026-08-29); form (case
+type / status / priority dropdowns + identifiers editor); SPA config;
+full BFF auth (session cookie → PASETO exchange → server-side proxy,
+CSRF on mutating calls, per-app `/signin`+`/verify` magic-link — no
+client-held token); 13-locale i18n throughout, including the merge,
+links, search, and audit/activity blocks. `pnpm run check` clean (0/0);
+vitest 70/70; Playwright 8/8 (unchanged — PRO-P15 added vitest coverage
+only, no new e2e smoke); production build succeeds.
 
 ## 15. Roadmap
 

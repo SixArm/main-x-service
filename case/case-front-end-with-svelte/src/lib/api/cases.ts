@@ -4,7 +4,9 @@ import { API_BASE_URL } from "$lib/config";
 import { ApiClient } from "./client";
 import type { Page, PageRequest } from "./client";
 import type {
+  AuditEntry,
   Case,
+  CaseEvent,
   CaseRef,
   CreateLinkRequest,
   EntityLink,
@@ -12,6 +14,7 @@ import type {
   MergeRequest,
   MergeResponse,
   ScoredRef,
+  SearchParams,
 } from "./types";
 
 /**
@@ -175,5 +178,52 @@ export class CaseRepository {
     return this.http.delete(
       `/api/cases/${encodeURIComponent(casePid)}/links/${encodeURIComponent(linkId)}`,
     );
+  }
+
+  /**
+   * Full-text case search. `GET /api/cases/search?q=&fuzzy=&phonetic=&limit=&offset=`.
+   * A blank `q` is rejected by the service with `400` — callers wanting a
+   * "show everything" view should call {@link listPage} instead.
+   * @param params The query plus optional fuzzy/phonetic toggles and paging.
+   * @returns One page of {@link CaseRef} hits, with the service's total.
+   */
+  search(params: SearchParams): Promise<Page<CaseRef>> {
+    const query = new URLSearchParams({ q: params.q });
+    if (params.fuzzy) query.set("fuzzy", "true");
+    if (params.phonetic) query.set("phonetic", "true");
+    return this.http.getPage<CaseRef>(`/api/cases/search?${query.toString()}`, {
+      limit: params.limit,
+      offset: params.offset,
+    });
+  }
+
+  /**
+   * Audit trail for a single case, newest first.
+   * `GET /api/cases/{pid}/audit`.
+   * @param pid Persistent id of the case (URL-encoded into the path).
+   * @returns The case's {@link AuditEntry} rows.
+   */
+  audit(pid: string): Promise<AuditEntry[]> {
+    return this.http.get<AuditEntry[]>(
+      `/api/cases/${encodeURIComponent(pid)}/audit`,
+    );
+  }
+
+  /**
+   * Recent audit-log entries across all cases (service-capped at 100).
+   * `GET /api/cases/audit/recent`.
+   * @returns The most recent {@link AuditEntry} rows, newest first.
+   */
+  recentAudit(): Promise<AuditEntry[]> {
+    return this.http.get<AuditEntry[]>("/api/cases/audit/recent");
+  }
+
+  /**
+   * Recent events from the active transport (service-capped at 100).
+   * `GET /api/cases/events/recent`.
+   * @returns The most recent {@link CaseEvent} rows.
+   */
+  recentEvents(): Promise<CaseEvent[]> {
+    return this.http.get<CaseEvent[]>("/api/cases/events/recent");
   }
 }
