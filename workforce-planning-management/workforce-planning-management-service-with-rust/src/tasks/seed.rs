@@ -58,7 +58,11 @@ impl Task for Seed {
                 manager_pid: ActiveValue::set(None),
                 salary_minor: ActiveValue::set(Some(6_500_000)),
                 salary_currency: ActiveValue::set(Some("GBP".to_string())),
-                hired_on: ActiveValue::set(chrono::NaiveDate::from_ymd_opt(2020, 1, 6).unwrap()),
+                hired_on: ActiveValue::set(
+                    chrono::NaiveDate::from_ymd_opt(2020, 1, 6).ok_or_else(|| {
+                        Error::string("seed data: invalid department-head hired_on date")
+                    })?,
+                ),
                 terminated_on: ActiveValue::set(None),
                 deleted_at: ActiveValue::set(None),
                 ..Default::default()
@@ -95,7 +99,9 @@ impl Task for Seed {
                     salary_minor: ActiveValue::set(Some(salary)),
                     salary_currency: ActiveValue::set(Some("GBP".to_string())),
                     hired_on: ActiveValue::set(
-                        chrono::NaiveDate::from_ymd_opt(2023, 3, 1).unwrap(),
+                        chrono::NaiveDate::from_ymd_opt(2023, 3, 1).ok_or_else(|| {
+                            Error::string("seed data: invalid employee hired_on date")
+                        })?,
                     ),
                     terminated_on: ActiveValue::set(None),
                     deleted_at: ActiveValue::set(None),
@@ -138,7 +144,9 @@ impl Task for Seed {
                 salary_currency: ActiveValue::set(Some("GBP".to_string())),
                 status: ActiveValue::set(status.to_string()),
                 opened_on: ActiveValue::set(Some(
-                    chrono::NaiveDate::from_ymd_opt(2026, 6, 1).unwrap(),
+                    chrono::NaiveDate::from_ymd_opt(2026, 6, 1).ok_or_else(|| {
+                        Error::string("seed data: invalid requisition opened_on date")
+                    })?,
                 )),
                 deleted_at: ActiveValue::set(None),
                 ..Default::default()
@@ -178,7 +186,10 @@ impl Task for Seed {
                 median_minor: ActiveValue::set(median),
                 max_minor: ActiveValue::set(max),
                 source: ActiveValue::set("Demo Salary Survey 2026".to_string()),
-                as_of: ActiveValue::set(chrono::NaiveDate::from_ymd_opt(2026, 4, 1).unwrap()),
+                as_of: ActiveValue::set(
+                    chrono::NaiveDate::from_ymd_opt(2026, 4, 1)
+                        .ok_or_else(|| Error::string("seed data: invalid benchmark as_of date"))?,
+                ),
                 deleted_at: ActiveValue::set(None),
                 ..Default::default()
             }
