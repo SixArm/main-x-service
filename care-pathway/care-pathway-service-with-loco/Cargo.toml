@@ -156,7 +156,7 @@ rstest = { version = "0.25" }
 insta = { version = "1.48", features = ["redactions", "yaml", "filters"] }
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so the extractor.s
 # happy path is verified un-gated (no auth-service / network dependency).
-ed25519-dalek = { version = "2.2" }
+ed25519-dalek = { version = "3.0" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
 sha2 = { version = "0.10" }
 base64 = { version = "0.22" }
