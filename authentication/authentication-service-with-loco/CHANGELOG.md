@@ -10,6 +10,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — `GET /api/compliance/audit/verify` now requires a bearer (PRO-P23)
+
+- The endpoint previously had no auth/authz check at all — the only
+  route in this crate reachable unauthenticated. It now requires a
+  valid PASETO bearer (`AuthUser`, `401` without one), but is
+  deliberately **not** admin-gated like `/api/auth/audit/recent`: its
+  report carries no PII (row counts and row ids only), so the gate is
+  about cost, not disclosure — the handler recomputes SHA-256, SHA-3,
+  and (where configured) an HMAC over up to 10,000 real `auth_events`
+  rows on every call, a real CPU/DB denial-of-service surface for an
+  anonymous caller. See `spec/index.md` §6.13/§16 for the full
+  reasoning and the rejected alternatives.
+- Added the missing `GET /api/compliance/audit/verify` entry (+
+  `AuditIntegrityReport` schema) to `src/openapi.rs`, previously a
+  tracked gap.
+- Tests: `tests/requests/compliance.rs` (`missing_token_is_unauthorized`,
+  `any_authenticated_caller_is_allowed`) pin the bearer-required,
+  not-admin-gated behaviour; `src/openapi.rs` gained
+  `documents_audit_verify_as_bearer_gated_not_admin_gated`.
+
 ## [0.1.1] - 2026-08-26
 
 ### Added — declared MSRV (Rust 1.95)

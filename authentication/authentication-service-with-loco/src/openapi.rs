@@ -32,7 +32,13 @@ pub fn spec() -> Value {
 /// per-area path groups (merged into a single object).
 fn paths() -> Value {
     let mut paths = serde_json::Map::new();
-    for group in [auth_paths(), account_paths(), admin_paths(), infra_paths()] {
+    for group in [
+        auth_paths(),
+        account_paths(),
+        admin_paths(),
+        compliance_paths(),
+        infra_paths(),
+    ] {
         if let Value::Object(map) = group {
             paths.extend(map);
         }
@@ -196,6 +202,28 @@ fn admin_paths() -> Value {
     })
 }
 
+/// Keyed integrity verification over the `auth_events` audit trail.
+/// Requires a bearer (any authenticated caller — not admin-gated, since
+/// the report carries no PII); see `src/controllers/compliance.rs` for
+/// the reasoning.
+fn compliance_paths() -> Value {
+    json!({
+            "/api/compliance/audit/verify": {
+                "get": {
+                    "tags": ["compliance"],
+                    "summary": "Recompute and verify auth_events integrity digests",
+                    "description": "Recomputes each examined auth_events row's SHA-256, SHA-3, and (where a key is configured) HMAC digest, and reports any row whose recomputed value no longer matches what was stored. Examines up to `limit` rows (default 1000, capped at 10000), newest first. A verified:true result attests only that no examined row's content was altered — it does NOT attest that no row was deleted (see the caveat field in the response). Requires a valid bearer token (any authenticated caller); gated for cost, not disclosure — the handler recomputes real digests over real DB rows on every call, an unauthenticated CPU/DB denial-of-service surface even though the report itself carries no PII (row counts and row ids only).",
+                    "security": [{ "bearer": [] }],
+                    "parameters": [{ "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 10000, "default": 1000 }, "description": "Rows to examine, newest first; clamped to [1, 10000]." }],
+                    "responses": {
+                        "200": { "description": "Integrity report", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuditIntegrityReport" } } } },
+                        "401": { "description": "Missing or invalid bearer token" }
+                    }
+                }
+            }
+    })
+}
+
 /// Infrastructure endpoints: the public key set and Prometheus metrics.
 fn infra_paths() -> Value {
     json!({
@@ -233,9 +261,22 @@ fn components() -> Value {
     })
 }
 
-/// The `components.schemas` object, split out of [`components`] so each
-/// stays under the pedantic line budget.
+/// The `components.schemas` object, assembled from [`core_schemas`] and
+/// [`compliance_schemas`] so each stays under the pedantic line budget.
 fn schemas() -> Value {
+    let mut schemas = serde_json::Map::new();
+    for group in [core_schemas(), compliance_schemas()] {
+        if let Value::Object(map) = group {
+            schemas.extend(map);
+        }
+    }
+    Value::Object(schemas)
+}
+
+/// The bulk of `components.schemas` — everything except the compliance
+/// report (split into [`compliance_schemas`] to stay under the pedantic
+/// line budget).
+fn core_schemas() -> Value {
     json!({
                 "SignupParams": { "type": "object", "required": ["email"], "properties": {
                     "email": { "type": "string", "format": "email", "description": "Email to register and the magic-link recipient." },
@@ -336,6 +377,28 @@ fn schemas() -> Value {
     })
 }
 
+/// The `AuditIntegrityReport` schema, split out of [`core_schemas`] to
+/// stay under the pedantic line budget.
+fn compliance_schemas() -> Value {
+    json!({
+                "AuditIntegrityReport": { "type": "object",
+                    "description": "The outcome of recomputing and verifying digests over a run of auth_events rows. verified:true attests only that no examined row's content was altered — it does NOT attest that no row was deleted (see caveat).",
+                    "required": ["rows", "intact", "unhashed", "sha3_intact", "sha3_unhashed", "mac_valid", "mac_absent", "mac_unverifiable", "mismatched", "verified", "caveat"],
+                    "properties": {
+                    "rows": { "type": "integer", "description": "Rows examined." },
+                    "intact": { "type": "integer", "description": "Rows whose SHA-256 was recomputed and matched." },
+                    "unhashed": { "type": "integer", "description": "Rows carrying no SHA-256 digest (written before the column existed)." },
+                    "sha3_intact": { "type": "integer", "description": "Rows whose SHA-3 was recomputed and matched." },
+                    "sha3_unhashed": { "type": "integer", "description": "Rows carrying no SHA-3 digest." },
+                    "mac_valid": { "type": "integer", "description": "Rows whose HMAC was recomputed and matched." },
+                    "mac_absent": { "type": "integer", "description": "Rows carrying no MAC (written before a key was configured)." },
+                    "mac_unverifiable": { "type": "integer", "description": "Rows naming a key or scheme this service cannot check." },
+                    "mismatched": { "type": "array", "items": { "type": "integer", "format": "int64" }, "description": "Row ids whose content did not match what was stored. No PII — ids only." },
+                    "verified": { "type": "boolean", "description": "true when no mismatch was found." },
+                    "caveat": { "type": "string", "description": "What this result does and does not attest to (deletion is not detected)." } } }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -364,6 +427,30 @@ mod tests {
         assert!(paths["/api/auth/account"]["delete"].is_object());
         assert!(paths["/.well-known/paseto-keys"]["get"].is_object());
         assert!(paths["/metrics.prom"]["get"].is_object());
+        assert!(paths["/api/compliance/audit/verify"]["get"].is_object());
+    }
+
+    /// PRO-P23: the endpoint requires a bearer (401 documented) but is
+    /// deliberately not admin-gated — no 403 — since its report carries
+    /// no PII; the bearer requirement is about recomputation cost, not
+    /// disclosure. See `src/controllers/compliance.rs`.
+    #[test]
+    fn documents_audit_verify_as_bearer_gated_not_admin_gated() {
+        let s = spec();
+        let ep = &s["paths"]["/api/compliance/audit/verify"]["get"];
+        assert_eq!(ep["security"][0]["bearer"], serde_json::json!([]));
+        assert!(ep["responses"]["401"].is_object());
+        assert!(
+            ep["responses"]["403"].is_null(),
+            "not admin-gated: no 403 response is documented"
+        );
+        assert_eq!(
+            ep["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/AuditIntegrityReport"
+        );
+        let schemas = &s["components"]["schemas"];
+        assert!(schemas["AuditIntegrityReport"]["properties"]["verified"].is_object());
+        assert!(schemas["AuditIntegrityReport"]["properties"]["mismatched"].is_object());
     }
 
     #[test]

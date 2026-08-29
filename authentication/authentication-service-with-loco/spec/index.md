@@ -287,15 +287,24 @@ single-use (cleared on consumption).
     this crate takes no hash chain and no external-witness checkpoint,
     unlike care-pathway/case/person/worker (see
     [`agents/share/runbooks/integrity-activation.md`](../../../agents/share/runbooks/integrity-activation.md),
-    which scopes to those four). **Open question (§16): this endpoint
-    currently has no authentication or authorization check at all** —
-    unlike the sibling loco-idiomatic services (e.g. case-service's
-    equivalent, gated behind its blanket `CASE_REQUIRE_AUTH` guard),
-    this crate has no blanket `/api/*` guard to sit behind; every other
-    endpoint here is gated ad hoc (session cookie, PASETO bearer, or
-    the admin handler's own `access=admin` check). The report leaks no
-    PII (row counts and row ids only), but the gap is real and
-    undecided — see §16.
+    which scopes to those four). **Decided (§16, PRO-P23): requires a
+    bearer token, not admin-gated.** Unlike the sibling loco-idiomatic
+    services (e.g. case-service's equivalent, gated behind its blanket
+    `CASE_REQUIRE_AUTH` guard), this crate has no blanket `/api/*`
+    guard to sit behind, so the handler now gates itself directly with
+    the `AuthUser` extractor (`401` without a valid PASETO bearer) —
+    the same per-handler pattern every other endpoint here uses
+    (session cookie, PASETO bearer, or the admin handler's own
+    `access=admin` check). It is deliberately **not** admin-gated like
+    `GET /api/auth/audit/recent`: the report leaks no PII (row counts
+    and row ids only, never an email), so the reason to gate it is
+    **cost, not disclosure** — the handler recomputes SHA-256, SHA-3,
+    and (where configured) an HMAC over up to `VERIFY_MAX_LIMIT`
+    (10,000) real DB rows on every call, which is genuine CPU + DB
+    work an anonymous caller could otherwise trigger repeatedly for
+    free. Requiring authentication removes that anonymous-internet
+    abuse; it does not add a dedicated rate limit, matching how every
+    other bearer-gated route in this crate is protected.
 
 ## 7. Non-functional requirements
 
@@ -368,9 +377,10 @@ The API is described by a hand-written **OpenAPI 3.0.3** document
 `utoipa`). It is served by the docs controller
 (`src/controllers/docs.rs`) at `GET /api-docs/openapi.json`, with a
 Swagger UI page at `GET /swagger-ui` (CDN assets). The document covers
-every endpoint **except `GET /api/compliance/audit/verify`** (§6.13,
-landed 2026-07-28 with no OpenAPI entry added — a gap for a future
-pass, tracked in §13) plus the `SignupParams` /
+every endpoint, including `GET /api/compliance/audit/verify` (§6.13;
+the OpenAPI entry + `AuditIntegrityReport` schema landed alongside the
+PRO-P23 bearer-gating decision — previously a tracked gap in §13) plus
+the `SignupParams` /
 `MagicLinkParams` / `CurrentResponse` / `Claims` (PASETO) /
 `PasetoKeys` / `PasetoKey` / `AuthEvent` / `AccountExport`
 (+ `AccountUserExport` / `AccountSessionExport` / `AccountAuditExport`)
@@ -572,18 +582,23 @@ only by that subject.
       See §6.13 for the full description and env vars. Now documented in
       §6.13/§10/§16 here and in `AGENTS.md`'s API surface + configuration
       tables.
-  - [ ] **Open: this endpoint has no auth/authz check**, unlike its
-        sibling crates' equivalents (case-service's is behind
-        `CASE_REQUIRE_AUTH`). This crate has **no blanket `/api/*`
-        guard at all** — every other endpoint is gated ad hoc (session
-        cookie, PASETO bearer, or the admin handler's own
-        `access=admin` check) — so there is no existing mechanism to
-        hang a guard on without designing one. Decide and either wire
-        a guard or record the decision to leave it open (it discloses
-        no PII today — row counts and ids only). See §16.
-  - [ ] **Open: not in the OpenAPI document.** `src/openapi.rs` has no
-        entry for this path (§9); `docs::routes()` tests assert the
-        other endpoints but not this one.
+  - [x] **PRO-P23 (2026-08-29): gated with a required bearer, not
+        admin-gated.** This crate has **no blanket `/api/*` guard at
+        all**, unlike sibling crates' equivalents (case-service's is
+        behind `CASE_REQUIRE_AUTH`) — so `verify_audit` now takes the
+        `AuthUser` extractor directly (`401` without a valid PASETO
+        bearer), the same per-handler pattern every other endpoint
+        here uses. Not admin-gated like `/api/auth/audit/recent`: the
+        report carries no PII (row counts and row ids only), so the
+        gate exists for **cost** (the handler recomputes SHA-256/
+        SHA-3/HMAC over up to 10,000 real DB rows on every call — an
+        unauthenticated CPU/DB denial-of-service surface), not
+        disclosure. See §6.13/§16.
+  - [x] **PRO-P23 (2026-08-29): added to the OpenAPI document.**
+        `src/openapi.rs` now documents `GET /api/compliance/audit/verify`
+        (bearer security scheme, `401` response, no `403` — pinned by
+        `documents_audit_verify_as_bearer_gated_not_admin_gated`) and
+        the `AuditIntegrityReport` schema.
 
 - [x] **SEC-A9 (security): hash bearer-equivalent secrets at rest.** The
       magic-link token (`users.magic_link_token`), the opaque session id
@@ -922,18 +937,40 @@ attribute-based, not a fixed role list).
 - ~~PASETO library choice~~ — resolved: `rusty_paseto` (+
   `ed25519-dalek`) shipped. Still open: BFF token-exchange
   caching (shared §10).
-- **Should `GET /api/compliance/audit/verify` (§6.13) require
-  authentication?** It leaks no PII today (row counts and row ids
-  only), but it is the only endpoint in this crate with no auth check
-  of any kind, and its own source doc comment previously (wrongly)
-  claimed it sat behind a blanket `AUTH_REQUIRE_AUTH` guard that does
-  not exist here — copied, unadapted, from a sibling crate that does
-  have one. Options: (a) build a minimal blanket guard for this crate
-  (a larger change — no other endpoint here uses that pattern; every
-  other route is gated per-handler), (b) gate this one handler the
-  same way `admin.rs` does (`access=admin`), or (c) leave it open and
-  record that decision explicitly. No lean yet — flagged, not decided,
-  by the 2026-08-04 doc pass (§13).
+- ~~**Should `GET /api/compliance/audit/verify` (§6.13) require
+  authentication?**~~ — **RESOLVED (PRO-P23, 2026-08-29): yes, gate
+  it, but with a plain bearer requirement rather than admin (a
+  variant of option (b) below).** Its own source doc comment
+  previously (wrongly) claimed it sat behind a blanket
+  `AUTH_REQUIRE_AUTH` guard that does not exist here — copied,
+  unadapted, from a sibling crate that does have one. The options
+  considered were: (a) build a minimal blanket guard for this crate —
+  rejected as disproportionate: no other endpoint here uses that
+  pattern, every other route is gated per-handler, and one endpoint
+  does not justify a new middleware layer; (b) gate this one handler
+  the same way `admin.rs` does (`access=admin`) — rejected as
+  *stricter than the disclosure warrants*: the report carries no PII
+  (row counts and row ids only, unlike `/api/auth/audit/recent`'s
+  emails), so demanding the elevated admin attribute would block
+  legitimate ops/monitoring callers for no privacy reason; (c) leave
+  it open — rejected, because the handler is not cheap: it recomputes
+  SHA-256, SHA-3, and (where configured) an HMAC over up to
+  `VERIFY_MAX_LIMIT` (10,000) real `auth_events` rows read fresh from
+  the database on **every call**, so an unauthenticated caller could
+  trigger real CPU + DB load for free — an unauthenticated
+  denial-of-service surface even though the boolean-ish output is
+  harmless. **Decision: require a valid PASETO bearer (`AuthUser`,
+  `401` without one), any authenticated caller** — this removes the
+  anonymous-internet abuse (the actual risk) without imposing a
+  disclosure-driven restriction the data does not warrant. No
+  dedicated additional rate limit was added beyond authentication,
+  matching how every other bearer-gated route in this crate is
+  protected. Implemented in `src/controllers/compliance.rs`, documented
+  in `src/openapi.rs` (`AuditIntegrityReport` schema + the `401`/no-`403`
+  contract), and pinned by
+  `tests/requests/compliance.rs::{missing_token_is_unauthorized,
+  any_authenticated_caller_is_allowed}` plus
+  `src/openapi.rs::documents_audit_verify_as_bearer_gated_not_admin_gated`.
 
 ## 17. References
 

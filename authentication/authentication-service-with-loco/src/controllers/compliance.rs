@@ -17,23 +17,39 @@
 //! caveat inline rather than leaving it to documentation, because a bare
 //! `verified: true` reads as more than it means.
 //!
-//! ## Authorization — currently none (open question)
+//! ## Authorization — requires a bearer token (spec §16, decided)
 //!
 //! Unlike the equivalent endpoint on sibling loco-idiomatic services
 //! (e.g. case-service, behind its blanket `CASE_REQUIRE_AUTH` guard),
 //! this crate has **no blanket `/api/*` guard at all** — every other
 //! route here is gated per-handler (session cookie, PASETO bearer, or
-//! the admin handler's own `access=admin` check) — so there is no
-//! `AUTH_REQUIRE_AUTH` flag and this endpoint is reachable
-//! unauthenticated. The response discloses no PII (row counts and row
-//! ids only, never an email), but the gap is real and undecided; see
-//! `spec/index.md` §16.
+//! the admin handler's own `access=admin` check).
+//!
+//! This handler is gated on the same basis: it requires a valid PASETO
+//! bearer ([`AuthUser`]), `401` without one. **Not** admin-gated — the
+//! response discloses no PII (row counts and row ids only, never an
+//! email), so the elevated `access=admin` bar `recent_audit` applies for
+//! its email-carrying rows would be stricter than the disclosure
+//! warrants.
+//!
+//! The reason to gate at all is **not** disclosure — it is cost. The
+//! handler does real work on every call: a DB read of up to
+//! [`VERIFY_MAX_LIMIT`] rows, then three digest recomputations
+//! (SHA-256, SHA-3, HMAC) per row. That is CPU + DB load an anonymous
+//! caller could trigger repeatedly at no cost to themselves — an
+//! unauthenticated denial-of-service surface even though the boolean
+//! `verified` output itself is harmless. Requiring a bearer removes the
+//! anonymous-internet version of that abuse, matching how every other
+//! bearer-gated route in this crate is protected (no dedicated rate
+//! limit beyond authentication). See `spec/index.md` §16 for the full
+//! reasoning and the rejected alternatives.
 
 use axum::extract::Query;
 use loco_rs::prelude::*;
 use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
 use serde::Deserialize;
 
+use crate::auth::AuthUser;
 use crate::compliance::audit_integrity;
 use crate::models::_entities::auth_events;
 
@@ -63,13 +79,15 @@ impl VerifyParams {
     }
 }
 
-/// Verify audit-row integrity.
+/// Verify audit-row integrity. Requires a valid PASETO bearer (any
+/// authenticated caller — not admin-gated; see the module docs).
 ///
 /// # Errors
 ///
 /// When the query fails.
 #[debug_handler]
 async fn verify_audit(
+    _auth: AuthUser,
     State(ctx): State<AppContext>,
     Query(params): Query<VerifyParams>,
 ) -> Result<Response> {

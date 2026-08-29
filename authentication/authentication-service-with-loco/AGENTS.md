@@ -77,17 +77,22 @@ template (see root `AGENTS.md`).
 | DELETE | `/api/auth/account` | Session | GDPR right to erasure: soft-delete + anonymise + revoke sessions + audit. |
 | GET | `/api/auth/admin/users/{pid}/attributes` | Admin | Show a user's ABAC subject attributes. `403` unless the caller carries `access=admin`. |
 | PUT | `/api/auth/admin/users/{pid}/attributes` | Admin | Replace a user's ABAC attribute map (body `{ "attributes": { … } }`); validates keys/values, writes an `attributes_assigned` audit row. |
-| GET | `/api/compliance/audit/verify` | **— (see note)** | Recompute SHA-256/SHA-3/MAC digests over `auth_events` rows; reports any row whose content no longer matches what was stored. |
+| GET | `/api/compliance/audit/verify` | Bearer | Recompute SHA-256/SHA-3/MAC digests over `auth_events` rows; reports any row whose content no longer matches what was stored. Any authenticated caller (not admin-gated — see note). |
 | GET | `/.well-known/paseto-keys` | — | Published Ed25519 public key(s) for offline PASETO verification. |
 | GET | `/api-docs/openapi.json` | — | Hand-written OpenAPI 3 document. |
 | GET | `/swagger-ui` | — | Swagger UI page (CDN assets) rendering the doc. |
 | GET | `/metrics.prom` | — | Prometheus metrics (text exposition; root path, no `/api` prefix). |
 
-> **`/api/compliance/audit/verify` has no auth/authz check today** —
-> unlike sibling loco-idiomatic crates (e.g. case-service, behind
-> `CASE_REQUIRE_AUTH`), this crate has no blanket `/api/*` guard to
-> hang one on; every other route above is gated ad hoc instead. It
-> leaks no PII (row counts and ids only). Open decision — see
+> **`/api/compliance/audit/verify` requires a bearer, decided PRO-P23**
+> — unlike sibling loco-idiomatic crates (e.g. case-service, behind
+> `CASE_REQUIRE_AUTH`), this crate has no blanket `/api/*` guard, so
+> the handler gates itself directly (`AuthUser`, `401` without a valid
+> token), the same per-handler pattern every other route above uses.
+> It is deliberately **not** admin-gated like `/api/auth/audit/recent`
+> — the report leaks no PII (row counts and ids only), so the gate is
+> about cost, not disclosure: the handler recomputes real digests over
+> up to 10,000 DB rows on every call, which is CPU/DB work an
+> unauthenticated caller could otherwise trigger for free. See
 > `spec/index.md` §16.
 
 To avoid account enumeration, `signup` and `magic-link` always return
@@ -154,7 +159,7 @@ src/
 ├── controllers/
 │   ├── auth.rs            signup / magic-link / verify / me / signout / audit + GDPR account export/audit/erasure
 │   ├── admin.rs           ABAC attribute assignment over HTTP (GET/PUT /api/auth/admin/users/{pid}/attributes; access=admin gated)
-│   ├── compliance.rs      GET /api/compliance/audit/verify — keyed integrity verification (currently no auth check; see spec §16)
+│   ├── compliance.rs      GET /api/compliance/audit/verify — keyed integrity verification (bearer-required, not admin-gated; see spec §16)
 │   ├── docs.rs            /api-docs/openapi.json + /swagger-ui
 │   ├── paseto_keys.rs     published key endpoint (/.well-known/paseto-keys — Ed25519 public key set)
 │   └── metrics.rs         /metrics.prom (Prometheus text exposition)
