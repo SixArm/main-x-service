@@ -167,14 +167,54 @@ clearly described manual check confirms the acceptance criterion.
     policy gets `2xx`; a valid token the policy denies gets `403`;
     no/bad token gets `401`. T-8 is complete; activation
     (`PLACE_REQUIRE_AUTH=1`) remains the operational decision.
-- [ ] **T-9 — Geo-radius `nearby` HTTP endpoint + search `offset`.**
-  - [ ] Add `GET /api/places/nearby?lat=&lon=&radius_km=` wiring the
-    existing `matching::geo::within_radius` Haversine primitive with a
-    bounding-box pre-filter.
-  - [ ] Add an `offset` field to `SearchQuery` for paginated search.
-  - **Acceptance:** an integration test posts places, then
-    `GET /api/places/nearby` returns only those within the radius;
-    `search?offset=` skips the requested number of results.
+- [x] **T-9 — Geo-radius `nearby` HTTP endpoint + search `offset`.**
+  - [x] Added `GET /api/places/nearby?lat=&lon=&radius_km=&limit=&offset=`.
+    New `matching::geo::bounding_box` computes a rectangular lat/lon
+    box (derived from the **same** mean Earth radius
+    `GeoCoordinates::distance_to` uses, so the two agree on one
+    sphere — see the constant's doc comment for the property test that
+    caught the mismatch when they didn't); `db::PlaceRepository::
+    list_in_bbox` runs it as a plain SQL `BETWEEN` range query over
+    `idx_places_geo` (capped at 5,000 candidate rows — SEC-M1), and the
+    existing `matching::geo::within_radius` Haversine check narrows
+    those candidates to the true within-radius set, nearest-first.
+    Follows the family pagination convention (`agents/share/
+    restful.md`): `limit` clamped to 100, `offset` beyond 10,000 is a
+    `400`, and `X-Total-Count`/`X-Limit`/`X-Offset` response headers
+    (`X-Total-Count` is every in-radius match, ignoring the page
+    window).
+  - [x] Added `offset` to `SearchQuery` — it was genuinely missing, not
+    merely undocumented (`GET /api/places/search` had no `offset`
+    field at all). `search::SearchEngine::search_page` adds a true
+    `X-Total-Count` (Tantivy's `Count` collector, not the page length)
+    alongside the existing `q`/`limit`/`fuzzy`/`mask_sensitive`
+    handling; `search()`/`fuzzy_search()` are unchanged call sites,
+    refactored to share the same query-building as `search_page`.
+  - **Acceptance (met):** `tests/api_nearby_and_search_offset.rs`
+    (DB-gated, `#[ignore]`) posts places then confirms
+    `GET /api/places/nearby` returns only those within the radius (and
+    a place at ~95%/105% of the radius is included/excluded — the
+    edge case a too-tight bounding box would get wrong); `search?
+    offset=` skips the requested rows and `X-Total-Count` stays the
+    true total across pages; an `offset` past the bound is `400` on
+    both endpoints. Unit-level: `matching::geo` gains `bounding_box`
+    tests (straddles center, grows with radius, clamps near a pole,
+    a zero radius collapses to a point, and — the boundary case —
+    every point on the true Haversine circle at exactly `radius_km`
+    falls inside the box) plus `within_radius_boundary_is_inclusive`
+    (a point placed at exactly the radius via the spherical
+    destination-point formula is included; the `<=` cutoff is
+    inclusive). `search::SearchEngine` gains `search_page` offset/total
+    tests. One real defect found and fixed along the way, worth a
+    regression test of its own
+    (`search::tests::overlong_single_token_is_not_indexed`): Tantivy's
+    default tokenizer drops any single unbroken token over 40
+    characters, which silently dropped a compound test-fixture "unique
+    token" (a literal-prefix-concatenated-with-a-32-hex-char-UUID, no
+    separator) from the index — a sharp edge worth knowing about
+    beyond this one test file. `cargo fmt --check` / `cargo clippy
+    --all-targets -- -D warnings` / `cargo test --lib` (221, was 212)
+    / `scripts/ci-check.sh test-db` all green.
 - [ ] **T-10 — Bulk import / export.**
   - [ ] `bulk_jobs` migration (per shared §3 schema).
   - [ ] Five endpoints (shared §4): `POST /api/places/import`,

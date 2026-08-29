@@ -8,7 +8,7 @@ use axum::{
     Json,
     extract::{Path, Query, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
@@ -18,11 +18,59 @@ use super::state::AppState;
 use crate::api::ApiResponse;
 use crate::db::audit::AuditContext;
 use crate::matching::confidence_label;
+use crate::matching::geo::{bounding_box, within_radius};
+use crate::models::geo::GeoCoordinates;
 use crate::models::merge::{MergeRecord, MergeRequest, MergeResponse};
 use crate::models::place::Place;
 use crate::privacy::{gdpr_export, mask_place};
 use crate::streaming::{EventKind, PlaceEvent};
 use crate::validation::{normalize_place, validate_place};
+
+/// Largest accepted `offset` on a paginated collection read
+/// (`agents/share/restful.md`, SEC-G7). Past this a request is a `400`:
+/// the database (or, for `nearby`, the in-process filter) would
+/// otherwise have to materialise and discard arbitrarily many rows,
+/// which is a cheap denial of service. Deep paging past this bound
+/// wants a cursor, not a bigger number.
+pub const MAX_OFFSET: u64 = 10_000;
+
+/// `400 Bad Request` envelope for a rejected query parameter.
+fn bad_request(code: &str, message: impl Into<String>) -> Response {
+    (
+        StatusCode::BAD_REQUEST,
+        Json(ApiResponse::<serde_json::Value>::error(
+            code,
+            message.into(),
+        )),
+    )
+        .into_response()
+}
+
+/// `400` for an `offset` beyond [`MAX_OFFSET`].
+fn offset_too_large() -> Response {
+    bad_request(
+        "offset_too_large",
+        format!("offset must not exceed {MAX_OFFSET}; narrow the query instead"),
+    )
+}
+
+/// Stamp the pagination headers onto a response
+/// (`agents/share/restful.md`): `X-Total-Count` is the total ignoring
+/// the page window, `X-Limit`/`X-Offset` are the limit/offset actually
+/// applied — so a caller that sent neither still learns the defaults.
+fn with_page_headers(mut response: Response, total: u64, limit: u64, offset: u64) -> Response {
+    let headers = response.headers_mut();
+    for (name, value) in [
+        ("x-total-count", total),
+        ("x-limit", limit),
+        ("x-offset", offset),
+    ] {
+        if let Ok(v) = axum::http::HeaderValue::from_str(&value.to_string()) {
+            headers.insert(name, v);
+        }
+    }
+    response
+}
 
 /// Map a crate error to the HTTP status the REST layer returns for it.
 fn status_for(err: &crate::Error) -> StatusCode {
@@ -267,11 +315,22 @@ pub struct SearchQuery {
     pub q: Option<String>,
     /// Max results (default 10, capped at 100).
     pub limit: Option<usize>,
+    /// Rows to skip (default 0). Bounded by [`MAX_OFFSET`]; an `offset`
+    /// beyond that is a `400`.
+    pub offset: Option<u64>,
     /// Use fuzzy matching.
     pub fuzzy: Option<bool>,
     /// Mask sensitive fields in the results.
     pub mask_sensitive: Option<bool>,
 }
+
+/// Default page size for `GET /api/places/search` — the cap this
+/// endpoint applied before `offset` existed, so omitting `limit`
+/// returns exactly what it always did.
+pub const SEARCH_DEFAULT_LIMIT: usize = 10;
+
+/// Largest page the search endpoint will serve in one call.
+pub const SEARCH_MAX_LIMIT: usize = 100;
 
 /// Search response payload.
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -283,21 +342,38 @@ pub struct SearchResponse {
 }
 
 /// Full-text / fuzzy place search.
+///
+/// `GET /api/places/search?q=&limit=&offset=&fuzzy=&mask_sensitive=`.
+/// Returns `200` with a [`SearchResponse`] plus the `X-Total-Count` /
+/// `X-Limit` / `X-Offset` pagination headers
+/// (`agents/share/restful.md`) — the total is the true index match
+/// count, not the number of rows this page returned. An `offset`
+/// beyond [`MAX_OFFSET`] is a `400`.
 #[utoipa::path(get, path = "/api/places/search", tag = "search",
     params(SearchQuery),
-    responses((status = 200, body = SearchResponse)))]
+    responses(
+        (status = 200, body = SearchResponse),
+        (status = 400, description = "offset too large", body = crate::api::ApiError)
+    ))]
 pub async fn search_places(
     State(state): State<AppState>,
     Query(q): Query<SearchQuery>,
 ) -> impl IntoResponse {
-    let limit = q.limit.unwrap_or(10).min(100);
-    let query = q.q.unwrap_or_default();
-    let ids = if q.fuzzy.unwrap_or(false) {
-        state.search_engine.fuzzy_search(&query, limit)
-    } else {
-        state.search_engine.search(&query, limit)
+    let offset = q.offset.unwrap_or(0);
+    if offset > MAX_OFFSET {
+        return offset_too_large();
     }
-    .unwrap_or_default();
+    let limit = q
+        .limit
+        .filter(|l| *l > 0)
+        .unwrap_or(SEARCH_DEFAULT_LIMIT)
+        .min(SEARCH_MAX_LIMIT);
+    let query = q.q.unwrap_or_default();
+    let offset_usize = usize::try_from(offset).unwrap_or(usize::MAX);
+    let (ids, total) = state
+        .search_engine
+        .search_page(&query, q.fuzzy.unwrap_or(false), limit, offset_usize)
+        .unwrap_or_default();
 
     let mut results = Vec::new();
     for id in ids {
@@ -311,10 +387,144 @@ pub async fn search_places(
             });
         }
     }
-    let total = results.len();
-    (
+    let count = results.len();
+    let response = (
         StatusCode::OK,
-        Json(ApiResponse::success(SearchResponse { results, total })),
+        Json(ApiResponse::success(SearchResponse {
+            results,
+            total: count,
+        })),
+    )
+        .into_response();
+    with_page_headers(
+        response,
+        u64::try_from(total).unwrap_or(u64::MAX),
+        u64::try_from(limit).unwrap_or(u64::MAX),
+        offset,
+    )
+}
+
+/// Query parameters for `GET /api/places/nearby`.
+#[derive(Debug, Clone, Deserialize, IntoParams)]
+pub struct NearbyQuery {
+    /// Center latitude, decimal degrees (`-90..=90`).
+    pub lat: f64,
+    /// Center longitude, decimal degrees (`-180..=180`).
+    pub lon: f64,
+    /// Search radius in kilometers (non-negative, finite).
+    pub radius_km: f64,
+    /// Max results (default 10, capped at 100).
+    pub limit: Option<u64>,
+    /// Rows to skip (default 0). Bounded by [`MAX_OFFSET`]; an `offset`
+    /// beyond that is a `400`.
+    pub offset: Option<u64>,
+}
+
+/// Default page size for `GET /api/places/nearby`.
+pub const NEARBY_DEFAULT_LIMIT: u64 = 10;
+
+/// Largest page the `nearby` endpoint will serve in one call.
+pub const NEARBY_MAX_LIMIT: u64 = 100;
+
+/// Safety cap on how many bounding-box candidates are read from the
+/// database before the exact Haversine filter runs. Bounds the request
+/// to a fixed amount of work regardless of how large a box a caller's
+/// `radius_km` produces (SEC-M1: bound every input).
+pub const NEARBY_BBOX_SCAN_CAP: u64 = 5_000;
+
+/// Geo-radius search.
+///
+/// `GET /api/places/nearby?lat=&lon=&radius_km=&limit=&offset=`. Filters
+/// places within `radius_km` of `(lat, lon)`: a coarse SQL bounding-box
+/// pre-filter (`matching::geo::bounding_box`, over the `idx_places_geo`
+/// index) narrows the candidates, then the exact
+/// [`within_radius`](crate::matching::geo::within_radius) Haversine
+/// check keeps only those truly inside the circle. Results are ordered
+/// nearest-first. Returns `200` with a [`SearchResponse`] plus the
+/// `X-Total-Count` / `X-Limit` / `X-Offset` pagination headers
+/// (`agents/share/restful.md`) — the total is every in-radius match,
+/// ignoring the page window. `lat`/`lon`/`radius_km` out of range, or an
+/// `offset` beyond [`MAX_OFFSET`], is a `400`.
+#[utoipa::path(get, path = "/api/places/nearby", tag = "search",
+    params(NearbyQuery),
+    responses(
+        (status = 200, body = SearchResponse),
+        (status = 400, description = "invalid lat/lon/radius_km, or offset too large", body = crate::api::ApiError)
+    ))]
+pub async fn nearby_places(
+    State(state): State<AppState>,
+    Query(q): Query<NearbyQuery>,
+) -> impl IntoResponse {
+    if !(-90.0..=90.0).contains(&q.lat) {
+        return bad_request("invalid_latitude", "lat must be in -90..=90");
+    }
+    if !(-180.0..=180.0).contains(&q.lon) {
+        return bad_request("invalid_longitude", "lon must be in -180..=180");
+    }
+    if !q.radius_km.is_finite() || q.radius_km < 0.0 {
+        return bad_request(
+            "invalid_radius",
+            "radius_km must be a non-negative finite number",
+        );
+    }
+    let offset = q.offset.unwrap_or(0);
+    if offset > MAX_OFFSET {
+        return offset_too_large();
+    }
+    let limit = q
+        .limit
+        .filter(|l| *l > 0)
+        .unwrap_or(NEARBY_DEFAULT_LIMIT)
+        .min(NEARBY_MAX_LIMIT);
+
+    let center = GeoCoordinates::new(q.lat, q.lon);
+    let (lat_min, lat_max, lon_min, lon_max) = bounding_box(&center, q.radius_km);
+    let candidates = match state
+        .place_repository
+        .list_in_bbox(lat_min, lat_max, lon_min, lon_max, NEARBY_BBOX_SCAN_CAP)
+        .await
+    {
+        Ok(c) => c,
+        Err(e) => return fail(&e).into_response(),
+    };
+
+    let radius_m = q.radius_km * 1000.0;
+    let mut within: Vec<(f64, Place)> = candidates
+        .into_iter()
+        .filter_map(|p| {
+            let geo = p.geo.as_ref()?;
+            let dist = geo.distance_to(&center);
+            within_radius(geo, &center, radius_m).then_some((dist, p))
+        })
+        .collect();
+    // Nearest-first, so pagination is a meaningful "closer" ordering
+    // rather than an arbitrary one.
+    within.sort_by(|(da, _), (db, _)| da.partial_cmp(db).unwrap_or(std::cmp::Ordering::Equal));
+
+    let total = within.len();
+    let offset_usize = usize::try_from(offset).unwrap_or(usize::MAX);
+    let limit_usize = usize::try_from(limit).unwrap_or(usize::MAX);
+    let results: Vec<Place> = within
+        .into_iter()
+        .skip(offset_usize)
+        .take(limit_usize)
+        .map(|(_dist, p)| p)
+        .collect();
+    let count = results.len();
+
+    let response = (
+        StatusCode::OK,
+        Json(ApiResponse::success(SearchResponse {
+            results,
+            total: count,
+        })),
+    )
+        .into_response();
+    with_page_headers(
+        response,
+        u64::try_from(total).unwrap_or(u64::MAX),
+        limit,
+        offset,
     )
 }
 

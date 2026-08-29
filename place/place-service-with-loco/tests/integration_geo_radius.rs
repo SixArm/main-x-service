@@ -7,10 +7,13 @@
 //! do not exercise as a whole-collection operation:
 //!
 //! 1. **Geo-radius filtering** (`spec/06-functional-requirements.md §6.3`,
-//!    task §13 T-9). The `nearby` HTTP endpoint is not yet wired, but the
-//!    `matching::geo::within_radius` Haversine primitive that the future
-//!    endpoint will use is exercised here over a small collection of
-//!    places so the filtering semantics are pinned end-to-end.
+//!    task §13 T-9, landed). The `GET /api/places/nearby` HTTP endpoint
+//!    now wires `matching::geo::within_radius` (behind a
+//!    `matching::geo::bounding_box` pre-filter) — see
+//!    `tests/api_nearby_and_search_offset.rs` for the DB-gated
+//!    end-to-end HTTP coverage. This file keeps the primitive-level
+//!    pin over a small in-memory collection, independent of the
+//!    database.
 //! 2. **Matcher-bridge worked example** (`agents/restful.md`). Drives two
 //!    service-side records through `adapter::to_matcher_place` and the
 //!    canonical `place_matcher::MatchingEngine`, asserting on the runnable

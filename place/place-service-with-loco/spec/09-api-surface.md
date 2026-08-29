@@ -4,7 +4,7 @@ Complete reference: [`agents/restful.md`](../agents/restful.md).
 
 | Tier | Surface |
 |---|---|
-| REST (Axum) | 16 endpoints under `/api/places/*` + `/api/audit/recent` + `/api/health` |
+| REST (Axum) | 17 endpoints under `/api/places/*` + `/api/audit/recent` + `/api/health` |
 | Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | Integrity verification (Axum) | `GET /api/records/verify`, `GET /api/audit/verify` — keyed-MAC + digest checks over place records / the audit log (§13; default `mac_absent` with no key configured) |
 | FHIR R5 (Axum) | `Location` resource — `GET/POST/PUT/DELETE /fhir/Location{,/{id}}`, `GET /fhir/metadata` (`CapabilityStatement`) — see §13 T-11 |
@@ -13,9 +13,10 @@ Complete reference: [`agents/restful.md`](../agents/restful.md).
 | Web UI | Full set documented in project-root [`spec.md`](../../spec/index.md) |
 | Docs | Swagger UI at `/swagger-ui` |
 
-The 16 `/api` REST endpoints are: `GET /api/health`; `POST /api/places`;
+The 17 `/api` REST endpoints are: `GET /api/health`; `POST /api/places`;
 `GET`/`PUT`/`DELETE /api/places/{id}`; `GET /api/places/search`;
-`POST /api/places/match`; `POST /api/places/check-duplicates`;
+`GET /api/places/nearby`; `POST /api/places/match`;
+`POST /api/places/check-duplicates`;
 `POST /api/places/merge`; `POST /api/places/deduplicate`;
 `GET /api/places/review-queue`;
 `POST /api/places/review-queue/{id}/decision`;
@@ -24,9 +25,12 @@ The 16 `/api` REST endpoints are: `GET /api/health`; `POST /api/places`;
 (plus `GET /api/whoami` and the integrity-verify pair listed above as
 their own tiers). Full table: [`agents/restful.md`](../agents/restful.md).
 
-Search query parameters are `q`, `limit`, `fuzzy`, `mask_sensitive`.
-Geo-radius search (`nearby`), an `/api/audit/user` route, and search
-`offset` pagination are **not yet delivered** — see §13 T-9.
+Search query parameters are `q`, `limit`, `offset`, `fuzzy`,
+`mask_sensitive`; `GET /api/places/nearby?lat=&lon=&radius_km=&limit=
+&offset=` is the geo-radius search. Both carry the family's
+`X-Total-Count`/`X-Limit`/`X-Offset` pagination headers
+(`agents/share/restful.md`) — delivered, §13 T-9. An `/api/audit/user`
+route remains **not yet delivered**.
 
 This crate **does** expose an HL7 FHIR R5 surface mapping places to the
 FHIR `Location` resource (delivered 2026-07-07, T-11) — see the FHIR

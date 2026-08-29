@@ -75,18 +75,20 @@ curl -X POST http://localhost:5150/api/places \
   }'
 ```
 
-Full-text / fuzzy search (query params: `q`, `limit`, `fuzzy`,
-`mask_sensitive`):
+Full-text / fuzzy search (query params: `q`, `limit`, `offset`,
+`fuzzy`, `mask_sensitive`; response carries `X-Total-Count`/`X-Limit`/
+`X-Offset` pagination headers):
 
 ```bash
 curl "http://localhost:5150/api/places/search?q=Central+Park&fuzzy=true&limit=10"
 ```
 
-> A geo-radius `nearby` endpoint (`lat` / `lon` / `radius_km`) and
-> `offset` pagination are **not yet delivered** — see
-> [`spec/13-tasks.md`](spec/13-tasks.md) T-9. The `within_radius`
-> Haversine primitive exists in `src/matching/geo.rs` but is not yet
-> wired to an HTTP route.
+Geo-radius search (`lat` / `lon` / `radius_km`, same `limit`/`offset`
+pagination, nearest-first — [`spec/13-tasks.md`](spec/13-tasks.md) T-9):
+
+```bash
+curl "http://localhost:5150/api/places/nearby?lat=40.7829&lon=-73.9654&radius_km=2"
+```
 
 ## Configuration
 
