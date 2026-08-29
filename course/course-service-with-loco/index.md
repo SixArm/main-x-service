@@ -53,7 +53,7 @@ curl http://localhost:8084/api/health
 ### Option 2: native build
 
 ```bash
-# Prerequisites: Rust 1.95+ (2024 edition), PostgreSQL 18+, podman (optional).
+# Prerequisites: Rust 1.96+ (2024 edition), PostgreSQL 18+, podman (optional).
 cp .env.example .env
 
 # Set up the database.

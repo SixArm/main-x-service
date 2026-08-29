@@ -4,7 +4,7 @@
 name = "case-folder-service-with-rust"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.96"
 publish = false
 default-run = "case-folder-service-with-rust-cli"
 description = "Case folder service — NHS paper case-note folder location tracking with a barcode/QR/RFID move audit trail"

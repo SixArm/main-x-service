@@ -114,8 +114,8 @@ jobs:
         if: always()
         run: rm -rf '${{ matrix.crate }}/target'
 
-  # Minimum Supported Rust Version — the current stable minus three
-  # (spec/rust-msrv-n-minus-3.md). Its own job rather than a step inside
+  # Minimum Supported Rust Version — the current stable minus two
+  # (spec/rust-msrv-n-minus-2/index.md). Its own job rather than a step inside
   # `check`: it is a second full compile of every crate under a different
   # toolchain, so it wants its own cache key instead of thrashing the
   # stable one. The stage checks manifest consistency against ci/msrv.txt

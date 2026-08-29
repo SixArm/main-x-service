@@ -886,7 +886,7 @@ the evidence bundle.
   CPU-bound halves of a request, compiled in CI by the new
   `scripts/ci-check.sh bench` stage. `Cargo.toml` also declares
   `rust-version = "1.95"` — the repository's current-stable-minus-three
-  floor (`spec/rust-msrv-n-minus-3/index.md`), enforced by
+  floor (`spec/rust-msrv-n-minus-2/index.md`), enforced by
   `scripts/ci-check.sh msrv`.
 
 - [x] **2026-08-02 — Privacy: field masking + GDPR export (repo

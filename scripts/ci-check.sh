@@ -39,7 +39,7 @@
 #               check --all-targets` against that toolchain. A no-op for
 #               the nightly-only fuzz/ sub-crates. Needs the MSRV
 #               toolchain installed: rustup toolchain install <msrv>
-#               --profile minimal. See spec/rust-msrv-n-minus-3/index.md.
+#               --profile minimal. See spec/rust-msrv-n-minus-2/index.md.
 #   bench       cargo bench --no-run, for crates declaring a [[bench]].
 #               Compiles and links the Criterion harnesses without
 #               running them: a benchmark nobody runs still rots, and a
@@ -84,7 +84,7 @@ enrolled_for_db() {
 # The declared MSRV, from its single source of truth. Every crate's
 # `rust-version` must equal this; keeping the number in one file is what
 # stops ~50 hand-edited manifests drifting apart.
-# (spec/rust-msrv-n-minus-3/index.md)
+# (spec/rust-msrv-n-minus-2/index.md)
 msrv_version() {
   grep -v '^[[:space:]]*#' ci/msrv.txt \
     | grep -v '^[[:space:]]*$' \

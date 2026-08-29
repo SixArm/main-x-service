@@ -4,7 +4,7 @@
 name = "project-portfolio-management-service"
 version = "0.3.0"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.96"
 publish = true
 default-run = "project-portfolio-management-service"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]

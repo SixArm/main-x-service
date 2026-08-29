@@ -62,8 +62,8 @@ steps:
     commands:
       - scripts/ci-check.sh bench
 
-  # Minimum Supported Rust Version — current stable minus three
-  # (spec/rust-msrv-n-minus-3.md). The stage asserts every crate's
+  # Minimum Supported Rust Version — current stable minus two
+  # (spec/rust-msrv-n-minus-2/index.md). The stage asserts every crate's
   # `rust-version` equals ci/msrv.txt, then compiles it against that
   # toolchain; the version is read from the file rather than written here
   # so a bump touches one place.

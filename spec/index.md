@@ -32,7 +32,7 @@ the family-wide source of truth; the briefer versions under
 | [dataflow](dataflow/index.md) | Request/data flows — create, match, merge, search, read/masked/export, auth |
 | [tech-stack](tech-stack/index.md) | Technology stack + hard constraints (Podman/Tokio/MiMalloc/PostgreSQL/chrono) and current drift |
 | [agents-directory-name-is-lowercase](agents-directory-name-is-lowercase/index.md) | The agent reference directories are named `agents`, lowercase — the rule, why a case-only mismatch hides on macOS, and the CI stage behind it |
-| [rust-msrv-n-minus-3](rust-msrv-n-minus-3/index.md) | Minimum Supported Rust Version — the N-3 policy, how it is declared and verified, and how to bump it |
+| [rust-msrv-n-minus-2](rust-msrv-n-minus-2/index.md) | Minimum Supported Rust Version — the N-2 policy, how it is declared and verified, and how to bump it |
 | [special-files-for-public-repos](special-files-for-public-repos/index.md) | The special top-level files every public repo carries (LICENSE.md, CITATION.cff, SECURITY.md, AI_STATEMENT.md, …) |
 | [free-open-source-funding](free-open-source-funding/index.md) | Funding channels for a free/open-source repo (GitHub Sponsors, Open Collective, `.github/FUNDING.yml`) |
 | [trusted-publishing](trusted-publishing/index.md) | OIDC-based crate publishing (no long-lived API tokens) — adopt once production-ready across every forge and target we use |

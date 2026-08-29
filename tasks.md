@@ -6746,6 +6746,56 @@ crate above.
   of these seven likely need no `otlp-test-tonic` rename. Update
   `agents/share/{overview.md,observability.md,rust-tracing-
   opentelemetry-stack.md}` once all seven land.
+- [x] **PRO-H13 (M)** *(done 2026-08-29)* **Tighten the Rust MSRV
+  policy from N-3 to N-2.** New
+  [`spec/rust-msrv-n-minus-2/index.md`](spec/rust-msrv-n-minus-2/index.md)
+  replaces `spec/rust-msrv-n-minus-3/index.md`, following the same
+  structure/rigor as its predecessor (dependency-floor tracking, the
+  MSRV-vs-toolchain-pin distinction, the bump procedure) with the
+  policy's own reasoning updated for why N-2 (tighter grace period;
+  N-3's eighteen weeks was more slack than this family's crates.io
+  consumers have ever needed). Floor moves **1.95 → 1.96** (still
+  current stable 1.98.0 minus two; clears the real dependency floor —
+  loco-rs / sea-orm / sqlx at 1.94 — by two releases, one more than
+  N-3 had). `ci/msrv.txt` updated; `rust-version = "1.96"` swept across
+  all 46 non-`fuzz` `Cargo.toml` manifests (verified: zero drift before
+  the sweep — every one of the 46 declared exactly `"1.95"`, and the 18
+  `fuzz/` sub-crates correctly declared none). Every live doc citing
+  the old path or the old number swept in the same change: root
+  `AGENTS.md`, `spec/index.md`, `spec/tech-stack/index.md` (two
+  separate tables), `agents/share/rust-loco-stack.md`,
+  `spec/agents-directory-name-is-lowercase/index.md` (also fixed a
+  pre-existing broken link — bare `rust-msrv-n-minus-3.md` instead of
+  the dir+`index.md` convention PRO-R2 already established elsewhere),
+  `.github/workflows/ci.yml` + `.woodpecker.yml` (comments only — both
+  CI jobs already read `ci/msrv.txt` dynamically, no hardcoded
+  version), `scripts/ci-check.sh` (comments), and the seven
+  per-crate README-facing `index.md`/badge files that stated
+  "Rust 1.95+" (person, worker, event, thing, place, course services).
+  **Deliberately left untouched**: `tasks.md`'s own `MSRV-1` entry and
+  four crates' `spec/index.md` dated task entries (organization,
+  care-pathway, portfolio, case) that record "declares rust-version =
+  1.95" as a historical fact about what was true when each landed —
+  only their now-stale link *target* was fixed, not the number, per
+  this repo's established CHANGELOG-stays-historical convention; same
+  for `place`/`event`'s `spec/13-tasks.md` dated "MSRV 1.95" verification
+  snapshots. Added a `### Changed` note under `[Unreleased]` in the 8
+  crates published to crates.io (person/worker/place/thing/event/
+  course-matcher, project-portfolio-management-matcher,
+  authentication-verifier) per the policy's own semver-visibility rule
+  — version bump + actual `cargo publish` deliberately deferred to
+  each crate's next real release rather than forced by an MSRV-only
+  change, matching how PRO-P17 handled the portfolio crate's CHANGELOG
+  earlier this phase. *Verified:* `scripts/ci-check.sh docs` green;
+  `scripts/ci-check.sh msrv` (no crate argument — the full sweep, not a
+  sample) exits `0` for all 46 non-`fuzz` crates under `rustc 1.96`
+  (`set -euo pipefail`, so any single crate's manifest-consistency
+  check or `cargo +1.96 check --all-targets` failure would have failed
+  the whole run) — Rust 1.96 was already `rustup`-installed locally
+  from the `rust-toolchain.toml` pin, so this needed no new toolchain
+  fetch. Two crates independently re-run standalone afterward
+  (`person-service-with-loco`, `project-portfolio-management-matcher`)
+  as an extra spot-check, both green.
 
 ### PRO-P — per-family targeted fixes
 

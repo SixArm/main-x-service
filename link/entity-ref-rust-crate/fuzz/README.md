@@ -44,4 +44,4 @@ nothing is carried between runs — CI's
 This sub-crate is **not** a member of any workspace and declares no
 `rust-version`: cargo-fuzz is nightly-only, so the repo MSRV does not
 apply to it (see
-[`spec/rust-msrv-n-minus-3/index.md`](../../../spec/rust-msrv-n-minus-3/index.md) §2).
+[`spec/rust-msrv-n-minus-2/index.md`](../../../spec/rust-msrv-n-minus-2/index.md) §2).

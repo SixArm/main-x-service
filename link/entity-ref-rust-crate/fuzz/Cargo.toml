@@ -20,7 +20,7 @@ path = ".."
 # serde path run on attacker-supplied strings. Not a member of any parent
 # workspace, so it never affects the crate's normal build/test/clippy, and
 # it carries no `rust-version`: cargo-fuzz is nightly-only
-# (spec/rust-msrv-n-minus-3/index.md §2).
+# (spec/rust-msrv-n-minus-2/index.md §2).
 
 [[bin]]
 name = "parse_ref"
