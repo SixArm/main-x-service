@@ -8,6 +8,14 @@
 //     or via `bin/e2e` which health-checks first.
 //   - Postgres reachable from the service (handled by the service's
 //     docker-compose).
+//   - authentication-service, in DEVELOPMENT mode, at AUTH_API_URL
+//     (default http://localhost:5150 —
+//     examples/compose/authentication-dev.yml, NOT full-family.yml).
+//     The mutating flows below (create/edit/merge) go through the
+//     page-visit auth guard + CSRF check, which need a real signed-in
+//     session — see auth.setup.ts (T-27, PRO-P32) and this project's
+//     AGENTS.md "Live-integration testing needs a real sign-in".
+//     `bin/e2e` health-checks this too.
 //
 // Each test creates its own data with a timestamped family name so
 // the suite stays idempotent across runs. afterAll soft-deletes

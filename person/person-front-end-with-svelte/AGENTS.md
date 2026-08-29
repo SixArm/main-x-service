@@ -101,6 +101,41 @@ path through it would touch the authentication-service contract, not
 just this app. A visitor who signs in from a guarded page lands on
 `/` and navigates back manually.
 
+This guard is why `tests/integration/` needs a real signed-in session
+— see the next section.
+
+## Live-integration testing needs a real sign-in (T-27, PRO-P32)
+
+`tests/integration/golden-paths.spec.ts` exercises the guard + CSRF
+check above for real, so it needs a real session, not a stub. A
+Playwright **`setup` project** (`tests/integration/auth.setup.ts`)
+runs once before `integration` (a `dependencies: ["setup"]` project
+relationship in `playwright.config.ts`, not a top-level
+`globalSetup` — the latter runs for every `--project`, which would
+force the deliberately service-free `smoke` project to need a live
+authentication-service too):
+
+1. `POST /api/auth/signup` against a live authentication-service.
+2. Poll the container's own console log for the issued magic-link
+   token (ANSI-stripped — the binary's tracing output stays coloured
+   through a plain pipe). There is no other way to retrieve it: the
+   HTTP response never carries it (anti-enumeration), and the token is
+   hashed at rest (SEC-A9) so a database read can't recover it either.
+3. `page.goto` the real `/verify?token=…` URL — same path a real
+   user's inbox click takes — and save the resulting
+   `__Host-mxi_session` / `__Host-mxi_csrf` cookies as a Playwright
+   `storageState` that `integration` reuses for every test.
+
+Step 2 only works against authentication-service running in
+`LOCO_ENV=development`: `deliver_magic_link` (its own
+`src/controllers/auth.rs`) logs the link **only** in that environment
+(SEC-A3 — a production-mode container never discloses a live login
+token to its logs). That's `examples/compose/authentication-dev.yml`
+(family-reusable, not person-specific) — never `examples/compose/
+full-family.yml`, which pins production mode. `bin/e2e` brings up and
+health-checks both person-service and authentication-service before
+invoking Playwright.
+
 ## What does NOT live here
 
 - FHIR Person UI. Out of scope for MVP.

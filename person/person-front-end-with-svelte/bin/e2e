@@ -5,20 +5,33 @@
 #   - person-service-with-loco up at PUBLIC_API_BASE_URL (default
 #     http://localhost:8080). Bring it up locally with:
 #       (cd ../person-service-with-loco && podman compose up -d)
+#   - authentication-service-with-loco up, in DEVELOPMENT mode, at
+#     AUTH_API_URL (default http://localhost:5150). Bring it up with:
+#       podman compose -f ../../examples/compose/authentication-dev.yml build
+#       podman compose -f ../../examples/compose/authentication-dev.yml up -d
+#     NOT full-family.yml / production compose — those run
+#     LOCO_ENV=production, which never logs the magic-link URL
+#     (SEC-A3), and this suite's `setup` project
+#     (tests/integration/auth.setup.ts) has no other way to complete a
+#     real sign-in (PRO-P32). See authentication-dev.yml's own header
+#     comment for why.
 #   - Playwright browsers installed (`pnpm exec playwright install chromium`).
 #
-# This wrapper does the health-check up front so we fail fast with a
+# This wrapper does both health-checks up front so we fail fast with a
 # clear message instead of via a generic Playwright timeout.
 #
 # Usage:
-#   bin/e2e                            # default API at :8080
-#   PUBLIC_API_BASE_URL=… bin/e2e      # override
+#   bin/e2e                            # default API at :8080, auth at :5150
+#   PUBLIC_API_BASE_URL=… bin/e2e      # override the person-service URL
+#   AUTH_API_URL=… bin/e2e             # override the authentication-service URL
 #   bin/e2e --headed                   # forward extra args to playwright
 
 set -euo pipefail
 
 API_BASE_URL="${PUBLIC_API_BASE_URL:-http://localhost:8080}"
+AUTH_BASE_URL="${AUTH_API_URL:-http://localhost:5150}"
 export PUBLIC_API_BASE_URL="$API_BASE_URL"
+export AUTH_API_URL="$AUTH_BASE_URL"
 
 printf 'Health-checking service at %s/api/health ... ' "$API_BASE_URL"
 if ! curl -fsS --max-time 5 "$API_BASE_URL/api/health" > /dev/null; then
@@ -33,6 +46,27 @@ then wait for the service to report healthy:
 
 Or point at a different URL:
   PUBLIC_API_BASE_URL=http://other.host:1234 bin/e2e
+EOF
+    exit 1
+fi
+echo "ok"
+
+printf 'Health-checking authentication-service at %s/_health ... ' "$AUTH_BASE_URL"
+if ! curl -fsS --max-time 5 "$AUTH_BASE_URL/_health" > /dev/null; then
+    printf '\n' >&2
+    cat >&2 <<EOF
+ERROR: authentication-service is not reachable at $AUTH_BASE_URL/_health.
+
+Start it (in DEVELOPMENT mode — see the note at the top of this
+script and examples/compose/authentication-dev.yml for why it must be
+this file, not the production-mode stacks):
+  podman compose -f ../../examples/compose/authentication-dev.yml build
+  podman compose -f ../../examples/compose/authentication-dev.yml up -d
+then wait for it to report healthy:
+  podman compose -f ../../examples/compose/authentication-dev.yml logs -f authentication-service
+
+Or point at a different URL:
+  AUTH_API_URL=http://other.host:1234 bin/e2e
 EOF
     exit 1
 fi

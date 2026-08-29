@@ -10,3 +10,8 @@ dist
 test-results
 playwright-report
 .vite
+
+# Real session + CSRF cookies from tests/integration/auth.setup.ts
+# (PRO-P32) — regenerated on every `pnpm test:integration` run, never
+# committed.
+tests/integration/.auth-storage-state.json

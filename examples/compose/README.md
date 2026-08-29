@@ -11,6 +11,7 @@ these are **dev/demo** stacks that run the actual service binaries.
 | [`single-service.yml`](single-service.yml) | One service (case-service) + its own Postgres — the minimal pattern, template for any other crate |
 | [`full-family.yml`](full-family.yml) | All ten entity registries + authentication-service + link-graph-service, one shared Postgres (twelve databases) |
 | [`enforced.yml`](enforced.yml) | An **override** on top of `full-family.yml`: `<ENTITY>_REQUIRE_AUTH` on everywhere, an ABAC policy mounted, PASETO key-fetch wired to authentication-service |
+| [`authentication-dev.yml`](authentication-dev.yml) | authentication-service alone, in `LOCO_ENV=development` — the mode that logs a real magic-link URL to the console (SEC-A3) instead of emailing it, for anything that needs to complete a real passwordless sign-in without SMTP (person-front-end-with-svelte's live-integration suite is the reference consumer — `tests/integration/auth.setup.ts`) |
 
 ## Prerequisites
 
@@ -52,6 +53,16 @@ podman compose -f examples/compose/full-family.yml -f examples/compose/enforced.
 curl http://localhost:8089/_health              # 200 — health stays public
 curl http://localhost:8089/api/cases            # 401 — no bearer token
 podman compose -f examples/compose/full-family.yml -f examples/compose/enforced.yml down -v
+
+# authentication-service alone, in development mode (real magic-link
+# sign-in without SMTP — see the table above)
+podman compose -f examples/compose/authentication-dev.yml build
+podman compose -f examples/compose/authentication-dev.yml up -d
+curl -X POST http://localhost:5150/api/auth/signup \
+  -H 'content-type: application/json' \
+  -d '{"email":"you@example.test","name":"You","return_url":"http://localhost:4173"}'
+podman compose -f examples/compose/authentication-dev.yml logs authentication-service | grep 'magic link issued'
+podman compose -f examples/compose/authentication-dev.yml down -v
 ```
 
 ## Why a migrate-then-start step per service

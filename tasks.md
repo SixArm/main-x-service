@@ -6825,11 +6825,25 @@ crate above.
 ### PRO-P — per-family targeted fixes
 
 **person**
-- [ ] **PRO-P1 (M)** `from_fhir` silently drops `additional_names`,
-  `marital_status`, `multiple_birth`, `managing_organization`, and
-  identifier-type coding (`src/api/fhir/mod.rs:375-417`) — a FHIR `PUT`
-  can erase native-API data. Parse them or reject with
-  `OperationOutcome`; list the gap in spec §14.2 until closed.
+- [x] **PRO-P1 (M)** *(done 2026-08-29, commit 5662667b — landed on
+  `main` already; this row was just never checked off)* `from_fhir`
+  silently drops `additional_names`, `marital_status`,
+  `multiple_birth`, `managing_organization`, and identifier-type
+  coding (`src/api/fhir/mod.rs:375-417`) — a FHIR `PUT` can erase
+  native-API data. Parse them or reject with `OperationOutcome`; list
+  the gap in spec §14.2 until closed.
+  *Result:* parsed 4 of the 5 with round-trip tests
+  (`additional_names` via a new shared `human_name_from_fhir` helper;
+  `marital_status`; `multiple_birth` boolean form;
+  `managing_organization` when a well-formed `Organization/<uuid>`
+  literal; identifier-type coding replacing the hardcoded `Other`).
+  The genuinely ambiguous cases are rejected with `OperationOutcome`
+  rather than force-parsed or silently dropped: a malformed/display-only
+  `managingOrganization` reference (400), and `multipleBirth`'s integer
+  birth-order form, which has no domain field to hold the order — its
+  mere presence maps to `Some(true)`, documented as a deliberate,
+  spec-§14.2-tracked coarsening rather than a silent drop. Verified
+  independently: `cargo test --lib` 355/355 (was 351, +4 new).
 - [x] **PRO-P2 (S)** *(done 2026-08-29)* Fixed `LinkType::ReplacedBy`'s
   serde rename (`"replacedby"` → `"replaced_by"`, matching the DB CHECK
   constraint) with a unit test pinning all four wire tags plus a
@@ -6869,10 +6883,11 @@ crate above.
   See `person-front-end-with-svelte/spec/16-open-questions.md` OQ-5
   for the full record.
 
-- [ ] **PRO-P32 (M)** *(found 2026-08-29, via PRO-P4)* person FE's live
-  integration suite (`tests/integration/golden-paths.spec.ts`) never
-  signs in, and now cannot complete any mutating flow: the page-visit
-  auth guard (PRO-H10) redirects `/persons/new`, `/persons/merge`,
+- [x] **PRO-P32 (M)** *(found 2026-08-29 via PRO-P4; done 2026-08-29)*
+  person FE's live integration suite
+  (`tests/integration/golden-paths.spec.ts`) never signs in, and now
+  cannot complete any mutating flow: the page-visit auth guard
+  (PRO-H10) redirects `/persons/new`, `/persons/merge`,
   `/persons/[id]/edit` to `/signin`, and the CSRF double-submit check
   (PRO-H5) rejects the proxy's mutating calls with `403`. Both landed
   2026-08-28/29, after this suite's "6/9 pass" baseline was written.
@@ -6885,6 +6900,54 @@ crate above.
   worker/thing/event/course's own live-integration suites, if they
   have equivalents — check when picking this up, since PRO-H10 rolled
   to all five front-ends.
+  *Decision (asked, not assumed):* a real magic-link sign-in, over a
+  guard/CSRF bypass.
+  *Scope check:* confirmed worker/thing/event/course carry **no**
+  equivalent live-integration suite (no `tests/integration/*.spec.ts`
+  in any of their front-ends) — this gap was person-only.
+  *Result:* a new Playwright `setup` project
+  (`person-front-end-with-svelte/tests/integration/auth.setup.ts`),
+  which the `integration` project `dependencies` on rather than a
+  top-level `globalSetup` (the latter would also gate the deliberately
+  service-free `smoke` project) — drives a real `POST /api/auth/signup`
+  against a live authentication-service, polls its console log for the
+  issued token (ANSI-stripped; its tracing output stays coloured
+  through a plain pipe — there is no other way to retrieve it: the
+  HTTP response never carries it (anti-enumeration), and the token is
+  hashed at rest, SEC-A9), then `page.goto`s the real `/verify` URL and
+  saves the resulting `__Host-mxi_session`/`__Host-mxi_csrf` cookies as
+  a `storageState` every `integration` test reuses. This only works
+  against authentication-service running in `LOCO_ENV=development`
+  (SEC-A3 — a production-mode container never logs the link), for
+  which no compose file existed anywhere in the repo; added
+  `examples/compose/authentication-dev.yml` (family-reusable, not
+  person-specific — any other front-end needing the same pattern can
+  reuse it directly). That file's one non-obvious fix, found live: a
+  dev-mode container binds `server.binding: localhost` (a hardcoded
+  literal in `config/development.yaml`, not one of its `{{
+  get_env(...) }}` templated fields) — reasonable for a bare `cargo
+  run`, but unreachable through the compose port-forward from outside
+  the container regardless of `ports:`, so the compose file patches
+  the one line at container start rather than duplicating the whole
+  config file. `bin/e2e` now health-checks authentication-service too.
+  Also fixed one adjacent, previously-latent bug found in the same
+  investigation: `playwright.config.ts`'s `webServer` command baked
+  `PUBLIC_API_BASE_URL` into the client build but never set the BFF's
+  own runtime `PERSON_API_URL` (`src/lib/server/config.ts`, read at
+  request time), so a UI-submitted mutation could silently target this
+  crate's `.env` default (`:5150`, the native `cargo run` port) rather
+  than the live instance `PUBLIC_API_BASE_URL` actually pointed the
+  direct-REST fixture helpers at (`:8080`, the podman-compose
+  container) — both now point at the same base. **Verified live,
+  end-to-end, not inferred**: signup → log line → `/verify` → both
+  real cookies present in the saved `storageState`; reusing it, a
+  guarded page (`/persons/new`) rendered its create form instead of
+  redirecting to `/signin`. `svelte-check` 0 errors, `prettier --check`
+  clean on the changed files. Full mutating-flow run (the rest of
+  `golden-paths.spec.ts` against a live person-service, needing
+  another release-mode container build) not additionally executed this
+  pass — the auth mechanism itself, which is what this task scoped, is
+  proven; see person's own spec §13 T-27 / §16 OQ-5 for the full record.
 
 **worker**
 - [x] **PRO-P5 (S)** *(done 2026-08-29)* Closed §13 T-2, reworded to
