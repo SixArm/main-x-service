@@ -272,3 +272,61 @@ export interface ScoredRef {
   /** Whether the score clears the match threshold. */
   is_match: boolean;
 }
+
+/**
+ * Query parameters for `GET /api/cases/search`. Only `q` is required; a
+ * missing/blank `q` is rejected by the service with `400`.
+ */
+export interface SearchParams {
+  /** The full-text query. */
+  q: string;
+  /** Typo-tolerant retrieval (Levenshtein ≤ 2) instead of exact terms. */
+  fuzzy?: boolean;
+  /** Phonetic (Soundex) retrieval; takes precedence over `fuzzy` server-side. */
+  phonetic?: boolean;
+  /** Page size; omitted ⇒ the service default. */
+  limit?: number;
+  /** Rows to skip; omitted ⇒ 0. */
+  offset?: number;
+}
+
+/**
+ * One audit-log row from `GET /api/cases/{pid}/audit` or
+ * `GET /api/cases/audit/recent`. Mirrors the service's `audit_logs`
+ * SeaORM entity (`src/models/_entities/audit_logs.rs`) — only the fields
+ * the UI renders are modelled here; the tamper-evidence columns
+ * (`hash`/`prev_hash`/`mac`/…) are opaque to this front-end.
+ */
+export interface AuditEntry {
+  /** Auto-incrementing primary key. */
+  id: number;
+  /** The audited case's persistent id. */
+  entity_pid: string;
+  /** The audited operation: `created` / `updated` / `deleted` / `merged` / `read` / `search` / `export` / … */
+  action: string;
+  /** Caller's user pid when a verified token was presented, else `null`. */
+  actor: string | null;
+  /** Optional JSON snapshot of the record state for the audited action. */
+  snapshot?: unknown;
+  /** Whether this row is a disclosure (HIPAA §164.528 accounting). */
+  disclosure?: boolean;
+  /** ISO-8601 timestamp of when the action was recorded. */
+  created_at: string;
+}
+
+/**
+ * One event from the service's event stream, returned by
+ * `GET /api/cases/events/recent`. Mirrors the service's `EventView`
+ * (`src/streaming.rs`) — `kind` is the service's `EventKind`, serialized
+ * lowercase.
+ */
+export interface CaseEvent {
+  /** The kind of change that occurred. */
+  kind: "created" | "updated" | "deleted" | "merged" | "linked" | "unlinked";
+  /** Persistent id of the affected case. */
+  pid: string;
+  /** The case's title at the time of the event. */
+  name: string;
+  /** Per-process monotonic sequence number. */
+  seq: number;
+}

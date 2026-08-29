@@ -54,18 +54,20 @@ src/
 │   └── components/CaseForm.svelte, LinksPanel.svelte, merge-validation.ts, link-validation.ts
 └── routes/
     ├── +layout.svelte / +layout.ts   top-bar nav (hamburger on narrow) + SPA toggle + SSO sign-in/out
-    ├── +page.svelte               list
+    ├── +page.svelte               list + full-text search box (fuzzy/phonetic toggles)
     ├── cases/+page.svelte         SVAR DataGrid + FilterBar index (client-side filtering)
     ├── board/+page.svelte         SVAR Kanban — drag a card to change status
     ├── new/+page.svelte           create
-    ├── [pid]/+page.svelte         detail + delete + check-duplicates + "subject of this case" links panel
+    ├── [pid]/+page.svelte         detail + delete + check-duplicates + "subject of this case" links panel + audit link
     ├── [pid]/edit/+page.svelte    edit
+    ├── [pid]/audit/+page.svelte   one case's audit trail, newest first
     ├── merge/+page.svelte         merge a duplicate into a survivor + recent merge history
+    ├── audit/+page.svelte         system-wide recent activity: recent audit entries + recent events
     ├── signin / verify            this app's own magic-link request/verify (BFF session establishment)
     └── api/proxy/[...path]        BFF proxy → case service (attaches the PASETO server-side)
 
 tests/
-├── unit/                         vitest: client / cases / case-form / i18n / layout / link-validation / merge-validation
+├── unit/                         vitest: client / cases / case-form / i18n / layout / link-validation / merge-validation (70 tests, 7 files)
 └── e2e/smoke.spec.ts             Playwright: 8 tests over the routes above + check-duplicates self-exclusion
 ```
 
@@ -74,6 +76,7 @@ tests/
 | UI action | Endpoint |
 |---|---|
 | List | `GET /api/cases` |
+| Search | `GET /api/cases/search?q=&fuzzy=&phonetic=&limit=&offset=` |
 | Create | `POST /api/cases` |
 | Detail | `GET /api/cases/{pid}` |
 | Edit | `PUT /api/cases/{pid}` |
@@ -82,6 +85,9 @@ tests/
 | Merge | `POST /api/cases/merge` |
 | Recent merges | `GET /api/cases/merges/recent` |
 | Links (list / assert / withdraw) | `GET`/`POST /api/cases/{pid}/links`, `DELETE /api/cases/{pid}/links/{id}` |
+| Case audit trail | `GET /api/cases/{pid}/audit` |
+| Recent audit (system-wide) | `GET /api/cases/audit/recent` |
+| Recent events (system-wide) | `GET /api/cases/events/recent` |
 
 ## Commands
 

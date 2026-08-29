@@ -131,6 +131,7 @@
     <button class="button" onclick={handleCheckDuplicates} disabled={checking}>
       {checking ? t("detail.checking") : t("detail.checkDuplicates")}
     </button>
+    <a class="button" href={`/${pid}/audit`}>{t("detail.viewAudit")}</a>
     <button onclick={handleDelete}>{t("detail.delete")}</button>
   </div>
 
