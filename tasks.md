@@ -6771,26 +6771,45 @@ crate above.
   sentinel rejections) rather than general web knowledge. All 7
   schemes already had fully-implemented, tested parsers — this was a
   pure documentation gap, not code.
-- [ ] **PRO-P4 (M)** *(investigated 2026-08-29, not resolved)* person
-  FE: stabilize the 3 documented failing live-integration tests
+- [~] **PRO-P4 (M)** *(partially resolved 2026-08-29)* person FE:
+  stabilize the 3 documented failing live-integration tests
   (duplicate-detector test-data interactions). A first attempt
-  diagnosed a real mechanism (the fixture DOB generator kept every
-  record in the same calendar year, and the service's actual
-  same-year/same-month DOB scorer plus the shared "E2E" family-name
-  token was enough to cross the 0.7 duplicate threshold for unrelated
-  records) and tried fixing the fixture's date-generation scheme to
-  spread records across distinct years. Verified live against a
-  freshly reset Postgres + a clean service instance (not a stale/dirty
-  DB — reproduced twice, once against a service already warmed up by
-  the earlier attempt, once against a fully fresh `test-db.sh
-  down`+`up`): the fix did **not** stabilize the suite — 6 tests fail
-  (`FR-3` ×2, `FR-6`, `FR-7`, `FR-8`, `FR-9`), which is *more* than the
-  3 originally documented, not fewer. The diagnostic reasoning may
-  still be partially correct but is not sufficient on its own; the
-  attempted fix was reverted (not landed) rather than presented as
-  working. Needs a fresh investigation, ideally tracing the actual
-  match scores the service returns for the colliding fixture pairs
-  rather than reasoning from the scoring algorithm's source alone.
+  (date-spacing only) was tried, verified live against a fresh
+  Postgres to still fail 6 tests, and reverted rather than landed as
+  working. A second, more defensive attempt closed the original
+  mechanism for real: `apiCreatePerson` now retries a 409 by
+  regenerating both the DOB and the family-name suffix (bounded, 5
+  attempts) instead of trying to statically predict the live
+  matcher's scoring — verified live that FR-9's fixture setup
+  (previously the reliable 409) now succeeds cleanly every run. **The
+  suite is still not green**, for a separate, unrelated, larger reason
+  found in the same investigation: the page-visit auth guard
+  (PRO-H10) and CSRF check (PRO-H5), both landed this session, now
+  require a signed-in session for every mutating flow, and this suite
+  never signs in — confirmed live, `FR-3`×2/`FR-6`/`FR-7`/`FR-8`/`FR-9`
+  all fail purely on `/signin` redirects or `403 csrf` rejections, not
+  duplicate-detector collisions. That gap is out of this task's scope
+  (test-data fixtures) and needs a security-relevant decision (real
+  sign-in vs. an approved test-mode bypass) — tracked as **PRO-P32**.
+  See `person-front-end-with-svelte/spec/16-open-questions.md` OQ-5
+  for the full record.
+
+- [ ] **PRO-P32 (M)** *(found 2026-08-29, via PRO-P4)* person FE's live
+  integration suite (`tests/integration/golden-paths.spec.ts`) never
+  signs in, and now cannot complete any mutating flow: the page-visit
+  auth guard (PRO-H10) redirects `/persons/new`, `/persons/merge`,
+  `/persons/[id]/edit` to `/signin`, and the CSRF double-submit check
+  (PRO-H5) rejects the proxy's mutating calls with `403`. Both landed
+  2026-08-28/29, after this suite's "6/9 pass" baseline was written.
+  Needs a decision: make the suite actually complete a magic-link
+  sign-in against a live `authentication-service` (real, but couples
+  this suite to a second live service), or add a deliberate,
+  explicitly-approved test-mode bypass of the guard/CSRF check (faster,
+  but a security-relevant carve-out that needs sign-off, not a
+  unilateral test-harness convenience). This same gap likely applies to
+  worker/thing/event/course's own live-integration suites, if they
+  have equivalents — check when picking this up, since PRO-H10 rolled
+  to all five front-ends.
 
 **worker**
 - [x] **PRO-P5 (S)** *(done 2026-08-29)* Closed §13 T-2, reworded to
