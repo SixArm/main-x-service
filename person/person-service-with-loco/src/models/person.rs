@@ -204,7 +204,12 @@ pub struct PersonLink {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum LinkType {
-    /// The person resource containing this link is replaced by the linked person
+    /// The person resource containing this link is replaced by the linked person.
+    ///
+    /// Renamed explicitly: `rename_all = "lowercase"` alone would produce
+    /// `"replacedby"`, but the `person_links.link_type` DB CHECK
+    /// constraint (2024-12-28 migration) expects `'replaced_by'`.
+    #[serde(rename = "replaced_by")]
     ReplacedBy,
     /// The person resource containing this link replaces the linked person
     Replaces,
@@ -395,6 +400,30 @@ mod tests {
             let json = serde_json::to_string(&g).expect("Gender serialization");
             let deser: Gender = serde_json::from_str(&json).expect("Gender deserialization");
             assert_eq!(deser, g);
+        }
+    }
+
+    /// Every `LinkType` variant serializes to the exact lowercase tag the
+    /// `person_links.link_type` DB CHECK constraint (2024-12-28
+    /// migration) accepts, and round-trips through JSON.
+    ///
+    /// Pins PRO-P2: `#[serde(rename_all = "lowercase")]` alone would
+    /// serialize `ReplacedBy` as `"replacedby"`, but the CHECK constraint
+    /// only accepts `'replaced_by'` — hence `ReplacedBy`'s explicit
+    /// `#[serde(rename = "replaced_by")]` override.
+    #[test]
+    fn test_link_type_wire_tags_match_db_check_constraint() {
+        let cases = [
+            (LinkType::ReplacedBy, "\"replaced_by\""),
+            (LinkType::Replaces, "\"replaces\""),
+            (LinkType::Refer, "\"refer\""),
+            (LinkType::Seealso, "\"seealso\""),
+        ];
+        for (variant, expected_json) in cases {
+            let json = serde_json::to_string(&variant).expect("LinkType serialization");
+            assert_eq!(json, expected_json);
+            let deser: LinkType = serde_json::from_str(&json).expect("LinkType deserialization");
+            assert_eq!(deser, variant);
         }
     }
 }

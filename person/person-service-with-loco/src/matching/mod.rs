@@ -155,11 +155,13 @@ impl ProbabilisticMatcher {
 
     /// Return the threshold used for classification.
     ///
-    /// Currently a hard-coded `0.85`; wiring this to the config is a
-    /// known TODO.
+    /// Delegates to the underlying [`ProbabilisticScorer`]'s configured
+    /// [`MatchingConfig::threshold_score`] (default `0.85`) rather than
+    /// hard-coding it, so a matcher built from a non-default config
+    /// reports its own threshold.
     #[must_use]
     pub fn threshold(&self) -> f64 {
-        0.85 // TODO: expose config properly
+        self.scorer.threshold_score()
     }
 
     /// Bucket a score into a [`MatchQuality`] via the underlying scorer.

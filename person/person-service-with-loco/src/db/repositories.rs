@@ -651,10 +651,9 @@ impl SeaOrmPersonRepository {
                 other_person_id: Set(link.other_person_id),
                 // `LinkType`'s `#[serde(rename_all = "lowercase")]` matches
                 // the CHECK constraint for `Replaces`/`Refer`/`Seealso`
-                // (single words) but not `ReplacedBy` (serde: `"replacedby"`,
-                // CHECK: `'replaced_by'`) — nothing in this crate
-                // constructs that variant today, so it is a narrower,
-                // separately-tracked residual rather than a blocker here.
+                // (single words); `ReplacedBy` carries its own
+                // `#[serde(rename = "replaced_by")]` override so it matches
+                // the CHECK constraint too (PRO-P2, 2026-08-29).
                 link_type: Set(enum_to_tag(&link.link_type).unwrap_or_default()),
                 created_at: Set(OffsetDateTime::now_utc()),
                 created_by: Set(None),

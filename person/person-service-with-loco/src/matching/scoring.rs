@@ -201,6 +201,13 @@ impl ProbabilisticScorer {
         score >= self.config.threshold_score
     }
 
+    /// Return the configured probable-match threshold
+    /// (`MatchingConfig::threshold_score`, default `0.85`).
+    #[must_use]
+    pub fn threshold_score(&self) -> f64 {
+        self.config.threshold_score
+    }
+
     /// Bucket a numeric score into a [`MatchQuality`].
     ///
     /// `>= 0.95` is definite, `>= threshold` is probable, `>= 0.50` is

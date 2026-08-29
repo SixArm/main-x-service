@@ -748,6 +748,85 @@ async fn test_merge_two_persons_round_trips_alias_name_and_replaces_link() {
     );
 }
 
+/// A `LinkType::ReplacedBy` link round-trips through Postgres.
+///
+/// Regression test for PRO-P2: `LinkType`'s `#[serde(rename_all =
+/// "lowercase")]` alone serializes `ReplacedBy` as `"replacedby"`, but
+/// the `person_links.link_type` CHECK constraint (2024-12-28 migration)
+/// only accepts `'replaced_by'` — every other variant (`Replaces`,
+/// `Refer`, `Seealso`) is a single lowercase word so the mismatch was
+/// specific to this one variant, and nothing in the merge path (which
+/// only ever writes `Replaces`, see the round-trip test above) exercised
+/// it. This test writes a `ReplacedBy` link directly via `PUT` and
+/// re-fetches, pinning both the write (the `#[serde(rename =
+/// "replaced_by")]` override satisfying the CHECK constraint) and the
+/// read (the stored `'replaced_by'` tag deserializing back to
+/// `LinkType::ReplacedBy`).
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn test_replaced_by_link_round_trips() {
+    use person_service::models::{LinkType, PersonLink};
+
+    let app = common::create_test_router().await;
+
+    let family_a = common::unique_person_name("ReplacedByA");
+    let family_b = common::unique_person_name("ReplacedByB");
+    let person_a = create_minimal_person(&app, &family_a, "A", "1980-02-02").await;
+    let person_b = create_minimal_person(&app, &family_b, "B", "1981-03-03").await;
+
+    let mut updated = person_a.clone();
+    updated.links.push(PersonLink {
+        other_person_id: person_b.id,
+        link_type: LinkType::ReplacedBy,
+    });
+
+    let update_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/persons/{}", person_a.id))
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&updated).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let update_status = update_response.status();
+    let update_body = axum::body::to_bytes(update_response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    assert_eq!(
+        update_status,
+        StatusCode::OK,
+        "expected the ReplacedBy link to satisfy the CHECK constraint, got: {}",
+        String::from_utf8_lossy(&update_body)
+    );
+
+    let get_response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/persons/{}", person_a.id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(get_response.status(), StatusCode::OK);
+    let get_body = axum::body::to_bytes(get_response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let get_api_response: ApiResponse<Person> = serde_json::from_slice(&get_body).unwrap();
+    let survivor = get_api_response.data.unwrap();
+
+    let link = survivor
+        .links
+        .iter()
+        .find(|l| l.other_person_id == person_b.id)
+        .expect("the ReplacedBy link should round-trip");
+    assert_eq!(link.link_type, LinkType::ReplacedBy);
+}
+
 /// A person carrying `telecom` (with `use_type` set) and an identifier
 /// with `use_type` set round-trips through Postgres.
 ///

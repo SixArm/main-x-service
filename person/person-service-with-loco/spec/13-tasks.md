@@ -823,10 +823,19 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     re-fetches the survivor, pinning both the write (insert succeeds)
     and read (stored lowercase tags deserialize to the right enum
     variants) sides together.
-  - **Residual, narrower gap, not fixed here:** `LinkType::ReplacedBy`'s
-    `#[serde(rename_all = "lowercase")]` produces `"replacedby"`, not
-    the CHECK's `'replaced_by'` — nothing in this crate constructs that
-    variant today, so it is tracked but not blocking.
+  - **Residual, narrower gap — closed 2026-08-29 (PRO-P2).**
+    `LinkType::ReplacedBy`'s `#[serde(rename_all = "lowercase")]`
+    produced `"replacedby"`, not the CHECK's `'replaced_by'`.
+    `ReplacedBy` now carries its own `#[serde(rename = "replaced_by")]`
+    override (the other three variants — `Replaces`, `Refer`,
+    `Seealso` — are already single lowercase words the blanket
+    `rename_all` gets right). Pinned by a DB-free unit test
+    (`models::person::tests::test_link_type_wire_tags_match_db_check_constraint`,
+    asserting every variant's exact wire tag) and a new DB-gated
+    integration test (`test_replaced_by_link_round_trips`,
+    `tests/api_integration_test.rs`) that writes a `ReplacedBy` link via
+    `PUT /api/persons/{id}` and re-fetches it — both green against a
+    real Postgres 18 (`scripts/ci-check.sh test-db`).
   - **Acceptance:** the new DB-gated test is green against Postgres 18
     (`scripts/ci-check.sh test-db`); `cargo test --lib` unaffected.
 
@@ -926,3 +935,24 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     audit table, and the never-auto-promoted-regardless-of-score
     governance test all live entirely on the link-graph side — see that
     crate's own `spec/13-tasks.md` T-33 entry.
+
+- [x] **PRO-P2 (S) — Expose the hardcoded `0.85` matcher threshold.**
+  *(done 2026-08-29)* `ProbabilisticMatcher::threshold()`
+  (`src/matching/mod.rs`) returned a hardcoded `0.85` with a `// TODO:
+  expose config properly` comment, instead of the threshold the
+  matcher was actually built with (`MatchingConfig::threshold_score`,
+  already a real, configurable field the underlying
+  `ProbabilisticScorer::is_match`/`classify_match` honour — see
+  `src/matching/scoring.rs`). A matcher constructed from a non-default
+  config silently reported the wrong threshold.
+  - [x] Added `ProbabilisticScorer::threshold_score()` — a getter over
+    the scorer's own `MatchingConfig.threshold_score`.
+  - [x] `ProbabilisticMatcher::threshold()` now delegates to
+    `self.scorer.threshold_score()` instead of the literal `0.85`.
+    Behaviour is unchanged for the default config (`threshold_score:
+    0.85`); only a non-default config changes what this method reports.
+  - **Acceptance:** `cargo fmt --check` / `cargo clippy --all-targets
+    -- -D warnings` clean; `cargo test --lib` green (existing
+    `matching::scoring` tests already cover `threshold_score` behaviour
+    via `is_match`/`classify_match`, unaffected by this change since it
+    only removes a duplicate hardcoded literal).
