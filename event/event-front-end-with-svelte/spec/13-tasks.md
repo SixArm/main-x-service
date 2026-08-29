@@ -25,4 +25,25 @@
 - [x] T-23a: Auth — BFF + httpOnly cookie: `/signin` + `/verify` (per-app magic-link), `src/lib/server/{session,auth,config}.ts`, `/api/proxy/[...path]` reverse proxy injecting a server-exchanged PASETO. The browser holds only `__Host-mxi_session`; no `mxi_access_token`/`localStorage` bearer, no fragment handoff (per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
 - [x] T-23b: CSRF protection on mutating browser→BFF calls (double-submit cookie per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md) §4) — the remaining half of the original T-23, split out once the cookie/PASETO half landed. Landed 2026-08-28: `__Host-mxi_csrf` (non-httpOnly) set alongside the session cookie at `/verify`, echoed as `X-CSRF-Token` by `ApiClient` on mutating requests, verified by the `/api/proxy` handler (double-submit + Origin/Referer backstop), cleared on signout. See §16 OQ-3.
 - [ ] T-24: i18n coverage for `/signin` and `/verify` — currently plain English only (see the in-file comment on `src/routes/signin/+page.svelte`), unlike the rest of the app's 13-locale coverage.
+- [x] T-25 (2026-08-29, PRO-H10): **Page-visit guard.** Redirect an
+  unauthenticated visitor away from every page whose sole purpose is
+  submitting a mutation — `/events/new`, `/events/[id]/edit`,
+  `/events/merge` each gained a `+page.server.ts` calling the new
+  `requireSignedIn(locals)` (`src/lib/server/session.ts`),
+  `redirect(303, "/signin")` on no session. Read/list/search/view
+  pages stay public — this mirrors the backend's own default-allow-read
+  / mutation-deny ABAC posture rather than a separate front-end policy.
+  `/calendar` also stays public: despite writing back on drag-to-
+  reschedule, its entire purpose is viewing the schedule, not
+  submitting a mutation. Event has no `/events/bulk` or `/review`
+  route (no bulk import/export, no review queue for this entity), so
+  neither exists to guard, unlike `person-front-end-with-svelte`'s
+  parallel task. `locals.sessionId` is presence-only, a UX convenience
+  in front of the backend's real enforcement, not a substitute for it.
+  Deliberately does not thread a `next` param back through `/signin` in
+  v1 (see `AGENTS.md`'s "Page-visit guard" section for why — the
+  magic-link round trip does not carry one today). Tests:
+  `tests/unit/session.test.ts` (+2 — `requireSignedIn` throws a
+  303-to-`/signin` redirect when signed out, passes through silently
+  when signed in).
 
