@@ -23,7 +23,7 @@ serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precisio
 thiserror = "2"
 base64 = "0.22"
 rusty_paseto = { version = "0.10.0", default-features = false, features = ["v4_public", "serde_json"] }
-reqwest = { version = "0.12", default-features = false, features = [
+reqwest = { version = "0.13", default-features = false, features = [
   "rustls-tls",
   "json",
 ], optional = true }
