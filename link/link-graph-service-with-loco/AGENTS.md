@@ -54,14 +54,16 @@ migrations (the last backs `src/models/suggestion_runs.rs`, one durable
 row per completed suggestion pass). The cross-service `same_identity`
 matcher round (LNK-4, T-29..33) is **complete** — see
 [`spec/13-tasks.md`](spec/13-tasks.md) and `spec/16-open-questions.md`
-OQ-9. `cargo test --lib`: 103 passed (2026-08-05). Remaining (see
+OQ-9. `cargo test --lib`: 104 passed (2026-08-29). Remaining (see
 [`spec/13-tasks.md`](spec/13-tasks.md) and spec §14): graph-read
-privacy-masking parity with the case service (T-18), T-22's remaining
-container hardening (its **OTLP export landed 2026-08-05** —
-`src/observability.rs`, the family's first working exporter),
-the durable-bus flip (T-23), the bus/governance/bench test tiers
-(T-26..28), and (this pass) the documentation-harmonisation sweep
-LNK-4's completion unblocked (DOC-6).
+privacy-masking parity with the case service (T-18), the durable-bus
+flip (T-23), the bus/governance/bench test tiers (T-26..28), and (this
+pass) the documentation-harmonisation sweep LNK-4's completion
+unblocked (DOC-6). T-22 itself is fully done — both its **OTLP export**
+(landed 2026-08-05, `src/observability.rs`, the family's first working
+exporter) and its Podman `HEALTHCHECK` + non-root `USER` directives
+(present in the `Dockerfile` since it was added, 2026-08-03) — see the
+correction in `spec/13-tasks.md` T-22.
 
 ## Three-part change rule
 
@@ -111,13 +113,25 @@ the shared design doc first, then the three above.
 
 - Family [Rust + Loco stack](../../agents/share/rust-loco-stack.md):
   Rust 2024, Tokio, Axum + Loco (backend-only — no Tera/HTMX/views),
-  SeaORM + PostgreSQL, Fluvio for the bus, Utoipa OpenAPI, tracing +
-  OpenTelemetry, MiMalloc on MUSL.
+  SeaORM + PostgreSQL, Fluvio for the bus, tracing + OpenTelemetry,
+  MiMalloc on MUSL.
+- **OpenAPI is hand-written, not Utoipa-generated.** `src/openapi.rs`
+  builds the `OpenAPI` 3 document by hand with `serde_json::json!` —
+  there is no `utoipa` dependency in this crate's `Cargo.toml` and no
+  `#[derive(ToSchema)]`/`OpenApi` macro anywhere in `src/`. Deliberate
+  (see the module doc comment): dependency-light and easier to keep
+  accurate to the enveloped wire format than a derive macro would be.
 - **Podman not Docker. PostgreSQL not SQLite. Tokio not async_std.**
 - Prefer `with-chrono` for SeaORM time types on this new crate (OQ-5).
-- Copy the `EntityRef` value type and the edge-kind registry per project
-  (drift-accepted); do not factor a shared `mxi-links` package without
-  explicit approval (design §12 / OQ-4).
+- **`EntityRef` is a real Cargo `path` dependency, not copied.**
+  `Cargo.toml` carries `entity-ref = { path = "../entity-ref-rust-crate"
+  }`; this crate takes the `EntityType`/`EntityRef`/`EdgeKind` types from
+  [`link/entity-ref-rust-crate`](../entity-ref-rust-crate) rather than
+  vendoring its own copy. This matches the shared design doc's resolved
+  position (`cross-service-linking.md` §12: "RESOLVED by practice" —
+  every real consumer, this aggregator included, took the path
+  dependency rather than the copy-per-project plan §2/§3 originally
+  described). Do not fork a local copy without explicit approval.
 
 ## What does NOT live here
 

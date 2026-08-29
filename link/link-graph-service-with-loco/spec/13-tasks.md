@@ -301,9 +301,19 @@
   `override_filter`); a failing export now logs
   `BatchSpanProcessor.ExportError` once per batch interval.
 
-  *Still open from this task's original wording*: the Podman health check
-  and non-root container hardening (`/_health` / `/_ping` and graceful
-  shutdown are loco's and were already in place).
+  *Correction (2026-08-29, PRO-P25):* this note previously read "still
+  open from this task's original wording: the Podman health check and
+  non-root container hardening" — stale. Reading the `Dockerfile`
+  confirms both are present and have been since it was added
+  (2026-08-03, `Add a production Containerfile for link-graph-service`):
+  `USER linkgraph` (non-root) and a `HEALTHCHECK --interval=30s
+  --timeout=3s --start-period=10s --retries=3 CMD curl --silent --fail
+  http://localhost:5160/_health || exit 1` instruction (with a documented
+  caveat that Podman's default OCI image format ignores `HEALTHCHECK`
+  unless built with `--format docker`, which is why the
+  `examples/compose/` stacks also set an equivalent compose-level
+  `healthcheck:`). T-22 has no open container-hardening work; `/_health`
+  / `/_ping` and graceful shutdown are loco's, as already noted.
 - [ ] T-23: Flip transport to the durable bus per entity as Fluvio
   topics go live; retire lazy verify-on-read per entity (design §5.1,
   event-bus.md §8).

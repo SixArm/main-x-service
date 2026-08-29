@@ -5,8 +5,9 @@ The read-model core, the real Fluvio consumer, reconciliation, offline
 PASETO + ABAC governance, and the cross-service `same_identity`
 suggestion job all compile clean, are clippy-clean
 (`--all-targets --all-features`), and are unit-tested (`cargo test
---lib`: **95 passed**, up from the v1-core-only 15 of 2026-07-09 — see
-§13 T-24/T-29/T-30/T-31/T-33 for the incremental counts). Built from
+--lib`: **104 passed** as of 2026-08-29, up from the v1-core-only 15 of
+2026-07-09 — see §13 T-24/T-29/T-30/T-31/T-33 for the incremental
+counts). Built from
 the canonical design doc
 [`cross-service-linking.md`](../../../agents/share/cross-service-linking.md)
 (this is its §4.3 read-model aggregator) and the
@@ -99,7 +100,8 @@ disagree, §13 wins.**
   Live-verified never to auto-promote regardless of score
   (`tests/live_suggest_never_promoted.rs`). See §5.5, §6.8, §10.7,
   `spec/16-open-questions.md` OQ-9.
-- **Tests** — un-gated unit suite (§11.1, 95 tests) + `#[ignore]`d
+- **Tests** — un-gated unit suite (§11.1, 104 tests as of 2026-08-29) +
+  `#[ignore]`d
   DB-gated suites (§11.2: `concealment`, `governance`, `graph_endpoints`,
   `idempotency`, `lazy_verify`, `reconcile`, `suggestion_runs`) + two
   manual `#[ignore]`d live-service tests
@@ -114,12 +116,16 @@ disagree, §13 wins.**
 
 Check [§13](13-tasks.md) directly for the current, authoritative list —
 it is kept current task-by-task; this is only a snapshot. As of
-2026-08-05: graph-read privacy-masking parity with the case service
+2026-08-29: graph-read privacy-masking parity with the case service
 (T-18), the durable-bus flip per entity (T-23), and the
 bus/governance/bench test tiers (T-26 Fluvio round-trip, T-27
-governance no-leak, T-28 Criterion benchmarks). T-22's Podman
-health-check + non-root container hardening also remains, though its
-OTLP half landed 2026-08-05.
+governance no-leak, T-28 Criterion benchmarks). T-22 is fully done —
+its OTLP half landed 2026-08-05, and its Podman `HEALTHCHECK` +
+non-root `USER` directives were already in the `Dockerfile` (added
+2026-08-03); a prior version of this note and of §13 T-22's own
+residual text claimed the container hardening half was still open,
+which reading the `Dockerfile` does not bear out (corrected
+2026-08-29, PRO-P25).
 
 ### 14.3 Upstream prerequisites — status as of 2026-08-04 (both resolved)
 
