@@ -21,7 +21,7 @@ fetch = ["dep:reqwest"]
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 thiserror = "2"
-base64 = "0.22"
+base64 = "0.23"
 rusty_paseto = { version = "0.10.0", default-features = false, features = ["v4_public", "serde_json"] }
 reqwest = { version = "0.12", default-features = false, features = [
   "rustls-tls",
