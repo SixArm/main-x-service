@@ -6,12 +6,21 @@
 //! barcode / QR / RFID scan as a move event and replaying that move log
 //! into a live location and a tamper-evident audit trail.
 //!
-//! It is **not** a master-patient index nor a matcher service: it does
-//! not own patient / place / worker identity. Those live in the upstream
-//! Main-X-Services, which this crate reaches through thin HTTP clients
-//! (see the `main_*_service` modules). The folder + volume + move data
-//! is this crate's own, and it joins against the upstream services for
-//! human-readable names, place hierarchy, and worker roles.
+//! It is **not** a master-patient index nor a matcher service, and it is
+//! a **pure aggregator with no local domain tables of its own**: it owns
+//! no patient / place / worker identity, and no folder / volume / move
+//! data either — folders and volumes live in the upstream Main Thing
+//! Service, moves in the Main Event Service, patients in the Main
+//! Patient Service, places in the Main Place Service, and workers in
+//! the Main Worker Service. This crate reaches all five through thin
+//! HTTP clients (see the `main_*_service` modules), joins their
+//! responses, and snapshots labels (patient name, NHS Number, cabinet
+//! path, worker name/role) onto the records it *writes upstream* so the
+//! audit trail stays readable if an upstream later renames or goes
+//! offline — it does not persist those snapshots itself. The `migration`
+//! crate's migrator list is deliberately empty and `models::_entities` is
+//! a placeholder; Loco requires both modules to exist even though this
+//! service has no PostgreSQL schema of its own.
 //!
 //! Notable domain rules implemented here:
 //! - **NHS Number Modulus-11** check-digit validation (`nhs`).
