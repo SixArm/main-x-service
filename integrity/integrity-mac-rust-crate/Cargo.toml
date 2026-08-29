@@ -19,7 +19,7 @@ path = "src/lib.rs"
 hmac = "0.12"
 sha2 = "0.10"
 # HKDF-SHA256 (RFC 5869) — per-(service, domain) subkey derivation.
-hkdf = "0.12"
+hkdf = "0.13"
 # Wipes the root key once the subkeys are derived.
 zeroize = "1"
 # OS entropy for key generation.
