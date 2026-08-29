@@ -1,0 +1,130 @@
+# authentication-service in **development** mode — its own Postgres,
+# `LOCO_ENV=development` overriding the image's baked-in
+# `LOCO_ENV=production` default (authentication-service-with-loco/
+# Dockerfile).
+#
+# This is deliberately a SEPARATE file from single-service.yml's
+# case-service example, not a `<- swap` copy of it: the whole point
+# here is the environment override. `config/development.yaml`
+# (authentication-service-with-loco/config/) sets `auto_migrate: true`
+# (no separate migrate step needed, unlike every production-mode
+# service in this directory) and is what makes
+# `deliver_magic_link` (src/controllers/auth.rs) write the magic-link
+# URL to the console log — SEC-A3 (agents/share/security.md) makes
+# that ONLY happen in `Environment::Development`, by design, so a
+# production-mode container (full-family.yml, single-service.yml) never
+# discloses a live login token to its logs. Anything that needs to
+# read a real magic link — a local demo, or a live-service test suite
+# driving a real passwordless sign-in (see
+# person-front-end-with-svelte/tests/integration/) — needs THIS file,
+# not the production-mode stacks.
+#
+# Build context is the REPOSITORY ROOT, resolved relative to this
+# file's location, exactly like every other file in this directory.
+#
+# Usage (from anywhere):
+#   podman compose -f examples/compose/authentication-dev.yml build
+#   podman compose -f examples/compose/authentication-dev.yml up -d
+#   curl http://localhost:5150/_health
+#   # trigger a magic link (POST /api/auth/magic-link or /signup), then:
+#   podman compose -f examples/compose/authentication-dev.yml logs authentication-service | grep 'magic link issued'
+#   podman compose -f examples/compose/authentication-dev.yml down -v
+#
+# NOTE: run `build` and `up` as two separate steps — see
+# single-service.yml's header comment for why (a compose-provider hang
+# observed on this repository's large build context).
+#
+# AUTH_ALLOWED_FRONTENDS below is the exact-origin allow-list
+# `choose_frontend` checks a magic link's `return_url` against
+# (agents/share/authentication-sessions.md §5); it defaults to the
+# person front-end's Playwright preview origin (port 4173 —
+# person-front-end-with-svelte/playwright.config.ts PREVIEW_PORT), so
+# this file works out of the box for that suite. Override it to add
+# another front-end's origin, comma-separated.
+
+services:
+  postgres:
+    image: docker.io/library/postgres:18-alpine
+    container_name: mxi-example-authentication-dev-postgres
+    environment:
+      POSTGRES_USER: loco
+      POSTGRES_PASSWORD: loco
+      POSTGRES_DB: authentication_service_development
+    volumes:
+      # PGDATA lives under /var/lib/postgresql in the postgres:18 image
+      # (.../18/docker, not the .../data of earlier majors) — mounting
+      # a volume at the old .../data path makes the 18 image refuse to
+      # start (agents/share/postgresql.md).
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loco -d authentication_service_development"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    networks:
+      - mxi-example-auth-dev
+
+  authentication-service:
+    build:
+      context: ../..
+      dockerfile: authentication/authentication-service-with-loco/Dockerfile
+    image: mxi-example-authentication-dev-service
+    container_name: mxi-example-authentication-dev-service
+    # COMPOSE-WORKER: matches every other file in this directory — the
+    # Dockerfile's own CMD is server-only, which never registers
+    # loco's background-queue worker.
+    #
+    # config/development.yaml (unlike production.yaml) hardcodes
+    # `server.binding: localhost` — reasonable for a bare `cargo run`
+    # on a laptop (nothing else on the LAN can reach it), but inside a
+    # container that means the process listens only on ITS OWN loopback,
+    # unreachable through the compose port-forward no matter what
+    # `ports:` says (confirmed live: the container's own internal
+    # HEALTHCHECK curl succeeds while a host-side curl against the
+    # published port gets a connection with no response). The binding
+    # is a literal in the YAML, not one of the file's `{{ get_env(...) }}`
+    # templated fields, so there is no env var to override it with.
+    # Patching the one line at container start (rather than committing
+    # a second copy of the whole file here, which could drift from the
+    # real one) is the smallest fix that keeps `cargo run`'s own
+    # loopback-only default untouched for every non-container dev user.
+    command:
+      - sh
+      - -c
+      - |
+        sed -i 's/binding: localhost/binding: 0.0.0.0/' /app/config/development.yaml
+        exec /app/authentication-service-cli start --server-and-worker
+    restart: unless-stopped
+    environment:
+      # Overrides the image's baked-in `LOCO_ENV=production` — this is
+      # the entire point of this file (see header comment).
+      LOCO_ENV: development
+      DATABASE_URL: postgresql://loco:loco@postgres:5432/authentication_service_development
+      AUTH_ALLOWED_FRONTENDS: ${AUTH_ALLOWED_FRONTENDS:-http://localhost:4173}
+      RUST_LOG: ${RUST_LOG:-info}
+      # No TOKEN_PRIVATE_KEY_SEED here: config/development.yaml carries
+      # no `auth.jwt` block requiring one, and SEC-A1's fail-closed
+      # dev-seed refusal only fires outside an explicitly
+      # non-production environment — Development is exempt by design.
+    ports:
+      - "5150:5150"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - mxi-example-auth-dev
+
+networks:
+  mxi-example-auth-dev:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

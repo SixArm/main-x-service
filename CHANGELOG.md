@@ -11,12 +11,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- `tasks.md` bookkeeping: six Phase 8 items (PRO-P8, PRO-P10, PRO-P15,
-  PRO-P24, PRO-P28, PRO-P30) had already landed on `main` in earlier
-  commits but were never checked off — found while working the queue
-  in order, verified each against the actual commit/diff rather than
-  trusting the title match, and closed with result notes. Also
-  documented (`agents/share/rust-loco-stack.md`) that the family's
+- `tasks.md` bookkeeping: **seven** Phase 8 items (PRO-P1, PRO-P8,
+  PRO-P10, PRO-P15, PRO-P24, PRO-P28, PRO-P30) had already landed on
+  `main` in earlier commits but were never checked off — found while
+  working the queue in order, verified each against the actual
+  commit/diff rather than trusting the title match, and closed with
+  result notes. Also documented (`agents/share/rust-loco-stack.md`) that the family's
   "PostgreSQL NOT SQLite" rule holds at the runtime-driver level, not
   the compiled-code level: `loco-rs`'s own `with-db` feature hardcodes
   `sqlx-sqlite` for every loco-based crate regardless of what that
@@ -38,6 +38,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `examples/compose/authentication-dev.yml`: a new family-reusable
+  compose stack running authentication-service in
+  `LOCO_ENV=development` — the only mode that logs a real magic-link
+  URL to the console (SEC-A3) instead of silently emailing it, for
+  anything that needs to complete a real passwordless sign-in without
+  SMTP. person-front-end-with-svelte's live-integration suite is the
+  first consumer (`tasks.md` PRO-P32; see that crate's own CHANGELOG
+  for the full record).
 - Dependabot enabled per `spec/dependabot`: GitHub Dependabot security
   updates (`automated-security-fixes`) turned on at the repo level
   (vulnerability alerts were already on), plus a generated

@@ -12,7 +12,7 @@
 - [x] T-10: Merge UI with preview.
 - [x] T-11: Vitest unit tests for `ApiClient` + `PersonRepository`.
 - [x] T-12: Playwright e2e smoke for every MVP route.
-- [x] T-12a: Playwright **integration** suite (`tests/integration/golden-paths.spec.ts`) driving the live preview against a running `person-service-with-loco`. 9 tests covering FR-1, FR-3 (×2 — happy path + 409 duplicate), FR-5, FR-6, FR-7, FR-8, FR-9, and per-record audit. Idempotent (timestamped family names + REST `DELETE` cleanup, plus a bounded 409-retry in `apiCreatePerson` — PRO-P4, see OQ-5). Run with `bin/e2e` or `pnpm test:integration`. Harness is validated (svelte-check clean, playwright `--list` discovers all 9 tests, smoke project still 6/6, bin/e2e exits 1 with a clear message when the service is down). **The duplicate-detector test-data interaction that used to fail 3 of 9 is fixed (PRO-P4, 2026-08-29 — see OQ-5); end-to-end validation against a live service is now blocked instead by the newer page-visit auth guard (PRO-H10) + CSRF check (PRO-H5), which this suite does not sign in for — see OQ-5's 2026-08-29 update.**
+- [x] T-12a: Playwright **integration** suite (`tests/integration/golden-paths.spec.ts`) driving the live preview against a running `person-service-with-loco`. 9 tests covering FR-1, FR-3 (×2 — happy path + 409 duplicate), FR-5, FR-6, FR-7, FR-8, FR-9, and per-record audit. Idempotent (timestamped family names + REST `DELETE` cleanup, plus a bounded 409-retry in `apiCreatePerson` — PRO-P4, see OQ-5). Run with `bin/e2e` or `pnpm test:integration`. Harness is validated (svelte-check clean, playwright `--list` discovers all 9 tests, smoke project still 6/6, bin/e2e exits 1 with a clear message when the service is down). **The duplicate-detector test-data interaction that used to fail 3 of 9 is fixed (PRO-P4, 2026-08-29 — see OQ-5). The page-visit auth guard (PRO-H10) + CSRF check (PRO-H5) blocker is also closed (T-27, PRO-P32, 2026-08-29): the suite now signs in for real via a dedicated `setup` project — see OQ-5's final update.**
 - [ ] T-13: SSR-safe load functions using `event.fetch` for SEO-irrelevant but warm-cache wins.
 - [ ] T-14: Integrate Lily Headless components beyond Button (Dialog for merge confirm, Combobox for identifier system, Banner for error states).
 - [ ] T-15: Identifier / address / emergency-contact edit (currently read-only on detail; edit form re-PUTs whole record but no UI to add/remove sub-records).
@@ -41,5 +41,45 @@
   carry one today). Tests: `tests/unit/session.test.ts` (+2 —
   `requireSignedIn` throws a 303-to-`/signin` redirect when signed
   out, passes through silently when signed in).
+- [x] T-27 (2026-08-29, PRO-P32): **Real magic-link sign-in for the
+  integration suite.** T-26/T-22's guard + CSRF check left
+  `tests/integration/golden-paths.spec.ts` unable to complete any
+  mutating flow (see §16 OQ-5's 2026-08-29 update). Decision (asked,
+  not assumed): a real sign-in against a live authentication-service,
+  not a bypass of the guard/CSRF check. Added a new Playwright `setup`
+  project (`tests/integration/auth.setup.ts`, a project `dependencies`
+  on rather than a top-level `globalSetup` — the latter would also
+  gate the deliberately service-free `smoke` project): `POST
+  /api/auth/signup`, poll the live authentication-service container's
+  log for the issued token (its tracing output is ANSI-coloured
+  regardless of pipe TTY-ness — stripped before matching), then
+  `page.goto` the real `/verify?token=…` URL and save the resulting
+  `__Host-mxi_session` / `__Host-mxi_csrf` cookies as a `storageState`
+  the `integration` project depends on and reuses. This only works
+  against a live authentication-service running in `LOCO_ENV=development`
+  (SEC-A3 — a production-mode container never logs the magic link),
+  which had no compose file anywhere in the repo — added
+  `examples/compose/authentication-dev.yml` (family-reusable, not
+  person-specific), whose one non-obvious fix is a container-start
+  `sed` patch of `server.binding: localhost → 0.0.0.0` (a dev-mode
+  container listening on its own loopback is unreachable through the
+  compose port-forward regardless of `ports:` — found live: the
+  container's own internal healthcheck passed while a host curl got a
+  connected-then-empty reply). `bin/e2e` now health-checks
+  authentication-service too. Also fixed a previously-latent, adjacent
+  bug found in the same investigation: `playwright.config.ts`'s
+  `webServer` command baked `PUBLIC_API_BASE_URL` into the client
+  build but never set the BFF's own runtime `PERSON_API_URL`
+  (`src/lib/server/config.ts`, read at request time, not build time),
+  so a UI-submitted mutation went through the server-side proxy to
+  whatever this crate's own `.env` said (`:5150`, the native `cargo
+  run` port) rather than the live instance `PUBLIC_API_BASE_URL`
+  actually started (`:8080`, the podman-compose container) — the two
+  are now set to the same base. Verified live end-to-end (not
+  inferred): signup → log line → `/verify` → both real cookies present
+  in the saved `storageState`; then, reusing it, a guarded page
+  (`/persons/new`) rendered its create form instead of redirecting to
+  `/signin`. `svelte-check` 0 errors, `prettier --check` clean on the
+  new/changed files.
 - [x] T-22 (2026-08-28, PRO-H5): Auth — adopt BFF + httpOnly cookie + CSRF (per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)). **BFF + httpOnly cookie + PASETO exchange are implemented**: `/signin` (magic-link request) and `/verify` (consumes the link, sets `__Host-mxi_session`, httpOnly/Secure/`SameSite=Lax`) at `src/routes/{signin,verify}/`; `src/hooks.server.ts` reads the cookie into `locals.sessionId`; `src/routes/api/proxy/[...path]/+server.ts` is the reverse proxy that drops the browser's cookie, exchanges the session for a short-lived PASETO (`src/lib/server/auth.ts`), and forwards with `Authorization: Bearer …`. No `mxi_access_token`/`localStorage` bearer, no fragment handoff — the browser never holds a token. **CSRF closed**: `/verify` additionally sets a second, **non-httpOnly**, Secure, `SameSite=Lax` cookie `__Host-mxi_csrf` (`generateCsrfToken()`/`CSRF_COOKIE`/`CSRF_COOKIE_OPTIONS`, `src/lib/server/session.ts`); `ApiClient` (`src/lib/api/client.ts`) reads it from `document.cookie` when running in the browser and echoes it as `X-CSRF-Token` on every non-GET/HEAD request; the proxy verifies the header matches the cookie (`verifyCsrf`, constant-value equality — both sides are BFF-issued, so no timing-safe compare is needed) and additionally rejects a present-but-mismatched `Origin`/`Referer`, returning `403 {"error":"csrf"}` **without forwarding upstream** on either failure. Sign-out (root `+page.server.ts`'s `signout` action) clears both cookies. Tests: `tests/unit/session.test.ts` (10, `verifyCsrf`/`generateCsrfToken`/cookie-option pins), `tests/unit/proxy.test.ts` (7, the route handler exercised directly — GET always passes, missing/mismatched token 403s, Origin/Referer backstop), `tests/unit/client.test.ts` (+3, the browser header-attach path via jsdom's real `document.cookie`, which required pointing `vite.config.ts`'s jsdom `testURL` at `https://` since a `__Host-`-prefixed cookie only sets over a secure origin).
 

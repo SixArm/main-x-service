@@ -9,6 +9,39 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — real magic-link sign-in for the live-integration suite (T-27, PRO-P32)
+
+- `tests/integration/golden-paths.spec.ts` could no longer complete
+  any mutating flow once the page-visit auth guard (T-26) and CSRF
+  check (T-22) landed — it never signed in. Added a Playwright `setup`
+  project (`tests/integration/auth.setup.ts`) driving a **real**
+  magic-link sign-in against a live authentication-service (not a
+  bypass of the guard/CSRF check): `POST /api/auth/signup`, poll the
+  service's own console log for the issued token (ANSI-stripped —
+  its tracing output stays coloured through a plain pipe), then
+  `page.goto` the real `/verify?token=…` and save the resulting
+  `__Host-mxi_session` / `__Host-mxi_csrf` cookies as a `storageState`
+  the `integration` project depends on. `smoke` is unaffected — this
+  is a project dependency, not a top-level `globalSetup`.
+- New family-reusable compose stack, `examples/compose/authentication-dev.yml`:
+  authentication-service in `LOCO_ENV=development` (the only mode that
+  logs the magic link — SEC-A3), with a container-start patch of
+  `server.binding: localhost → 0.0.0.0` (found live: a dev-mode
+  container listening on its own loopback is unreachable through the
+  compose port-forward regardless of `ports:`).
+- `bin/e2e` now also health-checks authentication-service.
+- Fixed an adjacent, previously-latent bug found in the same pass:
+  `playwright.config.ts`'s `webServer` command set `PUBLIC_API_BASE_URL`
+  for the client build but never the BFF's own runtime `PERSON_API_URL`
+  (`src/lib/server/config.ts`), so a UI-submitted mutation could
+  silently target this crate's `.env` default (`:5150`) instead of the
+  live instance the suite actually started (`:8080`) — both now point
+  at the same base.
+- Verified live end-to-end: signup → log line → `/verify` → both
+  cookies present in `storageState`; then a guarded page
+  (`/persons/new`) rendered its form instead of redirecting to
+  `/signin`. See spec §16 OQ-5 and §13 T-27 for the full record.
+
 ### Added — duplicate review-queue screen, completed (repo FE-4)
 
 - The `/review` board already existed as a SVAR Kanban with
