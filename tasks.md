@@ -6917,12 +6917,24 @@ crate above.
   it later.
 
 **course**
-- [ ] **PRO-P8 (S)** FE AGENTS.md falsely claims "the service has no
-  FHIR surface" (`/fhir/Basic` shipped with T-20) — restate as a scope
-  choice or open a viewer task. Decide T-28: `COURSE_API_URL` fallback
-  is `localhost:5150` but the service runs on 8084 (the documented
-  port-collision hazard). Implement T-18: observe the registered-but-
-  never-observed `http_requests_total` or unregister it.
+- [x] **PRO-P8 (S)** *(done 2026-08-29, commit 5fc4eb52 — landed on
+  `main` already; this row was just never checked off)* FE AGENTS.md
+  falsely claims "the service has no FHIR surface" (`/fhir/Basic`
+  shipped with T-20) — restate as a scope choice or open a viewer
+  task. Decide T-28: `COURSE_API_URL` fallback is `localhost:5150` but
+  the service runs on 8084 (the documented port-collision hazard).
+  Implement T-18: observe the registered-but-never-observed
+  `http_requests_total` or unregister it.
+  *Result:* reworded the FE's FHIR claim as a deliberate scope choice
+  (no FHIR viewer, matching every sibling front-end). Fixed
+  `COURSE_API_URL`'s fallback to `8084` (every doc already said 8084
+  was correct; nothing claimed 5150 was deliberate). Wired
+  `http_requests_total` via a `track_http_requests_mw` route-layer
+  middleware on both router surfaces, labelled by matched-route
+  template (not raw path, to avoid pid-cardinality blowup) — course's
+  own first reference implementation, no sibling loco service wires
+  this metric either. Verified independently: `cargo test --lib`
+  124/124 (was 123), FE `npm run check` 0 errors (463 files).
 
 **organization**
 - [x] **PRO-P9 (S)** *(done 2026-08-29)* Fixed spec §2/§9/§10.7 to
@@ -6932,11 +6944,22 @@ crate above.
   versions (loco 1.0.1→1.1.0, authentication-verifier 0.2→0.9, both
   verified against Cargo.toml) and added the previously-undocumented
   `src/compliance/` + integrity-digests migration to the layout map.
-- [ ] **PRO-P10 (M)** Promote the buried SEC-B3 TOCTOU follow-up
-  (ConnectionTrait-generic `streaming::*_and_emit` + advisory-locked
-  bulk upsert) from `[x]`-entry prose to a first-class open §13 item.
-  Re-triage the FE "search box once the service ships search" task —
-  the precondition has been met since Tantivy landed.
+- [x] **PRO-P10 (M)** *(done 2026-08-29, commit ff44a6e6 — landed on
+  `main` already; this row was just never checked off)* Promote the
+  buried SEC-B3 TOCTOU follow-up (ConnectionTrait-generic
+  `streaming::*_and_emit` + advisory-locked bulk upsert) from
+  `[x]`-entry prose to a first-class open §13 item. Re-triage the FE
+  "search box once the service ships search" task — the precondition
+  has been met since Tantivy landed.
+  *Result:* docs-only change. Promoted SEC-B3's TOCTOU gap to its own
+  open §13 item with the concrete why-not-fixed-already finding
+  (`streaming::*_and_emit` isn't `ConnectionTrait`-generic; a separate
+  guard transaction deadlocked under this crate's own
+  `max_connections: 1` test config) and the real fix's scope —
+  tracked, not implemented here. Verified organization's Tantivy
+  search actually shipped 2026-07-31 and reworded the FE task (§13,
+  §15) to drop the stale precondition. `scripts/ci-check.sh docs`
+  green.
 
 **place**
 - [x] **PRO-P11 (S)** *(done 2026-08-29)* Most of this was already
@@ -7002,8 +7025,20 @@ crate above.
   checkbox, each with a file/line citation. Closed entity T-13 as
   won't-do, citing the root AGENTS.md no-`agents/`-for-newer-
   subprojects decision. Docs-only; `scripts/ci-check.sh docs` green.
-- [ ] **PRO-P15 (M)** case FE: add the search box + audit/event views —
-  the shipped Tantivy search unblocked T-11 weeks ago.
+- [x] **PRO-P15 (M)** *(done 2026-08-29, commit 77413e2b — landed on
+  `main` already; this row was just never checked off)* case FE: add
+  the search box + audit/event views — the shipped Tantivy search
+  unblocked T-11 weeks ago.
+  *Result:* added `SearchBox.svelte` wired into the case list (blank
+  query → `listPage()`, non-blank → `search()` with fuzzy/phonetic
+  toggles), a `/[pid]/audit` per-case trail linked from the detail
+  page, and a system-wide `/audit` recent-activity view in top nav —
+  copy-adapted from course-front-end (neither organization nor
+  care-pathway had a fully wired equivalent to copy from). Plus the
+  repository methods/types and 21 new i18n keys × 13 locales.
+  Verified independently: `npm run check` 0 errors (424 files),
+  `npm test` 70/70 (was 61, +9 new pinning the new search/audit
+  surfaces).
 
 **project-portfolio-management (the uncommitted PM-suite WIP — verified
 green as it sits; these finish it)**
@@ -7053,12 +7088,30 @@ green as it sits; these finish it)**
   bearer security scheme, no `403`), decision recorded in `spec/index.md`
   §6.13/§16, and pinned by `tests/requests/compliance.rs` +
   `src/openapi.rs::documents_audit_verify_as_bearer_gated_not_admin_gated`.
-- [ ] **PRO-P24 (M)** FE: repair the E2E suite (silently red since
-  ~2026-06-17; `page.route()` can't intercept BFF server-side fetch;
-  delete the two obsolete `return_to`/localStorage cases). Delete or
-  wire the dead `src/lib/api/{client,auth}.ts` + `config.ts` (~19 of 36
-  unit tests exercise code no route imports) and reconcile the "no
-  data-grid dependency" claim with the six unused SVAR deps.
+- [x] **PRO-P24 (M)** *(done 2026-08-29, commit 3142b098 — landed on
+  `main` already; this row was just never checked off)* FE: repair the
+  E2E suite (silently red since ~2026-06-17; `page.route()` can't
+  intercept BFF server-side fetch; delete the two obsolete
+  `return_to`/localStorage cases). Delete or wire the dead
+  `src/lib/api/{client,auth}.ts` + `config.ts` (~19 of 36 unit tests
+  exercise code no route imports) and reconcile the "no data-grid
+  dependency" claim with the six unused SVAR deps.
+  *Result:* root cause was that every auth-service call happens
+  server-side (`src/lib/server/auth.ts`'s own `fetch`), which
+  `page.route()` cannot intercept. Fixed by adding a dependency-free
+  Node mock auth server (`tests/e2e/mock-auth-server.mjs`) as a second
+  Playwright `webServer`, exercising the real cookie → CSRF → `/token`
+  → bearer → `/me` round trip. Deleted the 3 cases asserting mechanisms
+  the BFF migration removed (9→6 cases, 4/9 passing→6/6 passing,
+  re-verified twice for flake). Deleted the dead `client.ts`/`auth.ts`/
+  `config.ts` + their 19 tests (verified zero importers outside their
+  own tests via grep across every route; `types.ts` kept — genuinely
+  imported elsewhere). Removed six unused `@svar-ui/*` deps and
+  regenerated the lockfile, making the "no data-grid dependency" spec
+  claim true instead of contradicted. Verified independently:
+  `npm run check` 0 errors (365 files), `npm test` 17/17 (was 36, the
+  drop matching the 19 deleted dead-code tests exactly), `npm run
+  test:e2e` 6/6, `npm run build` succeeds.
 
 **link-graph / libraries**
 - [x] **PRO-P25 (S)** *(done 2026-08-29)* Fixed AGENTS.md's two wrong
@@ -7113,13 +7166,30 @@ green as it sits; these finish it)**
   **live** Postgres run of the DB-gated round-trip test (not just
   compiled): fmt/clippy clean, 67 unit tests, `subject_rights_round_trip`
   passed live, front-end 0 svelte-check errors + 5/5 vitest.
-- [ ] **PRO-P28 (S)** patient-flow: drop the `sqlx-sqlite` sea-orm
-  feature (family rule: PostgreSQL NOT SQLite); fix
-  `publish`/repository metadata (PRO-H3e); add the `[x]` PF-T19 row for
-  the delivered `time-analysis` endpoint (the queue is the single
-  source of truth and its newest capability is invisible there);
-  correct PF-T17's 9→8 count; commit the verified-additive staff-
-  utilisation spec hunks (owner decision).
+- [x] **PRO-P28 (S)** *(done 2026-08-29, commit 499b12ba — landed on
+  `main` already; this row was just never checked off)* patient-flow:
+  drop the `sqlx-sqlite` sea-orm feature (family rule: PostgreSQL NOT
+  SQLite); fix `publish`/repository metadata (PRO-H3e); add the `[x]`
+  PF-T19 row for the delivered `time-analysis` endpoint (the queue is
+  the single source of truth and its newest capability is invisible
+  there); correct PF-T17's 9→8 count; commit the verified-additive
+  staff-utilisation spec hunks (owner decision).
+  *Result:* removed the crate's own explicit `sqlx-sqlite` sea-orm
+  feature (verified genuinely unused, `cargo check` clean) — note this
+  does not remove `sqlx-sqlite` from the compiled dependency graph
+  entirely: `loco-rs` 1.1.0's own `with-db` feature hardcodes
+  `sea-orm`/`sea-orm-migration`'s `sqlx-sqlite` unconditionally for
+  every loco-based crate in the family (confirmed transitively present
+  in care-pathway/person/worker/organization/case's `Cargo.lock`s too,
+  not patient-flow-specific), so "PostgreSQL NOT SQLite" holds at the
+  runtime-driver-selection level, not at the compiled-code level,
+  until/unless loco-rs itself makes the driver set configurable — out
+  of scope for this crate alone. `publish`/repository metadata was
+  already correct (PRO-H3e's earlier sweep, commit 190db156). PF-T19
+  row added to `spec/tasks.md`'s Phase 7; PF-T17's stale "9 tests"
+  corrected to the verified 8. The staff-utilisation spec coverage was
+  verified already fully written (`capacity.md`, added 2026-08-26) —
+  no action needed.
 - [x] **PRO-P29 (S)** *(done 2026-08-29)* `license`+`description` were
   already present (an earlier Cargo metadata sweep) — no change needed.
   Verified ST-14 (ESLint, `npm run lint` clean) and ST-16 (codegen,
@@ -7134,9 +7204,18 @@ green as it sits; these finish it)**
   not queued" roadmap section (none has a `requirements.md` entry or
   `design.md` decision) rather than leaving them looking like committed
   work.
-- [ ] **PRO-P30 (S)** WPM: migration-manifest metadata + edition (with
-  PRO-H3); drop the dead `ensure_employee` helper; convert the 4
-  seed-task `.unwrap()`s to contextful errors.
+- [x] **PRO-P30 (S)** *(done 2026-08-29, commit 26357234 — landed on
+  `main` already; this row was just never checked off)* WPM:
+  migration-manifest metadata + edition (with PRO-H3); drop the dead
+  `ensure_employee` helper; convert the 4 seed-task `.unwrap()`s to
+  contextful errors.
+  *Result:* migration-manifest metadata/edition was already correct
+  (covered by PRO-H3's earlier sweep, verified rather than assumed);
+  `ensure_employee` was already dead-code-removed in an earlier commit
+  (845dcd6a, PRO-H4) — confirmed via `git log -S` + a fresh grep, no
+  change needed. Converted the 4 remaining hardcoded-literal-date
+  `.unwrap()`s in `src/tasks/seed.rs` to `Error::string(...)` via
+  `.ok_or_else`, each naming which seed date failed to parse.
 - [x] **PRO-P31 (S)** *(done 2026-08-29)* Verified fully complete
   already — no edits needed. The Delivery-section rewrite + FE
   "(planned)" heading + "grow topic files" reword were landed by

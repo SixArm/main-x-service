@@ -11,6 +11,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `tasks.md` bookkeeping: six Phase 8 items (PRO-P8, PRO-P10, PRO-P15,
+  PRO-P24, PRO-P28, PRO-P30) had already landed on `main` in earlier
+  commits but were never checked off — found while working the queue
+  in order, verified each against the actual commit/diff rather than
+  trusting the title match, and closed with result notes. Also
+  documented (`agents/share/rust-loco-stack.md`) that the family's
+  "PostgreSQL NOT SQLite" rule holds at the runtime-driver level, not
+  the compiled-code level: `loco-rs`'s own `with-db` feature hardcodes
+  `sqlx-sqlite` for every loco-based crate regardless of what that
+  crate's own manifest requests (found while verifying PRO-P28).
+
 - `.github/workflows/ci.yml`'s `supply-chain` job now runs the same
   `scripts/ci-check.sh evidence` stage `.woodpecker.yml` does, closing
   a CI-platform divergence that made root AGENTS.md's "byte-identical
