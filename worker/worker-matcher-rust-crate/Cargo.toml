@@ -20,7 +20,7 @@ unicode-normalization = "0.1"
 strsim = "0.11"
 thiserror = "2.0"
 soundex = "0.2"
-nhs-number = "1.0"
+nhs-number = "2.0"
 mimalloc = "0.1.52"
 
 [dev-dependencies]
