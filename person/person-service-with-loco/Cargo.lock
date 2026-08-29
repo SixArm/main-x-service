@@ -5296,7 +5296,7 @@ dependencies = [
  "aws-credential-types",
  "aws-sdk-s3",
  "axum 0.8.9",
- "base64 0.22.1",
+ "base64 0.23.1",
  "bigdecimal",
  "bytes",
  "chrono",
