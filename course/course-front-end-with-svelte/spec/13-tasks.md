@@ -28,4 +28,27 @@
 - [x] T-26: CSRF protection for browser→BFF mutating requests (synchroniser token per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md) §4) plus a route-level guard so an unauthenticated visitor is redirected rather than silently served every page (today `locals.sessionId`/`signedIn` is exposed to the layout for chrome display only — nothing blocks a request). **Landed 2026-08-28** (PRO-H5), rolling the PROVEN reference pattern from `person-front-end-with-svelte` (commit e73931b2) verbatim: `src/lib/server/session.ts` gains `CSRF_COOKIE`/`CSRF_COOKIE_OPTIONS`/`generateCsrfToken()`/`verifyCsrf()`; `/verify` sets the new non-httpOnly `__Host-mxi_csrf` cookie alongside the session cookie; the root `+page.server.ts` signout action clears both; `src/lib/api/client.ts` echoes the cookie as `X-CSRF-Token` on every non-GET/HEAD request; the proxy (`src/routes/api/proxy/[...path]/+server.ts`) rejects a missing/mismatched token with `403 {"error":"csrf"}`, backstopped by an Origin/Referer check. Tests ported: `tests/unit/session.test.ts` (new), `tests/unit/proxy.test.ts` (new), a CSRF describe block added to `tests/unit/client.test.ts`; `vite.config.ts` gains the jsdom `https://` `environmentOptions` fix the `__Host-` prefix needs to stick under test. **The second half of this task — a route-level guard that redirects an unauthenticated *visitor* away from a page — is deliberately left undone here**, on the same basis it is absent in the proven reference: `person-front-end-with-svelte` (audited, landed) has no such guard either — its `+layout.server.ts` exposes `signedIn` for chrome display only, exactly as course's does today. A related but distinct question was also investigated per this task's brief: whether the BFF proxy itself should reject a non-GET/HEAD request when `locals.sessionId` is absent, rather than forwarding it upstream with no `Authorization` header. Concluded **no** — the family's activation-gate design (`agents/share/security.md` §4) deliberately makes the entity service's own `<ENTITY>_REQUIRE_AUTH` the enforcement point; the reference proxy in person forwards unconditionally too (it only conditionally *attaches* a bearer). Adding a course-only BFF-side 401 would diverge from that shared pattern without closing a gap the family's own design treats as intentional. Both open points (the page-redirect guard and, if reconsidered, a BFF-side session check) are better tracked as a fresh family-wide task alongside `PRO-H5` than solved once, differently, in course alone.
 - [ ] T-27: Translate `/signin` and `/verify` copy into the other 12 locales (currently English-only by design, per the code comment).
 - [ ] T-28: **Bug** — `src/lib/server/config.ts`'s `COURSE_API_URL` fallback (used only when the env var is unset) is `http://localhost:5150`, the generic loco dev port, but `course-service-with-loco` is the one service in the family whose own dev config overrides that to `8084` (`course-service-with-loco/config/development.yaml`; confirmed live 2026-08-04). A developer who skips `cp .env.example .env` (the quick-start's first step) gets silently routed to the wrong port. `.env.example` now documents the correct `8084` default; the code fallback itself is untouched pending a decision on whether to fix the constant or add a boot-time warning when the var is unset.
+- [x] T-29 (2026-08-29, PRO-H10): **Page-visit guard.** Redirect an
+  unauthenticated visitor away from every page whose sole purpose is
+  submitting a mutation — `/courses/new`, `/courses/[id]/edit`,
+  `/courses/merge` each gained a `+page.server.ts` calling the new
+  `requireSignedIn(locals)` (`src/lib/server/session.ts`),
+  `redirect(303, "/signin")` on no session. Read/list/search/view
+  pages stay public — this mirrors the backend's own default-allow-read
+  / mutation-deny ABAC posture rather than a separate front-end policy.
+  `/courses/[id]`'s embedded soft-delete and `/board`'s drag-to-move
+  status change both stay public too, same call as the reference's
+  `/persons/[id]`: an otherwise-view page's incidental mutation control
+  does not make the page itself mutation-only. Course has no
+  bulk-import/export UI and no review-queue route (nothing to guard
+  there), and no standalone `CourseInstance` create/edit route yet
+  (T-15). `locals.sessionId` is presence-only, a UX convenience in
+  front of the backend's real enforcement, not a substitute for it.
+  Deliberately does not thread a `next` param back through `/signin` in
+  v1 (see `AGENTS.md`'s "Page-visit guard" section for why — the
+  magic-link round trip does not carry one today). Ported from the
+  `person-front-end-with-svelte` reference implementation. Tests:
+  `tests/unit/session.test.ts` (+2 — `requireSignedIn` throws a
+  303-to-`/signin` redirect when signed out, passes through silently
+  when signed in).
 

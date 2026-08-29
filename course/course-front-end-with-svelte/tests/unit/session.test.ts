@@ -1,11 +1,13 @@
 // Unit tests for the BFF session/CSRF helpers: the double-submit
 // verification logic and the token minter. No SvelteKit runtime involved.
+import { isRedirect } from "@sveltejs/kit";
 import { describe, expect, it } from "vitest";
 import {
   CSRF_COOKIE,
   CSRF_COOKIE_OPTIONS,
   SESSION_COOKIE_OPTIONS,
   generateCsrfToken,
+  requireSignedIn,
   verifyCsrf,
 } from "../../src/lib/server/session";
 
@@ -44,6 +46,31 @@ describe("verifyCsrf", () => {
   // token an empty header could match.
   it("rejects an empty-string cookie even against an empty-string header", () => {
     expect(verifyCsrf("", "")).toBe(false);
+  });
+});
+
+describe("requireSignedIn", () => {
+  // Pins: PRO-H10's page-visit guard — a signed-out visitor is redirected
+  // to /signin, never allowed to fall through to the page's own load.
+  it("redirects to /signin when no session is present", () => {
+    try {
+      requireSignedIn({ sessionId: null });
+      throw new Error("expected requireSignedIn to throw a redirect");
+    } catch (error) {
+      expect(isRedirect(error)).toBe(true);
+      if (isRedirect(error)) {
+        expect(error.status).toBe(303);
+        expect(error.location).toBe("/signin");
+      }
+    }
+  });
+
+  // Pins: a signed-in visitor (any non-null session id) passes through
+  // silently — no throw, no return value to check.
+  it("does not throw when a session is present", () => {
+    expect(() =>
+      requireSignedIn({ sessionId: "some-session-id" }),
+    ).not.toThrow();
   });
 });
 
