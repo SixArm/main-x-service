@@ -40,21 +40,23 @@ is also sent to the service so the magic-link email language matches.
 3. **TypeScript strict** (with `noUncheckedIndexedAccess`).
 4. **Minimal deps.** Unlike the data-heavy sibling front-ends, this UI
    uses no data grid. Lily `ThemePicker`/`LocalePicker` ARE used in the
-   layout (theme + locale chrome); the SVAR packages are declared in
-   `package.json` but currently **unused in `src/`**. Add nothing further
-   unless a real need appears (drift is accepted family-wide).
+   layout (theme + locale chrome). The six `@svar-ui/*` packages that had
+   accumulated in `package.json` unused in `src/` were **removed
+   2026-08-29** (PRO-P24) — the dependency tree now actually matches this
+   rule instead of contradicting it. Add nothing further unless a real
+   need appears (drift is accepted family-wide).
 5. **No envelope.** The auth service is loco.rs and returns **raw JSON**
    (no `{success,data,error}` wrapper).
-6. **`src/lib/api/` is dead code, not a client library to extend.**
-   `client.ts` (`ApiClient`) and `auth.ts` (`AuthRepository`) are the
-   pre-BFF, browser-held-token model's HTTP layer. No route imports
-   either one today — the live BFF calls the auth service via
-   `src/lib/server/auth.ts` / `src/lib/server/admin.ts` instead (plain
-   `fetch` against `AUTH_API_URL`, never a shared client class). `api/`'s
-   only remaining callers are its own unit tests
-   (`tests/unit/client.test.ts`, `tests/unit/auth.test.ts`). Don't wire a
-   new route to it without first checking whether it should be deleted
-   instead — see spec §13.
+6. **`src/lib/api/` held dead code and was pruned — don't resurrect it.**
+   `client.ts` (`ApiClient`) and `auth.ts` (`AuthRepository`) were the
+   pre-BFF, browser-held-token model's HTTP layer; no route ever imported
+   either one once the BFF landed — the live BFF calls the auth service
+   via `src/lib/server/auth.ts` / `src/lib/server/admin.ts` instead
+   (plain `fetch` against `AUTH_API_URL`, never a shared client class).
+   Deleted 2026-08-29 (PRO-P24) along with `src/lib/config.ts` and the 19
+   unit tests that existed only to exercise them. `src/lib/api/types.ts`
+   (the wire-shape types) stays — it's genuinely shared with
+   `src/lib/server/`. See spec §13.
 
 ## Layout
 
@@ -67,16 +69,13 @@ src/
 ├── hooks.server.ts               BFF: read __Host-mxi_session + __Host-mxi_csrf, populate event.locals
 ├── app.d.ts                      App.Locals: sessionId, csrfToken
 ├── lib/
-│   ├── config.ts                 dead: PUBLIC_API_BASE_URL + VITE_RETURN_TO_ALLOWLIST, read only by lib/api/ below
 │   ├── i18n.svelte.ts            13-locale catalog + reactive locale store + t() (en source of truth; see spec §4)
 │   ├── server/                   the REAL BFF, reads AUTH_API_URL (private, server-only):
 │   │   ├── session.ts              SESSION_COOKIE/CSRF_COOKIE names + options, Set-Cookie parsing
 │   │   ├── auth.ts                 verifyMagicLink/requestMagicLink/signup/exchangeToken/currentUser/signout
 │   │   └── admin.ts                ABAC attribute GET/PUT (exchanges session for a bearer first)
-│   └── api/                      DEAD — no route imports this; kept alive only by its own unit tests (see Ground rule 6)
-│       ├── client.ts               ApiClient (reads config.ts's PUBLIC_API_BASE_URL)
-│       ├── types.ts                LoginResponse / CurrentUser (mirror the service views; still used by server/ too)
-│       └── auth.ts                 AuthRepository (signup/magic-link/verify/me/signout)
+│   └── api/
+│       └── types.ts                LoginResponse / CurrentUser (mirror the service views; used by server/)
 └── routes/
     ├── +layout.server.ts         resolves the signed-in user: cookie → /token exchange → GET /me (drives every page)
     ├── +layout.svelte            top nav + locale/theme pickers + signed-in badge
@@ -138,10 +137,10 @@ pnpm run build
 Configure the auth-service base URL with `AUTH_API_URL` (see
 `.env.example`; NOT `PUBLIC_API_BASE_URL` — see Ground rule 6).
 
-`pnpm run test:e2e` (playwright) currently **fails 5 of 9 cases** — its
-`page.route()` stubs intercept only browser-issued requests, but every
-auth-service call moved server-side under the BFF migration, so
-`AUTH_API_URL` (unset in CI/dev ⇒ `http://localhost:5150`) is hit for
-real and the stub never engages. This is a pre-existing, unfixed gap
-from the BFF migration (`f66ff50f`), not something introduced by this
-audit; see spec §11/§13.
+`pnpm run test:e2e` (playwright) is **green (6/6)**. It no longer relies
+on `page.route()` (which only intercepts browser-issued requests, and
+every auth-service call moved server-side under the BFF migration —
+that gap, silently red since `f66ff50f`, is why the suite used to fail
+5/9). `playwright.config.ts` instead points `AUTH_API_URL` at a second
+`webServer`, `tests/e2e/mock-auth-server.mjs` — a small Node HTTP stub
+implementing the handful of endpoints the BFF calls. See spec §11/§13.

@@ -169,6 +169,11 @@ Cross-cutting UI rule for every `*-front-end-with-svelte` app:
   state (the selected `locale`) is kept in `localStorage`.
 - No data-grid dependency (accepted drift); Lily `ThemePicker` /
   `LocalePicker` (headless) ARE used for the top-bar theme/locale chrome.
+  The six `@svar-ui/*` packages `package.json` had accumulated
+  (calendar, filemanager, filter, gantt, grid, kanban — "installed per
+  family convention" per `CHANGELOG.md`, no route ever imported any of
+  them) were **removed 2026-08-29** (PRO-P24) so the dependency tree
+  actually matches this claim instead of contradicting it.
 - **Localization (i18n).** The full family-standard **13-locale** UI
   (`en` `cy` `es` `fr` `de` `ar` `ru` `hi` `zh` `bn` `pt` `id` `ur`)
   implemented with **no i18n library** — `src/lib/i18n.svelte.ts` holds a
@@ -200,10 +205,13 @@ browser). The browser talks only to this app's own origin. There is
 root layout's server load (signed-in vs signed-out), and CSRF tokens are
 issued by the BFF (§6 FR 7).
 
-> `src/lib/api/{client,auth}.ts` (`ApiClient` / `AuthRepository`) are
-> **not** part of this layering — no route imports them. They are the
-> pre-BFF client-held-token model's HTTP layer, kept alive only by their
-> own unit tests. See §13.
+> `src/lib/api/{client,auth}.ts` (`ApiClient` / `AuthRepository`) and
+> `src/lib/config.ts` were the pre-BFF client-held-token model's HTTP
+> layer — no route imported either one once the BFF landed. **Deleted
+> 2026-08-29** (PRO-P24), along with the 19 unit tests that existed only
+> to exercise them; `src/lib/api/types.ts` (the wire-shape types) stays —
+> it is genuinely shared, imported by `src/lib/server/auth.ts`,
+> `src/lib/server/admin.ts`, and `src/routes/admin/attributes/`. See §13.
 
 ## 9. API consumption
 
@@ -255,33 +263,40 @@ cookie + a CSRF token on mutations, §6 FR 7).
 
 ## 11. Testing
 
-> The e2e suite below is currently **failing 5 of 9 cases** — a real,
-> live-verified gap, not a doc-only staleness issue. See the bullet below
-> and §13.
+> **Repaired 2026-08-29 (PRO-P24).** The e2e suite is green (6/6); see
+> the bullet below and §13 for what changed.
 
-- **Unit (vitest, `tests/unit/`, 36 tests across 5 files, all passing):**
-  `client.test.ts` (9) and `auth.test.ts` (10) pin `ApiClient` request
-  shaping and `AuthRepository` path/verb/body construction — but these
-  exercise the **dead** `src/lib/api/` layer (§8, §13), not the live BFF
-  path; `session.test.ts` (3) pins the BFF cookie-parsing helpers
+- **Unit (vitest, `tests/unit/`, 17 tests across 3 files, all passing):**
+  `session.test.ts` (3) pins the BFF cookie-parsing helpers
   (`src/lib/server/session.ts`); `i18n.test.ts` (13) covers `translate`/
   `t` lookups, the fallback chain, full 13-locale key-parity, RTL
   detection, and region-subtag reduction (`cy-GB` → `cy`); `layout.test.ts`
-  (1) is a smoke import check.
-- **E2E (playwright, `tests/e2e/smoke.spec.ts`, 9 cases, 4 passing / 5
-  failing):** stubs `**/api/auth/**` via `page.route()`, which only
-  intercepts requests the **browser** issues. Since the BFF migration
-  moved every auth-service call server-side (Node `fetch` against
-  `AUTH_API_URL`), the stub no longer engages for any of them — the five
-  failing cases are exactly the ones whose assertions depend on a stubbed
-  auth-service response (sign-in submit, verify success, both `return_to`
-  cases — which also assert removed behaviour — and the signed-in
-  dashboard via a `localStorage`-seeded session, itself a removed
-  mechanism). The four passing cases are the ones that render without any
-  auth-service round trip (sign-up/sign-in form render, verify's
-  missing-token error, signed-out home). Fixing this needs either a
-  Node-level fetch intercept (e.g. pointing `AUTH_API_URL` at a stub HTTP
-  server started per-test) or a real auth-service instance; see §13.
+  (1) is a smoke import check. `client.test.ts` (9) and `auth.test.ts`
+  (10) — which pinned the **dead** `src/lib/api/` layer (§8), not the
+  live BFF path — were deleted alongside that code (36 → 17).
+- **E2E (playwright, `tests/e2e/smoke.spec.ts`, 6 cases, all passing):**
+  every auth-service call this app makes happens **server-side** (the
+  BFF's own Node `fetch` against `AUTH_API_URL`, `src/lib/server/auth.ts`
+  / `admin.ts`), so `page.route()` — which only intercepts requests the
+  **browser** issues — can never see any of them; this had been true,
+  and the suite silently red, since the BFF migration (`f66ff50f`,
+  2026-06-17). The fix points `AUTH_API_URL` at a real (if tiny) Node
+  HTTP server, `tests/e2e/mock-auth-server.mjs`, implementing the handful
+  of endpoints the BFF calls (signup, magic-link request/verify, token
+  exchange, `/me`, signout) with one fixed user and one fixed magic-link
+  token — started as a second Playwright `webServer` entry alongside the
+  app (`playwright.config.ts`), rather than stubbed in the browser. The
+  session cookie the BFF sets on itself (`__Host-mxi_session`, `Secure`)
+  is accepted by Chromium over plain HTTP because `localhost` is a
+  potentially-trustworthy origin, so the full cookie → `/token` exchange
+  → bearer → `/me` round trip exercises for real. The two `return_to`
+  cases (cross-origin token handoff) and the `localStorage`-seeded
+  signed-in-dashboard case were **deleted, not fixed** — they asserted
+  mechanisms removed by the BFF migration (§13; there is no `return_to`
+  handoff and no client-held session left to test), and the remaining
+  "verify route consumes the token and lands on the signed-in dashboard"
+  case already covers signed-in dashboard rendering via the real (mock)
+  cookie flow. 9 cases → 6.
 
 ## 12. Compliance
 
@@ -342,26 +357,38 @@ session on sign-out and the BFF clears the cookie. CSRF protection (§6 FR
       independent `/signin` + session cookie: every sibling front-end is
       its own BFF now, so there is no "sign in here, bounce back there"
       flow left to support (`authentication-sessions.md` §6).
-- [ ] **E2E suite is red (5/9), discovered 2026-08-04 (this audit).**
+- [x] **E2E suite is red (5/9), discovered 2026-08-04 (this audit);
+      repaired 2026-08-29 (PRO-P24).**
       `tests/e2e/smoke.spec.ts`'s `page.route()` stubs cannot intercept
-      the BFF's server-side `fetch` calls (§11) — this has been true
-      since `f66ff50f` moved those calls server-side, so the suite has
-      likely been silently broken since 2026-06-17 (not introduced by
-      this audit; `git log` shows no touching commit since). Needs either
-      a Node-level fetch intercept (stub `AUTH_API_URL` with a real HTTP
-      server per test) or running against a live auth-service; also drop
-      the two cases asserting the removed `return_to` handoff and the
-      `localStorage`-seeded-session case (§13 above; sessions are cookies
-      now).
-- [ ] **`src/lib/api/{client,auth}.ts` + `src/lib/config.ts`'s
-      `PUBLIC_API_BASE_URL`/`VITE_RETURN_TO_ALLOWLIST` are dead,
-      discovered 2026-08-04 (this audit).** No route imports them; their
-      only callers are their own unit tests (`client.test.ts`,
-      `auth.test.ts`, 19 tests). Decide: delete them (and retire/rewrite
-      those 19 tests against the real `src/lib/server/` layer instead),
-      or repurpose them as the Node-level e2e fetch-intercept fixture the
-      item above needs. Flagged rather than silently deleted — this is a
-      code decision, not a doc fix.
+      the BFF's server-side `fetch` calls (§11) — this had been true
+      since `f66ff50f` moved those calls server-side, so the suite was
+      silently broken from 2026-06-17 to 2026-08-29. Fixed by pointing
+      `AUTH_API_URL` at a real Node HTTP server
+      (`tests/e2e/mock-auth-server.mjs`), started as a second Playwright
+      `webServer` entry (§11); also dropped the two cases asserting the
+      removed `return_to` handoff and the `localStorage`-seeded-session
+      case (§13 above; sessions are cookies now). 9 cases → 6, all
+      passing.
+- [x] **`src/lib/api/{client,auth}.ts` + `src/lib/config.ts` were dead,
+      discovered 2026-08-04 (this audit); deleted 2026-08-29 (PRO-P24).**
+      No route imported them; their only callers were their own unit
+      tests (`client.test.ts`, `auth.test.ts`, 19 tests, deleted with
+      them). Decided **delete** over repurposing as the e2e fetch-
+      intercept fixture: the mock server the e2e fix needed (above) has
+      to run as a standalone process under plain `node` (a second
+      Playwright `webServer`), not as an in-process `fetch` wrapper, so
+      `ApiClient`/`AuthRepository`'s shape didn't fit that job either.
+      `src/lib/api/types.ts` (the wire-shape types) is kept — it is
+      genuinely shared with `src/lib/server/`.
+- [x] **SVAR/"no data-grid dependency" reconciled, discovered 2026-08-04
+      (this audit); resolved 2026-08-29 (PRO-P24).** `package.json`
+      carried six unused `@svar-ui/*` packages (calendar, filemanager,
+      filter, gantt, grid, kanban — added 2026-07-19 "per family
+      convention", no route ever imported any of them; confirmed by
+      `grep -ri svar src/` returning nothing). Removed rather than
+      wiring in a grid this entity has no listable resource to justify,
+      so the dependency tree matches the §7/§2 "no data-grid dependency"
+      claim instead of contradicting it. `pnpm-lock.yaml` regenerated.
 - [x] Add vitest unit tests for `ApiClient` and `AuthRepository`
       (`tests/unit/client.test.ts` + `tests/unit/auth.test.ts`, now 19
       tests — grew from the original 16). *(2026-06-13; entity spec
@@ -443,13 +470,16 @@ by this audit (2026-08-04, DOC-4) though it was code-removed back in
 catalog (§13). ABAC attribute admin (`/admin/attributes`) landed
 2026-07-19.
 
-**Known gaps, both discovered by this audit (2026-08-04):** the
-`tests/e2e/smoke.spec.ts` suite is red (4/9 passing) because its
-browser-side `page.route()` stubs cannot see the BFF's server-side
-`fetch` calls (§11); `src/lib/api/{client,auth}.ts` (+ `config.ts`'s
-`PUBLIC_API_BASE_URL`/`VITE_RETURN_TO_ALLOWLIST`) are dead code kept
-alive only by their own 19 unit tests. Neither blocks `pnpm check` /
-`pnpm test` / `pnpm build`, all of which are green.
+**Gaps discovered by the 2026-08-04 audit were closed 2026-08-29
+(PRO-P24):** the `tests/e2e/smoke.spec.ts` suite is now green (6/6) —
+`AUTH_API_URL` points at a real Node HTTP mock server instead of relying
+on browser-side `page.route()` stubs the BFF's server-side `fetch` calls
+were never visible to (§11); `src/lib/api/{client,auth}.ts` and
+`src/lib/config.ts` (dead code kept alive only by their own 19 unit
+tests) are deleted; the six unused `@svar-ui/*` packages are removed
+from `package.json`, reconciling the dependency tree with the
+"no data-grid dependency" claim (§7). `pnpm check` / `pnpm test` /
+`pnpm build` / `pnpm test:e2e` are all green.
 
 ## 15. Roadmap
 
@@ -457,10 +487,12 @@ v0.1 (shipped, since removed): functional magic-link UI (bearer-token
 SPA). v0.2 (shipped): **BFF + httpOnly-cookie session migration**
 (`authentication-sessions.md`) — CSRF landed 2026-07-19; the
 cross-origin `return_to` handoff and the pre-BFF `src/lib/api/` client
-were meant to be restated, not silently orphaned — see §13. v0.3: repair
-the e2e suite (§11/§13) and resolve the `src/lib/api/` dead-code
-question; shared-nav integration with sibling front-ends is otherwise
-complete (all now session-cookie + BFF based, no shared client token).
+were meant to be restated, not silently orphaned — see §13. v0.3
+(shipped 2026-08-29, PRO-P24): repaired the e2e suite (§11/§13), deleted
+the dead `src/lib/api/{client,auth}.ts` + `config.ts`, and removed the
+six unused `@svar-ui/*` packages; shared-nav integration with sibling
+front-ends is otherwise complete (all now session-cookie + BFF based, no
+shared client token).
 
 ## 16. Open questions
 

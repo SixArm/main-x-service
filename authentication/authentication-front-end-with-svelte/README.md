@@ -63,10 +63,10 @@ per-locale catalog and a reactive store in `src/lib/i18n.svelte.ts`
 |---|---|---|
 | `AUTH_API_URL` | `http://localhost:5150` | Auth service REST base URL (no trailing slash). Read **server-side only**, by the BFF (`src/lib/server/auth.ts`, `src/lib/server/admin.ts`). This is the var that actually configures the running app. |
 
-`PUBLIC_API_BASE_URL` and `VITE_RETURN_TO_ALLOWLIST` also appear in
-`.env.example` but are **dead**: they feed `src/lib/config.ts` →
-`src/lib/api/{client,auth}.ts`, which no route imports (only their own
-unit tests do). See `AGENTS.md` Ground rule 6.
+`PUBLIC_API_BASE_URL` and `VITE_RETURN_TO_ALLOWLIST` used to appear here
+too, but fed the pre-BFF `src/lib/config.ts` → `src/lib/api/{client,auth}.ts`
+layer, which no route ever imported. That code (and the two vars) was
+deleted 2026-08-29 (PRO-P24) — see `AGENTS.md` Ground rule 6.
 
 ## How it works
 
@@ -112,19 +112,18 @@ a "come here to sign in, then bounce back" flow to support. See
 ```bash
 pnpm run check     # svelte-check (strict, 0 errors expected) — passing
 pnpm run build     # passing
-pnpm run test      # vitest (unit) — passing, 36 tests / 5 files
-pnpm run test:e2e  # playwright — 4/9 PASSING, 5/9 FAILING (see below)
+pnpm run test      # vitest (unit) — passing, 17 tests / 3 files
+pnpm run test:e2e  # playwright — 6/6 PASSING
 ```
 
-`pnpm run test:e2e` fails 5 of 9 cases. `tests/e2e/smoke.spec.ts` stubs
-the auth API via `page.route()`, which only intercepts requests the
-**browser** makes — but every auth-service call moved server-side when
-this app became a BFF, so the stub never sees them; the SvelteKit Node
-server hits the real `AUTH_API_URL` (`http://localhost:5150` by default)
-instead, which has nothing listening in CI/local dev without the auth
-service running. Two of the five failures also assert the removed
-`return_to` handoff above. This is a pre-existing gap from the BFF
-migration, not introduced by this pass; see `spec/index.md` §11/§13.
+`tests/e2e/smoke.spec.ts` no longer stubs the auth API via `page.route()`
+— that only intercepts requests the **browser** makes, but every
+auth-service call happens server-side (the BFF's own `fetch`), so the
+stub could never see any of them (a silent gap since the BFF migration).
+`playwright.config.ts` instead starts a second `webServer`,
+`tests/e2e/mock-auth-server.mjs` — a small Node HTTP stub — and points
+`AUTH_API_URL` at it, so the SvelteKit server's real outbound calls hit
+something that actually answers them. See `spec/index.md` §11/§13.
 
 ## Project layout
 

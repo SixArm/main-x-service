@@ -10,6 +10,38 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- **E2E suite repaired (PRO-P24).** `tests/e2e/smoke.spec.ts`'s
+  `page.route()` stubs could never intercept the BFF's server-side
+  `fetch` calls to the auth service (silently red 4/9 → now the
+  suite's `page.route()` usage is gone entirely and 9 cases → 6, all
+  passing) since the BFF migration (`f66ff50f`, 2026-06-17).
+  `playwright.config.ts` now runs a second `webServer`,
+  `tests/e2e/mock-auth-server.mjs` (a dependency-free Node HTTP stub),
+  and points `AUTH_API_URL` at it, so the SvelteKit server's real
+  outbound calls have something to answer them. Also deleted the two
+  `return_to` cross-origin-handoff cases and the `localStorage`-seeded
+  signed-in-dashboard case — all three asserted mechanisms the BFF
+  migration removed.
+
+### Removed
+
+- **Dead pre-BFF client layer.** `src/lib/api/client.ts`
+  (`ApiClient`), `src/lib/api/auth.ts` (`AuthRepository`), and
+  `src/lib/config.ts` (`PUBLIC_API_BASE_URL` /
+  `VITE_RETURN_TO_ALLOWLIST`) are deleted — no route imported any of
+  them once the BFF landed; their only callers were their own 19 unit
+  tests (`tests/unit/client.test.ts`, `tests/unit/auth.test.ts`,
+  deleted with them; 36 → 17 unit tests). `src/lib/api/types.ts` is
+  kept — it's genuinely shared with `src/lib/server/`.
+- **Six unused `@svar-ui/*` dependencies.** `svelte-calendar`,
+  `svelte-filemanager`, `svelte-filter`, `svelte-gantt`, `svelte-grid`,
+  `svelte-kanban` were added 2026-07-19 "per family convention" with no
+  route ever importing any of them, contradicting this crate's own
+  "no data-grid dependency" claim (spec §7). Removed; `pnpm-lock.yaml`
+  regenerated.
+
 ## [0.1.0] - 2026-08-04
 
 ### Added
