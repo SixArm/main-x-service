@@ -6569,16 +6569,44 @@ crate above.
   point, not the BFF). This is a genuine **family-wide gap across all
   five front-ends**, not course-specific — tracked as **PRO-H10**
   below rather than solved once, differently, in one crate.
-- [ ] **PRO-H10 (S)** **Decide the family's page-visit auth-guard
-  posture.** None of the five BFF front-ends (person, worker, thing,
-  event, course) redirect an unauthenticated visitor away from a
-  page — `locals.sessionId`/`signedIn` is exposed to the layout for
-  chrome display only, and every route renders regardless. This may
-  be intentional (read pages are public by design, matching the
-  family's default-allow-read ABAC posture) or an oversight — needs an
-  explicit decision recorded in `agents/share/authentication-sessions.md`
-  or a family-wide spec, then applied uniformly if a guard is wanted,
-  rather than left to accumulate per-crate drift. Found during PRO-H5.
+- [x] **PRO-H10 (S)** **Decide the family's page-visit auth-guard
+  posture.** DONE 2026-08-29. Owner decision: add a page-visit guard,
+  applied uniformly (not "public is intentional, just document it").
+  Policy chosen: mirror the backend's own default-allow-read /
+  mutation-deny ABAC posture (`agents/share/authorization-attributes.md`
+  §5) rather than invent a separate front-end rule — guard only pages
+  whose entire purpose is submitting a mutation (create/edit/merge/
+  bulk-import-export/review-decide); leave every read/list/search/view
+  page public, including a view page with an incidental mutation
+  control (a detail page's embedded delete button, a calendar's
+  drag-to-reschedule) where the page's own purpose is still viewing.
+  Built person as the reference (`requireSignedIn(locals)` in
+  `src/lib/server/session.ts`, a `+page.server.ts` guard per protected
+  route, `redirect(303, "/signin")`), then rolled to worker/thing/
+  event/course in parallel, each independently verifying its own route
+  inventory against the policy rather than copying person's paths —
+  real per-crate differences surfaced and were handled correctly:
+  worker/thing have no bulk route (capability matrix "–"), event/course
+  have neither bulk nor a review queue, event's `/calendar` and
+  course's `/board`+`/calendar` are view-purpose pages left public by
+  the same reasoning as person's detail-page delete button. Deliberately
+  does NOT thread a `next` param back through `/signin` in any of the
+  five — the magic-link round trip only preserves `return_url`'s origin
+  today, and carrying a return path through it would touch the
+  authentication-service contract; documented as a known v1 limitation
+  in each crate's `AGENTS.md`, not an oversight. All five independently
+  reverified (`npm run check` 0 errors/warnings, `npm test` — person
+  91/91 was 89, worker 78/78 was 76, thing 85/85 was 83, event 56/56
+  was 54, course 57/57 was 55 — `npm run lint` showing only pre-existing
+  drift in files none of this touched). One process note: the event
+  rollout agent ran a forbidden `git stash`/`git stash pop` mid-task
+  while diagnosing a test baseline; caught and self-corrected within the
+  same turn, verified via `git stash list` (empty) and a full
+  `git status` sweep across all four still-in-flight crates before any
+  landing proceeded — nothing was lost, but flagged via SendFeedback as
+  a recurring class of risk (concurrent agents + git commands touching
+  the shared working tree) worth a harness-level guard rather than
+  relying on prompt instructions alone.
 - [~] **PRO-H6 (M)** *(decided 2026-08-28 — owner chose "implement",
   not "drop"; scoped as PRO-H11 below rather than done inline, since
   real Tonic servers across four services is a multi-week feature
