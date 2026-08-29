@@ -5,9 +5,17 @@
 //! outbound responses and [`from_fhir_person`](crate::api::fhir::from_fhir_person) for inbound requests. The
 //! FHIR resource shapes live in [`resources`](crate::api::fhir::resources), bundle handling in
 //! [`bundle`](crate::api::fhir::bundle), search-parameter parsing in [`search_parameters`](crate::api::fhir::search_parameters), and
-//! the Axum endpoints in [`handlers`](crate::api::fhir::handlers). The conversions are intentionally
-//! lossy where the domain model has no equivalent field (noted by inline
-//! `TODO`s).
+//! the Axum endpoints in [`handlers`](crate::api::fhir::handlers). Per
+//! `agents/share/fhir.md`'s "lossless where the model allows, explicit
+//! where it does not" principle, [`from_fhir_person`](crate::api::fhir::from_fhir_person) parses every
+//! field FHIR carries an equivalent for (name array, marital status,
+//! multiple-birth, managing-organization reference, identifier-type
+//! coding); the one field it cannot parse with confidence —
+//! `managingOrganization` present but not a literal
+//! `"Organization/<uuid>"` reference — is rejected with an
+//! `OperationOutcome` rather than silently dropped (see
+//! [`parse_managing_organization`]). See `spec/14-implementation-status.md`
+//! §14.2 for the remaining, genuine model gap (multiple-birth order).
 
 use crate::Result;
 use crate::models::{Address, Identifier, Person};
@@ -235,6 +243,131 @@ pub fn to_fhir_person(person: &Person) -> FhirPerson {
     resource
 }
 
+/// Parse one FHIR `HumanName` entry into a domain [`crate::models::HumanName`].
+///
+/// Shared by the primary-name parse and the `additional_names` parse in
+/// [`from_fhir_person`], so a FHIR `Patient.name[]` entry beyond the
+/// first round-trips through the same rules as the first.
+fn human_name_from_fhir(fname: &resources::FhirHumanName) -> crate::models::HumanName {
+    use crate::models::{HumanName, NameUse};
+    HumanName {
+        use_type: fname.use_.as_ref().and_then(|u| match u.as_str() {
+            "usual" => Some(NameUse::Usual),
+            "official" => Some(NameUse::Official),
+            "temp" => Some(NameUse::Temp),
+            "nickname" => Some(NameUse::Nickname),
+            "anonymous" => Some(NameUse::Anonymous),
+            "old" => Some(NameUse::Old),
+            "maiden" => Some(NameUse::Maiden),
+            _ => None,
+        }),
+        family: fname.family.clone().unwrap_or_default(),
+        given: fname.given.clone().unwrap_or_default(),
+        prefix: fname.prefix.clone().unwrap_or_default(),
+        suffix: fname.suffix.clone().unwrap_or_default(),
+    }
+}
+
+/// Parse a FHIR `Identifier.type` `CodeableConcept` back into the domain
+/// [`crate::models::IdentifierType`].
+///
+/// Prefers the first coding's `code` (the shape [`fhir_identifiers`]
+/// writes: `code` == the type's [`Display`](std::fmt::Display) form,
+/// e.g. `"MRN"`), falling back to the concept's free-text `text` for a
+/// resource built by hand. An unrecognised or absent code maps to
+/// [`IdentifierType::Other`](crate::models::IdentifierType::Other) —
+/// consistent with that type's own documented "unknown deserializes to
+/// `Other` rather than failing" contract, not a silent drop.
+fn identifier_type_from_fhir(fid: &resources::FhirIdentifier) -> crate::models::IdentifierType {
+    use crate::models::IdentifierType;
+    let code = fid.type_.as_ref().and_then(|tc| {
+        tc.coding
+            .as_ref()
+            .and_then(|codings| codings.first())
+            .and_then(|c| c.code.clone())
+            .or_else(|| tc.text.clone())
+    });
+    code.and_then(|c| serde_json::from_value(serde_json::Value::String(c)).ok())
+        .unwrap_or(IdentifierType::Other)
+}
+
+/// Parse a FHIR `Patient.maritalStatus` `CodeableConcept` back into the
+/// domain's free-text/coded `marital_status` string.
+///
+/// Prefers the first coding's `code` (the shape [`to_fhir_patient`]
+/// writes — `code` == the original domain string), falling back to the
+/// concept's `text` for a resource built by hand.
+fn parse_fhir_marital_status(cc: Option<&resources::FhirCodeableConcept>) -> Option<String> {
+    cc.and_then(|c| {
+        c.coding
+            .as_ref()
+            .and_then(|codings| codings.first())
+            .and_then(|coding| coding.code.clone())
+            .or_else(|| c.text.clone())
+    })
+}
+
+/// Parse a FHIR `multipleBirth[x]` choice back into the domain's
+/// `Option<bool>` `multiple_birth` flag.
+///
+/// `multipleBirthBoolean` maps directly. `multipleBirthInteger` (birth
+/// order, `1..`, per the FHIR `positiveInt` constraint on that element)
+/// has no domain field to carry the order in — but its mere presence is
+/// unambiguous evidence the person *was* part of a multiple birth, so it
+/// maps to `Some(true)` rather than being dropped. The order itself is a
+/// genuine, documented model gap (spec §14.2), not a parsing ambiguity.
+fn parse_fhir_multiple_birth(mb: Option<&resources::FhirMultipleBirth>) -> Option<bool> {
+    use resources::FhirMultipleBirth;
+    match mb {
+        Some(FhirMultipleBirth::Boolean(b)) => Some(*b),
+        Some(FhirMultipleBirth::Integer(_)) => Some(true),
+        None => None,
+    }
+}
+
+/// Parse a FHIR `Patient.managingOrganization` `Reference` back into the
+/// domain's `Option<Uuid>` `managing_organization` field.
+///
+/// The only shape [`to_fhir_patient`] ever writes is a literal
+/// `"Organization/<uuid>"` reference, so that is the only shape parsed
+/// with confidence. A reference present but **not** in that shape (a
+/// display-only reference with no literal `reference`, a reference to a
+/// different resource type, or a malformed UUID) is **rejected**
+/// (`crate::Error::Validation`, surfaced as a `400 invalid`
+/// `OperationOutcome` by the handlers) rather than silently discarded —
+/// per `agents/share/fhir.md`'s "explicit where [the model] does not
+/// [carry the data]" principle.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] when `reference` is present but
+/// is not a well-formed `"Organization/<uuid>"` literal reference.
+fn parse_managing_organization(
+    reference: Option<&resources::FhirReference>,
+) -> Result<Option<uuid::Uuid>> {
+    let Some(r) = reference else {
+        return Ok(None);
+    };
+    let Some(ref_str) = r.reference.as_deref() else {
+        return Err(crate::Error::Validation(
+            "managingOrganization must carry a literal `reference` (e.g. \
+             \"Organization/<uuid>\"); a display-only reference cannot be represented"
+                .to_string(),
+        ));
+    };
+    let Some(id_str) = ref_str.strip_prefix("Organization/") else {
+        return Err(crate::Error::Validation(format!(
+            "managingOrganization.reference must be of the form \
+             \"Organization/<uuid>\", got: {ref_str}"
+        )));
+    };
+    uuid::Uuid::parse_str(id_str).map(Some).map_err(|e| {
+        crate::Error::Validation(format!(
+            "managingOrganization.reference has an invalid UUID: {e}"
+        ))
+    })
+}
+
 /// Parse a FHIR `deceased[x]` choice into the domain
 /// `(deceased, deceased_datetime)` pair.
 fn parse_fhir_deceased(
@@ -298,18 +431,21 @@ fn parse_fhir_contact_point(
 
 /// Map an inbound FHIR [`FhirPerson`] to the internal [`Person`].
 ///
-/// Parses the id (generating a fresh UUID when absent), the first name
-/// entry (required — errors otherwise), gender, birth date, deceased
-/// flag, identifiers, addresses, and telecom. Fields the domain does not
-/// yet round-trip (additional names, marital status, multiple birth,
-/// org reference) are left at defaults.
+/// Parses the id (generating a fresh UUID when absent), the name array
+/// (the first entry required — errors otherwise — with any further
+/// entries mapped into `additional_names`), gender, birth date, deceased
+/// flag, identifiers (including identifier-type coding), addresses,
+/// telecom, marital status, multiple-birth, and the managing-organization
+/// reference.
 ///
 /// # Errors
 ///
-/// Returns [`crate::Error::Validation`] on an invalid UUID or when no
-/// name entry is present.
+/// Returns [`crate::Error::Validation`] on an invalid UUID, when no name
+/// entry is present, or when `managingOrganization` is present but is
+/// not a well-formed `"Organization/<uuid>"` literal reference (see
+/// [`parse_managing_organization`]).
 pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
-    use crate::models::{Gender, HumanName, NameUse};
+    use crate::models::Gender;
     use chrono::Utc;
     use uuid::Uuid;
 
@@ -321,30 +457,17 @@ pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
         Uuid::new_v4()
     };
 
-    // Parse name (use first name)
-    let first_name = fhir_person
+    // Parse names: the first is the primary name, any further entries
+    // are additional names/aliases (FHIR `Patient.name[]` beyond index 0).
+    let names = fhir_person
         .name
         .as_ref()
-        .and_then(|names| names.first())
+        .filter(|names| !names.is_empty())
         .ok_or_else(|| {
             crate::Error::Validation("Person must have at least one name".to_string())
         })?;
-    let name = HumanName {
-        use_type: first_name.use_.as_ref().and_then(|u| match u.as_str() {
-            "usual" => Some(NameUse::Usual),
-            "official" => Some(NameUse::Official),
-            "temp" => Some(NameUse::Temp),
-            "nickname" => Some(NameUse::Nickname),
-            "anonymous" => Some(NameUse::Anonymous),
-            "old" => Some(NameUse::Old),
-            "maiden" => Some(NameUse::Maiden),
-            _ => None,
-        }),
-        family: first_name.family.clone().unwrap_or_default(),
-        given: first_name.given.clone().unwrap_or_default(),
-        prefix: first_name.prefix.clone().unwrap_or_default(),
-        suffix: first_name.suffix.clone().unwrap_or_default(),
-    };
+    let name = human_name_from_fhir(&names[0]);
+    let additional_names = names[1..].iter().map(human_name_from_fhir).collect();
 
     // Parse gender
     let gender = if let Some(ref g) = fhir_person.gender {
@@ -367,12 +490,12 @@ pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
     // Parse deceased
     let (deceased, deceased_datetime) = parse_fhir_deceased(fhir_person.deceased.as_ref());
 
-    // Parse identifiers
+    // Parse identifiers, including the identifier-type coding.
     let identifiers = if let Some(ref ids) = fhir_person.identifier {
         ids.iter()
             .filter_map(|fid| {
                 Some(Identifier::new(
-                    crate::models::IdentifierType::Other, // TODO: Parse from coding
+                    identifier_type_from_fhir(fid),
                     fid.system.clone()?,
                     fid.value.clone()?,
                 ))
@@ -396,12 +519,19 @@ pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
         .map(|tels| tels.iter().filter_map(parse_fhir_contact_point).collect())
         .unwrap_or_default();
 
+    // Parse marital status, multiple birth, and the managing-organization
+    // reference (the latter fallible — see `parse_managing_organization`).
+    let marital_status = parse_fhir_marital_status(fhir_person.marital_status.as_ref());
+    let multiple_birth = parse_fhir_multiple_birth(fhir_person.multiple_birth.as_ref());
+    let managing_organization =
+        parse_managing_organization(fhir_person.managing_organization.as_ref())?;
+
     Ok(Person {
         id,
         identifiers,
         active: fhir_person.active.unwrap_or(true),
         name,
-        additional_names: vec![], // TODO: Parse additional names from FHIR
+        additional_names,
         telecom,
         gender,
         birth_date,
@@ -411,10 +541,10 @@ pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
         tax_id: None,
         documents: vec![],
         emergency_contacts: vec![],
-        marital_status: None, // TODO: Parse marital status
-        multiple_birth: None, // TODO: Parse multiple birth
+        marital_status,
+        multiple_birth,
         photo: vec![],
-        managing_organization: None, // TODO: Parse organization reference
+        managing_organization,
         links: vec![],
         created_at: Utc::now(),
         updated_at: Utc::now(),
