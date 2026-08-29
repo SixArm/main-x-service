@@ -9,6 +9,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `.github/workflows/ci.yml`'s `supply-chain` job now runs the same
+  `scripts/ci-check.sh evidence` stage `.woodpecker.yml` does, closing
+  a CI-platform divergence that made root AGENTS.md's "byte-identical
+  commands" claim false (`tasks.md` PRO-R5).
+- Root `AGENTS.md` + `agents/share/overview.md` doc corrections
+  (PRO-R6): the "matchers run to §25" claim was false for six of nine
+  matcher crates (place/thing/event stop at §13; organization/
+  care-pathway/case/portfolio are each still one `spec/index.md`) —
+  replaced with the real spread. The Library-crates tables claimed
+  entity-ref was "not yet published to crates.io"; checking crates.io
+  directly found it **was** published (`entity-ref` 0.2.0, 2026-08-05)
+  — fixed that row and added the missing note that integrity-mac, by
+  contrast, genuinely isn't published.
+
 ### Added
 
 - Dependabot enabled per `spec/dependabot`: GitHub Dependabot security

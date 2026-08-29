@@ -209,8 +209,11 @@ jobs:
 
   # IEC 62304 / FD&C §524B supply-chain evidence. The SOUP-annotation gate
   # and the requirement->test traceability check are ordinary tests, so
-  # `check` already enforces them; this job adds advisory/licence scanning
-  # and publishes the rendered SBOM as an artefact.
+  # `check` already enforces them; this job adds advisory/licence
+  # scanning (`deny`), runs the same `evidence` stage Woodpecker's
+  # `supply-chain` step runs (PRO-R5 — the two platforms were diverging
+  # here), and publishes the rendered SBOM as a downloadable artefact,
+  # which Woodpecker has no equivalent of.
   supply-chain:
     name: supply chain
     runs-on: ubuntu-latest
@@ -229,10 +232,20 @@ jobs:
         run: cargo install cargo-deny --locked
       - name: cargo-deny (advisories + licences)
         run: scripts/ci-check.sh deny
-      - name: render SBOM
-        run: |
-          cd care-pathway/care-pathway-service-with-loco
-          cargo run --locked --quiet --bin sbom > "$RUNNER_TEMP/sbom.cdx.json"
+      # The same command Woodpecker's `supply-chain` step runs (PRO-R5):
+      # loops every crate via ci-crates.sh, no-op except where a
+      # compliance/traceability.tsv exists (today: care-pathway only,
+      # so this writes exactly one /tmp/sbom.json — a second crate
+      # adopting compliance/ would need this step reworked to keep more
+      # than the last one, same as Woodpecker's would).
+      - name: evidence (SBOM render + traceability, byte-identical with Woodpecker)
+        run: scripts/ci-check.sh evidence
+      # Beyond the byte-identical `evidence` stage above: GitHub Actions
+      # can publish a downloadable artefact and Woodpecker has no
+      # equivalent, so keep the SBOM the step above already rendered
+      # rather than paying for a second `cargo run`.
+      - name: stage SBOM for upload
+        run: cp /tmp/sbom.json "$RUNNER_TEMP/sbom.cdx.json"
       - uses: actions/upload-artifact@v4
         with:
           name: care-pathway-sbom

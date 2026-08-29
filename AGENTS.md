@@ -13,13 +13,20 @@ Two spec shapes exist, and they are different on purpose:
 
 | Shape | Used by | Layout | Live task queue |
 |---|---|---|---|
-| **Numbered** | entity service crates, matcher crates, front-end projects | `spec/01-purpose-and-vision.md` … (§1–§18; matchers run to §25) | §13 |
+| **Numbered** | entity service crates, matcher crates, front-end projects | `spec/01-purpose-and-vision.md` … (§1–§18 for service/front-end crates; matcher crates vary¹) | §13 |
 | **Topic-named** | the five consumer applications | `spec/<topic>.md` plus the SDD trio `requirements.md` / `design.md` / `tasks.md` | `spec/tasks.md` |
 
 The numbered shape suits a crate with one entity and a fixed set of
 concerns; the topic shape suits an application whose modules are the
 natural unit. Neither is being migrated to the other — a rename that
 buys nothing is churn.
+
+¹ The matcher crates' own §1–§25 shape ([overview.md](agents/share/overview.md))
+is not evenly rolled out: person, worker, and course run the full
+`01-…` … `25-…` spread; place, thing, and event stop at `13-references.md`;
+organization, care-pathway, case, and project-portfolio-management
+(portfolio) are each still one `spec/index.md`, with an open task per
+crate to split into the numbered shape.
 
 > Historical note: these were single `spec.md` files. They are
 > directories now, and no live `spec.md` remains (the ones under
@@ -75,14 +82,15 @@ summarises them one line each.
 
 ### Library crates
 
-Peer-side support libraries (not services, not matchers). Dependency-light
-and published to crates.io for downstream consumers.
+Peer-side support libraries (not services, not matchers). Dependency-light,
+and published to crates.io for downstream consumers where noted below —
+two of the three are; Integrity MAC is not yet (see its row).
 
 | Crate                                                                         | Entity                                                                                                                                                                                                                                                                                                                                    | Spec                                                                    | Index                                                               |
 | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | [Authentication Verifier](authentication/authentication-verifier-rust-crate/) | User — peer-side **offline PASETO v4.public (Ed25519) verification** for the [Authentication Service](authentication/authentication-service-with-loco/); fetches/holds the service's `/.well-known/paseto-keys`, mirrors the `Claims` shape, verifies `kid`/`iss`/`aud`/`exp`. Published to crates.io as `authentication-verifier` (0.9). | [spec](authentication/authentication-verifier-rust-crate/spec/index.md) | [index](authentication/authentication-verifier-rust-crate/index.md) |
-| [Integrity MAC](integrity/integrity-mac-rust-crate/) | — (cross-cutting) — keyed integrity **MACs** (HMAC-SHA256, FIPS 198-1) with production-grade key handling for every service carrying a tamper-evidence tier: HKDF-SHA256 subkeys per (service, domain) so a tag cannot transfer between purposes or between services sharing one key; key-file sourcing that takes precedence over the environment and never falls back; root-key zeroization; placeholder refusal; key generation from the OS CSPRNG. Extracted 2026-07-27 rather than copied per service — a key-handling defect in a copy would make MACs forgeable while every test stayed green. | — | — |
-| [Entity Ref](link/entity-ref-rust-crate/) | — (cross-cutting) — the [cross-service-linking](agents/share/cross-service-linking.md) contract: `EntityRef` (the `entity_type:uuid` URN value type) + the closed v1 `EdgeKind` registry (`is_symmetric`/`is_temporal`/`inverse`/`sensitivity`/`permits`). Designed to be copied per project but never actually was — it is a real Cargo `path` dependency of eight crates (`link-graph-service-with-loco` plus person/worker/case and four consumer apps). **Not yet published to crates.io** (unlike the rest of this table's header claim). | — | — |
+| [Integrity MAC](integrity/integrity-mac-rust-crate/) | — (cross-cutting) — keyed integrity **MACs** (HMAC-SHA256, FIPS 198-1) with production-grade key handling for every service carrying a tamper-evidence tier: HKDF-SHA256 subkeys per (service, domain) so a tag cannot transfer between purposes or between services sharing one key; key-file sourcing that takes precedence over the environment and never falls back; root-key zeroization; placeholder refusal; key generation from the OS CSPRNG. Extracted 2026-07-27 rather than copied per service — a key-handling defect in a copy would make MACs forgeable while every test stayed green. **Not published to crates.io** — every consumer is in-tree via a Cargo `path` dependency; unlike Entity Ref below, no release has been cut. | — | — |
+| [Entity Ref](link/entity-ref-rust-crate/) | — (cross-cutting) — the [cross-service-linking](agents/share/cross-service-linking.md) contract: `EntityRef` (the `entity_type:uuid` URN value type) + the closed v1 `EdgeKind` registry (`is_symmetric`/`is_temporal`/`inverse`/`sensitivity`/`permits`). Designed to be copied per project but never actually was — it is a real Cargo `path` dependency of eight crates (`link-graph-service-with-loco` plus person/worker/case and four consumer apps). **Published to crates.io as `entity-ref` (0.2.0, 2026-08-05)** — correcting an earlier "not yet published" claim here; every in-tree consumer still takes the `path` dependency rather than the crates.io release. | — | — |
 
 ### Front-end projects
 
