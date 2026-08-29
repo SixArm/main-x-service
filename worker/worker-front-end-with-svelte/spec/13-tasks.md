@@ -121,4 +121,22 @@
   (the board + queue + comparison panel, and the merge page's
   query-param seed) — all passing (`pnpm check`: 0/0; `pnpm vitest run`:
   6 files / 56 tests; `pnpm exec playwright test`: 9/9).
+- [x] T-26 (2026-08-29, PRO-H10): **Page-visit guard.** Redirect an
+  unauthenticated visitor away from every page whose sole purpose is
+  submitting a mutation — `/workers/new`, `/workers/[id]/edit`,
+  `/workers/merge`, `/review` each gained a `+page.server.ts` calling
+  the new `requireSignedIn(locals)` (`src/lib/server/session.ts`),
+  `redirect(303, "/signin")` on no session. Read/list/search/view
+  pages stay public — this mirrors the backend's own default-allow-
+  read / mutation-deny ABAC posture rather than a separate front-end
+  policy. `locals.sessionId` is presence-only, a UX convenience in
+  front of the backend's real enforcement, not a substitute for it.
+  No `/workers/bulk` route exists to guard — worker carries no bulk
+  import/export capability, unlike person's reference implementation
+  of this task. Deliberately does not thread a `next` param back
+  through `/signin` in v1 (see `AGENTS.md`'s "Page-visit guard"
+  section for why — the magic-link round trip does not carry one
+  today). Tests: `tests/unit/session.test.ts` (+2 — `requireSignedIn`
+  throws a 303-to-`/signin` redirect when signed out, passes through
+  silently when signed in).
 
