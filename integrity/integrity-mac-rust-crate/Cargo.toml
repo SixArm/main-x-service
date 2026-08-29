@@ -16,7 +16,7 @@ path = "src/lib.rs"
 
 [dependencies]
 # HMAC-SHA256 (FIPS 198-1) — the keyed digest itself.
-hmac = "0.12"
+hmac = "0.13"
 sha2 = "0.10"
 # HKDF-SHA256 (RFC 5869) — per-(service, domain) subkey derivation.
 hkdf = "0.12"
