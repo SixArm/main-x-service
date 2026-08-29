@@ -48,12 +48,22 @@
   folder-not-cached branches), `addFolder`, and `addBuilding/Room/Cabinet`.
   Also fixed a `cache-api.md` drift: `cabinetLocation` returns "In transit"
   for an unknown id, not only `null`. vitest unit count 26→43.
-- [ ] **ST-14** ESLint + svelte-eslint (P1)
+- [x] **ST-14** ESLint + svelte-eslint (P1). `eslint.config.js` (flat
+  config) + `eslint-plugin-svelte` + `svelte-eslint-parser`; `npm run
+  lint` (`eslint .`) is clean. Cross-referenced in root **T-14**; this
+  row was left unticked after that landed — reconciled 2026-08-29.
 - [x] **ST-15** `@axe-core/playwright` scans (P1) — UR-9.
   `tests/e2e/a11y.spec.ts` scans 9 primary routes (`/`, `/patients`,
   `/folders`, `/volumes`, `/workers`, `/cabinets`, `/alerts`, `/reports`,
   `/scan`) for serious/critical violations.
-- [ ] **ST-16** Codegen client types from API OpenAPI/JSON Schema (P1) — UR-6
+- [x] **ST-16** Codegen client types from API OpenAPI/JSON Schema (P1) —
+  UR-6. `npm run gen:api` runs `openapi-typescript
+  ../case-folder-service-with-rust/openapi.yaml -o
+  src/lib/api/schema.d.ts`; `client.ts` imports `components` from the
+  generated schema and aliases its wire types. Verified 2026-08-29:
+  regenerating produces no diff (schema is current). Cross-referenced
+  in root **T-12**; this row was left unticked after that landed —
+  reconciled 2026-08-29.
 
 ## Production gates
 

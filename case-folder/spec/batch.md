@@ -47,5 +47,7 @@ If/when added, a batch operation MUST preserve the existing audit guarantees:
   volume; it only records the moves.
 
 Adding batches would therefore relax invariant 8 (introduce a second
-group-move operation) and is tracked as a [§ Tasks / roadmap](roadmap.md)
-item, not a current behaviour.
+group-move operation). It is listed as an
+[idea-stage entry in the roadmap](roadmap.md#idea-stage--not-designed-not-queued) —
+not a queued task, and not a current behaviour — until it has a
+`requirements.md` entry and a `design.md` decision.

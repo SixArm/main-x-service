@@ -50,10 +50,11 @@
   mappers (P1) — NFR-6
 - [x] **T-13** Automated axe accessibility scans (`tests/e2e/a11y.spec.ts`,
   9 routes, fails on serious/critical) (P1) — NFR-5
-- [x] **T-14** vitest unit tests (`npm run test:unit`, 43 tests — `nhs.ts`
-  + all exported `client.ts` mappers + the `cache.svelte.ts` store (ST-13c)
-  + components) + ESLint flat config (`npm run lint`, clean) for the Svelte
-  client (P1)
+- [x] **T-14** vitest unit tests (`npm run test:unit`, 48 tests across 9
+  files as of the DOC-7 audit — `nhs.ts` + all exported `client.ts`
+  mappers + the `cache.svelte.ts` store (ST-13c) + `i18n.test.ts` +
+  `routes/layout.test.ts` + components) + ESLint flat config
+  (`npm run lint`, clean) for the Svelte client (P1)
 - [x] **T-15** Harden the Modulus-11 core invariant on both editions
   (D-6) — NFR-1. Fixed two factual errors in
   [nhs-number.md](nhs-number.md)'s worked-example table (the `013 628 2963`

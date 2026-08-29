@@ -23,3 +23,20 @@ Priorities are shared across both editions unless noted.
 
 See [requirements.md](requirements.md) for the requirements these items
 would satisfy and [tasks.md](tasks.md) for active delivery.
+
+## Idea stage — not designed, not queued
+
+These three topic files sketch a possible capability each, but none has
+a `requirements.md` entry, a `design.md` decision, or a `tasks.md` row —
+so, unlike the table above, they are **not** committed roadmap items.
+Each file's own "Open questions" section is the reason: the data model
+and lifecycle are still undecided. They stay linked from
+[index.md](index.md) as parked ideas, not silently dropped, but picking
+one up starts at `requirements.md` per the SDD workflow above, not at
+its sketch file.
+
+| File | Idea |
+| --- | --- |
+| [tag-it.md](tag-it.md) | Declare an interest in a folder, with desired dates |
+| [receive-it.md](receive-it.md) | Confirm receiving a case folder, closing the loop on a move |
+| [batch.md](batch.md) | Transient multi-patient bulk grouping for a single physical handling action |
