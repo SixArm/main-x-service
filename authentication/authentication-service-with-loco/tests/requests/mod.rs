@@ -6,5 +6,6 @@
 
 mod admin;
 mod auth;
+mod compliance;
 mod prepare_data;
 mod rate_limit;
