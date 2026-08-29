@@ -9,8 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- **2026-08-29 — PRO-P8: `COURSE_API_URL`'s code fallback (`src/lib/server/config.ts`) fixed from `http://localhost:5150` to `http://localhost:8084`, T-28.** The old fallback silently pointed an unconfigured dev environment at the family's shared generic loco port rather than at `course-service-with-loco`'s own documented dev port; no explicit-choice rationale for 5150 exists anywhere in this project's docs, so this was a copy-paste bug from a sibling front-end, not a deliberate convention. `.env.example`, `README.md`, and `index.md` updated to match (they already documented 8084 as the "real" default and flagged the fallback as wrong).
+
 ### Documentation
 
+- **2026-08-29 — PRO-P8: corrected the false "the service has no FHIR surface" claim in `AGENTS.md`.** `course-service-with-loco` mounts `/fhir/Basic{,/{id}}` + `/fhir/metadata` (T-20, landed and tested). The absence of a FHIR viewer here is a front-end scope choice — the resource is a deliberately non-standard best-effort `Basic` wrapper (`agents/share/fhir.md` §3), and every sibling front-end likewise ships no FHIR UI — not evidence the backend lacks one.
 - **2026-08-04 — DOC-4 pass: recorded the 2026-06-18 BFF auth + i18n
   landing that had never been written down here.** The family-wide
   auth-migration commit (2026-06-18) added this app's full BFF —

@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — request-path observability middleware (T-18)
+
+- **2026-08-29 (PRO-P8)**: `http_requests_total{path,status}` — declared
+  since T-16 but never incremented — is now observed on the live request
+  path by `crate::metrics::track_http_requests_mw`, layered via
+  `route_layer` (not `layer`, so `axum::extract::MatchedPath` resolves)
+  on both router surfaces: the loco production router
+  (`App::after_routes`, `src/app.rs`) and the `tower::oneshot` test
+  router (`create_router`, `src/api/rest/mod.rs`). The `path` label is
+  the **matched route template** (e.g. `/api/courses/{id}`), not the raw
+  request path, so a course `pid` never mints its own label series.
+  Family-wide check found no sibling loco service actually wires this
+  counter either (`http_requests_total` is declared-but-dead in all nine
+  other entity services) — this is a fresh implementation, not a copy of
+  an existing pattern. New DB-free test in `metrics::tests`.
+
 ### Added — declared MSRV (Rust 1.95)
 
 - `Cargo.toml` now declares `rust-version = "1.95"`, the repository's

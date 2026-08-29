@@ -19,8 +19,9 @@
   feature flag (T-23); the deliberately non-standard FHIR `Basic`
   surface (T-20); header-based API versioning (T-25); and row-level
   integrity digests + audit-log MAC verification, default off (T-24).
-  **Still open**: the request-path middleware that increments the
-  already-declared `http_requests_total{path,status}` counter (T-18).
+  Also landed since, out of version-cut sequence: the request-path
+  middleware that increments the `http_requests_total{path,status}`
+  counter (T-18, 2026-08-29, PRO-P8).
 - **v0.5** (next): bulk import / export (T-19, designed in §9.2, not
   yet built); syllabus-section sub-resource handlers + repository
   round-trip (currently the column ships JSONB, but no read/write

@@ -13,6 +13,10 @@
 //! there is no loco state to thread through, so handlers reach the
 //! metrics directly.
 //!
+//! `http_requests_total` is observed by [`track_http_requests_mw`], an
+//! Axum middleware layered (via `route_layer`, T-18) on both router
+//! surfaces in [`crate::api::rest`] and [`crate::app`].
+//!
 //! # Metric inventory
 //!
 //! | Name | Type | Labels |
@@ -24,6 +28,10 @@
 //! | `http_requests_total` | counter vec | `path`, `status` |
 
 use std::sync::OnceLock;
+
+use axum::extract::{MatchedPath, Request};
+use axum::middleware::Next;
+use axum::response::Response;
 
 use prometheus::{Counter, Encoder, IntCounterVec, Opts, Registry, TextEncoder};
 
@@ -48,10 +56,10 @@ pub struct Metrics {
     /// Count of course merges (`POST /api/courses/merge`).
     pub course_merged_total: Counter,
 
-    /// HTTP requests, labelled by `path` and `status`. Reserved for an
-    /// observability middleware; declared here so the metric appears in
-    /// the exposition from the first scrape even before any request is
-    /// recorded.
+    /// HTTP requests, labelled by `path` and `status`. Observed on every
+    /// request by [`track_http_requests_mw`] (T-18); declared here so the
+    /// metric appears in the exposition from the first scrape even before
+    /// any request is recorded.
     pub http_requests_total: IntCounterVec,
 }
 
@@ -143,6 +151,35 @@ impl Metrics {
     }
 }
 
+/// Axum middleware: observe every routed request on
+/// [`Metrics::http_requests_total`] (T-18).
+///
+/// Labelled by the **matched route template** (e.g. `/api/courses/{id}`),
+/// not the raw request path — using the raw path would let each course
+/// `pid` mint its own label series and grow the metric unboundedly.
+/// Reading [`MatchedPath`] requires this to be layered with
+/// [`axum::Router::route_layer`] rather than [`axum::Router::layer`]: a
+/// plain `layer` wraps the whole router *before* route matching runs, so
+/// `MatchedPath` would not yet be resolved; `route_layer` applies to the
+/// already-registered routes, after matching. A request that matches no
+/// route (a stray path returning a raw `404`) never reaches this
+/// middleware at all under `route_layer`, and so is not counted — it
+/// isn't on the declared API surface the metric describes.
+pub async fn track_http_requests_mw(
+    matched_path: MatchedPath,
+    req: Request,
+    next: Next,
+) -> Response {
+    let path = matched_path.as_str().to_owned();
+    let response = next.run(req).await;
+    let status = response.status().as_u16().to_string();
+    Metrics::global()
+        .http_requests_total
+        .with_label_values(&[&path, &status])
+        .inc();
+    response
+}
+
 /// DB-free pins for the Prometheus registry and its text rendering: the
 /// declared counters appear in the exposition (with `# HELP`/`# TYPE`
 /// banners) even before being incremented, and an increment is reflected
@@ -212,5 +249,48 @@ mod tests {
             .and_then(|v| v.parse().ok())
             .expect("counter sample has a numeric value");
         assert!(value >= 1.0, "expected >= 1 after inc(), got {value}");
+    }
+
+    /// [`track_http_requests_mw`] observes a real request on the live
+    /// request path: a router carrying one dynamic-segment route, layered
+    /// with `route_layer` (the only way `MatchedPath` resolves), records
+    /// the **matched template** — not the concrete id in the URL — with
+    /// the response status.
+    #[tokio::test]
+    async fn track_http_requests_mw_labels_by_matched_route_template() {
+        use axum::{Router, body::Body, http::Request, routing::get};
+        use tower::ServiceExt;
+
+        let app = Router::new()
+            .route("/probe/{id}", get(|| async { "ok" }))
+            .route_layer(axum::middleware::from_fn(track_http_requests_mw));
+
+        let before = Metrics::global()
+            .http_requests_total
+            .with_label_values(&["/probe/{id}", "200"])
+            .get();
+
+        let req = Request::builder()
+            .uri("/probe/some-concrete-uuid")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+
+        let after = Metrics::global()
+            .http_requests_total
+            .with_label_values(&["/probe/{id}", "200"])
+            .get();
+        assert!(
+            after > before,
+            "expected the matched-template label to increment: before={before} after={after}"
+        );
+
+        // The concrete id never became its own label series.
+        let body = Metrics::global().render();
+        assert!(
+            !body.contains("some-concrete-uuid"),
+            "the raw path segment must not appear as a label value; got: {body}"
+        );
     }
 }

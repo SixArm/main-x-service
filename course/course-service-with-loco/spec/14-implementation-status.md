@@ -18,6 +18,6 @@
 | gRPC | – not built, not even a stub (§2.2) |
 | OpenTelemetry export | – `OTLP_*` config parses but is unused; no exporter (§2.2) |
 | Bulk import / export | – designed (§9.2) but not built (T-19) |
-| Metrics | ✅ Prometheus `GET /metrics.prom` (T-16) — process-wide registry; `course_{created,updated,deleted,merged}_total` counters + labelled `http_requests_total` (reserved for a future request middleware) |
+| Metrics | ✅ Prometheus `GET /metrics.prom` (T-16) — process-wide registry; `course_{created,updated,deleted,merged}_total` counters + labelled `http_requests_total{path,status}`, observed on the live request path by a `route_layer` middleware (T-18) |
 | Tests | ✅ 123 unit + 2 DB-gated `#[ignore]` unit (`db::outbox_atomicity_tests`) + 14 bridge + 12 `#[ignore]` integration + 1 `#[ignore]` auth-activation (`tests/enforcement.rs`) + 1 feature-gated `#[ignore]` Fluvio round-trip (`tests/fluvio_relay.rs`) + 3 criterion benches — run `cargo test --lib` for the live count |
 
