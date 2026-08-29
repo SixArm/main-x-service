@@ -4,7 +4,7 @@
 //! `GET /metrics.prom` in Prometheus text-exposition format. Mounted at
 //! the **root** (not under `/api`) so a scraper can reach it with the
 //! conventional `metrics_path: /metrics.prom`, alongside the other root
-//! routes (`/.well-known/jwks.json`, `/api-docs/openapi.json`).
+//! routes (`/.well-known/paseto-keys`, `/api-docs/openapi.json`).
 //!
 //! The endpoint is unauthenticated: this service has no blanket-auth
 //! middleware, and the auth flows under `/api/auth/*` are already public,

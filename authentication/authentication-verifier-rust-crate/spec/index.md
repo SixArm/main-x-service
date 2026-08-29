@@ -382,30 +382,30 @@ attribute values, so it is safe for 403 bodies and audit trails.
       `evaluate`/`evaluate_with_resource` unchanged. Engine tests:
       `$sub` ownership, literal-`$`, `env` time-window deny, empty-env
       delegation identity. Version 0.4.0 → 0.5.0.
-- [x] **Algorithm agility for the verifier (unreleased, post-v0.8.0).**
-      *(2026-07-27)* `Verifier` now dispatches on each key's *declared*
-      algorithm (internal `VerificationKey::{Ed25519, Unsupported}` enum)
-      instead of assuming Ed25519, so an unrecognised algorithm cannot
-      silently verify — see §5 "Algorithm agility" and
+- [x] **Algorithm agility for the verifier (v0.9.0).**
+      *(2026-07-27; released 2026-08-05)* `Verifier` now dispatches on
+      each key's *declared* algorithm (internal
+      `VerificationKey::{Ed25519, Unsupported}` enum) instead of
+      assuming Ed25519, so an unrecognised algorithm cannot silently
+      verify — see §5 "Algorithm agility" and
       [authentication-sessions.md](../../../agents/share/authentication-sessions.md)
       §5.1 for the full rationale. Added `unsupported_key_count()` /
       `algorithms()`; `key_count()` now counts only usable keys; a
       duplicate `kid` is a construction error, not last-wins; a token
       selecting an unsupported key fails `UnsupportedAlgorithm`, not
       `UnknownKid`. Source-compatible — no consuming crate changed.
-      Landed in `src/lib.rs`; **not yet reflected in a CHANGELOG release
-      heading** (Cargo.toml is still `0.8.0`; this and the three tasks
-      below sit in `CHANGELOG.md`'s `[Unreleased]` pending a version-bump
-      decision — H-5 explicitly deferred cutting a release here rather
-      than create a second, contradictory `[0.8.0]` heading).
-- [x] **cargo-fuzz harness (SEC-I2, unreleased).** *(2026-07-14)* Added
-      `fuzz/` (two libFuzzer targets, `verify` and `policy`) per §11.
-- [x] **SEC-V1/V2/V4 hardening (unreleased).** *(2026-07-13)* HTTPS
-      (or loopback-only HTTP) + timeout + no-redirect + 64 KiB body cap
-      on `from_paseto_keys_url` (SEC-V1, §6 FR9); no vacuous match for a
-      negated `resource.`/`env.` condition on an absent namespace
-      (SEC-V2, §6 FR8); cross-key-forgery, missing-`exp`, and
-      never-panic-on-malformed-input tests (SEC-V4). See
+      Landed in `src/lib.rs`; released as `[0.9.0] - 2026-08-05` in
+      `CHANGELOG.md`, alongside the two tasks below (Cargo.toml bumped
+      `0.8.0` → `0.9.0`).
+- [x] **cargo-fuzz harness (SEC-I2, v0.9.0).** *(2026-07-14; released
+      2026-08-05)* Added `fuzz/` (two libFuzzer targets, `verify` and
+      `policy`) per §11.
+- [x] **SEC-V1/V2/V4 hardening (v0.9.0).** *(2026-07-13; released
+      2026-08-05)* HTTPS (or loopback-only HTTP) + timeout + no-redirect
+      + 64 KiB body cap on `from_paseto_keys_url` (SEC-V1, §6 FR9); no
+      vacuous match for a negated `resource.`/`env.` condition on an
+      absent namespace (SEC-V2, §6 FR8); cross-key-forgery, missing-`exp`,
+      and never-panic-on-malformed-input tests (SEC-V4). See
       [security.md](../../../agents/share/security.md) §2 for the
       family-wide audit these came out of.
 - [x] **Hot-reloadable verifier for key rotation (v0.8.0).**
@@ -463,20 +463,14 @@ environment attributes (v0.5.0), obligations (v0.6.0), and hot-reload
 for both the policy (`ReloadablePolicy`, v0.7.0) and the verifier
 (`ReloadableVerifier`, v0.8.0) — are all shipped and released.
 
-**Unreleased since v0.8.0 (as of this audit).** Three further changes
-have landed in `src/`/`fuzz/` but not yet in a dated `CHANGELOG.md`
-heading or a bumped `Cargo.toml` version (see §13): SEC-V1/V2/V4
-hardening (2026-07-13), the `fuzz/` cargo-fuzz harness (SEC-I2,
-2026-07-14), and verifier algorithm agility (2026-07-27, §5). `cargo
-test` is 54 unit + 4 doc tests green (57 unit + 5 doc with
-`--features fetch`, which adds the loopback-fetch tests plus the
-`from_paseto_keys_url` doctest); `cargo clippy --all-targets -- -D
-warnings` and `cargo fmt --check` are both clean. Neither a `authentication-verifier-vX.Y.Z`
-git tag nor a `cargo publish` has happened for any version past the
-crates.io-published 0.2 — confirmed via `git tag -l`, which has no
-`authentication-verifier-*` tag at all, and H-5's own notes, which
-explicitly deferred both the version-bump/tag and the crates.io publish
-decision for this crate.
+**v0.9.0 shipped (2026-08-05).** Three further changes released
+together in a dated `CHANGELOG.md` heading with a bumped `Cargo.toml`
+version (see §13): SEC-V1/V2/V4 hardening (landed 2026-07-13), the
+`fuzz/` cargo-fuzz harness (SEC-I2, landed 2026-07-14), and verifier
+algorithm agility (landed 2026-07-27, §5). `cargo test` is green;
+`cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` are
+both clean. Cargo.toml's `version` field reads `0.9.0`, confirming the
+bump described above.
 
 ## 15. Roadmap
 

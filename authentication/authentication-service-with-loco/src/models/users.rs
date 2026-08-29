@@ -214,7 +214,8 @@ impl ActiveModelBehavior for super::_entities::users::ActiveModel {
 impl Authenticable for Model {
     /// loco `Authenticable` hook: resolve a user from an api-key bearer.
     /// Present for loco's middleware; the magic-link surface authenticates
-    /// via RS256 JWTs (see [`crate::auth`]) rather than api keys.
+    /// via PASETO v4.public tokens (see [`crate::auth`]) rather than api
+    /// keys.
     ///
     /// # Errors
     ///

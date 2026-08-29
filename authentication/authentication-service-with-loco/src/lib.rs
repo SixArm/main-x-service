@@ -2,10 +2,11 @@
 //! single sign-on provider.
 //!
 //! A loco.rs application that authenticates users via passwordless email
-//! magic links and issues RS256 JWT access tokens. Every other service
-//! verifies those tokens offline against the public keys published at
-//! `/.well-known/jwks.json` (see the sibling `authentication-verifier`
-//! crate). There is no shared secret and no per-request introspection.
+//! magic links and issues short-lived PASETO v4.public (Ed25519) access
+//! tokens. Every other service verifies those tokens offline against the
+//! public key set published at `/.well-known/paseto-keys` (see the
+//! sibling `authentication-verifier` crate). There is no shared secret
+//! and no per-request introspection.
 //!
 //! See `spec/index.md` for the living specification and `AGENTS.md` for
 //! the working conventions.
@@ -15,7 +16,7 @@
 
 /// Loco `Hooks` boot: route registration, workers, seeding, truncation.
 pub mod app;
-/// RS256 JWT issuance, verification, JWKS publication, bearer extractor.
+/// PASETO v4.public issuance, verification, key-set publication, bearer extractor.
 pub mod auth;
 /// Loco HTTP controllers (magic-link auth + paseto-keys endpoint).
 /// Compliance controls: keyed integrity over the auth-event trail.

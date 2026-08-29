@@ -1,8 +1,9 @@
-//! Create the `sessions` table — one row per issued access token, keyed
-//! by `jid` (the JWT `jti`, `UNIQUE`). This is what makes stateless RS256
-//! tokens *locally* revocable: signout stamps `revoked_at`, and `/me`
-//! rejects a revoked session even though the JWT signature still
-//! validates. `expires_at` lets stale rows be reaped.
+//! Create the `sessions` table — one row per server-side cookie session,
+//! keyed by `jid` (the session's opaque id, `UNIQUE`, stamped into the
+//! short-lived PASETO access token's `sid` claim). This is what makes a
+//! session *locally* revocable: signout stamps `revoked_at`, and `/me`
+//! rejects a revoked session even though a cached token's PASETO
+//! signature still verifies. `expires_at` lets stale rows be reaped.
 
 use loco_rs::schema::{ColType, create_table, drop_table};
 use sea_orm_migration::prelude::*;

@@ -2,7 +2,7 @@
 //!
 //! Each submodule exposes a `routes()` builder that [`crate::app::App`]
 //! mounts. The surface is deliberately small: passwordless magic-link
-//! auth, the public JWKS, and the `OpenAPI`/Swagger docs.
+//! auth, the published PASETO key set, and the `OpenAPI`/Swagger docs.
 
 pub mod admin;
 /// Passwordless magic-link auth (signup / request / redeem / me /

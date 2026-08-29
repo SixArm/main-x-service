@@ -3,7 +3,7 @@
 //! Flow:
 //! 1. `POST /api/auth/signup`     `{email, name?, locale?}` — create the account, issue a magic link.
 //! 2. `POST /api/auth/magic-link` `{email, locale?}`        — issue a magic link for an existing account (sign in).
-//! 3. `GET  /api/auth/magic-link/{token}`          — consume the link → RS256 access token + session.
+//! 3. `GET  /api/auth/magic-link/{token}`          — consume the link → server-side session (+ cookie).
 //! 4. `GET  /api/auth/me`                          — current user (bearer token required).
 //! 5. `POST /api/auth/signout`                     — revoke the current session (bearer token required).
 //! 6. `GET  /api/auth/audit/recent`                — recent authentication events (system-wide audit trail).
@@ -18,9 +18,10 @@
 //! HTTP response never does — the anti-enumeration contract holds at the
 //! wire. No tokens or secrets are ever stored.
 //!
-//! Tokens are RS256 and verifiable offline by peer services via the
-//! JWKS at `/.well-known/jwks.json`. In development the magic link is
-//! written to the tracing log (no SMTP required).
+//! Cross-service access tokens are short-lived PASETO v4.public
+//! (Ed25519), verifiable offline by peer services against the published
+//! key set at `/.well-known/paseto-keys`. In development the magic link
+//! is written to the tracing log (no SMTP required).
 
 use axum::http::StatusCode;
 use loco_rs::controller::ErrorDetail;
@@ -545,7 +546,7 @@ async fn token(headers: axum::http::HeaderMap, State(ctx): State<AppContext>) ->
 }
 
 /// Current authenticated user. Honors local revocation: a signed-out
-/// session is rejected even though its JWT signature is still valid.
+/// session is rejected even though its PASETO signature is still valid.
 /// Honors GDPR erasure: a deleted account is treated as gone — its
 /// still-valid bearer token returns `401`, not the tombstoned record.
 #[debug_handler]
@@ -571,8 +572,9 @@ async fn me(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
 }
 
 /// Revoke the current session. Peer services that cached the token keep
-/// honoring it until expiry (offline JWKS verification) — that's the
-/// documented tradeoff of stateless tokens; we keep TTLs short.
+/// honoring it until expiry (offline PASETO verification against the
+/// published key set) — that's the documented tradeoff of stateless
+/// tokens; we keep TTLs short.
 #[debug_handler]
 async fn signout(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
     let AuthUser(claims) = auth;
