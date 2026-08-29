@@ -11,6 +11,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Dependabot enabled per `spec/dependabot`: GitHub Dependabot security
+  updates (`automated-security-fixes`) turned on at the repo level
+  (vulnerability alerts were already on), plus a generated
+  `.github/dependabot.yml` covering every one of the ~64 Cargo
+  workspaces (main crate + `migration/` + `fuzz/` sub-crates, since
+  this repo has no root `Cargo.toml` for Dependabot to walk on its
+  own) and all 16 SvelteKit front-ends' `npm` packages, plus
+  `github-actions`, on a weekly schedule with routine minor/patch
+  updates grouped per directory. `scripts/dependabot-generate.sh`
+  regenerates the file from the live tree (same discovery pattern as
+  `scripts/ci-crates.sh`) so it stays in sync as crates/front-ends are
+  added, removed, or moved.
 - `.github/FUNDING.yml`: GitHub Sponsors enabled (`joelparkerhenderson`).
   Open Collective intentionally omitted — no collective exists yet.
   CONTRIBUTING.md and NEWS.md updated to match (`spec/free-open-source-funding`).
