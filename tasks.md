@@ -6755,34 +6755,54 @@ crate above.
   identifier-type coding (`src/api/fhir/mod.rs:375-417`) — a FHIR `PUT`
   can erase native-API data. Parse them or reject with
   `OperationOutcome`; list the gap in spec §14.2 until closed.
-- [ ] **PRO-P2 (S)** `LinkType::ReplacedBy` serializes `"replacedby"`
-  vs DB CHECK `'replaced_by'` (`src/models/person.rs:208` vs the
-  2024-12-28 migration) — fix the serde rename with a DB-gated pin;
-  close the §13 residual. Also expose the hardcoded `0.85` matcher
-  threshold (`src/matching/mod.rs:162`).
-- [ ] **PRO-P3 (S)** worker-matcher TSV: add the 7 missing scheme rows
+- [x] **PRO-P2 (S)** *(done 2026-08-29)* Fixed `LinkType::ReplacedBy`'s
+  serde rename (`"replacedby"` → `"replaced_by"`, matching the DB CHECK
+  constraint) with a unit test pinning all four wire tags plus a
+  DB-gated round-trip integration test; closed the §13 residual.
+  Exposed the hardcoded `0.85` matcher threshold via a new
+  `ProbabilisticScorer::threshold_score()` getter over the existing
+  (already-honored) config field. Verified: fmt/clippy clean, 351 lib
+  tests (was 350), DB-gated suite green against real Postgres.
+- [x] **PRO-P3 (S)** *(done 2026-08-29)* Added the 7 missing scheme rows
   (`br_cpf`, `cn_rrn`, `in_aadhaar`, `jp_my_number`, `mx_curp`,
-  `nz_nhi`, `za_id`) to `agents/national-person-identifiers.tsv`
-  (T-17.1 residual). *(filed under person for the shared TSV; code is
-  worker's)*
+  `nz_nhi`, `za_id`) to `agents/national-person-identifiers.tsv`,
+  each cross-checked against worker-matcher's actual
+  `src/identifiers.rs` check-digit implementation (weights, moduli,
+  sentinel rejections) rather than general web knowledge. All 7
+  schemes already had fully-implemented, tested parsers — this was a
+  pure documentation gap, not code.
 - [ ] **PRO-P4 (M)** person FE: stabilize the 3 documented failing
   live-integration tests (duplicate-detector test-data interactions).
 
 **worker**
-- [ ] **PRO-P5 (S)** Close/re-point stale §13 T-2 (superseded by BUS-3's
-  `FluvioSink`); fix §14.1's `Worker`→`Practitioner` wording and rename
-  `test_fhir_worker_route_is_mounted` accordingly.
+- [x] **PRO-P5 (S)** *(done 2026-08-29)* Closed §13 T-2, reworded to
+  describe the actual shipped `FluvioSink : EventSink` (BUS-3,
+  2026-08-03) rather than the originally-scoped `EventProducer` shape.
+  Fixed §14.1's `Worker`→`Practitioner` wording and renamed
+  `test_fhir_worker_route_is_mounted` →
+  `test_fhir_practitioner_route_is_mounted`, updating every reference
+  across spec/06/09/13/14 + `agents/restful.md`. Verified: fmt clean,
+  312 lib tests / 11 ignored, renamed test passes.
 
 **thing**
-- [ ] **PRO-P6 (S)** Fix FE `spec/14-implementation-status.md` E2E row
-  (actual: 7 tests, `/review` covered; T-23 now `/signin`+`/verify`
-  only).
+- [x] **PRO-P6 (S)** *(done 2026-08-29)* Fixed FE
+  `spec/14-implementation-status.md`'s E2E row — verified live
+  (`tests/e2e/things.spec.ts`) at 7 tests with `/review` covered,
+  matching the task's claim exactly; corrected the previously-stale
+  "5 tests, `/review` uncovered" row.
 
 **event**
-- [ ] **PRO-P7 (S)** Fix spec §14.1's stale "`/fhir/*` stubs out of
-  scope" enforcement wording (guard covers `/fhir/*`; T-8 landed) and
-  clarify that the dedup review queue is ephemeral (no `review_queue`
-  table) or add the table to match siblings.
+- [x] **PRO-P7 (S)** *(done 2026-08-29)* Verified `/fhir/*` is already
+  covered by the blanket guard (only `/fhir/metadata` is public) and
+  T-8 is fully `[x]` — the §14.1 "`/fhir/*` stubs out of scope"
+  wording was stale; fixed. Investigated the review queue: genuinely
+  ephemeral by design (`POST /api/events/deduplicate` computes
+  `ReviewQueueItem`s in-memory, no `review_queue` table, no
+  list/decision endpoints) — documented as a real gap vs. the family
+  pattern (new §16 OQ-4) rather than building a migration+table, which
+  is bigger than a doc task's scope. Also flagged that a returned
+  `AutoMerged` item is a label only, since nothing persists to act on
+  it later.
 
 **course**
 - [ ] **PRO-P8 (S)** FE AGENTS.md falsely claims "the service has no
@@ -6793,12 +6813,13 @@ crate above.
   never-observed `http_requests_total` or unregister it.
 
 **organization**
-- [ ] **PRO-P9 (S)** TSV truth sweep: spec §2/§9/§10.7 still say
-  "JSONL + CSV only" / "`format` accepts only jsonl/csv (400
-  otherwise)" while `BulkFormat::Tsv` shipped 2026-08-21; AGENTS.md /
-  index.md / README never mention TSV. Also refresh AGENTS.md (loco
-  1.0.1→1.1.0, verifier 0.2→0.9, missing `src/compliance/` +
-  integrity-digests migration in the layout map).
+- [x] **PRO-P9 (S)** *(done 2026-08-29)* Fixed spec §2/§9/§10.7 to
+  mention TSV (`BulkFormat::Tsv`, shipped 2026-08-21 — verified live
+  against `src/bulk/mod.rs` + `CHANGELOG.md`); added TSV to AGENTS.md
+  + README's format lists. Refreshed AGENTS.md's stale dependency
+  versions (loco 1.0.1→1.1.0, authentication-verifier 0.2→0.9, both
+  verified against Cargo.toml) and added the previously-undocumented
+  `src/compliance/` + integrity-digests migration to the layout map.
 - [ ] **PRO-P10 (M)** Promote the buried SEC-B3 TOCTOU follow-up
   (ConnectionTrait-generic `streaming::*_and_emit` + advisory-locked
   bulk upsert) from `[x]`-entry prose to a first-class open §13 item.
@@ -6806,11 +6827,17 @@ crate above.
   the precondition has been met since Tantivy landed.
 
 **place**
-- [ ] **PRO-P11 (S)** Beyond PRO-H2: reconcile matcher `spec/index.md`
-  "Version targeted: 0.6.1" → 0.7.0 and the stale §3 field-table rows;
-  update service `spec/05-domain-model.md` + `10-persistence.md` to the
-  renamed fields/columns; refresh `spec/14` test counts (212 lib / 86
-  integration).
+- [x] **PRO-P11 (S)** *(done 2026-08-29)* Most of this was already
+  repaired by the earlier PRO-H2 aftermath commit (9e3ebe62) — verified
+  directly against Cargo.toml/src/models.rs/src/models/geo.rs/the
+  coordinate-columns migration rather than trusted; the matcher spec
+  version, field table, and both service spec files already matched.
+  Found and fixed the one genuine remaining gap: `spec/11-worked-
+  examples.md` still called the pre-rename `.latitude(...)`/
+  `.longitude(...)` builders (non-compiling against the actual API)
+  across three examples, six call sites. Test counts verified live —
+  212 lib / 86 integration matched the task's claim exactly; fixed the
+  one stale "205 unit" instance.
 - [ ] **PRO-P12 (M)** Land T-9 (geo-radius `nearby` endpoint + search
   `offset`) — the smallest open functional gap; both halves have
   primitives in `matching::geo` and `SearchQuery`.
@@ -6882,12 +6909,15 @@ green as it sits; these finish it)**
   T-7 links, T-8 bulk).
 
 **authentication**
-- [ ] **PRO-P21 (S)** Verifier `spec/index.md` §13/§14 still says the
-  0.9.0 release is pending — it was cut 2026-08-05. Refresh.
-- [ ] **PRO-P22 (S)** Sweep the stale RS256-JWT/JWKS doc-comments (8
-  files: `lib.rs:5-7,18`, `app.rs:6`, `controllers/{auth,mod,metrics}`,
-  `models/users.rs:217`, migration `sessions.rs:2`) to PASETO wording —
-  the comments describe the model `jwt.md` forbids.
+- [x] **PRO-P21 (S)** *(done 2026-08-29)* Verified 0.9.0 was cut
+  2026-08-05 (Cargo.toml, `CHANGELOG.md` `[0.9.0]` heading, git tag
+  `authentication-verifier-v0.9.0`) — fixed §13/§14's "pending"/
+  "unreleased" wording.
+- [x] **PRO-P22 (S)** *(done 2026-08-29)* Fixed all 8 named
+  RS256-JWT/JWKS doc-comment locations to PASETO wording, plus two
+  further stale spots in `controllers/auth.rs` found in the same
+  file (the `me`/`signout` doc comments). Post-fix grep confirmed only
+  correctly-historical RS256/JWKS references remain, left alone.
 - [ ] **PRO-P23 (M)** Decide + implement auth on the unauthenticated
   `GET /api/compliance/audit/verify` (or record the leave-open decision
   in §16) and add it to `openapi.rs`.
@@ -6899,11 +6929,13 @@ green as it sits; these finish it)**
   data-grid dependency" claim with the six unused SVAR deps.
 
 **link-graph / libraries**
-- [ ] **PRO-P25 (S)** link-graph: refresh AGENTS.md ground rules that
-  contradict the code (still says copy-EntityRef + Utoipa; reality is
-  the entity-ref path dep + hand-written OpenAPI); update spec §13
-  T-22's residual note (Dockerfile already has `USER` + `HEALTHCHECK`)
-  and the stale test counts.
+- [x] **PRO-P25 (S)** *(done 2026-08-29)* Fixed AGENTS.md's two wrong
+  ground rules — verified `entity-ref` is a real Cargo path dependency
+  (not copied) and OpenAPI is hand-written (no Utoipa dependency
+  anywhere). Verified the Dockerfile already has both `USER` and
+  `HEALTHCHECK` (since its original 2026-08-03 commit) and corrected
+  §13 T-22's residual note accordingly. Refreshed the stale test count
+  (103→104, verified live) across AGENTS.md/README.md/spec/14/spec/15.
 - [ ] **PRO-P26 (M)** integrity-mac: decide its documentation tier — a
   minimal `spec/` (it is the family's tamper-evidence keystone and the
   only crate with neither spec nor an explicit waiver) or an
@@ -6935,12 +6967,20 @@ green as it sits; these finish it)**
   source of truth and its newest capability is invisible there);
   correct PF-T17's 9→8 count; commit the verified-additive staff-
   utilisation spec hunks (owner decision).
-- [ ] **PRO-P29 (S)** case-folder: add `license`+`description` to the
-  service manifest; tick delivered-but-open ST-14/ST-16 in the FE queue
-  (contradicts the cross-cutting queue); fix the `lib.rs` ownership
-  doc-comment (claims local tables; the migration registers none);
-  correct the 43→48 vitest count; queue or de-flag
-  tag-it/receive-it/batch drafts.
+- [x] **PRO-P29 (S)** *(done 2026-08-29)* `license`+`description` were
+  already present (an earlier Cargo metadata sweep) — no change needed.
+  Verified ST-14 (ESLint, `npm run lint` clean) and ST-16 (codegen,
+  zero-diff regeneration) are genuinely delivered; reconciled both the
+  FE and cross-cutting queues to agree. Rewrote `lib.rs`'s ownership
+  comment — verified against the migration crate's explicit empty
+  migrator that this service persists **nothing** locally, not even
+  folder/volume/move data as the old comment claimed; it is a pure
+  five-service aggregator. Corrected the vitest count to the live-
+  verified 48 (was stale at 43). De-flagged the ambiguous tag-it/
+  receive-it/batch drafts as an explicit "Idea stage — not designed,
+  not queued" roadmap section (none has a `requirements.md` entry or
+  `design.md` decision) rather than leaving them looking like committed
+  work.
 - [ ] **PRO-P30 (S)** WPM: migration-manifest metadata + edition (with
   PRO-H3); drop the dead `ensure_employee` helper; convert the 4
   seed-task `.unwrap()`s to contextful errors.
