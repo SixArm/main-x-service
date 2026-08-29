@@ -36,7 +36,7 @@ jobs:
       crates: ${{ steps.list.outputs.crates }}
       db-crates: ${{ steps.list.outputs.db-crates }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: list
         run: |
           echo "crates=$(scripts/ci-crates.sh --json)" >> "$GITHUB_OUTPUT"
@@ -53,7 +53,7 @@ jobs:
     name: rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup component add rustfmt
       - run: scripts/ci-check.sh fmt
 
@@ -64,7 +64,7 @@ jobs:
     name: docs conventions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: scripts/ci-check.sh docs
 
   check:
@@ -79,7 +79,7 @@ jobs:
       matrix:
         crate: ${{ fromJson(needs.discover.outputs.crates) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: free disk space (drop preinstalled runner bloat this repo never touches)
         run: |
           echo "before:"; df -h /
@@ -130,7 +130,7 @@ jobs:
       matrix:
         crate: ${{ fromJson(needs.discover.outputs.crates) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: free disk space (drop preinstalled runner bloat this repo never touches)
         run: |
           echo "before:"; df -h /
@@ -186,7 +186,7 @@ jobs:
       POSTGRES_USER: loco
       POSTGRES_PASSWORD: loco
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: free disk space (drop preinstalled runner bloat this repo never touches)
         run: |
           echo "before:"; df -h /
@@ -215,7 +215,7 @@ jobs:
     name: supply chain
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: free disk space (drop preinstalled runner bloat this repo never touches)
         run: |
           echo "before:"; df -h /
