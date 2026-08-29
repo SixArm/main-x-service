@@ -6440,11 +6440,17 @@ crate above.
 - [x] **PRO-R4 (S)** *(done 2026-08-26)* Delete `task.org` from the repo root — committed
   editor scratch ("foo/bar/alpha/bravo/charlie"), superseded by this
   file and the per-crate spec queues.
-- [ ] **PRO-R5 (S)** CI-platform parity: `.woodpecker.yml` runs the
+- [x] **PRO-R5 (S)** *(done 2026-08-29)* CI-platform parity: `.woodpecker.yml` runs the
   `evidence` stage (SBOM render) but no GitHub workflow does — either
   add it to `.github/workflows/ci.yml` or document the divergence; fix
   root AGENTS.md's "byte-identical commands" claim either way.
-- [ ] **PRO-R6 (S)** Root `AGENTS.md` corrections found by audit:
+  *Result:* added a `scripts/ci-check.sh evidence` step to the
+  `supply-chain` job (byte-identical with Woodpecker's), and reworked
+  the existing SBOM-artifact-upload step to reuse that stage's output
+  (`cp /tmp/sbom.json`) instead of a second, redundant `cargo run`. The
+  "byte-identical commands" claim in AGENTS.md is now true rather than
+  fixed by rewording.
+- [x] **PRO-R6 (S)** *(done 2026-08-29)* Root `AGENTS.md` corrections found by audit:
   (a) "matchers run to §25" is false for thing-matcher (13 topic
   sections, documented) and organization/care-pathway matchers (single
   `spec/index.md`, each with an open split task) — state the real
@@ -6452,6 +6458,25 @@ crate above.
   crates.io" while 2 of 3 rows are unpublished (entity-ref noted
   in-row, integrity-mac not noted) — reword, and decide
   `publish = false` vs intent-to-publish for both unpublished crates.
+  *Result:* (a) verified every matcher crate's actual spec spread
+  (person/worker/course → §25; place/thing/event → §13;
+  organization/care-pathway/case/portfolio → still one `spec/index.md`)
+  and replaced the false blanket claim with a footnote stating it,
+  mirrored in `agents/share/overview.md`. (b) checking crates.io
+  directly overturned the task's own premise: **entity-ref is already
+  published** (`entity-ref` 0.2.0, 2026-08-05 — confirmed against the
+  crates.io API, matching the in-tree `Cargo.toml` version exactly),
+  so only integrity-mac is genuinely unpublished. Fixed both rows in
+  AGENTS.md and overview.md accordingly (entity-ref's row no longer
+  says "not yet published"; integrity-mac's now explicitly says it
+  isn't) and reworded both tables' header sentences to state the mixed
+  status rather than claim a universal. Did not attempt to actually
+  publish integrity-mac — that's an outward-facing, effectively
+  irreversible action outside this task's scope; decided
+  intent-to-publish (no `publish = false` added — the crate's `[lib]`
+  is already publishable by cargo's default, matching entity-ref's
+  history of sitting unpublished before its 2026-08-05 release) over
+  `publish = false`, documented as a decision rather than left silent.
 
 ### PRO-H — family-wide hygiene sweeps
 
