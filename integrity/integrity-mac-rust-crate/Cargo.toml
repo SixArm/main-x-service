@@ -23,7 +23,7 @@ hkdf = "0.12"
 # Wipes the root key once the subkeys are derived.
 zeroize = "1"
 # OS entropy for key generation.
-getrandom = "0.2"
+getrandom = "0.4"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
