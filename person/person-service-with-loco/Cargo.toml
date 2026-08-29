@@ -207,7 +207,7 @@ rusty_paseto = { version = "0.10", default-features = false, features = ["v4_pub
 base64 = { version = "0.22" }
 
 # Benchmarking
-criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
 
 # `parquet::file::reader::ChunkReader` is implemented for `bytes::Bytes`
 # (and `File`), not `std::io::Cursor` — needed to read encoded Parquet
