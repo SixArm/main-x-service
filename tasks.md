@@ -6875,9 +6875,21 @@ crate above.
   across three examples, six call sites. Test counts verified live —
   212 lib / 86 integration matched the task's claim exactly; fixed the
   one stale "205 unit" instance.
-- [ ] **PRO-P12 (M)** Land T-9 (geo-radius `nearby` endpoint + search
-  `offset`) — the smallest open functional gap; both halves have
-  primitives in `matching::geo` and `SearchQuery`.
+- [x] **PRO-P12 (M)** *(done 2026-08-29)* Landed T-9: `GET
+  /api/places/nearby?lat=&lon=&radius_km=&limit=&offset=` (bounding-box
+  SQL pre-filter + the existing `within_radius` Haversine primitive to
+  narrow) and `offset` on the existing search endpoint (genuinely
+  missing — `SearchQuery` had no field for it at all — plus a true
+  `X-Total-Count` via Tantivy's `Count` collector, replacing the prior
+  page-length-as-total). Found and fixed two real bugs along the way:
+  a `bounding_box`/`distance_to` Earth-radius constant mismatch, and
+  Tantivy's default tokenizer silently dropping any unbroken token
+  over 40 chars (misread at first as a concurrency issue in a DB-gated
+  test). 221 lib tests (was 212) + a new 5-test DB-gated file, all
+  independently reverified via the proper `scripts/ci-check.sh
+  test-db` wrapper (an initial manual re-run against a stale,
+  unmigrated ad-hoc database gave false failures — a verification
+  mistake caught and corrected, not a defect in the landed work).
 
 **care-pathway**
 - [x] **PRO-P13 (M)** *(done 2026-08-28)* The crate spec (self-declared
