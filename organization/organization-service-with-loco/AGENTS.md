@@ -19,7 +19,7 @@ there is no separate model or adapter to drift.
 
 | Question | Answer |
 |---|---|
-| Framework | loco.rs 1.0.1 (`Hooks`/`AppContext`/CLI, loco config, `sea-orm-migration` 2.0). |
+| Framework | loco.rs 1.1.0 (`Hooks`/`AppContext`/CLI, loco config, `sea-orm-migration` 2.0). |
 | Build / test | `cargo build` · `cargo test` (DB-free) · `cargo test -- --ignored` (request-level suite; needs Postgres). |
 | Run | `cargo loco start` (needs Postgres). |
 | Persistence | One `organizations` table: `pid`, `name`, `data` (JSONB Organization), `active`, soft-delete. |
@@ -45,7 +45,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | POST | `/api/organizations/review-queue/{id}/decision` | Decide a pending review item (`confirmed` / `rejected`) |
 | POST | `/api/organizations/merge` | Merge a duplicate into a survivor (`422` equal pids, `404` unknown) |
 | GET | `/api/organizations/merges/recent` | Merge-history records |
-| POST | `/api/organizations/import` | BLK-5: multipart JSONL/CSV upload → `202 {job_id}` |
+| POST | `/api/organizations/import` | BLK-5: multipart JSONL/CSV/TSV upload → `202 {job_id}` |
 | GET | `/api/organizations/import/{id}` | BLK-5: import job status + counts + `errors_url` |
 | POST | `/api/organizations/export` | BLK-5: `{format, q, limit, offset, masking_profile, include_soft_deleted}` → `202 {job_id}` |
 | GET | `/api/organizations/export/{id}` | BLK-5: export job status + `download_url` |
@@ -111,7 +111,9 @@ create (no duplicate check, no audit row, no event — deliberate for a
 seed task); it refuses to insert into a non-empty table (EX-4).
 
 **BLK-5 async bulk import/export** (`src/bulk/`) is implemented, scoped
-to **JSONL + CSV only** (no Parquet) and a **local-filesystem-only**
+to **JSONL + CSV + TSV** (no Parquet; TSV lands 2026-08-21, sharing the
+CSV codec via a declared delimiter — never sniffed) and a
+**local-filesystem-only**
 artifact store (no S3 backend — the trait is async so a future S3
 backend needs no signature change). Stable key: LEI → DUNS → explicit
 `pid` (`src/bulk/stable_key.rs`); a keyless row runs the same
@@ -148,7 +150,7 @@ flag and enforcement semantics are unchanged, only the credential
 changed. See
 [agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md)
 (source of truth); `src/auth.rs` verifies PASETO via the
-`authentication-verifier` crate (0.2, `from_paseto_keys_*`).
+`authentication-verifier` crate (0.9, `from_paseto_keys_*`).
 
 ## Golden rules
 
@@ -178,6 +180,12 @@ src/
 ├── fhir/                   FHIR resource structs, to/from-FHIR conversions,
 │                           `OperationOutcome`, searchset `Bundle`, search-param parsing
 ├── privacy.rs             masking + the GDPR export envelope
+├── compliance/             row-level integrity: content_hash (SHA-256),
+│                           content_hash_sha3 (SHA3-256), content_mac
+│                           (HMAC-SHA256, keyed) over organizations +
+│                           audit_logs rows (mod.rs, record_integrity.rs,
+│                           audit_integrity.rs, mac.rs); default-off
+│                           without `ORGANIZATION_INTEGRITY_MAC_KEY`
 ├── search/                Tantivy index (index.rs schema, mod.rs engine)
 ├── tasks/search.rs        `search_reindex` + boot self-heal
 ├── tasks/seed_examples.rs `seed_examples` — loads the repo's demo
@@ -189,9 +197,10 @@ src/
 │                           LoggingSink (default), FluvioSink (BUS-3,
 │                           behind the `fluvio` Cargo feature), drain +
 │                           retention loop
-├── bulk/                   BLK-5 async bulk import/export (JSONL + CSV;
-│                           columns, csv, jsonl, stable_key, error_report,
-│                           pipeline, store, worker, handlers)
+├── bulk/                   BLK-5 async bulk import/export (JSONL + CSV +
+│                           TSV — TSV shares the csv codec via a declared
+│                           delimiter; columns, csv, jsonl, stable_key,
+│                           error_report, pipeline, store, worker, handlers)
 ├── models/
 │   ├── organizations.rs   CRUD helpers over the stored payload
 │   ├── bulk_jobs.rs       BLK-5 job CRUD/status helpers
@@ -200,6 +209,7 @@ src/
 migration/src/            m20220101_000001_organizations, …_000002_audit_logs,
                           …_000003_merge_records, …_000004_event_outbox,
                           m20260719_000001_review_queue,
+                          m20260728_000001_integrity_digests,
                           m20260803_000001_review_queue_provenance,
                           m20260803_000002_bulk_jobs
 tests/fluvio_relay.rs     `#![cfg(feature = "fluvio")]`-gated, `#[ignore]`d
