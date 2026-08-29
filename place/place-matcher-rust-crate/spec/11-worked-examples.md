@@ -8,16 +8,16 @@ The examples below trace the spec through realistic place data. They are illustr
 let a = Place::builder()
     .name("Eiffel Tower")
     .add_alternate_name("La Tour Eiffel")
-    .latitude(48.858_222)
-    .longitude(2.294_500)
+    .latitude_as_decimal_degrees(48.858_222)
+    .longitude_as_decimal_degrees(2.294_500)
     .category(PlaceCategory::Monument)
     .country_code_as_iso_3166_1_alpha_2("FR")
     .build();
 
 let b = Place::builder()
     .name("Tour Eiffel")
-    .latitude(48.858_3)
-    .longitude(2.294_5)
+    .latitude_as_decimal_degrees(48.858_3)
+    .longitude_as_decimal_degrees(2.294_5)
     .category(PlaceCategory::Monument)
     .country_code_as_iso_3166_1_alpha_2("FR")
     .build();
@@ -33,16 +33,16 @@ Per-field sketch under default weights: `name_score ≈ 0.84` (best-of-cartesian
 ```rust
 let manhattan = Place::builder()
     .name("Starbucks")
-    .latitude(40.7589)
-    .longitude(-73.9851)
+    .latitude_as_decimal_degrees(40.7589)
+    .longitude_as_decimal_degrees(-73.9851)
     .category(PlaceCategory::Cafe)
     .country_code_as_iso_3166_1_alpha_2("US")
     .build();
 
 let los_angeles = Place::builder()
     .name("Starbucks")
-    .latitude(34.0522)
-    .longitude(-118.2437)
+    .latitude_as_decimal_degrees(34.0522)
+    .longitude_as_decimal_degrees(-118.2437)
     .category(PlaceCategory::Cafe)
     .country_code_as_iso_3166_1_alpha_2("US")
     .build();

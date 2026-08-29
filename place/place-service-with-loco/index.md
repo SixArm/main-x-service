@@ -117,7 +117,7 @@ Configuration is loaded from `config/{development,test,production}.yaml`
 ## Testing
 
 ```bash
-# 205 unit tests (models, matching, validation, privacy, search,
+# 212 unit tests (models, matching, validation, privacy, search,
 # streaming, auth, FHIR, compliance/integrity, config, db, relay);
 # run for the live count.
 cargo test --lib
