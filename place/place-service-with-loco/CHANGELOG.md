@@ -8,6 +8,26 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — geo-radius `nearby` search + search `offset` (T-9)
+
+`GET /api/places/nearby?lat=&lon=&radius_km=&limit=&offset=` filters
+places within `radius_km` of `(lat, lon)`, nearest-first: a new
+`matching::geo::bounding_box` helper computes a coarse rectangular
+lat/lon pre-filter (derived from the same mean Earth radius
+`GeoCoordinates::distance_to` uses, so the two agree on one sphere),
+run as a plain SQL range query over `idx_places_geo`
+(`db::PlaceRepository::list_in_bbox`, capped at 5,000 candidate rows —
+SEC-M1), then the existing `matching::geo::within_radius` Haversine
+check narrows those candidates to the true within-radius set.
+
+`GET /api/places/search` gains `offset` — it was genuinely missing,
+not merely undocumented. Both endpoints follow the family pagination
+convention (`agents/share/restful.md`): `limit` clamped to a
+per-endpoint maximum, an `offset` beyond 10,000 is `400`, and
+`X-Total-Count`/`X-Limit`/`X-Offset` response headers (the search
+endpoint's `X-Total-Count` is now the true Tantivy match count, not
+the page length).
+
 ### Changed — geo coordinates are exact decimals, not floats
 
 `GeoCoordinates::latitude` / `longitude` / `elevation` move from `f64` to

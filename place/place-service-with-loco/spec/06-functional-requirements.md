@@ -77,15 +77,23 @@ canonical algorithm.
 
 Tantivy across `name`, `alternate_name`, `identifiers`, address
 components, `place_type`. Full-text + fuzzy + boolean. Search query
-parameters delivered today: `q`, `limit`, `fuzzy`, `mask_sensitive`.
+parameters: `q`, `limit`, `offset`, `fuzzy`, `mask_sensitive`; the
+response carries `X-Total-Count`/`X-Limit`/`X-Offset` pagination
+headers (`agents/share/restful.md`).
 
-**Geo-radius search** (`GET /api/places/nearby?lat=&lon=&radius_km=`)
-and `offset` pagination are **not yet delivered** — tracked as §13
-T-9. The matching primitive
-[`within_radius`](../src/matching/geo.rs) (Haversine) exists and is
-unit-tested, but no HTTP route or `SearchQuery` geo parameters wire it
-up yet. PostGIS-backed spatial queries are a further roadmap item
-(§13 T-1).
+**Geo-radius search** (`GET /api/places/nearby?lat=&lon=&radius_km=
+&limit=&offset=`, §13 T-9, delivered) filters places within
+`radius_km` of `(lat, lon)`, nearest-first, and carries the same
+pagination headers. [`within_radius`](../src/matching/geo.rs)
+(Haversine) is the exact per-candidate check; a new
+[`bounding_box`](../src/matching/geo.rs) helper computes a coarse
+rectangular pre-filter (derived from the same mean Earth radius
+`within_radius`'s distance calculation uses, so the two agree on one
+sphere) that `db::PlaceRepository::list_in_bbox` runs as a plain SQL
+range query over `idx_places_geo`, capped at 5,000 candidate rows.
+PostGIS-backed spatial indexing is a further roadmap item (§13 T-1) —
+this SQL-range pre-filter is the interim answer the extensions list
+(§10.2) already named.
 
 ### 6.4 Duplicate detection and merging
 

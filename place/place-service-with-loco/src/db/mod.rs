@@ -99,6 +99,29 @@ pub trait PlaceRepository: Send + Sync {
     /// # Errors
     /// Propagates any database error from the query or hydration.
     async fn list(&self, limit: u64, offset: u64) -> Result<Vec<Place>>;
+    /// List non-deleted places whose coordinates fall within a
+    /// rectangular latitude/longitude bounding box (inclusive), up to
+    /// `cap` rows.
+    ///
+    /// This is the coarse **pre-filter** for geo-radius search
+    /// (`crate::matching::geo::bounding_box` computes the box; the
+    /// btree `idx_places_geo` index answers the range query cheaply). A
+    /// rectangle over-includes a circle's corners, so the caller MUST
+    /// still apply [`crate::matching::geo::within_radius`] to the
+    /// returned rows to get the true within-radius set. `cap` bounds how
+    /// many candidate rows are read, so a large box can never turn a
+    /// radius search into an unbounded table scan.
+    ///
+    /// # Errors
+    /// Propagates any database error from the query or hydration.
+    async fn list_in_bbox(
+        &self,
+        lat_min: f64,
+        lat_max: f64,
+        lon_min: f64,
+        lon_max: f64,
+        cap: u64,
+    ) -> Result<Vec<Place>>;
     /// Record a merge of `duplicate` into `main` in the merge-history table.
     ///
     /// # Errors
@@ -391,6 +414,34 @@ impl PlaceRepository for SeaOrmPlaceRepository {
             .order_by_desc(places::Column::CreatedAt)
             .limit(limit)
             .offset(offset)
+            .all(&self.db)
+            .await
+            .map_err(|e| map_db(&e))?;
+        let mut out = Vec::with_capacity(rows.len());
+        for row in rows {
+            out.push(self.hydrate(row).await?);
+        }
+        Ok(out)
+    }
+
+    async fn list_in_bbox(
+        &self,
+        lat_min: f64,
+        lat_max: f64,
+        lon_min: f64,
+        lon_max: f64,
+        cap: u64,
+    ) -> Result<Vec<Place>> {
+        // A range comparison against a NULL geo column is never true in
+        // SQL, so rows with no coordinates are excluded without a
+        // separate `IS NOT NULL` filter.
+        let rows = places::Entity::find()
+            .filter(places::Column::IsDeleted.eq(false))
+            .filter(places::Column::GeoLatitudeAsDecimalDegrees.gte(bbox_decimal(lat_min)))
+            .filter(places::Column::GeoLatitudeAsDecimalDegrees.lte(bbox_decimal(lat_max)))
+            .filter(places::Column::GeoLongitudeAsDecimalDegrees.gte(bbox_decimal(lon_min)))
+            .filter(places::Column::GeoLongitudeAsDecimalDegrees.lte(bbox_decimal(lon_max)))
+            .limit(cap)
             .all(&self.db)
             .await
             .map_err(|e| map_db(&e))?;
@@ -744,6 +795,17 @@ fn parse_day_of_week(tag: &str) -> DayOfWeek {
 /// Map a `SeaORM` [`DbErr`](sea_orm::DbErr) into the crate error type.
 fn map_db(e: &sea_orm::DbErr) -> crate::Error {
     crate::Error::Database(e.to_string())
+}
+
+/// Convert a bounding-box bound (already-clamped, finite) into the
+/// decimal the `NUMERIC` geo columns compare against.
+///
+/// Unlike the domain [`GeoCoordinates`] constructor, this never panics on
+/// a pathological input: it is a query bound, not stored data, so a
+/// value that somehow fails to parse degrades to `0` (an inert, always-
+/// finite fallback) rather than taking down the request.
+fn bbox_decimal(value: f64) -> bigdecimal::BigDecimal {
+    format!("{value}").parse().unwrap_or_default()
 }
 
 pub use audit::AuditLogRepository;

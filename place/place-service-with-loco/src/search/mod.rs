@@ -9,7 +9,7 @@ use std::path::Path;
 
 use tantivy::{
     TantivyDocument,
-    collector::TopDocs,
+    collector::{Count, TopDocs},
     doc,
     query::{BooleanQuery, FuzzyTermQuery, Occur, Query, QueryParser},
     schema::{Term, Value},
@@ -99,6 +99,76 @@ impl SearchEngine {
     /// search itself fails.
     pub fn search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
+        let query = self.exact_query(query_str)?;
+        self.collect_ids(&searcher, query.as_ref(), limit)
+    }
+
+    /// Fuzzy search — tolerates typos. A query that tokenises to nothing
+    /// returns an empty result rather than an error.
+    ///
+    /// # Errors
+    /// Returns [`crate::Error::Search`] if the underlying search fails.
+    pub fn fuzzy_search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
+        let searcher = self.index.reader().searcher();
+        let Some(query) = self.fuzzy_query(query_str) else {
+            return Ok(Vec::new());
+        };
+        self.collect_ids(&searcher, query.as_ref(), limit)
+    }
+
+    /// One page of hits **plus the true total**: `(ids, total)`.
+    ///
+    /// A page can never tell a caller how much there is in total — which
+    /// is the whole point of `X-Total-Count`
+    /// (`agents/share/restful.md`) — so the total comes from Tantivy's
+    /// `Count` collector rather than the page length. `fuzzy` selects the
+    /// same two retrieval routes [`search`](Self::search) /
+    /// [`fuzzy_search`](Self::fuzzy_search) expose.
+    ///
+    /// # Errors
+    /// Returns [`crate::Error::Search`] if the query fails to parse or the
+    /// underlying search fails.
+    pub fn search_page(
+        &self,
+        query_str: &str,
+        fuzzy: bool,
+        limit: usize,
+        offset: usize,
+    ) -> Result<(Vec<String>, usize)> {
+        let searcher = self.index.reader().searcher();
+        let query = if fuzzy {
+            let Some(q) = self.fuzzy_query(query_str) else {
+                return Ok((Vec::new(), 0));
+            };
+            q
+        } else {
+            self.exact_query(query_str)?
+        };
+        // Ask for the whole prefix up to the page end, then skip: Tantivy
+        // has no "start at N" collector, and the offset is bounded by the
+        // caller precisely so this stays finite.
+        let wanted = offset.saturating_add(limit).max(1);
+        let s = self.index.schema();
+        let (top, total) = searcher
+            .search(query.as_ref(), &(TopDocs::with_limit(wanted), Count))
+            .map_err(|e| crate::Error::Search(format!("search: {e}")))?;
+        let mut ids = Vec::new();
+        for (_score, addr) in top.into_iter().skip(offset) {
+            let doc: TantivyDocument = searcher
+                .doc(addr)
+                .map_err(|e| crate::Error::Search(format!("retrieve doc: {e}")))?;
+            if let Some(v) = doc.get_first(s.id)
+                && let Some(t) = v.as_str()
+            {
+                ids.push(t.to_string());
+            }
+        }
+        Ok((ids, total))
+    }
+
+    /// Build the exact/full-text query over name + `alternate_name` +
+    /// keywords + locality + identifiers.
+    fn exact_query(&self, query_str: &str) -> Result<Box<dyn Query>> {
         let s = self.index.schema();
         let parser = QueryParser::for_index(
             self.index.index(),
@@ -110,23 +180,18 @@ impl SearchEngine {
                 s.identifiers,
             ],
         );
-        let query = parser
+        parser
             .parse_query(query_str)
-            .map_err(|e| crate::Error::Search(format!("parse query: {e}")))?;
-        self.collect_ids(&searcher, query.as_ref(), limit)
+            .map_err(|e| crate::Error::Search(format!("parse query: {e}")))
     }
 
-    /// Fuzzy search — tolerates typos. A query that tokenises to nothing
-    /// returns an empty result rather than an error.
-    ///
-    /// # Errors
-    /// Returns [`crate::Error::Search`] if the underlying search fails.
-    pub fn fuzzy_search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
-        let searcher = self.index.reader().searcher();
+    /// Build the fuzzy (typo-tolerant) query, or `None` when the input
+    /// tokenises to nothing.
+    fn fuzzy_query(&self, query_str: &str) -> Option<Box<dyn Query>> {
         let s = self.index.schema();
         let tokens = tokenise(query_str);
         if tokens.is_empty() {
-            return Ok(Vec::new());
+            return None;
         }
         let fields = [s.name, s.alternate_name, s.keywords, s.locality];
         let mut sub: Vec<(Occur, Box<dyn Query>)> = Vec::new();
@@ -136,8 +201,7 @@ impl SearchEngine {
                 sub.push((Occur::Should, Box::new(FuzzyTermQuery::new(term, 2, true))));
             }
         }
-        let q = BooleanQuery::new(sub);
-        self.collect_ids(&searcher, &q, limit)
+        Some(Box::new(BooleanQuery::new(sub)))
     }
 
     /// Blocking query used by the duplicate detector: fuzzy name match.
@@ -263,6 +327,72 @@ mod tests {
         eng.index_place(&p).unwrap();
         let hits = eng.fuzzy_search("Yellowstoen", 10).unwrap();
         assert_eq!(hits, vec![p.id.to_string()]);
+    }
+
+    /// `search_page` reports the true total (ignoring the page window)
+    /// A single "word" (no internal separator) longer than Tantivy's
+    /// default tokenizer's 40-character `RemoveLongFilter` cutoff is
+    /// dropped at index time — silently, exactly like a stop word — so
+    /// it can never be found even by an exact query for the same
+    /// string. Pinned because it is a sharp edge for anyone building a
+    /// "unique token" test fixture by concatenating a prefix directly
+    /// against a 32-hex-character UUID with no separator (an easy
+    /// mistake: `format!("Prefix{}", Uuid::new_v4().simple())` reliably
+    /// produces a >40-char single token).
+    #[test]
+    fn overlong_single_token_is_not_indexed() {
+        let dir = TempDir::new().unwrap();
+        let eng = SearchEngine::new(dir.path()).unwrap();
+        // 11 + 32 = 43 chars, no separator: one token, over the cutoff.
+        let overlong = format!("Offsetville{}", "a1b2c3d4e5f60708090a0b0c0d0e0f10");
+        assert_eq!(overlong.len(), 43);
+        eng.index_place(&place(&overlong)).unwrap();
+        assert_eq!(
+            eng.search(&overlong, 10).unwrap(),
+            Vec::<String>::new(),
+            "an over-length single token must not be findable — it was never indexed"
+        );
+        // The same prefix, separated so it tokenises into two ≤40-char
+        // terms, IS findable — the fix a caller should reach for.
+        let dir2 = TempDir::new().unwrap();
+        let eng2 = SearchEngine::new(dir2.path()).unwrap();
+        let separated = format!("Offsetville-{}", "a1b2c3d4e5f60708090a0b0c0d0e0f10");
+        let p = place(&separated);
+        eng2.index_place(&p).unwrap();
+        assert_eq!(eng2.search(&separated, 10).unwrap(), vec![p.id.to_string()]);
+    }
+
+    /// and `offset` skips the requested number of results.
+    #[test]
+    fn search_page_offset_skips_and_reports_total() {
+        let dir = TempDir::new().unwrap();
+        let eng = SearchEngine::new(dir.path()).unwrap();
+        for n in ["Park One", "Park Two", "Park Three"] {
+            eng.index_place(&place(n)).unwrap();
+        }
+        let (page0, total0) = eng.search_page("Park", false, 2, 0).unwrap();
+        assert_eq!(page0.len(), 2);
+        assert_eq!(total0, 3);
+        let (page1, total1) = eng.search_page("Park", false, 2, 2).unwrap();
+        assert_eq!(page1.len(), 1);
+        assert_eq!(total1, 3);
+        // The two pages together cover every hit exactly once (no overlap,
+        // nothing missed).
+        let mut all: Vec<String> = page0.into_iter().chain(page1).collect();
+        all.sort();
+        all.dedup();
+        assert_eq!(all.len(), 3);
+    }
+
+    /// An offset at or past the total returns an empty page, not an error.
+    #[test]
+    fn search_page_offset_past_total_is_empty() {
+        let dir = TempDir::new().unwrap();
+        let eng = SearchEngine::new(dir.path()).unwrap();
+        eng.index_place(&place("Solo Park")).unwrap();
+        let (page, total) = eng.search_page("Park", false, 10, 5).unwrap();
+        assert!(page.is_empty());
+        assert_eq!(total, 1);
     }
 
     /// Deleting a place removes it from the index document count.

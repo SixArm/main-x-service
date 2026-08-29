@@ -2,13 +2,16 @@
 
 ## Test Categories
 
-### Unit Tests (207 tests: 205 run by default + 2 DB-gated `#[ignore]`)
+### Unit Tests (221 tests: 219 run by default + 2 DB-gated `#[ignore]`)
 
 Located in `#[cfg(test)] mod tests` within each source file. Verified
-2026-08-04 via `cargo test --lib -- --list`; the models/matching/
-validation/privacy/search core (below) predates the auth, event-bus,
-FHIR, and compliance work and is unchanged in count except
-`validation` (+4, the SEC-M1 size-cap tests).
+2026-08-26 via `cargo test --lib -- --list` (was 207, verified
+2026-08-04); the only counts that moved are `matching::geo` (T-9's
+`bounding_box` + the exact-boundary `within_radius` test) and `search`
+(T-9's `search_page` offset/total tests, plus a regression test for an
+over-length-token indexing edge case `search_page` surfaced). The rest
+of the models/matching/validation/privacy core is unchanged since
+2026-08-04.
 
 | Module                  | Tests | What's Covered                                                                                                                                                                                                  |
 | ----------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -22,14 +25,14 @@ FHIR, and compliance work and is unchanged in count except
 | `models::consent`       | 4     | Active, revoked, expired by date, not yet expired                                                                                                                                                               |
 | `matching::name`        | 8     | Exact, case-insensitive, similar, different, empty, both empty, substring, prefix bonus                                                                                                                         |
 | `matching::address`     | 5     | Identical, different, partial, no overlap, case-insensitive                                                                                                                                                     |
-| `matching::geo`         | 7     | Same point, close, moderate, far, within radius (true/false), custom reference                                                                                                                                  |
+| `matching::geo`         | 12    | Same point, close, moderate, far, within radius (true/false, plus the exact-boundary `<=` inclusive case), custom reference; T-9's `bounding_box` (straddles center + grows with radius, contains every true-Haversine-circle point at exactly `radius_km`, zero radius collapses to a point, clamps near a pole) |
 | `matching::identifier`  | 7     | Matching/different GLN, empty, mixed, has_gln_match (true, false type, false value)                                                                                                                             |
 | `matching::phonetic`    | 10    | Robert, Rupert, match, no match, Ashcraft, empty, single char, case, Washington, place names                                                                                                                    |
 | `matching::scoring`     | 8     | Identical places, name only, different, GLN deterministic, confidence levels, weights sum, fuzzy, phonetic bonus                                                                                                |
 | `matching::adapter`     | 5     | Service → matcher field routing (telecom, address renames, identifier-scheme URIs, place-type mapping, sparse records)                                                                                          |
 | `validation`            | 29    | Valid place, empty/whitespace name, invalid lat/lon, valid coords, invalid/valid GLN + check-digit helper, valid/invalid opening-hours times + `time_is_valid` helper, invalid/valid URL, invalid/valid telephone, address missing fields, address with locality, multiple errors, normalization, 4× SEC-M1 input-size-cap tests |
 | `privacy`               | 8     | Mask telephone/fax/geo, preserve name, no sensitive fields, short phone, GDPR export, export fields                                                                                                             |
-| `search` (+ `search::index`) | 6 | Index/exact/fuzzy search, delete-removes, empty-index, create-or-open round trip                                                                                                                          |
+| `search` (+ `search::index`) | 9 | Index/exact/fuzzy search, delete-removes, empty-index, create-or-open round trip; T-9's `search_page` offset+total (skips + reports the true total, offset past total is empty); an over-length (>40 char) single token is silently dropped by Tantivy's default tokenizer, not found even by exact query on the same string (a sharp edge for a "unique token" test fixture built by concatenating a prefix directly against a 32-hex-char UUID with no separator) |
 | `streaming` (+ `streaming::envelope`) | 11 | `EventTransport::parse`; `Envelope` construction (`for_place`/`for_merge`), `EventView` projection, `OutboxInsert` field mapping (T-12) |
 | `metrics`               | 1     | Registry render includes default counters                                                                                                                                                                       |
 | `api::rest` (+ `state`, `version`, `handlers::review_report_tests`) | 11 | OpenAPI path/schema assertions, `AppState` construction, `Accepts-version` negotiation, review-queue report shaping |
@@ -55,16 +58,17 @@ below) brings the `tests/` directory total to 86.
 | `integration_privacy.rs`    | 4     | Mask-export workflow, full GDPR export, immutability, soft delete export                                                                                                                                                                                                  |
 | `integration_models.rs`     | 13    | Full construction serialization, soft delete timestamps, unique IDs, place hierarchy, geo distance symmetry/triangle inequality, multiple identifier types, consent lifecycle/serialization, all place types, full week opening hours, address default/equality           |
 | `integration_scoring.rs`    | 24    | Unicode names, long names, single char, reversed words, address edge cases, geo poles/date line/radius boundary, identifier edge cases, Soundex consistency, custom weights, confidence boundaries, score range validation, phonetic bonus, all components, batch sorting |
-| `integration_geo_radius.rs` | 4     | Geo-radius candidate filtering over a collection (the future `nearby` endpoint primitive), radius monotonicity, matcher-bridge worked example (near-duplicate match + unrelated reject) |
+| `integration_geo_radius.rs` | 4     | Geo-radius candidate filtering over a collection (the `matching::geo::within_radius` primitive the wired `nearby` endpoint uses — DB-free, independent of `api_nearby_and_search_offset.rs` below), radius monotonicity, matcher-bridge worked example (near-duplicate match + unrelated reject) |
 | `integration_edge_cases.rs` | 16    | Boundary coordinates, GLN length validation, URL protocols, address minimal/empty fields, multi-word normalization, idempotent normalization, all sensitive fields masking, empty phone masking, GDPR field preservation, combined workflows, GLN deterministic override  |
 
-**DB/broker-gated additions (2026-08).** Three more files exist in
+**DB/broker-gated additions (2026-08).** Four more files exist in
 `tests/` beyond the 86 counted above, all `#[ignore]`d so a plain
 `cargo test --tests` is unaffected — they need real infrastructure:
 
 | File | Tests | Gate | What's covered |
 |---|---|---|---|
 | `api_integration_test.rs` | 3 | `DATABASE_URL` | QA-SERVER-FIELDS regression: a minimal hand-written create body round-trips a fresh id + "now" timestamps; two hand-written creates don't collide; an omitted `name` fails via `validation_error`, not the JSON extractor |
+| `api_nearby_and_search_offset.rs` | 5 | `DATABASE_URL` | T-9 end-to-end over the real router: `GET /api/places/nearby` filters to places within `radius_km` (and correctly includes/excludes a place a hair inside/outside the radius); out-of-range `lat`/`lon`/`radius_km` is `400`; `GET /api/places/search?offset=` skips the requested rows while `X-Total-Count` stays the true total; an `offset` past the bound is `400` on both endpoints. Each test overrides `SEARCH_INDEX_PATH` to a private `TempDir` (see the file's `test_router` doc comment) rather than sharing the crate's default `./data/search_index` — a directory every local test run and every concurrent agent session on the same machine writes to, and racing writers there silently drop an index write. |
 | `enforcement.rs` | 1 | `DATABASE_URL`, run with `-- --ignored` | `PLACE_REQUIRE_AUTH=1` activation proof over the real production router (public paths open, protected read/write need a token, valid-but-empty-`attrs` reads but not writes) |
 | `fluvio_relay.rs` | 1 | `--features fluvio` **and** a live Fluvio broker | `FluvioSink` round-trip (create → outbox → relay → real topic); verified today only by compiling under the feature, not by an actual run |
 

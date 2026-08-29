@@ -59,6 +59,7 @@ impl utoipa::Modify for SecurityAddon {
         handlers::update_place,
         handlers::delete_place,
         handlers::search_places,
+        handlers::nearby_places,
         handlers::match_place,
         handlers::check_duplicates,
         handlers::merge_places,
@@ -126,6 +127,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/whoami", get(auth::whoami))
         .route("/places", post(handlers::create_place))
         .route("/places/search", get(handlers::search_places))
+        .route("/places/nearby", get(handlers::nearby_places))
         .route("/places/match", post(handlers::match_place))
         .route("/places/check-duplicates", post(handlers::check_duplicates))
         .route("/places/merge", post(handlers::merge_places))
@@ -179,6 +181,7 @@ pub fn places_routes() -> loco_rs::controller::Routes {
         .add("/whoami", get(auth::whoami))
         .add("/places", post(handlers::create_place))
         .add("/places/search", get(handlers::search_places))
+        .add("/places/nearby", get(handlers::nearby_places))
         .add("/places/match", post(handlers::match_place))
         .add("/places/check-duplicates", post(handlers::check_duplicates))
         .add("/places/merge", post(handlers::merge_places))
@@ -226,6 +229,21 @@ mod tests {
             "OpenAPI paths missing /metrics.prom: {:?}",
             doc.paths.paths.keys().collect::<Vec<_>>()
         );
+    }
+
+    /// The generated `OpenAPI` document advertises the T-9 geo-radius
+    /// `GET /api/places/nearby` and the paginated
+    /// `GET /api/places/search` routes (DB-free — built from `ApiDoc`).
+    #[test]
+    fn openapi_includes_nearby_and_search_paths() {
+        let doc = ApiDoc::openapi();
+        for path in ["/api/places/nearby", "/api/places/search"] {
+            assert!(
+                doc.paths.paths.contains_key(path),
+                "OpenAPI paths missing {path}: {:?}",
+                doc.paths.paths.keys().collect::<Vec<_>>()
+            );
+        }
     }
 
     /// The generated `OpenAPI` document advertises `GET /api/whoami` and
