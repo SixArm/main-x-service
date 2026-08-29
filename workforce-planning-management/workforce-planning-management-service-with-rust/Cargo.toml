@@ -4,7 +4,7 @@
 name = "workforce-planning-management-service"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.96"
 publish = true
 default-run = "workforce-planning-management-service"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]

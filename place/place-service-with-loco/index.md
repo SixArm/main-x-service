@@ -10,7 +10,7 @@ anything modelled by schema.org/Place.
 
 ## Quick start
 
-Prerequisites: Rust 1.95+ (2024 edition), PostgreSQL 18+ with PostGIS.
+Prerequisites: Rust 1.96+ (2024 edition), PostgreSQL 18+ with PostGIS.
 
 ```bash
 cd place/place-service-with-loco   # within the main-x-service monorepo

@@ -59,4 +59,4 @@ such table — their parents are not workspace roots.)
 
 It declares no `rust-version`: cargo-fuzz is nightly-only, so the repo
 MSRV does not apply (see
-[`spec/rust-msrv-n-minus-3/index.md`](../../../spec/rust-msrv-n-minus-3/index.md) §2).
+[`spec/rust-msrv-n-minus-2/index.md`](../../../spec/rust-msrv-n-minus-2/index.md) §2).

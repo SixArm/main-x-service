@@ -1,11 +1,12 @@
 # The declared Minimum Supported Rust Version for every Rust crate here.
 #
-# Policy: current stable minus three (N-3). See spec/rust-msrv-n-minus-3/index.md
+# Policy: current stable minus two (N-2). See spec/rust-msrv-n-minus-2/index.md
 # for why, what it does and does not promise, and how to bump it.
 #
-# Derived 2026-08-20 from stable 1.98.0 (2026-08-18).
+# Derived 2026-08-29 from stable 1.98.0 (2026-08-18). Tightened from the
+# family's former N-3 policy (1.95) to N-2 in the same change.
 # The true dependency floor is 1.94 (loco-rs / sea-orm / sqlx), so this
-# clears it by one release.
+# clears it by two releases.
 #
 # One bare `major.minor` line below; everything else here is a comment.
-1.95
+1.96

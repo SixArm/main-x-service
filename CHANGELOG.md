@@ -33,6 +33,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `rust-msrv-n-minus-3` are directories with `index.md`; all
   repo-wide references swept; the `docs` CI stage exclusion updated
   (PRO-R1/PRO-R2).
+- Tightened the Rust MSRV policy from N-3 to **N-2**: the floor moves
+  from 1.95 to **1.96**, `ci/msrv.txt` and all 46 non-`fuzz`
+  `Cargo.toml` manifests updated, `spec/rust-msrv-n-minus-3/` replaced
+  by `spec/rust-msrv-n-minus-2/` (PRO-H13).
 - `spec/index.md` now lists the geo-naming, decimal-coordinate,
   serde-float, and special-files specs.
 

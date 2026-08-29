@@ -4,7 +4,7 @@
 name = "care-pathway-service"
 version = "0.2.0"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.96"
 publish = false
 default-run = "care-pathway-service"
 description = "Care pathway service — clinical care-pathway registry that interoperates with the care-pathway-matcher crate"

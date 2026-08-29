@@ -165,15 +165,18 @@ discovers the ~55 crates and feeds them to each stage.
 | `msrv` | `cargo +<msrv> check --all-targets` | asserts every `rust-version` equals [`ci/msrv.txt`](ci/msrv.txt), then compiles against that toolchain |
 | `bench` | `cargo bench --no-run` | compiles the Criterion benches (`--all-targets` already type-checks them; this proves they *link*) |
 
-**The MSRV is the current stable minus three** — today **1.95**, from
+**The MSRV is the current stable minus two** — today **1.96**, from
 stable 1.98. It is declared per crate (`rust-version` in every
 `[package]`, since there is no root manifest to inherit from), sourced
-from [`ci/msrv.txt`](ci/msrv.txt), and enforced by the `msrv` stage. It
-is deliberately a *different number* from the `rust-toolchain.toml` pin
-(1.96.1, what we build with) and from current stable. The binding
-constraint is the dependency graph, not our code: loco-rs / sea-orm /
-sqlx already require 1.94. See
-[`spec/rust-msrv-n-minus-3/index.md`](spec/rust-msrv-n-minus-3/index.md) for the
+from [`ci/msrv.txt`](ci/msrv.txt), and enforced by the `msrv` stage. At
+N-2 the MSRV's minor version now coincides with the
+`rust-toolchain.toml` pin (1.96.1, what we build with) — the pin still
+carries a patch version the MSRV does not, so the two remain distinct
+numbers with distinct jobs (§3 of the policy doc), they simply moved
+closer together than they were at N-3. The binding constraint is still
+the dependency graph, not our code: loco-rs / sea-orm / sqlx require
+1.94, so 1.96 clears it with one release of headroom. See
+[`spec/rust-msrv-n-minus-2/index.md`](spec/rust-msrv-n-minus-2/index.md) for the
 policy and the bump procedure.
 
 **`ci/db-suites.txt` is an allowlist, not a denylist.** A crate joins it

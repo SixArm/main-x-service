@@ -4,7 +4,7 @@
 name = "link-graph-service"
 version = "0.2.0"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.96"
 publish = false
 default-run = "link-graph-service"
 description = "Link graph service — read-model aggregator for cross-service entity linking, serving the queryable graph over neighbors/single-view/freshness"

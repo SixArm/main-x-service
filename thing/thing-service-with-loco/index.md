@@ -38,7 +38,7 @@ person/worker/event) — see the honest capability matrix in
 
 ## Quick start
 
-Prerequisites: Rust 1.95+ (2024 edition), PostgreSQL 18+.
+Prerequisites: Rust 1.96+ (2024 edition), PostgreSQL 18+.
 
 ```bash
 cd thing/thing-service-with-loco   # within the main-x-service monorepo

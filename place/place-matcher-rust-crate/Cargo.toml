@@ -2,7 +2,7 @@
 name = "place-matcher"
 version = "0.7.0"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.96"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "Deterministic and probabilistic matching of geographic places (Haversine distance, external place IDs, ISO 3166-1 alpha-2 country codes, categories) with explainable per-field score breakdowns."
 license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"

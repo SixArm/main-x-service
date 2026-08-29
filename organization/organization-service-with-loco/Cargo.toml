@@ -4,7 +4,7 @@
 name = "organization-service"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.96"
 publish = false
 default-run = "organization-service"
 description = "Organization Service - An organization administration microservice that interoperates with the organization-matcher crate"

@@ -135,5 +135,5 @@ the path can break.
 - [`../agents/share/index.md`](../agents/share/index.md) — the shared
   reference docs this rule renamed
 - [`../scripts/ci-check.sh`](../scripts/ci-check.sh) — the `docs` stage
-- [`rust-msrv-n-minus-3.md`](rust-msrv-n-minus-3.md) — the other
-  repository-wide convention with a CI stage behind it
+- [`rust-msrv-n-minus-2/index.md`](../rust-msrv-n-minus-2/index.md) —
+  the other repository-wide convention with a CI stage behind it
