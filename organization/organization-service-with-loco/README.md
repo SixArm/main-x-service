@@ -32,7 +32,7 @@ API URLs are version-free; select the version with the
 | GET | `/api/organizations/search?q=[&fuzzy][&phonetic]` | Tantivy full-text search — fuzzy = typo-tolerant, phonetic = Soundex |
 | POST | `/api/organizations/merge` | Fold a duplicate into a survivor |
 | GET | `/api/organizations/merges/recent` | Merge-history records |
-| POST | `/api/organizations/import` | Bulk import (multipart JSONL/CSV) → `202 {job_id}` |
+| POST | `/api/organizations/import` | Bulk import (multipart JSONL/CSV/TSV) → `202 {job_id}` |
 | POST | `/api/organizations/export` | Bulk export → `202 {job_id}` |
 | GET | `/api/organizations/bulk-jobs` | Recent bulk import/export jobs |
 | GET | `/api/organizations/whoami` | Verified bearer-token claims (`401` without one) |
@@ -110,7 +110,7 @@ published key set is fetched over HTTP at boot when
 `ORGANIZATION_PASETO_KEYS_URL` is set and refreshed periodically
 thereafter, with warn + env fallback) + a **FHIR R5 API** (`Organization`
 — this crate is the family's reference implementation) + header-based
-API versioning + async bulk import/export (JSONL/CSV). Still deferred
+API versioning + async bulk import/export (JSONL/CSV/TSV). Still deferred
 (see [spec §13](./spec/index.md)): richer validation beyond identifier
 check-digits (URL/country-code format), real-time duplicate check on
 create, and an S3 bulk-artifact backend. Auth is provided by the central

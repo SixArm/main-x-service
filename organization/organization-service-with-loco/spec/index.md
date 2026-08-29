@@ -30,7 +30,7 @@ MVP: CRUD + matching. Since delivered beyond the MVP (§13): full-text
 search (Tantivy), streaming (incl. the durable outbox + relay + a
 `FluvioSink`), audit, OpenAPI, record merge + a stored review queue,
 field masking + the GDPR right-of-access export, async bulk
-import/export (BLK-5, JSONL/CSV), a **FHIR R5 API** (the family
+import/export (BLK-5, JSONL/CSV/TSV), a **FHIR R5 API** (the family
 reference implementation), header-based API versioning, and PASETO key
 rotation + ABAC policy hot-reload without a restart (AU-2). Still out
 of scope (deferred, §13): gRPC, richer validation (URL/country-code
@@ -242,8 +242,10 @@ in-scope services (§13).
 jobs, newest first. `import` is a declared destructive POST
 (`auth::DESTRUCTIVE_POST_SUFFIXES`); an elevated (`full` masking or
 soft-deleted) export additionally requires `Action::Destructive` via
-`authorize_record`. `format` accepts only `jsonl`/`csv` (`400`
-otherwise); `include_soft_deleted=true` is `400` (not yet supported).
+`authorize_record`. `format` accepts `jsonl`/`csv`/`tsv` (`400`
+otherwise; TSV shares the CSV codec via a declared, never-sniffed
+delimiter — §13 2026-08-21); `include_soft_deleted=true` is `400` (not
+yet supported).
 
 **Auth.** The credential is a short-lived **PASETO v4.public** token
 (Ed25519, riding in `Authorization: Bearer v4.public.…`), verified
@@ -341,6 +343,9 @@ point. This is a deliberate, narrow scope decision (documented in
 JSON-encoded cell each). JSONL is the lossless reference format
 (one wire row per line); CSV round-trips losslessly against it
 (pinned by `bulk::csv::tests::round_trips_a_fully_populated_organization_losslessly`).
+**TSV** (landed 2026-08-21, §13) reuses this same column set and codec
+unchanged — it differs from CSV in exactly one byte, the delimiter,
+declared by `format` and never sniffed from the file content.
 
 **Export sensitivity.** Reuses the existing masking exactly
 (`crate::privacy::mask_organization` — §7 masking task): the default
