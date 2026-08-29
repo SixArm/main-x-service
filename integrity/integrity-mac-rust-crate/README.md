@@ -4,6 +4,12 @@ Keyed integrity MACs (HMAC-SHA256, FIPS 198-1) with production-grade key
 handling, shared by every Main X Index service that carries a
 tamper-evidence tier.
 
+> This crate has no `spec/`, `AGENTS.md`, `CLAUDE.md`, or `index.md` — a
+> deliberate, documented waiver, not an oversight. See the
+> [`CHANGELOG.md`](./CHANGELOG.md) header for why: the design rationale
+> below and in `src/lib.rs`'s rustdoc is already the complete
+> documentation surface.
+
 ## Why it exists
 
 The services store three integrity values per row: SHA-256, SHA-3, and a

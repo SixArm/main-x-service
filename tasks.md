@@ -6936,10 +6936,31 @@ green as it sits; these finish it)**
   `HEALTHCHECK` (since its original 2026-08-03 commit) and corrected
   §13 T-22's residual note accordingly. Refreshed the stale test count
   (103→104, verified live) across AGENTS.md/README.md/spec/14/spec/15.
-- [ ] **PRO-P26 (M)** integrity-mac: decide its documentation tier — a
-  minimal `spec/` (it is the family's tamper-evidence keystone and the
-  only crate with neither spec nor an explicit waiver) or an
-  entity-ref-style waiver paragraph.
+- [x] **PRO-P26 (M)** *(done 2026-08-29)* integrity-mac: decided
+  **waiver, not `spec/`** — read the entity-ref precedent (its
+  `CHANGELOG.md` header: "no spec/AGENTS.md/CLAUDE.md, small
+  single-file value-type crate, rustdoc+CHANGELOG+README are the
+  complete surface") and then read integrity-mac's own `src/lib.rs`
+  (348 of 1147 lines are `///`/`//!` prose) and README before deciding.
+  Unlike entity-ref, the waiver ground here is *not* "too small to
+  bother" — integrity-mac is the higher-stakes crate (per overview.md,
+  the family's tamper-evidence keystone, embedded in all ten registries
+  + auth + link-graph) — it's that the design rationale a spec/ would
+  hold (threat model, HKDF-SHA256 per-service-per-domain derivation and
+  the two failure modes it closes, fail-closed key sourcing, root-key
+  zeroization, placeholder refusal, the scheme-tag migration story) is
+  *already* full prose in `src/lib.rs`'s module + item doc comments and
+  mirrored in `README.md`, and the family-wide integration/activation
+  story already lives in `agents/share/security.md` invariant 1 +
+  `agents/share/runbooks/integrity-activation.md`. A `spec/` here would
+  duplicate that prose, not add to it, and would need to be kept in
+  lock-step with the rustdoc. Added a waiver paragraph to
+  `CHANGELOG.md`'s header (the entity-ref precedent location) stating
+  this reasoning and naming exactly where the real documentation lives,
+  plus a short pointer at the top of `README.md`. `AGENTS.md`'s and
+  `agents/share/overview.md`'s library-crates tables already show "—"
+  for this crate's spec/index columns (unchanged, still accurate — no
+  contradiction to fix). Docs-only; `scripts/ci-check.sh docs` green.
 
 **consumer apps**
 - [x] **PRO-P27 (M)** *(done 2026-08-28, CRM-T21/T22)* CRM: built the
@@ -6984,10 +7005,13 @@ green as it sits; these finish it)**
 - [ ] **PRO-P30 (S)** WPM: migration-manifest metadata + edition (with
   PRO-H3); drop the dead `ensure_employee` helper; convert the 4
   seed-task `.unwrap()`s to contextful errors.
-- [ ] **PRO-P31 (S)** CMS: rewrite the service edition spec's Delivery
-  section to the delivered state (feed included, T23/T24 landed,
-  231/60 counts); drop the FE "(planned)" heading; reword both
-  editions' "grow topic files" promises; `publish = false` (PRO-H3e).
+- [x] **PRO-P31 (S)** *(done 2026-08-29)* Verified fully complete
+  already — no edits needed. The Delivery-section rewrite + FE
+  "(planned)" heading + "grow topic files" reword were landed by
+  PRO-H8; `publish = false` was set tree-wide (including CMS) by the
+  earlier Cargo-metadata-sweep commit (`190db156`), and the FE's
+  `package.json` already had `"private": true`. Confirmed via
+  `git diff --stat` against HEAD being empty on both files.
 
 ### Suggested execution order
 
