@@ -6771,8 +6771,26 @@ crate above.
   sentinel rejections) rather than general web knowledge. All 7
   schemes already had fully-implemented, tested parsers — this was a
   pure documentation gap, not code.
-- [ ] **PRO-P4 (M)** person FE: stabilize the 3 documented failing
-  live-integration tests (duplicate-detector test-data interactions).
+- [ ] **PRO-P4 (M)** *(investigated 2026-08-29, not resolved)* person
+  FE: stabilize the 3 documented failing live-integration tests
+  (duplicate-detector test-data interactions). A first attempt
+  diagnosed a real mechanism (the fixture DOB generator kept every
+  record in the same calendar year, and the service's actual
+  same-year/same-month DOB scorer plus the shared "E2E" family-name
+  token was enough to cross the 0.7 duplicate threshold for unrelated
+  records) and tried fixing the fixture's date-generation scheme to
+  spread records across distinct years. Verified live against a
+  freshly reset Postgres + a clean service instance (not a stale/dirty
+  DB — reproduced twice, once against a service already warmed up by
+  the earlier attempt, once against a fully fresh `test-db.sh
+  down`+`up`): the fix did **not** stabilize the suite — 6 tests fail
+  (`FR-3` ×2, `FR-6`, `FR-7`, `FR-8`, `FR-9`), which is *more* than the
+  3 originally documented, not fewer. The diagnostic reasoning may
+  still be partially correct but is not sufficient on its own; the
+  attempted fix was reverted (not landed) rather than presented as
+  working. Needs a fresh investigation, ideally tracing the actual
+  match scores the service returns for the colliding fixture pairs
+  rather than reasoning from the scoring algorithm's source alone.
 
 **worker**
 - [x] **PRO-P5 (S)** *(done 2026-08-29)* Closed §13 T-2, reworded to
@@ -6918,9 +6936,17 @@ green as it sits; these finish it)**
   further stale spots in `controllers/auth.rs` found in the same
   file (the `me`/`signout` doc comments). Post-fix grep confirmed only
   correctly-historical RS256/JWKS references remain, left alone.
-- [ ] **PRO-P23 (M)** Decide + implement auth on the unauthenticated
-  `GET /api/compliance/audit/verify` (or record the leave-open decision
-  in §16) and add it to `openapi.rs`.
+- [x] **PRO-P23 (M)** *(done 2026-08-29)* Decided: gate
+  `GET /api/compliance/audit/verify` with a required PASETO bearer
+  (`AuthUser`, `401` without one), but **not** admin-gated like
+  `/api/auth/audit/recent` — the report carries no PII (row counts and
+  row ids only), so the gate is about the real CPU/DB recomputation
+  cost (SHA-256 + SHA-3 + HMAC over up to 10,000 rows on every call),
+  not disclosure. Implemented in `src/controllers/compliance.rs`,
+  documented in `src/openapi.rs` (new `AuditIntegrityReport` schema +
+  bearer security scheme, no `403`), decision recorded in `spec/index.md`
+  §6.13/§16, and pinned by `tests/requests/compliance.rs` +
+  `src/openapi.rs::documents_audit_verify_as_bearer_gated_not_admin_gated`.
 - [ ] **PRO-P24 (M)** FE: repair the E2E suite (silently red since
   ~2026-06-17; `page.route()` can't intercept BFF server-side fetch;
   delete the two obsolete `return_to`/localStorage cases). Delete or
