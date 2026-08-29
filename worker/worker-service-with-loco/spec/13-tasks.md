@@ -91,11 +91,26 @@ clearly described manual check confirms the acceptance criterion.
     policy gets `2xx`; a valid token the policy denies gets `403`;
     no/bad token gets `401`. T-1b is complete; activation
     (`WORKER_REQUIRE_AUTH=1`) remains the operational decision.
-- [ ] **T-2 — Production Fluvio publisher.**
-  - [ ] Implement `FluvioEventPublisher : EventProducer` behind
-    feature flag `fluvio`.
-  - **Acceptance:** integration test publishes a `WorkerCreated`
-    record end-to-end against a local Fluvio broker.
+- [x] **T-2 — Production Fluvio publisher.** *(done 2026-08-03, via
+  BUS-3 — see `AGENTS.md` "Durable event bus relay (Fluvio)")* Superseded
+  the originally-scoped `FluvioEventPublisher : EventProducer` shape with
+  a real-broker `FluvioSink : EventSink` (`src/relay.rs`), ported from
+  the case-service BUS-1 reference, sitting behind the Phase-3 outbox
+  relay (default-off via `WORKER_EVENT_TRANSPORT=outbox` +
+  `WORKER_EVENT_RELAY`) and this crate's own off-by-default `fluvio`
+  Cargo feature — a plain `cargo build`/`cargo test` is unaffected.
+  `WORKER_FLUVIO_ENDPOINT` selects it over the default `LoggingSink`; an
+  endpoint configured without the feature compiled in makes the relay
+  refuse to start (logged, not a silent no-broker fallback).
+  - [x] `FluvioSink` implemented behind the `fluvio` feature.
+  - **Acceptance (met):** `tests/fluvio_relay.rs` is a
+    `#![cfg(feature = "fluvio")]`-gated, `#[ignore]`d live round-trip
+    against a local broker (`compose.fluvio.yaml` +
+    `Dockerfile.fluvio-cli`); `cargo build --lib --features fluvio` and
+    `cargo clippy --all-targets --features fluvio -- -D warnings` prove
+    the real `fluvio` 0.50 API compiles. No automated CI run in this repo
+    stands up a broker, so the round-trip itself is exercised locally,
+    not in CI.
 - [~] **T-3 — FHIR capability statement + bundle handling.**
   - [x] *(done 2026-07-07, via T-12)* `GET /fhir/metadata` returns a
     CapabilityStatement listing the **`Practitioner`** resource — the
@@ -144,7 +159,7 @@ clearly described manual check confirms the acceptance criterion.
     and GET/PUT/DELETE `/fhir/Worker/{id}`; its handlers extract
     `AppState` via `FromRef` exactly like the REST surface.
   - [x] **Acceptance:** the mount is pinned by two route tests in
-    `tests/api_integration_test.rs` — `test_fhir_worker_route_is_mounted`
+    `tests/api_integration_test.rs` — `test_fhir_practitioner_route_is_mounted`
     (un-gated; a malformed UUID makes the `Path<Uuid>` extractor return
     `400`, proving the route matched a handler rather than a route-level
     `404`) and `test_fhir_worker_not_found_returns_operation_outcome`

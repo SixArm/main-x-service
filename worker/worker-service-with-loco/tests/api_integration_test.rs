@@ -525,7 +525,7 @@ async fn test_get_worker_not_found() {
 /// route-level `404` with an empty body. Pins spec §13 T-9 / T-12 (the
 /// FHIR surface is reachable) without a live database.
 #[tokio::test]
-async fn test_fhir_worker_route_is_mounted() {
+async fn test_fhir_practitioner_route_is_mounted() {
     let app = common::create_test_router_no_db();
 
     let response = app
