@@ -165,7 +165,10 @@ controls when they land.
 - [x] playwright smoke for the four routes (`tests/e2e/smoke.spec.ts`,
   4 tests, API stubbed, runs against `vite preview`).
 - [ ] Identifier `Custom(label)` editing in the form.
-- [ ] Search box once the service ships search.
+- [ ] Search box — the service's Tantivy full-text search shipped
+  2026-07-31 (`GET /api/organizations/search?q=[&fuzzy][&phonetic]`,
+  see the service `AGENTS.md`/spec API surface table), so this is no
+  longer blocked on the service; it is a real open UI task now.
 - [x] ~~Bearer token wiring — `auth.svelte.ts` token store
   (`localStorage["mxi_access_token"]`) + `ApiClient` auto-attach +
   layout session affordance~~ — **superseded** (see auth-migration task below).
@@ -250,8 +253,8 @@ v0.1 (here): CRUD + duplicate-check UI, vitest + Playwright suites. The
 v0.1 session shipped as a client-held bearer + cross-origin SSO handoff;
 that is now superseded by the BFF + httpOnly-cookie model (§6.7/§6.8,
 [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)),
-which has since shipped (§13). Next: search box once the service ships
-search; audit views.
+which has since shipped (§13). Next: the search box (§13 — no longer
+blocked, the service's Tantivy search shipped 2026-07-31); audit views.
 
 ## 16. Open questions
 

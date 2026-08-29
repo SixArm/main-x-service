@@ -556,6 +556,31 @@ organization is not a data subject.
   deadlock (§10.7 "Concurrency"); an S3 `ArtifactStore` backend behind a
   cargo feature (the trait is already async, so this is additive).
 
+- [ ] **SEC-B3: advisory-lock-protect the BLK-5 per-row bulk upsert.**
+  `bulk::pipeline::import_upsert` (§10.7 "Concurrency") is a **plain**
+  find-then-write with no lock — unlike the family's SEC-B3 reference
+  pattern (person; an advisory-lock guard transaction wrapping
+  find-then-write). Two importers racing the identical stable key
+  (LEI → DUNS → explicit `pid`) in the same instant can both pass the
+  "does it exist" check and both `INSERT`, producing a duplicate row.
+  **Why it isn't already fixed:** `streaming::create_and_emit` /
+  `update_and_emit` are hard-coded to `&DatabaseConnection` and open
+  their *own* internal transaction under the `outbox` transport, so they
+  are not generic over `ConnectionTrait`. A stable-key advisory lock
+  taken on a separate guard transaction would hold one pooled connection
+  while these helpers need a second — under a small pool (this crate's
+  own `config/test.yaml` runs `max_connections: 1`) that was tried and
+  deadlocked **every** import, not only a concurrent one. **Scope of the
+  real fix** (not part of this task item — this item only tracks it):
+  make `streaming::create_and_emit`/`update_and_emit` generic over
+  `ConnectionTrait` (a `src/streaming.rs`-wide change, since every
+  caller passes `&DatabaseConnection` today), then have
+  `bulk::pipeline::import_upsert` take a stable-key `pg_advisory_xact_lock`
+  inside the *same* transaction it upserts in, matching the SEC-B3
+  reference shape with no separate connection needed. See §10.7 and the
+  repo [`tasks.md`](../../../tasks.md) SEC-B3 entry (closed there for
+  person; open here).
+
 - [x] **SEC-M5 (security): check-digit / format validation of deterministic
   identifiers.** `validation::problems` now validates LEI (ISO 17442 + ISO
   7064 MOD 97-10), GLN (13 digits + GS1 mod-10), DUNS (9 digits), and VAT
