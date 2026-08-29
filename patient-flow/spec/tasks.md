@@ -83,7 +83,7 @@ code + tests in one PR.
 > transport.
 
 - [x] PF-T17 Request-test suite + conditional board reads — landed
-  2026-07-18. `tests/requests/{topology,flows,boards}.rs` (9 tests,
+  2026-07-18. `tests/requests/{topology,flows,boards}.rs` (8 tests,
   `--ignored`, Postgres per family convention): topology CRUD +
   422s, the full request→allocate→admit→Red2Green→ready→discharge→
   deep-clean journey, the **double-placement race** (two concurrent
@@ -131,6 +131,30 @@ code + tests in one PR.
   short-lived PASETO and injects the bearer. Inert until
   `PATIENT_FLOW_REQUIRE_AUTH` + the auth service are deployed; no
   token ever reaches browser JS. (spec auth.md)
+
+## Phase 7 — cross-service journey (time-based analysis)
+
+- [x] PF-T19 `GET /api/stays/{pid}/time-analysis` — landed 2026-08-24
+  ("Add time-based analysis, and the journey links it needs").
+  Serves the stitched-journey timeline contract that
+  `care-pathway-service`'s `continues_as` link follows across a
+  service boundary (its `src/journey.rs`): clock bounds, elapsed
+  span, and value-adding time, so a journey that begins on a care
+  pathway and continues into an inpatient stay is measured end to
+  end. Value-adding time is derived straight from the stay's
+  `Red2Green` day classifications — a green day is the value-adding
+  time, unclassified days count as non-value-adding (matching the
+  denominator rule in
+  [`agents/share/time-based-analysis.md`](../../agents/share/time-based-analysis.md)) —
+  and the response carries `coverage`/`confidence` so an
+  under-classified stay (classification only starts once the board
+  is in use) reads as "we do not know" rather than "inefficient". A
+  sensitive read like the MDT view: record-level ABAC, audited
+  (`stay_time_analysis_read`); the `mask` obligation is deliberately
+  not applied since the response carries only durations, no
+  identifiers. Covered by `tests/requests/flows.rs`
+  (`full_journey_request_to_deep_clean`).
+  (src/controllers/stays.rs, src/flow/journey.rs)
 
 ## Staff utilisation (permitted 2026-08-25, blocked on inputs)
 
