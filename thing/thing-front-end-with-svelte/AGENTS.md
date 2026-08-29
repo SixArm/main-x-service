@@ -74,6 +74,42 @@ Sign-out clears both cookies. See
 `../../agents/share/authentication-sessions.md` §4 for the design this
 implements.
 
+## Page-visit guard (PRO-H10, 2026-08-29)
+
+Every page whose sole purpose is submitting a mutation
+(`/things/new`, `/things/[id]/edit`, `/things/merge`, `/review`)
+carries a `+page.server.ts` load function calling
+`requireSignedIn(locals)` (`src/lib/server/session.ts`), which redirects
+an unauthenticated visitor to `/signin` (303) rather than render a form
+whose submit would fail. `/review` is guarded in full even though it
+also *lists* the stored review queue on load: the queue exists solely to
+be decided on (confirm/reject, plus the deep-link into `/things/merge`),
+so an unauthenticated visitor gains nothing from seeing it that isn't
+also blocked at the point of action — the same call person's own
+`/review` guard made. Read/list/search/view pages stay public
+(`/things`, `/things/[id]`, `/things/[id]/audit`, `/things/match`) —
+this mirrors the backend's own default-allow-read / mutation-deny ABAC
+posture (`agents/share/authorization-attributes.md` §5) rather than
+inventing a separate front-end policy. `locals.sessionId` is
+presence-only (set from the httpOnly cookie, never re-validated here) —
+a UX convenience in front of the backend's real enforcement, not a
+substitute for it.
+
+This crate has **no `/things/bulk` route to guard** — unlike person,
+thing carries no bulk import/export capability at all (see
+`agents/share/overview.md`'s capability matrix: the bulk row is `–` for
+thing), so there was nothing to add there.
+
+**Known v1 limitation, not an oversight**: no `next`-param round trip
+back to the originally-requested page after signing in — the magic-link
+flow only preserves `return_url`'s origin today
+(`src/lib/server/auth.ts::requestMagicLink`), and carrying a return path
+through it would touch the authentication-service contract, not just
+this app. A visitor who signs in from a guarded page lands on `/` and
+navigates back manually. This crate's BFF/auth wiring (`hooks.server.ts`,
+`/signin`, `/verify`, the proxy, CSRF) is the same shape as person's —
+ported in T-22/T-25 — so the limitation applies identically here.
+
 ## What does NOT live here
 
 - FHIR Thing UI. Out of scope for MVP.
