@@ -167,7 +167,7 @@ Search parameters: `name`, `family`, `given`,
 loco router — `App::routes` registers `fhir_routes()` alongside the
 REST and metrics route groups, and `create_router` mirrors the same
 `/fhir/Practitioner` surface for the integration-test harness. The mount is
-pinned by `tests/api_integration_test.rs::test_fhir_worker_route_is_mounted`
+pinned by `tests/api_integration_test.rs::test_fhir_practitioner_route_is_mounted`
 (un-gated, asserts the route is reachable via a `400` from the
 `Path<Uuid>` extractor) and
 `::test_fhir_worker_not_found_returns_operation_outcome` (DB-gated,
