@@ -39,45 +39,92 @@ interface CreatedPerson {
 
 // ─── Tiny REST helpers ─────────────────────────────────────────────
 
-// Generate a per-record DOB that is unique within the run so that the
-// matcher's renormalised weighted-average score for two *different*
-// seeded records stays below the 0.85 duplicate-detection threshold.
-// Two E2E_* records that share family+DOB+gender now correctly score
-// as a duplicate (post-scoring-renormalisation fix in the service);
-// each test therefore needs distinct demographics per record except
-// where it *explicitly* wants to exercise the 409 path.
-let uniqueDobCounter = 0;
+// Generate a per-record DOB spread across a wide range of past years
+// (rather than the ~150-day span the old fixed-epoch-plus-17-days scheme
+// used) so unrelated fixtures are unlikely to land in the create-time
+// duplicate detector's same-year scoring bands in the first place. This
+// is a *first line of defense*, not the correctness guarantee — see the
+// PRO-P4 note on `apiCreatePerson` below for why a fixed date scheme
+// alone cannot be trusted to dodge a live, real matcher.
 function uniqueDob(): string {
-    uniqueDobCounter += 1;
-    const d = new Date(Date.UTC(1970, 0, 1));
-    d.setUTCDate(d.getUTCDate() + uniqueDobCounter * 17);
+    const year = 1930 + Math.floor(Math.random() * 90); // 1930-2019
+    const dayOfYear = Math.floor(Math.random() * 365);
+    const d = new Date(Date.UTC(year, 0, 1));
+    d.setUTCDate(d.getUTCDate() + dayOfYear);
     return d.toISOString().slice(0, 10);
 }
+
+/** Bounded retries for {@link apiCreatePerson}'s duplicate-avoidance loop. */
+const MAX_DUPLICATE_RETRIES = 5;
 
 // Create a person directly via the REST API (bypassing the UI) to seed
 // fixtures. Defaults to a unique DOB unless one is supplied; asserts a 2xx
 // and a success envelope before returning the created record's id + inputs.
+//
+// PRO-P4 (2026-08-29): retries on a 409 by regenerating both the DOB and
+// the family-name suffix, rather than relying on a fixed date-spacing
+// scheme to dodge the live create-time duplicate detector
+// (`check_duplicates_internal`, threshold 0.7,
+// `person-service-with-loco/src/api/rest/handlers.rs`). Reproduced live,
+// repeatedly, that hand-tuned spacing is not durably safe: every
+// `E2E_*` family is a fuzzy-search candidate for every other record
+// (the candidate search tokenizes on `_` and fuzzy-matches per token),
+// a same-year DOB pair scores 0.50-0.95 in the service's own DOB grader
+// (`dob_matching::match_birth_dates`,
+// `person-service-with-loco/src/matching/algorithms.rs`) even with
+// wholly distinct names, and this suite's own worker can be recycled
+// mid-run (observed live, apparently triggered by the guarded-page
+// redirects a signed-out run now hits — see this project's `AGENTS.md`
+// "Page-visit guard (PRO-H10)"), which resets any in-process fixture
+// counter and can make two *different* worker generations land on the
+// same computed demographics. A test suite whose fixtures can
+// unpredictably collide with a live, evolving matcher is exactly the
+// "duplicate-detector test-data interaction" PRO-P4 exists to
+// stabilize — regenerating and retrying is robust to that in a way no
+// fixed date/name scheme can promise to be. A caller that *wants* the
+// 409 (the FR-3 duplicate-detection test) passes a fixed `birth_date`,
+// which disables retrying here — that call seeds the *first* record
+// only; the actual duplicate POST goes through the UI directly, not
+// through this helper.
 async function apiCreatePerson(
     request: APIRequestContext,
     family: string,
     given: string,
     extra: { birth_date?: string } & Record<string, unknown> = {},
 ): Promise<CreatedPerson> {
-    const birth_date = (extra.birth_date as string | undefined) ?? uniqueDob();
-    const res = await request.post(`${API_BASE}/api/persons`, {
-        data: {
-            name: { family, given: [given] },
-            gender: "female",
-            birth_date,
-            active: true,
-            ...extra,
-        },
-    });
-    expect(res.status(), `create ${family} ${given}`).toBeGreaterThanOrEqual(200);
-    expect(res.status()).toBeLessThan(300);
-    const body = await res.json();
-    expect(body.success, `envelope.success for ${family}`).toBe(true);
-    return { id: body.data.id, family, given, birth_date };
+    const { birth_date: fixedBirthDate, ...rest } = extra;
+    let lastStatus = 0;
+    let lastBody: unknown;
+    for (let attempt = 0; attempt < MAX_DUPLICATE_RETRIES; attempt += 1) {
+        const birth_date = fixedBirthDate ?? uniqueDob();
+        // A retry needs a fresh family too — the same family with a new
+        // DOB can still collide via the given-name + gender + fuzzy
+        // family-token signal alone.
+        const thisFamily = attempt === 0 ? family : `${family}_r${attempt}`;
+        const res = await request.post(`${API_BASE}/api/persons`, {
+            data: {
+                name: { family: thisFamily, given: [given] },
+                gender: "female",
+                birth_date,
+                active: true,
+                ...rest,
+            },
+        });
+        lastStatus = res.status();
+        if (lastStatus === 409 && fixedBirthDate === undefined) {
+            lastBody = await res.json().catch(() => undefined);
+            continue;
+        }
+        expect(lastStatus, `create ${thisFamily} ${given}`).toBeGreaterThanOrEqual(200);
+        expect(lastStatus).toBeLessThan(300);
+        const body = await res.json();
+        expect(body.success, `envelope.success for ${thisFamily}`).toBe(true);
+        return { id: body.data.id, family: thisFamily, given, birth_date };
+    }
+    throw new Error(
+        `create ${family} ${given}: still 409 after ${MAX_DUPLICATE_RETRIES} attempts ` +
+            `(last response: ${JSON.stringify(lastBody)})`,
+    );
 }
 
 // Soft-delete a seeded person via the API during cleanup.

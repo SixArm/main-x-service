@@ -21,5 +21,5 @@
 | E2E smoke | ✅ (`tests/e2e/`, route-stubbed) |
 | `pnpm install` verified | ✅ (`node_modules` present) |
 | `pnpm test` verified | ✅ |
-| Live integration | ⚠️ partial — 6/9 integration tests pass against the live stack (OQ-5 resolved); remaining 3 are duplicate-detector test-data interactions |
+| Live integration | ⚠️ partial — the duplicate-detector test-data interaction (3/9 failing) is fixed (PRO-P4, 2026-08-29, OQ-5); 7/9 now fail instead on the newer page-visit auth guard (PRO-H10) + CSRF check (PRO-H5), which this suite does not sign in for — see OQ-5 |
 
