@@ -3,8 +3,9 @@
 //! This is the composition root. `Hooks` is where loco asks the
 //! application to register its routes, background workers, CLI tasks,
 //! seed data, and table-truncation logic. The auth service mounts four
-//! controller route groups (magic-link auth, JWKS, docs, Prometheus
-//! metrics) and otherwise keeps the surface minimal.
+//! controller route groups (magic-link auth, the published PASETO key
+//! set, docs, Prometheus metrics) and otherwise keeps the surface
+//! minimal.
 
 use crate::migration::Migrator;
 use async_trait::async_trait;
