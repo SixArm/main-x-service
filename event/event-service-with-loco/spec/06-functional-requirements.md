@@ -126,7 +126,19 @@ sensitive identifiers or party emails.
   threshold.
 - Explicit `POST /api/events/check-duplicates`.
 - Batch `POST /api/events/deduplicate`.
-- Review queue (`Pending` / `Confirmed` / `Rejected` / `AutoMerged`).
+- Review queue (`Pending` / `Confirmed` / `Rejected` / `AutoMerged`) —
+  **ephemeral by design, not persisted.** `POST /api/events/deduplicate`
+  computes candidate pairs on the fly and returns them as
+  `ReviewQueueItem`s in the same response; each gets a fresh random
+  `id` that names nothing durable. There is no `review_queue` table
+  (§10.1), no `GET /api/events/review-queue` listing endpoint, and no
+  `POST .../review-queue/{id}/decision` endpoint — unlike person /
+  worker / place / thing / organization, which persist candidate pairs
+  and support a confirm/reject decision workflow (see
+  [match-search-merge.md](../../../agents/share/match-search-merge.md)).
+  `AutoMerged` on a scanned pair is a **label only**: the batch scan
+  does not itself perform a merge. Rerunning the scan re-discovers and
+  re-scores the same pairs from scratch. See §16 OQ-4.
 - Merge picks the surviving record; transfers identifiers, alternate
   names, keywords, locations, parties, and `same_as` URLs; appends the
   duplicate's primary name as an `alternate_name` on the survivor;

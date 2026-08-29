@@ -23,6 +23,9 @@ PostgreSQL 18+ via SeaORM.
 - `organizations`, `organization_addresses`,
   `organization_contacts`, `organization_identifiers`.
 - `audit_log`.
+- **No `review_queue` table.** Unlike person / worker / place / thing /
+  organization, event's dedup review queue is not persisted — see §6.4
+  and §16 OQ-4.
 
 ### 10.2 Extensions
 
