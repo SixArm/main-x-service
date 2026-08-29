@@ -1,71 +1,27 @@
-// Pins the end-to-end SPA behaviour with the auth API stubbed: the
-// signup/signin forms render and submit, the verify route consumes a token
-// and lands on the dashboard, the signed-in/signed-out home views, and —
-// crucially — the cross-origin handoff: an allowlisted (self-origin)
-// return_to receives the token in the URL fragment, while a foreign origin
-// is ignored and the token is never handed off.
-import { test, expect, type Page } from "@playwright/test";
+// Pins the BFF SPA behaviour against a real (if tiny) auth-service stub:
+// the signup/signin forms render and submit, the verify route consumes a
+// token server-side and lands on the signed-in dashboard, and the home
+// page's signed-in/signed-out views render correctly.
+//
+// Every auth-service call this app makes happens server-side (the
+// SvelteKit BFF's own `fetch`, src/lib/server/auth.ts) — never from the
+// browser — so `page.route()` cannot stub it (it only intercepts
+// browser-issued requests). `AUTH_API_URL` is instead pointed, via
+// `playwright.config.ts`'s second `webServer` entry, at
+// `tests/e2e/mock-auth-server.mjs`, a real Node HTTP server implementing
+// the handful of endpoints the BFF calls. See spec §11/§13.
+//
+// The prior cross-origin `return_to` handoff and the `localStorage`
+// bearer-token model it and the seeded-session test assumed were removed
+// with the BFF migration (`authentication-sessions.md`; spec §13,
+// 2026-08-04); those three cases are deleted rather than fixed, not
+// merely skipped — there is no return_to handoff and no client-held
+// session left to test.
+import { test, expect } from "@playwright/test";
 
-// Smoke tests over the auth SPA routes. The auth API is stubbed per-test
-// via `page.route`, so a broken endpoint contract (wrong path / method)
-// surfaces as an unhandled request and a failing assertion, without
-// needing the Rust service.
-
-const PID = "11111111-1111-4111-8111-111111111111";
+// Must match tests/e2e/mock-auth-server.mjs's fixture data.
 const EMAIL = "alice@example.com";
-const NAME = "Alice";
-const TOKEN = "test-access-token";
-
-const CURRENT_USER = { pid: PID, name: NAME, email: EMAIL };
-const LOGIN_RESPONSE = {
-  token: TOKEN,
-  pid: PID,
-  name: NAME,
-  email: EMAIL,
-  is_verified: true,
-};
-
-/** Stub every `/api/auth/*` call so the SPA renders offline. */
-async function stubApi(page: Page) {
-  await page.route("**/api/auth/**", async (route) => {
-    const req = route.request();
-    const url = new URL(req.url());
-    const method = req.method();
-    const path = url.pathname;
-
-    if (path === "/api/auth/signup" && method === "POST") {
-      return route.fulfill({ status: 200, body: "" });
-    }
-    if (path === "/api/auth/magic-link" && method === "POST") {
-      return route.fulfill({ status: 200, body: "" });
-    }
-    if (path.startsWith("/api/auth/magic-link/") && method === "GET") {
-      return route.fulfill({ json: LOGIN_RESPONSE });
-    }
-    if (path === "/api/auth/me" && method === "GET") {
-      return route.fulfill({ json: CURRENT_USER });
-    }
-    if (path === "/api/auth/signout" && method === "POST") {
-      return route.fulfill({ status: 200, body: "" });
-    }
-    return route.fulfill({ status: 404, json: { error: "unhandled in stub" } });
-  });
-}
-
-/** Seed a signed-in session into localStorage before the app boots. */
-async function seedSession(page: Page) {
-  await page.addInitScript(
-    ([token, user]) => {
-      localStorage.setItem("mxi.auth.token", token as string);
-      localStorage.setItem("mxi.auth.user", user as string);
-    },
-    [TOKEN, JSON.stringify(CURRENT_USER)],
-  );
-}
-
-test.beforeEach(async ({ page }) => {
-  await stubApi(page);
-});
+const VALID_MAGIC_TOKEN = "magic-123";
 
 test("sign-up page shows the create-account form", async ({ page }) => {
   await page.goto("/signup", { waitUntil: "networkidle" });
@@ -97,37 +53,19 @@ test("sign-in submits the email and confirms the link was sent", async ({
 test("verify route consumes the token and lands on the signed-in dashboard", async ({
   page,
 }) => {
-  await page.goto(`/verify?token=magic-123`, { waitUntil: "networkidle" });
-  // On success the page stores the session and redirects to "/".
+  // The mock auth server accepts exactly this token, sets the session +
+  // CSRF cookies on its response, and the BFF's `+page.server.ts` load
+  // re-hosts them on this origin before redirecting home — all server
+  // side; the browser never sees a token.
+  await page.goto(`/verify?token=${VALID_MAGIC_TOKEN}`, {
+    waitUntil: "networkidle",
+  });
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
   await expect(page.getByRole("main").getByText(EMAIL)).toBeVisible();
-});
-
-test("verify hands the token to an allowlisted return_to via the URL fragment", async ({
-  page,
-}) => {
-  // Self-origin is always allowed (empty allowlist ⇒ same-origin only),
-  // so we can exercise the cross-origin handoff decision without build
-  // env config: park a same-origin return_to, then verify.
-  await page.addInitScript(() => {
-    sessionStorage.setItem("mxi_return_to", location.origin + "/signin");
-  });
-  await page.goto("/verify?token=magic-123", { waitUntil: "networkidle" });
-  // The page redirects to return_to with the token in the URL fragment.
-  await expect(page).toHaveURL(/\/signin#access_token=test-access-token/);
-});
-
-test("verify ignores a non-allowlisted return_to and never appends the token", async ({
-  page,
-}) => {
-  await page.addInitScript(() => {
-    sessionStorage.setItem("mxi_return_to", "https://evil.example.com/grab");
-  });
-  await page.goto("/verify?token=magic-123", { waitUntil: "networkidle" });
-  // Falls through to home; the token is not handed off.
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Sign out" }),
+  ).toBeVisible();
 });
 
 test("verify route reports an error when the token is missing", async ({
@@ -137,16 +75,6 @@ test("verify route reports an error when the token is missing", async ({
   await expect(
     page.getByRole("heading", { name: "Could not sign you in" }),
   ).toBeVisible();
-});
-
-test("home page renders the account dashboard for a signed-in session", async ({
-  page,
-}) => {
-  await seedSession(page);
-  await page.goto("/", { waitUntil: "networkidle" });
-  await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
-  await expect(page.getByRole("main").getByText(EMAIL)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 });
 
 test("home page shows the signed-out state without a session", async ({
