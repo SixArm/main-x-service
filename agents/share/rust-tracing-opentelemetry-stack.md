@@ -17,33 +17,33 @@ proved against a real in-process OTLP/gRPC collector in its
 of it (repo `tasks.md` PRO-H9, 2026-08-28), with the same in-process-collector
 test tier ported alongside; **worker and event** followed in the same
 task (also 2026-08-28), each copying person's already-adapted port rather
-than re-deriving link-graph-service's. **course and place** are the
-newest ports (`tasks.md` PRO-H12, 2026-08-30), both copying person's
-port. All six crates' `AGENTS.md` document the adaptations each needed
+than re-deriving link-graph-service's. **course, place, and thing** are
+the newest ports (`tasks.md` PRO-H12, 2026-08-30), all copying person's
+port. All seven crates' `AGENTS.md` document the adaptations each needed
 beyond link-graph-service's shape: the tower middleware wired onto
 **two** router-construction surfaces instead of one, for every crate
-that (like person/worker/event/course/place) carries a hand-rolled
-`create_router` alongside the loco-native path; and — for a crate that
-**declares** a `tonic` Cargo dependency at all — a renamed
+that (like person/worker/event/course/place/thing) carries a
+hand-rolled `create_router` alongside the loco-native path; and — for a
+crate that **declares** a `tonic` Cargo dependency at all — a renamed
 dev-dependency, `otlp-test-tonic = { package = "tonic", … }`, so the
 in-process collector's tonic 0.14 does not collide with it in a test
 binary's extern prelude. **This is not the same test as
 [overview.md](overview.md)'s gRPC-stub capability row**, which tracks
 only whether a `src/api/grpc` module exists: person/worker/event need
-the rename because they have both a stub and the dependency; place
-needs the rename too despite showing `–` on that row, because it
+the rename because they have both a stub and the dependency; place and
+thing need the rename too despite showing `–` on that row, because each
 already declares `tonic` + `tonic-build` in `Cargo.toml` in
-anticipation of a not-yet-built gRPC server (its own spec T-4) — Cargo
-does not care that no code calls `tonic::` yet, only that the name and
-version collide. course needed no rename because it is the one crate
-here that declares no `tonic` dependency at all. **Check each
-remaining crate's actual `Cargo.toml`, not the capability matrix**,
-before assuming either way. **thing, organization, care-pathway, case,
+anticipation of a not-yet-built gRPC server (place's spec T-4, thing's
+T-3) — Cargo does not care that no code calls `tonic::` yet, only that
+the name and version collide. course needed no rename because it is
+the one crate here that declares no `tonic` dependency at all. **Check
+each remaining crate's actual `Cargo.toml`, not the capability matrix**,
+before assuming either way. **organization, care-pathway, case,
 portfolio** carry no observability module at all yet (PRO-H12's
-remaining scope); the last four are loco-idiomatic (`src/controllers/`),
+remaining scope); all four are loco-idiomatic (`src/controllers/`),
 not person-style, so their router-construction surface count and
 layering point still need working out fresh rather than assumed
-identical to the six done so far. Three things settled that this doc
+identical to the seven done so far. Three things settled that this doc
 does not say:
 
 - **Versions.** `opentelemetry` / `_sdk` / `-otlp` /

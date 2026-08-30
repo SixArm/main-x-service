@@ -60,14 +60,27 @@ utoipa-swagger-ui = { version = "9", features = ["axum"] }
 
 # Data Streaming
 
-# OpenTelemetry (Observability)
-opentelemetry = { version = "0.27", features = ["trace", "metrics", "logs"] }
-opentelemetry-otlp = { version = "0.27", features = ["trace", "metrics", "logs"] }
-opentelemetry_sdk = { version = "0.27", features = ["rt-tokio", "trace", "metrics", "logs"] }
-opentelemetry-semantic-conventions = "0.27"
+# OpenTelemetry (Observability) — real OTLP export (PRO-H12, ported from
+# person-service — see src/observability.rs's module docs). These were
+# previously stale 0.27/0.28 pins with zero consumers (no
+# src/observability module existed at all until this change). `grpc-tonic`
+# (not the crate's default `http-proto` + blocking reqwest): the shared
+# doc's `OTLP_ENDPOINT` default is `http://localhost:4317`, the gRPC
+# port. `internal-logs` is kept ON so a failing export is visible in the
+# log rather than silently dropped. No `logs` feature — this pipeline is
+# traces + metrics only.
+opentelemetry = { version = "0.32", features = ["trace", "metrics"] }
+opentelemetry_sdk = { version = "0.32", features = ["trace", "metrics"] }
+opentelemetry-otlp = { version = "0.32", default-features = false, features = [
+  "grpc-tonic",
+  "trace",
+  "metrics",
+  "internal-logs",
+] }
+opentelemetry-semantic-conventions = { version = "0.32" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-tracing-opentelemetry = "0.28"
+tracing-opentelemetry = { version = "0.33" }
 
 # Utilities
 uuid = { version = "1.24", features = ["v4", "serde"] }
@@ -130,6 +143,46 @@ tower = { version = "0.5", features = ["util"] }
 
 # Benchmarking
 criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+
+# An in-process OTLP/gRPC collector for `tests/otlp_export.rs` /
+# `tests/otlp_middleware.rs` (PRO-H12, ported from person-service): the
+# generated `TraceServiceServer` / `MetricsServiceServer` plus tonic's
+# server transport, so the export pipeline is proved against a real gRPC
+# listener in a normal `cargo test` run — no external collector, nothing
+# `#[ignore]`d. This `tonic` (0.14, from opentelemetry-otlp's own
+# `grpc-tonic` line) is deliberately a different major version from this
+# crate's main `tonic = "0.12"` dependency — Cargo links both without
+# conflict since they are separate crates to the compiler; there is no
+# version to unify.
+opentelemetry-proto = { version = "0.32", default-features = false, features = [
+  "gen-tonic",
+  "trace",
+  "metrics",
+] }
+# Renamed (`package = "tonic"`), not a plain `tonic = "0.14"` dev-dependency:
+# this crate declares `tonic = "0.12"` in [dependencies] (dead weight
+# today — T-3's not-yet-built gRPC server; `agents/share/overview.md`'s
+# capability matrix correctly shows `–` on the gRPC-stub row because no
+# `src/api/grpc` module exists yet, but a *declared* dependency collides
+# in the extern prelude regardless of whether any code actually calls
+# `tonic::` — see `agents/share/observability.md` for the general note,
+# found rolling this to place, PRO-H12 slice 2). A regular dependency
+# plus a dev-dependency sharing the unrenamed name `tonic` at two
+# different versions makes rustc refuse the test binary with `E0464:
+# multiple candidates for rlib dependency tonic`. The renamed crate is
+# still exactly `tonic` 0.14.6 underneath — the same build
+# `opentelemetry-proto`'s own `tonic` 0.14 dependency resolves to — so
+# `otlp_test_tonic::Response<T>` and the generated
+# `opentelemetry_proto::tonic::...` types are the same types; only the
+# `use` path in the test files changes.
+otlp-test-tonic = { package = "tonic", version = "0.14" }
+tokio-stream = { version = "0.1", features = ["net"] }
+# The mounted-middleware test (`tests/otlp_middleware.rs`) makes a real
+# HTTP request against a served router.
+reqwest = { version = "0.12", default-features = false, features = [
+  "rustls-tls",
+  "json",
+] }
 
 [build-dependencies]
 # gRPC code generation

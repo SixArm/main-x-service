@@ -75,6 +75,8 @@ pub mod metrics;
 /// Domain models: the [`Thing`](models::thing::Thing) entity and its
 /// supporting value objects.
 pub mod models;
+/// Structured logging + OpenTelemetry OTLP export (traces + metrics).
+pub mod observability;
 /// Privacy controls: per-field masking and GDPR export.
 pub mod privacy;
 /// Durable event bus **Phase 3** relay: drains the `event_outbox` to an

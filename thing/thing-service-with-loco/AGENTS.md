@@ -75,6 +75,61 @@ DATABASE_URL=… cargo test --test api_integration_test
 cargo bench
 ```
 
+## OpenTelemetry OTLP export
+
+`src/observability.rs` (repo `tasks.md` PRO-H12, landed 2026-08-30) is a
+close port of person-service's `src/observability.rs` — itself a port of
+link-graph-service's, the family's first working exporter. This crate
+carried no *working* observability module before this change:
+`opentelemetry`/`opentelemetry-otlp`/`opentelemetry_sdk`/
+`tracing-opentelemetry` were declared in `Cargo.toml` at stale 0.27/0.28
+pins with **zero consumers anywhere in `src/`** — dead scaffolding from
+an earlier, since-deleted stub — bumped to the family's settled 0.32/0.33
+pins in the same change that added the real module.
+`App::init_logger` installs it (loco's own `EnvFilter` + formatted
+layer, plus the `tracing-opentelemetry` bridge over an OTLP/gRPC
+exporter); `App::on_shutdown` flushes it. Export is **on by default** —
+set `OTLP_ENDPOINT=""` to disable it — at `OTLP_ENDPOINT` (default
+`http://localhost:4317`) with `service.name` from `OTLP_SERVICE_NAME`
+(default `thing-service`); both variables are **deliberately
+unprefixed**, matching every other crate that carries this pipeline,
+not the per-service `THING_*` convention `THING_REQUIRE_AUTH` and its
+siblings use.
+
+**Where this crate's shape forced real adaptation** — confirmed rather
+than assumed, and identical to place's slice (PRO-H12 slice 2) before
+it:
+
+- **Two router-construction surfaces**: the loco-native one
+  (`api::rest::things_routes()`, mounted via `App::routes`/
+  `App::after_routes`) and a standalone hand-rolled one
+  (`api::rest::create_router`, used only by the DB-gated integration
+  tests). `observability::trace_mw` is layered onto **both**, as the
+  outermost layer in each.
+- **A renamed `tonic` dev-dependency was needed**, exactly as place's
+  slice needed and course's did not: this crate's own "Running this
+  crate" section below already stated the gRPC dependency is "unwired
+  scaffolding for spec/13-tasks.md T-3, not a running server" — but a
+  *declared* `tonic = "0.12"` dependency collides with an unrenamed
+  `tonic` dev-dependency at a different version regardless of whether
+  any code actually calls `tonic::` (`E0464`). So the in-process OTLP
+  collector tests' `tonic 0.14` dev-dependency is declared as
+  `otlp-test-tonic = { package = "tonic", version = "0.14" }`, same as
+  person/worker/event/place. This crate carries no SOUP register, so no
+  matching `soup.rs` rename-resolution fix was needed.
+
+`tests/otlp_export.rs` and `tests/otlp_middleware.rs` (ported from
+place, with `tests/otlp_collector/`) prove real export against a real
+gRPC listener in a normal `cargo test` run: a `tracing` span and a
+metric both reach the collector's decoded protobuf, and a served HTTP
+request returns a `traceparent` whose trace id matches the exported
+span's. None of this needs a database. Landing this raised `cargo test
+--lib` from 197 to 205 (8 new `src/observability.rs` unit tests), plus
+4 new tests across the two `tests/otlp_*.rs` binaries. Verified
+independently: `cargo fmt --check` clean, `cargo clippy --all-targets
+-- -D warnings` clean, `cargo deny check` clean, MSRV check clean,
+`cargo bench --no-run` compiles clean.
+
 ## Doc hierarchy quick reference
 
 | File | Role |
