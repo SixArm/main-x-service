@@ -320,4 +320,47 @@ clearly described manual check confirms the acceptance criterion.
   activation runbook. 11 DB-free unit tests
   (`compliance::mac::tests` ×2, `compliance::record_integrity::tests`
   ×6, `compliance::audit_integrity::tests` ×3).
+- [x] **T-13 (2026-08-30, PRO-H12 slice 2 of 7): OpenTelemetry OTLP
+  export.** New `src/observability.rs` — this crate carried no *working*
+  observability module before this change: `opentelemetry`/`opentelemetry-otlp`/
+  `opentelemetry_sdk`/`tracing-opentelemetry` were declared in
+  `Cargo.toml` at stale 0.27/0.28 pins with **zero consumers anywhere in
+  `src/`** (confirmed by grep before touching them) — dead scaffolding
+  from an earlier, since-deleted stub, not a live module to replace.
+  Close port of person-service's `src/observability.rs` (itself ported
+  from link-graph-service's, the family's original reference), bumping
+  those stale deps to the family's settled 0.32/0.33 pins in the same
+  change. `App::init_logger`/`on_shutdown` (`src/app.rs`) install/flush
+  it; `observability::trace_mw` is layered as the outermost middleware
+  on **both** of this crate's router-construction surfaces
+  (`App::after_routes` and `api::rest::create_router`) — the same
+  two-surface adaptation PRO-H9 and course (PRO-H12 slice 1) needed.
+  **Correction to PRO-H12's own scoping note**: it assumed "per
+  `overview.md`'s capability matrix only person/worker/event carry a
+  gRPC stub, so most of the remaining seven likely need no
+  `otlp-test-tonic` rename" — false for this crate. The capability
+  matrix's gRPC row tracks whether a `src/api/grpc` **module** exists
+  (place has none, hence its `–`), not whether `tonic` is a **declared**
+  Cargo dependency; place already carries `tonic = "0.12"` +
+  `tonic-build` in anticipation of the still-open T-4 (gRPC
+  implementation, not yet started), and a declared-but-code-unused
+  dependency collides in a dev-dependency's extern prelude exactly the
+  same as a genuinely-used one (`E0464`) — Cargo doesn't know or care
+  that no code calls `tonic::`. So this crate needed the **same**
+  `otlp-test-tonic = { package = "tonic", version = "0.14" }` rename
+  PRO-H9's three did, confirmed by first trying a plain dependency and
+  watching it fail to compile before reverting to the rename. course
+  (slice 1) needed no rename because it is the one crate among these
+  that declares no `tonic` dependency at all, not because it lacks a
+  gRPC *module* — thing (slice 3, next) needs checking on the same
+  basis, not assumed from the capability matrix either.
+  `tests/otlp_export.rs` + `tests/otlp_middleware.rs` +
+  `tests/otlp_collector/` (ported from person-service) prove real
+  export against a real in-process gRPC listener in a normal `cargo
+  test` run. Verified independently: `cargo fmt --check` clean, `cargo
+  clippy --all-targets -- -D warnings` clean, `cargo deny check` clean,
+  MSRV check (`cargo +1.96 check --all-targets`) clean, `cargo bench
+  --no-run` compiles clean, `cargo test --lib` 229/229 (was 221, +8
+  new `observability::tests`), `cargo test --test otlp_export --test
+  otlp_middleware` 4/4.
 

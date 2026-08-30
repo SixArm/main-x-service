@@ -8,6 +8,35 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — real OpenTelemetry OTLP export (T-13, PRO-H12 slice 2 of 7)
+
+- **2026-08-30**: new `src/observability.rs`. This crate carried no
+  *working* observability module before this change —
+  `opentelemetry`/`opentelemetry-otlp`/`opentelemetry_sdk`/
+  `tracing-opentelemetry` were declared at stale 0.27/0.28 pins with
+  zero consumers anywhere in `src/` (dead scaffolding from an earlier,
+  since-deleted stub), bumped to the family's settled 0.32/0.33 pins in
+  the same change. Close port of person-service's, itself a port of
+  link-graph-service's original reference. `observability::trace_mw` is
+  layered as the outermost middleware on both of this crate's
+  router-construction surfaces (`App::after_routes` and
+  `api::rest::create_router`).
+- Needed the renamed `otlp-test-tonic = { package = "tonic", … }`
+  dev-dependency PRO-H9's three crates needed — unlike course (PRO-H12
+  slice 1), which needed no rename. This crate already declares
+  `tonic = "0.12"` + `tonic-build` in anticipation of the still-open
+  T-4 (gRPC implementation), and a declared-but-code-unused dependency
+  collides with an unrenamed dev-dependency the same way a genuinely
+  used one does.
+- `tests/otlp_export.rs` + `tests/otlp_middleware.rs` +
+  `tests/otlp_collector/` (ported from person-service) prove real
+  export against a real in-process gRPC listener. Verified
+  independently: `cargo fmt --check`, `cargo clippy --all-targets -D
+  warnings`, `cargo deny check`, the MSRV check, and `cargo bench
+  --no-run` all clean; `cargo test --lib` 229/229 (was 221, +8 new);
+  `cargo test --test otlp_export --test otlp_middleware` 4/4. See spec
+  §13 T-13.
+
 ### Added — geo-radius `nearby` search + search `offset` (T-9)
 
 `GET /api/places/nearby?lat=&lon=&radius_km=&limit=&offset=` filters

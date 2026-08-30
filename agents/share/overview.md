@@ -114,20 +114,27 @@ case, and portfolio each provide:
   `/metrics.prom` endpoint. OpenTelemetry OTLP export is **rolling out
   but not yet family-wide** (repo `tasks.md` PRO-H9 + PRO-H12): as of
   2026-08-30, **person, worker, event** (PRO-H9, 2026-08-28) and
-  **course** (PRO-H12 slice 1, 2026-08-30) carry a real exporter
-  (`src/observability.rs` — course's ported from person's, which ported
-  from link-graph-service's — see below); the other six registries
-  (place, thing, organization, care-pathway, case, portfolio) carry no
-  such module at all. person/worker/event each also needed a renamed
-  `tonic` dev-dependency to avoid an extern-prelude collision with the
-  crate's own gRPC-stub `tonic` dependency (all three carry one); course
-  needed no such rename — it carries no gRPC stub — so its dev-dependency
-  is a plain `tonic`. The cross-cutting **link-graph-service** carries
-  the original reference (`src/observability.rs`: OTLP/gRPC traces +
-  metrics bridged from `tracing` through loco's `Hooks::init_logger`
+  **course, place** (PRO-H12 slices 1–2, 2026-08-30) carry a real
+  exporter (`src/observability.rs` — course's/place's ported from
+  person's, which ported from link-graph-service's — see below); the
+  other five registries (thing, organization, care-pathway, case,
+  portfolio) carry no such module at all. Whether the port needs a
+  renamed `otlp-test-tonic` dev-dependency (to avoid an extern-prelude
+  collision) tracks whether the crate **declares** a `tonic` dependency
+  at all — not the gRPC-stub row below, which tracks only whether a
+  `src/api/grpc` module exists: person/worker/event need the rename
+  because they have both; place needs it too despite showing `–` on
+  gRPC, because it already declares `tonic` in `Cargo.toml` in
+  anticipation of a not-yet-built gRPC server (place's own spec T-4);
+  course needed no rename because it is the one crate here that
+  declares no `tonic` dependency at all. Check each remaining crate's
+  actual `Cargo.toml`, not this table, before assuming either way. The
+  cross-cutting **link-graph-service** carries the original reference
+  (`src/observability.rs`: OTLP/gRPC traces + metrics bridged from
+  `tracing` through loco's `Hooks::init_logger`
   seam, with a per-request span, an `http.server.request.duration`
   histogram, and a W3C `traceparent` response header, proved against a
-  real in-process collector). Rolling this across the remaining six
+  real in-process collector). Rolling this across the remaining five
   registries is queued work (`tasks.md` PRO-H12).
 - **PostgreSQL** persistence via SeaORM + migrations
 
@@ -138,7 +145,7 @@ case, and portfolio each provide:
 | Full-text search via Tantivy¹ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Privacy masking module (`src/privacy`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ |
 | FHIR R5 surface | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ | ✅ | ✅ | – |
-| gRPC stub (Tonic) | ✅ | ✅ | – | – | ✅ | – | – | – | – | – |
+| gRPC stub (Tonic)⁶ | ✅ | ✅ | – | – | ✅ | – | – | – | – | – |
 | Durable outbox events (Phase 2)² | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Real-broker relay sink (`FluvioSink`, Phase 3)⁴ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Boundary normalization (phone/address) | ✅ | ✅ | ✅ | – | ✅ | – | – | – | – | – |
@@ -205,6 +212,17 @@ scope decision rather than a gap: TBA needs a unit that enters, waits,
 is worked on and leaves, and a registry of *identities* has records
 rather than journeys (see that doc's §12).
 
+⁶ Tracks whether a `src/api/grpc` **module** exists, not whether
+`tonic` is merely a **declared** Cargo dependency — the two diverge for
+place and thing, which each declare `tonic` + `tonic-build` in
+anticipation of a not-yet-built gRPC server (their own spec T-4/T-3)
+with no module to show for it yet, hence their `–` here. That
+distinction matters beyond this table: a declared-but-code-unused
+`tonic` dependency still collides with an unrenamed `tonic`
+dev-dependency at a different version (`E0464`), exactly as a
+genuinely-used one does — found rolling PRO-H12 to place (2026-08-30),
+which needed the same `otlp-test-tonic` rename PRO-H9's three crates
+needed despite this row's `–`.
 
 ### The two cross-cutting services
 
@@ -221,9 +239,9 @@ These are **not** entity registries and share little of the matrix above:
   CRUD writes / matching / FHIR. Carries the family's original working
   OpenTelemetry OTLP exporter (2026-08-05, `src/observability.rs`) — the
   reference person's own exporter (2026-08-28, PRO-H9) was ported from,
-  and worker/event (PRO-H9) and course (PRO-H12) have since ported in
-  turn; place, thing, organization, care-pathway, case, and portfolio
-  still carry no observability module (PRO-H12, in progress).
+  and worker/event (PRO-H9) and course/place (PRO-H12) have since
+  ported in turn; thing, organization, care-pathway, case, and
+  portfolio still carry no observability module (PRO-H12, in progress).
 
 See [rust-loco-stack.md](rust-loco-stack.md) for the dependency stack.
 
