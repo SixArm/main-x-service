@@ -151,7 +151,7 @@ serial_test = "3.5"
 tower = { version = "0.5", features = ["util"] }
 
 # Benchmarking
-criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
 
 # An in-process OTLP/gRPC collector for `tests/otlp_export.rs` /
 # `tests/otlp_middleware.rs` (PRO-H9, ported from person-service): the
