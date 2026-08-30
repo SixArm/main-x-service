@@ -1240,7 +1240,7 @@ dependencies = [
  "async-trait",
  "authentication-verifier",
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "chrono",
  "course-matcher",
  "criterion",

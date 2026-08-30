@@ -157,7 +157,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 # any network dependency.
 ed25519-dalek = { version = "2.2" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
-base64 = { version = "0.22" }
+base64 = { version = "0.23" }
 # The activation proof (tests/enforcement.rs) sets process-wide env vars
 # before booting the router, so it must not run beside another test in
 # the same process.
