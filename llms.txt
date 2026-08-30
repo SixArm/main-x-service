@@ -1,0 +1,138 @@
+# Main X Index (main-x-service)
+
+> A federated identity index: ~55 self-contained Rust crates (loco.rs
+> backend services + SvelteKit operator front-ends), one per real-world
+> entity (person, worker, place, thing, event, course, organization,
+> care pathway, case, plan/portfolio), each doing CRUD, probabilistic +
+> deterministic matching, full-text search, record merge, an audit
+> trail, and event streaming — plus a central SSO provider, a
+> cross-service link-graph aggregator, and five consumer applications
+> that build on the registries.
+
+Each crate is self-contained (own REST API, own persistence, own
+matching algorithm) and shares an architecture and documentation
+layout, not code. Every subproject's `spec/` directory is the single
+source of truth for that subproject; code conforms to the spec, not
+the reverse. Repository: https://github.com/SixArm/main-x-service and
+https://codeberg.org/SixArm/main-x-service (the same history, pushed
+to both). License: Rust crates `MIT OR Apache-2.0 OR BSD-3-Clause OR
+GPL-2.0-only OR GPL-3.0-only`; front-ends `MIT OR Apache-2.0` — see
+[LICENSE.md](LICENSE.md).
+
+## Start here
+
+- [index.md](index.md): repo root navigation (subprojects, examples, running, architecture snapshot)
+- [AGENTS.md](AGENTS.md): the full subproject index plus CI, spec-driven-development, and shared-doc wiring
+- [agents/share/overview.md](agents/share/overview.md): the honest per-crate capability matrix — what each crate actually has today
+- [agents/share/architecture.md](agents/share/architecture.md): the layered request flow and the two internal service shapes
+- [AI_STATEMENT.md](AI_STATEMENT.md): how AI tools are used to develop this software, and the bounds on that use
+- [tasks.md](tasks.md): the live, repo-spanning work queue
+- [plan.md](plan.md): cross-subproject planning
+- [tutorials/](tutorials/): six live-verified walkthroughs — [01 getting started](tutorials/01-getting-started.md), [02 identity lifecycle](tutorials/02-identity-lifecycle.md), [03 auth & ABAC](tutorials/03-authentication-abac.md), [04 cross-service linking](tutorials/04-cross-service-linking.md), [05 bulk import/export](tutorials/05-bulk-import-export.md), [06 the event bus](tutorials/06-event-bus.md)
+- [examples/](examples/): runnable reference material — [compose/](examples/compose/) Podman stacks, [data/](examples/data/) synthetic fixtures, [policies/](examples/policies/) ABAC policy cookbook, [api/](examples/api/) per-service `.http` collections
+
+## Entity registry services (Rust, loco.rs)
+
+- [person-service](person/person-service-with-loco/spec/index.md): Person (general) identity registry
+- [worker-service](worker/worker-service-with-loco/spec/index.md): Worker (workforce/professional) identity registry, plus assessments
+- [place-service](place/place-service-with-loco/spec/index.md): Place registry (schema.org/Place)
+- [thing-service](thing/thing-service-with-loco/spec/index.md): Thing/asset registry (schema.org/Thing)
+- [event-service](event/event-service-with-loco/spec/index.md): Time-bounded event registry (schema.org/Event)
+- [course-service](course/course-service-with-loco/spec/index.md): Course-identity registry plus CourseInstance sub-resource
+- [authentication-service](authentication/authentication-service-with-loco/spec/index.md): Central SSO — passwordless magic-link, cookie sessions, PASETO v4.public issuance
+- [organization-service](organization/organization-service-with-loco/spec/index.md): Organization registry (schema.org/Organization); family FHIR reference implementation
+- [care-pathway-service](care-pathway/care-pathway-service-with-loco/spec/index.md): Clinical care-pathway registry
+- [case-service](case/case-service-with-loco/spec/index.md): Governmental case-tracking registry
+- [project-portfolio-management-service](project-portfolio-management/project-portfolio-management-service-with-loco/spec/index.md): Plan registry — one recursive tree; a full PM suite (goals/tasks/issues/timeline/burndown)
+
+## Matcher crates (dependency-light comparison libraries)
+
+- [person-matcher](person/person-matcher-rust-crate/spec/index.md): Demographic + multinational national-identifier matching
+- [worker-matcher](worker/worker-matcher-rust-crate/spec/index.md): Workforce/professional identity matching
+- [place-matcher](place/place-matcher-rust-crate/spec/index.md): Geographic/postal-address/venue matching
+- [thing-matcher](thing/thing-matcher-rust-crate/spec/index.md): Generic thing/asset matching
+- [event-matcher](event/event-matcher-rust-crate/spec/index.md): Time-bounded event matching
+- [course-matcher](course/course-matcher-rust-crate/spec/index.md): Course matching (name, code, level, keywords)
+- [organization-matcher](organization/organization-matcher-rust-crate/spec/index.md): Organization matching (name, address, LEI/DUNS/GLN/…)
+- [care-pathway-matcher](care-pathway/care-pathway-matcher-rust-crate/spec/index.md): Clinical care-pathway matching
+- [case-matcher](case/case-matcher-rust-crate/spec/index.md): Governmental case matching
+- [project-portfolio-management-matcher](project-portfolio-management/project-portfolio-management-matcher-rust-crate/spec/index.md): Plan matching (no kind gate)
+
+## Library crates (peer-side, not services or matchers)
+
+- [authentication-verifier](authentication/authentication-verifier-rust-crate/index.md): Offline PASETO v4.public (Ed25519) verification; published to crates.io
+- [integrity-mac](integrity/integrity-mac-rust-crate/): Keyed integrity MACs (HMAC-SHA256) with production-grade key handling, embedded family-wide
+- [entity-ref](link/entity-ref-rust-crate/): The `EntityRef` URN type + the closed v1 `EdgeKind` registry for cross-service linking; published to crates.io as `entity-ref`
+
+## Cross-cutting services
+
+- [link-graph-service-with-loco](link/link-graph-service-with-loco/spec/index.md): Read-model aggregator for cross-service entity linking; carries the family's original OpenTelemetry OTLP exporter
+
+## Front-end projects (SvelteKit operator SPAs)
+
+- [person-front-end-with-svelte](person/person-front-end-with-svelte/spec/index.md): Operator UI for Person CRUD/search/match/merge/audit
+- [worker-front-end-with-svelte](worker/worker-front-end-with-svelte/spec/index.md): Operator UI for Worker
+- [place-front-end-with-svelte](place/place-front-end-with-svelte/spec/index.md): Operator UI for Place
+- [thing-front-end-with-svelte](thing/thing-front-end-with-svelte/spec/index.md): Operator UI for Thing
+- [event-front-end-with-svelte](event/event-front-end-with-svelte/spec/index.md): Operator UI for Event
+- [course-front-end-with-svelte](course/course-front-end-with-svelte/spec/index.md): Operator UI for Course
+- [authentication-front-end-with-svelte](authentication/authentication-front-end-with-svelte/spec/index.md): Passwordless magic-link sign up/in/out UI
+- [organization-front-end-with-svelte](organization/organization-front-end-with-svelte/spec/index.md): Operator UI for Organization
+- [care-pathway-front-end-with-svelte](care-pathway/care-pathway-front-end-with-svelte/spec/index.md): Operator UI for care pathways
+- [case-front-end-with-svelte](case/case-front-end-with-svelte/spec/index.md): Operator UI for governmental cases
+- [project-portfolio-management-front-end-with-svelte](project-portfolio-management/project-portfolio-management-front-end-with-svelte/spec/index.md): Operator UI plus Kanban/Gantt/burndown project-management views
+
+## Consumer applications (build on the registries)
+
+- [case-folder](case-folder/spec/index.md): NHS paper case-note folder location tracking
+- [patient-flow](patient-flow/spec/index.md): NHS hospital bed management and ward whiteboards
+- [workforce-planning-management](workforce-planning-management/spec/index.md): All-in-one HR across the employee lifecycle
+- [contact-relationship-management](contact-relationship-management/spec/index.md): Customer/prospect relationships (sales, marketing, service, support)
+- [content-management-system](content-management-system/spec/index.md): Headless content management (block documents, assets, editorial lifecycle)
+
+## Shared reference docs (agents/share/)
+
+- [agents/share/index.md](agents/share/index.md): the index of every shared doc below, kept current in one place
+- [agents/share/dataflow.md](agents/share/dataflow.md): create / match / merge / search data flows
+- [agents/share/match-search-merge.md](agents/share/match-search-merge.md): matching, search, and merge workflows combined
+- [agents/share/privacy.md](agents/share/privacy.md): data masking, GDPR export, consent
+- [agents/share/jwt.md](agents/share/jwt.md): why JWTs are not used for sessions
+- [agents/share/authentication-sessions.md](agents/share/authentication-sessions.md): cookie sessions + PASETO v4 cross-service tokens + the BFF pattern
+- [agents/share/authorization-attributes.md](agents/share/authorization-attributes.md): ABAC — the policy language, default policy, 401/403 split
+- [agents/share/security.md](agents/share/security.md): audit summary, cross-cutting invariants, the REQUIRE_AUTH activation gate
+- [agents/share/auditability.md](agents/share/auditability.md): audit logging and event streaming
+- [agents/share/cross-service-linking.md](agents/share/cross-service-linking.md): the hybrid write-local + read-model-aggregator link topology
+- [agents/share/bulk-import-export.md](agents/share/bulk-import-export.md): async bulk import/export (JSONL/CSV/Parquet)
+- [agents/share/availability.md](agents/share/availability.md): scaling, health checks, graceful shutdown
+- [agents/share/observability.md](agents/share/observability.md): tracing + OpenTelemetry rollout status
+- [agents/share/restful.md](agents/share/restful.md): RESTful API conventions and pagination
+- [agents/share/fhir.md](agents/share/fhir.md): HL7 FHIR R5 API design and per-entity resource mapping
+- [agents/share/api-versioning.md](agents/share/api-versioning.md): header-based API versioning (`Accepts-version`)
+- [agents/share/loco.md](agents/share/loco.md): the loco.rs framework conventions used family-wide
+- [agents/share/rust-loco-stack.md](agents/share/rust-loco-stack.md): the full Rust + loco dependency stack
+- [agents/share/postgresql.md](agents/share/postgresql.md): PostgreSQL setup, extensions, the local test database
+- [agents/share/compliance-for-healthcare.md](agents/share/compliance-for-healthcare.md): HIPAA, NHS, EHDS, ONC/HTI, IEC 62304
+- [agents/share/compliance-for-technology.md](agents/share/compliance-for-technology.md): GDPR, ISO/IEC 27001, ISO/IEC 42001
+- [agents/share/locales.md](agents/share/locales.md): supported locales for i18n/l10n
+- [agents/share/configuration.md](agents/share/configuration.md): the complete environment-variable reference
+
+## Continuous integration & policy
+
+- [.github/workflows/ci.yml](.github/workflows/ci.yml) and [.woodpecker.yml](.woodpecker.yml): the CI pipelines (fmt, clippy, test, test-db, deny, evidence, fuzz, msrv, bench)
+- [scripts/ci-check.sh](scripts/ci-check.sh): run any CI stage locally, exactly as CI runs it
+- [ci/msrv.txt](ci/msrv.txt): the declared Minimum Supported Rust Version (current stable minus two)
+- [ci/db-suites.txt](ci/db-suites.txt): the allowlist of crates whose `--ignored` Postgres suite runs in CI
+- [SECURITY.md](SECURITY.md): how to report a vulnerability
+- [CONTRIBUTING.md](CONTRIBUTING.md): contribution ground rules
+- [GOVERNANCE.md](GOVERNANCE.md): sole-maintainer governance
+- [LICENSE.md](LICENSE.md): per-subproject SPDX license expressions
+
+## Optional
+
+- [BENCHMARKS.md](BENCHMARKS.md): Criterion benchmark suite inventory
+- [COMPARISONS.md](COMPARISONS.md): how this system compares to adjacent kinds of systems (MDM platforms, …)
+- [RFC.md](RFC.md): open questions the maintainer wants outside views on
+- [NEWS.md](NEWS.md): project news and milestones
+- [CHANGELOG.md](CHANGELOG.md): repo-level (monorepo-wide) change summary
+- [MAINTAINERS.md](MAINTAINERS.md): maintainer contact
+- [INSTALL.md](INSTALL.md): build/run prerequisites
