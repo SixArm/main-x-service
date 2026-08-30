@@ -165,6 +165,8 @@ embedded library; soft-delete with audit-friendly timestamps.
 | `ORGANIZATION_SEARCH_BOOT_REINDEX` | unset ⇒ **on** | Boot-time self-heal: when the index is empty **and** the table is not, rebuild in the background (`App::after_routes`). Falsy (`0`/`false`/`no`/`off`) ⇒ skip, for a deployment large enough to want the rebuild scheduled by hand. Anything else (including an unrecognised value) leaves it on, because the failure it prevents is silent. |
 | `ORGANIZATION_EVENT_RETENTION_DAYS` | `7` | Outbox row TTL. **Enforced** by the Phase-3 relay's periodic `purge_published` (deletes `published_at < now() - INTERVAL '<n> days'`) when the relay runs ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §3). |
 | `ORGANIZATION_BULK_ARTIFACT_DIR` | system temp dir + `organization-bulk-artifacts` | Base directory for BLK-5 bulk import/export artifacts (uploaded input, export output, error report) — `src/bulk/store.rs`, local-filesystem only this rollout step (§10.7). |
+| `OTLP_ENDPOINT` | `http://localhost:4317` | OTLP/gRPC collector endpoint (`src/observability.rs`). Set to the empty string to disable export. **Deliberately not `ORGANIZATION_`-prefixed** — one family-wide variable name, per [`agents/share/rust-tracing-opentelemetry-stack.md`](../../../agents/share/rust-tracing-opentelemetry-stack.md). |
+| `OTLP_SERVICE_NAME` | `organization-service` | `service.name` OTel resource attribute (`src/observability.rs`). Also deliberately unprefixed. |
 
 ## 8. Architecture
 
@@ -931,6 +933,42 @@ organization is not a data subject.
   `pnpm test:e2e` (10/10, up from 7 — three new: the keyboard table, the
   live-breakdown comparison, the merge query-string prefill) all green.
 
+- [x] **Real OpenTelemetry OTLP export (PRO-H12 slice 4 of 7)**
+  *(2026-08-30)*. New `src/observability.rs` — this crate carried no
+  observability module at all before this change, and is the first of
+  the four remaining loco-idiomatic registries (organization,
+  care-pathway, case, portfolio) to carry it; PRO-H12 slices 1–3
+  (course, place, thing) were all person-style crates. Close port of
+  course-service's, itself a port of person-service's, itself a port of
+  link-graph-service's original reference: a `tracing-opentelemetry`
+  bridge over an OTLP/gRPC `SdkTracerProvider`/`SdkMeterProvider`,
+  export-on-by-default at `OTLP_ENDPOINT` (default
+  `http://localhost:4317`) with `service.name` from `OTLP_SERVICE_NAME`
+  (default `organization-service`) — both variables deliberately
+  unprefixed, matching every other crate carrying this pipeline.
+  `App::init_logger` installs it; `App::on_shutdown` flushes it.
+  Real adaptation, confirmed rather than assumed: this crate has
+  exactly **one** router-construction surface
+  (`App::routes`/`App::after_routes`; even its own request-level test
+  suite boots the real `App` via loco's testing harness rather than a
+  second hand-rolled router), unlike the person-style crates' two, so
+  `observability::trace_mw` is layered once, as the outermost
+  middleware in `after_routes`. No `tonic` dev-dependency rename was
+  needed: this crate declares no `tonic` dependency at all (no gRPC
+  stub — `agents/share/overview.md`'s capability matrix), so the
+  in-process OTLP collector tests take a plain `tonic = "0.14"`
+  dev-dependency, exactly as course's did. `tests/otlp_export.rs` +
+  `tests/otlp_middleware.rs` + `tests/otlp_collector/` (ported from
+  course-service) prove real export against a real in-process gRPC
+  listener in a normal `cargo test` run — no external collector,
+  nothing `#[ignore]`d, no database. **Acceptance:** `cargo fmt
+  --check`, `cargo clippy --all-targets -- -D warnings`, `cargo deny
+  check`, `cargo bench --no-run`, and the MSRV check (`cargo +1.96
+  check --all-targets`) all clean; `cargo test --lib` 198/198 (was
+  190, +8 new observability unit tests); `cargo test --test
+  otlp_export --test otlp_middleware` 4/4 (real protobuf crossing a
+  real in-process gRPC socket).
+
 ## 14. Implementation status
 
 Done: loco boot; organizations table + migration; CRUD (blank name →
@@ -968,7 +1006,11 @@ queue with `provenance = "import"`); the `seed_examples` CLI task
 (EX-4); DB-free tests; request-level test suite plus five dedicated
 Postgres-gated test binaries (`enforcement`, `masking`, `outbox_audit`,
 `seed_examples_db`, `fluvio_relay`; §11); loco scaffolding leftovers
-removed (no workers/tasks/data stubs); green build + clippy.
+removed (no workers/tasks/data stubs); real **OpenTelemetry OTLP
+export** (`src/observability.rs`, PRO-H12 slice 4 of 7 — structured
+logging plus a `tracing-opentelemetry` bridge over an OTLP/gRPC
+exporter, `trace_mw` layered on this crate's one router-construction
+surface); green build + clippy.
 
 Still open (§13): richer validation beyond identifier check-digits (URL
 well-formedness, ISO country codes); real-time duplicate check on

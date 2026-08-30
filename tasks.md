@@ -6752,7 +6752,7 @@ crate above.
   module at all — not part of this task's scope (it targeted the
   three stubs specifically); a family-wide rollout to the rest is
   unqueued follow-up work, not a gap in this task's closure.
-- [ ] **PRO-H12 (L, in progress — 3 of 7 slices landed)** **OTLP
+- [ ] **PRO-H12 (L, in progress — 4 of 7 slices landed)** **OTLP
   rollout, remaining seven registries.** place, thing, course,
   organization, care-pathway, case, portfolio carry no
   `src/observability` module at all (unlike PRO-H9's three, which had
@@ -6830,10 +6830,33 @@ crate above.
   197, +8); `cargo test --test otlp_export --test otlp_middleware`
   4/4. Full results: thing/thing-service-with-loco's own
   `spec/13-tasks.md` T-11 and `CHANGELOG.md`.
-  **Remaining 4 slices**: organization, care-pathway, case, portfolio
-  — all loco-style `src/controllers/`, not person-style, so router
-  surface count and layering point still need working out fresh, not
-  assumed identical to the three person-style slices done so far.
+  *Slice 4 (organization), done 2026-08-30:* the first of the four
+  remaining **loco-idiomatic** registries (`src/controllers/`, not
+  person-style `src/api/rest/`) — the router-surface question flagged
+  as open above is now resolved for this crate: it has exactly **one**
+  router-construction surface (`App::routes`/`App::after_routes` in
+  `src/app.rs`; even its own request-level test suite boots the real
+  `App` via loco's testing harness rather than a second hand-rolled
+  router), so `trace_mw` is layered once rather than twice. Also
+  confirmed: organization declares no `tonic` dependency at all (no
+  gRPC stub), so — like course's slice 1 — no `otlp-test-tonic` rename
+  was needed, and there were no stale/dead OTel dependency pins to
+  clean up (unlike place/thing's slices 2–3), since this crate carried
+  none at all before this change. Full port (`src/observability.rs`,
+  `Hooks::init_logger`/`on_shutdown`, `trace_mw` on the one surface,
+  `tests/otlp_{export,middleware}.rs` + `tests/otlp_collector/`)
+  verified independently: `cargo fmt --check`, `cargo clippy
+  --all-targets -D warnings`, `cargo deny check`, `cargo bench
+  --no-run`, and the MSRV check all clean; `cargo test --lib` 198/198
+  (was 190, +8); `cargo test --test otlp_export --test
+  otlp_middleware` 4/4. Full results:
+  organization/organization-service-with-loco's own `spec/index.md`
+  §13 and `CHANGELOG.md`.
+  **Remaining 3 slices**: care-pathway, case, portfolio — all
+  loco-style `src/controllers/` like organization; each still needs
+  its own router-surface count confirmed rather than assumed identical
+  (organization's single-surface shape is now one data point, not a
+  guarantee the other three match it).
 - [x] **PRO-H13 (M)** *(done 2026-08-29)* **Tighten the Rust MSRV
   policy from N-3 to N-2.** New
   [`spec/rust-msrv-n-minus-2/index.md`](spec/rust-msrv-n-minus-2/index.md)

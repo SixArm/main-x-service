@@ -41,6 +41,9 @@ pub mod merge;
 pub mod metrics;
 /// `SeaORM` entities plus the CRUD/audit helpers layered over them.
 pub mod models;
+/// Structured logging plus real `OpenTelemetry` OTLP export (repo
+/// `tasks.md` PRO-H12).
+pub mod observability;
 /// Hand-written OpenAPI 3 document served at `/api-docs/openapi.json`.
 pub mod openapi;
 

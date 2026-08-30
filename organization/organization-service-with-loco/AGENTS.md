@@ -226,6 +226,59 @@ tests/requests/bulk.rs    BLK-5 request-level suite (Postgres-gated)
 config/                   development/production/test yaml
 ```
 
+## OpenTelemetry OTLP export
+
+`src/observability.rs` (repo `tasks.md` PRO-H12 slice 4 of 7, landed
+2026-08-30) is a close port of course-service's `src/observability.rs`
+— itself a port of person-service's, itself of link-graph-service's,
+the family's first working exporter. This crate carried **no**
+`src/observability` module at all before this change, and is the
+**first of the four remaining loco-idiomatic registries**
+(organization, care-pathway, case, portfolio — `src/controllers/`, not
+`src/api/rest/`) to carry it; PRO-H12 slices 1–3 (course, place, thing)
+were all person-style crates. `App::init_logger` installs it (loco's
+own `EnvFilter` + formatted layer, plus the `tracing-opentelemetry`
+bridge over an OTLP/gRPC exporter); `App::on_shutdown` flushes it.
+Export is **on by default** — set `OTLP_ENDPOINT=""` to disable it —
+at `OTLP_ENDPOINT` (default `http://localhost:4317`) with
+`service.name` from `OTLP_SERVICE_NAME` (default
+`organization-service`); both variables are **deliberately
+unprefixed**, matching every other crate that carries this pipeline,
+not the per-service `ORGANIZATION_*` convention
+`ORGANIZATION_REQUIRE_AUTH` and its siblings use.
+
+**Where this crate's shape forced real adaptation**, confirmed rather
+than assumed:
+
+- **Exactly one router-construction surface**, unlike the person-style
+  crates' two. This crate is genuinely loco-idiomatic: `App::routes` +
+  `App::after_routes` in `src/app.rs` is the only place a router gets
+  built — even the request-level test suite (`tests/enforcement.rs`,
+  `tests/masking.rs`, …) boots the real `App` via loco's own testing
+  harness (`loco_rs::testing::prelude`) rather than a second
+  hand-rolled router. `observability::trace_mw` is therefore layered
+  **once**, as the outermost middleware in `after_routes` — the same
+  precedent `require_auth_mw` and `require_version_mw` already set by
+  being layered there.
+- **No `tonic` rename needed** — this crate declares no `tonic`
+  dependency of its own (no gRPC stub — `agents/share/overview.md`'s
+  capability matrix), so the in-process OTLP collector tests' `tonic
+  0.14` dev-dependency is a plain, un-renamed dependency, exactly as
+  course's is.
+
+`tests/otlp_export.rs` and `tests/otlp_middleware.rs` (ported from
+course-service, with `tests/otlp_collector/` — an in-process OTLP/gRPC
+collector, unchanged) prove real export against a real gRPC listener
+in a normal `cargo test` run: a `tracing` span and a metric both reach
+the collector's decoded protobuf, and a served HTTP request returns a
+`traceparent` whose trace id matches the exported span's. None of this
+needs a database. Landing this raised `cargo test --lib` from 190 to
+198 (8 new `src/observability.rs` unit tests), plus 4 new tests across
+the two `tests/otlp_*.rs` binaries. Verified independently: `cargo fmt
+--check`, `cargo clippy --all-targets -- -D warnings`, `cargo deny
+check`, `cargo bench --no-run`, and the MSRV check (`cargo +1.96 check
+--all-targets`) all clean.
+
 ## Container image
 
 `Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's

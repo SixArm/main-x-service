@@ -78,6 +78,20 @@ authentication-verifier = { path = "../../authentication/authentication-verifier
 # the relay's `LoggingSink` covers dev/CI with no broker at all.
 fluvio = { version = "0.50", optional = true }
 
+# Real OpenTelemetry OTLP export (repo tasks.md PRO-H12, slice 4 of 7 —
+# see src/observability.rs's module docs). This crate declares no `tonic`
+# dependency of its own (no gRPC stub, unlike person/worker/event), so the
+# span/metric exporters' own `grpc-tonic` feature needs no rename.
+opentelemetry = { version = "0.32", features = ["trace", "metrics"] }
+opentelemetry_sdk = { version = "0.32", features = ["trace", "metrics"] }
+opentelemetry-otlp = { version = "0.32", default-features = false, features = [
+  "grpc-tonic",
+  "trace",
+  "metrics",
+] }
+opentelemetry-semantic-conventions = { version = "0.32" }
+tracing-opentelemetry = { version = "0.33" }
+
 [features]
 # Off by default. The relay's `EventSink` seam (src/relay.rs) needs no
 # feature to build or test; only `FluvioSink` — the real-broker producer
@@ -120,6 +134,30 @@ tokio = { version = "1.53", default-features = false, features = [
   # `time` lets the boot-reindex test await a spawned background task
   # instead of busy-waiting.
   "time",
+] }
+
+# An in-process OTLP/gRPC collector for `tests/otlp_export.rs` /
+# `tests/otlp_middleware.rs` (PRO-H12, ported from course-service): the
+# generated `TraceServiceServer` / `MetricsServiceServer` plus tonic's
+# server transport, so the export pipeline is proved against a real gRPC
+# listener in a normal `cargo test` run — no external collector, nothing
+# `#[ignore]`d.
+opentelemetry-proto = { version = "0.32", default-features = false, features = [
+  "gen-tonic",
+  "trace",
+  "metrics",
+] }
+# Plain `tonic`, not a renamed `package = "tonic"` dev-dependency like
+# person/worker/event needed: this crate carries no gRPC stub of its own,
+# so there is no `E0464` extern-prelude collision to dodge.
+tonic = "0.14"
+tokio-stream = { version = "0.1", features = ["net"] }
+# The mounted-middleware test (`tests/otlp_middleware.rs`) makes a real
+# HTTP request against a served router; this crate has no other direct
+# `reqwest` dependency.
+reqwest = { version = "0.12", default-features = false, features = [
+  "rustls-tls",
+  "json",
 ] }
 
 [[bench]]
