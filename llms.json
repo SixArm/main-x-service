@@ -1,0 +1,155 @@
+{
+  "name": "Main X Index (main-x-service)",
+  "summary": "A federated identity index: ~55 self-contained Rust crates (loco.rs backend services + SvelteKit operator front-ends), one per real-world entity (person, worker, place, thing, event, course, organization, care pathway, case, plan/portfolio), each doing CRUD, probabilistic + deterministic matching, full-text search, record merge, an audit trail, and event streaming — plus a central SSO provider, a cross-service link-graph aggregator, and five consumer applications that build on the registries.",
+  "notes": "Each crate is self-contained (own REST API, own persistence, own matching algorithm) and shares an architecture and documentation layout, not code. Every subproject's spec/ directory is the single source of truth for that subproject; code conforms to the spec, not the reverse.",
+  "repository": [
+    "https://github.com/SixArm/main-x-service",
+    "https://codeberg.org/SixArm/main-x-service"
+  ],
+  "license": {
+    "rust_crates": "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only",
+    "front_ends": "MIT OR Apache-2.0",
+    "doc": "LICENSE.md"
+  },
+  "sections": [
+    {
+      "title": "Start here",
+      "items": [
+        { "title": "index.md", "url": "index.md", "description": "Repo root navigation (subprojects, examples, running, architecture snapshot)" },
+        { "title": "AGENTS.md", "url": "AGENTS.md", "description": "The full subproject index plus CI, spec-driven-development, and shared-doc wiring" },
+        { "title": "agents/share/overview.md", "url": "agents/share/overview.md", "description": "The honest per-crate capability matrix — what each crate actually has today" },
+        { "title": "agents/share/architecture.md", "url": "agents/share/architecture.md", "description": "The layered request flow and the two internal service shapes" },
+        { "title": "AI_STATEMENT.md", "url": "AI_STATEMENT.md", "description": "How AI tools are used to develop this software, and the bounds on that use" },
+        { "title": "tasks.md", "url": "tasks.md", "description": "The live, repo-spanning work queue" },
+        { "title": "plan.md", "url": "plan.md", "description": "Cross-subproject planning" },
+        { "title": "tutorials/", "url": "tutorials/", "description": "Six live-verified walkthroughs: getting started, identity lifecycle, auth & ABAC, cross-service linking, bulk import/export, the event bus" },
+        { "title": "examples/", "url": "examples/", "description": "Runnable reference material: Podman compose stacks, synthetic data fixtures, an ABAC policy cookbook, per-service .http request collections" }
+      ]
+    },
+    {
+      "title": "Entity registry services (Rust, loco.rs)",
+      "items": [
+        { "title": "person-service", "url": "person/person-service-with-loco/spec/index.md", "description": "Person (general) identity registry" },
+        { "title": "worker-service", "url": "worker/worker-service-with-loco/spec/index.md", "description": "Worker (workforce/professional) identity registry, plus assessments" },
+        { "title": "place-service", "url": "place/place-service-with-loco/spec/index.md", "description": "Place registry (schema.org/Place)" },
+        { "title": "thing-service", "url": "thing/thing-service-with-loco/spec/index.md", "description": "Thing/asset registry (schema.org/Thing)" },
+        { "title": "event-service", "url": "event/event-service-with-loco/spec/index.md", "description": "Time-bounded event registry (schema.org/Event)" },
+        { "title": "course-service", "url": "course/course-service-with-loco/spec/index.md", "description": "Course-identity registry plus CourseInstance sub-resource" },
+        { "title": "authentication-service", "url": "authentication/authentication-service-with-loco/spec/index.md", "description": "Central SSO — passwordless magic-link, cookie sessions, PASETO v4.public issuance" },
+        { "title": "organization-service", "url": "organization/organization-service-with-loco/spec/index.md", "description": "Organization registry (schema.org/Organization); family FHIR reference implementation" },
+        { "title": "care-pathway-service", "url": "care-pathway/care-pathway-service-with-loco/spec/index.md", "description": "Clinical care-pathway registry" },
+        { "title": "case-service", "url": "case/case-service-with-loco/spec/index.md", "description": "Governmental case-tracking registry" },
+        { "title": "project-portfolio-management-service", "url": "project-portfolio-management/project-portfolio-management-service-with-loco/spec/index.md", "description": "Plan registry — one recursive tree; a full PM suite (goals/tasks/issues/timeline/burndown)" }
+      ]
+    },
+    {
+      "title": "Matcher crates (dependency-light comparison libraries)",
+      "items": [
+        { "title": "person-matcher", "url": "person/person-matcher-rust-crate/spec/index.md", "description": "Demographic + multinational national-identifier matching" },
+        { "title": "worker-matcher", "url": "worker/worker-matcher-rust-crate/spec/index.md", "description": "Workforce/professional identity matching" },
+        { "title": "place-matcher", "url": "place/place-matcher-rust-crate/spec/index.md", "description": "Geographic/postal-address/venue matching" },
+        { "title": "thing-matcher", "url": "thing/thing-matcher-rust-crate/spec/index.md", "description": "Generic thing/asset matching" },
+        { "title": "event-matcher", "url": "event/event-matcher-rust-crate/spec/index.md", "description": "Time-bounded event matching" },
+        { "title": "course-matcher", "url": "course/course-matcher-rust-crate/spec/index.md", "description": "Course matching (name, code, level, keywords)" },
+        { "title": "organization-matcher", "url": "organization/organization-matcher-rust-crate/spec/index.md", "description": "Organization matching (name, address, LEI/DUNS/GLN/…)" },
+        { "title": "care-pathway-matcher", "url": "care-pathway/care-pathway-matcher-rust-crate/spec/index.md", "description": "Clinical care-pathway matching" },
+        { "title": "case-matcher", "url": "case/case-matcher-rust-crate/spec/index.md", "description": "Governmental case matching" },
+        { "title": "project-portfolio-management-matcher", "url": "project-portfolio-management/project-portfolio-management-matcher-rust-crate/spec/index.md", "description": "Plan matching (no kind gate)" }
+      ]
+    },
+    {
+      "title": "Library crates (peer-side, not services or matchers)",
+      "items": [
+        { "title": "authentication-verifier", "url": "authentication/authentication-verifier-rust-crate/index.md", "description": "Offline PASETO v4.public (Ed25519) verification; published to crates.io" },
+        { "title": "integrity-mac", "url": "integrity/integrity-mac-rust-crate/", "description": "Keyed integrity MACs (HMAC-SHA256) with production-grade key handling, embedded family-wide" },
+        { "title": "entity-ref", "url": "link/entity-ref-rust-crate/", "description": "The EntityRef URN type + the closed v1 EdgeKind registry for cross-service linking; published to crates.io as entity-ref" }
+      ]
+    },
+    {
+      "title": "Cross-cutting services",
+      "items": [
+        { "title": "link-graph-service-with-loco", "url": "link/link-graph-service-with-loco/spec/index.md", "description": "Read-model aggregator for cross-service entity linking; carries the family's original OpenTelemetry OTLP exporter" }
+      ]
+    },
+    {
+      "title": "Front-end projects (SvelteKit operator SPAs)",
+      "items": [
+        { "title": "person-front-end-with-svelte", "url": "person/person-front-end-with-svelte/spec/index.md", "description": "Operator UI for Person CRUD/search/match/merge/audit" },
+        { "title": "worker-front-end-with-svelte", "url": "worker/worker-front-end-with-svelte/spec/index.md", "description": "Operator UI for Worker" },
+        { "title": "place-front-end-with-svelte", "url": "place/place-front-end-with-svelte/spec/index.md", "description": "Operator UI for Place" },
+        { "title": "thing-front-end-with-svelte", "url": "thing/thing-front-end-with-svelte/spec/index.md", "description": "Operator UI for Thing" },
+        { "title": "event-front-end-with-svelte", "url": "event/event-front-end-with-svelte/spec/index.md", "description": "Operator UI for Event" },
+        { "title": "course-front-end-with-svelte", "url": "course/course-front-end-with-svelte/spec/index.md", "description": "Operator UI for Course" },
+        { "title": "authentication-front-end-with-svelte", "url": "authentication/authentication-front-end-with-svelte/spec/index.md", "description": "Passwordless magic-link sign up/in/out UI" },
+        { "title": "organization-front-end-with-svelte", "url": "organization/organization-front-end-with-svelte/spec/index.md", "description": "Operator UI for Organization" },
+        { "title": "care-pathway-front-end-with-svelte", "url": "care-pathway/care-pathway-front-end-with-svelte/spec/index.md", "description": "Operator UI for care pathways" },
+        { "title": "case-front-end-with-svelte", "url": "case/case-front-end-with-svelte/spec/index.md", "description": "Operator UI for governmental cases" },
+        { "title": "project-portfolio-management-front-end-with-svelte", "url": "project-portfolio-management/project-portfolio-management-front-end-with-svelte/spec/index.md", "description": "Operator UI plus Kanban/Gantt/burndown project-management views" }
+      ]
+    },
+    {
+      "title": "Consumer applications (build on the registries)",
+      "items": [
+        { "title": "case-folder", "url": "case-folder/spec/index.md", "description": "NHS paper case-note folder location tracking" },
+        { "title": "patient-flow", "url": "patient-flow/spec/index.md", "description": "NHS hospital bed management and ward whiteboards" },
+        { "title": "workforce-planning-management", "url": "workforce-planning-management/spec/index.md", "description": "All-in-one HR across the employee lifecycle" },
+        { "title": "contact-relationship-management", "url": "contact-relationship-management/spec/index.md", "description": "Customer/prospect relationships (sales, marketing, service, support)" },
+        { "title": "content-management-system", "url": "content-management-system/spec/index.md", "description": "Headless content management (block documents, assets, editorial lifecycle)" }
+      ]
+    },
+    {
+      "title": "Shared reference docs (agents/share/)",
+      "items": [
+        { "title": "agents/share/index.md", "url": "agents/share/index.md", "description": "The index of every shared doc below, kept current in one place" },
+        { "title": "agents/share/dataflow.md", "url": "agents/share/dataflow.md", "description": "Create / match / merge / search data flows" },
+        { "title": "agents/share/match-search-merge.md", "url": "agents/share/match-search-merge.md", "description": "Matching, search, and merge workflows combined" },
+        { "title": "agents/share/privacy.md", "url": "agents/share/privacy.md", "description": "Data masking, GDPR export, consent" },
+        { "title": "agents/share/jwt.md", "url": "agents/share/jwt.md", "description": "Why JWTs are not used for sessions" },
+        { "title": "agents/share/authentication-sessions.md", "url": "agents/share/authentication-sessions.md", "description": "Cookie sessions + PASETO v4 cross-service tokens + the BFF pattern" },
+        { "title": "agents/share/authorization-attributes.md", "url": "agents/share/authorization-attributes.md", "description": "ABAC — the policy language, default policy, 401/403 split" },
+        { "title": "agents/share/security.md", "url": "agents/share/security.md", "description": "Audit summary, cross-cutting invariants, the REQUIRE_AUTH activation gate" },
+        { "title": "agents/share/auditability.md", "url": "agents/share/auditability.md", "description": "Audit logging and event streaming" },
+        { "title": "agents/share/cross-service-linking.md", "url": "agents/share/cross-service-linking.md", "description": "The hybrid write-local + read-model-aggregator link topology" },
+        { "title": "agents/share/bulk-import-export.md", "url": "agents/share/bulk-import-export.md", "description": "Async bulk import/export (JSONL/CSV/Parquet)" },
+        { "title": "agents/share/availability.md", "url": "agents/share/availability.md", "description": "Scaling, health checks, graceful shutdown" },
+        { "title": "agents/share/observability.md", "url": "agents/share/observability.md", "description": "Tracing + OpenTelemetry rollout status" },
+        { "title": "agents/share/restful.md", "url": "agents/share/restful.md", "description": "RESTful API conventions and pagination" },
+        { "title": "agents/share/fhir.md", "url": "agents/share/fhir.md", "description": "HL7 FHIR R5 API design and per-entity resource mapping" },
+        { "title": "agents/share/api-versioning.md", "url": "agents/share/api-versioning.md", "description": "Header-based API versioning (Accepts-version)" },
+        { "title": "agents/share/loco.md", "url": "agents/share/loco.md", "description": "The loco.rs framework conventions used family-wide" },
+        { "title": "agents/share/rust-loco-stack.md", "url": "agents/share/rust-loco-stack.md", "description": "The full Rust + loco dependency stack" },
+        { "title": "agents/share/postgresql.md", "url": "agents/share/postgresql.md", "description": "PostgreSQL setup, extensions, the local test database" },
+        { "title": "agents/share/compliance-for-healthcare.md", "url": "agents/share/compliance-for-healthcare.md", "description": "HIPAA, NHS, EHDS, ONC/HTI, IEC 62304" },
+        { "title": "agents/share/compliance-for-technology.md", "url": "agents/share/compliance-for-technology.md", "description": "GDPR, ISO/IEC 27001, ISO/IEC 42001" },
+        { "title": "agents/share/locales.md", "url": "agents/share/locales.md", "description": "Supported locales for i18n/l10n" },
+        { "title": "agents/share/configuration.md", "url": "agents/share/configuration.md", "description": "The complete environment-variable reference" }
+      ]
+    },
+    {
+      "title": "Continuous integration & policy",
+      "items": [
+        { "title": ".github/workflows/ci.yml", "url": ".github/workflows/ci.yml", "description": "GitHub CI pipeline (fmt, clippy, test, test-db, deny, evidence, fuzz, msrv, bench)" },
+        { "title": ".woodpecker.yml", "url": ".woodpecker.yml", "description": "Codeberg CI pipeline — byte-identical stages to ci.yml" },
+        { "title": "scripts/ci-check.sh", "url": "scripts/ci-check.sh", "description": "Run any CI stage locally, exactly as CI runs it" },
+        { "title": "ci/msrv.txt", "url": "ci/msrv.txt", "description": "The declared Minimum Supported Rust Version (current stable minus two)" },
+        { "title": "ci/db-suites.txt", "url": "ci/db-suites.txt", "description": "The allowlist of crates whose --ignored Postgres suite runs in CI" },
+        { "title": "SECURITY.md", "url": "SECURITY.md", "description": "How to report a vulnerability" },
+        { "title": "CONTRIBUTING.md", "url": "CONTRIBUTING.md", "description": "Contribution ground rules" },
+        { "title": "GOVERNANCE.md", "url": "GOVERNANCE.md", "description": "Sole-maintainer governance" },
+        { "title": "LICENSE.md", "url": "LICENSE.md", "description": "Per-subproject SPDX license expressions" }
+      ]
+    },
+    {
+      "title": "Optional",
+      "items": [
+        { "title": "BENCHMARKS.md", "url": "BENCHMARKS.md", "description": "Criterion benchmark suite inventory" },
+        { "title": "COMPARISONS.md", "url": "COMPARISONS.md", "description": "How this system compares to adjacent kinds of systems (MDM platforms, …)" },
+        { "title": "RFC.md", "url": "RFC.md", "description": "Open questions the maintainer wants outside views on" },
+        { "title": "NEWS.md", "url": "NEWS.md", "description": "Project news and milestones" },
+        { "title": "CHANGELOG.md", "url": "CHANGELOG.md", "description": "Repo-level (monorepo-wide) change summary" },
+        { "title": "MAINTAINERS.md", "url": "MAINTAINERS.md", "description": "Maintainer contact" },
+        { "title": "INSTALL.md", "url": "INSTALL.md", "description": "Build/run prerequisites" }
+      ]
+    }
+  ]
+}
