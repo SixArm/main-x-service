@@ -6752,7 +6752,7 @@ crate above.
   module at all — not part of this task's scope (it targeted the
   three stubs specifically); a family-wide rollout to the rest is
   unqueued follow-up work, not a gap in this task's closure.
-- [ ] **PRO-H12 (L, in progress — 1 of 7 slices landed)** **OTLP
+- [ ] **PRO-H12 (L, in progress — 2 of 7 slices landed)** **OTLP
   rollout, remaining seven registries.** place, thing, course,
   organization, care-pathway, case, portfolio carry no
   `src/observability` module at all (unlike PRO-H9's three, which had
@@ -6793,11 +6793,36 @@ crate above.
   this slice, fixed while already editing the same paragraphs). Full
   results: course/course-service-with-loco's own `spec/13-tasks.md`
   T-26 and `CHANGELOG.md`.
-  **Remaining 6 slices**: place, thing (person-style, no gRPC stub —
-  should each be a near-identical port to course's); organization,
-  care-pathway, case, portfolio (loco-style `src/controllers/` — router
-  surface count and layering point still to be worked out fresh, not
-  assumed).
+  *Slice 2 (place), done 2026-08-30:* **overturned this task's own
+  scoping assumption.** "per `overview.md`'s capability matrix only
+  person/worker/event carry a gRPC stub at all, so most of these seven
+  likely need no rename" is false for place: the capability matrix's
+  gRPC row tracks whether a `src/api/grpc` **module** exists (place has
+  none, hence its `–`), not whether `tonic` is a **declared** Cargo
+  dependency — place already declares `tonic = "0.12"` + `tonic-build`
+  in anticipation of its own still-open T-4 (gRPC implementation, not
+  yet started), and Cargo's extern-prelude collision (`E0464`) fires on
+  a declared-but-code-unused dependency exactly the same as a
+  genuinely-used one. Confirmed live: tried the plain dev-dependency
+  first, watched it fail to compile, reverted to the
+  `otlp-test-tonic = { package = "tonic", … }` rename PRO-H9's three
+  crates needed. Also found place already declared
+  `opentelemetry`/`opentelemetry-otlp`/`opentelemetry_sdk`/
+  `tracing-opentelemetry` at stale 0.27/0.28 pins with **zero
+  consumers** anywhere in `src/` — dead scaffolding from an earlier,
+  since-deleted stub, not a live module — bumped to the family's
+  settled 0.32/0.33 pins in the same change. Full port
+  verified independently: `cargo fmt --check`, `cargo clippy
+  --all-targets -D warnings`, `cargo deny check`, the MSRV check, and
+  `cargo bench --no-run` all clean; `cargo test --lib` 229/229 (was
+  221, +8); `cargo test --test otlp_export --test otlp_middleware`
+  4/4. Full results: place/place-service-with-loco's own
+  `spec/13-tasks.md` T-13 and `CHANGELOG.md`.
+  **Remaining 5 slices**: thing (person-style — check its own
+  `Cargo.toml` for a declared `tonic`, same as place, rather than
+  trusting the capability matrix); organization, care-pathway, case,
+  portfolio (loco-style `src/controllers/` — router surface count and
+  layering point still to be worked out fresh, not assumed).
 - [x] **PRO-H13 (M)** *(done 2026-08-29)* **Tighten the Rust MSRV
   policy from N-3 to N-2.** New
   [`spec/rust-msrv-n-minus-2/index.md`](spec/rust-msrv-n-minus-2/index.md)

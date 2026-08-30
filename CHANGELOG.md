@@ -11,13 +11,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- course-service: real OpenTelemetry OTLP export (`tasks.md` PRO-H12
-  slice 1 of 7) — `src/observability.rs`, ported from person-service;
-  the fourth entity registry with a working exporter alongside
-  person/worker/event (PRO-H9). See course's own `CHANGELOG.md` for the
-  full record; `agents/share/{overview.md,observability.md,
+- course-service and place-service: real OpenTelemetry OTLP export
+  (`tasks.md` PRO-H12 slices 1–2 of 7) — `src/observability.rs`,
+  ported from person-service; the fourth and fifth entity registries
+  with a working exporter alongside person/worker/event (PRO-H9).
+  place needed the `otlp-test-tonic` package-rename PRO-H9's three
+  crates needed (despite showing `–` on `overview.md`'s gRPC-stub
+  capability row — that row tracks a stub module, not a declared
+  `tonic` dependency, and place already declares one for its own
+  not-yet-built T-4) and had stale, zero-consumer 0.27/0.28
+  OpenTelemetry dependency pins bumped to the family's settled
+  0.32/0.33 in the same change. See each crate's own `CHANGELOG.md`
+  for the full record; `agents/share/{overview.md,observability.md,
   rust-tracing-opentelemetry-stack.md}` updated (also correcting a
-  stale claim found in the same pass — those docs still described
+  stale claim found while landing course — those docs still described
   worker/event as carrying PRO-H9's dead stub after PRO-H9 had already
   replaced both, 2026-08-28).
 

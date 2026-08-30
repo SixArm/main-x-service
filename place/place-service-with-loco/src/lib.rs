@@ -62,6 +62,8 @@ pub mod fhir;
 pub mod matching;
 pub mod metrics;
 pub mod models;
+/// Structured logging + OpenTelemetry OTLP export (traces + metrics).
+pub mod observability;
 pub mod privacy;
 /// Durable event bus **Phase 3** — the transactional-outbox relay worker:
 /// a background loop that drains unpublished `event_outbox` rows to an
