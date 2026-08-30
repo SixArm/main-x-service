@@ -30,6 +30,8 @@ pub mod matching;
 /// Process-wide Prometheus metrics, served at `/metrics.prom`.
 pub mod metrics;
 pub mod models;
+/// Structured logging + OpenTelemetry OTLP export (traces + metrics).
+pub mod observability;
 pub mod privacy;
 /// Durable event bus **Phase 3** — the `course_outbox` relay worker
 /// (drains unpublished rows to an [`relay::EventSink`], stamps

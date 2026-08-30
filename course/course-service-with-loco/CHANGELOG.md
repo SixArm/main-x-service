@@ -9,6 +9,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — real OpenTelemetry OTLP export (T-26, PRO-H12 slice 1 of 7)
+
+- **2026-08-30**: new `src/observability.rs` — this crate carried no
+  observability module at all before this change (unlike
+  person/worker/event, PRO-H9, which each had a dead stub to replace).
+  Close port of person-service's, itself a port of link-graph-service's
+  original reference: the `tracing-opentelemetry` bridge over an
+  OTLP/gRPC `SdkTracerProvider`/`SdkMeterProvider`, export-on-by-default
+  at `OTLP_ENDPOINT` (default `http://localhost:4317`) with
+  `service.name` from `OTLP_SERVICE_NAME` (default `course-service`).
+  `observability::trace_mw` is layered as the outermost middleware on
+  both of this crate's router-construction surfaces
+  (`App::after_routes` and `api::rest::create_router`) — the same
+  two-surface adaptation person/worker/event needed. Unlike those
+  three, no `tonic` dev-dependency rename was needed: this crate
+  carries no gRPC stub of its own, so the in-process OTLP collector
+  tests take a plain `tonic = "0.14"` dev-dependency.
+  `tests/otlp_export.rs` + `tests/otlp_middleware.rs` +
+  `tests/otlp_collector/` (ported from person-service) prove real
+  export against a real in-process gRPC listener. Verified
+  independently: `cargo fmt --check`, `cargo clippy --all-targets -D
+  warnings`, `cargo deny check`, and the MSRV check (`cargo +1.96
+  check --all-targets`) all clean; `cargo test --lib` 132/132 (was
+  124, +8 new); `cargo test --test otlp_export --test
+  otlp_middleware` 4/4. See spec §13 T-26.
+
 ### Added — request-path observability middleware (T-18)
 
 - **2026-08-29 (PRO-P8)**: `http_requests_total{path,status}` — declared
