@@ -9,6 +9,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- course-service: real OpenTelemetry OTLP export (`tasks.md` PRO-H12
+  slice 1 of 7) — `src/observability.rs`, ported from person-service;
+  the fourth entity registry with a working exporter alongside
+  person/worker/event (PRO-H9). See course's own `CHANGELOG.md` for the
+  full record; `agents/share/{overview.md,observability.md,
+  rust-tracing-opentelemetry-stack.md}` updated (also correcting a
+  stale claim found in the same pass — those docs still described
+  worker/event as carrying PRO-H9's dead stub after PRO-H9 had already
+  replaced both, 2026-08-28).
+
 ### Fixed
 
 - `tasks.md` bookkeeping: **seven** Phase 8 items (PRO-P1, PRO-P8,

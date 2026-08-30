@@ -6,7 +6,7 @@
 - Request/response logging
 - Error logging with context
 
-## Status (2026-08-28)
+## Status (2026-08-30)
 
 This document describes the **target** shape.
 [`link-graph-service`](../../link/link-graph-service-with-loco/) implemented
@@ -15,19 +15,29 @@ proved against a real in-process OTLP/gRPC collector in its
 `tests/otlp_export.rs` / `tests/otlp_middleware.rs`).
 [`person-service`](../../person/person-service-with-loco/) is a close port
 of it (repo `tasks.md` PRO-H9, 2026-08-28), with the same in-process-collector
-test tier ported alongside. **worker and event still carry the original
-stub** (`src/observability/`, exporter and `tracing_opentelemetry` layer
-commented out behind `// TODO: Initialize OTLP exporter`) and should copy
-person's port next — its `AGENTS.md` documents the two adaptations its
-shape needed beyond link-graph-service's (the tower middleware wired onto
-two router-construction surfaces instead of one, since person carries a
-hand-rolled `create_router` alongside the loco-native path; and a renamed
-`tonic` dev-dependency, `otlp-test-tonic = { package = "tonic", … }`, so
-the in-process collector's tonic 0.14 does not collide with the crate's
-own `tonic = "0.12"` gRPC-stub dependency in a test binary's extern
-prelude — worker and event both carry that same gRPC-stub dependency, so
-both will need the same rename). Three things settled that this doc does
-not say:
+test tier ported alongside; **worker and event** followed in the same
+task (also 2026-08-28), each copying person's already-adapted port rather
+than re-deriving link-graph-service's. **course** is the newest port
+(`tasks.md` PRO-H12, 2026-08-30), copying person's port too. All five
+crates' `AGENTS.md` document the adaptations each needed beyond
+link-graph-service's shape: the tower middleware wired onto **two**
+router-construction surfaces instead of one, for every crate that (like
+person/worker/event/course) carries a hand-rolled `create_router`
+alongside the loco-native path; and — **only** for a crate that also
+carries a `tonic` gRPC stub of its own (person, worker, event — per
+[overview.md](overview.md)'s capability matrix) — a renamed dev-dependency,
+`otlp-test-tonic = { package = "tonic", … }`, so the in-process
+collector's tonic 0.14 does not collide with the crate's own
+`tonic = "0.12"` gRPC-stub dependency in a test binary's extern prelude.
+course carries no gRPC stub, so its in-process-collector tests take a
+plain `tonic = "0.14"` dev-dependency with no rename needed — proof the
+rename is conditional on the gRPC-stub collision, not a fixed step of
+the port. **place, thing, organization, care-pathway, case, portfolio**
+carry no observability module at all yet (PRO-H12's remaining scope);
+the last four are loco-idiomatic (`src/controllers/`), not person-style,
+so their router-construction surface count and layering point still need
+working out fresh rather than assumed identical to the five done so far.
+Three things settled that this doc does not say:
 
 - **Versions.** `opentelemetry` / `_sdk` / `-otlp` /
   `-semantic-conventions` **0.32**, `tracing-opentelemetry` **0.33**, with

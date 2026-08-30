@@ -66,6 +66,23 @@ uuid = { version = "1.24", features = ["serde", "v4"] }
 prometheus = { version = "0.13" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+# Real OpenTelemetry OTLP export (PRO-H12, ported from person-service —
+# see src/observability.rs's module docs). `grpc-tonic` (not the crate's
+# default `http-proto` + blocking reqwest): the shared doc's
+# `OTLP_ENDPOINT` default is `http://localhost:4317`, the gRPC port.
+# `internal-logs` is kept ON so a failing export is visible in the log
+# rather than silently dropped. No `logs` feature — this pipeline is
+# traces + metrics only.
+opentelemetry = { version = "0.32", features = ["trace", "metrics"] }
+opentelemetry_sdk = { version = "0.32", features = ["trace", "metrics"] }
+opentelemetry-otlp = { version = "0.32", default-features = false, features = [
+  "grpc-tonic",
+  "trace",
+  "metrics",
+  "internal-logs",
+] }
+opentelemetry-semantic-conventions = { version = "0.32" }
+tracing-opentelemetry = { version = "0.33" }
 
 # Error handling
 thiserror = "2.0"
@@ -109,6 +126,31 @@ fluvio = ["dep:fluvio"]
 tokio-test = "0.4"
 tempfile = "3.27"
 criterion = { version = "0.5", features = ["html_reports"] }
+
+# An in-process OTLP/gRPC collector for `tests/otlp_export.rs` /
+# `tests/otlp_middleware.rs` (PRO-H12, ported from person-service): the
+# generated `TraceServiceServer` / `MetricsServiceServer` plus tonic's
+# server transport, so the export pipeline is proved against a real gRPC
+# listener in a normal `cargo test` run — no external collector, nothing
+# `#[ignore]`d.
+opentelemetry-proto = { version = "0.32", default-features = false, features = [
+  "gen-tonic",
+  "trace",
+  "metrics",
+] }
+# Plain `tonic`, not a renamed `package = "tonic"` dev-dependency like
+# person/worker/event needed: this crate carries no gRPC stub of its own
+# (`agents/share/overview.md`'s capability matrix — course is `–` on
+# gRPC), so there is no `E0464` extern-prelude collision to dodge.
+tonic = "0.14"
+tokio-stream = { version = "0.1", features = ["net"] }
+# The mounted-middleware test (`tests/otlp_middleware.rs`) makes a real
+# HTTP request against a served router; this crate has no other direct
+# `reqwest` dependency.
+reqwest = { version = "0.12", default-features = false, features = [
+  "rustls-tls",
+  "json",
+] }
 
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so
 # the bearer-verification path is exercised without the auth service or

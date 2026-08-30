@@ -55,6 +55,69 @@ Shared reference docs live at the project root under
 | Metrics | `src/metrics.rs` (process-wide Prometheus registry, `OnceLock`); served at root `/metrics.prom` via `metrics_routes()` in `src/api/rest/mod.rs` (T-16) |
 | Migrations | `migrations/` |
 
+## OpenTelemetry OTLP export
+
+`src/observability.rs` (repo `tasks.md` PRO-H12, landed 2026-08-30) is a
+close port of person-service's `src/observability.rs` — itself a port of
+link-graph-service's, the family's first working exporter. Person, not
+link-graph-service, was the copy source here for the same reason worker
+and event's PRO-H9 ports were: person had already solved the
+two-router-construction-surfaces adaptation this crate's shape also
+needs. This module is genuinely new — this crate carried **no**
+`src/observability` module at all before this change, unlike
+person/worker/event, which each had a dead stub to replace (PRO-H9).
+`App::init_logger` installs it (loco's own `EnvFilter` + formatted
+layer, plus the `tracing-opentelemetry` bridge over an OTLP/gRPC
+exporter); `App::on_shutdown` flushes it. Export is **on by default** —
+set `OTLP_ENDPOINT=""` to disable it — at `OTLP_ENDPOINT` (default
+`http://localhost:4317`) with `service.name` from `OTLP_SERVICE_NAME`
+(default `course-service`); both variables are **deliberately
+unprefixed**, matching every other crate that carries this pipeline and
+`agents/share/rust-tracing-opentelemetry-stack.md`'s config table, not
+the per-service `COURSE_*` convention `COURSE_REQUIRE_AUTH` and its
+siblings use.
+
+**Where this crate's shape forced real adaptation** — confirmed rather
+than assumed:
+
+- **Two router-construction surfaces**, exactly as person/worker/event
+  needed: this crate carries the loco-native one
+  (`api::rest::courses_routes()`, mounted via `App::routes`/
+  `App::after_routes`) and a standalone hand-rolled one
+  (`api::rest::create_router`, used only by the DB-gated integration
+  tests) — where link-graph-service has exactly one (pure loco). The
+  `observability::trace_mw` tower middleware (per-request span +
+  `http.server.request.duration` histogram + W3C `traceparent` response
+  header) is layered onto **both**, as the outermost layer in each, so
+  tracing behaves identically regardless of which router a caller or
+  test builds — the same precedent `auth::require_auth_mw` already set
+  by being layered on both surfaces. It is a **second**, complementary
+  middleware to the existing `metrics::track_http_requests_mw` (T-18's
+  Prometheus counter) — the two are independent sinks layered side by
+  side, not a replacement of one by the other.
+- **No `tonic` rename needed** — the one adaptation person/worker/event
+  all needed that this crate does **not**: this crate carries no gRPC
+  stub of its own (`agents/share/overview.md`'s capability matrix —
+  course is `–` on gRPC), so the in-process OTLP collector tests' `tonic
+  0.14` dev-dependency is declared as a plain `tonic = "0.14"` — no
+  `package = "…"` rename, and no matching SOUP-register fix (this crate
+  carries no SOUP register at all — see `agents/models.md`'s peers'
+  notes on that).
+
+`tests/otlp_export.rs` and `tests/otlp_middleware.rs` (ported from
+person-service, with `tests/otlp_collector/` — an in-process OTLP/gRPC
+collector, unchanged from link-graph-service's original bar the
+un-renamed `tonic` import) prove real export against a real gRPC
+listener in a normal `cargo test` run: a `tracing` span and a metric
+both reach the collector's decoded protobuf, and a served HTTP request
+returns a `traceparent` whose trace id matches the exported span's. None
+of this needs a database. Landing this raised `cargo test --lib` from
+124 to 132 (8 new `src/observability.rs` unit tests), plus 4 new tests
+across the two `tests/otlp_*.rs` binaries. Verified independently:
+`cargo fmt --check` clean, `cargo clippy --all-targets -- -D warnings`
+clean, `cargo deny check` clean, MSRV check (`cargo +1.96 check
+--all-targets`) clean.
+
 ## Container image
 
 `Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's

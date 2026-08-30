@@ -6752,12 +6752,13 @@ crate above.
   module at all — not part of this task's scope (it targeted the
   three stubs specifically); a family-wide rollout to the rest is
   unqueued follow-up work, not a gap in this task's closure.
-- [ ] **PRO-H12 (L)** **OTLP rollout, remaining seven registries.**
-  place, thing, course, organization, care-pathway, case, portfolio
-  carry no `src/observability` module at all (unlike PRO-H9's three,
-  which had a dead stub to replace). Bigger lift than PRO-H9: each
-  needs `src/observability.rs` added from scratch (copy person's
-  port — see its `AGENTS.md` "OpenTelemetry OTLP export" section),
+- [ ] **PRO-H12 (L, in progress — 1 of 7 slices landed)** **OTLP
+  rollout, remaining seven registries.** place, thing, course,
+  organization, care-pathway, case, portfolio carry no
+  `src/observability` module at all (unlike PRO-H9's three, which had
+  a dead stub to replace). Bigger lift than PRO-H9: each needs
+  `src/observability.rs` added from scratch (copy person's port —
+  see its `AGENTS.md` "OpenTelemetry OTLP export" section),
   `Hooks::init_logger`/`on_shutdown` wired into `src/app.rs`,
   `trace_mw` layered on every router-construction surface (verify the
   actual count per crate — organization/care-pathway/case/portfolio
@@ -6771,6 +6772,32 @@ crate above.
   of these seven likely need no `otlp-test-tonic` rename. Update
   `agents/share/{overview.md,observability.md,rust-tracing-
   opentelemetry-stack.md}` once all seven land.
+  *Slice 1 (course), done 2026-08-30:* chosen first because it is
+  person-style (two router-construction surfaces, same shape PRO-H9
+  already proved) **and** carries no gRPC stub — confirming the
+  `tonic`-rename step is conditional on the gRPC-stub collision, not a
+  fixed part of the port: course's in-process-collector tests take a
+  plain, un-renamed `tonic = "0.14"` dev-dependency. Full port
+  (`src/observability.rs`, `Hooks::init_logger`/`on_shutdown`,
+  `trace_mw` on both surfaces, `tests/otlp_{export,middleware}.rs` +
+  `tests/otlp_collector/`) verified independently: `cargo fmt --check`,
+  `cargo clippy --all-targets -D warnings`, `cargo deny check`, and the
+  MSRV check all clean; `cargo test --lib` 132/132 (was 124, +8);
+  `cargo test --test otlp_export --test otlp_middleware` 4/4 (real
+  protobuf crossing a real in-process gRPC socket). `agents/share/
+  {overview.md,observability.md,rust-tracing-opentelemetry-stack.md}`
+  updated to the true current state (also corrected a stale claim
+  found in the same pass: they still described worker/event as
+  carrying PRO-H9's dead stub, when PRO-H9 had already replaced both
+  with real exporters on 2026-08-28 — a doc-vs-code drift unrelated to
+  this slice, fixed while already editing the same paragraphs). Full
+  results: course/course-service-with-loco's own `spec/13-tasks.md`
+  T-26 and `CHANGELOG.md`.
+  **Remaining 6 slices**: place, thing (person-style, no gRPC stub —
+  should each be a near-identical port to course's); organization,
+  care-pathway, case, portfolio (loco-style `src/controllers/` — router
+  surface count and layering point still to be worked out fresh, not
+  assumed).
 - [x] **PRO-H13 (M)** *(done 2026-08-29)* **Tighten the Rust MSRV
   policy from N-3 to N-2.** New
   [`spec/rust-msrv-n-minus-2/index.md`](spec/rust-msrv-n-minus-2/index.md)
