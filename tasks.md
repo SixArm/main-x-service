@@ -6907,6 +6907,36 @@ crate above.
   fetch. Two crates independently re-run standalone afterward
   (`person-service-with-loco`, `project-portfolio-management-matcher`)
   as an extra spot-check, both green.
+- [ ] **PRO-H14 (M)** **Publish `main-x-service.github.io`.** No
+  `main-x-service.github.io` (or `sixarm*.github.io`) repo exists
+  locally or on GitHub/Codeberg today — confirmed by search, not
+  assumed absent. Scaffold and publish it, following the pattern the
+  maintainer's other `*.github.io` sites already use (e.g.
+  `fhir-rust/fhir-rust.github.io`): a SvelteKit site prerendered by
+  `@sveltejs/adapter-static`, using the Lily Design System, that
+  **renders this monorepo's own Markdown rather than restating it**
+  (the repository stays the source of truth; the site is a view of
+  it) — plus GitHub Pages hosting and a decided routing scheme
+  (`/`, `/docs/…`, `/specs/…`, or equivalent — pick one before
+  building rather than mid-build, since it fixes every link target
+  below).
+  Once the routing scheme is fixed: publish website-appropriate
+  `static/llms.txt` and `static/llms.json` in that site repo — **not**
+  a copy of this repo's root `llms.txt`/`llms.json`, whose links are
+  repo-relative (`README.md`, `agents/share/overview.md`, …) and only
+  resolve inside a git checkout. Each entry's `url` must instead point
+  at wherever that content actually resolves under the site's own
+  domain. See
+  [`spec/llms-json-and-llms-txt/index.md`](spec/llms-json-and-llms-txt/index.md)
+  §"Repo checkout vs. published site — two link sets, not one" for the
+  requirement this task closes.
+  *Blocked on a decision, not on effort:* the site's actual domain
+  (a dedicated `main-x-service.github.io` / `sixarm.github.io` user or
+  org vs. a `sixarm.github.io/main-x-service/` project page under the
+  existing SixArm org) was asked and deliberately deferred
+  (2026-08-30) rather than guessed — guessing here would ship a
+  public-facing site with wrong links, the exact failure the spec note
+  above exists to prevent. Confirm the domain before starting.
 
 ### PRO-P — per-family targeted fixes
 

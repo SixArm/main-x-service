@@ -30,6 +30,8 @@ GPL-2.0-only OR GPL-3.0-only`; front-ends `MIT OR Apache-2.0` — see
 - [plan.md](plan.md): cross-subproject planning
 - [tutorials/](tutorials/): six live-verified walkthroughs — [01 getting started](tutorials/01-getting-started.md), [02 identity lifecycle](tutorials/02-identity-lifecycle.md), [03 auth & ABAC](tutorials/03-authentication-abac.md), [04 cross-service linking](tutorials/04-cross-service-linking.md), [05 bulk import/export](tutorials/05-bulk-import-export.md), [06 the event bus](tutorials/06-event-bus.md)
 - [examples/](examples/): runnable reference material — [compose/](examples/compose/) Podman stacks, [data/](examples/data/) synthetic fixtures, [policies/](examples/policies/) ABAC policy cookbook, [api/](examples/api/) per-service `.http` collections
+- [sixarm-services-skill/](sixarm-services-skill/SKILL.md): a Claude Code skill explaining this system's concepts, terminology, and worked examples
+- [sixarm-services-maintainer-skill/](sixarm-services-maintainer-skill/SKILL.md): a Claude Code skill for making a code/spec/infrastructure change here
 
 ## Entity registry services (Rust, loco.rs)
 
