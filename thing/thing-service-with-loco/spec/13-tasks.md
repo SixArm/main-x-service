@@ -317,4 +317,39 @@ clearly described manual check confirms the acceptance criterion.
   **Acceptance:** `GET /api/records/verify` and `GET /api/audit/verify`
   are reachable and return a report naming any digest mismatch;
   `cargo test --lib` clean.
+- [x] **T-11 (2026-08-30, PRO-H12 slice 3 of 7): OpenTelemetry OTLP
+  export.** New `src/observability.rs` — this crate carried no
+  *working* observability module before this change:
+  `opentelemetry`/`opentelemetry-otlp`/`opentelemetry_sdk`/
+  `tracing-opentelemetry` were declared in `Cargo.toml` at stale
+  0.27/0.28 pins with **zero consumers anywhere in `src/`** (confirmed
+  by grep before touching them) — dead scaffolding from an earlier,
+  since-deleted stub, the identical situation place hit landing PRO-H12
+  slice 2. Close port of person-service's `src/observability.rs`
+  (itself ported from link-graph-service's), bumping those stale deps
+  to the family's settled 0.32/0.33 pins in the same change.
+  `App::init_logger`/`on_shutdown` (`src/app.rs`) install/flush it;
+  `observability::trace_mw` is layered as the outermost middleware on
+  **both** of this crate's router-construction surfaces
+  (`App::after_routes` and `api::rest::create_router`).
+  **Needed the same renamed `otlp-test-tonic` dev-dependency place's
+  slice needed**, for the same reason: this crate's own `AGENTS.md`
+  already stated it plainly ("no gRPC — the Tonic dependency is unwired
+  scaffolding for spec/13-tasks.md T-3, not a running server") —
+  `tonic = "0.12"` + `tonic-build` are declared in `Cargo.toml` in
+  anticipation of the still-open T-3, with zero code consumers, and a
+  declared-but-unused dependency collides with an unrenamed
+  dev-dependency the same way a genuinely-used one does. Confirmed
+  this crate's shape (no observability module, dead stale OTel pins,
+  declared-but-dead `tonic`, two router surfaces, no SOUP register)
+  was identical to place's before starting, rather than re-deriving it
+  from scratch. `tests/otlp_export.rs` + `tests/otlp_middleware.rs` +
+  `tests/otlp_collector/` (ported from place, which ported from
+  person-service) prove real export against a real in-process gRPC
+  listener in a normal `cargo test` run. Verified independently: `cargo
+  fmt --check` clean, `cargo clippy --all-targets -- -D warnings`
+  clean, `cargo deny check` clean, MSRV check (`cargo +1.96 check
+  --all-targets`) clean, `cargo bench --no-run` compiles clean, `cargo
+  test --lib` 205/205 (was 197, +8 new `observability::tests`), `cargo
+  test --test otlp_export --test otlp_middleware` 4/4.
 

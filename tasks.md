@@ -6752,7 +6752,7 @@ crate above.
   module at all — not part of this task's scope (it targeted the
   three stubs specifically); a family-wide rollout to the rest is
   unqueued follow-up work, not a gap in this task's closure.
-- [ ] **PRO-H12 (L, in progress — 2 of 7 slices landed)** **OTLP
+- [ ] **PRO-H12 (L, in progress — 3 of 7 slices landed)** **OTLP
   rollout, remaining seven registries.** place, thing, course,
   organization, care-pathway, case, portfolio carry no
   `src/observability` module at all (unlike PRO-H9's three, which had
@@ -6818,11 +6818,22 @@ crate above.
   221, +8); `cargo test --test otlp_export --test otlp_middleware`
   4/4. Full results: place/place-service-with-loco's own
   `spec/13-tasks.md` T-13 and `CHANGELOG.md`.
-  **Remaining 5 slices**: thing (person-style — check its own
-  `Cargo.toml` for a declared `tonic`, same as place, rather than
-  trusting the capability matrix); organization, care-pathway, case,
-  portfolio (loco-style `src/controllers/` — router surface count and
-  layering point still to be worked out fresh, not assumed).
+  *Slice 3 (thing), done 2026-08-30:* confirmed identical shape to
+  place's before starting (its own `AGENTS.md` already stated the
+  `tonic` dependency is unwired scaffolding for its own open T-3), so
+  this was a same-day, mechanical repeat of slice 2's port rather than
+  fresh investigation: needed the same `otlp-test-tonic` rename, and
+  the same stale-0.27/0.28-pins-with-zero-consumers cleanup. Full port
+  verified independently: `cargo fmt --check`, `cargo clippy
+  --all-targets -D warnings`, `cargo deny check`, the MSRV check, and
+  `cargo bench --no-run` all clean; `cargo test --lib` 205/205 (was
+  197, +8); `cargo test --test otlp_export --test otlp_middleware`
+  4/4. Full results: thing/thing-service-with-loco's own
+  `spec/13-tasks.md` T-11 and `CHANGELOG.md`.
+  **Remaining 4 slices**: organization, care-pathway, case, portfolio
+  — all loco-style `src/controllers/`, not person-style, so router
+  surface count and layering point still need working out fresh, not
+  assumed identical to the three person-style slices done so far.
 - [x] **PRO-H13 (M)** *(done 2026-08-29)* **Tighten the Rust MSRV
   policy from N-3 to N-2.** New
   [`spec/rust-msrv-n-minus-2/index.md`](spec/rust-msrv-n-minus-2/index.md)
