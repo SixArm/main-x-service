@@ -222,6 +222,20 @@ Two at once want the same port, so move one:
 `DB_SUITES_FORCE=1` runs it anyway, which is how a crate gets **observed**
 green before being added to that allowlist.
 
+## AI agent guidance
+
+- [`llms.txt`](llms.txt) / [`llms.json`](llms.json) — a curated,
+  size-bounded (<40KB each) map of this repo's most important content,
+  for a tool that wants a starting point rather than a full-tree
+  crawl. Defined by [`spec/llms-json-and-llms-txt/index.md`](spec/llms-json-and-llms-txt/index.md);
+  update both together with this file whenever a subproject, matcher,
+  front-end, or shared doc is added, renamed, or removed.
+- [`sixarm-services-skill/`](sixarm-services-skill/SKILL.md) /
+  [`sixarm-services-maintainer-skill/`](sixarm-services-maintainer-skill/SKILL.md) —
+  Claude Code skills for, respectively, explaining what this system
+  does and making a change to it. Defined by
+  [`spec/agent-skills/index.md`](spec/agent-skills/index.md).
+
 ## Shared reference docs
 
 @agents/share/index.md

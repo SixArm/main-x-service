@@ -23,7 +23,9 @@
         { "title": "tasks.md", "url": "tasks.md", "description": "The live, repo-spanning work queue" },
         { "title": "plan.md", "url": "plan.md", "description": "Cross-subproject planning" },
         { "title": "tutorials/", "url": "tutorials/", "description": "Six live-verified walkthroughs: getting started, identity lifecycle, auth & ABAC, cross-service linking, bulk import/export, the event bus" },
-        { "title": "examples/", "url": "examples/", "description": "Runnable reference material: Podman compose stacks, synthetic data fixtures, an ABAC policy cookbook, per-service .http request collections" }
+        { "title": "examples/", "url": "examples/", "description": "Runnable reference material: Podman compose stacks, synthetic data fixtures, an ABAC policy cookbook, per-service .http request collections" },
+        { "title": "sixarm-services-skill/", "url": "sixarm-services-skill/SKILL.md", "description": "A Claude Code skill explaining this system's concepts, terminology, and worked examples" },
+        { "title": "sixarm-services-maintainer-skill/", "url": "sixarm-services-maintainer-skill/SKILL.md", "description": "A Claude Code skill for making a code/spec/infrastructure change here" }
       ]
     },
     {

@@ -79,6 +79,24 @@ own `spec/` instead (see root [`AGENTS.md`](AGENTS.md)'s "The `agents/`
 directory: older subprojects only" for why that split is deliberate,
 not a gap).
 
+## AI agent guidance
+
+- [`llms.txt`](llms.txt) / [`llms.json`](llms.json) — a curated,
+  size-bounded map of this repo's most important content (every
+  entity registry, matcher, library, front-end, consumer app, and
+  cross-cutting service, plus the shared reference docs and CI entry
+  points), for an AI tool that wants a starting point rather than a
+  full-tree crawl. See
+  [`spec/llms-json-and-llms-txt/index.md`](spec/llms-json-and-llms-txt/index.md).
+- [`sixarm-services-skill/`](sixarm-services-skill/) — a Claude Code
+  skill explaining the system's concepts, terminology, and worked
+  examples for someone who wants to understand what it does.
+- [`sixarm-services-maintainer-skill/`](sixarm-services-maintainer-skill/) —
+  a Claude Code skill for someone about to change code, specs, or
+  infrastructure here: the SDD discipline, the crate layout, and the
+  local CI-check commands.
+- Both skills are defined by their own `spec/agent-skills/index.md`.
+
 ## Architecture snapshot
 
 ```
