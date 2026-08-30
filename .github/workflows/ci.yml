@@ -246,7 +246,7 @@ jobs:
       # rather than paying for a second `cargo run`.
       - name: stage SBOM for upload
         run: cp /tmp/sbom.json "$RUNNER_TEMP/sbom.cdx.json"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: care-pathway-sbom
           path: ${{ runner.temp }}/sbom.cdx.json
