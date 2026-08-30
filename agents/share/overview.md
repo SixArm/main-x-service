@@ -113,29 +113,38 @@ case, and portfolio each provide:
 - **Observability** — structured `tracing` and a Prometheus
   `/metrics.prom` endpoint. OpenTelemetry OTLP export is **rolling out
   but not yet family-wide** (repo `tasks.md` PRO-H9 + PRO-H12): as of
-  2026-08-30, **person, worker, event** (PRO-H9, 2026-08-28) and
-  **course, place, thing** (PRO-H12 slices 1–3, 2026-08-30) carry a real
-  exporter (`src/observability.rs` — course's/place's/thing's ported
-  from person's, which ported from link-graph-service's — see below);
-  the other four registries (organization, care-pathway, case,
-  portfolio) carry no such module at all. Whether the port needs a
-  renamed `otlp-test-tonic` dev-dependency (to avoid an extern-prelude
+  2026-08-30, **person, worker, event** (PRO-H9, 2026-08-28),
+  **course, place, thing** (PRO-H12 slices 1–3, 2026-08-30), and
+  **organization** (PRO-H12 slice 4, 2026-08-30) carry a real exporter
+  (`src/observability.rs` — course's/place's/thing's ported from
+  person's, organization's ported from course's, which ported from
+  link-graph-service's — see below); the other three registries
+  (care-pathway, case, portfolio) carry no such module at all.
+  Organization is the **first of the four loco-idiomatic registries**
+  (`src/controllers/`, not person-style `src/api/rest/`) to carry the
+  exporter, and it settles a question the earlier slices left open for
+  this group: it has exactly **one** router-construction surface
+  (`App::routes`/`App::after_routes`), unlike the person-style crates'
+  two, so `trace_mw` is layered once rather than twice — care-pathway,
+  case, and portfolio each still need their own surface count
+  confirmed, not assumed identical. Whether a port needs a renamed
+  `otlp-test-tonic` dev-dependency (to avoid an extern-prelude
   collision) tracks whether the crate **declares** a `tonic` dependency
   at all — not the gRPC-stub row below, which tracks only whether a
   `src/api/grpc` module exists: person/worker/event need the rename
   because they have both; place and thing need it too despite showing
   `–` on gRPC, because each already declares `tonic` in `Cargo.toml` in
   anticipation of a not-yet-built gRPC server (place's spec T-4,
-  thing's T-3); course needed no rename because it is the one crate
-  here that declares no `tonic` dependency at all. Check each
-  remaining crate's actual `Cargo.toml`, not this table, before
-  assuming either way. The cross-cutting **link-graph-service** carries
-  the original reference (`src/observability.rs`: OTLP/gRPC traces +
-  metrics bridged from `tracing` through loco's `Hooks::init_logger`
-  seam, with a per-request span, an `http.server.request.duration`
-  histogram, and a W3C `traceparent` response header, proved against a
-  real in-process collector). Rolling this across the remaining four
-  registries is queued work (`tasks.md` PRO-H12).
+  thing's T-3); course and organization needed no rename because
+  neither declares a `tonic` dependency at all. Check each remaining
+  crate's actual `Cargo.toml`, not this table, before assuming either
+  way. The cross-cutting **link-graph-service** carries the original
+  reference (`src/observability.rs`: OTLP/gRPC traces + metrics
+  bridged from `tracing` through loco's `Hooks::init_logger` seam, with
+  a per-request span, an `http.server.request.duration` histogram, and
+  a W3C `traceparent` response header, proved against a real in-process
+  collector). Rolling this across the remaining three registries is
+  queued work (`tasks.md` PRO-H12).
 - **PostgreSQL** persistence via SeaORM + migrations
 
 ### Capabilities that vary by crate
@@ -240,8 +249,8 @@ These are **not** entity registries and share little of the matrix above:
   CRUD writes / matching / FHIR. Carries the family's original working
   OpenTelemetry OTLP exporter (2026-08-05, `src/observability.rs`) — the
   reference person's own exporter (2026-08-28, PRO-H9) was ported from,
-  and worker/event (PRO-H9) and course/place/thing (PRO-H12) have
-  since ported in turn; organization, care-pathway, case, and
+  and worker/event (PRO-H9) and course/place/thing/organization
+  (PRO-H12) have since ported in turn; care-pathway, case, and
   portfolio still carry no observability module (PRO-H12, in progress).
 
 See [rust-loco-stack.md](rust-loco-stack.md) for the dependency stack.

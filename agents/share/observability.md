@@ -2,7 +2,7 @@
 
 Every Main X Index crate ships structured `tracing`, configurable log
 levels, and a Prometheus `/metrics.prom` endpoint. **OpenTelemetry OTLP
-export is not yet family-wide**: as of 2026-08-30, seven services
+export is not yet family-wide**: as of 2026-08-30, eight services
 actually export spans and metrics over OTLP —
 [`link-graph-service`](../../link/link-graph-service-with-loco/)
 (`src/observability.rs`, the original reference),
@@ -10,19 +10,22 @@ actually export spans and metrics over OTLP —
 [`worker-service`](../../worker/worker-service-with-loco/), and
 [`event-service`](../../event/event-service-with-loco/) (all three
 `src/observability.rs`, ported from link-graph-service under repo
-`tasks.md` PRO-H9), and
+`tasks.md` PRO-H9),
 [`course-service`](../../course/course-service-with-loco/),
 [`place-service`](../../place/place-service-with-loco/), and
 [`thing-service`](../../thing/thing-service-with-loco/)
 (`src/observability.rs`, ported from person's under `tasks.md`
-PRO-H12). organization, care-pathway, case, and portfolio have no
-observability module yet — PRO-H12's remaining scope, and all four are
-loco-idiomatic (`src/controllers/`), not person-style, so expect real
-adaptation rather than a near-identical port. Copy person's port (not
-link-graph-service's directly) for the rest — its `AGENTS.md`
-"OpenTelemetry OTLP export" section documents the adaptations a
-person-style crate's shape needs (the tower middleware wired onto two
-router-construction surfaces).
+PRO-H12 slices 1–3), and now
+[`organization-service`](../../organization/organization-service-with-loco/)
+(`src/observability.rs`, ported from course's under `tasks.md` PRO-H12
+slice 4) — the **first of the four loco-idiomatic registries**
+(`src/controllers/`, not person-style `src/api/rest/`) to carry it.
+care-pathway, case, and portfolio still have no observability module —
+PRO-H12's remaining scope. Copy organization's port (not a
+person-style crate's) for those three: its `AGENTS.md` "OpenTelemetry
+OTLP export" section documents the adaptation a genuinely loco-idiomatic
+crate's shape needs — exactly **one** router-construction surface, so
+the tower middleware is layered once rather than on two.
 
 **The `otlp-test-tonic` dev-dependency rename is not decided by the
 `overview.md` gRPC-stub capability row.** It is needed whenever the

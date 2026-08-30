@@ -18,16 +18,16 @@ of it (repo `tasks.md` PRO-H9, 2026-08-28), with the same in-process-collector
 test tier ported alongside; **worker and event** followed in the same
 task (also 2026-08-28), each copying person's already-adapted port rather
 than re-deriving link-graph-service's. **course, place, and thing** are
-the newest ports (`tasks.md` PRO-H12, 2026-08-30), all copying person's
-port. All seven crates' `AGENTS.md` document the adaptations each needed
-beyond link-graph-service's shape: the tower middleware wired onto
-**two** router-construction surfaces instead of one, for every crate
-that (like person/worker/event/course/place/thing) carries a
-hand-rolled `create_router` alongside the loco-native path; and — for a
-crate that **declares** a `tonic` Cargo dependency at all — a renamed
-dev-dependency, `otlp-test-tonic = { package = "tonic", … }`, so the
-in-process collector's tonic 0.14 does not collide with it in a test
-binary's extern prelude. **This is not the same test as
+the next ports (`tasks.md` PRO-H12 slices 1–3, 2026-08-30), all copying
+person's port. All six of those crates' `AGENTS.md` document the
+adaptations each needed beyond link-graph-service's shape: the tower
+middleware wired onto **two** router-construction surfaces instead of
+one, for every crate that (like person/worker/event/course/place/thing)
+carries a hand-rolled `create_router` alongside the loco-native path;
+and — for a crate that **declares** a `tonic` Cargo dependency at all —
+a renamed dev-dependency, `otlp-test-tonic = { package = "tonic", … }`,
+so the in-process collector's tonic 0.14 does not collide with it in a
+test binary's extern prelude. **This is not the same test as
 [overview.md](overview.md)'s gRPC-stub capability row**, which tracks
 only whether a `src/api/grpc` module exists: person/worker/event need
 the rename because they have both a stub and the dependency; place and
@@ -36,15 +36,26 @@ already declares `tonic` + `tonic-build` in `Cargo.toml` in
 anticipation of a not-yet-built gRPC server (place's spec T-4, thing's
 T-3) — Cargo does not care that no code calls `tonic::` yet, only that
 the name and version collide. course needed no rename because it is
-the one crate here that declares no `tonic` dependency at all. **Check
-each remaining crate's actual `Cargo.toml`, not the capability matrix**,
-before assuming either way. **organization, care-pathway, case,
-portfolio** carry no observability module at all yet (PRO-H12's
-remaining scope); all four are loco-idiomatic (`src/controllers/`),
-not person-style, so their router-construction surface count and
-layering point still need working out fresh rather than assumed
-identical to the seven done so far. Three things settled that this doc
-does not say:
+one of the crates here that declares no `tonic` dependency at all.
+**Check each remaining crate's actual `Cargo.toml`, not the capability
+matrix**, before assuming either way.
+
+**organization** is the newest port (`tasks.md` PRO-H12 slice 4 of 7,
+2026-08-30, copying course's port) and the **first of the four
+loco-idiomatic registries** (organization, care-pathway, case,
+portfolio — `src/controllers/`, not person-style `src/api/rest/`) to
+carry one. It settles, for itself, the open question the other six
+ports left for this group: organization has exactly **one**
+router-construction surface (`App::routes`/`App::after_routes`; even
+its own request-level test suite boots the real `App` via loco's
+testing harness rather than a second hand-rolled router), so
+`trace_mw` is layered once, not twice — and it declares no `tonic`
+dependency at all, so it needed no rename either, same as course.
+**care-pathway, case, portfolio** still carry no observability module
+(PRO-H12's remaining scope); each still needs its own
+router-construction surface count and layering point confirmed rather
+than assumed identical to organization's. Three things settled that
+this doc does not say:
 
 - **Versions.** `opentelemetry` / `_sdk` / `-otlp` /
   `-semantic-conventions` **0.32**, `tracing-opentelemetry` **0.33**, with

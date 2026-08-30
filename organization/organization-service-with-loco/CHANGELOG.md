@@ -9,8 +9,36 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — real OpenTelemetry OTLP export (PRO-H12 slice 4 of 7)
 
-
+- **2026-08-30**: new `src/observability.rs` — this crate carried no
+  observability module at all before this change, and is the first of
+  the four remaining loco-idiomatic registries (organization,
+  care-pathway, case, portfolio) to carry one; PRO-H12 slices 1–3
+  (course, place, thing) were all person-style crates. Close port of
+  course-service's, itself a port of person-service's, itself a port of
+  link-graph-service's original reference: the `tracing-opentelemetry`
+  bridge over an OTLP/gRPC `SdkTracerProvider`/`SdkMeterProvider`,
+  export-on-by-default at `OTLP_ENDPOINT` (default
+  `http://localhost:4317`) with `service.name` from `OTLP_SERVICE_NAME`
+  (default `organization-service`). Real adaptation, confirmed rather
+  than assumed: this crate has exactly **one** router-construction
+  surface (`App::routes`/`App::after_routes` in `src/app.rs` — even its
+  own request-level test suite boots the real `App` via loco's testing
+  harness, not a second hand-rolled router), unlike the person-style
+  crates' two, so `observability::trace_mw` is layered once, as the
+  outermost middleware in `after_routes`. No `tonic` dev-dependency
+  rename was needed: this crate declares no `tonic` dependency at all
+  (no gRPC stub), so the in-process OTLP collector tests take a plain
+  `tonic = "0.14"` dev-dependency, exactly as course's did.
+  `tests/otlp_export.rs` + `tests/otlp_middleware.rs` +
+  `tests/otlp_collector/` (ported from course-service) prove real
+  export against a real in-process gRPC listener. Verified
+  independently: `cargo fmt --check`, `cargo clippy --all-targets -D
+  warnings`, `cargo deny check`, `cargo bench --no-run`, and the MSRV
+  check (`cargo +1.96 check --all-targets`) all clean; `cargo test
+  --lib` 198/198 (was 190, +8 new); `cargo test --test otlp_export
+  --test otlp_middleware` 4/4. See spec §13.
 
 
 
