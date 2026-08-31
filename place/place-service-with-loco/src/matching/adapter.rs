@@ -27,7 +27,7 @@
 //! | `address.address_region` | `address.county` |
 //! | `address.postal_code` | `address.postcode` |
 //! | `address.address_country` | `address.country` + `country_code_as_iso_3166_1_alpha_2` if 2-char |
-//! | `geo.latitude_as_decimal_degrees` / `.longitude_as_decimal_degrees` / `.elevation_as_decimal_metres` | `latitude`/`longitude`/`elevation_as_metre` |
+//! | `geo.latitude_as_decimal_degrees` / `.longitude_as_decimal_degrees` / `.elevation_as_decimal_metres` | `latitude_as_decimal_degrees`/`longitude_as_decimal_degrees`/`elevation_as_metre` |
 //! | `telephone` | `phone` |
 //! | `global_location_number` | `add_place_id(Other("GLN"), value)` |
 //! | `branch_code` | `add_place_id(Other("BranchCode"), value)` |
@@ -92,7 +92,9 @@ pub fn to_matcher_place(p: &Place) -> MPlace {
             geo.latitude_as_decimal_degrees.to_f64(),
             geo.longitude_as_decimal_degrees.to_f64(),
         ) {
-            b = b.latitude(lat).longitude(lon);
+            b = b
+                .latitude_as_decimal_degrees(lat)
+                .longitude_as_decimal_degrees(lon);
         }
         if let Some(e) = geo
             .elevation_as_decimal_metres
@@ -233,7 +235,8 @@ mod tests {
     use crate::models::identifier::PlaceIdentifier;
 
     /// Pins that `name` carries through verbatim and `geo.latitude_as_decimal_degrees` /
-    /// `geo.longitude_as_decimal_degrees` route to the matcher's bare `latitude` / `longitude`.
+    /// `geo.longitude_as_decimal_degrees` route to the matcher's
+    /// `latitude_as_decimal_degrees` / `longitude_as_decimal_degrees`.
     #[test]
     fn round_trip_basic_name_and_geo() {
         use crate::models::geo::GeoCoordinates;
@@ -245,8 +248,8 @@ mod tests {
         });
         let m = to_matcher_place(&svc);
         assert_eq!(m.name.as_deref(), Some("Central Park"));
-        assert_eq!(m.latitude, Some(40.7829));
-        assert_eq!(m.longitude, Some(-73.9654));
+        assert_eq!(m.latitude_as_decimal_degrees, Some(40.7829));
+        assert_eq!(m.longitude_as_decimal_degrees, Some(-73.9654));
     }
 
     /// Pins the address field renames (`locality`→`city`,

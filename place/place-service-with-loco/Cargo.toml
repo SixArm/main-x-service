@@ -19,7 +19,7 @@ path = "src/bin/main.rs"
 # implementation shared by every service, rather than a copy per crate.
 integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 # Unkeyed content digests, kept for structural diversity.
-sha2 = { version = "0.10" }
+sha2 = { version = "0.11" }
 sha3 = { version = "0.10" }
 # Async Runtime
 tokio = { version = "1.53", features = ["full"] }
@@ -83,7 +83,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-opentelemetry = { version = "0.33" }
 
 # Utilities
-uuid = { version = "1.24", features = ["v4", "serde"] }
+uuid = { version = "1.26", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.3"
 thiserror = "2.0"
@@ -97,10 +97,10 @@ strsim = "0.11"
 prometheus = "0.13"
 
 # Sibling matcher crate
-place-matcher = "0.6.1"
+place-matcher = "0.7.0"
 
 # Geo
-geo = "0.29"
+geo = "0.33"
 haversine = "0.2"
 
 # Security
@@ -190,7 +190,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 
 [build-dependencies]
 # gRPC code generation
-tonic-build = "0.12"
+tonic-build = "0.14"
 
 [[bench]]
 name = "matching_bench"
