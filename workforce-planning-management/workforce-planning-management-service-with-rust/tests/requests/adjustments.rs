@@ -16,8 +16,8 @@ use super::{activate, an_org, seed_employee};
 async fn adjustments_round_trip() {
     request::<App, _, _>(|request, _ctx| async move {
         let org = an_org();
-        let employee = seed_employee(&request, &org, "RA-1", None).await;
-        activate(&request, &employee).await;
+        let employee = seed_employee!(&request, &org, "RA-1", None).await;
+        activate!(&request, &employee).await;
 
         // The useful bit is required — a request without the barrier
         // (or an unknown category) is refused.

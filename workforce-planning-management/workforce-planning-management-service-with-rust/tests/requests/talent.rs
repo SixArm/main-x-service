@@ -17,8 +17,8 @@ use super::{activate, an_org, seed_employee};
 async fn development_plans_track_claimed_and_verified_progress() {
     request::<App, _, _>(|request, _ctx| async move {
         let org = an_org();
-        let employee = seed_employee(&request, &org, "T-1", None).await;
-        activate(&request, &employee).await;
+        let employee = seed_employee!(&request, &org, "T-1", None).await;
+        activate!(&request, &employee).await;
 
         let skill: Value = request
             .post("/api/skills")
@@ -152,10 +152,10 @@ async fn development_plans_track_claimed_and_verified_progress() {
 async fn pipelines_apprenticeships_and_intelligence() {
     request::<App, _, _>(|request, _ctx| async move {
         let org = an_org();
-        let apprentice = seed_employee(&request, &org, "P-1", None).await;
-        activate(&request, &apprentice).await;
-        let supervisor = seed_employee(&request, &org, "P-2", None).await;
-        activate(&request, &supervisor).await;
+        let apprentice = seed_employee!(&request, &org, "P-1", None).await;
+        activate!(&request, &apprentice).await;
+        let supervisor = seed_employee!(&request, &org, "P-2", None).await;
+        activate!(&request, &supervisor).await;
 
         // ── Talent pipeline: stages move forward, and readiness may regress.
         let pipeline: Value = request

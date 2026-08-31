@@ -18,10 +18,10 @@ use super::{activate, an_org, seed_employee};
 async fn payroll_run_derives_reconciled_payslips() {
     request::<App, _, _>(|request, _ctx| async move {
         let org = an_org();
-        let plain = seed_employee(&request, &org, "E-2001", Some(3_600_000)).await;
-        let enrolled = seed_employee(&request, &org, "E-2002", Some(4_800_000)).await;
-        activate(&request, &plain).await;
-        activate(&request, &enrolled).await;
+        let plain = seed_employee!(&request, &org, "E-2001", Some(3_600_000)).await;
+        let enrolled = seed_employee!(&request, &org, "E-2002", Some(4_800_000)).await;
+        activate!(&request, &plain).await;
+        activate!(&request, &enrolled).await;
         // A pension plan + enrolment for the second employee.
         let plan: Value = request
             .post("/api/benefit-plans")
@@ -159,8 +159,8 @@ async fn payroll_run_derives_reconciled_payslips() {
 async fn benchmark_comparison_flags() {
     request::<App, _, _>(|request, _ctx| async move {
         let org = an_org();
-        let low = seed_employee(&request, &org, "E-3001", Some(2_000_000)).await;
-        let high = seed_employee(&request, &org, "E-3002", Some(9_900_000)).await;
+        let low = seed_employee!(&request, &org, "E-3001", Some(2_000_000)).await;
+        let high = seed_employee!(&request, &org, "E-3002", Some(9_900_000)).await;
         let bad_band = request
             .post("/api/benchmarks")
             .json(&json!({

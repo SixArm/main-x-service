@@ -326,12 +326,22 @@ async fn enforcement_personas_gate_and_mask() {
 
         // 360 report under mask (WPM-R29): comments are review-content
         // tier — a masked caller keeps the numbers, loses the words.
-        let with_auth = |builder: axum_test::TestRequest, token: &str| {
-            builder.add_header("authorization", format!("Bearer {token}"))
-        };
+        // A macro, not a closure: a bare `let f = |builder, token| ...;`
+        // needs `builder`'s type known at the closure expression itself
+        // (Rust does not infer a closure parameter's type from a later
+        // call site in the same block), and that type is loco's
+        // internally-pinned `axum_test::TestRequest` (17.x) — not this
+        // crate's own, newer `axum-test` dev-dependency (see
+        // tests/requests/mod.rs for the same rationale on seed helpers).
+        // Expanding inline sidesteps naming the type at all.
+        macro_rules! with_auth {
+            ($builder:expr, $token:expr $(,)?) => {
+                $builder.add_header("authorization", format!("Bearer {}", $token))
+            };
+        }
         let mut rater_pids = Vec::new();
         for n in 0..3 {
-            let rater = with_auth(request.post("/api/employees"), &machine)
+            let rater = with_auth!(request.post("/api/employees"), &machine)
                 .json(&json!({
                     "person_ref": format!("person:{}", uuid::Uuid::new_v4()),
                     "organization_ref": org,
@@ -344,7 +354,7 @@ async fn enforcement_personas_gate_and_mask() {
                 .json::<Value>();
             rater_pids.push(rater["pid"].as_str().unwrap().to_string());
         }
-        let appraisal = with_auth(
+        let appraisal = with_auth!(
             request.post(&format!("/api/employees/{employee_pid}/appraisals")),
             &machine,
         )
@@ -354,7 +364,7 @@ async fn enforcement_personas_gate_and_mask() {
         let a_pid = appraisal["pid"].as_str().unwrap().to_string();
         for (n, rater) in rater_pids.iter().enumerate() {
             let group = if n == 0 { "manager" } else { "peer" };
-            with_auth(
+            with_auth!(
                 request.post(&format!("/api/appraisals/{a_pid}/nominations")),
                 &machine,
             )
@@ -362,14 +372,14 @@ async fn enforcement_personas_gate_and_mask() {
             .await
             .assert_status_ok();
         }
-        with_auth(
+        with_auth!(
             request.post(&format!("/api/appraisals/{a_pid}/status")),
             &machine,
         )
         .json(&json!({ "to": "collecting" }))
         .await
         .assert_status_ok();
-        with_auth(
+        with_auth!(
             request.post(&format!("/api/appraisals/{a_pid}/responses")),
             &machine,
         )
@@ -378,14 +388,14 @@ async fn enforcement_personas_gate_and_mask() {
                            "comment": "Delegate more." }))
         .await
         .assert_status_ok();
-        with_auth(
+        with_auth!(
             request.post(&format!("/api/appraisals/{a_pid}/status")),
             &machine,
         )
         .json(&json!({ "to": "shared" }))
         .await
         .assert_status_ok();
-        let full_report: Value = with_auth(
+        let full_report: Value = with_auth!(
             request.get(&format!("/api/appraisals/{a_pid}/report")),
             &payroll,
         )
@@ -402,7 +412,7 @@ async fn enforcement_personas_gate_and_mask() {
             manager_group["comments"][0], "Delegate more.",
             "unmasked read sees words"
         );
-        let masked_report: Value = with_auth(
+        let masked_report: Value = with_auth!(
             request.get(&format!("/api/appraisals/{a_pid}/report")),
             &other,
         )
