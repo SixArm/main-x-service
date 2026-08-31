@@ -42,7 +42,7 @@ sea-orm = { version = "2.0", features = [
   "macros",
 ] }
 chrono = { version = "0.4" }
-uuid = { version = "1.24", features = ["v4", "serde"] }
+uuid = { version = "1.26", features = ["v4", "serde"] }
 mimalloc = { version = "0.1.52" }
 prometheus = { version = "0.13" }
 # Upstream display-name lookups (`http` client mode only; stub is the
@@ -68,16 +68,16 @@ required-features = []
 loco-rs = { workspace = true, features = ["testing"] }
 # Name the `TestServer` type in shared request-test helpers (same
 # version loco's testing feature uses internally).
-axum-test = { version = "17.3.0" }
+axum-test = { version = "21.1.0" }
 tokio = { version = "1.53", default-features = false, features = [
   "rt-multi-thread",
   "macros",
   "net",
 ] }
-serial_test = { version = "3.5.0" }
+serial_test = { version = "4.0.1" }
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so
 # the auth path is verified without the auth service or a network.
 ed25519-dalek = { version = "2.2" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
-sha2 = { version = "0.10" }
-base64 = { version = "0.22" }
+sha2 = { version = "0.11" }
+base64 = { version = "0.23" }

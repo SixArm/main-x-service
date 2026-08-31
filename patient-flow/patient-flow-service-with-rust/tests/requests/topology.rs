@@ -15,7 +15,7 @@ use super::seed_ward;
 // fetches back; the bed starts `available`.
 async fn topology_creates_and_reads_back() {
     request::<App, _, _>(|request, _ctx| async move {
-        let (ward_pid, bed_pids) = seed_ward(&request, "inpatient", Some("respiratory"), 2).await;
+        let (ward_pid, bed_pids) = seed_ward!(&request, "inpatient", Some("respiratory"), 2).await;
         let ward: Value = request.get(&format!("/api/wards/{ward_pid}")).await.json();
         assert_eq!(ward["kind"], "inpatient");
         assert_eq!(ward["specialty"], "respiratory");
@@ -96,7 +96,7 @@ async fn topology_validation_is_422() {
 // transition names the current state and returns 422.
 async fn bed_transitions_and_illegal_moves() {
     request::<App, _, _>(|request, _ctx| async move {
-        let (_, bed_pids) = seed_ward(&request, "inpatient", None, 1).await;
+        let (_, bed_pids) = seed_ward!(&request, "inpatient", None, 1).await;
         let bed = &bed_pids[0];
         let closed: Value = request
             .post(&format!("/api/beds/{bed}/state"))

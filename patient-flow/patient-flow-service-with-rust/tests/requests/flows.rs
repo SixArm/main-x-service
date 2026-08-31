@@ -17,7 +17,7 @@ use super::{a_person, seed_ward};
 #[allow(clippy::too_many_lines)] // the full journey is one narrative
 async fn full_journey_request_to_deep_clean() {
     request::<App, _, _>(|request, _ctx| async move {
-        let (ward_pid, _bed_pids) = seed_ward(&request, "inpatient", Some("respiratory"), 2).await;
+        let (ward_pid, _bed_pids) = seed_ward!(&request, "inpatient", Some("respiratory"), 2).await;
         let person = a_person();
 
         // Queue a bed request; the ranked eligible list offers our beds.
@@ -198,7 +198,7 @@ async fn full_journey_request_to_deep_clean() {
 // row lock serialises the placement check.
 async fn concurrent_admits_place_exactly_one_patient() {
     request::<App, _, _>(|request, _ctx| async move {
-        let (_, bed_pids) = seed_ward(&request, "inpatient", None, 1).await;
+        let (_, bed_pids) = seed_ward!(&request, "inpatient", None, 1).await;
         let bed = bed_pids[0].clone();
         let admit = |person: String| {
             let request = &request;
