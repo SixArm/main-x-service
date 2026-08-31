@@ -28,7 +28,7 @@ integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 # no MAC key is configured — a sponge and a Merkle-Damgard chain, so
 # an advance against one design family does not transfer.
 sha2 = { version = "0.10" }
-sha3 = { version = "0.10" }
+sha3 = { version = "0.12" }
 loco-rs = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
@@ -77,9 +77,9 @@ sea-orm = { version = "2.0", features = [
   "with-chrono",
 ] }
 chrono = { version = "0.4" }
-uuid = { version = "1.24", features = ["v4", "serde"] }
+uuid = { version = "1.26", features = ["v4", "serde"] }
 mimalloc = { version = "0.1.52" }
-prometheus = { version = "0.13" }
+prometheus = { version = "0.14" }
 
 # The one shared cross-service-linking contract: EntityType / EntityRef
 # (URN parse/Display/serde as a single TEXT column) + the closed v1
@@ -158,7 +158,7 @@ tokio-stream = { version = "0.1", features = ["net"] }
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process, so
 # the case↔person concealment can be proved end-to-end with real bearer
 # tokens (tests/concealment.rs) without the auth service.
-ed25519-dalek = { version = "2.2" }
+ed25519-dalek = { version = "3.0" }
 rusty_paseto = { version = "0.10", default-features = false, features = [
   "v4_public",
   "serde_json",
