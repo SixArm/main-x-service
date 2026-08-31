@@ -56,8 +56,8 @@ reqwest = { version = "0.12", default-features = false, features = [
   "rustls-tls",
   "json",
 ] }
-validator = { version = "0.20" }
-uuid = { version = "1.24", features = ["v4", "serde"] }
+validator = { version = "0.21" }
+uuid = { version = "1.26", features = ["v4", "serde"] }
 include_dir = { version = "0.7" }
 mimalloc = { version = "0.1.52" }
 # Prometheus metrics registry + text-exposition rendering for /metrics.prom.
@@ -69,7 +69,7 @@ sha2 = { version = "0.10" }
 # structurally unrelated to SHA-256's Merkle-Damgard chaining, so a
 # cryptanalytic advance against one design family does not transfer to
 # it. See spec/12-compliance.md §12.4z.
-sha3 = { version = "0.10" }
+sha3 = { version = "0.12" }
 # Keyed integrity (HMAC-SHA256, FIPS 198-1) over the same pre-image, with
 # a key the database never holds — see spec/12-compliance.md §12.4z. This
 # is what raises tamper detection above "careless modification": the
@@ -150,7 +150,7 @@ sea-orm = { version = "2.0", features = ["mock"] }
 # The `TestServer` loco's testing harness hands to a request test. Named
 # explicitly so the compliance request tests can factor out helpers that
 # take one (loco re-exports the harness, not the type).
-axum-test = { version = "17.3" }
+axum-test = { version = "21.1" }
 serial_test = { version = "3.5.0" }
 rstest = { version = "0.25" }
 insta = { version = "1.48", features = ["redactions", "yaml", "filters"] }

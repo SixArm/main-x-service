@@ -2,8 +2,8 @@
 //! and read the derived per-instance, timeline, cohort, constraint and
 //! flow views. Pins the contract in `spec/time-based-analysis.md` §14.3.
 
-use axum_test::TestServer;
 use care_pathway_service::app::App;
+use loco_rs::TestServer;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
