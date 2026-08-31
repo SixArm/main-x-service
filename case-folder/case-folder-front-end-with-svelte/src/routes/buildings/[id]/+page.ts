@@ -19,11 +19,13 @@ export async function load({ fetch, params }) {
         ]);
         cache.setRooms(places.rooms);
         cache.setCabinets(places.cabinets);
+        // `page.data.title` convention (see `../../+layout.svelte`).
         return {
             building: show.place,
             // Narrow the global room list down to this building's rooms.
             rooms: places.rooms.filter((r) => r.buildingId === params.id),
-            presences: history.presences
+            presences: history.presences,
+            title: `${show.place.name} · Case Tracking`
         };
     } catch (e) {
         if (e instanceof ApiError && e.status === 404) {

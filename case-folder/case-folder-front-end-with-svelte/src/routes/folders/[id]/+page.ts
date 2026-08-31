@@ -12,7 +12,8 @@ export async function load({ fetch, params }) {
             api.folders.show(params.id, { fetch }),
             api.folders.history(params.id, { fetch })
         ]);
-        return { folder, history };
+        // `page.data.title` convention (see `../../+layout.svelte`).
+        return { folder, history, title: `${folder.title} · Case Tracking` };
     } catch (e) {
         if (e instanceof ApiError && e.status === 404) {
             error(404, 'Folder not found');

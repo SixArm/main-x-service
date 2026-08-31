@@ -12,7 +12,8 @@ export async function load({ fetch, params }) {
         const move = await api.moves.show(params.id, { fetch });
         // The patient's other folders, so the user can jump across them.
         const siblings = await api.folders.list({ nhsNumber: move.nhsNumber }, { fetch });
-        return { move, folders: siblings.items };
+        // `page.data.title` convention (see `../../+layout.svelte`).
+        return { move, folders: siblings.items, title: `${move.folderTitle} move · Case Tracking` };
     } catch (e) {
         if (e instanceof ApiError && e.status === 404) error(404, 'Move event not found');
         error(503, (e as Error).message);

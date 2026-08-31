@@ -9,7 +9,8 @@ import { error } from '@sveltejs/kit';
 export async function load({ fetch }) {
     try {
         const list = await api.workers.list({}, { fetch });
-        return { workers: list.items };
+        // `page.data.title` convention (see `../+layout.svelte`).
+        return { workers: list.items, title: 'Workers · Case Tracking' };
     } catch (e) {
         error(503, (e as Error).message);
     }

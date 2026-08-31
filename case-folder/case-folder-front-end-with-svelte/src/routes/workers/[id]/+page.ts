@@ -8,7 +8,9 @@ import { error } from '@sveltejs/kit';
 
 export async function load({ fetch, params }) {
     try {
-        return await api.workers.show(params.id, { fetch });
+        const result = await api.workers.show(params.id, { fetch });
+        // `page.data.title` convention (see `../../+layout.svelte`).
+        return { ...result, title: `${result.worker.name} · Case Tracking` };
     } catch (e) {
         if (e instanceof ApiError && e.status === 404) error(404, 'Worker not found');
         error(503, (e as Error).message);

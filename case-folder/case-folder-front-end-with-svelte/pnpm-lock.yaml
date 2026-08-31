@@ -34,10 +34,13 @@ importers:
         version: 2.6.0(picomatch@4.0.4)(svelte@5.55.10(@typescript-eslint/types@8.61.0))(typescript@5.9.3)
       lily-design-system-svelte-headless:
         specifier: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless
-        version: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless
-      lily-design-system-svelte-locale-picker:
-        specifier: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-picker
-        version: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-picker(svelte@5.55.10(@typescript-eslint/types@8.61.0))
+        version: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless(svelte@5.55.10(@typescript-eslint/types@8.61.0))
+      lily-design-system-svelte-share-picker:
+        specifier: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-share-picker
+        version: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-share-picker(svelte@5.55.10(@typescript-eslint/types@8.61.0))
+      lily-design-system-svelte-text-size-picker:
+        specifier: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-text-size-picker
+        version: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-text-size-picker(svelte@5.55.10(@typescript-eslint/types@8.61.0))
       lily-design-system-svelte-theme-picker:
         specifier: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-picker
         version: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-picker(svelte@5.55.10(@typescript-eslint/types@8.61.0))
@@ -1384,9 +1387,16 @@ packages:
 
   lily-design-system-svelte-headless@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless:
     resolution: {directory: ../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless, type: directory}
+    peerDependencies:
+      svelte: ^5.0.0
 
-  lily-design-system-svelte-locale-picker@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-picker:
-    resolution: {directory: ../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-picker, type: directory}
+  lily-design-system-svelte-share-picker@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-share-picker:
+    resolution: {directory: ../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-share-picker, type: directory}
+    peerDependencies:
+      svelte: ^5.0.0
+
+  lily-design-system-svelte-text-size-picker@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-text-size-picker:
+    resolution: {directory: ../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-text-size-picker, type: directory}
     peerDependencies:
       svelte: ^5.0.0
 
@@ -3157,11 +3167,16 @@ snapshots:
 
   lilconfig@2.1.0: {}
 
-  lily-design-system-svelte-headless@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless:
+  lily-design-system-svelte-headless@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless(svelte@5.55.10(@typescript-eslint/types@8.61.0)):
     dependencies:
       aria-query: 5.3.1
+      svelte: 5.55.10(@typescript-eslint/types@8.61.0)
 
-  lily-design-system-svelte-locale-picker@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-picker(svelte@5.55.10(@typescript-eslint/types@8.61.0)):
+  lily-design-system-svelte-share-picker@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-share-picker(svelte@5.55.10(@typescript-eslint/types@8.61.0)):
+    dependencies:
+      svelte: 5.55.10(@typescript-eslint/types@8.61.0)
+
+  lily-design-system-svelte-text-size-picker@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-text-size-picker(svelte@5.55.10(@typescript-eslint/types@8.61.0)):
     dependencies:
       svelte: 5.55.10(@typescript-eslint/types@8.61.0)
 

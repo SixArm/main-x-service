@@ -16,12 +16,14 @@ export async function load({ fetch }) {
             api.moves.list({}, { fetch }),
             api.volumes.list({}, { fetch })
         ]);
+        // `page.data.title` convention (see `../+layout.svelte`).
         return {
             stats,
             cabinets: places.cabinets,
             folders: folders.items,
             moves: moves.items,
-            volumes: volumes.items
+            volumes: volumes.items,
+            title: 'Reports · Case Tracking'
         };
     } catch (e) {
         error(503, (e as Error).message);

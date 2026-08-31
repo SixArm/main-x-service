@@ -1,10 +1,17 @@
 // Sign-out action (BFF): revoke the session server-side, then clear the
 // httpOnly cookie and redirect home.
 
-import type { Actions } from "./$types";
+import type { Actions, PageServerLoad } from "./$types";
 import { redirect } from "@sveltejs/kit";
 import { signout } from "$lib/server/auth";
 import { SESSION_COOKIE } from "$lib/server/session";
+
+// `page.data.title` convention (see `+layout.svelte`): mirrors this
+// route's own <svelte:head><title> so SharePicker gets the right title
+// without reading the DOM.
+export const load: PageServerLoad = () => {
+  return { title: "Care pathways — Main X" };
+};
 
 export const actions: Actions = {
   signout: async ({ locals, fetch, cookies }) => {

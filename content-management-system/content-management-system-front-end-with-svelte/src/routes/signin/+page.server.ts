@@ -4,8 +4,15 @@
 // by the auth service's allow-list). No credential is held
 // client-side.
 
-import type { Actions } from "./$types";
+import type { Actions, PageServerLoad } from "./$types";
 import { requestMagicLink } from "$lib/server/auth";
+
+// `page.data.title` convention (see `../+layout.svelte`): mirrors this
+// route's own <svelte:head><title> so SharePicker gets the right title
+// without reading the DOM.
+export const load: PageServerLoad = () => {
+  return { title: "Sign in — Content Management System" };
+};
 
 export const actions: Actions = {
   default: async ({ request, fetch, url }) => {

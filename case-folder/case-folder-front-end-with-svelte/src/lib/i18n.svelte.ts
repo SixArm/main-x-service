@@ -17,9 +17,10 @@
 //
 // The i18n store is the SINGLE SOURCE OF TRUTH for the locale: it owns
 // persistence and is reflected onto `<html lang>` / `<html dir>` by the
-// root layout. The Lily LocalePicker just calls `i18n.set` and reflects
-// `value={i18n.locale}` (with `applyDir={false}` so the layout effect owns
-// `dir` consistently).
+// root layout. There is currently no in-app locale switcher (the Lily
+// LocalePicker that called `i18n.set` was removed from the layout in
+// favour of the Lily share/text-size pickers); `i18n.set` remains the
+// programmatic entry point for a future one.
 
 import { browser } from "$app/environment";
 
@@ -86,8 +87,9 @@ export function isRtl(locale: string): boolean {
 
 /**
  * localStorage key under which the chosen UI locale is persisted. Exported
- * so the LocalePicker can share it — the i18n store is the single source of
- * truth for the chosen locale, and the select persists to the same key.
+ * so a future locale switcher can share it — the i18n store is the single
+ * source of truth for the chosen locale, and any such control would persist
+ * to the same key.
  */
 export const LOCALE_KEY = "mxi.case-folder.locale";
 
@@ -101,6 +103,11 @@ const STRINGS = {
         "brand.tagline": "NHS paper records",
         "chrome.language": "Language",
         "chrome.theme": "Theme",
+        "nav.share": "Share",
+        "nav.text_size": "Text size",
+        "share.copy_link": "Copy link",
+        "share.copied": "Link copied",
+        "share.copy_failed": "Could not copy — copy it from the address bar",
         "theme.default": "Default",
         "theme.highContrast": "High contrast",
         "nav.toggle": "Toggle navigation",
@@ -551,6 +558,11 @@ const STRINGS = {
         "brand.tagline": "Cofnodion papur y GIG",
         "chrome.language": "Iaith",
         "chrome.theme": "Thema",
+        "nav.share": "Rhannu",
+        "nav.text_size": "Maint testun",
+        "share.copy_link": "Copïo dolen",
+        "share.copied": "Dolen wedi'i chopïo",
+        "share.copy_failed": "Methu copïo — copïwch o'r bar cyfeiriad",
         "theme.default": "Rhagosodedig",
         "theme.highContrast": "Cyferbyniad uchel",
         "nav.toggle": "Toglo'r llywio",
@@ -966,6 +978,11 @@ const STRINGS = {
         "brand.tagline": "Registros en papel del NHS",
         "chrome.language": "Idioma",
         "chrome.theme": "Tema",
+        "nav.share": "Compartir",
+        "nav.text_size": "Tamaño del texto",
+        "share.copy_link": "Copiar enlace",
+        "share.copied": "Enlace copiado",
+        "share.copy_failed": "No se pudo copiar — cópielo desde la barra de direcciones",
         "theme.default": "Predeterminado",
         "theme.highContrast": "Alto contraste",
         "nav.toggle": "Alternar navegación",
@@ -1381,6 +1398,11 @@ const STRINGS = {
         "brand.tagline": "Dossiers papier du NHS",
         "chrome.language": "Langue",
         "chrome.theme": "Thème",
+        "nav.share": "Partager",
+        "nav.text_size": "Taille du texte",
+        "share.copy_link": "Copier le lien",
+        "share.copied": "Lien copié",
+        "share.copy_failed": "Impossible de copier — copiez-le depuis la barre d'adresse",
         "theme.default": "Par défaut",
         "theme.highContrast": "Contraste élevé",
         "nav.toggle": "Basculer la navigation",
@@ -1796,6 +1818,11 @@ const STRINGS = {
         "brand.tagline": "NHS-Papierakten",
         "chrome.language": "Sprache",
         "chrome.theme": "Thema",
+        "nav.share": "Teilen",
+        "nav.text_size": "Textgröße",
+        "share.copy_link": "Link kopieren",
+        "share.copied": "Link kopiert",
+        "share.copy_failed": "Kopieren fehlgeschlagen — bitte aus der Adressleiste kopieren",
         "theme.default": "Standard",
         "theme.highContrast": "Hoher Kontrast",
         "nav.toggle": "Navigation umschalten",
@@ -2211,6 +2238,11 @@ const STRINGS = {
         "brand.tagline": "السجلات الورقية لهيئة الخدمات الصحية الوطنية",
         "chrome.language": "اللغة",
         "chrome.theme": "السمة",
+        "nav.share": "مشاركة",
+        "nav.text_size": "حجم النص",
+        "share.copy_link": "نسخ الرابط",
+        "share.copied": "تم نسخ الرابط",
+        "share.copy_failed": "تعذر النسخ — انسخه من شريط العنوان",
         "theme.default": "افتراضي",
         "theme.highContrast": "تباين عالٍ",
         "nav.toggle": "تبديل التنقل",
@@ -2626,6 +2658,11 @@ const STRINGS = {
         "brand.tagline": "Бумажные записи NHS",
         "chrome.language": "Язык",
         "chrome.theme": "Тема",
+        "nav.share": "Поделиться",
+        "nav.text_size": "Размер текста",
+        "share.copy_link": "Копировать ссылку",
+        "share.copied": "Ссылка скопирована",
+        "share.copy_failed": "Не удалось скопировать — скопируйте из адресной строки",
         "theme.default": "По умолчанию",
         "theme.highContrast": "Высокий контраст",
         "nav.toggle": "Переключить навигацию",
@@ -3041,6 +3078,11 @@ const STRINGS = {
         "brand.tagline": "NHS कागज़ी रिकॉर्ड",
         "chrome.language": "भाषा",
         "chrome.theme": "थीम",
+        "nav.share": "साझा करें",
+        "nav.text_size": "टेक्स्ट का आकार",
+        "share.copy_link": "लिंक कॉपी करें",
+        "share.copied": "लिंक कॉपी हो गया",
+        "share.copy_failed": "कॉपी नहीं हो सका — इसे एड्रेस बार से कॉपी करें",
         "theme.default": "डिफ़ॉल्ट",
         "theme.highContrast": "उच्च कंट्रास्ट",
         "nav.toggle": "नेविगेशन टॉगल करें",
@@ -3456,6 +3498,11 @@ const STRINGS = {
         "brand.tagline": "NHS 纸质记录",
         "chrome.language": "语言",
         "chrome.theme": "主题",
+        "nav.share": "分享",
+        "nav.text_size": "文字大小",
+        "share.copy_link": "复制链接",
+        "share.copied": "链接已复制",
+        "share.copy_failed": "无法复制 — 请从地址栏复制",
         "theme.default": "默认",
         "theme.highContrast": "高对比度",
         "nav.toggle": "切换导航",
@@ -3871,6 +3918,11 @@ const STRINGS = {
         "brand.tagline": "NHS কাগজের রেকর্ড",
         "chrome.language": "ভাষা",
         "chrome.theme": "থিম",
+        "nav.share": "শেয়ার করুন",
+        "nav.text_size": "টেক্সটের আকার",
+        "share.copy_link": "লিঙ্ক কপি করুন",
+        "share.copied": "লিঙ্ক কপি হয়েছে",
+        "share.copy_failed": "কপি করা যায়নি — ঠিকানা বার থেকে কপি করুন",
         "theme.default": "ডিফল্ট",
         "theme.highContrast": "উচ্চ কনট্রাস্ট",
         "nav.toggle": "নেভিগেশন টগল করুন",
@@ -4286,6 +4338,11 @@ const STRINGS = {
         "brand.tagline": "Registos em papel do NHS",
         "chrome.language": "Idioma",
         "chrome.theme": "Tema",
+        "nav.share": "Partilhar",
+        "nav.text_size": "Tamanho do texto",
+        "share.copy_link": "Copiar link",
+        "share.copied": "Link copiado",
+        "share.copy_failed": "Não foi possível copiar — copie a partir da barra de endereço",
         "theme.default": "Predefinido",
         "theme.highContrast": "Alto contraste",
         "nav.toggle": "Alternar navegação",
@@ -4701,6 +4758,11 @@ const STRINGS = {
         "brand.tagline": "Rekaman kertas NHS",
         "chrome.language": "Bahasa",
         "chrome.theme": "Tema",
+        "nav.share": "Bagikan",
+        "nav.text_size": "Ukuran teks",
+        "share.copy_link": "Salin tautan",
+        "share.copied": "Tautan disalin",
+        "share.copy_failed": "Tidak dapat menyalin — salin dari bilah alamat",
         "theme.default": "Bawaan",
         "theme.highContrast": "Kontras tinggi",
         "nav.toggle": "Alihkan navigasi",
@@ -5116,6 +5178,11 @@ const STRINGS = {
         "brand.tagline": "NHS کاغذی ریکارڈز",
         "chrome.language": "زبان",
         "chrome.theme": "تھیم",
+        "nav.share": "شیئر کریں",
+        "nav.text_size": "متن کا سائز",
+        "share.copy_link": "لنک کاپی کریں",
+        "share.copied": "لنک کاپی ہو گیا",
+        "share.copy_failed": "کاپی نہیں ہو سکا — اسے ایڈریس بار سے کاپی کریں",
         "theme.default": "طے شدہ",
         "theme.highContrast": "اعلیٰ تضاد",
         "nav.toggle": "نیویگیشن ٹوگل کریں",

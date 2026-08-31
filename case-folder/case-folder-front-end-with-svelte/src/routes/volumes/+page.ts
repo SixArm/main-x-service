@@ -9,7 +9,8 @@ import { error } from '@sveltejs/kit';
 export async function load({ fetch }) {
     try {
         const list = await api.volumes.list({}, { fetch });
-        return { volumes: list.items };
+        // `page.data.title` convention (see `../+layout.svelte`).
+        return { volumes: list.items, title: 'Volumes · Case Tracking' };
     } catch (e) {
         error(503, (e as Error).message);
     }

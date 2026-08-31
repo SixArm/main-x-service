@@ -6,6 +6,10 @@
 import type { PageServerLoad } from "./$types";
 import { requireSignedIn } from "$lib/server/session";
 
-export const load: PageServerLoad = ({ locals }) => {
+// `page.data.title` convention (see `../../../+layout.svelte`): mirrors
+// this route's own <svelte:head><title> so SharePicker gets the right
+// title without reading the DOM.
+export const load: PageServerLoad = ({ locals, params }) => {
   requireSignedIn(locals);
+  return { title: `Edit worker · ${params.id}` };
 };

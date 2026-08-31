@@ -9,7 +9,8 @@ import { error } from '@sveltejs/kit';
 
 export async function load({ fetch }) {
     try {
-        return { alerts: await api.alerts.list({ fetch }) };
+        // `page.data.title` convention (see `../+layout.svelte`).
+        return { alerts: await api.alerts.list({ fetch }), title: 'Alerts · Case Tracking' };
     } catch (e) {
         error(503, (e as Error).message);
     }

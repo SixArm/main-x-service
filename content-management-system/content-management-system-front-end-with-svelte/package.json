@@ -40,7 +40,8 @@
   "dependencies": {
     "@svar-ui/svelte-grid": "^2.7.2",
     "lily-design-system-svelte-headless": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless",
-    "lily-design-system-svelte-locale-picker": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-picker",
+    "lily-design-system-svelte-share-picker": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-share-picker",
+    "lily-design-system-svelte-text-size-picker": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-text-size-picker",
     "lily-design-system-svelte-theme-picker": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-picker"
   }
 }

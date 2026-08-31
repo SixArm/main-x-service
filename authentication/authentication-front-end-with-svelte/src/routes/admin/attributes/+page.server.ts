@@ -9,11 +9,16 @@ import { fail } from "@sveltejs/kit";
 import { getUserAttributes, putUserAttributes } from "$lib/server/admin";
 import type { UserAttributes } from "$lib/api/types";
 
+// `page.data.title` convention (see `../../+layout.svelte`): mirrors this
+// route's own <svelte:head><title> so SharePicker gets the right title
+// without reading the DOM.
+const TITLE = "Attributes — Main X Auth";
+
 export const load: PageServerLoad = async ({ url, locals, fetch }) => {
   const pid = url.searchParams.get("pid")?.trim() || null;
-  if (!pid) return { pid: null, target: null as UserAttributes | null };
+  if (!pid) return { pid: null, target: null as UserAttributes | null, title: TITLE };
   if (!locals.sessionId) {
-    return { pid, target: null, error: "Sign in as an admin to manage attributes." };
+    return { pid, target: null, error: "Sign in as an admin to manage attributes.", title: TITLE };
   }
   const result = await getUserAttributes(
     fetch,
@@ -22,9 +27,9 @@ export const load: PageServerLoad = async ({ url, locals, fetch }) => {
     pid,
   );
   if (!result.ok) {
-    return { pid, target: null, error: result.message, status: result.status };
+    return { pid, target: null, error: result.message, status: result.status, title: TITLE };
   }
-  return { pid, target: result.data };
+  return { pid, target: result.data, title: TITLE };
 };
 
 /** Parse the editor text into the string→string-array attribute map, or

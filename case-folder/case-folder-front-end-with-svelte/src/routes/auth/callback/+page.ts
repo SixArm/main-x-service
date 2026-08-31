@@ -11,10 +11,14 @@ import { cache } from '$lib/store/cache.svelte';
 import { redirect } from '@sveltejs/kit';
 
 export async function load({ url, fetch }) {
+    // `page.data.title` convention (see `../../+layout.svelte`). Only the
+    // error path renders this page — success redirects below — but the
+    // utility row (and its SharePicker) still shows on bare routes.
+    const title = 'Signing in · Case Tracking';
     const token = url.searchParams.get('token');
     if (!token) {
         // Malformed / truncated link — nothing to verify.
-        return { error: 'This sign-in link is missing its token.' };
+        return { error: 'This sign-in link is missing its token.', title };
     }
     try {
         const user = await api.auth.verify(token, { fetch });
@@ -23,7 +27,7 @@ export async function load({ url, fetch }) {
         // Surface a readable reason (expired / already-used token, etc.).
         const message =
             e instanceof ApiError ? e.message : (e as Error).message ?? 'Sign-in failed.';
-        return { error: message };
+        return { error: message, title };
     }
     // Success — hand off to the dashboard. The layout's `me()` check will
     // now see the session cookie and let the protected routes through.

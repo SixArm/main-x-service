@@ -2,8 +2,15 @@
 // request to the authentication service. The form carries an email, an
 // optional name, and the UI locale; no credential is held client-side.
 
-import type { Actions } from "./$types";
+import type { Actions, PageServerLoad } from "./$types";
 import { signup } from "$lib/server/auth";
+
+// `page.data.title` convention (see `../+layout.svelte`): mirrors this
+// route's own <svelte:head><title> so SharePicker gets the right title
+// without reading the DOM.
+export const load: PageServerLoad = () => {
+  return { title: "Create account — Main X Auth" };
+};
 
 export const actions: Actions = {
   default: async ({ request, fetch }) => {
