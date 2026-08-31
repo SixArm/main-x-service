@@ -7,7 +7,8 @@
 //! deterministic matching, and the batch ranking entry point. Numbers
 //! are reported in absolute time per call.
 
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use std::hint::black_box;
 use thing_matcher::{Identifier, MatchConfig, MatchingEngine, SimilarityAlgorithm, Thing};
 
 /// Build a richly-populated reference `Thing` (the Eiffel Tower) used as the
