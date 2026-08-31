@@ -9,7 +9,7 @@ stable compiler is `1.N`, the MSRV is `1.(N-2)`.
 | Current stable (`N`) | **1.98.0** (2026-08-18) |
 | **Declared MSRV (`N-2`)** | **1.96** |
 | Toolchain we *build* with | **1.96.1** (`rust-toolchain.toml`) |
-| Single source of truth | [`ci/msrv.txt`](../ci/msrv.txt) |
+| Single source of truth | [`ci/msrv.txt`](../../ci/msrv.txt) |
 
 At N-2 the MSRV's minor version happens to coincide with the build
 pin's minor version (both `1.96`) — the pin still carries a patch
@@ -76,10 +76,10 @@ rust-version = "1.96"
 
 - It is declared **per crate** rather than inherited, because this
   repository has **no root `Cargo.toml`** — each crate is its own
-  workspace (see [`scripts/ci-crates.sh`](../scripts/ci-crates.sh)), so
+  workspace (see [`scripts/ci-crates.sh`](../../scripts/ci-crates.sh)), so
   there is nothing to inherit from.
 - The value is duplicated across 46 manifests, and duplication drifts,
-  so **[`ci/msrv.txt`](../ci/msrv.txt) is the single source of truth**
+  so **[`ci/msrv.txt`](../../ci/msrv.txt) is the single source of truth**
   and a CI stage fails when any manifest disagrees with it (§4).
 - `rust-version` is not cosmetic. With edition 2024 (resolver `"3"`)
   Cargo is **MSRV-aware**: when resolving a dependency it prefers the
@@ -93,7 +93,7 @@ rust-version = "1.96"
 The `fuzz/` sub-crates (18 of them) are **excluded** and carry no
 `rust-version`. They are `publish = false` scaffolding that only ever
 builds under `cargo +nightly fuzz` with sanitizer instrumentation
-([`.github/workflows/fuzz.yml`](../.github/workflows/fuzz.yml)); a
+([`.github/workflows/fuzz.yml`](../../.github/workflows/fuzz.yml)); a
 stable-toolchain floor would be a claim nothing checks and nobody could
 use. Everything else — service crates, matcher crates, library crates,
 and the `migration/` sub-crates — declares it: 46 crates in total.
@@ -105,7 +105,7 @@ They are routinely confused, so, explicitly:
 | Number | Where | What it means |
 |---|---|---|
 | **1.98** (`N`) | upstream | the newest stable compiler that exists |
-| **1.96.1** | [`rust-toolchain.toml`](../rust-toolchain.toml) | the compiler this repo *builds and formats with*, pinned so `cargo fmt` is byte-identical on every machine |
+| **1.96.1** | [`rust-toolchain.toml`](../../rust-toolchain.toml) | the compiler this repo *builds and formats with*, pinned so `cargo fmt` is byte-identical on every machine |
 | **1.96** (`N-2`) | `ci/msrv.txt` + every `Cargo.toml` | the oldest compiler we *promise still works* |
 
 The pin exists to stop rustfmt drift churning the tree; the MSRV exists
@@ -204,9 +204,9 @@ update.
 
 ## See also
 
-- [`../rust-toolchain.toml`](../rust-toolchain.toml) — the build pin (§3)
-- [`../ci/msrv.txt`](../ci/msrv.txt) — the declared floor
-- [`../scripts/ci-check.sh`](../scripts/ci-check.sh) — the `msrv` stage
+- [`../../rust-toolchain.toml`](../../rust-toolchain.toml) — the build pin (§3)
+- [`../../ci/msrv.txt`](../../ci/msrv.txt) — the declared floor
+- [`../../scripts/ci-check.sh`](../../scripts/ci-check.sh) — the `msrv` stage
 - [`tech-stack/index.md`](../tech-stack/index.md) — the wider stack and its
   hard constraints
 - [`testing/index.md`](../testing/index.md) — the surrounding test strategy

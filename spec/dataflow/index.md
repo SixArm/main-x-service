@@ -55,7 +55,7 @@ HTTP POST
   │
   ├─ 4. Persist: INSERT (transactional) ............. row committed
   │
-  ├─ 5. Search index: upsert into Tantivy (where present)
+  ├─ 5. Search index: upsert into Tantivy
   │
   ├─ 6. Publish `Created` event (in-memory stream)
   │
@@ -85,9 +85,9 @@ Step-by-step:
    In the older services this fans out across normalized child tables
    inside one transaction; in loco services it is a single-row INSERT of
    the JSONB `data` column plus the denormalized `name`/`pid`.
-5. **Search index.** Older services call the search engine to index the
-   new record (Tantivy). Loco services skip this — full-text indexing is
-   deferred (`ILIKE` name search stands in).
+5. **Search index.** Every service, loco or older, indexes the new
+   record in Tantivy — full-text search is live family-wide, not just
+   in the older services. See [search](../search/index.md).
 6. **Publish event.** A `Created` event goes to the in-memory event
    stream (`streaming::publish_with_actor(EventKind::Created, …)`),
    carrying the entity id, name, and actor. See
@@ -127,16 +127,24 @@ HTTP POST {query, candidates}
 ```
 HTTP POST {query}
   │
-  ├─ 1. Candidate set
-  │       loco today: in-memory scan of up to CHECK_DUPLICATES_SCAN_CAP
-  │                   (1000) active rows; WARN if the cap is hit
-  │       target / older: search → blocking candidates
+  ├─ 1. Candidate set: search index → blocking candidates
+  │       (up to CHECK_DUPLICATES_CANDIDATE_LIMIT, e.g. 200 for
+  │       organization) — Tantivy-index-blocked, not a table scan;
+  │       an unavailable index is a 503, never a silent "no duplicates"
   │
   ├─ 2. Score each candidate with the matcher
   ├─ 3. Classify (confidence bands) + filter to is_match
   ├─ 4. Sort best-first (descending score)
   └─ 5. Response: [{pid, name, score, confidence, is_match}]
 ```
+
+The **separate batch** `POST /api/<plural>/deduplicate` endpoint is the
+one bounded by an in-memory scan: it scores every unordered pair, so it
+loads rows in bulk up to `CHECK_DUPLICATES_SCAN_CAP` (e.g. 1000 for
+organization) active rows and `WARN`s if the cap is hit. Real-time
+`check-duplicates` (above) and batch `deduplicate` are two different
+endpoints with two different candidate-selection strategies — do not
+conflate them.
 
 The matcher returns `score` in `[0.0, 1.0]`, an `is_match` boolean, and
 a `confidence` band. Classification bands (configurable):
@@ -150,9 +158,10 @@ a `confidence` band. Classification bands (configurable):
 
 `f64` is only partially ordered, so the sort falls back to "equal" for
 any `NaN` (which the engine never emits) rather than panicking. The
-loco in-memory scan is a stop-gap: hitting the cap means the result may
-be incomplete (search-backed candidate blocking is deferred). See
-[matching](../matching/index.md).
+batch `deduplicate` scan is a genuine stop-gap: hitting its cap means
+the result may be incomplete, because scoring every pair does not
+blend with index-backed candidate selection the way single-query
+`check-duplicates` does. See [matching](../matching/index.md).
 
 ---
 
@@ -220,9 +229,7 @@ HTTP GET ?q=stroke
   │
   ├─ 1. Reject absent / blank q ......................... 400
   │
-  ├─ 2. Query
-  │       loco today: Postgres ILIKE over denormalized name (cap 50)
-  │       older / target: Tantivy full-text query (fuzzy + phonetic)
+  ├─ 2. Query: Tantivy full-text query (fuzzy + phonetic modes)
   │
   ├─ 3. Fetch matched rows / fetch-by-id batch
   │
@@ -231,14 +238,10 @@ HTTP GET ?q=stroke
   └─ 5. Response: JSON array (+ pagination: offset + limit)
 ```
 
-The loco services do a pragmatic case-insensitive `ILIKE` over the
-denormalized `name`/`title` column (capped, currently 50 rows) and
-return lightweight `{pid, name}` references; full-text, fuzzy, and
-phonetic search via Tantivy is deferred. The older services run a
-Tantivy query, collect the matching ids, batch-fetch the records via the
-repository, optionally mask, then serialize with `offset`/`limit`
-pagination. See [search](../search/index.md) and
-[postgresql](../postgresql/index.md).
+Both service generations run a Tantivy query, collect the matching ids,
+batch-fetch the records via the repository, optionally mask, then
+serialize with `offset`/`limit` pagination. See
+[search](../search/index.md) and [postgresql](../postgresql/index.md).
 
 ---
 
@@ -341,12 +344,12 @@ differs between the two service generations:
 | --- | --- | --- |
 | Persistence (create §1.4) | single-row INSERT of JSONB `data` + denormalized `name`/`pid` | INSERT fanned across normalized child tables in one transaction |
 | DTO | the matcher type stored verbatim (no adapter) | a separate `Person`/etc. model + adapter to the matcher type |
-| Search (§4) | Postgres `ILIKE` over the denormalized name (cap) | Tantivy full-text / fuzzy / phonetic |
+| Search (§4) | Tantivy full-text / fuzzy / phonetic | Tantivy full-text / fuzzy / phonetic |
 | Create-time dedup (§1.2–§1.3) | deferred; explicit `check-duplicates` only | real-time on create → `409` |
 | Success status (§1.8) | `200` with `{pid, name}` | `201 Created` |
 | Validation error helper | `Error::CustomError(422, …)` | `ApiResponse::error` + `StatusCode::UNPROCESSABLE_ENTITY` |
 | Privacy (§5) | masked/export deferred in several crates | present (person/place/worker) |
-| check-duplicates candidates (§2) | in-memory scan (cap 1000, WARN on cap) | search-blocked candidates |
+| check-duplicates candidates (§2) | Tantivy-index-blocked, same as older (batch `deduplicate` is the in-memory scan, cap 1000, WARN on cap) | search-blocked candidates |
 
 For any specific crate, the per-crate `spec.md §13` (live task queue) is
 the source of truth on which of these stages are wired versus deferred.

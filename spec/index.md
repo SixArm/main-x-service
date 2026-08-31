@@ -36,6 +36,9 @@ the family-wide source of truth; the briefer versions under
 | [special-files-for-public-repos](special-files-for-public-repos/index.md) | The special top-level files every public repo carries (LICENSE.md, CITATION.cff, SECURITY.md, AI_STATEMENT.md, …) |
 | [free-open-source-funding](free-open-source-funding/index.md) | Funding channels for a free/open-source repo (GitHub Sponsors, Open Collective, `.github/FUNDING.yml`) |
 | [trusted-publishing](trusted-publishing/index.md) | OIDC-based crate publishing (no long-lived API tokens) — adopt once production-ready across every forge and target we use |
+| [dependabot](dependabot/index.md) | GitHub Dependabot — repo-level security updates plus a scheduled `.github/dependabot.yml` for update PRs |
+| [agent-skills](agent-skills/index.md) | The repo's top-level Claude Code agent skills — `sixarm-services-skill` (explaining the system) and `sixarm-services-maintainer-skill` (making a change to it) |
+| [llms-json-and-llms-txt](llms-json-and-llms-txt/index.md) | `llms.json` / `llms.txt` — curated, size-bounded AI-guidance map of the repo's most important content |
 
 ### Data & persistence
 
@@ -43,8 +46,8 @@ the family-wide source of truth; the briefer versions under
 | ----- | ----------- |
 | [postgresql](postgresql/index.md) | PostgreSQL — version, per-service DBs, pooling, the two persistence styles, extensions, JSONB, locks, migrations, ops |
 | [data-modeling.md](data-modeling.md) | Data-modeling rules (SQL-first, child tables, discriminators, JSONB policy) |
-| [data.md](data.md) | Data conventions |
-| [latitude-longitude-as-decimal-degrees](latitude-longitude-as-decimal-degrees/index.md) | Store coordinates as decimal (NUMERIC), never float |
+| [data.md](data.md) | Pointer stub — see data-modeling.md above |
+| [latitude-longitude-as-decimal-degrees](latitude-longitude-as-decimal-degrees/index.md) | Pointer stub — see latitude-longitude-altitude-elevation below |
 | [latitude-longitude-altitude-elevation](latitude-longitude-altitude-elevation/index.md) | Geo field naming: `*_as_decimal_degrees` / `*_as_decimal_metres` |
 | [serde-json-float-roundtrip-arbitrary-precision](serde-json-float-roundtrip-arbitrary-precision/index.md) | Serde JSON float round-trip rules (arbitrary precision) |
 

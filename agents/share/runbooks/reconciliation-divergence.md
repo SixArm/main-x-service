@@ -12,8 +12,8 @@ for the design.
 
 Once per `LINK_GRAPH_RECONCILE_SECS` (default `300`s; a non-numeric or
 `0` value silently falls back to the default), **one independent worker
-per configured entity** (person, case — the only two with a live bulk
-`/links` endpoint today):
+per configured entity** (person, case, and care-pathway — the only
+three with a live bulk `/links` endpoint today):
 
 1. Pulls that entity's authoritative edge set: `GET
    LINK_GRAPH_RECONCILE_URL_<ENTITY>`, bearer `LINK_GRAPH_RECONCILE_TOKEN`

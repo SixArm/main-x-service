@@ -98,7 +98,7 @@ connectivity?) probes, and for container `HEALTHCHECK` directives.
 
 | Endpoint | Provided by | Purpose |
 |---|---|---|
-| `GET /_health` | loco services (organization, care-pathway, case, authentication) | loco's built-in readiness check (verifies DB/queue) |
+| `GET /_health` | loco services (organization, care-pathway, case, portfolio, authentication, link-graph-service) | loco's built-in readiness check (verifies DB/queue) |
 | `GET /_ping` | loco services | loco's lightweight liveness ping |
 | `GET /api/health` | legacy Axum services (Dockerfile `HEALTHCHECK`) | service health check |
 | `GET /api/health` | event-service and some compose health probes | versioned health check |

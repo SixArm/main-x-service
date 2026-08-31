@@ -13,13 +13,13 @@ use the `sixarm-services-maintainer-skill` instead.
 ## What this is, in one paragraph
 
 The Main X Index is a **federated identity index**: a family of small
-services, one per kind of real-world entity (a person, a workplace, a
-piece of equipment, an event, a course, an organization, a clinical
-care pathway, a governmental case, a project or plan), each doing the
-same four things for its entity — **store records, find likely
-duplicates, merge confirmed duplicates, and let other services and
-front-ends read and search them**. A handful of cross-cutting pieces
-(a single sign-on provider, a cross-service link graph) tie the
+services, one per kind of real-world entity (a person, a worker, a
+workplace, a piece of equipment, an event, a course, an organization, a
+clinical care pathway, a governmental case, a project or plan), each
+doing the same four things for its entity — **store records, find
+likely duplicates, merge confirmed duplicates, and let other services
+and front-ends read and search them**. A handful of cross-cutting
+pieces (a single sign-on provider, a cross-service link graph) tie the
 entities together without merging them into one big database.
 
 Read [`agents/share/overview.md`](../agents/share/overview.md) for the

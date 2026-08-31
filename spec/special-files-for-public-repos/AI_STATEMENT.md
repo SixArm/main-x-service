@@ -1,5 +1,11 @@
 # AI Statement
 
+> **Template example — not this repo's AI statement.** This file is kept
+> as a worked example of the `AI_STATEMENT.md` pattern described in
+> [`index.md`](index.md) in this same directory; its content describes a
+> different (openEHR-project-derived) project, not `main-x-service`. This
+> repo's own AI statement is the root [`AI_STATEMENT.md`](../../AI_STATEMENT.md).
+
 Version 1.0.0, status is active.
 
 Canonical location is `AI_STATEMENT.md` at the repository root.

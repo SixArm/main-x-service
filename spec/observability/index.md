@@ -33,20 +33,25 @@ crate (older Axum services vs. loco-native services — see §2).
 |---|---|---|---|
 | **Logging / tracing** | `tracing` + `tracing-subscriber` (JSON or compact); loco `logger:` config block; SeaORM SQL query logging via `database.enable_logging` | every service | implemented |
 | **Metrics** | Prometheus text exposition at `GET /metrics.prom` (the `prometheus` crate registry in `src/metrics.rs`) | every service | implemented (all 10 services) |
-| **Distributed tracing** | OpenTelemetry OTLP export, `opentelemetry-semantic-conventions` | `src/observability/` bootstrap | scaffolded; OTLP exporter stubbed (`todo!` / commented) |
+| **Distributed tracing** | OpenTelemetry OTLP export, `opentelemetry-semantic-conventions` | flat `src/observability.rs` module | **implemented in 8 services**: the cross-cutting link-graph-service (the original reference) plus **7 of the 10 entity registries** — person, worker, event (PRO-H9), course, place, thing (PRO-H12 slices 1–3), and organization (PRO-H12 slice 4). Real exporter code (`opentelemetry_otlp::{SpanExporter, MetricExporter}`, …), not a stub. **Still missing on 3 entity registries — care-pathway, case, and portfolio** — PRO-H12's remaining scope (§6). |
 
 ### 1.1 Logging / tracing
 
 Process-wide logging is set up exactly once at startup.
 
-- **Older Axum services** — `src/observability/mod.rs::init_telemetry`
+- **Older Axum services (and the loco services that have ported the
+  OTLP exporter — §1.3)** — `src/observability.rs::init_telemetry`
   builds an OTel `Resource` tagging `service.name` / `service.version`,
   then installs a JSON `tracing` subscriber. The level comes from the
   `RUST_LOG` env filter (`EnvFilter::try_from_default_env`), falling
   back to the configured `log_level`. `shutdown_telemetry` flushes the
-  tracer provider on graceful exit.
-- **Loco-native services** — logging is driven by loco's `logger:`
-  config block (see §1.1.1), not a hand-rolled subscriber.
+  tracer provider on graceful exit. Note the module is a **flat file**,
+  `src/observability.rs`, not a `src/observability/mod.rs` directory —
+  see §1.3 and §6.2.
+- **Loco-native services without the exporter (care-pathway, case,
+  portfolio)** — logging is driven only by loco's `logger:` config
+  block (see §1.1.1), not a hand-rolled subscriber; there is no
+  `src/observability.rs` in these three at all yet.
 
 #### 1.1.1 Loco `logger:` config block
 
@@ -93,14 +98,23 @@ Prometheus text-exposition format and served at `GET /metrics.prom`
 
 ### 1.3 Distributed tracing
 
-The OTLP pipeline is **scaffolded but not yet active**. In
-`src/observability/mod.rs` the OTLP exporter and the
-`tracing_opentelemetry` layer are commented out (`TODO`), and the
-`custom_metrics::*Metrics` OpenTelemetry instrument set
-(`Counter`/`Histogram`) is constructed by a `todo!()` stub. The
-`traces.rs` and `metrics.rs` submodules under `src/observability/` are
-reserved placeholders for span/context propagation helpers and the OTLP
-metric counterpart respectively. See §3 and §6.
+The OTLP pipeline is **active in 8 services** — the cross-cutting
+link-graph-service plus 7 of the 10 entity registries. This section
+used to describe every service as scaffolded; that description now
+applies only to the three still-missing entity registries
+(care-pathway, case, portfolio). In
+`src/observability.rs`, link-graph-service (the original reference,
+2026-08-05), person, worker, event (PRO-H9, 2026-08-28), course, place,
+thing (PRO-H12 slices 1–3, 2026-08-30), and organization (PRO-H12 slice
+4, 2026-08-30 — the first loco-idiomatic crate, `src/controllers/`
+rather than `src/api/rest/`, to carry it) each wire a real OTLP
+exporter (span + metric) bridged from `tracing` through loco's
+`Hooks::init_logger` seam, with a per-request span, an
+`http.server.request.duration` histogram, and a W3C `traceparent`
+response header — proved against a real in-process collector, not a
+`todo!()` stub. **care-pathway, case, and portfolio carry no
+`src/observability.rs` module at all** — PRO-H12's remaining scope. See
+§3 and §6.
 
 ---
 
@@ -149,7 +163,7 @@ Histogram buckets are tuned per metric:
 | Generation | Services | `/metrics.prom`? |
 |---|---|---|
 | Older Axum services | person, worker, place, thing, event, course | **Yes** — `src/metrics.rs` + handler |
-| Loco-native services | organization, care-pathway, case, authentication | **Yes** — `src/metrics.rs` + `src/controllers/metrics.rs` |
+| Loco-native services | organization, care-pathway, case, portfolio, authentication | **Yes** — `src/metrics.rs` + `src/controllers/metrics.rs` |
 
 Every service exposes the Prometheus surface at the root path
 `/metrics.prom` (public, `text/plain; version=0.0.4`) alongside loco's
@@ -224,9 +238,12 @@ stack brief):
 | `OTLP_ENDPOINT` | `http://localhost:4317` | OTLP collector endpoint |
 
 The OTel `Resource` is tagged with `service.name` (from config) and
-`service.version` (`CARGO_PKG_VERSION`) at bootstrap. The exporter
-wiring itself is currently commented out (§6); once enabled, each
-response carries a `traceparent` header for cross-service correlation.
+`service.version` (`CARGO_PKG_VERSION`) at bootstrap. **On the 8 landed
+services** (§1.3) the exporter wiring is real, not commented out, and
+each response carries a `traceparent` header for cross-service
+correlation. **On care-pathway, case, and portfolio** the exporter is
+absent (§6), so this section's env vars and behaviour don't yet apply
+to those three.
 
 ### 3.5 Correlation across services
 
@@ -234,10 +251,13 @@ The services form a federation (one per entity) plus the central
 [authentication-service](../../authentication/authentication-service-with-loco).
 Trace correlation relies on W3C `traceparent` propagation: an inbound
 request's context is extracted, attached to the request span, and
-propagated outbound on DB / RPC / HTTP calls. The reserved
-`src/observability/traces.rs` is where the extraction/propagation
-helpers land. Until OTLP is wired, correlation is best-effort via the
-shared `service.name` / request-path log fields.
+propagated outbound on DB / RPC / HTTP calls. On the 8 landed services
+(§1.3) the extraction/propagation logic lives inline in the flat
+`src/observability.rs` — there is no separate `traces.rs` submodule;
+that was an earlier scaffolding plan this doc described before the
+shape settled. **On care-pathway, case, and portfolio**, which have no
+`src/observability.rs` at all yet, correlation is still best-effort via
+the shared `service.name` / request-path log fields.
 
 ---
 
@@ -291,9 +311,13 @@ distinct from the trace stream:
   over REST (`GET /api/audit/recent`, `GET /api/<plural>/{id}/audit`).
   See [`agents/share/auditability.md`](../../agents/share/auditability.md).
 - **Event stream** → `*Created` / `*Updated` / `*Deleted` /
-  `*Merged` / `*Linked` / `*Unlinked` events. In-memory today
-  (durable bus is roadmap); the loco services expose a frozen
-  `EventView` projection at `GET /api/<plural>/events/recent`.
+  `*Merged` / `*Linked` / `*Unlinked` events. In-memory by default
+  (`<ENTITY>_EVENT_TRANSPORT=memory`); a durable Postgres-outbox +
+  `FluvioSink` relay is **shipped, default-off, on all ten entity
+  registries** (see [`spec/event-streaming/index.md`](../event-streaming/index.md)
+  §4/§8) — a deployment opts in by flipping the transport, it is not
+  unwritten code. The loco services expose a frozen `EventView`
+  projection at `GET /api/<plural>/events/recent`.
 
 Instrument publish counts and failures so a stalled audit/event writer
 is visible.
@@ -340,23 +364,39 @@ where geo is modeled) are catalogued in the same postgresql spec.
 
 - JSON / compact structured `tracing` with `RUST_LOG` + loco
   `logger:` config; per-call `service.name` / `service.version`.
-- Prometheus `/metrics.prom` text exposition on the **5 older Axum
-  services** (person, worker, place, thing, event): CRUD counters,
+- Prometheus `/metrics.prom` text exposition on the **6 older Axum
+  services** (person, worker, place, thing, event, **and course** —
+  this list previously omitted course, contradicting §2.3, which has
+  always listed all six correctly) plus organization, care-pathway,
+  case, portfolio, and authentication (§2.3): CRUD counters,
   `http_requests_total`, latency + match-score histograms.
+- **Real OpenTelemetry OTLP export on 8 of 10 entity-registry-adjacent
+  services** (§1.3) — link-graph-service (the original reference),
+  person, worker, event, course, place, thing, and organization — each
+  via a working `src/observability.rs` proved against a real
+  in-process collector, not scaffolding.
 - SeaORM SQL query logging toggle (`database.enable_logging`).
 - Health endpoints on every service; audit-log table + query API;
-  in-memory event stream.
+  event stream (in-memory by default, durable outbox + Fluvio relay
+  shipped default-off on all ten registries — §4.5).
 
-### 6.2 Roadmap
+### 6.2 Roadmap — scoped to the 3 remaining crates
 
-| Item | Status | Blocking detail |
+Everything below is **already done** on link-graph-service, person,
+worker, event, course, place, thing, and organization (§1.3, §3.4–3.5).
+What remains is porting the same shape to **care-pathway, case, and
+portfolio**, which today have no `src/observability.rs` module at all
+(PRO-H12's remaining scope) — not a family-wide gap.
+
+| Item | Status | Detail |
 |---|---|---|
-| Full OTLP exporter wiring | scaffolded | exporter + `tracing_opentelemetry` layer commented out in `src/observability/mod.rs`; `custom_metrics::*Metrics::new()` is `todo!()` |
-| `traceparent` propagation helpers | reserved | `src/observability/traces.rs` placeholder |
-| OTLP metric counterpart | reserved | `src/observability/metrics.rs` placeholder (mirrors the Prometheus set over OTLP) |
-| DB connection-pool gauges | deferred | surface pool saturation as a first-class metric |
-| Durable event bus | deferred | replace in-memory stream (Fluvio per the stack reference) |
-| Background-job metrics | deferred | Postgres-backed queue is configured but idle |
+| OTLP exporter (span + metric) | **done** on 8/10; **missing** on care-pathway/case/portfolio | Port organization's loco-idiomatic version (not a person-style crate's) — organization's `AGENTS.md` documents the adaptation these three, all `src/controllers/`-shaped, will need: exactly one router-construction surface, so the tower middleware layers once. |
+| `traceparent` propagation | **done** on 8/10, inline in the flat `src/observability.rs` (no separate `traces.rs` file — see §3.5) | Same porting task as above. |
+| OTLP metric counterpart (mirrors the Prometheus set) | **done** on 8/10 | Same porting task as above. |
+| `otlp-test-tonic` dev-dependency rename | needed only where a crate **declares** `tonic` at all (tracked by the Cargo.toml, not the gRPC-stub capability row) | Check each remaining crate's own `Cargo.toml` before porting — this tripped up place and thing despite showing `–` on gRPC. |
+| DB connection-pool gauges | deferred, family-wide | surface pool saturation as a first-class metric |
+| Durable event bus | **shipped**, default-off, all ten registries | see [`spec/event-streaming/index.md`](../event-streaming/index.md) — not a roadmap item any more; only actually flipping a deployment's transport, and building the search-re-indexer/cache/analytics consumers, remain open |
+| Background-job metrics | deferred, family-wide | Postgres-backed queue is configured but idle |
 
 ---
 

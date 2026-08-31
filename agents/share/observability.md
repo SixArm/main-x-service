@@ -50,9 +50,9 @@ family's settled 0.32/0.33 versions in the same change that adds the
 real module rather than leaving two OTLP dependency generations in one
 manifest.
 
-The four remaining loco-idiomatic crates (organization, care-pathway,
-case, portfolio) have not yet had their router-construction surface
-count and layering point worked out — expect it to differ from the
+The three remaining loco-idiomatic crates (care-pathway, case,
+portfolio) have not yet had their router-construction surface count
+and layering point worked out — expect it to differ from the
 person-style crates' two-surface pattern, per PRO-H12's own note. See
 [rust-tracing-opentelemetry-stack.md](rust-tracing-opentelemetry-stack.md)
 for the full Loco-specific guide and

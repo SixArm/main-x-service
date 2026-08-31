@@ -20,15 +20,19 @@ Every service owns its own implementation — there is no shared audit
 crate — but they all follow the conventions below. As with merge, the
 family splits into two implementation lineages:
 
-- **Loco lineage** (`organization`, `care-pathway`, `case`): the
-  canonical shape this spec describes — an `audit_logs` table written by
-  a controller `audit()` helper, plus a Phase-1 in-memory event stream
+- **Loco lineage** (`organization`, `care-pathway`, `case`, `portfolio`):
+  the canonical shape this spec describes — an `audit_logs` table written
+  by a controller `audit()` helper, plus a Phase-1 in-memory event stream
   (`src/streaming.rs`) behind the `EventPublisher` seam.
 - **MPI lineage** (`person`, `place`, `thing`, `event`, `worker`,
   `course`): the older `AuditLogRepository` over an `audit_log` table
   (`src/db/audit.rs`) with typed `log_create` / `log_update` /
   `log_delete` helpers, plus an `EventProducer`-based stream under
   `src/streaming/`. Same intent, richer column set; see §2 and §3.
+
+`authentication` (`auth_events`) and `link-graph-service` each carry
+their own, separate audit scheme rather than joining either lineage
+above.
 
 > Related monorepo topic specs that exist:
 > [postgresql](../postgresql/index.md),
