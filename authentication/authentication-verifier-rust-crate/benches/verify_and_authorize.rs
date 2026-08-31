@@ -27,9 +27,10 @@ use authentication_verifier::abac::{Action, Policy};
 use authentication_verifier::{Claims, Verifier};
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use ed25519_dalek::SigningKey;
 use rusty_paseto::core::{Footer, Key, Paseto, PasetoAsymmetricPrivateKey, Payload, Public, V4};
+use std::hint::black_box;
 
 /// A fixed seed → a deterministic keypair. Benchmark-only; the real
 /// service reads its seed from the environment.
