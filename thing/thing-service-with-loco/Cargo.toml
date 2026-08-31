@@ -138,7 +138,7 @@ base64 = { version = "0.22" }
 # The activation proof (tests/enforcement.rs) sets process-wide env vars
 # before booting the router, so it must not run beside another test in
 # the same process; `tower` drives that router with `oneshot`.
-serial_test = "3.5"
+serial_test = "4.0"
 tower = { version = "0.5", features = ["util"] }
 
 # Benchmarking
