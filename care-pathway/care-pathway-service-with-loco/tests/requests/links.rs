@@ -2,8 +2,8 @@
 //! (`agents/share/cross-service-linking.md` §4.1/§4.2) and the
 //! reconciliation pull the aggregator uses.
 
-use axum_test::TestServer;
 use care_pathway_service::app::App;
+use loco_rs::TestServer;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
