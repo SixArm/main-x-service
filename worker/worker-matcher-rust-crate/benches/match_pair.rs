@@ -8,7 +8,8 @@
 //! are reported in absolute time per call.
 
 use chrono::NaiveDate;
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use std::hint::black_box;
 use worker_matcher::{
     Address, Gender, MatchConfig, MatchingEngine, NicknameTable, SimilarityAlgorithm, Worker,
 };
