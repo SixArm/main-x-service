@@ -144,7 +144,7 @@ async fn engagement_round_trip() {
 
         // ── Funnel over a seeded pipeline: two deals created, one
         // moved to Proposal — entered counts + honest conversion.
-        let (pipeline_pid, stages) = seed_pipeline(&request).await;
+        let (pipeline_pid, stages) = seed_pipeline!(&request).await;
         for name in ["Deal A", "Deal B"] {
             let deal: Value = request
                 .post("/api/deals")

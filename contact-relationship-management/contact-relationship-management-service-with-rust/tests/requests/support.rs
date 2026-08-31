@@ -35,7 +35,7 @@ async fn ticket_sla_journey() {
             .await;
         assert_eq!(backwards.status_code(), 422);
 
-        let contact = seed_contact(&request, "Ticket Raiser").await;
+        let contact = seed_contact!(&request, "Ticket Raiser").await;
         let agent = a_worker();
         let ticket: Value = request
             .post("/api/tickets")

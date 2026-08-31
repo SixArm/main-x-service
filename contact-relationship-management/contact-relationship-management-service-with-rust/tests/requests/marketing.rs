@@ -17,7 +17,7 @@ use super::{a_person, seed_contact};
 // advance sends nothing.
 async fn consent_gates_campaign_and_nurture() {
     request::<App, _, _>(|request, _ctx| async move {
-        let consented = seed_contact(&request, "Consented Contact").await;
+        let consented = seed_contact!(&request, "Consented Contact").await;
         // A second contact who never consented.
         let never: Value = request
             .post("/api/contacts")

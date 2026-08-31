@@ -18,7 +18,7 @@ use super::seed_contact;
 async fn subject_rights_round_trip() {
     request::<App, _, _>(|request, _ctx| async move {
         // ── Subject access: gathers the footprint, names exclusions, audited.
-        let contact_pid = seed_contact(&request, "Dana Rivers").await;
+        let contact_pid = seed_contact!(&request, "Dana Rivers").await;
         request
             .post("/api/activities")
             .json(
@@ -49,7 +49,7 @@ async fn subject_rights_round_trip() {
         );
 
         // ── Erasure refused while an open deal names it primary contact.
-        let (pipeline_pid, stages) = super::seed_pipeline(&request).await;
+        let (pipeline_pid, stages) = super::seed_pipeline!(&request).await;
         let deal: Value = request
             .post("/api/deals")
             .json(&json!({ "name": "Renewal", "pipeline_pid": pipeline_pid,

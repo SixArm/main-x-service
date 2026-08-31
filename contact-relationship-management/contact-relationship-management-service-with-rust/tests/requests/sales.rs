@@ -17,7 +17,7 @@ use super::{a_person, seed_pipeline};
 // the deal moves through stages to Won; the forecast follows.
 async fn sales_journey_end_to_end() {
     request::<App, _, _>(|request, _ctx| async move {
-        let (pipeline_pid, stage_pids) = seed_pipeline(&request).await;
+        let (pipeline_pid, stage_pids) = seed_pipeline!(&request).await;
         // Capture a referral lead with a corporate domain: 20+10 = 30.
         let captured: Value = request
             .post("/api/leads")
@@ -133,8 +133,8 @@ async fn contracts_404_and_pipeline_membership() {
             assert_eq!(request.get(&path).await.status_code(), 404, "{path}");
         }
         // A stage from another pipeline is refused on a move.
-        let (pipeline_a, _stages_a) = seed_pipeline(&request).await;
-        let (_pipeline_b, stages_b) = seed_pipeline(&request).await;
+        let (pipeline_a, _stages_a) = seed_pipeline!(&request).await;
+        let (_pipeline_b, stages_b) = seed_pipeline!(&request).await;
         let deal: Value = request
             .post("/api/deals")
             .json(&json!({
