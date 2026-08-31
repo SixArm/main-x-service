@@ -15,7 +15,7 @@ use super::{a_person, seed_ward};
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn whiteboard_cards_and_etag_cycle() {
     request::<App, _, _>(|request, _ctx| async move {
-        let (ward_pid, bed_pids) = seed_ward(&request, "inpatient", None, 2).await;
+        let (ward_pid, bed_pids) = seed_ward!(&request, "inpatient", None, 2).await;
         request
             .post("/api/stays")
             .json(&json!({
@@ -85,7 +85,7 @@ async fn whiteboard_cards_and_etag_cycle() {
 // At-a-glance counts the seeded topology and is itself conditional.
 async fn at_a_glance_counts_and_is_conditional() {
     request::<App, _, _>(|request, _ctx| async move {
-        let (ward_pid, bed_pids) = seed_ward(&request, "inpatient", None, 3).await;
+        let (ward_pid, bed_pids) = seed_ward!(&request, "inpatient", None, 3).await;
         request
             .post("/api/stays")
             .json(&json!({
@@ -128,7 +128,7 @@ async fn at_a_glance_counts_and_is_conditional() {
 // personal data — writes a `locate_read` audit row (spec `audit.md`).
 async fn locate_finds_and_audits_the_read() {
     request::<App, _, _>(|request, _ctx| async move {
-        let (_, bed_pids) = seed_ward(&request, "inpatient", None, 1).await;
+        let (_, bed_pids) = seed_ward!(&request, "inpatient", None, 1).await;
         let person = a_person();
         request
             .post("/api/stays")
