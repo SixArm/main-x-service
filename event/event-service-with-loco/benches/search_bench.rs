@@ -7,7 +7,8 @@
 //! `cargo bench`.
 
 use chrono::{TimeZone, Utc};
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 use tempfile::TempDir;
 
 use event_service::models::Event;
