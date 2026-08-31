@@ -21,7 +21,7 @@ tokio = { version = "1.53", features = ["full"] }
 # Web Framework & HTTP (axum 0.8 to match loco 0.16)
 axum = { version = "0.8", features = ["macros", "multipart", "ws"] }
 tower = { version = "0.5", features = ["full"] }
-tower-http = { version = "0.6", features = ["cors", "trace", "compression-full"] }
+tower-http = { version = "0.7", features = ["cors", "trace", "compression-full"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -79,7 +79,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-opentelemetry = { version = "0.33" }
 
 # Utilities
-uuid = { version = "1.24", features = ["v4", "serde"] }
+uuid = { version = "1.26", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.3"
 thiserror = "2.0"
@@ -204,10 +204,10 @@ proptest = "1.11"
 # any network dependency.
 ed25519-dalek = { version = "2.2" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
-base64 = { version = "0.22" }
+base64 = { version = "0.23" }
 
 # Benchmarking
-criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
 
 # `parquet::file::reader::ChunkReader` is implemented for `bytes::Bytes`
 # (and `File`), not `std::io::Cursor` — needed to read encoded Parquet
@@ -256,7 +256,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 
 [build-dependencies]
 # gRPC code generation
-tonic-build = "0.12"
+tonic-build = "0.14"
 
 [[bench]]
 name = "matching_bench"
