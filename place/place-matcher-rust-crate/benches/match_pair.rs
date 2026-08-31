@@ -7,11 +7,12 @@
 //! deterministic matching, and the batch ranking entry point. Numbers
 //! are reported in absolute time per call.
 
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use place_matcher::{
     Address, MatchConfig, MatchingEngine, Place, PlaceCategory, PlaceId, PlaceIdScheme,
     SimilarityAlgorithm,
 };
+use std::hint::black_box;
 
 fn build_eiffel() -> Place {
     Place::builder()
