@@ -16,8 +16,8 @@ use super::{activate, an_org, seed_employee};
 async fn assessment_round_trip() {
     request::<App, _, _>(|request, _ctx| async move {
         let org = an_org();
-        let employee = seed_employee(&request, &org, "A-1", None).await;
-        activate(&request, &employee).await;
+        let employee = seed_employee!(&request, &org, "A-1", None).await;
+        activate!(&request, &employee).await;
 
         // ── The instrument catalog enforces the category↔scale rule.
         assert_eq!(

@@ -16,10 +16,10 @@ use super::{activate, an_org, seed_employee};
 async fn wellbeing_round_trip() {
     request::<App, _, _>(|request, ctx| async move {
         let org = an_org();
-        let engineer = seed_employee(&request, &org, "W-1", None).await;
-        activate(&request, &engineer).await;
-        let second = seed_employee(&request, &org, "W-2", None).await;
-        activate(&request, &second).await;
+        let engineer = seed_employee!(&request, &org, "W-1", None).await;
+        activate!(&request, &engineer).await;
+        let second = seed_employee!(&request, &org, "W-2", None).await;
+        activate!(&request, &second).await;
         // Move the second employee out of the engineering cohort.
         request
             .put(&format!("/api/employees/{second}"))
@@ -232,8 +232,8 @@ async fn wellbeing_round_trip() {
 async fn benefits_awareness_round_trip() {
     request::<App, _, _>(|request, _ctx| async move {
         let org = an_org();
-        let employee = seed_employee(&request, &org, "B-1", None).await;
-        activate(&request, &employee).await;
+        let employee = seed_employee!(&request, &org, "B-1", None).await;
+        activate!(&request, &employee).await;
 
         // A real benefit plan to signpost.
         let plan: Value = request
@@ -366,8 +366,8 @@ async fn benefits_awareness_round_trip() {
         // now live-enrolled in the linked plan. The enrolled employee
         // acknowledges `done`; a second employee dismisses and does
         // not enrol ⇒ 1/2. A health rule carries no conversion.
-        let second = seed_employee(&request, &org, "B-2", None).await;
-        activate(&request, &second).await;
+        let second = seed_employee!(&request, &org, "B-2", None).await;
+        activate!(&request, &second).await;
         request
             .post(&format!(
                 "/api/employees/{employee}/wellbeing-acknowledgements"
@@ -425,12 +425,12 @@ async fn pulse_round_trip() {
         // Five engineering employees (the k floor) + one in finance.
         let mut engineers = Vec::new();
         for n in 0..5 {
-            let pid = seed_employee(&request, &org, &format!("P-{n}"), None).await;
-            activate(&request, &pid).await;
+            let pid = seed_employee!(&request, &org, &format!("P-{n}"), None).await;
+            activate!(&request, &pid).await;
             engineers.push(pid);
         }
-        let accountant = seed_employee(&request, &org, "P-9", None).await;
-        activate(&request, &accountant).await;
+        let accountant = seed_employee!(&request, &org, "P-9", None).await;
+        activate!(&request, &accountant).await;
         request
             .put(&format!("/api/employees/{accountant}"))
             .json(&json!({ "department": "finance" }))

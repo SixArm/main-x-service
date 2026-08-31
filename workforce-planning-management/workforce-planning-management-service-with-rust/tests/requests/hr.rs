@@ -146,7 +146,7 @@ async fn hire_journey_end_to_end() {
             .json(&json!({ "reason": "reference on file from agency" }))
             .await
             .assert_status_ok();
-        activate(&request, &employee_pid).await;
+        activate!(&request, &employee_pid).await;
         // Requisition can now fill (offer → filled needs the hired count).
         request
             .post(&format!("/api/requisitions/{req_pid}/status"))
@@ -198,8 +198,8 @@ async fn contracts_404_cycle_and_uniqueness() {
         }
         // Cycle refusal: a -> b -> a.
         let org = an_org();
-        let a = seed_employee(&request, &org, "E-0001", None).await;
-        let b = seed_employee(&request, &org, "E-0002", None).await;
+        let a = seed_employee!(&request, &org, "E-0001", None).await;
+        let b = seed_employee!(&request, &org, "E-0002", None).await;
         request
             .put(&format!("/api/employees/{b}"))
             .json(&json!({ "manager_pid": a }))

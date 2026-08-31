@@ -16,12 +16,12 @@ use super::{activate, an_org, seed_employee};
 async fn learning_round_trip() {
     request::<App, _, _>(|request, _ctx| async move {
         let org = an_org();
-        let mentor = seed_employee(&request, &org, "E-1", None).await;
-        activate(&request, &mentor).await;
-        let mentee = seed_employee(&request, &org, "E-2", None).await;
-        activate(&request, &mentee).await;
-        let bystander = seed_employee(&request, &org, "E-3", None).await;
-        activate(&request, &bystander).await;
+        let mentor = seed_employee!(&request, &org, "E-1", None).await;
+        activate!(&request, &mentor).await;
+        let mentee = seed_employee!(&request, &org, "E-2", None).await;
+        activate!(&request, &mentee).await;
+        let bystander = seed_employee!(&request, &org, "E-3", None).await;
+        activate!(&request, &bystander).await;
 
         // ── Skills catalog + declared proficiency (validated 1-5).
         let skill: Value = request

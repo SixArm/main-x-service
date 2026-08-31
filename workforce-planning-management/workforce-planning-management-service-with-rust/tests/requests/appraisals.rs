@@ -17,14 +17,14 @@ use super::{activate, an_org, seed_employee};
 async fn appraisal_round_trip() {
     request::<App, _, _>(|request, _ctx| async move {
         let org = an_org();
-        let subject = seed_employee(&request, &org, "A-0", None).await;
-        activate(&request, &subject).await;
-        let manager = seed_employee(&request, &org, "A-M", None).await;
-        activate(&request, &manager).await;
+        let subject = seed_employee!(&request, &org, "A-0", None).await;
+        activate!(&request, &subject).await;
+        let manager = seed_employee!(&request, &org, "A-M", None).await;
+        activate!(&request, &manager).await;
         let mut peers = Vec::new();
         for n in 0..3 {
-            let pid = seed_employee(&request, &org, &format!("A-P{n}"), None).await;
-            activate(&request, &pid).await;
+            let pid = seed_employee!(&request, &org, &format!("A-P{n}"), None).await;
+            activate!(&request, &pid).await;
             peers.push(pid);
         }
 
@@ -146,7 +146,7 @@ async fn appraisal_round_trip() {
         assert!(read["read_at"].is_string());
 
         // Nominations freeze once collecting.
-        let late = seed_employee(&request, &org, "A-L", None).await;
+        let late = seed_employee!(&request, &org, "A-L", None).await;
         assert_eq!(
             request
                 .post(&format!("/api/appraisals/{a_pid}/nominations"))

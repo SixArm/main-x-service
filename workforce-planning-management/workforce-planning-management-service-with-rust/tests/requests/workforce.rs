@@ -16,8 +16,8 @@ use super::{activate, an_org, seed_employee};
 async fn time_caps_and_overtime() {
     request::<App, _, _>(|request, _ctx| async move {
         let org = an_org();
-        let employee = seed_employee(&request, &org, "E-1001", None).await;
-        activate(&request, &employee).await;
+        let employee = seed_employee!(&request, &org, "E-1001", None).await;
+        activate!(&request, &employee).await;
         // 20h recorded fine; +5h more the same day breaks the cap.
         let first: Value = request
             .post(&format!("/api/employees/{employee}/time-entries"))
@@ -59,8 +59,8 @@ async fn time_caps_and_overtime() {
 async fn leave_balance_journey() {
     request::<App, _, _>(|request, _ctx| async move {
         let org = an_org();
-        let employee = seed_employee(&request, &org, "E-1002", None).await;
-        activate(&request, &employee).await;
+        let employee = seed_employee!(&request, &org, "E-1002", None).await;
+        activate!(&request, &employee).await;
         request
             .post(&format!("/api/employees/{employee}/leave-entitlements"))
             .json(&json!({ "kind": "annual", "year": 2026, "entitled_days": 5 }))
@@ -146,8 +146,8 @@ async fn leave_balance_journey() {
 async fn shift_conflicts() {
     request::<App, _, _>(|request, _ctx| async move {
         let org = an_org();
-        let employee = seed_employee(&request, &org, "E-1003", None).await;
-        activate(&request, &employee).await;
+        let employee = seed_employee!(&request, &org, "E-1003", None).await;
+        activate!(&request, &employee).await;
         let early: Value = request
             .post("/api/shifts")
             .json(&json!({
@@ -249,10 +249,10 @@ async fn shift_conflicts() {
 async fn working_time_guardrails() {
     request::<App, _, _>(|request, _ctx| async move {
         let org = an_org();
-        let heavy = seed_employee(&request, &org, "WT-1", None).await;
-        activate(&request, &heavy).await;
-        let light = seed_employee(&request, &org, "WT-2", None).await;
-        activate(&request, &light).await;
+        let heavy = seed_employee!(&request, &org, "WT-1", None).await;
+        activate!(&request, &heavy).await;
+        let light = seed_employee!(&request, &org, "WT-2", None).await;
+        activate!(&request, &light).await;
 
         // 35 recorded 24-hour days inside the 17-week window ending
         // 2026-07-10 — 50 400 min, over the 48 960-min ceiling. Unapproved

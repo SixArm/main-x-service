@@ -15,8 +15,8 @@ use super::{activate, an_org, seed_employee};
 async fn ergonomics_round_trip() {
     request::<App, _, _>(|request, _ctx| async move {
         let org = an_org();
-        let employee = seed_employee(&request, &org, "DSE-1", None).await;
-        activate(&request, &employee).await;
+        let employee = seed_employee!(&request, &org, "DSE-1", None).await;
+        activate!(&request, &employee).await;
 
         // Blank workstation refused; default checklist instantiates.
         assert_eq!(

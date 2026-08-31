@@ -17,8 +17,8 @@ use super::{activate, an_org, seed_employee};
 async fn subject_rights_round_trip() {
     request::<App, _, _>(|request, _ctx| async move {
         let org = an_org();
-        let employee = seed_employee(&request, &org, "SR-1", Some(3_600_000)).await;
-        activate(&request, &employee).await;
+        let employee = seed_employee!(&request, &org, "SR-1", Some(3_600_000)).await;
+        activate!(&request, &employee).await;
 
         // Give the employee a footprint: time (with a note), leave,
         // and a wellbeing acknowledgement.
