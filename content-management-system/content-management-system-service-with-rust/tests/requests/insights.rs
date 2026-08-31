@@ -10,7 +10,7 @@ use serial_test::serial;
 use super::{a_key, a_site_payload};
 
 /// A site with a routable article type.
-async fn seed_site(request: &axum_test::TestServer, prefix: &str) -> String {
+async fn seed_site(request: &loco_rs::TestServer, prefix: &str) -> String {
     let mut payload = a_site_payload(&a_key(prefix));
     payload["base_url"] = json!("https://example.test");
     let created: Value = request.post("/api/sites").json(&payload).await.json();
@@ -43,12 +43,12 @@ fn png(size: u32) -> Vec<u8> {
 
 /// Upload an asset, optionally with alt text.
 async fn upload(
-    request: &axum_test::TestServer,
+    request: &loco_rs::TestServer,
     site_pid: &str,
     size: u32,
     alt: Option<&str>,
 ) -> String {
-    use axum_test::multipart::{MultipartForm, Part};
+    use axum_test_loco_compat::multipart::{MultipartForm, Part};
     let mut form = MultipartForm::new().add_part(
         "file",
         Part::bytes(png(size))

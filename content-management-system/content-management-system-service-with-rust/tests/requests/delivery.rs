@@ -11,7 +11,7 @@ use serial_test::serial;
 use super::{a_key, a_site_payload};
 
 /// A public site with a base URL and a routable article type.
-async fn seed_public_site(request: &axum_test::TestServer, prefix: &str) -> (String, String) {
+async fn seed_public_site(request: &loco_rs::TestServer, prefix: &str) -> (String, String) {
     let key = a_key(prefix);
     let mut payload = a_site_payload(&key);
     payload["visibility"] = json!("public");
@@ -31,7 +31,7 @@ async fn seed_public_site(request: &axum_test::TestServer, prefix: &str) -> (Str
 
 /// Create, route, and publish an entry. Returns its pid.
 async fn publish_at(
-    request: &axum_test::TestServer,
+    request: &loco_rs::TestServer,
     site_pid: &str,
     key: &str,
     path: &str,
