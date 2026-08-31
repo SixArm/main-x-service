@@ -42,7 +42,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 regex = { version = "1.13" }
 # Embedded full-text search index (see src/search/). Same version as the
 # older services' `src/search/`, so the family runs one index format.
-tantivy = { version = "0.22" }
+tantivy = { version = "0.26" }
 # BLK-5 bulk import/export: the CSV codec (src/bulk/csv.rs). Same crate
 # and major version the person/care-pathway bulk modules already use.
 csv = "1"
@@ -54,7 +54,7 @@ sea-orm = { version = "2.0", features = [
 ] }
 chrono = { version = "0.4" }
 validator = { version = "0.20" }
-uuid = { version = "1.24", features = ["v4", "serde"] }
+uuid = { version = "1.26", features = ["v4", "serde"] }
 include_dir = { version = "0.7" }
 # Prometheus text-exposition metrics, served at `/metrics.prom` (see src/metrics.rs).
 prometheus = { version = "0.13" }
@@ -121,7 +121,7 @@ insta = { version = "1.48", features = ["redactions", "yaml", "filters"] }
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so
 # the extractor's happy path is verified un-gated (no auth-service /
 # network dependency).
-ed25519-dalek = { version = "2.2" }
+ed25519-dalek = { version = "3.0.0" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
 sha2 = { version = "0.10" }
 base64 = { version = "0.22" }
