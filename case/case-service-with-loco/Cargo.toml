@@ -45,7 +45,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 regex = { version = "1.13" }
 # Embedded full-text search index (see src/search/). Same version as the
 # rest of the family, so one index format.
-tantivy = { version = "0.22" }
+tantivy = { version = "0.26" }
 migration = { path = "migration" }
 sea-orm = { version = "2.0", features = [
   "sqlx-sqlite",
@@ -55,10 +55,10 @@ sea-orm = { version = "2.0", features = [
 ] }
 chrono = { version = "0.4" }
 validator = { version = "0.20" }
-uuid = { version = "1.24", features = ["v4", "serde"] }
+uuid = { version = "1.26", features = ["v4", "serde"] }
 include_dir = { version = "0.7" }
 mimalloc = { version = "0.1.52" }
-prometheus = { version = "0.13" }
+prometheus = { version = "0.14" }
 # SHA-256 for the tamper-evident audit hash chain (HIPAA §164.312(c)).
 # Also a dev-dependency below, for the in-process token tests.
 sha2 = { version = "0.10" }
@@ -66,7 +66,7 @@ sha2 = { version = "0.10" }
 # structurally unrelated to SHA-256's Merkle-Damgard chaining, so a
 # cryptanalytic advance against one design family does not transfer to
 # it. See spec/12-compliance.md §12.4z.
-sha3 = "0.10"
+sha3 = "0.12"
 # Keyed integrity (HMAC-SHA256, FIPS 198-1) over the same pre-image, with
 # a key the database never holds — see spec/12-compliance.md §12.4z. The
 # unkeyed digests are forgeable by anyone who can write SQL, since their
@@ -131,7 +131,7 @@ rstest = { version = "0.25" }
 insta = { version = "1.48", features = ["redactions", "yaml", "filters"] }
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so the extractor.s
 # happy path is verified un-gated (no auth-service / network dependency).
-ed25519-dalek = { version = "2.2" }
+ed25519-dalek = { version = "3.0" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
 sha2 = { version = "0.10" }
 base64 = { version = "0.22" }
