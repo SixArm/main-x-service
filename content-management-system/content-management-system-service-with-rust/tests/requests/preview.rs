@@ -11,7 +11,7 @@ use super::{a_key, a_site_payload};
 
 /// A site with a non-routable article type and one drafted entry.
 /// Returns `(site_key, entry_pid, first_revision_pid)`.
-async fn seed_draft(request: &axum_test::TestServer, prefix: &str) -> (String, String, String) {
+async fn seed_draft(request: &loco_rs::TestServer, prefix: &str) -> (String, String, String) {
     let key = a_key(prefix);
     let created: Value = request
         .post("/api/sites")

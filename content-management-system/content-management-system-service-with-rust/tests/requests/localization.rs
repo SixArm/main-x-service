@@ -11,7 +11,7 @@ use super::{a_key, a_site_payload};
 
 /// A three-locale site (`en` default, `fr`, `fr-CA` → `fr` → `en`) with
 /// an article type.
-async fn seed_multilingual_site(request: &axum_test::TestServer, prefix: &str) -> (String, String) {
+async fn seed_multilingual_site(request: &loco_rs::TestServer, prefix: &str) -> (String, String) {
     let key = a_key(prefix);
     let created: Value = request
         .post("/api/sites")
@@ -34,7 +34,7 @@ async fn seed_multilingual_site(request: &axum_test::TestServer, prefix: &str) -
 }
 
 /// Create an entry in the source locale.
-async fn create_entry(request: &axum_test::TestServer, site_pid: &str, key: &str) -> String {
+async fn create_entry(request: &loco_rs::TestServer, site_pid: &str, key: &str) -> String {
     let created: Value = request
         .post(&format!("/api/sites/{site_pid}/entries"))
         .json(&json!({
@@ -47,7 +47,7 @@ async fn create_entry(request: &axum_test::TestServer, site_pid: &str, key: &str
 }
 
 /// Publish a variant.
-async fn publish(request: &axum_test::TestServer, entry_pid: &str, locale: &str) {
+async fn publish(request: &loco_rs::TestServer, entry_pid: &str, locale: &str) {
     request
         .post(&format!(
             "/api/entries/{entry_pid}/variants/{locale}/transition"
