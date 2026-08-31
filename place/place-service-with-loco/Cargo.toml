@@ -97,7 +97,7 @@ strsim = "0.11"
 prometheus = "0.13"
 
 # Sibling matcher crate
-place-matcher = "0.6.1"
+place-matcher = "0.7.0"
 
 # Geo
 geo = "0.29"
