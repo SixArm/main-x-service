@@ -11,10 +11,11 @@
 //! per-candidate cost — which is what makes super-linear scaling visible
 //! rather than something you infer from three separate absolute numbers.
 
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use organization_matcher::{
     IdentifierScheme, MatchConfig, MatchingEngine, OrgIdentifier, Organization, PostalAddress,
 };
+use std::hint::black_box;
 
 /// Terse `OrgIdentifier` constructor.
 fn ident(scheme: IdentifierScheme, value: &str) -> OrgIdentifier {
