@@ -62,10 +62,13 @@ than read from `AGENTS.md`/`llms.json` at build time.
 ## 5. Publishing
 
 See the root [`spec/monorepo-github-pages/index.md`](../../spec/monorepo-github-pages/index.md)
-for the full contract. In short: `git subtree split --prefix=main-x-service.github.io`
-from the monorepo root produces the tree pushed to the sibling
-`SixArm/main-x-service.github.io` repo, which is what GitHub Pages
-actually serves. Never edit that sibling directly.
+for the full contract. In short: `make github-pages` (the repo-root
+`Makefile`, delegating to `bin/make-github-pages`) runs `git subtree
+push --prefix=main-x-service.github.io github-pages main`, producing
+the tree pushed to the sibling `SixArm/main-x-service.github.io` repo,
+which is what GitHub Pages actually serves. Never edit that sibling
+directly. Requires a one-time `git remote add github-pages
+git@github.com:SixArm/main-x-service.github.io.git` per checkout.
 
 ## 6. Tasks
 

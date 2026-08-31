@@ -59,7 +59,16 @@ subproject's own API — that stays in that subproject's own `spec/`.
 
 ```sh
 # from the main-x-service repo root
-git subtree split --prefix=main-x-service.github.io -b export/main-x-service.github.io
-# then push that branch's tree to the sibling repo's main, e.g.:
-git push git@github.com:SixArm/main-x-service.github.io.git export/main-x-service.github.io:main
+make github-pages
+```
+
+That target (repo-root `Makefile`, delegating to `bin/make-github-pages`)
+runs `git subtree push --prefix=main-x-service.github.io github-pages
+main` — the only route from a monorepo commit to the live site, since
+GitHub Pages serves the sibling repo, not this one. Requires a
+`github-pages` remote, added once per checkout (not something the repo
+can commit):
+
+```sh
+git remote add github-pages git@github.com:SixArm/main-x-service.github.io.git
 ```

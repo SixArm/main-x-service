@@ -1,0 +1,15 @@
+#!/bin/sh
+# Push the docs site subdirectory out to the github-pages remote via
+# git's subtree mechanism. Invoked by `make github-pages`.
+# See spec/monorepo-github-pages/index.md.
+#
+# Requires a `github-pages` remote pointing at the deployed pages repo,
+# added once per checkout (a remote is local git config, not something
+# this repository can commit):
+#   git remote add github-pages git@github.com:SixArm/main-x-service.github.io.git
+set -eu
+
+top="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$top"
+
+git subtree push --prefix=main-x-service.github.io github-pages main
