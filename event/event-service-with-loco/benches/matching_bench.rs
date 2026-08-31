@@ -8,7 +8,8 @@
 //! similarity used as a name-score floor. Run with `cargo bench`.
 
 use chrono::{DateTime, TimeZone, Utc};
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 
 use event_service::config::MatchingConfig;
 use event_service::matching::algorithms::{
