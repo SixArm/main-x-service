@@ -11,6 +11,10 @@
 //!
 //! See `spec/auth.md` for the full flow and configuration matrix.
 
+/// Minimal HS256-only `jsonwebtoken` crypto backend — see its module
+/// docs for why neither built-in backend fits.
+mod crypto;
+
 /// Email delivery of magic links (trait + log-only default impl).
 pub mod mailer;
 
@@ -193,6 +197,10 @@ impl AuthState {
     /// - `mailer`: magic-link delivery backend.
     #[must_use]
     pub fn new(config: AuthConfig, mailer: Box<dyn Mailer>) -> Self {
+        // Idempotent (see `crypto::install`'s docs): required before
+        // any `encode`/`decode` call, since `jsonwebtoken` installs a
+        // panicking stub by default.
+        crypto::install();
         let encoding = EncodingKey::from_secret(config.secret.as_bytes());
         let decoding = DecodingKey::from_secret(config.secret.as_bytes());
         let allowlist = config
