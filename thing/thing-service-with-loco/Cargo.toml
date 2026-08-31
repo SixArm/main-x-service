@@ -29,7 +29,7 @@ tokio = { version = "1.53", features = ["full"] }
 # Web Framework & HTTP (axum 0.8 to match loco 0.16)
 axum = { version = "0.8", features = ["macros", "multipart", "ws"] }
 tower = { version = "0.5", features = ["full"] }
-tower-http = { version = "0.6", features = ["cors", "trace", "compression-full"] }
+tower-http = { version = "0.7", features = ["cors", "trace", "compression-full"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -83,7 +83,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-opentelemetry = { version = "0.33" }
 
 # Utilities
-uuid = { version = "1.24", features = ["v4", "serde"] }
+uuid = { version = "1.26", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.3"
 thiserror = "2.0"
@@ -126,7 +126,7 @@ fluvio = ["dep:fluvio"]
 # Testing
 assertables = "10"
 tokio-test = "0.4"
-mockall = "0.13"
+mockall = "0.15"
 tempfile = "3.27"
 
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so
@@ -138,7 +138,7 @@ base64 = { version = "0.22" }
 # The activation proof (tests/enforcement.rs) sets process-wide env vars
 # before booting the router, so it must not run beside another test in
 # the same process; `tower` drives that router with `oneshot`.
-serial_test = "3.5"
+serial_test = "4.0.1"
 tower = { version = "0.5", features = ["util"] }
 
 # Benchmarking
