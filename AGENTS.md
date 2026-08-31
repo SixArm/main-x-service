@@ -148,6 +148,19 @@ entity. They are not matcher-backed and have no front-end of their own.
 | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | [link-graph-service-with-loco](link/link-graph-service-with-loco/spec/index.md) | **Read-model aggregator** for cross-service entity linking — consumes every entity's event stream (+ the new `linked`/`unlinked` events) and serves the queryable cross-service graph (`neighbors` / `single-view` / freshness). The read side of the hybrid topology in [cross-service-linking.md](agents/share/cross-service-linking.md); each entity service owns its own link **writes** (`entity_links` + events). v1 edges: `same_identity` (person↔worker), `works_at`/`member_of` (person→org), `employed_by` (worker→org), `subject_of` (case→person). | [spec](link/link-graph-service-with-loco/spec/index.md) |
 
+### GitHub Pages
+
+[`main-x-service.github.io/`](main-x-service.github.io/) — the public
+documentation front door for this monorepo (SvelteKit + Lily Design
+System, static/prerendered, no auth). Built and edited **here**, inside
+the monorepo, and periodically published to GitHub Pages via `git
+subtree split` into a sibling read-only repository,
+`SixArm/main-x-service.github.io` — never edited directly. See
+[`spec/monorepo-github-pages/index.md`](spec/monorepo-github-pages/index.md)
+for the publishing contract and
+[`main-x-service.github.io/spec/index.md`](main-x-service.github.io/spec/index.md)
+for the site's own scope.
+
 ## Continuous integration
 
 Both remotes run the same checks, because `origin` pushes to Codeberg
