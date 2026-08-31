@@ -15,7 +15,8 @@ use case_matcher::{
     Case, CaseIdentifier, CaseStatus, CaseType, IdentifierScheme, MatchConfig, MatchingEngine,
     Priority,
 };
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use std::hint::black_box;
 
 /// Terse `CaseIdentifier` constructor.
 fn ident(scheme: IdentifierScheme, value: &str) -> CaseIdentifier {
