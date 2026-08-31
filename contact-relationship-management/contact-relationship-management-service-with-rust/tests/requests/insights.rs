@@ -15,8 +15,8 @@ use super::{a_person, a_worker, seed_contact, seed_pipeline};
 #[allow(clippy::too_many_lines)] // one seeded estate, seven views
 async fn insight_views_round_trip() {
     request::<App, _, _>(|request, _ctx| async move {
-        let (pipeline_pid, stages) = seed_pipeline(&request).await;
-        let contact_pid = seed_contact(&request, "Prime Contact").await;
+        let (pipeline_pid, stages) = seed_pipeline!(&request).await;
+        let contact_pid = seed_contact!(&request, "Prime Contact").await;
 
         // A duplicate CRM row for the same person URN (hygiene case).
         let shared_person = a_person();
