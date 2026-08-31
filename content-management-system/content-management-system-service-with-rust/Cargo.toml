@@ -48,7 +48,7 @@ sea-orm = { version = "2.0", features = [
 chrono = { version = "0.4" }
 uuid = { version = "1.24", features = ["v4", "serde"] }
 mimalloc = { version = "0.1.52" }
-prometheus = { version = "0.13" }
+prometheus = { version = "0.14" }
 # Upstream display-name lookups (`http` client mode only; stub is the
 # default). Same minimal reqwest configuration as the verifier's fetch.
 reqwest = { version = "0.12", default-features = false, features = [
@@ -59,7 +59,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 # Content addressing: an asset's storage key is the SHA-256 of its
 # bytes, so identical uploads deduplicate and an uploader can never
 # choose a key (CMS-R6).
-sha2 = { version = "0.10" }
+sha2 = { version = "0.11" }
 
 # Webhook body signing (HMAC-SHA256), the RustCrypto pairing for the
 # sha2 above. Not the family `integrity-mac` crate: that one protects
@@ -68,7 +68,7 @@ sha2 = { version = "0.10" }
 # verify — a different problem with a different key lifecycle. Not
 # hand-rolled either: HMAC is short enough to look easy and exactly the
 # kind of code that fails silently.
-hmac = { version = "0.12" }
+hmac = { version = "0.13" }
 
 # HTML sanitization for the one place markup may enter (an `embed`
 # block, and later bulk import). A real HTML5 tokenizer, because
@@ -116,7 +116,7 @@ tokio = { version = "1.53", default-features = false, features = [
   "macros",
   "net",
 ] }
-serial_test = { version = "3.5.0" }
+serial_test = { version = "4.0.1" }
 # The artifact-store tests write to a scratch directory and prove the
 # path-confinement rule against a file outside the base.
 tempfile = { version = "3" }
@@ -124,5 +124,5 @@ tempfile = { version = "3" }
 # the auth path is verified without the auth service or a network.
 ed25519-dalek = { version = "2.2" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
-sha2 = { version = "0.10" }
+sha2 = { version = "0.11" }
 base64 = { version = "0.22" }
