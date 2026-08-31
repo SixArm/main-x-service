@@ -100,7 +100,7 @@
 
 use std::collections::HashMap;
 
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 use zeroize::Zeroize as _;
 
@@ -463,8 +463,8 @@ impl KeySet {
         } else {
             material.legacy_raw.clone()
         };
-        let mut mac =
-            <Hmac<Sha256> as Mac>::new_from_slice(&key).expect("HMAC accepts keys of any length");
+        let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(&key)
+            .expect("HMAC accepts keys of any length");
         mac.update(preimage);
         if mac.verify_slice(&expected).is_ok() {
             MacVerdict::Valid
@@ -574,7 +574,7 @@ pub fn assess_key_hex(candidate: &str) -> Assessment {
 /// something to paper over — a fallback here would be a predictable key.
 pub fn generate_key() -> Result<String, String> {
     let mut bytes = [0u8; KEY_BYTES];
-    getrandom::getrandom(&mut bytes)
+    getrandom::fill(&mut bytes)
         .map_err(|e| format!("the operating system entropy source failed: {e}"))?;
     let hex = to_hex(&bytes);
     bytes.zeroize();
@@ -636,7 +636,7 @@ fn derive(root: &[u8], info: &str) -> Vec<u8> {
 fn raw_tag(key: &[u8], preimage: &[u8]) -> String {
     // Infallible for HMAC: it accepts a key of any length.
     let mut mac =
-        <Hmac<Sha256> as Mac>::new_from_slice(key).expect("HMAC accepts keys of any length");
+        <Hmac<Sha256> as KeyInit>::new_from_slice(key).expect("HMAC accepts keys of any length");
     mac.update(preimage);
     to_hex(&mac.finalize().into_bytes())
 }
