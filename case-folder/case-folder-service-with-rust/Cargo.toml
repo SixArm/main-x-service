@@ -41,7 +41,19 @@ sea-orm = { version = "2.0", features = [
 ] }
 thiserror = "2"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-jsonwebtoken = "9"
+# No crypto-backend feature: jsonwebtoken 10+ ships neither by
+# default, and its only two built-in options are `rust_crypto` (which
+# unconditionally bundles the `rsa` crate — RUSTSEC-2023-0071, the
+# Marvin timing attack this family removed from the dependency graph
+# on 2026-08-21, see `agents/share/security.md` §7 and the `auth`
+# comment above) and `aws_lc_rs` (a C/asm crypto library this family
+# has no other dependency on). This crate signs/verifies only HS256,
+# so `src/auth/crypto.rs` installs a minimal custom `CryptoProvider`
+# (the documented extension point) built on the `hmac`/`sha2` below —
+# see that module's docs for the full reasoning.
+jsonwebtoken = { version = "11", default-features = false }
+hmac = "0.13"
+sha2 = "0.11"
 
 [[bin]]
 name = "case-folder-service-with-rust-cli"
@@ -50,4 +62,4 @@ required-features = []
 
 [dev-dependencies]
 loco-rs = { workspace = true, features = ["testing"] }
-serial_test = "3"
+serial_test = "4.0.1"
