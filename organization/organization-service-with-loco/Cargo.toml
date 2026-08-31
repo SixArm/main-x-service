@@ -42,7 +42,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 regex = { version = "1.13" }
 # Embedded full-text search index (see src/search/). Same version as the
 # older services' `src/search/`, so the family runs one index format.
-tantivy = { version = "0.22" }
+tantivy = { version = "0.26" }
 # BLK-5 bulk import/export: the CSV codec (src/bulk/csv.rs). Same crate
 # and major version the person/care-pathway bulk modules already use.
 csv = "1"
