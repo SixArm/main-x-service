@@ -21,7 +21,7 @@ tokio = { version = "1.53", features = ["full"] }
 # Web Framework & HTTP (axum 0.8 to match loco 0.16)
 axum = { version = "0.8", features = ["macros", "multipart", "ws"] }
 tower = { version = "0.5", features = ["full"] }
-tower-http = { version = "0.6", features = ["cors", "trace", "compression-full"] }
+tower-http = { version = "0.7", features = ["cors", "trace", "compression-full"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -79,7 +79,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-opentelemetry = { version = "0.33" }
 
 # Utilities
-uuid = { version = "1.24", features = ["v4", "serde"] }
+uuid = { version = "1.26", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.3"
 thiserror = "2.0"
@@ -112,7 +112,7 @@ mimalloc = "0.1.52"
 
 # SHA-256 for the tamper-evident audit hash chain (HIPAA §164.312(c)).
 # See src/compliance/audit_chain.rs.
-sha2 = "0.10"
+sha2 = "0.11"
 # Second integrity digest. SHA-3 (FIPS 202) is a **sponge** construction,
 # structurally unrelated to SHA-256's Merkle-Damgard chaining, so a
 # cryptanalytic advance against one design family does not transfer to
@@ -150,7 +150,7 @@ fluvio = ["dep:fluvio"]
 # Serialises the DB-gated audit-chain tests: they each truncate
 # `audit_log`, so running them concurrently would have one test wipe
 # another's chain mid-append.
-serial_test = "3.5"
+serial_test = "4.0.1"
 # `mock`: a `DatabaseConnection` that errors on any query, standing in
 # for sea-orm 1.1's removed `DatabaseConnection::Disconnected` — used
 # by tests/common/mod.rs's no-DB test router.
@@ -210,7 +210,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 ] }
 
 # Benchmarking
-criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
 
 [build-dependencies]
 # gRPC code generation
