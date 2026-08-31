@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "=26"
+  },
   "description": "SvelteKit authoring/editorial front-end for the Content Management System Service (Main X Index): content types, block authoring, revisions, assets, workflow, localization, delivery preview, insights.",
   "license": "MIT OR Apache-2.0",
   "scripts": {
