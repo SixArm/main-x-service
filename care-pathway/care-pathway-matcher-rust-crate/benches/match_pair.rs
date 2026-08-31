@@ -15,7 +15,8 @@ use care_pathway_matcher::{
     CarePathway, CareSetting, CodeSystem, ConditionCode, IdentifierScheme, MatchConfig,
     MatchingEngine, PathwayIdentifier,
 };
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use std::hint::black_box;
 
 /// Terse `PathwayIdentifier` constructor.
 fn ident(scheme: IdentifierScheme, value: &str) -> PathwayIdentifier {
