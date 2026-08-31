@@ -7,11 +7,12 @@
 //! deterministic matching, and the batch ranking entry point. Numbers
 //! are reported in absolute time per call.
 
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use event_matcher::{
     Address, Event, EventCategory, EventId, EventIdScheme, Location, MatchConfig, MatchingEngine,
     SimilarityAlgorithm,
 };
+use std::hint::black_box;
 
 /// Build a richly-populated reference event (Glastonbury 2024) used as the
 /// "query" side in most benchmarks. Exercises every scored field so the
