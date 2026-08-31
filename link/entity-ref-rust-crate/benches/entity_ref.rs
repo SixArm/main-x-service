@@ -19,8 +19,9 @@
 //! - **serde versus direct parse.** The gap is what the JSON layer costs
 //!   over `FromStr`, which is the choice a bulk import makes per row.
 
-use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use entity_ref::{EdgeKind, EntityRef, EntityType};
+use std::hint::black_box;
 use std::str::FromStr as _;
 
 const PERSON_REF: &str = "person:0c4f1e2a-0000-4000-8000-000000000000";
