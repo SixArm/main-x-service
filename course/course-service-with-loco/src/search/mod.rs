@@ -248,7 +248,7 @@ impl SearchEngine {
     ) -> Result<Vec<String>> {
         let s = self.index.schema();
         let top = searcher
-            .search(query, &TopDocs::with_limit(limit))
+            .search(query, &TopDocs::with_limit(limit).order_by_score())
             .map_err(|e| crate::Error::Search(format!("search: {e}")))?;
         let mut ids = Vec::with_capacity(top.len());
         for (_score, addr) in top {
