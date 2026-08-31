@@ -100,7 +100,7 @@ prometheus = "0.13"
 place-matcher = "0.6.1"
 
 # Geo
-geo = "0.29"
+geo = "0.33"
 haversine = "0.2"
 
 # Security
