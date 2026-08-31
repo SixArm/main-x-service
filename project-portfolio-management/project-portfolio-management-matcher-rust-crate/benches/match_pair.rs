@@ -12,11 +12,12 @@
 //! never a matching gate, so a benchmark that held it constant would hide
 //! the cost of the component that actually runs.
 
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use project_portfolio_management_matcher::{
     Goal, IdentifierScheme, MatchConfig, MatchingEngine, Plan, PlanIdentifier, PlanKind,
     PlanRelationship, PlanStatus, RelationKind,
 };
+use std::hint::black_box;
 
 /// Terse `PlanIdentifier` constructor.
 fn ident(scheme: IdentifierScheme, value: &str) -> PlanIdentifier {
