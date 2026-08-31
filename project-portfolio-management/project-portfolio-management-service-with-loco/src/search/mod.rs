@@ -370,7 +370,7 @@ impl SearchEngine {
             .search(
                 query.as_ref(),
                 &(
-                    tantivy::collector::TopDocs::with_limit(wanted.max(1)),
+                    tantivy::collector::TopDocs::with_limit(wanted.max(1)).order_by_score(),
                     tantivy::collector::Count,
                 ),
             )
@@ -510,7 +510,7 @@ impl SearchEngine {
         }
         let s = self.index.schema();
         let top = searcher
-            .search(query, &TopDocs::with_limit(limit))
+            .search(query, &TopDocs::with_limit(limit).order_by_score())
             .map_err(|e| err(&format!("search: {e}")))?;
         let mut pids = Vec::with_capacity(top.len());
         for (_score, addr) in top {
