@@ -38,7 +38,7 @@
 //! does not apply, and requiring it there would make a local receiver
 //! untestable without a certificate.
 
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use serde::Serialize;
 use sha2::Sha256;
 
