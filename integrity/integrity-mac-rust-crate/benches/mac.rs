@@ -20,8 +20,9 @@
 //!   stored value should be rejected by parsing, long before any HMAC
 //!   work.
 
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use integrity_mac::{KeyConfig, KeySet, MacVerdict};
+use std::hint::black_box;
 
 /// A realistic 32-byte root key — varied bytes, so it passes the
 /// placeholder rule and the key set is actually enabled.
