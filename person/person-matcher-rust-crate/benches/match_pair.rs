@@ -8,10 +8,11 @@
 //! are reported in absolute time per call.
 
 use chrono::NaiveDate;
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use person_matcher::{
     Address, Gender, MatchConfig, MatchingEngine, NicknameTable, Person, SimilarityAlgorithm,
 };
+use std::hint::black_box;
 
 /// Shorthand for a chrono `NaiveDate`, keeping the fixture builders terse.
 fn dob(y: i32, m: u32, d: u32) -> NaiveDate {

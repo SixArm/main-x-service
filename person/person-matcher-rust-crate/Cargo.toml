@@ -24,7 +24,7 @@ united-kingdom-national-health-service-number = { version = "1.0", package = "nh
 mimalloc = "0.1.52"
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 proptest = "1.11"
 
 [[bench]]
