@@ -32,7 +32,7 @@ loco-rs = { version = "1.1.0", default-features = false, features = ["cli", "wit
 integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 # Unkeyed content digests: SHA-256 (FIPS 180-4) and SHA3-256 (FIPS 202).
 sha2 = { version = "0.10" }
-sha3 = { version = "0.10" }
+sha3 = { version = "0.12" }
 loco-rs = { workspace = true  }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
@@ -46,7 +46,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 regex = { version = "1.13" }
 # Embedded full-text search index (see src/search/). Same version as the
 # rest of the family, so one index format.
-tantivy = { version = "0.22" }
+tantivy = { version = "0.26" }
 migration = { path = "migration" }
 sea-orm = { version = "2.0", features = [
   "sqlx-sqlite",
@@ -55,11 +55,11 @@ sea-orm = { version = "2.0", features = [
   "macros",
 ] }
 chrono = { version = "0.4" }
-validator = { version = "0.20" }
-uuid = { version = "1.24", features = ["v4", "serde"] }
+validator = { version = "0.21" }
+uuid = { version = "1.26", features = ["v4", "serde"] }
 include_dir = { version = "0.7" }
 mimalloc = { version = "0.1.52" }
-prometheus = { version = "0.13" }
+prometheus = { version = "0.14" }
 
 # Canonical matching algorithm — embedded and used directly as the API DTO.
 project-portfolio-management-matcher = { path = "../project-portfolio-management-matcher-rust-crate" }
@@ -97,12 +97,12 @@ tokio = { version = "1.53", default-features = false, features = [
   "macros",
   "net",
 ] }
-serial_test = { version = "3.5.0" }
+serial_test = { version = "4.0.1" }
 rstest = { version = "0.25" }
 insta = { version = "1.48", features = ["redactions", "yaml", "filters"] }
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so the extractor.s
 # happy path is verified un-gated (no auth-service / network dependency).
-ed25519-dalek = { version = "2.2" }
+ed25519-dalek = { version = "3.0" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
 sha2 = { version = "0.10" }
 base64 = { version = "0.22" }
