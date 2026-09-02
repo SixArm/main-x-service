@@ -9,6 +9,33 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — two real bugs found running the live-integration suite green (PRO-P4, resumed)
+
+- **Edit form (`FR-6`) crashed silently.** `/persons/[id]/edit` loads
+  its record into a `$state` variable and hands it straight to
+  `PersonForm`; `createForm` (`src/lib/forms/form.svelte.ts`) called
+  `structuredClone` on that prop directly, which cannot clone a Svelte
+  5 `$state` reactive proxy at all (`DataCloneError`), even though the
+  wrapped data is plain JSON. Fixed with `$state.snapshot()` before
+  cloning. Pinned in `tests/unit/form.test.ts`, using a new
+  `.svelte.ts` test fixture (`tests/unit/support/reactive-state.svelte.ts`)
+  that constructs a real `$state` proxy so the regression reproduces
+  without a browser.
+- **Match check (`FR-8`) rendered nothing.**
+  `PersonRepository.match()`/`.checkDuplicates()` assumed the service
+  returns a bare `MatchResult[]`; it actually wraps them as
+  `{ matches, total }` / `{ has_duplicates, potential_matches }`
+  (verified against a running service). `search()` already normalises
+  its own envelope drift — `match()`/`checkDuplicates()` now do the
+  same (a bare array is still accepted). Pinned in
+  `tests/unit/persons.test.ts`.
+
+Both were found live: `bin/e2e` went from 8/10 → 10/10 (run twice,
+no flake) once fixed. Neither was a test-data or auth-mechanism issue
+— PRO-P32 had already closed those; this resumed PRO-P4 to actually
+re-run the suite afterward, which had not been done. Full record in
+`spec/16-open-questions.md` OQ-5's closing update.
+
 ### Added — real magic-link sign-in for the live-integration suite (T-27, PRO-P32)
 
 - `tests/integration/golden-paths.spec.ts` could no longer complete

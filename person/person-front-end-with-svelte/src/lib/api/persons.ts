@@ -135,22 +135,40 @@ export class PersonRepository {
     return this.http.delete<void>(`/api/persons/${id}`);
   }
 
-  /** Score the index against a query record; returns ranked candidates. */
-  match(request: MatchRequest): Promise<MatchResult[]> {
-    return this.http.post<MatchResult[]>("/api/persons/match", {
+  /**
+   * Score the index against a query record; returns ranked candidates.
+   *
+   * The live service wraps candidates as `{ matches, total }`, never a
+   * bare array (verified against a running instance — PRO-P4) — but a
+   * bare array is accepted too, in case a future response drops the
+   * wrapper, the same defensive posture {@link search} already takes.
+   */
+  async match(request: MatchRequest): Promise<MatchResult[]> {
+    type MatchEnvelope =
+      | MatchResult[]
+      | { matches: MatchResult[]; total?: number };
+    const data = await this.http.post<MatchEnvelope>("/api/persons/match", {
       body: request,
     });
+    return Array.isArray(data) ? data : data.matches;
   }
 
   /**
    * Check whether a candidate person would collide with existing records,
    * without creating anything. Mirrors the duplicate detection that
-   * {@link create} runs implicitly.
+   * {@link create} runs implicitly — same envelope shape as a create's
+   * `409` `error.details` (`{ has_duplicates, potential_matches }`,
+   * verified live — PRO-P4), not a bare array.
    */
-  checkDuplicates(candidate: Partial<Person>): Promise<MatchResult[]> {
-    return this.http.post<MatchResult[]>("/api/persons/check-duplicates", {
-      body: candidate,
-    });
+  async checkDuplicates(candidate: Partial<Person>): Promise<MatchResult[]> {
+    type DuplicatesEnvelope =
+      | MatchResult[]
+      | { has_duplicates?: boolean; potential_matches: MatchResult[] };
+    const data = await this.http.post<DuplicatesEnvelope>(
+      "/api/persons/check-duplicates",
+      { body: candidate },
+    );
+    return Array.isArray(data) ? data : data.potential_matches;
   }
 
   /** Merge a confirmed duplicate into a surviving main record. */
