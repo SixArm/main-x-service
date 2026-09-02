@@ -198,10 +198,75 @@ src/
 │   ├── bulk_jobs.rs       bulk-job CRUD + idempotency helpers (BLK-5)
 │   ├── review_queue.rs    duplicate-review-queue CRUD (BLK-5; raw SQL, provenance from the start)
 │   └── _entities/         SeaORM entities (cases, audit_logs, merge_records, entity_links, event_outbox, bulk_jobs)
+├── observability.rs       structured logging + real OpenTelemetry OTLP export (PRO-H12 slice 6 — see below)
 migration/src/            …_000001_cases … _000005_entity_links, …_000006_compliance …
                           _000011_integrity_mac, …_000012_review_queue, …_000013_bulk_jobs
 config/                   development/production/test yaml
+tests/otlp_export.rs       real OTLP/gRPC export proof, in-process collector, no database
+tests/otlp_middleware.rs   the mounted `trace_mw` layer proved end to end over a real HTTP request
+tests/otlp_collector/      the shared in-process OTLP/gRPC collector both otlp_* binaries use
 ```
+
+## OpenTelemetry OTLP export
+
+`src/observability.rs` (repo `tasks.md` PRO-H12 slice 6 of 7, landed
+2026-09-02) is a close port of care-pathway-service's
+`src/observability.rs` — itself a port of organization's, itself
+course's, itself person's, itself link-graph-service's, the family's
+first working exporter. This crate carried **no** `src/observability`
+module at all before this change, and is the **third of the four
+loco-idiomatic registries** (organization, care-pathway, case,
+portfolio — `src/controllers/`, not `src/api/rest/`) to carry it.
+`App::init_logger` installs it (loco's own `EnvFilter` + formatted
+layer, plus the `tracing-opentelemetry` bridge over an OTLP/gRPC
+exporter); `App::on_shutdown` flushes it. Export is **on by default** —
+set `OTLP_ENDPOINT=""` to disable it — at `OTLP_ENDPOINT` (default
+`http://localhost:4317`) with `service.name` from `OTLP_SERVICE_NAME`
+(default `case-service`); both variables are **deliberately
+unprefixed**, matching every other crate that carries this pipeline,
+not the per-service `CASE_*` convention `CASE_REQUIRE_AUTH` and its
+siblings use.
+
+**Where this crate's shape forced real adaptation**, confirmed rather
+than assumed:
+
+- **Exactly one router-construction surface**, unlike the person-style
+  crates' two. This crate is genuinely loco-idiomatic: `App::routes` +
+  `App::after_routes` in `src/app.rs` is the only place a router gets
+  built — confirmed by grepping `src/` and `tests/` for a second
+  `Router::new()`/`create_router`: the one hit (`src/auth.rs`) is a
+  unit test for the auth middleware itself, not an app-level router.
+  `observability::trace_mw` is therefore layered **once**, as the
+  outermost middleware in `after_routes` — the same precedent
+  `require_auth_mw` and `require_version_mw` already set by being
+  layered there.
+- **No `tonic` rename needed** — this crate declares no `tonic`
+  dependency of its own (no gRPC stub — `agents/share/overview.md`'s
+  capability matrix), so the in-process OTLP collector tests' `tonic
+  0.14` dev-dependency is a plain, un-renamed dependency, exactly as
+  course's, organization's, and care-pathway's are.
+- **The same SOUP-register bookkeeping care-pathway's port needed, plus
+  one more.** This crate also carries an IEC 62304 SOUP register
+  (`compliance/soup.tsv`, verified live by
+  `every_direct_dependency_is_annotated`), so the new dependencies each
+  needed a `name<TAB>purpose<TAB>safety relevance` row before `cargo
+  test --lib` was green — 9 rows here (5 main, 4 test-only) rather than
+  care-pathway's 8, because this crate has no existing `reqwest` main
+  dependency the middleware test could reuse and so needed its own
+  dev-dependency entry.
+
+`tests/otlp_export.rs` and `tests/otlp_middleware.rs` (ported from
+care-pathway-service, with `tests/otlp_collector/` — an in-process
+OTLP/gRPC collector, unchanged) prove real export against a real gRPC
+listener in a normal `cargo test` run: a `tracing` span and a metric
+both reach the collector's decoded protobuf, and a served HTTP request
+returns a `traceparent` whose trace id matches the exported span's.
+None of this needs a database. Landing this raised `cargo test --lib`
+from 253 to 261 (8 new `src/observability.rs` unit tests), plus 4 new
+tests across the two `tests/otlp_*.rs` binaries. Verified
+independently: `cargo fmt --check`, `cargo clippy --all-targets -- -D
+warnings`, `cargo deny check`, `cargo bench --no-run`, and the MSRV
+check (`cargo +1.96 check --all-targets`) all clean.
 
 ## Container image
 

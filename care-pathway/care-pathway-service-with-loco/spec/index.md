@@ -750,6 +750,31 @@ the evidence bundle.
     throughput or flow efficiency**, and none can be derived by
     arithmetic from what is returned.
 
+- [x] **2026-09-01 — PRO-H12 slice 5: OpenTelemetry OTLP export.** This
+  crate carried no `src/observability` module at all before this
+  change. Added it as a port of organization-service's slice 4 (repo
+  `tasks.md` PRO-H12) — `src/observability.rs` (real OTLP/gRPC span +
+  metric export, on by default at `OTLP_ENDPOINT`, disabled by setting
+  it to the empty string), `App::init_logger`/`on_shutdown` wired in
+  `src/app.rs`, and `observability::trace_mw` layered as the outermost
+  middleware in `after_routes` — this crate's **only**
+  router-construction surface, confirmed (not assumed) by grepping
+  `src/`/`tests/` for a second `Router::new()`/`create_router`: the
+  one hit is a unit test for the auth middleware, not an app-level
+  router. No `otlp-test-tonic` rename was needed (this crate declares
+  no `tonic` dependency of its own). See
+  [`agents/share/rust-tracing-opentelemetry-stack.md`](../../../agents/share/rust-tracing-opentelemetry-stack.md)
+  for the full rollout status. Because this crate is the family's IEC
+  62304 SOUP-register reference implementation, the port also required
+  8 new `compliance/soup.tsv` rows (found by running
+  `every_direct_dependency_is_annotated`, not anticipated up front).
+  Verified: `cargo fmt --check`, `cargo clippy --all-targets -D
+  warnings`, `cargo deny check`, `cargo bench --no-run`, and the MSRV
+  check (`cargo +1.96 check --all-targets`) all clean; `cargo test
+  --lib` 316/316 (was 308, +8 new `src/observability.rs` unit tests);
+  `cargo test --test otlp_export --test otlp_middleware` 4/4 (real
+  protobuf crossing a real in-process gRPC socket).
+
 - [x] **2026-08-28 — PRO-P13: backport TBA + journey-links into this
   spec, and close the instances/insights OpenAPI gap.** This spec
   (§1–§18) had zero coverage of time-based analysis and the

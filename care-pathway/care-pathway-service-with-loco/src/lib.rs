@@ -48,6 +48,10 @@ pub mod journey;
 pub mod merge;
 pub mod metrics;
 pub mod models;
+/// Structured logging + real OpenTelemetry OTLP export (repo `tasks.md`
+/// PRO-H12, slice 5 of 7). Installed via [`app::App::init_logger`];
+/// [`observability::trace_mw`] is layered in `App::after_routes`.
+pub mod observability;
 pub mod openapi;
 /// Field masking + the GDPR right-of-access export envelope.
 pub mod privacy;
