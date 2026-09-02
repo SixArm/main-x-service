@@ -141,8 +141,11 @@ what's actually implemented per crate today, and
 Published crates (currently `authentication-verifier` and the
 matcher crates — see `AGENTS.md`'s Library/Matcher crate tables for
 which ones) are released to crates.io with `cargo publish`, run
-locally by the maintainer against a stored API token; no publish step
-runs in CI today. We intend to move to **Trusted Publishing** (OIDC,
+locally against a stored API token — by the maintainer, or by the
+project's AI tooling once it judges an already-merged version bump
+ready to release (see [`AI_STATEMENT.md`](AI_STATEMENT.md) §5/§6 and
+[`GOVERNANCE.md`](GOVERNANCE.md)); no publish step runs in CI today.
+We intend to move to **Trusted Publishing** (OIDC,
 no long-lived tokens stored anywhere) once it is production-ready
 across every code forge we use (GitHub.com, Codeberg.org) and every
 target registry (crates.io, npm) — see
