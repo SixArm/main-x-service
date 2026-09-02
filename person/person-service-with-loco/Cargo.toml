@@ -268,6 +268,18 @@ reqwest = { version = "0.12", default-features = false, features = [
 # `agents/share/observability.md` documents for the OTLP dependency
 # generations in place/thing's manifests) — not simply reused as-is.
 tonic-build = "0.12"
+# `tonic_build::compile_protos` shells out to a real `protoc` binary —
+# it does not bundle one itself (an earlier `build.rs` comment claimed
+# otherwise; wrong, caught only by CI, not by local `cargo build`,
+# because this developer's machine already had `protoc` on `PATH` via
+# Homebrew). CI's runner does not have `protoc` installed, so a plain
+# `tonic_build::compile_protos` call failed there with "Could not find
+# `protoc`" while passing locally. `protoc-bin-vendored` ships prebuilt
+# `protoc` binaries for the platforms this family builds on (macOS
+# arm64/x86_64 for local dev, Linux x86_64 for CI); `build.rs` points
+# `PROTOC` at it before compiling, so no system `protoc` install is
+# required anywhere, verified rather than assumed this time.
+protoc-bin-vendored = "3"
 
 [[bench]]
 name = "matching_bench"

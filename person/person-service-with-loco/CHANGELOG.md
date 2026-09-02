@@ -54,6 +54,20 @@ a SOUP-register test gained a required `prost` annotation);
 `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings`
 clean.
 
+**Fixed after landing, found by real CI rather than local runs:**
+`build.rs`'s own doc comment claimed `tonic_build::compile_protos`
+"shells out to a bundled `protoc`... so no system `protoc` install is
+required" — wrong. It shells out to a real `protoc` binary and bundles
+none; the claim went unverified against CI because this developer's
+machine already had `protoc` on `PATH` (Homebrew), so every local
+`cargo build`/`test` masked the gap. CI's runner has no `protoc`
+installed, and failed with "Could not find `protoc`" on every job
+touching this crate. Fixed by adding `protoc-bin-vendored` (a
+build-dependency shipping prebuilt `protoc` binaries for the platforms
+this family builds on) and pointing `PROTOC` at it in `build.rs`
+before compiling — verified this time by an actual CI run, not a local
+success generalised without checking.
+
 ## [0.6.0] - 2026-08-27
 
 ### Added — TSV bulk import/export, and fuzzed row decoders
