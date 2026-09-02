@@ -22,6 +22,7 @@ use loco_rs::{
 };
 use migration::Migrator;
 use std::path::Path;
+use std::sync::OnceLock;
 
 #[allow(unused_imports)]
 use crate::{
@@ -32,9 +33,14 @@ use crate::{
         objective_links, objectives, plan_dependencies, plans, proposals, report_definitions,
         reviews, risks, scenarios, scheduled_actions,
     },
+    observability::{self, Telemetry, TelemetryConfig},
     tasks,
     workers::downloader::DownloadWorker,
 };
+
+/// The installed telemetry providers, so `on_shutdown` can flush what the
+/// batch processor is still holding. Set once by [`App::init_logger`].
+static TELEMETRY: OnceLock<Telemetry> = OnceLock::new();
 
 /// Blanket auth-enforcement middleware: PASETO authentication then ABAC
 /// authorization. Reads the `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` flag, the verifier,
@@ -88,6 +94,63 @@ impl Hooks for App {
         config: Config,
     ) -> Result<BootResult> {
         create_app::<Self, Migrator>(mode, environment, config).await
+    }
+
+    /// Install this crate's own logging + `OpenTelemetry` stack (repo
+    /// `tasks.md` PRO-H12), returning `true` so loco does **not** also
+    /// install its own. Ported from case-service's `App::init_logger`
+    /// (itself care-pathway's, itself organization's, itself course's,
+    /// itself person's) — the `Hooks::init_logger` seam is identical
+    /// across crates' shapes despite the differing router layout (see
+    /// `src/observability.rs`'s module docs and `after_routes` below for
+    /// where this crate's shape actually diverges).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error only if an OTLP exporter cannot be **built** (a
+    /// malformed endpoint). A collector that is merely unreachable is not an
+    /// error: the gRPC channel connects lazily, so boot is unaffected.
+    fn init_logger(ctx: &AppContext) -> Result<bool> {
+        let telemetry_config = TelemetryConfig::from_env();
+        if !telemetry_config.export_enabled() {
+            return Ok(false);
+        }
+        let logger_config = &ctx.config.logger;
+        // An operator who set `RUST_LOG` or `logger.override_filter` owns
+        // the filter outright; otherwise loco's module whitelist applies,
+        // and the whitelist has no `opentelemetry*` entry — so a failing
+        // export would be silent unless widened.
+        let operator_supplied =
+            std::env::var("RUST_LOG").is_ok() || logger_config.override_filter.is_some();
+        let env_filter = observability::with_exporter_diagnostics(
+            loco_rs::logger::init_env_filter::<Self>(
+                logger_config.override_filter.as_ref(),
+                &logger_config.level,
+            ),
+            operator_supplied,
+        );
+        // `logger.enable: false` means "no stdout layer" — honour it rather
+        // than quietly turning logging on for anyone who enables export.
+        let fmt_layer = logger_config
+            .enable
+            .then(|| loco_rs::logger::init_layer(std::io::stdout, &logger_config.format, true));
+        let telemetry = observability::init(&telemetry_config, env_filter, fmt_layer)
+            .map_err(|error| loco_rs::Error::Message(format!("OTLP init failed: {error}")))?;
+        tracing::info!(
+            service.name = %telemetry_config.service_name,
+            endpoint = %telemetry_config.endpoint.as_deref().unwrap_or_default(),
+            "OpenTelemetry OTLP export enabled"
+        );
+        let _ = TELEMETRY.set(telemetry);
+        Ok(true)
+    }
+
+    /// Flush and tear down the OTLP providers on graceful shutdown, so the
+    /// last batch of spans is not lost with the process.
+    async fn on_shutdown(_ctx: &AppContext) {
+        if let Some(telemetry) = TELEMETRY.get() {
+            telemetry.shutdown();
+        }
     }
 
     async fn initializers(_ctx: &AppContext) -> Result<Vec<Box<dyn Initializer>>> {
@@ -156,7 +219,13 @@ impl Hooks for App {
             .layer(axum::middleware::from_fn(require_auth_mw))
             .layer(axum::middleware::from_fn(
                 crate::version::require_version_mw,
-            )))
+            ))
+            // Outermost layer runs first, so the request span wraps
+            // versioning and the auth guard too — a 401/403 is part of the
+            // trace, not invisible to it. This is this crate's only
+            // router-construction surface — see `src/observability.rs`'s
+            // module docs.
+            .layer(axum::middleware::from_fn(observability::trace_mw)))
     }
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
         queue.register(DownloadWorker::build(ctx)).await?;

@@ -752,6 +752,33 @@ HIPAA/NHS/GDPR posture for audit and access controls.
 ## 13. Tasks (live work queue)
 
 
+- [x] **2026-09-02 — PRO-H12 slice 7 of 7 (the last): OpenTelemetry
+  OTLP export.** This crate carried no `src/observability` module at
+  all before this change. Added it as a port of case-service's slice 6
+  (repo `tasks.md` PRO-H12) — `src/observability.rs` (real OTLP/gRPC
+  span + metric export, on by default at `OTLP_ENDPOINT`, disabled by
+  setting it to the empty string), `App::init_logger`/`on_shutdown`
+  wired in `src/app.rs`, and `observability::trace_mw` layered as the
+  outermost middleware in `after_routes` — this crate's **only**
+  router-construction surface, confirmed (not assumed) by grepping
+  `src/`/`tests/` for a second `Router::new()`/`create_router`: the
+  one hit is a unit test for the auth middleware, not an app-level
+  router. No `otlp-test-tonic` rename was needed (this crate declares
+  no `tonic` dependency of its own), and — unlike care-pathway/case —
+  this crate carries no IEC 62304 SOUP register, so no
+  `compliance/soup.tsv` bookkeeping was needed either: the simplest of
+  the four loco-idiomatic ports. See
+  [`agents/share/rust-tracing-opentelemetry-stack.md`](../../../agents/share/rust-tracing-opentelemetry-stack.md)
+  for the full rollout status. Verified: `cargo fmt --check`, `cargo
+  clippy --all-targets -D warnings`, `cargo deny check`, `cargo bench
+  --no-run`, and the MSRV check (`cargo +1.96 check --all-targets`)
+  all clean; `cargo test --lib` 361/361 (was 353, +8 new
+  `src/observability.rs` unit tests); `cargo test --test otlp_export
+  --test otlp_middleware` 4/4 (real protobuf crossing a real
+  in-process gRPC socket). **This closes PRO-H12**: every entity
+  registry in the family now exports real OTLP/gRPC traces and
+  metrics.
+
 - [x] **2026-08-21 — FUZZ-2: cargo-fuzz harness for the request-path
   logic.** Three coverage-guided targets over the pure, total code that
   faces the network: `validate_json` (bytes → `serde_json` → `Plan` →
