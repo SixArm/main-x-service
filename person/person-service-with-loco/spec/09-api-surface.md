@@ -7,7 +7,7 @@ Complete endpoint reference: [`agents/restful.md`](../agents/restful.md).
 | REST (Axum) | 16 endpoints under `/api/persons/*` + `/api/audit/*` + `/api/health` — including `GET /api/persons`, the database-backed collection list added after a live investigation found `/persons/search?q=*` unreliable for enumeration (see `CHANGELOG.md`) |
 | Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | FHIR R5 (Axum) | Person CRUD + search under `/fhir/Person` |
-| gRPC (Tonic) | Stubbed; not yet implemented |
+| gRPC (Tonic) | Real server (T-6, 2026-09-02): `CreatePerson` / `GetPerson` / `ListPersons` / `DeletePerson` on `PersonService`, generated from `proto/person.proto`, spawned on `grpc_port` alongside the REST router. No `UpdatePerson` RPC yet, and the proto `Person` message is a partial projection (identification + demographics only) — see spec §13 T-6 |
 | Docs | Swagger UI at `/swagger-ui` (OpenAPI 3.0 via utoipa) |
 
 All REST endpoints return `{ "success": bool, "data": …, "error": … }`.

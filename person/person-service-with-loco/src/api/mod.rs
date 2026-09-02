@@ -6,11 +6,11 @@
 //! shape. [`ApiError`](crate::api::ApiError) is the structured error body. The [`From`] impls
 //! map a [`crate::Error`] into a failed response. Submodules: [`rest`](crate::api::rest)
 //! (the primary HTTP API + Swagger), [`fhir`](crate::api::fhir) (HL7 FHIR R5 Person), and
-//! [`grpc`](crate::api::grpc) (Tonic stub).
+//! [`grpc`](crate::api::grpc) (a real Tonic server — Create/Get/List/Delete Person).
 
 /// HL7 FHIR R5 API for the Person resource.
 pub mod fhir;
-/// gRPC API (Tonic) — stub.
+/// gRPC API (Tonic) — Create/Get/List/Delete Person, real server.
 pub mod grpc;
 /// REST API: router, handlers, state, and OpenAPI/Swagger.
 pub mod rest;

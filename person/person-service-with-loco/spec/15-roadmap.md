@@ -36,8 +36,12 @@ and accept.
 - **Production readiness** — security audit + pen test, HIPAA + GDPR
   validation, DR runbook + drills, backup / restore, incident
   response, CI/CD pipeline.
-- **Feature enhancements** — complete gRPC, complete FHIR (capability
-  statement, bundles, Organization), Fluvio production publisher +
-  consumers, ML-based match scoring with A/B test framework, person
-  photo storage and retrieval, consent enforcement in the query layer.
+- **Feature enhancements** — extend the gRPC surface landed 2026-09-02
+  (T-6: `UpdatePerson`, match/merge/search/bulk/FHIR over gRPC, the
+  remaining domain fields on the proto `Person` message, disclosure
+  accounting + SEC-G3 masking parity with REST — see T-6's own record
+  for the full list), complete FHIR (capability statement, bundles,
+  Organization), Fluvio production publisher + consumers, ML-based
+  match scoring with A/B test framework, person photo storage and
+  retrieval, consent enforcement in the query layer.
 

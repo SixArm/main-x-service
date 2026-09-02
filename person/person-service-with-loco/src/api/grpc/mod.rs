@@ -1,46 +1,71 @@
-//! gRPC API (Tonic) — stub.
+//! gRPC API (Tonic) — a real server (PRO-H11), not a stub.
 //!
-//! Reserved surface for a high-throughput gRPC interface mirroring the
-//! REST/FHIR APIs. The Protobuf service is not yet defined and
-//! [`serve`](crate::api::grpc::serve) is a no-op that returns immediately; the commented body
-//! sketches the intended Tonic wiring. Callers should use the REST API
-//! ([`crate::api::rest`]) until this is implemented.
+//! [`serve`] binds a [`tonic::transport::Server`] on
+//! [`ServerConfig::grpc_port`](crate::config::ServerConfig::grpc_port)
+//! and serves [`service::PersonGrpcService`], generated from
+//! `proto/person.proto` by `build.rs` into [`proto`]. The RPC handlers
+//! delegate to the **same** [`crate::api::rest::AppState`] — the same
+//! `PersonRepository`, the same `crate::validation::validate_person`,
+//! the same duplicate-detection core, the same offline-PASETO/ABAC
+//! machinery — the REST handlers already call
+//! ([`service`] module docs), so there is one set of business rules
+//! behind two wire protocols, not two.
+//!
+//! `App::after_routes` (`src/app.rs`) spawns [`serve`] as a background
+//! task alongside the REST router at boot; a bind failure is logged,
+//! not fatal — the REST surface still comes up even if the gRPC port is
+//! unavailable (e.g. already in use), matching this crate's existing
+//! "always boot" posture for other best-effort subsystems (key
+//! refresh, policy watch).
+//!
+//! Covers `CreatePerson` / `GetPerson` / `ListPersons` / `DeletePerson`
+//! — deliberately not the full REST surface (no `UpdatePerson`, no
+//! match/merge/search/bulk/FHIR). See this crate's spec `T-6` and
+//! `AGENTS.md`'s gRPC section for what is out of scope for this slice
+//! and tracked as follow-up, rather than silently missing.
 
 use crate::Result;
+use crate::api::rest::AppState;
 use crate::config::ServerConfig;
 
-/// Generated Protobuf types (reserved).
+pub mod service;
+
+/// Generated Protobuf types and the `PersonService` client/server
+/// traits, compiled from `proto/person.proto` by `build.rs`.
 ///
-/// Will hold `tonic::include_proto!("person")` output once the `.proto`
-/// service definition exists; empty for now.
+/// Generated code, not hand-written — exempted from this crate's own
+/// `#![deny(missing_docs)]` / `#![warn(clippy::pedantic)]` policy
+/// (`src/lib.rs`) the same way every consumer of `tonic::include_proto!`
+/// has to: prost emits no doc comments on generated fields/variants,
+/// and pedantic lints (e.g. naming conventions on generated enum
+/// variants) have no hand-written author to satisfy them.
+#[allow(missing_docs, clippy::pedantic, clippy::all)]
 pub mod proto {
-    // Protocol buffer generated code will go here
-    // tonic::include_proto!("person");
+    tonic::include_proto!("person");
 }
 
-/// Start the gRPC server (currently a no-op stub).
-///
-/// Accepts the [`ServerConfig`] for forward compatibility (host/port)
-/// but performs no work and returns `Ok(())` immediately. Will bind and
-/// serve the Tonic service once the gRPC API is implemented.
+/// Bind and serve the `PersonService` gRPC server on
+/// `config.grpc_port`, forever (or until the process shuts down).
 ///
 /// # Errors
 ///
-/// Currently infallible (always returns `Ok(())`). Once implemented it
-/// will return [`crate::Error::Api`] on bind/serve failures.
-pub fn serve(_config: ServerConfig) -> Result<()> {
-    // TODO: Implement gRPC server
-    // let addr = format!("{}:{}", config.host, config.grpc_port)
-    //     .parse::<std::net::SocketAddr>()
-    //     .map_err(|e| crate::Error::Api(format!("Invalid gRPC address: {}", e)))?;
-    //
-    // tracing::info!("gRPC server listening on {}", addr);
-    //
-    // Server::builder()
-    //     .add_service(...)
-    //     .serve(addr)
-    //     .await
-    //     .map_err(|e| crate::Error::Api(e.to_string()))?;
+/// [`crate::Error::Api`] if `host:grpc_port` fails to parse as a socket
+/// address, or if binding/serving fails (e.g. the port is already in
+/// use).
+pub async fn serve(config: ServerConfig, state: AppState) -> Result<()> {
+    let addr = format!("{}:{}", config.host, config.grpc_port)
+        .parse::<std::net::SocketAddr>()
+        .map_err(|e| crate::Error::Api(format!("invalid gRPC bind address: {e}")))?;
+
+    tracing::info!(%addr, "gRPC server listening");
+
+    tonic::transport::Server::builder()
+        .add_service(proto::person_service_server::PersonServiceServer::new(
+            service::PersonGrpcService::new(state),
+        ))
+        .serve(addr)
+        .await
+        .map_err(|e| crate::Error::Api(format!("gRPC server failed: {e}")))?;
 
     Ok(())
 }

@@ -161,7 +161,7 @@ case, and portfolio each provide:
 | Full-text search via Tantivy¹ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Privacy masking module (`src/privacy`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ |
 | FHIR R5 surface | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ | ✅ | ✅ | – |
-| gRPC stub (Tonic)⁶ | ✅ | ✅ | – | – | ✅ | – | – | – | – | – |
+| gRPC (Tonic)⁶ | ✅ real | stub | – | – | stub | – | – | – | – | – |
 | Durable outbox events (Phase 2)² | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Real-broker relay sink (`FluvioSink`, Phase 3)⁴ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Boundary normalization (phone/address) | ✅ | ✅ | ✅ | – | ✅ | – | – | – | – | – |
@@ -239,7 +239,18 @@ dev-dependency at a different version (`E0464`), exactly as a
 genuinely-used one does — found rolling PRO-H12 to place (2026-08-30),
 confirmed again on thing the same day, both needing the same
 `otlp-test-tonic` rename PRO-H9's three crates needed despite this
-row's `–`.
+row's `–`. As of 2026-09-02 (repo `tasks.md` PRO-H11/PRO-H6), **person**
+is the family's first **real** gRPC server — `proto/person.proto` +
+`build.rs` (`tonic-build`) + `src/api/grpc/service.rs`, covering
+Create/Get/List/Delete Person, delegating to the same domain logic and
+auth/ABAC machinery REST uses (verified live against a real Postgres by
+`tests/grpc_integration_test.rs`), spawned alongside the REST router at
+boot. **worker** and **event** still carry only the commented-out `serve`
+stub PRO-H11 scoped them for as the next slices; person is the copy
+source (see its own `AGENTS.md` "gRPC server" section for the exact
+adaptation — proto message design, auth parity, the `tonic-build`
+version-pin fix). Thing's inclusion is still an open call (PRO-H6),
+independent of person landing.
 
 ### The two cross-cutting services
 
