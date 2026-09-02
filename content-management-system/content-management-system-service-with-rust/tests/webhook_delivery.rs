@@ -83,7 +83,7 @@ async fn receiver(status: StatusCode) -> (SocketAddr, Arc<Mutex<Vec<Received>>>)
 }
 
 /// A site with one entry, so the outbox holds real events.
-async fn seed(request: &axum_test::TestServer, prefix: &str) -> String {
+async fn seed(request: &loco_rs::TestServer, prefix: &str) -> String {
     let key = format!("{prefix}-{}", uuid::Uuid::new_v4().simple());
     let created: Value = request
         .post("/api/sites")

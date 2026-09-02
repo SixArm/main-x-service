@@ -2,7 +2,7 @@
 //! delivery headers, metadata, declared renditions, replace, orphans,
 //! the delete-refusal, and the alt-text publish gate.
 
-use axum_test::multipart::{MultipartForm, Part};
+use axum_test_loco_compat::multipart::{MultipartForm, Part};
 use content_management_system_service::app::App;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
@@ -42,7 +42,7 @@ fn upload_form(
 }
 
 /// Declare a site + an article type with a media field.
-async fn seed_site_and_type(request: &axum_test::TestServer, prefix: &str) -> String {
+async fn seed_site_and_type(request: &loco_rs::TestServer, prefix: &str) -> String {
     let site_pid = seed_site(request, &a_key(prefix)).await;
     request
         .post(&format!("/api/sites/{site_pid}/content-types"))

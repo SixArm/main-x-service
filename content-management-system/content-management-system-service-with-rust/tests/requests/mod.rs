@@ -45,7 +45,7 @@ pub fn a_site_payload(key: &str) -> Value {
 }
 
 /// Create a site and return its pid.
-pub async fn seed_site(request: &axum_test::TestServer, key: &str) -> String {
+pub async fn seed_site(request: &loco_rs::TestServer, key: &str) -> String {
     let created: Value = request
         .post("/api/sites")
         .json(&a_site_payload(key))
