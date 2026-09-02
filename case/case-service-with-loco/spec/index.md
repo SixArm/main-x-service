@@ -771,6 +771,32 @@ the other v1 edge kinds even though it shares the same edge shape.
 ## 13. Tasks (live work queue)
 
 
+- [x] **2026-09-02 — PRO-H12 slice 6: OpenTelemetry OTLP export.** This
+  crate carried no `src/observability` module at all before this
+  change. Added it as a port of care-pathway-service's slice 5 (repo
+  `tasks.md` PRO-H12) — `src/observability.rs` (real OTLP/gRPC span +
+  metric export, on by default at `OTLP_ENDPOINT`, disabled by setting
+  it to the empty string), `App::init_logger`/`on_shutdown` wired in
+  `src/app.rs`, and `observability::trace_mw` layered as the outermost
+  middleware in `after_routes` — this crate's **only**
+  router-construction surface, confirmed (not assumed) by grepping
+  `src/`/`tests/` for a second `Router::new()`/`create_router`: the
+  one hit is a unit test for the auth middleware, not an app-level
+  router. No `otlp-test-tonic` rename was needed (this crate declares
+  no `tonic` dependency of its own). See
+  [`agents/share/rust-tracing-opentelemetry-stack.md`](../../../agents/share/rust-tracing-opentelemetry-stack.md)
+  for the full rollout status. Like care-pathway, this crate carries
+  its own IEC 62304 SOUP register (`compliance/soup.tsv`), so the port
+  also required 9 new rows (5 main dependencies, 4 test-only — one
+  more than care-pathway's, since this crate has no existing `reqwest`
+  main dependency to reuse for the middleware test). Verified: `cargo
+  fmt --check`, `cargo clippy --all-targets -D warnings`, `cargo deny
+  check`, `cargo bench --no-run`, and the MSRV check (`cargo +1.96
+  check --all-targets`) all clean; `cargo test --lib` 261/261 (was
+  253, +8 new `src/observability.rs` unit tests); `cargo test --test
+  otlp_export --test otlp_middleware` 4/4 (real protobuf crossing a
+  real in-process gRPC socket).
+
 - [x] **2026-08-21 — TSV bulk format + fuzzed row decoders.**
   `BulkFormat::Tsv` is accepted for import and export alongside `jsonl`
   and `csv`. TSV shares the CSV codec rather than forking it — the codec

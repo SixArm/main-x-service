@@ -6789,9 +6789,9 @@ crate above.
   module at all — not part of this task's scope (it targeted the
   three stubs specifically); a family-wide rollout to the rest is
   unqueued follow-up work, not a gap in this task's closure.
-- [ ] **PRO-H12 (L, in progress — 4 of 7 slices landed)** **OTLP
+- [x] **PRO-H12 (L)** *(done 2026-09-02 — all 7 slices landed)* **OTLP
   rollout, remaining seven registries.** place, thing, course,
-  organization, care-pathway, case, portfolio carry no
+  organization, care-pathway, case, portfolio carried no
   `src/observability` module at all (unlike PRO-H9's three, which had
   a dead stub to replace). Bigger lift than PRO-H9: each needs
   `src/observability.rs` added from scratch (copy person's port —
@@ -6889,11 +6889,85 @@ crate above.
   otlp_middleware` 4/4. Full results:
   organization/organization-service-with-loco's own `spec/index.md`
   §13 and `CHANGELOG.md`.
-  **Remaining 3 slices**: care-pathway, case, portfolio — all
-  loco-style `src/controllers/` like organization; each still needs
-  its own router-surface count confirmed rather than assumed identical
-  (organization's single-surface shape is now one data point, not a
-  guarantee the other three match it).
+  *Slice 5 (care-pathway), done 2026-09-01:* the second loco-idiomatic
+  registry, ported from organization's slice 4 rather than re-derived.
+  Confirmed rather than assumed organization's single-router-surface
+  finding: grepped `src/` and `tests/` for a second
+  `Router::new()`/`create_router` fresh for this crate (the one hit,
+  in `src/auth.rs`, is a unit test for the auth middleware itself, not
+  an app-level router), so `trace_mw` is layered once in
+  `after_routes`, same as organization. Also confirmed: care-pathway
+  declares no `tonic` dependency at all (no gRPC stub), so — like
+  course's and organization's — no `otlp-test-tonic` rename was
+  needed, and there were no stale/dead OTel dependency pins to clean
+  up, since this crate carried none at all before this change. One
+  adaptation the earlier four ports had no equivalent of: care-pathway
+  is the family's IEC 62304 SOUP-register reference implementation
+  (`compliance/soup.tsv`, verified by its own
+  `every_direct_dependency_is_annotated` test), so the port also
+  needed 8 new SOUP rows (5 main dependencies, 3 test-only) — found by
+  running the test, not anticipated in advance. Full port
+  (`src/observability.rs`, `Hooks::init_logger`/`on_shutdown`,
+  `trace_mw` on the one surface, `tests/otlp_{export,middleware}.rs` +
+  `tests/otlp_collector/`) verified independently: `cargo fmt --check`,
+  `cargo clippy --all-targets -D warnings`, `cargo deny check`, `cargo
+  bench --no-run`, and the MSRV check (`cargo +1.96 check
+  --all-targets`) all clean; `cargo test --lib` 316/316 (was 308, +8);
+  `cargo test --test otlp_export --test otlp_middleware` 4/4. Docs
+  updated in the same pass: `agents/share/{overview.md,
+  observability.md, rust-tracing-opentelemetry-stack.md}`.
+  *Slice 6 (case), done 2026-09-02:* the third loco-idiomatic
+  registry, ported from care-pathway's slice 5 rather than re-derived.
+  Confirmed rather than assumed the same single-router-surface finding
+  a third time: grepped `src/` and `tests/` for a second
+  `Router::new()`/`create_router` fresh for this crate (the one hit,
+  in `src/auth.rs`, is a unit test for the auth middleware itself, not
+  an app-level router), so `trace_mw` is layered once in
+  `after_routes`. Also confirmed: case declares no `tonic` dependency
+  at all (no gRPC stub), so — like the three prior loco-idiomatic
+  ports — no `otlp-test-tonic` rename was needed. Like care-pathway,
+  case carries its own IEC 62304 SOUP register (`compliance/soup.tsv`),
+  so this port also needed SOUP rows — 9 this time (5 main
+  dependencies, 4 test-only), one more than care-pathway's 8, because
+  case has no existing `reqwest` main dependency the middleware test
+  could reuse and so needed its own dev-dependency SOUP row. Full port
+  (`src/observability.rs`, `Hooks::init_logger`/`on_shutdown`,
+  `trace_mw` on the one surface, `tests/otlp_{export,middleware}.rs` +
+  `tests/otlp_collector/`) verified independently: `cargo fmt --check`,
+  `cargo clippy --all-targets -D warnings`, `cargo deny check`, `cargo
+  bench --no-run`, and the MSRV check (`cargo +1.96 check
+  --all-targets`) all clean; `cargo test --lib` 261/261 (was 253, +8);
+  `cargo test --test otlp_export --test otlp_middleware` 4/4. Docs
+  updated in the same pass: `agents/share/{overview.md,
+  observability.md, rust-tracing-opentelemetry-stack.md}`.
+  *Slice 7 (portfolio), done 2026-09-02 — PRO-H12 complete.* The
+  fourth and last loco-idiomatic registry, ported from case's slice 6.
+  Confirmed rather than assumed the same single-router-surface finding
+  a fourth time: grepped `src/` and `tests/` for a second
+  `Router::new()`/`create_router` fresh for this crate (the one hit,
+  in `src/auth.rs`, is again a unit test for the auth middleware
+  itself, not an app-level router), so `trace_mw` is layered once in
+  `after_routes` — four for four loco-idiomatic registries now share
+  the identical single-surface shape. Also confirmed: portfolio
+  declares no `tonic` dependency at all (no gRPC stub), so no
+  `otlp-test-tonic` rename was needed, same as the other three.
+  Unlike care-pathway/case, portfolio carries **no** IEC 62304 SOUP
+  register, so this port needed no `compliance/soup.tsv` bookkeeping
+  step — the simplest of the four loco-idiomatic ports for exactly
+  that reason. Full port (`src/observability.rs`,
+  `Hooks::init_logger`/`on_shutdown`, `trace_mw` on the one surface,
+  `tests/otlp_{export,middleware}.rs` + `tests/otlp_collector/`)
+  verified independently: `cargo fmt --check`, `cargo clippy
+  --all-targets -D warnings`, `cargo deny check`, `cargo bench
+  --no-run`, and the MSRV check (`cargo +1.96 check --all-targets`)
+  all clean; `cargo test --lib` 361/361 (was 353, +8); `cargo test
+  --test otlp_export --test otlp_middleware` 4/4. Docs updated in the
+  same pass: `agents/share/{overview.md, observability.md,
+  rust-tracing-opentelemetry-stack.md}`, rewritten from "rolling out"
+  to "family-wide" language now that all ten entity registries plus
+  link-graph-service export real OTLP. **This closes PRO-H12 — every
+  entity registry in the family now carries a real OpenTelemetry OTLP
+  exporter.**
 - [x] **PRO-H13 (M)** *(done 2026-08-29)* **Tighten the Rust MSRV
   policy from N-3 to N-2.** New
   [`spec/rust-msrv-n-minus-2/index.md`](spec/rust-msrv-n-minus-2/index.md)

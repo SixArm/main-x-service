@@ -60,6 +60,11 @@ pub mod lifecycle;
 pub mod merge;
 pub mod metrics;
 pub mod models;
+/// Structured logging + real OpenTelemetry OTLP export (repo `tasks.md`
+/// PRO-H12, slice 7 of 7 — the last). Installed via
+/// [`app::App::init_logger`]; [`observability::trace_mw`] is layered in
+/// `App::after_routes`.
+pub mod observability;
 /// The OKR engine: key-result progress, objective scores, and the
 /// alignment-weighted plan score — all derived on read.
 pub mod okr;

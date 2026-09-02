@@ -23,6 +23,7 @@
 | Authentication (blanket enforcement) | Default-off `/api/*` enforcement middleware behind `PERSON_REQUIRE_AUTH` (lenient parse), public allow-list (health, OpenAPI/Swagger, metrics), layered on both router surfaces; DB-free unit-test matrix (T-1b) |
 | Authentication (boot-time key fetch) | `PERSON_PASETO_KEYS_URL` fetched once at boot via `Verifier::from_paseto_keys_url` (verifier `fetch` feature); fetched set wins over `PERSON_PASETO_KEYS`; fetch failure warns and falls back to the env path — the service always boots; verifier now lives in a process-wide `ReloadableVerifier` that the blanket guard **and** the `AuthUser` extractors read per request, so a rotation reaches both together; `spawn_key_refresh` re-fetches on `PERSON_PASETO_KEYS_REFRESH_SECS` (default 3600, `0` off) and keeps the current keys on failure; `policy()` is a `ReloadablePolicy` with `spawn_policy_watcher` hot-reloading `PERSON_ABAC_POLICY_FILE` on an mtime change; activation proved end-to-end by `tests/enforcement.rs` (own binary); local-listener + dead-port tokio tests (T-1c fetch item) |
 | Authorization (ABAC) | Inside the blanket guard: action derived from method + destructive named POSTs (`/merge`, `/deduplicate`, `/import`); shared `authentication-verifier` 0.3 engine evaluates `PERSON_ABAC_POLICY`/`_FILE` (else the built-in default policy) over the token's `attrs` claim; first-match-wins, default allow-read / deny-mutation; `401` vs `403` split with deciding-rule reason; DB-free §7 test matrix (T-1c) |
+| gRPC API | Real `tonic::transport::Server` (T-6, PRO-H11, 2026-09-02) generated from `proto/person.proto` — `CreatePerson`/`GetPerson`/`ListPersons`/`DeletePerson`, delegating to the same `AppState`/`PersonRepository`/`validate_person`/duplicate-detection REST uses; blanket-enforcement + record-level ABAC gRPC-side (`grpc_enforce`, `authorize_record`) honour `PERSON_REQUIRE_AUTH` on both surfaces together; spawned alongside the REST router in `App::after_routes` |
 | Containers | Multi-stage Dockerfile built with Podman, dev + test Compose |
 | Tests | Unit + integration + Criterion benchmarks; CI workflows |
 | Documentation | README, CLAUDE.md, agents/* set, architecture, deploy guide, this spec |
@@ -34,7 +35,7 @@ Open gaps drive tasks in §13. Live gap list:
 | Gap | Task |
 |---|---|
 | Event consumers (`src/streaming/consumer.rs` is still a stub) | (no task yet) |
-| gRPC API (Tonic stub, no working server) | T-6 |
+| gRPC API — landed 2026-09-02: a real Tonic server (Create/Get/List/Delete Person; no Update RPC, no match/merge/search/bulk/FHIR over gRPC yet) | T-6 |
 | Dedup / merge / privacy integration tests (a dedicated end-to-end suite; individual paths are covered by scattered tests today) | T-5 |
 | Spec-drift CI guard | T-7 |
 | FHIR `multipleBirthInteger` (birth order) has no domain field to carry the order in — `from_fhir_person` maps its mere presence to `multiple_birth = Some(true)` (unambiguous), but the order itself is lost; a genuine model gap, not a parsing ambiguity | (no task yet) |
