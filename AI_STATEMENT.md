@@ -96,10 +96,32 @@ nothing": the merge that puts the version bump on `main` — and with it,
 the content of what ships — is still the maintainer's, made through the
 same reviewed PR every other change goes through. What changed is the
 step after that merge: whether *this particular state of `main`* is
-ready to tag and publish — the §7 gates green, the changelog accurate,
-nothing else pending — is now a judgment AI may make and act on
+ready to tag and publish is now a judgment AI may make and act on
 directly, scoped to a crate this repository already publishes to
 crates.io (§5, §11).
+
+An agent working in this repository **may** work through §§1–4 below,
+decide the release meets them, and carry out §5 itself — the
+maintainer no longer has to tick every box personally before
+`cargo publish` runs:
+
+1. The version bump is already merged to `main` through the normal
+   reviewed pull request — not by AI (this section, above).
+2. The §7 gates are green for the crate being released: `fmt`,
+   `clippy -D warnings`, `test` (and `test-db` where the crate is
+   enrolled), `deny`, and the other stages `scripts/ci-check.sh` runs
+   for it.
+3. The crate's `CHANGELOG.md` accurately reflects the version's
+   content, and the `Cargo.toml` version matches the changelog entry
+   being released.
+4. The crate is one this repository has already chosen to publish to
+   crates.io (§5's library-crates table) — never a first publish — and
+   nothing else is known to be pending against it (no open blocking
+   issue, no unresolved regression report).
+5. Run `cargo publish`.
+
+Any one of §§1–4 not holding means the release is not ready — AI does
+not publish and instead says which item failed and why.
 
 ## 7. Quality controls
 
@@ -250,7 +272,7 @@ Rev. 1.
 | Version | Date       | Change                                                                 |
 | ------- | ---------- | ---------------------------------------------------------------------- |
 | 1.0.0   | 2026-08-26 | First issue for this repository, adapted from the 2026-08-24 template. |
-| 1.1.0   | 2026-09-02 | Authorizes AI to judge an already-merged version bump of a crate this repository already publishes to crates.io ready to release, and to execute `cargo publish` for it (§5, §6, §11). *What* a release contains remains the maintainer's decision, made via the same reviewed-and-merged PR every other change goes through; the readiness-to-publish judgment for an already-decided, already-merged version — and the mechanical publish step — no longer need a separate ask. §10 also spells out, plainly rather than left implicit, that the standing `Co-Authored-By` trailer convention names a tool as attribution only — never as an accountable author, co-author, or signer, which remains the human — prompted by finding a vendored external template in this same review that carried the opposite (wrong) no-trailer rule (`spec/special-files-for-public-repos/AI_STATEMENT.md`, fixed the same day). |
+| 1.1.0   | 2026-09-02 | Authorizes AI to judge an already-merged version bump of a crate this repository already publishes to crates.io ready to release, and to execute `cargo publish` for it (§5, §6, §11), against an explicit five-item checklist (§6) — the version already merged, the §7 gates green, the changelog accurate, the crate already chosen for crates.io with nothing else pending, then publish; any unmet item means no publish. *What* a release contains remains the maintainer's decision, made via the same reviewed-and-merged PR every other change goes through; the readiness-to-publish judgment for an already-decided, already-merged version — and the mechanical publish step — no longer need a separate ask. §10 also spells out, plainly rather than left implicit, that the standing `Co-Authored-By` trailer convention names a tool as attribution only — never as an accountable author, co-author, or signer, which remains the human — prompted by finding a vendored external template in this same review that carried the opposite (wrong) no-trailer rule (`spec/special-files-for-public-repos/AI_STATEMENT.md`, fixed the same day). |
 
 ## Annex B. Machine-readable summary
 
