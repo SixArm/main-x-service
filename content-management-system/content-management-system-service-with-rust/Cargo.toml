@@ -108,9 +108,19 @@ required-features = []
 
 [dev-dependencies]
 loco-rs = { workspace = true, features = ["testing"] }
-# Name the `TestServer` type in shared request-test helpers (same
-# version loco's testing feature uses internally).
-axum-test = { version = "17.3.0" }
+axum-test = { version = "21.1.0" }
+# Test helpers name loco_rs::TestServer (loco-rs's own re-export of its
+# internally-pinned axum-test), not axum_test::TestServer directly, so
+# they always match whatever TestServer loco_rs::testing::request()
+# hands back regardless of this crate's own (newer) axum-test above.
+# The one place that can't route through that re-export is multipart
+# body construction (tests/requests/{assets,insights}.rs): loco-rs
+# doesn't re-export axum_test::multipart, and MultipartForm/Part must
+# be the exact version TestServer::multipart() expects. This renamed
+# pin tracks loco-rs 1.1.0's own "axum-test = \"17.0.1\"" requirement
+# (see loco-rs's Cargo.toml) for that one purpose only — bump it in
+# lockstep whenever loco-rs's internal pin moves.
+axum-test-loco-compat = { package = "axum-test", version = "=17.3.0" }
 tokio = { version = "1.53", default-features = false, features = [
   "rt-multi-thread",
   "macros",

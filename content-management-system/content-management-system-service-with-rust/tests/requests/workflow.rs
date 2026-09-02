@@ -28,7 +28,7 @@ async fn make_due(ctx: &loco_rs::app::AppContext, entry_pid: &str, column: &str)
 
 /// A site + an article type whose only field is optional, so the gate
 /// is exercised deliberately rather than incidentally.
-async fn seed_site_and_type(request: &axum_test::TestServer, prefix: &str) -> String {
+async fn seed_site_and_type(request: &loco_rs::TestServer, prefix: &str) -> String {
     let site_pid = seed_site(request, &a_key(prefix)).await;
     request
         .post(&format!("/api/sites/{site_pid}/content-types"))
@@ -48,7 +48,7 @@ async fn seed_site_and_type(request: &axum_test::TestServer, prefix: &str) -> St
 
 /// Create an entry, returning `(entry_pid, revision_pid)`.
 async fn create_entry(
-    request: &axum_test::TestServer,
+    request: &loco_rs::TestServer,
     site_pid: &str,
     key: &str,
 ) -> (String, String) {
@@ -70,10 +70,10 @@ async fn create_entry(
 
 /// Apply a transition.
 async fn act(
-    request: &axum_test::TestServer,
+    request: &loco_rs::TestServer,
     entry_pid: &str,
     body: Value,
-) -> axum_test::TestResponse {
+) -> axum_test_loco_compat::TestResponse {
     request
         .post(&format!("/api/entries/{entry_pid}/variants/en/transition"))
         .json(&body)
