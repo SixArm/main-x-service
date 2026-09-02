@@ -150,7 +150,12 @@ tool, and what it did. This repository's commit convention additionally
 carries a `Co-Authored-By` trailer on AI-generated commits; the trailer
 is attribution, not disclosure — this document is the maintained
 disclosure, and the PR description is where a contribution's specifics
-belong. The contributor
+belong. Naming a tool in a `Co-Authored-By` trailer does not make it an
+author, a co-author, or a signer in any accountable sense: the git
+author and committer fields are always the human who ran the tool and
+submitted the change (§4, §6), and the trailer changes none of that —
+it is metadata, not a claim of authorship or a certification the
+contributor could otherwise sign. The contributor
 remains responsible for their submission in full, under the same
 [CONTRIBUTING.md](CONTRIBUTING.md) bar as any other work: understood,
 explained on request, tested, and honest.
@@ -242,7 +247,7 @@ Rev. 1.
 | Version | Date       | Change                                                                 |
 | ------- | ---------- | ---------------------------------------------------------------------- |
 | 1.0.0   | 2026-08-26 | First issue for this repository, adapted from the 2026-08-24 template. |
-| 1.1.0   | 2026-09-02 | Authorizes AI execution of `cargo publish` for an already-merged version bump of a crate this repository already publishes to crates.io (§5, §6, §11). The release *decision* — what ships, and when — remains the maintainer's, made via the same reviewed-and-merged PR every other change goes through; only the mechanical publish step no longer needs a separate ask. |
+| 1.1.0   | 2026-09-02 | Authorizes AI execution of `cargo publish` for an already-merged version bump of a crate this repository already publishes to crates.io (§5, §6, §11). The release *decision* — what ships, and when — remains the maintainer's, made via the same reviewed-and-merged PR every other change goes through; only the mechanical publish step no longer needs a separate ask. §10 also spells out, plainly rather than left implicit, that the standing `Co-Authored-By` trailer convention names a tool as attribution only — never as an accountable author, co-author, or signer, which remains the human — prompted by finding a vendored external template in this same review that carried the opposite (wrong) no-trailer rule (`spec/special-files-for-public-repos/AI_STATEMENT.md`, fixed the same day). |
 
 ## Annex B. Machine-readable summary
 
