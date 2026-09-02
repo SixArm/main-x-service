@@ -8,6 +8,25 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — missing raw-SQL counterpart for the coordinate-column rename (CI red on `main`)
+
+`migration/src/m20260824_000001_coordinate_columns_name_their_units.rs`
+(the sea-orm-migration crate) renames `event_locations.latitude` →
+`latitude_as_decimal_degrees` (and `longitude` likewise), but this
+crate's `test-db` CI stage does not drive the sea-orm migrator — it
+applies `migrations/*/up.sql` in lexicographic order
+(`scripts/ci-check.sh`). No `migrations/2026082400000001_.../up.sql`
+counterpart was ever added, so CI's database stayed at the old column
+names while the code already queried the new ones:
+`db::repositories::tests::merge_enqueues_merged_with_merged_from_and_deleted`
+failed with `column event_locations.latitude_as_decimal_degrees does
+not exist` on every `main` CI run since the rename landed
+(2026-08-24) — found while checking CI status before merging several
+open PRs. Added the missing `migrations/2026082400000001_coordinate_columns_name_their_units/{up,down}.sql`,
+mirroring the sea-orm migration's SQL. Verified against a real
+Postgres: `scripts/ci-check.sh test-db event/event-service-with-loco`
+now green (was the one persistently failing job).
+
 ## [0.6.0] - 2026-08-27
 
 ### Changed — geo coordinates are exact decimals, not floats

@@ -134,12 +134,16 @@ design.
 
 Contributors **may** use AI tools. A contribution with **ai-generated**
 content per §3 **shall** say so in the pull-request description — which
-tool, and what it did. Disclosure lives in the PR description and never in
-commit trailers, for two reasons stated openly: this repository's standing
-rule keeps tool attribution out of commit metadata (one maintained
-disclosure beats ten thousand trailer lines, and this document is that
-disclosure), and the wider ecosystem has no agreed trailer anyway — the
-same trailers some communities recommend, others forbid. The contributor
+tool, and what it did. This repository's commit convention additionally
+carries a `Co-Authored-By` trailer on AI-generated commits; the trailer
+is attribution, not disclosure — this document is the maintained
+disclosure, and the PR description is where a contribution's specifics
+belong. Naming a tool in a `Co-Authored-By` trailer does not make it an
+author, a co-author, or a signer in any accountable sense: the git
+author and committer fields are always the human who ran the tool and
+submitted the change (§4, §6), and the trailer changes none of that —
+it is metadata, not a claim of authorship or a certification the
+contributor could otherwise sign. The contributor
 remains responsible for their submission in full, under the same
 [CONTRIBUTING.md](CONTRIBUTING.md) bar as any other work: understood,
 explained on request, tested, and honest.
