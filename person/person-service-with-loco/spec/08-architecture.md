@@ -10,7 +10,8 @@ src/
 │   ├── mod.rs               # ApiResponse, ApiError
 │   ├── rest/                # REST API (Axum) — 15 endpoints, mounted at /api
 │   ├── fhir/                # FHIR R5 Person + bundle stubs
-│   └── grpc/                # Tonic stub
+│   └── grpc/                # real Tonic server (T-6): mod.rs (serve + generated
+│                             # proto module) + service.rs (PersonGrpcService)
 ├── models/                  # Person, HumanName, Identifier, …
 ├── db/                      # SeaORM entities + repositories + audit
 ├── matching/                # algorithms + scoring + phonetic
@@ -38,9 +39,18 @@ is no hand-rolled `Config::from_env → AppState → serve` path.
   surface) and `metrics_routes()` (root `/metrics.prom`).
 - `after_routes()` builds the boot-time singletons (domain `Config` via
   `Config::from_env`, the Tantivy `SearchEngine`, the
-  `ProbabilisticMatcher`), constructs `AppState`, inserts it into loco's
-  `shared_store`, and merges the Swagger UI plus a permissive CORS layer
-  onto loco's Axum router.
+  `ProbabilisticMatcher`), constructs `AppState`, **spawns the gRPC
+  server** (`crate::api::grpc::serve`, T-6) as a background task with a
+  cloned `AppState` — a bind/serve failure is logged, not fatal, so the
+  REST surface still boots even if `grpc_port` is unavailable — inserts
+  the original `AppState` into loco's `shared_store`, and merges the
+  Swagger UI plus a permissive CORS layer onto loco's Axum router.
+
+`proto/person.proto` (crate root, alongside `Cargo.toml`) and `build.rs`
+are the gRPC codegen inputs: `build.rs` compiles the `.proto` via
+`tonic-build` into `$OUT_DIR`, included by `tonic::include_proto!` in
+`src/api/grpc/mod.rs`'s `proto` submodule — the generated code is never
+checked in.
 
 Migrations run via the loco CLI (`cargo loco db migrate`) and are
 **auto-run in development** (`auto_migrate`, per

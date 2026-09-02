@@ -37,5 +37,62 @@ silently target this crate's `.env` default (`:5150`, the native
 at (`:8080`, the podman-compose container) — now both point at the
 same base. `bin/e2e` health-checks both services before invoking
 Playwright.
+
+**OQ-5 fully closed 2026-09-02 (PRO-P4, resumed).** PRO-P32 proved the
+auth mechanism but never re-ran `golden-paths.spec.ts` itself against a
+live stack — this session did (a real `person-service` release
+container + `authentication-dev` compose, migrated, `bin/e2e` run
+twice for flake). The suite is now genuinely **10/10**, but getting
+there needed three more real fixes, none of them test-data or auth
+mechanics:
+
+1. **The service database had no schema.** `config/production.yaml`
+   sets `auto_migrate: false` and `docker-compose.yml` has no migrate
+   step, so a freshly-built container 500s on every DB-touching route.
+   Not a code bug — an operational step (`person-service -e production
+   db migrate`) this task's environment happened to skip; recorded here
+   because the next person to stand this stack up will hit it too.
+2. **`FR-6` (edit) — a real front-end bug.** `/persons/[id]/edit`
+   loads the record into a `let person = $state<Person | null>(null)`
+   variable, then hands it to `<PersonForm initial={person} …>`.
+   `createForm` (`src/lib/forms/form.svelte.ts`) called
+   `structuredClone(args.initial)` on that prop directly — but a
+   Svelte 5 `$state` reactive proxy cannot be structured-cloned at all
+   (`DataCloneError: #<Object> could not be cloned`), even though the
+   data it wraps is plain JSON. The create page never hit this because
+   its `initial` is a plain literal, never `$state`-wrapped. Fixed by
+   unwrapping with `$state.snapshot()` before cloning — safe for both
+   callers, since snapshotting an already-plain object is a no-op.
+   Pinned in `tests/unit/form.test.ts` (a `.svelte.ts` fixture,
+   `reactive-state.svelte.ts`, constructs a real `$state` proxy so the
+   regression is reproducible without a browser); confirmed the test
+   fails with the fix reverted before landing it.
+3. **`FR-8` (match check) — a real front-end bug.**
+   `PersonRepository.match()`/`.checkDuplicates()` typed their return
+   as a bare `MatchResult[]` and returned the envelope `data`
+   unchecked. The live service actually wraps them —
+   `POST /api/persons/match` → `{ matches, total }`,
+   `POST /api/persons/check-duplicates` → `{ has_duplicates,
+   potential_matches }` (verified against the running service, not
+   assumed) — so `results` in `/persons/match`'s page held that
+   wrapper object, not an array, and `MatchResultsList` silently
+   rendered nothing. `search()` already normalises its own envelope
+   drift; `match()`/`checkDuplicates()` now do the same (bare array
+   still accepted, for the same forward-compatibility reason `search`
+   keeps it). Pinned in `tests/unit/persons.test.ts`.
+
+Also fixed, infrastructure rather than app code: this crate's own
+`pnpm install` had never linked `lily-design-system-svelte-locale-picker`
+(present in `package.json` since the `*-select`→`*-picker` rename,
+absent from `node_modules`) and `pnpm-workspace.yaml` shipped the
+literal placeholder `allowBuilds: {esbuild: "set this to true or
+false"}` rather than a real value — both silently broke `npm run
+build` for anyone running it fresh. Fixed (`pnpm install` +
+`pnpm approve-builds esbuild`, workspace file now says `true`).
+
+Full verification: `npm run check` (svelte-check) 0 errors; `npm run
+lint` clean on every file this pass touched (three pre-existing,
+untouched files still carry old formatting drift, unrelated); `npm
+test` 98/98 (was 91, +7); `bin/e2e` 10/10 live, run twice.
 - **OQ-6** (2026-06-04, updated 2026-08-01): Container runtime switched from Docker to Podman across all docs and scripts. The `docker-compose.yml` filename is retained because Podman's `compose` sub-command reads it transparently. The **test** compose files were renamed on 2026-08-01: every service crate now carries a `compose.test.yaml` (Compose spec's canonical name) holding just its Postgres, driven by `scripts/test-db.sh`; the three `docker-compose.test.yml` files were removed and their doc references updated in lockstep, as this note required. The dev/prod `docker-compose.yml` files are the remaining rename.
 - **OQ-7** (2026-08-03, repo FE-3): The bulk screen cannot offer a working **download** for an export artifact or an import error report. `BulkJobView.download_url` / `errors_url` are opaque artifact-store references — `file://<path>` on the default local backend, `s3://<bucket>/<key>` on S3 — and the service exposes **no HTTP endpoint that serves the bytes**, so neither is fetchable by a browser. The screen therefore renders each reference as plain text with a note, rather than a link that would 404 or a proxy hop that would have to read the service host's filesystem. Closing this needs a service-side change (an owner-scoped, TTL'd artifact-download route, or presigned URLs surfaced in the view — the S3 backend's `presigned_get` already exists but is not exposed), at which point the front-end swaps the text for a link. Until then the operator retrieves the artifact from the service host.

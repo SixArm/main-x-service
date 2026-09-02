@@ -28,7 +28,7 @@ importers:
         version: 2.6.0(picomatch@4.0.4)(svelte@5.56.0)(typescript@5.9.3)
       lily-design-system-svelte-headless:
         specifier: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless
-        version: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless
+        version: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless(svelte@5.56.0)
       lily-design-system-svelte-locale-picker:
         specifier: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-picker
         version: file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-picker(svelte@5.56.0)
@@ -1031,14 +1031,19 @@ packages:
 
   lily-design-system-svelte-headless@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless:
     resolution: {directory: ../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless, type: directory}
+    engines: {node: '=26'}
+    peerDependencies:
+      svelte: ^5.0.0
 
   lily-design-system-svelte-locale-picker@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-picker:
     resolution: {directory: ../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-picker, type: directory}
+    engines: {node: '=26'}
     peerDependencies:
       svelte: ^5.0.0
 
   lily-design-system-svelte-theme-picker@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-picker:
     resolution: {directory: ../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-picker, type: directory}
+    engines: {node: '=26'}
     peerDependencies:
       svelte: ^5.0.0
 
@@ -2324,9 +2329,10 @@ snapshots:
 
   kleur@4.1.5: {}
 
-  lily-design-system-svelte-headless@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless:
+  lily-design-system-svelte-headless@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless(svelte@5.56.0):
     dependencies:
       aria-query: 5.3.2
+      svelte: 5.56.0
 
   lily-design-system-svelte-locale-picker@file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-picker(svelte@5.56.0):
     dependencies:

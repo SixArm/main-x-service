@@ -1,0 +1,87 @@
+// PersonService — a real, working gRPC surface (PRO-H11), compiled by
+// build.rs via tonic-build into `crate::api::grpc::proto`.
+//
+// Deliberately NOT a 1:1 mirror of the REST/FHIR representations
+// (repo tasks.md PRO-H11 scopes it that way explicitly). The domain
+// `Person` model carries identifiers, addresses, telecom, documents,
+// emergency contacts, and links — modelling all of that in protobuf in
+// one pass would be a large, mostly-mechanical undertaking with no
+// current caller asking for it. This first slice carries
+// identification + core demographic fields only (id, name, gender,
+// birth date, tax id, timestamps) — enough for a real client to
+// create, read, list, and delete a record. Extending the message
+// schema to the remaining fields is tracked as follow-up (see this
+// crate's spec T-6 and AGENTS.md's gRPC section) rather than silently
+// out of scope.
+syntax = "proto3";
+
+package person;
+
+// A person record. `id`/`created_at`/`updated_at` are server-set and
+// ignored on input; every other field is a create/update input on
+// requests and the persisted value on responses.
+message Person {
+  string id = 1;
+  bool active = 2;
+  string family_name = 3;
+  repeated string given_names = 4;
+  Gender gender = 5;
+  // ISO 8601 date (e.g. "1990-01-15"). Absent (not merely empty) when
+  // unknown — proto3 `optional` gives explicit field presence, matching
+  // the domain's `Option<NaiveDate>` exactly.
+  optional string birth_date = 6;
+  optional string tax_id = 7;
+  // RFC 3339 timestamps. Server-set; ignored on input.
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+// Mirrors `crate::models::Gender`. `GENDER_UNSPECIFIED` (the required
+// proto3 zero value) maps on input to `Gender::Unknown` — the same
+// "safe default when source data is absent" the domain type already
+// documents — and is never produced on output, where an explicit
+// `Gender::Unknown` always encodes as `GENDER_UNKNOWN`.
+enum Gender {
+  GENDER_UNSPECIFIED = 0;
+  GENDER_UNKNOWN = 1;
+  GENDER_MALE = 2;
+  GENDER_FEMALE = 3;
+  GENDER_OTHER = 4;
+}
+
+message CreatePersonRequest {
+  Person person = 1;
+}
+
+message GetPersonRequest {
+  string id = 1;
+}
+
+message ListPersonsRequest {
+  // Page size; server clamps to the same maximum `GET /api/persons` does.
+  uint32 limit = 1;
+  uint32 offset = 2;
+}
+
+message ListPersonsResponse {
+  repeated Person persons = 1;
+}
+
+message DeletePersonRequest {
+  string id = 1;
+}
+
+message DeletePersonResponse {}
+
+service PersonService {
+  // Validates and real-time duplicate-checks exactly as `POST
+  // /api/persons` does: `INVALID_ARGUMENT` on a validation failure,
+  // `ALREADY_EXISTS` when a likely duplicate is found.
+  rpc CreatePerson(CreatePersonRequest) returns (Person);
+  // `NOT_FOUND` when the id is absent or soft-deleted.
+  rpc GetPerson(GetPersonRequest) returns (Person);
+  rpc ListPersons(ListPersonsRequest) returns (ListPersonsResponse);
+  // Soft-delete, exactly as `DELETE /api/persons/{id}` — the row is
+  // retained with `deleted_at` set, not physically removed.
+  rpc DeletePerson(DeletePersonRequest) returns (DeletePersonResponse);
+}

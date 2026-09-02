@@ -39,6 +39,10 @@ pub mod initializers;
 pub mod merge;
 pub mod metrics;
 pub mod models;
+/// Structured logging + real OpenTelemetry OTLP export (repo `tasks.md`
+/// PRO-H12, slice 6 of 7). Installed via [`app::App::init_logger`];
+/// [`observability::trace_mw`] is layered in `App::after_routes`.
+pub mod observability;
 pub mod openapi;
 /// Durable event bus Phase 3: the `event_outbox` relay + retention loop.
 pub mod relay;

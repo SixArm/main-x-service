@@ -6644,7 +6644,7 @@ crate above.
   gRPC in the family capability matrix today, so T-3/PRO-H11 also
   needs to settle whether thing joins the other three or its dead
   deps get dropped instead, rather than assuming either way).
-- [ ] **PRO-H11 (L)** **Design and build real gRPC servers for
+- [~] **PRO-H11 (L)** **Design and build real gRPC servers for
   person/worker/event (thing's inclusion TBD — see PRO-H6).** Today
   all four crates carry only stubs or dead dependencies; nothing
   serves real gRPC anywhere in the family. Scope: a `.proto` surface
@@ -6658,6 +6658,44 @@ crate above.
   running server. Close each crate's own T-3/T-6-equivalent task on
   landing, and flip the `overview.md` capability-matrix gRPC row from
   "stub" language to real ✅/– once decided and (where chosen) built.
+  *person landed 2026-09-02 as the reference slice* — `proto/person.proto`
+  (package `person`) + `build.rs` (`tonic-build`, pinned to 0.12 to
+  match the main `tonic` 0.12 dependency — the crate's pre-existing
+  `tonic-build = "0.14"` build-dependency was dead scaffolding, no
+  `build.rs`/`proto/` at all, version-mismatched with runtime `tonic`)
+  + `src/api/grpc/service.rs` (`PersonGrpcService`): `CreatePerson` /
+  `GetPerson` / `ListPersons` / `DeletePerson`, deliberately not the
+  full REST surface (no `UpdatePerson`, no match/merge/search/bulk/FHIR
+  over gRPC) and the proto `Person` message a deliberate partial
+  projection (id/name/gender/birth-date/tax-id/timestamps, not the
+  full domain model) — both tracked as follow-up in person's own spec
+  §13 T-6, not silently missing. Every RPC delegates to the exact same
+  functions REST calls (`validate_person`, the shared
+  duplicate-detection core bumped from private to `pub(crate)` rather
+  than copied, the same `PersonRepository` methods,
+  `auth::authorize_record` + `mask_person` for `GetPerson`) — no
+  duplicated business logic. A new `grpc_enforce` mirrors REST's
+  blanket-guard `auth::enforce`, gated by the same `PERSON_REQUIRE_AUTH`
+  flag, so enforcement protects both surfaces together; documented,
+  not-yet-carried-over gaps are the §164.528 disclosure-accounting
+  audit row and `ListPersons`' SEC-G3 per-record masking. Verified
+  live, not merely compiled: `tests/grpc_integration_test.rs` binds a
+  real server on an OS-assigned port and drives it with a real
+  `PersonServiceClient` over an actual HTTP/2 connection — a
+  Create→Get→List→Delete→Get(`NOT_FOUND`) round trip plus two
+  error-path proofs (blank family name → `INVALID_ARGUMENT`, proving
+  the shared validator runs; malformed id → `INVALID_ARGUMENT`, not
+  `INTERNAL`) — all green against a real Postgres
+  (`scripts/ci-check.sh test-db person/person-service-with-loco`, full
+  suite). `cargo test --lib` 355/355 (was 354, +1: a SOUP-register test
+  gained a required `prost` annotation); `cargo fmt --check` / `cargo
+  clippy --all-targets -D warnings` clean. `grpcurl` was not
+  additionally run by hand (unavailable in this sandbox, `brew install`
+  blocked by directory ownership); the automated test proves the
+  identical claim the crate's own spec named as T-6's acceptance
+  criterion, repeatably. **Still open**: worker and event, as their
+  own slices (copy person's `AGENTS.md` "gRPC server" section, not
+  reinvent the pattern); thing's inclusion per PRO-H6.
 - [x] **PRO-H7 (L)** *(done 2026-08-28)* **Matcher component parity:
   `relationships` + `tags`.** Verified fact before starting: person did
   **not** actually have this implemented either — the earlier audit's
@@ -6752,9 +6790,9 @@ crate above.
   module at all — not part of this task's scope (it targeted the
   three stubs specifically); a family-wide rollout to the rest is
   unqueued follow-up work, not a gap in this task's closure.
-- [ ] **PRO-H12 (L, in progress — 4 of 7 slices landed)** **OTLP
+- [x] **PRO-H12 (L)** *(done 2026-09-02 — all 7 slices landed)* **OTLP
   rollout, remaining seven registries.** place, thing, course,
-  organization, care-pathway, case, portfolio carry no
+  organization, care-pathway, case, portfolio carried no
   `src/observability` module at all (unlike PRO-H9's three, which had
   a dead stub to replace). Bigger lift than PRO-H9: each needs
   `src/observability.rs` added from scratch (copy person's port —
@@ -6852,11 +6890,85 @@ crate above.
   otlp_middleware` 4/4. Full results:
   organization/organization-service-with-loco's own `spec/index.md`
   §13 and `CHANGELOG.md`.
-  **Remaining 3 slices**: care-pathway, case, portfolio — all
-  loco-style `src/controllers/` like organization; each still needs
-  its own router-surface count confirmed rather than assumed identical
-  (organization's single-surface shape is now one data point, not a
-  guarantee the other three match it).
+  *Slice 5 (care-pathway), done 2026-09-01:* the second loco-idiomatic
+  registry, ported from organization's slice 4 rather than re-derived.
+  Confirmed rather than assumed organization's single-router-surface
+  finding: grepped `src/` and `tests/` for a second
+  `Router::new()`/`create_router` fresh for this crate (the one hit,
+  in `src/auth.rs`, is a unit test for the auth middleware itself, not
+  an app-level router), so `trace_mw` is layered once in
+  `after_routes`, same as organization. Also confirmed: care-pathway
+  declares no `tonic` dependency at all (no gRPC stub), so — like
+  course's and organization's — no `otlp-test-tonic` rename was
+  needed, and there were no stale/dead OTel dependency pins to clean
+  up, since this crate carried none at all before this change. One
+  adaptation the earlier four ports had no equivalent of: care-pathway
+  is the family's IEC 62304 SOUP-register reference implementation
+  (`compliance/soup.tsv`, verified by its own
+  `every_direct_dependency_is_annotated` test), so the port also
+  needed 8 new SOUP rows (5 main dependencies, 3 test-only) — found by
+  running the test, not anticipated in advance. Full port
+  (`src/observability.rs`, `Hooks::init_logger`/`on_shutdown`,
+  `trace_mw` on the one surface, `tests/otlp_{export,middleware}.rs` +
+  `tests/otlp_collector/`) verified independently: `cargo fmt --check`,
+  `cargo clippy --all-targets -D warnings`, `cargo deny check`, `cargo
+  bench --no-run`, and the MSRV check (`cargo +1.96 check
+  --all-targets`) all clean; `cargo test --lib` 316/316 (was 308, +8);
+  `cargo test --test otlp_export --test otlp_middleware` 4/4. Docs
+  updated in the same pass: `agents/share/{overview.md,
+  observability.md, rust-tracing-opentelemetry-stack.md}`.
+  *Slice 6 (case), done 2026-09-02:* the third loco-idiomatic
+  registry, ported from care-pathway's slice 5 rather than re-derived.
+  Confirmed rather than assumed the same single-router-surface finding
+  a third time: grepped `src/` and `tests/` for a second
+  `Router::new()`/`create_router` fresh for this crate (the one hit,
+  in `src/auth.rs`, is a unit test for the auth middleware itself, not
+  an app-level router), so `trace_mw` is layered once in
+  `after_routes`. Also confirmed: case declares no `tonic` dependency
+  at all (no gRPC stub), so — like the three prior loco-idiomatic
+  ports — no `otlp-test-tonic` rename was needed. Like care-pathway,
+  case carries its own IEC 62304 SOUP register (`compliance/soup.tsv`),
+  so this port also needed SOUP rows — 9 this time (5 main
+  dependencies, 4 test-only), one more than care-pathway's 8, because
+  case has no existing `reqwest` main dependency the middleware test
+  could reuse and so needed its own dev-dependency SOUP row. Full port
+  (`src/observability.rs`, `Hooks::init_logger`/`on_shutdown`,
+  `trace_mw` on the one surface, `tests/otlp_{export,middleware}.rs` +
+  `tests/otlp_collector/`) verified independently: `cargo fmt --check`,
+  `cargo clippy --all-targets -D warnings`, `cargo deny check`, `cargo
+  bench --no-run`, and the MSRV check (`cargo +1.96 check
+  --all-targets`) all clean; `cargo test --lib` 261/261 (was 253, +8);
+  `cargo test --test otlp_export --test otlp_middleware` 4/4. Docs
+  updated in the same pass: `agents/share/{overview.md,
+  observability.md, rust-tracing-opentelemetry-stack.md}`.
+  *Slice 7 (portfolio), done 2026-09-02 — PRO-H12 complete.* The
+  fourth and last loco-idiomatic registry, ported from case's slice 6.
+  Confirmed rather than assumed the same single-router-surface finding
+  a fourth time: grepped `src/` and `tests/` for a second
+  `Router::new()`/`create_router` fresh for this crate (the one hit,
+  in `src/auth.rs`, is again a unit test for the auth middleware
+  itself, not an app-level router), so `trace_mw` is layered once in
+  `after_routes` — four for four loco-idiomatic registries now share
+  the identical single-surface shape. Also confirmed: portfolio
+  declares no `tonic` dependency at all (no gRPC stub), so no
+  `otlp-test-tonic` rename was needed, same as the other three.
+  Unlike care-pathway/case, portfolio carries **no** IEC 62304 SOUP
+  register, so this port needed no `compliance/soup.tsv` bookkeeping
+  step — the simplest of the four loco-idiomatic ports for exactly
+  that reason. Full port (`src/observability.rs`,
+  `Hooks::init_logger`/`on_shutdown`, `trace_mw` on the one surface,
+  `tests/otlp_{export,middleware}.rs` + `tests/otlp_collector/`)
+  verified independently: `cargo fmt --check`, `cargo clippy
+  --all-targets -D warnings`, `cargo deny check`, `cargo bench
+  --no-run`, and the MSRV check (`cargo +1.96 check --all-targets`)
+  all clean; `cargo test --lib` 361/361 (was 353, +8); `cargo test
+  --test otlp_export --test otlp_middleware` 4/4. Docs updated in the
+  same pass: `agents/share/{overview.md, observability.md,
+  rust-tracing-opentelemetry-stack.md}`, rewritten from "rolling out"
+  to "family-wide" language now that all ten entity registries plus
+  link-graph-service export real OTLP. **This closes PRO-H12 — every
+  entity registry in the family now carries a real OpenTelemetry OTLP
+  exporter.**
 - [x] **PRO-H13 (M)** *(done 2026-08-29)* **Tighten the Rust MSRV
   policy from N-3 to N-2.** New
   [`spec/rust-msrv-n-minus-2/index.md`](spec/rust-msrv-n-minus-2/index.md)
@@ -6976,28 +7088,58 @@ crate above.
   sentinel rejections) rather than general web knowledge. All 7
   schemes already had fully-implemented, tested parsers — this was a
   pure documentation gap, not code.
-- [~] **PRO-P4 (M)** *(partially resolved 2026-08-29)* person FE:
-  stabilize the 3 documented failing live-integration tests
-  (duplicate-detector test-data interactions). A first attempt
-  (date-spacing only) was tried, verified live against a fresh
-  Postgres to still fail 6 tests, and reverted rather than landed as
-  working. A second, more defensive attempt closed the original
-  mechanism for real: `apiCreatePerson` now retries a 409 by
+- [x] **PRO-P4 (M)** *(done 2026-09-02, resumed after a partial
+  2026-08-29 landing)* person FE: stabilize the 3 documented failing
+  live-integration tests (duplicate-detector test-data interactions).
+  A first attempt (date-spacing only) was tried, verified live
+  against a fresh Postgres to still fail 6 tests, and reverted rather
+  than landed as working. A second, more defensive attempt closed the
+  original mechanism for real: `apiCreatePerson` now retries a 409 by
   regenerating both the DOB and the family-name suffix (bounded, 5
   attempts) instead of trying to statically predict the live
   matcher's scoring — verified live that FR-9's fixture setup
-  (previously the reliable 409) now succeeds cleanly every run. **The
-  suite is still not green**, for a separate, unrelated, larger reason
-  found in the same investigation: the page-visit auth guard
-  (PRO-H10) and CSRF check (PRO-H5), both landed this session, now
-  require a signed-in session for every mutating flow, and this suite
-  never signs in — confirmed live, `FR-3`×2/`FR-6`/`FR-7`/`FR-8`/`FR-9`
-  all fail purely on `/signin` redirects or `403 csrf` rejections, not
-  duplicate-detector collisions. That gap is out of this task's scope
-  (test-data fixtures) and needs a security-relevant decision (real
-  sign-in vs. an approved test-mode bypass) — tracked as **PRO-P32**.
-  See `person-front-end-with-svelte/spec/16-open-questions.md` OQ-5
-  for the full record.
+  (previously the reliable 409) now succeeds cleanly every run. The
+  suite was **not yet green** at that point, for a separate, larger
+  reason: the page-visit auth guard (PRO-H10) and CSRF check
+  (PRO-H5), both landed the same session, now require a signed-in
+  session for every mutating flow, and the suite never signed in —
+  tracked separately as **PRO-P32**, which built and verified a real
+  magic-link sign-in mechanism (`tests/integration/auth.setup.ts`) —
+  but PRO-P32 verified the auth mechanism itself, not the suite it
+  unblocked, so `golden-paths.spec.ts` was never actually re-run
+  end-to-end after that fix landed.
+  *Result (resumed 2026-09-02):* stood up the real stack this needs —
+  a release-mode `person-service` container (`podman compose up -d`,
+  then `db migrate` by hand: `config/production.yaml` sets
+  `auto_migrate: false` and the compose file has no migrate step, an
+  operational gap worth knowing about, not a code bug) plus
+  `authentication-dev.yml`'s dev-mode stack — and ran `bin/e2e`. Found
+  it was **8/10**, not 10/10, and both remaining failures were real
+  front-end bugs, neither test-data nor auth: (1) `FR-6` (edit) —
+  `createForm` called `structuredClone` directly on a Svelte 5
+  `$state`-wrapped `initial` (exactly what the edit page passes,
+  unlike the create page's plain literal), which throws
+  `DataCloneError` even on plain-JSON data; fixed with
+  `$state.snapshot()` first. (2) `FR-8` (match check) —
+  `PersonRepository.match()`/`.checkDuplicates()` assumed a bare
+  `MatchResult[]` return; the live service actually wraps both as
+  `{matches,…}`/`{has_duplicates, potential_matches}` (verified
+  against the running service, not assumed) — `search()` already
+  normalises envelope drift, these two now do too. Both regressions
+  pinned (`tests/unit/form.test.ts` with a new `.svelte.ts` fixture
+  that constructs a real `$state` proxy so the bug reproduces without
+  a browser; `tests/unit/persons.test.ts`); each test confirmed to
+  fail with its fix reverted before landing. Also fixed in the same
+  pass: `pnpm install` had never linked
+  `lily-design-system-svelte-locale-picker` (present in `package.json`
+  since the `*-select`→`*-picker` rename, missing from `node_modules`)
+  and `pnpm-workspace.yaml` shipped the literal unfilled placeholder
+  `esbuild: "set this to true or false"` — both silently broke a fresh
+  `npm run build`. Verified: `npm run check` (svelte-check) 0 errors;
+  `npm test` 98/98 (was 91, +7); `bin/e2e` **10/10, run twice**, no
+  flake. See
+  `person-front-end-with-svelte/spec/16-open-questions.md` OQ-5 for
+  the full record.
 
 - [x] **PRO-P32 (M)** *(found 2026-08-29 via PRO-P4; done 2026-08-29)*
   person FE's live integration suite
