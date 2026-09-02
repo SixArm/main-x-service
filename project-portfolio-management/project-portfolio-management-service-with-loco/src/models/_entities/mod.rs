@@ -3,6 +3,7 @@
 pub mod adoption_snapshots;
 pub mod allocations;
 pub mod audit_logs;
+pub mod automation_milestone_fires;
 pub mod automation_runs;
 pub mod automations;
 pub mod benefits;

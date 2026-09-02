@@ -199,7 +199,7 @@ described manual check confirms it. Split tasks too big for one PR
     Request tests committed (`tests/requests/metrics_control.rs`).
 
 - [~] **T-21 — Automation breadth (FR-32).** **Partially landed
-  2026-08-26.**
+  2026-08-26, extended 2026-09-02.**
   - [x] **`plan_phase_changed` trigger**, wired into the phase
     controller. Deliberately its **own** trigger rather than folded into
     `plan_stage_changed`: the gate stage and the project phase are
@@ -212,11 +212,94 @@ described manual check confirms it. Split tasks too big for one PR
   - [x] The existing invariant holds unchanged: the phase change is
     committed before the rule fires, so a failing rule is logged as a
     `failed` run and **never undoes the operator's move**.
-  - [ ] Field-change, date-arrival and SLE-breach triggers.
-  - [ ] **Multi-action rules** applied in declared order with per-action
-    outcomes logged. This is the larger half of FR-32 and is untouched:
-    the schema holds one action per rule, so it is a migration plus an
-    engine change, not a validation tweak.
+  - [x] **`milestone_due` trigger (date-arrival).** *(Landed
+    2026-09-02.)* The one dated field with unambiguous "arrived"
+    semantics is `milestones.due` — a task's own `due_at`/`start_at`/
+    `finish_at` are each ambiguous about which one "the" date-arrival
+    trigger means, so this ships narrowly on milestones rather than
+    guessing a task-date convention. Unlike every other trigger, a
+    milestone's due date does not arrive as a write anyone makes — there
+    is no event to hang the rule on — so it needs its own **exactly-once
+    claim**, not the existing fire-on-write path. New join table
+    `automation_milestone_fires (automation_pid, milestone_pid)`
+    (migration `m20260902_000002_automation_milestone_fires`) with a
+    `UNIQUE (automation_pid, milestone_pid)` constraint claimed via
+    `INSERT ... ON CONFLICT DO NOTHING`; a suppressed conflict surfaces
+    from sea-orm's `exec_with_returning` as
+    `DbErr::RecordNotFound("Failed to find inserted item")` — **verified
+    live against a real Postgres**, not assumed from reading the crate
+    source (which also has a `RecordNotInserted` variant, but that one
+    belongs to a different insert code path and does not appear here).
+    `POST /api/automations/milestones/sweep` (new
+    `controllers::automation::sweep_milestone_due`) queries overdue,
+    undone, non-deleted milestones (capped at `SWEEP_CAP`), and for each
+    enabled `milestone_due` rule matching the milestone's plan attempts
+    the claim before applying the rule's actions — so a rule/milestone
+    pair fires **exactly once, ever**, not once per sweep. The optional
+    scheduler ticker (`src/scheduler.rs`) now calls this sweep alongside
+    the existing `sweep_due` on every tick; the endpoint still works
+    standalone for a deployment driving both sweeps from external cron.
+    Shares the new `apply_rule_actions` helper extracted from `fire()` so
+    both the write-triggered path and the sweep log outcomes identically
+    (multi-action, per-action logging, never undoing prior state).
+    Verified live:
+    `a_milestone_due_rule_fires_once_the_date_arrives_and_never_again`
+    seeds one overdue and one far-future milestone, sweeps twice, and
+    confirms `fired: 1` then `fired: 0, already_claimed: 1` — with
+    exactly one `automation_runs` row throughout and the far-future
+    milestone never appearing. Full DB-gated suite 76/76 (was 75, +1);
+    `cargo test --lib` 360/360 (was 358, +2); `cargo fmt --check` /
+    `cargo clippy --all-targets -D warnings` clean.
+  - [ ] **Field-change and SLE-breach triggers — deliberately deferred.**
+    Both need an owner decision this pass is not the place to guess:
+    field-change needs a declared set of "which field(s) count" (every
+    field on a `Plan`/`Task` payload firing a rule is a very different
+    product from a curated allow-list, and the wrong default is hard to
+    walk back once rules depend on it); SLE-breach needs a chosen SLE
+    source (the workflow's own service-level expectation, §-derived from
+    history per `tba.rs`, vs an operator-declared target) and a
+    once-only notification schema so a breach does not re-fire every
+    sweep. Same reasoning basis as the PRO-P33 controls-registration
+    deferral: a mechanical implementation would have to invent the
+    business decision rather than express one already made. Left open
+    pending a product decision on both.
+  - [x] **Multi-action rules** applied in declared order with per-action
+    outcomes logged. *(Landed 2026-09-02.)* `automations.action_kind`/
+    `action_value` (one action per rule) replaced by an `actions JSONB
+    NOT NULL DEFAULT '[]'` array (migration
+    `m20260902_000001_automation_multi_action`; a
+    `CHECK (jsonb_array_length(actions) > 0)` refuses an empty list even
+    from a direct insert), backfilling every existing single-action rule
+    into a one-element array so nothing silently emptied. Array order
+    **is** declared order — no separate position column. Pure
+    `automation::validate_actions` (5 new unit tests) validates every
+    element with the existing `validate_action` and names the offending
+    0-based index on failure. `automation_runs` gained `action_index`
+    (`DEFAULT 0`, so every pre-existing run stays correctly addressable
+    as "action 0" with no backfill needed); `fire()` now loops the
+    parsed action list and calls `record_run` once per action, so an
+    N-action rule writes N run rows — a partial failure (action 2 of 3)
+    is visible rather than overwriting or being swallowed by the next
+    action's outcome. `act_assign`/`act_set_task_status`/`act_notify`/
+    `act_schedule` were refactored to take one action's
+    `kind`/`value` rather than the whole rule row, so nothing changed
+    about *what* an action does, only how many a rule may declare.
+    OpenAPI schema + its mounted-routes pinning test updated (also
+    fixed a pre-existing, unrelated staleness found in the same block:
+    the `trigger_kind` enum was missing `plan_phase_changed`, landed
+    earlier in this same task but never reflected in the doc).
+    Verified live against a fresh Postgres:
+    `a_multi_action_rule_applies_every_action_in_order_and_logs_each_outcome`
+    seeds a two-action rule (`add_label` on an already-labelled plan,
+    then `assign`) and confirms the first action logs `skipped` while
+    the second still applies — proving one action's non-fatal outcome
+    does not block the next. Full DB-gated suite 75/75 (was 74, +1);
+    `cargo test --lib` 358/358 (was 353, +5); `cargo fmt --check` /
+    `cargo clippy --all-targets -D warnings` clean. **No back-compat
+    shim**: `actions` is the only accepted shape on `POST
+    /api/automations` — there is no front-end consumer yet (PRO-P20)
+    and this service is pre-1.0 with synthetic data only, so a clean
+    cut was chosen over carrying two request shapes.
 
 - [x] **T-22 — Realized gains (§5.9.6 / FR-33).** **Landed 2026-08-26.**
   Pure `src/value.rs` (11 tests), migration `m20260826_000003_value`,

@@ -7382,11 +7382,40 @@ green as it sits; these finish it)**
   predates the effort/value/ceremony additions); then land T-26's
   remainder (action→task conversion; register the pre-existing implicit
   controls).
-- [ ] **PRO-P20 (L)** T-21 triggers (field-change/date/SLE + multi-action
+- [~] **PRO-P20 (L)** T-21 triggers (field-change/date/SLE + multi-action
   rules); FE adoption of the PM suite (workflows, OKR, distribution,
   TPC/controls, effort/ceremony views — all honestly "Not built");
   standing pre-WIP gaps (goals FR-12, issues FR-14, review-queue table,
   T-7 links, T-8 bulk).
+  *Multi-action rules landed 2026-09-02* — the schema-changing "larger
+  half" of T-21's automation-breadth remainder (FR-32): a rule now
+  declares an ordered `actions` array instead of one action, and every
+  action's outcome is logged separately (`automations`/`automation_runs`
+  migration `m20260902_000001_automation_multi_action`, pure
+  `automation::validate_actions`, `fire()` looping the parsed list).
+  Verified live against a fresh Postgres (DB-gated suite 75/75, was 74;
+  `cargo test --lib` 358/358, was 353); `cargo fmt --check` / `cargo
+  clippy --all-targets -D warnings` clean. See
+  `project-portfolio-management/spec/13-tasks.md` T-21 for the full
+  record.
+  *`milestone_due` date-arrival trigger landed 2026-09-02* — the one
+  dated field (`milestones.due`) with unambiguous "arrived" semantics,
+  fired via a new claim-based sweep (`POST
+  /api/automations/milestones/sweep`, migration
+  `m20260902_000002_automation_milestone_fires`) so a rule/milestone
+  pair fires exactly once, ever — verified live by sweeping twice and
+  confirming `fired: 1` then `fired: 0, already_claimed: 1` with only
+  one `automation_runs` row throughout. The optional scheduler ticker
+  now drives this sweep too. `cargo test --lib` 360/360 (was 358);
+  DB-gated suite 76/76 (was 75); `cargo fmt --check` / `cargo clippy
+  --all-targets -D warnings` clean. See
+  `project-portfolio-management/spec/13-tasks.md` T-21 for the full
+  record. **Still open, deliberately**: field-change and SLE-breach
+  triggers — both need a product decision (which field(s) count as
+  "changed"; which SLE source and a once-only notification schema) that
+  this pass is not the place to invent, same reasoning as the PRO-P33
+  deferral. The FE-adoption and standing-pre-WIP-gaps items this task
+  bundles are all still untouched.
 
 **authentication**
 - [x] **PRO-P21 (S)** *(done 2026-08-29)* Verified 0.9.0 was cut

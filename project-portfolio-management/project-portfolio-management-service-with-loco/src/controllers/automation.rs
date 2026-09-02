@@ -62,6 +62,12 @@ fn db_err(e: sea_orm::DbErr) -> Error {
 }
 
 /// `POST /api/automations` body.
+///
+/// `actions` is an **ordered** list (FR-32) — array order is the
+/// declared firing order, applied in full every time the rule matches.
+/// Each element is `{"kind": …, "value": …}`, the same shape
+/// `action_kind`/`action_value` used singly before this rule type
+/// existed.
 #[derive(Debug, Deserialize)]
 struct AutomationPayload {
     /// Scope the rule to one plan's board; absent = every plan.
@@ -73,14 +79,12 @@ struct AutomationPayload {
     from_status: Option<String>,
     #[serde(default)]
     to_status: Option<String>,
-    action_kind: String,
-    #[serde(default)]
-    action_value: serde_json::Value,
+    actions: Vec<serde_json::Value>,
 }
 
-/// `POST /api/automations` — configure one rule. The trigger and the
-/// action are validated here, at write time, so a malformed rule can
-/// never fail silently later when nobody is watching.
+/// `POST /api/automations` — configure one rule. The trigger and every
+/// declared action are validated here, at write time, so a malformed
+/// rule can never fail silently later when nobody is watching.
 #[debug_handler]
 async fn create_automation(
     State(ctx): State<AppContext>,
@@ -101,12 +105,7 @@ async fn create_automation(
     ) {
         problems.push(e);
     }
-    let action_value = if payload.action_value.is_null() {
-        serde_json::json!({})
-    } else {
-        payload.action_value.clone()
-    };
-    if let Err(e) = rules::validate_action(&payload.action_kind, &action_value, TASK_STATUSES) {
+    if let Err(e) = rules::validate_actions(&payload.actions, TASK_STATUSES) {
         problems.push(e);
     }
     if !problems.is_empty() {
@@ -128,8 +127,7 @@ async fn create_automation(
         trigger_kind: ActiveValue::set(payload.trigger_kind.clone()),
         from_status: ActiveValue::set(payload.from_status.clone()),
         to_status: ActiveValue::set(payload.to_status.clone()),
-        action_kind: ActiveValue::set(payload.action_kind.clone()),
-        action_value: ActiveValue::set(action_value),
+        actions: ActiveValue::set(serde_json::Value::Array(payload.actions.clone())),
         enabled: ActiveValue::set(true),
         deleted_at: ActiveValue::set(None),
         ..Default::default()
@@ -144,7 +142,9 @@ async fn create_automation(
         caller.actor(),
         Some(serde_json::json!({
             "trigger_kind": row.trigger_kind,
-            "action_kind": row.action_kind,
+            "action_kinds": row.actions.as_array().map(|a| {
+                a.iter().filter_map(|v| v.get("kind").and_then(serde_json::Value::as_str)).collect::<Vec<_>>()
+            }),
             "plan_pid": row.plan_pid.map(|p| p.to_string()),
         })),
     )
@@ -350,11 +350,12 @@ fn action_str(value: &serde_json::Value, field: &str) -> Option<String> {
 /// `assign` — put the named person on the task.
 async fn act_assign(
     ctx: &AppContext,
-    rule: &crate::models::_entities::automations::Model,
+    rule_name: &str,
+    action_value: &serde_json::Value,
     subject_kind: &str,
     subject_pid: Uuid,
 ) -> (&'static str, serde_json::Value) {
-    let Some(assignee) = action_str(&rule.action_value, "assignee_ref") else {
+    let Some(assignee) = action_str(action_value, "assignee_ref") else {
         return ("failed", serde_json::json!({ "reason": "no assignee_ref" }));
     };
     if subject_kind != "task" {
@@ -380,7 +381,7 @@ async fn act_assign(
                 "task",
                 subject_pid,
                 "task_assigned",
-                &format!("Assigned to you by automation `{}`", rule.name),
+                &format!("Assigned to you by automation `{rule_name}`"),
             )
             .await
             .ok();
@@ -399,11 +400,11 @@ async fn act_assign(
 /// cascade.
 async fn act_set_task_status(
     ctx: &AppContext,
-    rule: &crate::models::_entities::automations::Model,
+    action_value: &serde_json::Value,
     subject_kind: &str,
     subject_pid: Uuid,
 ) -> (&'static str, serde_json::Value) {
-    let Some(status) = action_str(&rule.action_value, "status") else {
+    let Some(status) = action_str(action_value, "status") else {
         return ("failed", serde_json::json!({ "reason": "no status" }));
     };
     if subject_kind != "task" {
@@ -441,18 +442,19 @@ async fn act_set_task_status(
 /// `notify` — write one in-app notification.
 async fn act_notify(
     ctx: &AppContext,
-    rule: &crate::models::_entities::automations::Model,
+    rule_name: &str,
+    action_value: &serde_json::Value,
     subject_kind: &str,
     subject_pid: Uuid,
 ) -> (&'static str, serde_json::Value) {
-    let Some(recipient) = action_str(&rule.action_value, "recipient_ref") else {
+    let Some(recipient) = action_str(action_value, "recipient_ref") else {
         return (
             "failed",
             serde_json::json!({ "reason": "no recipient_ref" }),
         );
     };
-    let message = action_str(&rule.action_value, "message")
-        .unwrap_or_else(|| format!("Automation `{}` fired", rule.name));
+    let message = action_str(action_value, "message")
+        .unwrap_or_else(|| format!("Automation `{rule_name}` fired"));
     match cap_models::notify(
         &ctx.db,
         &recipient,
@@ -471,16 +473,16 @@ async fn act_notify(
 /// `schedule_action` — hand a deadline to the set-and-forget queue.
 async fn act_schedule(
     ctx: &AppContext,
-    rule: &crate::models::_entities::automations::Model,
+    rule_pid: Uuid,
+    action_value: &serde_json::Value,
     subject_kind: &str,
     subject_pid: Uuid,
     actor: Option<&str>,
 ) -> (&'static str, serde_json::Value) {
-    let Some(action_kind) = action_str(&rule.action_value, "action_kind") else {
+    let Some(action_kind) = action_str(action_value, "action_kind") else {
         return ("failed", serde_json::json!({ "reason": "no action_kind" }));
     };
-    let Some(days) = rule
-        .action_value
+    let Some(days) = action_value
         .get("in_days")
         .and_then(serde_json::Value::as_i64)
     else {
@@ -493,9 +495,9 @@ async fn act_schedule(
             subject_kind: subject_kind.to_string(),
             subject_pid,
             action_kind,
-            payload: rule.action_value.clone(),
+            payload: action_value.clone(),
             due_at: due_at.into(),
-            source_automation_pid: Some(rule.pid),
+            source_automation_pid: Some(rule_pid),
             created_by: actor.map(std::string::ToString::to_string),
         },
     )
@@ -512,23 +514,38 @@ async fn act_schedule(
     }
 }
 
-/// Apply one matched rule's action. Returns the run outcome and the
-/// detail recorded against it.
+/// Apply one action of a matched rule. Returns the run outcome and the
+/// detail recorded against it — one call per element of the rule's
+/// `actions` array, so a rule with several actions calls this several
+/// times, each independently logged (FR-32).
 async fn apply_action(
     ctx: &AppContext,
     rule: &crate::models::_entities::automations::Model,
+    action: &rules::ParsedAction,
     fact: &rules::TriggerFact,
     subject_kind: &str,
     subject_pid: Uuid,
     actor: Option<&str>,
 ) -> (&'static str, serde_json::Value) {
-    match rule.action_kind.as_str() {
-        "assign" => act_assign(ctx, rule, subject_kind, subject_pid).await,
-        "set_task_status" => act_set_task_status(ctx, rule, subject_kind, subject_pid).await,
-        "notify" => act_notify(ctx, rule, subject_kind, subject_pid).await,
-        "schedule_action" => act_schedule(ctx, rule, subject_kind, subject_pid, actor).await,
+    match action.kind.as_str() {
+        "assign" => act_assign(ctx, &rule.name, &action.value, subject_kind, subject_pid).await,
+        "set_task_status" => {
+            act_set_task_status(ctx, &action.value, subject_kind, subject_pid).await
+        }
+        "notify" => act_notify(ctx, &rule.name, &action.value, subject_kind, subject_pid).await,
+        "schedule_action" => {
+            act_schedule(
+                ctx,
+                rule.pid,
+                &action.value,
+                subject_kind,
+                subject_pid,
+                actor,
+            )
+            .await
+        }
         "add_label" => {
-            let Some(label) = action_str(&rule.action_value, "label") else {
+            let Some(label) = action_str(&action.value, "label") else {
                 return ("failed", serde_json::json!({ "reason": "no label" }));
             };
             match add_plan_label(ctx, fact.plan_pid, &label).await {
@@ -618,13 +635,64 @@ pub(crate) async fn fire(
         if !rules::rule_matches(&rule_fact, fact) {
             continue;
         }
+        apply_rule_actions(ctx, &rule, fact, subject_kind, subject_pid, actor).await;
+    }
+}
+
+/// Parse, apply and log every action of one **already-matched** rule.
+/// Shared by [`fire`] (one-shot triggers) and
+/// [`sweep_milestone_due`] (the `milestone_due` sweep) — the two differ
+/// only in *how* a rule is found to fire (a single write vs. a claimed
+/// sweep row), not in what firing does once found.
+async fn apply_rule_actions(
+    ctx: &AppContext,
+    rule: &crate::models::_entities::automations::Model,
+    fact: &rules::TriggerFact,
+    subject_kind: &str,
+    subject_pid: Uuid,
+    actor: Option<&str>,
+) {
+    // Already validated at write time (`create_automation`); this can
+    // only fail on data that predates that validation or was written
+    // some other way, so it is logged and the rule is skipped entirely
+    // — a partially-parsed action list has no safe partial-apply
+    // reading — rather than firing on whatever parsed.
+    let actions = match rule
+        .actions
+        .as_array()
+        .map(std::vec::Vec::as_slice)
+        .map(|actions| rules::validate_actions(actions, TASK_STATUSES))
+    {
+        Some(Ok(actions)) => actions,
+        Some(Err(err)) => {
+            tracing::warn!(
+                "automation {} has an invalid actions array, not firing: {err}",
+                rule.pid
+            );
+            return;
+        }
+        None => {
+            tracing::warn!(
+                "automation {} actions is not a JSON array, not firing",
+                rule.pid
+            );
+            return;
+        }
+    };
+    // Each action fires in declared order (array order) and logs its
+    // own outcome (FR-32) — one rule with N actions writes N
+    // `automation_runs` rows, distinguished by `action_index`, so a
+    // partial failure (action 2 of 3) is visible rather than
+    // overwriting or being swallowed by the next action's result.
+    for (action_index, action) in actions.iter().enumerate() {
         let (outcome, detail) =
-            apply_action(ctx, &rule, fact, subject_kind, subject_pid, actor).await;
+            apply_action(ctx, rule, action, fact, subject_kind, subject_pid, actor).await;
         if let Err(err) = cap_models::record_run(
             &ctx.db,
             rule.pid,
             subject_kind,
             subject_pid,
+            i32::try_from(action_index).unwrap_or(i32::MAX),
             outcome,
             detail.clone(),
         )
@@ -640,7 +708,8 @@ pub(crate) async fn fire(
             Some(serde_json::json!({
                 "automation_pid": rule.pid.to_string(),
                 "name": rule.name,
-                "action_kind": rule.action_kind,
+                "action_index": action_index,
+                "action_kind": action.kind,
                 "outcome": outcome,
                 "detail": detail,
             })),
@@ -648,6 +717,107 @@ pub(crate) async fn fire(
         .await
         .ok();
     }
+}
+
+/// Sweep every live milestone whose `due` date has arrived (`due <=`
+/// today) and is not yet `done`, firing every enabled `milestone_due`
+/// rule that matches it — at most [`SWEEP_CAP`] milestones. Returns
+/// `(fired, already_claimed, capped)`, where `fired` counts
+/// **rule firings** (a milestone matched by two rules counts as two).
+///
+/// A due date is a **condition**, not a one-shot event, so — unlike
+/// [`fire`] — each (rule, milestone) pair is **claimed** with an
+/// `INSERT … ON CONFLICT DO NOTHING` into `automation_milestone_fires`
+/// before it is applied: only the caller whose insert actually adds a
+/// row proceeds, so two concurrent sweeps (or the ticker racing the
+/// endpoint) cannot double-fire the same pair, and a milestone that
+/// stays overdue across many sweeps fires exactly once per matching
+/// rule, not once per sweep.
+///
+/// # Errors
+///
+/// Propagates a database error from the due-milestone query.
+pub async fn sweep_milestone_due(ctx: &AppContext) -> Result<(usize, usize, bool)> {
+    use crate::models::_entities::{automation_milestone_fires, milestones};
+    let today = chrono::Utc::now().date_naive();
+    let due = milestones::Entity::find()
+        .filter(milestones::Column::Due.lte(today))
+        .filter(milestones::Column::Done.eq(false))
+        .filter(milestones::Column::DeletedAt.is_null())
+        .order_by_asc(milestones::Column::Due)
+        .limit(SWEEP_CAP)
+        .all(&ctx.db)
+        .await
+        .map_err(db_err)?;
+    let capped = due.len() as u64 >= SWEEP_CAP;
+    let candidates = cap_models::enabled_automations(&ctx.db, "milestone_due").await?;
+    let (mut fired, mut already_claimed) = (0, 0);
+    for milestone in &due {
+        let fact = rules::TriggerFact {
+            kind: "milestone_due".to_string(),
+            plan_pid: milestone.plan_pid,
+            from_status: None,
+            to_status: None,
+        };
+        for rule in &candidates {
+            let rule_fact = rules::RuleFact {
+                enabled: rule.enabled,
+                plan_pid: rule.plan_pid,
+                trigger_kind: rule.trigger_kind.clone(),
+                from_status: rule.from_status.clone(),
+                to_status: rule.to_status.clone(),
+            };
+            if !rules::rule_matches(&rule_fact, &fact) {
+                continue;
+            }
+            // The claim: Postgres's `RETURNING` comes back with zero
+            // rows when `DO NOTHING` suppresses the insert, which
+            // `sea-orm`'s `exec_with_returning` surfaces as
+            // `Err(DbErr::RecordNotFound)` rather than an empty `Ok` —
+            // verified live against a real Postgres, not assumed (see
+            // the match arm below).
+            let claim = automation_milestone_fires::Entity::insert(
+                automation_milestone_fires::ActiveModel {
+                    automation_pid: ActiveValue::set(rule.pid),
+                    milestone_pid: ActiveValue::set(milestone.pid),
+                    ..Default::default()
+                },
+            )
+            .on_conflict(
+                sea_orm::sea_query::OnConflict::columns([
+                    automation_milestone_fires::Column::AutomationPid,
+                    automation_milestone_fires::Column::MilestonePid,
+                ])
+                .do_nothing()
+                .to_owned(),
+            )
+            .exec_with_returning(&ctx.db)
+            .await;
+            match claim {
+                Ok(_) => {}
+                // `Insert::exec_with_returning` on a single `ActiveModel`
+                // reports a `DO NOTHING`-suppressed conflict as
+                // `RecordNotFound` (verified live against Postgres, not
+                // assumed — `RecordNotInserted` is a *different* code
+                // path's error, `TryInsertResult::Conflicted`'s, which
+                // this call never goes through): `RETURNING` came back
+                // with zero rows because the conflicting row already
+                // existed, which is exactly "already claimed", not a
+                // failure.
+                Err(sea_orm::DbErr::RecordNotFound(_)) => {
+                    already_claimed += 1;
+                    continue;
+                }
+                Err(err) => {
+                    tracing::warn!("milestone-due claim failed: {err}");
+                    continue;
+                }
+            }
+            apply_rule_actions(ctx, rule, &fact, "milestone", milestone.pid, None).await;
+            fired += 1;
+        }
+    }
+    Ok((fired, already_claimed, capped))
 }
 
 /// `POST /api/scheduled-actions` body.
@@ -976,6 +1146,24 @@ async fn sweep(State(ctx): State<AppContext>) -> Result<Response> {
     }))
 }
 
+/// `POST /api/automations/milestones/sweep` — fire every enabled
+/// `milestone_due` rule matching a milestone whose `due` date has
+/// arrived. Safe to call repeatedly and from more than one caller: the
+/// claim (`automation_milestone_fires`) is atomic, so each
+/// (rule, milestone) pair fires exactly once, ever — not once per
+/// sweep while it stays overdue.
+#[debug_handler]
+async fn sweep_milestones(State(ctx): State<AppContext>) -> Result<Response> {
+    let (fired, already_claimed, capped) = sweep_milestone_due(&ctx).await?;
+    format::json(serde_json::json!({
+        "fired": fired,
+        "already_claimed": already_claimed,
+        "capped": capped,
+        "cap": SWEEP_CAP,
+        "as_of": chrono::Utc::now().to_rfc3339(),
+    }))
+}
+
 /// The automation routes.
 pub fn routes() -> Routes {
     Routes::new()
@@ -989,5 +1177,6 @@ pub fn routes() -> Routes {
         .add("/scheduled-actions", post(create_scheduled_action))
         .add("/scheduled-actions", get(list_scheduled_actions))
         .add("/scheduled-actions/sweep", post(sweep))
+        .add("/automations/milestones/sweep", post(sweep_milestones))
         .add("/scheduled-actions/{pid}", delete(cancel_scheduled_action))
 }
