@@ -9,6 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- Real OpenTelemetry OTLP export (`src/observability.rs`, repo
+  `tasks.md` PRO-H12 slice 5 of 7): a `tracing-opentelemetry` bridge
+  over an OTLP/gRPC span exporter, plus an OTLP/gRPC metric exporter
+  feeding an `http.server.request.duration` histogram. On by default
+  at `OTLP_ENDPOINT` (default `http://localhost:4317`); set it to the
+  empty string to disable export and keep only local logging. Ported
+  from organization-service's slice 4; confirmed rather than assumed
+  that this crate, like organization's, has exactly one
+  router-construction surface, so `trace_mw` is layered once in
+  `after_routes`. Proved end to end against a real in-process OTLP/gRPC
+  collector (`tests/otlp_export.rs`, `tests/otlp_middleware.rs`), not
+  merely against in-process SDK state.
+
 ## [0.2.0] - 2026-08-27
 
 ### Added — stitched journeys, and a denial that no longer discloses

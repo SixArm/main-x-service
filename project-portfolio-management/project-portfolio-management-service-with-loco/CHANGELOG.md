@@ -84,6 +84,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   not block the next. `cargo test --lib` 358/358 (was 353, +5);
   DB-gated suite 75/75 (was 74, +1).
 
+### Added — OpenTelemetry OTLP export (PRO-H12 slice 7 of 7)
+
+- Real OpenTelemetry OTLP export (`src/observability.rs`, repo
+  `tasks.md` PRO-H12 slice 7 of 7 — the last): a `tracing-opentelemetry`
+  bridge over an OTLP/gRPC span exporter, plus an OTLP/gRPC metric
+  exporter feeding an `http.server.request.duration` histogram. On by
+  default at `OTLP_ENDPOINT` (default `http://localhost:4317`); set it
+  to the empty string to disable export and keep only local logging.
+  Ported from case-service's slice 6; confirmed rather than assumed
+  that this crate, like the other three loco-idiomatic registries, has
+  exactly one router-construction surface, so `trace_mw` is layered
+  once in `after_routes`. Proved end to end against a real in-process
+  OTLP/gRPC collector (`tests/otlp_export.rs`, `tests/otlp_middleware.rs`),
+  not merely against in-process SDK state. This closes repo
+  `tasks.md` PRO-H12 — every entity registry in the family now
+  exports real OTLP/gRPC traces and metrics.
+
 ## [0.3.0] - 2026-08-26
 
 The project-management suite (entity spec §13 T-15 … T-27, landed
