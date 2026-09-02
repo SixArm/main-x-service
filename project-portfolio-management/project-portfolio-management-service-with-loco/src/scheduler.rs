@@ -1,17 +1,21 @@
 //! The **set-and-forget** ticker: an optional in-process loop that
-//! sweeps due [scheduled actions](crate::controllers::automation) so a
-//! deadline configured once fires without anyone poking an endpoint.
+//! sweeps due [scheduled actions](crate::controllers::automation) and
+//! overdue [`milestone_due` automations](crate::controllers::automation::sweep_milestone_due)
+//! so a deadline configured once fires without anyone poking an
+//! endpoint.
 //!
 //! Gated by `PROJECT_PORTFOLIO_MANAGEMENT_SCHEDULER_MINUTES` (unset /
 //! `0` ⇒ off, the default; parse failure ⇒ off with a warning) —
 //! the same posture as the estate-snapshot ticker in
 //! [`crate::snapshots`]. With the ticker off, `POST
-//! /api/scheduled-actions/sweep` still works, so a deployment can
-//! drive the sweep from its own cron instead.
+//! /api/scheduled-actions/sweep` and `POST
+//! /api/automations/milestones/sweep` still work, so a deployment can
+//! drive both sweeps from its own cron instead.
 //!
-//! Firing is claim-based (see
-//! [`crate::controllers::automation::sweep_due`]), so running the
-//! ticker *and* an external cron cannot double-fire a deadline.
+//! Both sweeps are claim-based (see
+//! [`crate::controllers::automation::sweep_due`] and
+//! [`crate::controllers::automation::sweep_milestone_due`]), so running
+//! the ticker *and* an external cron cannot double-fire a deadline.
 
 use loco_rs::prelude::AppContext;
 
@@ -58,6 +62,16 @@ pub fn spawn(ctx: AppContext) {
                 }
                 Ok(_) => {}
                 Err(err) => tracing::warn!("scheduled-action sweep failed: {err}"),
+            }
+            match crate::controllers::automation::sweep_milestone_due(&ctx).await {
+                Ok((fired, already_claimed, capped)) if fired > 0 || capped => {
+                    tracing::info!(
+                        "milestone-due sweep fired {fired} rule(s) \
+                         (already claimed {already_claimed}, capped {capped})"
+                    );
+                }
+                Ok(_) => {}
+                Err(err) => tracing::warn!("milestone-due sweep failed: {err}"),
             }
         }
     });

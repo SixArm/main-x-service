@@ -199,7 +199,7 @@ described manual check confirms it. Split tasks too big for one PR
     Request tests committed (`tests/requests/metrics_control.rs`).
 
 - [~] **T-21 — Automation breadth (FR-32).** **Partially landed
-  2026-08-26.**
+  2026-08-26, extended 2026-09-02.**
   - [x] **`plan_phase_changed` trigger**, wired into the phase
     controller. Deliberately its **own** trigger rather than folded into
     `plan_stage_changed`: the gate stage and the project phase are
@@ -212,7 +212,57 @@ described manual check confirms it. Split tasks too big for one PR
   - [x] The existing invariant holds unchanged: the phase change is
     committed before the rule fires, so a failing rule is logged as a
     `failed` run and **never undoes the operator's move**.
-  - [ ] Field-change, date-arrival and SLE-breach triggers.
+  - [x] **`milestone_due` trigger (date-arrival).** *(Landed
+    2026-09-02.)* The one dated field with unambiguous "arrived"
+    semantics is `milestones.due` — a task's own `due_at`/`start_at`/
+    `finish_at` are each ambiguous about which one "the" date-arrival
+    trigger means, so this ships narrowly on milestones rather than
+    guessing a task-date convention. Unlike every other trigger, a
+    milestone's due date does not arrive as a write anyone makes — there
+    is no event to hang the rule on — so it needs its own **exactly-once
+    claim**, not the existing fire-on-write path. New join table
+    `automation_milestone_fires (automation_pid, milestone_pid)`
+    (migration `m20260902_000002_automation_milestone_fires`) with a
+    `UNIQUE (automation_pid, milestone_pid)` constraint claimed via
+    `INSERT ... ON CONFLICT DO NOTHING`; a suppressed conflict surfaces
+    from sea-orm's `exec_with_returning` as
+    `DbErr::RecordNotFound("Failed to find inserted item")` — **verified
+    live against a real Postgres**, not assumed from reading the crate
+    source (which also has a `RecordNotInserted` variant, but that one
+    belongs to a different insert code path and does not appear here).
+    `POST /api/automations/milestones/sweep` (new
+    `controllers::automation::sweep_milestone_due`) queries overdue,
+    undone, non-deleted milestones (capped at `SWEEP_CAP`), and for each
+    enabled `milestone_due` rule matching the milestone's plan attempts
+    the claim before applying the rule's actions — so a rule/milestone
+    pair fires **exactly once, ever**, not once per sweep. The optional
+    scheduler ticker (`src/scheduler.rs`) now calls this sweep alongside
+    the existing `sweep_due` on every tick; the endpoint still works
+    standalone for a deployment driving both sweeps from external cron.
+    Shares the new `apply_rule_actions` helper extracted from `fire()` so
+    both the write-triggered path and the sweep log outcomes identically
+    (multi-action, per-action logging, never undoing prior state).
+    Verified live:
+    `a_milestone_due_rule_fires_once_the_date_arrives_and_never_again`
+    seeds one overdue and one far-future milestone, sweeps twice, and
+    confirms `fired: 1` then `fired: 0, already_claimed: 1` — with
+    exactly one `automation_runs` row throughout and the far-future
+    milestone never appearing. Full DB-gated suite 76/76 (was 75, +1);
+    `cargo test --lib` 360/360 (was 358, +2); `cargo fmt --check` /
+    `cargo clippy --all-targets -D warnings` clean.
+  - [ ] **Field-change and SLE-breach triggers — deliberately deferred.**
+    Both need an owner decision this pass is not the place to guess:
+    field-change needs a declared set of "which field(s) count" (every
+    field on a `Plan`/`Task` payload firing a rule is a very different
+    product from a curated allow-list, and the wrong default is hard to
+    walk back once rules depend on it); SLE-breach needs a chosen SLE
+    source (the workflow's own service-level expectation, §-derived from
+    history per `tba.rs`, vs an operator-declared target) and a
+    once-only notification schema so a breach does not re-fire every
+    sweep. Same reasoning basis as the PRO-P33 controls-registration
+    deferral: a mechanical implementation would have to invent the
+    business decision rather than express one already made. Left open
+    pending a product decision on both.
   - [x] **Multi-action rules** applied in declared order with per-action
     outcomes logged. *(Landed 2026-09-02.)* `automations.action_kind`/
     `action_value` (one action per rule) replaced by an `actions JSONB

@@ -9,6 +9,52 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — milestone-due date-arrival trigger (T-21, FR-32)
+
+- A new `milestone_due` trigger kind fires when a milestone's own `due`
+  date has arrived — the one dated field in the domain with
+  unambiguous "arrived" semantics (a task's `due_at`/`start_at`/
+  `finish_at` are each ambiguous about which one "the" date-arrival
+  trigger would mean, so this ships narrowly on milestones rather than
+  guessing a task-date convention).
+- Unlike every other trigger, nobody's write makes a due date "arrive"
+  — there is no event to hang the rule on — so this needed its own
+  **exactly-once claim** rather than the existing fire-on-write path.
+  New table `automation_milestone_fires (automation_pid, milestone_pid)`
+  (migration `m20260902_000002_automation_milestone_fires`) with a
+  `UNIQUE (automation_pid, milestone_pid)` constraint, claimed via
+  `INSERT … ON CONFLICT DO NOTHING`. A suppressed conflict surfaces
+  from sea-orm 2.0.2's `exec_with_returning` as `DbErr::RecordNotFound
+  ("Failed to find inserted item")` — confirmed by running the claim
+  twice against a real Postgres, not assumed from the crate source
+  (which also defines a `RecordNotInserted` variant used by a
+  different insert code path, `TryInsert`, not this one).
+- New `POST /api/automations/milestones/sweep`
+  (`sweep_milestone_due`): finds overdue, undone, non-deleted
+  milestones (capped at `SWEEP_CAP`), and for each enabled
+  `milestone_due` rule matching the milestone's plan, attempts the
+  claim before applying the rule's actions — so a rule/milestone pair
+  fires exactly once, ever, no matter how many times the sweep runs.
+  The optional scheduler ticker now calls this sweep on every tick
+  alongside the existing `sweep_due`; the endpoint also works
+  standalone for a deployment driving both sweeps from external cron.
+- `fire()`'s action-application logic is extracted into a shared
+  `apply_rule_actions` helper so the write-triggered path and the new
+  sweep log multi-action outcomes identically.
+- Verified live: a new request test seeds one overdue and one
+  far-future milestone, a matching `milestone_due` rule, sweeps twice,
+  and confirms `fired: 1, already_claimed: 0` then `fired: 0,
+  already_claimed: 1` — with exactly one `automation_runs` row
+  throughout and the far-future milestone never firing.
+  `cargo test --lib` 360/360 (was 358, +2); DB-gated suite 76/76 (was
+  75, +1).
+- **Field-change and SLE-breach triggers are deliberately not
+  included** — both need a product decision (which fields count as
+  "changed"; which SLE source and a once-only notification schema)
+  that a mechanical implementation would otherwise have to invent. Left
+  open in spec §13 T-21 pending that decision, on the same reasoning
+  basis as the PRO-P33 controls-registration deferral.
+
 ### Added — multi-action automation rules (T-21, FR-32)
 
 - A rule may now declare **more than one action**, applied in the

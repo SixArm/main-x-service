@@ -30,6 +30,16 @@ pub const TRIGGER_KINDS: &[&str] = &[
     // collapsing them into one trigger would make a rule fire on the
     // wrong kind of change.
     "plan_phase_changed",
+    // Added 2026-09-02 (FR-32's "a date arriving"), scoped narrowly to
+    // `milestones.due` — the one dated field in this service with an
+    // unambiguous "arrived" reading. Unlike every trigger above, this
+    // one is not fired from a single write: a due date stays true every
+    // time a sweep looks at it, so firing needs its own exactly-once
+    // claim (`automation_milestone_fires`,
+    // `controllers::automation::sweep_milestone_due`) rather than a
+    // one-shot call from `fire()`. Carries no status filter — see
+    // `validate_trigger` below.
+    "milestone_due",
 ];
 
 /// What an automation may do when it fires.
@@ -608,6 +618,36 @@ mod tests {
             .expect_err("must refuse");
         assert!(err.contains("task_moved"), "{err}");
         assert!(validate_trigger("review_submitted", None, None, STATUSES).is_ok());
+    }
+
+    #[test]
+    fn milestone_due_is_a_recognised_statusless_trigger() {
+        assert!(is_token(TRIGGER_KINDS, "milestone_due"));
+        assert!(validate_trigger("milestone_due", None, None, STATUSES).is_ok());
+        // A date arriving has no from/to status of any kind — neither a
+        // task status nor a phase.
+        assert!(validate_trigger("milestone_due", None, Some("done"), STATUSES).is_err());
+    }
+
+    #[test]
+    fn a_milestone_due_rule_matches_its_own_plan_only() {
+        let mine = Uuid::new_v4();
+        let theirs = Uuid::new_v4();
+        let rule = RuleFact {
+            enabled: true,
+            plan_pid: Some(mine),
+            trigger_kind: "milestone_due".to_string(),
+            from_status: None,
+            to_status: None,
+        };
+        let fact_for = |plan: Uuid| TriggerFact {
+            kind: "milestone_due".to_string(),
+            plan_pid: plan,
+            from_status: None,
+            to_status: None,
+        };
+        assert!(rule_matches(&rule, &fact_for(mine)));
+        assert!(!rule_matches(&rule, &fact_for(theirs)));
     }
 
     #[test]

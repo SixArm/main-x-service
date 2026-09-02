@@ -7255,12 +7255,25 @@ green as it sits; these finish it)**
   `cargo test --lib` 358/358, was 353); `cargo fmt --check` / `cargo
   clippy --all-targets -D warnings` clean. See
   `project-portfolio-management/spec/13-tasks.md` T-21 for the full
-  record. **Still open**: field-change, date-arrival and SLE-breach
-  triggers (T-21's other remainder — date-arrival/SLE-breach need new
-  periodic-sweep infrastructure, not just validation, so scoped as its
-  own slice rather than folded in here); the FE-adoption and
-  standing-pre-WIP-gaps items this task bundles are all still
-  untouched.
+  record.
+  *`milestone_due` date-arrival trigger landed 2026-09-02* — the one
+  dated field (`milestones.due`) with unambiguous "arrived" semantics,
+  fired via a new claim-based sweep (`POST
+  /api/automations/milestones/sweep`, migration
+  `m20260902_000002_automation_milestone_fires`) so a rule/milestone
+  pair fires exactly once, ever — verified live by sweeping twice and
+  confirming `fired: 1` then `fired: 0, already_claimed: 1` with only
+  one `automation_runs` row throughout. The optional scheduler ticker
+  now drives this sweep too. `cargo test --lib` 360/360 (was 358);
+  DB-gated suite 76/76 (was 75); `cargo fmt --check` / `cargo clippy
+  --all-targets -D warnings` clean. See
+  `project-portfolio-management/spec/13-tasks.md` T-21 for the full
+  record. **Still open, deliberately**: field-change and SLE-breach
+  triggers — both need a product decision (which field(s) count as
+  "changed"; which SLE source and a once-only notification schema) that
+  this pass is not the place to invent, same reasoning as the PRO-P33
+  deferral. The FE-adoption and standing-pre-WIP-gaps items this task
+  bundles are all still untouched.
 
 **authentication**
 - [x] **PRO-P21 (S)** *(done 2026-08-29)* Verified 0.9.0 was cut
