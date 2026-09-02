@@ -1,4 +1,5 @@
-//! API layer: REST (Axum) and gRPC (Tonic stub).
+//! API layer: REST (Axum) and gRPC (Tonic — a real server,
+//! Create/Get/List/Delete Event).
 //!
 //! (FHIR R5 lives in [`crate::fhir`] + [`crate::controllers::fhir`], not
 //! here — the earlier `api::fhir` `501` stub was removed once the real

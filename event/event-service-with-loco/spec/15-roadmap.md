@@ -32,9 +32,12 @@
   ingress, probes.
 - **Production readiness** — security audit + pen test, GDPR
   validation, DR runbook, backup / restore, CI/CD pipeline.
-- **Feature enhancements** — complete gRPC (the `Appointment`
+- **Feature enhancements** — extend the gRPC surface landed 2026-09-02
+  (T-6: `UpdateEvent`, match/merge/search/FHIR over gRPC, the
+  remaining schema.org/Event fields on the proto `Event` message — see
+  T-6's own record for the full list); the `Appointment`
   `CapabilityStatement` and the ad hoc searchset `Bundle` already ship
-  via T-10); a FHIR `Encounter` mapping alongside `Appointment`; bulk
+  via T-10; a FHIR `Encounter` mapping alongside `Appointment`; bulk
   import/export (T-9); Fluvio consumers (the production sink itself,
   `FluvioSink`, shipped via T-11/BUS-3 — what remains is a deployment
   actually pointing `EVENT_FLUVIO_ENDPOINT` at a live broker, and the

@@ -7,7 +7,8 @@ src/
 ├── api/
 │   ├── mod.rs               # ApiResponse, ApiError
 │   ├── rest/                # /api/* — 18 endpoints
-│   └── grpc/                # Tonic stub
+│   └── grpc/                # real Tonic server (T-6): mod.rs (serve + generated
+│                             # proto module) + service.rs (EventGrpcService)
 ├── controllers/
 │   └── fhir.rs              # mounted FHIR R5 Appointment routes + /fhir/metadata
 ├── fhir/                    # FHIR resources, conversions, OperationOutcome, Bundle, CapabilityStatement

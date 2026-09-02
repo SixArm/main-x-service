@@ -23,7 +23,7 @@
 - Real-time + batch duplicate detection + review queue.
 - Record merging with link tracking and JSON snapshots.
 - Per-field privacy masking, GDPR Article 15 export, consent records.
-- REST API (Axum) + gRPC stub.
+- REST API (Axum) + gRPC (Create/Get/List/Delete Event).
 - FHIR R5 `Appointment` surface (`/fhir/Appointment{,/{id}}` +
   `/fhir/metadata`) — best-effort schema.org/Event → FHIR mapping.
 - PostgreSQL persistence via SeaORM.

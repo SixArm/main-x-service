@@ -7,7 +7,7 @@ Complete endpoint reference: [`agents/restful.md`](../agents/restful.md).
 | REST (Axum) | 18 endpoints under `/api/health`, `/api/whoami`, `/api/events/*`, `/api/audit/*`, and the compliance pair `/api/records/verify` + `/api/audit/verify` (§13, 2026-07-28) |
 | Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | FHIR R5 (Axum) | Live `Appointment` surface — `/fhir/Appointment{,/{id}}` (read/create/update/delete/search) + `GET /fhir/metadata` (`CapabilityStatement`); `application/fhir+json`, `OperationOutcome` errors, searchset Bundle (see §6.8) |
-| gRPC (Tonic) | Stubbed |
+| gRPC (Tonic) | Real server (T-6, 2026-09-02): `CreateEvent` / `GetEvent` / `ListEvents` / `DeleteEvent` on `EventService`, generated from `proto/event.proto`, spawned on `grpc_port` alongside the REST router. No `UpdateEvent` RPC yet, and the proto `Event` message is a partial projection (identification + time-window fields only) — see spec §13 T-6 |
 | Web UI | None in this crate (backend-only loco service, no view tier). The operator UI is the sibling [`event-front-end-with-svelte`](../../event-front-end-with-svelte/spec/index.md). |
 | Docs | Swagger UI at `/swagger-ui` |
 

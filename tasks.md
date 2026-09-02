@@ -6644,7 +6644,13 @@ crate above.
   gRPC in the family capability matrix today, so T-3/PRO-H11 also
   needs to settle whether thing joins the other three or its dead
   deps get dropped instead, rather than assuming either way).
-- [~] **PRO-H11 (L)** **Design and build real gRPC servers for
+  **Person/worker/event's portion resolved 2026-09-02 via PRO-H11
+  below** (real servers, not dropped). **Still open**: thing — its own
+  T-3, undecided whether it joins the other three or its dead
+  `tonic`/`tonic-build` deps get dropped instead.
+- [x] **PRO-H11 (L)** *(done 2026-09-02 for its stated person/worker/
+  event scope; thing's inclusion is the separate, still-open PRO-H6
+  call)* **Design and build real gRPC servers for
   person/worker/event (thing's inclusion TBD — see PRO-H6).** Today
   all four crates carry only stubs or dead dependencies; nothing
   serves real gRPC anywhere in the family. Scope: a `.proto` surface
@@ -6659,42 +6665,60 @@ crate above.
   landing, and flip the `overview.md` capability-matrix gRPC row from
   "stub" language to real ✅/– once decided and (where chosen) built.
   *person landed 2026-09-02 as the reference slice*, *worker landed
-  2026-09-02 the same day, copying person's pattern* — each gets
-  `proto/<entity>.proto` + `build.rs` (`tonic-build`, pinned to 0.12 to
-  match the main `tonic` 0.12 dependency; worker's manifest already had
-  the right version pinned, unlike person's mismatched pre-existing
-  0.14) + `src/api/grpc/service.rs` (`<Entity>GrpcService`):
-  `Create<Entity>` / `Get<Entity>` / `List<Entity>s` / `Delete<Entity>`,
-  deliberately not the full REST surface (no Update RPC, no
-  match/merge/search/FHIR over gRPC) and each proto message a
-  deliberate partial projection (id/name/gender/birth-date/tax-id/
-  timestamps, plus worker's `worker_type`) — both tracked as follow-up
-  in each crate's own spec §13 T-6, not silently missing. Every RPC
-  delegates to the exact same functions REST calls (validation, the
-  shared duplicate-detection core bumped from private to `pub(crate)`
-  rather than copied, the same repository methods,
-  `auth::authorize_record` + masking for the Get RPC) — no duplicated
-  business logic; worker's repository takes no `AuditContext` (unlike
-  person's), so its gRPC side has no `audit_context_of` equivalent. A
-  new `grpc_enforce` mirrors REST's blanket-guard `auth::enforce` in
-  both crates, gated by the same `<ENTITY>_REQUIRE_AUTH` flag, so
-  enforcement protects both surfaces together; documented,
-  not-yet-carried-over gaps are the §164.528 disclosure-accounting
-  audit row and per-record read-visibility filtering on List. Verified
-  live, not merely compiled, in both crates:
+  the same day copying person's pattern*, *event landed the same day
+  copying both* — each gets `proto/<entity>.proto` + `build.rs`
+  (`tonic-build`, pinned to 0.12 to match the main `tonic` 0.12
+  dependency; worker's and event's manifests already had the right
+  version pinned, unlike person's mismatched pre-existing 0.14) +
+  `src/api/grpc/service.rs` (`<Entity>GrpcService`): `Create<Entity>` /
+  `Get<Entity>` / `List<Entity>s` / `Delete<Entity>`, deliberately not
+  the full REST surface (no Update RPC, no match/merge/search/FHIR
+  over gRPC) and each proto message a deliberate partial projection
+  (id/name/timestamps plus each entity's own identity fields —
+  gender/birth-date/tax-id for person, plus worker's `worker_type`;
+  start-date/end-date/`event_status` for event) — both tracked as
+  follow-up in each crate's own spec §13 T-6, not silently missing.
+  Every RPC delegates to the exact same functions REST calls
+  (validation, the shared duplicate-detection core bumped from private
+  to `pub(crate)` rather than copied, the same repository methods) —
+  no duplicated business logic. Two genuine per-crate divergences,
+  each confirmed by reading the sibling crate's code rather than
+  assumed identical: worker's and event's repositories take no
+  `AuditContext` (unlike person's), so neither gRPC side has an
+  `audit_context_of` equivalent; and event's own REST handlers
+  (`create_event`/`get_event`/`delete_event`) carry **no record-level
+  ABAC** at all (unlike person's/worker's `authorize_record` + masking
+  on Get), so event's gRPC side has none to mirror either — the
+  blanket `grpc_enforce` (gated by the same `<ENTITY>_REQUIRE_AUTH`
+  flag in all three crates) is event's only gRPC-side auth check.
+  Event also has **no REST list endpoint at all**, so its `ListEvents`
+  RPC calls `EventRepository::list_active` directly — real domain
+  logic, just not otherwise exposed — rather than mirroring a REST
+  handler the way person's/worker's `ListPersons`/`ListWorkers` do.
+  Verified live, not merely compiled, in all three crates:
   `tests/grpc_integration_test.rs` binds a real server on an
   OS-assigned port and drives it with a real client over an actual
   HTTP/2 connection — a Create→Get→List→Delete→Get(`NOT_FOUND`) round
   trip plus error-path proofs (validation failure → `INVALID_ARGUMENT`;
   malformed id → `INVALID_ARGUMENT`, not `INTERNAL`; worker adds an
-  unrecognised `worker_type` → `INVALID_ARGUMENT` proof) — all green
-  against a real Postgres, full DB-gated suite. `grpcurl` was not
-  additionally run by hand (unavailable in this sandbox); the
-  automated tests prove the identical claim each crate's own spec
-  named as T-6's acceptance criterion, repeatably. **Still open**:
-  event, as its own slice (copy person's/worker's `AGENTS.md` "gRPC
-  server" section, not reinvent the pattern); thing's inclusion per
-  PRO-H6.
+  unrecognised `worker_type` proof, event an unrecognised
+  `event_status` proof) — all green against a real Postgres, full
+  DB-gated suite in each crate. `grpcurl` was not additionally run by
+  hand (unavailable in this sandbox); the automated tests prove the
+  identical claim each crate's own spec named as T-6's acceptance
+  criterion, repeatably. A real, CI-only bug was found and fixed the
+  same day across all three crates: each `build.rs` initially claimed
+  `tonic_build::compile_protos` "shells out to a bundled `protoc`" —
+  wrong, and only caught by actually checking CI status (not by any
+  local run, since this developer's machine already had `protoc` on
+  `PATH`); fixed by adding `protoc-bin-vendored` as a build-dependency
+  and pointing `PROTOC` at it in `build.rs` before compiling, with
+  event's `build.rs` written with the fix from its first commit rather
+  than needing its own follow-up. **Still open**: thing's inclusion,
+  per PRO-H6 (a separate, undecided call, not blocked on this task);
+  `UpdateEvent`/`UpdatePerson`/`UpdateWorker` and
+  match/merge/search/FHIR over gRPC in all three, tracked in each
+  crate's own spec §13 T-6.
 - [x] **PRO-H7 (L)** *(done 2026-08-28)* **Matcher component parity:
   `relationships` + `tags`.** Verified fact before starting: person did
   **not** actually have this implemented either — the earlier audit's

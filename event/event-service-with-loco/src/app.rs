@@ -189,12 +189,29 @@ impl Hooks for App {
         // / `EVENT_ABAC_POLICY_FILE`).
         crate::api::rest::auth::spawn_key_refresh();
         crate::api::rest::auth::spawn_policy_watcher();
+        // Grabbed before `config` moves into `AppState::new` below.
+        let grpc_config = config.server.clone();
         let state = AppState::new(ctx.db.clone(), search_engine, matcher, config);
         ctx.shared_store.insert(state.clone());
         // Durable event bus Phase 3: start the outbox relay loop. A no-op
         // unless `EVENT_EVENT_TRANSPORT=outbox` AND `EVENT_EVENT_RELAY` are
         // set, so the default `memory` transport never spawns it.
         crate::relay::spawn(ctx.db.clone());
+        // PRO-H11: the real gRPC server, spawned alongside the REST
+        // router rather than blocking boot on it. Shares this exact
+        // `AppState` (cloned — the REST router below takes the
+        // original), so both surfaces see one database pool, one
+        // search index, one matcher. A bind/serve failure is logged,
+        // not fatal: the REST surface still comes up even if the gRPC
+        // port is unavailable, matching this crate's existing
+        // "always boot" posture for other best-effort subsystems (key
+        // refresh, policy watch, the outbox relay).
+        let grpc_state = state.clone();
+        tokio::spawn(async move {
+            if let Err(e) = crate::api::grpc::serve(grpc_config, grpc_state).await {
+                tracing::error!("gRPC server failed to start or exited: {e}");
+            }
+        });
         let router = router
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
             .layer(axum::middleware::from_fn_with_state(

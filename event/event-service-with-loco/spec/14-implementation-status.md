@@ -21,6 +21,7 @@
 | Authentication (blanket enforcement, default-off) | Env-gated `EVENT_REQUIRE_AUTH` middleware (`auth::enforce` + `require_auth_mw`) on every `/api/*` **and** `/fhir/*` route; public allow-list `/api/health` + `/fhir/metadata` (`auth::PUBLIC_API_PATHS`); wired on both router surfaces; DB-free enforce-matrix + flag-parser tests, including a dedicated `/fhir/*` regression guard (`test_enforce_on_guards_fhir_resource_paths`) (T-8, enforcement part) |
 | Authentication (boot-time key fetch) | `EVENT_PASETO_KEYS_URL` set ⇒ key set fetched over HTTP once at boot (`state::boot_verifier` in `after_routes`, before shared-store insert / middleware capture; fetched set wins; failure warn-logs and falls back to `EVENT_PASETO_KEYS`/empty — always boots); no refresh loop (rotation re-fetch is roadmap) (T-8, fetch part) |
 | Authorization (ABAC) | Inside the blanket guard: action derived from method + destructive named POSTs (`/merge`, `/deduplicate`, `/import`); shared `authentication-verifier` 0.3 engine evaluates `EVENT_ABAC_POLICY`/`_FILE` (else the built-in default policy) over the token's `attrs` claim; first-match-wins, default allow-read / deny-mutation; `401` vs `403` split with deciding-rule reason; DB-free §7 test matrix (T-8, authorization part) |
+| gRPC API | Real `tonic::transport::Server` (T-6, PRO-H11, 2026-09-02) generated from `proto/event.proto` — `CreateEvent`/`GetEvent`/`ListEvents`/`DeleteEvent`, delegating to the same `AppState`/`EventRepository`/`validate_event`/duplicate-detection REST uses; `ListEvents` calls `EventRepository::list_active` directly since this crate has no REST list endpoint of its own; blanket-enforcement gRPC-side (`grpc_enforce`) honours `EVENT_REQUIRE_AUTH` on both surfaces together (no record-level ABAC to mirror — REST has none here either); spawned alongside the REST router in `App::after_routes` |
 | Containers | Multi-stage Dockerfile built with Podman, dev + test Compose |
 | Tests | Unit + integration + Criterion benchmarks; CI workflows |
 | Keyed integrity verification | `src/compliance/` (`mac`, `record_integrity`, `audit_integrity`) — SHA-256 + SHA3-256 digests and a keyed HMAC-SHA256 MAC over each `Event` record and each `audit_log` row, via the shared `integrity-mac` crate; `GET /api/records/verify` + `GET /api/audit/verify`; default off (no `EVENT_INTEGRITY_MAC_KEY`/`_KEY_FILE` ⇒ no MAC written, rows report `mac_absent`); no hash chain / external-witness checkpoint (unlike person/worker/care-pathway/case) |
@@ -39,7 +40,7 @@ literally superseded.
 | Recurrence / RRULE | T-3 |
 | Event consumers (a deployment pointing `EVENT_FLUVIO_ENDPOINT` at a live broker; the link-graph aggregator's own consumer is tracked as BUS-2, elsewhere) | (no task yet) |
 | Dedup / merge / privacy integration tests | T-5 |
-| gRPC API | T-6 |
+| gRPC API — landed 2026-09-02: a real Tonic server (Create/Get/List/Delete Event; no Update RPC, no match/merge/search/FHIR over gRPC yet) | T-6 |
 | iCalendar I/O | T-7 |
 | Bulk import / export | T-9 |
 

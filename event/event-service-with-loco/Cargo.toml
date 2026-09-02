@@ -49,8 +49,12 @@ migration = { path = "migration" }
 # Search Engine
 tantivy = "0.22"
 
-# gRPC
+# gRPC (PRO-H11: a real Tonic server, generated from proto/event.proto
+# by build.rs; `prost` is the wire-message crate tonic-build's
+# generated code names directly, so it is a normal dependency, not
+# merely pulled in transitively through tonic's own "prost" feature)
 tonic = { version = "0.12", features = ["transport", "codegen", "prost"] }
+prost = "0.13"
 
 # OpenAPI Documentation
 utoipa = { version = "5.5", features = ["axum_extras", "chrono", "uuid"] }
@@ -188,8 +192,21 @@ reqwest = { version = "0.12", default-features = false, features = [
 ] }
 
 [build-dependencies]
-# gRPC code generation
+# gRPC code generation (PRO-H11). Pinned to 0.12 to match the main
+# `tonic = "0.12"` dependency above — codegen and runtime must be the
+# same tonic major line. This entry already had the correct version
+# (matching person-service's/worker-service's post-fix pin), but was
+# still dead scaffolding until now: no `build.rs`, no `proto/`
+# directory.
 tonic-build = "0.12"
+# `tonic_build::compile_protos` shells out to a real `protoc` binary —
+# it does not bundle one. `protoc-bin-vendored` ships prebuilt
+# `protoc` binaries for the platforms this family builds on;
+# `build.rs` points `PROTOC` at it before compiling, so no system
+# `protoc` install is required anywhere. Included from this crate's
+# first landing — person-service's and worker-service's each hit this
+# as a real CI-only failure and needed a follow-up fix.
+protoc-bin-vendored = "3"
 
 [[bench]]
 name = "matching_bench"

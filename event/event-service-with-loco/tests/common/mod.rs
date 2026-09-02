@@ -4,6 +4,15 @@
 //! before running `cargo test --test api_integration_test`. The
 //! helpers are async because [`event_service::db::create_connection`]
 //! is.
+//!
+//! Each test binary compiles this module separately, so a helper used
+//! by one suite is dead code in another (PRO-H11's `grpc_integration_test`
+//! needs `create_test_app_state` but not `create_test_router`, which
+//! only `api_integration_test` builds a REST router with). That is a
+//! property of the layout, not a defect worth deleting helpers over —
+//! same convention person-service's and worker-service's `tests/common/mod.rs`
+//! already use.
+#![allow(dead_code)]
 
 use axum::Router;
 use event_service::{
