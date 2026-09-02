@@ -8,6 +8,55 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — a real gRPC server (T-6, repo `tasks.md` PRO-H11)
+
+`src/api/grpc/` is a working `tonic::transport::Server`, replacing the
+commented-out stub — following person-service's and worker-service's
+reference implementations for this repo's gRPC rollout.
+`proto/event.proto` defines `EventService` (`CreateEvent` /
+`GetEvent` / `ListEvents` / `DeleteEvent`), compiled by a new
+`build.rs` (`tonic-build`, already correctly pinned to the 0.12 line
+matching the main `tonic` dependency). `App::after_routes` spawns the
+server on `GRPC_PORT` (config `server.grpc_port`, default `50051`)
+alongside the REST router, sharing a cloned `AppState`; a bind/serve
+failure is logged, not fatal.
+
+Every RPC delegates to the exact same code REST's handlers call — no
+duplicated business logic: `crate::validation::validate_event`, the
+duplicate-detection core (`handlers::check_duplicates_internal`,
+bumped from private to `pub(crate)` rather than copied), and the same
+`EventRepository` trait methods (no `AuditContext` parameter, like
+worker's). `ListEvents` calls `EventRepository::list_active` directly
+— this crate has no REST list endpoint at all to mirror, so the RPC
+delegates to the repository method itself. A new `grpc_enforce`
+function (`src/api/grpc/service.rs`) mirrors this crate's blanket-guard
+`require_auth_mw`, gated by the same `EVENT_REQUIRE_AUTH` flag; unlike
+person's/worker's gRPC slices, there is no record-level ABAC pass to
+add, since this crate's own REST handlers have none either.
+`event_status` parses via the domain enum's existing `serde`
+implementation in both directions rather than a hand-rolled mapping.
+
+The proto `Event` message is a deliberate partial projection —
+identification + the time-window fields that define an event's
+identity (id, name, start/end date, `event_status`, timestamps) — not
+a 1:1 mirror of every field the schema.org/Event domain model or REST
+carry; extending it, adding `UpdateEvent`, and match/merge/search/FHIR
+over gRPC are documented follow-up (spec §13 T-6), not silent gaps.
+
+Verified live, not merely compiled: `tests/grpc_integration_test.rs`
+binds the server on an OS-assigned port and drives it with a real
+`EventServiceClient` over an actual HTTP/2 connection — a
+Create→Get→List→Delete→Get(`NOT_FOUND`) round trip against the same
+database/search-index the REST integration suite uses, plus a blank
+name → `INVALID_ARGUMENT` proof, an unrecognised `event_status` →
+`INVALID_ARGUMENT` proof, and a malformed id → `INVALID_ARGUMENT`
+proof (not `INTERNAL`). All pass against a real Postgres
+(`scripts/ci-check.sh test-db event/event-service-with-loco`, full
+DB-gated suite green). `cargo test --lib` 167/167 (unchanged — this
+crate has no SOUP register to gain a new dependency annotation, unlike
+person's/worker's); `cargo fmt --check` / `cargo clippy --all-targets
+-- -D warnings` clean.
+
 ### Fixed — missing raw-SQL counterpart for the coordinate-column rename (CI red on `main`)
 
 `migration/src/m20260824_000001_coordinate_columns_name_their_units.rs`

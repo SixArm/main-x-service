@@ -615,10 +615,14 @@ pub struct DuplicateCheckResponse {
     pub potential_matches: Vec<MatchResponse>,
 }
 
-/// Shared duplicate-detection core used by both `create_event` and
-/// `check_duplicates`: block by name + date, score, keep candidates at
-/// or above the configured `threshold_score`.
-async fn check_duplicates_internal(state: &AppState, event: &Event) -> Vec<MatchResponse> {
+/// Shared duplicate-detection core used by `create_event`,
+/// `check_duplicates`, and (PRO-H11) the gRPC `CreateEvent` RPC: block
+/// by name + date, score, keep candidates at or above the configured
+/// `threshold_score`.
+pub(crate) async fn check_duplicates_internal(
+    state: &AppState,
+    event: &Event,
+) -> Vec<MatchResponse> {
     let candidates = blocking_candidates(state, event).await;
     state
         .matcher

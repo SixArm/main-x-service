@@ -117,10 +117,63 @@ clearly described manual check confirms the acceptance criterion.
   - [ ] Mask + export round-trip.
   - **Acceptance:** `cargo test --test api_integration_test` covers
     all three workflows.
-- [ ] **T-6 — gRPC implementation.**
-  - [ ] Promote the stub to a working Tonic server mirroring REST CRUD.
+- [~] **T-6 — gRPC implementation.** **Landed 2026-09-02 (repo
+  `tasks.md` PRO-H11 — following person-service's and worker-service's
+  reference implementations).**
+  - [x] Promoted the stub to a working Tonic server:
+    `proto/event.proto` (package `event`) + `build.rs` (`tonic-build`,
+    already correctly pinned to 0.12 in this crate's manifest, same as
+    worker's — but still dead scaffolding with no `build.rs`/`proto/`
+    until now) + `src/api/grpc/service.rs` (`EventGrpcService`),
+    covering `CreateEvent` / `GetEvent` / `ListEvents` / `DeleteEvent`.
+    Deliberately not the full REST surface: no `UpdateEvent` RPC, no
+    match/merge/search/FHIR over gRPC. `ListEvents` calls
+    `EventRepository::list_active` directly — this crate has **no REST
+    list endpoint at all** to mirror (confirmed by grep, not assumed),
+    unlike person's/worker's gRPC slices which each mirrored a real
+    `GET /api/<plural>`. The proto `Event` message is also a
+    deliberate **partial** projection (id, name, start/end date,
+    `event_status`, timestamps) — not every field the schema.org/Event
+    domain model carries (identifiers, location, organizer, performer,
+    offers, …); extending it is follow-up.
+  - [x] **No duplicated business logic.** Every RPC delegates into the
+    exact functions REST already calls: `crate::validation::validate_event`
+    (`CreateEvent`), the shared duplicate-detection core
+    (`check_duplicates_internal`, bumped from private to `pub(crate)`
+    rather than copied), the same `EventRepository` trait methods
+    (`create`/`get_by_id`/`list_active`/`delete` — this crate's
+    repository takes no `AuditContext`, like worker's). `event_status`
+    parses via the domain enum's existing `serde` implementation
+    (`serde_json`, in both directions — `EventStatus` has no `Display`
+    impl unlike `WorkerType`, so there is no shortcut for the output
+    side either) rather than a hand-rolled second mapping.
+  - [x] **Auth parity, and a genuine simplification confirmed by
+    reading REST, not assumed.** `grpc_enforce` mirrors this crate's
+    blanket-guard `require_auth_mw`, gated by the same
+    `EVENT_REQUIRE_AUTH` flag. Unlike person's/worker's gRPC slices,
+    there is **no record-level ABAC pass** to add: this crate's own
+    `create_event`/`get_event`/`delete_event` REST handlers apply only
+    the blanket guard too, with no `authorize_record` call to mirror —
+    confirmed by reading them, not assumed absent. **Documented, not
+    silently missing:** `UpdateEvent` has no RPC yet.
+  - [x] **Verified live, not merely compiled.**
+    `tests/grpc_integration_test.rs` binds a real
+    `tonic::transport::Server` on an OS-assigned port and drives it
+    with a real `EventServiceClient` over an actual HTTP/2 connection:
+    a Create→Get→List→Delete→Get(`NOT_FOUND`) round trip against the
+    same database/search-index REST integration tests use, plus a
+    blank-name → `INVALID_ARGUMENT` proof, an unrecognised
+    `event_status` → `INVALID_ARGUMENT` proof, and a malformed-id →
+    `INVALID_ARGUMENT` proof (not `INTERNAL`). All four pass against a
+    real Postgres (`scripts/ci-check.sh test-db
+    event/event-service-with-loco`, full suite green). `grpcurl` was
+    not additionally run by hand — unavailable in this sandbox — but
+    the automated test proves the identical claim the spec's original
+    acceptance criterion named, repeatably.
   - **Acceptance:** `grpcurl` against `EventService.GetEvent`
-    round-trips a record.
+    round-trips a record — satisfied by `tests/grpc_integration_test.rs`
+    (above); a literal `grpcurl` CLI run is optional local confirmation,
+    not additionally exercised.
 - [ ] **T-7 — iCalendar import / export.**
   - [ ] `POST /api/events/import.ics`, `GET /api/events/{id}.ics`.
   - **Acceptance:** Apple Calendar imports the exported `.ics`

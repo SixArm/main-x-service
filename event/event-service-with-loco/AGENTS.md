@@ -144,6 +144,69 @@ needs a database. `cargo test --lib` grew from 159 to 167 (the eight
 new `observability::tests` unit tests); `cargo test --test otlp_export
 --test otlp_middleware` is 4 further tests, all green.
 
+## gRPC server (T-6, repo `tasks.md` PRO-H11)
+
+`src/api/grpc/` is a real `tonic::transport::Server`, not the
+commented-out stub it used to be — following person-service's and
+worker-service's reference implementations for this repo's gRPC
+rollout. `proto/event.proto` (crate root) defines `EventService` —
+`CreateEvent` / `GetEvent` / `ListEvents` / `DeleteEvent` — compiled
+by `build.rs` (`tonic-build`, already correctly pinned to the same
+0.12 line as the main `tonic` dependency in this crate's manifest, as
+worker's was). `App::after_routes` spawns `crate::api::grpc::serve` as
+a background task on `GRPC_PORT` (config `server.grpc_port`, default
+`50051`) alongside the REST router, sharing one cloned `AppState` — a
+bind/serve failure is logged, not fatal, so REST still boots if the
+gRPC port is unavailable.
+
+**No duplicated business logic.** `src/api/grpc/service.rs`'s
+`EventGrpcService` calls the exact same functions the REST handlers
+do: `crate::validation::validate_event`, the shared duplicate-detection
+core (`handlers::check_duplicates_internal`, bumped to `pub(crate)`
+rather than copied), and the same `EventRepository` trait methods
+(which take no `AuditContext`, like worker's). `ListEvents` calls
+`EventRepository::list_active` directly rather than mirroring a REST
+handler — this crate has **no REST list endpoint at all** (confirmed
+by grep, not assumed), so the repository method itself, real
+already-tested domain logic, is what the RPC delegates to.
+`event_status` parses via the domain enum's existing `serde`
+implementation in both directions (`EventStatus` has no `Display` impl
+unlike `WorkerType`, so there is no shortcut for the output side
+either) rather than a hand-rolled mapping.
+
+**Auth parity, and a genuine simplification confirmed by reading REST,
+not assumed.** `grpc_enforce` (in `service.rs`) mirrors this crate's
+blanket-guard `require_auth_mw`, gated by the same `EVENT_REQUIRE_AUTH`
+flag. Unlike person's/worker's gRPC slices, there is **no record-level
+ABAC pass** to add here: this crate's own `create_event`/`get_event`/
+`delete_event` REST handlers apply only the blanket guard too, with no
+`authorize_record` call to mirror.
+
+**Deliberately not carried over yet** (tracked in spec §13 T-6, not
+silently missing): `UpdateEvent` (no RPC); match/merge/search/FHIR
+over gRPC; and most of the schema.org/Event domain model's fields on
+the proto `Event` message (identifiers, location, organizer,
+performer, offers, …) — the message is a deliberate partial projection
+(id, name, start/end date, `event_status`, timestamps), not a 1:1
+mirror of REST/FHIR.
+
+`tests/grpc_integration_test.rs` proves it end to end against a real
+Postgres: binds the server on an OS-assigned port (the same
+`TcpListener::bind("127.0.0.1:0")` + `serve_with_incoming` pattern
+`tests/otlp_collector` uses), connects a real
+`event_service_client::EventServiceClient`, and drives a
+Create→Get→List→Delete→Get(`NOT_FOUND`) round trip plus three
+error-path proofs (a blank name → `INVALID_ARGUMENT`; an unrecognised
+`event_status` → `INVALID_ARGUMENT`; a malformed id →
+`INVALID_ARGUMENT`, not `INTERNAL`). `#[ignore]`d like the REST
+integration suite; run with `cargo test --test grpc_integration_test
+-- --ignored` against `scripts/test-db.sh up
+event/event-service-with-loco`. A manual `grpcurl
+EventService.GetEvent` smoke check (this crate's spec §13 T-6's
+original acceptance criterion) was not additionally run in this
+sandbox (`grpcurl` unavailable) — the automated test proves the
+identical claim, repeatably.
+
 ## Container image
 
 `Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's

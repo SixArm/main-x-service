@@ -1,0 +1,81 @@
+// EventService — a real, working gRPC surface (PRO-H11, following
+// person-service's and worker-service's reference implementations),
+// compiled by build.rs via tonic-build into `crate::api::grpc::proto`.
+//
+// Deliberately NOT a 1:1 mirror of the REST representation. The domain
+// `Event` model carries identifiers, a full schema.org/Event property
+// set (location, organizer, performer, offers, …) — modelling all of
+// that in protobuf in one pass would be a large, mostly-mechanical
+// undertaking with no current caller asking for it. This first slice
+// carries identification + the time-window fields that define an
+// event's identity (id, name, start/end date, status, timestamps) —
+// enough for a real client to create, read, list, and delete a
+// record. Extending the message schema to the remaining fields is
+// tracked as follow-up (see this crate's spec T-6-equivalent gRPC
+// task and AGENTS.md's gRPC section) rather than silently out of
+// scope.
+syntax = "proto3";
+
+package event;
+
+// An event record. `id`/`created_at`/`updated_at` are server-set and
+// ignored on input; every other field is a create input on requests
+// and the persisted value on responses.
+message Event {
+  string id = 1;
+  bool active = 2;
+  string name = 3;
+  // RFC 3339 timestamp (schema.org/startDate). Required, matching the
+  // domain model.
+  string start_date = 4;
+  // RFC 3339 timestamp (schema.org/endDate). Absent (not merely
+  // empty) when open-ended — proto3 `optional` gives explicit field
+  // presence, matching the domain's `Option<DateTime<Utc>>` exactly.
+  optional string end_date = 5;
+  // Mirrors `crate::models::EventStatus`'s snake_case wire token
+  // (e.g. "scheduled", "cancelled"); absent on input defaults to
+  // "scheduled", same as `Event::new`. An unrecognised string is
+  // rejected (`INVALID_ARGUMENT`), not silently coerced.
+  optional string event_status = 6;
+  // RFC 3339 timestamps. Server-set; ignored on input.
+  string created_at = 7;
+  string updated_at = 8;
+}
+
+message CreateEventRequest {
+  Event event = 1;
+}
+
+message GetEventRequest {
+  string id = 1;
+}
+
+message ListEventsRequest {
+  // Page size; server clamps to the same maximum a REST list endpoint
+  // would (this crate has none yet — see AGENTS.md's gRPC section).
+  uint32 limit = 1;
+  uint32 offset = 2;
+}
+
+message ListEventsResponse {
+  repeated Event events = 1;
+}
+
+message DeleteEventRequest {
+  string id = 1;
+}
+
+message DeleteEventResponse {}
+
+service EventService {
+  // Validates and real-time duplicate-checks exactly as `POST
+  // /api/events` does: `INVALID_ARGUMENT` on a validation failure,
+  // `ALREADY_EXISTS` when a likely duplicate is found.
+  rpc CreateEvent(CreateEventRequest) returns (Event);
+  // `NOT_FOUND` when the id is absent or soft-deleted.
+  rpc GetEvent(GetEventRequest) returns (Event);
+  rpc ListEvents(ListEventsRequest) returns (ListEventsResponse);
+  // Soft-delete, exactly as `DELETE /api/events/{id}` — the row is
+  // retained, not physically removed.
+  rpc DeleteEvent(DeleteEventRequest) returns (DeleteEventResponse);
+}
