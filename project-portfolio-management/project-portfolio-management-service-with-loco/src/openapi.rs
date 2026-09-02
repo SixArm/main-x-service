@@ -101,12 +101,12 @@ fn capability_paths() -> Value {
         // --- workflow automation ----------------------------------------
         "/api/automations": {
             "post": { "tags": ["automation"],
-                "summary": "Configure one rule: when a trigger fires, apply one action",
-                "description": "Triggers: task_moved (with optional from_status/to_status), review_submitted, plan_stage_changed. Actions: assign, add_label, notify, schedule_action, set_task_status. The action shape is validated here, at write time.",
+                "summary": "Configure one rule: when a trigger fires, apply its actions in declared order (FR-32)",
+                "description": "Triggers: task_moved (with optional from_status/to_status), review_submitted, plan_stage_changed, plan_phase_changed (with optional from_status/to_status naming project phases, not task statuses). Actions (1-20, applied in array order, each outcome logged separately): assign, add_label, notify, schedule_action, set_task_status. Every action's shape is validated here, at write time.",
                 "requestBody": { "required": true, "content": { "application/json": {
                     "schema": { "$ref": "#/components/schemas/Automation" } } } },
                 "responses": { "200": { "description": "The stored rule" },
-                               "422": { "description": "Unknown trigger/action or malformed action_value" } } },
+                               "422": { "description": "Unknown trigger, empty/oversized actions array, or a malformed action in it" } } },
             "get": { "tags": ["automation"], "summary": "List rules (?plan=&trigger=&enabled=; cap 200)",
                 "responses": { "200": { "description": "Rules" } } } },
         "/api/automations/runs": get("automation", "What the automations actually did (?automation=&subject=&outcome=applied|skipped|failed; cap 200)"),
@@ -359,14 +359,15 @@ fn components() -> Value {
                     "reviewer_scope": { "type": "string", "enum": ["internal", "external"], "default": "internal" },
                     "expertise": { "type": "string", "nullable": true, "description": "Why this expert: the specialism the delegation is for" },
                     "due_on": { "type": "string", "format": "date", "nullable": true } } },
-                "Automation": { "type": "object", "required": ["name", "trigger_kind", "action_kind"], "properties": {
+                "Automation": { "type": "object", "required": ["name", "trigger_kind", "actions"], "properties": {
                     "plan_pid": { "type": "string", "format": "uuid", "nullable": true, "description": "Scope to one plan's board; absent = every plan" },
                     "name": { "type": "string" },
-                    "trigger_kind": { "type": "string", "enum": ["task_moved", "review_submitted", "plan_stage_changed"] },
-                    "from_status": { "type": "string", "nullable": true, "description": "task_moved only; absent = any column" },
-                    "to_status": { "type": "string", "nullable": true, "description": "task_moved only; absent = any column" },
-                    "action_kind": { "type": "string", "enum": ["assign", "add_label", "notify", "schedule_action", "set_task_status"] },
-                    "action_value": { "type": "object", "description": "Action-specific: assign {assignee_ref}, add_label {label}, notify {recipient_ref, message?}, schedule_action {action_kind, in_days, recipient_ref?}, set_task_status {status}" } } },
+                    "trigger_kind": { "type": "string", "enum": ["task_moved", "review_submitted", "plan_stage_changed", "plan_phase_changed"] },
+                    "from_status": { "type": "string", "nullable": true, "description": "task_moved (a task status) or plan_phase_changed (a project phase) only; absent = any" },
+                    "to_status": { "type": "string", "nullable": true, "description": "task_moved (a task status) or plan_phase_changed (a project phase) only; absent = any" },
+                    "actions": { "type": "array", "minItems": 1, "maxItems": 20, "description": "Applied in declared order; each action's outcome is logged separately (FR-32)", "items": { "type": "object", "required": ["kind"], "properties": {
+                        "kind": { "type": "string", "enum": ["assign", "add_label", "notify", "schedule_action", "set_task_status"] },
+                        "value": { "type": "object", "description": "Action-specific: assign {assignee_ref}, add_label {label}, notify {recipient_ref, message?}, schedule_action {action_kind, in_days, recipient_ref?}, set_task_status {status}" } } } } } },
                 "MergeRequest": { "type": "object", "required": ["main_pid", "duplicate_pid"], "properties": {
                     "main_pid": { "type": "string", "format": "uuid" },
                     "duplicate_pid": { "type": "string", "format": "uuid" },

@@ -16,7 +16,7 @@
 //!   comparison against a caller-supplied clock; the module has no
 //!   clock of its own.
 
-use serde_json::Value;
+use serde_json::{Value, json};
 use uuid::Uuid;
 
 /// What can fire an automation.
@@ -229,6 +229,65 @@ pub fn validate_action(
         _ => unreachable!("action_kind was checked against ACTION_KINDS above"),
     }
     Ok(())
+}
+
+/// Highest number of actions one rule may declare. A bound, not a
+/// design target: nothing about the engine needs a cap, but an
+/// unbounded array is an unbounded number of `automation_runs` rows per
+/// firing, and a request body nobody could plausibly declare by hand
+/// past a few dozen is more likely a mistake than an intention.
+pub const MAX_ACTIONS_PER_RULE: usize = 20;
+
+/// One parsed, already-validated action from a rule's `actions` array.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedAction {
+    /// One of [`ACTION_KINDS`].
+    pub kind: String,
+    /// The action's own parameters, already checked by [`validate_action`].
+    pub value: Value,
+}
+
+/// Validate a rule's **ordered list** of actions (FR-32: "more than one
+/// action per rule, applied in declared order").
+///
+/// Array order **is** declared order — there is no separate position
+/// field to keep in sync with it. Every element is validated with
+/// [`validate_action`]; the first problem found names its 0-based index
+/// so a caller with several actions can tell which one is wrong.
+///
+/// # Errors
+///
+/// A message naming the offending index and field, or the empty-array /
+/// too-many-actions / malformed-element case.
+pub fn validate_actions(
+    actions: &[Value],
+    task_statuses: &[&str],
+) -> Result<Vec<ParsedAction>, String> {
+    if actions.is_empty() {
+        return Err("actions must declare at least one action".to_string());
+    }
+    if actions.len() > MAX_ACTIONS_PER_RULE {
+        return Err(format!(
+            "actions may declare at most {MAX_ACTIONS_PER_RULE}, found {}",
+            actions.len()
+        ));
+    }
+    let mut parsed = Vec::with_capacity(actions.len());
+    for (index, action) in actions.iter().enumerate() {
+        let kind = action
+            .get("kind")
+            .and_then(Value::as_str)
+            .filter(|k| !k.trim().is_empty())
+            .ok_or_else(|| format!("actions[{index}].kind is required"))?;
+        let value = action.get("value").cloned().unwrap_or_else(|| json!({}));
+        validate_action(kind, &value, task_statuses)
+            .map_err(|e| format!("actions[{index}]: {e}"))?;
+        parsed.push(ParsedAction {
+            kind: kind.to_string(),
+            value,
+        });
+    }
+    Ok(parsed)
 }
 
 /// Validate a trigger definition: the kind must be known, and the
@@ -481,6 +540,53 @@ mod tests {
         assert!(
             validate_action("set_task_status", &json!({"status": "shipped"}), STATUSES).is_err()
         );
+    }
+
+    #[test]
+    fn an_empty_actions_array_is_refused() {
+        let err = validate_actions(&[], STATUSES).expect_err("must refuse");
+        assert!(err.contains("at least one"), "{err}");
+    }
+
+    #[test]
+    fn too_many_actions_is_refused() {
+        let who = format!("person:{}", Uuid::new_v4());
+        let actions: Vec<Value> = (0..=MAX_ACTIONS_PER_RULE)
+            .map(|_| json!({ "kind": "assign", "value": { "assignee_ref": who } }))
+            .collect();
+        let err = validate_actions(&actions, STATUSES).expect_err("must refuse");
+        assert!(err.contains("at most"), "{err}");
+    }
+
+    #[test]
+    fn actions_are_validated_in_declared_order_and_the_index_names_the_bad_one() {
+        let who = format!("person:{}", Uuid::new_v4());
+        let actions = vec![
+            json!({ "kind": "assign", "value": { "assignee_ref": who } }),
+            json!({ "kind": "add_label", "value": { "label": "" } }),
+        ];
+        let err = validate_actions(&actions, STATUSES).expect_err("must refuse");
+        assert!(err.starts_with("actions[1]:"), "{err}");
+    }
+
+    #[test]
+    fn a_well_formed_action_list_parses_in_order() {
+        let who = format!("person:{}", Uuid::new_v4());
+        let actions = vec![
+            json!({ "kind": "assign", "value": { "assignee_ref": who } }),
+            json!({ "kind": "add_label", "value": { "label": "fast-track" } }),
+        ];
+        let parsed = validate_actions(&actions, STATUSES).expect("valid");
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].kind, "assign");
+        assert_eq!(parsed[1].kind, "add_label");
+        assert_eq!(parsed[1].value["label"], "fast-track");
+    }
+
+    #[test]
+    fn an_action_with_no_kind_is_refused() {
+        let err = validate_actions(&[json!({ "value": {} })], STATUSES).expect_err("must refuse");
+        assert!(err.contains("actions[0].kind"), "{err}");
     }
 
     #[test]

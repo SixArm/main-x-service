@@ -291,7 +291,8 @@ migration/src/                …_000001_plans, …_000002_audit_logs,
                               m20260825_000006_key_results,
                               m20260826_000001_effort,
                               m20260826_000002_ceremonies,
-                              m20260826_000003_value
+                              m20260826_000003_value,
+                              m20260902_000001_automation_multi_action
 config/                       development/production/test yaml
 ```
 

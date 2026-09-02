@@ -9,6 +9,35 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — multi-action automation rules (T-21, FR-32)
+
+- A rule may now declare **more than one action**, applied in the
+  array's declared order, with **each action's outcome logged
+  separately**: `automations.action_kind`/`action_value` (one action)
+  is replaced by `actions JSONB NOT NULL DEFAULT '[]'`
+  (`[{"kind": …, "value": …}, …]`), and `automation_runs` gains
+  `action_index` so a firing of an N-action rule writes N run rows
+  instead of one silently overwriting the next. A `CHECK
+  (jsonb_array_length(actions) > 0)` refuses an empty list even from a
+  direct insert; migration `m20260902_000001_automation_multi_action`
+  backfills every existing single-action rule into a one-element array.
+- New pure `automation::validate_actions` (5 tests): validates every
+  declared action with the existing per-kind `validate_action` and
+  names the offending 0-based index on failure; capped at 20 actions
+  per rule.
+- `POST /api/automations`'s body changed from `action_kind`/
+  `action_value` to `actions: [{kind, value}]` — a breaking change with
+  **no back-compat shim**: there is no front-end consumer of this
+  endpoint yet (repo `tasks.md` PRO-P20) and this service is pre-1.0
+  with synthetic data only, so a clean cut was chosen over carrying two
+  request shapes.
+- Verified live against a fresh Postgres: a new request test seeds a
+  two-action rule (`add_label` on an already-labelled plan, then
+  `assign`) and confirms the first action logs `skipped` while the
+  second still applies, proving one action's non-fatal outcome does
+  not block the next. `cargo test --lib` 358/358 (was 353, +5);
+  DB-gated suite 75/75 (was 74, +1).
+
 ## [0.3.0] - 2026-08-26
 
 The project-management suite (entity spec §13 T-15 … T-27, landed

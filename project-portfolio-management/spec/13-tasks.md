@@ -213,10 +213,43 @@ described manual check confirms it. Split tasks too big for one PR
     committed before the rule fires, so a failing rule is logged as a
     `failed` run and **never undoes the operator's move**.
   - [ ] Field-change, date-arrival and SLE-breach triggers.
-  - [ ] **Multi-action rules** applied in declared order with per-action
-    outcomes logged. This is the larger half of FR-32 and is untouched:
-    the schema holds one action per rule, so it is a migration plus an
-    engine change, not a validation tweak.
+  - [x] **Multi-action rules** applied in declared order with per-action
+    outcomes logged. *(Landed 2026-09-02.)* `automations.action_kind`/
+    `action_value` (one action per rule) replaced by an `actions JSONB
+    NOT NULL DEFAULT '[]'` array (migration
+    `m20260902_000001_automation_multi_action`; a
+    `CHECK (jsonb_array_length(actions) > 0)` refuses an empty list even
+    from a direct insert), backfilling every existing single-action rule
+    into a one-element array so nothing silently emptied. Array order
+    **is** declared order — no separate position column. Pure
+    `automation::validate_actions` (5 new unit tests) validates every
+    element with the existing `validate_action` and names the offending
+    0-based index on failure. `automation_runs` gained `action_index`
+    (`DEFAULT 0`, so every pre-existing run stays correctly addressable
+    as "action 0" with no backfill needed); `fire()` now loops the
+    parsed action list and calls `record_run` once per action, so an
+    N-action rule writes N run rows — a partial failure (action 2 of 3)
+    is visible rather than overwriting or being swallowed by the next
+    action's outcome. `act_assign`/`act_set_task_status`/`act_notify`/
+    `act_schedule` were refactored to take one action's
+    `kind`/`value` rather than the whole rule row, so nothing changed
+    about *what* an action does, only how many a rule may declare.
+    OpenAPI schema + its mounted-routes pinning test updated (also
+    fixed a pre-existing, unrelated staleness found in the same block:
+    the `trigger_kind` enum was missing `plan_phase_changed`, landed
+    earlier in this same task but never reflected in the doc).
+    Verified live against a fresh Postgres:
+    `a_multi_action_rule_applies_every_action_in_order_and_logs_each_outcome`
+    seeds a two-action rule (`add_label` on an already-labelled plan,
+    then `assign`) and confirms the first action logs `skipped` while
+    the second still applies — proving one action's non-fatal outcome
+    does not block the next. Full DB-gated suite 75/75 (was 74, +1);
+    `cargo test --lib` 358/358 (was 353, +5); `cargo fmt --check` /
+    `cargo clippy --all-targets -D warnings` clean. **No back-compat
+    shim**: `actions` is the only accepted shape on `POST
+    /api/automations` — there is no front-end consumer yet (PRO-P20)
+    and this service is pre-1.0 with synthetic data only, so a clean
+    cut was chosen over carrying two request shapes.
 
 - [x] **T-22 — Realized gains (§5.9.6 / FR-33).** **Landed 2026-08-26.**
   Pure `src/value.rs` (11 tests), migration `m20260826_000003_value`,

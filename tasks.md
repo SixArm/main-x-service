@@ -7240,11 +7240,27 @@ green as it sits; these finish it)**
   predates the effort/value/ceremony additions); then land T-26's
   remainder (action→task conversion; register the pre-existing implicit
   controls).
-- [ ] **PRO-P20 (L)** T-21 triggers (field-change/date/SLE + multi-action
+- [~] **PRO-P20 (L)** T-21 triggers (field-change/date/SLE + multi-action
   rules); FE adoption of the PM suite (workflows, OKR, distribution,
   TPC/controls, effort/ceremony views — all honestly "Not built");
   standing pre-WIP gaps (goals FR-12, issues FR-14, review-queue table,
   T-7 links, T-8 bulk).
+  *Multi-action rules landed 2026-09-02* — the schema-changing "larger
+  half" of T-21's automation-breadth remainder (FR-32): a rule now
+  declares an ordered `actions` array instead of one action, and every
+  action's outcome is logged separately (`automations`/`automation_runs`
+  migration `m20260902_000001_automation_multi_action`, pure
+  `automation::validate_actions`, `fire()` looping the parsed list).
+  Verified live against a fresh Postgres (DB-gated suite 75/75, was 74;
+  `cargo test --lib` 358/358, was 353); `cargo fmt --check` / `cargo
+  clippy --all-targets -D warnings` clean. See
+  `project-portfolio-management/spec/13-tasks.md` T-21 for the full
+  record. **Still open**: field-change, date-arrival and SLE-breach
+  triggers (T-21's other remainder — date-arrival/SLE-breach need new
+  periodic-sweep infrastructure, not just validation, so scoped as its
+  own slice rather than folded in here); the FE-adoption and
+  standing-pre-WIP-gaps items this task bundles are all still
+  untouched.
 
 **authentication**
 - [x] **PRO-P21 (S)** *(done 2026-08-29)* Verified 0.9.0 was cut
