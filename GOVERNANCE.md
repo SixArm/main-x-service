@@ -3,7 +3,20 @@
 This project uses **sole-maintainer governance** (sometimes called
 BDFL): Joel Parker Henderson (see [MAINTAINERS.md](MAINTAINERS.md))
 holds final decision authority over scope, design, releases, and
-membership.
+membership — with two narrow, explicit delegations, both per
+[AI_STATEMENT.md](AI_STATEMENT.md) §5/§6: the project's AI tooling may
+merge a pull request into `main` once it clears an explicit checklist
+(discipline followed, CI green, evidence documented, no unresolved
+specification-facing question), and may judge an already-merged,
+already-decided version bump ready to publish to crates.io and execute
+that publish. What a change contains — scope, design, a release's
+content — stays a maintainer decision, decided in the pull request
+itself before either checklist is ever consulted; the checklists
+govern only whether an already-decided change is merged or released.
+**One boundary on the merge delegation:** a pull request changing this
+document, [AI_STATEMENT.md](AI_STATEMENT.md), or
+[MAINTAINERS.md](MAINTAINERS.md) is merged by the maintainer, not by
+AI — the delegation cannot expand itself.
 
 ## How decisions are made
 
