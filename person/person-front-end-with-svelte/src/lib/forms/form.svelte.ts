@@ -53,13 +53,23 @@ export interface FormState<T> {
  * @returns A {@link FormState} handle to bind to and drive from markup.
  */
 export function createForm<T>(args: CreateFormArgs<T>): FormState<T> {
+  // `$state.snapshot` unwraps `args.initial` if it is (or contains) a
+  // Svelte 5 `$state` reactive proxy — e.g. an edit page that loads its
+  // record into a `$state` variable and passes it straight through as
+  // `initial` — before handing it to `structuredClone`, which cannot
+  // clone such a proxy at all ("could not be cloned", thrown even
+  // though the underlying data is plain JSON). A caller that already
+  // passed a plain, non-reactive object (the common case: a blank
+  // literal on a create page) is unaffected — snapshotting one is a
+  // no-op copy.
+  const snapshot = $state.snapshot(args.initial) as T;
   // structuredClone isolates internal state from the caller's `initial`.
-  let value = $state<T>(structuredClone(args.initial));
+  let value = $state<T>(structuredClone(snapshot));
   let errors = $state<FieldErrors>({});
   let submitting = $state(false);
   let submitError = $state<string | null>(null);
   // Keep a pristine clone so reset() can restore the original value.
-  const initial = structuredClone(args.initial);
+  const initial = structuredClone(snapshot);
 
   return {
     get value() {

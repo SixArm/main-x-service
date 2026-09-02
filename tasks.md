@@ -7088,28 +7088,58 @@ crate above.
   sentinel rejections) rather than general web knowledge. All 7
   schemes already had fully-implemented, tested parsers — this was a
   pure documentation gap, not code.
-- [~] **PRO-P4 (M)** *(partially resolved 2026-08-29)* person FE:
-  stabilize the 3 documented failing live-integration tests
-  (duplicate-detector test-data interactions). A first attempt
-  (date-spacing only) was tried, verified live against a fresh
-  Postgres to still fail 6 tests, and reverted rather than landed as
-  working. A second, more defensive attempt closed the original
-  mechanism for real: `apiCreatePerson` now retries a 409 by
+- [x] **PRO-P4 (M)** *(done 2026-09-02, resumed after a partial
+  2026-08-29 landing)* person FE: stabilize the 3 documented failing
+  live-integration tests (duplicate-detector test-data interactions).
+  A first attempt (date-spacing only) was tried, verified live
+  against a fresh Postgres to still fail 6 tests, and reverted rather
+  than landed as working. A second, more defensive attempt closed the
+  original mechanism for real: `apiCreatePerson` now retries a 409 by
   regenerating both the DOB and the family-name suffix (bounded, 5
   attempts) instead of trying to statically predict the live
   matcher's scoring — verified live that FR-9's fixture setup
-  (previously the reliable 409) now succeeds cleanly every run. **The
-  suite is still not green**, for a separate, unrelated, larger reason
-  found in the same investigation: the page-visit auth guard
-  (PRO-H10) and CSRF check (PRO-H5), both landed this session, now
-  require a signed-in session for every mutating flow, and this suite
-  never signs in — confirmed live, `FR-3`×2/`FR-6`/`FR-7`/`FR-8`/`FR-9`
-  all fail purely on `/signin` redirects or `403 csrf` rejections, not
-  duplicate-detector collisions. That gap is out of this task's scope
-  (test-data fixtures) and needs a security-relevant decision (real
-  sign-in vs. an approved test-mode bypass) — tracked as **PRO-P32**.
-  See `person-front-end-with-svelte/spec/16-open-questions.md` OQ-5
-  for the full record.
+  (previously the reliable 409) now succeeds cleanly every run. The
+  suite was **not yet green** at that point, for a separate, larger
+  reason: the page-visit auth guard (PRO-H10) and CSRF check
+  (PRO-H5), both landed the same session, now require a signed-in
+  session for every mutating flow, and the suite never signed in —
+  tracked separately as **PRO-P32**, which built and verified a real
+  magic-link sign-in mechanism (`tests/integration/auth.setup.ts`) —
+  but PRO-P32 verified the auth mechanism itself, not the suite it
+  unblocked, so `golden-paths.spec.ts` was never actually re-run
+  end-to-end after that fix landed.
+  *Result (resumed 2026-09-02):* stood up the real stack this needs —
+  a release-mode `person-service` container (`podman compose up -d`,
+  then `db migrate` by hand: `config/production.yaml` sets
+  `auto_migrate: false` and the compose file has no migrate step, an
+  operational gap worth knowing about, not a code bug) plus
+  `authentication-dev.yml`'s dev-mode stack — and ran `bin/e2e`. Found
+  it was **8/10**, not 10/10, and both remaining failures were real
+  front-end bugs, neither test-data nor auth: (1) `FR-6` (edit) —
+  `createForm` called `structuredClone` directly on a Svelte 5
+  `$state`-wrapped `initial` (exactly what the edit page passes,
+  unlike the create page's plain literal), which throws
+  `DataCloneError` even on plain-JSON data; fixed with
+  `$state.snapshot()` first. (2) `FR-8` (match check) —
+  `PersonRepository.match()`/`.checkDuplicates()` assumed a bare
+  `MatchResult[]` return; the live service actually wraps both as
+  `{matches,…}`/`{has_duplicates, potential_matches}` (verified
+  against the running service, not assumed) — `search()` already
+  normalises envelope drift, these two now do too. Both regressions
+  pinned (`tests/unit/form.test.ts` with a new `.svelte.ts` fixture
+  that constructs a real `$state` proxy so the bug reproduces without
+  a browser; `tests/unit/persons.test.ts`); each test confirmed to
+  fail with its fix reverted before landing. Also fixed in the same
+  pass: `pnpm install` had never linked
+  `lily-design-system-svelte-locale-picker` (present in `package.json`
+  since the `*-select`→`*-picker` rename, missing from `node_modules`)
+  and `pnpm-workspace.yaml` shipped the literal unfilled placeholder
+  `esbuild: "set this to true or false"` — both silently broke a fresh
+  `npm run build`. Verified: `npm run check` (svelte-check) 0 errors;
+  `npm test` 98/98 (was 91, +7); `bin/e2e` **10/10, run twice**, no
+  flake. See
+  `person-front-end-with-svelte/spec/16-open-questions.md` OQ-5 for
+  the full record.
 
 - [x] **PRO-P32 (M)** *(found 2026-08-29 via PRO-P4; done 2026-08-29)*
   person FE's live integration suite
