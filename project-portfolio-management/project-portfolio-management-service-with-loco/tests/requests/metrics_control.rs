@@ -575,3 +575,90 @@ async fn a_key_result_must_be_measurable_to_be_declared() {
     })
     .await;
 }
+
+// -------------------------------------------- control action conversion
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// T-26: a control action converts into the work store that already
+// exists (a task) rather than becoming a fifth one. The converted task
+// lands on the control's own plan, in that plan's workflow-initial
+// state, carrying the action's description as its title — and a
+// second conversion attempt, or one on a closed action, is refused
+// rather than silently creating a duplicate task.
+async fn converting_a_control_action_creates_a_task_on_the_plan() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let plan = create_plan!(request, "Controls conversion plan");
+        let control: Value = request
+            .post(&format!("/api/plans/{plan}/controls"))
+            .json(&json!({
+                "name": "Flow floor", "timing": "concurrent",
+                "metric": "flow_efficiency", "target_value": 1_500,
+                "comparator": "at_least"
+            }))
+            .await
+            .json();
+        let control_pid = control["pid"].as_str().expect("control pid").to_string();
+
+        let failing: Value = request
+            .post(&format!("/api/controls/{control_pid}/readings"))
+            .json(&json!({ "value": 600, "method": "automatic" }))
+            .await
+            .json();
+        let reading = failing["pid"].as_str().expect("reading pid").to_string();
+
+        let action: Value = request
+            .post(&format!("/api/readings/{reading}/actions"))
+            .json(&json!({
+                "kind": "correct",
+                "description": "Rebalance the sprint to clear the flow-efficiency gap",
+            }))
+            .await
+            .json();
+        let action_pid = action["pid"].as_str().expect("action pid").to_string();
+
+        let converted: Value = request
+            .post(&format!("/api/actions/{action_pid}/convert"))
+            .await
+            .json();
+        let task_pid = converted["task_pid"]
+            .as_str()
+            .expect("convert returns task_pid")
+            .to_string();
+
+        let tasks: Value = request
+            .get(&format!("/api/plans/{plan}/tasks"))
+            .await
+            .json();
+        let task = tasks["tasks"]
+            .as_array()
+            .expect("tasks array")
+            .iter()
+            .find(|t| t["pid"] == task_pid)
+            .expect("the converted task is on the control's own plan");
+        assert_eq!(
+            task["title"], "Rebalance the sprint to clear the flow-efficiency gap",
+            "the task's title is the action's description"
+        );
+
+        // A second conversion of the same action is refused, not a
+        // second task.
+        let again = request
+            .post(&format!("/api/actions/{action_pid}/convert"))
+            .await;
+        assert_eq!(
+            again.status_code(),
+            422,
+            "an already-converted action cannot be converted twice"
+        );
+
+        // An unknown action is a plain 404, not a 500.
+        let unknown = request
+            .post("/api/actions/00000000-0000-0000-0000-000000000000/convert")
+            .await;
+        assert_eq!(unknown.status_code(), 404);
+    })
+    .await;
+}

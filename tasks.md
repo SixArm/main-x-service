@@ -7376,11 +7376,53 @@ green as it sits; these finish it)**
   mirror; refresh service AGENTS.md (knows nothing of the PM suite);
   regenerate the §14 snapshot on land; fix the stale Cargo description
   (also in PRO-H3f).
-- [~] **PRO-P19 (M)** *(test-db run 2026-08-26: 74/74 request + 3 gated singles green against a fresh Postgres; WIP landed. T-26 remainder still open)* Run `scripts/ci-check.sh test-db` on the 74-test
-  DB-gated suite **before committing the WIP** (T-27's green claim
-  predates the effort/value/ceremony additions); then land T-26's
-  remainder (action→task conversion; register the pre-existing implicit
-  controls).
+- [x] **PRO-P19 (M)** *(done 2026-09-02)* Run `scripts/ci-check.sh
+  test-db` on the DB-gated suite **before committing the WIP** (T-27's
+  green claim predates the effort/value/ceremony additions); then land
+  T-26's remainder (action→task conversion; register the pre-existing
+  implicit controls).
+  *Result:* test-db run confirmed 74/74 green against a fresh Postgres
+  (2026-08-26, unchanged from the earlier partial note). T-26's
+  action→task conversion landed: `POST /api/actions/{pid}/convert`
+  (`src/controllers/controls.rs`), creating a task on the action's own
+  plan in that plan's workflow-initial state and stamping
+  `converted_task_pid`, transactionally with the task's opening
+  transition (same invariant `engineering::create_task` already
+  upholds). Refuses a double-conversion and a conversion of a closed
+  action (`422`); unknown action is `404`. Issue conversion
+  deliberately **not** built — this service has no `issues` store yet
+  (FR-14, still deferred), and the migration's own doc comment says
+  actions convert into work stores that already exist, which issues
+  are not. New request test
+  (`converting_a_control_action_creates_a_task_on_the_plan`) verified
+  live against a fresh Postgres: 75/75 (was 74, +1). Verified
+  independently: `cargo fmt --check`, `cargo clippy --all-targets -D
+  warnings` clean.
+  **T-26's other remainder — registering the pre-existing implicit
+  controls (gate readiness, WIP limits/SLE, retrospectives, variance
+  views) — investigated and deliberately left undone**, tracked
+  separately as **PRO-P33**: it turned out to need an owner decision
+  (default thresholds for controls whose feedforward verdict can
+  **block a write**) rather than being a mechanical registration gap,
+  and inventing those defaults unsupervised was judged the wrong call.
+  See PRO-P33 and `project-portfolio-management/spec/13-tasks.md`
+  T-26 for the full reasoning.
+- [ ] **PRO-P33 (S)** *(found 2026-09-02 via PRO-P19)* Decide how
+  project-portfolio-management-service registers the controls that
+  already exist in all but name — gate readiness (feedforward), WIP
+  limits and the SLE (concurrent), retrospectives and the variance
+  views (feedback) — so `GET /controls/coverage` reports reality
+  rather than only newly-authored controls. Not a code gap: every
+  metric except a retrospective one is already in `KNOWN_METRICS` and
+  already registerable through the existing `POST /plans/{pid}/controls`
+  API. What's missing is a decision on (a) the default
+  `target_value`/`comparator`/`tolerance` each gets, (b) whether
+  registration is automatic (risky — a feedforward control can block a
+  write, so an invented default would be a silent behavioural change
+  to every plan) or an explicit opt-in action, and (c) a computable
+  metric for "a retrospective happened" at all, which does not exist
+  today. See `project-portfolio-management/spec/13-tasks.md` T-26 for
+  the investigation.
 - [~] **PRO-P20 (L)** T-21 triggers (field-change/date/SLE + multi-action
   rules); FE adoption of the PM suite (workflows, OKR, distribution,
   TPC/controls, effort/ceremony views — all honestly "Not built");
