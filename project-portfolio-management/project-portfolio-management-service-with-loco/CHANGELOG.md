@@ -9,6 +9,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **Control action → task conversion** (T-26 remainder, `POST
+  /api/actions/{pid}/convert`): converts a `control_actions` row into a
+  task on the control's own plan, in that plan's workflow-initial
+  state, carrying the action's description as the task title and
+  transactionally recording the task's opening transition — the same
+  invariant `engineering::create_task` already upholds, so a converted
+  task is analysable identically to a hand-created one. Stamps
+  `converted_task_pid`; refuses a second conversion of the same action
+  and a conversion of a closed one (`422`); an unknown action is `404`.
+  Issue conversion is deliberately not offered: this service has no
+  `issues` store yet (FR-14, still deferred), and the migration's own
+  doc comment says actions convert into work stores that already
+  exist, which issues are not — `converted_issue_pid` stays reserved,
+  always `NULL`. Verified live against a fresh Postgres: 75/75 request
+  tests (was 74, +1 for
+  `converting_a_control_action_creates_a_task_on_the_plan`); `cargo
+  fmt --check` / `cargo clippy --all-targets -- -D warnings` clean.
+
 ## [0.3.0] - 2026-08-26
 
 The project-management suite (entity spec §13 T-15 … T-27, landed

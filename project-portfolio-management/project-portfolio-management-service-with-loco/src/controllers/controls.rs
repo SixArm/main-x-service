@@ -31,7 +31,7 @@ use uuid::Uuid;
 
 use crate::auth::MaybeAuthUser;
 use crate::controls as rules;
-use crate::models::_entities::{control_actions, control_readings, controls, plans};
+use crate::models::_entities::{control_actions, control_readings, controls, plans, tasks};
 use crate::models::audit_logs::Model as AuditModel;
 use crate::validation::MAX_TEXT_LEN;
 
@@ -99,6 +99,17 @@ async fn find_reading(ctx: &AppContext, raw: &str) -> Result<control_readings::M
     let pid = find_plan_pid(raw)?;
     control_readings::Entity::find()
         .filter(control_readings::Column::Pid.eq(pid))
+        .one(&ctx.db)
+        .await
+        .map_err(db_err)?
+        .ok_or(Error::NotFound)
+}
+
+async fn find_action(ctx: &AppContext, raw: &str) -> Result<control_actions::Model> {
+    let pid = find_plan_pid(raw)?;
+    control_actions::Entity::find()
+        .filter(control_actions::Column::Pid.eq(pid))
+        .filter(control_actions::Column::DeletedAt.is_null())
         .one(&ctx.db)
         .await
         .map_err(db_err)?
@@ -453,6 +464,120 @@ async fn add_action(
     format::json(serde_json::json!({ "pid": row.pid.to_string() }))
 }
 
+/// `POST /api/actions/{pid}/convert` — turn a control action into a
+/// task on the control's own plan (T-26: actions convert into the work
+/// stores that already exist rather than becoming a fifth one — see
+/// `control_actions`' migration doc comment). Created into the
+/// **initial** state of the workflow in force for that plan, exactly
+/// like an ordinary task create (`engineering::create_task`), so it
+/// enters the board and the flow analysis identically to a
+/// hand-created one.
+///
+/// **Issue conversion is deliberately not offered here.** This service
+/// has no `issues` store yet (spec §13, FR-14, deferred); the
+/// `converted_issue_pid` column stays reserved, `NULL`, until one
+/// lands, rather than this endpoint faking an issue as a task.
+#[debug_handler]
+async fn convert_action(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+) -> Result<Response> {
+    let action = find_action(&ctx, &pid).await?;
+    if action.converted_task_pid.is_some() || action.converted_issue_pid.is_some() {
+        return Err(unprocessable("action is already converted"));
+    }
+    if action.closed_at.is_some() {
+        return Err(unprocessable("action is already closed"));
+    }
+    let reading = control_readings::Entity::find()
+        .filter(control_readings::Column::Pid.eq(action.reading_pid))
+        .one(&ctx.db)
+        .await
+        .map_err(db_err)?
+        .ok_or(Error::NotFound)?;
+    let control = controls::Entity::find()
+        .filter(controls::Column::Pid.eq(reading.control_pid))
+        .filter(controls::Column::DeletedAt.is_null())
+        .one(&ctx.db)
+        .await
+        .map_err(db_err)?
+        .ok_or(Error::NotFound)?;
+
+    // The vocabulary comes from the workflow in force for the control's
+    // plan, exactly like `engineering::create_task` — a plan with a
+    // custom task workflow gets the converted task in *its* initial
+    // state, not a hardcoded "todo".
+    let workflow = super::workflow::in_force(&ctx, control.plan_pid, "task").await?;
+    let initial = workflow
+        .states
+        .iter()
+        .find(|state| state.is_initial)
+        .map_or("todo", |state| state.key.as_str());
+
+    let now = chrono::Utc::now();
+    // The task and its opening transition commit together with the
+    // action's own update, same reasoning as task creation (spec
+    // `time-based-analysis.md` §5.1 invariant 3): a converted task
+    // without a transition would silently begin its life at its first
+    // later move, and an action left unmarked could be converted twice.
+    let txn = ctx.db.begin().await.map_err(db_err)?;
+    let task = tasks::ActiveModel {
+        pid: ActiveValue::set(Uuid::new_v4()),
+        plan_pid: ActiveValue::set(control.plan_pid),
+        sprint_pid: ActiveValue::set(None),
+        title: ActiveValue::set(action.description.clone()),
+        description: ActiveValue::set(Some(format!(
+            "Converted from a {} action on control \"{}\".",
+            action.kind, control.name
+        ))),
+        status: ActiveValue::set(initial.to_string()),
+        assignee_ref: ActiveValue::set(action.owner_ref.clone()),
+        points: ActiveValue::set(None),
+        status_changed_at: ActiveValue::set(now.into()),
+        flow_type: ActiveValue::set(None),
+        done_at: ActiveValue::set(None),
+        deleted_at: ActiveValue::set(None),
+        ..Default::default()
+    }
+    .insert(&txn)
+    .await
+    .map_err(db_err)?;
+    crate::tba::transition_row(
+        task.pid,
+        control.plan_pid,
+        None,
+        initial.to_string(),
+        now,
+        caller.actor().map(ToString::to_string),
+        action.owner_ref.clone(),
+    )
+    .insert(&txn)
+    .await
+    .map_err(db_err)?;
+    let mut active: control_actions::ActiveModel = action.clone().into();
+    active.converted_task_pid = ActiveValue::set(Some(task.pid));
+    active.update(&txn).await.map_err(db_err)?;
+    txn.commit().await.map_err(db_err)?;
+
+    AuditModel::record(
+        &ctx.db,
+        control.pid,
+        "control_action_converted",
+        caller.actor(),
+        Some(serde_json::json!({
+            "action_pid": action.pid.to_string(),
+            "task_pid": task.pid.to_string(),
+        })),
+    )
+    .await
+    .ok();
+    format::json(serde_json::json!({
+        "pid": action.pid.to_string(),
+        "task_pid": task.pid.to_string(),
+    }))
+}
+
 /// Build the coverage facts for a set of controls.
 async fn coverage_of(
     ctx: &AppContext,
@@ -568,4 +693,5 @@ pub fn routes() -> Routes {
         .add("/controls/{pid}/readings", post(add_reading))
         .add("/controls/{pid}/readings", get(list_readings))
         .add("/readings/{pid}/actions", post(add_action))
+        .add("/actions/{pid}/convert", post(convert_action))
 }

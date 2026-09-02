@@ -328,14 +328,46 @@ described manual check confirms it. Split tasks too big for one PR
     from the pass rate; coverage names never-read controls and
     unanswered failures, and shows every timing at zero; an `accept`
     action clears the unanswered count.
-  - [ ] Action → task / issue conversion (the `converted_*_pid` columns
-    exist and are always `NULL` today).
+  - [x] **Action → task conversion**, *(done 2026-09-02)*: `POST
+    /api/actions/{pid}/convert` creates a task on the action's own
+    control's plan, in the plan's workflow-initial state, carrying the
+    action's description as the task title, and stamps
+    `converted_task_pid` — mirroring `engineering::create_task`'s own
+    transactional task+transition commit (spec `time-based-analysis.md`
+    §5.1 invariant 3) so a converted task is analysable identically to a
+    hand-created one. Refuses a second conversion of the same action and
+    a conversion of a closed one (`422`), and a `404` on an unknown
+    action — pinned by
+    `tests/requests/metrics_control.rs::converting_a_control_action_creates_a_task_on_the_plan`.
+    **Issue conversion is deliberately not implemented**:
+    `converted_issue_pid` stays reserved, always `NULL`, until this
+    service has an `issues` store of its own (FR-14, still deferred
+    below) — the migration's own doc comment says actions convert into
+    work stores that *already exist*, and issues do not yet.
   - [x] `#[ignore]`d request tests committed
-    (`tests/requests/metrics_control.rs`).
+    (`tests/requests/metrics_control.rs`; now 76 cases, +1 for the
+    conversion endpoint above).
   - [ ] Register the controls that already exist in all but name — gate
     readiness (feedforward), WIP limits and the SLE (concurrent),
     retrospectives and the variance views (feedback) — so coverage
     reports reality rather than only newly-authored controls.
+    **Investigated 2026-09-02, deliberately left open rather than
+    guessed**: every one of these four *can* already be registered
+    today through the plain `POST /plans/{pid}/controls` API — their
+    metrics (`gate_readiness`, `work_in_progress`, `cycle_time_p85`,
+    `budget_variance`) are already in `KNOWN_METRICS`, and `validate()`
+    requires a metric name for every control regardless of
+    `source_kind`, so nothing in the *code* actually blocks this. What
+    is missing is a **decision this task cannot make unsupervised**:
+    what `target_value`/`comparator`/`tolerance` each gets, and whether
+    registration is auto-created (risky: a feedforward control's
+    verdict can **block a write** — silently registering one with an
+    invented threshold would be an unrequested behavioural change to
+    every plan) or an opt-in per-plan action an operator takes. There
+    is also no computable metric for **retrospectives** at all today
+    (no `KNOWN_METRICS` entry reflects "a retrospective happened"),
+    which would need its own design, not a registration. Needs an
+    owner decision before code, not a guessed default.
   - **Acceptance:** a feedforward control may block a write and a
     feedback control may not; a control naming an unknown metric is
     refused at **write**, not left permanently `Unmeasured`; an

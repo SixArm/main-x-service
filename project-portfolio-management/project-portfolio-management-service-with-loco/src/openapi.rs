@@ -713,6 +713,19 @@ fn control_paths() -> Value {
                 }
             }
         },
+        "/api/actions/{pid}/convert": {
+            "post": {
+                "tags": ["controls"],
+                "summary": "Convert a control action into a task on its own plan",
+                "description": "Actions convert into the work stores that already exist rather than becoming a fifth one. Created into the workflow-initial state of the control's own plan, carrying the action's description as the task title. Issue conversion is not offered — this service has no issues store yet, so converted_issue_pid stays reserved and NULL.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Converted; body carries the new task_pid" },
+                    "404": { "description": "Unknown action" },
+                    "422": { "description": "Already converted, or already closed" }
+                }
+            }
+        },
         "/api/plans/{pid}/controls/coverage": {
             "get": {
                 "tags": ["controls"],
@@ -1325,6 +1338,7 @@ mod tests {
             ("/api/controls/{pid}/readings", "post"),
             ("/api/controls/{pid}/readings", "get"),
             ("/api/readings/{pid}/actions", "post"),
+            ("/api/actions/{pid}/convert", "post"),
             ("/api/plans/{pid}/controls/coverage", "get"),
             ("/api/controls/coverage", "get"),
         ] {
