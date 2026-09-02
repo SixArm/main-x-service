@@ -8,6 +8,57 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — a real gRPC server (T-6, repo `tasks.md` PRO-H11)
+
+`src/api/grpc/` is a working `tonic::transport::Server`, replacing the
+commented-out stub — following person-service's reference
+implementation for this repo's gRPC rollout. `proto/worker.proto`
+defines `WorkerService` (`CreateWorker` / `GetWorker` / `ListWorkers` /
+`DeleteWorker`), compiled by a new `build.rs` (`tonic-build`, already
+correctly pinned to the 0.12 line matching the main `tonic`
+dependency — unlike person-service's, which needed fixing from a
+mismatched 0.14). `App::after_routes` spawns the server on `GRPC_PORT`
+(config `server.grpc_port`, default `50051`) alongside the REST
+router, sharing a cloned `AppState`; a bind/serve failure is logged,
+not fatal.
+
+Every RPC delegates to the exact same code REST's handlers call — no
+duplicated business logic: `crate::validation::validate_worker`, the
+duplicate-detection core (`handlers::check_duplicates_internal`,
+bumped from private to `pub(crate)` rather than copied), the same
+`WorkerRepository` trait methods (no `AuditContext` parameter here,
+unlike person's — audit logging is wired internally via the
+repository's `with_*` builders), and `auth::authorize_record` +
+`crate::privacy::mask_worker` for `GetWorker`'s record-level ABAC +
+masking. A new `grpc_enforce` function (`src/api/grpc/service.rs`) is
+the gRPC counterpart of REST's blanket-guard `auth::enforce`, gated by
+the same `WORKER_REQUIRE_AUTH` flag, so enabling enforcement protects
+both API surfaces together. `worker_type` parses via the domain enum's
+existing `serde` implementation rather than a hand-rolled second
+mapping.
+
+The proto `Worker` message is a deliberate partial projection —
+identification + core demographic + workforce fields (id, family/given
+name, gender, `worker_type`, birth date, tax id, timestamps) — not a
+1:1 mirror of every field the domain model or REST carry; extending
+it, adding `UpdateWorker`, and porting REST's disclosure-accounting
+audit row + per-record masking to the gRPC surface are documented
+follow-up (spec §13 T-6), not silent gaps.
+
+Verified live, not merely compiled: `tests/grpc_integration_test.rs`
+binds the server on an OS-assigned port and drives it with a real
+`WorkerServiceClient` over an actual HTTP/2 connection — a
+Create→Get→List→Delete→Get(`NOT_FOUND`) round trip against the same
+database/search-index the REST integration suite uses, plus a blank
+family name → `INVALID_ARGUMENT` proof, an unrecognised `worker_type`
+→ `INVALID_ARGUMENT` proof, and a malformed id → `INVALID_ARGUMENT`
+proof (not `INTERNAL`). All pass against a real Postgres
+(`scripts/ci-check.sh test-db worker/worker-service-with-loco`, full
+DB-gated suite green). `cargo test --lib` 312/312 (was 311, +1 — a
+SOUP-register test gained a required `prost` annotation);
+`cargo fmt --check` / `cargo clippy --all-targets -- -D warnings`
+clean.
+
 ## [0.6.0] - 2026-08-27
 
 ### Added — declared MSRV (Rust 1.95)

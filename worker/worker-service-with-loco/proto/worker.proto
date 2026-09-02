@@ -1,0 +1,90 @@
+// WorkerService — a real, working gRPC surface (PRO-H11, following
+// person-service's reference implementation), compiled by build.rs via
+// tonic-build into `crate::api::grpc::proto`.
+//
+// Deliberately NOT a 1:1 mirror of the REST representation. The domain
+// `Worker` model carries identifiers, addresses, telecom, documents,
+// emergency contacts, and links — modelling all of that in protobuf in
+// one pass would be a large, mostly-mechanical undertaking with no
+// current caller asking for it. This first slice carries
+// identification + core demographic + workforce fields only (id, name,
+// gender, worker_type, birth date, tax id, timestamps) — enough for a
+// real client to create, read, list, and delete a record. Extending
+// the message schema to the remaining fields is tracked as follow-up
+// (see this crate's spec T-6-equivalent gRPC task and AGENTS.md's gRPC
+// section) rather than silently out of scope.
+syntax = "proto3";
+
+package worker;
+
+// A worker record. `id`/`created_at`/`updated_at` are server-set and
+// ignored on input; every other field is a create input on requests
+// and the persisted value on responses.
+message Worker {
+  string id = 1;
+  bool active = 2;
+  string family_name = 3;
+  repeated string given_names = 4;
+  Gender gender = 5;
+  // Mirrors `crate::models::worker::WorkerType`'s snake_case wire
+  // token (e.g. "doctor", "nurse"); absent when unset. An unrecognised
+  // string is rejected (`INVALID_ARGUMENT`), not silently dropped.
+  optional string worker_type = 6;
+  // ISO 8601 date (e.g. "1990-01-15"). Absent (not merely empty) when
+  // unknown — proto3 `optional` gives explicit field presence.
+  optional string birth_date = 7;
+  optional string tax_id = 8;
+  // RFC 3339 timestamps. Server-set; ignored on input.
+  string created_at = 9;
+  string updated_at = 10;
+}
+
+// Mirrors `crate::models::Gender`. `GENDER_UNSPECIFIED` (the required
+// proto3 zero value) maps on input to `Gender::Unknown` — the same
+// "safe default when source data is absent" the domain type already
+// documents — and is never produced on output, where an explicit
+// `Gender::Unknown` always encodes as `GENDER_UNKNOWN`.
+enum Gender {
+  GENDER_UNSPECIFIED = 0;
+  GENDER_UNKNOWN = 1;
+  GENDER_MALE = 2;
+  GENDER_FEMALE = 3;
+  GENDER_OTHER = 4;
+}
+
+message CreateWorkerRequest {
+  Worker worker = 1;
+}
+
+message GetWorkerRequest {
+  string id = 1;
+}
+
+message ListWorkersRequest {
+  // Page size; server clamps to the same maximum `GET /api/workers` does.
+  uint32 limit = 1;
+  uint32 offset = 2;
+}
+
+message ListWorkersResponse {
+  repeated Worker workers = 1;
+}
+
+message DeleteWorkerRequest {
+  string id = 1;
+}
+
+message DeleteWorkerResponse {}
+
+service WorkerService {
+  // Validates and real-time duplicate-checks exactly as `POST
+  // /api/workers` does: `INVALID_ARGUMENT` on a validation failure,
+  // `ALREADY_EXISTS` when a likely duplicate is found.
+  rpc CreateWorker(CreateWorkerRequest) returns (Worker);
+  // `NOT_FOUND` when the id is absent or soft-deleted.
+  rpc GetWorker(GetWorkerRequest) returns (Worker);
+  rpc ListWorkers(ListWorkersRequest) returns (ListWorkersResponse);
+  // Soft-delete, exactly as `DELETE /api/workers/{id}` — the row is
+  // retained, not physically removed.
+  rpc DeleteWorker(DeleteWorkerRequest) returns (DeleteWorkerResponse);
+}

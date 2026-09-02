@@ -3977,9 +3977,9 @@ checksum = "2195bf6aa996a481483b29d62a7663eed3fe39600c460e323f8ff41e90bdd89b"
 
 [[package]]
 name = "nhs-number"
-version = "1.0.3"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49bf07de676c04a26a6026aac282524ac949982e371b01f91545c394e1a2be88"
+checksum = "ae93d2f91855525559e94bc90af3f6b9c35d86863a0af45b8f28f0272bd2478c"
 dependencies = [
  "rand 0.10.2",
  "serde",
@@ -8108,6 +8108,7 @@ dependencies = [
  "opentelemetry-semantic-conventions",
  "opentelemetry_sdk",
  "prometheus",
+ "prost 0.13.5",
  "reqwest 0.12.28",
  "rusty_paseto",
  "sea-orm",

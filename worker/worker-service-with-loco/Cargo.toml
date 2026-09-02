@@ -45,6 +45,10 @@ tantivy = "0.22"
 
 # gRPC
 tonic = { version = "0.12", features = ["transport", "codegen", "prost"] }
+# `prost` is the wire-message crate tonic-build's generated code names
+# directly (PRO-H11), so it is a normal dependency, not merely pulled
+# in transitively through tonic's own "prost" feature.
+prost = "0.13"
 
 # OpenAPI Documentation
 utoipa = { version = "5.5", features = ["axum_extras", "chrono", "uuid"] }
@@ -213,7 +217,12 @@ reqwest = { version = "0.12", default-features = false, features = [
 criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
 
 [build-dependencies]
-# gRPC code generation
+# gRPC code generation (PRO-H11). Pinned to 0.12 to match the main
+# `tonic = "0.12"` dependency above — codegen and runtime must be the
+# same tonic major line. This entry already had the correct version
+# (unlike person-service's pre-fix 0.14, mismatched with its runtime
+# `tonic 0.12`), but was still dead scaffolding until now: no
+# `build.rs`, no `proto/` directory.
 tonic-build = "0.12"
 
 [[bench]]

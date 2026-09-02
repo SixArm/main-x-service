@@ -21,7 +21,8 @@
   (`/fhir/Practitioner` + `/fhir/metadata`; the standard mapping per
   `agents/share/fhir.md` §3, superseding the early non-standard
   `Worker` resourceType; handlers implemented and mounted on the loco
-  router via `fhir_routes()` — §13 T-9 done) + gRPC stub.
+  router via `fhir_routes()` — §13 T-9 done) + gRPC
+  (Create/Get/List/Delete Worker — §13 T-6 done).
 - PostgreSQL persistence via SeaORM.
 
 ### 2.2 Out of scope (today)

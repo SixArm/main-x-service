@@ -8,7 +8,8 @@ src/
 │   ├── mod.rs               # ApiResponse, ApiError
 │   ├── rest/                # REST API (Axum) — 15 endpoints
 │   ├── fhir/                # FHIR R5 Worker resource
-│   └── grpc/                # Tonic stub
+│   └── grpc/                # real Tonic server (T-6): mod.rs (serve + generated
+│                             # proto module) + service.rs (WorkerGrpcService)
 ├── models/                  # Worker, HumanName, Identifier, …
 ├── db/                      # SeaORM entities + repositories + audit
 ├── matching/                # algorithms + scoring + phonetic
