@@ -1,6 +1,6 @@
 # AI Statement
 
-Version 1.0.0, status is active.
+Version 1.1.0, status is active.
 
 Canonical location is `AI_STATEMENT.md` at the repository root.
 
@@ -75,7 +75,8 @@ defensible method exists for measuring one.
 | Application and tooling code                                  | ai-generated | written in directed sessions; reviewed and merged by the maintainer                                                                    |
 | Tests (unit, DB-gated, property, fuzz)                         | ai-generated | held to the same authority as the code they test: expectations cite the specification, and the attribution rules below govern failures |
 | Documentation and this statement                              | ai-generated | held to the repository's own prose rules                                                                                               |
-| Specification adjudications, owner rulings, release decisions | none         | decided by the maintainer and recorded in the spec                                                                                     |
+| Publishing an already-merged release (`cargo publish`)         | ai-generated | executes a crates.io publish for a version, changelog, and content the maintainer has already reviewed and merged to `main`; scoped to this repository's crates already published to crates.io (`agents/share/overview.md`'s library-crates table) — never an unmerged or unreviewed version |
+| Specification adjudications, owner rulings, release decisions | none         | decided by the maintainer and recorded in the spec — *what* ships and *when* remains a maintainer decision; §5's publish row is executing that decision, not making it |
 | Contribution and review verdicts on others' work              | none         | not in use                                                                                                                             |
 
 ## 6. Human oversight
@@ -87,6 +88,15 @@ Where the tools run sessions, the decisions with consequences — what a
 specification silence means, what ships in a release — are directed to
 be recorded in the specifications. A decision that exists only inside a
 tool session is not a decision this project made.
+
+As of 2026-09-02, AI **may** execute `cargo publish` for one of this
+repository's already-published library crates (§5), but only after the
+maintainer has already reviewed and merged the version bump — the same
+gate every other change passes through. This does not relax "AI merges
+nothing": the merge that puts a release-ready version on `main` is
+still the maintainer's; what changed is that the mechanical step after
+that merge — running the publish command, once the §7 gates are green
+on `main` — no longer needs a separate ask for each release.
 
 ## 7. Quality controls
 
@@ -151,9 +161,11 @@ In this project, AI **shall not**: merge anything; adjudicate, score, or
 answer reviews of contributions (the PR reviewer of §7 is advisory input
 to the maintainer, not a verdict); sign anything; decide a
 specification-facing question (silences are adjudicated by the maintainer
-and recorded); or weaken a test, an expectation, or a gate to make
-something pass — the last being a standing hard rule for humans and tools
-alike.
+and recorded); publish a crate whose version bump has not already been
+reviewed and merged by the maintainer, or publish a first release of a
+crate this repository has not already chosen to publish (§5); or weaken
+a test, an expectation, or a gate to make something pass — the last
+being a standing hard rule for humans and tools alike.
 
 ## 12. Limitations and residual risks
 
@@ -230,6 +242,7 @@ Rev. 1.
 | Version | Date       | Change                                                                 |
 | ------- | ---------- | ---------------------------------------------------------------------- |
 | 1.0.0   | 2026-08-26 | First issue for this repository, adapted from the 2026-08-24 template. |
+| 1.1.0   | 2026-09-02 | Authorizes AI execution of `cargo publish` for an already-merged version bump of a crate this repository already publishes to crates.io (§5, §6, §11). The release *decision* — what ships, and when — remains the maintainer's, made via the same reviewed-and-merged PR every other change goes through; only the mechanical publish step no longer needs a separate ask. |
 
 ## Annex B. Machine-readable summary
 
@@ -238,8 +251,8 @@ is authoritative where the two could ever disagree.
 
 ```yaml
 ai-statement:
-  version: 1.0.0
-  last-updated: 2026-08-26
+  version: 1.1.0
+  last-updated: 2026-09-02
   vocabulary: w3c-ai-content-disclosure
   disclosure-default: ai-generated
   tools:
@@ -250,6 +263,7 @@ ai-statement:
     implementation: ai-generated
     testing: ai-generated
     documentation: ai-generated
+    release-publishing: ai-generated  # cargo publish; scoped to an already-merged version bump, see §5/§6
     review: none
     adjudication: none
     release-decisions: none
