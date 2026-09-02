@@ -224,6 +224,16 @@ criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
 # `tonic 0.12`), but was still dead scaffolding until now: no
 # `build.rs`, no `proto/` directory.
 tonic-build = "0.12"
+# `tonic_build::compile_protos` shells out to a real `protoc` binary —
+# it does not bundle one. CI's runner has no `protoc` installed, so a
+# plain `compile_protos` call fails there ("Could not find `protoc`")
+# while succeeding locally on any machine that already has `protoc` on
+# `PATH` (found on person-service first; ported the fix here in the
+# same pass rather than let this crate hit the identical CI failure).
+# `protoc-bin-vendored` ships prebuilt `protoc` binaries for the
+# platforms this family builds on; `build.rs` points `PROTOC` at it
+# before compiling.
+protoc-bin-vendored = "3"
 
 [[bench]]
 name = "matching_bench"

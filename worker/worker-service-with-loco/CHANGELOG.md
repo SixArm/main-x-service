@@ -59,6 +59,15 @@ SOUP-register test gained a required `prost` annotation);
 `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings`
 clean.
 
+**Fixed after landing, ported from person-service the same day:**
+`build.rs`'s doc comment (copied from person-service's) claimed
+`tonic_build::compile_protos` "shells out to a bundled `protoc`" —
+wrong on both crates. CI's runner has no `protoc` installed and failed
+on every job touching this crate; local builds masked it because this
+developer's machine already had `protoc` on `PATH`. Fixed by adding
+`protoc-bin-vendored` as a build-dependency and pointing `PROTOC` at
+it in `build.rs` before compiling.
+
 ## [0.6.0] - 2026-08-27
 
 ### Added — declared MSRV (Rust 1.95)
