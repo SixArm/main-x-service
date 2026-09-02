@@ -161,7 +161,7 @@ case, and portfolio each provide:
 | Full-text search via Tantivy¹ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Privacy masking module (`src/privacy`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ |
 | FHIR R5 surface | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ | ✅ | ✅ | – |
-| gRPC (Tonic)⁶ | ✅ real | stub | – | – | stub | – | – | – | – | – |
+| gRPC (Tonic)⁶ | ✅ real | ✅ real | – | – | stub | – | – | – | – | – |
 | Durable outbox events (Phase 2)² | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Real-broker relay sink (`FluvioSink`, Phase 3)⁴ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Boundary normalization (phone/address) | ✅ | ✅ | ✅ | – | ✅ | – | – | – | – | – |
@@ -240,17 +240,18 @@ genuinely-used one does — found rolling PRO-H12 to place (2026-08-30),
 confirmed again on thing the same day, both needing the same
 `otlp-test-tonic` rename PRO-H9's three crates needed despite this
 row's `–`. As of 2026-09-02 (repo `tasks.md` PRO-H11/PRO-H6), **person**
-is the family's first **real** gRPC server — `proto/person.proto` +
-`build.rs` (`tonic-build`) + `src/api/grpc/service.rs`, covering
-Create/Get/List/Delete Person, delegating to the same domain logic and
-auth/ABAC machinery REST uses (verified live against a real Postgres by
-`tests/grpc_integration_test.rs`), spawned alongside the REST router at
-boot. **worker** and **event** still carry only the commented-out `serve`
-stub PRO-H11 scoped them for as the next slices; person is the copy
-source (see its own `AGENTS.md` "gRPC server" section for the exact
-adaptation — proto message design, auth parity, the `tonic-build`
-version-pin fix). Thing's inclusion is still an open call (PRO-H6),
-independent of person landing.
+and **worker** are the family's real gRPC servers — `proto/*.proto` +
+`build.rs` (`tonic-build`) + `src/api/grpc/service.rs` in each,
+covering Create/Get/List/Delete for the entity, delegating to the same
+domain logic and auth/ABAC machinery REST uses (verified live against
+a real Postgres by each crate's `tests/grpc_integration_test.rs`),
+spawned alongside the REST router at boot. Worker copied person's
+already-adapted pattern (see worker's own `AGENTS.md` "gRPC server"
+section for the one difference: worker's `WorkerRepository` methods
+take no `AuditContext`, so there is no `audit_context_of` call on its
+gRPC side). **event** still carries only the commented-out `serve`
+stub PRO-H11 scoped it for as the next slice. Thing's inclusion is
+still an open call (PRO-H6), independent of person/worker landing.
 
 ### The two cross-cutting services
 

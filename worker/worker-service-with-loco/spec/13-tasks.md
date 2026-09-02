@@ -135,10 +135,65 @@ clearly described manual check confirms the acceptance criterion.
   - [ ] Mask + export round-trip.
   - **Acceptance:** `cargo test --test api_integration_test` covers
     all three workflows.
-- [ ] **T-6 — gRPC implementation.**
-  - [ ] Promote the stub to a working Tonic server mirroring REST CRUD.
+- [~] **T-6 — gRPC implementation.** **Landed 2026-09-02 (repo
+  `tasks.md` PRO-H11 — following person-service's reference
+  implementation).**
+  - [x] Promoted the stub to a working Tonic server:
+    `proto/worker.proto` (package `worker`) + `build.rs` (`tonic-build`,
+    already correctly pinned to 0.12 in this crate's manifest — unlike
+    person's, which had to be fixed from a mismatched 0.14 — but still
+    dead scaffolding with no `build.rs`/`proto/` until now) +
+    `src/api/grpc/service.rs` (`WorkerGrpcService`), covering
+    `CreateWorker` / `GetWorker` / `ListWorkers` / `DeleteWorker`.
+    Deliberately not the full REST surface: no `UpdateWorker` RPC, no
+    match/merge/search/assessments/FHIR over gRPC. The proto `Worker`
+    message is also a deliberate **partial** projection (id, name,
+    gender, `worker_type`, birth date, tax id, timestamps) — not every
+    field the domain model carries (identifiers, addresses, telecom,
+    documents, emergency contacts, links); extending it is follow-up.
+  - [x] **No duplicated business logic.** Every RPC delegates into the
+    exact functions REST already calls: `crate::validation::validate_worker`
+    (`CreateWorker`), the shared duplicate-detection core
+    (`check_duplicates_internal`, bumped from private to `pub(crate)`
+    rather than copied), the same `WorkerRepository` trait methods
+    (`create`/`get_by_id`/`list_active`/`delete` — this crate's
+    repository takes no `AuditContext`, unlike person's, so there is
+    no `audit_context_of` equivalent needed here), and
+    `auth::authorize_record` + `crate::privacy::mask_worker` for
+    `GetWorker`'s record-level ABAC + masking, matching
+    `handlers::get_worker`'s own logic exactly. `worker_type` parses
+    via the domain enum's existing `serde` implementation
+    (`serde_json::from_value`) rather than a hand-rolled second
+    mapping that could drift from it.
+  - [x] **Auth parity, not an unauthenticated side door.**
+    `grpc_enforce` (gRPC metadata → `authentication_verifier::Claims`
+    → the same `Policy::evaluate`) is the blanket-guard counterpart of
+    REST's `auth::enforce`, gated by the same `WORKER_REQUIRE_AUTH`
+    flag. `GetWorker`/`DeleteWorker` additionally run
+    `authorize_record` against the loaded record, same as REST's
+    single-record handlers. **Documented, not silently missing:** the
+    HIPAA §164.528 disclosure-accounting audit row REST writes on
+    every read is not yet written on the gRPC path; `ListWorkers`
+    applies only the blanket `Read` check, not REST's per-record
+    read-visibility filtering.
+  - [x] **Verified live, not merely compiled.**
+    `tests/grpc_integration_test.rs` binds a real
+    `tonic::transport::Server` on an OS-assigned port and drives it
+    with a real `WorkerServiceClient` over an actual HTTP/2 connection:
+    a Create→Get→List→Delete→Get(`NOT_FOUND`) round trip against the
+    same database/search-index REST integration tests use, plus a
+    blank-family-name → `INVALID_ARGUMENT` proof, an unrecognised
+    `worker_type` → `INVALID_ARGUMENT` proof, and a malformed-id →
+    `INVALID_ARGUMENT` proof (not `INTERNAL`). All four pass against a
+    real Postgres (`scripts/ci-check.sh test-db
+    worker/worker-service-with-loco`, full suite green). `grpcurl` was
+    not additionally run by hand — unavailable in this sandbox — but
+    the automated test proves the identical claim the spec's original
+    acceptance criterion named, repeatably.
   - **Acceptance:** `grpcurl` against `WorkerService.GetWorker`
-    round-trips a record.
+    round-trips a record — satisfied by `tests/grpc_integration_test.rs`
+    (above); a literal `grpcurl` CLI run is optional local confirmation,
+    not additionally exercised.
 - [ ] **T-7 — Credential-expiry warning workflow.**
   - [ ] Background scan: `IdentityDocument.expiry_date` within 30
     days → publish `CredentialExpiringSoon` event.

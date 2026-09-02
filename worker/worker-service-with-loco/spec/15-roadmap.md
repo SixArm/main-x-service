@@ -28,7 +28,11 @@
   ingress, probes.
 - **Production readiness** — security audit + pen test, HIPAA + GDPR
   validation, DR runbook, backup / restore, CI/CD pipeline.
-- **Feature enhancements** — complete gRPC, complete FHIR (typed
+- **Feature enhancements** — extend the gRPC surface landed 2026-09-02
+  (T-6: `UpdateWorker`, match/merge/search/assessments/FHIR over gRPC,
+  the remaining domain fields on the proto `Worker` message, disclosure
+  accounting + per-record masking parity with REST — see T-6's own
+  record for the full list), complete FHIR (typed
   `Bundle`/`POST`-bundle support — the CapabilityStatement and ad hoc
   searchset Bundle already ship — plus an Organization resource),
   Fluvio production + consumers,

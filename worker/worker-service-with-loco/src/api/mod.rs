@@ -2,14 +2,15 @@
 //!
 //! Submodules: [`rest`](crate::api::rest) (the primary Axum JSON API),
 //! [`fhir`](crate::api::fhir) (HL7 FHIR R5 endpoints), and
-//! [`grpc`](crate::api::grpc) (a Tonic stub). This module also defines the
+//! [`grpc`](crate::api::grpc) (a real Tonic server — Create/Get/List/Delete
+//! Worker). This module also defines the
 //! shared [`ApiResponse`](crate::api::ApiResponse)/[`ApiError`](crate::api::ApiError)
 //! envelope every REST handler returns,
 //! giving clients a uniform `{ success, data, error }` shape.
 
 /// HL7 FHIR R5 endpoints (the `Worker` resource).
 pub mod fhir;
-/// gRPC API (Tonic stub).
+/// gRPC API (Tonic) — Create/Get/List/Delete Worker, real server.
 pub mod grpc;
 /// Primary REST JSON API (Axum) with OpenAPI/Swagger.
 pub mod rest;

@@ -6658,44 +6658,43 @@ crate above.
   running server. Close each crate's own T-3/T-6-equivalent task on
   landing, and flip the `overview.md` capability-matrix gRPC row from
   "stub" language to real ✅/– once decided and (where chosen) built.
-  *person landed 2026-09-02 as the reference slice* — `proto/person.proto`
-  (package `person`) + `build.rs` (`tonic-build`, pinned to 0.12 to
-  match the main `tonic` 0.12 dependency — the crate's pre-existing
-  `tonic-build = "0.14"` build-dependency was dead scaffolding, no
-  `build.rs`/`proto/` at all, version-mismatched with runtime `tonic`)
-  + `src/api/grpc/service.rs` (`PersonGrpcService`): `CreatePerson` /
-  `GetPerson` / `ListPersons` / `DeletePerson`, deliberately not the
-  full REST surface (no `UpdatePerson`, no match/merge/search/bulk/FHIR
-  over gRPC) and the proto `Person` message a deliberate partial
-  projection (id/name/gender/birth-date/tax-id/timestamps, not the
-  full domain model) — both tracked as follow-up in person's own spec
-  §13 T-6, not silently missing. Every RPC delegates to the exact same
-  functions REST calls (`validate_person`, the shared
-  duplicate-detection core bumped from private to `pub(crate)` rather
-  than copied, the same `PersonRepository` methods,
-  `auth::authorize_record` + `mask_person` for `GetPerson`) — no
-  duplicated business logic. A new `grpc_enforce` mirrors REST's
-  blanket-guard `auth::enforce`, gated by the same `PERSON_REQUIRE_AUTH`
-  flag, so enforcement protects both surfaces together; documented,
+  *person landed 2026-09-02 as the reference slice*, *worker landed
+  2026-09-02 the same day, copying person's pattern* — each gets
+  `proto/<entity>.proto` + `build.rs` (`tonic-build`, pinned to 0.12 to
+  match the main `tonic` 0.12 dependency; worker's manifest already had
+  the right version pinned, unlike person's mismatched pre-existing
+  0.14) + `src/api/grpc/service.rs` (`<Entity>GrpcService`):
+  `Create<Entity>` / `Get<Entity>` / `List<Entity>s` / `Delete<Entity>`,
+  deliberately not the full REST surface (no Update RPC, no
+  match/merge/search/FHIR over gRPC) and each proto message a
+  deliberate partial projection (id/name/gender/birth-date/tax-id/
+  timestamps, plus worker's `worker_type`) — both tracked as follow-up
+  in each crate's own spec §13 T-6, not silently missing. Every RPC
+  delegates to the exact same functions REST calls (validation, the
+  shared duplicate-detection core bumped from private to `pub(crate)`
+  rather than copied, the same repository methods,
+  `auth::authorize_record` + masking for the Get RPC) — no duplicated
+  business logic; worker's repository takes no `AuditContext` (unlike
+  person's), so its gRPC side has no `audit_context_of` equivalent. A
+  new `grpc_enforce` mirrors REST's blanket-guard `auth::enforce` in
+  both crates, gated by the same `<ENTITY>_REQUIRE_AUTH` flag, so
+  enforcement protects both surfaces together; documented,
   not-yet-carried-over gaps are the §164.528 disclosure-accounting
-  audit row and `ListPersons`' SEC-G3 per-record masking. Verified
-  live, not merely compiled: `tests/grpc_integration_test.rs` binds a
-  real server on an OS-assigned port and drives it with a real
-  `PersonServiceClient` over an actual HTTP/2 connection — a
-  Create→Get→List→Delete→Get(`NOT_FOUND`) round trip plus two
-  error-path proofs (blank family name → `INVALID_ARGUMENT`, proving
-  the shared validator runs; malformed id → `INVALID_ARGUMENT`, not
-  `INTERNAL`) — all green against a real Postgres
-  (`scripts/ci-check.sh test-db person/person-service-with-loco`, full
-  suite). `cargo test --lib` 355/355 (was 354, +1: a SOUP-register test
-  gained a required `prost` annotation); `cargo fmt --check` / `cargo
-  clippy --all-targets -D warnings` clean. `grpcurl` was not
-  additionally run by hand (unavailable in this sandbox, `brew install`
-  blocked by directory ownership); the automated test proves the
-  identical claim the crate's own spec named as T-6's acceptance
-  criterion, repeatably. **Still open**: worker and event, as their
-  own slices (copy person's `AGENTS.md` "gRPC server" section, not
-  reinvent the pattern); thing's inclusion per PRO-H6.
+  audit row and per-record read-visibility filtering on List. Verified
+  live, not merely compiled, in both crates:
+  `tests/grpc_integration_test.rs` binds a real server on an
+  OS-assigned port and drives it with a real client over an actual
+  HTTP/2 connection — a Create→Get→List→Delete→Get(`NOT_FOUND`) round
+  trip plus error-path proofs (validation failure → `INVALID_ARGUMENT`;
+  malformed id → `INVALID_ARGUMENT`, not `INTERNAL`; worker adds an
+  unrecognised `worker_type` → `INVALID_ARGUMENT` proof) — all green
+  against a real Postgres, full DB-gated suite. `grpcurl` was not
+  additionally run by hand (unavailable in this sandbox); the
+  automated tests prove the identical claim each crate's own spec
+  named as T-6's acceptance criterion, repeatably. **Still open**:
+  event, as its own slice (copy person's/worker's `AGENTS.md` "gRPC
+  server" section, not reinvent the pattern); thing's inclusion per
+  PRO-H6.
 - [x] **PRO-H7 (L)** *(done 2026-08-28)* **Matcher component parity:
   `relationships` + `tags`.** Verified fact before starting: person did
   **not** actually have this implemented either — the earlier audit's

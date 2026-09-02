@@ -867,12 +867,17 @@ pub struct DuplicateCheckResponse {
     pub potential_matches: Vec<MatchResponse>,
 }
 
-/// Shared duplicate-detection core used by both [`create_worker`] (pre-insert
-/// gate) and [`check_duplicates`] (explicit check). Blocks on family name +
+/// Shared duplicate-detection core used by [`create_worker`] (pre-insert
+/// gate), [`check_duplicates`] (explicit check), and (PRO-H11) the gRPC
+/// `CreateWorker` RPC — the same real-time duplicate check on every
+/// surface that can create a worker. Blocks on family name +
 /// birth year, skips the probe's own id, scores candidates, and returns those
 /// at or above the 0.7 review threshold (capped at 10). Returns an empty vec
 /// on any search/match error so a detection failure never blocks a create.
-async fn check_duplicates_internal(state: &AppState, worker: &Worker) -> Vec<MatchResponse> {
+pub(crate) async fn check_duplicates_internal(
+    state: &AppState,
+    worker: &Worker,
+) -> Vec<MatchResponse> {
     let family_name = &worker.name.family;
     let birth_year = worker.birth_date.map(|d| d.year());
 

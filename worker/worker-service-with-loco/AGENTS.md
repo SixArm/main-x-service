@@ -146,6 +146,70 @@ the exported span's. None of this needs a database. Landing this raised
 tests + 2 new `soup.rs` rename-resolution tests), plus 4 new tests across
 the two `tests/otlp_*.rs` binaries.
 
+## gRPC server (T-6, repo `tasks.md` PRO-H11)
+
+`src/api/grpc/` is a real `tonic::transport::Server`, not the
+commented-out stub it used to be — following person-service's
+reference implementation for this repo's gRPC rollout.
+`proto/worker.proto` (crate root) defines `WorkerService` —
+`CreateWorker` / `GetWorker` / `ListWorkers` / `DeleteWorker` —
+compiled by `build.rs` (`tonic-build`, already correctly pinned to the
+same 0.12 line as the main `tonic` dependency in this crate's manifest
+— unlike person-service's, which needed fixing from a mismatched
+0.14). `App::after_routes` spawns `crate::api::grpc::serve` as a
+background task on `GRPC_PORT` (config `server.grpc_port`, default
+`50051`) alongside the REST router, sharing one cloned `AppState` — a
+bind/serve failure is logged, not fatal, so REST still boots if the
+gRPC port is unavailable.
+
+**No duplicated business logic.** `src/api/grpc/service.rs`'s
+`WorkerGrpcService` calls the exact same functions the REST handlers
+do: `crate::validation::validate_worker`, the shared duplicate-detection
+core (`handlers::check_duplicates_internal`, bumped to `pub(crate)`
+rather than copied), the same `WorkerRepository` trait methods (which
+take no `AuditContext`, unlike person-service's — audit logging is
+wired internally via the repository's `with_*` builders, so there is
+no `audit_context_of` call here), and `auth::authorize_record` +
+`crate::privacy::mask_worker` for `GetWorker`'s record-level ABAC +
+masking — the wire format differs, the rules do not. `worker_type`
+parses via the domain enum's existing `serde` implementation
+(`serde_json::from_value`) rather than a hand-rolled second mapping.
+
+**Auth parity with REST, by design.** `grpc_enforce` (in
+`service.rs`) is the gRPC counterpart of `auth::enforce`: it reads the
+bearer token from the `authorization` gRPC metadata entry and is gated
+by the same `WORKER_REQUIRE_AUTH` flag. `GetWorker`/`DeleteWorker`
+additionally run `auth::authorize_record` against the loaded record,
+same as REST's single-record handlers.
+
+**Deliberately not carried over yet** (tracked in spec §13 T-6, not
+silently missing): `UpdateWorker` (no RPC); the HIPAA §164.528
+disclosure-accounting audit row REST writes on every read; `ListWorkers`'
+per-record read-visibility filtering (only the blanket `Read` check
+applies today); match/merge/search/assessments/FHIR over gRPC; and
+most of the domain model's fields on the proto `Worker` message
+(identifiers, addresses, telecom, documents, emergency contacts,
+links) — the message is a deliberate partial projection (id, name,
+gender, `worker_type`, birth date, tax id, timestamps), not a 1:1
+mirror of REST/FHIR.
+
+`tests/grpc_integration_test.rs` proves it end to end against a real
+Postgres: binds the server on an OS-assigned port (the same
+`TcpListener::bind("127.0.0.1:0")` + `serve_with_incoming` pattern
+`tests/otlp_collector` uses), connects a real
+`worker_service_client::WorkerServiceClient`, and drives a
+Create→Get→List→Delete→Get(`NOT_FOUND`) round trip plus three
+error-path proofs (a blank family name → `INVALID_ARGUMENT`; an
+unrecognised `worker_type` → `INVALID_ARGUMENT`; a malformed id →
+`INVALID_ARGUMENT`, not `INTERNAL`). `#[ignore]`d like the REST
+integration suite; run with `cargo test --test grpc_integration_test
+-- --ignored` against `scripts/test-db.sh up
+worker/worker-service-with-loco`. A manual `grpcurl
+WorkerService.GetWorker` smoke check (this crate's spec §13 T-6's
+original acceptance criterion) was not additionally run in this
+sandbox (`grpcurl` unavailable) — the automated test proves the
+identical claim, repeatably.
+
 ## Container image
 
 `Dockerfile` (multi-stage, Debian 13 slim runtime) builds this crate's

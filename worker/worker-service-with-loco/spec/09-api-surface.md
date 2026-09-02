@@ -13,7 +13,7 @@ Implemented by `src/api/rest/version.rs` (`require_version_mw`).
 | REST (Axum) | 16 endpoints under `/api/workers/*` + `/api/audit/*` + `/api/health` — including `GET /api/workers`, the database-backed collection list added after a live investigation (on the sibling person-service) found `/workers/search?q=*` unreliable for enumeration (see `CHANGELOG.md`) |
 | Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | FHIR R5 (Axum) | `Practitioner` CRUD + search under `/fhir/Practitioner` + `/fhir/metadata` (the standard `agents/share/fhir.md` §3 mapping; handlers implemented and **mounted** via `fhir_routes()` in `App::routes`; pinned by `tests/api_integration_test.rs::test_fhir_practitioner_route_is_mounted`, which asserts the `/fhir/Practitioner` route) |
-| gRPC (Tonic) | Stubbed |
+| gRPC (Tonic) | Real server (T-6, 2026-09-02): `CreateWorker` / `GetWorker` / `ListWorkers` / `DeleteWorker` on `WorkerService`, generated from `proto/worker.proto`, spawned on `grpc_port` alongside the REST router. No `UpdateWorker` RPC yet, and the proto `Worker` message is a partial projection (identification + demographics only) — see spec §13 T-6 |
 | Web UI | Full set documented in project-root [`spec.md`](../../spec/index.md) |
 | Docs | Swagger UI at `/swagger-ui` (OpenAPI 3.0 via utoipa) |
 
