@@ -44,8 +44,12 @@ migration = { path = "migration" }
 # Search Engine
 tantivy = "0.22"
 
-# gRPC
+# gRPC (PRO-H11: a real Tonic server, generated from proto/person.proto
+# by build.rs; `prost` is the wire-message crate tonic-build's generated
+# code names directly, so it is a normal dependency, not merely pulled
+# in transitively through tonic's own "prost" feature)
 tonic = { version = "0.12", features = ["transport", "codegen", "prost"] }
+prost = "0.13"
 
 # OpenAPI Documentation
 utoipa = { version = "5.5", features = ["axum_extras", "chrono", "uuid"] }
@@ -255,8 +259,15 @@ reqwest = { version = "0.12", default-features = false, features = [
 ] }
 
 [build-dependencies]
-# gRPC code generation
-tonic-build = "0.14"
+# gRPC code generation (PRO-H11). Pinned to 0.12 to match the main
+# `tonic = "0.12"` dependency above — codegen and runtime must be the
+# same tonic major line, or the generated server trait's associated
+# types don't match what this crate's `tonic::transport::Server`
+# expects. This was previously pinned at 0.14 with no `build.rs` and no
+# `proto/` directory at all (dead scaffolding, same trap
+# `agents/share/observability.md` documents for the OTLP dependency
+# generations in place/thing's manifests) — not simply reused as-is.
+tonic-build = "0.12"
 
 [[bench]]
 name = "matching_bench"

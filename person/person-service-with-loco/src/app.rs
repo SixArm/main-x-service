@@ -160,7 +160,7 @@ impl Hooks for App {
         // / `PERSON_ABAC_POLICY_FILE`).
         auth::spawn_key_refresh();
         auth::spawn_policy_watcher();
-        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config)
+        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config.clone())
             .await
             .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         // Blanket auth enforcement (default-off, `PERSON_REQUIRE_AUTH`),
@@ -168,6 +168,22 @@ impl Hooks for App {
         // restart. Layered unconditionally; the flag is the only switch.
         // The verifier and policy are read live per request.
         let enforcement = auth::Enforcement::from_env();
+        // PRO-H11: the real gRPC server, spawned alongside the REST
+        // router rather than blocking boot on it. Shares this exact
+        // `AppState` (cloned — the REST router below takes the
+        // original), so both surfaces see one database pool, one
+        // search index, one matcher. A bind/serve failure is logged,
+        // not fatal: the REST surface still comes up even if the gRPC
+        // port is unavailable, matching this crate's existing
+        // "always boot" posture for other best-effort subsystems (key
+        // refresh, policy watch, the outbox relay).
+        let grpc_state = state.clone();
+        let grpc_config = config.server.clone();
+        tokio::spawn(async move {
+            if let Err(e) = crate::api::grpc::serve(grpc_config, grpc_state).await {
+                tracing::error!("gRPC server failed to start or exited: {e}");
+            }
+        });
         ctx.shared_store.insert(state);
         // Durable event bus Phase 3: start the outbox relay loop. Gated
         // internally — a no-op unless the transport is `outbox`

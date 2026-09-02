@@ -906,14 +906,19 @@ pub struct DuplicateCheckResponse {
     pub potential_matches: Vec<MatchResponse>,
 }
 
-/// Shared duplicate-detection core for `create_person` and
-/// `check_duplicates`.
+/// Shared duplicate-detection core for `create_person`,
+/// `check_duplicates`, and (PRO-H11) the gRPC `CreatePerson` RPC — the
+/// same real-time duplicate check on every surface that can create a
+/// person, not a REST-only rule reimplemented for gRPC.
 ///
 /// Blocks on the search index by family name + birth year, excludes the
 /// probe's own id, scores candidates with the matcher, and returns those
 /// at or above the 0.7 review threshold (max 10). Errors degrade to an
 /// empty result rather than failing the caller.
-async fn check_duplicates_internal(state: &AppState, person: &Person) -> Vec<MatchResponse> {
+pub(crate) async fn check_duplicates_internal(
+    state: &AppState,
+    person: &Person,
+) -> Vec<MatchResponse> {
     let family_name = &person.name.family;
     let birth_year = person.birth_date.map(|d| d.year());
 

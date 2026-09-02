@@ -430,10 +430,69 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   - [ ] Mask + export round-trip.
   - **Acceptance:** `cargo test --test api_integration_test` covers
     all three workflows.
-- [ ] **T-6 — gRPC implementation.**
-  - [ ] Promote stub to a working Tonic server mirroring REST CRUD.
+- [~] **T-6 — gRPC implementation.** **Landed 2026-09-02 (repo
+  `tasks.md` PRO-H11 — this crate is the reference; worker/event/thing
+  follow as their own slices).**
+  - [x] Promote stub to a working Tonic server: `proto/person.proto`
+    (package `person`) + `build.rs` (`tonic-build`, pinned to the
+    same 0.12 line as the main `tonic` dependency — the pre-existing
+    `tonic-build = "0.14"` build-dependency was dead scaffolding with
+    no `build.rs` and no `proto/` at all, mismatched with runtime
+    `tonic 0.12`, and is now fixed rather than left as-is) +
+    `src/api/grpc/service.rs` (`PersonGrpcService`), covering
+    `CreatePerson` / `GetPerson` / `ListPersons` / `DeletePerson`.
+    Deliberately **not** the full REST surface in this slice: no
+    `UpdatePerson` RPC, no match/merge/search/bulk/FHIR over gRPC. The
+    proto `Person` message is also a deliberate **partial** projection
+    (id, name, gender, birth date, tax id, timestamps) — not every
+    field the domain model carries (identifiers, addresses, telecom,
+    documents, emergency contacts, links); extending it is follow-up,
+    not a silently-dropped requirement.
+  - [x] **No duplicated business logic.** Every RPC delegates into the
+    exact functions REST already calls: `crate::validation::validate_person`
+    (`CreatePerson`), the shared duplicate-detection core
+    (`check_duplicates_internal`, bumped from private to `pub(crate)`
+    rather than copied), the same `PersonRepository` trait methods
+    (`create`/`get_by_id`/`list_active`/`delete`), and
+    `auth::authorize_record` + `crate::privacy::mask_person` for
+    `GetPerson`'s record-level ABAC + masking, matching
+    `handlers::get_person`'s own logic exactly.
+  - [x] **Auth parity, not an unauthenticated side door.**
+    `grpc_enforce` (gRPC metadata → `authentication_verifier::Claims`
+    → the same `Policy::evaluate`) is the blanket-guard counterpart of
+    REST's `auth::enforce`, gated by the same `PERSON_REQUIRE_AUTH`
+    flag — turning enforcement on protects both surfaces together.
+    `GetPerson`/`DeletePerson` additionally run `authorize_record`
+    against the loaded record, same as REST's single-record handlers.
+    **Documented, not silently missing:** the HIPAA §164.528
+    disclosure-accounting audit row REST writes on every read is not
+    yet written on the gRPC path (needs a gRPC-side `AccessContext`
+    equivalent — client IP/user-agent arrive differently than through
+    an Axum extractor); `ListPersons` applies only the blanket `Read`
+    check, not REST's SEC-G3 per-record read-visibility filtering/masking.
+  - [x] **Verified live, not merely compiled.**
+    `tests/grpc_integration_test.rs` binds a real
+    `tonic::transport::Server` on an OS-assigned port (the same
+    `TcpListener::bind("127.0.0.1:0")` + `serve_with_incoming` pattern
+    `tests/otlp_collector` already used) and drives it with a real
+    `PersonServiceClient` over an actual HTTP/2 connection: a
+    Create→Get→List→Delete→Get(`NOT_FOUND`) round trip against the
+    same database/search-index REST integration tests use, plus a
+    blank-family-name → `INVALID_ARGUMENT` proof (the shared validator
+    actually runs) and a malformed-id → `INVALID_ARGUMENT` proof (not
+    `INTERNAL`). All three pass against a real Postgres
+    (`scripts/ci-check.sh test-db person/person-service-with-loco`,
+    full suite green). `grpcurl` was not additionally run by hand —
+    not installed in this sandbox (`brew install` blocked by
+    directory ownership) — but the automated test proves the identical
+    claim the spec's original acceptance criterion named
+    (`PersonService.GetPerson` round-trips a record over a real
+    network connection), and does so repeatably in CI rather than as a
+    one-off manual check.
   - **Acceptance:** `grpcurl` against `PersonService.GetPerson`
-    round-trips a record.
+    round-trips a record — satisfied by `tests/grpc_integration_test.rs`
+    (above); a literal `grpcurl` CLI run is optional local confirmation,
+    not additionally exercised.
 - [ ] **T-7 — Spec-drift CI check.**
   - [ ] Fail PR if `src/matching/**` or `src/models/person.rs`
     changes without a `spec.md` edit (allowlist in `.spec-allow`).

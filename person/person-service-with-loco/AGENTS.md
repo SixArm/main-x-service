@@ -68,8 +68,9 @@ human or agent to open on demand rather than always pull into context):
 ## Running this crate
 
 ```bash
-# REST API (FHIR R5 mounted within it; gRPC is a stub) — boots via the
-# loco CLI, which needs a subcommand. Bare `cargo run` will not start it.
+# REST API (FHIR R5 mounted within it) + a real gRPC server on
+# GRPC_PORT (default 50051, T-6) — boots via the loco CLI, which needs
+# a subcommand. Bare `cargo run` will not start it.
 cargo run -- start                              # or: cargo loco start
 cargo loco db migrate                           # apply migrations (auto in dev)
 
@@ -158,6 +159,64 @@ listener in a normal `cargo test` run: a `tracing` span and a metric
 both reach the collector's decoded protobuf, and a served HTTP request
 returns a `traceparent` whose trace id matches the exported span's.
 None of this needs a database.
+
+## gRPC server (T-6, repo `tasks.md` PRO-H11 reference)
+
+`src/api/grpc/` is a real `tonic::transport::Server`, not the
+commented-out stub it used to be. `proto/person.proto` (crate root)
+defines `PersonService` — `CreatePerson` / `GetPerson` / `ListPersons`
+/ `DeletePerson` — compiled by `build.rs` (`tonic-build`, pinned to the
+same 0.12 line as the main `tonic` dependency) into
+`crate::api::grpc::proto`. `App::after_routes` spawns
+`crate::api::grpc::serve` as a background task on `GRPC_PORT` (config
+`server.grpc_port`, default `50051`) alongside the REST router, sharing
+one cloned `AppState` — a bind/serve failure is logged, not fatal, so
+REST still boots if the gRPC port is unavailable.
+
+**No duplicated business logic.** `src/api/grpc/service.rs`'s
+`PersonGrpcService` calls the exact same functions the REST handlers
+do: `crate::validation::validate_person`, the shared duplicate-detection
+core (`handlers::check_duplicates_internal`, bumped to `pub(crate)`
+rather than copied), the same `PersonRepository` trait methods, and
+`auth::authorize_record` + `crate::privacy::mask_person` for
+`GetPerson`'s record-level ABAC + masking — the wire format differs,
+the rules do not.
+
+**Auth parity with REST, by design.** `grpc_enforce` (in
+`service.rs`) is the gRPC counterpart of `auth::enforce`: it reads the
+bearer token from the `authorization` gRPC metadata entry and is gated
+by the same `PERSON_REQUIRE_AUTH` flag, so turning enforcement on
+protects both surfaces together — there is no way to leave gRPC open
+while REST is locked down. `GetPerson`/`DeletePerson` additionally run
+`auth::authorize_record` against the loaded record, same as REST's
+single-record handlers.
+
+**Deliberately not carried over yet** (tracked in spec §13 T-6, not
+silently missing): `UpdatePerson` (no RPC); the HIPAA §164.528
+disclosure-accounting audit row REST writes on every read (needs a
+gRPC-side `AccessContext` equivalent); `ListPersons`' SEC-G3 per-record
+read-visibility filtering/masking (only the blanket `Read` check
+applies today); match/merge/search/bulk/FHIR over gRPC; and most of the
+domain model's fields on the proto `Person` message (identifiers,
+addresses, telecom, documents, emergency contacts, links) — the
+message is a deliberate partial projection (id, name, gender, birth
+date, tax id, timestamps), not a 1:1 mirror of REST/FHIR.
+
+`tests/grpc_integration_test.rs` proves it end to end against a real
+Postgres: binds the server on an OS-assigned port (the same
+`TcpListener::bind("127.0.0.1:0")` + `serve_with_incoming` pattern
+`tests/otlp_collector` uses), connects a real
+`person_service_client::PersonServiceClient`, and drives a
+Create→Get→List→Delete→Get(`NOT_FOUND`) round trip plus two error-path
+proofs (a blank family name → `INVALID_ARGUMENT`, proving the shared
+validator actually runs; a malformed id → `INVALID_ARGUMENT`, not
+`INTERNAL`). `#[ignore]`d like the REST integration suite; run with
+`cargo test --test grpc_integration_test -- --ignored` against
+`scripts/test-db.sh up person/person-service-with-loco`. A manual
+`grpcurl PersonService.GetPerson` smoke check (this crate's spec §13
+T-6's original acceptance criterion) was not additionally run in this
+sandbox (`grpcurl` unavailable, `brew install` blocked by directory
+ownership) — the automated test proves the identical claim, repeatably.
 
 ## Container image
 

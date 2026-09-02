@@ -12,7 +12,7 @@
 - Record merging with link tracking and transferred-data snapshots.
 - Data validation + phone / address normalisation at the boundary.
 - Per-field privacy masking, GDPR Article 15 export, consent model.
-- REST API (Axum) + FHIR R5 Person + gRPC stub.
+- REST API (Axum) + FHIR R5 Person + gRPC (Create/Get/List/Delete Person).
 - PostgreSQL persistence via SeaORM, with migrations.
 - Observability (tracing + OpenTelemetry OTLP).
 
