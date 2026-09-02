@@ -3,7 +3,14 @@
 This project uses **sole-maintainer governance** (sometimes called
 BDFL): Joel Parker Henderson (see [MAINTAINERS.md](MAINTAINERS.md))
 holds final decision authority over scope, design, releases, and
-membership.
+membership — with one narrow, explicit delegation: judging an
+already-merged, already-decided version bump ready to publish to
+crates.io may be done by the project's AI tooling directly, and it may
+execute that publish, per [AI_STATEMENT.md](AI_STATEMENT.md) §5/§6.
+What a release contains stays a maintainer decision, made through the
+normal spec-driven change and merge process below; only the
+readiness-to-publish judgment for an already-merged version is
+delegated.
 
 ## How decisions are made
 
