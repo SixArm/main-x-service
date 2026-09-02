@@ -37,13 +37,18 @@ issue reports, and feedback are welcome.
 ## Contributor expectations for AI tooling
 
 See [AI_STATEMENT.md](AI_STATEMENT.md) — it binds contributors as well
-as the maintainer. That includes who may decide a release is ready and
-publish it: for this repository's crates.io crates, AI tooling may
-judge an already-merged version bump ready and run `cargo publish`
-directly, without a per-release ask ([AI_STATEMENT.md](AI_STATEMENT.md)
-§5/§6, [GOVERNANCE.md](GOVERNANCE.md)) — a contributor's own change
-still lands the same way as any other, through spec + code + test and
-a maintainer-reviewed merge.
+as the maintainer. That includes who may merge a change and who may
+decide a release is ready and publish it: AI tooling may merge a pull
+request once it clears an explicit checklist (the discipline for its
+kind of change is followed, CI is green, the evidence is documented,
+no unresolved specification-facing question is raised), and may judge
+an already-merged version bump of a crates.io crate ready and run
+`cargo publish` directly — neither without a maintainer-decided *what*
+behind it ([AI_STATEMENT.md](AI_STATEMENT.md) §5/§6,
+[GOVERNANCE.md](GOVERNANCE.md)). A contributor's own change still lands
+the same way as any other: spec + code + test, the same green gate,
+merged once that checklist is met — by the maintainer, or by AI acting
+on it.
 
 ## Funding
 
