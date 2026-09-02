@@ -11,7 +11,7 @@ use super::{a_key, seed_site};
 
 /// Declare a content type with a representative field set, returning
 /// the site pid.
-async fn seed_site_and_type(request: &axum_test::TestServer, prefix: &str) -> String {
+async fn seed_site_and_type(request: &loco_rs::TestServer, prefix: &str) -> String {
     let site_pid = seed_site(request, &a_key(prefix)).await;
     request
         .post(&format!("/api/sites/{site_pid}/content-types"))
@@ -35,7 +35,7 @@ async fn seed_site_and_type(request: &axum_test::TestServer, prefix: &str) -> St
 
 /// Create an entry, returning `(entry_pid, revision_pid)`.
 async fn create_entry(
-    request: &axum_test::TestServer,
+    request: &loco_rs::TestServer,
     site_pid: &str,
     key: &str,
 ) -> (String, String) {
