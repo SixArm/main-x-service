@@ -539,6 +539,37 @@ mod tests {
         assert!(s < 0.1, "got {s}");
     }
 
+    /// T-2 acceptance: an event recorded in `America/New_York` matches
+    /// an event recorded in `UTC` at the same wall-clock instant.
+    ///
+    /// `Event::start_date`/`end_date` are stored as `DateTime<Utc>`, an
+    /// absolute instant resolved from whatever offset the input carried
+    /// at the parse boundary (`chrono::DateTime::parse_from_rfc3339`
+    /// plus `.with_timezone(&Utc)`, used uniformly by the REST, gRPC and
+    /// FHIR intake paths), so the scorer itself never sees an
+    /// unresolved local time to get wrong.
+    ///
+    /// This proves that claim against the real IANA tz database via
+    /// `chrono-tz`, rather than a hand-picked fixed offset. The chosen
+    /// date sits before that year's spring-forward, so `America/New_York`
+    /// is EST (UTC minus five hours) here, and a naive UTC-plus-zero
+    /// assumption would silently mis-score by a full five hours if the
+    /// conversion were ever skipped.
+    #[test]
+    fn cross_timezone_same_instant_matches_exactly() {
+        let new_york_local = chrono_tz::America::New_York
+            .with_ymd_and_hms(2026, 3, 1, 9, 0, 0)
+            .unwrap();
+        let new_york_as_utc = new_york_local.with_timezone(&Utc);
+        let utc_instant = dt(2026, 3, 1, 14);
+        assert_eq!(
+            new_york_as_utc, utc_instant,
+            "chrono-tz's America/New_York EST offset (UTC-5) should land on the same instant as 14:00 UTC"
+        );
+        let s = time_matching::match_start_dates(new_york_as_utc, utc_instant);
+        assert!(s > 0.999, "got {s}");
+    }
+
     /// Window overlap is the Jaccard ratio of the two intervals.
     #[test]
     fn window_overlap() {

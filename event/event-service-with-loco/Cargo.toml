@@ -141,6 +141,14 @@ assertables = "10"
 tokio-test = "0.4"
 mockall = "0.13"
 tempfile = "3.27"
+# T-2: proves the date-proximity scorer's timezone correctness against
+# the real IANA tz database (DST-aware), not a hand-picked fixed offset
+# string. Test-only — production code never needs a zone name to score
+# proximity, since `Event::start_date`/`end_date` are stored as absolute
+# `DateTime<Utc>` instants (offset already resolved at the parse
+# boundary; see `Event::time_zone`'s doc comment, "Storage is always
+# UTC").
+chrono-tz = "0.10"
 
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so
 # the bearer-verification path is exercised without the auth service or

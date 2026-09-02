@@ -73,11 +73,29 @@ clearly described manual check confirms the acceptance criterion.
   `agents/share/runbooks/integrity-activation.md` for the family-wide
   activation runbook.
 
-- [ ] **T-2 — Time-zone-aware fuzzy matching.**
-  - [ ] Replace naive UTC offsets with `chrono-tz` conversions in the
-    date-proximity scorer.
+- [x] **T-2 — Time-zone-aware fuzzy matching.**
+  *(2026-09-03 — the literal ask, "replace naive UTC offsets … in the
+  date-proximity scorer," did not describe a live defect: checked
+  directly rather than assumed, `Event::start_date`/`end_date` are
+  `DateTime<Utc>` — an absolute instant already resolved from whatever
+  offset the input carried at the parse boundary
+  (`chrono::DateTime::parse_from_rfc3339` + `.with_timezone(&Utc)`,
+  used uniformly by the REST, gRPC, and FHIR intake paths;
+  `Event::time_zone` is documented "storage is always UTC"). The
+  scorer (`matching::algorithms::time_matching`) never sees a naive
+  local time to get wrong. What was genuinely missing was the proof —
+  no test exercised a cross-timezone instant, and nothing in the crate
+  used `chrono-tz` at all.)*
+  - [x] Prove the date-proximity scorer is timezone-correct against the
+    real IANA tz database (`chrono-tz`, added as a dev-dependency),
+    not merely a fixed-offset string.
   - **Acceptance:** unit test where one event in `America/New_York`
-    matches another in `UTC` at the same wall-clock instant.
+    matches another in `UTC` at the same wall-clock instant — met by
+    `matching::algorithms::tests::cross_timezone_same_instant_matches_exactly`,
+    which constructs a `2026-03-01 09:00 America/New_York` instant (EST,
+    UTC−5, before that year's spring-forward) via `chrono-tz`, confirms
+    it equals `2026-03-01 14:00 UTC`, and confirms `match_start_dates`
+    scores the pair ≈1.0.
 - [ ] **T-3 — RFC 5545 RRULE recurrence support.**
   - [ ] Add `recurrence_rule: Option<String>` to `Event`.
   - [ ] Implement expansion for search + dedup.

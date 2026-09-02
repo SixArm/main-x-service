@@ -25,18 +25,20 @@
 | Containers | Multi-stage Dockerfile built with Podman, dev + test Compose |
 | Tests | Unit + integration + Criterion benchmarks; CI workflows |
 | Keyed integrity verification | `src/compliance/` (`mac`, `record_integrity`, `audit_integrity`) — SHA-256 + SHA3-256 digests and a keyed HMAC-SHA256 MAC over each `Event` record and each `audit_log` row, via the shared `integrity-mac` crate; `GET /api/records/verify` + `GET /api/audit/verify`; default off (no `EVENT_INTEGRITY_MAC_KEY`/`_KEY_FILE` ⇒ no MAC written, rows report `mac_absent`); no hash chain / external-witness checkpoint (unlike person/worker/care-pathway/case) |
+| Time-zone-aware fuzzy matching | Verified, not a code change (T-2, 2026-09-03) — `Event::start_date`/`end_date` were already stored as `DateTime<Utc>` absolute instants, resolved from the input's offset at the parse boundary; the date-proximity scorer never saw a naive local time. Closed the actual gap: a `chrono-tz`-backed unit test now proves a `America/New_York` instant matches its `UTC` equivalent |
 
 ### 14.2 Open gaps → tasks
 
-FHIR Event mapping (T-1) and the production Fluvio publisher (T-4) are
-**resolved** — T-1 via T-10 (`Appointment` mapping, live), T-4 via T-11
-(transactional outbox + relay + `FluvioSink`) — and are no longer
-listed here; see their §13 entries for what shipped and what each
-literally superseded.
+FHIR Event mapping (T-1), the production Fluvio publisher (T-4), and
+time-zone-aware fuzzy matching (T-2) are **resolved** — T-1 via T-10
+(`Appointment` mapping, live), T-4 via T-11 (transactional outbox +
+relay + `FluvioSink`), T-2 by verifying the scorer already operates on
+resolved UTC instants and adding the proof that was missing — and are
+no longer listed here; see their §13 entries for what shipped and what
+each literally superseded.
 
 | Gap | Task |
 |---|---|
-| Time-zone-aware fuzzy matching | T-2 |
 | Recurrence / RRULE | T-3 |
 | Event consumers (a deployment pointing `EVENT_FLUVIO_ENDPOINT` at a live broker; the link-graph aggregator's own consumer is tracked as BUS-2, elsewhere) | (no task yet) |
 | Dedup / merge / privacy integration tests | T-5 |
