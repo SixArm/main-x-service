@@ -1,6 +1,9 @@
 //! `SeaORM` Entity — `automation_runs`. The append-only log of what an
 //! automation actually did (or refused to do) on one subject: the
-//! honest record behind "the platform updated this for you".
+//! honest record behind "the platform updated this for you". One
+//! firing of an N-action rule writes N rows sharing everything but
+//! `action_index` (0-based, matching the rule's `actions` array
+//! position) — FR-32's "each action's outcome logged separately".
 
 // SeaORM-generated entity shape: documented by the migration.
 #![allow(missing_docs)]
@@ -20,6 +23,7 @@ pub struct Model {
     pub automation_pid: Uuid,
     pub subject_kind: String,
     pub subject_pid: Uuid,
+    pub action_index: i32,
     pub outcome: String,
     pub detail: Json,
 }

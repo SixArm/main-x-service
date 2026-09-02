@@ -111,9 +111,12 @@ pub async fn notify<C: ConnectionTrait>(
     .map_err(|e| Error::Model(ModelError::from(e)))
 }
 
-/// Record what one automation firing did. Every run is logged —
-/// applied, skipped, or failed — so an automated change is always
-/// traceable to the rule that made it.
+/// Record what one **action** of one automation firing did.
+/// `action_index` (0-based) names which element of the rule's `actions`
+/// array this row reports on (FR-32: "each action's outcome logged
+/// separately") — a firing of an N-action rule calls this N times, one
+/// row per action, never one row overwritten by the next action's
+/// outcome.
 ///
 /// # Errors
 ///
@@ -123,6 +126,7 @@ pub async fn record_run<C: ConnectionTrait>(
     automation_pid: Uuid,
     subject_kind: &str,
     subject_pid: Uuid,
+    action_index: i32,
     outcome: &str,
     detail: serde_json::Value,
 ) -> Result<automation_runs::Model> {
@@ -131,6 +135,7 @@ pub async fn record_run<C: ConnectionTrait>(
         automation_pid: ActiveValue::set(automation_pid),
         subject_kind: ActiveValue::set(subject_kind.to_string()),
         subject_pid: ActiveValue::set(subject_pid),
+        action_index: ActiveValue::set(action_index),
         outcome: ActiveValue::set(outcome.to_string()),
         detail: ActiveValue::set(detail),
         ..Default::default()

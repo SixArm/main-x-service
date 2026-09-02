@@ -1,6 +1,8 @@
 //! `SeaORM` Entity — `automations`. One workflow rule: when a trigger
-//! fires (typically a task crossing the Kanban board), apply one
-//! action. `plan_pid` scopes the rule to a plan; `NULL` = every plan.
+//! fires (typically a task crossing the Kanban board), apply its
+//! `actions` **in declared order** (FR-32) — a JSONB array of
+//! `{"kind": …, "value": …}`, never empty (schema-enforced). `plan_pid`
+//! scopes the rule to a plan; `NULL` = every plan.
 
 // SeaORM-generated entity shape: documented by the migration.
 #![allow(missing_docs)]
@@ -22,8 +24,7 @@ pub struct Model {
     pub trigger_kind: String,
     pub from_status: Option<String>,
     pub to_status: Option<String>,
-    pub action_kind: String,
-    pub action_value: Json,
+    pub actions: Json,
     pub enabled: bool,
     pub deleted_at: Option<DateTimeWithTimeZone>,
 }

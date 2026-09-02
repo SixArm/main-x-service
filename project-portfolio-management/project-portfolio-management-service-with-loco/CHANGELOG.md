@@ -29,6 +29,81 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   `converting_a_control_action_creates_a_task_on_the_plan`); `cargo
   fmt --check` / `cargo clippy --all-targets -- -D warnings` clean.
 
+### Added — milestone-due date-arrival trigger (T-21, FR-32)
+
+- A new `milestone_due` trigger kind fires when a milestone's own `due`
+  date has arrived — the one dated field in the domain with
+  unambiguous "arrived" semantics (a task's `due_at`/`start_at`/
+  `finish_at` are each ambiguous about which one "the" date-arrival
+  trigger would mean, so this ships narrowly on milestones rather than
+  guessing a task-date convention).
+- Unlike every other trigger, nobody's write makes a due date "arrive"
+  — there is no event to hang the rule on — so this needed its own
+  **exactly-once claim** rather than the existing fire-on-write path.
+  New table `automation_milestone_fires (automation_pid, milestone_pid)`
+  (migration `m20260902_000002_automation_milestone_fires`) with a
+  `UNIQUE (automation_pid, milestone_pid)` constraint, claimed via
+  `INSERT … ON CONFLICT DO NOTHING`. A suppressed conflict surfaces
+  from sea-orm 2.0.2's `exec_with_returning` as `DbErr::RecordNotFound
+  ("Failed to find inserted item")` — confirmed by running the claim
+  twice against a real Postgres, not assumed from the crate source
+  (which also defines a `RecordNotInserted` variant used by a
+  different insert code path, `TryInsert`, not this one).
+- New `POST /api/automations/milestones/sweep`
+  (`sweep_milestone_due`): finds overdue, undone, non-deleted
+  milestones (capped at `SWEEP_CAP`), and for each enabled
+  `milestone_due` rule matching the milestone's plan, attempts the
+  claim before applying the rule's actions — so a rule/milestone pair
+  fires exactly once, ever, no matter how many times the sweep runs.
+  The optional scheduler ticker now calls this sweep on every tick
+  alongside the existing `sweep_due`; the endpoint also works
+  standalone for a deployment driving both sweeps from external cron.
+- `fire()`'s action-application logic is extracted into a shared
+  `apply_rule_actions` helper so the write-triggered path and the new
+  sweep log multi-action outcomes identically.
+- Verified live: a new request test seeds one overdue and one
+  far-future milestone, a matching `milestone_due` rule, sweeps twice,
+  and confirms `fired: 1, already_claimed: 0` then `fired: 0,
+  already_claimed: 1` — with exactly one `automation_runs` row
+  throughout and the far-future milestone never firing.
+  `cargo test --lib` 360/360 (was 358, +2); DB-gated suite 76/76 (was
+  75, +1).
+- **Field-change and SLE-breach triggers are deliberately not
+  included** — both need a product decision (which fields count as
+  "changed"; which SLE source and a once-only notification schema)
+  that a mechanical implementation would otherwise have to invent. Left
+  open in spec §13 T-21 pending that decision, on the same reasoning
+  basis as the PRO-P33 controls-registration deferral.
+
+### Added — multi-action automation rules (T-21, FR-32)
+
+- A rule may now declare **more than one action**, applied in the
+  array's declared order, with **each action's outcome logged
+  separately**: `automations.action_kind`/`action_value` (one action)
+  is replaced by `actions JSONB NOT NULL DEFAULT '[]'`
+  (`[{"kind": …, "value": …}, …]`), and `automation_runs` gains
+  `action_index` so a firing of an N-action rule writes N run rows
+  instead of one silently overwriting the next. A `CHECK
+  (jsonb_array_length(actions) > 0)` refuses an empty list even from a
+  direct insert; migration `m20260902_000001_automation_multi_action`
+  backfills every existing single-action rule into a one-element array.
+- New pure `automation::validate_actions` (5 tests): validates every
+  declared action with the existing per-kind `validate_action` and
+  names the offending 0-based index on failure; capped at 20 actions
+  per rule.
+- `POST /api/automations`'s body changed from `action_kind`/
+  `action_value` to `actions: [{kind, value}]` — a breaking change with
+  **no back-compat shim**: there is no front-end consumer of this
+  endpoint yet (repo `tasks.md` PRO-P20) and this service is pre-1.0
+  with synthetic data only, so a clean cut was chosen over carrying two
+  request shapes.
+- Verified live against a fresh Postgres: a new request test seeds a
+  two-action rule (`add_label` on an already-labelled plan, then
+  `assign`) and confirms the first action logs `skipped` while the
+  second still applies, proving one action's non-fatal outcome does
+  not block the next. `cargo test --lib` 358/358 (was 353, +5);
+  DB-gated suite 75/75 (was 74, +1).
+
 ### Added — OpenTelemetry OTLP export (PRO-H12 slice 7 of 7)
 
 - Real OpenTelemetry OTLP export (`src/observability.rs`, repo

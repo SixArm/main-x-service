@@ -111,7 +111,7 @@ plan-scoped sub-resources hang off `/api/plans/{pid}/...`. See
 | DevOps | `POST /devops/events` (deploy/incident/recovery ingest) · `GET /devops/metrics` (from ingested events only) · `GET /devops/releases` |
 | Oversight areas | `GET /board/{pack,investments,trends}` + `POST /board/snapshots` · `/auditor/{trail,findings,evidence-pack}` · `/compliance/{register,findings}` · `/risk/heatmap` · `/security/register` · `/regulator/extract` (persona gating = ABAC policy config) |
 | Collaboration | `POST`/`GET /reviews` (+ `/consensus` · `/{pid}/respond` · `/{pid}/submit` · `DELETE /{pid}`) · `POST /plans/{pid}/tasks/{t_pid}/assign` · `GET /assignees/workload` · `GET /notifications` (+ `/{pid}/read`) |
-| Automation | `POST`/`GET /automations` (+ `/{pid}/enable`·`/disable` · `DELETE /{pid}` · `GET /runs`) · `POST`/`GET /scheduled-actions` (+ `/sweep` · `DELETE /{pid}`) |
+| Automation | `POST`/`GET /automations` (+ `/{pid}/enable`·`/disable` · `DELETE /{pid}` · `GET /runs`) · `POST`/`GET /scheduled-actions` (+ `/sweep` · `DELETE /{pid}`) · `POST /automations/milestones/sweep` (claim-based `milestone_due` date-arrival trigger; a rule/milestone pair fires exactly once, ever) |
 | Prioritisation | `GET /plans/{pid}/smart-score` · `/prioritisation` · `/lifecycle` · `/plans/{pid}/lifecycle` (derived; ETag + `as_of`) |
 | Audit / events | `GET /plans/audit/recent` · `/plans/{pid}/audit` · `/plans/events/recent` |
 | Auth | `GET /plans/whoami` (`401` without a valid token) |
@@ -224,7 +224,7 @@ src/
 ├── controllers/controls.rs   controls register: standards, readings, actions, coverage
 ├── controllers/value.rs      business-case targets, value points, adoption, satisfaction, performance
 ├── controllers/collaboration.rs  collaborative review + assignees + notifications
-├── controllers/automation.rs PPM automations + runs + scheduled actions + sweep
+├── controllers/automation.rs PPM automations + runs + scheduled actions + sweep + milestone-due sweep (claim-based)
 ├── controllers/prioritisation.rs Smart Score + ranked queue + bird's-eye lifecycle
 ├── controllers/compliance.rs `/api/compliance/{records,audit}/verify` — row-level integrity verification
 ├── controllers/docs.rs       OpenAPI JSON + Swagger UI
@@ -254,7 +254,7 @@ src/
 ├── automation.rs             pure trigger matching + action validation + due-ness
 ├── prioritisation.rs         the pure, explainable Smart Score (renormalised, self-describing)
 ├── lifecycle.rs              pure bird's-eye funnel + next-phase readiness checklist
-├── scheduler.rs              optional set-and-forget sweep ticker (env-gated, default off)
+├── scheduler.rs              optional set-and-forget sweep ticker (env-gated, default off; sweeps scheduled actions and milestone-due rules)
 ├── openapi.rs                OpenAPI 3 document
 ├── privacy.rs                field masking (lead_ref, owner org) + GDPR export envelope
 ├── compliance/                keyed integrity: mac.rs (integrity-mac binding) + record_integrity.rs (plans) + audit_integrity.rs (audit_logs); default off without PORTFOLIO_INTEGRITY_MAC_KEY[_FILE]
@@ -292,7 +292,9 @@ migration/src/                …_000001_plans, …_000002_audit_logs,
                               m20260825_000006_key_results,
                               m20260826_000001_effort,
                               m20260826_000002_ceremonies,
-                              m20260826_000003_value
+                              m20260826_000003_value,
+                              m20260902_000001_automation_multi_action,
+                              m20260902_000002_automation_milestone_fires
 config/                       development/production/test yaml
 tests/otlp_export.rs          real OTLP/gRPC export proof, in-process collector, no database
 tests/otlp_middleware.rs      the mounted `trace_mw` layer proved end to end over a real HTTP request

@@ -242,8 +242,9 @@ async fn workflow_automation_fires_on_a_board_move_and_logs_the_run() {
                 "name": "Route reviews to the lead",
                 "trigger_kind": "task_moved",
                 "to_status": "in_review",
-                "action_kind": "assign",
-                "action_value": { "assignee_ref": assignee },
+                "actions": [
+                    { "kind": "assign", "value": { "assignee_ref": assignee } },
+                ],
             }))
             .await
             .json();
@@ -257,8 +258,9 @@ async fn workflow_automation_fires_on_a_board_move_and_logs_the_run() {
                 "name": "Other board only",
                 "trigger_kind": "task_moved",
                 "to_status": "in_review",
-                "action_kind": "add_label",
-                "action_value": { "label": "should-not-appear" },
+                "actions": [
+                    { "kind": "add_label", "value": { "label": "should-not-appear" } },
+                ],
             }))
             .await
             .assert_status_ok();
@@ -270,8 +272,24 @@ async fn workflow_automation_fires_on_a_board_move_and_logs_the_run() {
                 .json(&json!({
                     "name": "Bad rule",
                     "trigger_kind": "task_moved",
-                    "action_kind": "assign",
-                    "action_value": { "assignee_ref": "just-a-name" },
+                    "actions": [
+                        { "kind": "assign", "value": { "assignee_ref": "just-a-name" } },
+                    ],
+                }))
+                .await
+                .status_code(),
+            422
+        );
+
+        // An empty actions array is refused too — it could never do
+        // anything.
+        assert_eq!(
+            request
+                .post("/api/automations")
+                .json(&json!({
+                    "name": "No actions",
+                    "trigger_kind": "task_moved",
+                    "actions": [],
                 }))
                 .await
                 .status_code(),
@@ -354,6 +372,174 @@ async fn workflow_automation_fires_on_a_board_move_and_logs_the_run() {
             Some(1),
             "a disabled rule adds no runs"
         );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// FR-32: a rule with more than one action applies every one of them, in
+// the array's declared order, and logs each action's own outcome
+// separately — one action skipping (the plan already carries the
+// label) does not stop the next one from applying.
+async fn a_multi_action_rule_applies_every_action_in_order_and_logs_each_outcome() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let plan_pid = create_plan!(request, "Multi-action board");
+        let assignee = person("66666666-6666-6666-6666-666666666666");
+
+        // The plan already carries this label, so the add_label action
+        // (declared first) will skip — the assign action (declared
+        // second) must still apply.
+        request
+            .put(&format!("/api/plans/{plan_pid}"))
+            .json(&json!({ "name": "Multi-action board", "tags": ["already-tagged"] }))
+            .await
+            .assert_status_ok();
+
+        let rule: Value = request
+            .post("/api/automations")
+            .json(&json!({
+                "plan_pid": plan_pid,
+                "name": "Label then assign",
+                "trigger_kind": "task_moved",
+                "to_status": "in_review",
+                "actions": [
+                    { "kind": "add_label", "value": { "label": "already-tagged" } },
+                    { "kind": "assign", "value": { "assignee_ref": assignee } },
+                ],
+            }))
+            .await
+            .json();
+        let rule_pid = rule["pid"].as_str().expect("pid").to_string();
+
+        let task: Value = request
+            .post(&format!("/api/plans/{plan_pid}/tasks"))
+            .json(&json!({ "title": "Needs both actions" }))
+            .await
+            .json();
+        let task_pid = task["pid"].as_str().expect("task pid").to_string();
+
+        request
+            .patch(&format!("/api/plans/{plan_pid}/tasks/{task_pid}"))
+            .json(&json!({ "status": "in_review" }))
+            .await
+            .assert_status_ok();
+
+        // The second action applied despite the first one skipping.
+        let moved: Value = request
+            .get(&format!("/api/plans/{plan_pid}/tasks"))
+            .await
+            .json();
+        assert_eq!(
+            moved["tasks"][0]["assignee_ref"], assignee,
+            "the second action (assign) must still apply after the first skipped"
+        );
+
+        // Both actions logged their own outcome, in declared order.
+        let runs: Value = request
+            .get(&format!("/api/automations/runs?automation={rule_pid}"))
+            .await
+            .json();
+        let mut rows = runs.as_array().cloned().expect("runs");
+        assert_eq!(rows.len(), 2, "one row per action: {rows:?}");
+        rows.sort_by_key(|r| r["action_index"].as_i64().unwrap_or(-1));
+        assert_eq!(rows[0]["action_index"], 0);
+        assert_eq!(rows[0]["outcome"], "skipped", "already carried the label");
+        assert_eq!(rows[1]["action_index"], 1);
+        assert_eq!(rows[1]["outcome"], "applied", "the assign action");
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// FR-32: "a date arriving" — a `milestone_due` rule fires once a
+// milestone's due date has passed, and the sweep is exactly-once: a
+// second sweep over the same still-overdue milestone does not refire
+// the rule.
+async fn a_milestone_due_rule_fires_once_the_date_arrives_and_never_again() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let plan_pid = create_plan!(request, "Milestone-triggered board");
+        let recipient = person("77777777-7777-7777-7777-777777777777");
+
+        let milestone: Value = request
+            .post(&format!("/api/plans/{plan_pid}/milestones"))
+            .json(&json!({ "name": "Beta freeze", "due": "2020-01-01" }))
+            .await
+            .json();
+        let milestone_pid = milestone["pid"]
+            .as_str()
+            .expect("milestone pid")
+            .to_string();
+
+        // A milestone due in the far future must not fire.
+        let future_milestone: Value = request
+            .post(&format!("/api/plans/{plan_pid}/milestones"))
+            .json(&json!({ "name": "Not yet", "due": "2099-01-01" }))
+            .await
+            .json();
+        let future_pid = future_milestone["pid"]
+            .as_str()
+            .expect("future milestone pid")
+            .to_string();
+
+        let rule: Value = request
+            .post("/api/automations")
+            .json(&json!({
+                "plan_pid": plan_pid,
+                "name": "Notify on milestone due",
+                "trigger_kind": "milestone_due",
+                "actions": [
+                    { "kind": "notify", "value": { "recipient_ref": recipient } },
+                ],
+            }))
+            .await
+            .json();
+        let rule_pid = rule["pid"].as_str().expect("pid").to_string();
+
+        let first: Value = request
+            .post("/api/automations/milestones/sweep")
+            .await
+            .json();
+        assert_eq!(
+            first["fired"], 1,
+            "exactly the one overdue milestone: {first:?}"
+        );
+        assert_eq!(first["already_claimed"], 0);
+
+        let runs: Value = request
+            .get(&format!("/api/automations/runs?automation={rule_pid}"))
+            .await
+            .json();
+        let rows = runs.as_array().cloned().expect("runs");
+        assert_eq!(rows.len(), 1, "one run for the one overdue milestone");
+        assert_eq!(rows[0]["subject_pid"], milestone_pid);
+        assert_eq!(rows[0]["outcome"], "applied");
+
+        // A second sweep claims nothing new: the pair already fired.
+        let second: Value = request
+            .post("/api/automations/milestones/sweep")
+            .await
+            .json();
+        assert_eq!(second["fired"], 0, "already fired for this milestone");
+        assert_eq!(second["already_claimed"], 1);
+        let after: Value = request
+            .get(&format!("/api/automations/runs?automation={rule_pid}"))
+            .await
+            .json();
+        assert_eq!(
+            after.as_array().map(Vec::len),
+            Some(1),
+            "still exactly one run, not two"
+        );
+
+        // The far-future milestone never appears in any run.
+        let none = rows.iter().any(|r| r["subject_pid"] == future_pid);
+        assert!(!none, "a not-yet-due milestone must not fire");
     })
     .await;
 }
@@ -477,8 +663,9 @@ async fn automation_lists_are_paginated() {
                     "name": format!("Rule {i}"),
                     "trigger_kind": "task_moved",
                     "to_status": "in_review",
-                    "action_kind": "add_label",
-                    "action_value": { "label": format!("paging-label-{i}") },
+                    "actions": [
+                        { "kind": "add_label", "value": { "label": format!("paging-label-{i}") } },
+                    ],
                 }))
                 .await
                 .assert_status_ok();

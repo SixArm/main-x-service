@@ -16,7 +16,7 @@
 //!   comparison against a caller-supplied clock; the module has no
 //!   clock of its own.
 
-use serde_json::Value;
+use serde_json::{Value, json};
 use uuid::Uuid;
 
 /// What can fire an automation.
@@ -30,6 +30,16 @@ pub const TRIGGER_KINDS: &[&str] = &[
     // collapsing them into one trigger would make a rule fire on the
     // wrong kind of change.
     "plan_phase_changed",
+    // Added 2026-09-02 (FR-32's "a date arriving"), scoped narrowly to
+    // `milestones.due` — the one dated field in this service with an
+    // unambiguous "arrived" reading. Unlike every trigger above, this
+    // one is not fired from a single write: a due date stays true every
+    // time a sweep looks at it, so firing needs its own exactly-once
+    // claim (`automation_milestone_fires`,
+    // `controllers::automation::sweep_milestone_due`) rather than a
+    // one-shot call from `fire()`. Carries no status filter — see
+    // `validate_trigger` below.
+    "milestone_due",
 ];
 
 /// What an automation may do when it fires.
@@ -229,6 +239,65 @@ pub fn validate_action(
         _ => unreachable!("action_kind was checked against ACTION_KINDS above"),
     }
     Ok(())
+}
+
+/// Highest number of actions one rule may declare. A bound, not a
+/// design target: nothing about the engine needs a cap, but an
+/// unbounded array is an unbounded number of `automation_runs` rows per
+/// firing, and a request body nobody could plausibly declare by hand
+/// past a few dozen is more likely a mistake than an intention.
+pub const MAX_ACTIONS_PER_RULE: usize = 20;
+
+/// One parsed, already-validated action from a rule's `actions` array.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedAction {
+    /// One of [`ACTION_KINDS`].
+    pub kind: String,
+    /// The action's own parameters, already checked by [`validate_action`].
+    pub value: Value,
+}
+
+/// Validate a rule's **ordered list** of actions (FR-32: "more than one
+/// action per rule, applied in declared order").
+///
+/// Array order **is** declared order — there is no separate position
+/// field to keep in sync with it. Every element is validated with
+/// [`validate_action`]; the first problem found names its 0-based index
+/// so a caller with several actions can tell which one is wrong.
+///
+/// # Errors
+///
+/// A message naming the offending index and field, or the empty-array /
+/// too-many-actions / malformed-element case.
+pub fn validate_actions(
+    actions: &[Value],
+    task_statuses: &[&str],
+) -> Result<Vec<ParsedAction>, String> {
+    if actions.is_empty() {
+        return Err("actions must declare at least one action".to_string());
+    }
+    if actions.len() > MAX_ACTIONS_PER_RULE {
+        return Err(format!(
+            "actions may declare at most {MAX_ACTIONS_PER_RULE}, found {}",
+            actions.len()
+        ));
+    }
+    let mut parsed = Vec::with_capacity(actions.len());
+    for (index, action) in actions.iter().enumerate() {
+        let kind = action
+            .get("kind")
+            .and_then(Value::as_str)
+            .filter(|k| !k.trim().is_empty())
+            .ok_or_else(|| format!("actions[{index}].kind is required"))?;
+        let value = action.get("value").cloned().unwrap_or_else(|| json!({}));
+        validate_action(kind, &value, task_statuses)
+            .map_err(|e| format!("actions[{index}]: {e}"))?;
+        parsed.push(ParsedAction {
+            kind: kind.to_string(),
+            value,
+        });
+    }
+    Ok(parsed)
 }
 
 /// Validate a trigger definition: the kind must be known, and the
@@ -484,6 +553,53 @@ mod tests {
     }
 
     #[test]
+    fn an_empty_actions_array_is_refused() {
+        let err = validate_actions(&[], STATUSES).expect_err("must refuse");
+        assert!(err.contains("at least one"), "{err}");
+    }
+
+    #[test]
+    fn too_many_actions_is_refused() {
+        let who = format!("person:{}", Uuid::new_v4());
+        let actions: Vec<Value> = (0..=MAX_ACTIONS_PER_RULE)
+            .map(|_| json!({ "kind": "assign", "value": { "assignee_ref": who } }))
+            .collect();
+        let err = validate_actions(&actions, STATUSES).expect_err("must refuse");
+        assert!(err.contains("at most"), "{err}");
+    }
+
+    #[test]
+    fn actions_are_validated_in_declared_order_and_the_index_names_the_bad_one() {
+        let who = format!("person:{}", Uuid::new_v4());
+        let actions = vec![
+            json!({ "kind": "assign", "value": { "assignee_ref": who } }),
+            json!({ "kind": "add_label", "value": { "label": "" } }),
+        ];
+        let err = validate_actions(&actions, STATUSES).expect_err("must refuse");
+        assert!(err.starts_with("actions[1]:"), "{err}");
+    }
+
+    #[test]
+    fn a_well_formed_action_list_parses_in_order() {
+        let who = format!("person:{}", Uuid::new_v4());
+        let actions = vec![
+            json!({ "kind": "assign", "value": { "assignee_ref": who } }),
+            json!({ "kind": "add_label", "value": { "label": "fast-track" } }),
+        ];
+        let parsed = validate_actions(&actions, STATUSES).expect("valid");
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].kind, "assign");
+        assert_eq!(parsed[1].kind, "add_label");
+        assert_eq!(parsed[1].value["label"], "fast-track");
+    }
+
+    #[test]
+    fn an_action_with_no_kind_is_refused() {
+        let err = validate_actions(&[json!({ "value": {} })], STATUSES).expect_err("must refuse");
+        assert!(err.contains("actions[0].kind"), "{err}");
+    }
+
+    #[test]
     fn unknown_action_kinds_and_non_objects_are_refused() {
         assert!(validate_action("launch_rocket", &json!({}), STATUSES).is_err());
         assert!(validate_action("add_label", &json!("fast-track"), STATUSES).is_err());
@@ -502,6 +618,36 @@ mod tests {
             .expect_err("must refuse");
         assert!(err.contains("task_moved"), "{err}");
         assert!(validate_trigger("review_submitted", None, None, STATUSES).is_ok());
+    }
+
+    #[test]
+    fn milestone_due_is_a_recognised_statusless_trigger() {
+        assert!(is_token(TRIGGER_KINDS, "milestone_due"));
+        assert!(validate_trigger("milestone_due", None, None, STATUSES).is_ok());
+        // A date arriving has no from/to status of any kind — neither a
+        // task status nor a phase.
+        assert!(validate_trigger("milestone_due", None, Some("done"), STATUSES).is_err());
+    }
+
+    #[test]
+    fn a_milestone_due_rule_matches_its_own_plan_only() {
+        let mine = Uuid::new_v4();
+        let theirs = Uuid::new_v4();
+        let rule = RuleFact {
+            enabled: true,
+            plan_pid: Some(mine),
+            trigger_kind: "milestone_due".to_string(),
+            from_status: None,
+            to_status: None,
+        };
+        let fact_for = |plan: Uuid| TriggerFact {
+            kind: "milestone_due".to_string(),
+            plan_pid: plan,
+            from_status: None,
+            to_status: None,
+        };
+        assert!(rule_matches(&rule, &fact_for(mine)));
+        assert!(!rule_matches(&rule, &fact_for(theirs)));
     }
 
     #[test]
