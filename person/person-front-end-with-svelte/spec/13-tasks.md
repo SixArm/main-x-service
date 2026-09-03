@@ -18,7 +18,14 @@
 - [ ] T-15: Identifier / address / emergency-contact edit (currently read-only on detail; edit form re-PUTs whole record but no UI to add/remove sub-records).
 - [ ] T-16: Theming tokens in `app.css` extracted to a small theme module.
 - [ ] T-17: `check-duplicates` endpoint wired into create form (preview before commit).
-- [ ] T-18: Batch deduplicate-scan results UI.
+- [x] T-18: Batch deduplicate-scan results UI. *(closed as duplicate,
+  2026-09-03 — verified directly rather than assumed)* T-25 below
+  shipped this exact capability at `/review` (`src/routes/review/`
+  exists and is live) under a different task number rather than under
+  this one; T-18 was never itself ticked when the board landed. See
+  T-25 for the full delivery record — the status/page-size filter, the
+  keyboard-reachable table path, the side-by-side comparison panel,
+  `provenance` on cards, and the test suite.
 - [ ] T-19: Masked-view toggle on detail page.
 - [ ] T-20: GDPR-export download button.
 - [ ] T-21: Validate the SVAR licensing fit (free GPL-3.0 vs Pro) — see §16 OQ-1.

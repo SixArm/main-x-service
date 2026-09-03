@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — T-18 closed as duplicate
+
+T-18 ("batch deduplicate-scan results UI") was never itself ticked
+when the `/review` board landed under T-25's task number instead.
+Verified `src/routes/review/` is live and closed T-18 as a duplicate
+rather than leaving it open against work that already shipped.
+
 ### Fixed — two real bugs found running the live-integration suite green (PRO-P4, resumed)
 
 - **Edit form (`FR-6`) crashed silently.** `/persons/[id]/edit` loads
