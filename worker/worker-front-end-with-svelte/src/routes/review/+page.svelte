@@ -240,7 +240,9 @@
 
     /** Renders a possibly-absent field as an explicit "not recorded". */
     function orNone(value: string | null | undefined): string {
-        return value && value.trim().length > 0 ? value : t("review.compare.none");
+        return value && value.trim().length > 0
+            ? value
+            : t("review.compare.none");
     }
 
     // The comparison rows, so the table body stays declarative.
@@ -324,7 +326,9 @@
                     .decideReview(String(ev.id), target)
                     .catch((cause) => {
                         actionError =
-                            cause instanceof Error ? cause.message : String(cause);
+                            cause instanceof Error
+                                ? cause.message
+                                : String(cause);
                     })
                     .finally(load);
             } else {
@@ -470,17 +474,23 @@
             <p class="muted">{t("review.compare.loading")}</p>
         {:else if pair}
             {#if pairPartial}
-                <p class="banner" role="status">{t("review.compare.partial")}</p>
+                <p class="banner" role="status">
+                    {t("review.compare.partial")}
+                </p>
             {/if}
             <table class="compare" data-testid="review-compare-table">
                 <thead>
                     <tr>
                         <th scope="col">{t("review.compare.field")}</th>
                         <th scope="col">
-                            {t("review.compare.a")} · {shortId(item.worker_id_a)}
+                            {t("review.compare.a")} · {shortId(
+                                item.worker_id_a,
+                            )}
                         </th>
                         <th scope="col">
-                            {t("review.compare.b")} · {shortId(item.worker_id_b)}
+                            {t("review.compare.b")} · {shortId(
+                                item.worker_id_b,
+                            )}
                         </th>
                     </tr>
                 </thead>
@@ -529,7 +539,9 @@
                 disabled={!canDecide(item) || deciding}
                 onclick={() => void decide("confirmed")}
             >
-                {deciding ? t("review.decide.deciding") : t("review.decide.confirm")}
+                {deciding
+                    ? t("review.decide.deciding")
+                    : t("review.decide.confirm")}
             </button>
             <button
                 type="button"

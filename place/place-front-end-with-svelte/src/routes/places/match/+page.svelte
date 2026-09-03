@@ -17,14 +17,23 @@
     import { PlaceRepository } from "$lib/api/places.js";
     import { blankPostalAddress } from "$lib/api/types.js";
     import { t } from "$lib/i18n.svelte.js";
-    import type { GeoCoordinates, MatchRequest, MatchResult, PostalAddress } from "$lib/api/types.js";
+    import type {
+        GeoCoordinates,
+        MatchRequest,
+        MatchResult,
+        PostalAddress,
+    } from "$lib/api/types.js";
 
     const repo = PlaceRepository.withFetch();
 
     let name = $state("");
     let threshold = $state(0.7);
     let address = $state<PostalAddress>(blankPostalAddress());
-    let geo = $state<GeoCoordinates>({ latitude_as_decimal_degrees: 0, longitude_as_decimal_degrees: 0, elevation_as_decimal_metres: null });
+    let geo = $state<GeoCoordinates>({
+        latitude_as_decimal_degrees: 0,
+        longitude_as_decimal_degrees: 0,
+        elevation_as_decimal_metres: null,
+    });
     let useGeo = $state(false);
 
     let results = $state<MatchResult[]>([]);
@@ -56,14 +65,28 @@
 <section class="surface stack">
     <form onsubmit={runMatch} class="stack">
         <FieldRow>
-            <LabeledField label={t("match.name")} for="m-name" required><input id="m-name" bind:value={name} required /></LabeledField>
-            <LabeledField label={t("match.threshold")} for="m-threshold" hint={t("match.thresholdHint")}>
-                <input id="m-threshold" type="number" step="0.05" min="0" max="1" bind:value={threshold} />
+            <LabeledField label={t("match.name")} for="m-name" required
+                ><input id="m-name" bind:value={name} required /></LabeledField
+            >
+            <LabeledField
+                label={t("match.threshold")}
+                for="m-threshold"
+                hint={t("match.thresholdHint")}
+            >
+                <input
+                    id="m-threshold"
+                    type="number"
+                    step="0.05"
+                    min="0"
+                    max="1"
+                    bind:value={threshold}
+                />
             </LabeledField>
         </FieldRow>
         <PostalAddressInput bind:address />
         <label class="row small">
-            <input type="checkbox" bind:checked={useGeo} /> {t("match.includeGeo")}
+            <input type="checkbox" bind:checked={useGeo} />
+            {t("match.includeGeo")}
         </label>
         {#if useGeo}
             <GeoCoordinatesInput bind:geo />

@@ -39,8 +39,10 @@
         // birth-date rules, to fail fast before the network round-trip.
         validate(value) {
             const errors: Record<string, string> = {};
-            if (!value.name.family.trim()) errors.family = t("form.errFamilyRequired");
-            if (!value.name.given.length) errors.given = t("form.errGivenRequired");
+            if (!value.name.family.trim())
+                errors.family = t("form.errFamilyRequired");
+            if (!value.name.given.length)
+                errors.given = t("form.errGivenRequired");
             if (value.birth_date && Date.parse(value.birth_date) > Date.now()) {
                 errors.birth_date = t("form.errBirthFuture");
             }
@@ -63,7 +65,11 @@
     <HumanNameInput bind:name={form.value.name} errors={form.errors} />
 
     <FieldRow>
-        <LabeledField label={t("form.birthDate")} for="dob" error={form.errors.birth_date}>
+        <LabeledField
+            label={t("form.birthDate")}
+            for="dob"
+            error={form.errors.birth_date}
+        >
             <input id="dob" type="date" bind:value={form.value.birth_date} />
         </LabeledField>
         <LabeledField label={t("form.gender")} for="gender">
@@ -73,7 +79,11 @@
                 {/each}
             </select>
         </LabeledField>
-        <LabeledField label={t("form.taxId")} for="tax_id" hint={t("form.taxIdHint")}>
+        <LabeledField
+            label={t("form.taxId")}
+            for="tax_id"
+            hint={t("form.taxIdHint")}
+        >
             <input id="tax_id" bind:value={form.value.tax_id} />
         </LabeledField>
     </FieldRow>
@@ -86,7 +96,12 @@
         <button type="submit" class="button primary" disabled={form.submitting}>
             {form.submitting ? t("form.saving") : submitLabel}
         </button>
-        <button type="button" class="button" onclick={() => form.reset()} disabled={form.submitting}>
+        <button
+            type="button"
+            class="button"
+            onclick={() => form.reset()}
+            disabled={form.submitting}
+        >
             {t("form.reset")}
         </button>
     </div>

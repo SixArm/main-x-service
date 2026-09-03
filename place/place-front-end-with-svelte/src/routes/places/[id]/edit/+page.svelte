@@ -55,6 +55,10 @@
     <div class="banner error">{error}</div>
 {:else if place}
     <section class="surface stack">
-        <PlaceForm initial={place} submitLabel={t("edit.saveChanges")} onsubmit={handleSubmit} />
+        <PlaceForm
+            initial={place}
+            submitLabel={t("edit.saveChanges")}
+            onsubmit={handleSubmit}
+        />
     </section>
 {/if}

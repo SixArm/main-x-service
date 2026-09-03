@@ -23,40 +23,99 @@
     // has a Lily stylesheet at `static/assets/themes/<slug>.css` (a symlink
     // to the shared design-system themes) that ThemePicker swaps in.
     const THEMES = [
-        "abyss", "acid", "aqua", "autumn", "black", "bumblebee", "business",
-        "caramellatte", "cmyk", "coffee", "corporate", "cupcake", "cyberpunk",
-        "dark", "dim", "dracula", "emerald", "fantasy", "forest", "garden",
-        "halloween", "lemonade", "light", "lofi", "luxury", "night", "nord",
-        "pastel", "retro", "silk", "sunset", "synthwave",
+        "abyss",
+        "acid",
+        "aqua",
+        "autumn",
+        "black",
+        "bumblebee",
+        "business",
+        "caramellatte",
+        "cmyk",
+        "coffee",
+        "corporate",
+        "cupcake",
+        "cyberpunk",
+        "dark",
+        "dim",
+        "dracula",
+        "emerald",
+        "fantasy",
+        "forest",
+        "garden",
+        "halloween",
+        "lemonade",
+        "light",
+        "lofi",
+        "luxury",
+        "night",
+        "nord",
+        "pastel",
+        "retro",
+        "silk",
+        "sunset",
+        "synthwave",
         "united-kingdom-national-health-service-england-for-patients",
         "united-kingdom-national-health-service-england-for-practitioners",
         "united-kingdom-national-health-service-scotland-for-patients",
         "united-kingdom-national-health-service-scotland-for-practitioners",
         "united-kingdom-national-health-service-wales-for-patients",
         "united-kingdom-national-health-service-wales-for-practitioners",
-        "valentine", "winter", "wireframe"
+        "valentine",
+        "winter",
+        "wireframe",
     ];
 
     // Human-readable labels for the theme select — the FULL theme name for
     // each slug (DaisyUI names title-cased; the NHS slugs spelled out in full).
     const THEME_LABELS: Record<string, string> = {
-        abyss: "Abyss", acid: "Acid", aqua: "Aqua", autumn: "Autumn",
-        black: "Black", bumblebee: "Bumblebee", business: "Business",
-        caramellatte: "Caramellatte", cmyk: "Cmyk", coffee: "Coffee",
-        corporate: "Corporate", cupcake: "Cupcake", cyberpunk: "Cyberpunk",
-        dark: "Dark", dim: "Dim", dracula: "Dracula", emerald: "Emerald",
-        fantasy: "Fantasy", forest: "Forest", garden: "Garden",
-        halloween: "Halloween", lemonade: "Lemonade", light: "Light",
-        lofi: "Lofi", luxury: "Luxury", night: "Night", nord: "Nord",
-        pastel: "Pastel", retro: "Retro", silk: "Silk", sunset: "Sunset",
-        synthwave: "Synthwave", valentine: "Valentine", winter: "Winter",
+        abyss: "Abyss",
+        acid: "Acid",
+        aqua: "Aqua",
+        autumn: "Autumn",
+        black: "Black",
+        bumblebee: "Bumblebee",
+        business: "Business",
+        caramellatte: "Caramellatte",
+        cmyk: "Cmyk",
+        coffee: "Coffee",
+        corporate: "Corporate",
+        cupcake: "Cupcake",
+        cyberpunk: "Cyberpunk",
+        dark: "Dark",
+        dim: "Dim",
+        dracula: "Dracula",
+        emerald: "Emerald",
+        fantasy: "Fantasy",
+        forest: "Forest",
+        garden: "Garden",
+        halloween: "Halloween",
+        lemonade: "Lemonade",
+        light: "Light",
+        lofi: "Lofi",
+        luxury: "Luxury",
+        night: "Night",
+        nord: "Nord",
+        pastel: "Pastel",
+        retro: "Retro",
+        silk: "Silk",
+        sunset: "Sunset",
+        synthwave: "Synthwave",
+        valentine: "Valentine",
+        winter: "Winter",
         wireframe: "Wireframe",
-        "united-kingdom-national-health-service-england-for-patients": "United Kingdom National Health Service England for Patients",
-        "united-kingdom-national-health-service-england-for-practitioners": "United Kingdom National Health Service England for Practitioners",
-        "united-kingdom-national-health-service-scotland-for-patients": "United Kingdom National Health Service Scotland for Patients",
-        "united-kingdom-national-health-service-scotland-for-practitioners": "United Kingdom National Health Service Scotland for Practitioners",
-        "united-kingdom-national-health-service-wales-for-patients": "United Kingdom National Health Service Wales for Patients",
-        "united-kingdom-national-health-service-wales-for-practitioners": "United Kingdom National Health Service Wales for Practitioners",
+        "united-kingdom-national-health-service-england-for-patients":
+            "United Kingdom National Health Service England for Patients",
+        "united-kingdom-national-health-service-england-for-practitioners":
+            "United Kingdom National Health Service England for Practitioners",
+        "united-kingdom-national-health-service-scotland-for-patients":
+            "United Kingdom National Health Service Scotland for Patients",
+        "united-kingdom-national-health-service-scotland-for-practitioners":
+            "United Kingdom National Health Service Scotland for Practitioners",
+        "united-kingdom-national-health-service-wales-for-patients":
+            "United Kingdom National Health Service Wales for Patients",
+        "united-kingdom-national-health-service-wales-for-practitioners":
+            "United Kingdom National Health Service Wales for Practitioners",
     };
 
     import { LocalePicker } from "lily-design-system-svelte-locale-picker";
@@ -114,14 +173,18 @@
         >
             <span class="hamburger-box" aria-hidden="true"></span>
         </button>
-        <a href="/" class="brand">Place <span class="muted small">{t("brand.tagline")}</span></a>
+        <a href="/" class="brand"
+            >Place <span class="muted small">{t("brand.tagline")}</span></a
+        >
         <nav id="primary-nav" class="primary-nav" class:open={menuOpen}>
             <ul>
                 {#each navItems as item}
                     <li>
                         <a
                             href={item.href}
-                            aria-current={page.url.pathname === item.href ? "page" : null}
+                            aria-current={page.url.pathname === item.href
+                                ? "page"
+                                : null}
                             onclick={() => (menuOpen = false)}
                         >
                             {t(item.key)}
@@ -152,11 +215,14 @@
                         <!-- Sign-out posts to the root page's `signout` action
                              (BFF: revokes server-side + clears the cookie). -->
                         <form method="POST" action="/?/signout" use:enhance>
-                            <button type="submit">{t("session.signOut")}</button>
+                            <button type="submit">{t("session.signOut")}</button
+                            >
                         </form>
                     {:else}
                         <!-- Per-app magic-link login on this app's own origin. -->
-                        <a class="signin button" href="/signin">{t("session.signIn")}</a>
+                        <a class="signin button" href="/signin"
+                            >{t("session.signIn")}</a
+                        >
                     {/if}
                 </section>
             </div>
@@ -189,7 +255,9 @@
         color: var(--mxi-color-fg);
         white-space: nowrap;
     }
-    .brand:hover { text-decoration: none; }
+    .brand:hover {
+        text-decoration: none;
+    }
     /* The hamburger toggle is the only nav affordance — visible at every
        viewport width (not a narrow-only responsive fallback). */
     .hamburger {
@@ -212,8 +280,12 @@
         background: var(--mxi-color-fg);
         content: "";
     }
-    .hamburger-box::before { transform: translateY(-5px); }
-    .hamburger-box::after { transform: translateY(3px); }
+    .hamburger-box::before {
+        transform: translateY(-5px);
+    }
+    .hamburger-box::after {
+        transform: translateY(3px);
+    }
     /* Nav is hidden by default at every width and opens as a dropdown panel
        overlaying the page content (position:absolute) so it never reflows the
        header bar. The toggle sets `aria-expanded` + `.open`. */
@@ -233,7 +305,9 @@
         border-radius: var(--mxi-radius);
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
     }
-    .primary-nav.open { display: flex; }
+    .primary-nav.open {
+        display: flex;
+    }
     .primary-nav ul {
         list-style: none;
         display: flex;
@@ -248,7 +322,10 @@
         border-radius: var(--mxi-radius);
         color: var(--mxi-color-fg);
     }
-    .primary-nav a:hover { background: var(--mxi-color-bg); text-decoration: none; }
+    .primary-nav a:hover {
+        background: var(--mxi-color-bg);
+        text-decoration: none;
+    }
     .primary-nav a[aria-current="page"] {
         background: var(--mxi-color-primary);
         color: var(--mxi-color-primary-fg);

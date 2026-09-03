@@ -57,15 +57,23 @@
     });
 
     // Textarea ↔ string[] adapters: join with newlines for display…
-    let alternateNamesJoined = $derived((form.value.alternate_names ?? []).join("\n"));
+    let alternateNamesJoined = $derived(
+        (form.value.alternate_names ?? []).join("\n"),
+    );
     let sameAsJoined = $derived((form.value.same_as ?? []).join("\n"));
 
     // …and split on input, trimming and dropping blank lines on write-back.
     function updateAlternateNames(value: string) {
-        form.value.alternate_names = value.split("\n").map((s) => s.trim()).filter(Boolean);
+        form.value.alternate_names = value
+            .split("\n")
+            .map((s) => s.trim())
+            .filter(Boolean);
     }
     function updateSameAs(value: string) {
-        form.value.same_as = value.split("\n").map((s) => s.trim()).filter(Boolean);
+        form.value.same_as = value
+            .split("\n")
+            .map((s) => s.trim())
+            .filter(Boolean);
     }
 
     // Suppress native navigation and delegate to the form controller's submit.
@@ -77,20 +85,43 @@
 
 <form onsubmit={handleSubmit} class="stack">
     <FieldRow>
-        <LabeledField label={t("form.name")} for="name" required error={form.errors.name}>
+        <LabeledField
+            label={t("form.name")}
+            for="name"
+            required
+            error={form.errors.name}
+        >
             <input id="name" bind:value={form.value.name} required />
         </LabeledField>
-        <LabeledField label={t("form.additionalType")} for="add-type" error={form.errors.additional_type} hint={t("form.additionalTypeHint")}>
-            <input id="add-type" type="url" bind:value={form.value.additional_type} placeholder="https://schema.org/Book" />
+        <LabeledField
+            label={t("form.additionalType")}
+            for="add-type"
+            error={form.errors.additional_type}
+            hint={t("form.additionalTypeHint")}
+        >
+            <input
+                id="add-type"
+                type="url"
+                bind:value={form.value.additional_type}
+                placeholder="https://schema.org/Book"
+            />
         </LabeledField>
     </FieldRow>
 
     <LabeledField label={t("form.description")} for="desc">
-        <textarea id="desc" rows={3} bind:value={form.value.description}></textarea>
+        <textarea id="desc" rows={3} bind:value={form.value.description}
+        ></textarea>
     </LabeledField>
 
-    <LabeledField label={t("form.disambiguating")} for="disambig" hint={t("form.disambiguatingHint")}>
-        <input id="disambig" bind:value={form.value.disambiguating_description} />
+    <LabeledField
+        label={t("form.disambiguating")}
+        for="disambig"
+        hint={t("form.disambiguatingHint")}
+    >
+        <input
+            id="disambig"
+            bind:value={form.value.disambiguating_description}
+        />
     </LabeledField>
 
     <FieldRow>
@@ -102,21 +133,31 @@
         </LabeledField>
     </FieldRow>
 
-    <LabeledField label={t("form.alternateNames")} for="alt-names" hint={t("form.alternateNamesHint")}>
+    <LabeledField
+        label={t("form.alternateNames")}
+        for="alt-names"
+        hint={t("form.alternateNamesHint")}
+    >
         <textarea
             id="alt-names"
             rows={3}
             value={alternateNamesJoined}
-            oninput={(e) => updateAlternateNames((e.target as HTMLTextAreaElement).value)}
+            oninput={(e) =>
+                updateAlternateNames((e.target as HTMLTextAreaElement).value)}
         ></textarea>
     </LabeledField>
 
-    <LabeledField label={t("form.sameAs")} for="same-as" hint={t("form.sameAsHint")}>
+    <LabeledField
+        label={t("form.sameAs")}
+        for="same-as"
+        hint={t("form.sameAsHint")}
+    >
         <textarea
             id="same-as"
             rows={3}
             value={sameAsJoined}
-            oninput={(e) => updateSameAs((e.target as HTMLTextAreaElement).value)}
+            oninput={(e) =>
+                updateSameAs((e.target as HTMLTextAreaElement).value)}
         ></textarea>
     </LabeledField>
 
@@ -134,6 +175,11 @@
         <button type="submit" class="button primary" disabled={form.submitting}>
             {form.submitting ? t("form.saving") : submitLabel}
         </button>
-        <button type="button" class="button" onclick={() => form.reset()} disabled={form.submitting}>{t("form.reset")}</button>
+        <button
+            type="button"
+            class="button"
+            onclick={() => form.reset()}
+            disabled={form.submitting}>{t("form.reset")}</button
+        >
     </div>
 </form>

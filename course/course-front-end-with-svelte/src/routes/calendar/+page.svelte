@@ -65,7 +65,9 @@
                     text: label,
                 });
             }
-            for (const [index, session] of (schedule?.sessions ?? []).entries()) {
+            for (const [index, session] of (
+                schedule?.sessions ?? []
+            ).entries()) {
                 out.push({
                     id: `${course.id}::${instance.id}::s${index}`,
                     start: new Date(session.start),

@@ -43,7 +43,10 @@
     function placeTypeLabel(p: Place): string {
         if (!p.place_type) return "";
         if (typeof p.place_type === "string") return p.place_type;
-        return translate("grid.typeOther").replace("{value}", p.place_type.Other);
+        return translate("grid.typeOther").replace(
+            "{value}",
+            p.place_type.Other,
+        );
     }
 
     // Flatten nested Place fields (address, geo) into the flat columns the
@@ -55,7 +58,9 @@
             place_type: placeTypeLabel(p),
             locality: p.address?.address_locality ?? "",
             country: p.address?.address_country ?? "",
-            geo: p.geo ? `${p.geo.latitude_as_decimal_degrees.toFixed(4)}, ${p.geo.longitude_as_decimal_degrees.toFixed(4)}` : "",
+            geo: p.geo
+                ? `${p.geo.latitude_as_decimal_degrees.toFixed(4)}, ${p.geo.longitude_as_decimal_degrees.toFixed(4)}`
+                : "",
         })),
     );
 
@@ -84,7 +89,9 @@
             : data,
     );
 
-    function initGrid(api: { on(action: string, cb: (ev: { id: string | number }) => void): void }) {
+    function initGrid(api: {
+        on(action: string, cb: (ev: { id: string | number }) => void): void;
+    }) {
         api.on("select-row", (ev) => {
             const found = places.find((p) => p.id === String(ev.id));
             if (found) onselect?.(found);
@@ -97,7 +104,8 @@
         <div class="filter-wrap">
             <FilterBar
                 fields={filterFields}
-                onchange={({ value }: { value: unknown }) => (filterRules = value)}
+                onchange={({ value }: { value: unknown }) =>
+                    (filterRules = value)}
             />
         </div>
         <div class="grid-wrap">

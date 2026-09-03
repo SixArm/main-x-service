@@ -19,7 +19,11 @@
     import FieldRow from "$lib/forms/FieldRow.svelte";
     import ThingIdentifierInput from "$lib/components/ThingIdentifierInput.svelte";
     import { ThingRepository } from "$lib/api/things.js";
-    import type { MatchRequest, MatchResult, ThingIdentifier } from "$lib/api/types.js";
+    import type {
+        MatchRequest,
+        MatchResult,
+        ThingIdentifier,
+    } from "$lib/api/types.js";
     import { t } from "$lib/i18n.svelte.js";
 
     const repo = ThingRepository.withFetch();
@@ -47,7 +51,10 @@
                 description: description || undefined,
                 url: url || undefined,
                 identifiers: identifiers.length > 0 ? identifiers : undefined,
-                same_as: sameAsRaw.split("\n").map((s) => s.trim()).filter(Boolean),
+                same_as: sameAsRaw
+                    .split("\n")
+                    .map((s) => s.trim())
+                    .filter(Boolean),
                 threshold,
             };
             results = await repo.match(req);
@@ -67,9 +74,22 @@
 <section class="surface stack">
     <form onsubmit={runMatch} class="stack">
         <FieldRow>
-            <LabeledField label={t("match.name")} for="m-name" required><input id="m-name" bind:value={name} required /></LabeledField>
-            <LabeledField label={t("match.threshold")} for="m-threshold" hint={t("match.thresholdHint")}>
-                <input id="m-threshold" type="number" step="0.05" min="0" max="1" bind:value={threshold} />
+            <LabeledField label={t("match.name")} for="m-name" required
+                ><input id="m-name" bind:value={name} required /></LabeledField
+            >
+            <LabeledField
+                label={t("match.threshold")}
+                for="m-threshold"
+                hint={t("match.thresholdHint")}
+            >
+                <input
+                    id="m-threshold"
+                    type="number"
+                    step="0.05"
+                    min="0"
+                    max="1"
+                    bind:value={threshold}
+                />
             </LabeledField>
         </FieldRow>
         <LabeledField label={t("match.description")} for="m-desc">
@@ -78,7 +98,11 @@
         <LabeledField label={t("match.url")} for="m-url">
             <input id="m-url" type="url" bind:value={url} />
         </LabeledField>
-        <LabeledField label={t("match.sameAs")} for="m-sameas" hint={t("match.sameAsHint")}>
+        <LabeledField
+            label={t("match.sameAs")}
+            for="m-sameas"
+            hint={t("match.sameAsHint")}
+        >
             <textarea id="m-sameas" rows={2} bind:value={sameAsRaw}></textarea>
         </LabeledField>
         <section class="stack">

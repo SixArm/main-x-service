@@ -18,7 +18,10 @@
 -->
 <script lang="ts">
     import type { Course } from "$lib/api/types.js";
-    import { COURSE_STATUSES, EDUCATIONAL_LEVEL_OPTIONS } from "$lib/api/types.js";
+    import {
+        COURSE_STATUSES,
+        EDUCATIONAL_LEVEL_OPTIONS,
+    } from "$lib/api/types.js";
     import { createForm } from "$lib/forms/form.svelte.js";
     import LabeledField from "$lib/forms/LabeledField.svelte";
     import FieldRow from "$lib/forms/FieldRow.svelte";
@@ -60,26 +63,42 @@
 
     // String views of the array fields for binding to text controls.
     // newline-joined for one-per-line textareas; comma-joined for inline lists.
-    let alternateNamesJoined = $derived((form.value.alternate_names ?? []).join("\n"));
+    let alternateNamesJoined = $derived(
+        (form.value.alternate_names ?? []).join("\n"),
+    );
     let sameAsJoined = $derived((form.value.same_as ?? []).join("\n"));
     let keywordsJoined = $derived((form.value.keywords ?? []).join(", "));
     let teachesJoined = $derived((form.value.teaches ?? []).join("\n"));
-    let availableLangJoined = $derived((form.value.available_language ?? []).join(", "));
+    let availableLangJoined = $derived(
+        (form.value.available_language ?? []).join(", "),
+    );
 
     // Inverse of the *Joined deriveds: parse edited text back into the
     // array fields, trimming and dropping blank entries.
     function updateAlternateNames(value: string) {
-        form.value.alternate_names = value.split("\n").map((s) => s.trim()).filter(Boolean);
+        form.value.alternate_names = value
+            .split("\n")
+            .map((s) => s.trim())
+            .filter(Boolean);
     }
     function updateSameAs(value: string) {
-        form.value.same_as = value.split("\n").map((s) => s.trim()).filter(Boolean);
+        form.value.same_as = value
+            .split("\n")
+            .map((s) => s.trim())
+            .filter(Boolean);
     }
     function updateKeywords(value: string) {
         // Keywords accept either comma or newline as a separator.
-        form.value.keywords = value.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
+        form.value.keywords = value
+            .split(/[,\n]/)
+            .map((s) => s.trim())
+            .filter(Boolean);
     }
     function updateTeaches(value: string) {
-        form.value.teaches = value.split("\n").map((s) => s.trim()).filter(Boolean);
+        form.value.teaches = value
+            .split("\n")
+            .map((s) => s.trim())
+            .filter(Boolean);
     }
     function updateAvailableLanguage(value: string) {
         // BCP-47 codes: split on any whitespace/comma and lowercase.
@@ -92,7 +111,12 @@
     // Type guard: narrows educational_level to its enumerated string
     // variants (excludes the { Custom } object), so the <select> can
     // bind a plain string value.
-    function isStringLevel(l: Course["educational_level"]): l is Exclude<NonNullable<Course["educational_level"]>, { Custom: string }> {
+    function isStringLevel(
+        l: Course["educational_level"],
+    ): l is Exclude<
+        NonNullable<Course["educational_level"]>,
+        { Custom: string }
+    > {
         return typeof l === "string";
     }
 
@@ -106,32 +130,61 @@
 
 <form onsubmit={handleSubmit} class="stack">
     <FieldRow>
-        <LabeledField label={t("form.name")} for="name" required error={form.errors.name}>
+        <LabeledField
+            label={t("form.name")}
+            for="name"
+            required
+            error={form.errors.name}
+        >
             <input id="name" bind:value={form.value.name} required />
         </LabeledField>
-        <LabeledField label={t("form.courseCode")} for="course-code" hint={t("form.courseCodeHint")} error={form.errors.course_code}>
-            <input id="course-code" bind:value={form.value.course_code} maxlength="100" />
+        <LabeledField
+            label={t("form.courseCode")}
+            for="course-code"
+            hint={t("form.courseCodeHint")}
+            error={form.errors.course_code}
+        >
+            <input
+                id="course-code"
+                bind:value={form.value.course_code}
+                maxlength="100"
+            />
         </LabeledField>
         <LabeledField label={t("form.status")} for="status">
             <select id="status" bind:value={form.value.status}>
-                {#each COURSE_STATUSES as s}<option value={s}>{s}</option>{/each}
+                {#each COURSE_STATUSES as s}<option value={s}>{s}</option
+                    >{/each}
             </select>
         </LabeledField>
     </FieldRow>
 
     <LabeledField label={t("form.description")} for="desc">
-        <textarea id="desc" rows={3} bind:value={form.value.description}></textarea>
+        <textarea id="desc" rows={3} bind:value={form.value.description}
+        ></textarea>
     </LabeledField>
 
     <FieldRow>
         <LabeledField label={t("form.url")} for="url" error={form.errors.url}>
             <input id="url" type="url" bind:value={form.value.url} />
         </LabeledField>
-        <LabeledField label={t("form.license")} for="license" error={form.errors.license}>
+        <LabeledField
+            label={t("form.license")}
+            for="license"
+            error={form.errors.license}
+        >
             <input id="license" type="url" bind:value={form.value.license} />
         </LabeledField>
-        <LabeledField label={t("form.numberOfCredits")} for="credits" error={form.errors.number_of_credits}>
-            <input id="credits" type="number" min="0" bind:value={form.value.number_of_credits} />
+        <LabeledField
+            label={t("form.numberOfCredits")}
+            for="credits"
+            error={form.errors.number_of_credits}
+        >
+            <input
+                id="credits"
+                type="number"
+                min="0"
+                bind:value={form.value.number_of_credits}
+            />
         </LabeledField>
     </FieldRow>
 
@@ -144,64 +197,102 @@
             -->
             <select
                 id="level"
-                value={isStringLevel(form.value.educational_level) ? form.value.educational_level : ""}
+                value={isStringLevel(form.value.educational_level)
+                    ? form.value.educational_level
+                    : ""}
                 onchange={(e) => {
                     const v = (e.target as HTMLSelectElement).value;
-                    form.value.educational_level = (v || null) as Course["educational_level"];
+                    form.value.educational_level = (v ||
+                        null) as Course["educational_level"];
                 }}
             >
                 <option value="">—</option>
-                {#each EDUCATIONAL_LEVEL_OPTIONS as l}<option value={l}>{l}</option>{/each}
+                {#each EDUCATIONAL_LEVEL_OPTIONS as l}<option value={l}
+                        >{l}</option
+                    >{/each}
             </select>
         </LabeledField>
-        <LabeledField label={t("form.typicalAgeRange")} for="age" hint={t("form.typicalAgeRangeHint")}>
+        <LabeledField
+            label={t("form.typicalAgeRange")}
+            for="age"
+            hint={t("form.typicalAgeRangeHint")}
+        >
             <input id="age" bind:value={form.value.typical_age_range} />
         </LabeledField>
-        <LabeledField label={t("form.timeRequired")} for="duration" hint={t("form.timeRequiredHint")}>
+        <LabeledField
+            label={t("form.timeRequired")}
+            for="duration"
+            hint={t("form.timeRequiredHint")}
+        >
             <input id="duration" bind:value={form.value.time_required} />
         </LabeledField>
     </FieldRow>
 
-    <LabeledField label={t("form.alternateNames")} for="alt-names" hint={t("form.alternateNamesHint")}>
+    <LabeledField
+        label={t("form.alternateNames")}
+        for="alt-names"
+        hint={t("form.alternateNamesHint")}
+    >
         <textarea
             id="alt-names"
             rows={3}
             value={alternateNamesJoined}
-            oninput={(e) => updateAlternateNames((e.target as HTMLTextAreaElement).value)}
+            oninput={(e) =>
+                updateAlternateNames((e.target as HTMLTextAreaElement).value)}
         ></textarea>
     </LabeledField>
 
-    <LabeledField label={t("form.keywords")} for="keywords" hint={t("form.keywordsHint")}>
+    <LabeledField
+        label={t("form.keywords")}
+        for="keywords"
+        hint={t("form.keywordsHint")}
+    >
         <input
             id="keywords"
             value={keywordsJoined}
-            oninput={(e) => updateKeywords((e.target as HTMLInputElement).value)}
+            oninput={(e) =>
+                updateKeywords((e.target as HTMLInputElement).value)}
         />
     </LabeledField>
 
-    <LabeledField label={t("form.teaches")} for="teaches" hint={t("form.teachesHint")}>
+    <LabeledField
+        label={t("form.teaches")}
+        for="teaches"
+        hint={t("form.teachesHint")}
+    >
         <textarea
             id="teaches"
             rows={3}
             value={teachesJoined}
-            oninput={(e) => updateTeaches((e.target as HTMLTextAreaElement).value)}
+            oninput={(e) =>
+                updateTeaches((e.target as HTMLTextAreaElement).value)}
         ></textarea>
     </LabeledField>
 
-    <LabeledField label={t("form.availableLanguages")} for="langs" hint={t("form.availableLanguagesHint")}>
+    <LabeledField
+        label={t("form.availableLanguages")}
+        for="langs"
+        hint={t("form.availableLanguagesHint")}
+    >
         <input
             id="langs"
             value={availableLangJoined}
-            oninput={(e) => updateAvailableLanguage((e.target as HTMLInputElement).value)}
+            oninput={(e) =>
+                updateAvailableLanguage((e.target as HTMLInputElement).value)}
         />
     </LabeledField>
 
-    <LabeledField label={t("form.sameAs")} for="same-as" hint={t("form.sameAsHint")}>
+    <LabeledField
+        label={t("form.sameAs")}
+        for="same-as"
+        hint={t("form.sameAsHint")}
+    >
         <textarea
             id="same-as"
             rows={3}
             value={sameAsJoined}
-            oninput={(e) => updateSameAs((e.target as HTMLTextAreaElement).value)}
+            oninput={(e) =>
+                updateSameAs((e.target as HTMLTextAreaElement).value)}
         ></textarea>
     </LabeledField>
 
@@ -210,12 +301,19 @@
         <CourseIdentifierInput bind:identifiers={form.value.identifiers!} />
     </section>
 
-    {#if form.submitError}<div class="banner error">{form.submitError}</div>{/if}
+    {#if form.submitError}<div class="banner error">
+            {form.submitError}
+        </div>{/if}
 
     <div class="row">
         <button type="submit" class="button primary" disabled={form.submitting}>
             {form.submitting ? t("form.saving") : submitLabel}
         </button>
-        <button type="button" class="button" onclick={() => form.reset()} disabled={form.submitting}>{t("form.reset")}</button>
+        <button
+            type="button"
+            class="button"
+            onclick={() => form.reset()}
+            disabled={form.submitting}>{t("form.reset")}</button
+        >
     </div>
 </form>

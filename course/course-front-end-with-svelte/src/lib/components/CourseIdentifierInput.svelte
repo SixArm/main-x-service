@@ -12,7 +12,10 @@
 -->
 <script lang="ts">
     import type { IdentifierType, CourseIdentifier } from "$lib/api/types.js";
-    import { IDENTIFIER_TYPE_OPTIONS, blankCourseIdentifier } from "$lib/api/types.js";
+    import {
+        IDENTIFIER_TYPE_OPTIONS,
+        blankCourseIdentifier,
+    } from "$lib/api/types.js";
     import LabeledField from "$lib/forms/LabeledField.svelte";
     import FieldRow from "$lib/forms/FieldRow.svelte";
     import { t } from "$lib/i18n.svelte.js";
@@ -36,7 +39,10 @@
         if (value === "Custom") {
             identifiers[idx] = { ...current, property_id: { Custom: "" } };
         } else {
-            identifiers[idx] = { ...current, property_id: value as IdentifierType };
+            identifiers[idx] = {
+                ...current,
+                property_id: value as IdentifierType,
+            };
         }
     }
 
@@ -61,40 +67,73 @@
     {#each identifiers as identifier, idx (idx)}
         <div class="identifier surface">
             <FieldRow>
-                <LabeledField label={t("identifier.type")} for={`id-type-${idx}`}>
+                <LabeledField
+                    label={t("identifier.type")}
+                    for={`id-type-${idx}`}
+                >
                     <select
                         id={`id-type-${idx}`}
-                        value={isCustom(identifier.property_id) ? "Custom" : identifier.property_id}
-                        onchange={(e) => setType(idx, (e.target as HTMLSelectElement).value)}
+                        value={isCustom(identifier.property_id)
+                            ? "Custom"
+                            : identifier.property_id}
+                        onchange={(e) =>
+                            setType(idx, (e.target as HTMLSelectElement).value)}
                     >
                         {#each IDENTIFIER_TYPE_OPTIONS as opt}
                             <option value={opt}>{opt}</option>
                         {/each}
-                        <option value="Custom">{t("identifier.customOption")}</option>
+                        <option value="Custom"
+                            >{t("identifier.customOption")}</option
+                        >
                     </select>
                 </LabeledField>
                 {#if isCustom(identifier.property_id)}
-                    <LabeledField label={t("identifier.customLabel")} for={`id-custom-${idx}`}>
+                    <LabeledField
+                        label={t("identifier.customLabel")}
+                        for={`id-custom-${idx}`}
+                    >
                         <input
                             id={`id-custom-${idx}`}
                             value={identifier.property_id.Custom}
-                            oninput={(e) => setCustomLabel(idx, (e.target as HTMLInputElement).value)}
+                            oninput={(e) =>
+                                setCustomLabel(
+                                    idx,
+                                    (e.target as HTMLInputElement).value,
+                                )}
                         />
                     </LabeledField>
                 {/if}
-                <LabeledField label={t("identifier.value")} for={`id-val-${idx}`} required>
-                    <input id={`id-val-${idx}`} bind:value={identifier.value} required />
+                <LabeledField
+                    label={t("identifier.value")}
+                    for={`id-val-${idx}`}
+                    required
+                >
+                    <input
+                        id={`id-val-${idx}`}
+                        bind:value={identifier.value}
+                        required
+                    />
                 </LabeledField>
                 <LabeledField label={t("identifier.url")} for={`id-url-${idx}`}>
                     <input id={`id-url-${idx}`} bind:value={identifier.url} />
                 </LabeledField>
             </FieldRow>
-            <button type="button" class="button danger small" onclick={() => remove(idx)}>{t("identifier.remove")}</button>
+            <button
+                type="button"
+                class="button danger small"
+                onclick={() => remove(idx)}>{t("identifier.remove")}</button
+            >
         </div>
     {/each}
-    <button type="button" class="button" onclick={add}>{t("identifier.add")}</button>
+    <button type="button" class="button" onclick={add}
+        >{t("identifier.add")}</button
+    >
 </section>
 
 <style>
-    .identifier { display: flex; flex-direction: column; gap: 0.5rem; }
+    .identifier {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
 </style>

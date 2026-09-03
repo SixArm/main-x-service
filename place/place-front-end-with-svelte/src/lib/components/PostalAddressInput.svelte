@@ -38,7 +38,15 @@
     <LabeledField label={t("address.postalCode")} for={`${prefix}-postal`}>
         <input id={`${prefix}-postal`} bind:value={address.postal_code} />
     </LabeledField>
-    <LabeledField label={t("address.country")} for={`${prefix}-country`} hint={t("address.countryHint")}>
-        <input id={`${prefix}-country`} bind:value={address.address_country} maxlength="2" />
+    <LabeledField
+        label={t("address.country")}
+        for={`${prefix}-country`}
+        hint={t("address.countryHint")}
+    >
+        <input
+            id={`${prefix}-country`}
+            bind:value={address.address_country}
+            maxlength="2"
+        />
     </LabeledField>
 </FieldRow>

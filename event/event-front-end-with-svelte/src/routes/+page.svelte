@@ -25,7 +25,11 @@
             const h = await repo.health();
             // A successful response means the service is up; the ternary
             // collapses to "ok" either way (any 2xx health body = healthy).
-            healthStatus = h.status?.toLowerCase().includes("ok") || h.status?.toLowerCase().includes("up") ? "ok" : "ok";
+            healthStatus =
+                h.status?.toLowerCase().includes("ok") ||
+                h.status?.toLowerCase().includes("up")
+                    ? "ok"
+                    : "ok";
         } catch (err) {
             // Any thrown ApiError/network error means the probe failed.
             healthStatus = "down";
@@ -44,7 +48,8 @@
 <header class="row" style="justify-content: space-between">
     <h1>{t("dashboard.title")}</h1>
     <span class="status" data-status={healthStatus}>
-        {t("dashboard.service")} {healthStatus}
+        {t("dashboard.service")}
+        {healthStatus}
     </span>
 </header>
 
@@ -63,8 +68,12 @@
             {#each recent as entry}
                 <li>
                     <code>{entry.action}</code>
-                    <a href={`/events/${entry.entity_id}`}>{entry.entity_id.slice(0, 8)}…</a>
-                    <span class="muted small">{new Date(entry.created_at).toLocaleString()}</span>
+                    <a href={`/events/${entry.entity_id}`}
+                        >{entry.entity_id.slice(0, 8)}…</a
+                    >
+                    <span class="muted small"
+                        >{new Date(entry.created_at).toLocaleString()}</span
+                    >
                 </li>
             {/each}
         </ul>
@@ -78,13 +87,27 @@
         background: #f3f4f6;
         font-size: 0.875rem;
     }
-    .status[data-status="ok"] { background: #dcfce7; color: var(--mxi-color-success); }
-    .status[data-status="down"] { background: #fee2e2; color: var(--mxi-color-danger); }
-    .audit { list-style: none; padding: 0; margin: 0; }
+    .status[data-status="ok"] {
+        background: #dcfce7;
+        color: var(--mxi-color-success);
+    }
+    .status[data-status="down"] {
+        background: #fee2e2;
+        color: var(--mxi-color-danger);
+    }
+    .audit {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
     .audit li {
-        display: flex; gap: 0.5rem; align-items: baseline;
+        display: flex;
+        gap: 0.5rem;
+        align-items: baseline;
         padding: 0.375rem 0;
         border-bottom: 1px solid var(--mxi-color-border);
     }
-    .audit li:last-child { border-bottom: none; }
+    .audit li:last-child {
+        border-bottom: none;
+    }
 </style>

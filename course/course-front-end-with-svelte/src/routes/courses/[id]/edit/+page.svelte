@@ -53,6 +53,10 @@
     <div class="banner error">{error}</div>
 {:else if course}
     <section class="surface stack">
-        <CourseForm initial={course} submitLabel={t("edit.saveChanges")} onsubmit={handleSubmit} />
+        <CourseForm
+            initial={course}
+            submitLabel={t("edit.saveChanges")}
+            onsubmit={handleSubmit}
+        />
     </section>
 {/if}

@@ -36,7 +36,12 @@
         loading = true;
         error = null;
         try {
-            const res = await repo.search({ q: q || "*", limit: 50, fuzzy, phonetic });
+            const res = await repo.search({
+                q: q || "*",
+                limit: 50,
+                fuzzy,
+                phonetic,
+            });
             things = res.items;
             total = res.total;
         } catch (err) {
@@ -67,14 +72,28 @@
 </header>
 
 <section class="surface stack">
-    <SearchBox bind:value={query} placeholder={t("things.searchPlaceholder")} onsearch={runSearch} />
+    <SearchBox
+        bind:value={query}
+        placeholder={t("things.searchPlaceholder")}
+        onsearch={runSearch}
+    />
     <div class="row small">
-        <label><input type="checkbox" bind:checked={fuzzy} /> {t("things.fuzzy")}</label>
-        <label><input type="checkbox" bind:checked={phonetic} /> {t("things.phonetic")}</label>
+        <label
+            ><input type="checkbox" bind:checked={fuzzy} />
+            {t("things.fuzzy")}</label
+        >
+        <label
+            ><input type="checkbox" bind:checked={phonetic} />
+            {t("things.phonetic")}</label
+        >
         <span class="muted" style="margin-left: auto">
             {loading
                 ? t("things.loading")
-                : translate(total === 1 ? "things.recordCount" : "things.recordCountPlural").replace("{count}", String(total))}
+                : translate(
+                      total === 1
+                          ? "things.recordCount"
+                          : "things.recordCountPlural",
+                  ).replace("{count}", String(total))}
         </span>
     </div>
     {#if error}

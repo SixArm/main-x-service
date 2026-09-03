@@ -21,7 +21,9 @@
     } = $props();
 
     // Default the placeholder to the localized "Search…" when not supplied.
-    const effectivePlaceholder = $derived(placeholder ?? t("search.placeholder"));
+    const effectivePlaceholder = $derived(
+        placeholder ?? t("search.placeholder"),
+    );
 
     // Intercept native submit (no page reload) and forward the query upward.
     function handleSubmit(e: SubmitEvent) {
@@ -41,6 +43,12 @@
 </form>
 
 <style>
-    .searchbox { display: flex; gap: 0.5rem; align-items: center; }
-    .searchbox input { flex: 1; }
+    .searchbox {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .searchbox input {
+        flex: 1;
+    }
 </style>

@@ -35,7 +35,12 @@
         error = null;
         try {
             // Empty query becomes "*" so the initial load lists everything.
-            const res = await repo.search({ q: q || "*", limit: 50, fuzzy, phonetic });
+            const res = await repo.search({
+                q: q || "*",
+                limit: 50,
+                fuzzy,
+                phonetic,
+            });
             persons = res.items;
             total = res.total;
         } catch (err) {
@@ -67,10 +72,20 @@
 </header>
 
 <section class="surface stack">
-    <SearchBox bind:value={query} placeholder={t("persons.searchPlaceholder")} onsearch={runSearch} />
+    <SearchBox
+        bind:value={query}
+        placeholder={t("persons.searchPlaceholder")}
+        onsearch={runSearch}
+    />
     <div class="row small">
-        <label><input type="checkbox" bind:checked={fuzzy} /> {t("persons.fuzzy")}</label>
-        <label><input type="checkbox" bind:checked={phonetic} /> {t("persons.phonetic")}</label>
+        <label
+            ><input type="checkbox" bind:checked={fuzzy} />
+            {t("persons.fuzzy")}</label
+        >
+        <label
+            ><input type="checkbox" bind:checked={phonetic} />
+            {t("persons.phonetic")}</label
+        >
         <span class="muted" style="margin-left: auto">
             {loading
                 ? t("persons.loading")

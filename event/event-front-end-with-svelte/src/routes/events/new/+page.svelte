@@ -40,9 +40,18 @@
             const created = await repo.create(value);
             if (created.id) goto(`/events/${created.id}`);
         } catch (err) {
-            if (err instanceof ApiError && err.isConflict && Array.isArray(err.details)) {
+            if (
+                err instanceof ApiError &&
+                err.isConflict &&
+                Array.isArray(err.details)
+            ) {
                 duplicates = err.details as MatchResult[];
-                throw new Error(translate("new.duplicatesDetected").replace("{n}", String(duplicates.length)));
+                throw new Error(
+                    translate("new.duplicatesDetected").replace(
+                        "{n}",
+                        String(duplicates.length),
+                    ),
+                );
             }
             throw err;
         }
@@ -54,7 +63,11 @@
 <header><h1>{t("new.title")}</h1></header>
 
 <section class="surface stack">
-    <EventForm initial={blank} submitLabel={t("new.create")} onsubmit={handleSubmit} />
+    <EventForm
+        initial={blank}
+        submitLabel={t("new.create")}
+        onsubmit={handleSubmit}
+    />
 </section>
 
 {#if duplicates.length > 0}

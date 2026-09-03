@@ -44,7 +44,10 @@
                 // Normalise both into the MatchResult[] the UI renders.
                 const details = err.details as
                     | MatchResult[]
-                    | { has_duplicates?: boolean; potential_matches?: MatchResult[] }
+                    | {
+                          has_duplicates?: boolean;
+                          potential_matches?: MatchResult[];
+                      }
                     | null;
                 const extracted: MatchResult[] = Array.isArray(details)
                     ? details
@@ -64,9 +67,16 @@
 <header><h1>{t("new.title")}</h1></header>
 
 <section class="surface stack">
-    <PersonForm initial={blank} submitLabel={t("new.create")} onsubmit={handleSubmit} />
+    <PersonForm
+        initial={blank}
+        submitLabel={t("new.create")}
+        onsubmit={handleSubmit}
+    />
 </section>
 
 {#if duplicates.length > 0}
-    <MatchResultsList results={duplicates} title={t("new.possibleDuplicates")} />
+    <MatchResultsList
+        results={duplicates}
+        title={t("new.possibleDuplicates")}
+    />
 {/if}

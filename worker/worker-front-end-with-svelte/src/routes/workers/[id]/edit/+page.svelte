@@ -58,6 +58,10 @@
     <div class="banner error">{error}</div>
 {:else if worker}
     <section class="surface stack">
-        <WorkerForm initial={worker} submitLabel={t("edit.submit")} onsubmit={handleSubmit} />
+        <WorkerForm
+            initial={worker}
+            submitLabel={t("edit.submit")}
+            onsubmit={handleSubmit}
+        />
     </section>
 {/if}

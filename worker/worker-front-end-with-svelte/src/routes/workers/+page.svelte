@@ -32,7 +32,12 @@
         loading = true;
         error = null;
         try {
-            const res = await repo.search({ q: q || "*", limit: 50, fuzzy, phonetic });
+            const res = await repo.search({
+                q: q || "*",
+                limit: 50,
+                fuzzy,
+                phonetic,
+            });
             workers = res.items;
             total = res.total;
         } catch (err) {
@@ -64,12 +69,26 @@
 </header>
 
 <section class="surface stack">
-    <SearchBox bind:value={query} placeholder={t("workers.searchPlaceholder")} onsearch={runSearch} />
+    <SearchBox
+        bind:value={query}
+        placeholder={t("workers.searchPlaceholder")}
+        onsearch={runSearch}
+    />
     <div class="row small">
-        <label><input type="checkbox" bind:checked={fuzzy} /> {t("workers.fuzzy")}</label>
-        <label><input type="checkbox" bind:checked={phonetic} /> {t("workers.phonetic")}</label>
+        <label
+            ><input type="checkbox" bind:checked={fuzzy} />
+            {t("workers.fuzzy")}</label
+        >
+        <label
+            ><input type="checkbox" bind:checked={phonetic} />
+            {t("workers.phonetic")}</label
+        >
         <span class="muted" style="margin-left: auto">
-            {loading ? t("common.loading") : total === 1 ? t("workers.recordsOne") : tf("workers.recordsOther", { count: total })}
+            {loading
+                ? t("common.loading")
+                : total === 1
+                  ? t("workers.recordsOne")
+                  : tf("workers.recordsOther", { count: total })}
         </span>
     </div>
     {#if error}

@@ -45,7 +45,9 @@
     }
 
     // Display label for an identifier scheme (handles { Custom }).
-    function identifierLabel(i: NonNullable<Course["identifiers"]>[number]): string {
+    function identifierLabel(
+        i: NonNullable<Course["identifiers"]>[number],
+    ): string {
         return typeof i.property_id === "string"
             ? i.property_id
             : `${t("detail.customPrefix")} ${i.property_id.Custom}`;
@@ -55,13 +57,17 @@
     function levelLabel(c: Course): string {
         const l = c.educational_level;
         if (!l) return t("detail.empty");
-        return typeof l === "string" ? l : `${t("detail.customPrefix")} ${l.Custom}`;
+        return typeof l === "string"
+            ? l
+            : `${t("detail.customPrefix")} ${l.Custom}`;
     }
 
     // Headline for an instance: prefer its name, else "date · mode".
     function instanceLabel(inst: CourseInstance): string {
         if (inst.name) return inst.name;
-        const when = inst.schedule?.start_date ? new Date(inst.schedule.start_date).toLocaleDateString() : t("detail.noDate");
+        const when = inst.schedule?.start_date
+            ? new Date(inst.schedule.start_date).toLocaleDateString()
+            : t("detail.noDate");
         return `${when} · ${inst.course_mode ?? t("detail.empty")}`;
     }
 </script>
@@ -76,25 +82,59 @@
     <header class="row" style="justify-content: space-between">
         <h1>{course.name}</h1>
         <div class="row">
-            <a href={`/courses/${id}/edit`} class="button">{t("detail.edit")}</a>
-            <a href={`/courses/${id}/audit`} class="button">{t("detail.audit")}</a>
-            <button class="button danger" onclick={handleDelete}>{t("detail.delete")}</button>
+            <a href={`/courses/${id}/edit`} class="button">{t("detail.edit")}</a
+            >
+            <a href={`/courses/${id}/audit`} class="button"
+                >{t("detail.audit")}</a
+            >
+            <button class="button danger" onclick={handleDelete}
+                >{t("detail.delete")}</button
+            >
         </div>
     </header>
 
     <section class="surface stack">
         <h2>{t("detail.identity")}</h2>
         <dl class="kv">
-            <dt>{t("detail.id")}</dt><dd><code>{course.id}</code></dd>
-            <dt>{t("detail.courseCode")}</dt><dd>{course.course_code ?? t("detail.empty")}</dd>
-            <dt>{t("detail.status")}</dt><dd>{course.status ?? t("detail.empty")}</dd>
-            <dt>{t("detail.educationalLevel")}</dt><dd>{levelLabel(course)}</dd>
-            <dt>{t("detail.numberOfCredits")}</dt><dd>{course.number_of_credits ?? t("detail.empty")}</dd>
-            <dt>{t("detail.timeRequired")}</dt><dd>{course.time_required ?? t("detail.empty")}</dd>
-            <dt>{t("detail.description")}</dt><dd>{course.description ?? t("detail.empty")}</dd>
-            <dt>{t("detail.url")}</dt><dd>{#if course.url}<a href={course.url} target="_blank" rel="noopener">{course.url}</a>{:else}{t("detail.empty")}{/if}</dd>
-            <dt>{t("detail.license")}</dt><dd>{#if course.license}<a href={course.license} target="_blank" rel="noopener">{course.license}</a>{:else}{t("detail.empty")}{/if}</dd>
-            <dt>{t("detail.free")}</dt><dd>{course.is_accessible_for_free === null || course.is_accessible_for_free === undefined ? t("detail.empty") : course.is_accessible_for_free ? t("detail.yes") : t("detail.no")}</dd>
+            <dt>{t("detail.id")}</dt>
+            <dd><code>{course.id}</code></dd>
+            <dt>{t("detail.courseCode")}</dt>
+            <dd>{course.course_code ?? t("detail.empty")}</dd>
+            <dt>{t("detail.status")}</dt>
+            <dd>{course.status ?? t("detail.empty")}</dd>
+            <dt>{t("detail.educationalLevel")}</dt>
+            <dd>{levelLabel(course)}</dd>
+            <dt>{t("detail.numberOfCredits")}</dt>
+            <dd>{course.number_of_credits ?? t("detail.empty")}</dd>
+            <dt>{t("detail.timeRequired")}</dt>
+            <dd>{course.time_required ?? t("detail.empty")}</dd>
+            <dt>{t("detail.description")}</dt>
+            <dd>{course.description ?? t("detail.empty")}</dd>
+            <dt>{t("detail.url")}</dt>
+            <dd>
+                {#if course.url}<a
+                        href={course.url}
+                        target="_blank"
+                        rel="noopener">{course.url}</a
+                    >{:else}{t("detail.empty")}{/if}
+            </dd>
+            <dt>{t("detail.license")}</dt>
+            <dd>
+                {#if course.license}<a
+                        href={course.license}
+                        target="_blank"
+                        rel="noopener">{course.license}</a
+                    >{:else}{t("detail.empty")}{/if}
+            </dd>
+            <dt>{t("detail.free")}</dt>
+            <dd>
+                {course.is_accessible_for_free === null ||
+                course.is_accessible_for_free === undefined
+                    ? t("detail.empty")
+                    : course.is_accessible_for_free
+                      ? t("detail.yes")
+                      : t("detail.no")}
+            </dd>
         </dl>
     </section>
 
@@ -106,7 +146,12 @@
                     <li>
                         <strong>{identifierLabel(identifier)}</strong>
                         <code>{identifier.value}</code>
-                        {#if identifier.url}<a href={identifier.url} target="_blank" rel="noopener" class="small">↗</a>{/if}
+                        {#if identifier.url}<a
+                                href={identifier.url}
+                                target="_blank"
+                                rel="noopener"
+                                class="small">↗</a
+                            >{/if}
                     </li>
                 {/each}
             </ul>
@@ -142,21 +187,32 @@
         <section class="surface stack">
             <h2>{t("detail.sameAs")}</h2>
             <ul>
-                {#each course.same_as as href}<li><a {href} target="_blank" rel="noopener">{href}</a></li>{/each}
+                {#each course.same_as as href}<li>
+                        <a {href} target="_blank" rel="noopener">{href}</a>
+                    </li>{/each}
             </ul>
         </section>
     {/if}
 
     {#if course.instances && course.instances.length > 0}
         <section class="surface stack">
-            <h2>{t("detail.instances")} <span class="muted small">({course.instances.length})</span></h2>
+            <h2>
+                {t("detail.instances")}
+                <span class="muted small">({course.instances.length})</span>
+            </h2>
             <ul>
                 {#each course.instances as inst}
                     <li>
                         <strong>{instanceLabel(inst)}</strong>
-                        {#if inst.status}<span class="muted small">{inst.status}</span>{/if}
+                        {#if inst.status}<span class="muted small"
+                                >{inst.status}</span
+                            >{/if}
                         {#if inst.maximum_attendee_capacity != null}
-                            <span class="muted small">{t("detail.capacity")} {inst.enrolled_count ?? 0}/{inst.maximum_attendee_capacity}</span>
+                            <span class="muted small"
+                                >{t("detail.capacity")}
+                                {inst.enrolled_count ??
+                                    0}/{inst.maximum_attendee_capacity}</span
+                            >
                         {/if}
                     </li>
                 {/each}
@@ -166,8 +222,20 @@
 {/if}
 
 <style>
-    .kv { display: grid; grid-template-columns: max-content 1fr; column-gap: 1rem; row-gap: 0.25rem; }
-    dt { font-weight: 600; }
-    dd { margin: 0; }
-    ul { margin: 0; padding-left: 1.25rem; }
+    .kv {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 1rem;
+        row-gap: 0.25rem;
+    }
+    dt {
+        font-weight: 600;
+    }
+    dd {
+        margin: 0;
+    }
+    ul {
+        margin: 0;
+        padding-left: 1.25rem;
+    }
 </style>

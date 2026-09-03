@@ -28,7 +28,9 @@
         <input type="hidden" name="locale" value={i18n.locale} />
         <button class="button" type="submit">Send magic link</button>
         {#if form?.error}
-            <p class="banner" role="alert">Could not send the sign-in link. Please try again.</p>
+            <p class="banner" role="alert">
+                Could not send the sign-in link. Please try again.
+            </p>
         {/if}
     </form>
 {/if}

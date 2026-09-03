@@ -20,7 +20,10 @@
     let mainId = $state("");
     let duplicateId = $state("");
     let reason = $state("");
-    let preview = $state<{ main: Event | null; duplicate: Event | null }>({ main: null, duplicate: null });
+    let preview = $state<{ main: Event | null; duplicate: Event | null }>({
+        main: null,
+        duplicate: null,
+    });
     let result = $state<MergeResponse | null>(null);
     let error = $state<string | null>(null);
     let loading = $state(false);
@@ -44,9 +47,22 @@
     // Validate ids, confirm, then perform the merge. ApiError is shown as
     // "code: message"; other errors fall back to their string form.
     async function doMerge() {
-        if (!mainId || !duplicateId) { error = translate("merge.bothIdsRequired"); return; }
-        if (mainId === duplicateId) { error = translate("merge.idsMustDiffer"); return; }
-        if (!confirm(translate("merge.confirm").replace("{dup}", duplicateId.slice(0, 8)).replace("{main}", mainId.slice(0, 8)))) return;
+        if (!mainId || !duplicateId) {
+            error = translate("merge.bothIdsRequired");
+            return;
+        }
+        if (mainId === duplicateId) {
+            error = translate("merge.idsMustDiffer");
+            return;
+        }
+        if (
+            !confirm(
+                translate("merge.confirm")
+                    .replace("{dup}", duplicateId.slice(0, 8))
+                    .replace("{main}", mainId.slice(0, 8)),
+            )
+        )
+            return;
         loading = true;
         error = null;
         try {
@@ -69,14 +85,18 @@
     // Split the localized "merge completed" template at {id} so the merge
     // record id renders inside a <code> element while {at} stays inline.
     function completedParts(): { before: string; after: string } {
-        const [before = "", rest = ""] = translate("merge.completedBody").split("{id}");
+        const [before = "", rest = ""] = translate("merge.completedBody").split(
+            "{id}",
+        );
         return { before, after: rest };
     }
 
     // One-line preview label: event name plus its (localized) start date.
     function summary(e: Event | null): string {
         if (!e) return translate("merge.preview.none");
-        const when = e.start_date ? new Date(e.start_date).toLocaleString() : translate("merge.preview.noDate");
+        const when = e.start_date
+            ? new Date(e.start_date).toLocaleString()
+            : translate("merge.preview.noDate");
         return `${e.name} (${when})`;
     }
 </script>
@@ -87,19 +107,44 @@
 
 <section class="surface stack">
     <FieldRow>
-        <LabeledField label={t("merge.mainId")} for="merge-main" required hint={t("merge.mainIdHint")}>
+        <LabeledField
+            label={t("merge.mainId")}
+            for="merge-main"
+            required
+            hint={t("merge.mainIdHint")}
+        >
             <input id="merge-main" bind:value={mainId} />
         </LabeledField>
-        <LabeledField label={t("merge.dupId")} for="merge-dup" required hint={t("merge.dupIdHint")}>
+        <LabeledField
+            label={t("merge.dupId")}
+            for="merge-dup"
+            required
+            hint={t("merge.dupIdHint")}
+        >
             <input id="merge-dup" bind:value={duplicateId} />
         </LabeledField>
     </FieldRow>
-    <LabeledField label={t("merge.reason")} for="merge-reason" hint={t("merge.reasonHint")}>
-        <input id="merge-reason" bind:value={reason} placeholder={t("merge.reasonPlaceholder")} />
+    <LabeledField
+        label={t("merge.reason")}
+        for="merge-reason"
+        hint={t("merge.reasonHint")}
+    >
+        <input
+            id="merge-reason"
+            bind:value={reason}
+            placeholder={t("merge.reasonPlaceholder")}
+        />
     </LabeledField>
     <div class="row">
-        <button type="button" class="button" onclick={loadPreview}>{t("merge.loadPreview")}</button>
-        <button type="button" class="button primary" onclick={doMerge} disabled={loading}>
+        <button type="button" class="button" onclick={loadPreview}
+            >{t("merge.loadPreview")}</button
+        >
+        <button
+            type="button"
+            class="button primary"
+            onclick={doMerge}
+            disabled={loading}
+        >
             {loading ? t("merge.merging") : t("merge.merge")}
         </button>
     </div>
@@ -110,8 +155,10 @@
     <section class="surface stack">
         <h2>{t("merge.previewTitle")}</h2>
         <dl class="kv">
-            <dt>{t("merge.preview.main")}</dt><dd>{summary(preview.main)}</dd>
-            <dt>{t("merge.preview.duplicate")}</dt><dd>{summary(preview.duplicate)}</dd>
+            <dt>{t("merge.preview.main")}</dt>
+            <dd>{summary(preview.main)}</dd>
+            <dt>{t("merge.preview.duplicate")}</dt>
+            <dd>{summary(preview.duplicate)}</dd>
         </dl>
     </section>
 {/if}
@@ -119,19 +166,36 @@
 {#if result}
     <section class="surface stack">
         <h2>{t("merge.completedTitle")}</h2>
-        <p>{completedParts().before}<code>{result.merge_record.id}</code>{completedParts().after.replace(
-            "{at}",
-            new Date(result.merge_record.merged_at).toLocaleString(),
-        )}</p>
-        <a href={`/events/${result.main_event.id}`} class="button primary"
-           onclick={() => result?.main_event.id && goto(`/events/${result.main_event.id}`)}>
+        <p>
+            {completedParts().before}<code>{result.merge_record.id}</code
+            >{completedParts().after.replace(
+                "{at}",
+                new Date(result.merge_record.merged_at).toLocaleString(),
+            )}
+        </p>
+        <a
+            href={`/events/${result.main_event.id}`}
+            class="button primary"
+            onclick={() =>
+                result?.main_event.id &&
+                goto(`/events/${result.main_event.id}`)}
+        >
             {t("merge.viewMerged")}
         </a>
     </section>
 {/if}
 
 <style>
-    .kv { display: grid; grid-template-columns: max-content 1fr; column-gap: 1rem; row-gap: 0.25rem; }
-    dt { font-weight: 600; }
-    dd { margin: 0; }
+    .kv {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 1rem;
+        row-gap: 0.25rem;
+    }
+    dt {
+        font-weight: 600;
+    }
+    dd {
+        margin: 0;
+    }
 </style>

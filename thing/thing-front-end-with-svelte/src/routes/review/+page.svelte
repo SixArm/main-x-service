@@ -338,7 +338,9 @@
                     .decideReview(String(ev.id), target)
                     .catch((cause) => {
                         actionError =
-                            cause instanceof Error ? cause.message : String(cause);
+                            cause instanceof Error
+                                ? cause.message
+                                : String(cause);
                     })
                     .finally(load);
             } else {
@@ -489,7 +491,9 @@
             <p class="muted">{t("review.compare.loading")}</p>
         {:else if pair}
             {#if pairPartial}
-                <p class="banner" role="status">{t("review.compare.partial")}</p>
+                <p class="banner" role="status">
+                    {t("review.compare.partial")}
+                </p>
             {/if}
             <table class="compare" data-testid="review-compare-table">
                 <thead>
@@ -525,7 +529,9 @@
                 <table class="compare" data-testid="review-breakdown">
                     <thead>
                         <tr>
-                            <th scope="col">{t("review.breakdown.component")}</th>
+                            <th scope="col"
+                                >{t("review.breakdown.component")}</th
+                            >
                             <th scope="col">{t("review.breakdown.weight")}</th>
                             <th scope="col">{t("review.breakdown.score")}</th>
                         </tr>
@@ -557,7 +563,9 @@
                 disabled={!canDecide(item) || deciding}
                 onclick={() => void decide("confirmed")}
             >
-                {deciding ? t("review.decide.deciding") : t("review.decide.confirm")}
+                {deciding
+                    ? t("review.decide.deciding")
+                    : t("review.decide.confirm")}
             </button>
             <button
                 type="button"

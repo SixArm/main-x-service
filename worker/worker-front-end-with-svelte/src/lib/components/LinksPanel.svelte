@@ -191,7 +191,8 @@
                             <td>{link.confidence ?? "—"}</td>
                             <td>
                                 {#if link.valid_from || link.valid_to}
-                                    {link.valid_from ?? "—"} → {link.valid_to ?? "—"}
+                                    {link.valid_from ?? "—"} → {link.valid_to ??
+                                        "—"}
                                 {:else}
                                     —
                                 {/if}
