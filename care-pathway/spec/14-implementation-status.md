@@ -38,9 +38,16 @@ Aspirational items live in §15, not here.
 
 Open gaps drive tasks in §13. Live gap list:
 
+T-1 ("single-file crate specs; no service `agents/` reference set") is
+**closed as won't-do** (2026-09-03) and no longer listed here: checked
+directly, the service crate's `spec/index.md` already carries the full
+§1–§18 numbered structure in one file by choice, and root `AGENTS.md`
+states plainly that the twenty-two newer subprojects — care-pathway
+included — deliberately carry no crate-level `agents/` reference set.
+See §13 T-1 for the full reasoning.
+
 | Gap | Task |
 |---|---|
-| Single-file crate specs; no service `agents/` reference set | T-1 |
 | Event streaming is in-memory only (process-local ring buffer); no durable broker, no cross-replica delivery | T-3 follow-up / §15 |
 | Request-level tests exist but are `#[ignore]`-gated; no DB-backed run in CI yet | T-4 follow-up |
 | Front-end tests run locally but aren't wired into CI; no merge-action UI yet | T-5 follow-up |

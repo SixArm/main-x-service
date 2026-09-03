@@ -7,15 +7,41 @@ criterion; tick the box when an automated test or clearly described
 manual check confirms it. Split tasks too big for one PR
 (`T-2a`, `T-2b`).
 
-- [ ] **T-1 — Thicken the thin crate docs.**
-  - [ ] Split the service's single-file `spec/index.md` into the
-    numbered §-per-file layout (the matcher and front-end carry the
-    same task in their own §13 / §23).
-  - [ ] Add a service `agents/` reference set (`models.md`,
+- [x] **T-1 — Thicken the thin crate docs.**
+  *(closed as won't-do, 2026-09-03 — stale against decisions the root
+  `AGENTS.md` already made explicit, verified directly rather than
+  assumed; see `case/spec/13-tasks.md` T-13 for the identical
+  precedent, and `organization/spec/13-tasks.md` T-1 for the same fix
+  applied there in the same pass)*
+  - [x] ~~Split the service's single-file `spec/index.md` into the
+    numbered §-per-file layout~~ — **moot.** Checked directly:
+    `care-pathway-service-with-loco/spec/index.md` already carries the
+    full §1–§18 numbered structure (`## 1. Purpose and vision` through
+    `## 18. Change control`) in one file by choice. Root `AGENTS.md`'s
+    "Two spec shapes exist" table fixes the numbering as what matters
+    for this shape, not a one-file-per-section split. (The matcher and
+    front-end crates, referenced above as carrying "the same task in
+    their own §13/§23," carry no matching item today — checked, not
+    assumed — so there is nothing further to close alongside this.)
+  - [x] ~~Add a service `agents/` reference set (`models.md`,
     `matching.md`, `restful.md`, `testing.md`,
-    `spec-driven-development.md`) matching the person-service shape.
-  - **Acceptance:** every link in this entity spec resolves to a
-    numbered section file rather than an anchor in a monolith.
+    `spec-driven-development.md`) matching the person-service shape.~~
+    — **won't do.** Root `AGENTS.md`'s "Subprojects" section states this
+    as a deliberate decision, not a gap: the six original entity crates
+    carry a crate-level `agents/` reference set, but the twenty-two
+    newer subprojects — care-pathway among them — deliberately do not,
+    because "those files restate what the spec already says, and a
+    restatement that nobody regenerates is exactly the drift the SDD
+    discipline exists to prevent." Confirmed
+    `care-pathway-service-with-loco/` has no crate-level `agents/`
+    directory today (only its `AGENTS.md` entry point, the newer
+    pattern) — that absence is correct per policy; adding the directory
+    this task asked for would be the regression, not the fix. (The
+    entity-level `care-pathway/agents/` directory this crate sits
+    beside already exists and is unaffected — a separate, deliberate
+    layer, not what this task asked for.)
+  - **Acceptance (superseded):** N/A — task rescoped to won't-do rather
+    than closed by a file that was never going to be added.
 - [x] **T-2 — Resolve the blank-name status-code discrepancy.**
   - [x] Service crate spec §6 says `422` for a blank `name`; the
     controller returns `400` (`bad_request`). Decide (family

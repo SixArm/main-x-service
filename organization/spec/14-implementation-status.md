@@ -42,9 +42,15 @@
 
 Open gaps drive tasks in §13 (entity-level) or the subproject queues.
 
+T-1 ("service docs thin") is **closed as won't-do** (2026-09-03) and no
+longer listed here: checked directly, the service crate's `spec/index.md`
+already carries the full §1–§18 numbered structure in one file by
+choice, and root `AGENTS.md` states plainly that the twenty-two newer
+subprojects — organization included — deliberately carry no crate-level
+`agents/` reference set. See §13 T-1 for the full reasoning.
+
 | Gap | Task |
 |---|---|
-| Service docs thin (single-file spec, no `agents/`) | T-1 |
 | Privacy: masking / GDPR export / consent | T-5 |
 | Merge, review queue, batch dedup | T-6 |
 | Duplicate check scans ≤ 1 000 rows in-process | T-7 |
