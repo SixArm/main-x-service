@@ -7778,6 +7778,50 @@ green as it sits; these finish it)**
   care-pathway and patient-flow inherit the rule rather than re-decide
   it.
 
+## Found 2026-09-03 (an upstream release turned CI red for 47 crates)
+
+- [ ] **DEP-3 (M)** **Unlocked crates make CI hostage to any
+  transitive release.** At 21:13Z `tinyvec 1.13.0` was published with
+  a bug (upstream issue #225, fix PR #226 open the same day: a
+  `no_std` + `alloc` path uses `vec!` without importing
+  `alloc::vec`), and **no `rust-version`** — so Cargo's MSRV-aware
+  resolver (which this family relies on, per
+  [`spec/rust-msrv-n-minus-2`](spec/rust-msrv-n-minus-2/index.md)) had
+  nothing to avoid it by. Within the hour every job that resolved fresh
+  failed with `cannot find macro 'vec'` — `check` on the pinned 1.96.1
+  and `msrv` alike, 59 jobs on one PR, 30 on another — while a third PR
+  whose jobs had resolved forty minutes earlier passed 168/168.
+  Reproduced locally: a scratch copy of `person-matcher` with no
+  lockfile resolves 1.13.0 and fails on 1.96.1; `cargo update tinyvec
+  --precise 1.12.0` and it compiles. The path is `unicode-normalization
+  → tinyvec` (matchers directly; services through `sqlx → stringprep`).
+  Exposure is structural: only **17 of 64** crates commit a
+  `Cargo.lock` (the services — root `.gitignore` ignores it, each
+  service's `!Cargo.lock` un-ignores; matchers, libraries, `migration/`
+  and `fuzz/` sub-crates resolve fresh on every CI run, by the standard
+  library-crate convention). `ci-check.sh`'s `--locked` therefore
+  protects 17 crates and leaves 47 floating. Nothing in the repo's
+  tree changed; CI went from green to red on the calendar.
+  Options, none taken yet — this is a **policy decision**, not a fix
+  to slip in: (a) commit lockfiles for every crate (reproducible,
+  matches the compliance posture in
+  [`security.md`](agents/share/security.md) / IEC 62304 §8, but
+  reverses an explicit `.gitignore` design and makes `cargo update` a
+  deliberate PR per crate); (b) a repo-level
+  `ci/dependency-pins.txt` (`tinyvec@1.12.0`) that `ci-check.sh`
+  applies with `cargo update <crate> --precise <ver>` to unlocked
+  crates before building — CI-only, manifest-free, reversible, and
+  exactly what MSRV-checking practice does elsewhere, at the cost of a
+  second place dependency truth lives; (c) wait for upstream (a yank or
+  1.13.1 is likely within a day) and accept that this recurs. Whatever
+  is chosen, WEB-8 already bounds the blast radius for PRs that touch
+  no crate, and `--locked` bounds it for the seventeen; the forty-seven
+  are the gap.
+  **Acceptance:** a decision recorded in the MSRV policy doc; if (a) or
+  (b), the `check` and `msrv` stages green on a day a bad transitive
+  release lands, proven by pinning one deliberately in a scratch
+  branch.
+
 ## Phase 11 — Front-end verification gap (2026-09-03)
 
 > **Provenance.** Found while closing T-19 (the masked-view toggle)
@@ -7794,7 +7838,7 @@ green as it sits; these finish it)**
 > consequences are listed here. Counts below are what was measured on
 > `main` this session, not estimates; anything not measured says so.
 
-- [ ] **WEB-1 (M)** The Playwright **smoke suites are red on `main`**
+- [x] **WEB-1 (M)** The Playwright **smoke suites are red on `main`**
   in three of the four front-ends touched: person 6 red (new-person
   form, validation, bulk page, merge form ×2, review board), worker 5
   red of 9, thing 4 red of 7; place is 7/7 green. Every red test loads
@@ -7829,6 +7873,23 @@ green as it sits; these finish it)**
   stated reason.
   **Acceptance:** `pnpm test:e2e` green in all six entity front-ends
   with the guard on; a redirect test wherever the guard exists.
+  **Done 2026-09-03 (#182).** Each of the five guarded front-ends'
+  Playwright config carries a `SMOKE_STORAGE_STATE` — a stub
+  `__Host-mxi_session` cookie applied to the smoke project via
+  `storageState` (Chromium sends Secure cookies to `http://localhost`,
+  so the preview stays HTTP) — and each spec gains a "page-visit guard"
+  describe that drops the cookie and pins the anonymous 303 on every
+  guarded route, so a removed guard fails the suite. The "third,
+  untriaged cause" above was read from the trace and is **older than
+  the guard**: course's and event's dashboard tests asserted the nav
+  links without first clicking `Toggle navigation` — a stale test
+  predating the hamburger-nav layout that person/worker/place/thing's
+  tests had already fixed; one line each. Measured alone (never in
+  parallel — the port collision above): person 16/16, worker 14/14,
+  thing 12/12, course 8/8, event 11/11, `svelte-check` 0/0 in all
+  five. Place untouched (PRO-H10 never reached it; 7/7 already). The
+  5 / 11 roll-out question is **still open** and moves to WEB-2's
+  scope: decide it when the CI stage makes the answer testable.
 - [ ] **WEB-2 (L)** A **front-end CI stage**. `scripts/ci-front-ends.sh`
   discovering `*/*-front-end-with-svelte/package.json` (the shape
   `ci-crates.sh` already has), and a `front-end` job in **both** CI
@@ -7918,7 +7979,7 @@ green as it sits; these finish it)**
   and thing only — add them for person, worker, event, course. A person
   WIP exists in this session's git stash (`wip: person-front-end T-20
   …`, page edits only, i18n keys not yet added).
-- [ ] **WEB-6 (S)** **T-13 / T-16 / T-17 are open ×4, identically.**
+- [x] **WEB-6 (S)** **T-13 / T-16 / T-17 are open ×4, identically.**
   SSR-safe loads, theming-tokens module, check-duplicates preview in
   the create form — each open, word-for-word, in person, worker, place,
   thing (event and course unchecked). Either do each once and copy
@@ -7926,6 +7987,23 @@ green as it sits; these finish it)**
   identical unticked rows per crate indefinitely. One pass, one
   decision per task; the drift-accepted policy makes "do once, copy"
   legitimate.
+  **Done 2026-09-03 (#187), all three closed with reasons, ×6 (event
+  and course included — they carried the same rows).** T-13
+  contradicts the CSR-only + BFF design every one of the six states
+  (`ssr = false`, no `+page.ts` load anywhere): won't-do. T-16 is
+  superseded by the Lily `ThemePicker` (2026-07-31); the 42 `--mxi-*`
+  tokens are CSS custom properties in `:root`, where they belong:
+  won't-do. T-17 is already delivered by T-6 — in all six services the
+  create handler runs the same duplicate detection as
+  `check-duplicates` and answers `409` **with the candidates, creating
+  nothing** (`check_duplicates_internal` in person/worker/event,
+  `find_probable_duplicates` in course, the same threshold scoring
+  inline in place/thing — verified per crate), and every `/new` page
+  renders them: superseded. The one real finding is the service's, not
+  any front-end's: **no override exists to create past a `409`**, so a
+  legitimate near-duplicate cannot be created through the UI — an
+  authorisation-shaped (`destructive`-class) question recorded in each
+  closure for the service specs to take up if a deployment needs it.
 - [ ] **WEB-7 (S)** **Review-queue wire-shape divergence.** Person and
   worker `ReviewQueueItem` carry `provenance` and a serialised
   `score_breakdown`; place-service and thing-service carry **neither**
@@ -7937,7 +8015,7 @@ green as it sits; these finish it)**
   the front-end panels are already generic and light up with no change.
   Organization: verify before claiming either way — the grep this
   finding rests on did not cover its loco-style layout.
-- [ ] **WEB-8 (S)** **Change-aware CI matrix.** PRs #172–#178 touched
+- [x] **WEB-8 (S)** **Change-aware CI matrix.** PRs #172–#178 touched
   no Rust (spec, CHANGELOG, one OpenAPI YAML, SvelteKit) and each ran
   all 168 checks for roughly an hour; two needed the watch re-armed
   past a one-hour timeout. Make `discover crates` diff the PR's changed
@@ -7949,7 +8027,34 @@ green as it sits; these finish it)**
   stay byte-identical. **Not** a `paths-ignore` — that skips required
   checks and leaves the PR unmergeable; an empty matrix that still
   reports success is the shape.
-- [ ] **WEB-9 (M)** **`.svelte` files are not prettier-checked
+  **Done 2026-09-03 (#184, completed by the `fuzz.yml` follow-up).**
+  `scripts/ci-crates.sh` gained the change-aware mode (diff from
+  `merge-base(CI_CHANGED_SINCE, HEAD)`; a crate is affected when a
+  changed path is inside it, when it depends on an affected crate
+  through a `path = "…"` dependency — transitively — or when `ci/`,
+  `scripts/`, the workflows, `rust-toolchain.toml`, `deny.toml` or
+  `.cargo/` change, in which case every crate is; unresolvable ref
+  fails **open**; empty prints `[]`/nothing, not a blank line) and a
+  `--db` flag; both pipelines read it, GitHub through `discover` with
+  `fetch-depth: 0` and `if: … != '[]'` guards on the matrix jobs,
+  Woodpecker through per-step `export CI_CHANGED_SINCE=…` (unverified
+  live, fail-open). Validated offline against real diffs first: the
+  WEB-3/WEB-4 branches → 0; PR #174 → exactly its one crate;
+  `entity-ref` → 14; `person-matcher` → 5 (incl. link-graph, which
+  embeds it); `scripts/` → 64. Live: #184's own run took the
+  every-crate branch (168) as designed. **Omission caught the same
+  evening:** `.github/workflows/fuzz.yml` has its own `discover` that
+  reads `ci-crates.sh` and never set the variable, so a front-end-only
+  PR still built all 18 fuzz sub-crates; fixed in the follow-up with
+  the identical `fetch-depth` / env / `if` shape. Two facts learned on
+  the way, recorded so nobody re-derives them: `main` carries **no
+  branch protection and no rulesets** — merges are gated by convention
+  (this session's "168 green, then merge") and nothing else, which is
+  a PRO-R-shaped question; and merging a base PR with
+  `--delete-branch` makes GitHub **close** every PR stacked on it
+  rather than retarget them (recovered by recreating the branch at its
+  merged tip, reopening, retargeting to `main`, deleting again).
+- [x] **WEB-9 (M)** **`.svelte` files are not prettier-checked
   anywhere.** Found doing WEB-4: every entity front-end has
   `prettier-plugin-svelte` in `devDependencies` and an **empty**
   `.prettierrc`, so the plugin is never loaded — `prettier --check src`
@@ -7967,6 +8072,18 @@ green as it sits; these finish it)**
   a hundred and twenty `.svelte` files deserves its own review.
   Depends: nothing; do before WEB-2 makes `lint` a gate, or the gate is
   born green for the wrong reason.
+  **Done 2026-09-03 (#183).** A `.prettierrc` per project loading the
+  plugin, with `tabWidth: 4` for `*.svelte` only — measured, not
+  chosen: the `.svelte` sources are written at four spaces, and at the
+  default two the reformat touched 3.1k–5.5k lines per project versus
+  0.7k–0.95k at four. One `prettier --write 'src/**/*.svelte'` per
+  project, 111 files, proven formatting-only by stripping and
+  comparing each file's content: 101 identical once whitespace and
+  trailing commas are removed, 8 more once semicolons are, the last 2
+  once parentheses are (`a ?? b` wrapped inside a ternary). No quote
+  changes. `svelte-check` 0/0, `vitest` unchanged, and every smoke
+  suite produced exactly its pre-change pass/fail set. `pnpm run lint`
+  now covers `.svelte` in all six.
 
 Suggested order: WEB-3 → WEB-1 → WEB-4 → WEB-9 → WEB-2 → WEB-8 →
 WEB-5 → WEB-6 → WEB-7. The first five are what make a front-end PR's
