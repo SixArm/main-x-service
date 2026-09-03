@@ -9,6 +9,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — T-13, T-16, T-17 closed (2026-09-03, repo WEB-6)
+
+Three tasks open word-for-word in six front-ends, closed with reasons
+rather than left as identical unticked rows: T-13 (SSR-safe loads)
+contradicts this project's CSR-only + BFF design (`ssr = false`); T-16
+(a theme module) is superseded by the Lily `ThemePicker` adopted
+2026-07-31; T-17 (check-duplicates preview) is already delivered by
+T-6 — `POST` answers `409` with the candidates without creating, and
+the form shows them. T-17's investigation found a real gap that is
+the service's, not this app's: no override exists to create past a
+`409`. Doc-only; no behaviour.
+
 ### Added — masked-view toggle on the detail page (T-19)
 
 A toggle button on `/workers/[id]` re-fetches through the existing
