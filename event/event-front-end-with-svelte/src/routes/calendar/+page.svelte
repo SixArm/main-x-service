@@ -67,7 +67,9 @@
             const updated: DomainEvent = {
                 ...found,
                 start_date: ev.event.start.toISOString(),
-                end_date: ev.event.end ? ev.event.end.toISOString() : found.end_date,
+                end_date: ev.event.end
+                    ? ev.event.end.toISOString()
+                    : found.end_date,
             };
             void repo
                 .update(String(ev.id), updated)

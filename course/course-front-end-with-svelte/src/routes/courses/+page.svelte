@@ -67,13 +67,25 @@
 </header>
 
 <section class="surface stack">
-    <SearchBox bind:value={query} placeholder={t("courses.searchPlaceholder")} onsearch={runSearch} />
+    <SearchBox
+        bind:value={query}
+        placeholder={t("courses.searchPlaceholder")}
+        onsearch={runSearch}
+    />
     <div class="row small">
-        <label><input type="checkbox" bind:checked={fuzzy} /> {t("courses.fuzzy")}</label>
+        <label
+            ><input type="checkbox" bind:checked={fuzzy} />
+            {t("courses.fuzzy")}</label
+        >
         <span class="muted" style="margin-left: auto">
             {loading
                 ? t("courses.loading")
-                : translate(total === 1 ? "courses.recordCount.one" : "courses.recordCount.other", i18n.locale).replace("{n}", String(total))}
+                : translate(
+                      total === 1
+                          ? "courses.recordCount.one"
+                          : "courses.recordCount.other",
+                      i18n.locale,
+                  ).replace("{n}", String(total))}
         </span>
     </div>
     {#if error}

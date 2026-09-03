@@ -43,7 +43,12 @@
     import type { KanbanInstanceApi } from "@svar-ui/svelte-kanban";
     import { PlaceRepository } from "$lib/api/places";
     import type { ReviewQueueOptions } from "$lib/api/places";
-    import type { Place, ReviewDecision, ReviewQueueItem, ReviewStatus } from "$lib/api/types";
+    import type {
+        Place,
+        ReviewDecision,
+        ReviewQueueItem,
+        ReviewStatus,
+    } from "$lib/api/types";
     import {
         REVIEW_LIMITS,
         REVIEW_STATUSES,
@@ -219,7 +224,10 @@
         if (!place?.place_type) return null;
         return typeof place.place_type === "string"
             ? place.place_type
-            : translate("detail.typeOther").replace("{value}", place.place_type.Other);
+            : translate("detail.typeOther").replace(
+                  "{value}",
+                  place.place_type.Other,
+              );
     }
 
     /** Flattened postal address; `null` when there is none. */
@@ -239,12 +247,16 @@
     /** `"lat, lon"`; `null` when there is no geo. */
     function geoLine(place: Place | null): string | null {
         const geo = place?.geo;
-        return geo ? `${geo.latitude_as_decimal_degrees}, ${geo.longitude_as_decimal_degrees}` : null;
+        return geo
+            ? `${geo.latitude_as_decimal_degrees}, ${geo.longitude_as_decimal_degrees}`
+            : null;
     }
 
     /** Renders a possibly-absent field as an explicit "not recorded". */
     function orNone(value: string | null | undefined): string {
-        return value && value.trim().length > 0 ? value : t("review.compare.none");
+        return value && value.trim().length > 0
+            ? value
+            : t("review.compare.none");
     }
 
     // The comparison rows, so the table body stays declarative.
@@ -342,7 +354,9 @@
                     .decideReview(String(ev.id), target)
                     .catch((cause) => {
                         actionError =
-                            cause instanceof Error ? cause.message : String(cause);
+                            cause instanceof Error
+                                ? cause.message
+                                : String(cause);
                     })
                     .finally(load);
             } else {
@@ -492,7 +506,9 @@
             <p class="muted">{t("review.compare.loading")}</p>
         {:else if pair}
             {#if pairPartial}
-                <p class="banner" role="status">{t("review.compare.partial")}</p>
+                <p class="banner" role="status">
+                    {t("review.compare.partial")}
+                </p>
             {/if}
             <table class="compare" data-testid="review-compare-table">
                 <thead>
@@ -551,7 +567,9 @@
                 disabled={!canDecide(item) || deciding}
                 onclick={() => void decide("confirmed")}
             >
-                {deciding ? t("review.decide.deciding") : t("review.decide.confirm")}
+                {deciding
+                    ? t("review.decide.deciding")
+                    : t("review.decide.confirm")}
             </button>
             <button
                 type="button"

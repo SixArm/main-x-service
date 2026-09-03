@@ -38,12 +38,20 @@
                 // future service-side shape change without redeploy.
                 const details = err.details as
                     | MatchResult[]
-                    | { has_duplicates?: boolean; potential_matches?: MatchResult[] }
+                    | {
+                          has_duplicates?: boolean;
+                          potential_matches?: MatchResult[];
+                      }
                     | null;
                 duplicates = Array.isArray(details)
                     ? details
                     : (details?.potential_matches ?? []);
-                throw new Error(translate("new.duplicatesDetected", i18n.locale).replace("{n}", String(duplicates.length)));
+                throw new Error(
+                    translate("new.duplicatesDetected", i18n.locale).replace(
+                        "{n}",
+                        String(duplicates.length),
+                    ),
+                );
             }
             throw err;
         }
@@ -55,9 +63,16 @@
 <header><h1>{t("new.title")}</h1></header>
 
 <section class="surface stack">
-    <CourseForm initial={blank} submitLabel={t("new.create")} onsubmit={handleSubmit} />
+    <CourseForm
+        initial={blank}
+        submitLabel={t("new.create")}
+        onsubmit={handleSubmit}
+    />
 </section>
 
 {#if duplicates.length > 0}
-    <MatchResultsList results={duplicates} title={t("new.possibleDuplicates")} />
+    <MatchResultsList
+        results={duplicates}
+        title={t("new.possibleDuplicates")}
+    />
 {/if}

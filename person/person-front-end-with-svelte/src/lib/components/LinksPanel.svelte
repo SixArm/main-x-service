@@ -170,11 +170,16 @@
                         <code>{link.to_ref}</code>
                     </div>
                     <div class="meta small muted">
-                        {#if link.role}{t("links.role")}: {link.role} · {/if}
-                        {#if link.confidence != null}{t("links.confidence")}: {link.confidence} · {/if}
+                        {#if link.role}{t("links.role")}: {link.role} ·
+                        {/if}
+                        {#if link.confidence != null}{t("links.confidence")}: {link.confidence}
+                            ·
+                        {/if}
                         {t("links.provenance")}: {link.provenance}
-                        {#if link.valid_from} · {t("links.validFrom")}: {link.valid_from}{/if}
-                        {#if link.valid_to} · {t("links.validTo")}: {link.valid_to}{/if}
+                        {#if link.valid_from}
+                            · {t("links.validFrom")}: {link.valid_from}{/if}
+                        {#if link.valid_to}
+                            · {t("links.validTo")}: {link.valid_to}{/if}
                     </div>
                     <button
                         class="button danger"
@@ -238,7 +243,11 @@
 
             <div class="field">
                 <label for="link-valid-from">{t("links.validFrom")}</label>
-                <input id="link-valid-from" type="date" bind:value={validFrom} />
+                <input
+                    id="link-valid-from"
+                    type="date"
+                    bind:value={validFrom}
+                />
             </div>
 
             <div class="field">
@@ -254,15 +263,59 @@
 </section>
 
 <style>
-    .links { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
-    .link { display: grid; grid-template-columns: 1fr max-content; gap: 0.25rem 0.75rem; align-items: center; padding: 0.625rem 0.75rem; border: 1px solid var(--mxi-color-border); border-radius: var(--mxi-radius); }
-    .link-main { display: flex; gap: 0.5rem; align-items: baseline; flex-wrap: wrap; }
-    .link button { grid-row: 1 / span 2; }
-    .meta { grid-column: 1; }
-    .assert { border-top: 1px solid var(--mxi-color-border); padding-top: var(--mxi-spacing); }
-    .fields { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem; }
-    .field { display: flex; flex-direction: column; gap: 0.25rem; }
-    .field.grow { flex: 1 1 20rem; }
-    label { font-weight: 600; font-size: 0.875rem; }
-    .hint { color: var(--mxi-color-muted); font-size: 0.75rem; }
+    .links {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .link {
+        display: grid;
+        grid-template-columns: 1fr max-content;
+        gap: 0.25rem 0.75rem;
+        align-items: center;
+        padding: 0.625rem 0.75rem;
+        border: 1px solid var(--mxi-color-border);
+        border-radius: var(--mxi-radius);
+    }
+    .link-main {
+        display: flex;
+        gap: 0.5rem;
+        align-items: baseline;
+        flex-wrap: wrap;
+    }
+    .link button {
+        grid-row: 1 / span 2;
+    }
+    .meta {
+        grid-column: 1;
+    }
+    .assert {
+        border-top: 1px solid var(--mxi-color-border);
+        padding-top: var(--mxi-spacing);
+    }
+    .fields {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    .field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    .field.grow {
+        flex: 1 1 20rem;
+    }
+    label {
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+    .hint {
+        color: var(--mxi-color-muted);
+        font-size: 0.75rem;
+    }
 </style>

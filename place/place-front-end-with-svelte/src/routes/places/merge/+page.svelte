@@ -32,7 +32,10 @@
     let mainId = $state(page.url.searchParams.get("main") ?? "");
     let duplicateId = $state(page.url.searchParams.get("duplicate") ?? "");
     let reason = $state("");
-    let preview = $state<{ main: Place | null; duplicate: Place | null }>({ main: null, duplicate: null });
+    let preview = $state<{ main: Place | null; duplicate: Place | null }>({
+        main: null,
+        duplicate: null,
+    });
     let result = $state<MergeResponse | null>(null);
     let error = $state<string | null>(null);
     let loading = $state(false);
@@ -56,9 +59,22 @@
     // Validate, confirm, then perform the merge. Guards prevent empty ids
     // and self-merge; confirm() is the last chance before the destructive op.
     async function doMerge() {
-        if (!mainId || !duplicateId) { error = translate("merge.bothIdsRequired"); return; }
-        if (mainId === duplicateId) { error = translate("merge.mustDiffer"); return; }
-        if (!confirm(translate("merge.confirm").replace("{duplicate}", duplicateId.slice(0, 8)).replace("{main}", mainId.slice(0, 8)))) return;
+        if (!mainId || !duplicateId) {
+            error = translate("merge.bothIdsRequired");
+            return;
+        }
+        if (mainId === duplicateId) {
+            error = translate("merge.mustDiffer");
+            return;
+        }
+        if (
+            !confirm(
+                translate("merge.confirm")
+                    .replace("{duplicate}", duplicateId.slice(0, 8))
+                    .replace("{main}", mainId.slice(0, 8)),
+            )
+        )
+            return;
         loading = true;
         error = null;
         try {
@@ -93,19 +109,44 @@
 
 <section class="surface stack">
     <FieldRow>
-        <LabeledField label={t("merge.mainId")} for="merge-main" required hint={t("merge.mainIdHint")}>
+        <LabeledField
+            label={t("merge.mainId")}
+            for="merge-main"
+            required
+            hint={t("merge.mainIdHint")}
+        >
             <input id="merge-main" bind:value={mainId} />
         </LabeledField>
-        <LabeledField label={t("merge.duplicateId")} for="merge-dup" required hint={t("merge.duplicateIdHint")}>
+        <LabeledField
+            label={t("merge.duplicateId")}
+            for="merge-dup"
+            required
+            hint={t("merge.duplicateIdHint")}
+        >
             <input id="merge-dup" bind:value={duplicateId} />
         </LabeledField>
     </FieldRow>
-    <LabeledField label={t("merge.reason")} for="merge-reason" hint={t("merge.reasonHint")}>
-        <input id="merge-reason" bind:value={reason} placeholder={t("merge.reasonPlaceholder")} />
+    <LabeledField
+        label={t("merge.reason")}
+        for="merge-reason"
+        hint={t("merge.reasonHint")}
+    >
+        <input
+            id="merge-reason"
+            bind:value={reason}
+            placeholder={t("merge.reasonPlaceholder")}
+        />
     </LabeledField>
     <div class="row">
-        <button type="button" class="button" onclick={loadPreview}>{t("merge.loadPreview")}</button>
-        <button type="button" class="button primary" onclick={doMerge} disabled={loading}>
+        <button type="button" class="button" onclick={loadPreview}
+            >{t("merge.loadPreview")}</button
+        >
+        <button
+            type="button"
+            class="button primary"
+            onclick={doMerge}
+            disabled={loading}
+        >
             {loading ? t("merge.merging") : t("merge.merge")}
         </button>
     </div>
@@ -116,8 +157,10 @@
     <section class="surface stack">
         <h2>{t("merge.preview")}</h2>
         <dl class="kv">
-            <dt>{t("merge.previewMain")}</dt><dd>{summary(preview.main)}</dd>
-            <dt>{t("merge.previewDuplicate")}</dt><dd>{summary(preview.duplicate)}</dd>
+            <dt>{t("merge.previewMain")}</dt>
+            <dd>{summary(preview.main)}</dd>
+            <dt>{t("merge.previewDuplicate")}</dt>
+            <dd>{summary(preview.duplicate)}</dd>
         </dl>
     </section>
 {/if}
@@ -125,16 +168,39 @@
 {#if result}
     <section class="surface stack">
         <h2>{t("merge.completed")}</h2>
-        <p>{t("merge.recordCreated").split("{id}")[0]}<code>{result.merge_record.id}</code>{t("merge.recordCreated").split("{id}")[1]?.replace("{at}", new Date(result.merge_record.merged_at).toLocaleString())}</p>
-        <a href={`/places/${result.main_place.id}`} class="button primary"
-           onclick={() => result?.main_place.id && goto(`/places/${result.main_place.id}`)}>
+        <p>
+            {t("merge.recordCreated").split("{id}")[0]}<code
+                >{result.merge_record.id}</code
+            >{t("merge.recordCreated")
+                .split("{id}")[1]
+                ?.replace(
+                    "{at}",
+                    new Date(result.merge_record.merged_at).toLocaleString(),
+                )}
+        </p>
+        <a
+            href={`/places/${result.main_place.id}`}
+            class="button primary"
+            onclick={() =>
+                result?.main_place.id &&
+                goto(`/places/${result.main_place.id}`)}
+        >
             {t("merge.viewMain")}
         </a>
     </section>
 {/if}
 
 <style>
-    .kv { display: grid; grid-template-columns: max-content 1fr; column-gap: 1rem; row-gap: 0.25rem; }
-    dt { font-weight: 600; }
-    dd { margin: 0; }
+    .kv {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 1rem;
+        row-gap: 0.25rem;
+    }
+    dt {
+        font-weight: 600;
+    }
+    dd {
+        margin: 0;
+    }
 </style>

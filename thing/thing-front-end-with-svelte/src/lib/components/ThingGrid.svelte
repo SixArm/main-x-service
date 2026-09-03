@@ -47,7 +47,10 @@
         if (!t.identifiers || t.identifiers.length === 0) return "";
         const first = t.identifiers[0];
         if (!first) return "";
-        const type = typeof first.property_id === "string" ? first.property_id : `Custom:${first.property_id.Custom}`;
+        const type =
+            typeof first.property_id === "string"
+                ? first.property_id
+                : `Custom:${first.property_id.Custom}`;
         return `${type} ${first.value}`;
     }
 
@@ -87,7 +90,9 @@
             : data,
     );
 
-    function initGrid(api: { on(action: string, cb: (ev: { id: string | number }) => void): void }) {
+    function initGrid(api: {
+        on(action: string, cb: (ev: { id: string | number }) => void): void;
+    }) {
         api.on("select-row", (ev) => {
             const found = things.find((t) => t.id === String(ev.id));
             if (found) onselect?.(found);
@@ -100,7 +105,8 @@
         <div class="filter-wrap">
             <FilterBar
                 fields={filterFields}
-                onchange={({ value }: { value: unknown }) => (filterRules = value)}
+                onchange={({ value }: { value: unknown }) =>
+                    (filterRules = value)}
             />
         </div>
         <div class="grid-wrap">

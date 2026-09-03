@@ -83,7 +83,9 @@
             : data,
     );
 
-    function initGrid(api: { on(action: string, cb: (ev: { id: string | number }) => void): void }) {
+    function initGrid(api: {
+        on(action: string, cb: (ev: { id: string | number }) => void): void;
+    }) {
         api.on("select-row", (ev) => {
             const found = workers.find((p) => p.id === String(ev.id));
             if (found) onselect?.(found);
@@ -96,7 +98,8 @@
         <div class="filter-wrap">
             <FilterBar
                 fields={filterFields}
-                onchange={({ value }: { value: unknown }) => (filterRules = value)}
+                onchange={({ value }: { value: unknown }) =>
+                    (filterRules = value)}
             />
         </div>
         <div class="grid-wrap">

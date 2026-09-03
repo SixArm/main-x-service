@@ -35,9 +35,13 @@
         try {
             const req: MatchRequest = {
                 name,
-                start_date: startDate ? new Date(startDate).toISOString() : undefined,
+                start_date: startDate
+                    ? new Date(startDate).toISOString()
+                    : undefined,
                 end_date: endDate ? new Date(endDate).toISOString() : undefined,
-                organizers: organizerName ? [{ kind: "organization", name: organizerName }] : undefined,
+                organizers: organizerName
+                    ? [{ kind: "organization", name: organizerName }]
+                    : undefined,
                 threshold,
             };
             results = await repo.match(req);
@@ -57,14 +61,31 @@
 <section class="surface stack">
     <form onsubmit={runMatch} class="stack">
         <FieldRow>
-            <LabeledField label={t("match.name")} for="m-name" required><input id="m-name" bind:value={name} required /></LabeledField>
-            <LabeledField label={t("match.threshold")} for="m-threshold" hint={t("match.thresholdHint")}>
-                <input id="m-threshold" type="number" step="0.05" min="0" max="1" bind:value={threshold} />
+            <LabeledField label={t("match.name")} for="m-name" required
+                ><input id="m-name" bind:value={name} required /></LabeledField
+            >
+            <LabeledField
+                label={t("match.threshold")}
+                for="m-threshold"
+                hint={t("match.thresholdHint")}
+            >
+                <input
+                    id="m-threshold"
+                    type="number"
+                    step="0.05"
+                    min="0"
+                    max="1"
+                    bind:value={threshold}
+                />
             </LabeledField>
         </FieldRow>
         <FieldRow>
             <LabeledField label={t("match.start")} for="m-start">
-                <input id="m-start" type="datetime-local" bind:value={startDate} />
+                <input
+                    id="m-start"
+                    type="datetime-local"
+                    bind:value={startDate}
+                />
             </LabeledField>
             <LabeledField label={t("match.end")} for="m-end">
                 <input id="m-end" type="datetime-local" bind:value={endDate} />

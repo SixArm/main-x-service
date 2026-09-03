@@ -193,7 +193,11 @@
                 polling: true,
                 error: null,
             };
-            void pollJob(importPanel, (id) => repo.getImportJob(id), () => importPanel);
+            void pollJob(
+                importPanel,
+                (id) => repo.getImportJob(id),
+                () => importPanel,
+            );
             void loadJobs();
         } catch (err) {
             importError = describe(err);
@@ -212,7 +216,10 @@
                 {
                     format: exportFormat,
                     q: exportQuery.trim() || undefined,
-                    limit: Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : undefined,
+                    limit:
+                        Number.isFinite(parsedLimit) && parsedLimit > 0
+                            ? parsedLimit
+                            : undefined,
                     masking_profile: maskingProfile,
                 },
                 crypto.randomUUID(),
@@ -225,7 +232,11 @@
                 polling: true,
                 error: null,
             };
-            void pollJob(exportPanel, (id) => repo.getExportJob(id), () => exportPanel);
+            void pollJob(
+                exportPanel,
+                (id) => repo.getExportJob(id),
+                () => exportPanel,
+            );
             void loadJobs();
         } catch (err) {
             // Includes the 403 a `full` masking profile draws without
@@ -271,9 +282,16 @@
             <dt>{t("bulk.job.submittedAt")}</dt>
             <dd>{panel.submittedAt.toLocaleString()}</dd>
             <dt>{t("bulk.job.status")}</dt>
-            <dd>{panel.job ? statusLabel(panel.job.status) : t("bulk.job.polling")}</dd>
+            <dd>
+                {panel.job
+                    ? statusLabel(panel.job.status)
+                    : t("bulk.job.polling")}
+            </dd>
             {#if panel.job}
-                {@const pct = progressPercent(panel.job.rows_processed, panel.job.rows_total)}
+                {@const pct = progressPercent(
+                    panel.job.rows_processed,
+                    panel.job.rows_total,
+                )}
                 <dt>{t("bulk.job.progress")}</dt>
                 <dd>
                     {panel.job.rows_processed}
@@ -293,7 +311,9 @@
                 <dd>{panel.job.rows_errored}</dd>
             {/if}
         </dl>
-        {#if panel.polling}<p class="muted small">{t("bulk.job.polling")}</p>{/if}
+        {#if panel.polling}<p class="muted small">
+                {t("bulk.job.polling")}
+            </p>{/if}
         {#if panel.job?.download_url}
             <div>
                 <div class="artifact-label">{t("bulk.artifact.output")}</div>
@@ -308,13 +328,20 @@
                 <p class="muted small">{t("bulk.artifact.note")}</p>
             </div>
         {/if}
-        {#if panel.error}<div class="banner error" role="alert">{panel.error}</div>{/if}
+        {#if panel.error}<div class="banner error" role="alert">
+                {panel.error}
+            </div>{/if}
     </section>
 {/snippet}
 
 <section class="surface stack">
     <h2>{t("bulk.import.title")}</h2>
-    <LabeledField label={t("bulk.import.file")} for="bulk-import-file" required hint={t("bulk.import.fileHint")}>
+    <LabeledField
+        label={t("bulk.import.file")}
+        for="bulk-import-file"
+        required
+        hint={t("bulk.import.fileHint")}
+    >
         <input
             id="bulk-import-file"
             type="file"
@@ -323,10 +350,20 @@
         />
     </LabeledField>
     <FieldRow>
-        <LabeledField label={t("bulk.import.format")} for="bulk-import-format" hint={t("bulk.import.formatHint")}>
+        <LabeledField
+            label={t("bulk.import.format")}
+            for="bulk-import-format"
+            hint={t("bulk.import.formatHint")}
+        >
             <select id="bulk-import-format" bind:value={importFormat}>
                 {#each BULK_IMPORT_FORMATS as fmt (fmt)}
-                    <option value={fmt}>{t(fmt === "jsonl" ? "bulk.format.jsonl" : "bulk.format.csv")}</option>
+                    <option value={fmt}
+                        >{t(
+                            fmt === "jsonl"
+                                ? "bulk.format.jsonl"
+                                : "bulk.format.csv",
+                        )}</option
+                    >
                 {/each}
             </select>
         </LabeledField>
@@ -337,11 +374,20 @@
     </label>
     <small class="hint">{t("bulk.import.dryRunHint")}</small>
     <div class="row">
-        <button type="button" class="button primary" onclick={startImport} disabled={importSubmitting}>
-            {importSubmitting ? t("bulk.import.submitting") : t("bulk.import.submit")}
+        <button
+            type="button"
+            class="button primary"
+            onclick={startImport}
+            disabled={importSubmitting}
+        >
+            {importSubmitting
+                ? t("bulk.import.submitting")
+                : t("bulk.import.submit")}
         </button>
     </div>
-    {#if importError}<div class="banner error" role="alert">{importError}</div>{/if}
+    {#if importError}<div class="banner error" role="alert">
+            {importError}
+        </div>{/if}
 </section>
 
 {#if importPanel}
@@ -351,7 +397,11 @@
 <section class="surface stack">
     <h2>{t("bulk.export.title")}</h2>
     <FieldRow>
-        <LabeledField label={t("bulk.export.format")} for="bulk-export-format" hint={t("bulk.export.formatHint")}>
+        <LabeledField
+            label={t("bulk.export.format")}
+            for="bulk-export-format"
+            hint={t("bulk.export.formatHint")}
+        >
             <select id="bulk-export-format" bind:value={exportFormat}>
                 {#each BULK_FORMATS as fmt (fmt)}
                     <option value={fmt}>
@@ -364,11 +414,17 @@
                 {/each}
             </select>
         </LabeledField>
-        <LabeledField label={t("bulk.export.masking")} for="bulk-export-masking" hint={t("bulk.export.maskingHint")}>
+        <LabeledField
+            label={t("bulk.export.masking")}
+            for="bulk-export-masking"
+            hint={t("bulk.export.maskingHint")}
+        >
             <select id="bulk-export-masking" bind:value={maskingProfile}>
                 {#each MASKING_PROFILES as profile (profile)}
                     <option value={profile}>
-                        {profile === "masked" ? t("bulk.masking.masked") : t("bulk.masking.full")}
+                        {profile === "masked"
+                            ? t("bulk.masking.masked")
+                            : t("bulk.masking.full")}
                     </option>
                 {/each}
             </select>
@@ -378,19 +434,41 @@
          detect, so a `failed` job may be a build choice, not a UI bug. -->
     <small class="hint">{t("bulk.export.parquetNote")}</small>
     <FieldRow>
-        <LabeledField label={t("bulk.export.query")} for="bulk-export-query" hint={t("bulk.export.queryHint")}>
+        <LabeledField
+            label={t("bulk.export.query")}
+            for="bulk-export-query"
+            hint={t("bulk.export.queryHint")}
+        >
             <input id="bulk-export-query" bind:value={exportQuery} />
         </LabeledField>
-        <LabeledField label={t("bulk.export.limit")} for="bulk-export-limit" hint={t("bulk.export.limitHint")}>
-            <input id="bulk-export-limit" type="number" min="1" bind:value={exportLimit} />
+        <LabeledField
+            label={t("bulk.export.limit")}
+            for="bulk-export-limit"
+            hint={t("bulk.export.limitHint")}
+        >
+            <input
+                id="bulk-export-limit"
+                type="number"
+                min="1"
+                bind:value={exportLimit}
+            />
         </LabeledField>
     </FieldRow>
     <div class="row">
-        <button type="button" class="button primary" onclick={startExport} disabled={exportSubmitting}>
-            {exportSubmitting ? t("bulk.export.submitting") : t("bulk.export.submit")}
+        <button
+            type="button"
+            class="button primary"
+            onclick={startExport}
+            disabled={exportSubmitting}
+        >
+            {exportSubmitting
+                ? t("bulk.export.submitting")
+                : t("bulk.export.submit")}
         </button>
     </div>
-    {#if exportError}<div class="banner error" role="alert">{exportError}</div>{/if}
+    {#if exportError}<div class="banner error" role="alert">
+            {exportError}
+        </div>{/if}
 </section>
 
 {#if exportPanel}
@@ -417,7 +495,9 @@
                 {/each}
             </select>
         </label>
-        <button type="button" class="button" onclick={loadJobs}>{t("bulk.jobs.refresh")}</button>
+        <button type="button" class="button" onclick={loadJobs}
+            >{t("bulk.jobs.refresh")}</button
+        >
     </div>
     <p class="muted small">{t("bulk.jobs.orderNote")}</p>
     {#if jobsError}<div class="banner error" role="alert">{jobsError}</div>{/if}
@@ -452,15 +532,54 @@
 </section>
 
 <style>
-    .kv { display: grid; grid-template-columns: max-content 1fr; column-gap: 1rem; row-gap: 0.25rem; }
-    dt { font-weight: 600; }
-    dd { margin: 0; }
-    .check { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 0.875rem; }
-    .inline { display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; }
-    .hint { color: var(--mxi-color-muted); font-size: 0.75rem; }
-    .artifact-label { font-weight: 600; font-size: 0.875rem; }
-    .artifact { display: block; overflow-wrap: anywhere; }
-    .jobs { width: 100%; border-collapse: collapse; }
-    .jobs th, .jobs td { text-align: start; padding: 0.375rem 0.5rem; border-bottom: 1px solid var(--mxi-color-border); }
-    .jobs th { font-size: 0.8125rem; }
+    .kv {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 1rem;
+        row-gap: 0.25rem;
+    }
+    dt {
+        font-weight: 600;
+    }
+    dd {
+        margin: 0;
+    }
+    .check {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+    .inline {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        font-size: 0.875rem;
+    }
+    .hint {
+        color: var(--mxi-color-muted);
+        font-size: 0.75rem;
+    }
+    .artifact-label {
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+    .artifact {
+        display: block;
+        overflow-wrap: anywhere;
+    }
+    .jobs {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .jobs th,
+    .jobs td {
+        text-align: start;
+        padding: 0.375rem 0.5rem;
+        border-bottom: 1px solid var(--mxi-color-border);
+    }
+    .jobs th {
+        font-size: 0.8125rem;
+    }
 </style>

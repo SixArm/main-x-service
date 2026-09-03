@@ -81,16 +81,17 @@
     <header class="row" style="justify-content: space-between">
         <h1>{worker.name.given.join(" ")} {worker.name.family}</h1>
         <div class="row">
-            <button
-                class="button"
-                aria-pressed={masked}
-                onclick={toggleMasked}
-            >
+            <button class="button" aria-pressed={masked} onclick={toggleMasked}>
                 {masked ? t("detail.showFull") : t("detail.showMasked")}
             </button>
-            <a href={`/workers/${id}/edit`} class="button">{t("detail.edit")}</a>
-            <a href={`/workers/${id}/audit`} class="button">{t("detail.audit")}</a>
-            <button class="button danger" onclick={handleDelete}>{t("detail.delete")}</button>
+            <a href={`/workers/${id}/edit`} class="button">{t("detail.edit")}</a
+            >
+            <a href={`/workers/${id}/audit`} class="button"
+                >{t("detail.audit")}</a
+            >
+            <button class="button danger" onclick={handleDelete}
+                >{t("detail.delete")}</button
+            >
         </div>
     </header>
 
@@ -101,12 +102,22 @@
     <section class="surface stack">
         <h2>{t("detail.identity")}</h2>
         <dl class="kv">
-            <dt>{t("detail.id")}</dt><dd><code>{worker.id}</code></dd>
-            <dt>{t("detail.active")}</dt><dd>{worker.active ? t("detail.yes") : t("detail.no")}</dd>
-            <dt>{t("detail.gender")}</dt><dd>{worker.gender}</dd>
-            <dt>{t("detail.birthDate")}</dt><dd>{worker.birth_date ?? "—"}</dd>
-            <dt>{t("detail.taxId")}</dt><dd>{worker.tax_id ?? "—"}</dd>
-            <dt>{t("detail.deceased")}</dt><dd>{worker.deceased ? worker.deceased_datetime ?? t("detail.deceasedYes") : t("detail.deceasedNo")}</dd>
+            <dt>{t("detail.id")}</dt>
+            <dd><code>{worker.id}</code></dd>
+            <dt>{t("detail.active")}</dt>
+            <dd>{worker.active ? t("detail.yes") : t("detail.no")}</dd>
+            <dt>{t("detail.gender")}</dt>
+            <dd>{worker.gender}</dd>
+            <dt>{t("detail.birthDate")}</dt>
+            <dd>{worker.birth_date ?? "—"}</dd>
+            <dt>{t("detail.taxId")}</dt>
+            <dd>{worker.tax_id ?? "—"}</dd>
+            <dt>{t("detail.deceased")}</dt>
+            <dd>
+                {worker.deceased
+                    ? (worker.deceased_datetime ?? t("detail.deceasedYes"))
+                    : t("detail.deceasedNo")}
+            </dd>
         </dl>
     </section>
 
@@ -131,8 +142,19 @@
             <ul>
                 {#each worker.addresses as a}
                     <li>
-                        {[a.line1, a.line2, a.city, a.state, a.postal_code, a.country].filter(Boolean).join(", ")}
-                        {#if a.use_type}<span class="muted small">({a.use_type})</span>{/if}
+                        {[
+                            a.line1,
+                            a.line2,
+                            a.city,
+                            a.state,
+                            a.postal_code,
+                            a.country,
+                        ]
+                            .filter(Boolean)
+                            .join(", ")}
+                        {#if a.use_type}<span class="muted small"
+                                >({a.use_type})</span
+                            >{/if}
                     </li>
                 {/each}
             </ul>
@@ -157,7 +179,9 @@
                 {#each worker.emergency_contacts as ec}
                     <li>
                         <strong>{ec.name}</strong> — {ec.relationship}
-                        {#if ec.is_primary}<span class="muted small">({t("detail.primary")})</span>{/if}
+                        {#if ec.is_primary}<span class="muted small"
+                                >({t("detail.primary")})</span
+                            >{/if}
                     </li>
                 {/each}
             </ul>
@@ -169,8 +193,20 @@
 {/if}
 
 <style>
-    .kv { display: grid; grid-template-columns: max-content 1fr; column-gap: 1rem; row-gap: 0.25rem; }
-    dt { font-weight: 600; }
-    dd { margin: 0; }
-    ul { margin: 0; padding-left: 1.25rem; }
+    .kv {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 1rem;
+        row-gap: 0.25rem;
+    }
+    dt {
+        font-weight: 600;
+    }
+    dd {
+        margin: 0;
+    }
+    ul {
+        margin: 0;
+        padding-left: 1.25rem;
+    }
 </style>

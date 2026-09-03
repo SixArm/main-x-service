@@ -36,9 +36,15 @@
             // 409 + array details = duplicate candidates. Show them and
             // rethrow so WorkerForm displays the banner and stays put,
             // letting the operator review before resubmitting.
-            if (err instanceof ApiError && err.isConflict && Array.isArray(err.details)) {
+            if (
+                err instanceof ApiError &&
+                err.isConflict &&
+                Array.isArray(err.details)
+            ) {
                 duplicates = err.details as MatchResult[];
-                throw new Error(tf("new.duplicatesDetected", { count: duplicates.length }));
+                throw new Error(
+                    tf("new.duplicatesDetected", { count: duplicates.length }),
+                );
             }
             // Any other error bubbles to the form banner.
             throw err;
@@ -51,9 +57,16 @@
 <header><h1>{t("new.heading")}</h1></header>
 
 <section class="surface stack">
-    <WorkerForm initial={blank} submitLabel={t("new.submit")} onsubmit={handleSubmit} />
+    <WorkerForm
+        initial={blank}
+        submitLabel={t("new.submit")}
+        onsubmit={handleSubmit}
+    />
 </section>
 
 {#if duplicates.length > 0}
-    <MatchResultsList results={duplicates} title={t("new.possibleDuplicates")} />
+    <MatchResultsList
+        results={duplicates}
+        title={t("new.possibleDuplicates")}
+    />
 {/if}

@@ -44,10 +44,21 @@
 </script>
 
 <FieldRow>
-    <LabeledField label={t("name.family")} for={`${prefix}-family`} required error={errors.family}>
+    <LabeledField
+        label={t("name.family")}
+        for={`${prefix}-family`}
+        required
+        error={errors.family}
+    >
         <input id={`${prefix}-family`} bind:value={name.family} required />
     </LabeledField>
-    <LabeledField label={t("name.given")} for={`${prefix}-given`} required error={errors.given} hint={t("name.givenHint")}>
+    <LabeledField
+        label={t("name.given")}
+        for={`${prefix}-given`}
+        required
+        error={errors.given}
+        hint={t("name.givenHint")}
+    >
         <input
             id={`${prefix}-given`}
             value={givenJoined}

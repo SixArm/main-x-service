@@ -16,5 +16,8 @@
 {/if}
 
 <style>
-    .error { color: var(--mxi-color-danger); font-size: 0.75rem; }
+    .error {
+        color: var(--mxi-color-danger);
+        font-size: 0.75rem;
+    }
 </style>

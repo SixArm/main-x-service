@@ -33,16 +33,17 @@
 </script>
 
 <form class="searchbox" role="search" onsubmit={handleSubmit}>
-    <input
-        type="search"
-        bind:value
-        placeholder={ph}
-        aria-label={ph}
-    />
+    <input type="search" bind:value placeholder={ph} aria-label={ph} />
     <button type="submit" class="button primary">{t("search.submit")}</button>
 </form>
 
 <style>
-    .searchbox { display: flex; gap: 0.5rem; align-items: center; }
-    .searchbox input { flex: 1; }
+    .searchbox {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .searchbox input {
+        flex: 1;
+    }
 </style>

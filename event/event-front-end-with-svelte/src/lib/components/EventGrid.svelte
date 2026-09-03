@@ -46,7 +46,9 @@
         events.map((e) => ({
             id: e.id ?? "",
             name: e.name,
-            start_date: e.start_date ? new Date(e.start_date).toLocaleString() : "",
+            start_date: e.start_date
+                ? new Date(e.start_date).toLocaleString()
+                : "",
             event_type: e.event_type ?? "",
             event_status: e.event_status ?? "",
             attendance_mode: e.event_attendance_mode ?? "",
@@ -78,7 +80,9 @@
             : data,
     );
 
-    function initGrid(api: { on(action: string, cb: (ev: { id: string | number }) => void): void }) {
+    function initGrid(api: {
+        on(action: string, cb: (ev: { id: string | number }) => void): void;
+    }) {
         api.on("select-row", (ev) => {
             const found = events.find((e) => e.id === String(ev.id));
             if (found) onselect?.(found);
@@ -91,7 +95,8 @@
         <div class="filter-wrap">
             <FilterBar
                 fields={filterFields}
-                onchange={({ value }: { value: unknown }) => (filterRules = value)}
+                onchange={({ value }: { value: unknown }) =>
+                    (filterRules = value)}
             />
         </div>
         <div class="grid-wrap">

@@ -73,26 +73,47 @@
 </header>
 
 <section class="surface stack">
-    <SearchBox bind:value={query} placeholder={t("events.searchPlaceholder")} onsearch={runSearch} />
+    <SearchBox
+        bind:value={query}
+        placeholder={t("events.searchPlaceholder")}
+        onsearch={runSearch}
+    />
     <div class="row small" style="flex-wrap: wrap; gap: 0.75rem">
-        <label class="row small">{t("events.filter.from")} <input type="date" bind:value={dateFrom} /></label>
-        <label class="row small">{t("events.filter.to")} <input type="date" bind:value={dateTo} /></label>
-        <label class="row small">{t("events.filter.status")}
+        <label class="row small"
+            >{t("events.filter.from")}
+            <input type="date" bind:value={dateFrom} /></label
+        >
+        <label class="row small"
+            >{t("events.filter.to")}
+            <input type="date" bind:value={dateTo} /></label
+        >
+        <label class="row small"
+            >{t("events.filter.status")}
             <select bind:value={statusFilter}>
                 <option value="">{t("events.filter.any")}</option>
                 {#each EVENT_STATUSES as s}<option value={s}>{s}</option>{/each}
             </select>
         </label>
-        <label class="row small">{t("events.filter.type")}
+        <label class="row small"
+            >{t("events.filter.type")}
             <select bind:value={typeFilter}>
                 <option value="">{t("events.filter.any")}</option>
                 {#each EVENT_TYPES as et}<option value={et}>{et}</option>{/each}
             </select>
         </label>
-        <label class="row small"><input type="checkbox" bind:checked={fuzzy} /> {t("events.filter.fuzzy")}</label>
-        <button type="button" class="button" onclick={() => runSearch(query)}>{t("events.filter.apply")}</button>
+        <label class="row small"
+            ><input type="checkbox" bind:checked={fuzzy} />
+            {t("events.filter.fuzzy")}</label
+        >
+        <button type="button" class="button" onclick={() => runSearch(query)}
+            >{t("events.filter.apply")}</button
+        >
         <span class="muted" style="margin-left: auto">
-            {loading ? t("events.loading") : translate(total === 1 ? "events.count.one" : "events.count.other").replace("{n}", String(total))}
+            {loading
+                ? t("events.loading")
+                : translate(
+                      total === 1 ? "events.count.one" : "events.count.other",
+                  ).replace("{n}", String(total))}
         </span>
     </div>
     {#if error}<div class="banner error">{error}</div>{/if}

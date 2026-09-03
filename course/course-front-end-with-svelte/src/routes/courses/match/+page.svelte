@@ -20,7 +20,12 @@
     import CourseIdentifierInput from "$lib/components/CourseIdentifierInput.svelte";
     import { CourseRepository } from "$lib/api/courses.js";
     import { EDUCATIONAL_LEVEL_OPTIONS } from "$lib/api/types.js";
-    import type { CourseIdentifier, EducationalLevel, MatchRequest, MatchResult } from "$lib/api/types.js";
+    import type {
+        CourseIdentifier,
+        EducationalLevel,
+        MatchRequest,
+        MatchResult,
+    } from "$lib/api/types.js";
     import { t } from "$lib/i18n.svelte.js";
 
     const repo = CourseRepository.withFetch();
@@ -57,10 +62,19 @@
                 educational_level: educationalLevel
                     ? (educationalLevel as EducationalLevel)
                     : undefined,
-                keywords: keywordsRaw.split(/[,\n]/).map((s) => s.trim()).filter(Boolean),
-                teaches: teachesRaw.split("\n").map((s) => s.trim()).filter(Boolean),
+                keywords: keywordsRaw
+                    .split(/[,\n]/)
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+                teaches: teachesRaw
+                    .split("\n")
+                    .map((s) => s.trim())
+                    .filter(Boolean),
                 identifiers: identifiers.length > 0 ? identifiers : undefined,
-                same_as: sameAsRaw.split("\n").map((s) => s.trim()).filter(Boolean),
+                same_as: sameAsRaw
+                    .split("\n")
+                    .map((s) => s.trim())
+                    .filter(Boolean),
             };
             rawResults = await repo.match(req);
         } catch (err) {
@@ -88,8 +102,19 @@
             <LabeledField label={t("match.providerId")} for="m-prov">
                 <input id="m-prov" bind:value={providerId} />
             </LabeledField>
-            <LabeledField label={t("match.displayThreshold")} for="m-threshold" hint={t("match.thresholdHint")}>
-                <input id="m-threshold" type="number" step="0.05" min="0" max="1" bind:value={threshold} />
+            <LabeledField
+                label={t("match.displayThreshold")}
+                for="m-threshold"
+                hint={t("match.thresholdHint")}
+            >
+                <input
+                    id="m-threshold"
+                    type="number"
+                    step="0.05"
+                    min="0"
+                    max="1"
+                    bind:value={threshold}
+                />
             </LabeledField>
         </FieldRow>
         <FieldRow>
@@ -102,13 +127,26 @@
                 </select>
             </LabeledField>
         </FieldRow>
-        <LabeledField label={t("match.keywords")} for="m-kw" hint={t("match.keywordsHint")}>
+        <LabeledField
+            label={t("match.keywords")}
+            for="m-kw"
+            hint={t("match.keywordsHint")}
+        >
             <input id="m-kw" bind:value={keywordsRaw} />
         </LabeledField>
-        <LabeledField label={t("match.teaches")} for="m-teaches" hint={t("match.teachesHint")}>
-            <textarea id="m-teaches" rows={2} bind:value={teachesRaw}></textarea>
+        <LabeledField
+            label={t("match.teaches")}
+            for="m-teaches"
+            hint={t("match.teachesHint")}
+        >
+            <textarea id="m-teaches" rows={2} bind:value={teachesRaw}
+            ></textarea>
         </LabeledField>
-        <LabeledField label={t("match.sameAs")} for="m-sameas" hint={t("match.sameAsHint")}>
+        <LabeledField
+            label={t("match.sameAs")}
+            for="m-sameas"
+            hint={t("match.sameAsHint")}
+        >
             <textarea id="m-sameas" rows={2} bind:value={sameAsRaw}></textarea>
         </LabeledField>
         <section class="stack">

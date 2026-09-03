@@ -72,7 +72,10 @@
         if (!p.place_type) return "—";
         return typeof p.place_type === "string"
             ? p.place_type
-            : translate("detail.typeOther").replace("{value}", p.place_type.Other);
+            : translate("detail.typeOther").replace(
+                  "{value}",
+                  p.place_type.Other,
+              );
     }
 </script>
 
@@ -86,16 +89,16 @@
     <header class="row" style="justify-content: space-between">
         <h1>{place.name}</h1>
         <div class="row">
-            <button
-                class="button"
-                aria-pressed={masked}
-                onclick={toggleMasked}
-            >
+            <button class="button" aria-pressed={masked} onclick={toggleMasked}>
                 {masked ? t("detail.showFull") : t("detail.showMasked")}
             </button>
             <a href={`/places/${id}/edit`} class="button">{t("detail.edit")}</a>
-            <a href={`/places/${id}/audit`} class="button">{t("detail.audit")}</a>
-            <button class="button danger" onclick={handleDelete}>{t("detail.delete")}</button>
+            <a href={`/places/${id}/audit`} class="button"
+                >{t("detail.audit")}</a
+            >
+            <button class="button danger" onclick={handleDelete}
+                >{t("detail.delete")}</button
+            >
         </div>
     </header>
 
@@ -106,14 +109,28 @@
     <section class="surface stack">
         <h2>{t("detail.identity")}</h2>
         <dl class="kv">
-            <dt>{t("detail.id")}</dt><dd><code>{place.id}</code></dd>
-            <dt>{t("detail.alternateName")}</dt><dd>{place.alternate_name ?? "—"}</dd>
-            <dt>{t("detail.type")}</dt><dd>{typeLabel(place)}</dd>
-            <dt>{t("detail.description")}</dt><dd>{place.description ?? "—"}</dd>
-            <dt>{t("detail.url")}</dt><dd>{#if place.url}<a href={place.url} target="_blank" rel="noopener">{place.url}</a>{:else}—{/if}</dd>
-            <dt>{t("detail.telephone")}</dt><dd>{place.telephone ?? "—"}</dd>
-            <dt>{t("detail.gln")}</dt><dd>{place.global_location_number ?? "—"}</dd>
-            <dt>{t("detail.branchCode")}</dt><dd>{place.branch_code ?? "—"}</dd>
+            <dt>{t("detail.id")}</dt>
+            <dd><code>{place.id}</code></dd>
+            <dt>{t("detail.alternateName")}</dt>
+            <dd>{place.alternate_name ?? "—"}</dd>
+            <dt>{t("detail.type")}</dt>
+            <dd>{typeLabel(place)}</dd>
+            <dt>{t("detail.description")}</dt>
+            <dd>{place.description ?? "—"}</dd>
+            <dt>{t("detail.url")}</dt>
+            <dd>
+                {#if place.url}<a
+                        href={place.url}
+                        target="_blank"
+                        rel="noopener">{place.url}</a
+                    >{:else}—{/if}
+            </dd>
+            <dt>{t("detail.telephone")}</dt>
+            <dd>{place.telephone ?? "—"}</dd>
+            <dt>{t("detail.gln")}</dt>
+            <dd>{place.global_location_number ?? "—"}</dd>
+            <dt>{t("detail.branchCode")}</dt>
+            <dd>{place.branch_code ?? "—"}</dd>
         </dl>
     </section>
 
@@ -122,7 +139,13 @@
             <h2>{t("detail.address")}</h2>
             <p>
                 <!-- Join only the populated address parts with commas. -->
-                {[place.address.street_address, place.address.address_locality, place.address.address_region, place.address.postal_code, place.address.address_country]
+                {[
+                    place.address.street_address,
+                    place.address.address_locality,
+                    place.address.address_region,
+                    place.address.postal_code,
+                    place.address.address_country,
+                ]
                     .filter(Boolean)
                     .join(", ")}
             </p>
@@ -133,9 +156,14 @@
         <section class="surface stack">
             <h2>{t("detail.geo")}</h2>
             <dl class="kv">
-                <dt>{t("detail.latitude_as_decimal_degrees")}</dt><dd>{place.geo.latitude_as_decimal_degrees}</dd>
-                <dt>{t("detail.longitude_as_decimal_degrees")}</dt><dd>{place.geo.longitude_as_decimal_degrees}</dd>
-                {#if place.geo.elevation_as_decimal_metres != null}<dt>{t("detail.elevation_as_decimal_metres")}</dt><dd>{place.geo.elevation_as_decimal_metres} m</dd>{/if}
+                <dt>{t("detail.latitude_as_decimal_degrees")}</dt>
+                <dd>{place.geo.latitude_as_decimal_degrees}</dd>
+                <dt>{t("detail.longitude_as_decimal_degrees")}</dt>
+                <dd>{place.geo.longitude_as_decimal_degrees}</dd>
+                {#if place.geo.elevation_as_decimal_metres != null}<dt>
+                        {t("detail.elevation_as_decimal_metres")}
+                    </dt>
+                    <dd>{place.geo.elevation_as_decimal_metres} m</dd>{/if}
             </dl>
         </section>
     {/if}
@@ -146,7 +174,14 @@
             <ul>
                 {#each place.identifiers as identifier}
                     <li>
-                        <strong>{typeof identifier.identifier_type === "string" ? identifier.identifier_type : translate("detail.identifierCustom").replace("{value}", identifier.identifier_type.Custom)}</strong>
+                        <strong
+                            >{typeof identifier.identifier_type === "string"
+                                ? identifier.identifier_type
+                                : translate("detail.identifierCustom").replace(
+                                      "{value}",
+                                      identifier.identifier_type.Custom,
+                                  )}</strong
+                        >
                         <code>{identifier.value}</code>
                     </li>
                 {/each}
@@ -159,7 +194,10 @@
             <h2>{t("detail.openingHours")}</h2>
             <ul>
                 {#each place.opening_hours as h}
-                    <li><strong>{h.day_of_week}</strong> {h.opens}–{h.closes}</li>
+                    <li>
+                        <strong>{h.day_of_week}</strong>
+                        {h.opens}–{h.closes}
+                    </li>
                 {/each}
             </ul>
         </section>
@@ -170,7 +208,9 @@
             <h2>{t("detail.amenities")}</h2>
             <ul>
                 {#each place.amenity_features as a}
-                    <li>{a.name}{#if a.value}: {a.value}{/if}</li>
+                    <li>
+                        {a.name}{#if a.value}: {a.value}{/if}
+                    </li>
                 {/each}
             </ul>
         </section>
@@ -178,8 +218,20 @@
 {/if}
 
 <style>
-    .kv { display: grid; grid-template-columns: max-content 1fr; column-gap: 1rem; row-gap: 0.25rem; }
-    dt { font-weight: 600; }
-    dd { margin: 0; }
-    ul { margin: 0; padding-left: 1.25rem; }
+    .kv {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 1rem;
+        row-gap: 0.25rem;
+    }
+    dt {
+        font-weight: 600;
+    }
+    dd {
+        margin: 0;
+    }
+    ul {
+        margin: 0;
+        padding-left: 1.25rem;
+    }
 </style>

@@ -24,7 +24,9 @@
 
     // Default the placeholder (also used as aria-label) to the translated
     // "Search…" when the caller doesn't supply one.
-    const resolvedPlaceholder = $derived(placeholder ?? t("search.placeholder"));
+    const resolvedPlaceholder = $derived(
+        placeholder ?? t("search.placeholder"),
+    );
 
     // Prevent the native full-page form navigation; emit the query instead.
     function handleSubmit(e: SubmitEvent) {
@@ -44,6 +46,12 @@
 </form>
 
 <style>
-    .searchbox { display: flex; gap: 0.5rem; align-items: center; }
-    .searchbox input { flex: 1; }
+    .searchbox {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .searchbox input {
+        flex: 1;
+    }
 </style>

@@ -35,9 +35,18 @@
         } catch (err) {
             // 409 with array details = duplicate candidates: surface them and
             // re-throw a friendly message so the form shows the warning banner.
-            if (err instanceof ApiError && err.isConflict && Array.isArray(err.details)) {
+            if (
+                err instanceof ApiError &&
+                err.isConflict &&
+                Array.isArray(err.details)
+            ) {
                 duplicates = err.details as MatchResult[];
-                throw new Error(translate("new.duplicatesDetected").replace("{count}", String(duplicates.length)));
+                throw new Error(
+                    translate("new.duplicatesDetected").replace(
+                        "{count}",
+                        String(duplicates.length),
+                    ),
+                );
             }
             // Any other error bubbles up to the form's submit-error handling.
             throw err;
@@ -50,9 +59,16 @@
 <header><h1>{t("new.title")}</h1></header>
 
 <section class="surface stack">
-    <ThingForm initial={blank} submitLabel={t("new.submitLabel")} onsubmit={handleSubmit} />
+    <ThingForm
+        initial={blank}
+        submitLabel={t("new.submitLabel")}
+        onsubmit={handleSubmit}
+    />
 </section>
 
 {#if duplicates.length > 0}
-    <MatchResultsList results={duplicates} title={t("new.possibleDuplicates")} />
+    <MatchResultsList
+        results={duplicates}
+        title={t("new.possibleDuplicates")}
+    />
 {/if}

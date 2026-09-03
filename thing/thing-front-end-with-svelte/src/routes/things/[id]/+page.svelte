@@ -72,8 +72,12 @@
 
     // Render an identifier's scheme as a label, handling the Custom variant.
     // The conditional type extracts the element type of the identifiers array.
-    function identifierLabel(t: Thing["identifiers"] extends (infer U)[] | undefined ? U : never): string {
-        return typeof t.property_id === "string" ? t.property_id : `${translate("detail.customPrefix")}${t.property_id.Custom}`;
+    function identifierLabel(
+        t: Thing["identifiers"] extends (infer U)[] | undefined ? U : never,
+    ): string {
+        return typeof t.property_id === "string"
+            ? t.property_id
+            : `${translate("detail.customPrefix")}${t.property_id.Custom}`;
     }
 </script>
 
@@ -87,16 +91,16 @@
     <header class="row" style="justify-content: space-between">
         <h1>{thing.name}</h1>
         <div class="row">
-            <button
-                class="button"
-                aria-pressed={masked}
-                onclick={toggleMasked}
-            >
+            <button class="button" aria-pressed={masked} onclick={toggleMasked}>
                 {masked ? t("detail.showFull") : t("detail.showMasked")}
             </button>
             <a href={`/things/${id}/edit`} class="button">{t("detail.edit")}</a>
-            <a href={`/things/${id}/audit`} class="button">{t("detail.audit")}</a>
-            <button class="button danger" onclick={handleDelete}>{t("detail.delete")}</button>
+            <a href={`/things/${id}/audit`} class="button"
+                >{t("detail.audit")}</a
+            >
+            <button class="button danger" onclick={handleDelete}
+                >{t("detail.delete")}</button
+            >
         </div>
     </header>
 
@@ -107,15 +111,38 @@
     <section class="surface stack">
         <h2>{t("detail.identity")}</h2>
         <dl class="kv">
-            <dt>{t("detail.id")}</dt><dd><code>{thing.id}</code></dd>
+            <dt>{t("detail.id")}</dt>
+            <dd><code>{thing.id}</code></dd>
             <dt>{t("detail.additionalType")}</dt>
-            <dd>{#if thing.additional_type}<a href={thing.additional_type} target="_blank" rel="noopener">{thing.additional_type}</a>{:else}—{/if}</dd>
-            <dt>{t("detail.description")}</dt><dd>{thing.description ?? "—"}</dd>
-            <dt>{t("detail.disambiguating")}</dt><dd>{thing.disambiguating_description ?? "—"}</dd>
-            <dt>{t("detail.url")}</dt><dd>{#if thing.url}<a href={thing.url} target="_blank" rel="noopener">{thing.url}</a>{:else}—{/if}</dd>
-            <dt>{t("detail.owner")}</dt><dd>{thing.owner ?? "—"}</dd>
+            <dd>
+                {#if thing.additional_type}<a
+                        href={thing.additional_type}
+                        target="_blank"
+                        rel="noopener">{thing.additional_type}</a
+                    >{:else}—{/if}
+            </dd>
+            <dt>{t("detail.description")}</dt>
+            <dd>{thing.description ?? "—"}</dd>
+            <dt>{t("detail.disambiguating")}</dt>
+            <dd>{thing.disambiguating_description ?? "—"}</dd>
+            <dt>{t("detail.url")}</dt>
+            <dd>
+                {#if thing.url}<a
+                        href={thing.url}
+                        target="_blank"
+                        rel="noopener">{thing.url}</a
+                    >{:else}—{/if}
+            </dd>
+            <dt>{t("detail.owner")}</dt>
+            <dd>{thing.owner ?? "—"}</dd>
             <dt>{t("detail.mainEntityOfPage")}</dt>
-            <dd>{#if thing.main_entity_of_page}<a href={thing.main_entity_of_page} target="_blank" rel="noopener">{thing.main_entity_of_page}</a>{:else}—{/if}</dd>
+            <dd>
+                {#if thing.main_entity_of_page}<a
+                        href={thing.main_entity_of_page}
+                        target="_blank"
+                        rel="noopener">{thing.main_entity_of_page}</a
+                    >{:else}—{/if}
+            </dd>
         </dl>
     </section>
 
@@ -127,7 +154,12 @@
                     <li>
                         <strong>{identifierLabel(identifier)}</strong>
                         <code>{identifier.value}</code>
-                        {#if identifier.url}<a href={identifier.url} target="_blank" rel="noopener" class="small">↗</a>{/if}
+                        {#if identifier.url}<a
+                                href={identifier.url}
+                                target="_blank"
+                                rel="noopener"
+                                class="small">↗</a
+                            >{/if}
                     </li>
                 {/each}
             </ul>
@@ -147,7 +179,9 @@
         <section class="surface stack">
             <h2>{t("detail.sameAs")}</h2>
             <ul>
-                {#each thing.same_as as href}<li><a {href} target="_blank" rel="noopener">{href}</a></li>{/each}
+                {#each thing.same_as as href}<li>
+                        <a {href} target="_blank" rel="noopener">{href}</a>
+                    </li>{/each}
             </ul>
         </section>
     {/if}
@@ -156,15 +190,29 @@
         <section class="surface stack">
             <h2>{t("detail.images")}</h2>
             <ul>
-                {#each thing.images as src}<li><a href={src} target="_blank" rel="noopener">{src}</a></li>{/each}
+                {#each thing.images as src}<li>
+                        <a href={src} target="_blank" rel="noopener">{src}</a>
+                    </li>{/each}
             </ul>
         </section>
     {/if}
 {/if}
 
 <style>
-    .kv { display: grid; grid-template-columns: max-content 1fr; column-gap: 1rem; row-gap: 0.25rem; }
-    dt { font-weight: 600; }
-    dd { margin: 0; }
-    ul { margin: 0; padding-left: 1.25rem; }
+    .kv {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 1rem;
+        row-gap: 0.25rem;
+    }
+    dt {
+        font-weight: 600;
+    }
+    dd {
+        margin: 0;
+    }
+    ul {
+        margin: 0;
+        padding-left: 1.25rem;
+    }
 </style>

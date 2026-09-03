@@ -28,13 +28,45 @@
 </script>
 
 <FieldRow>
-    <LabeledField label={t("geo.latitude_as_decimal_degrees")} for={`${prefix}-lat`} error={errors.latitude_as_decimal_degrees} hint={t("geo.latitudeHint")}>
-        <input id={`${prefix}-lat`} type="number" step="0.0001" min="-90" max="90" bind:value={geo.latitude_as_decimal_degrees} />
+    <LabeledField
+        label={t("geo.latitude_as_decimal_degrees")}
+        for={`${prefix}-lat`}
+        error={errors.latitude_as_decimal_degrees}
+        hint={t("geo.latitudeHint")}
+    >
+        <input
+            id={`${prefix}-lat`}
+            type="number"
+            step="0.0001"
+            min="-90"
+            max="90"
+            bind:value={geo.latitude_as_decimal_degrees}
+        />
     </LabeledField>
-    <LabeledField label={t("geo.longitude_as_decimal_degrees")} for={`${prefix}-lon`} error={errors.longitude_as_decimal_degrees} hint={t("geo.longitudeHint")}>
-        <input id={`${prefix}-lon`} type="number" step="0.0001" min="-180" max="180" bind:value={geo.longitude_as_decimal_degrees} />
+    <LabeledField
+        label={t("geo.longitude_as_decimal_degrees")}
+        for={`${prefix}-lon`}
+        error={errors.longitude_as_decimal_degrees}
+        hint={t("geo.longitudeHint")}
+    >
+        <input
+            id={`${prefix}-lon`}
+            type="number"
+            step="0.0001"
+            min="-180"
+            max="180"
+            bind:value={geo.longitude_as_decimal_degrees}
+        />
     </LabeledField>
-    <LabeledField label={t("geo.elevation_as_decimal_metres")} for={`${prefix}-elev`}>
-        <input id={`${prefix}-elev`} type="number" step="1" bind:value={geo.elevation_as_decimal_metres} />
+    <LabeledField
+        label={t("geo.elevation_as_decimal_metres")}
+        for={`${prefix}-elev`}
+    >
+        <input
+            id={`${prefix}-elev`}
+            type="number"
+            step="1"
+            bind:value={geo.elevation_as_decimal_metres}
+        />
     </LabeledField>
 </FieldRow>

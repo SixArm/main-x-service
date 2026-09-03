@@ -51,13 +51,26 @@
                 <li>
                     <header class="row">
                         <code>{entry.action}</code>
-                        <span class="muted small">{new Date(entry.created_at).toLocaleString()}</span>
-                        {#if entry.user_id}<span class="muted small">{translate("auditLog.by").replace("{user}", entry.user_id)}</span>{/if}
+                        <span class="muted small"
+                            >{new Date(entry.created_at).toLocaleString()}</span
+                        >
+                        {#if entry.user_id}<span class="muted small"
+                                >{translate("auditLog.by").replace(
+                                    "{user}",
+                                    entry.user_id,
+                                )}</span
+                            >{/if}
                     </header>
                     {#if entry.new_values}
                         <details>
-                            <summary class="small">{t("auditLog.payload")}</summary>
-                            <pre class="small">{JSON.stringify(entry.new_values, null, 2)}</pre>
+                            <summary class="small"
+                                >{t("auditLog.payload")}</summary
+                            >
+                            <pre class="small">{JSON.stringify(
+                                    entry.new_values,
+                                    null,
+                                    2,
+                                )}</pre>
                         </details>
                     {/if}
                 </li>
@@ -67,6 +80,17 @@
 </section>
 
 <style>
-    .entries { list-style: decimal; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
-    pre { background: var(--mxi-color-bg); padding: 0.5rem; border-radius: var(--mxi-radius); overflow-x: auto; }
+    .entries {
+        list-style: decimal;
+        padding-left: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    pre {
+        background: var(--mxi-color-bg);
+        padding: 0.5rem;
+        border-radius: var(--mxi-radius);
+        overflow-x: auto;
+    }
 </style>

@@ -22,7 +22,9 @@
     } = $props();
 
     // Fall back to the translated default placeholder when none is given.
-    const resolvedPlaceholder = $derived(placeholder ?? t("search.defaultPlaceholder"));
+    const resolvedPlaceholder = $derived(
+        placeholder ?? t("search.defaultPlaceholder"),
+    );
 
     // Prevent the native form navigation; hand the query to the parent.
     function handleSubmit(e: SubmitEvent) {
@@ -42,6 +44,12 @@
 </form>
 
 <style>
-    .searchbox { display: flex; gap: 0.5rem; align-items: center; }
-    .searchbox input { flex: 1; }
+    .searchbox {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .searchbox input {
+        flex: 1;
+    }
 </style>

@@ -46,7 +46,10 @@
         if (!c.identifiers || c.identifiers.length === 0) return "";
         const first = c.identifiers[0];
         if (!first) return "";
-        const type = typeof first.property_id === "string" ? first.property_id : `${t("detail.customPrefix")}${first.property_id.Custom}`;
+        const type =
+            typeof first.property_id === "string"
+                ? first.property_id
+                : `${t("detail.customPrefix")}${first.property_id.Custom}`;
         return `${type} ${first.value}`;
     }
 
@@ -54,7 +57,9 @@
     function levelLabel(c: Course): string {
         const l = c.educational_level;
         if (!l) return "";
-        return typeof l === "string" ? l : `${t("detail.customPrefix")} ${l.Custom}`;
+        return typeof l === "string"
+            ? l
+            : `${t("detail.customPrefix")} ${l.Custom}`;
     }
 
     // Project courses into the flat row shape the grid columns expect.
@@ -94,7 +99,9 @@
             : data,
     );
 
-    function initGrid(api: { on(action: string, cb: (ev: { id: string | number }) => void): void }) {
+    function initGrid(api: {
+        on(action: string, cb: (ev: { id: string | number }) => void): void;
+    }) {
         api.on("select-row", (ev) => {
             const found = courses.find((c) => c.id === String(ev.id));
             if (found) onselect?.(found);
@@ -107,7 +114,8 @@
         <div class="filter-wrap">
             <FilterBar
                 fields={filterFields}
-                onchange={({ value }: { value: unknown }) => (filterRules = value)}
+                onchange={({ value }: { value: unknown }) =>
+                    (filterRules = value)}
             />
         </div>
         <div class="grid-wrap">

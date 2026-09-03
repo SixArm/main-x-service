@@ -21,7 +21,9 @@
     } = $props();
 
     // Fall back to the generic "Search…" placeholder when the parent omits one.
-    const resolvedPlaceholder = $derived(placeholder ?? t("search.placeholder"));
+    const resolvedPlaceholder = $derived(
+        placeholder ?? t("search.placeholder"),
+    );
 
     // Submit handler: suppress native navigation, then notify the parent.
     function handleSubmit(e: SubmitEvent) {
@@ -41,6 +43,12 @@
 </form>
 
 <style>
-    .searchbox { display: flex; gap: 0.5rem; align-items: center; }
-    .searchbox input { flex: 1; }
+    .searchbox {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .searchbox input {
+        flex: 1;
+    }
 </style>
