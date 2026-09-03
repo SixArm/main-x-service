@@ -91,7 +91,11 @@ export const MATCH_COMPONENTS: readonly MatchComponent[] = [
     weight: 0.1,
   },
   { key: "tax_id_score", labelKey: "review.component.taxId", weight: 0.1 },
-  { key: "document_score", labelKey: "review.component.document", weight: 0.05 },
+  {
+    key: "document_score",
+    labelKey: "review.component.document",
+    weight: 0.05,
+  },
 ];
 
 /** One rendered row of the score-breakdown table. */
