@@ -32,3 +32,36 @@ spec §16.
   Should it reference the
   [organization entity](../../organization/) (`pid`) so provider
   scoping survives organisation renames and merges?
+- **OQ-7 — Fairness slices need demographics the instance layer does
+  not hold.** ehrapy's `detect_bias` (standardised mean differences and
+  value-count ratios across sensitive attributes) and Cox case-mix
+  adjustment would answer "who is breaching the standard", which is the
+  question an equity audit asks. The instance layer carries only a
+  `subject_ref` URN, by design — age, sex, ethnicity, and deprivation
+  live in the [person](../../person/) registry. Options: (a) a
+  server-side join through the person service under the caller's
+  forwarded credential, aggregated and suppressed before it leaves; (b)
+  the caller exports `journey_features` (T-14a) and joins in a secure
+  processing environment; (c) do not offer it. (a) makes this service a
+  processor of demographic data it never stored, with everything that
+  implies for §12; (b) keeps the join where the data governance already
+  is. *Lean: (b), and say so in the T-14a docs — a fairness slice is
+  exactly what the feature export is for.* (Raised by the T-14 triage,
+  2026-09-03.)
+- **OQ-8 — Cost on the process map.** BNSSG annotated its
+  directly-follows map with median cost per activity, which turned a
+  flow diagram into a spend diagram. No `CarePathway`, instance, or
+  segment field carries cost, and adding one is a domain expansion (whose
+  cost? reference cost, tariff, actual?) rather than an analytics
+  feature. *Lean: leave the map cost-free; if a cost field ever lands on
+  segments, T-14b's node annotation is the one-line change.*
+- **OQ-9 — What is a "case" in the event log?** T-14a uses the instance
+  `pid` as `case_id`, so one patient with a re-enrolment or a
+  `continues_as` continuation appears as two cases — BNSSG had the same
+  problem the other way round (case = patient, so a second hip
+  replacement was truncated). The stitched journey
+  (`GET /api/instances/{pid}/journey`) is the natural case for a
+  cross-episode analysis, but it crosses a service boundary and a
+  credential boundary. *Lean: instance now; add an optional
+  `journey_id` column populated only when the caller can read every
+  leg, once T-14a exists.*

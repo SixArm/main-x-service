@@ -304,3 +304,273 @@ manual check confirms it. Split tasks too big for one PR
   - **Open (TBA-8 … TBA-11):** the front-end timeline wall and cohort
     view, cross-service journey stitching via the link-graph aggregator,
     and Prometheus gauges for cohort %VA / p90 lead time.
+
+- [ ] **T-14 — Pathway analytics: what to borrow from process mining,
+  treatment-pattern analysis, and exploratory EHR analysis.**
+  *(Triaged 2026-09-03 against four open-source projects. Their code was
+  read, not just their READMEs — the defects and the undocumented
+  behaviour noted below came from the source. Citations in
+  [§17.3](17-references.md).)*
+
+  **The four sources.**
+
+  | Source | What it is | State |
+  |---|---|---|
+  | [IPPA-py](https://github.com/PatientPathwayAnalysis/IPPA-py) | *Individualised Patient Pathway Analysis*: timed state machines (evaluation / treatment / related-illness) run over per-visit claims rows, cut into episodes where every machine is idle, then reduced to named **anchors** and a **delay decomposition** (waiting → evaluating → detecting → treating). TB in Taiwan's NHI; BMJ Glob Health 2020. | Python, Apache-2.0; dormant since 2019-03; no tests; a `'2st'` typo and a `zip(ser_t[:1], …)` slice bug are live in the anchor code. |
+  | [process-mining-clinical-pathways](https://github.com/nhs-bnssg-analytics/process-mining-clinical-pathways) | NHS BNSSG single-study code: SUS spells, e-RS referrals, SWD contacts → one bupaR **event log** (`case = pseudonymised NHS number`, `activity = <setting>_<service>`) → variants, directly-follows process maps annotated with median days, heuristics + inductive miners, PM4Py alignments. Elective hip replacement. | R + T-SQL; **no licence**; dormant since 2021-06; not runnable as committed (blank connection strings, private tables, a syntax error at `2_…extracting_data.R:413`). |
+  | [TreatmentPatterns](https://darwin-eu-dev.github.io/TreatmentPatterns/) | DARWIN EU / OHDSI R package: OMOP target + event cohorts → treatment **eras** → gap-collapsed, overlap-combined, truncated **pathway strings** with strata, an **attrition table**, **cell suppression**, sunburst / Sankey. | R, Apache-2.0; CRAN 3.1.2 (2026-02), one maintainer, active. Read from source: `minEraDuration` also filters *target* rows, and the unstratified export path skips `censorData()`. |
+  | [ehrapy](https://github.com/theislab/ehrapy) | Theis lab scanpy-style EHR toolkit on `EHRData(AnnData)`: QC + missingness, imputation, **bias detection** (SMD, value-count ratios), Kaplan–Meier / Cox, clustering / pseudotime, and a CONSORT-style **`CohortTracker`**. Nature Medicine 2024. | Python, Apache-2.0; 0.15.0 (2026-07), active, heavy API churn (`ep.io` moved out in 0.14, AnnData compatibility dropped in 0.15, MedCAT removed in 0.12.1). |
+
+  **Triage.** Every concept was placed in exactly one column. The
+  refusals are recorded here so they are not re-litigated; the
+  baseline they were judged against is the instance layer
+  (`pathway_instances` / `instance_steps` / `instance_events` /
+  `instance_team` / `instance_measures`), the TBA segment + clock
+  model ([time-based-analysis.md](time-based-analysis.md)), the
+  `continues_as` journey edge, and the five template insight lenses.
+
+  | Concept | From | Decision |
+  |---|---|---|
+  | Event log (case / activity / timestamp / lifecycle / resource); source-prefixed activity labels; per-case lookup table | BNSSG | **Adopt** → T-14a (export codec) |
+  | Directly-follows process map, nodes + edges annotated with case counts and median inter-activity days; state-transition Sankey (`sankey_diagram_time`) | BNSSG, ehrapy | **Adopt** → T-14b |
+  | Trace variants + coverage Pareto; pathway strings built with named knobs (`minEraDuration`, `eraCollapseSize`, `combinationWindow`, `minPostCombinationDuration`, `filterTreatments`, `maxPathLength`); FRFS / LRFS overlap decomposition; canonical `a+b`; duration stats per line | BNSSG, TreatmentPatterns | **Adopt** → T-14c |
+  | Named anchors → delay decomposition; anchored windows (`startAnchor` / `windowStart` / `endAnchor` / `windowEnd`) | IPPA, TreatmentPatterns | **Adopt** → T-14d |
+  | Right-censoring: open journeys as censored; Kaplan–Meier + log-rank; explicit `CENSORED` / `LOST` outcomes | ehrapy, IPPA | **Adopt** → T-14e |
+  | Rule-based cohort split (`check_rule(contains(activity))` → paired throughput / trace length / map); stratified Table 1 | BNSSG, ehrapy | **Adopt** → T-14f |
+  | CONSORT-style cohort tracker (`label`, `operation`, `n`, `parent`; category sets frozen at step 0); attrition table with a row per transformation | ehrapy, TreatmentPatterns | **Adopt** → T-14g |
+  | Missingness metrics (`missing_values_pct`, entropy of missingness), date-sanity codes (`bad_date` 1–5), the MCAR caveat | ehrapy, BNSSG | **Adopt** → T-14h |
+  | Conformance checking (alignments against a model) | BNSSG | **Adapt** → T-14i: against the *template the instance was enrolled on*, never against a discovered model |
+  | Retroactive timeout → idle state, stamped at the moment the timeout expired rather than when it was noticed | IPPA | **Adopt** → T-14j (stalled journeys) |
+  | Cell suppression modes (`minCellCount` / `remove` / `mean`), `"<5"` rendering, the shareable-aggregate vs non-shareable-patient-level split | TreatmentPatterns | **Adopt with two changes** → T-14k: no `mean` mode, no censor-up-to-threshold, and secondary suppression of marginals |
+  | Sunburst + Sankey of variants (with a `Stopped` terminal node), dotted chart, zoomable process-map SVG, attrition flowchart | TreatmentPatterns, BNSSG, ehrapy | **Adopt** → T-14l (front-end) |
+  | Seeded synthetic pseudo-data release (IPPA-data); bundled reference datasets (`ed.dt.*`) | IPPA, ehrapy | **Adopt** → T-14m |
+  | Sensitivity sweep over timeout parameters (`run_sens.py`) | IPPA | **Adopt as a rule, not an endpoint:** every parameterised derivation echoes its parameters in the response (T-14c, T-14j), so a caller can sweep. |
+  | Heuristics / inductive / alpha miners; alignments against a discovered Petri net; model fitness / precision | BNSSG | **Refuse.** A discovered model is a notebook artefact, and BNSSG itself only ever checked conformance against the model it had just discovered. The service ships the event log (T-14a) and the DFG (T-14b) that those miners consume. |
+  | Automatic episode segmentation (all state machines idle ⇒ cut) | IPPA | **Refuse.** Instances are explicit enrolments. Inferring episodes from events is the [TBA §3](time-based-analysis.md) refusal restated; it would also make coverage a lie. |
+  | Facility capability inferred from observed behaviour (`'Anti-TB'` count > 0 ⇒ capable) | IPPA | **Refuse.** Not a registry question; what a provider can do is [organization](../../organization/)'s to assert, and IPPA's own paper says the inference under-counts. |
+  | Trajectory clustering (`leiden`, `dpt`, NCP tensor decomposition), pseudotime, causal estimators (IPTW, g-computation) | ehrapy | **Refuse in the service.** Enabled by the per-journey feature export (T-14a) for a notebook; a service that clusters patients is making a claim it cannot audit. |
+  | Cox proportional hazards with case-mix adjusted provider curves; bias / fairness slice by sensitive attributes (`detect_bias`) | ehrapy | **Open** → [OQ-7](16-open-questions.md): needs demographics the instance layer deliberately does not hold. |
+  | Cost annotations on the process map (`custom(attribute="cost2", median)`) | BNSSG | **Open** → [OQ-8](16-open-questions.md): no cost field exists; adding one is a domain expansion, not an analytics feature. |
+  | Imputation (`knn_impute`, `miss_forest_impute`, `locf_impute`) | ehrapy | **Refuse.** A missing clock stop or segment boundary is a finding ([TBA §6.6](time-based-analysis.md)), never a value to fill. ehrapy's own paper lists informative missingness as unaddressed; on a pathway clock, missingness is *always* informative. |
+  | Results data model + federated upload (`ResultModelManager`, Strategus module) | TreatmentPatterns | **Refuse.** T-10's export contract covers it; a study-package uploader is not a registry's job. |
+  | Per-resource throughput from the event log's `resource` column | BNSSG (where it is `NA` throughout) | **Refuse**, per [family TBA §7](../../agents/share/time-based-analysis.md): never a person metric. |
+
+  **Suggested order.** T-14m (fixtures every other test needs) → T-14k
+  (the suppression rule every aggregate inherits) → T-14b, T-14c, T-14d
+  (the three derivations) → T-14e, T-14f, T-14g → T-14h, T-14i, T-14j →
+  T-14a → T-14l. Each sub-task is one three-part PR (spec + code +
+  tests); the pure parts go in `src/tba.rs` or a sibling
+  `src/analytics.rs`, DB-free and property-tested, per
+  [TBA §14](time-based-analysis.md).
+
+  - [ ] **T-14a — Event-log and journey-feature export codecs.**
+    Extends T-10 with two named export codecs, so a bupaR / PM4Py /
+    ehrapy user can consume the instance layer without a bespoke query.
+    - [ ] `event_log` (CSV + JSONL): one row per activity instance.
+      `case_id` = the instance `pid` (never `subject_ref`; a patient's
+      stitched journey across instances is [OQ-9](16-open-questions.md)),
+      `activity` = `stage:<stage>` for segments, `step:<name>` for
+      completed steps, `event:<kind>` for instance events, `lifecycle`
+      = `start` / `complete` (segments carry both; steps and events are
+      `complete`-only, as BNSSG's point-in-time rows were), `timestamp`,
+      `category`, `waste`, `resource` = the team **role** of
+      `actor_ref` (never the URN), `location_ref`; case attributes
+      `pathway_pid`, `care_setting`, `urgency`, `status`, `outcome`.
+    - [ ] `journey_features` (CSV + JSONL): one row per instance with
+      LT, VT, PT, %A, %VA, coverage, #HO, per-stage durations, gap
+      count, anchors + delays (T-14d), variant string (T-14c),
+      conformance (T-14i), outcome, and a `censored` flag. This is the
+      per-journey feature vector ehrapy's longitudinal tutorial builds
+      by hand — the input to a notebook's clustering, not the service's.
+    - [ ] Both are **patient-level ⇒ non-shareable**
+      (TreatmentPatterns' `exportPatientLevel` split): `masking_profile`
+      masked by default, `full` gated, every export audited, per T-10.
+      Suppression does **not** apply to rows (T-14k applies to
+      aggregates); gating does.
+    - **Acceptance:** exporting a seeded cohort (T-14m) and re-deriving
+      the DFG from the file equals the T-14b endpoint's DFG; a test
+      asserts no codec output ever contains a `subject_ref` or a person
+      URN; the column set is pinned by a snapshot so a bupaR
+      `eventlog(case_id, activity_id, lifecycle_id, timestamp,
+      resource_id)` mapping does not drift.
+  - [ ] **T-14b — Directly-follows process map per pathway cohort.**
+    `GET /api/care-pathways/{pathway}/process-map?level=stage|step`
+    (+ the T-14f cohort filters): nodes (activity, instance count,
+    occurrence count, median duration where the activity has one) and
+    edges (from, to, instance count, median + p90 gap in days) derived
+    on read — stage level from segments in time order, step level from
+    completed steps in `done_on` order — with explicit `start` / `end`
+    pseudo-nodes so entry and exit variety is visible. Self-loops are
+    kept: a return to a stage is a finding. Level `step` states its own
+    caveat in the response: `done_on` is a date, so a same-day pair is
+    a 0-day edge.
+    - **Acceptance:** pure `process_map` tests — edge counts sum to the
+      transition count, median gaps match hand-computed values, a
+      cohort of one variant yields a chain; a request test on the
+      seeded cohort; nodes and edges below the floor are withheld with
+      a reason, never zeroed (T-14k).
+  - [ ] **T-14c — Journey variants (pathway strings).**
+    `GET /api/care-pathways/{pathway}/variants`: per instance, the
+    ordered stage sequence from segments, transformed by **named,
+    defaulted, echoed** parameters: `min_segment_days` (shorter
+    segments dropped), `collapse_gap_days` (same stage separated by ≤ N
+    days ⇒ one step), `combination_window_days` (overlap ≥ N days ⇒ a
+    canonical alphabetical `a+b` step; shorter overlap ⇒ a handoff;
+    FRFS / LRFS decomposition into non-overlapping intervals; stubs
+    shorter than `min_post_combination_days` dropped; iterate until no
+    overlap remains, so three-way overlap converges to `a+b+c`),
+    `filter` = `first` | `changes` | `all`, `max_path_length`. Output:
+    variant string (`referral-diagnostics-treatment+follow_up-…`),
+    frequency, share, cumulative coverage (the Pareto), and per-position
+    ("line") duration quantiles with `overall` as a pseudo-line. Nothing
+    stored; an attrition row per transformation (T-14g shape).
+    - **Acceptance:** pure tests reproduce TreatmentPatterns' documented
+      cases — two overlapping eras become three intervals under FRFS and
+      under LRFS; `b+a` ≡ `a+b`; a stub below
+      `min_post_combination_days` disappears; `changes` collapses
+      `a-a-b` to `a-b` while `all` keeps it; coverage sums to 1 over the
+      unsuppressed variants and the suppressed count is disclosed.
+  - [ ] **T-14d — Stage anchors, delay decomposition, and anchored
+    standards.** Per instance: `anchors` = first `started_at` of each
+    stage in `STAGES` (`null` if never reached), `delays` = adjacent
+    differences in stage order (IPPA's waiting → evaluating → detecting
+    → treating, in our vocabulary). The standards catalogue gains
+    `from_anchor` / `to_anchor` (default clock start → clock stop, i.e.
+    today's behaviour), so `cancer_fds_28` can score referral →
+    `diagnostics` rather than the whole clock. Cohort compliance uses
+    the anchored interval when both anchors are present and reports
+    `unreached` as a **third verdict** — never compliant, never a
+    breach, disclosed as a count. A standard whose anchor the `STAGES`
+    vocabulary cannot express stays whole-clock with an `anchor_note`
+    saying so, rather than approximating. Resolves the "segment
+    templates" lean in [TBA §17](time-based-analysis.md) only as far as
+    anchors go; per-template target durations remain that open question.
+    - **Acceptance:** a journey whose referral → diagnostics interval is
+      20 days inside a 100-day clock is compliant on a 28-day
+      referral-to-diagnostics standard and unaffected on `rtt_18_weeks`;
+      an instance that never reaches `diagnostics` is `unreached`,
+      excluded from numerator and denominator, and counted; the default
+      anchors reproduce today's figures exactly (regression pin).
+  - [ ] **T-14e — Censoring-aware cohort statistics.** Today
+    `?status=all` mixes closed lead times with open instances' running
+    lead time, which understates the eventual distribution (the
+    survivorship error ehrapy's MIMIC tutorial exists to teach). Add a
+    Kaplan–Meier estimate of time-to-close and time-to-anchor (T-14d)
+    treating open instances as right-censored at `as_of`, with median
+    and p90 read off the curve where it reaches them (else `null` with
+    reason `curve_did_not_reach`), the numbers of events and censored
+    instances, and a log-rank test between the two sides of a T-14f
+    split. Whether `discontinued` closure is an event or a censor is a
+    parameter, default `event`, echoed. Nearest-rank percentiles stay as
+    they are; KM is an additional, labelled block, not a replacement.
+    - **Acceptance:** KM on a fully closed cohort equals the empirical
+      distribution; an all-open cohort returns `null` with the reason;
+      log-rank on two identical cohorts gives p ≈ 1; property test: the
+      survival function is non-increasing in `[0, 1]`.
+  - [ ] **T-14f — Rule-based cohort splits and the paired comparison.**
+    Every cohort endpoint (`time-analysis`, `constraints`, `variants`,
+    `process-map`, `data-quality`) accepts `contains=` / `excludes=`
+    with `stage:<s>`, `step:<name>`, `event:<kind>`, `waste:<w>`,
+    `outcome:<o>`, `setting:<s>`, `urgency:<u>`, and `compare=true`
+    returns the same figures for the complement side by side — the
+    stratified Table 1 (n, lead-time percentiles, %VA, coverage, #HO,
+    standard compliance) BNSSG built by hand with `check_rule` +
+    `group_by` and `tableone`.
+    - **Acceptance:** split and complement sizes sum to the unsplit
+      cohort; identical filters on both sides give identical figures;
+      when one side is below the floor, the other side's figures are
+      also withheld wherever they could be differenced against the
+      unsplit total (T-14k).
+  - [ ] **T-14g — Cohort attrition record (CONSORT).** Every cohort
+    response carries `attrition`: ordered steps `{label, operation,
+    instances, parent}` from "enrolled on pathway" through the status
+    filter, window, rule filters, degenerate-clock exclusion, coverage
+    floor, and suppression, so the denominator is explained inside the
+    response rather than in a log. `parent` gives the branching a
+    `compare` needs. Category sets used by any composition table are
+    frozen at step 0 (ehrapy's rule), so a later step cannot invent a
+    stratum — or silently lose one.
+    - **Acceptance:** the last step's `instances` equals the analysed
+      n; a test enumerates every exclusion reason in the code and
+      asserts each has a step; a step that excluded nobody still
+      appears (an empty cell is a finding).
+  - [ ] **T-14h — Journey data-quality and missingness report.**
+    `GET /api/care-pathways/{pathway}/data-quality`: per cohort, the
+    share of instances with no segments, an open segment past closure,
+    a terminal status with no clock stop, `done_on` before
+    `enrolled_on`, out-of-order step completion, segments clipped by the
+    clock, coverage below the floor, and anchors unreached — each a
+    code in a closed vocabulary (BNSSG's `bad_date` 1–5, generalised);
+    plus per-stage and per-field missingness percentage and entropy of
+    missingness across instances. The report is the finding; it never
+    imputes (see the triage table).
+    - **Acceptance:** a seeded cohort with injected defects (T-14m)
+      reports each code exactly once per defect; a clean cohort reports
+      every code at zero, rows present.
+  - [ ] **T-14i — Conformance to the enrolled template.** Per
+    instance, the steps copied at enrolment (`instance_steps.position`)
+    against their completion order (`done_on`): skipped steps, adjacent
+    declared pairs completed out of order, steps completed after
+    closure, and `escalation` events; a labelled ratio
+    `pairs_in_order / declared_pairs` shipped with both numbers; cohort
+    share fully conformant. Against the template only — never a
+    discovered model — and with no penalty for extra events: a journey
+    may need more than its template foresaw.
+    - **Acceptance:** completing steps in template order scores 1.0
+      with zero inversions; reverse order scores 0; a skipped step is
+      reported as skipped, not as an inversion; an instance with one
+      declared step reports `null` (no pairs) with the reason.
+  - [ ] **T-14j — Stalled journeys (aging WIP).**
+    `GET /api/instances/stalled?idle_days=N` (default 60, echoed):
+    open instances whose last recorded activity — latest of segment
+    start / end, step `done_on`, event `occurred_at`, review — is older
+    than N days, sorted by idle time, each row naming its last-activity
+    source. Complements `overdue-reviews` (a due date) with an
+    observed-silence test. The timeout is retroactive, as IPPA's
+    `Process.time_out` is: idle-since is the last activity time, not
+    the time the silence was noticed. Never grouped by actor.
+    - **Acceptance:** an instance whose last event was 61 days ago is
+      listed at `idle_days=60` and not at 90; an instance with an open
+      segment started 5 days ago is not listed; a closed instance is
+      never listed.
+  - [ ] **T-14k — Disclosure control: modes and marginals.** Generalise
+    the TBA-10 floor to every aggregate above: `min_cell_count`
+    (deployment-configurable upward only, per [TBA §17](time-based-analysis.md)),
+    modes `withhold` (default: `null` + reason) and `remove`. Two of
+    TreatmentPatterns' three modes are deliberately **not** adopted:
+    `mean` substitutes a made-up count, and `minCellCount` reports a
+    suppressed cell *as* the threshold, which reads as a count. And one
+    rule is added that TreatmentPatterns leaves to the caller: when a
+    cell in a stratified table is withheld, enough sibling cells are
+    also withheld that the value cannot be recovered by differencing
+    against a visible total (secondary suppression).
+    - **Acceptance:** property test over generated stratified outputs —
+      no withheld cell is recoverable as `total − Σ visible`; `remove`
+      and `withhold` never disagree on *which* cells are small; the
+      T-14a codecs are exempt from suppression and gated instead.
+  - [ ] **T-14l — Front-end analytics views** in
+    `care-pathway-front-end-with-svelte`. `/time` gains the process map
+    (an in-house layered SVG layout — node size = instances, edge label
+    = median days — rather than a new graph dependency), the variants
+    sunburst and Sankey with a `Stopped` terminal node, a dotted chart
+    (instances × time, coloured by stage), the attrition flowchart, the
+    `compare` two-column view, and the stalled list; filters bound to
+    the T-14f parameters; suppressed cells rendered as "withheld
+    (n < 5)", never blank. Theme-aware, i18n keys in every locale file.
+    - **Acceptance:** vitest units for the sunburst / Sankey transforms
+      from a variants payload and the DFG layout; Playwright smoke with
+      the API stubbed; a withheld cell is visibly labelled.
+  - [ ] **T-14m — Seeded synthetic journey cohorts.** A generator in
+    `src/data` plus a loco task (`journeys:seed` with `pathway`, `n`,
+    `seed`, `open_share`, `defects`): deterministic instances with
+    segments, steps, and events across `STAGES`, configurable
+    stage-duration distributions, gap and overlap rates, defect
+    injection for every T-14h code, and a censoring share. `subject_ref`
+    values come from a fixed, obviously fictional UUID namespace. Never
+    real data, never derived from real data — the family's synthetic-
+    only rule, and IPPA-data's own disclaimer ("no responsibility to
+    answer any epidemiological question") is the reason to say so in
+    the docs. Used by every T-14 test and by the repo demo seed (EX-4).
+    - **Acceptance:** the same seed produces byte-identical output;
+      generated cohorts satisfy every §5.1 invariant unless a defect
+      was requested; the README states the data is synthetic.

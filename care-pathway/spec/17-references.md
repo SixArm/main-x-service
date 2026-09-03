@@ -82,6 +82,33 @@ Analytics / pathway discovery (process mining):
 - **opencodecounts** — R package + Shiny app exploring NHS clinical
   coding (SNOMED CT, ICD-10) over time.
 
+Triaged for §13 T-14 (2026-09-03) — the code was read, not the README:
+
+- [IPPA-py](https://github.com/PatientPathwayAnalysis/IPPA-py) —
+  Individualised Patient Pathway Analysis (Python, Apache-2.0): timed
+  state machines over claims visits, episode cutting, named anchors and
+  delay decomposition. Ku CC et al., *BMJ Glob Health* 2020;5:e002187,
+  [doi:10.1136/bmjgh-2019-002187](https://doi.org/10.1136/bmjgh-2019-002187).
+  Companion pseudo-data release:
+  [IPPA-data](https://github.com/PatientPathwayAnalysis/IPPA-data) (CC-BY-4.0).
+- [process-mining-clinical-pathways](https://github.com/nhs-bnssg-analytics/process-mining-clinical-pathways)
+  — NHS BNSSG + University of Bristol (R + T-SQL, no licence):
+  SUS / e-RS / SWD rows → bupaR event log → variants, performance
+  process maps, heuristics + inductive miners, PM4Py alignments, for
+  elective hip replacement.
+- [TreatmentPatterns](https://darwin-eu-dev.github.io/TreatmentPatterns/)
+  — DARWIN EU / OHDSI (R, Apache-2.0, CRAN): OMOP cohorts → treatment
+  eras → collapsed, combined, truncated pathway strings with strata,
+  attrition, cell suppression, sunburst / Sankey. Markus A et al.,
+  *Comput Methods Programs Biomed* 2022,
+  [doi:10.1016/j.cmpb.2022.107081](https://doi.org/10.1016/j.cmpb.2022.107081).
+- [ehrapy](https://github.com/theislab/ehrapy) — Theis lab (Python,
+  Apache-2.0): scanpy-style exploratory EHR analysis on
+  `EHRData(AnnData)` — QC + missingness, bias detection, Kaplan–Meier /
+  Cox, clustering, CONSORT-style `CohortTracker`. Heumos L et al.,
+  *Nat Med* 2024;30:3369–3380,
+  [doi:10.1038/s41591-024-03214-0](https://doi.org/10.1038/s41591-024-03214-0).
+
 Emerging AI tools:
 
 - **CP-Env** (arXiv, 2025) — agentic hospital environment evaluating

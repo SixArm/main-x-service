@@ -7658,3 +7658,56 @@ green as it sits; these finish it)**
    security-relevant functional gaps.
 8. Everything else in per-family order; PRO-H6/H7/H9 as capacity
    allows.
+
+## Phase 9 — Pathway analytics triage (2026-09-03)
+
+> **Provenance.** Four open-source pathway-analysis projects were read
+> — their code, not their READMEs — and triaged against what the
+> care-pathway trio already carries (the instance layer, the TBA
+> segment + clock model, `continues_as` journeys, the insight lenses):
+> [IPPA-py](https://github.com/PatientPathwayAnalysis/IPPA-py),
+> [nhs-bnssg-analytics/process-mining-clinical-pathways](https://github.com/nhs-bnssg-analytics/process-mining-clinical-pathways),
+> [DARWIN EU TreatmentPatterns](https://darwin-eu-dev.github.io/TreatmentPatterns/),
+> and [theislab/ehrapy](https://github.com/theislab/ehrapy). The full
+> triage table — every concept adopted, adapted, refused, or left open,
+> each with its reason — and the thirteen resulting sub-tasks
+> (T-14a … T-14m) live in
+> [`care-pathway/spec/13-tasks.md`](care-pathway/spec/13-tasks.md) T-14,
+> which is the single source of truth for them. Only the consequences
+> that cross a subproject boundary are listed here.
+
+- [ ] **PA-1 (L)** care-pathway **T-14a … T-14m** — the entity-level
+  queue. Tracked there, not here; this row exists so the family plan
+  shows the work. Suggested order and the pure-function / property-test
+  discipline are stated in T-14.
+- [ ] **PA-2 (S)** Record the two disclosure rules the triage settled
+  in the family contract,
+  [`agents/share/time-based-analysis.md`](agents/share/time-based-analysis.md)
+  §8, so portfolio and patient-flow inherit them rather than re-decide:
+  a suppressed cell is **withheld with a reason or removed** — never
+  "censored up" to the threshold (TreatmentPatterns' `minCellCount`
+  mode, which reads as a count) and never replaced by a mean — and
+  **secondary suppression** of sibling cells is required wherever a
+  withheld cell could be recovered by differencing against a visible
+  total. Depends: care-pathway T-14k (the reference implementation).
+- [ ] **PA-3 (S)** Adopt the CONSORT attrition record (care-pathway
+  T-14g's `{label, operation, n, parent}` shape) on the other two TBA
+  surfaces — portfolio's cross-plan rollup and patient-flow's
+  `GET /api/stays/{pid}/time-analysis` cohort reads — so every cohort
+  denominator in the family is explained inside the response. Depends:
+  T-14g.
+- [ ] **PA-4 (S)** Add `event_log` and `journey_features` as named
+  export codecs to
+  [`agents/share/bulk-import-export.md`](agents/share/bulk-import-export.md)
+  §5, with the rule TreatmentPatterns enforces by splitting `export()`
+  from `exportPatientLevel()`: a per-journey row is **patient-level and
+  non-shareable** — gated by masking profile and audited, never
+  suppressed as if it were an aggregate. Depends: care-pathway T-14a.
+- [ ] **PA-5 (S)** Open question to settle family-wide, not
+  per-service: where a fairness slice by demographic attributes is
+  computed at all (care-pathway [OQ-7](care-pathway/spec/16-open-questions.md)).
+  The lean there is "in the caller's secure processing environment over
+  the exported features, not in the registry"; if that is the family
+  answer, write it into
+  [`agents/share/privacy.md`](agents/share/privacy.md) so case and
+  patient-flow do not each re-open it.
