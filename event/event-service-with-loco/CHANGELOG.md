@@ -8,6 +8,20 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Verified — timezone correctness of the date-proximity scorer (T-2)
+
+T-2 asked to "replace naive UTC offsets with `chrono-tz` conversions in
+the date-proximity scorer." Checked directly rather than assumed: no
+such defect exists — `Event::start_date`/`end_date` are `DateTime<Utc>`,
+an absolute instant already resolved from whatever offset the input
+carried at the parse boundary, uniformly across the REST, gRPC, and
+FHIR intake paths. What was missing was proof: a new unit test,
+`matching::algorithms::tests::cross_timezone_same_instant_matches_exactly`,
+constructs a `2026-03-01 09:00 America/New_York` instant via the
+`chrono-tz` crate (new dev-dependency; DST-aware, real IANA tz
+database — not a hand-picked fixed offset), confirms it equals
+`2026-03-01 14:00 UTC`, and confirms the scorer rates the pair a match.
+
 ### Added — a real gRPC server (T-6, repo `tasks.md` PRO-H11)
 
 `src/api/grpc/` is a working `tonic::transport::Server`, replacing the
