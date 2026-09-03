@@ -16,6 +16,8 @@
     - masked — whether the masked view is currently shown; re-fetches
       on toggle rather than masking client-side, so this always reflects
       the server's actual masking rules.
+    - exporting — true while a GDPR export download is in flight
+      (T-20), so a slow request can't be double-submitted.
 -->
 <script lang="ts">
     import { page } from "$app/state";
@@ -31,6 +33,7 @@
     let error = $state<string | null>(null);
     let loading = $state(true);
     let masked = $state(false);
+    let exporting = $state(false);
 
     // Reactive route param; stays current if the user navigates between ids.
     const id = $derived(page.params.id as string);
@@ -71,6 +74,35 @@
             error = err instanceof Error ? err.message : String(err);
         }
     }
+
+    // GDPR export (T-20): fetch the service's export payload and hand it
+    // to the browser as a downloaded JSON file — the payload shape is
+    // service-defined (`exportGdpr` returns `unknown`), so this never
+    // interprets it, only serializes and saves what came back. A Blob
+    // object URL through a synthetic anchor is the plain-browser way to
+    // save client-held data; the URL is revoked once the click has fired.
+    async function handleExportGdpr() {
+        exporting = true;
+        error = null;
+        try {
+            const data = await repo.exportGdpr(id);
+            const blob = new Blob([JSON.stringify(data, null, 2)], {
+                type: "application/json",
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `person-${id}-export.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            error = err instanceof Error ? err.message : String(err);
+        } finally {
+            exporting = false;
+        }
+    }
 </script>
 
 <svelte:head><title>{t("detail.head.title.prefix")} · {id}</title></svelte:head>
@@ -91,6 +123,13 @@
             <a href={`/persons/${id}/audit`} class="button"
                 >{t("detail.audit")}</a
             >
+            <button
+                class="button"
+                onclick={handleExportGdpr}
+                disabled={exporting}
+            >
+                {exporting ? t("detail.exportingGdpr") : t("detail.exportGdpr")}
+            </button>
             <button class="button danger" onclick={handleDelete}
                 >{t("detail.delete")}</button
             >
