@@ -18,7 +18,25 @@
 - [ ] T-16: Theming tokens in `app.css` extracted to a small theme module.
 - [ ] T-17: `check-duplicates` endpoint wired into create form (preview before commit).
 - [x] T-18: Batch deduplicate-scan results UI. Landed 2026-07-19 as `/review` — SVAR Kanban board (Pending / Confirmed / Rejected / AutoMerged) that loads the stored `GET /api/places/review-queue` on mount and drives decisions through `POST /api/places/review-queue/{id}/decision`; the scan button (`POST /api/places/deduplicate`, destructive-classed) is explicit, never a page-load side effect.
-- [ ] T-19: Masked-view toggle on detail page.
+- [x] T-19: Masked-view toggle on detail page. *(2026-09-03)* A toggle
+  button in the `/places/[id]` header re-fetches through the existing
+  `PlaceRepository.masked(id)` (`GET /api/places/{id}/masked`) rather
+  than redacting fields client-side — the server decides what counts as
+  sensitive, mirroring person's and worker's identical T-19 delivery.
+  Shows a `role="status"` banner while the masked view is active, so a
+  screenshot or a glance at the page makes the mode unambiguous.
+  Toggling back re-fetches the plain record rather than caching the
+  pre-toggle state, so a concurrent edit is never shown stale. New keys
+  `detail.showMasked` / `detail.showFull` / `detail.maskedNotice`,
+  translated across all 13 locales. The repository method and its unit
+  test (`masked() GETs /api/places/:id/masked`) already existed on
+  `main` — this task closes the gap the repo memory identified: the
+  method was wired but never surfaced in any route's UI.
+  - **Acceptance:** the pre-existing `tests/unit/places.test.ts`
+    `masked()` test already pinned the endpoint; a new Playwright smoke
+    test (`tests/e2e/places.spec.ts`) stubs the plain and masked
+    endpoints with visibly different `telephone` values and asserts the
+    toggle switches between them and shows/hides the masked-view banner.
 - [ ] T-20: GDPR-export download button.
 - [ ] T-21: Validate the SVAR licensing fit (free GPL-3.0 vs Pro) — see §16 OQ-1.
 - [x] T-22: Auth — adopt BFF + httpOnly cookie + CSRF; the browser holds only `__Host-mxi_session`, the SvelteKit server attaches a short-lived PASETO server-side; no `mxi_access_token`/`localStorage` bearer, no fragment handoff (per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)). Landed: `/signin` + `/verify` routes, `src/lib/server/{session,auth,config}.ts`, and the `/api/proxy/[...path]` reverse proxy that injects the server-exchanged PASETO. CSRF on mutating browser→BFF calls is not yet separately verified — worth a follow-up task if it isn't covered elsewhere.

@@ -56,6 +56,48 @@ test.describe("Place front-end smoke", () => {
         await expect(page.getByLabel(/Duplicate place ID/)).toHaveValue("dup-222");
     });
 
+    // Pins: the masked-view toggle (T-19) re-fetches through
+    // GET /api/places/{id}/masked and back, rather than redacting
+    // client-side — the two stubs return visibly different telephone
+    // values so the test can tell which endpoint actually answered.
+    test("place detail toggles between the plain and masked view", async ({
+        page,
+    }) => {
+        const id = "0c4f1e2a-0000-4000-8000-00000000000a";
+        const base = {
+            id,
+            name: "Central Park",
+            address: { address_locality: "New York" },
+        };
+        await page.route("**/api/places/**", async (route) => {
+            const url = route.request().url();
+            const envelope = url.includes("/masked")
+                ? { success: true, data: { ...base, telephone: "***-***-5309" }, error: null }
+                : { success: true, data: { ...base, telephone: "+1-555-867-5309" }, error: null };
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify(envelope),
+            });
+        });
+
+        await page.goto(`/places/${id}`);
+        await expect(page.getByText("+1-555-867-5309")).toBeVisible();
+        await expect(
+            page.getByText("Showing the masked view"),
+        ).not.toBeVisible();
+
+        await page.getByRole("button", { name: "Show masked" }).click();
+        await expect(page.getByText("***-***-5309")).toBeVisible();
+        await expect(page.getByText("Showing the masked view")).toBeVisible();
+
+        await page.getByRole("button", { name: "Show full" }).click();
+        await expect(page.getByText("+1-555-867-5309")).toBeVisible();
+        await expect(
+            page.getByText("Showing the masked view"),
+        ).not.toBeVisible();
+    });
+
     // Pins the FE-4 review screen: the board, the keyboard-reachable queue
     // table, and the side-by-side comparison the Compare button opens. The
     // queue and both sides of the pair are stubbed at the network layer so
