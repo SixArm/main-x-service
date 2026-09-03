@@ -23,13 +23,13 @@
 | Row-level integrity digests | SHA-256/SHA-3/optional-MAC over the assembled record (child tables included), stamped on every write; `GET /api/records/verify` + `GET /api/audit/verify` (2026-07-28) |
 | Server-owned wire fields optional | `POST /api/things` no longer demands `id`/`created_at`/`updated_at`/collection fields it owns and discards (QA-SERVER-FIELDS, 2026-08-04) |
 | Tests | 197 unit (`cargo test --lib`) + 6 DB-free/gated integration files + `duplicate_detection` bridge suite + `enforcement` activation proof + Criterion benchmarks |
+| `ThingMatcher` trait abstraction | The concrete facade is `ProbabilisticMatcher : ThingMatcher`; `AppState::matcher` holds `Arc<dyn ThingMatcher>`, so an alternative scorer can be substituted with no handler change (T-2, 2026-09-03) |
 
 ### 14.2 Open gaps → tasks
 
 | Gap | Task |
 |---|---|
 | Fluvio production publisher wired to a real deployment target | T-1 |
-| `Matcher` trait abstraction | T-2 |
 | gRPC API | T-3 |
 | Embedding-based similarity | T-5 |
 | Spec-drift CI guard | T-6 |

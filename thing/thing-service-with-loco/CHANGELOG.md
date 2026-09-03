@@ -8,6 +8,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Changed — `ThingMatcher` trait (T-2)
+
+The concrete matcher facade, formerly `struct ThingMatcher`, is renamed
+`ProbabilisticMatcher` (matching the sibling `event-service`/
+`worker-service` naming convention). A new `ThingMatcher` trait
+(`score`/`is_match`/`threshold`) is implemented for it, and
+`AppState::matcher` is now `Arc<dyn ThingMatcher>` rather than
+`Arc<ProbabilisticMatcher>`, so an alternative scorer (ML-based,
+embedding-based, …) can be substituted with no handler change — every
+call site already went through the three trait methods, never the
+struct directly. Two new unit tests
+(`matching::tests::probabilistic_matcher_implements_thing_matcher`,
+`matching::tests::trait_score_matches_the_free_function`) prove the
+trait object behaves identically to a direct `compute_match` call.
+
 ### Added — real OpenTelemetry OTLP export (T-11, PRO-H12 slice 3 of 7)
 
 - **2026-08-30**: new `src/observability.rs`. This crate carried no

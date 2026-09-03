@@ -4,8 +4,8 @@
 //! background queue). The existing REST router is built in
 //! [`App::after_routes`] and merged onto loco's router, so the
 //! hand-written Axum surface keeps working while loco owns the lifecycle.
-//! Boot-time singletons (`SearchEngine`, `ThingMatcher`, domain `Config`)
-//! are constructed here and carried in [`AppState`].
+//! Boot-time singletons (`SearchEngine`, `ProbabilisticMatcher`, domain
+//! `Config`) are constructed here and carried in [`AppState`].
 
 use async_trait::async_trait;
 use axum::Router as AxumRouter;
@@ -26,7 +26,7 @@ use std::sync::OnceLock;
 use crate::{
     api::rest::{ApiDoc, AppState, metrics_routes, things_routes},
     config::Config,
-    matching::ThingMatcher,
+    matching::ProbabilisticMatcher,
     observability::{self, Telemetry, TelemetryConfig},
     search::SearchEngine,
 };
@@ -147,7 +147,7 @@ impl Hooks for App {
     /// Post-routing hook where the hand-written Axum surface is attached.
     ///
     /// Builds the boot-time singletons (`Config`, `SearchEngine`,
-    /// `ThingMatcher`), stuffs the assembled [`AppState`] into loco's shared
+    /// `ProbabilisticMatcher`), stuffs the assembled [`AppState`] into loco's shared
     /// store so the legacy handlers can extract it, then mounts Swagger UI,
     /// the blanket auth-enforcement middleware
     /// (`auth::require_auth_mw` — a near-noop unless `THING_REQUIRE_AUTH`
@@ -169,7 +169,7 @@ impl Hooks for App {
         let config = Config::from_env().map_err(|e| loco_rs::Error::string(&e.to_string()))?;
         let search_engine = SearchEngine::new(&config.search.index_path)
             .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
-        let matcher = ThingMatcher::new(&config.matching);
+        let matcher = ProbabilisticMatcher::new(&config.matching);
         crate::api::rest::auth::init().await;
         // Key rotation and policy edits without a restart: both loops are
         // no-ops unless their source is configured (`THING_PASETO_KEYS_URL`
