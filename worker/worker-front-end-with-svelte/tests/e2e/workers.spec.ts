@@ -98,6 +98,51 @@ test.describe("Worker front-end smoke", () => {
         await expect(page.getByRole("button", { name: "Assert link" })).toBeVisible();
     });
 
+    // Pins: the masked-view toggle (T-19) re-fetches through
+    // GET /api/workers/{id}/masked and back, rather than redacting
+    // client-side — the two stubs return visibly different tax_id values
+    // so the test can tell which endpoint actually answered.
+    test("worker detail toggles between the plain and masked view", async ({
+        page,
+    }) => {
+        const id = "0c4f1e2a-0000-4000-8000-00000000000a";
+        const base = {
+            id,
+            name: { family: "Smith", given: ["John"] },
+            gender: "male",
+            active: true,
+        };
+        await page.route("**/api/workers/**", async (route) => {
+            const url = route.request().url();
+            const envelope = url.includes("/links")
+                ? { success: true, data: [], error: null }
+                : url.includes("/masked")
+                  ? { success: true, data: { ...base, tax_id: "***-**-****" }, error: null }
+                  : { success: true, data: { ...base, tax_id: "123-45-6789" }, error: null };
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify(envelope),
+            });
+        });
+
+        await page.goto(`/workers/${id}`);
+        await expect(page.getByText("123-45-6789")).toBeVisible();
+        await expect(
+            page.getByText("Showing the masked view"),
+        ).not.toBeVisible();
+
+        await page.getByRole("button", { name: "Show masked" }).click();
+        await expect(page.getByText("***-**-****")).toBeVisible();
+        await expect(page.getByText("Showing the masked view")).toBeVisible();
+
+        await page.getByRole("button", { name: "Show full" }).click();
+        await expect(page.getByText("123-45-6789")).toBeVisible();
+        await expect(
+            page.getByText("Showing the masked view"),
+        ).not.toBeVisible();
+    });
+
     // Pins: the merge page renders its heading and both id inputs.
     test("merge form renders both ID inputs", async ({ page }) => {
         await page.goto("/workers/merge");

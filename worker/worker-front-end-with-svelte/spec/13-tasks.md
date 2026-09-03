@@ -35,7 +35,22 @@
   T-25 for the full delivery record — the status/page-size filter, the
   keyboard-reachable table path, the side-by-side comparison panel,
   and the test suite.
-- [ ] T-19: Masked-view toggle on detail page.
+- [x] T-19: Masked-view toggle on detail page. *(2026-09-03)* A toggle
+  button in the `/workers/[id]` header re-fetches through the existing
+  `WorkerRepository.masked(id)` (`GET /api/workers/{id}/masked`) rather
+  than redacting fields client-side — the server decides what counts as
+  sensitive, mirroring person's identical T-19 delivery. Shows a
+  `role="status"` banner while the masked view is active, so a
+  screenshot or a glance at the page makes the mode unambiguous.
+  Toggling back re-fetches the plain record rather than caching the
+  pre-toggle state, so a concurrent edit is never shown stale. New keys
+  `detail.showMasked` / `detail.showFull` / `detail.maskedNotice`,
+  translated across all 13 locales.
+  - **Acceptance:** `tests/unit/workers.test.ts` pins `masked()` GETs
+    `/api/workers/{id}/masked`; a new Playwright smoke test
+    (`tests/e2e/workers.spec.ts`) stubs the plain and masked endpoints
+    with visibly different `tax_id` values and asserts the toggle
+    switches between them and shows/hides the masked-view banner.
 - [ ] T-20: GDPR-export download button.
 - [ ] T-21: Validate the SVAR licensing fit (free GPL-3.0 vs Pro) — see §16 OQ-1.
 - [x] T-22a: Auth — adopt the BFF + httpOnly-cookie shape: `/signin` +

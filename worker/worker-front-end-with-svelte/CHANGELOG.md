@@ -9,6 +9,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — masked-view toggle on the detail page (T-19)
+
+A toggle button on `/workers/[id]` re-fetches through the existing
+`WorkerRepository.masked(id)` (`GET /api/workers/{id}/masked`) instead
+of redacting fields client-side. Shows a status banner while the
+masked view is active. New i18n keys across all 13 locales; a
+repository test pins the endpoint, and a Playwright smoke test
+exercises the toggle end to end with visibly different stubbed
+responses. Mirrors person-front-end's identical T-19 delivery.
+
 ### Fixed — T-18 closed as duplicate
 
 T-18 ("batch deduplicate-scan results UI") was never itself ticked
