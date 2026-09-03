@@ -101,6 +101,13 @@ list means delivered above.
 | `pnpm run lint` (prettier) fails on two pre-existing files (`src/lib/api/client.ts`, `src/lib/i18n.svelte.ts`); no `.svelte` file is prettier-checked at all, since `prettier-plugin-svelte` is not installed | §15 |
 | No posts / comments / members sub-resources (deferred from the plan lineage) | §15 |
 | Front-end e2e tests are API-stubbed and not wired into CI | §15 |
+| A scenario commit is one-way (no rollback) and an evaluation names no `as_of`, so two reads of one scenario can disagree silently | T-28a |
+| No phased budget baseline — so no EAC/ETC, no portfolio-level overrun forecast, and the SPI/CPI gap above stays open | T-28b |
+| Allocations carry a `role` string, no skills; capacity has no scale evidence for the 50-plus-plan case | T-28c, T-28d |
+| No outbound transport of any kind — `notify` is in-app only; no webhook, email, or push | T-28m |
+| No source-tool import (Jira / Asana export → plans + tasks); waits on T-8 | T-28n |
+| Mobile layout unverified (one `@media` rule; two desktop-shaped grid dependencies); no per-user saved views; no role-tailored nav | T-28k, T-28l, T-28f |
+| No go-live runbook — and the activation gate defaults off | T-28o |
 | No cross-service link **aggregator** (`link-graph-service`) — out of this trio's scope | §15 / [cross-service-linking.md](../../agents/share/cross-service-linking.md) |
 
 ### 14.3 Keeping this section honest
