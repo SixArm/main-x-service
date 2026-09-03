@@ -7711,3 +7711,210 @@ green as it sits; these finish it)**
   answer, write it into
   [`agents/share/privacy.md`](agents/share/privacy.md) so case and
   patient-flow do not each re-open it.
+
+## Phase 10 — PPM evaluation-criteria triage (2026-09-03)
+
+> **Provenance.** A ten-criterion buyer's checklist for project
+> portfolio management tools (strategic alignment, scenario modelling,
+> resource management, reporting and analytics, financial management,
+> integrations, task management, AI capabilities, usability, deployment
+> effort) was triaged against what the portfolio trio carries today —
+> mounted routes, entity columns and the front-end route tree, not the
+> roadmap. The full table (carried / not carried / disposition per
+> criterion, including the three refusals: a connector catalogue, an
+> in-service model assistant, and scoring-by-spreadsheet) and the
+> sixteen resulting sub-tasks (T-28a … T-28p) live in
+> [`project-portfolio-management/spec/13-tasks.md`](project-portfolio-management/spec/13-tasks.md)
+> T-28, the single source of truth for them. Only the consequences that
+> cross a subproject boundary are listed here.
+
+- [ ] **EV-1 (L)** portfolio **T-28a … T-28p** — the entity-level
+  queue. Tracked there, not here; this row exists so the family plan
+  shows the work. Suggested order is stated in T-28 (the phased budget
+  baseline T-28b first — it unblocks SPI/CPI, which T-23 left
+  permanently `no_baseline`).
+- [ ] **EV-2 (L)** Enterprise identity federation — **SAML 2.0 and
+  OIDC** as *upstream* identity providers to `authentication-service`,
+  so a deployment's existing IdP signs users in and the family's own
+  session + PASETO model stays exactly as it is downstream. Mentioned
+  nowhere in the family today (grep of `agents/share/` and the auth
+  service spec finds neither term), and it belongs to the auth service,
+  not to any entity trio: every front-end already signs in through it.
+  Design first in
+  [`agents/share/authentication-sessions.md`](agents/share/authentication-sessions.md)
+  (a new §7a beside the magic link: the IdP assertion establishes the
+  same Postgres session, attribute mapping from IdP claims into `users.attributes`
+  under the vocabulary gate, and the same fail-closed posture on
+  metadata/certificate fetch as SEC-V1), then the auth service task.
+  Magic link stays the default; federation is opt-in per deployment.
+- [ ] **EV-3 (M)** Outbound **webhook sink** as a family contract in
+  [`agents/share/event-bus.md`](agents/share/event-bus.md): a
+  `WebhookSink` beside `LoggingSink` / `FluvioSink` in each crate's
+  relay, delivering the outbox envelope to configured URLs, signed with
+  an HMAC through the shared `integrity-mac` crate under its own HKDF
+  domain (`webhook`) so a tag cannot transfer between purposes, with a
+  per-URL event-kind filter, retry with backoff, a delivery log, and
+  the SEC-V1 / SEC-B11 fetch posture (HTTPS outside loopback, no
+  redirects). Portfolio is the first adopter (T-28m); the other nine
+  registries copy it when a consumer asks. Publishing the signature
+  pre-image format is part of the contract, or nobody can verify it.
+- [ ] **EV-4 (S)** A family **go-live runbook**,
+  [`agents/share/runbooks/first-deployment.md`](agents/share/runbooks/first-deployment.md),
+  beside the four existing runbooks: the ordered checklist for standing
+  up any registry, leading with the activation gate
+  (`<ENTITY>_REQUIRE_AUTH` defaults **off** — security.md §4), then the
+  ABAC policy mount, the PASETO keys URL, the event transport, the
+  integrity controls (which already have their own runbook), and a
+  verification step per item that proves it took effect rather than
+  reads that it was set. Portfolio's own page (T-28o) is the first
+  instance and should be written against a fresh container.
+- [ ] **EV-5 (S)** Record the "no black-box output" property as a
+  family rule in
+  [`agents/share/time-based-analysis.md`](agents/share/time-based-analysis.md)
+  §8 or a sibling: every derived figure discloses its inputs and its
+  reasons, or is `null` with a reason; a model-driven assistant, if any
+  deployment ever wants one, sits outside the services over their open
+  API and cites what it read. Portfolio's T-28j is the reference pin;
+  care-pathway and patient-flow inherit the rule rather than re-decide
+  it.
+
+## Phase 11 — Front-end verification gap (2026-09-03)
+
+> **Provenance.** Found while closing T-19 (the masked-view toggle)
+> across the person / worker / place / thing front-ends (PRs #175–#178,
+> all merged). Every one of those PRs ran the full 168-check Rust matrix
+> and **none of it touched the changed files**: `scripts/ci-crates.sh`
+> prunes `node_modules` and `.svelte-kit`, and neither
+> `.github/workflows/ci.yml` nor `.woodpecker.yml` has a Node step. The
+> local runs (`pnpm run check`, `vitest`, `build`, `lint`, Playwright)
+> were the only verification those four PRs had — and running them
+> surfaced three families of pre-existing breakage that nobody had seen,
+> precisely because nothing runs them. Per-front-end fixes belong in
+> each project's own `spec/13-tasks.md`; only the family-shaped
+> consequences are listed here. Counts below are what was measured on
+> `main` this session, not estimates; anything not measured says so.
+
+- [ ] **WEB-1 (M)** The Playwright **smoke suites are red on `main`**
+  in three of the four front-ends touched: person 6 red (new-person
+  form, validation, bulk page, merge form ×2, review board), worker 5
+  red of 9, thing 4 red of 7; place is 7/7 green. Every red test loads
+  a page that PRO-H10 (2026-08-29) put behind `requireSignedIn` —
+  `/new`, `/merge`, `/review`, person's `/bulk` — which now 303s an
+  anonymous visitor to `/signin`, while the smoke tests (written to
+  need no service and no session) still assert the form heading. Place
+  is green only because **PRO-H10 never reached it**: `requireSignedIn`
+  appears 0 times in place's `src/`, and also 0 in organization,
+  care-pathway, case, portfolio and all five consumer apps; course (4)
+  and event (4) have it, but their suites could not be measured at
+  all: on `main` both fail before the first test — `pnpm build` dies on
+  `Rollup failed to resolve import "lily-design-system-svelte-locale-picker"`,
+  the WEB-3 lockfile drift — so Playwright's webServer never starts.
+  Land WEB-3 there first, then expect the same red. Fix
+  without weakening the guard: give the smoke project a stubbed
+  `__Host-mxi_session` cookie via `context.addCookies` (the guard is
+  presence-only and never validates it — each `AGENTS.md` says so), so
+  guarded pages render; and add **one** test per guarded front-end
+  asserting the anonymous 303, so the guard itself is pinned rather
+  than merely tolerated. Separately decide, once, whether PRO-H10 is
+  meant to roll to the remaining front-ends, and record the answer in
+  each spec either way — today the family is split 5 / 11 with no
+  stated reason.
+  **Acceptance:** `pnpm test:e2e` green in all six entity front-ends
+  with the guard on; a redirect test wherever the guard exists.
+- [ ] **WEB-2 (L)** A **front-end CI stage**. `scripts/ci-front-ends.sh`
+  discovering `*/*-front-end-with-svelte/package.json` (the shape
+  `ci-crates.sh` already has), and a `front-end` job in **both** CI
+  files that runs, per project: `pnpm install --frozen-lockfile`,
+  `pnpm run check`, `pnpm vitest run`, `pnpm run build`, `pnpm run
+  lint`, and the Playwright smoke project (browsers cached). The
+  blocker to solve first, and the reason this has never existed: every
+  front-end takes Lily as
+  `file:../../../../lilydesignsystem/lily-design-system/…` — a sibling
+  checkout **outside this repository** — so `pnpm install` cannot
+  succeed on a clean runner at all. Options, decide once in a shared
+  front-end stack doc under `agents/share/` and then apply ×16: publish
+  the Lily packages (they are at `0.1.1`) and take a registry version;
+  a git-URL dependency pinned to a commit; or vendor. Until this lands,
+  a front-end PR's green checks are Rust checks and say nothing about
+  the diff — worth a sentence in `AGENTS.md` so nobody reads 168 green
+  as verification. Depends: WEB-1 (or the stage is born red), WEB-3.
+- [ ] **WEB-3 (S)** **Lockfile drift sweep.** `pnpm-lock.yaml` in
+  **eleven** front-ends still carries the stale
+  `lily-design-system-svelte-headless` entry with no peer-resolved
+  `(svelte@…)` variant that #176–#178 corrected in worker / place /
+  thing (authentication and person were already clean): care-pathway,
+  case-folder, case, contact-relationship-management,
+  content-management-system, course, event, organization,
+  patient-flow, portfolio, workforce-planning-management. The symptom
+  is `svelte-check` failing on `Cannot find module
+  'lily-design-system-svelte-locale-picker'` plus `vitest` failing
+  `layout.test.ts` — the package is in `package.json` and in the
+  lockfile's importers, and never lands in `node_modules`. `pnpm
+  install` also pruned two packages that were never in `package.json`
+  (`…-share-picker`, `…-text-size-picker`) from a stale `node_modules`.
+  One `pnpm install` per project, commit the lockfile, and confirm
+  `--frozen-lockfile` then passes. Prerequisite for WEB-2.
+- [ ] **WEB-4 (S)** **Prettier debt sweep.** `pnpm run lint`
+  (`prettier --check src`) fails today in every entity front-end
+  measured — person 3 files, worker 3, place 2, thing 1, event 1,
+  course 2, portfolio 2 (its own §14 already says so). All in files no
+  recent PR touched, so every feature PR inherits a red lint it did not
+  cause and has to prove so by `git stash`. Reformat per project in a
+  formatting-only PR (no behaviour; `svelte-check` and `vitest`
+  unchanged), and then WEB-2 makes it a gate. Carry portfolio's finding
+  along: its `.svelte` files are not prettier-checked even though
+  `prettier-plugin-svelte` is installed — check whether each project's
+  `lint` script's glob actually reaches `.svelte` (case-folder lacks
+  the plugin entirely). Measure the nine unmeasured front-ends before
+  touching them.
+- [ ] **WEB-5 (M)** **Wire the unwired privacy button — T-20 GDPR
+  export, ×6.** `exportGdpr(id)` (`GET /api/<plural>/{id}/export`)
+  exists in six front-end repositories (person, worker, place, thing,
+  event, course) and is referenced by **zero** routes — the same
+  "method wired, UI absent" gap T-19 just closed for the masked view.
+  Reference shape, person first then copy-adapt (drift accepted): a
+  button on the detail page; `JSON.stringify` the `unknown` payload and
+  hand it to the browser as a Blob download named
+  `<entity>-<id>-export.json`; an `exporting` state disables the button
+  in flight; errors go to the existing banner; the smoke test stubs the
+  route and asserts a Playwright `download` event carrying that
+  filename; keys ×13 locales. Repository-level tests exist for place
+  and thing only — add them for person, worker, event, course. A person
+  WIP exists in this session's git stash (`wip: person-front-end T-20
+  …`, page edits only, i18n keys not yet added).
+- [ ] **WEB-6 (S)** **T-13 / T-16 / T-17 are open ×4, identically.**
+  SSR-safe loads, theming-tokens module, check-duplicates preview in
+  the create form — each open, word-for-word, in person, worker, place,
+  thing (event and course unchecked). Either do each once and copy
+  round as T-19 was, or close it as won't-do with a reason — not four
+  identical unticked rows per crate indefinitely. One pass, one
+  decision per task; the drift-accepted policy makes "do once, copy"
+  legitimate.
+- [ ] **WEB-7 (S)** **Review-queue wire-shape divergence.** Person and
+  worker `ReviewQueueItem` carry `provenance` and a serialised
+  `score_breakdown`; place-service and thing-service carry **neither**
+  — `review_queue` has no `provenance` column, and `score_breakdown` is
+  stored but never serialised and always written `NULL` by the batch
+  scan (each front-end's T-23 / T-24 verified this against the Rust
+  source and substituted `detection_method` in the UI). Both service
+  specs need a §13 row to add the column and serialise the breakdown;
+  the front-end panels are already generic and light up with no change.
+  Organization: verify before claiming either way — the grep this
+  finding rests on did not cover its loco-style layout.
+- [ ] **WEB-8 (S)** **Change-aware CI matrix.** PRs #172–#178 touched
+  no Rust (spec, CHANGELOG, one OpenAPI YAML, SvelteKit) and each ran
+  all 168 checks for roughly an hour; two needed the watch re-armed
+  past a one-hour timeout. Make `discover crates` diff the PR's changed
+  paths against the crate list and emit only the affected crates —
+  everything still runs on pushes to `main` and whenever `ci/`,
+  `scripts/`, either workflow, or any shared `path`-dependency crate
+  (`entity-ref`, `integrity-mac`, `authentication-verifier`, the
+  matchers) changes. One script, both CI files, so the two platforms
+  stay byte-identical. **Not** a `paths-ignore` — that skips required
+  checks and leaves the PR unmergeable; an empty matrix that still
+  reports success is the shape.
+
+Suggested order: WEB-3 → WEB-1 → WEB-4 → WEB-2 → WEB-8 → WEB-5 →
+WEB-6 → WEB-7. The first four are what make a front-end PR's green
+mean something; the last four are the backlog that green would then
+protect.

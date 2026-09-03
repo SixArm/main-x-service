@@ -482,6 +482,209 @@ described manual check confirms it. Split tasks too big for one PR
   deliberately not accepted as an input, since it is the *absence* of a
   declaration).
 
+- [ ] **T-28 — PPM evaluation-criteria triage (2026-09-03).** A
+  ten-criterion buyer's checklist for project portfolio management
+  tools (strategic alignment, scenario modelling, resource management,
+  reporting and analytics, financial management, integrations, task
+  management, AI capabilities, usability, deployment effort — each with
+  the question a buyer puts to a vendor) was triaged against what this
+  trio carries **today**, by reading the mounted routes
+  (`grep '\.add("' src/controllers/*.rs`), the entity columns, and the
+  front-end route tree — not the roadmap. The table records, per
+  criterion, what is already answered, what is not, and the
+  disposition. Sub-tasks follow; the cross-subproject consequences
+  (an enterprise IdP at the auth service, a webhook relay sink, a
+  family go-live runbook) are in the repo root
+  [`tasks.md`](../../tasks.md) Phase 10 and only pointed at from here.
+
+  | Criterion | Already carried (route / module) | Not carried | Disposition |
+  |---|---|---|---|
+  | Strategic alignment | Smart Score with a disclosed per-component breakdown, `strategic_alignment` one of six weighted components (`src/prioritisation.rs`; `GET /prioritisation`, `GET /plans/{pid}/smart-score`); objectives registry + weighted `objective_links` + the OKR engine (T-16); gate reviews, lifecycle funnel, plan reviews with consensus | The Strategic Alignment Index (T-23: needs an input the service does not hold) | **Carried.** The buyer's question — "score and rank against custom objectives without a spreadsheet" — is answered by the objectives registry plus the env-tunable weights. Nothing new. |
+  | Scenario modelling | `scenarios` are separate records; `GET /scenarios/{pid}/evaluate` reads live data without writing it; `GET /scenarios/compare` is the side-by-side; `POST …/commit` stamps funding | **Rollback** — a commit is one-way (`committed_at` only); an evaluation names no `as_of`, so two reads of one scenario a week apart differ silently | T-28a |
+  | Resource management | `allocations` (person ref + role + percent + window); `GET /capacity` with `over_allocated`; `GET /capacity/utilization` (T-24); `GET /assignees/workload`; reassignment by largest slack | **Skill-based** allocation — an allocation carries a `role` string, no skills; no scale evidence for the "50+ concurrent projects" question | T-28c, T-28d |
+  | Reporting and analytics | Persona surfaces already exist — `at-a-glance`, `executive/*`, `board/*`, `financials/*`, `technology/*`, `auditor/*`, `compliance/*`, `regulator/*`, `risk/heatmap`; saved `report_definitions` (filter + field projection) run on demand; Monte-Carlo delivery forecast | Nothing ties a persona surface to the **caller** — every user gets the whole nav; `report_definitions` has no `group_by` (PPM-9 promised one) and no scheduled run (PPM-9 says synchronous only, awaiting T-8) | T-28e, T-28f |
+  | Financial management | `budget_lines` per plan; variance per currency (`insights::variance_by_currency`, `GET /financials/variance`); exposure; TPC with cost-estimate-to-complete; value realization with ROI (T-22) | **Cost forecasting** — no phased baseline, so SPI/CPI are permanently `no_baseline` (T-23) and there is no EAC/ETC or portfolio-level overrun forecast; actuals arrive by hand until T-8 lands | **T-28b** — the single highest-leverage gap in the table |
+  | Integrations | Open API: hand-written OpenAPI 3 + Swagger UI, pinned two-way against mounted routes; inbound `POST /devops/events`; the durable outbox → relay (event bus); deterministic external ids for Jira / Asana / Trello / MS Project / GitHub / Linear | **Outbound** — the `notify` action is in-app only (no email, push, or webhook transport); no PM-tool import path (T-8 open, and no source-tool codec); two-way sync is roadmap only | T-28m (webhook sink, family-shaped), T-28n (import codec). **Refused:** a native-connector catalogue / no-code integration builder — the open API, bulk, and signed webhooks *are* the integration surface of a service like this one. |
+  | Task management | Gantt (`/gantt`, `/plans/[pid]/schedule`); `plan_dependencies` with cycle refusal, critical path, and slipping-dependency violations (`src/visibility.rs`); the append-only transition log; multi-plan reviews + rollup | **Automatic reprioritisation when a deadline shifts** — exactly the field-change trigger T-21 deferred for want of a declared field set. This checklist supplies it: the plan timeframe and a milestone's due date are the two dates a shift is asked about | T-28g |
+  | AI capabilities | Every derived figure here is deterministic and discloses its inputs: Smart Score components, forecast by seed, constraint ranking, aging WIP, the controls verdicts. The buyer's question — "which outputs are explainable and auditable vs black-box" — is answered *all of them, none* | No portfolio-**optimisation** recommendation (the evaluator scores a scenario a planner wrote; it proposes none); no **demand** forecast (the intake pipeline has arrival history nobody forecasts from); no assistant | T-28h, T-28i, T-28j. **Refused:** an LLM assistant *inside the service* — it would be the one output that could not disclose its inputs, in a service whose every other number does. If one is ever wanted it sits at the front-end BFF over the open API and cites the endpoint it read. |
+  | Usability | Hamburger top-nav, 13 locales with parity tests, SVAR grid / Kanban / Gantt, Lily headless; `viewport` meta present | One `@media` rule in the whole app and two data-grid dependencies that are desktop-shaped — mobile is **unverified**, not absent; no per-user saved views (report definitions are shared); no role-specific UX (see reporting); no onboarding path beyond the README quick start | T-28k, T-28l, T-28p, and T-28f |
+  | Deployment effort | Containerised (Podman, Debian slim, MUSL static), `compose.*.yaml`; SSO through the central auth service (magic link + PASETO v4.public, BFF so no token reaches the browser); every knob an env var, documented family-wide in `configuration.md` | **SAML / OIDC** federation to an enterprise IdP — mentioned nowhere in the family, and it belongs to the auth service, not here; data migration waits on T-8 + T-28n; no go-live runbook, and the one that matters most is the activation gate: `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` **defaults off** | T-28o; SAML/OIDC → root `tasks.md` EV-2 |
+
+  Two things the triage did **not** change: the matchable / operational
+  partition (nothing below is a matcher signal), and the measurement
+  stance — absent evidence stays `null` with a reason, never zero, in
+  every new figure.
+
+  - [ ] **T-28a (M) — Scenario rollback and evaluation provenance.**
+    `POST /scenarios/{pid}/rollback` restores each member's funding
+    state to what the commit replaced (stored **at commit time** in a
+    `scenario_commit_effects` row per member — the prior state is not
+    reconstructable later), audited, and refused (`409`, naming the
+    members) where a member's funding state has since been changed by
+    any other path: report the divergence, never overwrite it.
+    `evaluate` and `compare` gain an `as_of` and a list of the live
+    inputs read (budget lines, allocations, scores) with their
+    `updated_at`, so two evaluations that disagree say why.
+    **Acceptance:** commit → rollback → commit is idempotent on funding
+    state; a member changed between commit and rollback blocks the
+    rollback and is named; every evaluation response carries `as_of`.
+  - [ ] **T-28b (L) — Phased budget baseline → SPI / CPI / EAC and the
+    portfolio overrun forecast.** A `budget_baselines` table: planned
+    cost per period per plan, in one currency, **frozen at approval**;
+    a re-baseline is a new version with a reason, append-only, and
+    every derived figure names the baseline version it used. Unblocks
+    the SPI/CPI T-23 left `no_baseline`; adds `GET
+    /plans/{pid}/financials/forecast` (EAC = actuals + ETC, with ETC
+    from the TPC cost-estimate-to-complete where recorded, else from
+    the baseline's remaining periods — and the response says which) and
+    `GET /financials/forecast` rolled over `parent_ref` **per
+    currency**, mixed currencies withheld exactly as T-22's ROI is.
+    Actuals still arrive by hand or by T-8 bulk; this task does not
+    build a finance connector.
+    **Acceptance:** a plan without a baseline reports `null` +
+    `no_baseline` unchanged; a re-baseline preserves its predecessor and
+    the old figure is reproducible from the old version; the rollup
+    over a subtree with two currencies reports two rows, never one sum;
+    integer minor units throughout, no float.
+  - [ ] **T-28c (M) — Skill-aware allocation.** An allocation may
+    declare `skills_required[]` (short tags); the capacity view
+    resolves a person's skills through the worker service by
+    `EntityRef` — lazy verify-on-read, cached with a TTL, **never copied
+    into any stored row** (people stay references, family doctrine) —
+    and reports a per-plan skill gap. A person whose worker record is
+    unreachable reports `unknown`, never "lacks the skill".
+    **Acceptance:** no skill text lands in `allocations` beyond the
+    requirement tags; a stubbed worker service returning `404` yields
+    `unknown` with a reason; the gap finding names the tag and the
+    plan.
+  - [ ] **T-28d (S) — Capacity at scale.** A DB-gated test seeds 60
+    plans with allocations across 40 shared people and asserts
+    `GET /capacity`, `GET /capacity/utilization`, and `GET /at-a-glance`
+    each complete in a **bounded query count** (asserted through the
+    connection's statement log, not timed), plus a Criterion bench over
+    the pure rollups. **Acceptance:** query count does not grow with
+    plan count; the bench compiles under the `bench` CI stage.
+  - [ ] **T-28e (M) — Report grouping and scheduled runs.**
+    `report_definitions.group_by` (one field, counts + the money
+    columns summed per currency); scheduled runs as a loco `worker`
+    job writing a bulk artifact with the family TTL posture. The
+    scheduled half **depends on T-8** (the artifact store and job table
+    do not exist here yet) and lands second. **Acceptance:** a grouped
+    run over two currencies never sums across them; a scheduled run is
+    audited like an export (even at zero rows).
+  - [ ] **T-28f (M) — Role-tailored navigation and landing page.** The
+    front-end reads the `attrs` the BFF already gets from `/whoami` and
+    orders the nav / picks the landing view from a deployment-declared
+    attribute (e.g. `view=executive|pmo|resource_manager`) — a
+    vocabulary the deployment declares, not an enum this code owns.
+    **Default is today's full nav**, so a token with no such attribute
+    changes nothing. This is presentation only; authorisation stays
+    with the service's ABAC. **Acceptance:** attrs absent ⇒ identical
+    nav; `view=executive` lands on `/executive`; every route stays
+    reachable by URL regardless of the attribute.
+  - [ ] **T-28g (M) — Deadline-shift trigger and rescheduling.** Two
+    narrow field-change triggers, the way `milestone_due` was narrowed
+    rather than guessing a task-date convention: `plan_timeframe_changed`
+    and `milestone_due_changed`. One new action, `propose_reschedule`:
+    walks `plan_dependencies` from the shifted item, computes each
+    successor's implied new dates through the edge lag, and writes a
+    **notification carrying the proposed shifts** — it moves nothing.
+    An opt-in `shift_dependents` action applies them, one logged
+    `automation_runs` row per task moved. The FR-32 invariants hold:
+    a failing action never undoes the deadline edit, applied shifts do
+    not re-enter the engine (no cascade), every firing is logged.
+    **Acceptance:** shifting a plan's end by 5 days proposes +5 on a
+    finish-start successor and +5 − lag where a lag exists; a
+    successor whose dependency is already violated is proposed with the
+    violation named; the shifted successors fire no further rule.
+  - [ ] **T-28h (M) — Deterministic scenario generator.**
+    `POST /scenarios/generate` takes the same constraints a scenario
+    holds (budget cap, currency, must-include) and returns a **draft
+    scenario** whose members were chosen greedily by Smart Score per
+    unit cost, with a **rationale row per candidate** — included with
+    its score and cost, or excluded with its reason (`over_cap`,
+    `no_score`, `foreign_currency`, `must_include_conflict`). It is
+    saved as an ordinary scenario, so it goes through the same
+    evaluate / compare / commit path as one a planner wrote. A
+    candidate without a score is listed **unranked**, never scored
+    zero. **Acceptance:** same inputs ⇒ byte-identical output; every
+    candidate appears exactly once across included + excluded; a
+    must-include that alone exceeds the cap is reported, not silently
+    dropped.
+  - [ ] **T-28i (S) — Demand forecast.** Reuse the throughput
+    Monte-Carlo behind `GET /plans/{pid}/forecast` over the intake
+    pipeline: proposal arrivals and approvals per period from
+    `proposals` timestamps, answering "how many approved proposals in
+    the next N periods" with the same seed determinism and the same
+    refusal below the minimum history. **Acceptance:** fewer than the
+    minimum periods ⇒ `null` + `insufficient_history`; the response
+    names the history window it drew from.
+  - [ ] **T-28j (S) — Explainability pin, and the non-goal recorded.**
+    A test that walks every derived `GET` in the OpenAPI document and
+    asserts the response carries either an inputs/reasons block or a
+    `null` with a reason — the "no black-box output" property this
+    entity already has, made unbreakable rather than habitual. And a
+    §2.3 amendment recording the refusal above: no model-driven
+    assistant inside the service. **Acceptance:** the test enumerates
+    routes from `openapi.rs`, so a new derived route without disclosure
+    fails CI.
+  - [ ] **T-28k (M) — Responsive audit at a phone viewport.** Playwright
+    (the existing API-stubbed e2e harness) at 390 × 844 across all 34
+    routes: no horizontal body scroll, the primary action of each page
+    reachable, and the two SVAR surfaces (grid, Gantt) degrading to a
+    read-only list rather than an unusable grid. **Acceptance:** the
+    e2e suite runs the mobile project in CI; each failing route is a
+    named test, not a screenshot.
+  - [ ] **T-28l (S) — Per-user saved views.** A `saved_views` table
+    keyed by the token `sub` (route + filter + sort + columns; no other
+    identity), served through the BFF so the browser holds nothing.
+    **Acceptance:** two users on one route see their own views; a view
+    is scoped to its route and never applied elsewhere.
+  - [ ] **T-28m (M) — Outbound webhooks as a relay sink.** Not a new
+    `notify` transport: a `WebhookSink` beside `LoggingSink` /
+    `FluvioSink` in `src/relay.rs`, delivering the outbox envelope to
+    configured URLs, **signed** with an HMAC over the body through the
+    shared `integrity-mac` crate under its own HKDF domain (`webhook`),
+    with a per-URL event-kind filter, retry with backoff, and a
+    delivery log. Family-shaped so the other nine registries copy it
+    (root `tasks.md` EV-3 carries the contract); portfolio is the first
+    adopter. HTTPS-only outside loopback, no redirects followed
+    (security invariant 7). **Acceptance:** a receiver verifies the
+    signature with the published pre-image format; a 5xx is retried
+    and a 4xx is not; a URL configured without the feature refuses to
+    start rather than silently logging.
+  - [ ] **T-28n (M) — Source-tool import codec.** Depends on **T-8**.
+    A Jira project export (and Asana's, the two most asked about)
+    mapped to plans + tasks: the project key → `JiraProjectKey` so the
+    plan deduplicates against its registry twin (R-0), issues → tasks
+    with the workflow's initial state unless the status maps, and every
+    unmapped field reported in the per-row error report rather than
+    dropped. **Acceptance:** re-importing the same export is idempotent
+    (upsert by the deterministic id); an unmapped status lands the task
+    in the initial state **and** names it in the report.
+  - [ ] **T-28o (S) — Go-live runbook.** Depends on root `tasks.md`
+    EV-4 for the family shape. Portfolio's own page leads with the
+    activation gate — `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`
+    defaults **off**, and a deployment reachable by untrusted callers
+    must set it and mount an ABAC policy before it is reachable — then
+    the PASETO keys URL, event transport, the optional scheduler ticker
+    and flow-gauge loop, and who owns each knob (the deploying
+    operator; there is no vendor-side configuration). **Acceptance:**
+    the runbook is verified against a fresh container, not read.
+  - [ ] **T-28p (S) — Operator onboarding guide.** A role-by-role
+    "first hour" walkthrough (executive, PMO, resource manager) in the
+    front-end docs, each step naming the route it lands on. It makes
+    **no time-to-productivity claim** until one is measured.
+    **Acceptance:** every route named in the guide exists (a test
+    walks the guide's links against the route tree).
+
+  **Suggested order:** T-28b first (it unblocks T-23's SPI/CPI and is
+  the buyer question with the most weight); then T-28g and T-28a
+  (both close a "deliberately deferred" note with a decision this
+  checklist supplied); T-28j early because it is cheap and guards
+  everything after it; T-28e / T-28n / T-28o wait on their
+  dependencies.
+
 - [ ] **T-1 — Scaffold the trio.**
   - [ ] Create `project-portfolio-management-matcher-rust-crate/`,
     `project-portfolio-management-service-with-loco/`, and
