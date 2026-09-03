@@ -8,14 +8,39 @@ queues. Each task has an acceptance criterion; tick the box when an
 automated test or clearly described manual check confirms it. Split
 oversized tasks (`T-2a`, `T-2b`).
 
-- [ ] **T-1 — Bring the service crate's doc set up to house shape.**
-  - [ ] Split `spec/index.md` into the 18-file `spec/` layout used by
-    the mature entities.
-  - [ ] Add the `agents/` doc set (`index.md`,
+- [x] **T-1 — Bring the service crate's doc set up to house shape.**
+  *(closed as won't-do, 2026-09-03 — stale against decisions the root
+  `AGENTS.md` already made explicit, verified directly rather than
+  assumed; see `case/spec/13-tasks.md` T-13 for the identical
+  precedent)*
+  - [x] ~~Split `spec/index.md` into the 18-file `spec/` layout used by
+    the mature entities.~~ — **moot.** Checked directly:
+    `organization-service-with-loco/spec/index.md` already carries the
+    full §1–§18 numbered structure (`## 1. Purpose and vision` through
+    `## 18. Change control`) in one file by choice. Root `AGENTS.md`'s
+    "Two spec shapes exist" table fixes the numbering as what matters
+    for this shape, not a one-file-per-section split — "[n]either is
+    being migrated to the other — a rename that buys nothing is
+    churn."
+  - [x] ~~Add the `agents/` doc set (`index.md`,
     `spec-driven-development.md`, `models.md`, `matching.md`,
-    `restful.md`, `testing.md`) per the root `AGENTS.md` contract.
-  - **Acceptance:** the service crate matches the per-crate doc list
-    in the root [`AGENTS.md`](../../AGENTS.md); links resolve.
+    `restful.md`, `testing.md`) per the root `AGENTS.md` contract.~~ —
+    **won't do.** Root `AGENTS.md`'s "Subprojects" section states this
+    as a deliberate decision, not a gap: the six original entity crates
+    carry a crate-level `agents/` reference set, but the twenty-two
+    newer subprojects — organization among them — deliberately do not,
+    because "those files restate what the spec already says, and a
+    restatement that nobody regenerates is exactly the drift the SDD
+    discipline exists to prevent." Confirmed
+    `organization-service-with-loco/` has no crate-level `agents/`
+    directory today (only its `AGENTS.md` entry point, the newer
+    pattern) — that absence is correct per policy; adding the directory
+    this task asked for would be the regression, not the fix. (The
+    entity-level `organization/agents/` directory this crate sits
+    beside already exists and is unaffected — a separate, deliberate
+    layer, not what this task asked for.)
+  - **Acceptance (superseded):** N/A — task rescoped to won't-do rather
+    than closed by a file that was never going to be added.
 - [x] **T-2 — Resolve the blank-name status-code drift.** *(done
   2026-06-13)*
   - [x] Decided for the family convention: `422 Unprocessable Entity`
