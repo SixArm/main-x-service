@@ -240,11 +240,7 @@ export interface EducationalCredential {
  * merge supersession chain; the rest are editorial cross-references.
  */
 export type LinkType =
-  | "replaces"
-  | "replaced-by"
-  | "seealso"
-  | "prerequisite"
-  | "successor";
+  "replaces" | "replaced-by" | "seealso" | "prerequisite" | "successor";
 
 /** A typed edge from this course to another course by ID. */
 export interface CourseLink {

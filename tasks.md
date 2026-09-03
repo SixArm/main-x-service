@@ -7877,7 +7877,7 @@ green as it sits; these finish it)**
   had it). `pnpm install --frozen-lockfile` now exits 0 in **16 / 16**
   front-ends — the property WEB-2's CI stage needs. Course and event
   build again; their smoke counts are recorded under WEB-1.
-- [ ] **WEB-4 (S)** **Prettier debt sweep.** `pnpm run lint`
+- [x] **WEB-4 (S)** **Prettier debt sweep.** `pnpm run lint`
   (`prettier --check src`) fails today in every entity front-end
   measured — person 3 files, worker 3, place 2, thing 1, event 1,
   course 2, portfolio 2 (its own §14 already says so). All in files no
@@ -7890,6 +7890,19 @@ green as it sits; these finish it)**
   `lint` script's glob actually reaches `.svelte` (case-folder lacks
   the plugin entirely). Measure the nine unmeasured front-ends before
   touching them.
+  **Done 2026-09-03 for the six entity front-ends.** Twelve files
+  reformatted with `prettier --write` and nothing else — person
+  (`i18n.svelte.ts`, `review.ts`, `svar-filter-augment.d.ts`), worker
+  (same three), place and course (`api/types.ts`,
+  `svar-filter-augment.d.ts`), thing and event
+  (`svar-filter-augment.d.ts`). `pnpm run lint` exits 0 in all six;
+  `svelte-check` 0 errors / 0 warnings and `vitest` unchanged and green
+  in all six (99 / 79 / 55 / 85 / 56 / 57 tests). The `.svelte`
+  question answered itself and is worse than "check the glob": the
+  plugin is never loaded at all — split out as **WEB-9** below rather
+  than buried here. Portfolio's two files and the nine unmeasured
+  front-ends (authentication, organization, care-pathway, case, the
+  five consumer apps) remain: measure, then the same one-command fix.
 - [ ] **WEB-5 (M)** **Wire the unwired privacy button — T-20 GDPR
   export, ×6.** `exportGdpr(id)` (`GET /api/<plural>/{id}/export`)
   exists in six front-end repositories (person, worker, place, thing,
@@ -7936,8 +7949,26 @@ green as it sits; these finish it)**
   stay byte-identical. **Not** a `paths-ignore` — that skips required
   checks and leaves the PR unmergeable; an empty matrix that still
   reports success is the shape.
+- [ ] **WEB-9 (M)** **`.svelte` files are not prettier-checked
+  anywhere.** Found doing WEB-4: every entity front-end has
+  `prettier-plugin-svelte` in `devDependencies` and an **empty**
+  `.prettierrc`, so the plugin is never loaded — `prettier --check src`
+  expands the directory to the extensions it can parse and silently
+  skips the ~20 `.svelte` files per project (an explicit
+  `src/**/*.svelte` glob confirms it: "No parser could be inferred" for
+  every one). Portfolio's §14 recorded this for itself; it is
+  family-wide (measured in person, worker, place, thing, event, course
+  — 23 / 22 / 21 / 20 / 19 / 21 files unreached). Fix per project:
+  `"plugins": ["prettier-plugin-svelte"]` in `.prettierrc`, then one
+  formatting-only PR reformatting the `.svelte` files (expect a large,
+  behaviour-free diff — `svelte-check` and `vitest` are the proof), then
+  the same `lint` script starts covering them. Deliberately **not**
+  folded into WEB-4, whose diff is twelve `.ts` files; a reformat of
+  a hundred and twenty `.svelte` files deserves its own review.
+  Depends: nothing; do before WEB-2 makes `lint` a gate, or the gate is
+  born green for the wrong reason.
 
-Suggested order: WEB-3 → WEB-1 → WEB-4 → WEB-2 → WEB-8 → WEB-5 →
-WEB-6 → WEB-7. The first four are what make a front-end PR's green
-mean something; the last four are the backlog that green would then
-protect.
+Suggested order: WEB-3 → WEB-1 → WEB-4 → WEB-9 → WEB-2 → WEB-8 →
+WEB-5 → WEB-6 → WEB-7. The first five are what make a front-end PR's
+green mean something; the last four are the backlog that green would
+then protect.
