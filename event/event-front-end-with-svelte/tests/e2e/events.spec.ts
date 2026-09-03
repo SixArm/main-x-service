@@ -1,5 +1,11 @@
 // Playwright smoke tests: load each top-level route in a real browser and
 // assert its key landmarks render. These guard wiring/routing, not logic.
+//
+// The suite carries a stub `__Host-mxi_session` cookie
+// (`SMOKE_STORAGE_STATE` in playwright.config.ts), so the pages PRO-H10
+// put behind `requireSignedIn` render instead of 303ing to /signin. The
+// guard is presence-only, so a stub is enough; the "page-visit guard"
+// describe at the bottom drops the cookie and pins the redirect itself.
 import { expect, test } from "@playwright/test";
 
 test.describe("Event front-end smoke", () => {
@@ -7,6 +13,9 @@ test.describe("Event front-end smoke", () => {
     test("dashboard renders nav and heading", async ({ page }) => {
         await page.goto("/");
         await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+        // The nav is a hamburger dropdown at every viewport width
+        // (deliberate layout design) — open it before asserting links.
+        await page.getByRole("button", { name: "Toggle navigation" }).click();
         await expect(page.getByRole("link", { name: "Events" })).toBeVisible();
         await expect(page.getByRole("link", { name: "Match check" })).toBeVisible();
         await expect(page.getByRole("link", { name: "Merge" })).toBeVisible();
@@ -85,4 +94,27 @@ test.describe("Event front-end smoke", () => {
         await page.goto("/events/evt-1/audit");
         await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
     });
+});
+
+// Pins the PRO-H10 page-visit guard itself (WEB-1): with NO session
+// cookie, every mutation page 303s to /signin rather than rendering a
+// form whose submit would fail. This is the one place the smoke suite
+// runs anonymous — the stub cookie above would otherwise make a removed
+// or broken guard invisible. Read/list/view pages stay public and are
+// deliberately not listed here; see AGENTS.md "Page-visit guard".
+test.describe("Event front-end page-visit guard", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    const guarded = [
+        "/events/new",
+        "/events/0c4f1e2a-0000-4000-8000-000000000001/edit",
+        "/events/merge",
+    ];
+
+    for (const path of guarded) {
+        test(`anonymous visit to ${path} redirects to /signin`, async ({ page }) => {
+            await page.goto(path);
+            await expect(page).toHaveURL(/\/signin(\?|$)/);
+        });
+    }
 });

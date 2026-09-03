@@ -45,6 +45,35 @@ const PREVIEW_PORT = Number(process.env.PLAYWRIGHT_PREVIEW_PORT ?? 4173);
 const API_BASE_URL = process.env.PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 const AUTH_API_URL = process.env.AUTH_API_URL ?? "http://localhost:5150";
 
+// The smoke project's "signed-in" state (WEB-1). PRO-H10 put every
+// mutation page (`/persons/new`, `/persons/[id]/edit`, `/persons/merge`,
+// `/persons/bulk`, `/review`) behind `requireSignedIn`, which 303s an
+// anonymous visitor to `/signin` — so a smoke test that asserts a form
+// heading needs a session cookie to be present. The guard is
+// presence-only (`hooks.server.ts` copies the cookie into
+// `locals.sessionId`; nothing validates it against the auth service —
+// `AGENTS.md`, "Page-visit guard"), so a stub value is enough: this
+// exercises the real guard code path with a real cookie, rather than
+// weakening the guard or bypassing it with an env flag. The value is
+// never sent anywhere — the smoke project has no service behind it.
+// `tests/e2e/persons.spec.ts` pins the anonymous redirect separately
+// with an empty storageState, so the guard itself stays tested.
+export const SMOKE_STORAGE_STATE = {
+  cookies: [
+    {
+      name: "__Host-mxi_session",
+      value: "smoke-stub-session",
+      domain: "localhost",
+      path: "/",
+      expires: -1,
+      httpOnly: true,
+      secure: true,
+      sameSite: "Lax" as const,
+    },
+  ],
+  origins: [],
+};
+
 export default defineConfig({
   timeout: 30_000,
   fullyParallel: false,
@@ -69,7 +98,7 @@ export default defineConfig({
     {
       name: "smoke",
       testDir: "tests/e2e",
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], storageState: SMOKE_STORAGE_STATE },
     },
     {
       // Real magic-link sign-in (PRO-P32), run once; `integration`

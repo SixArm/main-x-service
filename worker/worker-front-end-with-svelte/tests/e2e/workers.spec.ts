@@ -5,6 +5,12 @@ import { expect, test } from "@playwright/test";
 // the page and shown as banners, but the layout still renders. Run with
 // the service started (`docker-compose up` in worker-service-with-loco)
 // for full coverage of the API-driven paths.
+//
+// The suite carries a stub `__Host-mxi_session` cookie
+// (`SMOKE_STORAGE_STATE` in playwright.config.ts), so the pages PRO-H10
+// put behind `requireSignedIn` render instead of 303ing to /signin. The
+// guard is presence-only, so a stub is enough; the "page-visit guard"
+// describe at the bottom drops the cookie and pins the redirect itself.
 
 test.describe("Worker front-end smoke", () => {
     // Pins: the dashboard shell renders its heading and the sidebar nav links.
@@ -254,4 +260,28 @@ test.describe("Worker front-end smoke", () => {
         ).toBeEnabled();
         await expect(panel.getByRole("button", { name: "Reject" })).toBeEnabled();
     });
+});
+
+// Pins the PRO-H10 page-visit guard itself (WEB-1): with NO session
+// cookie, every mutation page 303s to /signin rather than rendering a
+// form whose submit would fail. This is the one place the smoke suite
+// runs anonymous — the stub cookie above would otherwise make a removed
+// or broken guard invisible. Read/list/view pages stay public and are
+// deliberately not listed here; see AGENTS.md "Page-visit guard".
+test.describe("Worker front-end page-visit guard", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    const guarded = [
+        "/workers/new",
+        "/workers/0c4f1e2a-0000-4000-8000-000000000001/edit",
+        "/workers/merge",
+        "/review",
+    ];
+
+    for (const path of guarded) {
+        test(`anonymous visit to ${path} redirects to /signin`, async ({ page }) => {
+            await page.goto(path);
+            await expect(page).toHaveURL(/\/signin(\?|$)/);
+        });
+    }
 });
