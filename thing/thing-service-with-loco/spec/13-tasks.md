@@ -25,11 +25,26 @@ clearly described manual check confirms the acceptance criterion.
     end-to-end against a broker (`#[ignore]`d — no automated run in
     this repo stands one up; verified by compiling clean under
     `--features fluvio`).
-- [ ] **T-2 — Introduce `ThingMatcher` trait.**
-  - [ ] Promote `compute_match` to a trait so alternative scorers
+- [x] **T-2 — Introduce `ThingMatcher` trait.** *(2026-09-03)* The
+  concrete facade formerly named `ThingMatcher` is renamed
+  `ProbabilisticMatcher` (matching the sibling `event-service`/
+  `worker-service` naming convention — the concrete strategy, not the
+  trait, carries the algorithm's name); a new `ThingMatcher` trait
+  (`score`/`is_match`/`threshold`) is implemented for it.
+  `AppState::matcher` is now `Arc<dyn ThingMatcher>` rather than
+  `Arc<ProbabilisticMatcher>`, so an alternative scorer can be
+  substituted without touching `AppState` or any handler — every call
+  site already went through `.score()`/`.is_match()`/`.threshold()`,
+  never the struct directly, so no handler changed.
+  - [x] Promote `compute_match` to a trait so alternative scorers
     (ML-based, embedding-based) can plug in.
   - **Acceptance:** `ProbabilisticMatcher : ThingMatcher` compiles
-    and behaves identically to today's free function.
+    and behaves identically to today's free function — proven by
+    `matching::tests::probabilistic_matcher_implements_thing_matcher`
+    (drives the concrete matcher through a `Box<dyn ThingMatcher>`) and
+    `matching::tests::trait_score_matches_the_free_function` (the
+    trait's `score` and a direct `compute_match` call agree bit-for-bit
+    on the same inputs).
 - [ ] **T-3 — gRPC implementation.**
   - [ ] Promote the stub to a working Tonic server mirroring REST CRUD.
   - **Acceptance:** `grpcurl` against `ThingService.GetThing`

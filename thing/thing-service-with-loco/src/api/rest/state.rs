@@ -7,7 +7,7 @@ use sea_orm::DatabaseConnection;
 
 use crate::config::Config;
 use crate::db::{AuditLogRepository, SeaOrmThingRepository, ThingRepository};
-use crate::matching::ThingMatcher;
+use crate::matching::{ProbabilisticMatcher, ThingMatcher};
 use crate::search::SearchEngine;
 use crate::streaming::{EventPublisher, InMemoryEventPublisher};
 
@@ -25,8 +25,10 @@ pub struct AppState {
     pub event_publisher: Arc<dyn EventPublisher>,
     /// Full-text search engine.
     pub search_engine: Arc<SearchEngine>,
-    /// Record matcher.
-    pub matcher: Arc<ThingMatcher>,
+    /// Record matcher (T-2: an `Arc<dyn ThingMatcher>` rather than a
+    /// concrete type, so an alternative scorer can be substituted for
+    /// [`ProbabilisticMatcher`] without changing `AppState`).
+    pub matcher: Arc<dyn ThingMatcher>,
     /// Loaded service configuration.
     pub config: Arc<Config>,
     /// Whether blanket `/api/*` bearer-token enforcement is on. Read
@@ -47,7 +49,7 @@ impl AppState {
     pub fn new(
         db: DatabaseConnection,
         search_engine: SearchEngine,
-        matcher: ThingMatcher,
+        matcher: ProbabilisticMatcher,
         config: Config,
     ) -> Self {
         let thing_repository: Arc<dyn ThingRepository> = Arc::new(
@@ -55,13 +57,14 @@ impl AppState {
         );
         let audit_log = Arc::new(AuditLogRepository::new(db.clone()));
         let event_publisher: Arc<dyn EventPublisher> = Arc::new(InMemoryEventPublisher::new());
+        let matcher: Arc<dyn ThingMatcher> = Arc::new(matcher);
         Self {
             db,
             thing_repository,
             audit_log,
             event_publisher,
             search_engine: Arc::new(search_engine),
-            matcher: Arc::new(matcher),
+            matcher,
             config: Arc::new(config),
             require_auth: super::auth::require_auth_from_env(),
         }

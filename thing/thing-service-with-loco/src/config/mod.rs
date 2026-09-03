@@ -53,7 +53,7 @@ pub struct SearchConfig {
     pub cache_size_mb: usize,
 }
 
-/// Matcher tuning shared with [`crate::matching::ThingMatcher`].
+/// Matcher tuning shared with [`crate::matching::ProbabilisticMatcher`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchingConfig {
     /// `is_match` cut-off score in `[0.0, 1.0]`.

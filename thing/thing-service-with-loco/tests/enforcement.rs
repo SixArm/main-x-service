@@ -28,7 +28,7 @@ use sha2::{Digest, Sha256};
 use thing_service::api::rest::{AppState, create_router};
 use thing_service::config::Config;
 use thing_service::db::create_connection;
-use thing_service::matching::ThingMatcher;
+use thing_service::matching::ProbabilisticMatcher;
 use thing_service::models::thing::Thing;
 use thing_service::search::SearchEngine;
 use tower::ServiceExt;
@@ -93,7 +93,7 @@ async fn test_router() -> axum::Router {
     let config = Config::from_env().expect("load config from env");
     std::fs::create_dir_all(&config.search.index_path).expect("create search index dir");
     let search_engine = SearchEngine::new(&config.search.index_path).expect("search engine");
-    let matcher = ThingMatcher::new(&config.matching);
+    let matcher = ProbabilisticMatcher::new(&config.matching);
     let db = create_connection(&config.database)
         .await
         .expect("Postgres connection — set DATABASE_URL to a running, migrated database");
