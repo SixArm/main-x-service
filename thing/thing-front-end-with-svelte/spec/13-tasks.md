@@ -18,7 +18,25 @@
 - [ ] T-16: Theming tokens in `app.css` extracted to a small theme module.
 - [ ] T-17: `check-duplicates` endpoint wired into create form (preview before commit).
 - [x] T-18: Batch deduplicate-scan results UI — `/review` (SVAR Kanban: Pending / Confirmed / Rejected / AutoMerged), landed 2026-07-19; drag-to-decide against `POST /api/things/review-queue/{id}/decision` landed the same day. The board was never otherwise specified or tested until T-24 below backfilled the filter, keyboard path, and comparison panel.
-- [ ] T-19: Masked-view toggle on detail page.
+- [x] T-19: Masked-view toggle on detail page. *(2026-09-03)* A toggle
+  button in the `/things/[id]` header re-fetches through the existing
+  `ThingRepository.masked(id)` (`GET /api/things/{id}/masked`) rather
+  than redacting fields client-side — the server decides what counts as
+  sensitive, mirroring person's, worker's, and place's identical T-19
+  delivery. Shows a `role="status"` banner while the masked view is
+  active, so a screenshot or a glance at the page makes the mode
+  unambiguous. Toggling back re-fetches the plain record rather than
+  caching the pre-toggle state, so a concurrent edit is never shown
+  stale. New keys `detail.showMasked` / `detail.showFull` /
+  `detail.maskedNotice`, translated across all 13 locales. The
+  repository method and its unit test already existed on `main` — only
+  the UI toggle was missing.
+  - **Acceptance:** the pre-existing `tests/unit/things.test.ts`
+    `masked()` test already pinned the endpoint; a new Playwright smoke
+    test (`tests/e2e/things.spec.ts`) stubs the plain and masked
+    endpoints with visibly different `owner` values and asserts the
+    toggle switches between them and shows/hides the masked-view
+    banner.
 - [ ] T-20: GDPR-export download button.
 - [ ] T-21: Validate the SVAR licensing fit (free GPL-3.0 vs Pro) — see §16 OQ-1.
 - [x] T-22: Auth — BFF + httpOnly `__Host-mxi_session` cookie + session→PASETO exchange; the browser never holds a token (per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)). Landed 2026-07-04 (`f66ff50f`): `hooks.server.ts`, `/signin`, `/verify`, `/api/proxy/[...path]`, `src/lib/server/{config,session,auth}.ts`. **CSRF is not yet implemented** — the BFF has no `X-CSRF-Token`/synchroniser-cookie check on mutating browser→BFF calls; tracked as a follow-up rather than closed silently under this checkbox.

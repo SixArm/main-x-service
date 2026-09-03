@@ -9,6 +9,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — masked-view toggle on the detail page (T-19)
+
+A toggle button on `/things/[id]` re-fetches through the existing
+`ThingRepository.masked(id)` (`GET /api/things/{id}/masked`) instead of
+redacting fields client-side. Shows a status banner while the masked
+view is active. New i18n keys across all 13 locales; a Playwright smoke
+test exercises the toggle end to end with visibly different stubbed
+`owner` values. The repository method and its unit test already
+existed — this closes the gap where it was never surfaced in any
+route's UI. Mirrors person's, worker's, and place's identical T-19
+delivery.
+
 ### Added — review-queue screen upgrade (2026-08-04, T-24 / repo FE-4)
 
 - `/review` gained a **status + page-size filter** (`?status=`/`?limit=`
