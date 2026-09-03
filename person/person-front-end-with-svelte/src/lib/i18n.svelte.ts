@@ -245,6 +245,8 @@ const STRINGS = {
     "detail.showFull": "Show full",
     "detail.maskedNotice":
       "Showing the masked view — some fields are redacted.",
+    "detail.exportGdpr": "Export data (GDPR)",
+    "detail.exportingGdpr": "Exporting…",
     "detail.identity": "Identity",
     "detail.id": "ID",
     "detail.active": "Active",
@@ -560,6 +562,8 @@ const STRINGS = {
     "detail.showFull": "Dangos yn llawn",
     "detail.maskedNotice":
       "Yn dangos y golwg guddiedig — mae rhai meysydd wedi'u cuddio.",
+    "detail.exportGdpr": "Allforio data (GDPR)",
+    "detail.exportingGdpr": "Wrthi'n allforio…",
     "detail.identity": "Hunaniaeth",
     "detail.id": "ID",
     "detail.active": "Gweithredol",
@@ -872,6 +876,8 @@ const STRINGS = {
     "detail.showFull": "Mostrar completo",
     "detail.maskedNotice":
       "Mostrando la vista enmascarada: algunos campos están ocultos.",
+    "detail.exportGdpr": "Exportar datos (RGPD)",
+    "detail.exportingGdpr": "Exportando…",
     "detail.identity": "Identidad",
     "detail.id": "ID",
     "detail.active": "Activo",
@@ -1184,6 +1190,8 @@ const STRINGS = {
     "detail.showFull": "Afficher complet",
     "detail.maskedNotice":
       "Affichage de la vue masquée — certains champs sont masqués.",
+    "detail.exportGdpr": "Exporter les données (RGPD)",
+    "detail.exportingGdpr": "Exportation…",
     "detail.identity": "Identité",
     "detail.id": "ID",
     "detail.active": "Actif",
@@ -1497,6 +1505,8 @@ const STRINGS = {
     "detail.showFull": "Vollständig anzeigen",
     "detail.maskedNotice":
       "Maskierte Ansicht wird angezeigt — einige Felder sind geschwärzt.",
+    "detail.exportGdpr": "Daten exportieren (DSGVO)",
+    "detail.exportingGdpr": "Exportiere…",
     "detail.identity": "Identität",
     "detail.id": "ID",
     "detail.active": "Aktiv",
@@ -1806,6 +1816,8 @@ const STRINGS = {
     "detail.showMasked": "إظهار المُقنَّع",
     "detail.showFull": "إظهار الكامل",
     "detail.maskedNotice": "يتم عرض العرض المُقنَّع — بعض الحقول مخفية.",
+    "detail.exportGdpr": "تصدير البيانات (GDPR)",
+    "detail.exportingGdpr": "جارٍ التصدير…",
     "detail.identity": "الهوية",
     "detail.id": "المعرف",
     "detail.active": "نشط",
@@ -2116,6 +2128,8 @@ const STRINGS = {
     "detail.showFull": "Показать полностью",
     "detail.maskedNotice":
       "Отображается маскированный вид — некоторые поля скрыты.",
+    "detail.exportGdpr": "Экспорт данных (GDPR)",
+    "detail.exportingGdpr": "Экспорт…",
     "detail.identity": "Идентичность",
     "detail.id": "ID",
     "detail.active": "Активно",
@@ -2426,6 +2440,8 @@ const STRINGS = {
     "detail.showFull": "पूर्ण दिखाएँ",
     "detail.maskedNotice":
       "मास्क्ड दृश्य दिखाया जा रहा है — कुछ फ़ील्ड छिपे हुए हैं।",
+    "detail.exportGdpr": "डेटा निर्यात करें (GDPR)",
+    "detail.exportingGdpr": "निर्यात हो रहा है…",
     "detail.identity": "पहचान",
     "detail.id": "ID",
     "detail.active": "सक्रिय",
@@ -2731,6 +2747,8 @@ const STRINGS = {
     "detail.showMasked": "显示脱敏视图",
     "detail.showFull": "显示完整视图",
     "detail.maskedNotice": "正在显示脱敏视图——部分字段已隐藏。",
+    "detail.exportGdpr": "导出数据（GDPR）",
+    "detail.exportingGdpr": "导出中…",
     "detail.identity": "身份",
     "detail.id": "ID",
     "detail.active": "活动",
@@ -3033,6 +3051,8 @@ const STRINGS = {
     "detail.showMasked": "মাস্কড দেখান",
     "detail.showFull": "সম্পূর্ণ দেখান",
     "detail.maskedNotice": "মাস্কড ভিউ দেখানো হচ্ছে — কিছু ক্ষেত্র লুকানো আছে।",
+    "detail.exportGdpr": "ডেটা রপ্তানি করুন (GDPR)",
+    "detail.exportingGdpr": "রপ্তানি হচ্ছে…",
     "detail.identity": "পরিচয়",
     "detail.id": "ID",
     "detail.active": "সক্রিয়",
@@ -3344,6 +3364,8 @@ const STRINGS = {
     "detail.showFull": "Mostrar completo",
     "detail.maskedNotice":
       "Mostrando a vista mascarada — alguns campos estão ocultos.",
+    "detail.exportGdpr": "Exportar dados (RGPD)",
+    "detail.exportingGdpr": "A exportar…",
     "detail.identity": "Identidade",
     "detail.id": "ID",
     "detail.active": "Ativo",
@@ -3656,6 +3678,8 @@ const STRINGS = {
     "detail.showFull": "Tampilkan lengkap",
     "detail.maskedNotice":
       "Menampilkan tampilan tersamar — beberapa kolom disembunyikan.",
+    "detail.exportGdpr": "Ekspor data (GDPR)",
+    "detail.exportingGdpr": "Mengekspor…",
     "detail.identity": "Identitas",
     "detail.id": "ID",
     "detail.active": "Aktif",
@@ -3969,6 +3993,8 @@ const STRINGS = {
     "detail.showFull": "مکمل دکھائیں",
     "detail.maskedNotice":
       "نقاب پوش منظر دکھایا جا رہا ہے — کچھ فیلڈز چھپے ہوئے ہیں۔",
+    "detail.exportGdpr": "ڈیٹا برآمد کریں (GDPR)",
+    "detail.exportingGdpr": "برآمد ہو رہا ہے…",
     "detail.identity": "شناخت",
     "detail.id": "ID",
     "detail.active": "فعال",

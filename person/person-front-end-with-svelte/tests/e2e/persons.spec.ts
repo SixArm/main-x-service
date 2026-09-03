@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 // Smoke tests that assert the page shell renders. They do NOT require a
 // running Person Service — failures from the API call are swallowed by
@@ -156,6 +157,45 @@ test.describe("Person front-end smoke", () => {
         await expect(
             page.getByText("Showing the masked view"),
         ).not.toBeVisible();
+    });
+
+    // Pins: the GDPR export button (T-20) fetches GET /api/persons/{id}/export
+    // and saves what came back as `person-<id>-export.json` — a real browser
+    // download (Blob object URL + synthetic anchor), asserted through
+    // Playwright's download event, with the saved bytes compared to the
+    // stubbed payload so a silently-empty file cannot pass.
+    test("person detail downloads the GDPR export as JSON", async ({ page }) => {
+        const id = "0c4f1e2a-0000-4000-8000-0000000000cc";
+        const envelope = (data: unknown) =>
+            JSON.stringify({ success: true, data, error: null });
+        const payload = { subject: id, exported_at: "2026-09-03T00:00:00Z", records: [] };
+
+        await page.route(`**/api/persons/${id}/links`, (route) =>
+            route.fulfill({ status: 200, contentType: "application/json", body: envelope([]) }),
+        );
+        // Most specific first: /export before the bare {id} record.
+        await page.route(`**/api/persons/${id}/export`, (route) =>
+            route.fulfill({ status: 200, contentType: "application/json", body: envelope(payload) }),
+        );
+        await page.route(`**/api/persons/${id}`, (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: envelope({ id, name: { family: "Smith", given: ["John"] }, gender: "male", active: true }),
+            }),
+        );
+
+        await page.goto(`/persons/${id}`);
+        const downloadPromise = page.waitForEvent("download");
+        await page.getByRole("button", { name: "Export data (GDPR)" }).click();
+        const download = await downloadPromise;
+        expect(download.suggestedFilename()).toBe(`person-${id}-export.json`);
+        const saved = await download.path();
+        expect(saved).not.toBeNull();
+        const text = readFileSync(saved as string, "utf8");
+        expect(JSON.parse(text)).toEqual(payload);
+        // The button is usable again once the download has been handed off.
+        await expect(page.getByRole("button", { name: "Export data (GDPR)" })).toBeEnabled();
     });
 
     // Pins: the bulk page renders both submit sections. The recent-jobs

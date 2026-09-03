@@ -9,6 +9,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — GDPR export download on the detail page (T-20)
+
+A button on `/persons/[id]` fetches `GET /api/persons/{id}/export` through
+the existing `PersonRepository.exportGdpr(id)` and saves the payload as
+`person-<id>-export.json` (Blob object URL + synthetic anchor; the button
+is disabled while the request is in flight). New i18n keys across all 13
+locales; a repository test pins the endpoint and a Playwright smoke test
+asserts the real browser download — filename and saved bytes. Reference
+implementation for repo `tasks.md` WEB-5; the other five entity
+front-ends copy-adapt.
+
 ### Changed — T-13, T-16, T-17 closed (2026-09-03, repo WEB-6)
 
 Three tasks open word-for-word in six front-ends, closed with reasons

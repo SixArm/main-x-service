@@ -94,6 +94,28 @@ describe("PersonRepository", () => {
   // Pins: masked() GETs the dedicated /masked endpoint (T-19) rather than
   // asking the plain detail endpoint to redact client-side — the server
   // decides what is sensitive, not this repository.
+  // Pins: exportGdpr() GETs the dedicated /export endpoint (T-20) and
+  // hands back the service-defined payload untouched — the page saves
+  // it as a file, it never interprets it.
+  it("GETs /api/persons/{id}/export on exportGdpr()", async () => {
+    let capturedUrl = "";
+    let capturedMethod = "";
+    const payload = { subject: "p1", exported_at: "2026-09-03T00:00:00Z", records: [] };
+    const client = new ApiClient({
+      baseUrl: "http://test",
+      fetch: mockFetch(async (input, init) => {
+        capturedUrl = String(input);
+        capturedMethod = init?.method ?? "GET";
+        return jsonResponse({ success: true, data: payload, error: null });
+      }),
+    });
+    const repo = new PersonRepository(client);
+    const result = await repo.exportGdpr("p1");
+    expect(capturedUrl).toContain("/api/persons/p1/export");
+    expect(capturedMethod).toBe("GET");
+    expect(result).toEqual(payload);
+  });
+
   it("GETs /api/persons/{id}/masked on masked()", async () => {
     let capturedUrl = "";
     let capturedMethod = "";

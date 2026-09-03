@@ -136,6 +136,8 @@ const CANONICAL_KEYS: StringKey[] = [
     "detail.loading", "detail.edit", "detail.audit", "detail.delete",
     // Masked-view toggle (T-19)
     "detail.showMasked", "detail.showFull", "detail.maskedNotice",
+    "detail.exportGdpr",
+    "detail.exportingGdpr",
     "detail.identity", "detail.id", "detail.active", "detail.yes", "detail.no",
     "detail.gender", "detail.birthDate", "detail.taxId", "detail.deceased",
     "detail.deceasedYes", "detail.deceasedNo", "detail.identifiers",
