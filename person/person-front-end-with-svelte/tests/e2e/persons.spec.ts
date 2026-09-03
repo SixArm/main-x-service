@@ -95,6 +95,63 @@ test.describe("Person front-end smoke", () => {
         await expect(page.getByText("No cross-service links yet.")).toBeVisible();
     });
 
+    // Pins: the masked-view toggle (T-19) re-fetches through
+    // GET /api/persons/{id}/masked and back, rather than redacting
+    // client-side — the two stubs return visibly different tax_id
+    // values so the test can tell which endpoint actually answered.
+    test("person detail toggles between the plain and masked view", async ({
+        page,
+    }) => {
+        const id = "0c4f1e2a-0000-4000-8000-0000000000bb";
+        const envelope = (data: unknown) =>
+            JSON.stringify({ success: true, data, error: null });
+        const base = {
+            id,
+            name: { family: "Smith", given: ["John"] },
+            gender: "male",
+            active: true,
+        };
+
+        await page.route(`**/api/persons/${id}/links`, (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: envelope([]),
+            }),
+        );
+        // Most specific first: /masked before the bare {id} record.
+        await page.route(`**/api/persons/${id}/masked`, (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: envelope({ ...base, tax_id: "***-**-****" }),
+            }),
+        );
+        await page.route(`**/api/persons/${id}`, (route) =>
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: envelope({ ...base, tax_id: "123-45-6789" }),
+            }),
+        );
+
+        await page.goto(`/persons/${id}`);
+        await expect(page.getByText("123-45-6789")).toBeVisible();
+        await expect(
+            page.getByText("Showing the masked view"),
+        ).not.toBeVisible();
+
+        await page.getByRole("button", { name: "Show masked" }).click();
+        await expect(page.getByText("***-**-****")).toBeVisible();
+        await expect(page.getByText("Showing the masked view")).toBeVisible();
+
+        await page.getByRole("button", { name: "Show full" }).click();
+        await expect(page.getByText("123-45-6789")).toBeVisible();
+        await expect(
+            page.getByText("Showing the masked view"),
+        ).not.toBeVisible();
+    });
+
     // Pins: the bulk page renders both submit sections. The recent-jobs
     // fetch runs on mount, so it is stubbed at the network layer (as the
     // detail-page test does) to keep the smoke project service-free.

@@ -134,6 +134,8 @@ const CANONICAL_KEYS: StringKey[] = [
     "merge.viewMain", "merge.noRecord", "merge.noDob", "merge.confirm.prefix",
     "merge.confirm.into", "merge.confirm.suffix", "detail.head.title.prefix",
     "detail.loading", "detail.edit", "detail.audit", "detail.delete",
+    // Masked-view toggle (T-19)
+    "detail.showMasked", "detail.showFull", "detail.maskedNotice",
     "detail.identity", "detail.id", "detail.active", "detail.yes", "detail.no",
     "detail.gender", "detail.birthDate", "detail.taxId", "detail.deceased",
     "detail.deceasedYes", "detail.deceasedNo", "detail.identifiers",
