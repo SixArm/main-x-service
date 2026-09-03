@@ -12,6 +12,16 @@
 # these steps loop over the discovered crates in one job instead. Same
 # commands and same coverage; slower, and a failure report that names every
 # failing crate at the end rather than one job per crate.
+#
+# On a pull request the loop is **change-aware** (repo tasks.md WEB-8),
+# through the same `scripts/ci-crates.sh` the GitHub matrix uses: each
+# build step exports CI_CHANGED_SINCE=origin/<target branch> and the
+# script lists only the crates the diff affects (see its header). The
+# target branch is fetched once, in the first build step, because a clone
+# may not carry it. This half is unverified against a live Woodpecker
+# runner as written; the script fails OPEN — every crate, with a note on
+# stderr — if the ref cannot be resolved, so the worst case is today's
+# full run, never a skipped check.
 
 when:
   - event: [push, pull_request, manual]
@@ -47,11 +57,14 @@ steps:
     image: *rust_image
     commands:
       - rustup component add clippy
+      - '[ -z "${CI_COMMIT_PULL_REQUEST}" ] || git fetch --no-tags origin "${CI_COMMIT_TARGET_BRANCH}" || true'
+      - export CI_CHANGED_SINCE="${CI_COMMIT_PULL_REQUEST:+origin/${CI_COMMIT_TARGET_BRANCH}}"
       - scripts/ci-check.sh clippy
 
   - name: test
     image: *rust_image
     commands:
+      - export CI_CHANGED_SINCE="${CI_COMMIT_PULL_REQUEST:+origin/${CI_COMMIT_TARGET_BRANCH}}"
       - scripts/ci-check.sh test
 
   # Criterion harnesses, compile-only. Numbers measured on shared CI
@@ -60,6 +73,7 @@ steps:
   - name: bench
     image: *rust_image
     commands:
+      - export CI_CHANGED_SINCE="${CI_COMMIT_PULL_REQUEST:+origin/${CI_COMMIT_TARGET_BRANCH}}"
       - scripts/ci-check.sh bench
 
   # Minimum Supported Rust Version — current stable minus two
@@ -72,6 +86,7 @@ steps:
     commands:
       - msrv=$(grep -v '^[[:space:]]*#' ci/msrv.txt | grep -v '^[[:space:]]*$' | head -1 | tr -d '[:space:]')
       - rustup toolchain install "$msrv" --profile minimal
+      - export CI_CHANGED_SINCE="${CI_COMMIT_PULL_REQUEST:+origin/${CI_COMMIT_TARGET_BRANCH}}"
       - scripts/ci-check.sh msrv
 
   # The `#[ignore]`-gated suites, against a real database. These are where
@@ -86,13 +101,16 @@ steps:
     commands:
       - apt-get update && apt-get install -y --no-install-recommends postgresql-client
       - until pg_isready -h postgres -U loco; do sleep 1; done
+      - export CI_CHANGED_SINCE="${CI_COMMIT_PULL_REQUEST:+origin/${CI_COMMIT_TARGET_BRANCH}}"
       - scripts/ci-check.sh test-db
 
   - name: supply-chain
     image: *rust_image
     commands:
       - cargo install cargo-deny --locked
+      - export CI_CHANGED_SINCE="${CI_COMMIT_PULL_REQUEST:+origin/${CI_COMMIT_TARGET_BRANCH}}"
       - scripts/ci-check.sh deny
+      - export CI_CHANGED_SINCE="${CI_COMMIT_PULL_REQUEST:+origin/${CI_COMMIT_TARGET_BRANCH}}"
       - scripts/ci-check.sh evidence
 
   # Coverage-guided libFuzzer smoke run (SEC-I2) — short, fixed-time-bound
@@ -107,4 +125,5 @@ steps:
     commands:
       - rustup toolchain install nightly
       - cargo install cargo-fuzz --locked
+      - export CI_CHANGED_SINCE="${CI_COMMIT_PULL_REQUEST:+origin/${CI_COMMIT_TARGET_BRANCH}}"
       - scripts/ci-check.sh fuzz

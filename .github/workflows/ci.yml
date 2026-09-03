@@ -6,6 +6,18 @@ name: CI
 # every step shells out to `scripts/ci-check.sh` so this pipeline and the
 # Woodpecker one run byte-identical commands. A check that only fails on
 # one platform is a check nobody trusts.
+#
+# On a pull request the matrix is **change-aware** (repo tasks.md WEB-8):
+# `discover` hands `scripts/ci-crates.sh` the PR's base commit, and the
+# script lists only the crates the diff affects — the crate a changed file
+# lives in, everything that depends on it through a `path = "…"`
+# dependency, and every crate whenever the CI machinery itself changes.
+# A doc-only or front-end-only PR therefore builds nothing rather than
+# 55 crates for an hour, and a PR touching `entity-ref` still rebuilds
+# every service that embeds it. Pushes to `main` and manual runs list
+# every crate, as before. `main` carries no required-status-check rule,
+# so an empty matrix cannot leave a PR waiting on checks that never run;
+# the matrix jobs simply skip.
 
 on:
   push:
@@ -37,15 +49,21 @@ jobs:
       db-crates: ${{ steps.list.outputs.db-crates }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Change-aware discovery diffs against the PR base, so the base
+          # commit must be in history; a shallow clone has only HEAD and
+          # the script would fall open to every crate.
+          fetch-depth: 0
       - id: list
+        # Empty on push / workflow_dispatch → every crate. See the header
+        # comment and scripts/ci-crates.sh "Change-aware mode".
+        env:
+          CI_CHANGED_SINCE: ${{ github.event.pull_request.base.sha }}
         run: |
           echo "crates=$(scripts/ci-crates.sh --json)" >> "$GITHUB_OUTPUT"
-          # Crates enrolled for database-backed suites (see ci/db-suites.txt).
-          db=$(grep -v '^[[:space:]]*#' ci/db-suites.txt \
-               | grep -v '^[[:space:]]*$' \
-               | paste -sd, - \
-               | sed 's/[^,]*/"&"/g')
-          echo "db-crates=[$db]" >> "$GITHUB_OUTPUT"
+          # Crates enrolled for database-backed suites (ci/db-suites.txt),
+          # intersected with the same affected set.
+          echo "db-crates=$(scripts/ci-crates.sh --json --db)" >> "$GITHUB_OUTPUT"
 
   # Formatting is cheap and needs no build, so it runs once over every
   # crate rather than paying matrix setup 55 times.
@@ -70,6 +88,9 @@ jobs:
   check:
     name: ${{ matrix.crate }}
     needs: discover
+    # Skip outright when the change-aware matrix is empty; GitHub rejects
+    # a matrix vector with no values instead of running zero jobs.
+    if: needs.discover.outputs.crates != '[]'
     runs-on: ubuntu-latest
     strategy:
       # Report every failing crate in one run rather than stopping at the
@@ -124,6 +145,9 @@ jobs:
   msrv:
     name: msrv · ${{ matrix.crate }}
     needs: discover
+    # Skip outright when the change-aware matrix is empty; GitHub rejects
+    # a matrix vector with no values instead of running zero jobs.
+    if: needs.discover.outputs.crates != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -163,6 +187,9 @@ jobs:
   test-db:
     name: db · ${{ matrix.crate }}
     needs: discover
+    # Skip outright when the change-aware matrix is empty; GitHub rejects
+    # a matrix vector with no values instead of running zero jobs.
+    if: needs.discover.outputs.db-crates != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
