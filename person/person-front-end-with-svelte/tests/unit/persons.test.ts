@@ -91,6 +91,31 @@ describe("PersonRepository", () => {
     expect(result.id).toBe("p1");
   });
 
+  // Pins: masked() GETs the dedicated /masked endpoint (T-19) rather than
+  // asking the plain detail endpoint to redact client-side — the server
+  // decides what is sensitive, not this repository.
+  it("GETs /api/persons/{id}/masked on masked()", async () => {
+    let capturedUrl = "";
+    let capturedMethod = "";
+    const client = new ApiClient({
+      baseUrl: "http://test",
+      fetch: mockFetch(async (input, init) => {
+        capturedUrl = String(input);
+        capturedMethod = init?.method ?? "GET";
+        return jsonResponse({
+          success: true,
+          data: { ...samplePerson, tax_id: null },
+          error: null,
+        });
+      }),
+    });
+    const repo = new PersonRepository(client);
+    const result = await repo.masked("p1");
+    expect(capturedUrl).toContain("/api/persons/p1/masked");
+    expect(capturedMethod).toBe("GET");
+    expect(result.id).toBe("p1");
+  });
+
   // Pins: a bare-array search payload is normalized to {items, total} with
   // total derived from the array length.
   it("normalises bare-array search responses to {items, total}", async () => {

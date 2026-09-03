@@ -26,7 +26,24 @@
   T-25 for the full delivery record — the status/page-size filter, the
   keyboard-reachable table path, the side-by-side comparison panel,
   `provenance` on cards, and the test suite.
-- [ ] T-19: Masked-view toggle on detail page.
+- [x] T-19: Masked-view toggle on detail page. *(2026-09-03)* A toggle
+  button in the `/persons/[id]` header re-fetches through the existing
+  `PersonRepository.masked(id)` (`GET /api/persons/{id}/masked`) rather
+  than redacting fields client-side — the server decides what counts as
+  sensitive, matching this crate's server-source-of-truth posture
+  elsewhere (bulk export's `masking_profile`, review's server-computed
+  breakdown). Shows a `role="status"` banner while the masked view is
+  active, so a screenshot or a glance at the page makes the mode
+  unambiguous. Toggling back re-fetches the plain record rather than
+  caching the pre-toggle state, so a concurrent edit is never shown
+  stale. New keys `detail.showMasked` / `detail.showFull` /
+  `detail.maskedNotice`, translated across all 13 locales and added to
+  the i18n-parity `CANONICAL_KEYS` list.
+  - **Acceptance:** `tests/unit/persons.test.ts` pins `masked()` GETs
+    `/api/persons/{id}/masked`; a new Playwright smoke test
+    (`tests/e2e/persons.spec.ts`) stubs the plain and masked endpoints
+    with visibly different `tax_id` values and asserts the toggle
+    switches between them and shows/hides the masked-view banner.
 - [ ] T-20: GDPR-export download button.
 - [ ] T-21: Validate the SVAR licensing fit (free GPL-3.0 vs Pro) — see §16 OQ-1.
 - [x] T-23 (repo FE-2): Cross-service **links panel** on `/persons/[id]` — list this person's active outbound edges, assert a new one (`same_identity` → worker, `works_at` / `member_of` → organization), and withdraw one behind a confirm. `LinksPanel.svelte` + `EntityLink` / `CreateLinkRequest` types + `listLinks` / `createLink` / `deleteLink` on the repository + the pure kind↔target-type rules in `src/lib/links.ts` (mirroring the service's `validate_edge`, so a wrong target type is caught before the request). Server `422` reasons are surfaced inline. Deliberately distinct from the `Person.links` merge relationship (§9). Tests: `tests/unit/links-validation.test.ts` (12), three repository tests + a 422-surfacing test, an i18n-parity extension for 26 new keys across all 13 locales, and a route-stubbed Playwright smoke assertion.
