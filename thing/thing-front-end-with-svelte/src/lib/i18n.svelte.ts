@@ -179,6 +179,10 @@ export const STRINGS = {
     "detail.edit": "Edit",
     "detail.audit": "Audit",
     "detail.delete": "Delete",
+    "detail.showMasked": "Show masked",
+    "detail.showFull": "Show full",
+    "detail.maskedNotice":
+      "Showing the masked view — some fields are redacted.",
     "detail.confirmDelete":
       "Soft-delete this thing? This cannot be undone via the UI.",
     "detail.identity": "Identity",
@@ -368,6 +372,10 @@ export const STRINGS = {
     "detail.edit": "Golygu",
     "detail.audit": "Archwilio",
     "detail.delete": "Dileu",
+    "detail.showMasked": "Dangos wedi'i guddio",
+    "detail.showFull": "Dangos yn llawn",
+    "detail.maskedNotice":
+      "Yn dangos y golwg guddiedig — mae rhai meysydd wedi'u cuddio.",
     "detail.confirmDelete":
       "Meddal-ddileu'r peth hwn? Ni ellir ei ddadwneud drwy'r rhyngwyneb.",
     "detail.identity": "Hunaniaeth",
@@ -549,6 +557,10 @@ export const STRINGS = {
     "detail.edit": "Editar",
     "detail.audit": "Auditoría",
     "detail.delete": "Eliminar",
+    "detail.showMasked": "Mostrar enmascarado",
+    "detail.showFull": "Mostrar completo",
+    "detail.maskedNotice":
+      "Mostrando la vista enmascarada: algunos campos están ocultos.",
     "detail.confirmDelete":
       "¿Eliminar de forma reversible esta cosa? No se puede deshacer desde la interfaz.",
     "detail.identity": "Identidad",
@@ -730,6 +742,10 @@ export const STRINGS = {
     "detail.edit": "Modifier",
     "detail.audit": "Audit",
     "detail.delete": "Supprimer",
+    "detail.showMasked": "Afficher masqué",
+    "detail.showFull": "Afficher complet",
+    "detail.maskedNotice":
+      "Affichage de la vue masquée — certains champs sont masqués.",
     "detail.confirmDelete":
       "Supprimer logiquement cette chose ? Action irréversible via l'interface.",
     "detail.identity": "Identité",
@@ -911,6 +927,10 @@ export const STRINGS = {
     "detail.edit": "Bearbeiten",
     "detail.audit": "Audit",
     "detail.delete": "Löschen",
+    "detail.showMasked": "Maskiert anzeigen",
+    "detail.showFull": "Vollständig anzeigen",
+    "detail.maskedNotice":
+      "Maskierte Ansicht wird angezeigt — einige Felder sind geschwärzt.",
     "detail.confirmDelete":
       "Dieses Ding logisch löschen? Über die Oberfläche nicht rückgängig zu machen.",
     "detail.identity": "Identität",
@@ -1090,6 +1110,9 @@ export const STRINGS = {
     "detail.edit": "تحرير",
     "detail.audit": "تدقيق",
     "detail.delete": "حذف",
+    "detail.showMasked": "إظهار المُقنَّع",
+    "detail.showFull": "إظهار الكامل",
+    "detail.maskedNotice": "يتم عرض العرض المُقنَّع — بعض الحقول مخفية.",
     "detail.confirmDelete":
       "حذف هذا الشيء حذفًا مبدئيًا؟ لا يمكن التراجع عنه عبر الواجهة.",
     "detail.identity": "الهوية",
@@ -1270,6 +1293,10 @@ export const STRINGS = {
     "detail.edit": "Изменить",
     "detail.audit": "Аудит",
     "detail.delete": "Удалить",
+    "detail.showMasked": "Показать маскированный",
+    "detail.showFull": "Показать полностью",
+    "detail.maskedNotice":
+      "Отображается маскированный вид — некоторые поля скрыты.",
     "detail.confirmDelete":
       "Выполнить мягкое удаление этой вещи? Это нельзя отменить через интерфейс.",
     "detail.identity": "Идентичность",
@@ -1451,6 +1478,10 @@ export const STRINGS = {
     "detail.edit": "संपादित करें",
     "detail.audit": "ऑडिट",
     "detail.delete": "हटाएँ",
+    "detail.showMasked": "मास्क्ड दिखाएँ",
+    "detail.showFull": "पूर्ण दिखाएँ",
+    "detail.maskedNotice":
+      "मास्क्ड दृश्य दिखाया जा रहा है — कुछ फ़ील्ड छिपे हुए हैं।",
     "detail.confirmDelete":
       "इस वस्तु को सॉफ़्ट-डिलीट करें? इसे इंटरफ़ेस से पूर्ववत नहीं किया जा सकता।",
     "detail.identity": "पहचान",
@@ -1627,6 +1658,9 @@ export const STRINGS = {
     "detail.edit": "编辑",
     "detail.audit": "审计",
     "detail.delete": "删除",
+    "detail.showMasked": "显示脱敏视图",
+    "detail.showFull": "显示完整视图",
+    "detail.maskedNotice": "正在显示脱敏视图——部分字段已隐藏。",
     "detail.confirmDelete": "软删除此事物？此操作无法通过界面撤销。",
     "detail.identity": "身份",
     "detail.id": "ID",
@@ -1806,6 +1840,9 @@ export const STRINGS = {
     "detail.edit": "সম্পাদনা",
     "detail.audit": "অডিট",
     "detail.delete": "মুছুন",
+    "detail.showMasked": "মাস্কড দেখান",
+    "detail.showFull": "সম্পূর্ণ দেখান",
+    "detail.maskedNotice": "মাস্কড ভিউ দেখানো হচ্ছে — কিছু ক্ষেত্র লুকানো আছে।",
     "detail.confirmDelete":
       "এই জিনিসটি সফট-ডিলিট করবেন? এটি ইন্টারফেসের মাধ্যমে পূর্বাবস্থায় ফেরানো যাবে না।",
     "detail.identity": "পরিচয়",
@@ -1987,6 +2024,10 @@ export const STRINGS = {
     "detail.edit": "Editar",
     "detail.audit": "Auditoria",
     "detail.delete": "Eliminar",
+    "detail.showMasked": "Mostrar mascarado",
+    "detail.showFull": "Mostrar completo",
+    "detail.maskedNotice":
+      "Mostrando a vista mascarada — alguns campos estão ocultos.",
     "detail.confirmDelete":
       "Eliminar esta coisa de forma reversível? Não pode ser desfeito pela interface.",
     "detail.identity": "Identidade",
@@ -2168,6 +2209,10 @@ export const STRINGS = {
     "detail.edit": "Edit",
     "detail.audit": "Audit",
     "detail.delete": "Hapus",
+    "detail.showMasked": "Tampilkan tersamar",
+    "detail.showFull": "Tampilkan lengkap",
+    "detail.maskedNotice":
+      "Menampilkan tampilan tersamar — beberapa kolom disembunyikan.",
     "detail.confirmDelete":
       "Hapus-lunak benda ini? Tindakan ini tidak dapat dibatalkan melalui antarmuka.",
     "detail.identity": "Identitas",
@@ -2349,6 +2394,10 @@ export const STRINGS = {
     "detail.edit": "ترمیم کریں",
     "detail.audit": "آڈٹ",
     "detail.delete": "حذف کریں",
+    "detail.showMasked": "نقاب پوش دکھائیں",
+    "detail.showFull": "مکمل دکھائیں",
+    "detail.maskedNotice":
+      "نقاب پوش منظر دکھایا جا رہا ہے — کچھ فیلڈز چھپے ہوئے ہیں۔",
     "detail.confirmDelete":
       "اس شے کو نرم حذف کریں؟ اسے انٹرفیس کے ذریعے واپس نہیں کیا جا سکتا۔",
     "detail.identity": "شناخت",

@@ -3,11 +3,16 @@
 
   Purpose: loads one Thing by route id and renders its identity, identifiers,
   alternate names, same-as URLs, and images, with Edit / Audit / Delete
-  actions. Delete is a soft delete and asks for confirmation.
+  actions. Delete is a soft delete and asks for confirmation. A
+  masked-view toggle re-fetches through GET /api/things/{id}/masked
+  (T-19) instead of the plain record.
 
   $state:
     - thing: the loaded record (null until fetched).
     - error / loading: request status.
+    - masked: whether the masked view is currently shown; re-fetches on
+      toggle rather than masking client-side, so this always reflects
+      the server's actual masking rules.
 
   Reactive notes: `id` is $derived from page.params; the record loads in
   onMount. handleDelete navigates back to the list on success.
@@ -24,19 +29,35 @@
     let thing = $state<Thing | null>(null);
     let error = $state<string | null>(null);
     let loading = $state(true);
+    let masked = $state(false);
 
     // Route param; cast since SvelteKit types params as possibly-undefined.
     const id = $derived(page.params.id as string);
 
-    onMount(async () => {
+    // Fetch the plain or masked record depending on `masked`, replacing
+    // whatever is currently shown. Shared by the initial load and the
+    // toggle handler so both go through one code path.
+    async function load() {
+        loading = true;
+        error = null;
         try {
-            thing = await repo.get(id);
+            thing = masked ? await repo.masked(id) : await repo.get(id);
         } catch (err) {
             error = err instanceof Error ? err.message : String(err);
         } finally {
             loading = false;
         }
-    });
+    }
+
+    // Flip the toggle and re-fetch through the new endpoint. A dedicated
+    // request per view, not client-side redaction — the server, not this
+    // page, decides what counts as sensitive.
+    function toggleMasked() {
+        masked = !masked;
+        void load();
+    }
+
+    onMount(load);
 
     // Soft-delete the Thing after explicit confirmation, then return to list.
     async function handleDelete() {
@@ -66,11 +87,22 @@
     <header class="row" style="justify-content: space-between">
         <h1>{thing.name}</h1>
         <div class="row">
+            <button
+                class="button"
+                aria-pressed={masked}
+                onclick={toggleMasked}
+            >
+                {masked ? t("detail.showFull") : t("detail.showMasked")}
+            </button>
             <a href={`/things/${id}/edit`} class="button">{t("detail.edit")}</a>
             <a href={`/things/${id}/audit`} class="button">{t("detail.audit")}</a>
             <button class="button danger" onclick={handleDelete}>{t("detail.delete")}</button>
         </div>
     </header>
+
+    {#if masked}
+        <div class="banner" role="status">{t("detail.maskedNotice")}</div>
+    {/if}
 
     <section class="surface stack">
         <h2>{t("detail.identity")}</h2>
