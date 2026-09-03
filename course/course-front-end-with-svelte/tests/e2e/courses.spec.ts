@@ -8,6 +8,7 @@
 // guard is presence-only, so a stub is enough; the "page-visit guard"
 // describe at the bottom drops the cookie and pins the redirect itself.
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 test.describe("Course front-end smoke", () => {
     // Pins: "/" shows the Dashboard heading and the sidebar nav links.
@@ -51,6 +52,38 @@ test.describe("Course front-end smoke", () => {
         await expect(page.getByRole("heading", { name: "Merge courses" })).toBeVisible();
         await expect(page.getByLabel(/Main course ID/)).toBeVisible();
         await expect(page.getByLabel(/Duplicate course ID/)).toBeVisible();
+    });
+
+    // Pins: the GDPR export button (T-20) fetches GET /api/courses/{id}/export
+    // and saves what came back as `course-<id>-export.json` — a real browser
+    // download (Blob object URL + synthetic anchor), asserted through
+    // Playwright's download event, with the saved bytes compared to the
+    // stubbed payload so a silently-empty file cannot pass.
+    test("course detail downloads the GDPR export as JSON", async ({ page }) => {
+        const id = "0c4f1e2a-0000-4000-8000-0000000000cc";
+        const payload = { subject: id, exported_at: "2026-09-03T00:00:00Z", records: [] };
+        const record = { id, name: "Introduction to Computer Science", course_code: "CS101", educational_level: "Undergraduate", keywords: [], instances: [], license: "CC-BY-4.0", url: "https://example.org/cs101" };
+        await page.route("**/api/courses/**", async (route) => {
+            const url = route.request().url();
+            const envelope = url.includes("/export")
+                ? { success: true, data: payload, error: null }
+                : { success: true, data: record, error: null };
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify(envelope),
+            });
+        });
+
+        await page.goto(`/courses/${id}`);
+        const downloadPromise = page.waitForEvent("download");
+        await page.getByRole("button", { name: "Export data (GDPR)" }).click();
+        const download = await downloadPromise;
+        expect(download.suggestedFilename()).toBe(`course-${id}-export.json`);
+        const saved = await download.path();
+        expect(saved).not.toBeNull();
+        expect(JSON.parse(readFileSync(saved as string, "utf8"))).toEqual(payload);
+        await expect(page.getByRole("button", { name: "Export data (GDPR)" })).toBeEnabled();
     });
 });
 

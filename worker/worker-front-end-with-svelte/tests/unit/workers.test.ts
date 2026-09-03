@@ -46,6 +46,28 @@ const sampleLink: EntityLink = {
 describe("WorkerRepository", () => {
     // Pins: create() POSTs the worker body to /api/workers and returns the
     // unwrapped created record.
+    // Pins: exportGdpr() GETs the dedicated /export endpoint (T-20) and
+    // hands back the service-defined payload untouched — the page saves
+    // it as a file, it never interprets it.
+    it("GETs /api/workers/{id}/export on exportGdpr()", async () => {
+        let capturedUrl = "";
+        let capturedMethod = "";
+        const payload = { subject: "x1", exported_at: "2026-09-03T00:00:00Z", records: [] };
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input, init) => {
+                capturedUrl = String(input);
+                capturedMethod = init?.method ?? "GET";
+                return jsonResponse({ success: true, data: payload, error: null });
+            }),
+        });
+        const repo = new WorkerRepository(client);
+        const result = await repo.exportGdpr("x1");
+        expect(capturedUrl).toContain("/api/workers/x1/export");
+        expect(capturedMethod).toBe("GET");
+        expect(result).toEqual(payload);
+    });
+
     it("POSTs to /api/workers on create", async () => {
         let capturedBody = "";
         let capturedUrl = "";

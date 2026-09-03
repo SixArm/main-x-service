@@ -9,6 +9,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — GDPR export download on the detail page (T-20)
+
+A button on `/places/[id]` fetches `GET /api/places/{id}/export` through the
+existing `PlaceRepository.exportGdpr(id)` and saves the payload as
+`place-<id>-export.json` (Blob object URL + synthetic anchor; the button is
+disabled while the request is in flight). New i18n keys across all 13
+locales; a repository test pins the endpoint and a Playwright smoke test
+asserts the real browser download — filename and saved bytes.
+Copy-adapted from person's reference (repo `tasks.md` WEB-5).
+
 ### Changed — T-13, T-16, T-17 closed (2026-09-03, repo WEB-6)
 
 Three tasks open word-for-word in six front-ends, closed with reasons

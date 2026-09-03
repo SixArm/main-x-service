@@ -51,7 +51,8 @@
     (`tests/e2e/workers.spec.ts`) stubs the plain and masked endpoints
     with visibly different `tax_id` values and asserts the toggle
     switches between them and shows/hides the masked-view banner.
-- [ ] T-20: GDPR-export download button.
+- [x] T-20: GDPR-export download button. *(2026-09-03, repo `tasks.md` WEB-5 — copy-adapted from person's reference)* A button on `/workers/[id]` calls the existing `WorkerRepository.exportGdpr(id)` (`GET /api/workers/{id}/export`) and hands the service-defined payload to the browser as a downloaded `worker-<id>-export.json` — serialised verbatim, never interpreted, through a Blob object URL and a synthetic anchor (revoked once the click has fired). An `exporting` state disables the button while the request is in flight; errors go to the existing banner. New keys `detail.exportGdpr` / `detail.exportingGdpr` ×13 locales.
+  - **Acceptance:** `tests/unit/workers.test.ts` pins `exportGdpr()` GETs `/api/workers/{id}/export` and returns the payload unchanged; a Playwright smoke test stubs the endpoint, clicks the button, awaits the browser `download` event, and asserts both the suggested filename and that the saved bytes parse back to the stubbed payload.
 - [ ] T-21: Validate the SVAR licensing fit (free GPL-3.0 vs Pro) — see §16 OQ-1.
 - [x] T-22a: Auth — adopt the BFF + httpOnly-cookie shape: `/signin` +
   `/verify` per-app magic-link pages, `__Host-mxi_session` httpOnly
