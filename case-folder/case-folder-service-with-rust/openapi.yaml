@@ -109,7 +109,8 @@ paths:
   /api/auth/logout:
     post:
       tags: [auth]
-      summary: Clear the session cookie.
+      summary: Clear the session cookie. Idempotent — always succeeds, even with no session.
+      security: []
       responses:
         '204': { description: Logged out. }
 
