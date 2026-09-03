@@ -10,6 +10,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — `openapi.yaml` logout security override (LT-11)
+
+Audited the existing `openapi.yaml` against every live route and
+response struct; it was already complete but had one real drift:
+`POST /api/auth/logout` inherited the document's default `security`
+requirement even though the handler never checks for a session and
+always returns `204` (logout is idempotent). Added `security: []`,
+matching `/healthz` and the other pre-session auth routes. Closes
+LT-11 — the document itself predates this pass but was never marked
+done.
+
 
 ### Added — declared MSRV (Rust 1.95)
 

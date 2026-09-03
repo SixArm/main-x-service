@@ -33,7 +33,27 @@
   suppression, `None`-endpoint in-transit/created-in-place, unknown cabinet,
   orphan-room hierarchy, mixed-log filtering). No behaviour change. Lib tests
   8→14.
-- [ ] **LT-11** OpenAPI / JSON Schema document for every endpoint (P1) — AR-4
+- [x] **LT-11** OpenAPI / JSON Schema document for every endpoint (P1) — AR-4.
+  *(2026-09-03)* [`openapi.yaml`](../openapi.yaml) already existed and was
+  substantially complete, but the checkbox was never ticked; audited it
+  against the live route table rather than assuming it was current.
+  Verified all 29 route operations across the 10 controllers (matched
+  method-by-method against every `routes()` fn in `src/controllers/`)
+  are present with request/response schemas, and that every response
+  struct in `src/responses/mod.rs` (`Patient`, `Place`, `Cabinet`,
+  `Folder`, `Volume`, `Move`, `Worker`, the `List<T>` envelope,
+  `ErrorBody`, `ValidationBody`) has a matching component schema. Found
+  and fixed one real drift while auditing: `POST /api/auth/logout` had
+  no `security: []` override, so it inherited the document's top-level
+  `security` requirement — but the handler (`src/controllers/auth.rs`)
+  never checks for a session and always returns `204` (its own doc
+  comment: "logout is idempotent (clearing an absent session is a
+  no-op)"), matching the middleware's public-path bypass for
+  `/api/auth/*` (`src/initializers/auth.rs`). The document now declares
+  it public, same as `/healthz` and the other two pre-session auth
+  routes. No route lacks a schema; the soft-fail 200-always endpoints
+  (`GET /api/stats`, `GET /api/patients/{nhs}`) were checked against
+  their handlers and correctly carry no `503` response.
 - [ ] **LT-12** SSE on `/api/moves` (P1)
 - [ ] **LT-13** Soft-delete cabinets, refusing while occupied (P2)
 - [ ] **LT-14** CSV / FHIR export of the audit log (P2)
