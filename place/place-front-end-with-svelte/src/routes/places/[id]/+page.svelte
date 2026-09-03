@@ -1,11 +1,16 @@
 <!--
   Place detail (route "/places/[id]") — read-only view of one place with
   Edit / Audit links and a soft-delete action. Sections (address, geo,
-  identifiers, opening hours, amenities) render only when present.
+  identifiers, opening hours, amenities) render only when present. A
+  masked-view toggle re-fetches through GET /api/places/{id}/masked
+  (T-19) instead of the plain record.
 
   Local $state:
     - place             — the fetched record (null until loaded).
     - error / loading   — request status.
+    - masked            — whether the masked view is currently shown;
+      re-fetches on toggle rather than masking client-side, so this
+      always reflects the server's actual masking rules.
   Derived:
     - id                — route param `[id]` (the place id).
 -->
@@ -21,19 +26,35 @@
     let place = $state<Place | null>(null);
     let error = $state<string | null>(null);
     let loading = $state(true);
+    let masked = $state(false);
 
     // Route param; `as string` because SvelteKit types params as optional.
     const id = $derived(page.params.id as string);
 
-    onMount(async () => {
+    // Fetch the plain or masked record depending on `masked`, replacing
+    // whatever is currently shown. Shared by the initial load and the
+    // toggle handler so both go through one code path.
+    async function load() {
+        loading = true;
+        error = null;
         try {
-            place = await repo.get(id);
+            place = masked ? await repo.masked(id) : await repo.get(id);
         } catch (err) {
             error = err instanceof Error ? err.message : String(err);
         } finally {
             loading = false;
         }
-    });
+    }
+
+    // Flip the toggle and re-fetch through the new endpoint. A dedicated
+    // request per view, not client-side redaction — the server, not this
+    // page, decides what counts as sensitive.
+    function toggleMasked() {
+        masked = !masked;
+        void load();
+    }
+
+    onMount(load);
 
     // Soft-delete behind a confirm() guard, then return to the list.
     async function handleDelete() {
@@ -65,11 +86,22 @@
     <header class="row" style="justify-content: space-between">
         <h1>{place.name}</h1>
         <div class="row">
+            <button
+                class="button"
+                aria-pressed={masked}
+                onclick={toggleMasked}
+            >
+                {masked ? t("detail.showFull") : t("detail.showMasked")}
+            </button>
             <a href={`/places/${id}/edit`} class="button">{t("detail.edit")}</a>
             <a href={`/places/${id}/audit`} class="button">{t("detail.audit")}</a>
             <button class="button danger" onclick={handleDelete}>{t("detail.delete")}</button>
         </div>
     </header>
+
+    {#if masked}
+        <div class="banner" role="status">{t("detail.maskedNotice")}</div>
+    {/if}
 
     <section class="surface stack">
         <h2>{t("detail.identity")}</h2>

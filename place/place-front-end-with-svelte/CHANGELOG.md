@@ -9,6 +9,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — masked-view toggle on the detail page (T-19)
+
+A toggle button on `/places/[id]` re-fetches through the existing
+`PlaceRepository.masked(id)` (`GET /api/places/{id}/masked`) instead of
+redacting fields client-side. Shows a status banner while the masked
+view is active. New i18n keys across all 13 locales; a Playwright smoke
+test exercises the toggle end to end with visibly different stubbed
+`telephone` values. The repository method and its unit test already
+existed — this closes the gap where it was never surfaced in any
+route's UI. Mirrors person's and worker's identical T-19 delivery.
+
 ### Fixed — DOC-4 doc audit (2026-08-04)
 
 - **`.env.example` was stale and wrong.** It documented `PUBLIC_API_BASE_URL`
