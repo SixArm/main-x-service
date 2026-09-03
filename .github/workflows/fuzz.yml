@@ -46,7 +46,18 @@ jobs:
       crates: ${{ steps.list.outputs.crates }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Change-aware discovery diffs against the PR base (ci.yml has
+          # the same step and the same reason): the base must be in
+          # history, or the script falls open to every crate.
+          fetch-depth: 0
       - id: list
+        # On a pull request only the fuzz/ sub-crates the diff affects
+        # (scripts/ci-crates.sh, "Change-aware mode" — a matcher edit
+        # reaches its fuzz/ sub-crate through the `path = ".."`
+        # dependency); empty on push / schedule / manual → every one.
+        env:
+          CI_CHANGED_SINCE: ${{ github.event.pull_request.base.sha }}
         run: |
           # Every fuzz/ sub-crate is its own Cargo.toml root (see
           # scripts/ci-crates.sh), and by convention is the literal last
@@ -57,6 +68,9 @@ jobs:
   fuzz:
     name: ${{ matrix.crate }}
     needs: discover
+    # Skip outright when the change-aware list is empty; GitHub rejects
+    # a matrix vector with no values instead of running zero jobs.
+    if: needs.discover.outputs.crates != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
