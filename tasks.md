@@ -7805,11 +7805,19 @@ green as it sits; these finish it)**
   is green only because **PRO-H10 never reached it**: `requireSignedIn`
   appears 0 times in place's `src/`, and also 0 in organization,
   care-pathway, case, portfolio and all five consumer apps; course (4)
-  and event (4) have it, but their suites could not be measured at
-  all: on `main` both fail before the first test — `pnpm build` dies on
-  `Rollup failed to resolve import "lily-design-system-svelte-locale-picker"`,
-  the WEB-3 lockfile drift — so Playwright's webServer never starts.
-  Land WEB-3 there first, then expect the same red. Fix
+  and event (4) have it; before WEB-3 landed neither could even build
+  on `main` (`Rollup failed to resolve import
+  "lily-design-system-svelte-locale-picker"`), and measured afterwards
+  they are **course 3 red of 5** (new, merge — the guard — plus
+  `dashboard renders nav and heading`) and **event 4 red of 8** (new,
+  merge, edit — the guard — plus the same dashboard test). `/` is not a
+  guarded page, so the dashboard failure in both is a **third cause,
+  untriaged** — do not fold it into the PRO-H10 fix without reading the
+  trace. (Measuring these two also reproduced the smoke-test port
+  collision: two front-ends' Playwright runs in parallel share preview
+  port 4173 with `reuseExistingServer`, each attaches to the other's
+  app, and every assertion fails — run them one at a time, or WEB-2's
+  CI stage must set `PLAYWRIGHT_PREVIEW_PORT` per project.) Fix
   without weakening the guard: give the smoke project a stubbed
   `__Host-mxi_session` cookie via `context.addCookies` (the guard is
   presence-only and never validates it — each `AGENTS.md` says so), so
@@ -7838,7 +7846,7 @@ green as it sits; these finish it)**
   a front-end PR's green checks are Rust checks and say nothing about
   the diff — worth a sentence in `AGENTS.md` so nobody reads 168 green
   as verification. Depends: WEB-1 (or the stage is born red), WEB-3.
-- [ ] **WEB-3 (S)** **Lockfile drift sweep.** `pnpm-lock.yaml` in
+- [x] **WEB-3 (S)** **Lockfile drift sweep.** `pnpm-lock.yaml` in
   **eleven** front-ends still carries the stale
   `lily-design-system-svelte-headless` entry with no peer-resolved
   `(svelte@…)` variant that #176–#178 corrected in worker / place /
@@ -7854,6 +7862,21 @@ green as it sits; these finish it)**
   (`…-share-picker`, `…-text-size-picker`) from a stale `node_modules`.
   One `pnpm install` per project, commit the lockfile, and confirm
   `--frozen-lockfile` then passes. Prerequisite for WEB-2.
+  **Done 2026-09-03.** All eleven lockfiles regenerated (six carry one
+  transitive bump the fix drags in, `aria-query` 5.3.1 → 5.3.2, the
+  headless package's own dependency); `svelte-check` 0 errors and
+  `vitest` green in every one of them. Doing the `--frozen-lockfile`
+  check found a **second, unrelated** defect hiding behind the same
+  non-zero exit: thirteen of sixteen `pnpm-workspace.yaml` files still
+  contained pnpm's literal template line `esbuild: set this to true or
+  false` — never edited since pnpm 11 generated it — so every install
+  ended `ERR_PNPM_IGNORED_BUILDS`, while the `package.json`
+  `pnpm.onlyBuiltDependencies` block everyone *did* fill in is the
+  pre-11 location pnpm 11 no longer reads. Set to `esbuild: true` in
+  all thirteen (course, person, content-management-system already
+  had it). `pnpm install --frozen-lockfile` now exits 0 in **16 / 16**
+  front-ends — the property WEB-2's CI stage needs. Course and event
+  build again; their smoke counts are recorded under WEB-1.
 - [ ] **WEB-4 (S)** **Prettier debt sweep.** `pnpm run lint`
   (`prettier --check src`) fails today in every entity front-end
   measured — person 3 files, worker 3, place 2, thing 1, event 1,
