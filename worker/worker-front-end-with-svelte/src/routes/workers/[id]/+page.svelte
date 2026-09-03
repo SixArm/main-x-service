@@ -1,12 +1,16 @@
 <!--
   Worker detail (route "/workers/[id]") — read-only view of one worker with
   links to edit/audit and a soft-delete action. Sections render only when
-  their data is present.
+  their data is present. A masked-view toggle re-fetches through
+  GET /api/workers/{id}/masked (T-19) instead of the plain record.
 
   $state:
     - worker — the loaded record, or null until/if loaded.
     - error — fetch/delete failure message.
     - loading — true until the initial fetch settles.
+    - masked — whether the masked view is currently shown; re-fetches on
+      toggle rather than masking client-side, so this always reflects the
+      server's actual masking rules.
 
   $derived:
     - id — the worker id from the route params.
@@ -24,20 +28,36 @@
     let worker = $state<Worker | null>(null);
     let error = $state<string | null>(null);
     let loading = $state(true);
+    let masked = $state(false);
 
     // Route param `id`; cast since SvelteKit types params as string|undefined.
     const id = $derived(page.params.id as string);
 
-    // Load the worker on mount.
-    onMount(async () => {
+    // Fetch the plain or masked record depending on `masked`, replacing
+    // whatever is currently shown. Shared by the initial load and the
+    // toggle handler so both go through one code path.
+    async function load() {
+        loading = true;
+        error = null;
         try {
-            worker = await repo.get(id);
+            worker = masked ? await repo.masked(id) : await repo.get(id);
         } catch (err) {
             error = err instanceof Error ? err.message : String(err);
         } finally {
             loading = false;
         }
-    });
+    }
+
+    // Flip the toggle and re-fetch through the new endpoint. A dedicated
+    // request per view, not client-side redaction — the server, not this
+    // page, decides what counts as sensitive.
+    function toggleMasked() {
+        masked = !masked;
+        void load();
+    }
+
+    // Load the worker on mount.
+    onMount(load);
 
     // Soft-delete after a confirm prompt, then return to the list.
     async function handleDelete() {
@@ -61,11 +81,22 @@
     <header class="row" style="justify-content: space-between">
         <h1>{worker.name.given.join(" ")} {worker.name.family}</h1>
         <div class="row">
+            <button
+                class="button"
+                aria-pressed={masked}
+                onclick={toggleMasked}
+            >
+                {masked ? t("detail.showFull") : t("detail.showMasked")}
+            </button>
             <a href={`/workers/${id}/edit`} class="button">{t("detail.edit")}</a>
             <a href={`/workers/${id}/audit`} class="button">{t("detail.audit")}</a>
             <button class="button danger" onclick={handleDelete}>{t("detail.delete")}</button>
         </div>
     </header>
+
+    {#if masked}
+        <div class="banner" role="status">{t("detail.maskedNotice")}</div>
+    {/if}
 
     <section class="surface stack">
         <h2>{t("detail.identity")}</h2>
