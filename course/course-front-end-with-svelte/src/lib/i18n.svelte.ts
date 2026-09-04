@@ -124,6 +124,8 @@ const STRINGS = {
     "detail.edit": "Edit",
     "detail.audit": "Audit",
     "detail.delete": "Delete",
+    "detail.exportGdpr": "Export data (GDPR)",
+    "detail.exportingGdpr": "Exporting…",
     "detail.confirmDelete":
       "Soft-delete this course? This cannot be undone via the UI.",
     "detail.identity": "Identity",
@@ -297,6 +299,8 @@ const STRINGS = {
     "detail.edit": "Golygu",
     "detail.audit": "Archwilio",
     "detail.delete": "Dileu",
+    "detail.exportGdpr": "Allforio data (GDPR)",
+    "detail.exportingGdpr": "Wrthi'n allforio…",
     "detail.confirmDelete":
       "Meddal-ddileu'r cwrs hwn? Ni ellir dadwneud hyn drwy'r rhyngwyneb.",
     "detail.identity": "Hunaniaeth",
@@ -460,6 +464,8 @@ const STRINGS = {
     "detail.edit": "Editar",
     "detail.audit": "Auditoría",
     "detail.delete": "Eliminar",
+    "detail.exportGdpr": "Exportar datos (RGPD)",
+    "detail.exportingGdpr": "Exportando…",
     "detail.confirmDelete":
       "¿Eliminar de forma reversible este curso? Esto no se puede deshacer desde la interfaz.",
     "detail.identity": "Identidad",
@@ -623,6 +629,8 @@ const STRINGS = {
     "detail.edit": "Modifier",
     "detail.audit": "Audit",
     "detail.delete": "Supprimer",
+    "detail.exportGdpr": "Exporter les données (RGPD)",
+    "detail.exportingGdpr": "Exportation…",
     "detail.confirmDelete":
       "Supprimer logiquement ce cours ? Cette action est irréversible depuis l'interface.",
     "detail.identity": "Identité",
@@ -786,6 +794,8 @@ const STRINGS = {
     "detail.edit": "Bearbeiten",
     "detail.audit": "Audit",
     "detail.delete": "Löschen",
+    "detail.exportGdpr": "Daten exportieren (DSGVO)",
+    "detail.exportingGdpr": "Exportiere…",
     "detail.confirmDelete":
       "Diesen Kurs vorläufig löschen? Dies kann über die Oberfläche nicht rückgängig gemacht werden.",
     "detail.identity": "Identität",
@@ -949,6 +959,8 @@ const STRINGS = {
     "detail.edit": "تحرير",
     "detail.audit": "تدقيق",
     "detail.delete": "حذف",
+    "detail.exportGdpr": "تصدير البيانات (GDPR)",
+    "detail.exportingGdpr": "جارٍ التصدير…",
     "detail.confirmDelete":
       "حذف هذه الدورة بشكل مبدئي؟ لا يمكن التراجع عن ذلك عبر الواجهة.",
     "detail.identity": "الهوية",
@@ -1111,6 +1123,8 @@ const STRINGS = {
     "detail.edit": "Изменить",
     "detail.audit": "Аудит",
     "detail.delete": "Удалить",
+    "detail.exportGdpr": "Экспорт данных (GDPR)",
+    "detail.exportingGdpr": "Экспорт…",
     "detail.confirmDelete":
       "Выполнить мягкое удаление этого курса? Это нельзя отменить через интерфейс.",
     "detail.identity": "Идентичность",
@@ -1273,6 +1287,8 @@ const STRINGS = {
     "detail.edit": "संपादित करें",
     "detail.audit": "ऑडिट",
     "detail.delete": "हटाएँ",
+    "detail.exportGdpr": "डेटा निर्यात करें (GDPR)",
+    "detail.exportingGdpr": "निर्यात हो रहा है…",
     "detail.confirmDelete":
       "इस पाठ्यक्रम को सॉफ़्ट-डिलीट करें? इसे इंटरफ़ेस के माध्यम से पूर्ववत नहीं किया जा सकता।",
     "detail.identity": "पहचान",
@@ -1436,6 +1452,8 @@ const STRINGS = {
     "detail.edit": "编辑",
     "detail.audit": "审计",
     "detail.delete": "删除",
+    "detail.exportGdpr": "导出数据（GDPR）",
+    "detail.exportingGdpr": "导出中…",
     "detail.confirmDelete": "软删除此课程？此操作无法通过界面撤销。",
     "detail.identity": "身份",
     "detail.id": "ID",
@@ -1595,6 +1613,8 @@ const STRINGS = {
     "detail.edit": "সম্পাদনা",
     "detail.audit": "অডিট",
     "detail.delete": "মুছুন",
+    "detail.exportGdpr": "ডেটা রপ্তানি করুন (GDPR)",
+    "detail.exportingGdpr": "রপ্তানি হচ্ছে…",
     "detail.confirmDelete":
       "এই কোর্সটি সফট-ডিলিট করবেন? এটি ইন্টারফেসের মাধ্যমে পূর্বাবস্থায় ফেরানো যাবে না।",
     "detail.identity": "পরিচয়",
@@ -1758,6 +1778,8 @@ const STRINGS = {
     "detail.edit": "Editar",
     "detail.audit": "Auditoria",
     "detail.delete": "Eliminar",
+    "detail.exportGdpr": "Exportar dados (RGPD)",
+    "detail.exportingGdpr": "A exportar…",
     "detail.confirmDelete":
       "Eliminar de forma reversível este curso? Isto não pode ser desfeito pela interface.",
     "detail.identity": "Identidade",
@@ -1921,6 +1943,8 @@ const STRINGS = {
     "detail.edit": "Edit",
     "detail.audit": "Audit",
     "detail.delete": "Hapus",
+    "detail.exportGdpr": "Ekspor data (GDPR)",
+    "detail.exportingGdpr": "Mengekspor…",
     "detail.confirmDelete":
       "Hapus sementara kursus ini? Ini tidak dapat dibatalkan melalui antarmuka.",
     "detail.identity": "Identitas",
@@ -2084,6 +2108,8 @@ const STRINGS = {
     "detail.edit": "ترمیم کریں",
     "detail.audit": "آڈٹ",
     "detail.delete": "حذف کریں",
+    "detail.exportGdpr": "ڈیٹا برآمد کریں (GDPR)",
+    "detail.exportingGdpr": "برآمد ہو رہا ہے…",
     "detail.confirmDelete":
       "اس کورس کو سافٹ ڈیلیٹ کریں؟ اسے انٹرفیس کے ذریعے واپس نہیں کیا جا سکتا۔",
     "detail.identity": "شناخت",

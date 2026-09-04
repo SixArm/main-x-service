@@ -202,6 +202,8 @@ const STRINGS = {
     "detail.edit": "Edit",
     "detail.audit": "Audit",
     "detail.delete": "Delete",
+    "detail.exportGdpr": "Export data (GDPR)",
+    "detail.exportingGdpr": "Exporting…",
     "detail.showMasked": "Show masked",
     "detail.showFull": "Show full",
     "detail.maskedNotice":
@@ -418,6 +420,8 @@ const STRINGS = {
     "detail.edit": "Golygu",
     "detail.audit": "Archwilio",
     "detail.delete": "Dileu",
+    "detail.exportGdpr": "Allforio data (GDPR)",
+    "detail.exportingGdpr": "Wrthi'n allforio…",
     "detail.showMasked": "Dangos wedi'i guddio",
     "detail.showFull": "Dangos yn llawn",
     "detail.maskedNotice":
@@ -625,6 +629,8 @@ const STRINGS = {
     "detail.edit": "Editar",
     "detail.audit": "Auditoría",
     "detail.delete": "Eliminar",
+    "detail.exportGdpr": "Exportar datos (RGPD)",
+    "detail.exportingGdpr": "Exportando…",
     "detail.showMasked": "Mostrar enmascarado",
     "detail.showFull": "Mostrar completo",
     "detail.maskedNotice":
@@ -832,6 +838,8 @@ const STRINGS = {
     "detail.edit": "Modifier",
     "detail.audit": "Audit",
     "detail.delete": "Supprimer",
+    "detail.exportGdpr": "Exporter les données (RGPD)",
+    "detail.exportingGdpr": "Exportation…",
     "detail.showMasked": "Afficher masqué",
     "detail.showFull": "Afficher complet",
     "detail.maskedNotice":
@@ -1040,6 +1048,8 @@ const STRINGS = {
     "detail.edit": "Bearbeiten",
     "detail.audit": "Audit",
     "detail.delete": "Löschen",
+    "detail.exportGdpr": "Daten exportieren (DSGVO)",
+    "detail.exportingGdpr": "Exportiere…",
     "detail.showMasked": "Maskiert anzeigen",
     "detail.showFull": "Vollständig anzeigen",
     "detail.maskedNotice":
@@ -1246,6 +1256,8 @@ const STRINGS = {
     "detail.edit": "تحرير",
     "detail.audit": "تدقيق",
     "detail.delete": "حذف",
+    "detail.exportGdpr": "تصدير البيانات (GDPR)",
+    "detail.exportingGdpr": "جارٍ التصدير…",
     "detail.showMasked": "إظهار المُقنَّع",
     "detail.showFull": "إظهار الكامل",
     "detail.maskedNotice": "يتم عرض العرض المُقنَّع — بعض الحقول مخفية.",
@@ -1452,6 +1464,8 @@ const STRINGS = {
     "detail.edit": "Изменить",
     "detail.audit": "Аудит",
     "detail.delete": "Удалить",
+    "detail.exportGdpr": "Экспорт данных (GDPR)",
+    "detail.exportingGdpr": "Экспорт…",
     "detail.showMasked": "Показать маскированный",
     "detail.showFull": "Показать полностью",
     "detail.maskedNotice":
@@ -1658,6 +1672,8 @@ const STRINGS = {
     "detail.edit": "संपादित करें",
     "detail.audit": "ऑडिट",
     "detail.delete": "हटाएँ",
+    "detail.exportGdpr": "डेटा निर्यात करें (GDPR)",
+    "detail.exportingGdpr": "निर्यात हो रहा है…",
     "detail.showMasked": "मास्क्ड दिखाएँ",
     "detail.showFull": "पूर्ण दिखाएँ",
     "detail.maskedNotice":
@@ -1859,6 +1875,8 @@ const STRINGS = {
     "detail.edit": "编辑",
     "detail.audit": "审计",
     "detail.delete": "删除",
+    "detail.exportGdpr": "导出数据（GDPR）",
+    "detail.exportingGdpr": "导出中…",
     "detail.showMasked": "显示脱敏视图",
     "detail.showFull": "显示完整视图",
     "detail.maskedNotice": "正在显示脱敏视图——部分字段已隐藏。",
@@ -2064,6 +2082,8 @@ const STRINGS = {
     "detail.edit": "সম্পাদনা",
     "detail.audit": "অডিট",
     "detail.delete": "মুছুন",
+    "detail.exportGdpr": "ডেটা রপ্তানি করুন (GDPR)",
+    "detail.exportingGdpr": "রপ্তানি হচ্ছে…",
     "detail.showMasked": "মাস্কড দেখান",
     "detail.showFull": "সম্পূর্ণ দেখান",
     "detail.maskedNotice": "মাস্কড ভিউ দেখানো হচ্ছে — কিছু ক্ষেত্র লুকানো আছে।",
@@ -2271,6 +2291,8 @@ const STRINGS = {
     "detail.edit": "Editar",
     "detail.audit": "Auditoria",
     "detail.delete": "Eliminar",
+    "detail.exportGdpr": "Exportar dados (RGPD)",
+    "detail.exportingGdpr": "A exportar…",
     "detail.showMasked": "Mostrar mascarado",
     "detail.showFull": "Mostrar completo",
     "detail.maskedNotice":
@@ -2478,6 +2500,8 @@ const STRINGS = {
     "detail.edit": "Edit",
     "detail.audit": "Audit",
     "detail.delete": "Hapus",
+    "detail.exportGdpr": "Ekspor data (GDPR)",
+    "detail.exportingGdpr": "Mengekspor…",
     "detail.showMasked": "Tampilkan tersamar",
     "detail.showFull": "Tampilkan lengkap",
     "detail.maskedNotice":
@@ -2684,6 +2708,8 @@ const STRINGS = {
     "detail.edit": "ترمیم کریں",
     "detail.audit": "آڈٹ",
     "detail.delete": "حذف کریں",
+    "detail.exportGdpr": "ڈیٹا برآمد کریں (GDPR)",
+    "detail.exportingGdpr": "برآمد ہو رہا ہے…",
     "detail.showMasked": "نقاب پوش دکھائیں",
     "detail.showFull": "مکمل دکھائیں",
     "detail.maskedNotice":

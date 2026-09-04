@@ -7,6 +7,7 @@
 // guard is presence-only, so a stub is enough; the "page-visit guard"
 // describe at the bottom drops the cookie and pins the redirect itself.
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 test.describe("Thing front-end smoke", () => {
     // Pins: dashboard shows its heading and the main nav links.
@@ -188,6 +189,38 @@ test.describe("Thing front-end smoke", () => {
             panel.getByRole("button", { name: "Confirm duplicate" }),
         ).toBeEnabled();
         await expect(panel.getByRole("button", { name: "Reject" })).toBeEnabled();
+    });
+
+    // Pins: the GDPR export button (T-20) fetches GET /api/things/{id}/export
+    // and saves what came back as `thing-<id>-export.json` — a real browser
+    // download (Blob object URL + synthetic anchor), asserted through
+    // Playwright's download event, with the saved bytes compared to the
+    // stubbed payload so a silently-empty file cannot pass.
+    test("thing detail downloads the GDPR export as JSON", async ({ page }) => {
+        const id = "0c4f1e2a-0000-4000-8000-0000000000cc";
+        const payload = { subject: id, exported_at: "2026-09-03T00:00:00Z", records: [] };
+        const record = { id, name: "Pride and Prejudice" };
+        await page.route("**/api/things/**", async (route) => {
+            const url = route.request().url();
+            const envelope = url.includes("/export")
+                ? { success: true, data: payload, error: null }
+                : { success: true, data: record, error: null };
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify(envelope),
+            });
+        });
+
+        await page.goto(`/things/${id}`);
+        const downloadPromise = page.waitForEvent("download");
+        await page.getByRole("button", { name: "Export data (GDPR)" }).click();
+        const download = await downloadPromise;
+        expect(download.suggestedFilename()).toBe(`thing-${id}-export.json`);
+        const saved = await download.path();
+        expect(saved).not.toBeNull();
+        expect(JSON.parse(readFileSync(saved as string, "utf8"))).toEqual(payload);
+        await expect(page.getByRole("button", { name: "Export data (GDPR)" })).toBeEnabled();
     });
 });
 

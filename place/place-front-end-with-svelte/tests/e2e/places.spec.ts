@@ -2,6 +2,7 @@
 // assert its key landmarks render. These pin routing + page scaffolding,
 // not API behaviour (the backend may be absent; only static UI is checked).
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 test.describe("Place front-end smoke", () => {
     // Pins: the dashboard heading plus the sidebar nav links are present.
@@ -186,5 +187,37 @@ test.describe("Place front-end smoke", () => {
             panel.getByRole("button", { name: "Confirm duplicate" }),
         ).toBeEnabled();
         await expect(panel.getByRole("button", { name: "Reject" })).toBeEnabled();
+    });
+
+    // Pins: the GDPR export button (T-20) fetches GET /api/places/{id}/export
+    // and saves what came back as `place-<id>-export.json` — a real browser
+    // download (Blob object URL + synthetic anchor), asserted through
+    // Playwright's download event, with the saved bytes compared to the
+    // stubbed payload so a silently-empty file cannot pass.
+    test("place detail downloads the GDPR export as JSON", async ({ page }) => {
+        const id = "0c4f1e2a-0000-4000-8000-0000000000cc";
+        const payload = { subject: id, exported_at: "2026-09-03T00:00:00Z", records: [] };
+        const record = { id, name: "Central Park", address: { address_locality: "New York" } };
+        await page.route("**/api/places/**", async (route) => {
+            const url = route.request().url();
+            const envelope = url.includes("/export")
+                ? { success: true, data: payload, error: null }
+                : { success: true, data: record, error: null };
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify(envelope),
+            });
+        });
+
+        await page.goto(`/places/${id}`);
+        const downloadPromise = page.waitForEvent("download");
+        await page.getByRole("button", { name: "Export data (GDPR)" }).click();
+        const download = await downloadPromise;
+        expect(download.suggestedFilename()).toBe(`place-${id}-export.json`);
+        const saved = await download.path();
+        expect(saved).not.toBeNull();
+        expect(JSON.parse(readFileSync(saved as string, "utf8"))).toEqual(payload);
+        await expect(page.getByRole("button", { name: "Export data (GDPR)" })).toBeEnabled();
     });
 });
