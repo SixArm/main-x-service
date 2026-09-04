@@ -13,10 +13,26 @@
 //! Governance (§10): both creating and reading an edge are authorised at
 //! the *same* level as reading the underlying case (via
 //! [`crate::auth::authorize_record`] on the loaded case), and every
-//! write is audited (`linked` / `unlinked` action). A per-record masking
-//! pass and a "denied read is indistinguishable from no-such-edge"
-//! refinement are follow-ups (spec §13); v1 leans on the blanket
-//! write/destructive guard plus the case-level record check.
+//! write is audited (`linked` / `unlinked` action).
+//!
+//! ### A denied request is a `404`, not a `403` (spec §13 T-9)
+//!
+//! On these endpoints a policy denial is reported as **not found**,
+//! matching the later family precedent established for the *other*
+//! high-sensitivity v1 edge kind, care-pathway's `continues_as`
+//! (`agents/share/cross-service-linking.md` §10.2). A `403` would
+//! answer the question the caller was not allowed to ask: "this case
+//! has a `subject_of` edge, and you may not see it" is itself a
+//! disclosure about a named person. An empty edge list and a denied
+//! read are deliberately indistinguishable.
+//!
+//! The cost is real: a misconfigured operator sees `404` where the
+//! truthful answer is "your policy denies this" — harder to debug. The
+//! **audit trail** carries the denial, so the information is moved
+//! rather than lost. This is **not** applied to the case record
+//! endpoints themselves (`controllers/cases.rs`), which still return
+//! `403`: a case is not disclosed merely by existing, but *this case has
+//! a subject* is the disclosure the link endpoints exist to protect.
 
 use std::collections::BTreeMap;
 
@@ -184,10 +200,34 @@ fn unprocessable(reason: &str) -> Error {
     )
 }
 
-/// Map a record-level authorization rejection (`(status, reason)`) to a
-/// loco error response — `403` policy-denied, `401` fail-safe (mirrors
-/// the cases controller).
+/// Map a record-level authorization rejection to its HTTP shape on the
+/// single-case link endpoints (`/api/cases/{pid}/links*`), where a
+/// denial must not disclose existence (spec §13 T-9).
+///
+/// A `403` ("forbidden") is folded into `404` ("not found") so that a
+/// denied read is indistinguishable from a case with no `subject_of`
+/// edges — see the module docs for why, and for why the case record
+/// endpoints (`controllers/cases.rs::record_rejection`) and the *bulk*
+/// pull below ([`bulk_rejection`]) deliberately do not do this. A `401`
+/// is left alone: "you sent no credential" discloses nothing about what
+/// exists, and folding it into `404` would leave an unauthenticated
+/// client retrying forever against a URL it should be authenticating to
+/// instead.
 fn record_rejection((status, reason): (StatusCode, String)) -> Error {
+    if status == StatusCode::FORBIDDEN {
+        return Error::NotFound;
+    }
+    Error::CustomError(status, ErrorDetail::new("unauthorized", &reason))
+}
+
+/// Map a record-level authorization rejection to its HTTP shape on the
+/// *bulk* reconciliation pull ([`bulk_links`]) — plain `403`/`401`,
+/// unlike [`record_rejection`]. The bulk pull is not scoped to one
+/// case's existence, so there is nothing a `403` there would disclose
+/// about a specific record; folding it to `404` would instead misstate
+/// what happened ("no such resource" when the true answer is "you may
+/// not run this privileged read").
+fn bulk_rejection((status, reason): (StatusCode, String)) -> Error {
     let code = if status == StatusCode::FORBIDDEN {
         "forbidden"
     } else {
@@ -215,8 +255,9 @@ fn authorize_case(caller: &MaybeAuthUser, action: Action, case: &CaseModel) -> R
 ///
 /// # Errors
 ///
-/// `404` unknown `pid`; `403`/`401` when the record-level policy denies;
-/// `422` when the edge is invalid; a DB error on the upsert.
+/// `404` unknown `pid` **or** the record-level policy denies (spec §13
+/// T-9); `401` fail-safe; `422` when the edge is invalid; a DB error on
+/// the upsert.
 #[debug_handler]
 async fn create_link(
     Path(pid): Path<String>,
@@ -256,8 +297,8 @@ async fn create_link(
 ///
 /// # Errors
 ///
-/// `404` unknown `pid`; `403`/`401` when the record-level policy denies;
-/// a DB error on the query.
+/// `404` unknown `pid` **or** the record-level policy denies (spec §13
+/// T-9); `401` fail-safe; a DB error on the query.
 #[debug_handler]
 async fn list_links(
     Path(pid): Path<String>,
@@ -283,8 +324,9 @@ async fn list_links(
 ///
 /// # Errors
 ///
-/// `400` malformed link id; `404` unknown `pid` or edge; `403`/`401` when
-/// the record-level policy denies; a DB error on the soft-delete.
+/// `400` malformed link id; `404` unknown `pid` or edge **or** the
+/// record-level policy denies (spec §13 T-9); `401` fail-safe; a DB
+/// error on the soft-delete.
 #[debug_handler]
 async fn delete_link(
     Path((pid, id)): Path<(String, String)>,
@@ -315,7 +357,7 @@ fn authorize_bulk(caller: &MaybeAuthUser) -> Result<()> {
     let resource: BTreeMap<String, Vec<String>> =
         BTreeMap::from([("governed".to_string(), vec!["subject_of".to_string()])]);
     crate::auth::authorize_record(caller, Action::Destructive, &resource)
-        .map_err(record_rejection)?;
+        .map_err(bulk_rejection)?;
     Ok(())
 }
 
@@ -420,5 +462,53 @@ mod tests {
     #[test]
     fn rejects_unknown_kind() {
         assert!(validate_edge("befriends", PERSON).is_err());
+    }
+
+    /// spec §13 T-9: on the single-case link endpoints, a policy denial
+    /// must be indistinguishable from "no such edge". If this ever
+    /// reverts to `403`, the endpoint starts answering the question the
+    /// caller was not allowed to ask — whether this case has a
+    /// `subject_of` edge at all.
+    #[test]
+    fn a_denied_link_request_is_reported_as_not_found() {
+        let denied = record_rejection((
+            StatusCode::FORBIDDEN,
+            "policy denied: dept=blocked".to_string(),
+        ));
+        assert!(
+            matches!(denied, Error::NotFound),
+            "a denial must not disclose existence, got {denied:?}"
+        );
+        let rendered = format!("{denied:?}");
+        assert!(
+            !rendered.contains("dept=blocked"),
+            "the denial reason must not leak: {rendered}"
+        );
+    }
+
+    /// spec §13 T-9: a missing credential stays `401` on the single-case
+    /// link endpoints — it discloses nothing about what exists, and
+    /// folding it into `404` would leave an unauthenticated client
+    /// retrying forever against a URL it should authenticate to.
+    #[test]
+    fn a_missing_credential_stays_unauthorized_on_links() {
+        let unauthed =
+            record_rejection((StatusCode::UNAUTHORIZED, "missing bearer token".to_string()));
+        assert!(
+            !matches!(unauthed, Error::NotFound),
+            "401 must not be folded into 404"
+        );
+    }
+
+    /// The bulk reconciliation pull is a system-wide privileged read, not
+    /// scoped to one case's existence, so its denial stays a plain `403`
+    /// — [`bulk_rejection`] deliberately does not fold it into `404`.
+    #[test]
+    fn a_denied_bulk_pull_stays_forbidden() {
+        let denied = bulk_rejection((StatusCode::FORBIDDEN, "policy denied".to_string()));
+        assert!(
+            !matches!(denied, Error::NotFound),
+            "the bulk pull's denial must stay 403, got {denied:?}"
+        );
     }
 }

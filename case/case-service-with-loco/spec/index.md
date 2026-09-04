@@ -753,7 +753,20 @@ edge kinds. The implementation MUST enforce:
   `subject_of` edge require at least the authorisation needed to read the
   case (§9). The link endpoints are never more permissive than
   `GET /api/cases/{pid}`. An unauthorised caller MUST NOT learn the edge
-  exists — a denied read is indistinguishable from "no such edge".
+  exists — a denied read is indistinguishable from "no such edge". **A
+  record-level deny on the single-case link endpoints
+  (`/api/cases/{pid}/links*`) is reported as `404`, never `403`** (T-9,
+  §13, matching care-pathway's `continues_as` precedent,
+  [cross-service-linking §10.2](../../../agents/share/cross-service-linking.md)):
+  a `403` there would itself disclose that this case carries a
+  `subject_of` edge. This fold is deliberately **narrower than the case
+  record itself** — `GET /api/cases/{pid}` keeps returning `403` on a
+  denial, since a case is not disclosed merely by existing, and the
+  *bulk* reconciliation pull (`GET /api/cases/links`) also stays `403`,
+  since it is not scoped to any one case's existence. An unauthenticated
+  `401` is left alone everywhere: "you sent no credential" discloses
+  nothing, and folding it into `404` would leave the caller retrying a
+  URL it should be authenticating to instead.
 - **Audit every read and write of these edges.** Each `POST`/`GET`/
   `DELETE` on `/api/cases/{pid}/links` — and any `single-view` that
   surfaces such an edge — writes an `audit_logs` row, consistent with the
@@ -811,8 +824,8 @@ the other v1 edge kinds even though it shares the same edge shape.
   `confirmed`/`rejected` once and `409`s (or documented equivalent) on a
   second decision of the same row; DB-gated test proves both.
 
-- [ ] **T-9 (S) `subject_of` link read denial should be `404`, not `403`,
-  per the later family precedent.** §12.1 of this spec already flags
+- [x] **T-9 (S) `subject_of` link read denial should be `404`, not `403`,
+  per the later family precedent.** *(resolved 2026-09-04.)* §12.1 of this spec already flags
   "a 'denied read is indistinguishable from no-such-edge' refinement
   remain\[s\] a follow-up" for the `case ↔ person` edge (landed
   2026-07-10, before the family settled the pattern). By 2026-08-24
@@ -833,6 +846,18 @@ the other v1 edge kinds even though it shares the same edge shape.
   gets an identical `404` body for both "no such case" and "case exists,
   edge denied"; a DB-gated test pins both branches are indistinguishable,
   matching care-pathway's `continues_as` test shape.
+  - **Resolved.** Split `src/controllers/links.rs::record_rejection`
+    (now folds a `403` into `Error::NotFound` for the single-case
+    `/api/cases/{pid}/links*` endpoints) from a new `bulk_rejection`
+    (unchanged plain `403`/`401`, for the bulk reconciliation pull only
+    — it is not scoped to one case's existence, so folding it would
+    misstate rather than protect). DB-free unit tests pin both mappers
+    plus the 401-is-not-folded case; a new DB-gated
+    `tests/links_masking.rs` (its own test binary, mirroring
+    `tests/masking.rs`'s process-wide-`OnceLock` reasoning) proves a
+    denied caller gets `404` reading a case's links while an ordinary
+    caller sees the link, and contrasts it against the case record
+    endpoint staying `403` for the same denied caller.
 
 - [x] **2026-09-02 — PRO-H12 slice 6: OpenTelemetry OTLP export.** This
   crate carried no `src/observability` module at all before this
@@ -1218,10 +1243,12 @@ the other v1 edge kinds even though it shares the same edge shape.
     (`auth::authorize_record` on the loaded case, so never more
     permissive than `GET /api/cases/{pid}`); every create/withdraw
     writes an audit row (`linked` / `unlinked` action, `actor` from
-    token). Per-record **masking** of the edge and a "denied read is
-    indistinguishable from no-such-edge" refinement remain follow-ups —
-    v1 leans on the blanket write/destructive guard + the case-level
-    record check.
+    token). The "denied read is indistinguishable from no-such-edge"
+    refinement landed via T-9 (§13, 2026-09-04): a record-level deny on
+    the single-case link endpoints is now `404`, matching care-pathway's
+    `continues_as` precedent. Per-record **masking** of the edge remains
+    a follow-up — v1 leans on the blanket write/destructive guard + the
+    case-level record check.
   - [x] Partition guard: `entity_links` live only in their own table +
     events; they are never projected into the matcher input (§5).
   - **Acceptance:** DB-gated (`tests/requests/entity_links.rs`,
