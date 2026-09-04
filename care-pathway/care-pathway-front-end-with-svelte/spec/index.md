@@ -273,6 +273,52 @@ for any access/audit requirements.
   same-origin `/api/proxy` BFF route that injects the PASETO bearer
   server-side; the browser holds no token.
 
+- [ ] **CPFE-T1 (M) Page-visit auth guard (`requireSignedIn`).** No
+  route redirects an unauthenticated visitor — every record-bearing
+  route (`/`, `/new`, `/[pid]`, `/[pid]/edit`, `/board`, `/gantt`,
+  `/sequence`, `/insights`, `/time`) loads and calls the BFF proxy
+  regardless of session state; only the layout chrome reflects
+  `locals.sessionId`. *(Verified: `grep -rn requireSignedIn src/`
+  returns no hits — matches the repo `tasks.md` WEB-1 finding that only
+  5 of 16 front-ends carry this guard.)* Add a shared `requireSignedIn`
+  helper (or per-route load guard) redirecting to `/signin` when
+  `locals.sessionId` is null. **Acceptance:** a test hits a protected
+  route with no session cookie and asserts a redirect to `/signin`; the
+  signed-out layout affordance is unchanged.
+
+- [ ] **CPFE-T2 (M) Masked view + GDPR export UI.** The service exposes
+  `GET /{pid}/masked` and `GET /{pid}/export`, but nothing in this
+  front-end calls either. *(Verified: `grep -rn "masked\|/export"
+  src/lib/api/care-pathways.ts src/routes/` returns no hits.)* Add
+  `CarePathwayRepository.masked(pid)`/`.export(pid)` plus a detail-page
+  affordance (e.g. a "View masked" toggle alongside the existing
+  audit-trail toggle, and a "Download GDPR export" action).
+  **Acceptance:** vitest pins for the two new repository methods; a
+  Playwright smoke test (API stubbed) exercises the toggle and export
+  action.
+
+- [ ] **CPFE-T3 (S) Wire the segment/clock recording UI.** This crate's
+  own `AGENTS.md` already documents `POST /api/instances/{pid}/segments`
+  and `POST /api/instances/{pid}/clock` as "client methods; not yet
+  wired to a route" — the repository has the calls, no page uses them.
+  *(Verified: `grep -rn "segments\|clock" src/routes/` shows only
+  `/time/+page.svelte` *reading* `timeline.clock`/gap data, never a
+  `postSegment`/`postClock` call site.)* Add the recording affordance to
+  `/[pid]` or `/board` (start/close a segment, set the clock), reusing
+  the existing TBA repository methods. **Acceptance:** vitest pins for
+  the new call sites; a Playwright smoke test covers the happy path
+  (API stubbed).
+
+- [ ] **CPFE-T4 (S) Real-time duplicate warning on the create form.**
+  Open question in §16 since v0.1, still unaddressed. *(Verified:
+  `src/routes/new/+page.svelte` calls only `repository.create()`; no
+  debounced `checkDuplicates()` call exists on the form.)* Add a
+  debounced `checkDuplicates()` call as the operator fills in
+  name/condition codes, surfacing candidate matches inline before
+  submit. **Acceptance:** a vitest test on the debounce/candidate logic;
+  a Playwright smoke test (API stubbed) shows the warning for a stubbed
+  duplicate response.
+
 ## 14. Implementation status
 
 Done: all nine routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`,

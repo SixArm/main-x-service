@@ -235,6 +235,70 @@ controls when they land.
   Playwright 10/10 (was 7; +3: keyboard table, live-breakdown compare,
   merge query-string prefill).
 
+- [ ] **ORGFE-T1 (M) Page-visit auth guard (`requireSignedIn`).** No
+  route in this front-end redirects an unauthenticated visitor — every
+  page (`/`, `/new`, `/[pid]`, `/[pid]/edit`, `/review`, `/merge`) loads
+  and calls the BFF proxy regardless of session state; only the layout
+  chrome's "signed in" panel reflects `locals.sessionId`.
+  *(Verified: `grep -rn requireSignedIn src/` returns no hits, and
+  `src/hooks.server.ts` / `src/routes/+layout.server.ts` only *read*
+  `locals.sessionId` into `signedIn`, never redirect on its absence —
+  matches the repo `tasks.md` WEB-1 finding that only 5 of 16
+  front-ends carry this guard.)* Add a shared `requireSignedIn` helper
+  (or per-route `+page.server.ts`/`+layout.server.ts` load guard)
+  redirecting to `/signin` when `locals.sessionId` is null, on every
+  mutating/record-bearing route. **Acceptance:** a vitest/Playwright
+  test hits a protected route with no session cookie and asserts a
+  redirect to `/signin`; the existing signed-out layout affordance is
+  unchanged.
+
+- [ ] **ORGFE-T2 (S) Masked view + GDPR export UI.** The service exposes
+  `GET /{pid}/masked` and `GET /{pid}/export`, but nothing in this
+  front-end calls either. *(Verified: `grep -rn "masked\|/export"
+  src/lib/api/*.ts src/routes/` returns no hits.)* Add
+  `OrganizationRepository.masked(pid)`/`.export(pid)` plus a detail-page
+  affordance (e.g. a "View masked" toggle and a "Download GDPR export"
+  action). **Acceptance:** vitest pins for the two new repository
+  methods; a Playwright smoke test (API stubbed) exercises the toggle
+  and the export action.
+
+- [ ] **ORGFE-T3 (S) Audit-trail view.** The service exposes `GET
+  /api/organizations/audit/recent` and `GET /{pid}/audit`
+  (`agents/share/auditability.md`), and this front-end's own roadmap
+  names "audit views" as next work, but no route or repository method
+  calls either endpoint. *(Verified: `find src/routes -maxdepth 1
+  -type d` lists no audit route, and `grep -rn audit
+  src/lib/api/*.ts` returns no hits.)* Add an `audit(pid)` repository
+  method and a detail-page "Show audit trail" toggle, matching the
+  pattern already shipped in the sibling
+  `care-pathway-front-end-with-svelte`. **Acceptance:** vitest pins the
+  new repository method; a Playwright smoke test covers the toggle
+  (loading/empty/error states).
+
+- [ ] **ORGFE-T4 (S) Inline identifier-format validation (LEI/DUNS
+  length).** Named as an open question in §16 since v0.1; the service
+  now validates LEI/GLN/DUNS/VAT check digits server-side (SEC-M5), but
+  the create/edit form gives no client-side hint before the round-trip
+  `422`. *(Verified: `agents/share/security.md` §2 SEC-M5 confirms the
+  server-side check; no client-side format check exists in
+  `src/lib/components/OrganizationForm.svelte`.)* Add pure length/format
+  hints (not full check-digit re-implementation — that stays
+  server-authoritative) surfaced inline per identifier row.
+  **Acceptance:** a vitest unit test on the new pure helper; the form
+  still submits and relies on the server's `422` as the authority.
+
+- [ ] **ORGFE-T5 (S) Real-time duplicate warning on the create form.**
+  Also named as an open question in §16 since v0.1: the create form has
+  no live duplicate hint, only the post-submit `check-duplicates`/`409`
+  path (once ORG-T3 lands service-side) or the separate `/review` flow.
+  *(Verified: `src/routes/new/+page.svelte` calls only
+  `repository.create()`, no debounced `checkDuplicates()` call exists
+  on the form.)* Add a debounced `checkDuplicates()` call as the
+  operator fills in name/address, surfacing candidate matches inline
+  before submit. **Acceptance:** a vitest test on the debounce/candidate
+  logic; a Playwright smoke test (API stubbed) shows the warning
+  appearing for a stubbed duplicate response.
+
 ## 14. Implementation status
 
 Done: the eight routes in §5 (list, `/organizations` grid, create,

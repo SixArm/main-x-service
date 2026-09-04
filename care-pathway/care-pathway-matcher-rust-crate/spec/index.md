@@ -270,6 +270,64 @@ add IO, async, or panics to library code.
 - [ ] Patient-group / age-band component.
 - [ ] Split this single `spec/index.md` into the numbered §-per-file
       layout used by the sibling matcher crates.
+- [ ] **CPM-T1 (S) Guard `MatchConfig` against caller-supplied
+      negative/NaN weights.** Every `MatchConfig` field is `pub` with no
+      validating constructor; a caller-built config with a negative or
+      `NaN` weight reaches `scoring::weighted_average` unchecked, which
+      can push the returned score outside `[0.0, 1.0]` or produce `NaN`
+      — breaking the crate's own "scores stay bounded and finite" claim
+      (§24) and `Confidence::classify`'s banding. *(Verified:
+      `tests/property_tests.rs` only constructs the engine via
+      `MatchingEngine::default_config()`; `src/config.rs` has no
+      rejecting constructor. This is the same gap as the sibling
+      `organization-matcher` crate's identical `MatchConfig` shape.)*
+      Add a fallible constructor (e.g. `MatchConfig::validated(self) ->
+      Result<Self, MatchError>`) rejecting negative/NaN/infinite weights
+      and an out-of-`[0.0, 1.0]` threshold, keeping the plain struct
+      literal working for the common case. **Acceptance:** a proptest
+      over adversarial weight vectors pins that `weighted_average`'s
+      output stays bounded for a *validated* config and that the
+      fallible constructor rejects the malformed ones.
+
+- [ ] **CPM-T2 (S) Fuzz/property/bench coverage for the
+      `relationships`/`tags` components.** Landed 2026-08-28 (both
+      `[x]` above) but exercised only by the hand-written unit tests in
+      `src/matcher.rs` — the property suite, the `cargo-fuzz` harness,
+      and the Criterion bench never touch either field. *(Verified:
+      `grep -n "relationships\|tags" fuzz/fuzz_targets/*.rs
+      tests/property_tests.rs benches/match_pair.rs` returns no hits
+      in any of the three.)* Extend `tests/property_tests.rs`'s
+      arbitrary-`CarePathway` strategy to generate `relationships`/
+      `tags`, add a case to `fuzz/fuzz_targets/match_care_pathways.rs`,
+      and add a `benches/match_pair.rs` group so a perf regression on
+      either component is visible. **Acceptance:** the never-panic/
+      bounded-score properties hold with populated `relationships`/
+      `tags`; `cargo +nightly fuzz run match_care_pathways` (short
+      smoke) runs clean with the new field paths reachable; `cargo
+      bench --no-run` compiles the new group.
+
+- [ ] **CPM-T3 (S) Bound array cardinality inside the library itself.**
+      `condition_codes`, `interventions`, `keywords`, `tags`,
+      `relationships`, `identifiers`, and `same_as` are all
+      unbounded `Vec`s scored by O(n·m) Jaccard/identifier loops in
+      `src/matcher.rs`, with no length cap anywhere in this crate — the
+      family's SEC-M1 fix for this exact DoS class
+      (`agents/share/security.md` §2, §3 invariant 3: "Bound every
+      input... Unbounded fan-out into O(n·m) scoring is a DoS") lives
+      only in the *service*'s `src/validation.rs`, which this
+      standalone, dependency-light library (its own README/AGENTS.md
+      selling point: "usable standalone") never requires a caller to go
+      through. *(Verified: `grep -n "MAX_\|cap\|limit"
+      src/matcher.rs src/scoring.rs src/care_pathway.rs` returns no
+      cardinality-bound hits.)* Add a documented, low-cost cap (e.g. a
+      `MAX_ARRAY_LEN` const consistent with the service's own SEC-M1
+      value) enforced inside the scoring functions themselves —
+      truncating or short-circuiting to a bounded cost rather than
+      erroring, so the pure/no-IO/never-panic contract (§24) is
+      preserved. **Acceptance:** a proptest asserts wall-clock cost is
+      bounded independent of input array length (mirrors the family's
+      SEC-M8 "bound the report, not just the work" precedent); existing
+      unit/integration tests unaffected for arrays under the cap.
 
 ## 24. Testing strategy
 

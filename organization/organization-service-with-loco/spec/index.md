@@ -969,6 +969,88 @@ organization is not a data subject.
   otlp_export --test otlp_middleware` 4/4 (real protobuf crossing a
   real in-process gRPC socket).
 
+- [ ] **ORG-T1 (S) Persist `score_breakdown` on stored review-queue rows.**
+  `controllers/organizations.rs::review_row_to_item` hard-codes
+  `score_breakdown: None` when mapping a stored `review_queue` row to
+  the wire `ReviewQueueItem`, even though the column exists in
+  `models/review_queue.rs` and IS written on insert
+  (`deduplicate`/`check_duplicates`'s persist path). The front-end's
+  FE-4 completion papered over this by calling `POST
+  /api/organizations/match` a second time against the loaded pair for a
+  live breakdown — a real workaround for a real gap, not a design
+  choice. *(Verified: `grep -n score_breakdown
+  src/controllers/organizations.rs` shows the field hard-coded `None` at
+  the `review_row_to_item` call site while `models/review_queue.rs`
+  both stores and reads it back.)* This is a three-part change (spec +
+  code + test) per the family discipline. **Acceptance:** `GET
+  /review-queue` returns the stored `score_breakdown` for a row that has
+  one; a DB-gated test scans, re-fetches the queue, and asserts the
+  breakdown round-trips without a second `/match` call.
+
+- [ ] **ORG-T2 (M) Extend the ABAC `mask` obligation to `list`, `search`,
+  `check-duplicates`, and `deduplicate`.** Only the single-record `GET
+  /{pid}` and `GET /{pid}/export` handlers call
+  `crate::auth::authorize_record`/honour the `mask` obligation; `list`,
+  `search`, `check_duplicates`, and `deduplicate` return the raw stored
+  record with no masking pass at all. This violates
+  `agents/share/security.md` invariant 5 ("masking on every read
+  path... list / search / check-duplicates... must never reveal more
+  than the equivalent single read") and is the same SEC-G3-shaped gap
+  the family tracks as partial for person. *(Verified:
+  `grep -n "async fn list\|async fn search\|async fn check_duplicates\|async fn deduplicate\|authorize_record"
+  src/controllers/organizations.rs` shows `authorize_record` called only
+  at the `GET /{pid}` (line 159) and export (line 218) sites.)* Three-part
+  change. **Acceptance:** a DB-gated test with a `mask`-obligation policy
+  proves a `list`/`search`/`check-duplicates` response redacts the same
+  fields `GET /{pid}/masked` does; `deduplicate` review-queue entries
+  likewise carry masked names/identifiers when the caller is
+  mask-obligated.
+
+- [ ] **ORG-T3 (M) Real-time duplicate check on create (`409`).**
+  `POST /api/organizations` has no duplicate short-circuit at all — the
+  handler validates and inserts unconditionally, leaving
+  `check-duplicates`/`deduplicate` as separate, opt-in calls a caller
+  can simply never make. This is already named in §15 Roadmap and §16
+  Open questions but has no closable §13 task with acceptance criteria.
+  *(Verified: `grep -n "StatusCode::CONFLICT\|409"
+  src/controllers/organizations.rs` returns no hits — no `create` path
+  ever returns `409`.)* Three-part change (spec — resolve the §16 open
+  question — + code + test), matching the family's real-time-create
+  duplicate-detect flow (`agents/share/dataflow.md`). **Acceptance:** a
+  DB-gated test creating a record that duplicates an existing one gets
+  `409` with candidate matches in the body; creating a genuinely new
+  record still succeeds; the existing `check-duplicates`/`deduplicate`
+  behaviour is unchanged.
+
+- [ ] **ORG-T4 (S) URL well-formedness + ISO 3166 country-code validation.**
+  `src/validation.rs` only length-bounds `url`, `address.country`, and
+  `same_as[i]` (`check_opt_text`/`string_array_caps`) — it never checks
+  they parse as a URL or a real ISO 3166-1 alpha-2/3 code. The crate's
+  own `[~]` task entry above already names this as deferred ("Still
+  open: URL well-formedness and country-code (ISO 3166) validation");
+  this promotes it to a closable item. *(Verified: `grep -n
+  "country\|url" src/validation.rs` shows only `check_opt_text`
+  length-only calls, no format check.)* Three-part change.
+  **Acceptance:** an `422` with a field-scoped reason for a malformed
+  `url` or an unrecognised `address.country`/`jurisdiction` code;
+  existing valid records are unaffected; unit tests for the new
+  validators plus a request-level `422` pin.
+
+- [ ] **ORG-T5 (S) Wire FHIR `GET /fhir/Organization` search onto the
+  Tantivy index.** The FHIR search handler
+  (`controllers/fhir.rs::search`) still runs a capped Postgres scan via
+  `OrganizationModel::list`, exactly as the Tantivy roll-out task above
+  already calls out ("Not wired to Tantivy: the FHIR `GET
+  /fhir/Organization` search... Moving it is a separate item, not a
+  side effect of this one"). *(Verified: `grep -n "async fn search"
+  src/controllers/fhir.rs` shows the handler calling the model list
+  path, not `crate::search::SearchEngine`.)* Three-part change.
+  **Acceptance:** `GET /fhir/Organization?name=` and `?address-city=`
+  resolve through the Tantivy engine (fuzzy/phonetic where the query
+  param allows it) instead of the scan cap; the `CapabilityStatement`'s
+  declared search params are unchanged; existing FHIR search tests stay
+  green plus a new test proving a hit beyond the old scan cap is found.
+
 ## 14. Implementation status
 
 Done: loco boot; organizations table + migration; CRUD (blank name →
