@@ -163,3 +163,62 @@
   throws a 303-to-`/signin` redirect when signed out, passes through
   silently when signed in).
 
+- [ ] T-27: **Assessment UI.** `worker-service-with-loco` exposes a full
+  assessments surface — `create_assessment` / `list_assessments` /
+  `get_assessment` / `update_assessment` / `delete_assessment` /
+  `assessment_profile` (`src/api/rest/assessments.rs`) over
+  `src/models/assessment.rs` / `src/db/assessments.rs` — recording
+  aptitude / personality / psychometric / selection assessments per
+  worker (per-scale results, score bands, validity, derived profile,
+  masked under ABAC), per `agents/share/overview.md`'s explicit worker
+  capability callout. This front-end has no surface for it at all: no
+  assessment types in `src/lib/api/types.ts`, no repository/client
+  module (`src/lib/api/workers.ts` has none), and no route anywhere
+  under `src/routes/` (verified: full-repo `grep -rn
+  "assessment|psychometric|aptitude|personality"` over `src/` returns
+  nothing). Add an assessments panel/route on `/workers/[id]`
+  (list + create + the derived profile view), gated by the same
+  masking/ABAC posture the detail page already applies to
+  identifiers/tax id.
+  - **Acceptance:** a new FR in `spec/06-functional-requirements.md`; a
+    route-stubbed Playwright smoke test asserting the panel lists
+    assessments and the derived profile renders; an i18n-parity
+    extension for the new keys across every locale.
+
+- [ ] T-28: **`/expiry` Playwright smoke coverage.** The credential-expiry
+  calendar is the only route in the route map with zero e2e coverage
+  (verified: `tests/e2e/workers.spec.ts` navigates `/`, `/workers`,
+  `/workers/new`, `/workers/match`, `/workers/[id]`, `/workers/merge`,
+  `/review`, but never `/expiry` — grep for `page.goto` across the
+  file). Add a smoke test stubbing `search()` with documents carrying
+  `expiry_date`, asserting the calendar renders
+  (`data-testid="expiry-calendar"`) and that selecting an event
+  navigates to `/workers/{id}`.
+  - **Acceptance:** the new Playwright test passes locally against the
+    route stub and is added to the standard `e2e` run.
+
+- [ ] T-29: **Expiry-calendar truncation indicator.** `/expiry`'s
+  `onMount` calls `repo.search({ q: "*", limit: 200 })` and only reads
+  `res.items`, discarding `res.total` even though
+  `WorkerRepository.search()` already returns `{ items, total }`
+  (verified: `src/lib/api/workers.ts` lines 82-100). When more than 200
+  workers carry documents, the calendar silently shows a partial
+  window with no signal to the operator — the code comment even names
+  this ("a window, not a promise of completeness") but nothing in the
+  UI says so. Surface `res.total` (e.g. "showing up to 200 of N
+  workers") when it exceeds the fetched count.
+  - **Acceptance:** a component/unit test pins that the truncation
+    notice appears when `total > items.length` and is absent otherwise.
+
+- [ ] T-30: **Test coverage for the phonetic search toggle.** `/workers`
+  offers a `phonetic` checkbox alongside `fuzzy`
+  (`src/routes/workers/+page.svelte`), and `SearchOptions.phonetic` is
+  wired all the way to the query string
+  (`src/lib/api/workers.ts:93`) — but unlike `fuzzy`, which is pinned
+  in `tests/unit/client.test.ts` (asserts `fuzzy=true` on the wire),
+  `phonetic` has zero coverage anywhere (verified: `grep -n
+  "phonetic" tests/unit/*.test.ts` returns nothing). Add a unit test
+  pinning `phonetic=true` reaches the API exactly as `fuzzy` does.
+  - **Acceptance:** the new assertion is added to `tests/unit/client.test.ts`
+    (or the equivalent repository test file) and passes.
+

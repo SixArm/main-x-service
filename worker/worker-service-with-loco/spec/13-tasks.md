@@ -571,3 +571,107 @@ clearly described manual check confirms the acceptance criterion.
     green on a bare `cargo test --lib`; clippy clean. The same seam and
     tests landed in all six `*-service-with-loco` crates that carry a
     `Config`, so the family is uniform.
+
+- [ ] **T-16 — Remove dead `FluvioProducer`/`FluvioConsumer` stub types.**
+  `src/streaming/producer.rs::FluvioProducer` and
+  `src/streaming/consumer.rs::FluvioConsumer` both `todo!()` on every
+  method and have zero callers anywhere in the crate (verified:
+  `grep -rn "FluvioProducer\|FluvioConsumer" --include="*.rs" .` matches
+  only their own definition/doc-comment lines) — leftover `EventProducer`/
+  `EventConsumer`-trait scaffolding from before the Phase-3 outbox relay
+  (`src/relay.rs::FluvioSink`, T-2) superseded this shape entirely. Same
+  situation as the dead `WorkerRepository::search` SQL method removed in
+  0.6.0 (QA-CUST-SQL): a plausible-looking, unexercised stub reachable
+  from library code. Remove both types (and the now-pointless
+  `EventConsumer` trait/module if `FluvioConsumer` was its only
+  implementor).
+  - **Acceptance:** `grep -rn "FluvioProducer\|FluvioConsumer" src/ tests/`
+    returns nothing; `cargo test --lib` and
+    `cargo clippy --all-targets -- -D warnings` stay clean.
+
+- [ ] **T-17 — `ProbabilisticMatcher::threshold()` ignores the configured `MATCHING_THRESHOLD`.**
+  `ProbabilisticMatcher::threshold()` (`src/matching/mod.rs:203-210`) is a
+  public `#[must_use]` accessor that returns a hardcoded literal `0.85`
+  regardless of the `MatchingConfig` the matcher was built with (verified:
+  its own doc comment admits "hard-coded ... tracked as a TODO"), while the
+  trait's real `is_match`/`classify_match` path correctly delegates to
+  `ProbabilisticScorer::is_match`, which reads `self.config.threshold_score`
+  (verified: `src/matching/scoring.rs:156-159`) — the value `Config::from_env`
+  (T-15) actually loads from `MATCHING_THRESHOLD`. No caller of `.threshold()`
+  exists today (verified: `grep -rn '\.threshold()' src/` — zero hits), so the
+  divergence is latent, not yet a live bug, but the method's answer is wrong
+  the moment anything calls it or `MATCHING_THRESHOLD` is set to a non-default
+  value.
+  - [ ] Expose the scorer's real configured `threshold_score` (an accessor on
+    `ProbabilisticScorer`) instead of the duplicated literal.
+  - **Acceptance:** a unit test builds a `ProbabilisticMatcher` from a
+    `MatchingConfig{threshold_score: 0.42, ...}` and asserts
+    `matcher.threshold() == 0.42`; `cargo test --lib` green; clippy clean.
+
+- [ ] **T-18 — DB-gated round-trip test for the review-queue persistence module.**
+  `src/db/review_queue.rs` (228 lines: normalized-pair upsert / list /
+  first-writer-wins decide, added under the 2026-07-19 "Stored review
+  queue" task) carries no `#[test]`/`mod tests` of its own (verified:
+  `grep -n '#\[test\]\|mod tests' src/db/review_queue.rs` — no matches),
+  and this crate's `tests/` directory has no `review_queue_db.rs`
+  (verified: `find tests -name '*.rs'` lists `api_integration_test.rs`,
+  `duplicate_detection.rs`, `enforcement.rs`, `fluvio_relay.rs`,
+  `gender_normalization_db.rs`, `grpc_integration_test.rs`, `otlp_*` — no
+  review-queue file) — unlike what the 2026-07-19 task's acceptance note
+  leans on ("the person crate's env-gated DB round-trip … the module is
+  byte-identical family-wide"). "Byte-identical to a tested module
+  elsewhere" is not "tested here": a worker-specific migration drift
+  would go undetected by this crate's own suite.
+  - **Acceptance:** a new `#[ignore]`d, `DATABASE_URL`-gated
+    `tests/review_queue_db.rs` inserts a pair, upserts a re-scan (score
+    refreshed, decision preserved), lists pending rows, and exercises the
+    first-writer-wins decision path against a real migrated Postgres;
+    green under `scripts/ci-check.sh test-db
+    worker/worker-service-with-loco`.
+
+- [ ] **T-19 — FHIR Practitioner round-trip fidelity: parse the fields `from_fhir_worker` still drops.**
+  T-12 (done) mounted `/fhir/Practitioner`, but five `TODO`s remain in the
+  FHIR→domain direction (verified: `grep -n TODO src/api/fhir/mod.rs` —
+  lines 301, 409, 420, 421, 423): identifiers always decode to
+  `IdentifierType::Other` regardless of the FHIR `Identifier.system`, and
+  `additional_names`, `marital_status`, `multiple_birth`, and
+  `managing_organization` are silently dropped on `POST`/`PUT
+  /fhir/Practitioner` even though `to_fhir` emits them going out — so a
+  client that reads a `Practitioner`, edits an unrelated field, and writes
+  it back loses that data. No open task tracks closing these (T-3's open
+  item is `Bundle` typed-struct promotion + Touchstone validation, a
+  different surface).
+  - [ ] Map `Identifier.system` back to the domain `IdentifierType` enum
+    via its existing serde vocabulary instead of defaulting to `Other`.
+  - [ ] Parse `additional_names`, `marital_status`, `multiple_birth`, and
+    a `managing_organization` reference back from the resource.
+  - **Acceptance:** a round-trip unit test in `src/api/fhir/mod.rs` —
+    `to_fhir` a `Worker` carrying two-plus `IdentifierType` variants,
+    `additional_names`, `marital_status`, and `multiple_birth`, then
+    `from_fhir_worker` the result, and assert the values survive instead
+    of degrading to `Other`/`None`/`vec![]`; `cargo test --lib` green.
+
+- [ ] **T-20 — gRPC surface: close the T-6 documented parity gaps.**
+  T-6 (landed 2026-09-02) explicitly documents three REST-vs-gRPC gaps as
+  "not silently missing" but none is a queued, checkable task item
+  (verified: neither `spec/13-tasks.md`'s T-6 block nor `AGENTS.md`'s
+  "gRPC server" section lists them as their own acceptance-bearing
+  bullets — only prose): (1) no `UpdateWorker` RPC exists at all; (2) the
+  HIPAA §164.528 disclosure-accounting audit row REST writes on every
+  `GET /api/workers/{id}` is not written by `WorkerGrpcService::GetWorker`;
+  (3) `ListWorkers` applies only the blanket `Read` ABAC check, not REST's
+  per-record read-visibility filtering. (2) and (3) are compliance-relevant
+  divergences between two API surfaces over the same data — invariant 5
+  (`agents/share/security.md` §3, "masking/authorization must hold on every
+  read path") reads as squarely in scope.
+  - [ ] Add an `UpdateWorker` RPC delegating to the same path
+    `handlers::update_worker` uses.
+  - [ ] Wire the disclosure-accounting audit write into `GetWorker`.
+  - [ ] Apply `ListWorkers`' REST counterpart's per-record read-visibility
+    filter to the gRPC path.
+  - **Acceptance:** `tests/grpc_integration_test.rs` gains an
+    `UpdateWorker` round trip (Create→Update→Get shows the change), a
+    disclosure-audit-row-written assertion on `GetWorker`, and a
+    `ListWorkers` test proving a record an ABAC policy would filter from
+    REST's list is excluded from gRPC's too; green against a real Postgres
+    (`scripts/ci-check.sh test-db worker/worker-service-with-loco`).

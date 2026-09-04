@@ -108,3 +108,72 @@
   new/changed files.
 - [x] T-22 (2026-08-28, PRO-H5): Auth — adopt BFF + httpOnly cookie + CSRF (per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)). **BFF + httpOnly cookie + PASETO exchange are implemented**: `/signin` (magic-link request) and `/verify` (consumes the link, sets `__Host-mxi_session`, httpOnly/Secure/`SameSite=Lax`) at `src/routes/{signin,verify}/`; `src/hooks.server.ts` reads the cookie into `locals.sessionId`; `src/routes/api/proxy/[...path]/+server.ts` is the reverse proxy that drops the browser's cookie, exchanges the session for a short-lived PASETO (`src/lib/server/auth.ts`), and forwards with `Authorization: Bearer …`. No `mxi_access_token`/`localStorage` bearer, no fragment handoff — the browser never holds a token. **CSRF closed**: `/verify` additionally sets a second, **non-httpOnly**, Secure, `SameSite=Lax` cookie `__Host-mxi_csrf` (`generateCsrfToken()`/`CSRF_COOKIE`/`CSRF_COOKIE_OPTIONS`, `src/lib/server/session.ts`); `ApiClient` (`src/lib/api/client.ts`) reads it from `document.cookie` when running in the browser and echoes it as `X-CSRF-Token` on every non-GET/HEAD request; the proxy verifies the header matches the cookie (`verifyCsrf`, constant-value equality — both sides are BFF-issued, so no timing-safe compare is needed) and additionally rejects a present-but-mismatched `Origin`/`Referer`, returning `403 {"error":"csrf"}` **without forwarding upstream** on either failure. Sign-out (root `+page.server.ts`'s `signout` action) clears both cookies. Tests: `tests/unit/session.test.ts` (10, `verifyCsrf`/`generateCsrfToken`/cookie-option pins), `tests/unit/proxy.test.ts` (7, the route handler exercised directly — GET always passes, missing/mismatched token 403s, Origin/Referer backstop), `tests/unit/client.test.ts` (+3, the browser header-attach path via jsdom's real `document.cookie`, which required pointing `vite.config.ts`'s jsdom `testURL` at `https://` since a `__Host-`-prefixed cookie only sets over a secure origin).
 
+- [ ] T-28: Backfill spec + test coverage for the `/expiry` identity-document
+  expiry calendar route (SVAR Calendar, month view, read-only) — it ships
+  and is listed in `spec/05-information-architecture.md` line 15, but has
+  no functional requirement in `spec/06-functional-requirements.md`, no
+  prior `§13` task, and zero Playwright coverage: `tests/e2e/persons.spec.ts`
+  never references `/expiry` or `data-testid="expiry-calendar"`, and the
+  only i18n reference is the bare key existence check in `i18n.test.ts`
+  line 189 (verified: grepped both test files, neither exists; same
+  undocumented-shipped-feature pattern T-18/T-25 already found once for
+  `/review`).
+  - **Acceptance:** a new FR in `spec/06-functional-requirements.md`; a
+    Playwright smoke test stubbing `PersonRepository.search()` and
+    asserting the calendar renders expiring documents and that selecting
+    an event navigates to `/persons/[id]`; a loading/error-state test for
+    the `onMount` fetch failure path.
+
+- [ ] T-29: Session-expiry UX on a proxied `401`/`403` — closes OQ-3(b).
+  `src/routes/api/proxy/[...path]/+server.ts` only ever relays the
+  upstream status and body verbatim (verified: read the full handler —
+  no branch inspects `upstream.status` before constructing the
+  `Response`), so an expired session or a stale PASETO surfaces to the
+  operator as a raw JSON error inline in whatever form/list happened to
+  be open, not a redirect to `/signin` or a "your session expired, sign
+  in again" banner. Add a client-side response interceptor in
+  `ApiClient` (`src/lib/api/client.ts`) that redirects to `/signin` on a
+  `401` from the proxy, and surfaces a distinct banner for a `403` (which
+  can also mean CSRF rejection, not just an expired session).
+  - **Acceptance:** `tests/unit/client.test.ts` pins the interceptor
+    (401 triggers navigation, 403 does not); a Playwright smoke test
+    stubs a 401 from the proxy on a guarded page and asserts the
+    redirect.
+
+- [ ] T-30: Extend `tests/integration/golden-paths.spec.ts` to cover the
+  cross-service links panel (T-23) and the duplicate review-queue
+  decide flow (T-25) against a live service, not just route-stubbed
+  smoke tests. The live-integration suite's own FR coverage table
+  still lists only FR-1/3/5/6/7/8/9/10 (verified: grepped `test(` and
+  `FR-` in the file) — every feature shipped since T-12a landed (links
+  panel, bulk import/export, review queue, masked view, GDPR export)
+  has smoke-level coverage only, stubbed against fixture responses
+  rather than exercised against the real service's `entity_links`/
+  `review_queue` tables. Links and review-decide are the two most
+  identity-integrity-critical of that set (per
+  `agents/share/cross-service-linking.md` and
+  `agents/share/match-search-merge.md`), so they are the right two to
+  close first.
+  - **Acceptance:** two new `integration` tests — create a
+    `same_identity`/`works_at` link via the panel and assert it appears
+    on reload; confirm a review-queue item end-to-end (seed a
+    near-duplicate pair, decide via the panel, assert the queue item's
+    status flips and the merge deep-link is seeded correctly) — both run
+    via `bin/e2e` against a live `person-service-with-loco`.
+
+- [ ] T-31: Audit log has a hard, silent 100-entry cap with no way to see
+  older history. `src/routes/persons/[id]/audit/+page.svelte` calls
+  `repo.audit(id, 100)` on mount and never offers a "load more" /
+  pagination control (verified: read the full component — one `onMount`
+  fetch, no offset state, no second request path), so a person with a
+  long edit history silently loses its oldest audit entries from view
+  with no indication more exist. `PersonRepository.audit()`
+  (`src/lib/api/persons.ts` line 274) already accepts a `limit`
+  parameter the service's audit endpoint presumably also accepts an
+  offset/cursor for — confirm against
+  `person-service-with-loco/agents/models.md` and add paging.
+  - **Acceptance:** `tests/unit/persons.test.ts` pins the paged request
+    shape; the audit page gains a "load more" control tested by a
+    Playwright smoke test asserting a second page of stubbed entries
+    appends rather than replaces the first.
+

@@ -1015,3 +1015,104 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     `matching::scoring` tests already cover `threshold_score` behaviour
     via `is_match`/`classify_match`, unaffected by this change since it
     only removes a duplicate hardcoded literal).
+
+- [ ] **T-33 (S) — Remove the dead `FluvioProducer`/`FluvioConsumer` stubs superseded by the outbox relay.**
+  `src/streaming/producer.rs`'s `FluvioProducer` and
+  `src/streaming/consumer.rs`'s `FluvioConsumer` are `EventProducer`/
+  `EventConsumer` trait impls whose every method is `todo!("Implement
+  Fluvio …")` — they panic if ever invoked (verified:
+  `grep -rn "todo!\|FIXME" src/` shows both files, and
+  `grep -rn "FluvioProducer\|FluvioConsumer" src/ tests/` finds zero
+  construction sites anywhere in the crate — dead code). The real
+  production Fluvio path already exists and is live: `src/relay.rs`'s
+  `FluvioSink : EventSink` (BUS-3, feature-gated `fluvio`, `spawn()`
+  selects it over `LoggingSink`). Leaving the old stubs in place invites
+  a future contributor to "finish" the wrong seam. Delete
+  `FluvioProducer`/`FluvioConsumer` (and `EventConsumer` if nothing else
+  implements it) or, if the trait seam is still wanted for a future
+  non-outbox transport, replace the `todo!()` bodies with a clear
+  `Error::Unsupported`/doc comment pointing at `relay::FluvioSink` as
+  the actual production path.
+  - **Acceptance:** `cargo build --lib` / `cargo clippy --all-targets --
+    -D warnings` clean; `grep -rn "todo!" src/` returns nothing under
+    `src/streaming/`; a doc comment or the file's removal makes clear
+    `relay::FluvioSink` is the real broker sink.
+
+- [ ] **T-34 (M) — FHIR reads honour ABAC masking obligations (currently unmasked).**
+  `src/api/rest/handlers.rs` calls `authorize_record` on every
+  single-record read/write path (verified: `grep -n authorize_record
+  src/api/rest/handlers.rs` hits lines 329/424/490/1962), and the gRPC
+  `GetPerson` does the same (per `CHANGELOG.md`'s T-6 entry). `src/api/
+  fhir/handlers.rs` has **zero** hits for `authorize_record` or
+  `mask_person` (verified: `grep -n "authorize_record\|mask_person"
+  src/api/fhir/handlers.rs` returns nothing) — `GET /fhir/Patient/{id}`
+  and `GET /fhir/Person/{id}` always return the full, unmasked resource
+  regardless of the caller's ABAC decision, a documented but untracked
+  gap from T-11 ("PHI masked-read is not yet driven by ABAC masking
+  obligations… deferred"). This is the exact class `security.md`
+  invariant #5 (masking on every read path) calls out. Wire
+  `auth::authorize_record`/`Decision::requires("mask")` into the FHIR
+  `Patient`/`Person` GET handlers, honouring `mask` by returning the
+  masked-projection resource, mirroring `handlers::get_person`'s pattern.
+  - **Acceptance:** a DB-gated integration test proves a `mask`-obligated
+    caller gets a redacted FHIR resource on `GET /fhir/Patient/{id}` and
+    `GET /fhir/Person/{id}` (parity with the REST masked-view test); a
+    denied caller gets `FhirOperationOutcome` `403`, not `200` full data.
+
+- [ ] **T-35 (M) — `UpdatePerson` gRPC RPC (currently REST-only for updates).**
+  `proto/person.proto` defines only `CreatePerson` / `GetPerson` /
+  `ListPersons` / `DeletePerson` (verified: `grep -n "rpc " proto/
+  person.proto` shows exactly those four); there is no `UpdatePerson`
+  RPC, so a gRPC-only client cannot modify an existing record —
+  documented in `src/api/grpc/service.rs`'s own module docs and this
+  file's T-6 entry as deliberate-but-deferred, never tracked as its own
+  actionable item. Add `UpdatePerson(UpdatePersonRequest) returns
+  (Person)` delegating to the same `validation::validate_person` +
+  `PersonRepository::update` + `auth::authorize_record(Action::Write,
+  …)` path `handlers::update_person` already uses, matching the
+  no-duplicated-business-logic rule the other four RPCs already follow.
+  - **Acceptance:** `tests/grpc_integration_test.rs` gains an
+    Update→Get round trip proving a field change persists and is visible
+    over both gRPC and REST; a blank-family-name update ⇒
+    `INVALID_ARGUMENT`, matching `CreatePerson`'s existing validation proof.
+
+- [ ] **T-36 (S) — HIPAA §164.528 disclosure-accounting audit row on the gRPC `GetPerson` read path.**
+  REST's `get_person` writes a disclosure-accounting audit row on every
+  read (per `agents/restful.md`'s `/api/persons/{id}/audit/disclosures`
+  endpoint and `compliance-for-healthcare.md` §2.1's §164.528
+  obligation); the gRPC `GetPerson` explicitly does **not** — confirmed
+  by `src/api/grpc/service.rs`'s own doc comment ("**not** yet write the
+  HIPAA §164.528 disclosure-accounting row") and by `grep -n
+  "disclosure\|AccessContext" src/api/grpc/service.rs` finding only the
+  comment, no implementation. This is a real compliance gap, not
+  cosmetic: a PHI read served over gRPC is invisible to
+  `GET /api/persons/{id}/audit/disclosures`. Build the gRPC-side
+  `AccessContext` equivalent (client IP/user-agent arrive via gRPC
+  connection metadata rather than an Axum extractor — the crate's own
+  docs flag this as the reason it was deferred) and call the same
+  disclosure-logging path REST's `get_person` uses.
+  - **Acceptance:** a DB-gated test drives `GetPerson` over gRPC and then
+    asserts the person's disclosure-accounting audit trail
+    (`/api/persons/{id}/audit/disclosures` or its repository-layer
+    equivalent) recorded the read, matching the existing REST-path
+    regression test's shape.
+
+- [ ] **T-37 (S) — SEC-G3 per-record read-visibility filtering/masking on the gRPC `ListPersons` RPC.**
+  REST's `search_persons` runs `auth::read_visibility` per hit so a
+  denied record is omitted and a `mask`-obligated one is redacted
+  (SEC-G3, closed for REST/search). The gRPC `ListPersons` applies only
+  the blanket `Read` check with no per-record filtering — confirmed by
+  `grep -n "search_result_disposition\|read_visibility"
+  src/api/grpc/service.rs` returning nothing, and documented in this
+  file's T-6 entry ("`ListPersons` applies only the blanket `Read`
+  check, not REST's SEC-G3 per-record read-visibility
+  filtering/masking"). Under an ABAC policy denying some records but
+  not others, `ListPersons` over-discloses relative to the equivalent
+  REST `GET /api/persons/search` — the exact violation
+  `security.md` invariant #5 exists to prevent, just not yet closed on
+  this surface. Reuse the same pure `search_result_disposition` REST's
+  search path already calls, per hit, in `list_persons`.
+  - **Acceptance:** a DB-gated test sets a policy that denies/masks
+    specific records and asserts `ListPersons` over gRPC omits/redacts
+    exactly as `GET /api/persons/search` does for the same caller and
+    dataset (a parity test against the existing SEC-G3 REST test).
