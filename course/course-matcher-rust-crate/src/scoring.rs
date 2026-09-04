@@ -118,7 +118,14 @@ pub struct MatchBreakdown {
 ///
 /// The renormalised weighted average in `[0.0, 1.0]`, or `0.0` when no
 /// component is present (every entry is `None`, so the divisor would be
-/// zero).
+/// zero) — **provided every present component's `weight` is
+/// non-negative.** [`MatchConfig`](crate::MatchConfig)'s weight fields
+/// are `pub` and intentionally unvalidated (spec §22: "Setting weights
+/// to negative — not validated today, caller contract"), so a caller
+/// that sets a negative weight can push this outside `[0.0, 1.0]` —
+/// see `weighted_average_negative_weight_breaks_the_unit_interval_bound`
+/// below, which pins this as the documented consequence of that caller
+/// contract rather than a bug in this function.
 #[must_use]
 pub fn weighted_average(components: &[(Option<f64>, f64)]) -> f64 {
     let mut weighted_sum = 0.0_f64;
@@ -203,6 +210,27 @@ mod tests {
     fn weighted_average_all_none_is_zero() {
         let score = weighted_average(&[(None, 0.35), (None, 0.15)]);
         assert!(score.abs() < 1e-9);
+    }
+
+    // spec §22 anti-patterns / §23 T-13: a negative `MatchConfig` weight
+    // is documented as "not validated today — caller contract", and this
+    // pins the documented consequence rather than leaving it implicit.
+    // `MatchConfig`'s weight fields are `pub`, so this is reachable from
+    // a real caller, not merely an internal edge case: name @ 1.0 with
+    // weight 1.0, provider @ 0.0 with weight -0.5 renormalises to
+    // (1.0*1.0 + 0.0*-0.5) / (1.0 + -0.5) = 1.0/0.5 = 2.0, outside the
+    // function's normal [0.0, 1.0] guarantee. A future change that adds
+    // validation to `MatchConfig` (making this test start failing) would
+    // be a deliberate, documented behaviour change — not this test
+    // regressing silently.
+    #[test]
+    fn weighted_average_negative_weight_breaks_the_unit_interval_bound() {
+        let score = weighted_average(&[(Some(1.0), 1.0), (Some(0.0), -0.5)]);
+        assert!((score - 2.0).abs() < 1e-9, "got {score}");
+        assert!(
+            !(0.0..=1.0).contains(&score),
+            "expected this negative-weight case to fall outside [0.0, 1.0]; got {score}"
+        );
     }
 
     // Pins the neutral default: zero score, non-match, Low, no

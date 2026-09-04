@@ -9,6 +9,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Documented — negative-weight consequence made explicit (T-13)
+
+- `spec §22`'s "setting weights to negative — not validated today,
+  caller contract" anti-pattern had an unstated consequence:
+  `scoring::weighted_average`'s `[0.0, 1.0]` return guarantee assumes
+  every present component's weight is non-negative, and a negative
+  `MatchConfig` weight (its fields are `pub` and unvalidated) can push
+  the renormalised score outside that range — confirmed:
+  `weighted_average(&[(Some(0.0), 1.0), (Some(1.0), -0.5)])` returns
+  `-1.0`. `weighted_average`'s doc comment and spec §22 now state this
+  explicitly, and a new regression test,
+  `weighted_average_negative_weight_breaks_the_unit_interval_bound`
+  (`src/scoring.rs`), pins it — so a future change to `MatchConfig`
+  validation is a deliberate decision against a documented contract,
+  not a silent behaviour change. No behaviour change here: this is the
+  crate's existing, deliberate caller-contract stance made explicit,
+  not a new validation.
+
 ### Changed
 - MSRV raised to Rust 1.96 (N-2 policy tightened from N-3; see spec/rust-msrv-n-minus-2/index.md).
 
