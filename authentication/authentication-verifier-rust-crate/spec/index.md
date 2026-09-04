@@ -434,6 +434,86 @@ attribute values, so it is safe for 403 bodies and audit trails.
 - [ ] Refetch-on-`UnknownKid` helper (or document the pattern per
       entity spec §13 T-5 key rotation).
 - [ ] Property-test the PASETO-keys parser against fuzzed documents.
+- [ ] **AV-1 (S) Exercise the `fetch` feature in CI.** *(verified:
+      `default = []` and `fetch = ["dep:reqwest"]` in `Cargo.toml`;
+      `scripts/ci-check.sh`'s `test` stage runs plain `cargo test` with
+      no `--features` flag for every crate, confirmed by grepping it
+      for `cargo test`/`features`)* — every `#[cfg(feature = "fetch")]`
+      item in `src/lib.rs` (`from_paseto_keys_url` itself, and the
+      SEC-V1 HTTPS-only / timeout / no-redirect / 64 KiB body-cap tests
+      at lines ~1016/1151/1173) is **never compiled, let alone run, by
+      this repo's own CI** — the same class of gap
+      [`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md)
+      §11 step 4 documents for person's `parquet` feature ("does this
+      crate's CI even build its optional features"). Add a
+      `test-fetch` (or similar) stage/step that runs
+      `cargo test --features fetch` for this crate specifically (either
+      in `scripts/ci-check.sh` as a crate-specific override, or as a
+      dedicated CI job), and note the gap's closure in `CHANGELOG.md`.
+      **Acceptance:** a CI run (or a documented local
+      `cargo test --features fetch`) actually compiles and passes the
+      `fetch`-gated tests; `AGENTS.md`/`README.md` note how to run it.
+
+- [ ] **AV-2 (S) Cut a dated release for the accumulated `[Unreleased]`
+      changes.** *(verified: `CHANGELOG.md`'s `[Unreleased]` section
+      lists the MSRV 1.96 bump and the Criterion `benches/
+      verify_and_authorize.rs` addition, both undated; `Cargo.toml`
+      still reads `version = "0.9.0"`, the same version §14 says
+      shipped 2026-08-05 — i.e. two real changes have landed since the
+      last release with no version bump)*. Per the family's "cargo
+      publish authorized" convention for already-published crates once
+      verified green, bump `Cargo.toml` to the next `0.10.0` (the
+      bench addition is new public-facing capability, not just a patch)
+      or `0.9.1`, move the `[Unreleased]` entries under a dated
+      heading, and publish. Update spec §13/§14 to record the release.
+      **Acceptance:** `cargo test`, `cargo clippy --all-targets -- -D
+      warnings`, `cargo fmt --check` all green; `CHANGELOG.md` has no
+      stale `[Unreleased]` content; `cargo publish --dry-run` succeeds.
+
+- [ ] **AV-3 (S) Reconcile §16's stale version-bump open question.**
+      *(verified: §16 currently reads "Version-bump for the unreleased
+      hardening — the next release needs a number that doesn't
+      collide with … `[0.8.0]` … (Lean: `0.9.0`, decided alongside the
+      crates.io publish call, both explicitly deferred by H-5)", but
+      §13/§14 of this same document already record that decision as
+      made and shipped: "v0.9.0 shipped (2026-08-05)")*. The open
+      question and the implementation-status section directly
+      contradict each other, which is exactly the drift the SDD
+      discipline in
+      [`agents/share/index.md`](../../../agents/share/index.md) exists
+      to prevent. Move the resolved entry to a `~~struck~~ — RESOLVED`
+      form (matching this doc's own convention elsewhere, e.g. the
+      "PASETO library choice" entry two lines below it) or delete it,
+      whichever the current unreleased-changes state (AV-2) leaves
+      accurate.
+      **Acceptance:** §16 no longer asserts an unresolved version-bump
+      decision that §13/§14 show as already made.
+
+- [ ] **AV-4 (M) Resolve the Axum-extractor open question with real
+      duplication data.** §16 asks "Should the crate offer an Axum
+      extractor, or stay framework-free and let each service wrap it?
+      (Currently framework-free.)" *(verified:
+      `grep -rl "struct AuthUser" --include="*.rs" .` from the repo
+      root, excluding `target/`, finds the same `FromRequestParts`-based
+      `AuthUser` extractor hand-duplicated in 15 sibling crates —
+      organization, care-pathway, workforce-planning-management,
+      course, project-portfolio-management, person, patient-flow,
+      thing, contact-relationship-management, case,
+      content-management-system, worker, place, event, and this
+      family's own authentication-service)*. Survey 2–3 of those
+      implementations for how much is genuinely copy-identical
+      boilerplate (parse `Authorization: Bearer …`, call
+      `Verifier::verify`, map `VerifyError` → `401`) versus
+      crate-specific (loco `AppContext` vs `axum::extract::State`,
+      differing error bodies), then either (a) ship an optional `axum`
+      Cargo feature on this crate providing a generic
+      `BearerClaims<V: AsRef<Verifier>>` extractor peers can adopt on
+      next touch, or (b) close the open question explicitly as "stay
+      framework-free" with the survey's reasoning recorded in §16.
+      Either outcome is a spec (§5/§16) + code (if (a)) + test change.
+      **Acceptance:** §16's open question is replaced by a recorded
+      decision; if (a), the new extractor has offline unit tests and a
+      documented adoption note for peers.
 
 ### Done (RS256-JWT era, superseded by the PASETO pivot)
 

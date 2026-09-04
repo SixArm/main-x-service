@@ -452,6 +452,94 @@ session on sign-out and the BFF clears the cookie. CSRF protection (§6 FR
       BFF/cookie migration — no token lives in the browser at all
       (`authentication-sessions.md` §3, §6); see the BFF task above.
 
+- [ ] **AFE-1 (S) Extend the PRO-H10 page-visit guard to
+      `/admin/attributes`.** Repo `tasks.md` PRO-H10 (2026-08-29,
+      DONE) decided the family's page-visit posture — guard only pages
+      whose entire purpose is a mutation, redirect to `/signin` via a
+      `requireSignedIn(locals)` helper — and rolled it to
+      person/worker/thing/event/course. *(verified:
+      `grep -rn "requireSignedIn" src/` in this crate returns nothing;
+      `src/routes/admin/attributes/+page.server.ts`'s `load` instead
+      returns `{ pid, target: null, error: "Sign in as an admin to
+      manage attributes." }` in-page, and its `save` action separately
+      does an ad-hoc `if (!locals.sessionId) return fail(401, …)` —
+      neither redirects)*. `/admin/attributes` is exactly the
+      mutation-page shape PRO-H10 targets (its whole purpose is
+      submitting a `PUT`), so it should follow the same pattern as the
+      five reference crates rather than its own bespoke in-page error.
+      Spec + code + test: add `requireSignedIn` to
+      `src/lib/server/session.ts` (or import the pattern), guard the
+      `load`, keep the `save` action's existing `401` (form actions
+      don't redirect on POST failure the same way), add a unit test.
+      **Acceptance:** an anonymous visit to `/admin/attributes` (any
+      `?pid=`) redirects to `/signin`; `pnpm test` green.
+
+- [ ] **AFE-2 (M) No UI for the GDPR account-export / erasure rights
+      the backend already implements.** The auth service exposes
+      `GET /api/auth/account/export` (subject data export),
+      `GET /api/auth/account/audit` (subject's own audit trail), and
+      `DELETE /api/auth/account` (erasure) — see
+      `authentication-service-with-loco/AGENTS.md`'s API-surface table.
+      *(verified: this crate's `src/lib/server/auth.ts` exports only
+      `verifyMagicLink`/`requestMagicLink`/`signup`/`exchangeToken`/
+      `currentUser`/`signout` — no export/audit/erasure call; the
+      dashboard `src/routes/+page.svelte` shows name/email/id and a
+      sign-out button only, no "download my data" or "delete my
+      account" control)*. This is the operator-facing UI for the one
+      service in the family whose entire job is a data subject's own
+      account, and it offers no way to exercise either right without
+      calling the API directly. Add `exportAccount`/`accountAudit`/
+      `eraseAccount` to `src/lib/server/auth.ts` (mirroring the
+      existing bearer-exchange pattern `admin.ts` uses), a dashboard
+      section or `/account/export`+`/account/delete` routes, and a
+      confirm-before-erase step (erasure is destructive and
+      irreversible per the service's own semantics). Spec (§5 route
+      table, §6, §9) + code + tests (unit for the new server calls;
+      e2e for the export/erase happy path against the mock server,
+      extending `tests/e2e/mock-auth-server.mjs`).
+      **Acceptance:** a signed-in user can view/download their export
+      and (with confirmation) erase their account from the UI;
+      `pnpm test` and `pnpm run test:e2e` green.
+
+- [ ] **AFE-3 (S) Zero e2e coverage of `/admin/attributes`.**
+      *(verified: `grep -n "admin" tests/e2e/mock-auth-server.mjs` finds
+      only a comment mentioning `admin.ts`, no route stub for
+      `GET`/`PUT /api/auth/admin/users/{pid}/attributes`;
+      `grep -n "test(" tests/e2e/smoke.spec.ts` lists six cases, none
+      touching `/admin/attributes`)* — this route (its own `load` +
+      `save` server action, per §13 AFE-1 above) has no end-to-end
+      coverage at all, unlike every other route in `src/routes/`. Add
+      mock-server handlers for the two admin endpoints (200, 403
+      non-admin, 401 unauthenticated) and playwright cases: view an
+      existing user's attributes, save a valid change, and see the
+      403/401 error paths surfaced in the UI.
+      **Acceptance:** `pnpm run test:e2e` covers `/admin/attributes`
+      end to end and stays green.
+
+- [ ] **AFE-4 (S) Surface the `429` rate-limit response distinctly from
+      a generic failure.** The auth service rate-limits `signup`/
+      `magic-link` issuance (5 requests / 5 min per email,
+      `authentication-service-with-loco/AGENTS.md`) and returns `429`
+      over the cap. *(verified: `src/lib/server/auth.ts`'s
+      `requestMagicLink`/`signup` both return only `res.ok` — a plain
+      boolean — discarding the status code entirely, so
+      `src/routes/signin/+page.server.ts`'s action collapses every
+      non-2xx response, `429` included, into the single generic
+      `error: "failed"` outcome; no `i18n` key or UI copy distinguishes
+      "try again in a few minutes" from any other failure)*. Since the
+      always-`200` anti-enumeration shape means `429` is the one
+      documented non-2xx outcome these two endpoints intentionally
+      produce, it is worth a distinct, honest message rather than a
+      generic "something went wrong". Change
+      `requestMagicLink`/`signup` to return the status (or a small
+      result enum), add an `account.rateLimited` i18n key (13 locales,
+      mirroring `tests/unit/i18n.test.ts`'s key-parity assertion), and
+      wire it into the `signin`/`signup` `+page.server.ts` actions and
+      pages.
+      **Acceptance:** a stubbed `429` response in a unit test produces
+      the distinct rate-limited UI state, not the generic failure one;
+      `pnpm test` (incl. the 13-locale key-parity check) green.
+
 ## 14. Implementation status
 
 Shipped (v0.1, prior bearer-token SPA model, since fully removed): all

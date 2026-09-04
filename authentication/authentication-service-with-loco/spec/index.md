@@ -870,6 +870,112 @@ only by that subject.
         (`tests/requests/admin.rs`): admin replace+show+audit, non-admin
         `403`, missing-token `401`.
 
+- [ ] **T-13 (S) Adopt the `Accepts-version` header helper.** Per
+      [`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md)
+      §6 step 6 ("later services adopt the header helper when next
+      touched — they already have version-free URLs, so this is
+      additive"). This crate's routes (`/api/auth/*`,
+      `/.well-known/paseto-keys`, `/api-docs/*`) are already
+      version-free, but *(verified: `grep -rn "Accepts-version\|
+      resolve_version" src/` returns no hits)* it carries no
+      `resolve_version` helper or response-header stamping at all,
+      unlike `event`/`worker`/`portfolio`. Add `src/version.rs`
+      (`resolve_version(header) -> Result<&'static str, …>` over
+      `SUPPORTED_API_VERSIONS = ["1.0"]` / `CURRENT_API_VERSION =
+      "1.0"`) and layer a small middleware in `app.rs` next to the auth
+      layer that stamps the response `Accepts-version` header and
+      returns `406` on an explicitly-unsupported request value.
+      Three-part change (this spec + code + tests): unit tests for
+      `resolve_version` (no header ⇒ current; supported ⇒ echoed; bare
+      major `1` ⇒ aliased to `1.0`; unsupported ⇒ error) plus a
+      DB-free request test that a plain `GET /api/auth/audit/recent`
+      (with a bearer) echoes `Accepts-version: 1.0`.
+      **Acceptance:** `cargo test --lib` green; every `/api/*` response
+      carries `Accepts-version`; an explicit unsupported version
+      (`Accepts-version: 9.9`) gets `406`.
+
+- [ ] **T-14 (S) Capture the source IP on sessions and `auth_events`.**
+      [`agents/share/auditability.md`](../../../agents/share/auditability.md)
+      documents family-wide audit rows as tracking
+      `user_id, user_ip_address, user_agent`, and
+      [`agents/share/compliance-for-healthcare.md`](../../../agents/share/compliance-for-healthcare.md)
+      §2.1 HIPAA §164.312(b) treats audit rows as the record of *who did
+      what from where*. *(verified: `grep -rn "ip_address\|user_ip\|
+      X-Forwarded-For\|client_ip" src/` returns no hits at all; the
+      `sessions` table (`src/migration/m20220101_000002_sessions.rs`)
+      has `user_agent` but no IP column, and `auth_events`
+      (`src/models/auth_events.rs`) records only `email`/`user_pid`/
+      `detail`)* — this crate is the one place in the family that issues
+      every session and never records where the request came from.
+      Add a nullable `source_ip` column to both `sessions` and
+      `auth_events` (migrations), thread the connecting peer address
+      (or `X-Forwarded-For`, first hop, behind a documented trust
+      boundary) from the controller into `sessions::issue` and
+      `AuthEvent::record`, and include it in the GDPR account export
+      (`GET /api/auth/account/export`) alongside the existing
+      `user_agent`. Spec + code + tests (unit: IP threading is
+      captured on issue/record; DB-gated: a signup/magic-link redeem
+      round-trip stores a non-null `source_ip`).
+      **Acceptance:** DB-gated suite green; `sessions.source_ip` and
+      `auth_events.source_ip` are populated on real requests; GDPR
+      export includes the field.
+
+- [ ] **T-15 (S) Audit admin reads of another user's ABAC attributes.**
+      `src/controllers/admin.rs::show_attributes`
+      (`GET /api/auth/admin/users/{pid}/attributes`) is admin-gated but
+      writes **no** `auth_events` row — only the `PUT` (replace) path
+      does, via `Model::record_attribute_assignment_best_effort`.
+      *(verified: reading `show_attributes` end-to-end shows it calls
+      only `users::Model::find_active_by_pid` +
+      `format::json(AttributesResponse::new(&user))`, no audit call;
+      `tests/requests/admin.rs::admin_can_replace_and_show_user_attributes`
+      asserts an audit row exists only for the replace, not the show)*.
+      Per
+      [`agents/share/compliance-for-healthcare.md`](../../../agents/share/compliance-for-healthcare.md)
+      §2.1 ("recording *mutations only* does not satisfy \[HIPAA
+      §164.312(b)\] — reads are activity") and
+      [`agents/share/security.md`](../../../agents/share/security.md)
+      invariant 5, an admin viewing a *different* user's privilege
+      attributes is exactly the read HIPAA's audit-controls provision
+      exists for. Add a best-effort `attributes_viewed` (or similar)
+      `auth_events` row on `show_attributes`, actor = the admin's
+      `pid:<uuid>`, target = the viewed user — mirroring the existing
+      `attributes_assigned` shape but with no value payload (attribute
+      *values* stay out of the audit detail, as `record_attribute_
+      assignment_best_effort` already does). Spec + code + tests
+      (DB-gated: a `GET` writes exactly one new audit row of the new
+      kind).
+      **Acceptance:** DB-gated suite green; a `GET` on the admin
+      attributes endpoint leaves an `auth_events` row an operator can
+      find via the existing per-subject/system-wide audit endpoints.
+
+- [ ] **T-16 (M) Hash-chain `auth_events` rows (tamper-evident deletion
+      detection).** `src/compliance/audit_integrity.rs`'s own doc
+      comment states the honest limit: *"Does not detect: a row deleted
+      wholesale, or rows reordered. […] Catching deletion needs a hash
+      chain plus external-witness checkpoints, which this service does
+      not have."* *(verified: `grep -rn "prev_hash\|hash_chain\|
+      chained" src/` returns no hits — no chaining column or logic
+      anywhere in this crate)*.
+      [`agents/share/overview.md`](../../../agents/share/overview.md)
+      confirms person, worker, care-pathway, and case already chain
+      their audit rows with external-witness checkpoints, but
+      authentication-service — the crate whose audit trail records
+      *who was granted `access=admin`* — is not one of them. Add a
+      `prev_hash`/`hash` pair to `auth_events` (migration), compute the
+      chain hash over `(prev_hash, existing MAC pre-image)` on write,
+      and extend `GET /api/compliance/audit/verify` to walk the chain
+      and report a broken link. Follow
+      [`agents/share/runbooks/integrity-activation.md`](../../../agents/share/runbooks/integrity-activation.md)
+      for checkpoint storage. Given the size, land it as: (a) the
+      chain column + write-path hashing, (b) the verify-endpoint walk +
+      report shape, (c) checkpoint storage — each its own spec + code +
+      test slice, `CHANGELOG.md` entry per slice.
+      **Acceptance:** DB-gated suite green; a test that deletes or
+      reorders a row in a chained sequence is detected by
+      `GET /api/compliance/audit/verify`; the doc comment's stated
+      limitation is removed once true.
+
 ## 14. Implementation status
 
 > **Pivot landed.** The code reality is cookie sessions + PASETO

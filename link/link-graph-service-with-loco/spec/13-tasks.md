@@ -707,6 +707,82 @@ auto-promote regardless of score. `DOC-6` (documentation harmonisation
 for this crate) was queued behind this chain finishing and is now
 unblocked.
 
+### Reconciliation gauge hardening
+
+- [ ] T-34 (M): Label `link_graph_reconciliation_divergence` per entity,
+  closing the runbook's first "sharp edge". *(verified:
+  `agents/share/runbooks/reconciliation-divergence.md` states plainly —
+  "Both entity workers write the same metric name, so its value is
+  'whatever the *most recently completed* pass of *either* entity
+  found' — not a sum, not per-entity. A converged `case` pass can
+  overwrite a diverging `person` pass's `47` with `0` a moment later,
+  and you'd never know from the metric alone." `src/metrics.rs` confirms
+  the code: `reconciliation_divergence` is a bare `IntGauge` (no
+  labels), the **only** reconciliation-adjacent metric in this crate
+  built that way — `edges` is an `IntGaugeVec` labelled `["status"]`,
+  and `consumer_lag_seconds` is an `IntGaugeVec` labelled `["entity"]`
+  for the exact same "per source entity" reason. `src/reconcile.rs`'s 7
+  unit tests (`diff_finds_missing_and_extra_by_edge_id`,
+  `bulk_response_deserializes_*`, `source_auth_requires_a_token_*`)
+  cover none of this — no test touches `reconciliation_divergence` at
+  all)*. Change it to an `IntGaugeVec` labelled `["entity"]`, mirroring
+  `consumer_lag_seconds`'s existing pattern exactly; `reconcile()`
+  already knows its `AuthoritativeSource::entity()`, so the label is
+  free at the call site. Spec (this file) + code + test: a unit or
+  DB-gated test that a `case` pass's divergence value and a `person`
+  pass's divergence value are independently readable (one converging to
+  `0` must not zero the other's stale-but-real count). Update the
+  runbook's "sharp edge" framing once fixed (out of scope for this
+  crate's own files, but note it in the PR).
+  **Acceptance:** `GET /metrics.prom` exposes
+  `link_graph_reconciliation_divergence{entity="person"}` and
+  `{entity="case"}` (etc.) as independent series; `cargo test --lib`
+  green.
+
+- [ ] T-35 (S): Add a per-entity "last reconciliation pass" gauge,
+  closing the runbook's second "sharp edge". *(verified: the same
+  runbook section — "It is also only updated on a successful fetch. A
+  pass that fails (timeout, non-2xx, malformed JSON) leaves the gauge
+  exactly where it was — a genuine `0` and a 'hasn't run since boot' `0`
+  look identical. The *only* per-pass signal, success or failure, is
+  the log line." `src/reconcile.rs`'s `reconciliation pass complete` /
+  `reconciliation pass failed` `tracing` lines are real (confirmed at
+  the `run_periodic`-style call site, line ~277) but nothing exports
+  them as a metric)*. Add an `IntGaugeVec` (e.g.
+  `link_graph_reconciliation_last_success_unixtime`, labelled
+  `["entity"]`, mirroring `suggestion_last_run`'s existing
+  `IntGaugeVec` pattern) set on every successful pass, so an operator
+  can distinguish "converged 2 minutes ago" from "never run" from
+  Prometheus alone, without cross-referencing logs. Optionally also
+  export a per-entity pass outcome counter (success/failure) for
+  alerting on a run of failures. Spec + code + test: a test that a
+  failed pass leaves the divergence gauge unchanged while the
+  last-success gauge also stays unchanged (proving the two together
+  disambiguate what one gauge alone cannot).
+  **Acceptance:** `GET /metrics.prom` exposes a per-entity
+  last-successful-pass signal; a DB-gated or unit test pins that a
+  failed pass does not advance it; `cargo test --lib` green.
+
+- [ ] T-36 (S): Add an operator-forceable reconciliation pass.
+  *(verified: the same runbook states "There is **no** endpoint, task,
+  or admin route to force a pass on demand, list the last-run time per
+  entity, or see a pass/fail counter — confirmed absent, not merely
+  undocumented. The only lever an operator has is restarting the
+  process… or restarting with a smaller interval temporarily." — an
+  explicitly documented operational gap, not a design choice recorded
+  as final)*. Add a `destructive`-gated admin endpoint or loco CLI task
+  (mirroring case-service's `subject_of` bulk-dump gating pattern — a
+  machine peer `svc=true` or an `access=admin` caller only, per
+  `agents/share/authorization-attributes.md` §4/§9) that runs one
+  reconciliation pass for a named entity immediately, reusing
+  `reconcile()`'s existing logic rather than duplicating it. Spec + code
+  + test: a DB-gated test that the forced pass updates the T-34/T-35
+  gauges exactly as the periodic worker does; ABAC tests (401/403/200)
+  matching the family's existing guard-test matrix.
+  **Acceptance:** an authorized operator can trigger and observe one
+  reconciliation pass without restarting the process; the runbook's
+  "confirmed absent" line is no longer true.
+
 ### Tests
 
 - [x] T-24: Un-gated unit suite (§11.1) — `cargo test --lib` (15 tests:
