@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security — `subject_of` link read denial is `404`, not `403` (T-9)
+
+`src/controllers/links.rs`'s single-case link endpoints
+(`/api/cases/{pid}/links*`) previously mapped a record-level policy
+denial to `403`, which itself discloses that a `subject_of` edge exists
+on the case — the later family precedent (care-pathway's `continues_as`,
+`agents/share/cross-service-linking.md` §10.2) established that a
+high-sensitivity link's denial must be `404` instead, indistinguishable
+from "no such edge". Split `record_rejection` (now folds `403` → `404`
+for the single-case endpoints) from a new `bulk_rejection` (unchanged
+plain `403`/`401`, for the bulk reconciliation pull, which is not
+scoped to one case's existence). The case record endpoint itself
+(`controllers/cases.rs`) is unaffected and still returns `403`. New
+DB-free unit tests plus a DB-gated `tests/links_masking.rs`. See
+spec/index.md §10.1/§12.1/§13 T-9.
+
 ### Added
 
 - Real OpenTelemetry OTLP export (`src/observability.rs`, repo
