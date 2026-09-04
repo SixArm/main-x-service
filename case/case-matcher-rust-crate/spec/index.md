@@ -288,6 +288,62 @@ IO, async, or panics to library code.
 - [ ] Optional case-type taxonomy (related types score partial).
 - [ ] Split this single `spec/index.md` into the numbered §-per-file
       layout used by the sibling matcher crates.
+- [ ] **Bound `subjects`/`keywords` array sizes inside the library
+      itself, or document that it relies entirely on the caller.**
+      *(Verified: `grep -n "MAX_" src/*.rs` finds nothing — no length
+      cap exists anywhere in this crate.)* The family's SEC-M1 caps
+      (`MAX_ARRAY_LEN`/`MAX_ITEM_LEN`, `agents/share/security.md`
+      invariant 3) live only in `case-service`'s
+      `src/validation.rs`, which runs *before* the matcher is called —
+      but this crate is documented as "usable standalone" (`AGENTS.md`,
+      `agents/share/overview.md`), and a standalone consumer with no
+      such caps can feed an arbitrarily large `subjects`/`keywords`
+      array straight into the Jaccard component (`matcher.rs`'s
+      set-Jaccard over `fold_set`), which is unbounded O(n·m). Either
+      add an opt-in cap (a `MatchConfig` field or a documented
+      `MatchingEngine::match_cases_bounded`), or add a prominent
+      rustdoc note on `MatchingEngine::match_cases` and the crate root
+      stating the caller must bound array sizes itself, plus a
+      `CHANGELOG.md` entry. Update `spec/index.md` §19/§22 either way.
+      **Acceptance:** either a cap exists and is unit-tested (an
+      over-long `subjects`/`keywords` array is truncated or rejected
+      deterministically, never scored in full), or the crate-root/API
+      rustdoc explicitly states the caller's obligation and a doctest
+      or `AGENTS.md` note points at `case-service`'s `MAX_ARRAY_LEN` as
+      the reference cap a standalone consumer should copy.
+- [ ] **Criterion bench group scaling `subjects`/`keywords` array size
+      per `Case`, not just candidate-list length.**
+      *(Verified: `grep -n "fn bench_" benches/match_pair.rs` shows
+      `bench_match_pair`, `bench_deterministic`, `bench_rank` — the
+      last sets `Throughput::Elements` only over the *candidate count*
+      10/100/1000, §24 "Testing strategy"; none scales a single
+      `Case`'s own array fields.)* Add a `bench_field_arrays` group that
+      holds two records fixed and grows `subjects`/`keywords` (e.g.
+      10/100/1000 entries each) with `Throughput::Elements`, so the
+      O(n·m) Jaccard cost the item above is about is directly visible
+      in `cargo bench` output rather than only inferred from the source.
+      **Acceptance:** `cargo bench --no-run` compiles the new group; a
+      local `cargo bench` run shows near-linear (or worse) scaling with
+      array size, recorded in a `CHANGELOG.md` note.
+- [ ] **Property-test `MatchConfig` values other than the built-in
+      presets.** *(Verified: `grep -n "MatchConfig" tests/proptests.rs`
+      returns no hits — the SEC-M6 property suite (§24) only ever
+      exercises `MatchingEngine::new(MatchConfig::default())`; the six
+      weight fields on `MatchConfig` are all `pub` with no validating
+      constructor, so a caller can build one directly with e.g. a
+      negative or `NaN` weight.)* Add a `proptest` strategy generating
+      arbitrary finite `MatchConfig` weights/threshold and assert the
+      same never-panic / finite-`[0.0,1.0]`-score invariants §19
+      already claims for the default config. If an adversarial config
+      (e.g. all-zero weights, so the renormalisation divisor is zero)
+      can break the invariant, decide whether `MatchConfig` needs a
+      validating constructor (`try_new` returning `Result`) or the
+      invariant is scoped to configs built via `default()`/`strict()`/
+      `lenient()` — record the decision in spec §19/§21.
+      **Acceptance:** the new proptest passes (or a validating
+      constructor is added and the property is re-run against it), and
+      §19/§21 states explicitly whether the finite-score guarantee
+      covers hand-built `MatchConfig` values.
 
 ## 24. Testing strategy
 

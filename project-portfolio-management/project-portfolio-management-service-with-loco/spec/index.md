@@ -751,6 +751,77 @@ HIPAA/NHS/GDPR posture for audit and access controls.
 
 ## 13. Tasks (live work queue)
 
+- [ ] **SEC-PPM-1 (M) Record-level masking/ABAC on `list` / `search` /
+  `check-duplicates`, matching the single-record `GET /{pid}` path.**
+  `agents/share/security.md` invariant 5 states masking "is not a
+  single-record-GET feature — it must hold on `list` / `search` /
+  `check-duplicates` ... paths too", and `case-service` closed exactly
+  this gap for itself as SEC-G2/G3. Portfolio's own single-record
+  `get_one` calls `crate::auth::authorize_record` with the `caller:
+  MaybeAuthUser` extractor and honours the `mask` obligation (§9.6,
+  `controllers/plans.rs` — verified: the `authorize_record` call sits
+  directly in `get_one`, with a doc comment naming the masked fields),
+  but `list`, `search`, and `check_duplicates` take **no** `caller`
+  parameter at all and never call `authorize_record` or the masking
+  helper — *(verified: `grep -n "fn list\|fn search\|fn check_duplicates"
+  -A 3 src/controllers/plans.rs` shows none of the three functions
+  taking a `MaybeAuthUser`/`AuthUser` argument, and reading each body
+  end-to-end shows no `authorize_record`/`mask` call in any of them)*.
+  A caller entitled only to a masked single-record view today sees the
+  **unmasked** `lead_ref`/`owner_org_id`/`owner_org_name` in the list,
+  search, and duplicate-check responses. Extend the ABAC + masking
+  check to all three, following case's precedent. Three-part change:
+  spec §9.1/§9.6/§13 + `src/controllers/plans.rs` + a DB-gated masking
+  test (mirroring `case-service`'s `tests/masking.rs` shape).
+  **Acceptance:** a DB-gated test proves a masked-obligation caller
+  gets redacted `lead_ref`/owner-org fields from `list`, `search`, and
+  `check-duplicates`, exactly as `GET /{pid}` already redacts them.
+
+- [ ] **SEC-PPM-2 (S) Audit the oversight bulk-read/export endpoints.**
+  `GET /api/auditor/evidence-pack` bundles a period's decisions plus up
+  to 2000 audit rows (JSON or CSV) — a bulk export of governance/audit
+  content structurally identical to the class `case-service`'s SEC-G1
+  ("authorise + audit the governed bulk-links read") and
+  `agents/share/bulk-import-export.md` §8 ("Every export is audited")
+  both close — but the handler never writes an `audit_logs` row for
+  the act of exporting it; it only **reads** the existing audit table
+  to build the response — *(verified:
+  `grep -n "fn evidence_pack" -A 25 src/controllers/oversight.rs`
+  shows a `SELECT`-only query against `audit_logs::Entity`, no
+  `audit_logs::ActiveModel`/insert call anywhere in the function or in
+  `auditor_trail`, its sibling raw-audit-explorer endpoint)*. Add an
+  audit write (actor, `from`/`to` window, `format`) on both
+  `evidence_pack` and `auditor_trail`, gating delivery on the write
+  succeeding — the same posture `case-service`'s bulk export uses
+  (SEC-B8). Three-part change: spec §9.13/§13 +
+  `src/controllers/oversight.rs` + a DB-gated request test.
+  **Acceptance:** a DB-gated test proves calling either endpoint writes
+  exactly one new `audit_logs` row naming the actor and the requested
+  window/format, and that a write failure prevents the response from
+  being returned.
+
+- [ ] **SEC-PPM-3 (S) Gate the oversight bulk-read endpoints as a
+  privileged (`destructive`-tier) read, not just the blanket guard.**
+  `evidence_pack`, `auditor_trail`, `board_pack`, and
+  `board_investments` each take no `caller`/`AuthUser` parameter at
+  all, relying solely on the coarse `/api/*` blanket guard — *(verified:
+  `grep -n "fn evidence_pack\|fn auditor_trail\|fn board_pack\|fn
+  board_investments" -A 8 src/controllers/oversight.rs` shows none of
+  the four signatures accepting `MaybeAuthUser`/`AuthUser`)*. Under the
+  built-in default ABAC policy every authenticated caller can read
+  (`agents/share/authorization-attributes.md` §5), so any signed-in
+  caller — not just `svc`/`admin` — can pull the full audit trail /
+  board investment register. `case-service` gates its analogous
+  bulk-links dump at `Action::Destructive` (SEC-G1: "default policy
+  admits only `svc`/`admin`"). Add the same
+  `authorize_record(Action::Destructive, …)` gate to these four
+  handlers (a no-op when `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` is
+  off, per the family's activation-gate convention). Three-part
+  change: spec §9.13/§13 + `src/controllers/oversight.rs` + a DB-gated
+  request test.
+  **Acceptance:** a DB-gated test proves a plain-`read`-tier caller
+  gets `403` from all four endpoints while an `access=admin` or
+  `svc=true` caller succeeds, with enforcement on.
 
 - [x] **2026-09-02 — PRO-H12 slice 7 of 7 (the last): OpenTelemetry
   OTLP export.** This crate carried no `src/observability` module at

@@ -460,6 +460,68 @@ links are **never** a match signal (entity spec §1).
 > This is the build queue for the implemented app (MVP shipped); check off
 > in three-part PRs (spec + code + test).
 
+- [ ] **FE-2 (M) Masked view + GDPR export UI for `/plans/[pid]`.** The
+  service has carried `GET /api/plans/{pid}/masked` and
+  `GET /api/plans/{pid}/export` since 2026-08-02 (this crate's own
+  `AGENTS.md`/§9 "API consumption" table lists both under "Plan CRUD"),
+  but `PlanRepository` has no `masked()`/`export()` method and no route
+  calls either path — *(verified: `grep -n "masked\|export(" src/lib/api/plans.ts`
+  returns nothing, and `AGENTS.md`'s own repository-method list —
+  "list + listPage + search + get + create + update + remove +
+  checkDuplicates + merge + recentMerges" — has no masked/export
+  entry)*. Add `PlanRepository.masked(pid)` / `.export(pid)`, and a
+  "View masked" / "Export (GDPR)" affordance on `/plans/[pid]` (a plain
+  link/button rendering the JSON is enough to make the capability
+  reachable; a dedicated view is a stretch goal).
+  Three-part change: spec §9/§13 + `src/lib/api/plans.ts` +
+  `src/routes/plans/[pid]/+page.svelte` + vitest coverage.
+  **Acceptance:** new vitest cases pin the two new repository methods'
+  URLs; a Playwright smoke test exercises the affordance from
+  `/plans/[pid]`.
+
+- [ ] **FE-3 (M) Decide and, if adopted, implement the `requireSignedIn`
+  page-visit guard (PRO-H10).** Repo `tasks.md` WEB-1 found the guard
+  rolled to 5 of 16 front-ends and explicitly left "the 5/11 roll-out
+  question... still open" for the rest — *(verified:
+  `grep -rn "requireSignedIn" src/` in this project returns zero
+  matches, matching WEB-1's finding, which names "place, organization,
+  care-pathway, case, portfolio and all five consumer apps" as
+  unguarded)*. This project's auth model (BFF + httpOnly session
+  cookie, §8) is structurally identical to the five front-ends that do
+  have the guard on `/new`/`/merge`-style mutating routes. Either add
+  it (following person's `requireSignedIn(locals)` pattern plus WEB-1's
+  `SMOKE_STORAGE_STATE` Playwright stub-cookie fix so the smoke suite
+  still renders guarded pages) to `/plans/new`, `/plans/merge`, and
+  `/plans/[pid]/edit`, or record in this spec (§8/§13) why portfolio
+  deliberately opts out.
+  **Acceptance:** either `requireSignedIn` gates the mutating routes
+  with a pinned anonymous-303 Playwright test (mirroring person's), or
+  spec §8 states the explicit reason portfolio stays unguarded.
+
+- [ ] **FE-4 (M) Consolidate ETag/conditional-GET handling for the
+  oversight and executive dashboard views.** The service documents
+  every `at-a-glance`/`executive/*`/`board/*`/`auditor/*`/
+  `compliance/*`/`financials/*`/`technology/*`/`risk/*`/`security/*`/
+  `regulator/*`/`scenarios/compare` read as "ETag-conditional" with an
+  `as_of` freshness watermark (service `AGENTS.md`), but the front-end
+  handles this on only two of the ~20 route directories that consume
+  such views — *(verified: `grep -rln "ETag\|If-None-Match\|304"
+  src/routes/ src/lib/` matches only `src/routes/dashboard/+page.svelte`
+  and `src/routes/executive/+page.svelte`; `src/lib/api/client.ts` and
+  `src/lib/api/ppm.ts` carry no shared `ETag`/`If-None-Match` handling
+  at all, so `auditor/`, `board/`, `compliance/`, `financials/`,
+  `technology/`, `risk/`, `security/`, `regulator/`, `scenarios/` each
+  either reinvent it or, more likely given the grep, never send
+  `If-None-Match` and always pay the full payload)*. Add one shared
+  helper in `client.ts` (store the last `ETag` per URL, send
+  `If-None-Match`, treat `304` as "reuse the cached body") and wire the
+  remaining oversight/executive routes to it.
+  Three-part change: spec §9/§13 + `src/lib/api/client.ts` + the
+  consuming routes + vitest coverage of the 304-reuse path.
+  **Acceptance:** a vitest case proves the shared helper reuses the
+  cached body on a stubbed `304`; at least the `board`/`auditor`/
+  `financials`/`technology` routes are wired to it.
+
 - [x] **2026-08-05 — Wire `/plans` itself to `listPage()`.** The sibling
   gap the entry directly below flagged and deliberately left open:
   `PlanRepository.listPage()` existed and was tested at the repository

@@ -770,6 +770,69 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
+- [ ] **T-7 (M) Batch `POST /api/cases/deduplicate` endpoint.**
+  `src/auth.rs::DESTRUCTIVE_POST_SUFFIXES` already lists `/deduplicate`
+  as a destructive-action path (matching `agents/share/match-search-merge.md`'s
+  "Batch — `POST /api/<plural>/deduplicate` scans the entire index"),
+  but no such handler is registered: `grep -n "fn deduplicate" src/`
+  finds nothing and `controllers::cases::routes()` (spec §9, this
+  file's own `AGENTS.md` API table) has no `/deduplicate` entry —
+  *(verified: `grep -n "deduplicate" src/controllers/cases.rs src/app.rs`
+  returns no route/handler; the const only appears in `src/auth.rs`)*.
+  Add the batch-scan handler (search-blocked candidates, same pattern
+  `check-duplicates` already uses) that enqueues pairs into
+  `review_queue` at `provenance = "batch"` (T-8 below must land the
+  queue's REST surface first, or expose the batch results directly).
+  Three-part change: spec §9 + `src/controllers/cases.rs` + a DB-gated
+  request test.
+  **Acceptance:** `POST /api/cases/deduplicate` returns candidate pairs
+  above threshold, writes them to `review_queue`, and a DB-gated test
+  proves the round-trip; `DESTRUCTIVE_POST_SUFFIXES`'s existing 401/403
+  matrix test now exercises a real route instead of a placeholder path.
+
+- [ ] **T-8 (M) Expose the `review_queue` REST surface.**
+  `src/models/review_queue.rs` already has `upsert`/`list`/`decide`
+  functions (added for the bulk-import pipeline, BLK-5), and the
+  `review_queue` table has carried `provenance` from day one, but
+  nothing calls `list`/`decide` from a controller — *(verified:
+  `grep -rn "review-queue\|review_queue" src/controllers/ src/app.rs`
+  returns nothing)*. Every sibling entity that has a review queue
+  (person / worker / place / thing / organization,
+  `agents/share/match-search-merge.md` "Review queue") exposes
+  `GET /api/<plural>/review-queue` and
+  `POST /api/<plural>/review-queue/{id}/decision`; case has the table
+  and the model helpers but not the endpoints, so a bulk-import row
+  routed to review (§8.7) is currently invisible over the API. Add the
+  two endpoints, first-writer-wins on `decide` per the family contract.
+  Three-part change: spec §9/§13 + `src/controllers/cases.rs` (or a new
+  `controllers/review_queue.rs`) + a DB-gated request test.
+  **Acceptance:** `GET /api/cases/review-queue` lists pending pairs
+  written by the bulk-import pipeline; `POST .../{id}/decision` accepts
+  `confirmed`/`rejected` once and `409`s (or documented equivalent) on a
+  second decision of the same row; DB-gated test proves both.
+
+- [ ] **T-9 (S) `subject_of` link read denial should be `404`, not `403`,
+  per the later family precedent.** §12.1 of this spec already flags
+  "a 'denied read is indistinguishable from no-such-edge' refinement
+  remain\[s\] a follow-up" for the `case ↔ person` edge (landed
+  2026-07-10, before the family settled the pattern). By 2026-08-24
+  `agents/share/cross-service-linking.md` §10.2 established, for the
+  *other* high-sensitivity edge kind (`continues_as`), that a denied
+  read on a high-sensitivity link "is reported as `404`, not `403`" —
+  a `403` itself discloses that the edge exists. `subject_of` is case's
+  own high-sensitivity kind (§10.1) and case predates that precedent:
+  *(verified: `src/controllers/links.rs::record_rejection` maps a
+  policy denial to `403 forbidden`/`401 unauthorized` only — no `404`
+  path exists for a record-level deny on `GET`/`POST`/`DELETE
+  /api/cases/{pid}/links*`)*. Align case's link controller with the
+  established pattern: a record-level deny on a links read returns
+  `404` (an unauthenticated `401` stays as-is — it discloses nothing).
+  Three-part change: spec §10.1/§12.1 update + `src/controllers/links.rs`
+  + a DB-gated masking test alongside the existing `tests/masking.rs`.
+  **Acceptance:** a caller whose policy denies `subject_of` link reads
+  gets an identical `404` body for both "no such case" and "case exists,
+  edge denied"; a DB-gated test pins both branches are indistinguishable,
+  matching care-pathway's `continues_as` test shape.
 
 - [x] **2026-09-02 — PRO-H12 slice 6: OpenTelemetry OTLP export.** This
   crate carried no `src/observability` module at all before this
