@@ -368,3 +368,79 @@ clearly described manual check confirms the acceptance criterion.
   test --lib` 205/205 (was 197, +8 new `observability::tests`), `cargo
   test --test otlp_export --test otlp_middleware` 4/4.
 
+- [ ] **T-12 (M) — Wire the review-queue `score_breakdown` that already
+  has a database column.** `migrations/2026071900000001_create_review_queue/up.sql`
+  declares `score_breakdown JSONB NULL` and `db::review_queue::ReviewQueueRow`
+  carries the field, but `handlers::batch_deduplicate` (the same
+  handler `POST /api/things/deduplicate` calls) always builds
+  `NewReviewItem { …, score_breakdown: None, … }` even though the
+  `MatchResult` computed one line above has a real per-field breakdown,
+  and the wire type `ReviewQueueItem` has no `score_breakdown` field at
+  all. `thing-front-end-with-svelte`'s own T-24 already built the
+  comparison-panel breakdown table against this exact column and
+  documented the gap as FR-15, verified "against this service's own
+  `src/api/rest/handlers.rs` and `src/db/review_queue.rs`". *(verified:
+  `grep -n score_breakdown src/api/rest/handlers.rs` shows only the
+  hard-coded `None` at line 647 and no field on the `ReviewQueueItem`
+  wire struct; the column exists per
+  `migrations/2026071900000001_create_review_queue/up.sql`.)*
+  **Acceptance:** the computed `MatchResult`'s breakdown is persisted on
+  `batch_deduplicate` and serialized on `ReviewQueueItem`; a DB-gated
+  test round-trips a scan and asserts the returned
+  `GET /api/things/review-queue` item's `score_breakdown` is non-null
+  and matches the matcher's own component scores; `cargo test --lib` +
+  clippy pedantic clean; three-part change (spec §9/§13 + code + test).
+
+- [ ] **T-13 (M) — Mask sensitive fields on `check-duplicates` / create's
+  `409` candidates.** `GET /api/things/search` already accepts
+  `mask_sensitive` and masks results before returning them, but
+  `check_duplicates` / `find_candidates` (`src/api/rest/handlers.rs`)
+  return `ScoredCandidate { thing: existing, .. }` — the full, unmasked
+  stored record — with no masking option at all, on both
+  `POST /api/things/check-duplicates` and the `409` body
+  `POST /api/things` returns on a duplicate hit. Per
+  `agents/share/security.md` invariant 5 ("masking on every read
+  path… a bulk or aggregate read must never reveal more than the
+  equivalent single read"), a caller who cannot see a thing's full
+  record via `GET` can still recover it by POSTing a near-duplicate
+  probe. *(verified: `grep -n mask_sensitive src/api/rest/handlers.rs`
+  shows it only on the `SearchQuery` struct and the `search_things`
+  handler; `find_candidates` (line 349, returning `ScoredCandidate` —
+  struct at line 339) and `check_duplicates` (line 409) have no masking
+  parameter or call.)*
+  **Acceptance:** `check-duplicates` (and the `409` path, sharing
+  `find_candidates`) accept an optional `mask_sensitive` flag with the
+  same default and masking function as `search`; a DB-free or DB-gated
+  test asserts a masked duplicate-check response redacts the same
+  fields `mask_thing` redacts on `/masked`; clippy pedantic clean;
+  three-part change (spec §9 + code + test).
+
+- [ ] **T-14 (M, security) — Verify GTIN/ISBN/ISSN check digits, not just
+  length.** `src/validation/mod.rs::validate_gtin` explicitly documents
+  "the check digit is not verified", accepting any 8/12/13/14-digit
+  string; `validate_isbn`/`validate_issn` likewise only check length and
+  character set, never the ISBN-10/ISSN mod-11 or ISBN-13/GTIN GS1
+  mod-10 check digit. Per `agents/share/security.md` SEC-M5
+  ("deterministic-identifier check-digit validation" — organization's
+  LEI/GLN/DUNS/VAT precedent) an unverified check digit lets a
+  transposed or mistyped identifier persist as if valid, and — since
+  `thing-matcher`'s deterministic short-circuit fires on any shared
+  `(property_id, value)` pair — two *different* physical items that
+  happen to share a mistyped GTIN would spuriously match. The sibling
+  `place-service-with-loco` crate already has exactly this GS1 mod-10
+  algorithm implemented and tested as `validation::gln_is_valid`
+  (`src/validation/mod.rs`), a direct adaptation source since GLN and
+  GTIN share the same GS1 check-digit scheme. *(verified:
+  `grep -n "check digit is not verified" src/validation/mod.rs` at the
+  `validate_gtin` doc comment; `sed -n '329,395p' src/validation/mod.rs`
+  shows `validate_isbn`/`validate_issn`/`validate_gtin` checking only
+  length + character class.)* **Acceptance:** `validate_gtin` rejects a
+  GTIN whose final digit fails the GS1 mod-10 check (adapted from
+  place-service's `gln_is_valid`); `validate_isbn`/`validate_issn`
+  verify their respective mod-11 check character (including the `X`
+  case); existing fixture identifiers in tests are real, checksum-valid
+  values (not just digit-count filler); unit tests cover a valid id and
+  a single-digit-transposed invalid one for each scheme; `cargo test
+  --lib` + clippy pedantic clean; three-part change (spec §6 + code +
+  test).
+

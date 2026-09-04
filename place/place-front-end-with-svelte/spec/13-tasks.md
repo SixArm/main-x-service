@@ -46,4 +46,74 @@
   - Scope decisions matching the family pattern: **confirming does not merge** (the decision endpoint is a pure status change and the service records no link to a merge), so the panel deep-links `/places/merge?main=…&duplicate=…` — in **either** survivor order, since a review item names an unordered pair — and `/places/merge` gained the same one-line `?main=`/`?duplicate=` seed person's merge page has; decision buttons are disabled for a non-`pending` item rather than offering a request guaranteed to answer `422 INVALID_REVIEW_TRANSITION`.
   - New pure module `src/lib/review.ts` (status vocabulary, `canDecide`, the five weighted `MATCH_COMPONENTS`, `breakdownRows`, `mergeHref`) — mirrors person's `$lib/review` shape exactly, adapted to place's own matcher weights and entity fields.
   - Tests: `tests/unit/review.test.ts` (15 — weights sum to 1.00, descending order, the null/non-object/unknown-key breakdown paths, the decidable guard, both merge-link orders), `PlaceRepository.listReviewQueue`'s new options plumbing exercised indirectly via `pnpm check`'s type coverage, an i18n-parity extension for 50 new keys across all 13 locales (`review.intro`/`loading`/`empty`/`filter.*`/`status.*`/`board.title`/`list.title`/`col.*`/`compare.*`/`field.*`/`breakdown.*`/`component.*`/`decide.*`/`merge.*`), and two new route-stubbed Playwright smoke assertions (the board + queue + comparison panel showing the "not recorded" breakdown note, and the merge page's query-param seed).
+- [ ] T-24: **CSRF protection on the BFF mutating proxy calls.** T-22
+  flagged this and left it open ("CSRF on mutating browser→BFF calls is
+  not yet separately verified"); it is not merely unverified, it does
+  not exist. `src/routes/api/proxy/[...path]/+server.ts` forwards
+  `GET`/`POST`/`PUT`/`PATCH`/`DELETE` alike with no synchroniser-token or
+  `Origin`/`Referer` check, and neither `src/` nor `tests/` contains the
+  string `csrf` anywhere. Per
+  [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
+  §4, CSRF protection is "mandatory" for cookie-authenticated mutating
+  requests — this is the same gap `thing-front-end-with-svelte` closed
+  as its own T-25 (repo PRO-H5), copy-adaptable directly: a second,
+  non-httpOnly `__Host-mxi_csrf` cookie set alongside the session cookie
+  in `/verify`, echoed as `X-CSRF-Token` on non-GET/HEAD requests by
+  `ApiClient`, and checked by the proxy before forwarding upstream,
+  backstopped by an `Origin`/`Referer` check. *(verified:
+  `grep -rln "csrf" src/ tests/` returns nothing in this project;
+  `sed -n '1,58p' src/routes/api/proxy/\[...path\]/+server.ts` shows no
+  such check; `thing/thing-front-end-with-svelte/src/lib/server/session.ts`
+  carries the working reference implementation.)* **Acceptance:** a
+  mutating proxy request with a missing/mismatched CSRF token is
+  rejected `403` before it reaches `PLACE_API_URL`; a matching token
+  passes; `tests/unit/` pins the token-generation, header-attachment,
+  and proxy-rejection matrix (mirroring `thing-front-end-with-svelte`'s
+  `tests/unit/session.test.ts` + `tests/unit/proxy.test.ts`); three-part
+  change (spec §8/§9 + code + test).
+- [ ] T-25: **Page-visit guard on mutation-only pages.** `/places/new`,
+  `/places/[id]/edit`, `/places/merge`, and `/review` render their forms
+  to an unauthenticated visitor and let the submit fail server-side,
+  rather than redirecting to `/signin` first. `thing-front-end-with-svelte`
+  already ships this as its own T-26 (PRO-H10):
+  `requireSignedIn(locals)` in `src/lib/server/session.ts`, called from
+  a `+page.server.ts` on each mutation-only route, `redirect(303,
+  "/signin")` when `locals.sessionId` is absent; read/list/search/view
+  pages stay public, matching the backend's default-allow-read /
+  mutation-deny ABAC posture rather than inventing a separate front-end
+  policy. *(verified: `grep -rln requireSignedIn src/` in this project
+  returns nothing; `find src/routes -name "+page.server.ts"` lists only
+  `/`, `/verify`, `/signin` — none of the four mutation-only routes has
+  one.)* **Acceptance:** an unauthenticated visit to any of the four
+  routes above redirects `303` to `/signin`; `/places`, `/places/[id]`,
+  and `/places/[id]/audit` stay reachable unauthenticated; a unit test
+  pins `requireSignedIn`'s pass/redirect behaviour; three-part change
+  (spec §8/§9 + code + test).
+- [ ] T-26: **E2E coverage for `/signin` and `/verify`.** `tests/e2e/`
+  contains exactly one spec file, `places.spec.ts`; there is no
+  Playwright smoke test for the magic-link sign-in or verify pages at
+  all — the same gap `thing-front-end-with-svelte` tracks as its still-open
+  T-23. *(verified: `ls tests/e2e/` lists only `places.spec.ts`;
+  `grep -rln "signin\|verify" tests/e2e/` returns nothing.)*
+  **Acceptance:** new Playwright specs cover `/signin` (request a link,
+  see confirmation state) and `/verify` (a stubbed valid token sets the
+  session and redirects; an invalid/expired token shows an error rather
+  than a raw 500); `pnpm test:e2e` green; three-part change (spec §11 +
+  test; no application code change expected unless the smoke test
+  surfaces a real defect).
+- [ ] T-27: **Wire `mask_sensitive` into the list/search UI.**
+  `GET /api/places/search` accepts `mask_sensitive` and
+  `PlaceRepository`'s search method already threads it through, but
+  `/places` (the list/search route) never sets it — there is no
+  operator-facing toggle, unlike the detail page's masked-view toggle
+  (T-19). An operator who wants a masked search result set (e.g. to
+  demo or screenshot without exposing telephone/coordinates) has no way
+  to ask for one. *(verified: `grep -rn "mask_sensitive" src/routes/`
+  in this project returns nothing, while `src/lib/api/places.ts`
+  declares the parameter on the search options type.)* **Acceptance:** a
+  checkbox on `/places` (alongside the existing fuzzy-search toggle)
+  sets `mask_sensitive` on the search call and re-fetches; a Playwright
+  test stubs masked vs. unmasked search responses and asserts the
+  toggle changes the request/rendered values; three-part change (spec
+  §6/§9 + code + test).
 

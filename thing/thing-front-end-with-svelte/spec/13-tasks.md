@@ -65,4 +65,52 @@
   round trip does not carry one today). Tests: `tests/unit/session.test.ts`
   (+2 — `requireSignedIn` throws a 303-to-`/signin` redirect when signed
   out, passes through silently when signed in).
+- [ ] T-27: **Wire `mask_sensitive` into the list/search UI.**
+  `ThingRepository`'s search options already declare `mask_sensitive`
+  (`src/lib/api/things.ts`) and it is forwarded to
+  `GET /api/things/search`, but `/things` (the list/search route)
+  already exposes a `fuzzy` checkbox and never sets `mask_sensitive` —
+  there is no operator-facing masked-search toggle, unlike the detail
+  page's masked-view toggle (T-19). *(verified:
+  `grep -n mask_sensitive src/routes/things/+page.svelte` returns
+  nothing, while `grep -n mask_sensitive src/lib/api/things.ts` shows
+  the option declared and threaded through `search()`; the same route
+  already wires a `fuzzy` `$state` checkbox at line 29/82.)*
+  **Acceptance:** a checkbox on `/things` (alongside the existing
+  `fuzzy` toggle) sets `mask_sensitive` on the search call and
+  re-fetches; a Playwright test stubs masked vs. unmasked search
+  responses and asserts the toggle changes the request/rendered values;
+  three-part change (spec §6/§9 + code + test).
+- [ ] T-28: **Pagination on the `/things` list/search route.**
+  `place-service`'s family-wide pagination convention
+  (`agents/share/restful.md`: `?limit=&offset=` plus
+  `X-Total-Count`/`X-Limit`/`X-Offset` response headers) is never
+  consumed here — `/things` calls `search({ limit: 50 })` with no
+  `offset` and no way to page past the first 50 results, and
+  `ThingRepository`/`ApiClient` never read the `X-Total-Count` header
+  at all, so an operator has no way to know the search matched more
+  than 50 things. *(verified: `grep -n "offset\|X-Total-Count"
+  src/routes/things/+page.svelte` returns nothing but the hard-coded
+  `limit: 50`; `grep -rn "X-Total-Count" src/lib/api/*.ts` returns
+  nothing.)* **Acceptance:** `/things` reads `X-Total-Count` from the
+  search response and shows a "N of M" indicator plus next/previous
+  controls that advance `offset`; a unit test pins
+  `ThingRepository.search` surfacing the total-count header; a
+  Playwright test stubs a response with `X-Total-Count` greater than
+  the page size and asserts the next-page control fetches with the
+  advanced `offset`; three-part change (spec §6/§9 + code + test).
+- [ ] T-29: **401/403 handling in `ApiClient`.** `ApiError` exposes
+  `isNotFound()`/`isConflict()`/`isValidation()` helpers but nothing for
+  `401`/`403`, and no route reacts to either status — a session that
+  expires mid-visit (or a `THING_REQUIRE_AUTH`-gated `403`) surfaces as
+  a raw, untranslated error banner rather than a redirect to `/signin`
+  or an access-denied message, the same gap `place-front-end-with-svelte`
+  carries under its own new T-25 (401/403). *(verified: `grep -n
+  "401\|403\|isUnauthorized\|isForbidden" src/lib/api/client.ts` returns
+  nothing.)* **Acceptance:** `ApiError` gains `isUnauthorized()` /
+  `isForbidden()`; a `401` from the proxy (session expired/absent)
+  redirects the browser to `/signin`; a `403` shows a translated
+  access-denied message rather than the raw error body; unit tests pin
+  both helpers and the redirect behaviour; three-part change (spec
+  §8/§9 + code + test).
 

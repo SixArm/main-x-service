@@ -364,3 +364,69 @@ clearly described manual check confirms the acceptance criterion.
   new `observability::tests`), `cargo test --test otlp_export --test
   otlp_middleware` 4/4.
 
+- [ ] **T-14 (M) — Wire the review-queue `score_breakdown` that already
+  has a database column.** `migrations/2026071900000001_create_review_queue/up.sql`
+  declares `score_breakdown JSONB NULL` and `db::review_queue::ReviewQueueRow`
+  carries the field, but `handlers::batch_deduplicate` always builds
+  `NewReviewItem { …, score_breakdown: None, … }` even though the
+  `MatchResult` computed one line above (`state.matcher.score(&places[i],
+  &places[j])`) has a real per-field breakdown, and the wire type
+  `ReviewQueueItem` (`src/api/rest/handlers.rs`) has no `score_breakdown`
+  field at all — so `review_row_to_item` cannot surface a value even if
+  one were persisted. The front-end already anticipates this exact fix:
+  `place-front-end-with-svelte`'s T-23 built its comparison-panel
+  breakdown table against this column and documented the gap as "a
+  candidate follow-up for `place-service-with-loco`'s own `spec/13-tasks.md`".
+  *(verified: `grep -n score_breakdown src/api/rest/handlers.rs` shows
+  only the hard-coded `None` at line 830 and no field on the
+  `ReviewQueueItem` struct at lines 737–753; the column exists per
+  `migrations/2026071900000001_create_review_queue/up.sql`.)*
+  **Acceptance:** `serde_json::to_value(result.breakdown)` (or an
+  equivalent per-field map) is persisted on `batch_deduplicate` and
+  serialized on `ReviewQueueItem`; a DB-gated test round-trips a scan and
+  asserts the returned `GET /api/places/review-queue` item's
+  `score_breakdown` is non-null and matches the matcher's own component
+  scores; `cargo test --lib` + clippy pedantic clean; three-part change
+  (spec §9/§13 + code + test).
+
+- [ ] **T-15 (M) — Mask sensitive fields on `check-duplicates` /
+  create's `409` candidates.** `GET /api/places/search` already accepts
+  `mask_sensitive` and masks results before returning them, but
+  `check_duplicates` / `find_candidates` (`src/api/rest/handlers.rs`)
+  return `ScoredCandidate { place: existing, .. }` — the full, unmasked
+  stored record — with no masking option at all, on both the explicit
+  `POST /api/places/check-duplicates` endpoint and the `409` body
+  `POST /api/places` returns on a duplicate hit. Per
+  `agents/share/security.md` invariant 5 ("masking on every read path…
+  a bulk or aggregate read must never reveal more than the equivalent
+  single read"), a caller who cannot see a place's full record via `GET`
+  can still recover it by POSTing a near-duplicate probe. *(verified:
+  `grep -n mask_sensitive src/api/rest/handlers.rs` shows it only on the
+  `SearchQuery` struct and the `search_places` handler; `find_candidates`
+  at line 544 and `check_duplicates` at line 596 have no masking
+  parameter or call.)* **Acceptance:** `check-duplicates` (and the
+  `409` path, sharing `find_candidates`) accept an optional
+  `mask_sensitive` flag with the same default and masking function as
+  `search`; a DB-free or DB-gated test asserts a masked duplicate-check
+  response redacts the same fields `mask_place` redacts on `/masked`;
+  clippy pedantic clean; three-part change (spec §9 + code + test).
+
+- [ ] **T-16 (S) — Guard `contained_in_place` against self-reference and
+  cycles.** `spec/16-open-questions.md` OQ-2 states "validation rejects
+  on insert" for hierarchy cycles, but no such check exists anywhere in
+  the crate: `validate_place` (`src/validation/mod.rs`) never references
+  `contained_in_place`, so a place can be created (or updated) with
+  `contained_in_place == Some(self_id)`, and nothing prevents a
+  multi-hop cycle (A contains B, B contains A) either. *(verified:
+  `grep -n contained_in_place src/validation/mod.rs` returns nothing;
+  `grep -rn "cycle\|self_containment" src/` finds no matching code
+  anywhere in `src/`.)* At minimum, reject direct self-reference in
+  `validate_place` (pure, no DB access needed); full multi-hop cycle
+  detection needs a DB round-trip and belongs in the repository's
+  `create`/`update`, alongside — not replacing — T-2's recursive-CTE
+  descendant query. **Acceptance:** `validate_place` returns a `422` for
+  `contained_in_place == Some(place.id)`; a DB-gated test creates A→B
+  then attempts B→A and asserts a `409`/`422` rather than a silently
+  persisted 2-cycle; unit + DB-gated tests green; three-part change
+  (spec §6/§16 + code + test).
+
