@@ -412,6 +412,53 @@ strip diacritics. Do not add IO, async, or panics to library code.
       similarity; `lead_ref` corroboration.
 - [ ] Split this single `spec/index.md` into the numbered §-per-file
       layout used by the sibling matcher crates.
+- [ ] **Bound `goals`/`keywords`/`relationships`/`tags` array sizes
+      inside the library itself, or document that it relies entirely
+      on the caller.** *(Verified: `grep -n "MAX_" src/*.rs` finds
+      nothing in this crate — no length cap exists anywhere.)* The
+      family's SEC-M1 caps (`agents/share/security.md` invariant 3)
+      live only in `project-portfolio-management-service`'s
+      `src/validation.rs`, which runs before the matcher is ever
+      called — but this crate is documented as usable standalone
+      (`AGENTS.md`, `agents/share/overview.md`), and a standalone
+      consumer with no such caps can feed an arbitrarily large
+      `goals`/`keywords`/`relationships`/`tags` array straight into
+      the Jaccard components in `matcher.rs`, which are unbounded
+      O(n·m). Either add an opt-in cap, or add a prominent rustdoc note
+      on `MatchingEngine::match_plans` and the crate root stating the
+      caller's obligation (pointing at the service's `MAX_ARRAY_LEN` as
+      the reference), plus a `CHANGELOG.md` entry and a §19/§22 update.
+      **Acceptance:** either a cap exists and is unit-tested, or the
+      crate-root/API rustdoc explicitly states the caller's obligation.
+- [ ] **Criterion bench group scaling per-`Plan` array field sizes
+      (`goals`/`keywords`/`relationships`/`tags`), not just candidate-list
+      length.** *(Verified: `grep -n "fn bench_" benches/match_pair.rs`
+      shows only candidate-count scaling via `bench_rank`
+      (10/100/1000, `Throughput::Elements`); no group varies a single
+      `Plan`'s own array fields.)* Add a `bench_field_arrays` group
+      holding two records fixed while growing one array field at a
+      time, so the O(n·m) cost the item above is about is directly
+      visible in `cargo bench` output.
+      **Acceptance:** `cargo bench --no-run` compiles the new group; a
+      local `cargo bench` run's near-linear-or-worse scaling is
+      recorded in a `CHANGELOG.md` note.
+- [ ] **Property-test `MatchConfig` values other than the built-in
+      presets.** *(Verified: `grep -n "MatchConfig" tests/property_tests.rs`
+      returns no hits — the SEC-M6 property suite (§19) only exercises
+      `MatchingEngine::new(MatchConfig::default())`; `MatchConfig`'s
+      weight fields are all `pub` with no validating constructor.)* Add
+      a `proptest` strategy generating arbitrary finite `MatchConfig`
+      weights/threshold and assert the same never-panic /
+      finite-`[0.0,1.0]`-score invariants already claimed for the
+      default config. If an adversarial config (e.g. all-zero weights)
+      can break the invariant, decide whether `MatchConfig` needs a
+      validating constructor or the invariant is scoped to
+      `default()`/preset-built configs only — record the decision in
+      spec §19/§21.
+      **Acceptance:** the new proptest passes (or a validating
+      constructor is added and the property re-run against it), and
+      §19/§21 states explicitly whether the guarantee covers hand-built
+      `MatchConfig` values.
 
 ## 24. Testing strategy
 

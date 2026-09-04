@@ -59,6 +59,39 @@
 - [ ] **LT-14** CSV / FHIR export of the audit log (P2)
 - [ ] **LT-15** NHS Spine PDS lookup on folder registration (P3)
 
+- [ ] **LT-17** Nested `.github/workflows/{quality,security}.yml` in this
+  crate are wired into neither `.github/workflows/` nor `.woodpecker.yml`
+  at the repo root *(verified: `grep -rl case-folder ../../.github/workflows/
+  ../../.woodpecker.yml` finds nothing)* — root CI already runs
+  `fmt`/`clippy`/`test`/`deny` against this crate via
+  `scripts/ci-crates.sh`'s generic Cargo.toml discovery, so these files
+  never execute and only look like coverage. Cross-referenced at the
+  cross-edition level as root **T-17** (same finding, decide once).
+  **Acceptance:** delete the two files, or add a one-line comment at the
+  top of each explaining why they're kept as a deliberate local-only
+  convenience despite never running in CI.
+- [ ] **LT-18** `openapi.yaml`'s `bearerAuth` scheme declares
+  `bearerFormat: JWT`, but `src/auth/mod.rs::bearer_token` /
+  `identity_from_headers` treat the bearer value as the raw opaque
+  session id, never as a decoded JWT *(verified by reading both files —
+  the only real JWT in this service is the short-lived magic-link token,
+  which is accepted only at `POST /api/auth/verify`, never as a bearer
+  credential elsewhere)*. Cross-referenced as root **T-18**.
+  **Acceptance:** `bearerFormat` is corrected or removed, matching the
+  actual credential shape.
+- [ ] **LT-19** [`testing.md`](testing.md)'s unit-test inventory
+  (`src/nhs.rs` 8 + `src/controllers/alerts.rs` 6 = 14, and `cargo test`
+  passes are described only in those terms) has drifted since **T-AUTH**
+  landed: `src/auth/mod.rs` carries 7 `#[test]`s and `src/auth/crypto.rs`
+  carries 2 more, neither module mentioned in the doc — *(verified:
+  `grep -rn '#\[test\]' src | xargs -I{} …` counts 23 unit tests total in
+  `src/`, against the 14 the doc enumerates)*. The same "doc says a count,
+  code has moved past it" pattern **LT-16** fixed once for
+  `testing.md`/`README.md`'s request-test count. **Acceptance:**
+  `testing.md` gets a `src/auth/` section naming what each of the 9 tests
+  pins (HS256 round-trip, expired-session eviction, cookie vs bearer
+  resolution, …), and the running total is corrected.
+
 ## Production gates
 
 - [ ] **LT-G1** Auth (CIS2 / OIDC) + ABAC via Loco auth layer (P0)

@@ -225,6 +225,59 @@ access/audit requirements.
 
 ## 13. Tasks (live work queue)
 
+- [ ] **FE-3 (M) Masked view + GDPR export UI.** The service has
+  carried `GET /api/cases/{pid}/masked` and `GET /api/cases/{pid}/export`
+  since 2026-08-02 (this crate's own `AGENTS.md` "API consumption"
+  table lists both), but `CaseRepository` has no `masked()`/`export()`
+  method and no route calls either path — *(verified:
+  `grep -n "  async \|(pid" src/lib/api/cases.ts` lists `get`/`update`/
+  `remove`/`audit` and no masked/export method; a repo-wide grep for
+  `masked` and `/export` under `src/lib/api/cases.ts` and
+  `src/routes/` returns nothing)*. Add `CaseRepository.masked(pid)` /
+  `.export(pid)`, and a "View masked" / "Export (GDPR)" affordance on
+  `/[pid]` — even a plain link/button that renders the JSON is enough
+  to make the capability reachable; a dedicated view is a stretch goal.
+  Three-part change: spec §6/§9/§13 + `src/lib/api/cases.ts` +
+  `src/routes/[pid]/+page.svelte` + vitest coverage.
+  **Acceptance:** new vitest cases pin the two new repository methods'
+  URLs; a Playwright smoke test exercises the masked view (or export)
+  affordance from `/[pid]`.
+
+- [ ] **FE-4 (M) Decide and, if adopted, implement the `requireSignedIn`
+  page-visit guard (PRO-H10).** Repo `tasks.md` WEB-1 found the guard
+  rolled to 5 of 16 front-ends (person, worker, thing, course, event)
+  and explicitly left "the 5/11 roll-out question... still open" for
+  the rest, case included — *(verified:
+  `grep -rn "requireSignedIn" src/` in this project returns zero
+  matches, matching WEB-1's finding)*. This project's own auth model
+  (BFF + httpOnly session cookie, §8) is otherwise identical to the
+  five that do have the guard, so there is no structural reason it
+  couldn't apply the same page-visit check to `/new`, `/merge`,
+  `/[pid]/edit` and similar mutating routes. Either add it (following
+  person's `requireSignedIn(locals)` pattern in `+page.server.ts`,
+  plus the WEB-1 fix's `SMOKE_STORAGE_STATE` Playwright stub-cookie
+  approach so the smoke suite still renders guarded pages) or record
+  in this spec (§8/§13) why case deliberately opts out — either answer
+  closes the open question for this one front-end.
+  **Acceptance:** either `requireSignedIn` gates the mutating routes
+  with a pinned anonymous-303 Playwright test (mirroring person's), or
+  spec §8 states the explicit reason case stays unguarded.
+
+- [ ] **FE-5 (S) `Custom(label)` editing for case type / status / schemes.**
+  Already an open §16/roadmap item ("Still open: ... `Custom(label)`
+  editing") but never promoted to a §13 checkbox with a concrete scope —
+  *(verified: `grep -n "Custom" src/lib/components/CaseForm.svelte`
+  shows no `Custom` variant handling in the form; the `case_matcher`
+  wire shape carries a `Custom(String)` case-type/status/identifier-scheme
+  variant per the sibling matcher's serde docs)*. Give `CaseForm` a
+  text input that appears when `Custom` is selected in the case-type /
+  status / identifier-scheme dropdowns, wired to the existing form
+  validation. Three-part change: spec §6/§13 + `CaseForm.svelte` +
+  vitest coverage.
+  **Acceptance:** selecting `Custom` in any of the three dropdowns
+  reveals a label input; a round-trip vitest case pins the payload
+  shape (`{Custom: "<label>"}`) sent on save.
+
 - [x] vitest unit tests for `ApiClient` + `CaseRepository` + `CaseForm`
   assembly + i18n parity + layout + the merge/link validators
   (`tests/unit/`, 61 tests across 7 files — see §11).

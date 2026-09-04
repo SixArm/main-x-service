@@ -46,4 +46,80 @@
 - [x] AU-2: **Key rotation + ABAC policy hot-reload without a restart** — the loco-style half of the family AU-1/AU-2 rollout (case was the reference; the five axum-style services landed the same day as AU-1). The verifier and the ABAC policy became reloadable holders (`ReloadableVerifier` / `ReloadablePolicy`) read per-request by the blanket guard and the bearer extractors, replacing boot-only `OnceLock` snapshots. `spawn_key_refresh` re-fetches `COURSE_PASETO_KEYS_URL` every `COURSE_PASETO_KEYS_REFRESH_SECS` (default 3600; `0` disables); a failed fetch keeps the current key set. `spawn_policy_watcher` polls `COURSE_ABAC_POLICY_FILE`'s mtime every 15s and reloads; a malformed edit falls back to the built-in default. `tests/enforcement.rs` is the activation proof (its own binary, `#[ignore]`d — needs a database). **Landed 2026-08-01** (see `CHANGELOG.md`; had no §13 entry until this DOC-2 pass).
 - [x] T-23: **Durable event bus — Phase 3, `FluvioSink` (BUS-3)** — copy-adapts the completed **case-service** reference (`agents/share/event-bus.md` §5/§8; `case/case-service-with-loco/src/relay.rs`, BUS-1). Correction en route: the family capability matrix (`agents/share/overview.md`) had claimed course carries "in-memory events only, no durable outbox" — false since T-21/T-22 landed the real `course_outbox` table + working `EventTransport::Outbox` switch + a relay already wired into `App::after_routes`; course is a legitimate `FluvioSink` target like every other outbox-carrying service. The real-broker `impl EventSink`, behind this crate's own `fluvio` Cargo feature (off by default; `fluvio` 0.50) — a default build's dependency tree and behaviour are unchanged. One producer per topic (`fluvio::Fluvio::connect_with_config` + `topic_producer`, held for the sink's lifetime), partitioned by record `pid` per §7. New config: `COURSE_FLUVIO_ENDPOINT` (the broker's SC address; unset ⇒ `LoggingSink`, unchanged default behaviour) and `COURSE_EVENT_TOPIC` (default `mxi.course.events`). **No silent fallback**: an endpoint configured **without** the `fluvio` feature refuses to start the relay at all (logged at `error`), rather than a `LoggingSink` masquerade that would mark outbox rows `published_at` without ever reaching the broker the operator asked for — the same shape as the family's artifact-store "no fallback on an explicit backend choice" rule (`agents/share/bulk-import-export.md` §12). The initial connection retries indefinitely rather than falling back, for the same reason. `compose.fluvio.yaml` + `Dockerfile.fluvio-cli` provision a local SC+SPU broker (Fluvio's own documented Docker Compose layout, translated to this repo's Podman conventions, `mxi-course-fluvio-*` container names) for opt-in manual runs; **not** wired into any automated CI stage. This crate has no `compliance/soup.tsv` (unlike case), so no SOUP register update. **Done (2026-08-03):** `cargo build`/`clippy --all-targets -D warnings`/`fmt --check` clean under both default features and `--features fluvio` (the real `fluvio` 0.50 API compiling is the actual verification of correct usage); `cargo test --lib` passes the same count under both configs. `tests/fluvio_relay.rs` is a `#![cfg(feature = "fluvio")]`-gated, `#[ignore]`d round-trip (enqueue via `SeaOrmCourseRepository::create` under the outbox transport → `FluvioSink` → `drain_once` → assert `published_at`), verified by compiling under the feature, not by an actual execution (no automated run in this repo stands up a broker) — same posture as case's `fluvio_relay_publishes_an_outbox_row_to_a_real_topic` (BUS-1) and person's `s3_round_trip_against_a_live_endpoint` (BLK-4). Deviation from the case template: course has no loco `request::<App, _, _>` test harness, so the test drives `SeaOrmCourseRepository` directly against a `DATABASE_URL`-configured Postgres, matching this crate's existing `outbox_atomicity_tests` shape rather than case's loco-request pattern. Full DB-gated suite (`scripts/ci-check.sh test-db course/course-service-with-loco`) green with zero regressions. Remaining: BUS-2 (link-graph Fluvio consumer, cross-cutting) and wiring the CourseInstance sub-resource onto the outbox.
 - [x] T-26 (2026-08-30, PRO-H12 slice 1 of 7): **OpenTelemetry OTLP export.** New `src/observability.rs` — this crate carried no observability module at all before this change (unlike person/worker/event, PRO-H9, which each had a dead stub to replace). Close port of person-service's `src/observability.rs` (itself ported from link-graph-service's, the family's original reference): the `tracing-opentelemetry` bridge over an OTLP/gRPC `SdkTracerProvider`/`SdkMeterProvider`, export-on-by-default at `OTLP_ENDPOINT` (default `http://localhost:4317`) with `service.name` from `OTLP_SERVICE_NAME` (default `course-service`), both deliberately unprefixed per the shared doc. `App::init_logger`/`on_shutdown` (`src/app.rs`) install/flush it; `observability::trace_mw` is layered as the outermost middleware on **both** of this crate's router-construction surfaces (`App::after_routes` and `api::rest::create_router`) — the same two-surface adaptation person/worker/event needed, confirmed rather than assumed identical. Unlike person/worker/event, **no `tonic` dev-dependency rename was needed**: this crate carries no gRPC stub of its own (`agents/share/overview.md`'s capability matrix), so the in-process OTLP collector tests' `tonic = "0.14"` dev-dependency is a plain, un-renamed dependency — proof the rename PRO-H9 needed is conditional on the gRPC-stub collision, not a fixed step of the port. `tests/otlp_export.rs` + `tests/otlp_middleware.rs` + `tests/otlp_collector/` (ported from person-service) prove real export against a real in-process gRPC listener in a normal `cargo test` run — a `tracing` span and a metric both reach the collector's decoded protobuf, and a served request's `traceparent` header matches its exported span's trace id. Verified independently: `cargo fmt --check` clean, `cargo clippy --all-targets -- -D warnings` clean, `cargo deny check` clean, MSRV check (`cargo +1.96 check --all-targets`) clean, `cargo test --lib` 132/132 (was 124, +8 new `observability::tests`), `cargo test --test otlp_export --test otlp_middleware` 4/4. `agents/share/{overview.md,observability.md,rust-tracing-opentelemetry-stack.md}` updated to reflect course as the fourth crate carrying a real exporter (PRO-H12's remaining scope: place, thing, organization, care-pathway, case, portfolio).
+- [ ] T-27: Persist the review queue to `course_match_scores` + add
+  list/decision endpoints. `POST /api/courses/deduplicate` classifies
+  pairs into the review band and returns `ReviewQueueItem`s in the
+  response (`src/models/review_queue.rs`,
+  `src/api/rest/handlers.rs`), but never writes them anywhere — the
+  `course_match_scores` SeaORM table exists precisely to hold these
+  rows (`src/db/models.rs`, doc comment: "backs `ReviewQueueItem`";
+  `spec/10-persistence.md` lists it as "historical match scores /
+  review queue") and is referenced nowhere outside its own definition.
+  *(verified: `grep -rn "course_match_scores" src/` matches only
+  `src/db/models.rs`; no INSERT/SELECT anywhere.)* Add
+  `CourseRepository::{upsert_review_item, list_review_items,
+  decide_review_item}`, wire `POST /api/courses/deduplicate` to
+  persist candidates it finds, and add `GET /api/courses/review-queue`
+  + `POST /api/courses/review-queue/{id}/decision` mirroring the
+  family pattern (`agents/share/match-search-merge.md`:
+  `pending`/`confirmed`/`rejected`/`automerged`, first-writer-wins).
+  - **Acceptance:** a batch dedup run's candidates survive a process
+    restart (queryable via `GET /api/courses/review-queue`); a
+    `pending` item can be confirmed or rejected exactly once; a
+    re-scan upserts (refreshes score, keeps a decided row's decision)
+    per the shared UNIQUE-upsert convention.
+- [ ] T-28: Wire the `syllabus_sections` sub-resource to persistence +
+  CRUD endpoints. The domain field is validated on every create/update
+  (`src/validation/mod.rs:153`, `cap_array`) and the DB schema is
+  fully built (`syllabus_sections` + `course_syllabus_text_values`
+  tables, FK relations in `src/db/models.rs`), but `hydrate_course`
+  hard-codes `syllabus_sections: vec![]` on every read
+  (`src/db/mod.rs:707,766`) and no repository method or route ever
+  writes a row — a client's submitted syllabus is silently accepted by
+  validation and then dropped. *(verified: `grep -n "syllabus"
+  src/api/rest/mod.rs` has zero route matches; `grep -rn
+  "syllabus_sections" src/db/mod.rs` shows only the hydrate-empty
+  comment.)* Add `CourseRepository::{list,get,create,update,soft_delete}_syllabus_section`
+  (mirroring T-8's instance pattern, including the self-referential
+  `parent_id` tree) and mount
+  `/api/courses/{id}/syllabus-sections{,/{section_id}}`.
+  - **Acceptance:** a created syllabus section round-trips through
+    `GET /api/courses/{id}` (`syllabus_sections` non-empty) and
+    through its own sub-resource endpoints; a nested (child) section
+    persists its `parent_id`; existing validation caps
+    (`MAX_ARRAY_LEN`) still apply pre-persist.
+- [ ] T-29: Fix stale implementation-status and changelog drift.
+  `spec/14-implementation-status.md`'s "OpenTelemetry export" row
+  still reads `– OTLP_* config parses but is unused; no exporter`,
+  which was true before T-26 (2026-08-30) but is false now —
+  `src/observability.rs` is a real exporter with `trace_mw` layered on
+  both router surfaces. *(verified: `src/observability.rs` exists with
+  the tracing-opentelemetry bridge; T-26 above is marked `[x]`.)*
+  Separately, `CHANGELOG.md`'s `[Unreleased]` section still carries a
+  `### Added — declared MSRV (Rust 1.95)` entry citing
+  `spec/rust-msrv-n-minus-3/index.md`, a doc that no longer exists —
+  the repo's MSRV policy moved to N-2 and this crate's own
+  `Cargo.toml` already declares `rust-version = "1.96"` matching
+  `ci/msrv.txt`. *(verified: `find spec -iname "*msrv*"` → only
+  `spec/rust-msrv-n-minus-2`; `grep -n rust-version Cargo.toml` →
+  `1.96`.)*
+  - **Acceptance:** `spec/14-implementation-status.md`'s OpenTelemetry
+    row says ✅ with a T-26 pointer; the CHANGELOG's stale MSRV-1.95
+    entry is corrected or folded into a dated MSRV-1.96 entry so
+    `[Unreleased]` no longer contradicts `Cargo.toml`.
+- [ ] T-30: Add `TODO`-marked fidelity-gap comments in
+  `src/fhir/mod.rs` per the family FHIR contract.
+  `agents/share/fhir.md` §2 requires "every drop of fidelity is a
+  documented, `TODO`-marked gap, never silent," but the gaps in
+  `to_fhir_basic` (listed in T-20 above) are recorded only as prose in
+  a doc comment (`src/fhir/mod.rs:118-120`). *(verified: `grep -rn
+  "TODO\|FIXME" src/` returns zero matches repo-wide.)* Convert the
+  documented gap list into actual `// TODO(fhir):` markers at the
+  point in `to_fhir_basic`/`from_fhir_basic` where each field is
+  skipped, so a future extension pass (or a repo-wide TODO sweep)
+  finds them mechanically rather than by reading prose.
+  - **Acceptance:** each of the twelve listed fidelity gaps has a
+    corresponding `// TODO` comment in `src/fhir/mod.rs`; `cargo
+    clippy --all-targets -- -D warnings` stays clean; no behavioural
+    change.
 

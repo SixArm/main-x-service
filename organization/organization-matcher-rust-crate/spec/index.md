@@ -272,6 +272,44 @@ async, or panics to library code.
 - [ ] Address: postal-code exact-anchor boost.
 - [ ] Split this single `spec/index.md` into the numbered §-per-file
       layout used by the sibling matcher crates.
+- [ ] **ORGM-T1 (S) Guard `MatchConfig` against caller-supplied
+      negative/NaN weights.** Every field on `MatchConfig` is `pub` and
+      directly settable, and nothing validates them — a caller-built
+      config with a negative or `NaN` weight reaches
+      `scoring::weighted_average` unchecked, where a negative
+      `weight_sum` (or one that sums to exactly zero from cancelling
+      positive/negative weights) can push the returned score outside
+      `[0.0, 1.0]` or produce `NaN`, breaking the crate's own documented
+      invariant ("scores stay bounded and finite", §24) and the
+      `Confidence::classify` banding built on it. *(Verified:
+      `tests/property_tests.rs` only ever constructs the engine via
+      `MatchingEngine::default_config()` — no property or unit test
+      exercises an adversarial `MatchConfig`, and `src/config.rs` has no
+      constructor that rejects one.)* Add a fallible constructor (e.g.
+      `MatchConfig::validated(self) -> Result<Self, MatchError>`
+      rejecting negative/NaN/infinite weights and a threshold outside
+      `[0.0, 1.0]`), document it in spec §7, and keep the plain struct
+      literal working for the common case (so this is additive, not a
+      breaking API change). **Acceptance:** a new proptest generates
+      weight vectors including negative/zero/NaN values and asserts
+      `weighted_average`'s output stays in `[0.0, 1.0]` when the
+      returned config is well-formed, and that the fallible constructor
+      actually rejects the malformed ones; `cargo clippy --all-targets
+      -- -D warnings` stays clean.
+
+- [ ] **ORGM-T2 (S) Fuzz coverage for the `relationships`/`tags`
+      components.** These two components (PRO-H7, already `[x]` above)
+      have zero presence in the crate's fuzz/property/bench harnesses —
+      only the hand-written unit tests in `src/matcher.rs` exercise
+      them. *(Verified: `grep -n "relationships\|tags"
+      fuzz/fuzz_targets/*.rs tests/property_tests.rs` returns no hits.)*
+      Extend `tests/property_tests.rs`'s `org_strategy()` to generate
+      `relationships`/`tags`, and add a `relationships_score`/
+      `tags_score` case to the existing `cargo-fuzz` harness (SEC-I2
+      coverage). **Acceptance:** the never-panic/bounded-score
+      properties (§24) hold with populated `relationships`/`tags`
+      fields; `cargo +nightly fuzz run match_organizations` (short
+      smoke) runs clean with the new field paths reachable.
 
 ## 24. Testing strategy
 

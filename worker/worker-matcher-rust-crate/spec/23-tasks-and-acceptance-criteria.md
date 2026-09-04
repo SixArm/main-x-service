@@ -27,5 +27,19 @@ Single source of truth for outstanding work; absorbs what an SDD workflow would 
 - [x] Add `tags_weight` (default `0.05`, supporting-signal cluster) and include the field in the probabilistic weighted average (§12.3); keep weights renormalised; update `agents/matching-algorithm.md` detail tables + `CHANGELOG.md`.
 - **Acceptance:** two records sharing tags score higher with a documented `tags_score`; empty tags do not participate; default weights renormalise correctly; `cargo test` + `cargo clippy --all-targets -- -D warnings` clean.
 
+**T-35 — Fuzz coverage for the national-identifier parsers (`src/identifiers.rs`).**
+- [ ] Add a `fuzz/fuzz_targets/identifiers.rs` libFuzzer target that feeds arbitrary UTF-8 directly into each of the 42+ per-scheme parse/validate functions in `src/identifiers.rs` (verified: `fuzz/fuzz_targets/` has only `match_workers.rs`, `scorer.rs`, `normalizer.rs` — none references `identifiers::`, and the JSON-blob `match_workers` target cannot reliably reach deeply-nested per-scheme fields by byte fuzzing alone).
+- [ ] Pin the never-panic + no-overflow invariant (`agents/share/security.md` invariant 2) across every scheme's checksum/regex validation, including the T-17.1 residual schemes once their TSV rows land.
+- **Acceptance:** `cargo +nightly fuzz run identifiers` runs clean for the CI smoke duration; every parser in `src/identifiers.rs` is reachable from the new target's call list.
+
+**T-36 — Library-level input-size bounds for standalone use (`agents/share/security.md` invariant 3).**
+- [ ] Add `MAX_TEXT_LEN`/`MAX_ARRAY_LEN`-style caps (mirroring the family-wide SEC-M1 bounds) inside `MatchingEngine`/`Scorer` itself, not only at the embedding service's HTTP boundary (verified: no `MAX_TEXT_LEN`/`MAX_ARRAY_LEN`/length-guard hits in `src/matcher.rs`, `src/scorer.rs`, or `src/models.rs`; the crate is published as "usable standalone" per `agents/share/overview.md`, so a standalone caller can pass unbounded strings straight into the O(n·m) Jaro-Winkler/Levenshtein scorers with no library-side ceiling).
+- [ ] Document the caps + their defaults in §7 (NFR) and §13 (configuration).
+- **Acceptance:** a pathological multi-megabyte name/address input degrades gracefully (bounded time) rather than unboundedly scaling; new unit + proptest cases pin the ceiling; `cargo test` and `cargo clippy --all-targets -- -D warnings` clean.
+
+**T-37 — Document the assessments-data boundary in §2 Scope.**
+- [ ] Add an explicit "out of scope" clause to `spec/02-scope.md` stating that `worker-service`'s aptitude / personality / psychometric / selection assessment data (per-scale results, score bands, derived profile — the `worker-service` row of `agents/share/overview.md`) is never a matcher input, output, or scoring signal, mirroring the existing organisation-level-identifiers out-of-scope paragraph already in that section (verified: `grep -rni 'assessment|psychometric|aptitude|personality'` across this crate's `spec/` and `src/` returns zero hits — the boundary holds in practice but is nowhere stated).
+- **Acceptance:** §2 states the boundary in the same style as the organisation-level-identifiers paragraph, cross-referencing `worker-service`.
+
 ---
 

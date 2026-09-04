@@ -1346,6 +1346,66 @@ the evidence bundle.
   domain having a distinct label and `Domain::ALL` covering every
   variant.
 
+- [ ] **CP-T1 (M) Batch `/deduplicate` + persisted `review_queue`.**
+  Unlike person/worker/place/thing/organization
+  (`agents/share/match-search-merge.md`: "Review queue persisted... —
+  person / worker / place / thing / organization"), this crate has only
+  real-time `check-duplicates`; there is no batch scan endpoint and no
+  stored review queue at all. `auth::DESTRUCTIVE_POST_SUFFIXES` already
+  reserves `/deduplicate` as a destructive action "ahead of the
+  dedup-scan... features", confirming this was planned but never
+  built. *(Verified: `grep -n '"/check-duplicates"\|"/deduplicate"\|"/review-queue"'
+  src/controllers/care_pathways.rs` shows only `/check-duplicates`
+  routed; no `review_queue` table/migration/model exists.)* Three-part
+  change: a `review_queue` migration (mirroring case-service's, which
+  also started from zero — `provenance` column from day one), `POST
+  /deduplicate` (pairwise scan persisting candidates), `GET
+  /review-queue` (`?status=&limit=`), `POST /review-queue/{id}/decision`.
+  **Acceptance:** DB-gated round-trip (scan → list → decide → `422` on
+  re-decide → `404` unknown) green; the front-end's `/review` route (a
+  Kanban already exists for the *service's* stored review model in the
+  sibling crates) can be pointed at it in a follow-up.
+
+- [ ] **CP-T2 (M) Extend the ABAC `mask` obligation to `list`, `search`,
+  and `check-duplicates`.** Only the single-record `GET /{pid}` and
+  `GET /{pid}/export` handlers call `crate::auth::authorize_record`; the
+  `list`, `search`, and `check_duplicates` handlers return unmasked
+  provider name/id even under a `mask`-obligated policy. This is the
+  same gap as the family's SEC-G3 (partial for person) and violates
+  `agents/share/security.md` invariant 5 ("masking on every read
+  path"). *(Verified: `grep -n "async fn list\|async fn search\|async fn check_duplicates\|authorize_record"
+  src/controllers/care_pathways.rs` shows `authorize_record` only at the
+  two lines that also match `get`/`get_export`.)* Three-part change.
+  **Acceptance:** a DB-gated test with a `mask`-obligation policy proves
+  `list`/`search`/`check-duplicates` responses redact `provider_name`/
+  `provider_id` exactly as `GET /{pid}/masked` does.
+
+- [ ] **CP-T3 (S) `same_as` URL well-formedness validation.**
+  `src/validation.rs`'s `string_array_caps("same_as", …)` only bounds
+  length/cardinality; it never checks the entries parse as URLs. Since
+  `same_as` also drives the matcher's R-2 deterministic short-circuit
+  (case-folded string overlap, empty-guarded), a garbage non-URL value
+  is silently accepted and stored, and two pathways sharing the same
+  garbage string would still deterministically short-circuit to a
+  match. *(Verified: `grep -n "same_as" src/validation.rs` shows only
+  the cardinality/length call, no format check.)* Three-part change.
+  **Acceptance:** an `422` with a field-scoped reason for a `same_as`
+  entry that doesn't parse as a URL; existing valid records unaffected;
+  unit + request-level tests.
+
+- [ ] **CP-T4 (S) Wire FHIR `GET /fhir/PlanDefinition` search onto the
+  Tantivy index.** `controllers/fhir.rs::search` calls
+  `PathwayModel::list(&ctx.db, FHIR_SEARCH_SCAN_CAP)` — a capped
+  Postgres scan — rather than `crate::search::SearchEngine`, even
+  though this crate indexes via Tantivy for the native `/search`
+  endpoint. *(Verified: `grep -n "async fn search" -A 15
+  src/controllers/fhir.rs` shows the handler reading
+  `PathwayModel::list` directly.)* Three-part change, mirroring the
+  identical open item already recommended for organization-service.
+  **Acceptance:** `GET /fhir/PlanDefinition?title=` resolves through
+  Tantivy; a test proves a hit beyond the old scan cap is now found;
+  the `CapabilityStatement`'s declared search params are unchanged.
+
 ## 14. Implementation status
 
 Done: loco boot; care_pathways table + migration; CRUD with `422`

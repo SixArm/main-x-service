@@ -47,4 +47,53 @@
   `tests/unit/session.test.ts` (+2 — `requireSignedIn` throws a
   303-to-`/signin` redirect when signed out, passes through silently
   when signed in).
+- [ ] T-26: Doc sync — CSRF and GDPR-export are landed but several docs
+  still describe them as pending or out of scope. `AGENTS.md`'s "What
+  does NOT live here" still lists "GDPR-export download UI. Out of
+  scope for MVP." though T-20 landed it 2026-09-03; `spec/02-scope.md`
+  and `spec/12-compliance.md` echo the same stale claim. Separately,
+  `index.md`, `spec/02-scope.md`, `spec/03-stakeholders-and-users.md`,
+  `spec/08-architecture.md`, `spec/12-compliance.md`,
+  `spec/14-implementation-status.md`, and `spec/15-roadmap.md` all
+  still say CSRF is "not yet implemented" / "not yet done" even though
+  T-23b (above) has been `[x]` since 2026-08-28. `spec/14-implementation-status.md`'s
+  test count is also stale (says 34; the suite is actually 62
+  `it`/`test` cases across 7 files). *(verified: `grep -n "CSRF"
+  index.md spec/*.md` and `grep -n "GDPR" AGENTS.md spec/*.md` both
+  return hits contradicting T-20/T-23b's `[x]` status; `grep -c
+  "it(\|test(" tests/unit/*.test.ts` sums to 62, not 34.)*
+  - **Acceptance:** every doc listed above reflects T-20 and T-23b as
+    landed (with their dates), `spec/14-implementation-status.md`'s
+    Auth — CSRF row flips to ✅ and the test-count/file-list lines
+    match the real suite, and `README.md`'s Project layout test list
+    gains `proxy.test.ts` + `session.test.ts`. Doc-only; no behaviour
+    change.
+- [ ] T-27: `/calendar` has zero test coverage — no Playwright smoke
+  test and no unit test, despite writing back through the update
+  endpoint on drag-to-reschedule. Every other MVP route has at least a
+  smoke test asserting its shell renders; `/calendar` is the one gap.
+  *(verified: `grep -n "calendar" tests/e2e/events.spec.ts
+  tests/unit/*.test.ts` returns no hits — `grep -n "goto|test("
+  tests/e2e/events.spec.ts` lists `/`, `/events`, `/events/new`,
+  `/events/match`, `/events/merge`, `/events/[id]`,
+  `/events/[id]/edit`, `/events/[id]/audit`, but never `/calendar`.)*
+  - **Acceptance:** a Playwright smoke test visits `/calendar` (API
+    stubbed) and asserts the SVAR Calendar mounts; a follow-on
+    assertion (or a second test) stubs a drag-driven `PUT` and
+    confirms the page calls the same update endpoint the edit form
+    uses, without asserting SVAR's own drag mechanics.
+- [ ] T-28: The BFF auth flow itself — `/signin`, `/verify`, and the
+  sign-out form action (`src/routes/+page.server.ts`) — has no direct
+  test coverage. `tests/unit/session.test.ts` covers only the pure
+  helpers (`verifyCsrf`, `requireSignedIn`); nothing renders `/signin`
+  or `/verify`, and nothing exercises the `signout` action that clears
+  `SESSION_COOKIE`/`CSRF_COOKIE` and calls `signout()`.
+  *(verified: `grep -rln "signin\|verify" tests/` returns only
+  `session.test.ts` and `events.spec.ts` — the latter mentions
+  `/signin` solely as the redirect target in guard tests; `grep -rn
+  "signout" tests/` returns nothing.)*
+  - **Acceptance:** Playwright smoke tests for `/signin` (form renders,
+    submits to the magic-link request) and `/verify` (renders its
+    landing states); a unit or component test for the `signout` action
+    asserting it clears both cookies and redirects to `/`.
 

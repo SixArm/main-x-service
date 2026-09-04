@@ -286,3 +286,77 @@ code + tests in one PR.
 > (`contact-relationship-management-front-end-with-svelte`) were not
 > otherwise touched by this round.
 
+- [ ] CRM-T23 **Front-end "Download my data" + Erase action.** The
+      follow-up flagged above when CRM-T21/T22 landed: the contact
+      detail page has no subject-access download link and no
+      confirm-gated erase action, matching WPM-T32's shape (verified:
+      `grep -rln "subject-access\|/erase"
+      contact-relationship-management-front-end-with-svelte/src`
+      returns nothing, while the service's
+      `GET /api/contacts/{pid}/subject-access` and `POST …/erase`
+      have been live since CRM-T21). **Acceptance:** a "Download my
+      data" link and an Erase action (confirm-gated, navigating away
+      after the record 404s, and surfacing the service's `422` reason
+      when an open deal/ticket/active nurture enrolment blocks it) land
+      on the contact detail page; a Playwright spec drives both against
+      `page.route` stubs; vitest path map extended; svelte-check 0;
+      i18n keys ×13. (CRM-D14; CRM-R20, CRM-G2)
+
+- [ ] CRM-T24 **Wire record-level ABAC into the contact/deal
+      handlers.** `auth::deal_resource_attrs` and
+      `auth::contact_resource_attrs` are defined and unit-tested in
+      `auth.rs`, but `authorize_record` is called only from
+      `controllers/privacy.rs` (the CRM-T21 subject-access/erase
+      handlers) — never from `controllers/sales.rs`'s deal read/write
+      handlers or `controllers/relationships.rs`'s contact handlers
+      (verified: `grep -rn "authorize_record" src/controllers/*.rs`
+      shows exactly the two `privacy.rs` call sites). CRM-T22 already
+      named this narrower than described: "no list/get handler yet
+      redacts a deal amount, forecast value, campaign ROI, or contact
+      channel detail on an ordinary read." **Acceptance:** the deal
+      and contact GET/PUT handlers call `authorize_record` with their
+      resource attrs and honour the `mask` obligation on read
+      (amount/channel fields); the enforcement matrix
+      (`tests/enforcement.rs`) gains an owner-vs-non-owner and
+      masked-vs-unmasked pin for at least one deal and one contact
+      endpoint; `cargo test` plus the DB-gated enforcement suite
+      green; clippy pedantic clean. (CRM-D10, CRM-D12; CRM-G1)
+
+- [ ] CRM-T25 **`require_ref` EntityType coverage.** Same gap as its
+      WPM sibling: `controllers/sales.rs`, `support.rs`, and
+      `relationships.rs` pass `EntityType::Worker`,
+      `::Organization`, and `::Person` to the shared `require_ref`
+      helper, but `validation.rs`'s own `ref_rules` test only ever
+      passes `EntityType::Person` (verified: `grep -n "EntityType::"
+      src/validation.rs` vs `grep -rn "entity_ref::EntityType::"
+      src/controllers/*.rs`). **Acceptance:** `ref_rules` exercises
+      the wrong-type branch for at least `Worker` and `Organization`
+      too; `cargo test` green; clippy pedantic clean. (CRM-D11)
+
+- [ ] CRM-T26 **Front-end sign-in gate.** No `+layout.server.ts`
+      exists and `hooks.server.ts` only populates `locals.sessionId`
+      without redirecting (verified: `find src/routes -iname
+      "+layout.server.ts"` returns nothing); every deal/ticket/
+      dashboard page is reachable signed-out and only fails silently
+      at the API layer — the same page-visit auth-guard gap the repo
+      root `tasks.md` WEB-1 finding names. **Acceptance:** a root or
+      per-protected-route guard redirects a session-less visitor to
+      sign-in (excluding the public sign-in/verify routes); a
+      Playwright spec pins it; svelte-check 0. (CRM-D12)
+
+- [ ] CRM-T27 **Front-end test coverage for honesty rendering.**
+      `tests/unit/crm.test.ts` is the only vitest file, covering
+      `money()`, i18n parity, and the API path map only (verified:
+      `find tests src -iname "*.test.ts"` returns exactly one file);
+      none of the win-rate/forecast/ROI null-ratio rendering, the deal
+      board's stage math, or the SLA countdown/breach-flag logic that
+      the deal board, forecast table, and ticket queue views render
+      client-side is unit-tested, and `src/lib` has no extracted
+      formatting module the way the CMS front-end's `$lib/format`
+      provides. **Acceptance:** the null-ratio/masked-amount rendering
+      and stage/breach helpers used by the deal board, forecast table,
+      and ticket queue are extracted into a testable `$lib` module
+      with a vitest suite (zero-denominator, masked, breach-boundary
+      cases); svelte-check 0; existing Playwright suite stays green.
+      (CRM-D10)
+
