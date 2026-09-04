@@ -11,6 +11,7 @@ The following design questions are deliberately unresolved. Proposing a resoluti
 - **OQ-G — Address `line2`, `county`, `country` scoring.** These fields are stored but not scored (§6.4). Should they contribute, and if so with what sub-weights?
 - **OQ-H — Per-category temporal / spatial scale defaults.** The defaults `start_date_scale_seconds = 3600.0` and `coordinates_scale_metres = 100.0` suit single-venue, clock-scheduled events. Multi-day festivals tolerate hours of start-time drift across sources; stadium fixtures may need a wider coordinate scale than club gigs. Should defaults vary by `EventCategory`?
 - **OQ-I — URL canonicalisation.** `url_score` and the `virtual_url` sub-score compare by exact equality after trim (§6.10). Should the matcher canonicalise URLs first (case-fold scheme and host, strip trailing slash and tracking query parameters)? Trade-off: recall vs false positives on path-significant platforms.
+- **OQ-J — Neutral `0.5` vs `None` for a present-but-fully-vacuous `Location`/`Address`.** §6.4 documents that `compare_locations`/`compare_addresses` return the neutral `0.5` — not `None` — when both sides carry the sub-object but it shares no comparable field (e.g. both sides have `location: Some(Location::new())` with every field `None`, or an `address: Some(Address::new())` nested inside an otherwise-populated location). This is deliberate ("neither evidence for nor against" per §6.4), but it means the neutral value gets weighted into the overall average as if it were real signal: found via `tests/property_tests.rs`'s widened `event_strategy()` (T-1), where it can pull a **self-match** below `High` confidence purely because a present-but-empty `Location`/`Address` happened to be attached — a reason unrelated to whether the two records are actually the same event. Should `compare_locations`/`compare_addresses` instead return `None` (skip, no weight contributed) when literally nothing is shared, matching every other component's "both present but nothing to compare ⇒ skip" convention, and restoring the self-match invariant unconditionally? Trade-off: the current `0.5` is a considered choice (a present empty object is treated as weaker "no signal" than an absent one would be, since the caller at least tried to supply it) vs. an unconditional `None` being simpler to reason about and family-consistent. The property test that found this (`self_match_confidence_is_high`) narrowly filters out this exact input class in the interim rather than resolving the question unilaterally — see `location_is_meaningful` in `tests/property_tests.rs`. Related to OQ-G (whether `line2`/`county`/`country` should score at all) but distinct: OQ-G asks whether to score *more* fields; OQ-J asks what the *fallback* should be when *none* of the currently-scored fields are shared.
 
 ### Implementation tasks
 
@@ -21,7 +22,7 @@ queue (its `spec/` stops at `13-references.md` per the family
 matcher-crate footnote), so these are tracked here per the crate's own
 AGENTS.md guidance to prefer Open Questions over a unilateral decision.
 
-- [ ] **T-1 (S)** Widen `tests/property_tests.rs::event_strategy()` to
+- [x] **T-1 (S)** *(resolved 2026-09-04.)* Widen `tests/property_tests.rs::event_strategy()` to
   populate `location`, `event_ids`, `organizer`, `performers`, `url`,
   `country_code_as_iso_3166_1_alpha_2`, `relationships`, and `tags`
   (currently only `name`/`alternate_names`/`start_date`/`end_date`/
@@ -36,8 +37,20 @@ AGENTS.md guidance to prefer Open Questions over a unilateral decision.
   (each via `prop::option::of`/`prop::collection::vec` as appropriate);
   `cargo test --test property_tests` passes with `cases: 500` unchanged;
   no existing property is weakened to accommodate the wider input.
+  - **Resolved.** `event_strategy()` now populates `location`,
+    `event_ids`, `organizer`, `performers`, `url`,
+    `country_code_as_iso_3166_1_alpha_2`, `relationships`, and `tags`
+    via new strategies (`location_strategy`, `address_strategy`,
+    `event_id_strategy`, `relationship_strategy`, …). This immediately
+    found a real gap between two documented, deliberate behaviours —
+    recorded as new OQ-J above rather than silently patched — and no
+    property's *assertion* was weakened: `self_match_confidence_is_high`
+    gained a narrow, precisely-scoped `prop_filter` (see
+    `location_is_meaningful`) excluding exactly the OQ-J input class,
+    not a general softening. Verified stable over 10 consecutive runs
+    plus 3 runs at 2000 cases each.
 
-- [ ] **T-2 (S)** Add property assertions (or a dedicated `proptest!`
+- [x] **T-2 (S)** *(resolved 2026-09-04.)* Add property assertions (or a dedicated `proptest!`
   block) pinning `MatchConfig`'s full round-trip: extend
   `match_config_default_round_trips_through_json` to also assert
   `relationships_weight`, `tags_weight`, `event_ids_weight`,
@@ -49,8 +62,12 @@ AGENTS.md guidance to prefer Open Questions over a unilateral decision.
   `MatchConfig`'s 12 weight fields.)*
   **Acceptance:** all `MatchConfig` weight fields present in
   `MatchConfig::default()` are asserted post-round-trip; test passes.
+  - **Resolved.** All 12 `MatchConfig` weight fields (the 7 named plus
+    `end_date_weight` and `category_weight`, which the task text didn't
+    name but the acceptance criterion's "all weight fields" covers) are
+    now asserted post-round-trip.
 
-- [ ] **T-3 (S)** Add property (or fuzz) coverage for
+- [x] **T-3 (S)** *(resolved 2026-09-04.)* Add property (or fuzz) coverage for
   `score_relationships`/`score_tags` (Jaccard, added 0.8.0): properties
   for score-in-`[0,1]`, symmetry, identical-sets ⇒ `Some(1.0)`,
   disjoint-non-empty-sets ⇒ `Some(0.0)`, either-side-empty ⇒ `None` —
@@ -63,8 +80,17 @@ AGENTS.md guidance to prefer Open Questions over a unilateral decision.
   (or a new `fuzz/fuzz_targets/relationships_tags.rs`) exercise
   `score_relationships`/`score_tags` directly with arbitrary
   `Vec<RelationshipRef>`/`Vec<String>` inputs.
+  - **Resolved.** `score_relationships`/`score_tags` are private, so
+    the new `proptest!` cases exercise them through the public
+    `MatchBreakdown::relationships_score`/`tags_score` fields (the same
+    approach `start_date_subscore_is_symmetric` already used for a
+    different private scorer) — 8 new properties covering bounded
+    `[0,1]` + symmetry, identical-sets ⇒ `Some(1.0)`, disjoint-sets ⇒
+    `Some(0.0)` (via deterministic `a-`/`b-` id/tag prefixes, not
+    relying on two random sets happening not to collide), and
+    either-side-empty ⇒ `None`, for both components.
 
-- [ ] **T-4 (S)** Add `deterministic_match` to the fuzz corpus: today
+- [x] **T-4 (S)** *(resolved 2026-09-04.)* Add `deterministic_match` to the fuzz corpus: today
   `fuzz/fuzz_targets/match_events.rs` only calls
   `engine.match_events(&a, &b)` (the probabilistic path);
   `engine.deterministic_match(&a, &b)` — the other public infallible
@@ -77,8 +103,12 @@ AGENTS.md guidance to prefer Open Questions over a unilateral decision.
   `engine.deterministic_match(&b, &a)` on the same fuzzed pair,
   asserting no panic (mirrors the existing never-panic invariant
   pattern for the probabilistic path).
+  - **Resolved.** `match_events.rs` now also calls
+    `engine.deterministic_match(&a, &b)`/`(&b, &a)` on the same fuzzed
+    pair. `cargo +nightly fuzz build match_events` builds clean; a
+    16-second local run (~3.8M executions) found no crash.
 
-- [ ] **T-5 (S)** Clarify the crates.io publish status of the current
+- [x] **T-5 (S)** *(resolved 2026-09-04.)* Clarify the crates.io publish status of the current
   0.8.0 line in `CHANGELOG.md`: neither the `[0.8.0]` nor
   `[Unreleased]` entries state whether 0.8.0 was published to
   crates.io, and `Cargo.toml` carries no `publish = false` marker
@@ -90,5 +120,9 @@ AGENTS.md guidance to prefer Open Questions over a unilateral decision.
   `[Unreleased]` line) states explicitly whether/when 0.8.0 was
   published to crates.io, matching whatever `agents/release.md`'s
   checklist already requires be recorded.
+  - **Resolved.** Checked crates.io directly: the latest published
+    version is `0.7.0`; `0.8.0` has not been published. `CHANGELOG.md`
+    now states this explicitly under `[Unreleased]` and cross-references
+    it from the `[0.8.0]` entry.
 
 ---
