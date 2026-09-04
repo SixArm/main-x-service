@@ -176,6 +176,7 @@ src/
 ├── mailers/auth.rs        magic-link mailer (prod)
 ├── tasks/attributes.rs    `user_attributes` CLI task — operator ABAC attribute assignment (set/show/unset/clear users.attributes)
 ├── migration/             in-crate migrator: m20220101_000001_users, _000002_sessions, _000003_auth_events, _000004_users_deleted_at, _000005_auth_rate_limits, _000006_users_attributes, _000007_sessions_data, _000008_sessions_ttls, _000009_hash_credentials_at_rest, m20260728_000001_add_auth_event_mac
+├── version.rs             header-based API versioning (`Accepts-version`, `require_version_mw`, layered in `after_routes`)
 └── views/auth.rs          LoginResponse / CurrentResponse
 config/                    development/production/test yaml (keys/ holds only a README — no committed key files)
 ```

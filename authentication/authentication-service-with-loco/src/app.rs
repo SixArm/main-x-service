@@ -9,6 +9,7 @@
 
 use crate::migration::Migrator;
 use async_trait::async_trait;
+use axum::Router as AxumRouter;
 use loco_rs::{
     Result,
     app::{AppContext, Hooks, Initializer},
@@ -92,6 +93,21 @@ impl Hooks for App {
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
     }
+
+    /// Layer the header-based API-versioning middleware (spec §13 T-13)
+    /// onto the router loco just built. This crate's only
+    /// router-construction surface — unlike the person-style crates,
+    /// there is no second hand-rolled router anywhere in `src/`/`tests/`.
+    ///
+    /// # Errors
+    ///
+    /// Never returns an error today; the signature is loco's.
+    async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
+        Ok(router.layer(axum::middleware::from_fn(
+            crate::version::require_version_mw,
+        )))
+    }
+
     /// Register background workers on the Postgres-backed queue. None are
     /// wired today; the queue config stays in place for a future worker.
     ///

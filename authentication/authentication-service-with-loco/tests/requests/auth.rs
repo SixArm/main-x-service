@@ -699,6 +699,67 @@ async fn account_erasure_soft_deletes_anonymises_revokes_and_audits() {
     .await;
 }
 
+/// spec §13 T-13: every `/api/*` response carries the negotiated
+/// `Accepts-version` header, regardless of the handler's own status
+/// code. `/api/auth/audit/recent` is admin-gated (`403` for a
+/// non-admin bearer), which is exactly the point: the header comes from
+/// `require_version_mw` wrapping the whole response, not from the
+/// handler body.
+///
+/// The task text that opened this called for a "DB-free" version of
+/// this test; this crate's `request()` harness boots the full loco
+/// `App` (a real Postgres connection), so — as every other request
+/// test in this file already does — it needs one. There is no DB-free
+/// way to exercise a real HTTP round trip through the mounted
+/// middleware in this crate; the DB-free half of T-13's acceptance
+/// (`resolve_version`'s own unit tests) lives in `src/version.rs`.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn api_responses_carry_the_accepts_version_header() {
+    request::<App, _, _>(|request, ctx| async move {
+        let logged_in = prepare_data::init_user_login(&request, &ctx).await;
+        let (auth_key, auth_value) = prepare_data::auth_header(&logged_in.token);
+
+        let response = request
+            .get("/api/auth/audit/recent")
+            .add_header(auth_key, auth_value)
+            .await;
+        assert_eq!(
+            response.status_code(),
+            403,
+            "a non-admin bearer is forbidden from the system-wide audit trail"
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get("accepts-version")
+                .and_then(|v| v.to_str().ok()),
+            Some("1.0"),
+            "the response must carry the negotiated Accepts-version header"
+        );
+
+        // An explicitly-unsupported version is a clean 406, still on the
+        // same `/api/*` path.
+        let unsupported = request
+            .get("/api/auth/audit/recent")
+            .add_header(
+                axum::http::HeaderName::from_static("accepts-version"),
+                axum::http::HeaderValue::from_static("9.9"),
+            )
+            .await;
+        assert_eq!(unsupported.status_code(), 406);
+
+        // A non-API path (the published key set) is exempt — no header.
+        let keys = request.get("/.well-known/paseto-keys").await;
+        assert!(
+            keys.headers().get("accepts-version").is_none(),
+            "non-API paths must not carry Accepts-version"
+        );
+    })
+    .await;
+}
+
 // ---------------------------------------------------------------------------
 // DB-free contract assertions (always run).
 // ---------------------------------------------------------------------------

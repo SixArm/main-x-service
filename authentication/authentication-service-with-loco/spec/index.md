@@ -870,7 +870,7 @@ only by that subject.
         (`tests/requests/admin.rs`): admin replace+show+audit, non-admin
         `403`, missing-token `401`.
 
-- [ ] **T-13 (S) Adopt the `Accepts-version` header helper.** Per
+- [x] **T-13 (S) Adopt the `Accepts-version` header helper.** *(resolved 2026-09-04.)* Per
       [`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md)
       §6 step 6 ("later services adopt the header helper when next
       touched — they already have version-free URLs, so this is
@@ -893,6 +893,27 @@ only by that subject.
       **Acceptance:** `cargo test --lib` green; every `/api/*` response
       carries `Accepts-version`; an explicit unsupported version
       (`Accepts-version: 9.9`) gets `406`.
+      - **Resolved.** Added `src/version.rs` (ported from `case`/
+        `care-pathway`'s reference implementation) — `resolve_version`
+        over `SUPPORTED_API_VERSIONS = ["1.0"]` /
+        `CURRENT_API_VERSION = "1.0"`, and `require_version_mw`,
+        layered in a new `after_routes` (this crate had none before —
+        it is the only router-construction surface, matching every
+        other loco-idiomatic crate). Versions `/api/auth/*` **and**
+        `/api/compliance/*` uniformly (`path == "/api" ||
+        path.starts_with("/api/")`); `/.well-known/paseto-keys`,
+        `/api-docs/*`, and `/metrics.prom` are exempt. 5 new DB-free
+        unit tests in `src/version.rs`. The task text's "DB-free
+        request test" line turned out not to be achievable in this
+        crate: `tests/requests/*`'s `request()` harness boots a real
+        loco `App` (a real Postgres connection) to run at all — *every*
+        existing HTTP-level test in this crate is already `#[ignore]`d
+        for that reason, with no DB-free exception. The new
+        `tests/requests/auth.rs::api_responses_carry_the_accepts_version_header`
+        follows that same established, `#[ignore]`d pattern instead of
+        forcing an unprecedented DB-free HTTP round trip; it pins the
+        header on a `403`, a `406` on an explicit unsupported version,
+        and the exemption on `/.well-known/paseto-keys`.
 
 - [ ] **T-14 (S) Capture the source IP on sessions and `auth_events`.**
       [`agents/share/auditability.md`](../../../agents/share/auditability.md)
