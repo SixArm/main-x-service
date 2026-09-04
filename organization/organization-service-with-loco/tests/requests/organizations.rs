@@ -101,6 +101,42 @@ async fn update_with_blank_name_returns_422() {
     .await;
 }
 
+/// A malformed `url` (no `http(s)://` scheme) is a validation failure:
+/// `422 Unprocessable Entity` (ORG-T4).
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn malformed_url_returns_422() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let mut payload = acme();
+        payload["url"] = json!("not-a-url");
+        let response = request.post("/api/organizations").json(&payload).await;
+        assert_eq!(response.status_code(), 422, "malformed url must be 422");
+    })
+    .await;
+}
+
+/// An unrecognised `address.country` code is a validation failure:
+/// `422 Unprocessable Entity` (ORG-T4).
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn unrecognised_country_code_returns_422() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let mut payload = acme();
+        payload["address"] = json!({"country": "ZZ"});
+        let response = request.post("/api/organizations").json(&payload).await;
+        assert_eq!(
+            response.status_code(),
+            422,
+            "unrecognised country code must be 422"
+        );
+    })
+    .await;
+}
+
 /// Unknown pid → `404 Not Found`.
 #[tokio::test]
 #[serial]
