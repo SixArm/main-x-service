@@ -42,10 +42,19 @@ The implementation MUST enforce:
   `main_entity_of_page`, `subject_of`, each `image`, each `same_as`)
   MUST use the `http://` or `https://` scheme.
 - `Isbn` is 10 or 13 digits (dashes / spaces tolerated; trailing `X`
-  allowed for ISBN-10).
-- `Issn` is 8 chars (trailing `X` allowed).
+  allowed for ISBN-10) **and its check digit MUST verify**: ISBN-10
+  by the mod-11 scheme (weights 10 down to 1, `X` = 10), ISBN-13 by
+  the same GS1 mod-10 scheme as `Gtin` below.
+- `Issn` is 8 chars (trailing `X` allowed) **and its check digit MUST
+  verify** by the mod-11 scheme (weights 8 down to 1, `X` = 10).
 - `Doi` MUST start with `10.` and contain `/`.
-- `Gtin` is 8 / 12 / 13 / 14 digits.
+- `Gtin` is 8 / 12 / 13 / 14 digits **and its check digit MUST
+  verify** by the GS1 mod-10 scheme (data digits weighted 3, 1, 3, 1,
+  … right-to-left; same algorithm as the sibling `place-service`'s
+  `gln_is_valid`, generalised from GLN's fixed 13 digits to any GTIN
+  length). A well-formed-but-wrong-checksum identifier (e.g. a single
+  transposed digit) is rejected, not merely one with the right digit
+  count — spec/13-tasks.md T-14.
 - `Uuid` MUST parse per RFC 4122.
 - `Uri` MUST contain a scheme separator (`:`).
 - Soft delete is the only delete.

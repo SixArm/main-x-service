@@ -47,7 +47,7 @@ fn test_validate_isbn_length() {
 fn test_validate_gtin_length() {
     let mut thing = Thing::new("X");
 
-    thing.identifiers = vec![ThingIdentifier::gtin("12345678")]; // 8
+    thing.identifiers = vec![ThingIdentifier::gtin("12345670")]; // 8, checksum-valid
     assert!(validate_thing(&thing).is_empty());
 
     thing.identifiers = vec![ThingIdentifier::gtin("0012345600012")]; // 13

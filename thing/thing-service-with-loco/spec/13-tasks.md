@@ -415,8 +415,8 @@ clearly described manual check confirms the acceptance criterion.
   fields `mask_thing` redacts on `/masked`; clippy pedantic clean;
   three-part change (spec §9 + code + test).
 
-- [ ] **T-14 (M, security) — Verify GTIN/ISBN/ISSN check digits, not just
-  length.** `src/validation/mod.rs::validate_gtin` explicitly documents
+- [x] **T-14 (M, security) — Verify GTIN/ISBN/ISSN check digits, not just
+  length.** *(resolved 2026-09-04.)* `src/validation/mod.rs::validate_gtin` explicitly documents
   "the check digit is not verified", accepting any 8/12/13/14-digit
   string; `validate_isbn`/`validate_issn` likewise only check length and
   character set, never the ISBN-10/ISSN mod-11 or ISBN-13/GTIN GS1
@@ -443,4 +443,20 @@ clearly described manual check confirms the acceptance criterion.
   a single-digit-transposed invalid one for each scheme; `cargo test
   --lib` + clippy pedantic clean; three-part change (spec §6 + code +
   test).
+  - **Resolved.** `src/validation/mod.rs` gained
+    `gs1_mod10_check_digit_is_valid` (generalised from
+    place-service's fixed-13-digit `gln_is_valid` to any length, so
+    it serves GTIN-8/12/13/14 and ISBN-13 alike) and
+    `mod11_check_digit_is_valid` (ISBN-10 and ISSN, weights `len`
+    down to 1, `X` = 10); both are wired into `validate_gtin`,
+    `validate_isbn`, and `validate_issn`. Two pre-existing fixtures
+    turned out to be checksum-invalid once verification was added —
+    `0-141-43951-9` (wrong ISBN-10 check digit; the real book's is
+    `0-141-43951-3`) and the GTIN-8 fixture `12345678` (replaced with
+    the checksum-valid `12345670`) — both fixed in
+    `src/validation/mod.rs`'s own tests and
+    `tests/integration_edge_cases.rs`. Spec §5.4 invariants updated
+    with the check-digit requirement; new unit tests pin a valid id
+    and a single-digit-transposed invalid one for each of
+    ISBN-10/ISBN-13/ISSN/GTIN-8/GTIN-13.
 

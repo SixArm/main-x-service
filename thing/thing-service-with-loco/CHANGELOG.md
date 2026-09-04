@@ -8,6 +8,25 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Security — GTIN/ISBN/ISSN check-digit verification (T-14)
+
+`validate_gtin`/`validate_isbn`/`validate_issn` previously checked only
+length and character class, explicitly documenting "the check digit is
+not verified" — so a mistyped or transposed identifier persisted as
+valid, and since `thing-matcher`'s deterministic short-circuit fires on
+any shared `(property_id, value)` pair, two different physical items
+sharing a mistyped GTIN could spuriously match. Added
+`gs1_mod10_check_digit_is_valid` (GTIN-8/12/13/14 and ISBN-13, adapted
+from the sibling `place-service`'s `gln_is_valid`, generalised from a
+fixed 13 digits to any length) and `mod11_check_digit_is_valid`
+(ISBN-10 and ISSN, `X` = 10), wired into all three validators. Two
+pre-existing test fixtures were checksum-invalid once verification was
+added and are now real, checksum-valid identifiers: the dashed ISBN-10
+fixture (`0-141-43951-9` → `0-141-43951-3`, the real check digit for
+that book) and a GTIN-8 fixture (`12345678` → `12345670`). New unit
+tests pin a valid id and a single-digit-transposed invalid one for each
+of ISBN-10/ISBN-13/ISSN/GTIN-8/GTIN-13. See spec §5.4 and §13 T-14.
+
 ### Changed — `ThingMatcher` trait (T-2)
 
 The concrete matcher facade, formerly `struct ThingMatcher`, is renamed

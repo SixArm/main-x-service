@@ -326,50 +326,61 @@ fn validate_identifier(id: &ThingIdentifier) -> Result<(), String> {
     }
 }
 
-/// Validate an ISBN: 10 or 13 digits after stripping dashes/whitespace. An
-/// ISBN-10 may end in the check character `X`; ISBN-13 must be all digits.
+/// Validate an ISBN: 10 or 13 digits after stripping dashes/whitespace, with
+/// the check digit verified (not just length + charset). An ISBN-10 may end
+/// in the check character `X`; ISBN-13 must be all digits and follows the
+/// same GS1 mod-10 scheme as a GTIN-13 / EAN-13.
 fn validate_isbn(v: &str) -> Result<(), String> {
     // Strip the cosmetic separators humans use; count only payload chars.
     let digits: String = v
         .chars()
         .filter(|c| !c.is_whitespace() && *c != '-')
         .collect();
-    let n = digits.len();
+    let chars: Vec<char> = digits.chars().collect();
+    let n = chars.len();
     if n != 10 && n != 13 {
         return Err(format!("ISBN must have 10 or 13 digits, got {n}"));
     }
-    let valid = if n == 10 {
-        digits.chars().take(9).all(|c| c.is_ascii_digit())
-            && digits
-                .chars()
-                .last()
-                .is_some_and(|c| c.is_ascii_digit() || c == 'X')
+    if n == 10 {
+        let head_ok = chars[..9].iter().all(char::is_ascii_digit);
+        let tail_ok = chars[9].is_ascii_digit() || chars[9] == 'X';
+        if !head_ok || !tail_ok {
+            return Err("ISBN contains invalid characters".into());
+        }
+        if !mod11_check_digit_is_valid(&chars) {
+            return Err("ISBN-10 check digit is invalid".into());
+        }
     } else {
-        digits.chars().all(|c| c.is_ascii_digit())
-    };
-    if !valid {
-        return Err("ISBN contains invalid characters".into());
+        if !chars.iter().all(char::is_ascii_digit) {
+            return Err("ISBN contains invalid characters".into());
+        }
+        let values: Vec<u32> = chars.iter().filter_map(|c| c.to_digit(10)).collect();
+        if !gs1_mod10_check_digit_is_valid(&values) {
+            return Err("ISBN-13 check digit is invalid".into());
+        }
     }
     Ok(())
 }
 
 /// Validate an ISSN: exactly 8 characters after stripping dashes/whitespace,
-/// the last of which may be the check character `X`.
+/// the last of which may be the check character `X`, with the mod-11 check
+/// digit verified (not just length + charset).
 fn validate_issn(v: &str) -> Result<(), String> {
     let s: String = v
         .chars()
         .filter(|c| !c.is_whitespace() && *c != '-')
         .collect();
-    if s.len() != 8 {
-        return Err(format!("ISSN must be 8 digits, got {}", s.len()));
+    let chars: Vec<char> = s.chars().collect();
+    if chars.len() != 8 {
+        return Err(format!("ISSN must be 8 digits, got {}", chars.len()));
     }
-    let head_ok = s.chars().take(7).all(|c| c.is_ascii_digit());
-    let tail_ok = s
-        .chars()
-        .last()
-        .is_some_and(|c| c.is_ascii_digit() || c == 'X');
+    let head_ok = chars[..7].iter().all(char::is_ascii_digit);
+    let tail_ok = chars[7].is_ascii_digit() || chars[7] == 'X';
     if !head_ok || !tail_ok {
         return Err("ISSN contains invalid characters".into());
+    }
+    if !mod11_check_digit_is_valid(&chars) {
+        return Err("ISSN check digit is invalid".into());
     }
     Ok(())
 }
@@ -384,7 +395,8 @@ fn validate_doi(v: &str) -> Result<(), String> {
 }
 
 /// Validate a GTIN: 8, 12, 13, or 14 digits (GTIN-8/UPC/EAN/GTIN-14) after
-/// dropping any non-digit characters. The check digit is not verified.
+/// dropping any non-digit characters, with the GS1 mod-10 check digit
+/// verified (not just length).
 fn validate_gtin(v: &str) -> Result<(), String> {
     let digits: String = v.chars().filter(char::is_ascii_digit).collect();
     if !matches!(digits.len(), 8 | 12 | 13 | 14) {
@@ -393,7 +405,60 @@ fn validate_gtin(v: &str) -> Result<(), String> {
             digits.len()
         ));
     }
+    let values: Vec<u32> = digits.chars().filter_map(|c| c.to_digit(10)).collect();
+    if !gs1_mod10_check_digit_is_valid(&values) {
+        return Err("GTIN check digit is invalid".into());
+    }
     Ok(())
+}
+
+/// Verify a GS1 mod-10 check digit — the scheme shared by GTIN (8/12/13/14
+/// digits) and ISBN-13/EAN-13. Adapted from the sibling `place-service`
+/// crate's `gln_is_valid` (GLN is itself a 13-digit GS1 key), generalised
+/// from a fixed 13 digits to any length so one function serves every GTIN
+/// variant and ISBN-13.
+///
+/// Weights the data digits (every digit but the last, the check digit)
+/// right-to-left by 3, 1, 3, 1, … — the rightmost data digit (adjacent to
+/// the check digit) always gets weight 3, regardless of overall length.
+/// The check digit is whatever rounds the weighted sum up to the next
+/// multiple of 10 (the outer `% 10` maps an already-multiple-of-10 sum's
+/// `10 - 0 = 10` back down to a 0 check digit).
+fn gs1_mod10_check_digit_is_valid(digits: &[u32]) -> bool {
+    let Some((check, data)) = digits.split_last() else {
+        return false;
+    };
+    let sum: u32 = data
+        .iter()
+        .rev()
+        .enumerate()
+        .map(|(i, &d)| if i % 2 == 0 { d * 3 } else { d })
+        .sum();
+    let expected = (10 - (sum % 10)) % 10;
+    expected == *check
+}
+
+/// Verify a mod-11 check digit — the scheme shared by ISBN-10 and ISSN.
+/// Each character is weighted by its distance from the *end* of the whole
+/// string (leftmost character gets weight `len`, the check character itself
+/// gets weight 1); a valid identifier's weighted sum is a multiple of 11.
+/// The check character may be `X`, standing for the value 10 (never
+/// possible from a single decimal digit).
+fn mod11_check_digit_is_valid(chars: &[char]) -> bool {
+    let Ok(n) = u32::try_from(chars.len()) else {
+        return false;
+    };
+    let mut sum: u32 = 0;
+    for (i, &c) in chars.iter().enumerate() {
+        let Some(value) = (if c == 'X' { Some(10) } else { c.to_digit(10) }) else {
+            return false;
+        };
+        let Ok(i) = u32::try_from(i) else {
+            return false;
+        };
+        sum += value * (n - i);
+    }
+    sum.is_multiple_of(11)
 }
 
 /// Validate a UUID by delegating to [`uuid::Uuid::parse_str`] (RFC 4122).
@@ -485,11 +550,13 @@ mod tests {
         assert!(errors.iter().any(|e| e.field == "same_as[0]"));
     }
 
-    /// A dashed ISBN-10 is valid (dashes are stripped before counting).
+    /// A dashed ISBN-10 is valid (dashes are stripped before counting) and
+    /// its check digit verifies. This is the real ISBN-10 for the Penguin
+    /// Classics edition of *Pride and Prejudice* (check digit `3`).
     #[test]
     fn test_valid_isbn_10() {
         let mut thing = Thing::new("X");
-        thing.identifiers = vec![ThingIdentifier::isbn("0-141-43951-9")];
+        thing.identifiers = vec![ThingIdentifier::isbn("0-141-43951-3")];
         assert!(validate_thing(&thing).is_empty());
     }
 
@@ -506,6 +573,26 @@ mod tests {
     fn test_invalid_isbn_length() {
         let mut thing = Thing::new("X");
         thing.identifiers = vec![ThingIdentifier::isbn("123")];
+        assert!(!validate_thing(&thing).is_empty());
+    }
+
+    /// spec/13-tasks.md T-14: an ISBN-10 with the right length and charset
+    /// but a wrong (single-digit-transposed) check digit is rejected — the
+    /// real fixture above ends in `3`; swapping in `9` (the value the old,
+    /// checksum-blind validator previously accepted) must now fail.
+    #[test]
+    fn test_invalid_isbn_10_check_digit() {
+        let mut thing = Thing::new("X");
+        thing.identifiers = vec![ThingIdentifier::isbn("0-141-43951-9")];
+        assert!(!validate_thing(&thing).is_empty());
+    }
+
+    /// spec/13-tasks.md T-14: an ISBN-13 with a wrong final digit (the real
+    /// fixture ends in `8`) is rejected, not just length-checked.
+    #[test]
+    fn test_invalid_isbn_13_check_digit() {
+        let mut thing = Thing::new("X");
+        thing.identifiers = vec![ThingIdentifier::isbn("9780141439517")];
         assert!(!validate_thing(&thing).is_empty());
     }
 
@@ -538,6 +625,50 @@ mod tests {
     fn test_invalid_gtin_length() {
         let mut thing = Thing::new("X");
         thing.identifiers = vec![ThingIdentifier::gtin("1234")];
+        assert!(!validate_thing(&thing).is_empty());
+    }
+
+    /// spec/13-tasks.md T-14: a GTIN-13 with the right length but a wrong
+    /// (single-digit-transposed) check digit is rejected, not just
+    /// length-checked. The valid fixture above ends in `2`.
+    #[test]
+    fn test_invalid_gtin_13_check_digit() {
+        let mut thing = Thing::new("X");
+        thing.identifiers = vec![ThingIdentifier::gtin("0012345600011")];
+        assert!(!validate_thing(&thing).is_empty());
+    }
+
+    /// A checksum-valid GTIN-8 is valid.
+    #[test]
+    fn test_valid_gtin_8() {
+        let mut thing = Thing::new("X");
+        thing.identifiers = vec![ThingIdentifier::gtin("12345670")];
+        assert!(validate_thing(&thing).is_empty());
+    }
+
+    /// spec/13-tasks.md T-14: a GTIN-8 with the right length but a wrong
+    /// check digit is rejected.
+    #[test]
+    fn test_invalid_gtin_8_check_digit() {
+        let mut thing = Thing::new("X");
+        thing.identifiers = vec![ThingIdentifier::gtin("12345678")];
+        assert!(!validate_thing(&thing).is_empty());
+    }
+
+    /// A checksum-valid ISSN is valid (a real ISSN: *Discrete Mathematics*).
+    #[test]
+    fn test_valid_issn() {
+        let mut thing = Thing::new("X");
+        thing.identifiers = vec![ThingIdentifier::issn("0378-5955")];
+        assert!(validate_thing(&thing).is_empty());
+    }
+
+    /// spec/13-tasks.md T-14: an ISSN with the right length and charset but
+    /// a wrong (single-digit-transposed) check digit is rejected.
+    #[test]
+    fn test_invalid_issn_check_digit() {
+        let mut thing = Thing::new("X");
+        thing.identifiers = vec![ThingIdentifier::issn("0378-5954")];
         assert!(!validate_thing(&thing).is_empty());
     }
 
