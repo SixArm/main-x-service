@@ -35,28 +35,38 @@ per configured entity** (person, case — the only two with a live bulk
 None of this is transactional — each apply/delete is its own statement,
 and a mid-repair error leaves a partially-repaired graph.
 
-## The gauge has two sharp edges — know them before you trust a "0"
+## The gauge had two sharp edges — both closed (T-34/T-35)
 
-`link_graph_reconciliation_divergence` is a **single, unlabelled gauge**.
-Both entity workers write the same metric name, so its value is
-"whatever the *most recently completed* pass of *either* entity found" —
-not a sum, not per-entity. A converged `case` pass can overwrite a
-diverging `person` pass's `47` with `0` a moment later, and you'd never
-know from the metric alone.
+`link_graph_reconciliation_divergence` was a **single, unlabelled
+gauge**. Both entity workers wrote the same metric name, so its value
+was "whatever the *most recently completed* pass of *either* entity
+found" — not a sum, not per-entity. A converged `case` pass could
+overwrite a diverging `person` pass's `47` with `0` a moment later, with
+no way to tell from the metric alone. **T-34 fixed this**: the gauge is
+now an `IntGaugeVec` labelled `entity`, so `link_graph_reconciliation_
+divergence{entity="person"}` and `{entity="case"}` are independent
+series — a converged pass for one entity can no longer mask another's
+real divergence.
 
-It is also **only updated on a successful fetch**. A pass that fails
-(timeout, non-2xx, malformed JSON) leaves the gauge exactly where it
-was — a genuine `0` and a "hasn't run since boot" `0` look identical.
-The *only* per-pass signal, success or failure, is the log line (below).
+It was also **only updated on a successful fetch, with no separate
+per-pass signal**. A pass that failed (timeout, non-2xx, malformed
+JSON) left the divergence gauge exactly where it was — a genuine `0`
+and a "hasn't run since boot" `0` looked identical, and the only
+per-pass signal at all was the log line. **T-35 fixed this**: a new
+`link_graph_reconciliation_last_success_unixtime` gauge, also labelled
+`entity`, is set on every *successful* pass and left untouched by a
+failed one — so `now() − last_success` tells you how stale a `0` is
+without cross-referencing logs.
 
 ## Checks
 
 | Check | Where | What it tells you |
 |---|---|---|
-| Current divergence value | `GET /metrics.prom` → `link_graph_reconciliation_divergence` (public even under the guard) | Last successful pass's count, for *some* entity — see the caveat above |
+| Current divergence value, per entity | `GET /metrics.prom` → `link_graph_reconciliation_divergence{entity="…"}` (public even under the guard) | Last successful pass's count **for that entity specifically** (T-34) |
+| Time since last successful pass, per entity | `GET /metrics.prom` → `link_graph_reconciliation_last_success_unixtime{entity="…"}` | `now() − this` = staleness; `0`/absent = never run since boot (T-35) |
 | Per-status edge counts | `GET /metrics.prom` → `link_graph_edges{status="verified\|unverified\|dangling"}` | Refreshed at scrape time from the DB; the `dangling` count is a leading indicator worth watching independent of divergence |
 | Event-consumption lag (a *different* concept) | `GET /api/health/freshness` | Bus lag, not reconciliation lag — a pass can be perfectly converged while this is stale, or vice versa |
-| Whether a pass ran and what happened | logs, `reconciliation pass complete` (info, carries `divergence=`) / `reconciliation pass failed` (warn, carries the error) | The only place a *failed* pass is visible at all |
+| Whether a pass ran and what happened | logs, `reconciliation pass complete` (info, carries `divergence=`) / `reconciliation pass failed` (warn, carries the error) | Still the only place a failed pass's *error detail* is visible — the gauges tell you *that* it failed (staleness), not *why* |
 | Whether a source is even configured | boot log — a worker is spawned only when its `LINK_GRAPH_RECONCILE_URL_<ENTITY>` is set and passes the SEC-B7 check below | Silence from an entity can mean "converged" or "never configured" — check the env, not just the metric |
 
 There is **no** endpoint, task, or admin route to force a pass on

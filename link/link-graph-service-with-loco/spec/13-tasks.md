@@ -709,7 +709,7 @@ unblocked.
 
 ### Reconciliation gauge hardening
 
-- [ ] T-34 (M): Label `link_graph_reconciliation_divergence` per entity,
+- [x] T-34 (M): *(resolved 2026-09-04.)* Label `link_graph_reconciliation_divergence` per entity,
   closing the runbook's first "sharp edge". *(verified:
   `agents/share/runbooks/reconciliation-divergence.md` states plainly —
   "Both entity workers write the same metric name, so its value is
@@ -738,8 +738,20 @@ unblocked.
   `link_graph_reconciliation_divergence{entity="person"}` and
   `{entity="case"}` (etc.) as independent series; `cargo test --lib`
   green.
+  - **Resolved.** `reconciliation_divergence` in `src/metrics.rs` is now
+    an `IntGaugeVec` labelled `["entity"]` (mirroring
+    `consumer_lag_seconds`'s existing pattern exactly, as suggested);
+    `reconcile()` sets it via `source.entity().as_str()` at the call
+    site. Two new `src/metrics.rs` unit tests pin the labels are
+    independent; a new DB-gated
+    `tests/reconcile.rs::reconciliation_divergence_gauge_is_independent_per_entity`
+    proves a converged `person` pass does not zero a diverging `case`
+    pass's real count. The shared runbook
+    (`agents/share/runbooks/reconciliation-divergence.md`) is updated
+    in the same PR (a four-part change per this crate's own
+    shared-contract rule) to record the sharp edge as closed.
 
-- [ ] T-35 (S): Add a per-entity "last reconciliation pass" gauge,
+- [x] T-35 (S): *(resolved 2026-09-04.)* Add a per-entity "last reconciliation pass" gauge,
   closing the runbook's second "sharp edge". *(verified: the same
   runbook section — "It is also only updated on a successful fetch. A
   pass that fails (timeout, non-2xx, malformed JSON) leaves the gauge
@@ -762,6 +774,17 @@ unblocked.
   **Acceptance:** `GET /metrics.prom` exposes a per-entity
   last-successful-pass signal; a DB-gated or unit test pins that a
   failed pass does not advance it; `cargo test --lib` green.
+  - **Resolved.** Added `reconciliation_last_success_unixtime`
+    (`IntGaugeVec` labelled `["entity"]`) to `src/metrics.rs`;
+    `reconcile()` sets it via `Utc::now().timestamp()` immediately
+    after computing the divergence count — i.e. only once the fetch and
+    read-model query have both already succeeded, so an early `?`
+    on either leaves it untouched. The optional pass-outcome counter is
+    not added (out of scope for this pass — the two gauges together
+    already satisfy the acceptance criterion). A new DB-gated
+    `tests/reconcile.rs::reconciliation_last_success_gauge_is_unchanged_by_a_failed_pass`
+    proves a failed pass advances neither gauge while a prior real
+    (non-zero) divergence value survives untouched.
 
 - [ ] T-36 (S): Add an operator-forceable reconciliation pass.
   *(verified: the same runbook states "There is **no** endpoint, task,

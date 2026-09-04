@@ -87,9 +87,16 @@ pub fn diff<H: std::hash::BuildHasher>(
 }
 
 /// Reconcile the read-model against a service's authoritative edges: diff,
-/// set the `link_graph_reconciliation_divergence` metric, then repair
-/// (upsert the missing, remove the extra). Returns the divergence count
-/// found (before repair).
+/// set the `link_graph_reconciliation_divergence` and
+/// `link_graph_reconciliation_last_success_unixtime` metrics (T-34/T-35,
+/// both labeled `["entity"]` by [`AuthoritativeSource::entity`]), then
+/// repair (upsert the missing, remove the extra). Returns the divergence
+/// count found (before repair).
+///
+/// The last-success gauge is set only when this function reaches this
+/// point — i.e. `source.fetch_all()` and the read-model query both
+/// succeeded — never on an early `?`-propagated error, so a failed pass
+/// leaves it exactly where it was (T-35's disambiguation-from-logs goal).
 ///
 /// # Errors
 ///
@@ -107,10 +114,17 @@ where
     let readmodel_ids = edges::Model::edge_ids_from_entity(db, source.entity()).await?;
     let divergence = diff(&readmodel_ids, &authoritative);
     let count = divergence.count();
+    let entity_label = source.entity().as_str();
 
-    Metrics::global()
+    let metrics = Metrics::global();
+    metrics
         .reconciliation_divergence
+        .with_label_values(&[entity_label])
         .set(i64::try_from(count).unwrap_or(i64::MAX));
+    metrics
+        .reconciliation_last_success_unixtime
+        .with_label_values(&[entity_label])
+        .set(Utc::now().timestamp());
 
     // Repair the read-model to match the authoritative source.
     let observed_at = Utc::now().fixed_offset();

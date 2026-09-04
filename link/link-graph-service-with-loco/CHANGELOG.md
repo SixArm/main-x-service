@@ -14,6 +14,30 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — reconciliation gauges' two "sharp edges" closed (T-34/T-35)
+
+`agents/share/runbooks/reconciliation-divergence.md` documented two
+operational gaps in the reconciliation metrics, both closed here:
+
+- **T-34**: `link_graph_reconciliation_divergence` was a single,
+  unlabelled gauge — every entity's worker wrote the same series, so a
+  converged `case` pass's `0` could overwrite a diverging `person`
+  pass's real `47` moments later, with no way to tell from the metric
+  alone. It is now an `IntGaugeVec` labelled `["entity"]` (mirroring
+  `consumer_lag_seconds`'s existing pattern), so each entity's
+  divergence is an independent series.
+- **T-35**: there was no per-pass success signal at all — a failed
+  pass (timeout, non-2xx, malformed JSON) left the divergence gauge
+  exactly where it was, so a genuine `0` and a "hasn't run since boot"
+  `0` looked identical, and the only signal was a log line. New
+  `link_graph_reconciliation_last_success_unixtime` (`IntGaugeVec`,
+  `["entity"]`) is set only on a successful pass, so staleness is
+  readable from Prometheus alone.
+
+New unit tests in `src/metrics.rs` plus two new DB-gated tests in
+`tests/reconcile.rs`. The shared runbook is updated in the same PR
+(a four-part change per this crate's shared-contract rule) to record
+both sharp edges as closed. See spec/13-tasks.md T-34/T-35.
 
 ### Added — declared MSRV (Rust 1.95)
 
