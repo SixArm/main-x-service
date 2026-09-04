@@ -176,6 +176,70 @@ code + tests in one PR.
   returns per-person cycle time, throughput or flow efficiency**, and
   none is derivable by arithmetic from what is returned.
 
+## Follow-on hardening (found 2026-09-04)
+
+- [ ] PF-T20 **OpenAPI doc missing `/api/stays/{pid}/time-analysis`.**
+  `src/openapi.rs` is hand-written and its own `spec_shape` test only
+  spot-checks a fixed path list; PF-T19 (landed 2026-08-24) added the
+  route to `app.rs` and `stays.rs` but never added a `paths` entry here
+  — *(verified: `grep -c time-analysis src/openapi.rs` returns `0`)*. A
+  FHIR-agnostic client discovering the API via `/api-docs/openapi.json`
+  cannot see this endpoint exists. Three-part: add the `paths` entry
+  (mirroring the `/api/locate/{person_ref}` sensitive-read shape already
+  documented there) and extend `openapi.rs`'s `spec_shape` test to assert
+  `/api/stays/{pid}/time-analysis` is present, closing the exact gap that
+  let this drift happen unnoticed.
+- [ ] PF-T21 **No allowlist test on the time-analysis response shape.**
+  `tests/requests/flows.rs::full_journey_request_to_deep_clean` asserts
+  the documented fields (`lead_time_ms`, `value_time_ms`, `span_days`,
+  `classified_days`, `clock.*`, `confidence`) are *present*, but nothing
+  asserts the top-level key set is *exactly* that — so a future change
+  could add a per-person rate/throughput field to the response without
+  any test failing, silently breaking the family-wide refusal in
+  [`agents/share/time-based-analysis.md` §7](../../agents/share/time-based-analysis.md)
+  — *(verified by reading the full assertion block in `flows.rs`, lines
+  ~99–125: every check is presence-only, none enumerates the object's
+  keys)*. This is the same acceptance bar **PF-T-U3** above already
+  states for the not-yet-built utilisation endpoint; PF-T19's endpoint
+  shipped first and never got the equivalent pin. **Acceptance:** the
+  test asserts `timeline.as_object().unwrap().keys()` is a subset of a
+  named allowlist (or an exact `BTreeSet` match), so adding an
+  undocumented field fails CI rather than shipping silently.
+- [ ] PF-T22 **Front-end has no page-visit sign-in guard.**
+  `src/hooks.server.ts` (PF-T18) stashes `locals.sessionId` from the
+  cookie but nothing redirects an anonymous visitor away from a
+  clinical/PII route (whiteboard, stay detail, bed-request board,
+  locate) — *(verified: `grep -rn requireSignedIn src` returns zero
+  hits, and no `+layout.server.ts` exists anywhere under `src/routes`)*.
+  This matches repo `tasks.md` **WEB-1**'s finding that the
+  `requireSignedIn` pattern PRO-H10 added to the ten entity front-ends
+  never reached any of the five consumer apps. Today's only real gate is
+  `PATIENT_FLOW_REQUIRE_AUTH` on the API, which defaults off (per
+  `agents/share/security.md` §4), so an anonymous visitor with front-end
+  access today sees live patient data. **Acceptance:** a `requireSignedIn`
+  helper (or `+layout.server.ts` check on `locals.sessionId`) redirects an
+  anonymous visitor to `/signin` on protected routes, preserving the
+  existing `?masked=1` kiosk exemption for the whiteboard; one Playwright
+  test pins the anonymous-303 behaviour, matching WEB-1's fix pattern
+  (a stubbed session cookie makes guarded pages render in the existing
+  suite rather than weakening the guard).
+- [ ] PF-T23 **Zero test coverage on the BFF session/token-exchange
+  code.** `src/lib/server/{session,auth,config}.ts` (PF-T18's
+  httpOnly-cookie helpers, magic-link request/verify, and the
+  session→PASETO `exchangeToken` call) have no unit tests, and
+  `tests/e2e/board.spec.ts` — the only e2e spec file — stubs the proxy
+  wholesale (`page.route("**/api/proxy/**", …)` at line 180) rather than
+  routing through `src/routes/api/proxy/[...path]/+server.ts` — *(verified:
+  `find tests/unit` lists only `bed-card.test.ts`; `grep -rn
+  exchangeToken tests/` matches nothing outside the mocked route
+  handler)*. The BFF pattern is this app's whole "no token in browser
+  JS" security property (`agents/share/authentication-sessions.md` §6);
+  it is currently unverified by any test, inert or not. **Acceptance:**
+  a vitest suite exercises `session.ts`'s cookie helpers directly and
+  `auth.ts`'s magic-link functions against a mocked fetch, and one e2e
+  test hits the real `/api/proxy/[...path]` route (auth-service stubbed
+  or skipped when unset) instead of intercepting it.
+
 ## Production gates (P0 — design-only until a real deployment)
 
 - [ ] PF-T-G1 Clinical safety case (DCB0129/0160) + named CSO.

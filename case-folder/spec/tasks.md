@@ -75,6 +75,56 @@
   service-edition doc drift: `testing.md`/`README.md` unit count (6→14) and
   request-test count (29→49).
 
+## Cross-edition hygiene (found 2026-09-04)
+
+- [ ] **T-17** Dead nested CI: `case-folder-service-with-rust/.github/workflows/`
+  (`quality.yml`, `security.yml`) is not referenced by either root pipeline
+  — *(verified: `grep -rl case-folder .github/workflows/ .woodpecker.yml`
+  finds nothing)*. Root `scripts/ci-crates.sh` already discovers this crate
+  (any dir with a `Cargo.toml`) and runs `fmt`/`clippy`/`test`/`deny`
+  against it via the family stages, so the nested workflows are pure
+  duplication that never actually runs on GitHub (this repo has no Actions
+  runner configured to pick up a nested `.github/`) — a contributor
+  checking this path's Actions tab sees green-looking jobs that never
+  executed. `patient-flow-service-with-rust`'s PF-T1 already faced the same
+  question and explicitly deferred nested workflows; case-folder's were
+  simply left in place unresolved. **Acceptance:** either delete both
+  files (root CI already covers the same checks) or, if kept deliberately
+  as a documented redundant local-CI convenience, say so in a comment at
+  the top of each file and in this app's `spec/index.md`/`AGENTS.md` —
+  either way the ambiguity is gone.
+- [ ] **T-18** `openapi.yaml`'s `bearerAuth` scheme claims
+  `bearerFormat: JWT`, but the value it actually accepts is the **opaque
+  session id** (the same string as the `cts_session` cookie) — *(verified:
+  `case-folder-service-with-rust/src/auth/mod.rs::bearer_token` strips the
+  `Bearer ` prefix and passes the raw string straight to session lookup;
+  nothing JWT-shaped is parsed on that path, only the `verify`-response's
+  short-lived magic token is a real JWT and it is never accepted as a
+  bearer credential)*. A client following the declared `bearerFormat`
+  would reasonably assume it can mint or inspect a JWT, which is wrong and
+  could mislead an integrator. **Acceptance:** `bearerFormat` reads
+  something accurate (e.g. omitted, or `Opaque session id`), and
+  [`api-contract.md`](../case-folder-service-with-rust/spec/api-contract.md)
+  is checked for the same claim.
+
+- [ ] **T-19** [audit-integrity.md](audit-integrity.md)'s hash-chain +
+  signature design (driving **T-G2**) reinvents a scheme the family
+  already built and audited: `integrity/integrity-mac-rust-crate`
+  provides exactly this — HMAC-SHA256 MACs with HKDF-SHA256 per-(service,
+  domain) subkeys, plus the `prev_hash`/`hash` audit-row chaining that
+  person, worker, care-pathway and case already embed *(verified:
+  `grep -n integrity-mac case-folder-service-with-rust/Cargo.toml` finds
+  no dependency, and `audit-integrity.md`'s design section names no
+  existing crate)*. Reusing it means case-folder's move-event chain gets
+  the same production-grade key handling (key-file-over-env precedence,
+  root-key zeroization, placeholder refusal) other services already have
+  proven, instead of a bespoke implementation earning its own security
+  review from scratch. **Acceptance:** `audit-integrity.md` either adopts
+  `integrity-mac` as its dependency (updating the design section to match
+  the crate's actual API) or records a stated reason it doesn't apply
+  here (e.g. the table-less-aggregator constraint in [D-1](design.md))
+  before T-G2 implementation starts.
+
 ## Production gates (blocked on deployment decisions)
 
 - [~] **T-G1** Auth + ABAC across API and client (P0) — magic-link auth

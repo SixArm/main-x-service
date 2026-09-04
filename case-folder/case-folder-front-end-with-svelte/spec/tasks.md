@@ -65,6 +65,48 @@
   in root **T-12**; this row was left unticked after that landed —
   reconciled 2026-08-29.
 
+- [ ] **ST-17** No Prettier at all: `package.json` has no `prettier`
+  or `prettier-plugin-svelte` devDependency, no `format`/`format:check`
+  script, and no `.prettierrc`/`prettier.config.*` file — *(verified:
+  `grep -i prettier package.json` and `ls .prettierrc*` both empty)*.
+  Every other checked sibling front-end (e.g.
+  `patient-flow-front-end-with-svelte`) carries `prettier` +
+  `prettier-plugin-svelte` as devDependencies with `format`/`lint`
+  scripts wired to it, so this app's `npm run lint` (ESLint only) is the
+  one place in the family relying on ESLint alone for style. This is the
+  exact gap the task brief's known-lead named ("case-folder's front-end
+  lacks the plugin entirely"). **Acceptance:** add `prettier` +
+  `prettier-plugin-svelte` as devDependencies, a `format` script
+  (`prettier --write .`), and CI-gate a `format:check`/`--check` step
+  alongside the existing `npm run lint` in [`AGENTS.md`](../AGENTS.md)
+  §"CI gate".
+- [ ] **ST-18** `UserView.role` (from `GET /api/auth/me`) is rendered in
+  three places (`+layout.svelte`, `move/+page.svelte`,
+  `workers/+page.svelte`) but there is no test asserting the signed-in
+  user's own role renders correctly in the nav utility row — *(verified:
+  `grep -rn "user.role" tests/`/`src/routes/+layout.svelte` shows the
+  template reads `user.role` at line 178, but `tests/e2e/auth.spec.ts`
+  only asserts the signed-in email and sign-out flow, never the role
+  suffix)*. Once **T-G1**'s CIS2/OIDC roles land this becomes an ABAC
+  signal worth trusting the UI reflects correctly. **Acceptance:** one
+  Playwright assertion (or vitest component test) pins that a stub user
+  carrying a `role` renders `(role)` next to their name, and one pins the
+  no-role case renders nothing.
+
+- [ ] **ST-19** `src/lib/api/schema.d.ts` is a **committed, generated**
+  file (`npm run gen:api` runs `openapi-typescript` against the sibling
+  crate's `openapi.yaml`) with no CI step re-generating and diffing it —
+  *(verified: `grep -n "gen:api\|schema.d.ts" AGENTS.md` finds the
+  script documented as a manual recipe step only; the "CI gate" section
+  lists just `npm run check` + `npm run test:e2e`)*. **ST-16**'s
+  "regenerating produces no diff" claim was a one-off manual check on
+  2026-08-29, not an enforced invariant — a future `openapi.yaml` edit
+  (e.g. this pass's **LT-18** `bearerFormat` fix) can drift silently
+  from the checked-in types with nothing failing. **Acceptance:** a CI
+  step runs `npm run gen:api` and fails the build on a non-empty `git
+  diff` against the committed file, added to the CI gate list in
+  [`AGENTS.md`](../AGENTS.md).
+
 ## Production gates
 
 - [ ] **ST-G1** Auth (CIS2 / OIDC) threaded through `api.*` (P0) — see [regulatory.md](regulatory.md)
