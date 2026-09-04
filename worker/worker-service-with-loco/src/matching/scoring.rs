@@ -41,6 +41,14 @@ impl ProbabilisticScorer {
         Self { config }
     }
 
+    /// Returns the configured match threshold (`MatchingConfig::
+    /// threshold_score`) — the same value `is_match`/`classify_match`
+    /// consult at runtime. Spec §13 T-17.
+    #[must_use]
+    pub fn threshold_score(&self) -> f64 {
+        self.config.threshold_score
+    }
+
     /// Scores `candidate` against `worker`, returning the overall score plus
     /// a per-component breakdown.
     ///
@@ -715,5 +723,18 @@ mod tests {
             "Score below threshold should not be a match"
         );
         assert_eq!(scorer.classify_match(0.70), MatchQuality::Probable);
+    }
+
+    /// Spec §13 T-17: `threshold_score()` returns the configured value the
+    /// scorer was actually built with.
+    #[test]
+    fn threshold_score_returns_the_configured_value() {
+        let config = MatchingConfig {
+            threshold_score: 0.42,
+            exact_match_score: 1.0,
+            fuzzy_match_score: 0.8,
+        };
+        let scorer = ProbabilisticScorer::new(config);
+        assert!((scorer.threshold_score() - 0.42).abs() < f64::EPSILON);
     }
 }

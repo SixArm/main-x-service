@@ -8,6 +8,30 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — `ProbabilisticMatcher::threshold()` now reflects the configured threshold (T-17)
+
+`ProbabilisticMatcher::threshold()` returned a hard-coded `0.85`
+regardless of the matcher's actual `MatchingConfig`, while the real
+`is_match`/`classify_match` path correctly read
+`MatchingConfig::threshold_score`. No caller of `.threshold()` existed,
+so this was latent rather than a live bug, but the answer was wrong the
+moment anything called it or `MATCHING_THRESHOLD` was set to a
+non-default value. Added `ProbabilisticScorer::threshold_score()`
+(returning the same field `is_match` already reads) and had
+`ProbabilisticMatcher::threshold()` delegate to it. New unit tests in
+both layers pin a non-default `0.42` round-trip. See spec/13-tasks.md
+T-17.
+
+### Removed — dead `FluvioProducer`/`FluvioConsumer` stub types (T-16)
+
+Both `todo!()`d on every method with zero callers anywhere in the
+crate — leftover scaffolding from before the Phase-3 outbox relay
+(`src/relay.rs`) superseded this shape entirely. `src/streaming/
+consumer.rs` (its only content) is deleted; `FluvioProducer` is removed
+from `src/streaming/producer.rs`; the now-pointless consumer-side trait
+is removed from `src/streaming/mod.rs`. `EventProducer` and
+`InMemoryEventPublisher` are unaffected. See spec/13-tasks.md T-16.
+
 ### Added — a real gRPC server (T-6, repo `tasks.md` PRO-H11)
 
 `src/api/grpc/` is a working `tonic::transport::Server`, replacing the

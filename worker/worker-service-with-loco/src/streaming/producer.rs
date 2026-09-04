@@ -1,9 +1,13 @@
 //! Concrete [`EventProducer`] implementations.
 //!
 //! [`InMemoryEventPublisher`] buffers events in a shared `Vec` for
-//! development and tests (and lets tests assert on what was published).
-//! [`FluvioProducer`] is the production transport placeholder. Both implement
-//! the [`EventProducer`] trait from the parent module.
+//! development and tests (and lets tests assert on what was published),
+//! implementing the [`EventProducer`] trait from the parent module. The
+//! real production broker path is the Phase-3 durable-bus outbox relay
+//! (`crate::relay`) — an earlier unimplemented producer placeholder here
+//! (every method panicking, zero callers) was removed rather than filled
+//! in (spec §13 T-16): the relay superseded this shape entirely before
+//! it was ever wired up.
 
 use super::{EventProducer, WorkerEvent};
 use crate::Result;
@@ -96,27 +100,5 @@ impl EventProducer for InMemoryEventPublisher {
 
         self.events.lock().unwrap().push(event);
         Ok(())
-    }
-}
-
-/// Production [`EventProducer`] backed by Fluvio (not yet implemented).
-pub struct FluvioProducer {
-    // Fluvio producer handle will be initialized here once wired up.
-}
-
-impl EventProducer for FluvioProducer {
-    /// Not yet implemented — wire up the Fluvio client before using this
-    /// producer in production.
-    ///
-    /// # Errors
-    ///
-    /// Will return a delivery error once implemented; today it does not return.
-    ///
-    /// # Panics
-    ///
-    /// Always panics via `todo!` — this transport is a placeholder.
-    fn publish(&self, _event: WorkerEvent) -> Result<()> {
-        // TODO: Implement Fluvio event publishing
-        todo!("Implement Fluvio event publishing")
     }
 }
