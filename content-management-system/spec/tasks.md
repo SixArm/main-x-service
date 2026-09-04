@@ -734,3 +734,73 @@ code + tests in one PR.
   WCAG 2.2 AA audit of the rendering channel, retention schedules,
   image consent + asset licensing, erasure-by-redaction procedure
   ([regulatory.md](regulatory.md)).
+
+- [ ] CMS-T27 **Auth activation surface (the code side of CMS-G1).**
+  Unlike its two sibling apps (WPM-T31, CRM-T22), CMS ships no
+  reference ABAC policy at all (verified: `find config -iname
+  "*abac*"` is empty, vs. WPM's and CRM's own
+  `config/abac-policy.reference.json`); CMS-G1 above is still fully
+  `[ ]`. **Acceptance:** a `config/abac-policy.reference.json`
+  encodes the `auth.md` personas (svc/admin, editor write + masked
+  read, `resource.owner = $sub` self-read where applicable,
+  masked-read fallback) plus an activation runbook section in
+  `auth.md`; `tests/enforcement.rs` mounts the shipped file and pins
+  at least a masked-vs-unmasked read and one destructive-POST
+  admin/svc-only case; `cargo test` plus the DB-gated enforcement
+  suite green; clippy pedantic clean. (CMS-G1)
+
+- [ ] CMS-T28 **Wire record-level ABAC into the sites/content-types
+  handlers.** `auth::site_resource_attrs` and
+  `auth::content_type_resource_attrs` are defined and unit-tested in
+  `auth.rs`, but neither is called from `controllers/sites.rs` or
+  `controllers/types.rs` (verified: `grep -rn
+  "site_resource_attrs\|content_type_resource_attrs"
+  src/controllers/*.rs` returns nothing, while `controllers/entries.rs`
+  correctly calls `auth::variant_resource_attrs` +
+  `authorize_record` on every read/write) — the same
+  defined-but-unwired pattern `auth.rs`'s own test docstring warns
+  against ("`authorize_record` computing an obligation nobody applies
+  is exactly the failure this helper exists to prevent"). **Acceptance:**
+  the site and content-type GET/PUT/DELETE handlers call
+  `authorize_record` with their resource attrs; the enforcement
+  matrix gains an owner-vs-non-owner pin for at least one site and
+  one content-type endpoint; `cargo test` plus the DB-gated
+  enforcement suite green; clippy pedantic clean. (CMS-D17)
+
+- [ ] CMS-T29 **Subject rights & retention (the code side of
+  CMS-G3).** CMS has no retention or subject-rights code at all — no
+  `CMS_RETENTION_DAYS`, no sweep task, no subject-access/erase
+  endpoint (verified: `grep -rln "retention\|subject_access\|erase"
+  src/` matches nothing) — unlike WPM-T30 and CRM-T21, which both
+  landed this for their personal-data surface. CMS's personal-data
+  surface is narrower but real: `author_ref`/`reviewer_ref` (worker
+  `EntityRef` URNs, confirmed in
+  `migration/src/m20260730_000005_entries.rs`) on `entries`/
+  `revisions`. **Acceptance:** `rules/privacy.rs` (pure: the floored
+  retention horizon + a sweep-list pin) and `controllers/privacy.rs`
+  (a subject-access listing of every entry/revision naming a given
+  worker as author or reviewer, and a scrub of the `author_ref`/
+  `reviewer_ref` fields on request, refused while the content is in
+  an active, non-terminal editorial state) join
+  `DESTRUCTIVE_POST_SUFFIXES`; a DB-gated round-trip test; `cargo
+  test` green; clippy pedantic clean; fmt clean. (CMS-G3)
+
+- [ ] CMS-T30 **`require_ref` EntityType coverage.**
+  `controllers/localization.rs`, `entries.rs`, `workflow.rs`, and
+  `sites.rs` pass both `EntityType::Worker` and
+  `EntityType::Organization` to the shared `require_ref` helper, but
+  `validation.rs`'s own `ref_rules` test only ever passes
+  `EntityType::Worker` (verified: `grep -n "EntityType::"
+  src/validation.rs` vs `grep -rn "entity_ref::EntityType::"
+  src/controllers/*.rs`). **Acceptance:** `ref_rules` exercises the
+  wrong-type branch for `Organization` too; `cargo test` green;
+  clippy pedantic clean. (CMS-D16)
+
+- [ ] CMS-T31 **Front-end sign-in gate.** No `+layout.server.ts`
+  exists under `src/routes` (verified: `find src/routes -iname
+  "+layout.server.ts"` returns nothing); every authoring/asset/
+  workflow view is reachable signed-out and only fails silently at
+  the API layer. **Acceptance:** a root or per-protected-route guard
+  redirects a session-less visitor to sign-in (excluding sign-in/
+  verify and any deliberately public `/delivery`/`/preview`
+  surface); a Playwright spec pins it; svelte-check 0. (CMS-D17)

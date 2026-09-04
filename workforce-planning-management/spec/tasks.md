@@ -531,3 +531,72 @@ code + tests in one PR.
       vs Postgres 18 (139 unit; the assessment category pin updated
       to 5); clippy pedantic clean; svelte-check 0; vitest 10;
       Playwright 9. (WPM-D23, WPM-D25; WPM-R33)
+
+- [ ] WPM-T37 **`require_ref` EntityType coverage.** `validation.rs`'s
+      shared `require_ref`/`ref_opt` helper is exercised by
+      `controllers/hr_core.rs`, `acquisition.rs`, `development.rs`,
+      `payroll.rs`, and `talent.rs` against `EntityType::Worker`,
+      `::Organization`, `::Course`, and `::CourseInstance`, but its
+      own unit test (`ref_rules`) only ever passes `EntityType::Person`
+      (verified: `grep -n "EntityType::" src/validation.rs` shows every
+      call in the test using `Person`, while `grep -rn
+      "entity_ref::EntityType::" src/controllers/*.rs` shows `Worker`/
+      `Organization`/`Course`/`CourseInstance` all in live use). The
+      wrong-type/malformed/bad-uuid branches are therefore proven for
+      exactly one of the five accepted types. **Acceptance:**
+      `ref_rules` (or a new parametrised test) exercises the
+      wrong-type-detected branch for at least `Worker`, `Organization`,
+      and `Course` in addition to `Person`; `cargo test` green; clippy
+      pedantic clean. (WPM-D9)
+
+- [ ] WPM-T38 **Front-end sign-in gate.** No `+layout.server.ts`
+      exists anywhere under `src/routes`, and `hooks.server.ts` only
+      reads the session cookie into `locals.sessionId` without ever
+      redirecting; `api/proxy/[...path]/+server.ts` forwards
+      unauthenticated when `WPM_REQUIRE_AUTH` is off and otherwise
+      just relays whatever the upstream 401 is (verified: `find
+      src/routes -iname "+layout.server.ts"` returns nothing; no
+      `redirect(` call exists in any `.server.ts` under `src/routes`).
+      A visitor with no session therefore reaches every profile/
+      payroll/wellbeing page and only discovers they are signed out
+      when an API call silently fails, rather than being redirected to
+      sign-in — the page-visit auth guard the repo root `tasks.md`
+      WEB-1 finding found on only 5 of 16 family front-ends.
+      **Acceptance:** a root `+layout.server.ts` (or per-protected-
+      route guard) redirects a visitor with no `locals.sessionId` to
+      `/signin` (excluding the public sign-in/verify routes); a
+      Playwright spec pins the redirect; svelte-check 0; existing
+      vitest/Playwright suites stay green. (WPM-D12)
+
+- [ ] WPM-T39 **Front-end honesty-format module.** The null-ratio /
+      no-data rendering rules (training completion %, conversion
+      rate, benchmark below/above-min flags, pulse means, appraisal
+      count-carrying means) are inlined per-route rather than
+      centralised: `src/lib/` has no `format.ts` counterpart to the
+      CMS front-end's `$lib/format` (verified: `find src/lib -maxdepth
+      2 -type f` lists only `api/`, `components/`, `config.ts`,
+      `i18n.svelte.ts`, and `server/`; the em-dash/no-data pattern
+      recurs inline in `routes/learning`, `routes/mentorship`, and
+      `routes/employees/[pid]`), and `tests/unit/` carries only
+      `wpm.test.ts` (money/i18n/paths) and `rename-migration.test.ts`
+      — none of the ratio/no-data rendering paths are unit-tested.
+      **Acceptance:** a `$lib/format.ts` (or equivalent) centralises
+      the null-not-zero ratio/percentage rendering with its own vitest
+      suite (zero-denominator, present-value, negative-flag cases);
+      the routes that currently inline the logic call it instead;
+      svelte-check 0; Playwright green. (WPM-D16)
+
+- [ ] WPM-T40 **List pagination headers.** No controller emits
+      `X-Total-Count`/`X-Limit`/`X-Offset`, and list handlers cap with
+      a hardcoded `.limit(...)` (e.g. `hr_core.rs`'s `.limit(500)` and
+      `.limit(200)`) rather than accepting `?limit=&offset=` (verified:
+      `grep -rln "X-Total-Count" src/` is empty; `grep -n "\.limit("
+      src/controllers/hr_core.rs` shows the two hardcoded caps) — the
+      family-wide contract in `agents/share/restful.md` (headers
+      report the true total, `limit` clamps rather than rejects,
+      `offset` is bounded per SEC-G7). **Acceptance:** at least the
+      employee list and one other high-traffic list endpoint accept
+      `?limit=&offset=`, clamp `limit` to a documented `MAX_LIMIT`,
+      bound `offset` (400 past it), and set the three response
+      headers; a request test pins clamping and the offset bound;
+      clippy pedantic clean. (WPM-D9, WPM-R7)
