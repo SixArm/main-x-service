@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — `require_ref` test coverage for Worker/Organization/Course (WPM-T37)
+
+`src/validation.rs`'s `ref_rules` unit test only ever exercised
+`EntityType::Person`, even though `controllers/hr_core.rs`,
+`acquisition.rs`, `development.rs`, `payroll.rs`, and `talent.rs` all
+call the shared `require_ref` helper with `EntityType::Worker`/
+`::Organization`/`::Course`/`::CourseInstance` too. New
+`ref_rules_wrong_type_worker_organization_and_course` test pins both
+the wrong-type rejection and the matching-type acceptance for `Worker`,
+`Organization`, and `Course`. See `../spec/tasks.md` WPM-T37.
 
 ### Added — declared MSRV (Rust 1.95)
 

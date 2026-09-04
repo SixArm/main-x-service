@@ -532,7 +532,8 @@ code + tests in one PR.
       to 5); clippy pedantic clean; svelte-check 0; vitest 10;
       Playwright 9. (WPM-D23, WPM-D25; WPM-R33)
 
-- [ ] WPM-T37 **`require_ref` EntityType coverage.** `validation.rs`'s
+- [x] WPM-T37 **`require_ref` EntityType coverage.** *(resolved
+      2026-09-05.)* `validation.rs`'s
       shared `require_ref`/`ref_opt` helper is exercised by
       `controllers/hr_core.rs`, `acquisition.rs`, `development.rs`,
       `payroll.rs`, and `talent.rs` against `EntityType::Worker`,
@@ -548,6 +549,15 @@ code + tests in one PR.
       wrong-type-detected branch for at least `Worker`, `Organization`,
       and `Course` in addition to `Person`; `cargo test` green; clippy
       pedantic clean. (WPM-D9)
+      - **Resolved.** New
+        `ref_rules_wrong_type_worker_organization_and_course` test in
+        `src/validation.rs` exercises both the wrong-type rejection (a
+        `person:` ref where `Worker`/`Organization`/`Course` is
+        expected) and the matching-type acceptance for each, alongside
+        the pre-existing `Person`-only `ref_rules` test.
+        `CourseInstance` is not additionally covered — the acceptance
+        criterion's "at least" three types is met, and the fourth
+        would be a mechanical repeat of the same pattern.
 
 - [ ] WPM-T38 **Front-end sign-in gate.** No `+layout.server.ts`
       exists anywhere under `src/routes`, and `hooks.server.ts` only
