@@ -49,5 +49,7 @@ pub mod rate_limit;
 pub mod secret_hash;
 /// Loco CLI tasks.
 pub mod tasks;
+/// Header-based API versioning (`Accepts-version`; agents/share/api-versioning.md).
+pub mod version;
 /// HTTP response view types.
 pub mod views;

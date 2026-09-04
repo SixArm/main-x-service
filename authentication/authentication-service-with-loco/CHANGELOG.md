@@ -10,6 +10,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — header-based API versioning, `Accepts-version` (T-13)
+
+New `src/version.rs` (ported from `case`/`care-pathway`'s reference
+implementation): `resolve_version` over `SUPPORTED_API_VERSIONS =
+["1.0"]` / `CURRENT_API_VERSION = "1.0"`, and `require_version_mw`,
+layered via a new `after_routes` in `app.rs` (this crate's first —
+previously routes were registered with no post-processing step). Every
+`/api/auth/*` and `/api/compliance/*` response now carries an
+`Accepts-version` header; an explicit unsupported version is a clean
+`406`. `/.well-known/paseto-keys`, `/api-docs/*`, and `/metrics.prom`
+are exempt (not part of the versioned REST surface). See spec/index.md
+T-13.
+
 ### Changed — `GET /api/compliance/audit/verify` now requires a bearer (PRO-P23)
 
 - The endpoint previously had no auth/authz check at all — the only
