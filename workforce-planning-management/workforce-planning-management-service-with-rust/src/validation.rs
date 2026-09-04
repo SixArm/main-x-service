@@ -154,6 +154,69 @@ mod tests {
         assert_eq!(p.into_vec().len(), 3);
     }
 
+    /// WPM-T37: `require_ref` exercises the wrong-type-detected branch for
+    /// `Worker`, `Organization`, and `Course` too, not just `Person` — the
+    /// controllers (`hr_core.rs`, `acquisition.rs`, `development.rs`,
+    /// `payroll.rs`, `talent.rs`) pass all five accepted types, but this
+    /// module's own tests previously only ever checked `Person`.
+    #[test]
+    fn ref_rules_wrong_type_worker_organization_and_course() {
+        // Worker: a well-formed ref of the *wrong* type is rejected...
+        let mut p = Problems::new();
+        p.require_ref(
+            "employee_ref",
+            EntityType::Worker,
+            &format!("person:{}", uuid::Uuid::new_v4()),
+        );
+        let v = p.into_vec();
+        assert_eq!(v.len(), 1);
+        assert!(v[0].contains("must reference a Worker"));
+        // ...but the matching type is accepted.
+        let mut p = Problems::new();
+        p.require_ref(
+            "employee_ref",
+            EntityType::Worker,
+            &format!("worker:{}", uuid::Uuid::new_v4()),
+        );
+        assert!(p.into_vec().is_empty());
+
+        // Organization: same pattern.
+        let mut p = Problems::new();
+        p.require_ref(
+            "employer_ref",
+            EntityType::Organization,
+            &format!("person:{}", uuid::Uuid::new_v4()),
+        );
+        let v = p.into_vec();
+        assert_eq!(v.len(), 1);
+        assert!(v[0].contains("must reference a Organization"));
+        let mut p = Problems::new();
+        p.require_ref(
+            "employer_ref",
+            EntityType::Organization,
+            &format!("organization:{}", uuid::Uuid::new_v4()),
+        );
+        assert!(p.into_vec().is_empty());
+
+        // Course: same pattern.
+        let mut p = Problems::new();
+        p.require_ref(
+            "course_ref",
+            EntityType::Course,
+            &format!("person:{}", uuid::Uuid::new_v4()),
+        );
+        let v = p.into_vec();
+        assert_eq!(v.len(), 1);
+        assert!(v[0].contains("must reference a Course"));
+        let mut p = Problems::new();
+        p.require_ref(
+            "course_ref",
+            EntityType::Course,
+            &format!("course:{}", uuid::Uuid::new_v4()),
+        );
+        assert!(p.into_vec().is_empty());
+    }
+
     #[test]
     fn list_rules() {
         let mut p = Problems::new();
