@@ -572,7 +572,7 @@ clearly described manual check confirms the acceptance criterion.
     tests landed in all six `*-service-with-loco` crates that carry a
     `Config`, so the family is uniform.
 
-- [ ] **T-16 — Remove dead `FluvioProducer`/`FluvioConsumer` stub types.**
+- [x] **T-16 — Remove dead `FluvioProducer`/`FluvioConsumer` stub types.** *(resolved 2026-09-04.)*
   `src/streaming/producer.rs::FluvioProducer` and
   `src/streaming/consumer.rs::FluvioConsumer` both `todo!()` on every
   method and have zero callers anywhere in the crate (verified:
@@ -588,8 +588,19 @@ clearly described manual check confirms the acceptance criterion.
   - **Acceptance:** `grep -rn "FluvioProducer\|FluvioConsumer" src/ tests/`
     returns nothing; `cargo test --lib` and
     `cargo clippy --all-targets -- -D warnings` stay clean.
+  - **Resolved.** `src/streaming/consumer.rs` deleted outright (its only
+    content was `FluvioConsumer`); `FluvioProducer` removed from
+    `src/streaming/producer.rs`; the now-pointless `EventConsumer` trait
+    (and its `pub mod consumer;` declaration) removed from
+    `src/streaming/mod.rs` — `EventProducer` stays, since
+    `InMemoryEventPublisher` still implements it. Module doc comments
+    updated to describe the removed scaffolding without naming the
+    removed types literally, so the acceptance grep stays true even in
+    the historical note. `grep -rn "FluvioProducer\|FluvioConsumer" src/
+    tests/` returns nothing; `cargo test --lib` (314 passed) and
+    `cargo clippy --all-targets -- -D warnings` both clean.
 
-- [ ] **T-17 — `ProbabilisticMatcher::threshold()` ignores the configured `MATCHING_THRESHOLD`.**
+- [x] **T-17 — `ProbabilisticMatcher::threshold()` ignores the configured `MATCHING_THRESHOLD`.** *(resolved 2026-09-04.)*
   `ProbabilisticMatcher::threshold()` (`src/matching/mod.rs:203-210`) is a
   public `#[must_use]` accessor that returns a hardcoded literal `0.85`
   regardless of the `MatchingConfig` the matcher was built with (verified:
@@ -602,11 +613,18 @@ clearly described manual check confirms the acceptance criterion.
   divergence is latent, not yet a live bug, but the method's answer is wrong
   the moment anything calls it or `MATCHING_THRESHOLD` is set to a non-default
   value.
-  - [ ] Expose the scorer's real configured `threshold_score` (an accessor on
+  - [x] Expose the scorer's real configured `threshold_score` (an accessor on
     `ProbabilisticScorer`) instead of the duplicated literal.
   - **Acceptance:** a unit test builds a `ProbabilisticMatcher` from a
     `MatchingConfig{threshold_score: 0.42, ...}` and asserts
     `matcher.threshold() == 0.42`; `cargo test --lib` green; clippy clean.
+  - **Resolved.** Added `ProbabilisticScorer::threshold_score()`
+    returning `self.config.threshold_score` (the same field `is_match`/
+    `classify_match` already read); `ProbabilisticMatcher::threshold()`
+    now delegates to `self.scorer.threshold_score()` instead of the
+    hard-coded `0.85`. New unit tests in both `src/matching/mod.rs` and
+    `src/matching/scoring.rs` pin a non-default `0.42` round-trips
+    through each layer.
 
 - [ ] **T-18 — DB-gated round-trip test for the review-queue persistence module.**
   `src/db/review_queue.rs` (228 lines: normalized-pair upsert / list /

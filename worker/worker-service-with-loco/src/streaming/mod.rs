@@ -6,9 +6,13 @@
 //! [`EventProducer`](crate::streaming::EventProducer) trait abstracts the
 //! transport; the bundled
 //! [`InMemoryEventPublisher`](crate::streaming::InMemoryEventPublisher) is the
-//! default in-process implementation, with Fluvio intended as the production
-//! broker. [`EventConsumer`](crate::streaming::EventConsumer) is the (stubbed)
-//! read side.
+//! default in-process implementation. The real production broker path is
+//! the Phase-3 durable-bus outbox relay (`crate::relay`,
+//! `WORKER_EVENT_TRANSPORT=outbox`) — see `AGENTS.md` "Durable event bus
+//! relay". An earlier consumer-side stub interface (pre-outbox
+//! scaffolding, every method panicking, zero callers) was removed rather
+//! than filled in (spec §13 T-16): the relay superseded that shape
+//! entirely before it was ever implemented.
 //!
 //! Events are serde-tagged on `event_type`, so the JSON wire form carries a
 //! discriminator field naming the variant.
@@ -20,7 +24,6 @@ use uuid::Uuid;
 use crate::Result;
 use crate::models::Worker;
 
-pub mod consumer;
 /// Canonical durable-event-bus envelope + transport selector (Phase 2).
 pub mod envelope;
 pub mod producer;
@@ -131,20 +134,3 @@ pub trait EventProducer: Send + Sync {
 }
 
 pub use producer::InMemoryEventPublisher;
-
-/// Consuming side of the event stream (currently a stub interface).
-pub trait EventConsumer {
-    /// Begins a subscription to the worker event topic.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the subscription cannot be established.
-    fn subscribe(&mut self) -> Result<()>;
-
-    /// Returns the next available event, or `None` when none is pending.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if polling the transport fails.
-    fn next_event(&mut self) -> Result<Option<WorkerEvent>>;
-}

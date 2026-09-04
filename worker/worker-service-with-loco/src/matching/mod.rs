@@ -200,13 +200,15 @@ impl ProbabilisticMatcher {
         }
     }
 
-    /// Returns the match threshold.
-    ///
-    /// Currently hard-coded to `0.85`; wiring this through to the config is
-    /// tracked as a TODO in the source.
+    /// Returns the configured match threshold — the same
+    /// `MatchingConfig::threshold_score` the real `is_match`/
+    /// `classify_match` path already consults via
+    /// `ProbabilisticScorer::threshold_score`. Spec §13 T-17: this used to
+    /// return a hard-coded `0.85` regardless of the matcher's actual
+    /// configuration.
     #[must_use]
     pub fn threshold(&self) -> f64 {
-        0.85 // TODO: expose config properly
+        self.scorer.threshold_score()
     }
 
     /// Classifies a raw score into a coarse [`MatchQuality`] band (definite /
@@ -434,6 +436,24 @@ mod tests {
             result.score
         );
         assert!(matcher.is_match(result.score));
+    }
+
+    /// Spec §13 T-17: `ProbabilisticMatcher::threshold()` must reflect the
+    /// matcher's actual configured `threshold_score`, not a hard-coded
+    /// `0.85` — a non-default config's threshold must round-trip.
+    #[test]
+    fn threshold_reflects_the_configured_value() {
+        let config = MatchingConfig {
+            threshold_score: 0.42,
+            exact_match_score: 1.0,
+            fuzzy_match_score: 0.8,
+        };
+        let matcher = ProbabilisticMatcher::new(config);
+        assert!(
+            (matcher.threshold() - 0.42).abs() < f64::EPSILON,
+            "expected 0.42, got {}",
+            matcher.threshold()
+        );
     }
 
     /// `find_matches` results are always sorted by descending score.
