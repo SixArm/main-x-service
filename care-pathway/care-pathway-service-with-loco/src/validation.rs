@@ -54,6 +54,15 @@
 //!   `en`, `en-GB`, `zh-Hans`. Existence in the IANA registry is not
 //!   checked.
 //!
+//! ## `same_as` rule
+//!
+//! - Each entry must begin with `http://` or `https://` (the same
+//!   lightweight scheme check every sibling entity crate applies). This
+//!   also protects the matcher's R-2 deterministic short-circuit, which
+//!   fires on case-folded `same_as` string overlap — an unvalidated
+//!   garbage value could otherwise let two unrelated pathways
+//!   deterministically match on a shared typo.
+//!
 //! [Verhoeff]: https://en.wikipedia.org/wiki/Verhoeff_algorithm
 
 use care_pathway_matcher::{
@@ -114,6 +123,11 @@ pub fn problems(pathway: &CarePathway) -> Vec<String> {
             out.push(format!(
                 "in_language[{i}]: {tag:?} is not a valid BCP-47 language tag"
             ));
+        }
+    }
+    for (i, url) in inspected(&pathway.same_as) {
+        if !is_valid_url(url.trim()) {
+            out.push(format!("same_as[{i}]: {url:?} is not a valid http(s) URL"));
         }
     }
     out
@@ -409,6 +423,19 @@ fn is_valid_bcp47(tag: &str) -> bool {
     parts.all(|sub| (1..=8).contains(&sub.len()) && sub.bytes().all(|b| b.is_ascii_alphanumeric()))
 }
 
+/// True if `url` (already trimmed by the caller) begins with `http://` or
+/// `https://` — the same lightweight scheme check every sibling crate's
+/// URL validator applies (e.g. `thing-service`'s `is_http_url`,
+/// `place-service`'s / `event-service`'s inline checks). `same_as` also
+/// drives the matcher's R-2 deterministic short-circuit (case-folded
+/// string overlap), so a non-URL value stored here is not just untidy
+/// data — it is a value two unrelated pathways could still spuriously
+/// short-circuit-match on.
+#[must_use]
+fn is_valid_url(url: &str) -> bool {
+    url.starts_with("http://") || url.starts_with("https://")
+}
+
 /// Verhoeff dihedral-group (D5) checksum validation. Returns `true` when
 /// the trailing digit correctly checksums the preceding digits, which is
 /// how SNOMED CT SCTIDs embed their check digit.
@@ -671,6 +698,43 @@ mod tests {
         let problems = problems(&p);
         assert_eq!(problems.len(), 1);
         assert!(problems[0].contains("in_language[1]"));
+    }
+
+    /// `same_as` entries must begin with `http://` or `https://`; other
+    /// schemes and bare strings are rejected.
+    #[test]
+    fn same_as_entries_must_be_http_urls() {
+        for v in [
+            "https://www.nice.org.uk/guidance/ng128",
+            "http://example.org/pathway/1",
+        ] {
+            assert!(is_valid_url(v), "should accept same_as URL {v:?}");
+        }
+        for v in [
+            "",
+            "not-a-url",
+            "www.nice.org.uk/guidance/ng128", // missing scheme
+            "ftp://example.org/pathway/1",    // wrong scheme
+            "urn:nice:ng128",                 // not http(s)
+        ] {
+            assert!(!is_valid_url(v), "should reject same_as URL {v:?}");
+        }
+    }
+
+    /// spec/13-tasks.md CP-T3: a malformed `same_as` entry is reported
+    /// tagged with its array index, alongside a well-formed one.
+    #[test]
+    fn malformed_same_as_url_is_a_problem() {
+        let p = CarePathway {
+            same_as: vec![
+                "https://www.nice.org.uk/guidance/ng128".into(),
+                "not-a-url".into(),
+            ],
+            ..CarePathway::new("X")
+        };
+        let problems = problems(&p);
+        assert_eq!(problems.len(), 1);
+        assert!(problems[0].contains("same_as[1]"));
     }
 
     /// A blank `name` yields exactly the `name is required` problem.

@@ -111,6 +111,26 @@ async fn malformed_identifier_on_create_returns_422() {
     .await;
 }
 
+/// A `same_as` entry that does not parse as an `http(s)://` URL is
+/// rejected `422` (spec §6 / spec/13-tasks.md CP-T3).
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn malformed_same_as_url_on_create_returns_422() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let mut payload = stroke_pathway();
+        payload["same_as"] = json!(["not-a-url"]);
+        let response = request.post("/api/care-pathways").json(&payload).await;
+        assert_eq!(
+            response.status_code(),
+            422,
+            "malformed same_as URL should be 422"
+        );
+    })
+    .await;
+}
+
 /// A blank `name` on update (`PUT`) is rejected `422`, same as create.
 #[tokio::test]
 #[serial]
