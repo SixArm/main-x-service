@@ -8,7 +8,7 @@
 //! names, sparse / dense `Thing` records.
 
 use proptest::prelude::*;
-use thing_matcher::{Confidence, MatchConfig, MatchingEngine, Normalizer, Thing};
+use thing_matcher::{Confidence, Identifier, MatchConfig, MatchingEngine, Normalizer, Thing};
 
 // ---------- Strategies ----------
 
@@ -46,6 +46,22 @@ fn thing_strategy() -> impl Strategy<Value = Thing> {
             }
             b.build()
         })
+}
+
+/// A `property_id`/`value` pair for `Identifier` where the trimmed form of
+/// at least one component is empty — a value `Identifier::new` refuses to
+/// build, but which is directly constructible via the struct's `pub`
+/// fields (its only guard; spec/10-open-questions.md OQ-F/OQ-G). Covers
+/// empty-string and whitespace-only components on either or both sides.
+fn degenerate_identifier_strategy() -> impl Strategy<Value = Identifier> {
+    prop_oneof![
+        ("[ \t]{0,6}", "[a-z]{1,8}")
+            .prop_map(|(value, property_id)| Identifier { property_id, value }),
+        ("[a-z]{1,8}", "[ \t]{0,6}")
+            .prop_map(|(value, property_id)| Identifier { property_id, value }),
+        ("[ \t]{0,6}", "[ \t]{0,6}")
+            .prop_map(|(value, property_id)| Identifier { property_id, value }),
+    ]
 }
 
 // ---------- Properties ----------
@@ -168,6 +184,35 @@ proptest! {
         prop_assert_eq!(&t.identifiers, &back.identifiers);
         prop_assert_eq!(&t.owner, &back.owner);
         prop_assert_eq!(&t.local_id, &back.local_id);
+    }
+
+    /// spec/10-open-questions.md OQ-G: no struct-literal-constructed
+    /// `Identifier` whose `property_id` or `value` trims to empty can ever
+    /// spuriously trip `deterministic_match` — the bypass fixed for OQ-F,
+    /// guarded here across many degenerate shapes rather than the fixed
+    /// examples pinned in `src/matcher.rs`'s unit tests. `url`/`same_as`
+    /// are cleared on both sides so the shared degenerate identifier is
+    /// the *only* thing `deterministic_match` could possibly fire on —
+    /// `thing_strategy()`'s small same_as/url alphabets can otherwise
+    /// coincidentally collide between two independently-generated things,
+    /// which would be a real (and correct) same_as/url match unrelated to
+    /// this property.
+    #[test]
+    fn deterministic_match_never_trips_on_a_shared_degenerate_identifier(
+        p1 in thing_strategy(),
+        p2 in thing_strategy(),
+        id in degenerate_identifier_strategy(),
+    ) {
+        let mut p1 = p1;
+        let mut p2 = p2;
+        p1.identifiers = vec![id.clone()];
+        p2.identifiers = vec![id];
+        p1.url = None;
+        p2.url = None;
+        p1.same_as.clear();
+        p2.same_as.clear();
+        let engine = MatchingEngine::default_config();
+        prop_assert!(!engine.deterministic_match(&p1, &p2));
     }
 
     /// `Confidence::from_score` MUST be monotonic.

@@ -17,37 +17,26 @@ they are recorded here (this crate carries no `spec/13-tasks.md`
 checklist — see `spec/index.md`'s table of contents, §1–§13 with no
 "Tasks" section) rather than left purely as prose in `CHANGELOG.md`.
 
-- **OQ-I (task, M, security) — Empty-value identity bypass on `PlaceId`
-  via direct construction/deserialization.** `PlaceId::new` rejects an
-  empty trimmed `value`, but `PlaceId` is **not** `#[non_exhaustive]`
-  and both fields (`scheme: PlaceIdScheme`, `value: String`) are `pub`
-  with `#[derive(Deserialize)]` — so `PlaceId { scheme:
-  PlaceIdScheme::Google, value: String::new() }` is constructible via a
-  struct literal, and **is likewise reachable via `serde_json`
-  deserialization of untrusted input**, entirely bypassing the
-  constructor's guard. `shares_place_id` (`src/matcher.rs`) only checks
-  `p1.place_ids.is_empty() || p2.place_ids.is_empty()` before comparing
-  `id1 == id2` — two places each carrying one `PlaceId { scheme:
-  Google, value: "" }` (e.g. from a JSON payload with `"value": ""`)
-  satisfy that equality and spuriously trip `deterministic_match`,
-  exactly the SEC-M2 false-identity class this crate already fixed for
-  `name_and_postcode_match` (0.7.0, see `CHANGELOG.md`) — but that fix
-  never touched this construction-bypass path. `shares_same_as`
-  (same file) already has the right pattern to copy: it skips entries
-  whose normalised form is empty. *(verified: `sed -n '318,325p'
-  src/models.rs` shows `PlaceId`'s fields are `pub` with no
-  `#[non_exhaustive]`, deriving `Deserialize`; `sed -n '949,960p'
-  src/matcher.rs` shows `shares_place_id`'s only empty-guard is on the
-  outer `Vec`, not per-entry.)* **Acceptance:** `shares_place_id`
-  additionally skips any `PlaceId` whose `value` is empty (mirroring
-  `shares_same_as`'s empty-skip), so a struct-literal- or
-  deserialize-constructed empty-value id can never contribute to a
-  match; a unit test constructs two `PlaceId`s with `value: String::new()`
-  directly (bypassing `new`) on both sides and asserts
-  `deterministic_match` returns `false`; existing `place_ids_scheme_
-  local_no_cross_match`-style tests stay green; `cargo test` +
-  `cargo clippy --all-targets -- -D warnings` clean; `CHANGELOG.md`
-  entry under "Security" (same class as the 0.7.0 SEC-M2 fix).
+- ~~**OQ-I (task, M, security) — Empty-value identity bypass on `PlaceId`
+  via direct construction/deserialization.**~~ — **RESOLVED (2026-09-04).**
+  `PlaceId::new` rejects an empty trimmed `value`, but `PlaceId` is not
+  `#[non_exhaustive]` and both fields are `pub` with `#[derive(Deserialize)]`,
+  so a struct literal or `serde_json` deserialization of untrusted input
+  bypassed the constructor's guard entirely. `shares_place_id`
+  (`src/matcher.rs`) now skips any `PlaceId` whose trimmed `value` is
+  empty on either side — matching the constructor's own definition of
+  "empty" — before comparing `id1 == id2`, closing the same false-identity
+  class already fixed for `name_and_postcode_match` (0.7.0). One
+  correction found while implementing: the acceptance note above cited a
+  `shares_same_as` function as "the right pattern to copy"; no such
+  function exists in this crate (verified: `grep -rn "same_as"
+  src/*.rs` returns nothing) — the fix was written directly against
+  `shares_place_id` instead. Two unit tests pin it:
+  `empty_value_place_id_never_matches_even_via_constructor_bypass` and
+  `whitespace_only_value_place_id_never_matches` (`src/matcher.rs`).
+  `cargo test` (165 lib tests passed, up from 163) + `cargo clippy
+  --all-targets -- -D warnings` + `cargo doc --no-deps` all clean. See
+  `CHANGELOG.md` "Security" under `[Unreleased]`.
 
 - **OQ-J (task, M) — Implement the spec'd-but-missing `setting`/`tags`
   weighted components.** `spec/03-data-model.md` §3.1.3, `spec/06-*.md`,

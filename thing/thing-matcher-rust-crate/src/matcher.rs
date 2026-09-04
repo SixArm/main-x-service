@@ -35,7 +35,7 @@
 //! assert!(result.is_match);
 //! ```
 
-use crate::models::{RelationKind, RelationshipRef, Thing};
+use crate::models::{Identifier, RelationKind, RelationshipRef, Thing};
 use crate::normalizer::Normalizer;
 use crate::scorer::{Scorer, SimilarityAlgorithm};
 use serde::{Deserialize, Serialize};
@@ -826,12 +826,31 @@ fn score_identifiers(thing1: &Thing, thing2: &Thing) -> Option<f64> {
 /// must match), so this never produces a cross-scheme false positive. Uses
 /// nested loops rather than a set because identifier lists are tiny in
 /// practice. Empty on either side trivially returns `false`.
+///
+/// An `Identifier` whose trimmed `property_id` or `value` is empty is
+/// never identity evidence, however it was constructed. `Identifier::new`
+/// already refuses to build one (see its doc comment), but `Identifier`
+/// is not `#[non_exhaustive]` and both fields are `pub` with
+/// `#[derive(Deserialize)]`, so a struct literal or `serde_json`
+/// deserialization of untrusted input bypasses that guard entirely.
+/// Without this check, two things each carrying one such id — say both
+/// from a JSON payload with an empty `value` — would spuriously satisfy
+/// `id1 == id2` and trip `deterministic_match`, the same false-identity
+/// class `shares_same_as` already guards against for `same_as` entries.
 fn shares_identifier(thing1: &Thing, thing2: &Thing) -> bool {
     if thing1.identifiers.is_empty() || thing2.identifiers.is_empty() {
         return false;
     }
+    let is_degenerate =
+        |id: &Identifier| id.property_id.trim().is_empty() || id.value.trim().is_empty();
     for id1 in &thing1.identifiers {
+        if is_degenerate(id1) {
+            continue;
+        }
         for id2 in &thing2.identifiers {
+            if is_degenerate(id2) {
+                continue;
+            }
             if id1 == id2 {
                 return true;
             }
@@ -1390,6 +1409,61 @@ mod tests {
             .add_identifier(id)
             .build();
         assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
+    }
+
+    // spec/10-open-questions.md OQ-F: `Identifier::new` refuses an empty
+    // trimmed `property_id`/`value`, but `Identifier` is not
+    // `#[non_exhaustive]` and both fields are `pub` with
+    // `#[derive(Deserialize)]`, so a struct literal (or `serde_json`
+    // deserialization of untrusted input) bypasses that guard entirely.
+    // Two unrelated things each carrying one such degenerate id must
+    // never spuriously match — this pins the fix.
+    #[test]
+    fn empty_value_identifier_never_matches_even_via_constructor_bypass() {
+        let empty_id = Identifier {
+            property_id: "sku".to_string(),
+            value: String::new(),
+        };
+        let a = Thing::builder()
+            .name("Eiffel Tower")
+            .add_identifier(empty_id.clone())
+            .build();
+        let b = Thing::builder()
+            .name("Wholly Different")
+            .add_identifier(empty_id)
+            .build();
+        assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
+    }
+
+    // Same bypass, but the empty side is `property_id` rather than `value`.
+    #[test]
+    fn empty_property_id_identifier_never_matches() {
+        let empty_id = Identifier {
+            property_id: String::new(),
+            value: "Q243".to_string(),
+        };
+        let a = Thing::builder()
+            .name("X")
+            .add_identifier(empty_id.clone())
+            .build();
+        let b = Thing::builder().name("Y").add_identifier(empty_id).build();
+        assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
+    }
+
+    // Same bypass, but whitespace-only — `Identifier::new` treats a
+    // trimmed-empty value as invalid, so the fix must too.
+    #[test]
+    fn whitespace_only_value_identifier_never_matches() {
+        let ws_id = Identifier {
+            property_id: "sku".to_string(),
+            value: "   ".to_string(),
+        };
+        let a = Thing::builder()
+            .name("X")
+            .add_identifier(ws_id.clone())
+            .build();
+        let b = Thing::builder().name("Y").add_identifier(ws_id).build();
+        assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 
     /// Pins that a shared `sameAs` URL alone triggers a deterministic match.

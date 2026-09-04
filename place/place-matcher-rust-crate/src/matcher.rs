@@ -946,12 +946,29 @@ fn score_country_code(p1: &Place, p2: &Place) -> Option<f64> {
 /// scheme-scoped via [`PlaceId`](crate::models::PlaceId)'s `PartialEq`, so a
 /// `(Google, "X")` never matches an `(OsmNode, "X")`. The nested loop is
 /// `O(n*m)`, which is fine because `place_ids` lists are tiny in practice.
+///
+/// A `PlaceId` whose trimmed `value` is empty is never identity evidence,
+/// however it was constructed. `PlaceId::new` already refuses to build one
+/// (see its doc comment), but `PlaceId` is not `#[non_exhaustive]` and both
+/// fields are `pub` with `#[derive(Deserialize)]`, so a struct literal or
+/// `serde_json` deserialization of untrusted input (e.g. `"value": ""`)
+/// bypasses that guard entirely. Without this check, two places each
+/// carrying one such id — say both from a JSON payload with an empty
+/// `value` — would spuriously satisfy `id1 == id2` and trip
+/// `deterministic_match`, the same false-identity class already closed
+/// for `name_and_postcode_match` (0.7.0, see `CHANGELOG.md`).
 fn shares_place_id(p1: &Place, p2: &Place) -> bool {
     if p1.place_ids.is_empty() || p2.place_ids.is_empty() {
         return false;
     }
     for id1 in &p1.place_ids {
+        if id1.value.trim().is_empty() {
+            continue;
+        }
         for id2 in &p2.place_ids {
+            if id2.value.trim().is_empty() {
+                continue;
+            }
             if id1 == id2 {
                 return true;
             }
@@ -1313,6 +1330,47 @@ mod tests {
             .add_place_id(id)
             .build();
         assert!(MatchingEngine::default_config().deterministic_match(&a, &b));
+    }
+
+    // spec/10-open-questions.md OQ-I: `PlaceId::new` refuses an empty
+    // trimmed value, but `PlaceId` is not `#[non_exhaustive]` and both
+    // fields are `pub` with `#[derive(Deserialize)]`, so a struct literal
+    // (or `serde_json` deserialization of untrusted input) bypasses that
+    // guard entirely. Two unrelated places each carrying one such
+    // empty-value id must never spuriously match — this pins the fix.
+    #[test]
+    fn empty_value_place_id_never_matches_even_via_constructor_bypass() {
+        let empty_id = PlaceId {
+            scheme: PlaceIdScheme::Google,
+            value: String::new(),
+        };
+        let a = Place::builder()
+            .name("Eiffel Tower")
+            .add_place_id(empty_id.clone())
+            .build();
+        let b = Place::builder()
+            .name("Wholly Different")
+            .add_place_id(empty_id)
+            .build();
+        assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
+        let r = MatchingEngine::default_config().match_places(&a, &b);
+        assert!(approx_eq(r.breakdown.place_ids_score.unwrap(), 0.0));
+    }
+
+    // Same bypass, but the empty value is whitespace-only — `PlaceId::new`
+    // treats a trimmed-empty value as invalid, so the fix must too.
+    #[test]
+    fn whitespace_only_value_place_id_never_matches() {
+        let ws_id = PlaceId {
+            scheme: PlaceIdScheme::Google,
+            value: "   ".to_string(),
+        };
+        let a = Place::builder()
+            .name("X")
+            .add_place_id(ws_id.clone())
+            .build();
+        let b = Place::builder().name("Y").add_place_id(ws_id).build();
+        assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 
     #[test]
