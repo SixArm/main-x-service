@@ -441,6 +441,90 @@ clearly described manual check confirms the acceptance criterion.
     version needs. BUS-2 (link-graph Fluvio consumer) and rolling
     `FluvioSink` to the remaining services continue elsewhere.
 
+- [ ] **T-12 — Wire or retire the `event-matcher` crate's second-opinion adapter.**
+  `src/matching/adapter.rs::to_matcher_event` and the `matcher_lib`
+  re-export (`pub use ::event_matcher as matcher_lib` in
+  `src/matching/mod.rs`) exist to score two service `Event`s through
+  the canonical `event-matcher` crate as "a second, independent
+  opinion" (per that module's doc comment), but production duplicate
+  detection (create-time check, `POST /api/events/deduplicate`) goes
+  entirely through the crate-local `scoring::ProbabilisticScorer` /
+  `DeterministicScorer` in `src/matching/scoring.rs`. `to_matcher_event`
+  is called only from its own module's `#[cfg(test)]` block — it is
+  dead in every production code path. *(verified: `grep -rn
+  "to_matcher_event\|matcher_lib\|calculate_score" src/` — the only
+  non-doc-comment call sites for `to_matcher_event` are inside
+  `src/matching/adapter.rs`'s own `mod tests`, lines 438–508.)* Either
+  surface the canonical-crate score as an actual second opinion (e.g.
+  in the score breakdown, or a config-gated comparison path) or remove
+  the adapter + re-export and record why in `agents/matching.md`.
+  **Acceptance:** `to_matcher_event`/`matcher_lib` is either called
+  from a real request path with a test proving it, or removed with a
+  spec note explaining the two-implementation history.
+
+- [ ] **T-13 — Resolve the unused `match_window_overlap` time scorer.**
+  `matching::algorithms::time_matching::match_window_overlap` (Jaccard
+  ratio of two events' `[start, end]` windows) is implemented and unit
+  tested (`algorithms.rs::window_overlap`), but never called from
+  `scoring::ProbabilisticScorer::calculate_score`, which instead scores
+  `start_date` and `end_date` independently via separate `START`/`END`
+  weights. *(verified: `grep -rn "match_window_overlap" src/` — only
+  the definition and its own unit test; `scoring.rs`'s weight table has
+  no `WINDOW_OVERLAP` entry.)* This is exactly the open question
+  event-matcher's own `spec/10-open-questions.md` OQ-C leaves
+  unresolved, but here it is half-built: the function exists with no
+  caller. Decide whether window-overlap replaces, blends with, or stays
+  dead alongside the independent start/end scoring, and either wire it
+  behind a `MatchingConfig` flag or delete it.
+  **Acceptance:** `match_window_overlap` has at least one production
+  call site with an integration/unit test proving its effect on a real
+  match score, or is removed and the decision recorded in
+  `agents/matching.md`.
+
+- [ ] **T-14 — Retire or wire the dead `organizations` table and
+  `Organization` model.** `src/models/organization.rs::Organization`
+  (a standalone venue-operator/promoter record, per its doc comment) is
+  referenced nowhere outside its own module and the blanket
+  `models::mod.rs` re-export. Separately, `db::models::organizations`
+  (a SeaORM entity backed by migration
+  `m20241228_000001_create_organizations`) is wired only as a
+  `belongs_to` foreign-key target from party rows — nothing ever
+  inserts into it. *(verified: `grep -rn "models::organization\|use.*organization::" src/`
+  — only self-references; `grep -n "organizations::ActiveModel\|organizations::Entity::insert\|Organization::insert" src/db/*.rs`
+  — zero hits.)* The table is migrated and permanently empty in every
+  deployment. Either add the CRUD path that populates it (so party
+  `organization_id` FKs can resolve to a real record) or drop the
+  domain model + table and repoint party rows accordingly.
+  **Acceptance:** `organizations` rows are created by some code path
+  with a test proving it, or the model/table/migration are removed
+  (with a down-migration and CHANGELOG entry) and `models::mod.rs`'s
+  doc comment updated to stop describing it as delivered.
+
+- [ ] **T-15 — Persist the dedup review queue (promotes OQ-4 to a
+  task).** `POST /api/events/deduplicate` computes `ReviewQueueItem`s
+  on the fly and returns them in the response body; there is no
+  `review_queue` table, no `GET .../review-queue` listing endpoint, and
+  no `POST .../review-queue/{id}/decision` endpoint — unlike person /
+  worker / place / thing / organization, which all persist the queue
+  per
+  [match-search-merge.md](../../../agents/share/match-search-merge.md).
+  *(verified: `grep -rn "review_queue\|ReviewQueue" src/` — the type
+  lives only in `src/models/review_queue.rs` and is consumed inline by
+  `handlers::deduplicate_events`; §16 OQ-4 already documents this gap
+  as "tracked as future work, not scheduled" but it has never been
+  given a `T-` id.)* A returned `AutoMerged` item today is a label
+  only — no merge is actually performed, since there is no persisted
+  row a follow-up call could reference by id. Add the `review_queue`
+  table (normalized-pair `UNIQUE` upsert, mirroring person's schema),
+  the two endpoints, and wire `AutoMerged` items to actually invoke the
+  merge path.
+  **Acceptance:** a batch dedup scan persists candidate pairs;
+  `GET /api/events/review-queue` lists `pending` items;
+  `POST /api/events/review-queue/{id}/decision` transitions
+  `pending → confirmed|rejected` (first-writer-wins, only `pending`
+  decidable); an `AutoMerged` item results in an actual merge, not
+  just a label.
+
 - [x] **T-CFG — `Config::from_env` loads the environment.** *(done
   2026-07-23)* The function was a stub that returned `Config::default()`
   and ignored the process environment, so every documented variable

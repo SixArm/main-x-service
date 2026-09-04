@@ -51,4 +51,57 @@
       (§5, §17). `CHANGELOG.md` and
       [`agents/matching-algorithm.md`](../agents/matching-algorithm.md)
       updated. Service-side bridge-test extension: same note as T-11.
+- [ ] T-13: Property-test coverage for negative `MatchConfig` weights,
+      per spec §22's documented anti-pattern ("Setting weights to
+      negative. Not validated today — caller contract."). Extend
+      `tests/proptests.rs::score_is_bounded_unit_interval` (or add a
+      sibling property) to generate a `MatchConfig` with an
+      arbitrary-signed weight on one component and assert the
+      documented `[0.0, 1.0]` bound in `weighted_average`'s doc
+      comment still holds — or, if it does not, decide and record
+      whether `weighted_average` should clamp/reject negative weights
+      or the doc comment should instead state the bound only holds for
+      non-negative weights. *(verified:
+      `weighted_average(&[(Some(0.0), 1.0), (Some(1.0), -0.5)])`
+      returns `-1.0`, outside the documented range, and no existing
+      proptest constructs a non-default `MatchConfig`.)*
+      - **Acceptance:** either (a) `weighted_average` is bounded for
+        any finite weight and a proptest pins it, or (b) the doc
+        comment on `weighted_average` and spec §22 are updated to
+        state the `[0.0, 1.0]` guarantee assumes non-negative weights,
+        with a regression test pinning the now-explicit contract
+        either way.
+- [ ] T-14: Pin the documented trailing-slash `same_as` behaviour
+      (spec §16: "we do NOT strip trailing slashes"). Add a unit test
+      alongside `same_as_url_overlap_short_circuits` (`src/matcher.rs`)
+      asserting that `same_as = ["https://x.org/c/"]` vs `same_as =
+      ["https://x.org/c"]` does **not** deterministic-match (R-2
+      misses), and that `same_as = ["https://x.org/c/"]` vs `same_as =
+      ["https://X.ORG/c/"]` (case only) **does** match. *(verified:
+      `grep -n "trailing_slash\|trailing slash" src/*.rs tests/*.rs`
+      returns nothing, and the sole existing `same_as` test only
+      varies case/whitespace, never the trailing-slash distinction §16
+      documents.)*
+      - **Acceptance:** the new test(s) pass under current
+        `normalize::fold` and fail if a future change makes `fold`
+        strip trailing slashes, so the spec's documented "we
+        deliberately preserve it" decision is enforced, not just
+        asserted in prose.
+- [ ] T-15: Reconcile `spec/24-testing-strategy.md` and this file's
+      T-8 entry with the crate-local Criterion bench added in
+      `[0.7.0]`. Update §24's "Benchmarks live at
+      `course-service-with-loco/benches/matching_bench.rs`" line to
+      also name this crate's own `benches/match_pair.rs` (four groups:
+      single-pair scoring, deterministic short-circuits, `rank`
+      throughput at N=10/100/1000, per-preset cost), and add a
+      cross-reference note on T-8 pointing at this crate's bench so a
+      reader of this file isn't left thinking benches exist only
+      service-side. *(verified: `CHANGELOG.md` `[0.7.0]` "Added —
+      Criterion benchmarks" entry describes `benches/match_pair.rs`,
+      which exists at `benches/match_pair.rs`;
+      `spec/24-testing-strategy.md` and T-8's body still describe only
+      the service-side bench.)*
+      - **Acceptance:** §24 and the T-8 note above both name
+        `benches/match_pair.rs` alongside the service-side bench; no
+        code change required.
 

@@ -52,4 +52,70 @@
   `tests/unit/session.test.ts` (+2 — `requireSignedIn` throws a
   303-to-`/signin` redirect when signed out, passes through silently
   when signed in).
+- [ ] T-30: Playwright smoke coverage for `/board` and `/calendar`.
+  Both routes landed 2026-07-19 (CHANGELOG "SVAR moderate fit") but
+  `tests/e2e/courses.spec.ts` (the only e2e suite) never gained a case
+  for either. `agents/testing.md` states the smoke suite's goal as
+  "every MVP route renders, primary action is clickable"; these two
+  are MVP routes (both nav-linked from `+layout.svelte`) that don't
+  meet it. *(verified: `grep -rn "board\|calendar"
+  tests/e2e/courses.spec.ts` matches nothing —
+  `tests/e2e/courses.spec.ts` has exactly 5 route tests — dashboard,
+  courses list, new, match, merge — plus the T-20 GDPR test and the
+  anonymous-guard describe; none visits `/board` or `/calendar`.)*
+  - **Acceptance:** two new Playwright tests — `/board` renders the
+    `data-testid="course-board"` Kanban wrap with at least the
+    lifecycle column headings; `/calendar` renders
+    `data-testid="instance-calendar"` — both stubbing
+    `search()`/`listInstances()` via `page.route(...)` per the suite's
+    existing convention.
+- [ ] T-31: Playwright smoke coverage for `/courses/[id]` and
+  `/courses/[id]/audit` route shells. Neither is visited as a general
+  render check today: `/courses/[id]` is only touched incidentally by
+  the T-20 GDPR-export test (which asserts the export button, not the
+  page's other landmarks — Edit link, Audit link, identity fields),
+  and `/courses/[id]/audit` is never visited by any test at all.
+  *(verified: `grep -n "audit" tests/e2e/courses.spec.ts` — no
+  match.)*
+  - **Acceptance:** a new Playwright test visits a stubbed
+    `/courses/{id}` and asserts the heading, the Edit link, and the
+    Audit link are visible; a second visits
+    `/courses/{id}/audit` (stubbing the audit endpoint) and asserts
+    the heading and at least one rendered audit entry.
+- [ ] T-32: `/courses` list has no pagination beyond a hardcoded
+  `limit: 50` and no total-count indicator. `src/lib/api/courses.ts`'s
+  `search()` and `src/lib/api/client.ts`'s `ApiClient` never read the
+  family-wide `X-Total-Count`/`X-Limit`/`X-Offset` response headers
+  ([`restful.md`](../../../agents/share/restful.md));
+  `src/routes/courses/+page.svelte` calls `repo.search({ q: q.trim(),
+  limit: 50, fuzzy })` with no offset control. A deployment with more
+  than 50 courses gets a silently truncated grid with no way to see
+  the rest and no on-screen indication that more exist. *(verified:
+  `grep -n "X-Total-Count\|X-Limit\|X-Offset\|totalCount"
+  src/lib/api/*.ts src/routes/courses/+page.svelte` — no matches;
+  `SearchOptions.offset` is declared in `src/lib/api/courses.ts` but
+  never surfaced in the UI.)*
+  - **Acceptance:** `ApiClient` exposes response headers (or a parsed
+    `{items, total, limit, offset}`) on `search()`;
+    `/courses/+page.svelte` gains Prev/Next controls and a "showing X
+    of Y" label driven by `X-Total-Count`; `tests/unit/courses.test.ts`
+    pins the header parse, a Playwright test pins the Next button
+    advancing `offset`.
+- [ ] T-33: `/board` and `/calendar` silently truncate at 100 / 50
+  courses respectively, with the same root cause as T-32 but a worse
+  symptom — a Kanban column or a calendar month can look complete
+  while quietly missing records past the cap, rather than a list
+  simply lacking a "next page" control.
+  `src/routes/board/+page.svelte` calls `repo.search({ q: "*", limit:
+  100 })`; `src/routes/calendar/+page.svelte` calls `repo.search({ q:
+  "*", limit: 50 })`. Neither reads `X-Total-Count` to detect or
+  surface truncation. *(verified: `grep -n "limit"
+  src/routes/board/+page.svelte src/routes/calendar/+page.svelte` →
+  `limit: 100` and `limit: 50`.)*
+  - **Acceptance:** once T-32 exposes the total count, both pages
+    compare it against the fetched item count and render a visible
+    "showing N of M — refine search to see more" notice (or raise the
+    cap and paginate the underlying fetch) rather than presenting a
+    silently partial board/calendar as complete; a unit or e2e test
+    pins the notice appears when `total > items.length`.
 
