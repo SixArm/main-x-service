@@ -12,60 +12,43 @@ they are recorded here (this crate carries no `spec/13-tasks.md`
 checklist — see `spec/index.md`'s table of contents) rather than left
 purely as prose elsewhere.
 
-- **OQ-F (task, M, security) — Empty-value identity bypass on
-  `Identifier` via direct construction/deserialization.**
-  `Identifier::new` rejects an empty trimmed `property_id`/`value`, but
-  `Identifier` is **not** `#[non_exhaustive]` and both fields are `pub`
-  with `#[derive(Deserialize)]` — so `Identifier { property_id:
-  "sku".into(), value: String::new() }` is constructible via a struct
-  literal, and is likewise reachable via `serde_json` deserialization of
-  untrusted input, entirely bypassing the constructor's guard.
-  `shares_identifier` (`src/matcher.rs`) only checks
-  `thing1.identifiers.is_empty() || thing2.identifiers.is_empty()`
-  before comparing `id1 == id2` — two things each carrying one
-  `Identifier { property_id: "sku", value: "" }` (e.g. from a JSON
-  payload with `"value": ""`) satisfy that equality and spuriously trip
-  `deterministic_match`, exactly the SEC-M2 false-identity class this
-  crate already fixed for `same_canonical_url`/`shares_same_as` in
-  0.7.0 (`CHANGELOG.md` "Security" entry) — but that fix never touched
-  this construction-bypass path on `Identifier`, and `shares_same_as`
-  in the same file already has the right pattern to copy: it skips
-  entries whose normalised form is empty. The sibling `place-matcher`
-  crate has the identical bypass on its own `PlaceId` type (see its own
-  `spec/10-open-questions.md` OQ-I), so the fix pattern should land
-  identically in both. *(verified: `sed -n '71,78p' src/models.rs`
-  shows `Identifier`'s fields are `pub` with no `#[non_exhaustive]`,
-  deriving `Deserialize`; `sed -n '829,841p' src/matcher.rs` shows
-  `shares_identifier`'s only empty-guard is on the outer `Vec`, not
-  per-entry.)* **Acceptance:** `shares_identifier` additionally skips
-  any `Identifier` whose `value` (or `property_id`) is empty (mirroring
-  `shares_same_as`'s empty-skip); a unit test constructs two
-  `Identifier`s with `value: String::new()` directly (bypassing `new`)
-  on both sides and asserts `deterministic_match` returns `false`;
-  existing `identifiers_property_scoped_no_cross_match`-style tests
-  stay green; `cargo test` + `cargo clippy --all-targets -- -D
-  warnings` clean; `CHANGELOG.md` entry under "Security" (same class as
-  the 0.7.0 SEC-M2 fix).
+- ~~**OQ-F (task, M, security) — Empty-value identity bypass on
+  `Identifier` via direct construction/deserialization.**~~ —
+  **RESOLVED (2026-09-04).** `Identifier::new` refuses an empty trimmed
+  `property_id`/`value`, but `Identifier` is not `#[non_exhaustive]` and
+  both fields are `pub` with `#[derive(Deserialize)]`, so a struct
+  literal or `serde_json` deserialization of untrusted input bypassed
+  the constructor's guard entirely. `shares_identifier`
+  (`src/matcher.rs`) now skips any `Identifier` whose trimmed
+  `property_id` or `value` is empty on either side — matching the
+  constructor's own definition of "empty" — before comparing
+  `id1 == id2`, closing the same false-identity class already fixed for
+  `same_canonical_url`/`shares_same_as` in 0.7.0. Three unit tests pin
+  the exact bypass shapes (empty `value`, empty `property_id`,
+  whitespace-only `value`); OQ-G's property test (below) covers the
+  general case. `cargo test` (106 lib tests, up from 103) + `cargo
+  clippy --all-targets -- -D warnings` + `cargo doc --no-deps` all
+  clean. See `CHANGELOG.md` "Security" under `[Unreleased]`.
 
-- **OQ-G (task, S, follow-up regression coverage for OQ-F) — Add a
+- ~~**OQ-G (task, S, follow-up regression coverage for OQ-F) — Add a
   property test asserting no struct-literal-constructed `Identifier`
-  can ever spuriously trip `deterministic_match`.** Once OQ-F above is
-  fixed, a `proptest` property (this crate already has a `proptest`
-  dev-dependency and property-test infrastructure — `spec/index.md`
-  cites the property-test suite) generating arbitrary
-  `Identifier { property_id, value }` pairs — including empty-string
-  and whitespace-only `value`s that bypass `Identifier::new` — over
-  arbitrary `Thing` pairs guards the fix from regressing silently the
-  way the pre-0.7.0 URL bug did. *(verified: `ls tests/` and
-  `grep -rn "proptest" Cargo.toml` confirm the crate already has
-  property-test scaffolding to extend, rather than needing a new
-  harness.)* **Acceptance:** a new `proptest!` block generates
-  `Identifier` pairs (including the empty/whitespace-value bypass case)
-  and asserts `deterministic_match` never returns `true` from a shared
-  empty-valued identifier alone; `cargo test` clean; documented in the
-  same PR as OQ-F's fix (not a separate follow-up PR, since an
-  unguarded fix is exactly the situation invariant 2
-  (`agents/share/security.md`) warns against).
+  can ever spuriously trip `deterministic_match`.**~~ — **RESOLVED
+  (2026-09-04), same PR as OQ-F.** A new property,
+  `deterministic_match_never_trips_on_a_shared_degenerate_identifier`
+  (`tests/property_tests.rs`), generates arbitrary `Identifier`s whose
+  `property_id`, `value`, or both trim to empty, attaches the same one
+  to two otherwise-unrelated `Thing`s, and asserts `deterministic_match`
+  is `false`. One design correction found while writing it: the first
+  draft generated `p1`/`p2` independently from the existing
+  `thing_strategy()` (which also randomises `url`/`same_as`) and failed
+  — not from the identifier bypass, but because the strategy's small
+  `same_as` alphabet let two independently-generated things coincidentally
+  share a URL, a **real** `shares_same_as` match unrelated to this
+  property. The test now clears `url`/`same_as` on both sides first, so
+  the shared degenerate identifier is the only thing `deterministic_match`
+  could possibly fire on. Confirmed the property genuinely exercises the
+  OQ-F fix (not a tautology): reverting `shares_identifier`'s change
+  makes it fail 1 of 13 property-test cases, immediately.
 
 - **OQ-H (task, M) — Resolve OQ-C: tag globally-unique identifier
   schemes and weight them accordingly.** OQ-C above has stood as an

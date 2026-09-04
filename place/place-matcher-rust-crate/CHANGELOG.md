@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **(spec/10-open-questions.md OQ-I, resolved) Empty-value identity bypass
+  on `PlaceId` via construction/deserialization.** `PlaceId::new` refuses
+  an empty trimmed `value`, but `PlaceId` is not `#[non_exhaustive]` and
+  both fields are `pub` with `#[derive(Deserialize)]`, so a struct literal
+  or `serde_json` deserialization of untrusted input (`"value": ""`)
+  bypassed that guard entirely. `shares_place_id` (`src/matcher.rs`) only
+  checked emptiness on the outer `Vec`, not per entry, so two places each
+  carrying one such empty-value id satisfied `id1 == id2` and spuriously
+  tripped `deterministic_match` — the same false-identity class already
+  closed for `name_and_postcode_match` (0.7.0, above) and for
+  person-matcher's `passport_books_share_pair`, but never applied to this
+  construction-bypass path. `shares_place_id` now skips any `PlaceId`
+  whose trimmed `value` is empty on either side, matching the constructor's
+  own definition of "empty". No weight/threshold or other behaviour change.
+
 ### Changed
 - MSRV raised to Rust 1.96 (N-2 policy tightened from N-3; see spec/rust-msrv-n-minus-2/index.md).
 

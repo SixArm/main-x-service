@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **(spec/10-open-questions.md OQ-F, resolved) Empty-value identity
+  bypass on `Identifier` via construction/deserialization.**
+  `Identifier::new` refuses an empty trimmed `property_id`/`value`, but
+  `Identifier` is not `#[non_exhaustive]` and both fields are `pub` with
+  `#[derive(Deserialize)]`, so a struct literal or `serde_json`
+  deserialization of untrusted input bypassed that guard entirely.
+  `shares_identifier` (`src/matcher.rs`) only checked emptiness on the
+  outer `Vec`, not per entry, so two things each carrying one such
+  degenerate identifier satisfied `id1 == id2` and spuriously tripped
+  `deterministic_match` — the same false-identity class already closed
+  for `same_canonical_url`/`shares_same_as` in this release, but never
+  applied to this construction-bypass path. `shares_identifier` now
+  skips any `Identifier` whose trimmed `property_id` or `value` is
+  empty on either side, matching the constructor's own definition of
+  "empty". Regression coverage: three unit tests pinning the exact
+  bypass shapes plus a new `proptest` property
+  (`deterministic_match_never_trips_on_a_shared_degenerate_identifier`,
+  `tests/property_tests.rs`, spec OQ-G) generating arbitrary degenerate
+  `property_id`/`value` pairs. No weight/threshold or other behaviour
+  change.
+
 ### Changed
 - MSRV raised to Rust 1.96 (N-2 policy tightened from N-3; see spec/rust-msrv-n-minus-2/index.md).
 
