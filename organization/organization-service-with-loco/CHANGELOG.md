@@ -9,6 +9,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — URL well-formedness + ISO 3166 country-code validation (ORG-T4)
+
+`src/validation.rs` previously only length-bounded `url`,
+`address.country`, `jurisdiction`, and `same_as[i]` — never checking
+they parse as a URL or a real country code. Added `is_valid_url` (the
+same `http://`/`https://` scheme check every sibling entity crate
+applies) for `url` and each `same_as[i]`, and `is_valid_country_code` +
+a 249-entry `ISO_3166_1` alpha-2/alpha-3 const table for
+`address.country` and `jurisdiction`. New unit tests plus two DB-gated
+request-level `422` pins. See spec/index.md ORG-T4.
+
 ### Added — real OpenTelemetry OTLP export (PRO-H12 slice 4 of 7)
 
 - **2026-08-30**: new `src/observability.rs` — this crate carried no

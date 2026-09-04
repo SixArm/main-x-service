@@ -68,7 +68,10 @@ are never fed to the matcher. See §8 and
 
 ## 6. Functional requirements
 
-1. `POST /api/organizations` — create; `name` required (422 if blank).
+1. `POST /api/organizations` — create; `name` required (422 if blank);
+   `url`/`same_as[i]` must be `http(s)://`, `address.country`/
+   `jurisdiction` must be a recognised ISO 3166-1 code (ORG-T4) — also
+   enforced on update. Rules in [`src/validation.rs`](../src/validation.rs).
 2. `GET /api/organizations[?limit=&offset=]` — list active `{pid, name}`,
    newest first, one page at a time. Reports `X-Total-Count` /
    `X-Limit` / `X-Offset` per
@@ -738,12 +741,12 @@ organization is not a data subject.
 - [x] Record merge — `POST /merge` folds a duplicate into a survivor
   (union fields, former-name alias, soft-delete, `merge_records` history
   + snapshot, `Merged` event); pure `src/merge.rs`; `/merges/recent`.
-- [~] Richer validation (identifier formats, URL, country codes).
-  **Partial**: SEC-M5 (below) validates the deterministic-identifier
-  formats (LEI/GLN/DUNS/VAT check digits). Still open: URL well-formedness
-  and country-code (ISO 3166) validation — `src/validation.rs` only
-  length-bounds `url` and `address.country` today, it does not check
-  their shape.
+- [x] Richer validation (identifier formats, URL, country codes).
+  SEC-M5 (below) validates the deterministic-identifier formats
+  (LEI/GLN/DUNS/VAT check digits). ORG-T4 (§13) closed the remaining
+  gap: `src/validation.rs` checks `url`/`same_as[i]` for an `http(s)://`
+  scheme and `address.country`/`jurisdiction` against the ISO 3166-1
+  alpha-2/alpha-3 registry (249 currently-assigned codes).
 - [ ] Cross-service link **target** readiness — organization is a v1
   link target only (§8;
   [`agents/share/cross-service-linking.md`](../../../agents/share/cross-service-linking.md)),
@@ -1022,7 +1025,8 @@ organization is not a data subject.
   record still succeeds; the existing `check-duplicates`/`deduplicate`
   behaviour is unchanged.
 
-- [ ] **ORG-T4 (S) URL well-formedness + ISO 3166 country-code validation.**
+- [x] **ORG-T4 (S) URL well-formedness + ISO 3166 country-code
+  validation.** *(resolved 2026-09-04.)*
   `src/validation.rs` only length-bounds `url`, `address.country`, and
   `same_as[i]` (`check_opt_text`/`string_array_caps`) — it never checks
   they parse as a URL or a real ISO 3166-1 alpha-2/3 code. The crate's
@@ -1035,6 +1039,19 @@ organization is not a data subject.
   `url` or an unrecognised `address.country`/`jurisdiction` code;
   existing valid records are unaffected; unit tests for the new
   validators plus a request-level `422` pin.
+  - **Resolved.** Added `is_valid_url` (the same lightweight
+    `http://`/`https://` scheme check every sibling entity crate
+    applies) for `url` and each `same_as[i]`, and `is_valid_country_code`
+    + a 249-entry `ISO_3166_1` `(alpha-2, alpha-3)` const table for
+    `address.country` and `jurisdiction`. New unit tests (including a
+    table-size pin and a well-formed/malformed round-trip) plus two
+    DB-gated request-level `422` pins
+    (`malformed_url_returns_422`, `unrecognised_country_code_returns_422`,
+    `tests/requests/organizations.rs`) verified green against a real
+    Postgres. The `within_caps_large_record_has_no_problems` `same_as`
+    fixture (previously non-URL filler up to the length cap) was fixed
+    to a checksum-neutral but well-formed URL at the same length, since
+    it is no longer accepted otherwise.
 
 - [ ] **ORG-T5 (S) Wire FHIR `GET /fhir/Organization` search onto the
   Tantivy index.** The FHIR search handler

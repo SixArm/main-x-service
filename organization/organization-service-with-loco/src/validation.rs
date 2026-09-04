@@ -10,6 +10,13 @@
 //!
 //! - **`name`** — required; must not be blank.
 //! - **`identifiers[i].value`** — must not be blank.
+//! - **`url`, `same_as[i]`** — when present, must begin with `http://` or
+//!   `https://` (ORG-T4) — the same lightweight scheme check every sibling
+//!   entity crate applies.
+//! - **`address.country`, `jurisdiction`** — when present, must be a
+//!   currently-assigned ISO 3166-1 alpha-2 or alpha-3 country code,
+//!   case-insensitively (ORG-T4). Existence in-list is checked; per-country
+//!   sub-national detail is out of scope.
 //! - **Input-size caps (SEC-M1)** — every scalar text field, array
 //!   cardinality, and per-entry string length is bounded, so a single huge
 //!   string or huge array cannot be used as a CPU/memory `DoS` against the
@@ -66,6 +73,27 @@ pub fn problems(org: &Organization) -> Vec<String> {
         check_opt_text(&mut out, "address.region", addr.region.as_ref());
         check_opt_text(&mut out, "address.postal_code", addr.postal_code.as_ref());
         check_opt_text(&mut out, "address.country", addr.country.as_ref());
+        if let Some(country) = &addr.country
+            && !is_valid_country_code(country)
+        {
+            out.push(format!(
+                "address.country: {country:?} is not a recognised ISO 3166-1 country code"
+            ));
+        }
+    }
+
+    // ORG-T4: URL well-formedness + ISO 3166 country-code format checks.
+    if let Some(url) = &org.url
+        && !is_valid_url(url)
+    {
+        out.push(format!("url: {url:?} is not a valid http(s) URL"));
+    }
+    if let Some(jurisdiction) = &org.jurisdiction
+        && !is_valid_country_code(jurisdiction)
+    {
+        out.push(format!(
+            "jurisdiction: {jurisdiction:?} is not a recognised ISO 3166-1 country code"
+        ));
     }
 
     // Input-size caps (SEC-M1): array cardinality.
@@ -89,6 +117,9 @@ pub fn problems(org: &Organization) -> Vec<String> {
     }
     for (i, url) in inspected(&org.same_as) {
         check_item(&mut out, "same_as", i, url);
+        if !is_valid_url(url) {
+            out.push(format!("same_as[{i}]: {url:?} is not a valid http(s) URL"));
+        }
     }
     for (i, keyword) in inspected(&org.keywords) {
         check_item(&mut out, "keywords", i, keyword);
@@ -254,6 +285,104 @@ fn is_valid_vat(s: &str) -> bool {
         && bytes[2..].iter().all(u8::is_ascii_alphanumeric)
 }
 
+/// ORG-T4: true when `url` begins with `http://` or `https://` — the same
+/// lightweight scheme check every sibling entity crate applies (e.g.
+/// `thing-service`'s `is_http_url`, `care-pathway-service`'s
+/// `is_valid_url`). No further URL structure (host, path) is checked.
+#[must_use]
+fn is_valid_url(url: &str) -> bool {
+    url.starts_with("http://") || url.starts_with("https://")
+}
+
+/// ORG-T4: true when `code` (any surrounding whitespace trimmed) is a
+/// currently-assigned ISO 3166-1 alpha-2 or alpha-3 country code,
+/// case-insensitively. Used to gate `address.country` and `jurisdiction`.
+///
+/// This checks *format against the published registry*, not any
+/// deeper geopolitical judgement: entries reflect the current edition of
+/// ISO 3166-1 (249 currently-assigned codes) exactly, so a commonly-seen
+/// but never-officially-assigned code (e.g. `XK` for Kosovo, which has no
+/// ISO 3166-1 entry) is rejected — this is the standard's own scope, not
+/// a political stance taken here.
+#[must_use]
+fn is_valid_country_code(code: &str) -> bool {
+    let upper = code.trim().to_ascii_uppercase();
+    ISO_3166_1
+        .iter()
+        .any(|&(alpha2, alpha3)| upper == alpha2 || upper == alpha3)
+}
+
+/// Currently-assigned ISO 3166-1 `(alpha-2, alpha-3)` country code pairs
+/// (249 entries), in alpha-2 alphabetical order. See
+/// [`is_valid_country_code`].
+#[rustfmt::skip]
+const ISO_3166_1: &[(&str, &str)] = &[
+    ("AD", "AND"), ("AE", "ARE"), ("AF", "AFG"), ("AG", "ATG"), ("AI", "AIA"),
+    ("AL", "ALB"), ("AM", "ARM"), ("AO", "AGO"), ("AQ", "ATA"), ("AR", "ARG"),
+    ("AS", "ASM"), ("AT", "AUT"), ("AU", "AUS"), ("AW", "ABW"), ("AX", "ALA"),
+    ("AZ", "AZE"),
+    ("BA", "BIH"), ("BB", "BRB"), ("BD", "BGD"), ("BE", "BEL"), ("BF", "BFA"),
+    ("BG", "BGR"), ("BH", "BHR"), ("BI", "BDI"), ("BJ", "BEN"), ("BL", "BLM"),
+    ("BM", "BMU"), ("BN", "BRN"), ("BO", "BOL"), ("BQ", "BES"), ("BR", "BRA"),
+    ("BS", "BHS"), ("BT", "BTN"), ("BV", "BVT"), ("BW", "BWA"), ("BY", "BLR"),
+    ("BZ", "BLZ"),
+    ("CA", "CAN"), ("CC", "CCK"), ("CD", "COD"), ("CF", "CAF"), ("CG", "COG"),
+    ("CH", "CHE"), ("CI", "CIV"), ("CK", "COK"), ("CL", "CHL"), ("CM", "CMR"),
+    ("CN", "CHN"), ("CO", "COL"), ("CR", "CRI"), ("CU", "CUB"), ("CV", "CPV"),
+    ("CW", "CUW"), ("CX", "CXR"), ("CY", "CYP"), ("CZ", "CZE"),
+    ("DE", "DEU"), ("DJ", "DJI"), ("DK", "DNK"), ("DM", "DMA"), ("DO", "DOM"),
+    ("DZ", "DZA"),
+    ("EC", "ECU"), ("EE", "EST"), ("EG", "EGY"), ("EH", "ESH"), ("ER", "ERI"),
+    ("ES", "ESP"), ("ET", "ETH"),
+    ("FI", "FIN"), ("FJ", "FJI"), ("FK", "FLK"), ("FM", "FSM"), ("FO", "FRO"),
+    ("FR", "FRA"),
+    ("GA", "GAB"), ("GB", "GBR"), ("GD", "GRD"), ("GE", "GEO"), ("GF", "GUF"),
+    ("GG", "GGY"), ("GH", "GHA"), ("GI", "GIB"), ("GL", "GRL"), ("GM", "GMB"),
+    ("GN", "GIN"), ("GP", "GLP"), ("GQ", "GNQ"), ("GR", "GRC"), ("GS", "SGS"),
+    ("GT", "GTM"), ("GU", "GUM"), ("GW", "GNB"), ("GY", "GUY"),
+    ("HK", "HKG"), ("HM", "HMD"), ("HN", "HND"), ("HR", "HRV"), ("HT", "HTI"),
+    ("HU", "HUN"),
+    ("ID", "IDN"), ("IE", "IRL"), ("IL", "ISR"), ("IM", "IMN"), ("IN", "IND"),
+    ("IO", "IOT"), ("IQ", "IRQ"), ("IR", "IRN"), ("IS", "ISL"), ("IT", "ITA"),
+    ("JE", "JEY"), ("JM", "JAM"), ("JO", "JOR"), ("JP", "JPN"),
+    ("KE", "KEN"), ("KG", "KGZ"), ("KH", "KHM"), ("KI", "KIR"), ("KM", "COM"),
+    ("KN", "KNA"), ("KP", "PRK"), ("KR", "KOR"), ("KW", "KWT"), ("KY", "CYM"),
+    ("KZ", "KAZ"),
+    ("LA", "LAO"), ("LB", "LBN"), ("LC", "LCA"), ("LI", "LIE"), ("LK", "LKA"),
+    ("LR", "LBR"), ("LS", "LSO"), ("LT", "LTU"), ("LU", "LUX"), ("LV", "LVA"),
+    ("LY", "LBY"),
+    ("MA", "MAR"), ("MC", "MCO"), ("MD", "MDA"), ("ME", "MNE"), ("MF", "MAF"),
+    ("MG", "MDG"), ("MH", "MHL"), ("MK", "MKD"), ("ML", "MLI"), ("MM", "MMR"),
+    ("MN", "MNG"), ("MO", "MAC"), ("MP", "MNP"), ("MQ", "MTQ"), ("MR", "MRT"),
+    ("MS", "MSR"), ("MT", "MLT"), ("MU", "MUS"), ("MV", "MDV"), ("MW", "MWI"),
+    ("MX", "MEX"), ("MY", "MYS"), ("MZ", "MOZ"),
+    ("NA", "NAM"), ("NC", "NCL"), ("NE", "NER"), ("NF", "NFK"), ("NG", "NGA"),
+    ("NI", "NIC"), ("NL", "NLD"), ("NO", "NOR"), ("NP", "NPL"), ("NR", "NRU"),
+    ("NU", "NIU"), ("NZ", "NZL"),
+    ("OM", "OMN"),
+    ("PA", "PAN"), ("PE", "PER"), ("PF", "PYF"), ("PG", "PNG"), ("PH", "PHL"),
+    ("PK", "PAK"), ("PL", "POL"), ("PM", "SPM"), ("PN", "PCN"), ("PR", "PRI"),
+    ("PS", "PSE"), ("PT", "PRT"), ("PW", "PLW"), ("PY", "PRY"),
+    ("QA", "QAT"),
+    ("RE", "REU"), ("RO", "ROU"), ("RS", "SRB"), ("RU", "RUS"), ("RW", "RWA"),
+    ("SA", "SAU"), ("SB", "SLB"), ("SC", "SYC"), ("SD", "SDN"), ("SE", "SWE"),
+    ("SG", "SGP"), ("SH", "SHN"), ("SI", "SVN"), ("SJ", "SJM"), ("SK", "SVK"),
+    ("SL", "SLE"), ("SM", "SMR"), ("SN", "SEN"), ("SO", "SOM"), ("SR", "SUR"),
+    ("SS", "SSD"), ("ST", "STP"), ("SV", "SLV"), ("SX", "SXM"), ("SY", "SYR"),
+    ("SZ", "SWZ"),
+    ("TC", "TCA"), ("TD", "TCD"), ("TF", "ATF"), ("TG", "TGO"), ("TH", "THA"),
+    ("TJ", "TJK"), ("TK", "TKL"), ("TL", "TLS"), ("TM", "TKM"), ("TN", "TUN"),
+    ("TO", "TON"), ("TR", "TUR"), ("TT", "TTO"), ("TV", "TUV"), ("TW", "TWN"),
+    ("TZ", "TZA"),
+    ("UA", "UKR"), ("UG", "UGA"), ("UM", "UMI"), ("US", "USA"), ("UY", "URY"),
+    ("UZ", "UZB"),
+    ("VA", "VAT"), ("VC", "VCT"), ("VE", "VEN"), ("VG", "VGB"), ("VI", "VIR"),
+    ("VN", "VNM"), ("VU", "VUT"),
+    ("WF", "WLF"), ("WS", "WSM"),
+    ("YE", "YEM"), ("YT", "MYT"),
+    ("ZA", "ZAF"), ("ZM", "ZMB"), ("ZW", "ZWE"),
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -365,7 +494,12 @@ mod tests {
             legal_name: Some("l".repeat(MAX_TEXT_LEN)),
             alternate_names: vec!["a".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN],
             identifiers: vec![ident(&"i".repeat(MAX_ITEM_LEN)); MAX_ARRAY_LEN],
-            same_as: vec!["s".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN],
+            // Must still be a well-formed http(s) URL (ORG-T4) at exactly
+            // the item-length cap, not just filler up to the cap.
+            same_as: vec![
+                format!("https://{}", "s".repeat(MAX_ITEM_LEN - "https://".len()));
+                MAX_ARRAY_LEN
+            ],
             keywords: vec!["k".repeat(MAX_ITEM_LEN); MAX_ARRAY_LEN],
             ..Organization::new("placeholder")
         };
@@ -413,6 +547,80 @@ mod tests {
         assert!(is_valid_vat("GB 999 9973 12"), "spaces tolerated");
         assert!(!is_valid_vat("1234567"), "no country prefix");
         assert!(!is_valid_vat("D1"), "too short");
+    }
+
+    /// ORG-T4: the registry has exactly the currently-assigned ISO 3166-1
+    /// count (249 entries) — a wrong count would mean a transcription
+    /// error (a dropped or duplicated row) rather than a real code.
+    #[test]
+    fn iso_3166_1_table_has_the_expected_entry_count() {
+        assert_eq!(ISO_3166_1.len(), 249);
+    }
+
+    /// ORG-T4: alpha-2 and alpha-3 codes are both accepted,
+    /// case-insensitively, with surrounding whitespace trimmed; an
+    /// unrecognised code (including the commonly-seen but never
+    /// officially-assigned `XK` for Kosovo) is rejected.
+    #[test]
+    fn country_codes_are_checked_against_iso_3166_1() {
+        for v in ["US", "us", " US ", "USA", "usa", "GB", "GBR", "gb"] {
+            assert!(is_valid_country_code(v), "should accept {v:?}");
+        }
+        for v in ["", "ZZ", "XK", "USAA", "U", "12"] {
+            assert!(!is_valid_country_code(v), "should reject {v:?}");
+        }
+    }
+
+    /// ORG-T4: `url` must begin with `http://` or `https://`.
+    #[test]
+    fn url_scheme_is_validated() {
+        for v in ["https://acme.example", "http://acme.example/about"] {
+            assert!(is_valid_url(v), "should accept {v:?}");
+        }
+        for v in ["", "acme.example", "ftp://acme.example", "not a url"] {
+            assert!(!is_valid_url(v), "should reject {v:?}");
+        }
+    }
+
+    /// ORG-T4: a malformed `url` is one problem; a malformed
+    /// `address.country` and a malformed `jurisdiction` are each their own
+    /// problem, alongside a `same_as[i]` non-URL entry.
+    #[test]
+    fn malformed_url_and_country_fields_are_reported() {
+        let org = Organization {
+            url: Some("not-a-url".into()),
+            jurisdiction: Some("ZZ".into()),
+            same_as: vec!["also-not-a-url".into()],
+            address: Some(PostalAddress {
+                country: Some("ZZ".into()),
+                ..PostalAddress::default()
+            }),
+            ..Organization::new("Acme")
+        };
+        let p = problems(&org);
+        assert_eq!(p.len(), 4, "problems: {p:?}");
+        assert!(p.iter().any(|m| m.starts_with("url:")));
+        assert!(p.iter().any(|m| m.starts_with("jurisdiction:")));
+        assert!(p.iter().any(|m| m.starts_with("same_as[0]:")));
+        assert!(p.iter().any(|m| m.starts_with("address.country:")));
+    }
+
+    /// ORG-T4: well-formed `url`/`same_as`/`jurisdiction`/`address.country`
+    /// produce no problems (the existing-valid-records-unaffected half of
+    /// the acceptance criteria).
+    #[test]
+    fn well_formed_url_and_country_fields_have_no_problems() {
+        let org = Organization {
+            url: Some("https://acme.example".into()),
+            jurisdiction: Some("GB".into()),
+            same_as: vec!["https://www.wikidata.org/wiki/Q4547858".into()],
+            address: Some(PostalAddress {
+                country: Some("gb".into()), // case-insensitive
+                ..PostalAddress::default()
+            }),
+            ..Organization::new("Acme")
+        };
+        assert!(problems(&org).is_empty(), "problems: {:?}", problems(&org));
     }
 
     /// SEC-M5: a malformed deterministic identifier surfaces as one indexed
