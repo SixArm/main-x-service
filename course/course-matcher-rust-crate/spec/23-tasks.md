@@ -51,7 +51,7 @@
       (§5, §17). `CHANGELOG.md` and
       [`agents/matching-algorithm.md`](../agents/matching-algorithm.md)
       updated. Service-side bridge-test extension: same note as T-11.
-- [ ] T-13: Property-test coverage for negative `MatchConfig` weights,
+- [x] T-13: *(resolved 2026-09-04, option (b))* Property-test coverage for negative `MatchConfig` weights,
       per spec §22's documented anti-pattern ("Setting weights to
       negative. Not validated today — caller contract."). Extend
       `tests/proptests.rs::score_is_bounded_unit_interval` (or add a
@@ -71,6 +71,21 @@
         state the `[0.0, 1.0]` guarantee assumes non-negative weights,
         with a regression test pinning the now-explicit contract
         either way.
+      - **Resolved via (b), not (a).** §22 already records negative
+        weights as a *deliberate* caller-contract decision, not an
+        oversight — adding validation to `MatchConfig` (option (a))
+        would silently change that documented contract rather than
+        clarify it, contrary to this crate's "trust the spec, don't
+        silently realign it" rule (`AGENTS.md`). Instead:
+        `weighted_average`'s doc comment (`src/scoring.rs`) now states
+        the `[0.0, 1.0]` guarantee explicitly assumes non-negative
+        weights, §22 above records the consequence, and a new unit
+        test (a proptest was considered but a fixed example is
+        sufficient and simpler here, since the property being pinned
+        is "this one documented edge case doesn't regress silently",
+        not a general invariant over arbitrary inputs) —
+        `weighted_average_negative_weight_breaks_the_unit_interval_bound`
+        — pins the exact numbers from the verified case above.
 - [ ] T-14: Pin the documented trailing-slash `same_as` behaviour
       (spec §16: "we do NOT strip trailing slashes"). Add a unit test
       alongside `same_as_url_overlap_short_circuits` (`src/matcher.rs`)
