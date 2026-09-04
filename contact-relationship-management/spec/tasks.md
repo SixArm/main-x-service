@@ -322,7 +322,8 @@ code + tests in one PR.
       endpoint; `cargo test` plus the DB-gated enforcement suite
       green; clippy pedantic clean. (CRM-D10, CRM-D12; CRM-G1)
 
-- [ ] CRM-T25 **`require_ref` EntityType coverage.** Same gap as its
+- [x] CRM-T25 **`require_ref` EntityType coverage.** *(resolved
+      2026-09-05.)* Same gap as its
       WPM sibling: `controllers/sales.rs`, `support.rs`, and
       `relationships.rs` pass `EntityType::Worker`,
       `::Organization`, and `::Person` to the shared `require_ref`
@@ -332,6 +333,11 @@ code + tests in one PR.
       src/controllers/*.rs`). **Acceptance:** `ref_rules` exercises
       the wrong-type branch for at least `Worker` and `Organization`
       too; `cargo test` green; clippy pedantic clean. (CRM-D11)
+      - **Resolved.** New `ref_rules_wrong_type_worker_and_organization`
+        test in `src/validation.rs` exercises both the wrong-type
+        rejection (a `person:` ref where `Worker`/`Organization` is
+        expected) and the matching-type acceptance for each, alongside
+        the pre-existing `Person`-only `ref_rules` test.
 
 - [ ] CRM-T26 **Front-end sign-in gate.** No `+layout.server.ts`
       exists and `hooks.server.ts` only populates `locals.sessionId`

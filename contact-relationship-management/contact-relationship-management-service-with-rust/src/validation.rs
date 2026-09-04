@@ -154,6 +154,51 @@ mod tests {
         assert_eq!(p.into_vec().len(), 3);
     }
 
+    /// CRM-T25: `require_ref` exercises the wrong-type branch for
+    /// `Worker` and `Organization` too, not just `Person` — the
+    /// controllers pass all three (`sales.rs`, `support.rs`,
+    /// `relationships.rs`), but this module's own tests previously only
+    /// ever checked `Person`.
+    #[test]
+    fn ref_rules_wrong_type_worker_and_organization() {
+        // Worker: a well-formed ref of the *wrong* type is rejected...
+        let mut p = Problems::new();
+        p.require_ref(
+            "rep_ref",
+            EntityType::Worker,
+            &format!("person:{}", uuid::Uuid::new_v4()),
+        );
+        let v = p.into_vec();
+        assert_eq!(v.len(), 1);
+        assert!(v[0].contains("must reference a Worker"));
+        // ...but the matching type is accepted.
+        let mut p = Problems::new();
+        p.require_ref(
+            "rep_ref",
+            EntityType::Worker,
+            &format!("worker:{}", uuid::Uuid::new_v4()),
+        );
+        assert!(p.into_vec().is_empty());
+
+        // Organization: same pattern.
+        let mut p = Problems::new();
+        p.require_ref(
+            "account_ref",
+            EntityType::Organization,
+            &format!("person:{}", uuid::Uuid::new_v4()),
+        );
+        let v = p.into_vec();
+        assert_eq!(v.len(), 1);
+        assert!(v[0].contains("must reference a Organization"));
+        let mut p = Problems::new();
+        p.require_ref(
+            "account_ref",
+            EntityType::Organization,
+            &format!("organization:{}", uuid::Uuid::new_v4()),
+        );
+        assert!(p.into_vec().is_empty());
+    }
+
     #[test]
     fn list_rules() {
         let mut p = Problems::new();

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — `require_ref` test coverage for Worker and Organization (CRM-T25)
+
+`src/validation.rs`'s `ref_rules` unit test only ever exercised
+`EntityType::Person`, even though `controllers/sales.rs`,
+`support.rs`, and `relationships.rs` all call the shared `require_ref`
+helper with `EntityType::Worker`/`::Organization` too. New
+`ref_rules_wrong_type_worker_and_organization` test pins both the
+wrong-type rejection and the matching-type acceptance for each. See
+`../spec/tasks.md` CRM-T25.
 
 ### Added — declared MSRV (Rust 1.95)
 
