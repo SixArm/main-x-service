@@ -6,6 +6,10 @@
 //! **never panics**, and the score is **finite and within `[0.0, 1.0]`** —
 //! across the whole deserialize → normalize → score path. Complements the
 //! crate's `proptest` properties with coverage-guided input generation.
+//!
+//! Also exercises `deterministic_match` (spec/10-open-questions.md T-4):
+//! the other public infallible entry point (spec §8.6) had no
+//! coverage-guided fuzzing at all — only the probabilistic path did.
 
 #![no_main]
 
@@ -33,4 +37,10 @@ fuzz_target!(|data: &[u8]| {
             result.score
         );
     }
+
+    // `deterministic_match` never panics on the same fuzzed pair, in
+    // either order (T-4). It returns a plain `bool`, so there is no
+    // range to check — only the never-panic invariant applies.
+    let _ = engine.deterministic_match(&a, &b);
+    let _ = engine.deterministic_match(&b, &a);
 });

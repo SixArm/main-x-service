@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 45205608b141e256ebc80e0b143dd53ed92e84a879435d93bc2287f0e9c1af0a # shrinks to p = Event { name: Some("A"), alternate_names: [], description: None, url: None, event_ids: [], local_id: None, category: None, keywords: [], in_language: None, typical_age_range: None, start_date: None, end_date: None, door_time: None, previous_start_date: None, event_status: None, event_attendance_mode: None, location: Some(Location { venue_name: None, address: Some(Address { line1: None, line2: None, city: None, county: None, postcode: None, country: None }), latitude_as_decimal_degrees: None, longitude_as_decimal_degrees: None, virtual_url: Some("https://example.org/a") }), country_code_as_iso_3166_1_alpha_2: None, organizer: None, performers: [], maximum_attendee_capacity: None, maximum_physical_attendee_capacity: None, maximum_virtual_attendee_capacity: None, is_accessible_for_free: None, super_event_id: None, relationships: [], tags: [] }
