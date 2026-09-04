@@ -11,7 +11,7 @@ use entity_ref::{EdgeKind, EntityRef, EntityType};
 use link_graph_service::app::App;
 use link_graph_service::events::{Envelope, LinkedEvent, apply_event};
 use link_graph_service::reconcile::{self, AuthoritativeSource};
-use loco_rs::prelude::ModelResult;
+use loco_rs::prelude::{ModelError, ModelResult};
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
@@ -31,6 +31,22 @@ impl AuthoritativeSource for MockSource {
     }
     async fn fetch_all(&self) -> ModelResult<Vec<LinkedEvent>> {
         Ok(self.1.clone())
+    }
+}
+
+/// A mock authoritative source for `entity` that always fails to fetch —
+/// simulates a timeout / non-2xx / malformed-JSON pass (T-35).
+struct FailingSource(EntityType);
+
+#[async_trait::async_trait]
+impl AuthoritativeSource for FailingSource {
+    fn entity(&self) -> EntityType {
+        self.0
+    }
+    async fn fetch_all(&self) -> ModelResult<Vec<LinkedEvent>> {
+        Err(ModelError::Any(Box::new(std::io::Error::other(
+            "mock fetch failure",
+        ))))
     }
 }
 
@@ -159,6 +175,111 @@ async fn reconcile_is_scoped_to_the_source_entity() {
         assert!(
             ids.contains(&u(30).to_string().as_str()),
             "person same_identity edge must not be reconciled away by the case source"
+        );
+    })
+    .await;
+}
+
+/// T-34: a `case` pass's divergence and a `person` pass's divergence are
+/// independently readable series — a converged `case` pass (`0`) must not
+/// zero out a diverging `person` pass's stale-but-real count, which a
+/// single unlabeled gauge could not distinguish.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test reconcile -- --ignored`"]
+async fn reconciliation_divergence_gauge_is_independent_per_entity() {
+    use link_graph_service::metrics::Metrics;
+
+    request::<App, _, _>(|_request, ctx| async move {
+        // A person source diverges by one (nothing in the read-model yet).
+        let person_source = MockSource(EntityType::Person, vec![]);
+        // Read-model has no person edges, authoritative source has none
+        // either in this pass — instead assert the *case* pass below
+        // first produces a real divergence, then a converged person pass
+        // must not clobber it.
+        let case_source = MockSource(EntityType::Case, vec![auth_edge(40, 7, 8)]);
+        let case_divergence = reconcile::reconcile(&ctx.db, &case_source).await.unwrap();
+        assert_eq!(case_divergence, 1, "case source has one missing edge");
+
+        // A converged person pass (matches nothing, diverges by zero).
+        let person_divergence = reconcile::reconcile(&ctx.db, &person_source).await.unwrap();
+        assert_eq!(person_divergence, 0, "person source is empty and converged");
+
+        // The two series must be independently readable: case's `1` must
+        // survive the person pass's `0`.
+        let m = Metrics::global();
+        assert_eq!(
+            m.reconciliation_divergence
+                .with_label_values(&["case"])
+                .get(),
+            1,
+            "case's divergence must not be zeroed by the person pass"
+        );
+        assert_eq!(
+            m.reconciliation_divergence
+                .with_label_values(&["person"])
+                .get(),
+            0
+        );
+    })
+    .await;
+}
+
+/// T-35: a failed reconciliation pass leaves the last-success gauge
+/// exactly where it was — a caller can distinguish "converged N seconds
+/// ago" from "just failed" instead of the gauge alone looking identical
+/// to "never run".
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test reconcile -- --ignored`"]
+async fn reconciliation_last_success_gauge_is_unchanged_by_a_failed_pass() {
+    use link_graph_service::metrics::Metrics;
+
+    request::<App, _, _>(|_request, ctx| async move {
+        // `auth_edge` always builds a case→person edge, so the source
+        // entity here is `Case` (matching `edge_valid_for_source`'s
+        // from_ref check) — the label under test, not the specific
+        // entity, is what T-35 cares about.
+        let entity = EntityType::Case;
+        let m = Metrics::global();
+
+        // A successful pass with a real (non-zero) divergence advances the
+        // last-success gauge and records that divergence.
+        let ok_source = MockSource(entity, vec![auth_edge(50, 9, 10)]);
+        let first = reconcile::reconcile(&ctx.db, &ok_source).await.unwrap();
+        assert_eq!(first, 1, "one missing edge");
+        let after_success = m
+            .reconciliation_last_success_unixtime
+            .with_label_values(&["case"])
+            .get();
+        assert!(after_success > 0, "a successful pass must set the gauge");
+        assert_eq!(
+            m.reconciliation_divergence
+                .with_label_values(&["case"])
+                .get(),
+            1
+        );
+
+        // A failing pass must not advance the last-success gauge, and must
+        // not touch the divergence gauge either — reconcile returns before
+        // setting either on a fetch error, so the prior pass's real `1`
+        // survives rather than being reset to `0`.
+        let failing_source = FailingSource(entity);
+        let err = reconcile::reconcile(&ctx.db, &failing_source).await;
+        assert!(err.is_err(), "the mock fetch is designed to fail");
+        assert_eq!(
+            m.reconciliation_last_success_unixtime
+                .with_label_values(&["case"])
+                .get(),
+            after_success,
+            "a failed pass must not advance the last-success gauge"
+        );
+        assert_eq!(
+            m.reconciliation_divergence
+                .with_label_values(&["case"])
+                .get(),
+            1,
+            "a failed pass must not reset the prior pass's real divergence count"
         );
     })
     .await;
