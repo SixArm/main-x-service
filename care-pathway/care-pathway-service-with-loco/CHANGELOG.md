@@ -9,6 +9,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security — `same_as` URL well-formedness validation (CP-T3)
+
+`src/validation.rs`'s `same_as` field was only length/cardinality-capped,
+never checked to parse as a URL. Since `same_as` also drives the
+matcher's R-2 deterministic short-circuit (case-folded string overlap),
+a garbage non-URL value stored on two different pathways could still
+deterministically match them. Added `is_valid_url` (the same lightweight
+`http://`/`https://` scheme check every sibling entity crate applies)
+and wired it into `problems()` as a per-entry check. New unit tests plus
+a DB-gated request-level `422` pin (`tests/requests/care_pathways.rs`).
+See spec/index.md CP-T3.
+
 ### Added
 
 - Real OpenTelemetry OTLP export (`src/observability.rs`, repo

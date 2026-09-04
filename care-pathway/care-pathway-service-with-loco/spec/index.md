@@ -74,8 +74,9 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    `condition_codes` format-validated against their `system` (ICD-10 /
    ICD-11 / SNOMED CT SCTID Verhoeff; `Custom` non-blank), `identifiers`
    structurally checked (canonical UUID for `Uuid`; `10.…/…` shape for
-   `Doi`; other schemes non-blank), and `in_language` checked for BCP-47
-   syntax; `422` on any problem, all reported together — also enforced on
+   `Doi`; other schemes non-blank), `in_language` checked for BCP-47
+   syntax, and each `same_as` entry checked for an `http(s)://` scheme;
+   `422` on any problem, all reported together — also enforced on
    update. Rules in [`src/validation.rs`](../src/validation.rs).
 2. `GET /api/care-pathways` — list active, `{pid, name}`.
    `GET /api/care-pathways/search?q=` — Tantivy full-text search over
@@ -1380,7 +1381,8 @@ the evidence bundle.
   `list`/`search`/`check-duplicates` responses redact `provider_name`/
   `provider_id` exactly as `GET /{pid}/masked` does.
 
-- [ ] **CP-T3 (S) `same_as` URL well-formedness validation.**
+- [x] **CP-T3 (S) `same_as` URL well-formedness validation.** *(resolved
+  2026-09-04.)*
   `src/validation.rs`'s `string_array_caps("same_as", …)` only bounds
   length/cardinality; it never checks the entries parse as URLs. Since
   `same_as` also drives the matcher's R-2 deterministic short-circuit
@@ -1392,6 +1394,16 @@ the evidence bundle.
   **Acceptance:** an `422` with a field-scoped reason for a `same_as`
   entry that doesn't parse as a URL; existing valid records unaffected;
   unit + request-level tests.
+  - **Resolved.** Added `is_valid_url` (the same lightweight
+    `http://`/`https://` scheme check every sibling entity crate
+    applies) and wired it into `problems()` as a per-entry `same_as[i]`
+    check, mirroring the existing `in_language`/identifier per-entry
+    loops. New unit tests
+    (`same_as_entries_must_be_http_urls`,
+    `malformed_same_as_url_is_a_problem`) plus a DB-gated request-level
+    test (`malformed_same_as_url_on_create_returns_422`,
+    `tests/requests/care_pathways.rs`) verified green against a real
+    Postgres (`scripts/ci-check.sh test-db …`).
 
 - [ ] **CP-T4 (S) Wire FHIR `GET /fhir/PlanDefinition` search onto the
   Tantivy index.** `controllers/fhir.rs::search` calls
