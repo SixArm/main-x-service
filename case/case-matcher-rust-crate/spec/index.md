@@ -288,7 +288,7 @@ IO, async, or panics to library code.
 - [ ] Optional case-type taxonomy (related types score partial).
 - [ ] Split this single `spec/index.md` into the numbered §-per-file
       layout used by the sibling matcher crates.
-- [ ] **Bound `subjects`/`keywords` array sizes inside the library
+- [x] **Bound `subjects`/`keywords` array sizes inside the library
       itself, or document that it relies entirely on the caller.**
       *(Verified: `grep -n "MAX_" src/*.rs` finds nothing — no length
       cap exists anywhere in this crate.)* The family's SEC-M1 caps
@@ -311,6 +311,27 @@ IO, async, or panics to library code.
       rustdoc explicitly states the caller's obligation and a doctest
       or `AGENTS.md` note points at `case-service`'s `MAX_ARRAY_LEN` as
       the reference cap a standalone consumer should copy.
+      **Resolution (2026-09-05):** chose the documentation path (an
+      in-library cap would need a `MatchConfig` field threaded through
+      every component that reads either array, a bigger and more
+      judgment-laden change than this crate's own `MatchConfig` weight
+      surface warrants for a first pass; the family's existing caps all
+      live at the service validation layer, not inside a matcher). Added
+      a "The caller must bound array sizes" section to the crate-root
+      docs (`src/lib.rs`) naming the O(n·m) Jaccard cost and pointing at
+      `case-service`'s `MAX_ARRAY_LEN`/`MAX_ITEM_LEN` as the reference
+      cap; a matching note on `MatchingEngine::match_cases`'s own
+      rustdoc (`src/matcher.rs`), since `rank`/`match_one_to_many` both
+      call it and inherit the same obligation; and a new golden rule
+      (#6) in `AGENTS.md` stating the obligation plainly for an agent
+      or integrator who reads that file instead. No test added — a
+      documentation-only obligation has nothing to unit-test; the
+      existing test suite (unchanged) still proves the crate's own
+      never-panic/bounded-score behavior on whatever input it is given.
+      Verified: `cargo test` (28 tests: 8 unit + 13 public-API + 7
+      doctests, all green, including the newly-noted `match_cases`
+      doctest), `cargo clippy --all-targets --all-features -- -D
+      warnings`, `cargo fmt --check`.
 - [ ] **Criterion bench group scaling `subjects`/`keywords` array size
       per `Case`, not just candidate-list length.**
       *(Verified: `grep -n "fn bench_" benches/match_pair.rs` shows

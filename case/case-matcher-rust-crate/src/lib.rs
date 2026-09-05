@@ -36,6 +36,21 @@
 //!   [`CaseStatus`], [`Priority`].
 //! - [`MatchingEngine`], [`MatchConfig`], [`MatchResult`],
 //!   [`MatchBreakdown`], [`Confidence`].
+//!
+//! ## The caller must bound array sizes
+//!
+//! `subjects` and `keywords` are compared by set Jaccard over every
+//! element (`matcher.rs`), an **unbounded O(n·m)** operation — this
+//! crate has no length cap of its own on either field (unlike
+//! `Case`'s consuming service, which validates every payload before it
+//! ever reaches a matcher). A standalone integrator (this crate is
+//! documented as usable outside `case-service`) that accepts either
+//! field from untrusted input must cap array length and per-entry
+//! length itself before calling [`MatchingEngine::match_cases`] or
+//! [`MatchingEngine::rank`] — an unbounded caller-supplied array is a
+//! denial-of-service vector (`agents/share/security.md` invariant 3).
+//! `case-service`'s `src/validation.rs` (`MAX_ARRAY_LEN` = 256,
+//! `MAX_ITEM_LEN` = 512) is the reference cap to copy.
 
 // Always start with high quality coding conventions.
 #![forbid(unsafe_code)] // pure library: no `unsafe` is ever needed.
