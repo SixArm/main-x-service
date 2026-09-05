@@ -47,6 +47,23 @@
 //!   [`PlanRelationship`], [`RelationKind`].
 //! - [`MatchingEngine`], [`MatchConfig`], [`MatchResult`],
 //!   [`MatchBreakdown`], [`Confidence`].
+//!
+//! ## The caller must bound array sizes
+//!
+//! `goals`, `keywords`, `relationships`, and `tags` are each compared by
+//! Jaccard over every element (`matcher.rs`), an **unbounded O(n·m)**
+//! operation — this crate has no length cap of its own on any of the
+//! four fields (unlike `Plan`'s consuming service, which validates
+//! every payload before it ever reaches a matcher). A standalone
+//! integrator (this crate is documented as usable outside
+//! `project-portfolio-management-service`) that accepts any of these
+//! fields from untrusted input must cap array length and per-entry
+//! length itself before calling [`MatchingEngine::match_plans`] — an
+//! unbounded caller-supplied array is a denial-of-service vector
+//! (`agents/share/security.md` invariant 3).
+//! `project-portfolio-management-service`'s `src/validation.rs`
+//! (`MAX_ARRAY_LEN` = 256, `MAX_ITEM_LEN` = 512) is the reference cap
+//! to copy.
 
 // Always start with high quality coding conventions.
 #![forbid(unsafe_code)] // pure library: no `unsafe` is ever needed.

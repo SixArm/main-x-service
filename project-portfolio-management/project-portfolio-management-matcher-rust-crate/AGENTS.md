@@ -33,6 +33,14 @@ crate.
 5. **Deterministic.** No clocks, RNGs, or environment variables.
 6. **Explainability.** Every match returns a per-component breakdown.
 7. **Diacritic-correct.**
+8. **Bound `goals`/`keywords`/`relationships`/`tags` before calling
+   in.** This crate has no length cap of its own on any of the four —
+   each is scored by Jaccard over every element (unbounded O(n·m)).
+   `project-portfolio-management-service` validates every payload
+   before it reaches this crate (`src/validation.rs`, `MAX_ARRAY_LEN` =
+   256, `MAX_ITEM_LEN` = 512); a standalone integrator that skips an
+   equivalent cap is exposing a denial-of-service vector, not merely a
+   slow path.
 
 ## What not to do
 

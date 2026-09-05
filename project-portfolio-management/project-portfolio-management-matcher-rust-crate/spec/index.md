@@ -347,7 +347,10 @@ and two plans with different kinds may still be the same identity. Do not
 compare `kind` as a matching signal. Do not short-circuit on owner-scoped or free-form schemes
 (`Code` / `LocalId` / `Custom`). Do not score a `code` across owners. Do
 not match on `status` (it drifts between duplicate records). Do not
-strip diacritics. Do not add IO, async, or panics to library code.
+strip diacritics. Do not add IO, async, or panics to library code. A
+standalone integrator must not feed `goals`/`keywords`/`relationships`/
+`tags` from untrusted input without bounding array/entry length first —
+this crate has no cap of its own (§23).
 
 ## 23. Tasks (live work queue)
 
@@ -412,7 +415,7 @@ strip diacritics. Do not add IO, async, or panics to library code.
       similarity; `lead_ref` corroboration.
 - [ ] Split this single `spec/index.md` into the numbered §-per-file
       layout used by the sibling matcher crates.
-- [ ] **Bound `goals`/`keywords`/`relationships`/`tags` array sizes
+- [x] **Bound `goals`/`keywords`/`relationships`/`tags` array sizes
       inside the library itself, or document that it relies entirely
       on the caller.** *(Verified: `grep -n "MAX_" src/*.rs` finds
       nothing in this crate — no length cap exists anywhere.)* The
@@ -430,6 +433,22 @@ strip diacritics. Do not add IO, async, or panics to library code.
       the reference), plus a `CHANGELOG.md` entry and a §19/§22 update.
       **Acceptance:** either a cap exists and is unit-tested, or the
       crate-root/API rustdoc explicitly states the caller's obligation.
+      **Resolution (2026-09-05):** ported case-matcher's identical fix
+      (the twin task there, resolved the same way): chose the
+      documentation path over an in-library cap (a bigger, more
+      judgment-laden change than a first pass warrants — the family's
+      existing caps all live at the service validation layer). Added a
+      "the caller must bound array sizes" section to the crate-root
+      docs (`src/lib.rs`), a matching note on
+      `MatchingEngine::match_plans`'s own rustdoc (`src/matcher.rs`), a
+      new `AGENTS.md` golden rule (#8), and the §22 anti-pattern line
+      above — all pointing at
+      `project-portfolio-management-service`'s `MAX_ARRAY_LEN` (256) /
+      `MAX_ITEM_LEN` (512) as the reference cap. No code change; no new
+      test (a documentation-only obligation has nothing to
+      unit-test). Verified: `cargo test` (23 tests: 6 unit + 10
+      public-API + 7 doctests, all green), `cargo clippy --all-targets
+      -- -D warnings`, `cargo fmt --check`.
 - [ ] **Criterion bench group scaling per-`Plan` array field sizes
       (`goals`/`keywords`/`relationships`/`tags`), not just candidate-list
       length.** *(Verified: `grep -n "fn bench_" benches/match_pair.rs`
