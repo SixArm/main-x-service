@@ -5,6 +5,29 @@
 
 import { test, expect, type Page } from "@playwright/test";
 
+/**
+ * Every page but /signin, /verify, and the kiosk display is gated on a
+ * session (PF-T22), so the smoke suite injects a fake
+ * `__Host-mxi_session` cookie directly into the browser context before
+ * each test — the server only checks the cookie's *presence*, never its
+ * validity (`locals.sessionId` is set straight from `cookies.get`), so a
+ * fabricated value is enough to pass the gate without a real
+ * authentication-service round trip.
+ */
+async function signIn(page: Page) {
+  await page.context().addCookies([
+    {
+      name: "__Host-mxi_session",
+      value: "smoke-test-session",
+      domain: "localhost",
+      path: "/",
+      httpOnly: true,
+      secure: true,
+      sameSite: "Lax",
+    },
+  ]);
+}
+
 const WARD = "11111111-1111-4111-8111-111111111111";
 const STAY = "22222222-2222-4222-8222-222222222222";
 const BED_FREE = "33333333-3333-4333-8333-333333333333";
@@ -141,8 +164,20 @@ const STAY_DETAIL = {
     },
   ],
   red_green: [
-    { stay_pid: STAY, day: "2026-07-16", classification: "red", delay_reasons: ["awaiting_diagnostics"], note: null },
-    { stay_pid: STAY, day: "2026-07-17", classification: "green", delay_reasons: [], note: null },
+    {
+      stay_pid: STAY,
+      day: "2026-07-16",
+      classification: "red",
+      delay_reasons: ["awaiting_diagnostics"],
+      note: null,
+    },
+    {
+      stay_pid: STAY,
+      day: "2026-07-17",
+      classification: "green",
+      delay_reasons: [],
+      note: null,
+    },
   ],
   infection_flags: [],
   length_of_stay_days: 3,
@@ -209,7 +244,11 @@ async function stubApi(page: Page) {
       return route.fulfill({ json: ELIGIBLE });
     if (path === `/api/bed-requests/${REQUEST}/allocate` && method === "POST")
       return route.fulfill({
-        json: { ...OPEN_REQUEST, status: "allocated", allocated_bed_pid: BED_FREE },
+        json: {
+          ...OPEN_REQUEST,
+          status: "allocated",
+          allocated_bed_pid: BED_FREE,
+        },
       });
     if (path.startsWith("/api/locate/"))
       return route.fulfill({
@@ -219,7 +258,12 @@ async function stubApi(page: Page) {
           status: "admitted",
           stay_pid: STAY,
           site: "St Elsewhere General",
-          ward: { pid: WARD, name: "Ward 7 — Respiratory", code: "W7", kind: "inpatient" },
+          ward: {
+            pid: WARD,
+            name: "Ward 7 — Respiratory",
+            code: "W7",
+            kind: "inpatient",
+          },
           bay: "Bay A",
           bed: "W7-A-1",
           home_location_note: null,
@@ -228,82 +272,143 @@ async function stubApi(page: Page) {
       });
     if (path === "/api/audits/recent") return route.fulfill({ json: [] });
 
-    return route.fulfill({ status: 404, json: { error: `unstubbed ${method} ${path}` } });
+    return route.fulfill({
+      status: 404,
+      json: { error: `unstubbed ${method} ${path}` },
+    });
   });
 }
 
-test("home lists wards and links to the whiteboard", async ({ page }) => {
-  await stubApi(page);
-  await page.goto("/");
-  await expect(page.getByRole("cell", { name: "Ward 7 — Respiratory" })).toBeVisible();
-  await page.getByRole("link", { name: "whiteboard" }).click();
-  await expect(page.getByRole("heading", { name: /whiteboard/ })).toBeVisible();
-  await expect(page.getByTestId("as-of")).toBeVisible();
+test.describe("sign-in gate (PF-T22)", () => {
+  // These tests run with NO session cookie — the opposite of every
+  // other test in this file — so they get their own describe block
+  // rather than relying on the file-level beforeEach.
+  test("a signed-out visitor is redirected from a protected page to /signin", async ({
+    page,
+  }) => {
+    await page.goto(`/wards/${WARD}/whiteboard`);
+    await expect(page).toHaveURL(/\/signin$/);
+  });
+
+  test("a signed-out visitor is redirected from the home page too", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page).toHaveURL(/\/signin$/);
+  });
+
+  test("/signin itself stays reachable with no session", async ({ page }) => {
+    const response = await page.goto("/signin");
+    expect(response?.status()).toBe(200);
+    await expect(page).toHaveURL(/\/signin$/);
+  });
+
+  // The kiosk display (a wall-mounted touchscreen) has no interactive
+  // session to sign in with, so it must stay reachable and render
+  // exactly as before the gate landed — proving the exemption with real
+  // content assertions, not just a bare non-redirect.
+  test("kiosk masked mode hides names but keeps bed states, with no session", async ({
+    page,
+  }) => {
+    await stubApi(page);
+    await page.goto(`/wards/${WARD}/kiosk?masked=1`);
+    await expect(page).toHaveURL(/\/kiosk\?masked=1$/);
+    await expect(page.locator("body")).toHaveClass(/kiosk/);
+    await expect(page.getByText("•••")).toBeVisible();
+    await expect(page.getByText("Test Patient 001")).not.toBeVisible();
+    await expect(page.getByText("falls risk")).not.toBeVisible();
+    await expect(
+      page.locator('[data-bed="W7-A-2"]').getByText("Available"),
+    ).toBeVisible();
+  });
 });
 
-test("whiteboard renders bed cards with journey chips", async ({ page }) => {
-  await stubApi(page);
-  await page.goto(`/wards/${WARD}/whiteboard`);
-  const occupiedCard = page.locator('[data-bed="W7-A-1"]');
-  await expect(occupiedCard.getByText("Test Patient 001")).toBeVisible();
-  await expect(occupiedCard.getByText("EDD 2026-07-20")).toBeVisible();
-  await expect(occupiedCard.getByText("Ready")).toBeVisible();
-  await expect(occupiedCard.getByText(/covid-19/)).toBeVisible();
-  await expect(occupiedCard.getByText("falls risk")).toBeVisible();
-  const freeCard = page.locator('[data-bed="W7-A-2"]');
-  await expect(freeCard.getByText("Available")).toBeVisible();
-});
+// Every test below exercises a gated page, so it needs a session
+// already present — the file-level tests lived unwrapped here before
+// PF-T22's gate existed; they are now scoped to this describe so the
+// "sign-in gate" tests above (deliberately signed OUT) don't inherit it.
+test.describe("signed-in smoke coverage", () => {
+  test.beforeEach(async ({ page }) => {
+    await signIn(page);
+  });
 
-test("tapping a patient opens the stay detail", async ({ page }) => {
-  await stubApi(page);
-  await page.goto(`/wards/${WARD}/whiteboard`);
-  await page.getByText("Test Patient 001").click();
-  await expect(page).toHaveURL(`/stays/${STAY}`);
-  await expect(page.getByRole("heading", { name: "Test Patient 001" })).toBeVisible();
-  await expect(page.getByText("LOS 3d")).toBeVisible();
-  await expect(page.locator("span.chip", { hasText: "CCD met" })).toBeVisible();
-  // The Red2Green run renders one chip per day.
-  await expect(page.getByTitle("2026-07-16")).toHaveText("R");
-  await expect(page.getByTitle("2026-07-17")).toHaveText("G");
-});
+  test("home lists wards and links to the whiteboard", async ({ page }) => {
+    await stubApi(page);
+    await page.goto("/");
+    await expect(
+      page.getByRole("cell", { name: "Ward 7 — Respiratory" }),
+    ).toBeVisible();
+    await page.getByRole("link", { name: "whiteboard" }).click();
+    await expect(
+      page.getByRole("heading", { name: /whiteboard/ }),
+    ).toBeVisible();
+    await expect(page.getByTestId("as-of")).toBeVisible();
+  });
 
-test("kiosk masked mode hides names but keeps bed states", async ({ page }) => {
-  await stubApi(page);
-  await page.goto(`/wards/${WARD}/kiosk?masked=1`);
-  await expect(page.locator("body")).toHaveClass(/kiosk/);
-  await expect(page.getByText("•••")).toBeVisible();
-  await expect(page.getByText("Test Patient 001")).not.toBeVisible();
-  await expect(page.getByText("falls risk")).not.toBeVisible();
-  await expect(page.locator('[data-bed="W7-A-2"]').getByText("Available")).toBeVisible();
-});
+  test("whiteboard renders bed cards with journey chips", async ({ page }) => {
+    await stubApi(page);
+    await page.goto(`/wards/${WARD}/whiteboard`);
+    const occupiedCard = page.locator('[data-bed="W7-A-1"]');
+    await expect(occupiedCard.getByText("Test Patient 001")).toBeVisible();
+    await expect(occupiedCard.getByText("EDD 2026-07-20")).toBeVisible();
+    await expect(occupiedCard.getByText("Ready")).toBeVisible();
+    await expect(occupiedCard.getByText(/covid-19/)).toBeVisible();
+    await expect(occupiedCard.getByText("falls risk")).toBeVisible();
+    const freeCard = page.locator('[data-bed="W7-A-2"]');
+    await expect(freeCard.getByText("Available")).toBeVisible();
+  });
 
-test("at-a-glance shows the site tiles", async ({ page }) => {
-  await stubApi(page);
-  await page.goto("/at-a-glance");
-  await expect(page.getByText("Beds available now")).toBeVisible();
-  await expect(page.getByText("Virtual ward census")).toBeVisible();
-  await expect(page.getByRole("cell", { name: "71.4%" })).toBeVisible();
-});
+  test("tapping a patient opens the stay detail", async ({ page }) => {
+    await stubApi(page);
+    await page.goto(`/wards/${WARD}/whiteboard`);
+    await page.getByText("Test Patient 001").click();
+    await expect(page).toHaveURL(`/stays/${STAY}`);
+    await expect(
+      page.getByRole("heading", { name: "Test Patient 001" }),
+    ).toBeVisible();
+    await expect(page.getByText("LOS 3d")).toBeVisible();
+    await expect(
+      page.locator("span.chip", { hasText: "CCD met" }),
+    ).toBeVisible();
+    // The Red2Green run renders one chip per day.
+    await expect(page.getByTitle("2026-07-16")).toHaveText("R");
+    await expect(page.getByTitle("2026-07-17")).toHaveText("G");
+  });
 
-test("bed-request board shows eligible beds and allocates", async ({ page }) => {
-  await stubApi(page);
-  await page.goto("/bed-requests");
-  await expect(page.locator("span.chip", { hasText: "urgent" })).toBeVisible();
-  await page.getByRole("button", { name: "Show beds" }).click();
-  const bedButton = page.getByRole("button", { name: /W7 · W7-A-2/ });
-  await expect(bedButton).toBeVisible();
-  await bedButton.click(); // allocate; the stub answers and the list reloads
-  await expect(page.getByRole("heading", { name: "Bed requests" })).toBeVisible();
-});
+  test("at-a-glance shows the site tiles", async ({ page }) => {
+    await stubApi(page);
+    await page.goto("/at-a-glance");
+    await expect(page.getByText("Beds available now")).toBeVisible();
+    await expect(page.getByText("Virtual ward census")).toBeVisible();
+    await expect(page.getByRole("cell", { name: "71.4%" })).toBeVisible();
+  });
 
-test("locate finds a patient and links to the stay", async ({ page }) => {
-  await stubApi(page);
-  await page.goto("/locate");
-  await page.getByPlaceholder("person:<uuid>").fill(PERSON);
-  await page.getByRole("button", { name: "Locate" }).click();
-  const result = page.getByTestId("locate-result");
-  await expect(result.getByText("W7 — Ward 7 — Respiratory")).toBeVisible();
-  await expect(result.getByText("bed W7-A-1")).toBeVisible();
-  await result.getByRole("link", { name: "Open stay" }).click();
-  await expect(page).toHaveURL(`/stays/${STAY}`);
+  test("bed-request board shows eligible beds and allocates", async ({
+    page,
+  }) => {
+    await stubApi(page);
+    await page.goto("/bed-requests");
+    await expect(
+      page.locator("span.chip", { hasText: "urgent" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Show beds" }).click();
+    const bedButton = page.getByRole("button", { name: /W7 · W7-A-2/ });
+    await expect(bedButton).toBeVisible();
+    await bedButton.click(); // allocate; the stub answers and the list reloads
+    await expect(
+      page.getByRole("heading", { name: "Bed requests" }),
+    ).toBeVisible();
+  });
+
+  test("locate finds a patient and links to the stay", async ({ page }) => {
+    await stubApi(page);
+    await page.goto("/locate");
+    await page.getByPlaceholder("person:<uuid>").fill(PERSON);
+    await page.getByRole("button", { name: "Locate" }).click();
+    const result = page.getByTestId("locate-result");
+    await expect(result.getByText("W7 — Ward 7 — Respiratory")).toBeVisible();
+    await expect(result.getByText("bed W7-A-1")).toBeVisible();
+    await result.getByRole("link", { name: "Open stay" }).click();
+    await expect(page).toHaveURL(`/stays/${STAY}`);
+  });
 });
