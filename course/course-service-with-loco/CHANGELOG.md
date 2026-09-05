@@ -51,16 +51,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   other entity services) — this is a fresh implementation, not a copy of
   an existing pattern. New DB-free test in `metrics::tests`.
 
-### Added — declared MSRV (Rust 1.95)
+### Added — declared MSRV (Rust 1.96)
 
-- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
-  **current stable minus three** floor
-  (`spec/rust-msrv-n-minus-3/index.md`). Sourced from `ci/msrv.txt` and
-  enforced by `scripts/ci-check.sh msrv`, which asserts the declared
-  value matches that file and then compiles the crate — `--all-targets`,
-  so benches and tests count — against the 1.95 toolchain. Behaviour is
-  unchanged; what changes is that the floor is now a checked claim
-  rather than an unstated assumption.
+- `Cargo.toml` declares `rust-version = "1.96"`, sourced from
+  `ci/msrv.txt` and enforced by `scripts/ci-check.sh msrv`, which
+  asserts the declared value matches that file and then compiles the
+  crate — `--all-targets`, so benches and tests count — against the
+  1.96 toolchain. Behaviour is unchanged; what changes is that the
+  floor is now a checked claim rather than an unstated assumption.
+  *(T-29, 2026-09-06: corrected from a stale "1.95 /
+  `spec/rust-msrv-n-minus-3`" entry left over from before the
+  repo-wide MSRV policy tightened from **current stable minus three**
+  to **current stable minus two**
+  (`spec/rust-msrv-n-minus-2/index.md`) — `Cargo.toml` had already
+  moved to 1.96 with no accompanying changelog update, so
+  `[Unreleased]` contradicted the manifest.)*
 
 ### Added — Durable event bus, real-broker sink (BUS-3, 2026-08-03)
 

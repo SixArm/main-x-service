@@ -88,7 +88,7 @@
     through its own sub-resource endpoints; a nested (child) section
     persists its `parent_id`; existing validation caps
     (`MAX_ARRAY_LEN`) still apply pre-persist.
-- [ ] T-29: Fix stale implementation-status and changelog drift.
+- [x] T-29: Fix stale implementation-status and changelog drift. *(resolved 2026-09-06.)*
   `spec/14-implementation-status.md`'s "OpenTelemetry export" row
   still reads `– OTLP_* config parses but is unused; no exporter`,
   which was true before T-26 (2026-08-30) but is false now —
@@ -107,6 +107,19 @@
     row says ✅ with a T-26 pointer; the CHANGELOG's stale MSRV-1.95
     entry is corrected or folded into a dated MSRV-1.96 entry so
     `[Unreleased]` no longer contradicts `Cargo.toml`.
+  - **Resolved.** `spec/14-implementation-status.md`'s OpenTelemetry
+    row now reads `✅ real OTLP/gRPC traces + metrics via
+    src/observability.rs (T-26)`. `CHANGELOG.md`'s `### Added —
+    declared MSRV` entry now cites 1.96/`ci/msrv.txt` (no more
+    `spec/rust-msrv-n-minus-3` dangling reference), with a note
+    explaining the correction rather than silently rewriting history.
+    Along the way, found and fixed the same underlying drift in
+    `spec/02-scope.md` §2 (still said "**Not** OpenTelemetry export")
+    and §2.2 (still listed OTLP as out-of-scope, contradicting T-26,
+    which the task's own acceptance criterion didn't name but is the
+    identical stale claim) — added a new §2.1d documenting the real
+    exporter, mirroring §2.1b's FHIR-reversal note style. Doc-only; no
+    code or behaviour change.
 - [ ] T-30: Add `TODO`-marked fidelity-gap comments in
   `src/fhir/mod.rs` per the family FHIR contract.
   `agents/share/fhir.md` §2 requires "every drop of fidelity is a
