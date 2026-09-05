@@ -18,7 +18,9 @@
 //!   normal probabilistic pipeline, never forced to `0.0`;
 //! - an identical clone of a record matches itself.
 
-use project_portfolio_management_matcher::{MatchingEngine, Plan, PlanKind, normalize, phonetic};
+use project_portfolio_management_matcher::{
+    MatchConfig, MatchingEngine, Plan, PlanKind, normalize, phonetic,
+};
 use proptest::prelude::*;
 
 // ---------- Strategies ----------
@@ -111,6 +113,40 @@ fn dateish_string() -> impl Strategy<Value = String> {
     "[-0-9]{0,40}"
 }
 
+/// A value that is sometimes well-formed (a small non-negative float,
+/// suitable for a weight, a threshold, or `timeframe_sigma_days`) and
+/// sometimes deliberately adversarial (negative, `NaN`, infinite) — the
+/// values `MatchConfig::validated` must reject, generated alongside the
+/// ones it must accept.
+fn adversarial_weight() -> impl Strategy<Value = f64> {
+    prop_oneof![
+        3 => 0.0f64..=1.0,
+        1 => Just(f64::NAN),
+        1 => Just(f64::INFINITY),
+        1 => Just(f64::NEG_INFINITY),
+        1 => -10.0f64..0.0,
+    ]
+}
+
+/// Build a `MatchConfig` from 11 adversarial-or-well-formed values: the
+/// 9 weights and `timeframe_sigma_days` in field-declaration order, then
+/// the threshold.
+fn config_from(values: &[f64]) -> MatchConfig {
+    MatchConfig {
+        threshold: values[10],
+        name_weight: values[0],
+        goals_weight: values[1],
+        code_weight: values[2],
+        owner_org_weight: values[3],
+        parent_weight: values[4],
+        timeframe_weight: values[5],
+        keywords_weight: values[6],
+        relationships_weight: values[7],
+        tags_weight: values[8],
+        timeframe_sigma_days: values[9],
+    }
+}
+
 // ---------- Properties ----------
 
 proptest! {
@@ -199,6 +235,38 @@ proptest! {
             prop_assert!(
                 (-800_000..=3_000_000).contains(&days),
                 "day count out of sane range for {s:?}: {days}"
+            );
+        }
+    }
+
+    /// For an arbitrary adversarial-or-well-formed weight/sigma/threshold
+    /// vector (including negative/zero/`NaN`/infinite values),
+    /// `MatchConfig::validated` must reject any config that is not
+    /// actually finite-and-non-negative-throughout, and — the property
+    /// that matters downstream — a config it DOES accept must never let
+    /// `weighted_average` push a score outside `[0.0, 1.0]` or produce
+    /// `NaN`.
+    #[test]
+    fn validated_config_never_produces_an_unbounded_score(
+        values in prop::collection::vec(adversarial_weight(), 11),
+        a in any_plan(), b in any_plan(),
+    ) {
+        let config = config_from(&values);
+        if let Ok(validated) = config.validated() {
+            let engine = MatchingEngine::new(validated);
+            let r = engine.match_plans(&a, &b);
+            prop_assert!(!r.score.is_nan(), "validated config produced a NaN score");
+            prop_assert!(
+                (0.0..=1.0).contains(&r.score),
+                "validated config produced an out-of-range score: {}",
+                r.score
+            );
+        } else {
+            let all_ok = values[..10].iter().all(|w| w.is_finite() && *w >= 0.0);
+            let threshold_ok = values[10].is_finite() && (0.0..=1.0).contains(&values[10]);
+            prop_assert!(
+                !(all_ok && threshold_ok),
+                "validated() rejected a well-formed config: {values:?}"
             );
         }
     }
