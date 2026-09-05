@@ -14,6 +14,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — operator-forceable reconciliation pass (T-36)
+
+There was no endpoint, task, or admin route to force a reconciliation
+pass on demand — the reconciliation-divergence runbook documented this
+as a confirmed operational gap. Added `POST
+/api/admin/reconcile/{entity}`, `Action::Destructive`-gated (built-in
+default policy: `svc=true` or `access=admin` only, matching
+case-service's bulk `subject_of` dump), which calls
+`reconcile::reconcile()` directly — the exact same call the periodic
+worker makes — so the on-demand and periodic paths cannot drift. `404`
+when `entity` has no `LINK_GRAPH_RECONCILE_URL_<ENTITY>` configured
+(nothing to force). New DB-gated test (`tests/force_reconcile.rs`, its
+own binary): 401/403/404/200 matrix, plus a mocked-HTTP source proving
+the forced pass reports the real divergence and updates the same
+T-34/T-35 gauges the periodic worker updates, converging to zero on a
+second pass. Not a new link-write endpoint of this service's own — see
+`AGENTS.md` "read-only to the world" — it repairs this aggregator's own
+read-model against a source it already trusts, the same category of
+action the periodic worker already performs unattended. See
+`spec/13-tasks.md` T-36 and
+`agents/share/runbooks/reconciliation-divergence.md`.
+
 ### Fixed — reconciliation gauges' two "sharp edges" closed (T-34/T-35)
 
 `agents/share/runbooks/reconciliation-divergence.md` documented two
