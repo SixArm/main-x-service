@@ -30,6 +30,22 @@ const PHONETIC_BONUS: f64 = 0.05;
 /// agreement can never masquerade as an exact-name match.
 const PHONETIC_CEILING: f64 = 0.95;
 
+/// Additive reward applied to the address component when the two
+/// records' postal codes are present and fold-equal, mirroring
+/// [`PHONETIC_BONUS`]'s role for names. A postal code is a strong,
+/// fine-grained locality signal (especially alphanumeric schemes like
+/// UK/Canada), so an exact match anchors the address score up even when
+/// `street_address`/`locality`/`region` disagree or are only fuzzily
+/// similar — corroborating evidence, not a substitute for the other
+/// fields actually agreeing.
+const POSTAL_CODE_ANCHOR_BONUS: f64 = 0.10;
+/// Upper bound the postal-code anchor may lift the address score to.
+/// Kept below a perfect `1.0` (mirroring [`PHONETIC_CEILING`]'s role for
+/// names) so a shared postal code alone can never masquerade as a full
+/// address match — an organization's street address is not implied by
+/// its postal code.
+const POSTAL_CODE_ANCHOR_CEILING: f64 = 0.95;
+
 /// The organization matcher: holds a [`MatchConfig`] and scores pairs.
 ///
 /// Construct one with [`MatchingEngine::new`] (or
@@ -340,7 +356,9 @@ fn name_score(a: &Organization, b: &Organization) -> f64 {
 /// address (or no field is populated on both sides). Computes a
 /// weighted, field-by-field Jaro-Winkler average, renormalised over the
 /// fields actually shared so a partially-filled address is not
-/// penalised for its blanks.
+/// penalised for its blanks. A postal code that fold-matches exactly on
+/// both sides then anchors the result up via [`POSTAL_CODE_ANCHOR_BONUS`]
+/// (capped at [`POSTAL_CODE_ANCHOR_CEILING`]) — see that constant's docs.
 fn address_score(a: &Organization, b: &Organization) -> Option<f64> {
     // Both records must carry an address at all.
     let (Some(aa), Some(ba)) = (&a.address, &b.address) else {
@@ -371,7 +389,20 @@ fn address_score(a: &Organization, b: &Organization) -> Option<f64> {
         }
     }
     // Renormalise over the contributing weights; `None` if none shared.
-    if wsum > 0.0 { Some(sum / wsum) } else { None }
+    let mut score = if wsum > 0.0 { sum / wsum } else { return None };
+
+    // Postal-code exact-anchor boost: an exact fold-match on postal code
+    // alone is strong evidence of the same location, so it nudges a
+    // borderline (or partially-disagreeing) address score up — but never
+    // past the ceiling, and never when either side's postal code is
+    // absent or blank.
+    if let (Some(ap), Some(bp)) = (aa.postal_code.as_deref(), ba.postal_code.as_deref()) {
+        let (apf, bpf) = (normalize::fold(ap), normalize::fold(bp));
+        if !apf.is_empty() && apf == bpf && score < POSTAL_CODE_ANCHOR_CEILING {
+            score = (score + POSTAL_CODE_ANCHOR_BONUS).min(POSTAL_CODE_ANCHOR_CEILING);
+        }
+    }
+    Some(score)
 }
 
 /// URL component score, comparing the two registered domains (scheme /
@@ -729,6 +760,96 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(address_score(&a, &b), None);
+    }
+
+    /// Pins the postal-code exact-anchor boost: a fold-equal postal code
+    /// nudges up an address score that would otherwise be dragged down
+    /// by a fuzzily-disagreeing street — by exactly
+    /// `POSTAL_CODE_ANCHOR_BONUS`, capped at `POSTAL_CODE_ANCHOR_CEILING`.
+    #[test]
+    fn postal_code_anchor_lifts_a_partially_disagreeing_address() {
+        let street_a = "100 Main Street";
+        let street_b = "999 Oak Avenue";
+        let postal = "62701";
+
+        let mut a = Organization::new("A");
+        let mut b = Organization::new("B");
+        a.address = Some(PostalAddress {
+            street_address: Some(street_a.into()),
+            postal_code: Some(postal.into()),
+            ..Default::default()
+        });
+        b.address = Some(PostalAddress {
+            // Deliberately dissimilar street so the pre-anchor score sits
+            // well below the ceiling — the anchor's effect must be
+            // visible, not masked by an already-high base score.
+            street_address: Some(street_b.into()),
+            postal_code: Some(postal.into()),
+            ..Default::default()
+        });
+
+        // Reconstruct the pre-anchor weighted average by hand: only
+        // street (0.30) and postal (0.20) are present on both sides, and
+        // the postal codes are fold-equal so their Jaro-Winkler is 1.0.
+        let street_jw = jaro_winkler(&normalize::fold(street_a), &normalize::fold(street_b));
+        let pre_anchor = (street_jw * 0.30 + 1.0 * 0.20) / (0.30 + 0.20);
+        assert!(
+            pre_anchor < POSTAL_CODE_ANCHOR_CEILING,
+            "test premise: pre-anchor score must be below the ceiling, got {pre_anchor}"
+        );
+
+        let anchored = address_score(&a, &b).expect("some");
+        assert!(
+            anchored > pre_anchor,
+            "expected the postal-code anchor to lift the score above {pre_anchor}, got {anchored}"
+        );
+        assert!(
+            (anchored - (pre_anchor + POSTAL_CODE_ANCHOR_BONUS).min(POSTAL_CODE_ANCHOR_CEILING))
+                .abs()
+                < 1e-9
+        );
+        assert!(anchored <= POSTAL_CODE_ANCHOR_CEILING);
+    }
+
+    /// The anchor must never fire on a blank (post-fold) postal code
+    /// shared by both sides — an empty value carries no identity.
+    #[test]
+    fn postal_code_anchor_does_not_fire_on_blank_postal_codes() {
+        let mut a = Organization::new("A");
+        let mut b = Organization::new("B");
+        a.address = Some(PostalAddress {
+            street_address: Some("100 Main Street".into()),
+            postal_code: Some("   ".into()),
+            ..Default::default()
+        });
+        b.address = Some(PostalAddress {
+            street_address: Some("999 Oak Avenue".into()),
+            postal_code: Some(String::new()),
+            ..Default::default()
+        });
+        let s = address_score(&a, &b).expect("some");
+        // Bare Jaro-Winkler on the dissimilar street addresses alone,
+        // with no anchor contribution — well under the ceiling.
+        assert!(s < POSTAL_CODE_ANCHOR_CEILING, "got {s}");
+    }
+
+    /// The anchor requires postal codes on **both** sides; a one-sided
+    /// postal code must not spuriously anchor.
+    #[test]
+    fn postal_code_anchor_does_not_fire_when_one_side_absent() {
+        let mut a = Organization::new("A");
+        let mut b = Organization::new("B");
+        a.address = Some(PostalAddress {
+            street_address: Some("100 Main Street".into()),
+            postal_code: Some("62701".into()),
+            ..Default::default()
+        });
+        b.address = Some(PostalAddress {
+            street_address: Some("999 Oak Avenue".into()),
+            ..Default::default()
+        });
+        let s = address_score(&a, &b).expect("some");
+        assert!(s < POSTAL_CODE_ANCHOR_CEILING, "got {s}");
     }
 
     /// Pins Jaccard: one shared tag of three distinct → 1/3, and that

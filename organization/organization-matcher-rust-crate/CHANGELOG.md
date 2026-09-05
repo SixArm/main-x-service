@@ -10,6 +10,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — postal-code exact-anchor boost for address matching (§23)
+
+An exact fold-match on postal code — a strong, fine-grained locality
+signal, especially for alphanumeric schemes (UK/Canada) — previously
+only ever contributed its plain `0.20` weight to the address
+component's weighted average, exactly like every other field. Added
+`POSTAL_CODE_ANCHOR_BONUS` (`0.10`) and `POSTAL_CODE_ANCHOR_CEILING`
+(`0.95`) to `src/matcher.rs`, mirroring the existing name-component
+Soundex bonus (`PHONETIC_BONUS`/`PHONETIC_CEILING`): when both sides'
+postal codes are present and fold-equal, `address_score` nudges its
+weighted average up by the bonus (capped at the ceiling) after
+computing it, so a shared postal code corroborates a partially- or
+fuzzily-disagreeing street/locality/region rather than being diluted
+into a single field's share of the average. Never fires on a blank
+(post-fold) postal code, and never on a one-sided postal code. Three
+new unit tests in `src/matcher.rs` pin the boosted amount exactly
+(reconstructing the pre-anchor weighted average by hand), the
+blank-postal-code no-op, and the one-sided-postal-code no-op. See
+spec/index.md §10.
+
 ### Added — fuzz/property coverage for `relationships`/`tags` (ORGM-T2)
 
 These two components had zero presence in the fuzz/property harnesses —
