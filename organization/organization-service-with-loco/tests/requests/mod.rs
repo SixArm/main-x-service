@@ -6,6 +6,7 @@ use std::sync::Once;
 
 mod bulk;
 mod event_outbox;
+mod fhir;
 mod organizations;
 
 /// Point the full-text index at a per-process temp directory.

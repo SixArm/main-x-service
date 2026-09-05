@@ -229,28 +229,96 @@ async fn remove(
 }
 
 /// `GET /fhir/Organization?<params>` — a `searchset` `Bundle` of matching
-/// organizations. In-memory filter over active rows (capped), then the
-/// `_count` page size. Supported params: see [`FhirOrgSearchParams`].
+/// organizations. Supported params: see [`FhirOrgSearchParams`].
+///
+/// A text-bearing param (`name` / `address` / `address-city` /
+/// `address-postalcode` / `identifier`) is resolved through the Tantivy
+/// index (ORG-T5) — the same tokenised full-text field set the native
+/// `/search` endpoint queries — rather than the capped in-memory Postgres
+/// scan this used to run: an index hit is not bounded by row count the
+/// way a `LIMIT`-then-filter scan is. [`FhirOrgSearchParams::matches`]
+/// still runs on every candidate the index returns, unchanged, so the
+/// precise per-field semantics (`address-city` only matches locality,
+/// etc.) are exactly as before — the index only replaces *retrieval*,
+/// never the authoritative filter. A request with no text-bearing param
+/// (bare `_id`, or no params at all) falls back to the same capped scan
+/// as before — there is no text to search on, so there is nothing for
+/// the index to narrow.
 async fn search(
     Query(params): Query<FhirOrgSearchParams>,
     State(ctx): State<AppContext>,
 ) -> Response {
-    let rows = match OrgModel::list(&ctx.db, FHIR_SEARCH_SCAN_CAP).await {
-        Ok(rows) => rows,
-        Err(e) => {
+    let query_text = params
+        .name
+        .as_deref()
+        .or(params.address.as_deref())
+        .or(params.address_city.as_deref())
+        .or(params.address_postalcode.as_deref())
+        .or(params.identifier.as_deref());
+
+    let rows = if let Some(q) = query_text {
+        let Some(engine) = crate::search::engine() else {
             return fhir_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
+                StatusCode::SERVICE_UNAVAILABLE,
                 "exception",
-                e.to_string(),
+                "the search index is unavailable, so this search cannot be resolved",
             );
+        };
+        // A generous candidate ceiling, not a result-count cap: `matches`
+        // below narrows to the specific field the caller asked about, so
+        // more candidates than `params.limit()` may be needed to fill a
+        // page. Reuses `FHIR_SEARCH_SCAN_CAP` as that ceiling rather than
+        // inventing a second constant for the same "generous but bounded"
+        // role the fallback scan already names.
+        let pids = match engine.search(
+            q,
+            usize::try_from(FHIR_SEARCH_SCAN_CAP).unwrap_or(usize::MAX),
+        ) {
+            Ok(pids) => pids,
+            Err(e) => {
+                return fhir_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "exception",
+                    e.to_string(),
+                );
+            }
+        };
+        match OrgModel::find_by_pids(
+            &ctx.db,
+            &crate::controllers::organizations::parse_pids(&pids),
+        )
+        .await
+        {
+            Ok(rows) => rows,
+            Err(e) => {
+                return fhir_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "exception",
+                    e.to_string(),
+                );
+            }
+        }
+    } else {
+        match OrgModel::list(&ctx.db, FHIR_SEARCH_SCAN_CAP).await {
+            Ok(rows) => {
+                if rows.len() as u64 == FHIR_SEARCH_SCAN_CAP {
+                    tracing::warn!(
+                        cap = FHIR_SEARCH_SCAN_CAP,
+                        "fhir search fallback scan hit the row cap; results may be truncated \
+                         (no text-bearing param to resolve through the index instead)"
+                    );
+                }
+                rows
+            }
+            Err(e) => {
+                return fhir_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "exception",
+                    e.to_string(),
+                );
+            }
         }
     };
-    if rows.len() as u64 == FHIR_SEARCH_SCAN_CAP {
-        tracing::warn!(
-            cap = FHIR_SEARCH_SCAN_CAP,
-            "fhir search scan hit the row cap; results may be truncated"
-        );
-    }
     let limit = params.limit();
     let mut resources = Vec::new();
     for model in &rows {
