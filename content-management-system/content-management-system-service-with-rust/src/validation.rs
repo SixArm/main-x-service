@@ -192,6 +192,32 @@ mod tests {
         assert_eq!(p.into_vec().len(), 3);
     }
 
+    /// CMS-T30: `require_ref` exercises the wrong-type branch for
+    /// `Organization` too, not just `Worker` — `localization.rs`,
+    /// `entries.rs`, `workflow.rs`, and `sites.rs` pass both, but this
+    /// module's own tests previously only ever checked `Worker`.
+    #[test]
+    fn ref_rules_wrong_type_organization() {
+        // A well-formed ref of the *wrong* type is rejected...
+        let mut p = Problems::new();
+        p.require_ref(
+            "owning_body_ref",
+            EntityType::Organization,
+            &format!("worker:{}", uuid::Uuid::new_v4()),
+        );
+        let v = p.into_vec();
+        assert_eq!(v.len(), 1);
+        assert!(v[0].contains("must reference a Organization"));
+        // ...but the matching type is accepted.
+        let mut p = Problems::new();
+        p.require_ref(
+            "owning_body_ref",
+            EntityType::Organization,
+            &format!("organization:{}", uuid::Uuid::new_v4()),
+        );
+        assert!(p.into_vec().is_empty());
+    }
+
     /// Keys reach delivery paths, so the shape is narrow on purpose.
     #[test]
     fn key_rules() {

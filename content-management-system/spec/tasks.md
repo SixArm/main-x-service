@@ -785,7 +785,8 @@ code + tests in one PR.
   `DESTRUCTIVE_POST_SUFFIXES`; a DB-gated round-trip test; `cargo
   test` green; clippy pedantic clean; fmt clean. (CMS-G3)
 
-- [ ] CMS-T30 **`require_ref` EntityType coverage.**
+- [x] CMS-T30 **`require_ref` EntityType coverage.** *(resolved
+  2026-09-05.)*
   `controllers/localization.rs`, `entries.rs`, `workflow.rs`, and
   `sites.rs` pass both `EntityType::Worker` and
   `EntityType::Organization` to the shared `require_ref` helper, but
@@ -795,6 +796,11 @@ code + tests in one PR.
   src/controllers/*.rs`). **Acceptance:** `ref_rules` exercises the
   wrong-type branch for `Organization` too; `cargo test` green;
   clippy pedantic clean. (CMS-D16)
+  - **Resolved.** New `ref_rules_wrong_type_organization` test in
+    `src/validation.rs` pins both the wrong-type rejection (a
+    `worker:` ref where `Organization` is expected) and the
+    matching-type acceptance, alongside the pre-existing `Worker`-only
+    `ref_rules` test.
 
 - [ ] CMS-T31 **Front-end sign-in gate.** No `+layout.server.ts`
   exists under `src/routes` (verified: `find src/routes -iname
