@@ -227,14 +227,36 @@ pub fn to_fhir_worker(worker: &Worker) -> FhirWorker {
     fhir_worker
 }
 
+/// Maps one FHIR `HumanName` entry onto an internal [`HumanName`]. Shared by
+/// [`parse_fhir_name`] (the first entry) and [`parse_fhir_additional_names`]
+/// (every entry after it) so the `use` vocabulary is decoded in one place.
+fn parse_one_fhir_name(fname: &FhirHumanName) -> HumanName {
+    use crate::models::NameUse;
+
+    HumanName {
+        use_type: fname.use_.as_ref().and_then(|u| match u.as_str() {
+            "usual" => Some(NameUse::Usual),
+            "official" => Some(NameUse::Official),
+            "temp" => Some(NameUse::Temp),
+            "nickname" => Some(NameUse::Nickname),
+            "anonymous" => Some(NameUse::Anonymous),
+            "old" => Some(NameUse::Old),
+            "maiden" => Some(NameUse::Maiden),
+            _ => None,
+        }),
+        family: fname.family.clone().unwrap_or_default(),
+        given: fname.given.clone().unwrap_or_default(),
+        prefix: fname.prefix.clone().unwrap_or_default(),
+        suffix: fname.suffix.clone().unwrap_or_default(),
+    }
+}
+
 /// Extracts the primary [`HumanName`] from the first FHIR name entry.
 ///
 /// # Errors
 ///
 /// Returns [`crate::Error::Validation`] if the worker has no name entries.
 fn parse_fhir_name(fhir_worker: &FhirWorker) -> Result<HumanName> {
-    use crate::models::NameUse;
-
     let Some(names) = fhir_worker.name.as_ref() else {
         return Err(crate::Error::Validation(
             "Worker must have at least one name".to_string(),
@@ -246,22 +268,18 @@ fn parse_fhir_name(fhir_worker: &FhirWorker) -> Result<HumanName> {
         ));
     };
 
-    Ok(HumanName {
-        use_type: first_name.use_.as_ref().and_then(|u| match u.as_str() {
-            "usual" => Some(NameUse::Usual),
-            "official" => Some(NameUse::Official),
-            "temp" => Some(NameUse::Temp),
-            "nickname" => Some(NameUse::Nickname),
-            "anonymous" => Some(NameUse::Anonymous),
-            "old" => Some(NameUse::Old),
-            "maiden" => Some(NameUse::Maiden),
-            _ => None,
-        }),
-        family: first_name.family.clone().unwrap_or_default(),
-        given: first_name.given.clone().unwrap_or_default(),
-        prefix: first_name.prefix.clone().unwrap_or_default(),
-        suffix: first_name.suffix.clone().unwrap_or_default(),
-    })
+    Ok(parse_one_fhir_name(first_name))
+}
+
+/// Extracts every FHIR name entry **after** the first (the primary name
+/// [`parse_fhir_name`] already handles) as internal `additional_names` —
+/// the direction `to_fhir_names` builds going out. Empty when the worker
+/// has zero or one name entry.
+fn parse_fhir_additional_names(fhir_worker: &FhirWorker) -> Vec<HumanName> {
+    let Some(names) = fhir_worker.name.as_ref() else {
+        return vec![];
+    };
+    names.iter().skip(1).map(parse_one_fhir_name).collect()
 }
 
 /// Decodes a FHIR gender code into a [`Gender`], defaulting to `Unknown`.
@@ -289,6 +307,30 @@ fn parse_fhir_deceased(fhir_worker: &FhirWorker) -> (bool, Option<chrono::DateTi
     }
 }
 
+/// Recovers the [`IdentifierType`](crate::models::IdentifierType) `to_fhir_identifiers`
+/// encoded into `Identifier.type.coding[0].code` (`id.identifier_type.to_string()` —
+/// the UPPERCASE wire token, e.g. `"NPI"`).
+///
+/// This is deliberately **not** read from `Identifier.system`: `system` carries
+/// the identifier's own assigning-authority string (round-tripped as-is,
+/// below), a value the type vocabulary has never lived in on the way out —
+/// reading it here would degrade every identifier to `Other` regardless of
+/// what was actually encoded. `IdentifierType`'s own `#[serde(rename_all =
+/// "UPPERCASE")]` + `#[serde(other)]` derive is the "existing serde
+/// vocabulary": deserializing through it (rather than a second hand-rolled
+/// match, as `db/repositories.rs::identifiers_from_db` uses for the same
+/// mapping) means a variant added there is picked up here for free, and an
+/// unrecognised code still lands on `Other` rather than an error.
+fn parse_fhir_identifier_type(fid: &FhirIdentifier) -> crate::models::IdentifierType {
+    fid.type_
+        .as_ref()
+        .and_then(|t| t.coding.as_ref())
+        .and_then(|codings| codings.first())
+        .and_then(|c| c.code.as_deref())
+        .and_then(|code| serde_json::from_value(serde_json::Value::String(code.to_string())).ok())
+        .unwrap_or(crate::models::IdentifierType::Other)
+}
+
 /// Maps the FHIR identifier list onto internal [`Identifier`]s, skipping any
 /// entry missing a system or value.
 fn parse_fhir_identifiers(fhir_worker: &FhirWorker) -> Vec<Identifier> {
@@ -298,7 +340,7 @@ fn parse_fhir_identifiers(fhir_worker: &FhirWorker) -> Vec<Identifier> {
     ids.iter()
         .filter_map(|fid| {
             Some(Identifier::new(
-                crate::models::IdentifierType::Other, // TODO: Parse from coding
+                parse_fhir_identifier_type(fid),
                 fid.system.clone()?,
                 fid.value.clone()?,
             ))
@@ -367,13 +409,73 @@ fn parse_fhir_telecom(fhir_worker: &FhirWorker) -> Vec<ContactPoint> {
         .collect()
 }
 
+/// Recovers `marital_status` from the FHIR `maritalStatus` `CodeableConcept`
+/// `to_fhir_worker` builds — preferring the plain-text form (`text`, set to
+/// the same string `to_fhir_worker` coded), falling back to the coding's
+/// `code` when `text` is absent.
+fn parse_fhir_marital_status(fhir_worker: &FhirWorker) -> Option<String> {
+    let concept = fhir_worker.marital_status.as_ref()?;
+    concept.text.clone().or_else(|| {
+        concept
+            .coding
+            .as_ref()
+            .and_then(|codings| codings.first())
+            .and_then(|c| c.code.clone())
+    })
+}
+
+/// Recovers `multiple_birth` from the FHIR `multipleBirth[x]` choice element.
+/// A boolean round-trips directly; a birth-**order** integer (e.g. "second
+/// twin") has no slot in the internal model beyond the flag itself, so any
+/// nonzero order is treated as `true` — the fact of a multiple birth is
+/// preserved even though the order is not.
+fn parse_fhir_multiple_birth(fhir_worker: &FhirWorker) -> Option<bool> {
+    use crate::api::fhir::resources::FhirMultipleBirth;
+
+    match fhir_worker.multiple_birth {
+        Some(FhirMultipleBirth::Boolean(b)) => Some(b),
+        Some(FhirMultipleBirth::Integer(n)) => Some(n != 0),
+        None => None,
+    }
+}
+
+/// Strips a FHIR literal reference's `{resource_type}/` prefix, so
+/// `"Organization/9a2f…"` recovers the bare id `to_fhir_worker` started
+/// from. A reference not carrying that prefix (or carrying none) is
+/// returned as-is rather than dropped — lenient, since an id is still
+/// better than nothing for a field this model stores as an opaque string.
+fn strip_reference_prefix<'a>(reference: &'a str, resource_type: &str) -> &'a str {
+    reference
+        .strip_prefix(resource_type)
+        .and_then(|rest| rest.strip_prefix('/'))
+        .unwrap_or(reference)
+}
+
+/// Recovers `managing_organization` from the FHIR `managingOrganization`
+/// reference `to_fhir_worker` builds as `Organization/{org_id}`. The
+/// internal field is a [`uuid::Uuid`], not an opaque string, so a
+/// reference whose id half is not a valid UUID (a malformed or
+/// hand-edited resource) is dropped rather than stored malformed.
+fn parse_fhir_managing_organization(fhir_worker: &FhirWorker) -> Option<uuid::Uuid> {
+    let reference = fhir_worker
+        .managing_organization
+        .as_ref()?
+        .reference
+        .as_deref()?;
+    uuid::Uuid::parse_str(strip_reference_prefix(reference, "Organization")).ok()
+}
+
 /// Maps a FHIR [`FhirWorker`] back to an internal [`Worker`].
 ///
 /// Parses the id (generating a fresh UUID when absent), takes the first name
 /// entry (erroring if there is none), and decodes gender / birth date /
-/// deceased / identifiers / addresses / telecom from their FHIR codes.
-/// Several fields are not yet round-tripped (see the `TODO` markers) and are
-/// left at their defaults.
+/// deceased / identifiers / addresses / telecom / additional names / marital
+/// status / multiple-birth flag / managing organization from their FHIR
+/// codes (T-19). `worker_type`, `tax_id`, `documents`, `emergency_contacts`,
+/// `photo`, and `links` have no FHIR slot this conversion populates yet and
+/// are left at their defaults — `links` in particular is a real,
+/// **unmarked** round-trip gap `to_fhir_worker` emits going out (spec §13,
+/// a follow-up beyond this task's five `TODO`-marked fields).
 ///
 /// # Errors
 ///
@@ -400,13 +502,17 @@ pub fn from_fhir_worker(fhir_worker: &FhirWorker) -> Result<Worker> {
     let identifiers = parse_fhir_identifiers(fhir_worker);
     let addresses = parse_fhir_addresses(fhir_worker);
     let telecom = parse_fhir_telecom(fhir_worker);
+    let additional_names = parse_fhir_additional_names(fhir_worker);
+    let marital_status = parse_fhir_marital_status(fhir_worker);
+    let multiple_birth = parse_fhir_multiple_birth(fhir_worker);
+    let managing_organization = parse_fhir_managing_organization(fhir_worker);
 
     Ok(Worker {
         id,
         identifiers,
         active: fhir_worker.active.unwrap_or(true),
         name,
-        additional_names: vec![], // TODO: Parse additional names from FHIR
+        additional_names,
         telecom,
         gender,
         worker_type: None,
@@ -417,10 +523,10 @@ pub fn from_fhir_worker(fhir_worker: &FhirWorker) -> Result<Worker> {
         tax_id: None,
         documents: vec![],
         emergency_contacts: vec![],
-        marital_status: None, // TODO: Parse marital status
-        multiple_birth: None, // TODO: Parse multiple birth
+        marital_status,
+        multiple_birth,
         photo: vec![],
-        managing_organization: None, // TODO: Parse organization reference
+        managing_organization,
         links: vec![],
         created_at: Utc::now(),
         updated_at: Utc::now(),
@@ -468,5 +574,84 @@ mod tests {
         let fhir = FhirWorker::new(); // no name set
         let err = from_fhir_worker(&fhir);
         assert!(err.is_err(), "a resource with no name must be rejected");
+    }
+
+    /// T-19: the five fields `from_fhir_worker` used to silently drop
+    /// (identifier type beyond `Other`, additional names, marital status,
+    /// multiple-birth flag, managing organization) all survive a
+    /// `to_fhir_worker` → `from_fhir_worker` round trip instead of
+    /// degrading to `Other`/`None`/`vec![]`.
+    #[test]
+    fn round_trip_preserves_previously_dropped_fields() {
+        use crate::models::IdentifierType;
+
+        let mut worker = sample_worker();
+        worker.identifiers = vec![
+            Identifier::new(
+                IdentifierType::NPI,
+                "http://hl7.org/fhir/sid/us-npi".to_string(),
+                "1234567893".to_string(),
+            ),
+            Identifier::new(
+                IdentifierType::TAX,
+                "http://example.org/tax-id".to_string(),
+                "99-1234567".to_string(),
+            ),
+        ];
+        worker.additional_names = vec![HumanName {
+            use_type: None,
+            family: "Doe".to_string(),
+            given: vec!["Jonathan".to_string()],
+            prefix: vec![],
+            suffix: vec![],
+        }];
+        worker.marital_status = Some("Married".to_string());
+        worker.multiple_birth = Some(true);
+        worker.managing_organization = Some(uuid::Uuid::new_v4());
+
+        let fhir = to_fhir_worker(&worker);
+        let back = from_fhir_worker(&fhir).expect("round-trip should succeed");
+
+        let back_types: Vec<_> = back
+            .identifiers
+            .iter()
+            .map(|i| i.identifier_type.clone())
+            .collect();
+        assert_eq!(
+            back_types,
+            vec![IdentifierType::NPI, IdentifierType::TAX],
+            "identifier types must survive, not degrade to Other: {back_types:?}"
+        );
+        assert_eq!(back.additional_names.len(), 1);
+        assert_eq!(back.additional_names[0].family, "Doe");
+        assert_eq!(back.additional_names[0].given, vec!["Jonathan".to_string()]);
+        assert_eq!(back.marital_status, worker.marital_status);
+        assert_eq!(back.multiple_birth, worker.multiple_birth);
+        assert_eq!(back.managing_organization, worker.managing_organization);
+    }
+
+    /// An identifier type FHIR never declared this crate's vocabulary for
+    /// still degrades to `Other` (the fail-safe, not a regression) rather
+    /// than an error or a panic.
+    #[test]
+    fn unrecognised_fhir_identifier_type_code_is_other() {
+        let fid = resources::FhirIdentifier {
+            use_: None,
+            type_: Some(FhirCodeableConcept {
+                coding: Some(vec![FhirCoding {
+                    system: None,
+                    code: Some("NOT-A-REAL-CODE".to_string()),
+                    display: None,
+                }]),
+                text: None,
+            }),
+            system: Some("urn:example".to_string()),
+            value: Some("x".to_string()),
+            assigner: None,
+        };
+        assert_eq!(
+            parse_fhir_identifier_type(&fid),
+            crate::models::IdentifierType::Other
+        );
     }
 }
