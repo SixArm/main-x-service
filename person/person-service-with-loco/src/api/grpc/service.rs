@@ -24,13 +24,16 @@
 //! [`crate::api::rest::auth::authorize_record`] against the loaded
 //! record (REST does the same before a single-record read/write), and
 //! `GetPerson` honours a `mask` obligation exactly as
-//! `crate::api::rest::handlers::get_person` does.
+//! `crate::api::rest::handlers::get_person` does. `GetPerson` also
+//! writes the HIPAA §164.528 disclosure-accounting audit row REST
+//! writes on every read (T-36): [`grpc_access_context`] is the
+//! gRPC-metadata counterpart of the Axum
+//! [`crate::compliance::disclosure::AccessContext`] extractor — client
+//! IP / user-agent still have nowhere to come from on this transport,
+//! same as REST, so both stay `None` there too.
 //!
 //! What is **not** carried over to this slice, and is tracked rather
-//! than silently absent (this crate's spec `T-6`): the HIPAA §164.528
-//! disclosure-accounting audit row REST writes on every read (needs a
-//! gRPC-side `AccessContext` equivalent — client IP / user-agent come
-//! from a different place than an Axum extractor); `ListPersons`'
+//! than silently absent (this crate's spec `T-6`): `ListPersons`'
 //! SEC-G3 per-record read-visibility filtering and masking (REST omits
 //! or masks rows an aggregate reader should not see in full; this RPC
 //! applies only the blanket `Read` check today); and `UpdatePerson`
@@ -46,6 +49,7 @@ use super::proto;
 use crate::api::rest::AppState;
 use crate::api::rest::auth::{self, MaybeAuthUser};
 use crate::api::rest::handlers::check_duplicates_internal;
+use crate::compliance::disclosure;
 use crate::models::{Gender, HumanName, Person};
 
 /// Same offset ceiling as REST's SEC-G7 bound
@@ -147,6 +151,21 @@ fn grpc_enforce(metadata: &MetadataMap, action: Action) -> Result<Option<Claims>
     } else {
         Err(Status::permission_denied(decision.reason))
     }
+}
+
+/// Build a [`disclosure::AccessContext`] from gRPC request metadata —
+/// this transport's counterpart of the REST `AccessContext`'s
+/// `FromRequestParts` extractor, which reads the same three headers off
+/// an Axum [`axum::http::HeaderMap`] instead (T-36). Extraction is
+/// infallible here too: a missing or malformed metadata entry degrades
+/// to an absent header, never a rejected call.
+fn grpc_access_context(metadata: &MetadataMap) -> disclosure::AccessContext {
+    let header = |name: &str| metadata.get(name).and_then(|v| v.to_str().ok());
+    disclosure::AccessContext::from_parts(
+        header(disclosure::PURPOSE_HEADER),
+        header(disclosure::RECIPIENT_HEADER),
+        header(disclosure::DESTINATION_HEADER),
+    )
 }
 
 /// Map [`crate::api::rest::auth::authorize_record`]'s `(StatusCode,
@@ -282,14 +301,16 @@ impl proto::person_service_server::PersonService for PersonGrpcService {
     /// Record-level ABAC + `mask` obligation, exactly as
     /// `GET /api/persons/{id}` (`crate::api::rest::handlers::get_person`)
     /// applies them — same [`auth::authorize_record`] call, same
-    /// [`crate::privacy::mask_person`] on a `mask` obligation. Does
-    /// **not** yet write the HIPAA §164.528 disclosure-accounting row
-    /// REST does (module docs).
+    /// [`crate::privacy::mask_person`] on a `mask` obligation, and now
+    /// (T-36) the same HIPAA §164.528 disclosure-accounting audit row,
+    /// via [`grpc_access_context`] in place of the Axum extractor.
     async fn get_person(
         &self,
         request: Request<proto::GetPersonRequest>,
     ) -> Result<Response<proto::Person>, Status> {
         let claims = grpc_enforce(request.metadata(), Action::Read)?;
+        let access = grpc_access_context(request.metadata());
+        let caller = MaybeAuthUser(claims);
         let id = parse_uuid(&request.into_inner().id)?;
 
         let person = self
@@ -300,12 +321,30 @@ impl proto::person_service_server::PersonService for PersonGrpcService {
             .map_err(|e| Status::internal(format!("failed to retrieve person: {e}")))?
             .ok_or_else(|| Status::not_found(format!("person '{id}' not found")))?;
 
-        let obligations = auth::authorize_record(
-            &MaybeAuthUser(claims),
-            Action::Read,
-            &auth::person_resource_attrs(&person),
+        let obligations =
+            auth::authorize_record(&caller, Action::Read, &auth::person_resource_attrs(&person))
+                .map_err(map_record_authz_error)?;
+
+        // Audited only once authorization has allowed the read: a denied
+        // request disclosed nothing, and recording it would pollute the
+        // §164.528 accounting with accesses that never happened. Mirrors
+        // `crate::api::rest::handlers::get_person` exactly.
+        if disclosure::record_access(
+            &self.state.audit_log,
+            "Person",
+            id,
+            disclosure::action::READ,
+            caller.claims().map(|c| c.sub.as_str()),
+            &access,
         )
-        .map_err(map_record_authz_error)?;
+        .await
+        .is_err()
+        {
+            return Err(Status::unavailable(
+                "the access could not be recorded in the audit trail, so the read was refused",
+            ));
+        }
+
         let body = if obligations.iter().any(|o| o == "mask") {
             crate::privacy::mask_person(&person)
         } else {

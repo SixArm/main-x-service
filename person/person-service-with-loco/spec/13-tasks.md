@@ -1086,7 +1086,7 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     over both gRPC and REST; a blank-family-name update ⇒
     `INVALID_ARGUMENT`, matching `CreatePerson`'s existing validation proof.
 
-- [ ] **T-36 (S) — HIPAA §164.528 disclosure-accounting audit row on the gRPC `GetPerson` read path.**
+- [x] **T-36 (S) — HIPAA §164.528 disclosure-accounting audit row on the gRPC `GetPerson` read path.** *(resolved 2026-09-05.)*
   REST's `get_person` writes a disclosure-accounting audit row on every
   read (per `agents/restful.md`'s `/api/persons/{id}/audit/disclosures`
   endpoint and `compliance-for-healthcare.md` §2.1's §164.528
@@ -1106,6 +1106,37 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     (`/api/persons/{id}/audit/disclosures` or its repository-layer
     equivalent) recorded the read, matching the existing REST-path
     regression test's shape.
+  - **Resolved.** Added `grpc_access_context` (`src/api/grpc/service.rs`)
+    — the gRPC-metadata counterpart of the Axum
+    `disclosure::AccessContext` `FromRequestParts` extractor, reading
+    the same three headers (`x-purpose-of-use`, `x-disclosure-recipient`,
+    `x-destination-region`) off `tonic::metadata::MetadataMap` instead.
+    `GetPerson` now calls `disclosure::record_access` exactly as
+    `crate::api::rest::handlers::get_person` does: only after
+    `authorize_record` allows the read (so a denied request logs
+    nothing), with the same entity type, action, and actor (the
+    verified caller's `sub`), returning `Status::unavailable` if the
+    write fails and `PERSON_AUDIT_FAIL_CLOSED` is on — the gRPC
+    counterpart of REST's `503`. New DB-gated test
+    `get_person_over_grpc_writes_a_disclosure_accounting_row`
+    (`tests/grpc_integration_test.rs`) drives a real `GetPerson` call
+    carrying both headers as gRPC metadata, then queries
+    `AuditLogRepository::disclosures_for_entity` directly (the
+    repository-layer equivalent named in this task's acceptance
+    criterion) — asserting the row's `context` carries the declared
+    recipient/purpose when `PERSON_AUDIT_READS` is on, and that no row
+    was written when it is off, mirroring
+    `tests/api_integration_test.rs`'s
+    `test_disclosure_accounting_states_whether_it_is_complete` shape
+    exactly (that gate is a process-wide `OnceLock`, so a test cannot
+    flip it after the first read — both branches were verified by
+    running the suite once with `PERSON_AUDIT_READS` unset and once
+    with it set to `1`). Verified against a real Postgres 18 via
+    `scripts/ci-check.sh test-db person/person-service-with-loco`: the
+    full DB-gated suite passes (24 + 26 + 5 + 1 + 4 + 1 tests across
+    the crate's suites, 0 failed); `cargo test --lib` unaffected (355
+    passed, same count); `cargo build`/`clippy --all-targets -- -D
+    warnings` clean.
 
 - [ ] **T-37 (S) — SEC-G3 per-record read-visibility filtering/masking on the gRPC `ListPersons` RPC.**
   REST's `search_persons` runs `auth::read_visibility` per hit so a
