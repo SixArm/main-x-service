@@ -487,6 +487,28 @@ pub fn mask_json(mut value: serde_json::Value, keys: &[&str]) -> serde_json::Val
     value
 }
 
+/// Apply the `mask` obligation to a **text** field (CRM-R15 masks
+/// contact channel detail): set each named top-level key to
+/// [`MASKED`] rather than `null`. Unlike an amount, a redacted string
+/// has no "looks like a real value" failure mode `null` is guarding
+/// against for [`mask_json`] — a visible, obviously-redacted
+/// placeholder keeps the field's type (a string, not an absence) while
+/// still hiding the content.
+#[must_use]
+pub fn mask_text_json(mut value: serde_json::Value, keys: &[&str]) -> serde_json::Value {
+    if let Some(object) = value.as_object_mut() {
+        for key in keys {
+            if object.contains_key(*key) {
+                object.insert(
+                    (*key).to_string(),
+                    serde_json::Value::String(MASKED.to_string()),
+                );
+            }
+        }
+    }
+    value
+}
+
 /// Environment attributes for the current request, for the `env.*`
 /// policy namespace (`authorization-attributes.md` §10). Derived here —
 /// not in the pure engine — so the clock stays at the service edge and
@@ -1489,6 +1511,22 @@ mod tests {
         assert_eq!(masked["currency"], "GBP");
         // Non-object values pass through untouched.
         let passthrough = mask_json(serde_json::json!([1, 2]), &["amount_minor"]);
+        assert_eq!(passthrough, serde_json::json!([1, 2]));
+    }
+
+    /// `mask_text_json` replaces the named text keys with [`MASKED`]
+    /// (never `null`, unlike `mask_json`'s amount handling) and leaves
+    /// every other field untouched.
+    #[test]
+    fn mask_text_json_redacts_text_keeps_structure() {
+        let masked = mask_text_json(
+            serde_json::json!({ "display_name": "Alice", "preferred_channel": "phone" }),
+            &["preferred_channel"],
+        );
+        assert_eq!(masked["display_name"], "Alice");
+        assert_eq!(masked["preferred_channel"], MASKED);
+        // Non-object values pass through untouched.
+        let passthrough = mask_text_json(serde_json::json!([1, 2]), &["preferred_channel"]);
         assert_eq!(passthrough, serde_json::json!([1, 2]));
     }
 }

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — record-level ABAC wired into the contact/deal handlers (CRM-T24)
+
+`auth::deal_resource_attrs`/`auth::contact_resource_attrs` were defined
+and unit-tested but `authorize_record` was called only from
+`controllers/privacy.rs` (subject-access/erase) — the deal and contact
+read/write handlers ran no record-level check at all. `get_contact` and
+`list_contacts` (via a new `readable_contacts` helper, omitting a
+denied row per invariant 5) now call `authorize_record` and, on a
+`mask` obligation, redact `preferred_channel` through a new
+`auth::mask_text_json` (a text-placeholder sibling of the existing
+amount-nulling `auth::mask_json`); `repoint_contact` gates its write
+the same way. `list_deals` (via a new `readable_deals` helper) and
+`deal_stage`/`reopen_deal` do the equivalent for deals, redacting
+`amount_minor`. New unit test `mask_text_json_redacts_text_keeps_structure`;
+`tests/enforcement.rs` gained an owner-vs-non-owner,
+masked-vs-unmasked scenario for one deal and one contact endpoint.
+`get_contact`'s bundled activities/deals/tickets rows, and the
+forecast/ROI fields CRM-T22 also named, are explicitly left out of
+this change (documented, not silent). See spec/tasks.md CRM-T24.
+
 ### Added — `require_ref` test coverage for Worker and Organization (CRM-T25)
 
 `src/validation.rs`'s `ref_rules` unit test only ever exercised

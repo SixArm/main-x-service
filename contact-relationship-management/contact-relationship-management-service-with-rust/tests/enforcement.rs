@@ -62,15 +62,19 @@ fn sign_as(kid: &str, sub: &str, attrs: &[(&str, &[&str])]) -> String {
 }
 
 /// The deployment policy (spec `auth.md` personas): machine peers do
-/// everything; `access=write` writes; any authenticated read is
-/// allowed.
+/// everything; `access=write` writes; the record's own owner (`$sub`
+/// matching `resource.owner`, CRM-T24) reads unmasked; any other
+/// authenticated read is allowed but carries the `mask` obligation —
+/// first-match-wins, so an unowned record (no `resource.owner` at
+/// all) falls through the owner rule to this masked catch-all.
 fn test_policy() -> String {
     json!({ "rules": [
         { "effect": "allow",
           "actions": ["read", "write", "delete", "destructive"],
           "when": { "svc": ["true"] } },
+        { "effect": "allow", "actions": ["read"], "when": { "resource.owner": ["$sub"] } },
         { "effect": "allow", "actions": ["write"], "when": { "access": ["write"] } },
-        { "effect": "allow", "actions": ["read"], "when": {} }
+        { "effect": "allow", "actions": ["read"], "when": {}, "obligations": ["mask"] }
     ] })
     .to_string()
 }
@@ -155,6 +159,114 @@ async fn enforcement_gates_the_real_stack() {
             .await;
         assert_eq!(history.status_code(), 200);
         assert_eq!(history.json::<Value>().as_array().unwrap().len(), 1);
+
+        // CRM-T24: record-level ABAC on the contact/deal read paths.
+        // The deal/contact's own owner reads unmasked; a stranger
+        // (the `reader` persona above, whose `sub` matches no
+        // `resource.owner`) reads the same records masked — `reader`
+        // itself proves the "GET allowed" case is unaffected, and the
+        // sub-below (`owner-user`) proves ownership actually changes
+        // the outcome, not just the default policy shape.
+        let owner_sub = uuid::Uuid::new_v4();
+        let owner = sign_as(&kid, &owner_sub.to_string(), &[]);
+        let owner_ref = format!("worker:{owner_sub}");
+
+        // A contact owned by `owner_sub`: the owner sees the real
+        // `preferred_channel`; the stranger sees it masked.
+        let owned_contact = request
+            .post("/api/contacts")
+            .add_header("authorization", bearer(&writer))
+            .json(&json!({
+                "person_ref": format!("person:{}", uuid::Uuid::new_v4()),
+                "display_name": "Owned Contact",
+                "owner_ref": owner_ref,
+                "preferred_channel": "phone",
+            }))
+            .await;
+        assert_eq!(owned_contact.status_code(), 200);
+        let owned_contact_pid = owned_contact.json::<Value>()["pid"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        let as_owner = request
+            .get(&format!("/api/contacts/{owned_contact_pid}"))
+            .add_header("authorization", bearer(&owner))
+            .await;
+        assert_eq!(as_owner.status_code(), 200);
+        assert_eq!(
+            as_owner.json::<Value>()["contact"]["preferred_channel"],
+            "phone"
+        );
+
+        let as_stranger = request
+            .get(&format!("/api/contacts/{owned_contact_pid}"))
+            .add_header("authorization", bearer(&reader))
+            .await;
+        assert_eq!(as_stranger.status_code(), 200);
+        assert_eq!(
+            as_stranger.json::<Value>()["contact"]["preferred_channel"],
+            contact_relationship_management_service::auth::MASKED
+        );
+
+        // A deal owned by `owner_sub`: the owner's list view sees the
+        // real `amount_minor`; the stranger's sees it nulled.
+        let pipeline = request
+            .post("/api/pipelines")
+            .add_header("authorization", bearer(&writer))
+            .json(&json!({
+                "name": "Enforced Pipeline",
+                "stages": [
+                    { "name": "Open", "probability_percent": 50 },
+                    { "name": "Won", "probability_percent": 100, "is_won": true },
+                ],
+            }))
+            .await;
+        assert_eq!(pipeline.status_code(), 200);
+        let pipeline_pid = pipeline.json::<Value>()["pid"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        let owned_deal = request
+            .post("/api/deals")
+            .add_header("authorization", bearer(&writer))
+            .json(&json!({
+                "name": "Owned Deal",
+                "pipeline_pid": pipeline_pid,
+                "amount_minor": 500_000,
+                "currency": "GBP",
+                "owner_ref": owner_ref,
+            }))
+            .await;
+        assert_eq!(owned_deal.status_code(), 200);
+        let owned_deal_pid = owned_deal.json::<Value>()["pid"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        let find_amount = |rows: &Value| -> Value {
+            rows.as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row["pid"] == owned_deal_pid)
+                .expect("the owned deal is in the list")["amount_minor"]
+                .clone()
+        };
+
+        let deals_as_owner = request
+            .get(&format!("/api/deals?pipeline={pipeline_pid}"))
+            .add_header("authorization", bearer(&owner))
+            .await;
+        assert_eq!(deals_as_owner.status_code(), 200);
+        assert_eq!(find_amount(&deals_as_owner.json::<Value>()), json!(500_000));
+
+        let deals_as_stranger = request
+            .get(&format!("/api/deals?pipeline={pipeline_pid}"))
+            .add_header("authorization", bearer(&reader))
+            .await;
+        assert_eq!(deals_as_stranger.status_code(), 200);
+        assert!(find_amount(&deals_as_stranger.json::<Value>()).is_null());
     })
     .await;
 }

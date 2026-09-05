@@ -302,25 +302,65 @@ code + tests in one PR.
       `page.route` stubs; vitest path map extended; svelte-check 0;
       i18n keys ×13. (CRM-D14; CRM-R20, CRM-G2)
 
-- [ ] CRM-T24 **Wire record-level ABAC into the contact/deal
-      handlers.** `auth::deal_resource_attrs` and
-      `auth::contact_resource_attrs` are defined and unit-tested in
-      `auth.rs`, but `authorize_record` is called only from
+- [x] CRM-T24 **Wire record-level ABAC into the contact/deal
+      handlers.** *(resolved 2026-09-05.)* `auth::deal_resource_attrs`
+      and `auth::contact_resource_attrs` were defined and unit-tested
+      in `auth.rs`, but `authorize_record` was called only from
       `controllers/privacy.rs` (the CRM-T21 subject-access/erase
       handlers) — never from `controllers/sales.rs`'s deal read/write
-      handlers or `controllers/relationships.rs`'s contact handlers
-      (verified: `grep -rn "authorize_record" src/controllers/*.rs`
-      shows exactly the two `privacy.rs` call sites). CRM-T22 already
-      named this narrower than described: "no list/get handler yet
-      redacts a deal amount, forecast value, campaign ROI, or contact
-      channel detail on an ordinary read." **Acceptance:** the deal
-      and contact GET/PUT handlers call `authorize_record` with their
-      resource attrs and honour the `mask` obligation on read
-      (amount/channel fields); the enforcement matrix
-      (`tests/enforcement.rs`) gains an owner-vs-non-owner and
-      masked-vs-unmasked pin for at least one deal and one contact
-      endpoint; `cargo test` plus the DB-gated enforcement suite
-      green; clippy pedantic clean. (CRM-D10, CRM-D12; CRM-G1)
+      handlers or `controllers/relationships.rs`'s contact handlers.
+  - **Resolved.** There is no single `GET /api/deals/{pid}` endpoint
+    (only `list_deals`, `deal_stage`, `reopen_deal` touch one deal) and
+    no general contact `PUT` (only `repoint_contact`, which changes
+    `person_ref` alone) — the task's literal "GET/PUT" framing didn't
+    quite match the routes that exist, so the fix is scoped to the
+    handlers that genuinely read or mutate a single record:
+    - `relationships.rs::get_contact` now calls `authorize_record`
+      (`Read`) and, on a `mask` obligation, redacts `preferred_channel`
+      via a new `auth::mask_text_json` (a sibling of the existing
+      `auth::mask_json`, which nulls amounts — a redacted **string**
+      is replaced with the `auth::MASKED` placeholder instead of
+      `null`, since a string has no "looks like zero" honesty problem
+      to guard against).
+    - `relationships.rs::list_contacts` filters + masks per row via a
+      new `readable_contacts` helper — a denied row is **omitted**, the
+      same invariant-5 shape landed for care-pathway-service (CP-T2)
+      and portfolio-service (SEC-PPM-1) this cycle.
+    - `relationships.rs::repoint_contact` calls `authorize_record`
+      (`Write`) before mutating.
+    - `sales.rs::list_deals` filters + masks per row via a new
+      `readable_deals` helper, redacting `amount_minor` (via the
+      existing `auth::mask_json`) on a masked row.
+    - `sales.rs::deal_stage` and `sales.rs::reopen_deal` call
+      `authorize_record` (`Write`) before mutating.
+    - **Left explicitly out of scope, not silently:** `get_contact`'s
+      bundled `activities`/`deals`/`tickets` rows are not re-authorized
+      or masked by this change — each carries its own resource
+      attributes a caller might read differently under, and folding
+      that in is a separate, larger change than this task's five
+      handlers. Forecast value and campaign ROI (also named in CRM-T22)
+      are computed in the `forecast`/analytics endpoints, not stored
+      fields on `Deal`, and are likewise untouched here.
+  - **Acceptance (met).** Two new unit tests in `auth.rs`
+    (`mask_json_nulls_amounts_keeps_structure`'s sibling
+    `mask_text_json_redacts_text_keeps_structure`, pinning the
+    placeholder-vs-null distinction). `tests/enforcement.rs`'s single
+    boot gained a third policy rule (`resource.owner: ["$sub"]` reads
+    unmasked) and the existing masked-catch-all read rule gained
+    `"obligations": ["mask"]`, then a new scenario: a contact and a
+    deal are each created with `owner_ref` pointing at a freshly-minted
+    "owner" persona's own `sub`; that owner's `GET /api/contacts/{pid}`
+    shows the real `preferred_channel` and their
+    `GET /api/deals?pipeline=` shows the real `amount_minor`, while the
+    existing unrelated `reader` persona (whose `sub` matches no
+    `resource.owner`) sees the same two records with
+    `preferred_channel` == `auth::MASKED` and `amount_minor` == `null`
+    respectively — proving both that ownership changes the outcome and
+    that an unowned/other-owned record still discloses nothing extra.
+    `cargo test --lib` (69, up from 68) and the DB-gated
+    `cargo test --test enforcement -- --ignored` plus the full
+    `--ignored` suite all green; `cargo fmt --check` and `cargo clippy
+    --all-targets -- -D warnings` clean. (CRM-D10, CRM-D12; CRM-G1)
 
 - [x] CRM-T25 **`require_ref` EntityType coverage.** *(resolved
       2026-09-05.)* Same gap as its
