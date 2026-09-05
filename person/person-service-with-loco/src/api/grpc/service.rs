@@ -30,13 +30,17 @@
 //! gRPC-metadata counterpart of the Axum
 //! [`crate::compliance::disclosure::AccessContext`] extractor — client
 //! IP / user-agent still have nowhere to come from on this transport,
-//! same as REST, so both stay `None` there too.
+//! same as REST, so both stay `None` there too. `ListPersons` now also
+//! applies REST's SEC-G3 per-record read-visibility filtering/masking
+//! (T-37), via the shared, `pub(crate)`
+//! [`crate::api::rest::handlers::search_result_disposition`] — a denied
+//! record is omitted (never revealed to exist) and a `mask`-obligated
+//! one is redacted, exactly as REST's `list_persons`/`search_persons`
+//! do; this RPC's proto has no client-requested `mask_sensitive` field,
+//! so only the ABAC obligation can trigger masking here.
 //!
 //! What is **not** carried over to this slice, and is tracked rather
-//! than silently absent (this crate's spec `T-6`): `ListPersons`'
-//! SEC-G3 per-record read-visibility filtering and masking (REST omits
-//! or masks rows an aggregate reader should not see in full; this RPC
-//! applies only the blanket `Read` check today); and `UpdatePerson`
+//! than silently absent (this crate's spec `T-6`): `UpdatePerson`
 //! entirely (no RPC for it yet).
 
 use uuid::Uuid;
@@ -48,7 +52,9 @@ use tonic::{Request, Response, Status};
 use super::proto;
 use crate::api::rest::AppState;
 use crate::api::rest::auth::{self, MaybeAuthUser};
-use crate::api::rest::handlers::check_duplicates_internal;
+use crate::api::rest::handlers::{
+    ResultDisposition, check_duplicates_internal, search_result_disposition,
+};
 use crate::compliance::disclosure;
 use crate::models::{Gender, HumanName, Person};
 
@@ -353,13 +359,18 @@ impl proto::person_service_server::PersonService for PersonGrpcService {
         Ok(Response::new(person_to_proto(&body)))
     }
 
-    /// A blanket `Read` check only — **not** REST's SEC-G3 per-record
-    /// visibility filtering / masking (module docs).
+    /// SEC-G3 per-record read-visibility filtering/masking, exactly as
+    /// REST's `list_persons`/`search_persons` apply it via the shared
+    /// [`search_result_disposition`] (T-37, module docs): a record the
+    /// caller may not read is omitted entirely (concealment, not just a
+    /// denial the caller could infer existence from), and a
+    /// `mask`-obligated one is redacted.
     async fn list_persons(
         &self,
         request: Request<proto::ListPersonsRequest>,
     ) -> Result<Response<proto::ListPersonsResponse>, Status> {
-        grpc_enforce(request.metadata(), Action::Read)?;
+        let claims = grpc_enforce(request.metadata(), Action::Read)?;
+        let caller = MaybeAuthUser(claims);
         let req = request.into_inner();
 
         if req.offset > MAX_LIST_OFFSET {
@@ -373,15 +384,28 @@ impl proto::person_service_server::PersonService for PersonGrpcService {
             req.limit.min(MAX_LIST_LIMIT)
         };
 
-        let persons = self
+        let rows = self
             .state
             .person_repository
             .list_active(u64::from(limit), u64::from(req.offset))
             .await
             .map_err(|e| Status::internal(format!("failed to list persons: {e}")))?;
-        Ok(Response::new(proto::ListPersonsResponse {
-            persons: persons.iter().map(person_to_proto).collect(),
-        }))
+
+        let mut persons = Vec::new();
+        for person in &rows {
+            let visibility = auth::read_visibility(&caller, person);
+            // No client-requested `mask_sensitive` on this proto (unlike
+            // REST's `ListQuery`), so only an ABAC `mask` obligation can
+            // trigger masking here.
+            match search_result_disposition(visibility.as_deref(), false) {
+                ResultDisposition::Omit => {}
+                ResultDisposition::Masked => {
+                    persons.push(person_to_proto(&crate::privacy::mask_person(person)));
+                }
+                ResultDisposition::Full => persons.push(person_to_proto(person)),
+            }
+        }
+        Ok(Response::new(proto::ListPersonsResponse { persons }))
     }
 
     /// Record-level ABAC exactly as `DELETE /api/persons/{id}`

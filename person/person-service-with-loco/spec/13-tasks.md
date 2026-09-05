@@ -1138,7 +1138,7 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     passed, same count); `cargo build`/`clippy --all-targets -- -D
     warnings` clean.
 
-- [ ] **T-37 (S) — SEC-G3 per-record read-visibility filtering/masking on the gRPC `ListPersons` RPC.**
+- [x] **T-37 (S) — SEC-G3 per-record read-visibility filtering/masking on the gRPC `ListPersons` RPC.** *(resolved 2026-09-05.)*
   REST's `search_persons` runs `auth::read_visibility` per hit so a
   denied record is omitted and a `mask`-obligated one is redacted
   (SEC-G3, closed for REST/search). The gRPC `ListPersons` applies only
@@ -1157,3 +1157,40 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     specific records and asserts `ListPersons` over gRPC omits/redacts
     exactly as `GET /api/persons/search` does for the same caller and
     dataset (a parity test against the existing SEC-G3 REST test).
+  - **Resolved.** `crate::api::rest::handlers::search_result_disposition`
+    and its `ResultDisposition` enum are now `pub(crate)` (same pattern
+    as `check_duplicates_internal`'s earlier bump), and the gRPC
+    `ListPersons` RPC (`src/api/grpc/service.rs`) calls
+    `auth::read_visibility` + `search_result_disposition` per row
+    exactly as REST's `list_persons`/`search_persons` do — a denied
+    record is omitted, a `mask`-obligated one is redacted via
+    `crate::privacy::mask_person`. (This RPC's proto has no
+    client-requested `mask_sensitive` field, so only the ABAC
+    obligation can trigger masking here, unlike REST's `ListQuery`.)
+    New DB-gated test `list_persons_over_grpc_applies_sec_g3_disposition`
+    (`tests/grpc_sec_g3.rs`, its own test binary — like
+    `tests/enforcement.rs`, since `PERSON_REQUIRE_AUTH`/`PERSON_PASETO_KEYS`/
+    `PERSON_ABAC_POLICY` are process-wide `OnceLock`s a shared binary
+    could not safely flip) mints real PASETO tokens and a policy that
+    denies reading a record under a specific (FK-valid, freshly
+    inserted) organization and masks a deceased one, then asserts over
+    a real `ListPersons` call: the denied record never appears, the
+    masked one appears with `tax_id` redacted to its last 4 characters,
+    and an unaffected record appears in full — the same three
+    dispositions `search_result_disposition`'s own unit test pins.
+    (The denial keys on `managing_org`, not `active`, because
+    `active = false` would also drop the row from
+    `PersonRepository::list_active`'s own `WHERE active = true` filter
+    for a reason unrelated to the policy — indistinguishable from a
+    false positive.) Along the way, found and documented (not
+    silently worked around) an unrelated pre-existing gap: gRPC's
+    `person_from_proto` never wires the proto `active` field into the
+    created record at all — every gRPC create lands `active = true`
+    regardless of what the client sent, unlike REST's `create_person`,
+    which deserializes the full `Person` JSON. Out of this task's
+    scope to fix; the test's fixtures set state via ground-truth SQL
+    instead of relying on it. Verified against a real Postgres 18 via
+    `scripts/ci-check.sh test-db person/person-service-with-loco`: the
+    full DB-gated suite passes, 0 failed; `cargo test --lib` unaffected
+    (355 passed, same count); `cargo build`/`clippy --all-targets --
+    -D warnings` clean.
