@@ -9,6 +9,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — `score_breakdown` was never actually surfaced on review-queue rows (ORG-T1)
+
+The `deduplicate` scan hard-coded `score_breakdown: None` when storing
+a new review-queue row, and the wire `ReviewQueueItem` had no field to
+carry one back even if it had been stored — so `GET /review-queue`
+could never show why a pair matched, forcing the front-end to call
+`POST /organizations/match` a second time against the loaded pair for
+a live breakdown. `deduplicate` now stores the matcher's real
+`MatchBreakdown` (`serde_json::to_value(&r.breakdown)`, the same
+pattern person-service uses); `ReviewQueueItem` carries it, and
+`review_row_to_item` reads it back. A re-fetch of the queue now
+answers "why did this match" with no second request.
+
 ### Added — URL well-formedness + ISO 3166 country-code validation (ORG-T4)
 
 `src/validation.rs` previously only length-bounded `url`,

@@ -526,6 +526,10 @@ struct ReviewQueueItem {
     match_quality: String,
     /// How the pair was detected (`batch_deduplication` here).
     detection_method: String,
+    /// Per-component score breakdown, as stored at detection time
+    /// (ORG-T1) — the matcher's own `MatchBreakdown`, JSON-encoded.
+    /// `None` for a row queued before this field was populated.
+    score_breakdown: Option<serde_json::Value>,
     /// Current review state.
     status: ReviewStatus,
     /// How the pair was first surfaced (`operator` / `import` /
@@ -548,6 +552,7 @@ fn review_row_to_item(row: &crate::models::review_queue::ReviewQueueRow) -> Revi
         match_score: row.match_score,
         match_quality: row.match_quality.clone(),
         detection_method: row.detection_method.clone(),
+        score_breakdown: row.score_breakdown.clone(),
         status: parse_review_status(&row.status),
         provenance: row.provenance.clone(),
         reviewed_by: row.reviewed_by.clone(),
@@ -623,7 +628,11 @@ async fn deduplicate(
                     match_score: r.score,
                     match_quality: format!("{:?}", r.confidence).to_lowercase(),
                     detection_method: "batch_deduplication".to_string(),
-                    score_breakdown: None,
+                    // ORG-T1: the column existed and was read back as
+                    // `None` unconditionally; store the real breakdown
+                    // so a re-fetch of the queue doesn't need a second
+                    // `/match` call to explain the score.
+                    score_breakdown: serde_json::to_value(&r.breakdown).ok(),
                     status: review_status_token(ReviewStatus::Pending).to_string(),
                     provenance: "operator".to_string(),
                 });

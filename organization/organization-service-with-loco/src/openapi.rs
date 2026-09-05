@@ -256,6 +256,7 @@ fn components() -> Value {
                     "match_score": { "type": "number", "format": "double" },
                     "match_quality": { "type": "string" },
                     "detection_method": { "type": "string" },
+                    "score_breakdown": { "type": "object", "nullable": true },
                     "status": { "type": "string", "enum": ["pending", "confirmed", "rejected", "automerged"] },
                     "reviewed_by": { "type": "string", "nullable": true },
                     "created_at": { "type": "string", "format": "date-time" },
