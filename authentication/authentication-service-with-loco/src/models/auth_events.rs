@@ -24,6 +24,15 @@ impl ActiveModelBehavior for super::_entities::auth_events::ActiveModel {}
 /// authorization changes.
 pub const ATTRIBUTES_ASSIGNED: &str = "attributes_assigned";
 
+/// The `event` value for an ABAC attribute-**read** audit row (T-15),
+/// written when an admin views another user's `users.attributes` via
+/// `GET /api/auth/admin/users/{pid}/attributes`. Recording *mutations
+/// only* does not satisfy HIPAA §164.312(b) — reads are activity — and
+/// an admin viewing a different user's privilege attributes is exactly
+/// the read that provision exists for
+/// (`agents/share/compliance-for-healthcare.md` §2.1).
+pub const ATTRIBUTES_VIEWED: &str = "attributes_viewed";
+
 impl Model {
     /// Record one authentication event. **Best-effort**: callers use
     /// [`record`](Self::record) for its side effect and must never fail
@@ -120,6 +129,29 @@ impl Model {
         Self::record_best_effort(
             db,
             ATTRIBUTES_ASSIGNED,
+            target_email,
+            Some(target_pid),
+            Some(&detail),
+        )
+        .await;
+    }
+
+    /// Record an ABAC **attribute-read** audit row (best-effort, T-15).
+    /// The row's subject is the **target** user, mirroring
+    /// [`Self::record_attribute_assignment_best_effort`]'s shape; the
+    /// `detail` carries only the admin's identity (`actor=pid:<uuid>`) —
+    /// attribute **values** stay out of the audit detail here too, same
+    /// reasoning as the assignment row.
+    pub async fn record_attribute_view_best_effort(
+        db: &DatabaseConnection,
+        target_email: Option<&str>,
+        target_pid: Uuid,
+        actor: &str,
+    ) {
+        let detail = format!("actor={actor}");
+        Self::record_best_effort(
+            db,
+            ATTRIBUTES_VIEWED,
             target_email,
             Some(target_pid),
             Some(&detail),

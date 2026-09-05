@@ -10,6 +10,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — audit admin reads of another user's ABAC attributes (T-15)
+
+`GET /api/auth/admin/users/{pid}/attributes` was admin-gated but wrote
+no `auth_events` row — only the `PUT` (replace) path did. Per HIPAA
+§164.312(b), recording mutations only does not satisfy the audit-
+controls requirement; reads are activity too, and an admin viewing a
+different user's privilege attributes is exactly the read that
+provision exists for. Added the `attributes_viewed` event kind and a
+`record_attribute_view_best_effort` helper mirroring the existing
+`attributes_assigned` shape (target subject, no value payload, actor
+in `detail`); `show_attributes` now writes one on every call.
+
 ### Added — header-based API versioning, `Accepts-version` (T-13)
 
 New `src/version.rs` (ported from `case`/`care-pathway`'s reference

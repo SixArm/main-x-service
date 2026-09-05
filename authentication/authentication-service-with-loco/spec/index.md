@@ -941,7 +941,7 @@ only by that subject.
       `auth_events.source_ip` are populated on real requests; GDPR
       export includes the field.
 
-- [ ] **T-15 (S) Audit admin reads of another user's ABAC attributes.**
+- [x] **T-15 (S) Audit admin reads of another user's ABAC attributes.** *(resolved 2026-09-05.)*
       `src/controllers/admin.rs::show_attributes`
       (`GET /api/auth/admin/users/{pid}/attributes`) is admin-gated but
       writes **no** `auth_events` row — only the `PUT` (replace) path
@@ -969,6 +969,23 @@ only by that subject.
       **Acceptance:** DB-gated suite green; a `GET` on the admin
       attributes endpoint leaves an `auth_events` row an operator can
       find via the existing per-subject/system-wide audit endpoints.
+      - **Resolved.** Added the `attributes_viewed` `auth_events` kind
+        (`src/models/auth_events.rs`) and a
+        `record_attribute_view_best_effort` helper mirroring
+        `record_attribute_assignment_best_effort`'s shape — target
+        subject, no value payload, actor rides in `detail` as
+        `pid:<uuid>`. `show_attributes` now calls it after the lookup
+        and before responding. Extended the existing
+        `admin_can_replace_and_show_user_attributes` DB-gated test
+        (rather than adding a parallel fixture) to assert exactly one
+        `attributes_viewed` row exists after the `GET`, distinct from
+        the `attributes_assigned` row the `PUT` above it already
+        asserts. Verified against a real Postgres 18 via
+        `scripts/ci-check.sh test-db
+        authentication/authentication-service-with-loco`: full
+        DB-gated suite passes (41 tests), 0 failed; `cargo test --lib`:
+        90 passed (unchanged), 0 failed; `cargo build`/`clippy
+        --all-targets -- -D warnings` clean.
 
 - [ ] **T-16 (M) Hash-chain `auth_events` rows (tamper-evident deletion
       detection).** `src/compliance/audit_integrity.rs`'s own doc

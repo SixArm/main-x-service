@@ -61,7 +61,10 @@ async fn sign_in_with_attributes(
 }
 
 /// An admin can replace a user's attributes; the change persists, an
-/// audit row is written, and GET reflects it.
+/// audit row is written, and GET reflects it — and GET itself writes
+/// its own `attributes_viewed` audit row (T-15): reading another user's
+/// privilege attributes is activity HIPAA §164.312(b) requires audited,
+/// not just the mutation.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -144,6 +147,22 @@ async fn admin_can_replace_and_show_user_attributes() {
             .add_header(k, v)
             .await;
         assert_eq!(get.status_code(), 200);
+
+        // T-15: the GET itself is audited — exactly one new
+        // `attributes_viewed` row, distinct from the PUT's
+        // `attributes_assigned` row asserted above.
+        let events_after_get =
+            auth_events::Model::for_subject(&ctx.db, target_pid, "target@loco.com")
+                .await
+                .unwrap();
+        let viewed_count = events_after_get
+            .iter()
+            .filter(|e| e.event == auth_events::ATTRIBUTES_VIEWED)
+            .count();
+        assert_eq!(
+            viewed_count, 1,
+            "exactly one attributes_viewed row should exist after the GET"
+        );
     })
     .await;
 }

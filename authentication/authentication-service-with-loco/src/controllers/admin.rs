@@ -124,7 +124,10 @@ fn validate_map(map: &BTreeMap<String, Vec<String>>) -> Result<()> {
 
 /// `GET /api/auth/admin/users/{pid}/attributes` — the user's current
 /// ABAC attribute map. `403` unless the caller is an admin; `404` for an
-/// unknown or GDPR-erased user.
+/// unknown or GDPR-erased user. Writes an `attributes_viewed` audit row
+/// (actor = the admin's pid) — an admin reading another user's
+/// privilege attributes is activity HIPAA §164.312(b) requires audited,
+/// not just a mutation (T-15).
 #[debug_handler]
 async fn show_attributes(
     auth: AuthUser,
@@ -136,6 +139,13 @@ async fn show_attributes(
     let user = users::Model::find_active_by_pid(&ctx.db, &pid)
         .await
         .map_err(|_| Error::NotFound)?;
+    AuthEvent::record_attribute_view_best_effort(
+        &ctx.db,
+        Some(&user.email),
+        user.pid,
+        &format!("pid:{}", claims.sub),
+    )
+    .await;
     format::json(AttributesResponse::new(&user))
 }
 
