@@ -391,29 +391,48 @@ clearly described manual check confirms the acceptance criterion.
   and matches the matcher's own component scores; `cargo test --lib` +
   clippy pedantic clean; three-part change (spec §9/§13 + code + test).
 
-- [ ] **T-13 (M) — Mask sensitive fields on `check-duplicates` / create's
-  `409` candidates.** `GET /api/things/search` already accepts
-  `mask_sensitive` and masks results before returning them, but
-  `check_duplicates` / `find_candidates` (`src/api/rest/handlers.rs`)
-  return `ScoredCandidate { thing: existing, .. }` — the full, unmasked
-  stored record — with no masking option at all, on both
-  `POST /api/things/check-duplicates` and the `409` body
-  `POST /api/things` returns on a duplicate hit. Per
+- [x] **T-13 (M) — Mask sensitive fields on `check-duplicates` / create's
+  `409` candidates.** *(resolved 2026-09-05.)* `GET /api/things/search`
+  already accepted `mask_sensitive` and masked results before returning
+  them, but `check_duplicates` / `find_candidates`
+  (`src/api/rest/handlers.rs`) returned `ScoredCandidate { thing:
+  existing, .. }` — the full, unmasked stored record — with no masking
+  option at all, on both `POST /api/things/check-duplicates` and the
+  `409` body `POST /api/things` returns on a duplicate hit. Per
   `agents/share/security.md` invariant 5 ("masking on every read
   path… a bulk or aggregate read must never reveal more than the
   equivalent single read"), a caller who cannot see a thing's full
-  record via `GET` can still recover it by POSTing a near-duplicate
+  record via `GET` could still recover it by POSTing a near-duplicate
   probe. *(verified: `grep -n mask_sensitive src/api/rest/handlers.rs`
   shows it only on the `SearchQuery` struct and the `search_things`
   handler; `find_candidates` (line 349, returning `ScoredCandidate` —
   struct at line 339) and `check_duplicates` (line 409) have no masking
   parameter or call.)*
-  **Acceptance:** `check-duplicates` (and the `409` path, sharing
-  `find_candidates`) accept an optional `mask_sensitive` flag with the
-  same default and masking function as `search`; a DB-free or DB-gated
-  test asserts a masked duplicate-check response redacts the same
-  fields `mask_thing` redacts on `/masked`; clippy pedantic clean;
-  three-part change (spec §9 + code + test).
+  **Resolution:** `find_candidates` gained a `mask_sensitive: bool`
+  parameter; when `true` each candidate's `thing` is redacted via the
+  existing `mask_thing` (same function and field set `/masked`/`search`
+  already use) before scoring is attached. `check_duplicates` gained a
+  `CheckDuplicatesQuery { mask_sensitive: Option<bool> }` (mirroring
+  `SearchQuery`, default `false`), and `create_thing` gained a sibling
+  `CreateThingQuery` so the `409` duplicate body honours the same flag
+  the caller's own create request carries — the caller posting the
+  create is the one who would otherwise recover the hidden record from
+  the `409` body. `match_thing` deliberately stays unmasked (documented
+  in code): a `/match` caller supplies the probe explicitly to compare
+  it, so there is no "recover a hidden record via a near-duplicate
+  probe" path to close there. New `tests/masking_check_duplicates.rs`
+  (`#[ignore]`d, DB-gated) seeds a thing with an owner and a
+  deterministic-short-circuit ISBN, then asserts: `check-duplicates`
+  with no flag returns the unmasked owner (matching search's own
+  default); `?mask_sensitive=true` returns `"[owner withheld]"` and a
+  `****`-masked identifier value; and
+  `POST /api/things?mask_sensitive=true` against an existing duplicate
+  returns `409` with the same masked owner in
+  `error.details[0].thing.owner`. Verified: `cargo build --lib`,
+  `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and
+  `scripts/ci-check.sh test-db thing/thing-service-with-loco` all clean
+  (214 lib tests + the 2 new masking tests, plus the rest of the
+  DB-gated suite, all passing); no `Cargo.lock` churn.
 
 - [x] **T-14 (M, security) — Verify GTIN/ISBN/ISSN check digits, not just
   length.** *(resolved 2026-09-04.)* `src/validation/mod.rs::validate_gtin` explicitly documents

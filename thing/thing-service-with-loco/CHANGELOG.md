@@ -8,6 +8,23 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Security — mask sensitive fields on `check-duplicates` / create's `409` candidates (T-13)
+
+`GET /api/things/search` already honoured `?mask_sensitive=`, but
+`check_duplicates`/`find_candidates` returned the full, unmasked stored
+record on both `POST /api/things/check-duplicates` and the `409` body
+`POST /api/things` returns on a duplicate hit — a caller who cannot see
+a thing's full record via `GET` could still recover it by posting a
+near-duplicate probe (`agents/share/security.md` invariant 5).
+`find_candidates` now takes a `mask_sensitive` flag and redacts each
+candidate via the existing `mask_thing` when set; `check_duplicates`
+and `create_thing` each accept a matching `?mask_sensitive=` query
+parameter (default `false`, same as `search`), so create's own `409`
+body honours the flag the caller's create request carries.
+`match_thing` is deliberately left unmasked — a `/match` caller
+supplies the probe explicitly to compare it, so there is no hidden
+record to protect there. See spec §13 T-13.
+
 ### Security — GTIN/ISBN/ISSN check-digit verification (T-14)
 
 `validate_gtin`/`validate_isbn`/`validate_issn` previously checked only
