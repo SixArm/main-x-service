@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — `require_ref` test coverage for Organization (CMS-T30)
+
+`src/validation.rs`'s `ref_rules` unit test only ever exercised
+`EntityType::Worker`, even though `controllers/localization.rs`,
+`entries.rs`, `workflow.rs`, and `sites.rs` all call the shared
+`require_ref` helper with `EntityType::Organization` too. New
+`ref_rules_wrong_type_organization` test pins both the wrong-type
+rejection and the matching-type acceptance. See `../spec/tasks.md`
+CMS-T30.
 
 ### Added — declared MSRV (Rust 1.95)
 
