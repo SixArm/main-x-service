@@ -8,7 +8,7 @@
 | Type check    | `cargo check`                                       | required green                                                     |
 | Lint          | `cargo clippy -- -D warnings`                       | required green                                                     |
 | Format        | `cargo fmt --check`                                 | required green                                                     |
-| Unit          | `cargo test --lib` (in-crate `#[cfg(test)]`)        | **21 in repo (nhs + geofence + auth session)**                    |
+| Unit          | `cargo test --lib` (in-crate `#[cfg(test)]`)        | **23 in repo (nhs + geofence + auth session + auth crypto)**      |
 | Request tests | `cargo test --test requests` (Loco testing harness) | **50 in repo** (use `StubClient`s — no real Patient/Worker needed) |
 
 ## Unit tests in repo
@@ -48,6 +48,15 @@ request-level `auth.rs` suite below:
 - `revoke_from_headers_drops_the_session`
 - `session_id_is_opaque_not_a_token` (the session id carries no decodable
   claims — unlike the magic-link token itself)
+
+### `src/auth/crypto.rs` — HS256 magic-link token signing (2 tests)
+
+The HMAC-SHA256 sign/verify primitive behind the magic-link token
+(distinct from the session store above, which never touches a
+cryptographic signature):
+
+- `hs256_signs_and_verifies_round_trip`
+- `hs256_rejects_a_wrong_secret`
 
 ## Request tests in repo (`tests/requests/*.rs`)
 

@@ -10,6 +10,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — stale unit-test count in `testing.md`/`README.md` (LT-19)
+
+`testing.md`'s summary table and `README.md`'s `cargo test` comment
+both said `21` unit tests, but `src/auth/crypto.rs`'s 2 HS256
+sign/verify tests were never counted — the actual total is `23`.
+Corrected both counts and added the missing `src/auth/crypto.rs`
+section to `testing.md`'s inventory. Doc-only; `cargo test --lib`
+confirms 23 passing. See spec `tasks.md` LT-19.
+
 ### Fixed — `openapi.yaml`'s misdeclared `bearerFormat: JWT` (LT-18)
 
 The `bearerAuth` security scheme declared `bearerFormat: JWT`, but
