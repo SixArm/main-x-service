@@ -40,3 +40,10 @@ path = "fuzz_targets/scorer.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "identifiers"
+path = "fuzz_targets/identifiers.rs"
+test = false
+doc = false
+bench = false

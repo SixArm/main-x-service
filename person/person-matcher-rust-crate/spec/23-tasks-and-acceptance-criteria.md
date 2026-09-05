@@ -29,11 +29,25 @@ Full list in [`agents/delivered-tasks.md`](../agents/delivered-tasks.md); covers
 - [ ] Add `tags_weight` (default `0.05`, supporting-signal cluster) and include the field in the probabilistic weighted average (§12.3); update `agents/matching-algorithm.md` detail tables + `CHANGELOG.md`.
 - **Acceptance:** two records sharing tags score higher with a documented `tags_score`; empty tags do not participate; default weights renormalise correctly; `cargo test` + `cargo clippy --all-targets -- -D warnings` clean.
 
-**T-35 — Fuzz target for national-identifier parsing (§12.1 / §14 / `src/identifiers.rs`).**
-- [ ] Add `fuzz/fuzz_targets/identifiers.rs` exercising every one of the 42 national-identifier parsers + the 9 passport-format validators in `src/identifiers.rs` with raw fuzzer bytes (never-panic + no cross-scheme false-equality).
-- [ ] Register the new `[[bin]]` in `fuzz/Cargo.toml` alongside `match_persons` / `normalizer` / `scorer`.
-- [ ] Document the target in `fuzz/README.md`.
+**T-35 — Fuzz target for national-identifier parsing (§12.1 / §14 / `src/identifiers.rs`).** *(resolved 2026-09-05.)*
+- [x] Add `fuzz/fuzz_targets/identifiers.rs` exercising every one of the 42 national-identifier parsers + the 9 passport-format validators in `src/identifiers.rs` with raw fuzzer bytes (never-panic + no cross-scheme false-equality).
+- [x] Register the new `[[bin]]` in `fuzz/Cargo.toml` alongside `match_persons` / `normalizer` / `scorer`.
+- [x] Document the target in `fuzz/README.md`.
 - **Acceptance:** `cargo +nightly fuzz run identifiers` runs clean for the CI smoke duration (`FUZZ_SECONDS`, default 30); no panic/overflow on any parser; existing `identifiers.rs` unit tests unaffected (verified: `fuzz/fuzz_targets/` today holds only `scorer.rs` / `normalizer.rs` / `match_persons.rs` — no target touches `src/identifiers.rs`, the module carrying all 42 scheme parsers + 9 passport validators and the most string-parsing-heavy attack surface in the crate).
+  - **Resolved.** The new target calls all 42 personal-identifier parsers
+    (`parse_united_kingdom_national_health_service_number` through
+    `parse_za_id`) plus the 9 passport validators
+    (`parse_cy_passport` through `parse_sk_passport`) with the same
+    arbitrary `&str`, asserting nothing beyond "does not panic" — each
+    parser is a pure `&str -> Option<String>` with no comparison surface
+    of its own, so cross-scheme false-equality is a matcher-level property
+    (already pinned by the `match_persons` fuzz target and the proptest
+    suite), not one an individual parser can exhibit in isolation. Smoke
+    run clean: `cargo +nightly fuzz run identifiers -- -max_total_time=30`
+    → ~907k executions, no crash. `cargo test --lib` (417 passed),
+    `cargo clippy --all-targets -- -D warnings`, and `cargo fmt --check`
+    all clean and unaffected (the `fuzz/` crate is standalone, per the
+    family convention).
 
 **T-36 — Input-size bounding for matcher inputs (§17 / §20).**
 - [ ] Add `MAX_NAME_LEN` / `MAX_ARRAY_LEN` / `MAX_ITEM_LEN`-style constants (mirroring the family's `security.md` invariant 3 values) and apply them at the top of `MatchingEngine::match_persons` / `Scorer` entry points, returning a `MatchingError` variant rather than performing unbounded work.
