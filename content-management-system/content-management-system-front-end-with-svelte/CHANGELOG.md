@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — root sign-in gate (CMS-T31)
+
+No `+layout.server.ts` existed anywhere under `src/routes`, so a
+visitor with no session reached every authoring/asset/workflow view
+and only discovered they were signed out once an API call silently
+failed through the BFF proxy. Ported the identical WPM-T38/CRM-T26 fix
+(same underlying architecture): new root `src/routes/+layout.server.ts`
+redirects to `/signin` (303) when `locals.sessionId` is `null`,
+excluding `/signin`/`/verify`. `/preview/[pid]/[locale]` needed no
+exclusion — it's a `+server.ts` endpoint, not a page, so this layout's
+`load` never runs for it. `dashboard.spec.ts` and `entries.spec.ts`
+each gained a small `signIn()` + `test.beforeEach`; a new
+`tests/e2e/sign-in-gate.spec.ts` (no session, the opposite of the other
+two) proves the redirect. See `../spec/tasks.md` CMS-T31.
+
 ### Added
 
 - 2026-07-31 — CMS-T26 views: the authoring UI. Entry list with

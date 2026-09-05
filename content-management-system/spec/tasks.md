@@ -802,7 +802,7 @@ code + tests in one PR.
     matching-type acceptance, alongside the pre-existing `Worker`-only
     `ref_rules` test.
 
-- [ ] CMS-T31 **Front-end sign-in gate.** No `+layout.server.ts`
+- [x] CMS-T31 **Front-end sign-in gate.** No `+layout.server.ts`
   exists under `src/routes` (verified: `find src/routes -iname
   "+layout.server.ts"` returns nothing); every authoring/asset/
   workflow view is reachable signed-out and only fails silently at
@@ -810,3 +810,25 @@ code + tests in one PR.
   redirects a session-less visitor to sign-in (excluding sign-in/
   verify and any deliberately public `/delivery`/`/preview`
   surface); a Playwright spec pins it; svelte-check 0. (CMS-D17)
+  **Resolution (2026-09-05):** ported WPM-T38/CRM-T26's identical fix.
+  New root `src/routes/+layout.server.ts` redirects to `/signin` (303)
+  when `locals.sessionId` is `null`, excluding `/signin`/`/verify`.
+  `/preview/[pid]/[locale]` needed no explicit exclusion: it is a
+  `+server.ts` endpoint, not a page, so a root layout's `load` never
+  runs for a direct request to it — this task does not touch preview's
+  own auth posture, deliberately. Root gate chosen over a narrower
+  per-mutation-page guard for the same reason as WPM/CRM: this app's
+  pages mix read content with embedded actions (workflow transitions,
+  schedule actions, …) rather than separating reads and writes onto
+  dedicated routes. Unlike WPM/CRM (one `smoke.spec.ts`), this project
+  has two existing e2e files (`dashboard.spec.ts`, `entries.spec.ts`)
+  with no shared `beforeEach`; each gained its own small `signIn()` +
+  `test.beforeEach` (family-convention per-file duplication, same
+  posture as the `chooseLocale` helper duplicated across WPM/CRM),
+  and a new `tests/e2e/sign-in-gate.spec.ts` (its own file, since it
+  runs with no session, the opposite of the other two) proves the
+  redirect from both the dashboard and a named page, plus that
+  `/signin` itself stays reachable. Verified: `npm run check`
+  (svelte-check: 369 files, 0 errors, 0 warnings), `npx playwright
+  test` (10 passed, run twice to confirm no flakiness), `npx vitest
+  run` (28 passed, unchanged).
