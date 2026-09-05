@@ -735,6 +735,42 @@ mod tests {
         assert_eq!(r.confidence, Confidence::High);
     }
 
+    /// T-14: pins spec §16's documented "we do NOT strip trailing
+    /// slashes" decision — a trailing-slash difference is a genuine
+    /// distinction the fold preserves, so it must NOT short-circuit
+    /// (R-2 misses this pair). Paired with
+    /// `same_as_case_only_difference_still_short_circuits` below, which
+    /// pins the fold *does* still ignore case on the same path shape.
+    #[test]
+    fn same_as_trailing_slash_difference_does_not_short_circuit() {
+        let engine = MatchingEngine::default_config();
+        let mut a = Course::new("Alpha");
+        let mut b = Course::new("Omega");
+        a.same_as = vec!["https://x.org/c/".into()];
+        b.same_as = vec!["https://x.org/c".into()];
+        let r = engine.match_courses(&a, &b);
+        assert!(
+            !r.breakdown.deterministic_match,
+            "a trailing-slash difference must not short-circuit"
+        );
+    }
+
+    /// The case-only counterpart of the test above: a trailing slash
+    /// present on *both* sides still folds away a case difference, so
+    /// the pair matches — confirming the trailing-slash test above
+    /// isn't failing to short-circuit for some unrelated reason.
+    #[test]
+    fn same_as_case_only_difference_still_short_circuits() {
+        let engine = MatchingEngine::default_config();
+        let mut a = Course::new("Alpha");
+        let mut b = Course::new("Omega");
+        a.same_as = vec!["https://x.org/c/".into()];
+        b.same_as = vec!["https://X.ORG/c/".into()];
+        let r = engine.match_courses(&a, &b);
+        assert!((r.score - 1.0).abs() < 1e-9);
+        assert!(r.breakdown.deterministic_match);
+    }
+
     #[test]
     fn non_deterministic_scheme_does_not_short_circuit() {
         // A shared CourseCode *identifier* is provider-scoped and must
