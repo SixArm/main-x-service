@@ -10,6 +10,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — e2e coverage of `/admin/attributes` (AFE-3)
+
+The admin operator route (view/replace a user's ABAC attributes) had no
+end-to-end coverage at all, unlike every other route. `tests/e2e/
+mock-auth-server.mjs` gained a second `access=admin` login identity
+(distinct pid/email from the ordinary one), session-aware `GET
+/api/auth/me`, and a `GET`/`PUT /api/auth/admin/users/{pid}/attributes`
+handler (401 no session, 403 non-admin, 200 otherwise, backed by an
+in-memory attribute map so a `PUT` really changes a later `GET`). New
+`tests/e2e/admin-attributes.spec.ts`: view an existing user's
+attributes, save a valid change (round-trip verified, not just the
+banner), the 403 path for a signed-in non-admin, and the 401 path for
+an unauthenticated visitor. `pnpm run test:e2e` — 10/10 (6 pre-existing
++ 4 new). See spec/index.md AFE-3.
+
 ### Fixed
 
 - **E2E suite repaired (PRO-P24).** `tests/e2e/smoke.spec.ts`'s
