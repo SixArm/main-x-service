@@ -80,7 +80,14 @@ const AUTHOR_UUID: &str = "55555555-5555-4555-8555-555555555555";
 /// Reads are allowed to any authenticated caller, but a caller with no
 /// attributes gets a **masked** read of unpublished content — the
 /// obligation this policy exists to exercise.
-fn test_policy() -> String {
+///
+/// `owner_gated_site_key`/`gated_content_type_key` are baked in here
+/// (rather than matched structurally) because the policy is read once
+/// at boot (env var, set before the app starts) while the fixture rows
+/// are created afterwards — the random per-run key has to be decided
+/// before the policy string is built, then reused when the fixture is
+/// POSTed (CMS-T28).
+fn test_policy(owner_gated_site_key: &str, gated_content_type_key: &str) -> String {
     json!({ "rules": [
         // delivery: a machine peer.
         { "effect": "allow",
@@ -123,6 +130,24 @@ fn test_policy() -> String {
         // attribute reads unpublished content **masked**.
         { "effect": "allow", "actions": ["read"],
           "when": { "access": ["write", "admin"] } },
+        // CMS-T28: a site's own owner (`$sub` matching `resource.owner`)
+        // reads it regardless of what follows; a specific,
+        // deliberately-named site (`owner-gated`) is otherwise denied —
+        // proving `get_site`/`update_site`/`delete_site` actually
+        // consult `site_resource_attrs` now, not just the coarse
+        // blanket guard (which has no `resource.*` to gate on).
+        { "effect": "allow", "actions": ["read"], "when": { "resource.owner": ["$sub"] } },
+        { "effect": "deny", "actions": ["read"], "when": { "resource.site": [owner_gated_site_key] } },
+        // CMS-T28's content-type analogue: `content_type_resource_attrs`
+        // has no owner concept (only `content_type`/`routable`), so the
+        // closest available "authorized vs unauthorized" pin keys on a
+        // specific, deliberately-named content type instead: the
+        // `author` persona may read it, everyone else (the catch-all
+        // below) may not.
+        { "effect": "allow", "actions": ["read"],
+          "when": { "role": ["author"], "resource.content_type": [gated_content_type_key] } },
+        { "effect": "deny", "actions": ["read"],
+          "when": { "resource.content_type": [gated_content_type_key] } },
         { "effect": "allow", "actions": ["read"], "when": {}, "obligations": ["mask"] }
     ] })
     .to_string()
@@ -138,11 +163,19 @@ fn test_policy() -> String {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test enforcement -- --ignored`"]
 async fn enforcement_gates_the_real_stack() {
     let (keys, kid) = keys_and_kid();
+    // Decided before the policy is built (and the app boots) precisely
+    // because the policy has to name them (CMS-T28) — see
+    // `test_policy`'s own doc comment.
+    let owner_gated_site_key = format!("owner-gated-{}", uuid::Uuid::new_v4().simple());
+    let gated_content_type_key = format!("gated-type-{}", uuid::Uuid::new_v4().simple());
     // `set_var` is `unsafe` in edition 2024; single-threaded setup step.
     unsafe {
         std::env::set_var("CMS_REQUIRE_AUTH", "1");
         std::env::set_var("CMS_PASETO_KEYS", keys.to_string());
-        std::env::set_var("CMS_ABAC_POLICY", test_policy());
+        std::env::set_var(
+            "CMS_ABAC_POLICY",
+            test_policy(&owner_gated_site_key, &gated_content_type_key),
+        );
     }
     // The five personas of `spec/auth.md`, as tokens.
     let reader = sign_as(&kid, "reader-user", &[]);
@@ -543,6 +576,96 @@ async fn enforcement_gates_the_real_stack() {
                 .await
                 .status_code(),
             403
+        );
+
+        // ---- CMS-T28: record-level ABAC on sites and content types ---
+        //
+        // Before this task, `get_site`/`update_site`/`delete_site` and
+        // `show`/`update`/`remove` (content types) never called
+        // `authorize_record` at all — a `resource.*`-keyed rule (like
+        // the two just added to this policy) would have had **no
+        // effect** on them, silently. These pins prove the record-level
+        // pass is real.
+        let site_owner = uuid::Uuid::new_v4();
+        let owner = sign_as(&kid, &site_owner.to_string(), &[]);
+        let owner_gated_site = request
+            .post("/api/sites")
+            .add_header("authorization", bearer(&editor))
+            .json(&json!({
+                "key": owner_gated_site_key, "name": "Owner-gated site",
+                "owner_ref": format!("organization:{site_owner}"),
+                "default_locale": "en", "locales": ["en"],
+            }))
+            .await;
+        assert_eq!(
+            owner_gated_site.status_code(),
+            200,
+            "{}",
+            owner_gated_site.text()
+        );
+        let owner_gated_site_pid = owner_gated_site.json::<Value>()["pid"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        // The site's own owner reads it (the `resource.owner: ["$sub"]`
+        // rule matches before the `owner-gated` deny is ever reached).
+        assert_eq!(
+            request
+                .get(&format!("/api/sites/{owner_gated_site_pid}"))
+                .add_header("authorization", bearer(&owner))
+                .await
+                .status_code(),
+            200,
+            "the site's own owner must be able to read it"
+        );
+        // A non-owner reader hits the deny rule keyed on this specific
+        // site.
+        assert_eq!(
+            request
+                .get(&format!("/api/sites/{owner_gated_site_pid}"))
+                .add_header("authorization", bearer(&reader))
+                .await
+                .status_code(),
+            403,
+            "a non-owner must not read the owner-gated site"
+        );
+
+        // The content-type analogue: `content_type_resource_attrs` has
+        // no owner concept, so the pin is keyed on a specific content
+        // type instead — the `author` persona may read it, a plain
+        // reader may not.
+        let gated_type = request
+            .post(&format!("/api/sites/{site_pid}/content-types"))
+            .add_header("authorization", bearer(&editor))
+            .json(&json!({
+                "key": gated_content_type_key, "name": "Gated type",
+                "fields": [{ "key": "summary", "label": "Summary", "kind": "text" }],
+            }))
+            .await;
+        assert_eq!(gated_type.status_code(), 200, "{}", gated_type.text());
+        let gated_type_pid = gated_type.json::<Value>()["pid"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        assert_eq!(
+            request
+                .get(&format!("/api/content-types/{gated_type_pid}"))
+                .add_header("authorization", bearer(&author))
+                .await
+                .status_code(),
+            200,
+            "the author persona's rule names this content type"
+        );
+        assert_eq!(
+            request
+                .get(&format!("/api/content-types/{gated_type_pid}"))
+                .add_header("authorization", bearer(&reader))
+                .await
+                .status_code(),
+            403,
+            "a plain reader must not read the gated content type"
         );
     })
     .await;

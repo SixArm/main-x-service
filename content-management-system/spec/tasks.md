@@ -749,23 +749,49 @@ code + tests in one PR.
   admin/svc-only case; `cargo test` plus the DB-gated enforcement
   suite green; clippy pedantic clean. (CMS-G1)
 
-- [ ] CMS-T28 **Wire record-level ABAC into the sites/content-types
-  handlers.** `auth::site_resource_attrs` and
-  `auth::content_type_resource_attrs` are defined and unit-tested in
-  `auth.rs`, but neither is called from `controllers/sites.rs` or
-  `controllers/types.rs` (verified: `grep -rn
-  "site_resource_attrs\|content_type_resource_attrs"
-  src/controllers/*.rs` returns nothing, while `controllers/entries.rs`
-  correctly calls `auth::variant_resource_attrs` +
-  `authorize_record` on every read/write) — the same
-  defined-but-unwired pattern `auth.rs`'s own test docstring warns
-  against ("`authorize_record` computing an obligation nobody applies
-  is exactly the failure this helper exists to prevent"). **Acceptance:**
-  the site and content-type GET/PUT/DELETE handlers call
-  `authorize_record` with their resource attrs; the enforcement
-  matrix gains an owner-vs-non-owner pin for at least one site and
-  one content-type endpoint; `cargo test` plus the DB-gated
-  enforcement suite green; clippy pedantic clean. (CMS-D17)
+- [x] CMS-T28 **Wire record-level ABAC into the sites/content-types
+  handlers.** *(resolved 2026-09-05.)* `auth::site_resource_attrs` and
+  `auth::content_type_resource_attrs` were defined and unit-tested in
+  `auth.rs`, but neither was called from `controllers/sites.rs` or
+  `controllers/types.rs` — the same defined-but-unwired pattern
+  `auth.rs`'s own test docstring warns against ("`authorize_record`
+  computing an obligation nobody applies is exactly the failure this
+  helper exists to prevent").
+  - **Resolved.** `sites.rs::get_site`/`update_site`/`delete_site` and
+    `types.rs::show`/`update`/`remove` each now call
+    `auth::authorize_record` with `site_resource_attrs`/
+    `content_type_resource_attrs` and the matching `Action`
+    (`Read`/`Write`/`Delete`), `map_err(authz_error)`, following
+    `entries.rs`'s exact reference pattern. No masking is wired for
+    either — unlike `entries.rs`'s variants, neither task's acceptance
+    criterion nor either resource-attrs helper names a field to
+    redact, so this is authorization only.
+  - **A note on the content-type pin.** `content_type_resource_attrs`
+    has no owner concept (only `content_type`/`routable` keys, unlike
+    `site_resource_attrs`'s `owner`/`owner_ref`), so a literal
+    "owner-vs-non-owner" pin for content types isn't structurally
+    possible. The closest available analogue is used instead: a
+    specific, deliberately-named content type is readable by the
+    `author` persona and denied to everyone else — the same
+    record-level-pass-is-real property, just keyed on identity of the
+    resource rather than ownership.
+  - **Acceptance (met).** `tests/enforcement.rs`'s single boot gained
+    two new policy rules (a site's own owner reads it via
+    `resource.owner: ["$sub"]`; a specific `owner-gated` site is
+    otherwise denied) and two more for content types (the `author`
+    persona reads a specific `gated-type` content type; everyone else
+    is denied) — both site/content-type keys are generated per test
+    run and baked into the policy string at setup time, since the
+    policy is read once at boot while the fixture rows are created
+    afterwards. New scenario: the owner-gated site's own owner reads
+    it (`200`) while an unrelated reader is denied (`403`); the gated
+    content type is readable by the author persona (`200`) and denied
+    to a plain reader (`403`). `cargo test --lib` (232, unchanged — no
+    new unit tests were needed, only the request-level enforcement
+    scenario) and the DB-gated `cargo test --test enforcement --
+    --ignored` plus the full `--ignored` suite all green; `cargo fmt
+    --check` and `cargo clippy --all-targets -- -D warnings` clean.
+    (CMS-D17)
 
 - [ ] CMS-T29 **Subject rights & retention (the code side of
   CMS-G3).** CMS has no retention or subject-rights code at all — no

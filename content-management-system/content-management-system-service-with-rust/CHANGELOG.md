@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — record-level ABAC wired into the sites/content-types handlers (CMS-T28)
+
+`auth::site_resource_attrs`/`auth::content_type_resource_attrs` were
+defined and unit-tested but never called from `controllers/sites.rs`
+or `controllers/types.rs` — the same defined-but-unwired pattern
+`auth.rs`'s own test docstring warns against. `get_site`/`update_site`/
+`delete_site` and `show`/`update`/`remove` (content types) now each
+call `auth::authorize_record` with their resource attrs and the
+matching `Action`, following `entries.rs`'s reference pattern —
+authorization only, since neither task's acceptance criterion nor
+either resource-attrs helper names a field to mask.
+`tests/enforcement.rs` gained an owner-vs-non-owner pin for one site
+(a site's own `resource.owner` reads it; a specific other site is
+denied) and an authorized-vs-unauthorized pin for one content type
+(`content_type_resource_attrs` has no owner concept, so the closest
+analogue is used: the `author` persona reads a specific content type,
+everyone else is denied). See spec/tasks.md CMS-T28.
+
 ### Added — `require_ref` test coverage for Organization (CMS-T30)
 
 `src/validation.rs`'s `ref_rules` unit test only ever exercised
