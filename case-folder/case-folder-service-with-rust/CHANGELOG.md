@@ -10,6 +10,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — `openapi.yaml`'s misdeclared `bearerFormat: JWT` (LT-18)
+
+The `bearerAuth` security scheme declared `bearerFormat: JWT`, but
+`src/auth/mod.rs::bearer_token`/`identity_from_headers` treat the
+bearer value as the same raw opaque session id `sessionCookie` looks
+up — never a decoded JWT. The only JWT this service issues is the
+short-lived magic-link token, accepted only at `POST /api/auth/verify`,
+never as a bearer credential elsewhere. Removed the field and added a
+comment recording why, rather than misdeclaring a credential shape
+this service doesn't use. Docs-only; no code change.
+
 ### Fixed — `openapi.yaml` logout security override (LT-11)
 
 Audited the existing `openapi.yaml` against every live route and
