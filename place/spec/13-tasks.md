@@ -5,7 +5,7 @@ belong in the owning crate's §13; tasks here either span subprojects
 or fix the integration contract. Tick the box when an automated test
 or clearly described manual check confirms the acceptance criterion.
 
-- [ ] **E-1 — Fix duplicate-check endpoint-name drift.**
+- [x] **E-1 — Fix duplicate-check endpoint-name drift.**
   - [x] Service `agents/restful.md` lists `POST /api/places/duplicates`;
     service spec §6.4 says `POST /api/places/check-duplicates`; the
     front-end's deferred T-17 says `check-duplicates`. Establish which
@@ -22,6 +22,20 @@ or clearly described manual check confirms the acceptance criterion.
     executing the front-end unit suite (`vitest run`: 8 passed) and by
     grep-consistency across client + test + service route.
     *(2026-06-13)*
+  - [x] **Service route test added (2026-09-05).**
+    `place-service-with-loco/tests/check_duplicates_route.rs`: boots the
+    real hand-rolled router (`api::rest::create_router`, same
+    construction `api_integration_test.rs` uses) and proves `POST
+    /api/places/check-duplicates` returns `200` with the
+    `DuplicateCheckResponse` envelope (`duplicates_found` + `candidates`),
+    and that the pre-fix doc-drifted `POST /api/places/duplicates` does
+    **not** serve it — it resolves as `405` (Axum's router matches that
+    path onto `/api/places/{id}`, which has no `POST` handler), not
+    `404`, so the test pins the actual observed status rather than an
+    assumed one. Verified: `cargo build`, `cargo clippy --all-targets --
+    -D warnings`, `cargo test --lib` (231 passed), `cargo test --
+    --ignored` against a real Postgres (all suites green, including the
+    new test), `cargo fmt --check`.
   - **Acceptance:** all three docs + code agree; a service route test
     covers the path.
 - [ ] **E-2 — Purge person-entity copy artifacts from the front-end.**
