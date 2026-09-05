@@ -928,6 +928,15 @@ async fn deduplicate_review_queue_round_trip() {
         let item = &report["review_items"][0];
         assert_eq!(item["status"], "pending");
         assert_eq!(item["detection_method"], "batch_deduplication");
+        // ORG-T1: the scan itself stores a real breakdown object (not
+        // the hard-coded `null` it used to) — these near-identical
+        // names trip the deterministic short-circuit, so the per-field
+        // scores are `None` (the matcher's own documented behaviour),
+        // but `deterministic_match` is always a real bool, never absent.
+        assert!(
+            item["score_breakdown"]["deterministic_match"].is_boolean(),
+            "score_breakdown should be a real MatchBreakdown object, got {item}"
+        );
         let id = item["id"].as_str().expect("item id").to_string();
 
         // Re-scan: same stored row, same id (normalized-pair upsert).
@@ -938,10 +947,15 @@ async fn deduplicate_review_queue_round_trip() {
             .json();
         assert_eq!(rescan["review_items"][0]["id"], id.as_str());
 
-        // The stored queue lists it.
+        // The stored queue lists it — and the breakdown round-trips
+        // through a fresh GET with no second `/match` call (ORG-T1).
         let listed: serde_json::Value = request.get("/api/organizations/review-queue").await.json();
         assert_eq!(listed["total"], 1);
         assert_eq!(listed["items"][0]["id"], id.as_str());
+        assert_eq!(
+            listed["items"][0]["score_breakdown"], item["score_breakdown"],
+            "GET /review-queue should return the same stored breakdown the scan did"
+        );
 
         // Decide pending → confirmed; the guard is first-writer-wins.
         let decided = request

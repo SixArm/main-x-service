@@ -972,7 +972,7 @@ organization is not a data subject.
   otlp_export --test otlp_middleware` 4/4 (real protobuf crossing a
   real in-process gRPC socket).
 
-- [ ] **ORG-T1 (S) Persist `score_breakdown` on stored review-queue rows.**
+- [x] **ORG-T1 (S) Persist `score_breakdown` on stored review-queue rows.** *(resolved 2026-09-05.)*
   `controllers/organizations.rs::review_row_to_item` hard-codes
   `score_breakdown: None` when mapping a stored `review_queue` row to
   the wire `ReviewQueueItem`, even though the column exists in
@@ -989,6 +989,37 @@ organization is not a data subject.
   /review-queue` returns the stored `score_breakdown` for a row that has
   one; a DB-gated test scans, re-fetches the queue, and asserts the
   breakdown round-trips without a second `/match` call.
+  - **Resolved — one correction to this task's own diagnosis, found by
+    re-verifying rather than trusting it.** The premise "IS written on
+    insert" did not hold: `ReviewQueueItem` (the wire struct
+    `review_row_to_item` maps onto) carried **no `score_breakdown` field
+    at all**, and the sole `NewReviewItem` construction site (in
+    `deduplicate`; `check_duplicates` never touches the review queue —
+    it is a synchronous, non-persisting match check) hard-coded
+    `score_breakdown: None` on **write**, not read. The underlying
+    finding — the column existing but never actually surfaced — was
+    real, just for a different reason. Fixed both ends: `deduplicate`
+    now stores `serde_json::to_value(&r.breakdown).ok()` (the matcher's
+    real `MatchBreakdown`, same pattern person-service already uses),
+    `ReviewQueueItem` gained the `score_breakdown` field (positioned
+    exactly where person's equivalent struct has it — right after
+    `detection_method`, before `status`), and `review_row_to_item` now
+    maps `row.score_breakdown.clone()` instead of dropping it. Also
+    added the field to the hand-written OpenAPI schema. DB-gated test:
+    extended `deduplicate_review_queue_round_trip` (not a new fixture)
+    to assert the scan itself stores a real `MatchBreakdown` object
+    (`deterministic_match` is always a bool — the two near-identical
+    fixture names trip the deterministic short-circuit, so the
+    per-field scores are `None` by the matcher's own documented
+    behaviour, which is why the assertion checks
+    `deterministic_match` rather than a specific component score) and
+    that a fresh `GET /review-queue` returns the identical stored
+    breakdown with no second `/match` call. Verified against a real
+    Postgres 18 via `scripts/ci-check.sh test-db
+    organization/organization-service-with-loco`: full DB-gated suite
+    passes (32 tests in the main request suite), 0 failed; `cargo test
+    --lib`: 203 passed (unchanged), 0 failed; `cargo build`/`clippy
+    --all-targets -- -D warnings` clean.
 
 - [ ] **ORG-T2 (M) Extend the ABAC `mask` obligation to `list`, `search`,
   `check-duplicates`, and `deduplicate`.** Only the single-record `GET
