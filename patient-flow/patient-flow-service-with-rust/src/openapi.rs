@@ -64,6 +64,7 @@ pub fn spec() -> Value {
             "/api/stays/{pid}/discharge-ready": { "post": { "tags": ["stays"], "summary": "Mark discharge-ready (requires EDD + CCD met; sets pathway p0–p3; starts the DTOC clock)", "responses": ok("Updated stay") } },
             "/api/stays/{pid}/discharge": { "post": { "tags": ["stays"], "summary": "Discharge (destination; vacates the bed; clears flags)", "responses": ok("Updated stay") } },
             "/api/stays/{pid}/red-green": { "post": { "tags": ["stays"], "summary": "Record today's Red2Green day (≤2 coded delay reasons; same-day editable)", "responses": ok("The day row") } },
+            "/api/stays/{pid}/time-analysis": { "get": { "tags": ["stays"], "summary": "Stitched-journey timeline: clock bounds, elapsed span, value-adding (green-day) time, coverage/confidence (audited sensitive read; no mask obligation — carries no identifiers)", "responses": ok("Timeline") } },
             "/api/stays/{pid}/infection-flags": { "post": { "tags": ["infection"], "summary": "Raise a precaution flag (contact|droplet|airborne|protective)", "responses": created } },
             "/api/stays/{pid}/infection-flags/{flag_pid}/clear": { "post": { "tags": ["infection"], "summary": "Clear a flag", "responses": ok("Cleared") } },
             "/api/bed-requests": {
@@ -102,6 +103,7 @@ mod tests {
             "/api/at-a-glance",
             "/api/locate/{person_ref}",
             "/api/bed-requests/{pid}/allocate",
+            "/api/stays/{pid}/time-analysis",
         ] {
             assert!(paths.contains_key(p), "missing {p}");
         }

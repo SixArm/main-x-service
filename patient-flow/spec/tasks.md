@@ -178,7 +178,8 @@ code + tests in one PR.
 
 ## Follow-on hardening (found 2026-09-04)
 
-- [ ] PF-T20 **OpenAPI doc missing `/api/stays/{pid}/time-analysis`.**
+- [x] PF-T20 **OpenAPI doc missing `/api/stays/{pid}/time-analysis`.**
+  *(resolved 2026-09-05.)*
   `src/openapi.rs` is hand-written and its own `spec_shape` test only
   spot-checks a fixed path list; PF-T19 (landed 2026-08-24) added the
   route to `app.rs` and `stays.rs` but never added a `paths` entry here
@@ -189,6 +190,9 @@ code + tests in one PR.
   documented there) and extend `openapi.rs`'s `spec_shape` test to assert
   `/api/stays/{pid}/time-analysis` is present, closing the exact gap that
   let this drift happen unnoticed.
+  - **Resolved.** Added the `paths` entry (audited sensitive-read
+    summary, no mask obligation noted per the handler's own doc
+    comment) and extended `spec_shape` to assert the path is present.
 - [ ] PF-T21 **No allowlist test on the time-analysis response shape.**
   `tests/requests/flows.rs::full_journey_request_to_deep_clean` asserts
   the documented fields (`lead_time_ms`, `value_time_ms`, `span_days`,
