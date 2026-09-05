@@ -605,6 +605,11 @@ pub struct ReviewQueueItem {
     pub match_quality: String,
     /// How the pair was detected (always `batch_deduplication` here).
     pub detection_method: String,
+    /// Per-component score breakdown explaining [`match_score`](Self::match_score)
+    /// (spec §13 T-12) — the matcher's own [`MatchBreakdown`](crate::matching::scoring::MatchBreakdown),
+    /// serialized verbatim. `None` only for a row scanned before this field
+    /// existed.
+    pub score_breakdown: Option<serde_json::Value>,
     /// Current review state.
     pub status: ReviewStatus,
     /// Reviewer identity recorded by the decision endpoint, if decided.
@@ -667,6 +672,7 @@ pub async fn deduplicate(
                     match_score: result.score,
                     match_quality: confidence_label(&result.confidence).to_string(),
                     detection_method: "batch_deduplication".to_string(),
+                    score_breakdown: serde_json::to_value(&result.breakdown).ok(),
                     status: ReviewStatus::Pending,
                     reviewed_by: None,
                     created_at: chrono::Utc::now(),
@@ -688,7 +694,7 @@ pub async fn deduplicate(
             match_score: r.match_score,
             match_quality: r.match_quality.clone(),
             detection_method: r.detection_method.clone(),
-            score_breakdown: None,
+            score_breakdown: r.score_breakdown.clone(),
             status: review_status_token(&r.status).to_string(),
         })
         .collect();
@@ -793,6 +799,7 @@ fn review_row_to_item(row: &crate::db::review_queue::ReviewQueueRow) -> ReviewQu
         match_score: row.match_score,
         match_quality: row.match_quality.clone(),
         detection_method: row.detection_method.clone(),
+        score_breakdown: row.score_breakdown.clone(),
         status: parse_review_status(&row.status),
         reviewed_by: row.reviewed_by.clone(),
         created_at: crate::db::convert::offset_to_ts(row.created_at),
@@ -1129,6 +1136,7 @@ mod review_report_tests {
             match_score: 0.91,
             match_quality: "probable".to_string(),
             detection_method: "batch_deduplication".to_string(),
+            score_breakdown: None,
             status: ReviewStatus::Pending,
             reviewed_by: None,
             created_at: chrono::Utc::now(),

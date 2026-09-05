@@ -40,6 +40,8 @@
 //! assert!(result.breakdown.deterministic_match);
 //! ```
 
+use serde::Serialize;
+
 use crate::models::thing::Thing;
 
 use super::description::description_similarity;
@@ -83,7 +85,11 @@ impl Default for MatchWeights {
 
 /// Per-component score breakdown returned alongside the overall score, so
 /// callers (and API responses) can explain *why* two records matched.
-#[derive(Debug, Clone)]
+///
+/// `Serialize` (spec §13 T-12) lets a caller persist this verbatim as the
+/// review queue's `score_breakdown` JSONB column
+/// (`db::review_queue::NewReviewItem::score_breakdown`).
+#[derive(Debug, Clone, Serialize)]
 pub struct MatchBreakdown {
     /// Name similarity (Jaro-Winkler), 0.0–1.0.
     pub name_score: f64,

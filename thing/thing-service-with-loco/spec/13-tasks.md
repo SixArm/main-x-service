@@ -368,14 +368,15 @@ clearly described manual check confirms the acceptance criterion.
   test --lib` 205/205 (was 197, +8 new `observability::tests`), `cargo
   test --test otlp_export --test otlp_middleware` 4/4.
 
-- [ ] **T-12 (M) — Wire the review-queue `score_breakdown` that already
-  has a database column.** `migrations/2026071900000001_create_review_queue/up.sql`
+- [x] **T-12 (M) — Wire the review-queue `score_breakdown` that already
+  has a database column.** *(resolved 2026-09-05.)*
+  `migrations/2026071900000001_create_review_queue/up.sql`
   declares `score_breakdown JSONB NULL` and `db::review_queue::ReviewQueueRow`
   carries the field, but `handlers::batch_deduplicate` (the same
-  handler `POST /api/things/deduplicate` calls) always builds
+  handler `POST /api/things/deduplicate` calls) always built
   `NewReviewItem { …, score_breakdown: None, … }` even though the
   `MatchResult` computed one line above has a real per-field breakdown,
-  and the wire type `ReviewQueueItem` has no `score_breakdown` field at
+  and the wire type `ReviewQueueItem` had no `score_breakdown` field at
   all. `thing-front-end-with-svelte`'s own T-24 already built the
   comparison-panel breakdown table against this exact column and
   documented the gap as FR-15, verified "against this service's own
@@ -384,12 +385,30 @@ clearly described manual check confirms the acceptance criterion.
   hard-coded `None` at line 647 and no field on the `ReviewQueueItem`
   wire struct; the column exists per
   `migrations/2026071900000001_create_review_queue/up.sql`.)*
-  **Acceptance:** the computed `MatchResult`'s breakdown is persisted on
-  `batch_deduplicate` and serialized on `ReviewQueueItem`; a DB-gated
-  test round-trips a scan and asserts the returned
-  `GET /api/things/review-queue` item's `score_breakdown` is non-null
-  and matches the matcher's own component scores; `cargo test --lib` +
-  clippy pedantic clean; three-part change (spec §9/§13 + code + test).
+  **Resolution:** `matching::scoring::MatchBreakdown` gained
+  `#[derive(Serialize)]` so it can be persisted verbatim as JSON; the
+  `deduplicate` scan loop now sets
+  `score_breakdown: serde_json::to_value(&result.breakdown).ok()` on
+  each `NewReviewItem` instead of the hard-coded `None`. The wire type
+  `ReviewQueueItem` gained an `Option<serde_json::Value>`
+  `score_breakdown` field, populated both when the scan response is
+  built directly and by `review_row_to_item` (the `GET
+  /api/things/review-queue` path), so a freshly-scanned pair and a
+  re-fetched stored one carry the identical breakdown. New DB-gated
+  `tests/review_queue_score_breakdown.rs` (`#[ignore]`d): seeds two
+  exact-name/description duplicates **directly through
+  `SeaOrmThingRepository`** (bypassing `POST /api/things`'s own
+  real-time duplicate check, which would otherwise reject the second
+  seed with `409` before the batch scan ever runs), scans via
+  `POST /api/things/deduplicate`, and asserts both the scan response's
+  and a subsequent `GET /api/things/review-queue`'s `score_breakdown`
+  are non-null with `name_score`/`description_score` both `1.0` —
+  matching the matcher's own component scores for an exact-text pair.
+  Verified: `cargo build --all-targets`, `cargo fmt --check`, `cargo
+  clippy --all-targets -- -D warnings`, and `scripts/ci-check.sh
+  test-db thing/thing-service-with-loco` all clean (214 lib tests + the
+  new review-queue test, plus the rest of the DB-gated suite, all
+  passing); no `Cargo.lock` churn.
 
 - [x] **T-13 (M) — Mask sensitive fields on `check-duplicates` / create's
   `409` candidates.** *(resolved 2026-09-05.)* `GET /api/things/search`
