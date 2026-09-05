@@ -10,6 +10,29 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — array-cardinality cap inside the library itself (CPM-T3)
+
+`condition_codes`, `interventions`, `keywords`, `tags`, `relationships`,
+`identifiers`, and `same_as` were all unbounded `Vec`s scored by O(n·m)
+Jaccard/identifier loops in `src/matcher.rs`, with no length cap
+anywhere in this crate — the family's SEC-M1 fix for this exact DoS
+class (`agents/share/security.md` invariant 3) lived only in the
+*service*'s `src/validation.rs`, which this standalone,
+dependency-light library never requires a caller to go through. Added
+`pub const MAX_ARRAY_LEN: usize = 256` (re-exported from `lib.rs`,
+matching `care-pathway-service`'s own value) and a private `capped`
+helper that truncates a slice before it reaches any pairwise scoring
+loop — every one of the seven fields above is now wrapped at its call
+site in `match_care_pathways`/`deterministic_match`. Truncation is
+silent (never an error), preserving the pure/no-IO/never-panic
+contract (§24); array-length *validation* stays the caller's job. New
+`tests/property_tests.rs` proptest `oversized_arrays_score_in_bounded_time`
+(its own low-`cases` block, since each iteration builds seven `n`-element
+`Vec`s) asserts a single `match_care_pathways` call stays under a
+generous wall-clock ceiling for `n` in `300..2000` — well past the cap —
+with values differing by side so neither deterministic short-circuit
+(R-0/R-2) fires and every field genuinely reaches scoring.
+
 ### Added — fuzz/property/bench coverage for `relationships`/`tags` (CPM-T2)
 
 These two components landed 2026-08-28 but were exercised only by the
