@@ -559,7 +559,7 @@ code + tests in one PR.
         criterion's "at least" three types is met, and the fourth
         would be a mechanical repeat of the same pattern.
 
-- [ ] WPM-T38 **Front-end sign-in gate.** No `+layout.server.ts`
+- [x] WPM-T38 **Front-end sign-in gate.** No `+layout.server.ts`
       exists anywhere under `src/routes`, and `hooks.server.ts` only
       reads the session cookie into `locals.sessionId` without ever
       redirecting; `api/proxy/[...path]/+server.ts` forwards
@@ -577,6 +577,44 @@ code + tests in one PR.
       `/signin` (excluding the public sign-in/verify routes); a
       Playwright spec pins the redirect; svelte-check 0; existing
       vitest/Playwright suites stay green. (WPM-D12)
+      **Resolution (2026-09-05):** chose the root `+layout.server.ts`
+      path rather than person-front-end's narrower per-mutation-page
+      `requireSignedIn` guard — WPM's pages mix read content with
+      embedded actions (the retention sweep button on `/privacy`,
+      payroll lifecycle actions on `/payroll/[id]`, …) rather than
+      separating reads and writes onto dedicated routes, so there is
+      no small "mutation-only" subset to gate instead; a root gate
+      naturally covers WPM's actual page shape. New
+      `src/routes/+layout.server.ts` redirects to `/signin` (303) for
+      any path other than `/signin`/`/verify` when `locals.sessionId`
+      is `null`. **A real technical wrinkle, found and resolved rather
+      than assumed:** this app runs `ssr = false` (root `+layout.ts`,
+      SPA mode), so the redirect is invisible in the raw HTTP response
+      to the *document* request (confirmed via `curl` — the initial
+      `GET /employees` still returns `200` with an empty shell) and
+      only surfaces through SvelteKit's client-side data-fetch
+      (confirmed via `curl http://…/employees/__data.json` returning
+      `{"type":"redirect","location":"/signin"}`), which a real browser
+      picks up during hydration and turns into a client-side
+      navigation — a plain `curl` check on the page URL alone would
+      have looked like the gate does nothing. `tests/e2e/smoke.spec.ts`
+      gained a `signIn()` helper that injects a fake
+      `__Host-mxi_session` cookie via Playwright's `context.addCookies`
+      (the server only checks the cookie's *presence*, never its
+      validity, so a fabricated value passes the gate without a real
+      authentication-service round trip) and a `"sign-in gate
+      (WPM-T38)"` describe block proving the redirect for a
+      signed-out visitor on both a named route and the dashboard, plus
+      that `/signin` itself stays reachable with no session. Every
+      **pre-existing** smoke test — all of which assume a signed-in
+      visitor implicitly — moved under a new `"signed-in smoke
+      coverage"` describe whose `beforeEach` calls `signIn()` before
+      the existing route stubs, so none of them silently redirect to
+      `/signin` instead of rendering the page under test; this was
+      verified empirically (all 12 Playwright tests green), not
+      assumed from reading the diff. Verified: `npm run check`
+      (svelte-check: 409 files, 0 errors, 0 warnings), `npx playwright
+      test` (12 passed), `npx vitest run` (10 passed, unchanged).
 
 - [ ] WPM-T39 **Front-end honesty-format module.** The null-ratio /
       no-data rendering rules (training completion %, conversion
