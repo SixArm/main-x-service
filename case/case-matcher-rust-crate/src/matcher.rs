@@ -91,6 +91,13 @@ impl MatchingEngine {
     /// Returns the populated [`MatchResult`]. Infallible by contract —
     /// every input pair yields a score.
     ///
+    /// **The caller must bound `subjects`/`keywords` array sizes.**
+    /// This crate has no length cap of its own; both fields are scored
+    /// by set Jaccard over every element, an unbounded O(n·m)
+    /// operation. See the crate-root docs ("The caller must bound array
+    /// sizes") for the reference cap (`case-service`'s `MAX_ARRAY_LEN` /
+    /// `MAX_ITEM_LEN`) a standalone integrator should copy.
+    ///
     /// # Examples
     ///
     /// ```

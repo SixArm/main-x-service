@@ -10,7 +10,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Documented — the caller must bound `subjects`/`keywords` array sizes
 
+This crate has no length cap of its own on `subjects`/`keywords` — both
+are scored by set Jaccard over every element, an unbounded O(n·m)
+operation. The family's SEC-M1 caps (`MAX_ARRAY_LEN`/`MAX_ITEM_LEN`)
+live only in `case-service`'s validation layer, which runs before this
+crate is ever called; a standalone integrator has no equivalent. Added
+a "the caller must bound array sizes" section to the crate-root docs
+and a matching note on `MatchingEngine::match_cases`'s rustdoc, plus a
+new `AGENTS.md` golden rule, all pointing at `case-service`'s
+`MAX_ARRAY_LEN`/`MAX_ITEM_LEN` as the reference cap to copy. No code
+change; see spec/index.md §23.
 
 ### Added — Criterion benchmarks
 

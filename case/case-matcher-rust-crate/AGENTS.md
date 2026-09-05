@@ -28,6 +28,13 @@ crate.
 3. **No `unsafe`. No `unwrap`/`expect`/`panic!`** in library code.
 4. **Deterministic.** No clocks, RNGs, or environment variables.
 5. **Explainability.** Every match returns a per-component breakdown.
+6. **Bound `subjects`/`keywords` before calling in.** This crate has no
+   length cap of its own on either field — both are scored by set
+   Jaccard over every element (unbounded O(n·m)). `case-service`
+   validates every payload before it reaches this crate
+   (`src/validation.rs`, `MAX_ARRAY_LEN` = 256, `MAX_ITEM_LEN` = 512);
+   a standalone integrator that skips an equivalent cap is exposing a
+   denial-of-service vector, not merely a slow path.
 6. **Diacritic-correct.**
 
 ## What not to do
