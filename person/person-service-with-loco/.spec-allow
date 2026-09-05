@@ -1,0 +1,14 @@
+# spec-drift-check.sh allowlist (spec/13-tasks.md T-7).
+#
+# Path patterns (extended regex) whose changes do NOT require a
+# corresponding update to spec/. Keep this file short: every
+# exception erodes the spec/code invariant the check exists to enforce.
+#
+# Format: one path pattern per line.  Blank lines and lines starting
+# with `#` are ignored.  Patterns are matched against paths returned
+# by `git diff --name-only`, which are always relative to the
+# **monorepo root** — e.g.
+# `person/person-service-with-loco/src/matching/mod.rs`, not
+# `src/matching/mod.rs` — so write patterns with that full prefix.
+
+# — none currently —

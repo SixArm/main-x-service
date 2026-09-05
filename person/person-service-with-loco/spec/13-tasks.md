@@ -493,11 +493,45 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     round-trips a record — satisfied by `tests/grpc_integration_test.rs`
     (above); a literal `grpcurl` CLI run is optional local confirmation,
     not additionally exercised.
-- [ ] **T-7 — Spec-drift CI check.**
-  - [ ] Fail PR if `src/matching/**` or `src/models/person.rs`
-    changes without a `spec.md` edit (allowlist in `.spec-allow`).
+- [x] **T-7 — Spec-drift CI check.** *(resolved 2026-09-05.)*
+  - [x] Fail PR if `src/matching/**` or `src/models/person.rs`
+    changes without a `spec/` edit (allowlist in `.spec-allow`). New
+    `scripts/spec-drift-check.sh` + `.spec-allow`, adapted from the
+    sibling `person-matcher-rust-crate`'s reference implementation of
+    the same discipline — with one fix on the way over. That reference
+    anchors its patterns as if the crate were the repository root
+    (`watched_pattern='^src/matcher\.rs$'`), but `git diff --name-only`
+    always returns paths relative to the **monorepo** root regardless
+    of the script's own working directory — *(verified: running the
+    reference script for real against this repo's history produces
+    diffs like `person/person-matcher-rust-crate/src/matcher.rs`,
+    which its own `^src/matcher\.rs$` pattern cannot match, so that
+    script's own stated acceptance criterion does not actually hold
+    against this monorepo)*. This crate's copy anchors both the
+    watched and spec patterns with its own path prefix
+    (`person/person-service-with-loco/`) instead, so the check is
+    genuinely functional here. A `.github/workflows/spec-drift.yml`
+    is included for documentation parity with the reference and with
+    this crate's own other `.github/workflows/*.yml` files — like
+    those, it is nested under a subcrate directory rather than the
+    repository root, so GitHub Actions does not discover or run it in
+    this monorepo (the root `.github/workflows/ci.yml` is what
+    actually runs); the workflow documents the intended wiring and the
+    script itself is directly runnable from a contributor machine.
   - **Acceptance:** `bash scripts/spec-drift-check.sh main HEAD`
-    exits non-zero on a code-only PR.
+    exits non-zero on a code-only PR. **Verified directly** (not
+    inferred) with three real, temporary commits against this repo's
+    actual history, each reverted afterward: (1) a code-only change to
+    `src/matching/mod.rs` with no `spec/` edit ⇒ exit `1`; (2) the same
+    change plus a `spec/13-tasks.md` edit ⇒ exit `0`
+    ("watched files AND spec/ both changed"); (3) the code-only change
+    alone, with a matching pattern added to `.spec-allow` ⇒ exit `0`
+    ("all watched changes match .spec-allow patterns"). `shellcheck`
+    flags one info-level `SC2086` (an unquoted `printf` expansion) at
+    the same line the reference implementation carries unchanged —
+    left as-is to match the copy source; quoting it would trade the
+    per-line indentation in the diagnostic output for no functional
+    gain.
 - [x] **T-8 — `db::audit` rename clean-up.** *(done 2026-06-15)*
   - [x] Verify no -era symbols remain in `src/db/audit.rs`.
   - **Acceptance:** `cargo check --lib` passes clean; legacy
