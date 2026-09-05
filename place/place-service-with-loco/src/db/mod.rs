@@ -200,6 +200,39 @@ impl SeaOrmPlaceRepository {
         Ok(())
     }
 
+    /// Walk the ancestor chain starting at `parent_id` and report whether
+    /// `place_id` appears in it — i.e. whether setting `place_id`'s
+    /// `contained_in_place` to `parent_id` would close a containment
+    /// cycle (T-16; the multi-hop half of OQ-2's "validation rejects on
+    /// insert", alongside `validate_place`'s pure direct-self-reference
+    /// check). A `visited` guard bounds the walk against a pre-existing
+    /// cycle that does not involve `place_id` (which this same check
+    /// should prevent going forward, but a corrupted row from before it
+    /// existed would otherwise loop forever).
+    ///
+    /// # Errors
+    /// Propagates any database error from the ancestor lookups.
+    async fn ancestor_chain_contains(&self, place_id: Uuid, parent_id: Uuid) -> Result<bool> {
+        let mut current = parent_id;
+        let mut visited = std::collections::HashSet::new();
+        loop {
+            if current == place_id {
+                return Ok(true);
+            }
+            if !visited.insert(current) {
+                return Ok(false);
+            }
+            let row = places::Entity::find_by_id(current)
+                .one(&self.db)
+                .await
+                .map_err(|e| map_db(&e))?;
+            match row.and_then(|r| r.contained_in_place) {
+                Some(next) => current = next,
+                None => return Ok(false),
+            }
+        }
+    }
+
     /// Load child collections and assemble a domain [`Place`].
     ///
     /// Reverses the normalization done on write: the flattened address/geo
@@ -321,6 +354,16 @@ impl SeaOrmPlaceRepository {
 #[async_trait::async_trait]
 impl PlaceRepository for SeaOrmPlaceRepository {
     async fn create(&self, place: &Place) -> Result<Place> {
+        // T-16 multi-hop half: `validate_place` already rejects the
+        // direct (0-hop) self-reference; this catches a cycle formed
+        // through one or more existing ancestors.
+        if let Some(parent_id) = place.contained_in_place
+            && self.ancestor_chain_contains(place.id, parent_id).await?
+        {
+            return Err(crate::Error::Conflict(
+                "contained_in_place would create a containment cycle".into(),
+            ));
+        }
         let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
         // `created_at`/`updated_at` are server-managed (see `Place`'s
         // field docs): stamp both to "now" here, overriding whatever the
@@ -362,6 +405,18 @@ impl PlaceRepository for SeaOrmPlaceRepository {
             .map_err(|e| map_db(&e))?;
         if exists.is_none() {
             return Err(crate::Error::NotFound);
+        }
+        // T-16: reject an update that would close a containment cycle
+        // through one or more existing ancestors (the case a plain
+        // self-reference check in `validate_place` cannot see — this is
+        // exactly the "A contains B, then update A to be contained in B"
+        // shape).
+        if let Some(parent_id) = place.contained_in_place
+            && self.ancestor_chain_contains(place.id, parent_id).await?
+        {
+            return Err(crate::Error::Conflict(
+                "contained_in_place would create a containment cycle".into(),
+            ));
         }
         let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
         // `created_at` is preserved (not overwritten by whatever the
@@ -893,5 +948,34 @@ mod tests {
             1,
             "one deleted outbox row for duplicate"
         );
+    }
+
+    /// T-16 multi-hop cycle: A contains B (`B.contained_in_place = A`),
+    /// then updating A to be contained in B must be rejected — the
+    /// direct self-reference case is covered by `validate_place`'s pure
+    /// unit tests; this is the repository-level ancestor-chain walk.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn update_rejects_a_cycle_through_an_existing_ancestor() {
+        let db = connect().await;
+        let repo = SeaOrmPlaceRepository::new(db.clone());
+
+        let mut a = Place::new("A");
+        a = repo.create(&a).await.unwrap();
+        let mut b = Place::new("B");
+        b.contained_in_place = Some(a.id);
+        b = repo.create(&b).await.unwrap();
+
+        // A → B would close the cycle A → B → A.
+        a.contained_in_place = Some(b.id);
+        let err = repo.update(&a).await.unwrap_err();
+        assert!(
+            matches!(err, crate::Error::Conflict(_)),
+            "expected Conflict, got {err:?}"
+        );
+
+        // The rejected update must not have persisted: A is still a root.
+        let reloaded = repo.get_by_id(&a.id).await.unwrap().unwrap();
+        assert_eq!(reloaded.contained_in_place, None);
     }
 }
