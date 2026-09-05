@@ -28,6 +28,38 @@ const PHONETIC_BONUS: f64 = 0.05;
 /// (>= 0.95) or pass for a deterministic-grade `1.0` match.
 const PHONETIC_CEILING: f64 = 0.95;
 
+/// Cardinality cap applied, inside this library, to every unbounded
+/// array-valued field before it feeds an O(n·m) scoring loop:
+/// `identifiers`, `same_as`, `condition_codes`, `interventions`,
+/// `keywords`, `relationships`, and `tags` (CPM-T3). This crate is
+/// documented as usable standalone, so a caller who never validates
+/// input before calling [`MatchingEngine::match_care_pathways`] must
+/// still get bounded scoring cost rather than an unbounded denial of
+/// service
+/// (`agents/share/security.md` invariant 3 / SEC-M1). The value matches
+/// `care-pathway-service`'s own `MAX_ARRAY_LEN` (`src/validation.rs`),
+/// so a caller who *does* validate at that boundary never sees the cap
+/// engage in practice.
+///
+/// This is a **scoring-cost** bound, not input validation: an oversized
+/// array is silently truncated (see [`capped`]) rather than rejected,
+/// since a pure library must never error or panic on merely-large input
+/// (§24). A service-layer caller should still validate and reject an
+/// oversized array before it reaches this crate, exactly as
+/// `care-pathway-service` already does.
+pub const MAX_ARRAY_LEN: usize = 256;
+
+/// Truncate a slice to at most [`MAX_ARRAY_LEN`] elements.
+///
+/// Bounds the cost of any pairwise scoring function that iterates (or
+/// nested-loops) the slice, independent of how large a caller's input
+/// actually is. Silent truncation, never an error, keeps this pure
+/// library's never-panic, no-IO contract intact (§24); array-length
+/// *validation* stays the caller's job (see [`MAX_ARRAY_LEN`]).
+fn capped<T>(items: &[T]) -> &[T] {
+    &items[..items.len().min(MAX_ARRAY_LEN)]
+}
+
 /// The care-pathway matcher: holds a [`MatchConfig`] and scores pairs.
 ///
 /// Stateless apart from its configuration, so a single engine can be
@@ -102,15 +134,16 @@ impl MatchingEngine {
         // Condition codes are the defining attribute of a pathway; compare
         // them as a set via Jaccard over `"system:code"` tokens.
         let condition_score = set_jaccard(
-            &condition_tokens(&a.condition_codes),
-            &condition_tokens(&b.condition_codes),
+            &condition_tokens(capped(&a.condition_codes)),
+            &condition_tokens(capped(&b.condition_codes)),
         );
         let pathway_code_score = pathway_code_score(a, b);
         let care_setting_score = care_setting_score(a, b);
-        let interventions_score = set_jaccard(&a.interventions, &b.interventions);
-        let keywords_score = set_jaccard(&a.keywords, &b.keywords);
-        let relationships_score = relationships_score(&a.relationships, &b.relationships);
-        let tags_score = tags_score(&a.tags, &b.tags);
+        let interventions_score = set_jaccard(capped(&a.interventions), capped(&b.interventions));
+        let keywords_score = set_jaccard(capped(&a.keywords), capped(&b.keywords));
+        let relationships_score =
+            relationships_score(capped(&a.relationships), capped(&b.relationships));
+        let tags_score = tags_score(capped(&a.tags), capped(&b.tags));
 
         // Renormalised weighted average over the present components only.
         let score = weighted_average(&[
@@ -222,7 +255,7 @@ fn deterministic_match(a: &CarePathway, b: &CarePathway) -> bool {
     // R-0 — any pair of deterministic identifiers shares a value.
     // Compare only within the same scheme (a DOI value must not match a
     // UUID value) and only for schemes flagged globally unique.
-    for ai in &a.identifiers {
+    for ai in capped(&a.identifiers) {
         // Provider-scoped / Custom schemes are not globally unique → skip.
         if !ai.scheme.is_deterministic() {
             continue;
@@ -233,7 +266,7 @@ fn deterministic_match(a: &CarePathway, b: &CarePathway) -> bool {
         if av.is_empty() {
             continue;
         }
-        for bi in &b.identifiers {
+        for bi in capped(&b.identifiers) {
             // Same scheme AND equal folded value ⇒ conclusive match.
             if ai.scheme == bi.scheme && av == normalize::fold(&bi.value) {
                 return true;
@@ -265,13 +298,13 @@ fn deterministic_match(a: &CarePathway, b: &CarePathway) -> bool {
     // R-2 — any same_as URL overlaps (case-folded). Two records pointing
     // at the same external identity page are the same pathway. Folding
     // tolerates surrounding whitespace and case differences.
-    for au in &a.same_as {
+    for au in capped(&a.same_as) {
         let an = normalize::fold(au);
         // Skip blank URLs so two blanks don't spuriously "overlap".
         if an.is_empty() {
             continue;
         }
-        for bu in &b.same_as {
+        for bu in capped(&b.same_as) {
             if an == normalize::fold(bu) {
                 return true;
             }

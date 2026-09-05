@@ -76,7 +76,8 @@ pub use care_pathway::{
 pub use config::MatchConfig;
 // Error handling — typed error and the crate-local `Result` alias.
 pub use error::{Error, Result};
-// Engine — the entry point that scores pairs.
-pub use matcher::MatchingEngine;
+// Engine — the entry point that scores pairs, plus the scoring-cost cap
+// (CPM-T3) a standalone caller can inspect rather than assume.
+pub use matcher::{MAX_ARRAY_LEN, MatchingEngine};
 // Result — the scored outcome and its per-component breakdown.
 pub use scoring::{Confidence, MatchBreakdown, MatchResult};

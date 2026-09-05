@@ -355,7 +355,7 @@ add IO, async, or panics to library code.
       the new group), and `cargo +nightly fuzz run match_care_pathways
       -- -max_total_time=20` — 2.7M executions in 20s, no crashes.
 
-- [ ] **CPM-T3 (S) Bound array cardinality inside the library itself.**
+- [x] **CPM-T3 (S) Bound array cardinality inside the library itself.** *(resolved 2026-09-05.)*
       `condition_codes`, `interventions`, `keywords`, `tags`,
       `relationships`, `identifiers`, and `same_as` are all
       unbounded `Vec`s scored by O(n·m) Jaccard/identifier loops in
@@ -377,6 +377,27 @@ add IO, async, or panics to library code.
       bounded independent of input array length (mirrors the family's
       SEC-M8 "bound the report, not just the work" precedent); existing
       unit/integration tests unaffected for arrays under the cap.
+      **Resolved.** Added `pub const MAX_ARRAY_LEN: usize = 256` (matching
+      `care-pathway-service`'s own SEC-M1 value; re-exported from
+      `lib.rs`) plus a private `fn capped<T>(&[T]) -> &[T]` truncation
+      helper in `src/matcher.rs`, applied at every one of the seven
+      unbounded fields' call sites: `identifiers`/`same_as` in the R-0/R-2
+      deterministic loops, and `condition_codes`/`interventions`/
+      `keywords`/`relationships`/`tags` before their respective scoring
+      functions. Truncation is silent, never an error — the caller still
+      owns array-length *validation*; this crate only bounds its own
+      scoring cost. New `tests/property_tests.rs` proptest
+      `oversized_arrays_score_in_bounded_time` (a dedicated low-`cases`
+      block, since each iteration builds seven `n`-element `Vec`s) builds
+      two pathways with `n in 300..2000` elements per field — deliberately
+      differing by side so neither the R-0 nor the R-2 short-circuit fires
+      and every field genuinely reaches scoring — and asserts a single
+      `match_care_pathways` call completes under a generous wall-clock
+      ceiling regardless of `n`. Verified: `cargo test` (60 unit + 6
+      property + 10 integration + 9 doctests, all green), `cargo clippy
+      --all-targets -- -D warnings` clean, `cargo fmt --check` clean,
+      `cargo +nightly fuzz build` still compiles against the changed
+      internals.
 
 ## 24. Testing strategy
 

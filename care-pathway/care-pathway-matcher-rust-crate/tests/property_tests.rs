@@ -11,8 +11,8 @@
 //! number in `[0.0, 1.0]`.
 
 use care_pathway_matcher::{
-    CarePathway, CodeSystem, ConditionCode, MatchConfig, MatchingEngine, RelationKind,
-    RelationshipRef, normalize, phonetic,
+    CarePathway, CodeSystem, ConditionCode, IdentifierScheme, MAX_ARRAY_LEN, MatchConfig,
+    MatchingEngine, PathwayIdentifier, RelationKind, RelationshipRef, normalize, phonetic,
 };
 use proptest::prelude::*;
 
@@ -207,5 +207,79 @@ proptest! {
                 "validated() rejected a well-formed config: {values:?}"
             );
         }
+    }
+}
+
+// A dedicated block with far fewer cases: each iteration below builds
+// seven `n`-element `Vec`s (n up to ~2000) and times a real match, so
+// running it at the default 400 cases would make the suite slow without
+// adding coverage — the property only needs a handful of large `n`
+// samples to prove the cap, not hundreds.
+proptest! {
+    #![proptest_config(ProptestConfig { cases: 20, ..ProptestConfig::default() })]
+
+    /// CPM-T3: pairwise scoring cost is bounded by [`MAX_ARRAY_LEN`]
+    /// regardless of how many elements a caller packs into any of the
+    /// unbounded array fields (`identifiers`, `same_as`,
+    /// `condition_codes`, `interventions`, `keywords`, `relationships`,
+    /// `tags`) — the cap truncates every one of them before any O(n·m)
+    /// work runs, so growing `n` well past the cap must not grow
+    /// wall-clock cost. Mirrors the family's SEC-M8 "bound the report,
+    /// not just the work" precedent. `n` ranges well above
+    /// `MAX_ARRAY_LEN` (256) so the property actually exercises
+    /// truncation; the ceiling is deliberately generous (CI-noise
+    /// tolerant) — without the cap, an O(n²) scan at `n` in the
+    /// thousands, across seven fields, would take orders of magnitude
+    /// longer than this.
+    #[test]
+    fn oversized_arrays_score_in_bounded_time(n in 300usize..2000) {
+        // Two care pathways, both with `n` elements in every unbounded
+        // field. Values differ by side (the "a-…"/"b-…" prefix) so
+        // neither the R-0 (identifier) nor R-2 (`same_as`) deterministic
+        // short-circuit fires and every field truly reaches scoring —
+        // the worst case for cost, not the cheapest.
+        let build = |side: &str| {
+            let mut p = CarePathway::new(format!("{side} Stroke Care Pathway"));
+            p.condition_codes = (0..n)
+                .map(|i| ConditionCode {
+                    system: CodeSystem::Icd10,
+                    code: format!("{side}-code-{i}"),
+                })
+                .collect();
+            p.interventions = (0..n).map(|i| format!("{side}-intervention-{i}")).collect();
+            p.keywords = (0..n).map(|i| format!("{side}-keyword-{i}")).collect();
+            p.tags = (0..n).map(|i| format!("{side}-tag-{i}")).collect();
+            p.relationships = (0..n)
+                .map(|i| RelationshipRef {
+                    relation: RelationKind::SimilarTo,
+                    pathway_id: format!("{side}-pid-{i}"),
+                })
+                .collect();
+            p.identifiers = (0..n)
+                .map(|i| PathwayIdentifier {
+                    scheme: IdentifierScheme::Custom("registry".into()),
+                    value: format!("{side}-id-{i}"),
+                })
+                .collect();
+            p.same_as = (0..n).map(|i| format!("https://{side}.example.org/{i}")).collect();
+            p
+        };
+        let a = build("a");
+        let b = build("b");
+
+        let engine = MatchingEngine::default_config();
+        let start = std::time::Instant::now();
+        let r = engine.match_care_pathways(&a, &b);
+        let elapsed = start.elapsed();
+
+        // Sanity: the short-circuits really didn't fire — this exercises
+        // the probabilistic path the cap protects, not the cheap R-0/R-2
+        // early return.
+        prop_assert!(!r.breakdown.deterministic_match);
+        prop_assert!(
+            elapsed.as_secs_f64() < 0.5,
+            "match_care_pathways took {elapsed:?} for n={n} (>= {MAX_ARRAY_LEN}), \
+             exceeding the bounded-cost ceiling — did MAX_ARRAY_LEN stop being applied?"
+        );
     }
 }
