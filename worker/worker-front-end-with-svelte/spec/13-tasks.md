@@ -210,15 +210,25 @@
   - **Acceptance:** a component/unit test pins that the truncation
     notice appears when `total > items.length` and is absent otherwise.
 
-- [ ] T-30: **Test coverage for the phonetic search toggle.** `/workers`
-  offers a `phonetic` checkbox alongside `fuzzy`
-  (`src/routes/workers/+page.svelte`), and `SearchOptions.phonetic` is
-  wired all the way to the query string
+- [x] T-30: **Test coverage for the phonetic search toggle.** *(resolved
+  2026-09-05.)* `/workers` offers a `phonetic` checkbox alongside
+  `fuzzy` (`src/routes/workers/+page.svelte`), and
+  `SearchOptions.phonetic` is wired all the way to the query string
   (`src/lib/api/workers.ts:93`) — but unlike `fuzzy`, which is pinned
   in `tests/unit/client.test.ts` (asserts `fuzzy=true` on the wire),
-  `phonetic` has zero coverage anywhere (verified: `grep -n
-  "phonetic" tests/unit/*.test.ts` returns nothing). Add a unit test
-  pinning `phonetic=true` reaches the API exactly as `fuzzy` does.
-  - **Acceptance:** the new assertion is added to `tests/unit/client.test.ts`
-    (or the equivalent repository test file) and passes.
+  `phonetic` had zero coverage anywhere (verified: `grep -n
+  "phonetic" tests/unit/*.test.ts` returned nothing).
+  **Resolution:** new `WorkerRepository` test in
+  `tests/unit/workers.test.ts` — "reaches the wire with phonetic=true,
+  same as fuzzy" — calls `repo.search({ q, fuzzy: true, phonetic:
+  true })` and asserts both `phonetic=true` and `fuzzy=true` appear in
+  the captured request URL. Placed in `workers.test.ts` rather than
+  `client.test.ts`: it exercises the real `WorkerRepository.search`
+  field mapping the task describes (`src/lib/api/workers.ts:93`)
+  directly, rather than `client.test.ts`'s generic `ApiClient`
+  query-string fixture, which would only prove the client can
+  serialize *some* boolean field named `phonetic` — not that this
+  repository's own mapping is correct. Verified: `npm run check`
+  (svelte-check) clean; `npm test` — 81/81 passing (was 80), all 8
+  files green.
 
