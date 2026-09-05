@@ -9,6 +9,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — Playwright smoke coverage for `/board`, `/calendar`, and the course detail/audit shells (T-30, T-31)
+
+Pure test-writing, no behaviour change. `/board` and `/calendar`
+landed 2026-07-19 but `tests/e2e/courses.spec.ts` never gained a case
+for either (T-30); `/courses/[id]` was only touched incidentally by
+the GDPR-export test (which never asserted the heading, Edit link, or
+Audit link) and `/courses/[id]/audit` was never visited by any test at
+all (T-31). Four new tests: `/board` stubs an empty search result and
+asserts the `course-board` Kanban wrap plus all four lifecycle column
+headings (draft/published/archived/retired — the columns are the
+fixed `COURSE_STATUSES` list, independent of course data, so an empty
+result set is enough to exercise the render path); `/calendar` stubs
+an empty search result (which short-circuits the `listInstances()`
+fan-out) and asserts the `instance-calendar` wrap; the course detail
+test stubs one record and asserts the heading plus the Edit and Audit
+links; the audit test stubs one entry and asserts the heading and the
+entry's action text. See spec/13-tasks.md T-30/T-31.
+
 ### Added — GDPR export download on the detail page (T-20)
 
 A button on `/courses/[id]` fetches `GET /api/courses/{id}/export` through the

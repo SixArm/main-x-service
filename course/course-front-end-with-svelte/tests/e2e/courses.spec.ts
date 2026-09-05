@@ -85,6 +85,110 @@ test.describe("Course front-end smoke", () => {
         expect(JSON.parse(readFileSync(saved as string, "utf8"))).toEqual(payload);
         await expect(page.getByRole("button", { name: "Export data (GDPR)" })).toBeEnabled();
     });
+
+    // Pins T-30: "/board" renders the lifecycle Kanban. Columns come
+    // from the fixed `COURSE_STATUSES` list regardless of course data,
+    // so an empty search result is enough to exercise the render path —
+    // this is a shell/landmark check, not a drag-and-drop test.
+    test("board renders the Kanban with lifecycle column headings", async ({ page }) => {
+        await page.route("**/api/courses/search**", async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({
+                    success: true,
+                    data: { items: [], total: 0 },
+                    error: null,
+                }),
+            });
+        });
+
+        await page.goto("/board");
+        const board = page.getByTestId("course-board");
+        await expect(board).toBeVisible();
+        await expect(board.getByText("draft")).toBeVisible();
+        await expect(board.getByText("published")).toBeVisible();
+        await expect(board.getByText("archived")).toBeVisible();
+        await expect(board.getByText("retired")).toBeVisible();
+    });
+
+    // Pins T-30: "/calendar" renders the read-only instance calendar. An
+    // empty search result means no `listInstances()` fan-out fires, so
+    // stubbing search alone is enough for this shell check.
+    test("calendar renders the instance calendar", async ({ page }) => {
+        await page.route("**/api/courses/search**", async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({
+                    success: true,
+                    data: { items: [], total: 0 },
+                    error: null,
+                }),
+            });
+        });
+
+        await page.goto("/calendar");
+        await expect(page.getByTestId("instance-calendar")).toBeVisible();
+    });
+
+    // Pins T-31: "/courses/[id]" renders its identity heading plus the
+    // Edit and Audit links — landmarks the existing GDPR-export test
+    // never asserted (it only checks the export button).
+    test("course detail renders heading, edit link, and audit link", async ({ page }) => {
+        const id = "0c4f1e2a-0000-4000-8000-0000000000dd";
+        const record = {
+            id,
+            name: "Introduction to Computer Science",
+            course_code: "CS101",
+            educational_level: "Undergraduate",
+            keywords: [],
+            instances: [],
+            license: "CC-BY-4.0",
+            url: "https://example.org/cs101",
+        };
+        await page.route(`**/api/courses/${id}`, async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({ success: true, data: record, error: null }),
+            });
+        });
+
+        await page.goto(`/courses/${id}`);
+        await expect(
+            page.getByRole("heading", { name: "Introduction to Computer Science" }),
+        ).toBeVisible();
+        await expect(page.getByRole("link", { name: "Edit" })).toBeVisible();
+        await expect(page.getByRole("link", { name: "Audit" })).toBeVisible();
+    });
+
+    // Pins T-31: "/courses/[id]/audit" renders its heading and at least
+    // one stubbed audit entry — never visited by any test before this.
+    test("course audit page renders heading and an audit entry", async ({ page }) => {
+        const id = "0c4f1e2a-0000-4000-8000-0000000000ee";
+        const entries = [
+            {
+                id: "audit-1",
+                entity_type: "course",
+                entity_id: id,
+                action: "created",
+                user_id: null,
+                created_at: "2026-09-01T00:00:00Z",
+            },
+        ];
+        await page.route(`**/api/courses/${id}/audit**`, async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({ success: true, data: entries, error: null }),
+            });
+        });
+
+        await page.goto(`/courses/${id}/audit`);
+        await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
+        await expect(page.getByText("created")).toBeVisible();
+    });
 });
 
 // Pins the PRO-H10 page-visit guard itself (WEB-1): with NO session
