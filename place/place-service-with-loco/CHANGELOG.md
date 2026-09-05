@@ -8,6 +8,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — persist and serve the review-queue `score_breakdown` (T-14)
+
+`POST /api/places/deduplicate` always wrote `score_breakdown: None` on
+every stored review-queue row even though the `MatchResult` computed
+for each pair carries a real per-component breakdown, and the wire
+type `ReviewQueueItem` had no `score_breakdown` field to carry one —
+so the `JSONB` column the 2026-07-19 migration already declared went
+unused. Mirrors `thing-service`'s identical T-12. `MatchBreakdown` now
+derives `Serialize`; the scan persists it verbatim, and
+`ReviewQueueItem` (both the scan response and
+`GET /api/places/review-queue`) now returns it. New
+`tests/review_queue_score_breakdown.rs` (DB-gated) round-trips a scan
+and asserts the breakdown matches the matcher's own component score.
+See spec §13 T-14.
+
 ### Security — mask sensitive fields on `check-duplicates` / create's `409` candidates (T-15)
 
 `GET /api/places/search` already honoured `?mask_sensitive=`, but

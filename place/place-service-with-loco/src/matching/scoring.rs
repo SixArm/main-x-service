@@ -27,6 +27,8 @@
 //! assert_eq!(r.confidence, MatchConfidence::Certain);
 //! ```
 
+use serde::Serialize;
+
 use super::address::address_similarity;
 use super::geo::geo_similarity;
 use super::identifier::{has_gln_match, identifier_similarity};
@@ -71,7 +73,11 @@ impl Default for MatchWeights {
 /// Every sub-score is reported even when its component did not participate in
 /// the weighted total (e.g. a place with no geo), so callers can see exactly
 /// what drove the overall score.
-#[derive(Debug, Clone)]
+///
+/// `Serialize` (spec §13 T-14) lets a caller persist this verbatim as the
+/// review queue's `score_breakdown` JSONB column
+/// (`db::review_queue::NewReviewItem::score_breakdown`).
+#[derive(Debug, Clone, Serialize)]
 pub struct MatchBreakdown {
     /// Name similarity sub-score.
     pub name_score: f64,
