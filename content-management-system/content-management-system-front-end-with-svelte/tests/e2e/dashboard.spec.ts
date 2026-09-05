@@ -6,6 +6,30 @@
 
 import { expect, test, type Page } from "@playwright/test";
 
+/**
+ * Every page but /signin and /verify is gated on a session (CMS-T31).
+ * The server only checks the cookie's *presence*, never its validity,
+ * so a fabricated value passes the gate without a real
+ * authentication-service round trip.
+ */
+async function signIn(page: Page) {
+  await page.context().addCookies([
+    {
+      name: "__Host-mxi_session",
+      value: "smoke-test-session",
+      domain: "localhost",
+      path: "/",
+      httpOnly: true,
+      secure: true,
+      sameSite: "Lax",
+    },
+  ]);
+}
+
+test.beforeEach(async ({ page }) => {
+  await signIn(page);
+});
+
 const SITE = {
   pid: "site-1",
   key: "demo",
