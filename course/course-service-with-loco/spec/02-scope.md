@@ -25,8 +25,8 @@
 - Row-level integrity digests + audit-log MAC verification
   (`GET /api/records/verify`, `GET /api/audit/verify`) — see §2.1c.
 - PostgreSQL persistence via SeaORM, with migrations.
-- Structured tracing (`tracing`). **Not** OpenTelemetry export — see
-  §2.2.
+- Structured tracing (`tracing`) **plus real OpenTelemetry OTLP
+  export** (`src/observability.rs`, T-26) — see §2.1d.
 
 ### 2.1a Authentication / authorisation (adopted, default-off)
 
@@ -57,16 +57,24 @@ this section used to carry, which predates T-20 shipping.
   ⇒ no MAC is written and rows report `mac_absent` rather than as
   mismatches. See §12.
 
+### 2.1d Observability — real OpenTelemetry OTLP export (adopted)
+
+`src/observability.rs` (T-26, PRO-H12 slice 1 of 7, landed 2026-08-30)
+is a real exporter — `tracing-opentelemetry` bridged over an OTLP/gRPC
+`SdkTracerProvider`/`SdkMeterProvider`, export-on-by-default at
+`OTLP_ENDPOINT` (default `http://localhost:4317`) with `service.name`
+from `OTLP_SERVICE_NAME` (default `course-service`). `trace_mw` is
+layered as the outermost middleware on both of this crate's
+router-construction surfaces. This reverses the MVP scope note §2.2
+used to carry, which predates T-26 shipping — same shape as §2.1b's
+FHIR reversal note above. See T-26 and
+[`observability.md`](../../../agents/share/observability.md).
+
 ### 2.2 Out of scope (MVP)
 
 - **gRPC.** No gRPC surface at all — not even a stub. There is no
   `tonic`/`prost` dependency; `GRPC_PORT` is unused legacy
   configuration (§7).
-- **OpenTelemetry export.** `OTLP_SERVICE_NAME` / `OTLP_ENDPOINT`
-  parse into `Config` but reach no exporter — there is no
-  `src/observability/` module (unlike person/worker/event, which at
-  least build an OTel `Resource` before installing a plain JSON
-  subscriber). Tracing is `tracing`-only.
 - ML-based match scoring.
 - LMS round-trip integration (LTI / xAPI / SCORM).
 - Course-discovery ranking.
