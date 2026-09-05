@@ -17,22 +17,43 @@ import { randomUUID } from "node:crypto";
 
 const PORT = Number(process.env.MOCK_AUTH_PORT ?? 5199);
 
-// Fixture data. Must match the constants tests/e2e/smoke.spec.ts asserts
-// against — kept in sync by hand since this file runs as plain Node and
-// the spec runs under Playwright's TypeScript loader, so a shared module
-// isn't worth the cross-loader friction for four constants.
+// Fixture data. Must match the constants tests/e2e/smoke.spec.ts and
+// tests/e2e/admin-attributes.spec.ts assert against — kept in sync by
+// hand since this file runs as plain Node and the specs run under
+// Playwright's TypeScript loader, so a shared module isn't worth the
+// cross-loader friction for a handful of constants.
 const PID = "11111111-1111-4111-8111-111111111111";
 const EMAIL = "alice@example.com";
 const NAME = "Alice";
 const VALID_MAGIC_TOKEN = "magic-123";
 
+// A second identity carrying `access=admin` — the operator who manages
+// other users' ABAC attributes. Distinct from `PID`/`EMAIL` above (an
+// ordinary signed-in user, no admin rights) so the 403 path is real: it
+// is this crate's own ABAC engine that would deny a non-admin caller,
+// not merely an untested branch.
+const ADMIN_PID = "22222222-2222-4222-8222-222222222222";
+const ADMIN_EMAIL = "admin@example.com";
+const ADMIN_NAME = "Ada";
+const ADMIN_MAGIC_TOKEN = "magic-admin-456";
+
+// The user whose attributes the admin views/edits — distinct from both
+// login identities above, matching the real UI's "manage someone else's
+// attributes" flow (an admin never edits their own attributes here).
+const TARGET_PID = "33333333-3333-4333-8333-333333333333";
+const TARGET_EMAIL = "target@example.com";
+
 const SESSION_COOKIE = "__Host-mxi_session";
 const CSRF_COOKIE = "__Host-mxi_csrf";
 
-/** sid -> { csrf } for verified magic-link sessions. */
+/** sid -> { csrf, pid, email, name, isAdmin } for verified magic-link
+ *  sessions. */
 const sessions = new Map();
 /** short-lived bearer -> sid, minted by POST /api/auth/token. */
 const bearers = new Map();
+/** pid -> ABAC attribute map, seeded with one target user so `GET` has
+ *  something real to return; `PUT` replaces it in place. */
+const userAttributes = new Map([[TARGET_PID, { access: ["write"] }]]);
 
 function sendJson(res, status, body) {
   const text = body === undefined ? "" : JSON.stringify(body);
@@ -92,7 +113,13 @@ const server = createServer(async (req, res) => {
     const token = decodeURIComponent(
       pathname.slice("/api/auth/magic-link/".length),
     );
-    if (token !== VALID_MAGIC_TOKEN) {
+    const identity =
+      token === VALID_MAGIC_TOKEN
+        ? { pid: PID, name: NAME, email: EMAIL, isAdmin: false }
+        : token === ADMIN_MAGIC_TOKEN
+          ? { pid: ADMIN_PID, name: ADMIN_NAME, email: ADMIN_EMAIL, isAdmin: true }
+          : null;
+    if (!identity) {
       return sendJson(res, 401, { error: "invalid_token" });
     }
     // Consuming the magic link establishes a session, exactly as the real
@@ -101,16 +128,16 @@ const server = createServer(async (req, res) => {
     // not through a browser cookie jar (this is a server-to-server call).
     const sid = randomUUID();
     const csrf = randomUUID();
-    sessions.set(sid, { csrf });
+    sessions.set(sid, { csrf, ...identity });
     res.setHeader("set-cookie", [
       `${SESSION_COOKIE}=${sid}; Path=/; HttpOnly; Secure; SameSite=Lax`,
       `${CSRF_COOKIE}=${csrf}; Path=/; HttpOnly; Secure; SameSite=Lax`,
     ]);
     return sendJson(res, 200, {
       token: "upstream-access-token",
-      pid: PID,
-      name: NAME,
-      email: EMAIL,
+      pid: identity.pid,
+      name: identity.name,
+      email: identity.email,
       is_verified: true,
     });
   }
@@ -130,10 +157,56 @@ const server = createServer(async (req, res) => {
   if (pathname === "/api/auth/me" && method === "GET") {
     const bearer = bearerFromAuthHeader(req.headers.authorization);
     const sid = bearer ? bearers.get(bearer) : undefined;
-    if (!sid || !sessions.has(sid)) {
+    const session = sid ? sessions.get(sid) : undefined;
+    if (!session) {
       return sendJson(res, 401, { error: "invalid_token" });
     }
-    return sendJson(res, 200, { pid: PID, name: NAME, email: EMAIL });
+    return sendJson(res, 200, {
+      pid: session.pid,
+      name: session.name,
+      email: session.email,
+    });
+  }
+
+  if (
+    pathname.startsWith("/api/auth/admin/users/") &&
+    pathname.endsWith("/attributes") &&
+    (method === "GET" || method === "PUT")
+  ) {
+    const targetPid = decodeURIComponent(
+      pathname.slice(
+        "/api/auth/admin/users/".length,
+        pathname.length - "/attributes".length,
+      ),
+    );
+    const bearer = bearerFromAuthHeader(req.headers.authorization);
+    const sid = bearer ? bearers.get(bearer) : undefined;
+    const session = sid ? sessions.get(sid) : undefined;
+    if (!session) {
+      return sendJson(res, 401, { error: "unauthorized" });
+    }
+    if (!session.isAdmin) {
+      return sendJson(res, 403, {
+        error: "forbidden",
+        description: "caller does not carry access=admin",
+      });
+    }
+    const targetEmail = targetPid === TARGET_PID ? TARGET_EMAIL : "unknown@example.com";
+    if (method === "PUT") {
+      const body = await readBody(req);
+      let attributes;
+      try {
+        attributes = JSON.parse(body).attributes;
+      } catch {
+        return sendJson(res, 400, { error: "invalid_body" });
+      }
+      userAttributes.set(targetPid, attributes ?? {});
+    }
+    return sendJson(res, 200, {
+      pid: targetPid,
+      email: targetEmail,
+      attributes: userAttributes.get(targetPid) ?? {},
+    });
   }
 
   if (pathname === "/api/auth/signout" && method === "POST") {

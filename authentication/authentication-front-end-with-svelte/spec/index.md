@@ -501,20 +501,31 @@ session on sign-out and the BFF clears the cookie. CSRF protection (§6 FR
       and (with confirmation) erase their account from the UI;
       `pnpm test` and `pnpm run test:e2e` green.
 
-- [ ] **AFE-3 (S) Zero e2e coverage of `/admin/attributes`.**
-      *(verified: `grep -n "admin" tests/e2e/mock-auth-server.mjs` finds
-      only a comment mentioning `admin.ts`, no route stub for
-      `GET`/`PUT /api/auth/admin/users/{pid}/attributes`;
-      `grep -n "test(" tests/e2e/smoke.spec.ts` lists six cases, none
-      touching `/admin/attributes`)* — this route (its own `load` +
-      `save` server action, per §13 AFE-1 above) has no end-to-end
-      coverage at all, unlike every other route in `src/routes/`. Add
-      mock-server handlers for the two admin endpoints (200, 403
-      non-admin, 401 unauthenticated) and playwright cases: view an
-      existing user's attributes, save a valid change, and see the
-      403/401 error paths surfaced in the UI.
-      **Acceptance:** `pnpm run test:e2e` covers `/admin/attributes`
-      end to end and stays green.
+- [x] **AFE-3 (S) Zero e2e coverage of `/admin/attributes`.** *(resolved
+      2026-09-05.)* This route (its own `load` + `save` server action,
+      per §13 AFE-1 above) had no end-to-end coverage at all, unlike
+      every other route in `src/routes/`.
+  - **Resolved.** `tests/e2e/mock-auth-server.mjs` gained: a second,
+    `access=admin` login identity (a new `magic-admin-456` token,
+    distinct pid/email from the ordinary `magic-123` login, so the 403
+    path is a real ABAC-shaped denial rather than an untested branch);
+    session-aware `GET /api/auth/me` (previously hard-coded to the one
+    fixture user regardless of which identity signed in); and a new
+    `GET`/`PUT /api/auth/admin/users/{pid}/attributes` handler — 401
+    with no session, 403 for a signed-in non-admin, 200 otherwise,
+    backed by an in-memory `pid -> attributes` map so a `PUT` genuinely
+    changes what a subsequent `GET` returns. New
+    `tests/e2e/admin-attributes.spec.ts`, four cases: an admin viewing
+    an existing (seeded) user's attributes, an admin saving a valid
+    change (asserted by the saved value round-tripping back into the
+    editor, not just the "saved" banner), a signed-in non-admin caller
+    seeing the exact `403` + `description` the mock service returns
+    (and never seeing the target's data), and an unauthenticated
+    visitor seeing the load function's own sign-in prompt rather than
+    any target data. **Acceptance (met):** `pnpm run test:e2e` — 10/10
+    passing (6 pre-existing + 4 new), run twice to rule out flakiness;
+    `pnpm run check` (svelte-check, 0 errors) and `pnpm test` (vitest,
+    17/17) unaffected.
 
 - [ ] **AFE-4 (S) Surface the `429` rate-limit response distinctly from
       a generic failure.** The auth service rate-limits `signup`/
