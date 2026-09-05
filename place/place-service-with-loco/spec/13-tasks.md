@@ -411,7 +411,7 @@ clearly described manual check confirms the acceptance criterion.
   response redacts the same fields `mask_place` redacts on `/masked`;
   clippy pedantic clean; three-part change (spec §9 + code + test).
 
-- [ ] **T-16 (S) — Guard `contained_in_place` against self-reference and
+- [x] **T-16 (S) — Guard `contained_in_place` against self-reference and
   cycles.** `spec/16-open-questions.md` OQ-2 states "validation rejects
   on insert" for hierarchy cycles, but no such check exists anywhere in
   the crate: `validate_place` (`src/validation/mod.rs`) never references
@@ -428,5 +428,27 @@ clearly described manual check confirms the acceptance criterion.
   `contained_in_place == Some(place.id)`; a DB-gated test creates A→B
   then attempts B→A and asserts a `409`/`422` rather than a silently
   persisted 2-cycle; unit + DB-gated tests green; three-part change
-  (spec §6/§16 + code + test).
+  (spec §6/§16 + code + test). *(resolved 2026-09-05.)*
+  - **Resolved.** `validate_place` (`src/validation/mod.rs`) rejects
+    `contained_in_place == Some(place.id)` with a `422`-shaped
+    `ValidationError` on field `contained_in_place`. The multi-hop case
+    is a new `SeaOrmPlaceRepository::ancestor_chain_contains` helper
+    (`src/db/mod.rs`) — a bounded walk up the parent chain (a
+    `visited` guard stops it looping on a pre-existing, unrelated
+    cycle rather than assuming none exists) — called from both
+    `create` and `update` before the write transaction opens; a hit
+    returns `Error::Conflict` (`409`). Two new pure unit tests
+    (`test_self_referencing_contained_in_place_is_rejected`,
+    `test_contained_in_a_different_place_is_not_rejected`) plus one
+    DB-gated test (`update_rejects_a_cycle_through_an_existing_ancestor`)
+    creating A→B then updating A to be contained in B, asserting the
+    `409` and that A's `contained_in_place` was **not** persisted.
+    `spec/16-open-questions.md` OQ-2 updated to record the resolution
+    (and to note the hierarchy is a tree — one `contained_in_place`
+    per place — so "two paths from A to B" cannot arise; the walk
+    needs no branching). Verified against a real Postgres 18 via
+    `scripts/ci-check.sh test-db place/place-service-with-loco`: full
+    DB-gated suite passes, 0 failed; `cargo test --lib`: 231 passed (up
+    from 229, the two new unit tests), 0 failed; `cargo build`/`clippy
+    --all-targets -- -D warnings` clean.
 

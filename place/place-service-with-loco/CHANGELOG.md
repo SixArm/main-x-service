@@ -8,6 +8,17 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — guard `contained_in_place` against self-reference and cycles (T-16)
+
+`spec/16-open-questions.md` OQ-2 claimed "validation rejects on
+insert" for hierarchy cycles, but no such check existed. `validate_place`
+now rejects `contained_in_place == Some(place.id)` (a `422`); the
+multi-hop case (A contains B, then B is made to contain A) is caught by
+a new `SeaOrmPlaceRepository::ancestor_chain_contains` walk up the
+parent chain, called from `create` and `update` before the write
+transaction opens, returning `409 Conflict` on a hit rather than
+silently persisting the cycle.
+
 ### Added — real OpenTelemetry OTLP export (T-13, PRO-H12 slice 2 of 7)
 
 - **2026-08-30**: new `src/observability.rs`. This crate carried no

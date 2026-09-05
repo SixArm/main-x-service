@@ -361,6 +361,19 @@ pub fn validate_place(place: &Place) -> Vec<ValidationError> {
         }
     }
 
+    // A place cannot contain itself. This is the direct (0-hop) case of
+    // the hierarchy-cycle rejection `spec/16-open-questions.md` OQ-2
+    // already documents as "validation rejects on insert" — pure and
+    // checkable with no DB access. The multi-hop case (A contains B,
+    // B contains A) needs a DB round-trip and is a repository-level
+    // check on create/update instead (T-16).
+    if place.contained_in_place == Some(place.id) {
+        errors.push(ValidationError {
+            field: "contained_in_place".into(),
+            message: "A place cannot contain itself".into(),
+        });
+    }
+
     // SEC-M1 input-size caps (additive; independent of the checks above).
     place_size_caps(&mut errors, place);
 
@@ -530,6 +543,32 @@ mod tests {
         let place = Place::new("Central Park");
         let errors = validate_place(&place);
         assert!(errors.is_empty(), "Errors: {errors:?}");
+    }
+
+    /// A place cannot list itself as its own container (T-16 direct
+    /// case; the multi-hop case is a repository-level check, since it
+    /// needs a DB round-trip — see `db::SeaOrmPlaceRepository::
+    /// ancestor_chain_contains`).
+    #[test]
+    fn test_self_referencing_contained_in_place_is_rejected() {
+        let mut place = Place::new("Self-contained");
+        place.contained_in_place = Some(place.id);
+        let errors = validate_place(&place);
+        assert_eq!(errors.len(), 1, "Errors: {errors:?}");
+        assert_eq!(errors[0].field, "contained_in_place");
+    }
+
+    /// Containing a *different* place is unaffected by the self-reference
+    /// check.
+    #[test]
+    fn test_contained_in_a_different_place_is_not_rejected() {
+        let mut place = Place::new("Nested");
+        place.contained_in_place = Some(uuid::Uuid::new_v4());
+        let errors = validate_place(&place);
+        assert!(
+            errors.iter().all(|e| e.field != "contained_in_place"),
+            "Errors: {errors:?}"
+        );
     }
 
     /// An empty name is rejected.
