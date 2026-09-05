@@ -317,7 +317,7 @@ add IO, async, or panics to library code.
     property_tests + public_api + doctests) all green, 0 failed;
     `cargo clippy --all-targets -- -D warnings` clean.
 
-- [ ] **CPM-T2 (S) Fuzz/property/bench coverage for the
+- [x] **CPM-T2 (S) Fuzz/property/bench coverage for the
       `relationships`/`tags` components.** Landed 2026-08-28 (both
       `[x]` above) but exercised only by the hand-written unit tests in
       `src/matcher.rs` — the property suite, the `cargo-fuzz` harness,
@@ -333,6 +333,27 @@ add IO, async, or panics to library code.
       `tags`; `cargo +nightly fuzz run match_care_pathways` (short
       smoke) runs clean with the new field paths reachable; `cargo
       bench --no-run` compiles the new group.
+      **Resolution (2026-09-05):** ported organization-matcher's
+      identical ORGM-T2 fix. `pathway()` gained `relation_kind()` (the
+      five fixed `RelationKind` variants plus a free-form `Custom`
+      label) and `relationship()` (a `RelationshipRef` struct literal —
+      this type has no validating constructor to route around, unlike
+      organization's) plus a `tags` generator, wired into the same
+      `CarePathway` the five existing properties already build. The
+      fuzz target now appends a relationship/tag derived from the raw
+      fuzz bytes to both pathways after the JSON-tuple decode and reruns
+      the bounded-score assertions, forcing the field paths reachable on
+      every run rather than depending on the corpus finding them by
+      chance. Added `benches/match_pair.rs`'s
+      `bench_relationships_and_tags` group (a `partial_overlap` case:
+      two relationships and two tags per side, one shared each) so a
+      perf regression on either component's Jaccard cost is visible
+      rather than hidden behind the aggregate `match_pair` numbers, none
+      of which populate either field. Verified: `cargo test` (property +
+      unit + doctests all green), `cargo clippy --all-targets -- -D
+      warnings`, `cargo fmt --check`, `cargo bench --no-run` (compiles
+      the new group), and `cargo +nightly fuzz run match_care_pathways
+      -- -max_total_time=20` — 2.7M executions in 20s, no crashes.
 
 - [ ] **CPM-T3 (S) Bound array cardinality inside the library itself.**
       `condition_codes`, `interventions`, `keywords`, `tags`,

@@ -13,7 +13,7 @@
 
 use care_pathway_matcher::{
     CarePathway, CareSetting, CodeSystem, ConditionCode, IdentifierScheme, MatchConfig,
-    MatchingEngine, PathwayIdentifier,
+    MatchingEngine, PathwayIdentifier, RelationKind, RelationshipRef,
 };
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use std::hint::black_box;
@@ -193,11 +193,50 @@ fn bench_config_variants(c: &mut Criterion) {
     group.finish();
 }
 
+/// `relationships`/`tags` Jaccard cost (CPM-T2), so a regression on
+/// either component is visible rather than hiding behind the aggregate
+/// `match_pair` numbers above, none of which populate either field.
+fn bench_relationships_and_tags(c: &mut Criterion) {
+    let mut group = c.benchmark_group("relationships_and_tags");
+    let engine = MatchingEngine::default_config();
+
+    let mut a = build_reference();
+    a.relationships = vec![
+        RelationshipRef {
+            relation: RelationKind::Supersedes,
+            pathway_id: "pathway-1".into(),
+        },
+        RelationshipRef {
+            relation: RelationKind::PrecededBy,
+            pathway_id: "pathway-2".into(),
+        },
+    ];
+    a.tags = vec!["priority:high".into(), "region:north".into()];
+    let mut b = build_near_duplicate();
+    b.relationships = vec![
+        RelationshipRef {
+            relation: RelationKind::Supersedes,
+            pathway_id: "pathway-1".into(),
+        },
+        RelationshipRef {
+            relation: RelationKind::FollowedBy,
+            pathway_id: "pathway-3".into(),
+        },
+    ];
+    b.tags = vec!["priority:high".into(), "region:south".into()];
+
+    group.bench_function("partial_overlap", |bencher| {
+        bencher.iter(|| engine.match_care_pathways(black_box(&a), black_box(&b)));
+    });
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_match_pair,
     bench_deterministic,
     bench_rank,
-    bench_config_variants
+    bench_config_variants,
+    bench_relationships_and_tags
 );
 criterion_main!(benches);
