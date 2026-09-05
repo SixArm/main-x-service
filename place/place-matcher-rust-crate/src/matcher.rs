@@ -76,11 +76,20 @@ use serde::{Deserialize, Serialize};
 ///     strict_mode: false,
 ///     gmail_dot_folding: false,
 ///     phone_default_country: Some("GB".into()),
+///     score_local_id: false,
+///     local_id_weight: 0.05,
 /// };
 /// assert_eq!(custom.match_threshold, 0.80);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+// Four independent feature toggles (`use_phonetic_matching`, `strict_mode`,
+// `gmail_dot_folding`, `score_local_id`) trip clippy's pedantic bool-count
+// heuristic. Each is a real, independently-documented opt-in with its own
+// acceptance criterion (OQ-K added the fourth); collapsing them into an enum
+// would obscure rather than clarify, and the acceptance criterion for
+// `score_local_id` specifically calls for a `bool`.
+#[allow(clippy::struct_excessive_bools)]
 pub struct MatchConfig {
     /// Threshold score for considering two places a match (`0.0..=1.0`).
     pub match_threshold: f64,
@@ -141,6 +150,23 @@ pub struct MatchConfig {
     /// [`crate::Normalizer::normalize_phone_e164`] using `cc` as the
     /// fallback jurisdiction. Defaults to `Some("GB")`.
     pub phone_default_country: Option<String>,
+
+    /// Opt in to scoring `local_id` (OQ-F/OQ-K). Defaults to `false`,
+    /// preserving the crate's long-standing default of never scoring it —
+    /// different organisations may issue colliding `local_id` values, so
+    /// treating one as identity evidence is only safe when the caller
+    /// knows every compared record comes from a single source. When
+    /// `true`, [`local_id_weight`](Self::local_id_weight) joins the
+    /// weighted sum via an exact-match-after-trim comparison
+    /// (`local_id_score`); `false` leaves that score `None` exactly as
+    /// before this field existed.
+    pub score_local_id: bool,
+
+    /// Weight for `local_id` exact-match equality. Only contributes when
+    /// [`score_local_id`](Self::score_local_id) is `true`; inert otherwise
+    /// (kept `Default`-derivable rather than `Option`-wrapped so a caller
+    /// can pre-set a weight before flipping the flag on).
+    pub local_id_weight: f64,
 }
 
 impl Default for MatchConfig {
@@ -169,6 +195,8 @@ impl Default for MatchConfig {
             strict_mode: false,
             gmail_dot_folding: false,
             phone_default_country: Some("GB".to_string()),
+            score_local_id: false,
+            local_id_weight: 0.05,
         }
     }
 }
@@ -374,6 +402,12 @@ pub struct MatchBreakdown {
     /// `None` if either side is absent or fails to parse as an email.
     #[serde(default)]
     pub email_score: Option<f64>,
+    /// Score for `local_id` exact-match-after-trim equality (`1.0` or
+    /// `0.0`); `None` when either side's trimmed value is empty/absent,
+    /// **or** [`MatchConfig::score_local_id`] is `false` (the default) —
+    /// see that field's doc comment for why this is opt-in.
+    #[serde(default)]
+    pub local_id_score: Option<f64>,
 }
 
 /// Place matcher engine.
@@ -592,6 +626,11 @@ impl MatchingEngine {
             place_ids_score: score_place_ids(place1, place2),
             phone_score: self.score_phone(place1, place2),
             email_score: self.score_email(place1, place2),
+            local_id_score: if self.config.score_local_id {
+                score_local_id(place1, place2)
+            } else {
+                None
+            },
         }
     }
 
@@ -644,6 +683,10 @@ impl MatchingEngine {
         if let Some(score) = breakdown.email_score {
             weighted_sum += score * self.config.email_weight;
             total_weight += self.config.email_weight;
+        }
+        if let Some(score) = breakdown.local_id_score {
+            weighted_sum += score * self.config.local_id_weight;
+            total_weight += self.config.local_id_weight;
         }
 
         // Phonetic match is a bonus only — never lowers the score.
@@ -939,6 +982,31 @@ fn score_country_code(p1: &Place, p2: &Place) -> Option<f64> {
     let na = a.trim().to_ascii_lowercase();
     let nb = b.trim().to_ascii_lowercase();
     Some(if na == nb { 1.0 } else { 0.0 })
+}
+
+/// Score `local_id` exact-match-after-trim equality: `Some(1.0)` if both
+/// sides have a non-empty (after trim) `local_id` and they are equal,
+/// `Some(0.0)` if both are non-empty but differ, `None` if either side is
+/// absent or trims to empty. Only called when
+/// [`MatchConfig::score_local_id`] is `true` (OQ-F/OQ-K) — callers who have
+/// not opted in never reach this function, so `local_id` stays unscored by
+/// default.
+///
+/// The empty-after-trim guard mirrors [`shares_place_id`]'s: a blank
+/// `local_id` on both sides must never count as shared identity, however
+/// it got there.
+fn score_local_id(p1: &Place, p2: &Place) -> Option<f64> {
+    let a = p1
+        .local_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())?;
+    let b = p2
+        .local_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())?;
+    Some(if a == b { 1.0 } else { 0.0 })
 }
 
 /// Return `true` if the two places share any identical `(scheme, value)`
@@ -1314,6 +1382,76 @@ mod tests {
             .build();
         let r = MatchingEngine::default_config().match_places(&a, &b);
         assert!(r.breakdown.place_ids_score.is_none());
+    }
+
+    // ---------- local_id (OQ-F/OQ-K: opt-in scoring) ----------
+
+    /// The default `MatchConfig` never scores `local_id`, even when both
+    /// sides carry the identical value — behaviour must stay byte-for-byte
+    /// unchanged from before this field existed.
+    #[test]
+    fn local_id_unscored_by_default_even_when_identical() {
+        let a = Place::builder().name("X").local_id("REF-1").build();
+        let b = Place::builder().name("X").local_id("REF-1").build();
+        let r = MatchingEngine::default_config().match_places(&a, &b);
+        assert!(
+            r.breakdown.local_id_score.is_none(),
+            "local_id must stay unscored unless MatchConfig::score_local_id is opted in"
+        );
+    }
+
+    #[test]
+    fn local_id_scores_one_when_opted_in_and_equal() {
+        let cfg = MatchConfig {
+            score_local_id: true,
+            ..MatchConfig::default()
+        };
+        let a = Place::builder().name("X").local_id(" REF-1 ").build();
+        let b = Place::builder().name("X").local_id("REF-1").build();
+        let r = MatchingEngine::new(cfg).match_places(&a, &b);
+        assert!(approx_eq(r.breakdown.local_id_score.unwrap(), 1.0));
+    }
+
+    #[test]
+    fn local_id_scores_zero_when_opted_in_and_different() {
+        let cfg = MatchConfig {
+            score_local_id: true,
+            ..MatchConfig::default()
+        };
+        let a = Place::builder().name("X").local_id("REF-1").build();
+        let b = Place::builder().name("X").local_id("REF-2").build();
+        let r = MatchingEngine::new(cfg).match_places(&a, &b);
+        assert!(approx_eq(r.breakdown.local_id_score.unwrap(), 0.0));
+    }
+
+    #[test]
+    fn local_id_none_when_opted_in_but_either_side_absent_or_blank() {
+        let cfg = MatchConfig {
+            score_local_id: true,
+            ..MatchConfig::default()
+        };
+        let engine = MatchingEngine::new(cfg);
+
+        let a = Place::builder().name("X").local_id("REF-1").build();
+        let b = Place::builder().name("X").build();
+        assert!(
+            engine
+                .match_places(&a, &b)
+                .breakdown
+                .local_id_score
+                .is_none()
+        );
+
+        let blank_a = Place::builder().name("X").local_id("REF-1").build();
+        let blank_b = Place::builder().name("X").local_id("   ").build();
+        assert!(
+            engine
+                .match_places(&blank_a, &blank_b)
+                .breakdown
+                .local_id_score
+                .is_none(),
+            "a whitespace-only local_id must never count as shared identity"
+        );
     }
 
     // ---------- deterministic match ----------

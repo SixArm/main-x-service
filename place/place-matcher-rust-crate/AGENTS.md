@@ -22,7 +22,7 @@ This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin,
 | Where do public types live? | `src/lib.rs` re-exports; defined under `src/{models,matcher,scorer,normalizer,error}.rs`. |
 | Where are demo runs? | `cargo run` and `cargo run --example basic_usage` and `cargo run --example custom_config`. |
 | What's the deterministic-match rule? | Any shared `(scheme, value)` pair across `place_ids`, OR identical normalised `name` plus identical normalised `address.postcode`. See [`spec.md` §5.1](./spec/index.md). |
-| What's the probabilistic-match pipeline? | Weighted, weight-renormalised sum across name / coordinates / address / category / country_code / place_ids / phone / email; missing fields skip. Optional Soundex bonus when phonetic gating clears. See [`spec.md` §5.2, §6](./spec/index.md). |
+| What's the probabilistic-match pipeline? | Weighted, weight-renormalised sum across name / coordinates / address / category / country_code / place_ids / phone / email, plus opt-in `local_id` (`MatchConfig::score_local_id`, default off); missing fields skip. Optional Soundex bonus when phonetic gating clears. See [`spec.md` §5.2, §6](./spec/index.md). |
 | Default match threshold | `0.80`. Strict: `0.95`. Lenient: `0.65`. See [`spec.md` §7](./spec/index.md). |
 | Default coordinates scale | `50.0` metres. Gaussian decay `exp(-(d/s)^2)`. See [`spec.md` §6.3](./spec/index.md). |
 | `#[non_exhaustive]` items | `Place`, `Address`, `PlaceCategory`, `PlaceIdScheme`, `MatchingError`. Construct via builders / `new`. See [`spec.md` §9.1](./spec/index.md). |
@@ -86,7 +86,7 @@ The `agents/` directory contains topic-specific guidance. Read the one that matc
 - Do not silently widen or narrow the public API; every re-export from `lib.rs` is part of the SemVer contract. (`spec.md` §9)
 - Do not add panicking unwraps in library code. `Option` / `Result` is the answer. (`spec.md` §8)
 - Do not log place data. Do not `Debug`-format records into traces.
-- Do not score `local_id`. Different organisations may issue colliding values. (`spec.md` §3.1.1)
+- Do not score `local_id` **by default**. Different organisations may issue colliding values — a caller who knows every compared record comes from one known source may opt in via `MatchConfig::score_local_id` (default `false`). (`spec.md` §3.1.1, §6.7a, §7)
 - Do not cross-match `PlaceId` values across schemes. A `(Google, "abc")` and an `(OsmNode, "abc")` refer to different things and must not match. (`spec.md` §3.5)
 - Do not construct `Place`, `Address`, `PlaceCategory`, `PlaceIdScheme`, or `MatchingError` via struct-literal syntax from downstream code. All carry `#[non_exhaustive]`.
 

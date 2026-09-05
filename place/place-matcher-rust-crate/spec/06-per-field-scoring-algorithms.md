@@ -65,6 +65,12 @@ If no sub-component is populated on both sides, the address score is the neutral
 
 `1.0` if both `place_ids` lists are non-empty AND any `(scheme, value)` pair is shared (under `PlaceId` equality); `0.0` if both lists are non-empty but no pair is shared; `None` if either list is empty.
 
+### 6.7a Local ID — `local_id_score` (opt-in; OQ-K, resolves OQ-F)
+
+**Unscored by default.** `local_id` is deliberately excluded from the default weighted sum: different organisations may issue colliding `local_id` values, so treating equality as identity evidence is only safe when the caller knows every compared record comes from a single known source. `MatchConfig::score_local_id` (default `false`) gates whether this component is computed at all — when `false`, `local_id_score` is always `None` and `local_id_weight` never participates, byte-for-byte identical to the crate's behaviour before this field existed.
+
+When `score_local_id = true`: `1.0` if both sides have a non-empty (after trim) `local_id` and the trimmed values are equal; `0.0` if both are non-empty but differ; `None` if either side is absent or trims to empty (a blank `local_id` on both sides must never count as shared identity, mirroring the empty-value guard on `place_ids`/`PlaceId`, §6.7). Weight: `MatchConfig::local_id_weight` (default `0.05`).
+
 ### 6.8 Phone — `phone_score`
 
 Compute `normalize_phone_e164(phone, cc)` for both sides where `cc = MatchConfig::phone_default_country`. If both canonicalise, `1.0` iff the canonical strings are equal, else `0.0`. Otherwise (either side fails to canonicalise) compare `normalize_phone(phone)` on both sides: `1.0` iff equal, else `0.0`.
