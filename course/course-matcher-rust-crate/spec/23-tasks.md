@@ -86,7 +86,7 @@
         not a general invariant over arbitrary inputs) —
         `weighted_average_negative_weight_breaks_the_unit_interval_bound`
         — pins the exact numbers from the verified case above.
-- [ ] T-14: Pin the documented trailing-slash `same_as` behaviour
+- [x] T-14: Pin the documented trailing-slash `same_as` behaviour *(resolved 2026-09-05.)*
       (spec §16: "we do NOT strip trailing slashes"). Add a unit test
       alongside `same_as_url_overlap_short_circuits` (`src/matcher.rs`)
       asserting that `same_as = ["https://x.org/c/"]` vs `same_as =
@@ -102,6 +102,16 @@
         strip trailing slashes, so the spec's documented "we
         deliberately preserve it" decision is enforced, not just
         asserted in prose.
+      - **Resolved.** Two new unit tests alongside
+        `same_as_url_overlap_short_circuits` (`src/matcher.rs`):
+        `same_as_trailing_slash_difference_does_not_short_circuit`
+        (`.../c/` vs `.../c` ⇒ no deterministic match) and
+        `same_as_case_only_difference_still_short_circuits` (`.../c/`
+        vs `.../C/`, slash present on both ⇒ still matches) — split
+        into two functions rather than one to keep each under
+        clippy's `many_single_char_names` threshold. `cargo test
+        --lib`: 95 passed (up from 92), 0 failed; `cargo build`/
+        `clippy --all-targets -- -D warnings` clean.
 - [ ] T-15: Reconcile `spec/24-testing-strategy.md` and this file's
       T-8 entry with the crate-local Criterion bench added in
       `[0.7.0]`. Update §24's "Benchmarks live at

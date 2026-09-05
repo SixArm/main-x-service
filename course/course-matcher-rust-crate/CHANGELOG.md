@@ -9,6 +9,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — pin the trailing-slash `same_as` behaviour (T-14)
+
+Spec §16 documents "we do NOT strip trailing slashes" for the R-2
+`same_as` short-circuit, but nothing pinned it: the only existing
+`same_as` test varied case and whitespace, never the trailing-slash
+distinction. Two new unit tests alongside
+`same_as_url_overlap_short_circuits` (`src/matcher.rs`) now cover both
+sides — `.../c/` vs `.../c` does not short-circuit, `.../c/` vs
+`.../C/` (slash present on both) still does — so a future change that
+made `normalize::fold` strip trailing slashes would fail CI instead of
+silently contradicting the spec.
+
 ### Documented — negative-weight consequence made explicit (T-13)
 
 - `spec §22`'s "setting weights to negative — not validated today,
