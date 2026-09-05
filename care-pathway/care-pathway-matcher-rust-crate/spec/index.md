@@ -136,6 +136,20 @@ weights simply never enter the denominator for them. `strict()` /
 Changing any weight (including `relationships_weight` or `tags_weight`)
 is a config-section + `CHANGELOG.md` edit in the same PR (§25).
 
+**Validation (CPM-T1).** Every field is `pub` and directly settable —
+the plain struct literal is still how the presets and the common case
+build a config — but a caller assembling one from untrusted input
+(e.g. deserialized config) can call the additive, opt-in
+`MatchConfig::validated(self) -> Result<Self>`, which rejects a
+negative, `NaN`, or infinite weight on any of the eight fields, or a
+threshold outside `[0.0, 1.0]`, returning `Error::InvalidConfig`
+naming the first offending field. This exists because such a value
+reaching §17's renormaliser unchecked can push the returned score
+outside `[0.0, 1.0]` or produce `NaN`, breaking the bounded-and-finite
+invariant §24 documents and the `Confidence` banding built on it. Same
+shape as the sibling `organization-matcher` crate's identical
+`MatchConfig`.
+
 ## 8. Normalisation
 
 `fold` (trim + NFKC + lowercase, diacritic-preserving); `pathway_code`
@@ -270,8 +284,8 @@ add IO, async, or panics to library code.
 - [ ] Patient-group / age-band component.
 - [ ] Split this single `spec/index.md` into the numbered §-per-file
       layout used by the sibling matcher crates.
-- [ ] **CPM-T1 (S) Guard `MatchConfig` against caller-supplied
-      negative/NaN weights.** Every `MatchConfig` field is `pub` with no
+- [x] **CPM-T1 (S) Guard `MatchConfig` against caller-supplied
+      negative/NaN weights.** *(resolved 2026-09-05.)* Every `MatchConfig` field is `pub` with no
       validating constructor; a caller-built config with a negative or
       `NaN` weight reaches `scoring::weighted_average` unchecked, which
       can push the returned score outside `[0.0, 1.0]` or produce `NaN`
@@ -288,6 +302,20 @@ add IO, async, or panics to library code.
       over adversarial weight vectors pins that `weighted_average`'s
       output stays bounded for a *validated* config and that the
       fallible constructor rejects the malformed ones.
+  - **Resolved.** Ported organization-matcher's ORGM-T1 fix verbatim
+    (identical `MatchConfig` shape, different field names):
+    `MatchConfig::validated(self) -> Result<Self>` reuses the crate's
+    existing `Error`/`Result` (not a new `MatchError` type) and returns
+    the new `Error::InvalidConfig(String)` variant naming the first
+    offending field. Five new unit tests (`src/config.rs`) pin the
+    accept/reject boundary; the acceptance proptest
+    (`validated_config_never_produces_an_unbounded_score`,
+    `tests/property_tests.rs`) generates a 9-value adversarial vector
+    (8 weights + threshold) and asserts an accepted config's score
+    stays finite and in `[0.0, 1.0]` while a rejected one really was
+    malformed. Documented in spec §7. Verified: `cargo test` (lib +
+    property_tests + public_api + doctests) all green, 0 failed;
+    `cargo clippy --all-targets -- -D warnings` clean.
 
 - [ ] **CPM-T2 (S) Fuzz/property/bench coverage for the
       `relationships`/`tags` components.** Landed 2026-08-28 (both
