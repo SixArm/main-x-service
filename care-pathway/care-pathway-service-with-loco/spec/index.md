@@ -1405,7 +1405,7 @@ the evidence bundle.
     `tests/requests/care_pathways.rs`) verified green against a real
     Postgres (`scripts/ci-check.sh test-db …`).
 
-- [ ] **CP-T4 (S) Wire FHIR `GET /fhir/PlanDefinition` search onto the
+- [x] **CP-T4 (S) Wire FHIR `GET /fhir/PlanDefinition` search onto the
   Tantivy index.** `controllers/fhir.rs::search` calls
   `PathwayModel::list(&ctx.db, FHIR_SEARCH_SCAN_CAP)` — a capped
   Postgres scan — rather than `crate::search::SearchEngine`, even
@@ -1413,10 +1413,39 @@ the evidence bundle.
   endpoint. *(Verified: `grep -n "async fn search" -A 15
   src/controllers/fhir.rs` shows the handler reading
   `PathwayModel::list` directly.)* Three-part change, mirroring the
-  identical open item already recommended for organization-service.
-  **Acceptance:** `GET /fhir/PlanDefinition?title=` resolves through
-  Tantivy; a test proves a hit beyond the old scan cap is now found;
-  the `CapabilityStatement`'s declared search params are unchanged.
+  identical open item already recommended for organization-service
+  (ORG-T5, landed first — this is its twin, same pattern ported).
+  **Resolution (2026-09-05):** `search()` now derives a `query_text`
+  from whichever of `FhirPlanSearchParams::name` /
+  `FhirPlanSearchParams::identifier` is present (the crate's only
+  text-bearing FHIR search params — both are indexed Tantivy `TEXT`
+  fields, `src/search/index.rs`); when present, candidates resolve via
+  `crate::search::engine().search(q, …)` +
+  `PathwayModel::find_by_pids`, mirroring the native `/api/care-pathways/search`
+  handler's retrieval exactly. A query with neither param (e.g. bare
+  `_id`) falls back to the original `PathwayModel::list` capped scan,
+  since there is nothing to search on. `FhirPlanSearchParams::matches`
+  is unchanged and stays the authoritative, field-precise filter in
+  both branches — only retrieval changed. `parse_pids` in
+  `controllers/care_pathways.rs` bumped `pub(crate)` for reuse (no
+  duplicated hit-parsing logic). The task's own acceptance text names a
+  `?title=` param that does not exist on this resource (the field is
+  `name`, per `FhirPlanSearchParams`) — corrected in the implementation
+  rather than followed literally. As in ORG-T5, literally exceeding the
+  1000-row scan cap in a test is impractical (it would mean creating
+  1000+ live, Tantivy-indexed rows); the substituted test proves
+  retrieval no longer depends on `PathwayModel::list`'s recency
+  ordering — the target pathway is created first (oldest/lowest id,
+  the position a newest-first scan reaches last) and is still found
+  ahead of five newer distractors
+  (`tests/requests/fhir.rs::fhir_search_by_name_resolves_through_the_index`);
+  a second test pins the bare-`_id` fallback
+  (`fhir_search_by_id_alone_still_works`). The `CapabilityStatement`'s
+  declared search params are unchanged (only retrieval changed, not
+  the supported-param list). Verified: `cargo build --lib`, `cargo
+  clippy --all-targets -- -D warnings`, `cargo test --lib` (318
+  passed), `cargo test -- --ignored` against a real Postgres (54
+  passed, including both new tests), `cargo fmt --check`.
 
 ## 14. Implementation status
 

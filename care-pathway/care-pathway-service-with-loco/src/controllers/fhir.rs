@@ -302,25 +302,74 @@ async fn remove(
 }
 
 /// `GET /fhir/PlanDefinition?<params>` — a `searchset` `Bundle` of matching
-/// care pathways. In-memory filter over active rows (capped), then the
-/// `_count` page size. Supported params: see [`FhirPlanSearchParams`].
+/// care pathways. When the query carries a text-bearing parameter (`name` /
+/// `identifier`), candidates are resolved through the Tantivy index rather
+/// than a capped in-memory Postgres scan — the same retrieval the native
+/// `/api/care-pathways/search` endpoint already uses (CP-T4); a query with
+/// neither falls back to the original capped scan, since there is nothing
+/// to search on. Either way, [`FhirPlanSearchParams::matches`] stays the
+/// authoritative, field-precise filter — only retrieval changes. Supported
+/// params: see [`FhirPlanSearchParams`].
 async fn search(
     Query(params): Query<FhirPlanSearchParams>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
     access: AccessContext,
 ) -> Response {
-    let rows = match PathwayModel::list(&ctx.db, FHIR_SEARCH_SCAN_CAP).await {
-        Ok(rows) => rows,
-        Err(e) => {
-            return fhir_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "exception",
-                e.to_string(),
-            );
+    let query_text = params.name.as_deref().or(params.identifier.as_deref());
+    let rows = if let Some(q) = query_text {
+        let hits = match crate::search::engine() {
+            Some(engine) => {
+                match engine.search(
+                    q,
+                    usize::try_from(FHIR_SEARCH_SCAN_CAP).unwrap_or(usize::MAX),
+                ) {
+                    Ok(hits) => hits,
+                    Err(e) => {
+                        return fhir_error(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "exception",
+                            e.to_string(),
+                        );
+                    }
+                }
+            }
+            None => {
+                return fhir_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "exception",
+                    "the search index is unavailable",
+                );
+            }
+        };
+        match PathwayModel::find_by_pids(
+            &ctx.db,
+            &crate::controllers::care_pathways::parse_pids(&hits),
+        )
+        .await
+        {
+            Ok(rows) => rows,
+            Err(e) => {
+                return fhir_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "exception",
+                    e.to_string(),
+                );
+            }
+        }
+    } else {
+        match PathwayModel::list(&ctx.db, FHIR_SEARCH_SCAN_CAP).await {
+            Ok(rows) => rows,
+            Err(e) => {
+                return fhir_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "exception",
+                    e.to_string(),
+                );
+            }
         }
     };
-    if rows.len() as u64 == FHIR_SEARCH_SCAN_CAP {
+    if query_text.is_none() && rows.len() as u64 == FHIR_SEARCH_SCAN_CAP {
         tracing::warn!(
             cap = FHIR_SEARCH_SCAN_CAP,
             "fhir search scan hit the row cap; results may be truncated"

@@ -108,7 +108,7 @@ impl Page {
 /// A malformed stored id can only come from a corrupted index, and the
 /// right response is to ignore that hit rather than fail a search that
 /// has other perfectly good results.
-fn parse_pids(hits: &[String]) -> Vec<uuid::Uuid> {
+pub(crate) fn parse_pids(hits: &[String]) -> Vec<uuid::Uuid> {
     hits.iter()
         .filter_map(|s| match uuid::Uuid::parse_str(s) {
             Ok(id) => Some(id),
