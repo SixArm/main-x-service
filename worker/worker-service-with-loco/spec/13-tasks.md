@@ -626,7 +626,7 @@ clearly described manual check confirms the acceptance criterion.
     `src/matching/scoring.rs` pin a non-default `0.42` round-trips
     through each layer.
 
-- [ ] **T-18 — DB-gated round-trip test for the review-queue persistence module.**
+- [x] **T-18 — DB-gated round-trip test for the review-queue persistence module.** *(resolved 2026-09-05.)*
   `src/db/review_queue.rs` (228 lines: normalized-pair upsert / list /
   first-writer-wins decide, added under the 2026-07-19 "Stored review
   queue" task) carries no `#[test]`/`mod tests` of its own (verified:
@@ -646,6 +646,28 @@ clearly described manual check confirms the acceptance criterion.
     first-writer-wins decision path against a real migrated Postgres;
     green under `scripts/ci-check.sh test-db
     worker/worker-service-with-loco`.
+  - **Resolved.** New `tests/review_queue_db.rs`, adapted from (not
+    copied verbatim from) person's `tests/review_queue_db.rs` — worker's
+    module has in fact already drifted from person's (no `provenance`
+    column, unboxed `DecideOutcome::Decided`), confirming the "byte-
+    identical" premise this task questioned no longer held even before
+    this test existed to prove it. Connects via the family-standard
+    `DATABASE_URL` env var (not person's bespoke
+    `REVIEW_QUEUE_TEST_DATABASE_URL` + inline migration application),
+    matching this crate's own `tests/gender_normalization_db.rs`
+    pattern — migrations are applied by `scripts/ci-check.sh test-db`
+    before the suite runs. Covers insert, pair-order normalization,
+    re-scan upsert (score refreshed, decision preserved), the
+    first-writer-wins `decide` path (`Decided` /
+    `AlreadyDecided` / `NotFound`), and the pending-status list filter;
+    cleanup is scoped to the test's own two record ids (never a
+    blanket table wipe, since other suites may hold rows of their
+    own). Verified against a real Postgres 18 via `scripts/ci-check.sh
+    test-db worker/worker-service-with-loco`: full DB-gated suite
+    passes (11 + 23 + 1 + 4 + 1 across the crate's suites), 0 failed;
+    `cargo test --lib`: 314 passed (unchanged — no unit tests added),
+    0 failed; `cargo build`/`clippy --all-targets -- -D warnings`
+    clean.
 
 - [ ] **T-19 — FHIR Practitioner round-trip fidelity: parse the fields `from_fhir_worker` still drops.**
   T-12 (done) mounted `/fhir/Practitioner`, but five `TODO`s remain in the

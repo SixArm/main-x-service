@@ -8,6 +8,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — DB-gated round-trip test for the review-queue persistence module (T-18)
+
+`src/db/review_queue.rs` (normalized-pair upsert / list / first-writer-
+wins decide) carried no test of its own, and this crate's `tests/`
+directory had no `review_queue_db.rs` — "byte-identical to person's
+tested module" (the 2026-07-19 task's acceptance note) was not "tested
+here", and in fact no longer holds: worker's module has since drifted
+from person's (no `provenance` column, unboxed `DecideOutcome::Decided`).
+New `tests/review_queue_db.rs` covers insert, pair-order normalization,
+re-scan upsert, the first-writer-wins `decide` path, and the
+pending-status list filter against a real migrated Postgres, following
+this crate's own `DATABASE_URL`-gated pattern
+(`tests/gender_normalization_db.rs`) rather than person's bespoke
+env var.
+
 ### Fixed — `ProbabilisticMatcher::threshold()` now reflects the configured threshold (T-17)
 
 `ProbabilisticMatcher::threshold()` returned a hard-coded `0.85`
