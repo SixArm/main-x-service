@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use super::{ensure_valid, record_rejection, unprocessable};
+use super::{Page, ensure_valid, record_rejection, unprocessable, with_page_headers};
 use crate::auth::{self, MaybeAuthUser};
 use crate::metrics::Metrics;
 use crate::models::_entities::{benefit_enrollments, benefit_plans, employees, onboarding_items};
@@ -213,15 +213,27 @@ async fn create_employee(
     })
 }
 
+/// Default page size for `GET /api/employees` — the cap this endpoint
+/// applied before pagination existed (WPM-T40), so omitting `?limit=`
+/// returns what it always did.
+const EMPLOYEE_LIST_DEFAULT_LIMIT: u64 = 500;
+
 /// `GET /api/employees` — active employees, filterable by
-/// `?department=` and `?status=`. Record-level masking applies per
-/// row (a list must never reveal more than the single read).
+/// `?department=` and `?status=`, paginated via `?limit=&offset=`
+/// (WPM-T40; `agents/share/restful.md`). Record-level masking applies
+/// per row (a list must never reveal more than the single read).
 #[derive(Debug, Deserialize)]
 struct EmployeeListParams {
     #[serde(default)]
     department: Option<String>,
     #[serde(default)]
     status: Option<String>,
+    /// Page size; absent, zero, or unparseable ⇒ [`EMPLOYEE_LIST_DEFAULT_LIMIT`].
+    #[serde(default)]
+    limit: Option<u64>,
+    /// Rows to skip; absent ⇒ 0.
+    #[serde(default)]
+    offset: Option<u64>,
 }
 
 #[debug_handler]
@@ -230,6 +242,12 @@ async fn list_employees(
     caller: MaybeAuthUser,
     Query(params): Query<EmployeeListParams>,
 ) -> Result<Response> {
+    let page = Page {
+        limit: params.limit,
+        offset: params.offset,
+    };
+    page.check_offset()?;
+    let (limit, offset) = page.resolve(EMPLOYEE_LIST_DEFAULT_LIMIT);
     let mut query = employees::Entity::find().filter(employees::Column::DeletedAt.is_null());
     if let Some(department) = &params.department {
         query = query.filter(employees::Column::Department.eq(department));
@@ -237,9 +255,11 @@ async fn list_employees(
     if let Some(status) = &params.status {
         query = query.filter(employees::Column::Status.eq(status));
     }
+    let total = query.clone().count(&ctx.db).await?;
     let rows = query
         .order_by_asc(employees::Column::Id)
-        .limit(500)
+        .limit(limit)
+        .offset(offset)
         .all(&ctx.db)
         .await?;
     let mut out = Vec::with_capacity(rows.len());
@@ -256,7 +276,7 @@ async fn list_employees(
             employee
         });
     }
-    format::json(out)
+    Ok(with_page_headers(format::json(out)?, total, limit, offset))
 }
 
 /// `GET /api/employees/{pid}` — one employee; a salary-bearing read
@@ -639,16 +659,41 @@ async fn create_plan(
     })
 }
 
-/// `GET /api/benefit-plans`.
+/// Default page size for `GET /api/benefit-plans` — the cap this
+/// endpoint applied before pagination existed (WPM-T40).
+const BENEFIT_PLAN_LIST_DEFAULT_LIMIT: u64 = 200;
+
+/// `?limit=&offset=` for `GET /api/benefit-plans` (WPM-T40).
+#[derive(Debug, Default, Deserialize)]
+struct PlanListParams {
+    #[serde(default)]
+    limit: Option<u64>,
+    #[serde(default)]
+    offset: Option<u64>,
+}
+
+/// `GET /api/benefit-plans`, paginated via `?limit=&offset=` (WPM-T40;
+/// `agents/share/restful.md`).
 #[debug_handler]
-async fn list_plans(State(ctx): State<AppContext>) -> Result<Response> {
-    let rows = benefit_plans::Entity::find()
-        .filter(benefit_plans::Column::DeletedAt.is_null())
+async fn list_plans(
+    State(ctx): State<AppContext>,
+    Query(params): Query<PlanListParams>,
+) -> Result<Response> {
+    let page = Page {
+        limit: params.limit,
+        offset: params.offset,
+    };
+    page.check_offset()?;
+    let (limit, offset) = page.resolve(BENEFIT_PLAN_LIST_DEFAULT_LIMIT);
+    let query = benefit_plans::Entity::find().filter(benefit_plans::Column::DeletedAt.is_null());
+    let total = query.clone().count(&ctx.db).await?;
+    let rows = query
         .order_by_asc(benefit_plans::Column::Id)
-        .limit(200)
+        .limit(limit)
+        .offset(offset)
         .all(&ctx.db)
         .await?;
-    format::json(rows)
+    Ok(with_page_headers(format::json(rows)?, total, limit, offset))
 }
 
 /// `POST /api/employees/{pid}/benefit-enrollments` — enrol; the

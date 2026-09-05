@@ -11,6 +11,7 @@ mod assessments;
 mod ergonomics;
 mod hr;
 mod learning;
+mod pagination;
 mod payroll;
 mod privacy;
 mod talent;

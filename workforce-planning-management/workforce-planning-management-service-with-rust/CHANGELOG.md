@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — list pagination headers (WPM-T40)
+
+No controller emitted `X-Total-Count`/`X-Limit`/`X-Offset`, and the two
+highest-traffic list endpoints capped with a hardcoded `.limit(...)`
+rather than accepting `?limit=&offset=` — the family-wide contract in
+`agents/share/restful.md`. Added the shared `Page`/`with_page_headers`
+pagination helpers (`MAX_LIMIT` 500, `MAX_OFFSET` 10 000) to
+`src/controllers/mod.rs`, ported from the sibling entity services.
+`GET /api/employees` and `GET /api/benefit-plans` now accept
+`?limit=&offset=`, clamp `limit` rather than reject it, bound `offset`
+(`400` past `MAX_OFFSET`, SEC-G7), and stamp all three response headers;
+the employee list's total reflects its `?department=`/`?status=` filter.
+New DB-gated tests in `tests/requests/pagination.rs`. See
+spec/tasks.md WPM-T40.
+
 ### Added — `require_ref` test coverage for Worker/Organization/Course (WPM-T37)
 
 `src/validation.rs`'s `ref_rules` unit test only ever exercised
