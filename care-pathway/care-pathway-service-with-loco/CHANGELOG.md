@@ -9,6 +9,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — FHIR `PlanDefinition` search now resolves through Tantivy (CP-T4)
+
+`GET /fhir/PlanDefinition?<params>` scanned up to `FHIR_SEARCH_SCAN_CAP`
+(1000) rows from Postgres via `PathwayModel::list` on every request, even
+though this crate indexes via Tantivy for the native
+`/api/care-pathways/search` endpoint. A query naming `name` or
+`identifier` (the resource's only text-bearing FHIR search params) now
+resolves candidates through `crate::search::engine()` +
+`PathwayModel::find_by_pids`, the same retrieval the native search
+handler uses; a query with neither still falls back to the original
+capped scan. `FhirPlanSearchParams::matches` is unchanged and remains
+the authoritative, field-precise filter in both branches. `parse_pids`
+in `controllers/care_pathways.rs` is now `pub(crate)` for reuse. New
+DB-gated tests (`tests/requests/fhir.rs`): an ordering-independence
+proof that a `name=` search finds an oldest-created target ahead of
+newer distractors, and a pin that bare-`_id` search still falls back to
+the scan. Twin of organization-service's ORG-T5. See spec/index.md
+CP-T4.
+
 ### Security — `same_as` URL well-formedness validation (CP-T3)
 
 `src/validation.rs`'s `same_as` field was only length/cardinality-capped,
