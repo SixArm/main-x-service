@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — OpenAPI doc was missing `/api/stays/{pid}/time-analysis` (PF-T20)
+
+The route landed in PF-T19 but `src/openapi.rs`'s hand-written `paths`
+map never gained an entry for it, so a client discovering the API via
+`/api-docs/openapi.json` could not see the endpoint exists. Added the
+`paths` entry (mirroring the `/api/locate/{person_ref}` sensitive-read
+shape) and extended `spec_shape`'s assertion list to catch the same
+drift recurring. See `../spec/tasks.md` PF-T20.
+
 ### Added — the stitched-journey timeline (`GET /api/stays/{pid}/time-analysis`)
 
 This service now serves the timeline contract `care-pathway-service`
