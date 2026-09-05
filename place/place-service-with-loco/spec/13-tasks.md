@@ -389,27 +389,49 @@ clearly described manual check confirms the acceptance criterion.
   scores; `cargo test --lib` + clippy pedantic clean; three-part change
   (spec §9/§13 + code + test).
 
-- [ ] **T-15 (M) — Mask sensitive fields on `check-duplicates` /
-  create's `409` candidates.** `GET /api/places/search` already accepts
-  `mask_sensitive` and masks results before returning them, but
-  `check_duplicates` / `find_candidates` (`src/api/rest/handlers.rs`)
-  return `ScoredCandidate { place: existing, .. }` — the full, unmasked
-  stored record — with no masking option at all, on both the explicit
+- [x] **T-15 (M) — Mask sensitive fields on `check-duplicates` /
+  create's `409` candidates.** *(resolved 2026-09-05.)*
+  `GET /api/places/search` already accepted `mask_sensitive` and masked
+  results before returning them, but `check_duplicates` /
+  `find_candidates` (`src/api/rest/handlers.rs`) returned
+  `ScoredCandidate { place: existing, .. }` — the full, unmasked stored
+  record — with no masking option at all, on both the explicit
   `POST /api/places/check-duplicates` endpoint and the `409` body
   `POST /api/places` returns on a duplicate hit. Per
   `agents/share/security.md` invariant 5 ("masking on every read path…
   a bulk or aggregate read must never reveal more than the equivalent
   single read"), a caller who cannot see a place's full record via `GET`
-  can still recover it by POSTing a near-duplicate probe. *(verified:
+  could still recover it by POSTing a near-duplicate probe. *(verified:
   `grep -n mask_sensitive src/api/rest/handlers.rs` shows it only on the
   `SearchQuery` struct and the `search_places` handler; `find_candidates`
   at line 544 and `check_duplicates` at line 596 have no masking
-  parameter or call.)* **Acceptance:** `check-duplicates` (and the
-  `409` path, sharing `find_candidates`) accept an optional
-  `mask_sensitive` flag with the same default and masking function as
-  `search`; a DB-free or DB-gated test asserts a masked duplicate-check
-  response redacts the same fields `mask_place` redacts on `/masked`;
-  clippy pedantic clean; three-part change (spec §9 + code + test).
+  parameter or call.)*
+  **Resolution:** `find_candidates` gained a `mask_sensitive: bool`
+  parameter; when `true` each candidate's `place` is redacted via the
+  existing `mask_place` (same function and field set `/masked`/`search`
+  already use) before scoring is attached. `check_duplicates` gained a
+  `CheckDuplicatesQuery { mask_sensitive: Option<bool> }` (mirroring
+  `SearchQuery`, default `false`), and `create_place` gained a sibling
+  `CreatePlaceQuery` so the `409` duplicate body honours the same flag
+  the caller's own create request carries — the caller posting the
+  create is the one who would otherwise recover the hidden record from
+  the `409` body. `match_place` deliberately stays unmasked (documented
+  in code), mirroring the identical decision landed for
+  `thing-service`'s T-13: a `/match` caller supplies the probe
+  explicitly to compare it, so there is no "recover a hidden record via
+  a near-duplicate probe" path to close there. New
+  `tests/masking_check_duplicates.rs` (`#[ignore]`d, DB-gated) seeds a
+  place with a telephone number and a check-digit-valid, deterministic-
+  short-circuit GLN, then asserts: `check-duplicates` with no flag
+  returns the unmasked telephone (matching search's own default);
+  `?mask_sensitive=true` returns a `****`-masked telephone; and
+  `POST /api/places?mask_sensitive=true` against an existing duplicate
+  returns `409` with the same masked telephone in
+  `error.details[0].place.telephone`. Verified: `cargo build --lib`,
+  `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and
+  `scripts/ci-check.sh test-db place/place-service-with-loco` all clean
+  (231 lib tests + the 2 new masking tests, plus the rest of the
+  DB-gated suite, all passing); no `Cargo.lock` churn.
 
 - [x] **T-16 (S) — Guard `contained_in_place` against self-reference and
   cycles.** `spec/16-open-questions.md` OQ-2 states "validation rejects
