@@ -9,6 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — unreachable authentication service crashed /verify with a raw 500 (T-26)
+
+`/signin` and `/verify` had zero Playwright coverage. Adding it (a real
+stub HTTP server standing in for the authentication service's
+magic-link endpoints, since the outbound calls happen server-side and
+`page.route` can't stub them) surfaced a real defect: `verifyMagicLink`'s
+`fetch` call had no error handling, so a network-level failure (the
+service unreachable, distinct from it reachably answering `401`) threw
+uncaught out of `load` and SvelteKit rendered its generic `500 Internal
+Error` page instead of this route's own UI. Now caught, yielding a new
+`serviceUnavailable` error state with its own honest message, distinct
+from "this link is invalid or has expired". New
+`tests/e2e/auth.spec.ts` (5 tests) plus `tests/e2e/auth-stub-server.ts`
++ `global-setup.ts` wiring. See spec §13 T-26.
+
 ### Added — GDPR export download on the detail page (T-20)
 
 A button on `/places/[id]` fetches `GET /api/places/{id}/export` through the

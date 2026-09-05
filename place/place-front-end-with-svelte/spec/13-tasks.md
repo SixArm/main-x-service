@@ -89,18 +89,47 @@
   and `/places/[id]/audit` stay reachable unauthenticated; a unit test
   pins `requireSignedIn`'s pass/redirect behaviour; three-part change
   (spec §8/§9 + code + test).
-- [ ] T-26: **E2E coverage for `/signin` and `/verify`.** `tests/e2e/`
-  contains exactly one spec file, `places.spec.ts`; there is no
-  Playwright smoke test for the magic-link sign-in or verify pages at
-  all — the same gap `thing-front-end-with-svelte` tracks as its still-open
-  T-23. *(verified: `ls tests/e2e/` lists only `places.spec.ts`;
-  `grep -rln "signin\|verify" tests/e2e/` returns nothing.)*
-  **Acceptance:** new Playwright specs cover `/signin` (request a link,
-  see confirmation state) and `/verify` (a stubbed valid token sets the
-  session and redirects; an invalid/expired token shows an error rather
-  than a raw 500); `pnpm test:e2e` green; three-part change (spec §11 +
-  test; no application code change expected unless the smoke test
-  surfaces a real defect).
+- [x] T-26: **E2E coverage for `/signin` and `/verify`.** *(resolved
+  2026-09-05.)* `tests/e2e/` contained exactly one spec file,
+  `places.spec.ts`; there was no Playwright smoke test for the
+  magic-link sign-in or verify pages at all — the same gap
+  `thing-front-end-with-svelte` tracks as its still-open T-23.
+  *(verified: `ls tests/e2e/` listed only `places.spec.ts`;
+  `grep -rln "signin\|verify" tests/e2e/` returned nothing.)*
+  **Resolution:** the outbound calls `/signin` and `/verify` make
+  happen server-side (`src/lib/server/auth.ts`), not in the browser, so
+  `page.route` cannot stub them. New `tests/e2e/auth-stub-server.ts` is
+  a real, minimal HTTP server standing in for the authentication
+  service's magic-link endpoints, started in a new
+  `tests/e2e/global-setup.ts` (Playwright `globalSetup`) **before** the
+  preview server boots — `AUTH_API_URL` is read once at that server's
+  startup (`$env/dynamic/private`), so the stub must already be
+  listening on the fixed port `playwright.config.ts`'s new
+  `webServer.env` points it at (`tests/e2e/auth-stub-port.ts` shares
+  that port between the two files). New `tests/e2e/auth.spec.ts` (5
+  tests): `/signin` renders the form and shows the confirmation banner
+  after submitting; `/verify` with no token shows the missing-token
+  message (needs no stub); with an expired/unknown token (a real `401`
+  from the stub) shows the invalid-token message; with a valid token
+  the stub returns a `Set-Cookie` and the page redirects home with the
+  session cookie set; and — the scenario that actually surfaced a real
+  defect — with the stub simulating the service being **unreachable**
+  (`req.socket.destroy()`, no response at all).
+  **Real defect found and fixed, as anticipated by this task's own
+  acceptance note:** `verifyMagicLink`'s `fetch` call in
+  `src/routes/verify/+page.server.ts` had no error handling, so a
+  network-level failure (unlike a reachable service answering `401`)
+  threw uncaught out of `load` and SvelteKit rendered its generic `500
+  Internal Error` page — confirmed directly by reproducing the
+  scenario (`curl` against the built preview server's `__data.json`
+  endpoint) before writing any fix. Now wrapped in a `try`/`catch`
+  yielding a new, honest `error: "serviceUnavailable"` state with its
+  own message ("We could not reach the sign-in service…") — deliberately
+  distinct from "this link is invalid or has expired", which would
+  misattribute an unreachable service to the token being bad.
+  Verified: `npm run check` (svelte-check) clean; `npm test` (vitest,
+  55/55) clean; `npx playwright test` 14/14 passing (5 new + 9
+  pre-existing), run three times to rule out flake.
 - [ ] T-27: **Wire `mask_sensitive` into the list/search UI.**
   `GET /api/places/search` accepts `mask_sensitive` and
   `PlaceRepository`'s search method already threads it through, but
