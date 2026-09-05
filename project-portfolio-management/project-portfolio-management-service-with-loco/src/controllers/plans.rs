@@ -144,6 +144,41 @@ impl PlanRef {
     }
 }
 
+/// Filter `rows` down to the ones `caller`'s record-level ABAC policy
+/// allows to read, projecting each survivor to a [`PlanRef`].
+///
+/// `get_one`/`get_export` already run [`crate::auth::authorize_record`]
+/// per plan (keyed on `resource.stage`, PPM-3); `list` and `search` did
+/// not, so a policy that **denies** read past some stage still let
+/// those plans' pid + name leak through the collection endpoints even
+/// though the direct `GET /{pid}` would `403` — a collection read
+/// disclosing more than the equivalent single read (spec SEC-PPM-1;
+/// `agents/share/security.md` invariant 5). A denied row is **omitted**,
+/// not surfaced with an error, since the array as a whole still
+/// succeeds for the rows the caller may see.
+///
+/// There is no `mask` **obligation** step here (unlike `get_one`): a
+/// [`PlanRef`] carries only `{pid, name}` — it never held `lead_ref`/
+/// `owner_org_id`/`owner_org_name` to begin with, so there is nothing
+/// left for that obligation to redact on this projection.
+///
+/// With `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` off (the default)
+/// or no configured deny rule, `authorize_record` never denies, so this
+/// is a no-op and every row passes through unchanged.
+fn readable_refs(rows: &[PlanModel], caller: &MaybeAuthUser) -> Vec<PlanRef> {
+    rows.iter()
+        .filter(|row| {
+            crate::auth::authorize_record(
+                caller,
+                authentication_verifier::Action::Read,
+                &crate::auth::plan_resource_attrs(row.stage.as_deref()),
+            )
+            .is_ok()
+        })
+        .map(PlanRef::of)
+        .collect()
+}
+
 /// Body of `POST /{collection}/match`: a query plus the explicit
 /// candidate list to rank it against (no persistence is touched).
 #[derive(Debug, Deserialize)]
@@ -444,6 +479,7 @@ async fn remove(
 async fn list(
     axum::extract::Query(params): axum::extract::Query<ListParams>,
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
 ) -> Result<Response> {
     let page = Page {
         limit: params.limit,
@@ -460,7 +496,7 @@ async fn list(
         .filter(|p| !p.is_empty());
     let rows = PlanModel::list_paged(&ctx.db, parent, limit, offset).await?;
     let total = PlanModel::count_for(&ctx.db, parent).await?;
-    let refs: Vec<PlanRef> = rows.iter().map(PlanRef::of).collect();
+    let refs = readable_refs(&rows, &caller);
     Ok(with_page_headers(format::json(refs)?, total, limit, offset))
 }
 
@@ -479,6 +515,7 @@ async fn list(
 async fn search(
     axum::extract::Query(params): axum::extract::Query<SearchParams>,
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
 ) -> Result<Response> {
     let q = params.q.unwrap_or_default();
     if q.trim().is_empty() {
@@ -514,7 +551,7 @@ async fn search(
     )?;
     let rows = PlanModel::find_by_pids(&ctx.db, &parse_pids(&pids)).await?;
     let total = index_total as u64;
-    let refs: Vec<PlanRef> = rows.iter().map(PlanRef::of).collect();
+    let refs = readable_refs(&rows, &caller);
     Ok(with_page_headers(format::json(refs)?, total, limit, offset))
 }
 
@@ -542,6 +579,11 @@ async fn match_against(Json(req): Json<MatchRequest>) -> Result<Response> {
 /// `Program`-labelled plan may still be the same identity (see
 /// `src/search/mod.rs`).
 ///
+/// A candidate the caller's record-level ABAC policy denies reading is
+/// **omitted**, same as [`readable_refs`] does for `list`/`search` (spec
+/// SEC-PPM-1) — a duplicate check must not reveal a plan's existence to
+/// a caller who could not `GET` it directly.
+///
 /// # Errors
 ///
 /// `503` when the search index is unavailable, so duplicates cannot be
@@ -549,6 +591,7 @@ async fn match_against(Json(req): Json<MatchRequest>) -> Result<Response> {
 #[debug_handler]
 async fn check_duplicates(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Json(query): Json<Plan>,
 ) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
@@ -573,15 +616,25 @@ async fn check_duplicates(
     for row in &rows {
         let candidate = row.to_plan()?;
         let r = engine.match_plans(&query, &candidate);
-        if r.is_match {
-            hits.push(ScoredRef {
-                pid: row.pid.to_string(),
-                name: row.name.clone(),
-                score: r.score,
-                confidence: format!("{:?}", r.confidence),
-                is_match: r.is_match,
-            });
+        if !r.is_match {
+            continue;
         }
+        if crate::auth::authorize_record(
+            &caller,
+            authentication_verifier::Action::Read,
+            &crate::auth::plan_resource_attrs(row.stage.as_deref()),
+        )
+        .is_err()
+        {
+            continue;
+        }
+        hits.push(ScoredRef {
+            pid: row.pid.to_string(),
+            name: row.name.clone(),
+            score: r.score,
+            confidence: format!("{:?}", r.confidence),
+            is_match: r.is_match,
+        });
     }
     hits.sort_by(|a, b| score_desc(a.score, b.score));
     format::json(hits)

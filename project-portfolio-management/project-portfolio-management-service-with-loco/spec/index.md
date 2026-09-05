@@ -751,31 +751,59 @@ HIPAA/NHS/GDPR posture for audit and access controls.
 
 ## 13. Tasks (live work queue)
 
-- [ ] **SEC-PPM-1 (M) Record-level masking/ABAC on `list` / `search` /
+- [x] **SEC-PPM-1 (M) Record-level ABAC on `list` / `search` /
   `check-duplicates`, matching the single-record `GET /{pid}` path.**
-  `agents/share/security.md` invariant 5 states masking "is not a
-  single-record-GET feature — it must hold on `list` / `search` /
-  `check-duplicates` ... paths too", and `case-service` closed exactly
-  this gap for itself as SEC-G2/G3. Portfolio's own single-record
-  `get_one` calls `crate::auth::authorize_record` with the `caller:
-  MaybeAuthUser` extractor and honours the `mask` obligation (§9.6,
-  `controllers/plans.rs` — verified: the `authorize_record` call sits
-  directly in `get_one`, with a doc comment naming the masked fields),
-  but `list`, `search`, and `check_duplicates` take **no** `caller`
-  parameter at all and never call `authorize_record` or the masking
-  helper — *(verified: `grep -n "fn list\|fn search\|fn check_duplicates"
-  -A 3 src/controllers/plans.rs` shows none of the three functions
-  taking a `MaybeAuthUser`/`AuthUser` argument, and reading each body
-  end-to-end shows no `authorize_record`/`mask` call in any of them)*.
-  A caller entitled only to a masked single-record view today sees the
-  **unmasked** `lead_ref`/`owner_org_id`/`owner_org_name` in the list,
-  search, and duplicate-check responses. Extend the ABAC + masking
-  check to all three, following case's precedent. Three-part change:
-  spec §9.1/§9.6/§13 + `src/controllers/plans.rs` + a DB-gated masking
-  test (mirroring `case-service`'s `tests/masking.rs` shape).
-  **Acceptance:** a DB-gated test proves a masked-obligation caller
-  gets redacted `lead_ref`/owner-org fields from `list`, `search`, and
-  `check-duplicates`, exactly as `GET /{pid}` already redacts them.
+  *(resolved 2026-09-05.)* `agents/share/security.md` invariant 5 states
+  masking "is not a single-record-GET feature — it must hold on `list`
+  / `search` / `check-duplicates` ... paths too", and `case-service`
+  closed exactly this gap for itself as SEC-G2/G3. Portfolio's own
+  single-record `get_one` calls `crate::auth::authorize_record` with
+  the `caller: MaybeAuthUser` extractor and honours the `mask`
+  obligation (§9.6, `controllers/plans.rs`), but `list`, `search`, and
+  `check_duplicates` took **no** `caller` parameter at all and never
+  called `authorize_record` or the masking helper.
+  **Correction to the original framing:** this task as written asked
+  for the `mask` **obligation** (`lead_ref`/`owner_org_id`/
+  `owner_org_name` redaction) on these three endpoints, mirroring
+  `GET /{pid}`. That framing does not fit the code: `PlanRef`/
+  `ScoredRef` (the response shapes for `list`/`search`/
+  `check-duplicates`) carry only `{pid, name}` /
+  `{pid, name, score, confidence, is_match}` — they never held
+  `lead_ref`/`owner_org_id`/`owner_org_name` to begin with, so there
+  was nothing for a `mask` obligation to redact on them (the same
+  family-wide DTO-shape finding care-pathway-service's twin task
+  CP-T2 made — checked case-service too, and its analogous
+  `CaseRef`/`ScoredRef` are equally thin). The actual, provable gap is
+  **authorization filtering**, not field redaction: a caller whose
+  direct read a `deny` rule blocks (e.g. a `resource.stage`-gated rule,
+  PPM-3) must not still see that plan's pid + name via the collection
+  endpoints.
+  **Resolution:** a new `readable_refs` helper
+  (`src/controllers/plans.rs`) filters `list`/`search` rows through
+  `authorize_record` (keyed on each row's own `stage` column, no
+  `to_plan()` parse needed), omitting a denied row from the response
+  rather than erroring the whole call; `check_duplicates` (which took
+  no caller/auth parameter before this change) gained a `MaybeAuthUser`
+  extractor and applies the identical per-candidate filter before
+  scoring a hit into the response. With
+  `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` off (the default) or no
+  configured deny rule, `authorize_record` never denies, so this is a
+  no-op — unchanged behaviour for every existing deployment.
+  **Acceptance (met):** a DB-gated test
+  (`tests/list_search_check_duplicates_authz.rs`) advances one plan
+  through gate 0 (`POST /{pid}/gate-reviews`, setting
+  `resource.stage = "g0_concept"`) and leaves a second plan ungated; a
+  policy denying read on `resource.stage = "g0_concept"` for
+  `dept=outsider` proves that caller's `list`, `search`, and
+  `check-duplicates` all omit the gated plan (confirmed by a control
+  assertion that the direct `GET /{pid}` is itself `403`), while still
+  surfacing the ungated plan, and that an unrestricted caller sees both
+  everywhere — the omission is scoped to the denied caller/record
+  pair, not a blanket regression. Verified green against a real
+  Postgres (`scripts/ci-check.sh test-db …`), plus `cargo test --lib`
+  (368, unchanged count — the fix needed no new unit test, only the
+  new request-level suite), `cargo fmt --check`, and `cargo clippy
+  --all-targets -- -D warnings`, all clean.
 
 - [x] **SEC-PPM-2 (S) Audit the oversight bulk-read/export endpoints.**
   `GET /api/auditor/evidence-pack` bundles a period's decisions plus up
