@@ -37,6 +37,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — missing manifest `readme` field (IM-3)
+
+`Cargo.toml` had no `readme` field, so a future published crates.io
+page would show only the one-line `description`, not this file's
+"Why it exists" / "What it does not defend against" sections. Added
+`readme = "README.md"`, ahead of the IM-1 publish. `cargo package
+--list` now includes `README.md`.
+
 ## [0.2.0] - 2026-08-21
 
 ### Security — a stored MAC containing a multi-byte character crashed the reader (SEC-M7)

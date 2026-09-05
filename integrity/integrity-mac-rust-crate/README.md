@@ -140,15 +140,19 @@ unverifiable rather than invalid.
       re-introduce the multi-copy risk in a different shape") — either
       way, not left as an unexamined duplication.
 
-- [ ] **IM-3 (S) Add `readme = "README.md"` to `Cargo.toml`.**
-      *(verified: neither this crate's `Cargo.toml` nor the published
-      `entity-ref` sibling's declares a `readme` field, so — same gap,
-      inherited rather than unique — the crates.io page for either
-      would show only the one-line `description`, not this file's much
-      more informative "Why it exists" / "What it does not defend
-      against" sections)*. A one-line manifest addition; do it here
-      ahead of the IM-1 publish so the first release already renders
-      the README on crates.io, and note the same fix for `entity-ref`
-      as a follow-up in that crate's own docs (out of scope here).
-      **Acceptance:** `cargo package --list` includes `README.md`;
-      `cargo publish --dry-run` (from IM-1) shows the readme wired.
+- [x] **IM-3 (S) Add `readme = "README.md"` to `Cargo.toml`.**
+      *(resolved 2026-09-05; verified: neither this crate's
+      `Cargo.toml` nor the published `entity-ref` sibling's declared a
+      `readme` field, so — same gap, inherited rather than unique —
+      the crates.io page for either would show only the one-line
+      `description`, not this file's much more informative "Why it
+      exists" / "What it does not defend against" sections)*. A
+      one-line manifest addition, landed ahead of the IM-1 publish so
+      the first release already renders the README on crates.io. The
+      `entity-ref` sibling's identical gap was fixed separately as
+      that crate's own ER-4.
+      **Resolved:** added `readme = "README.md"`. Verified: `cargo
+      package --list` now includes `README.md`. The `cargo publish
+      --dry-run` re-check is deferred to IM-1 (the actual first
+      publish decision), out of scope for this doc/manifest-only
+      change.
