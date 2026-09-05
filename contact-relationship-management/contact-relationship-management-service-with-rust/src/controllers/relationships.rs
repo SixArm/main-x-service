@@ -7,8 +7,8 @@ use sea_orm::{QueryOrder, QuerySelect, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::{ensure_valid, unprocessable};
-use crate::auth::MaybeAuthUser;
+use super::{ensure_valid, record_rejection, unprocessable};
+use crate::auth::{self, MaybeAuthUser};
 use crate::models::_entities::{accounts, activities, contacts, deals, tickets};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
@@ -156,21 +156,69 @@ async fn create_contact(
 
 /// `GET /api/contacts` — active contacts.
 #[debug_handler]
-async fn list_contacts(State(ctx): State<AppContext>) -> Result<Response> {
+async fn list_contacts(State(ctx): State<AppContext>, caller: MaybeAuthUser) -> Result<Response> {
     let rows = contacts::Entity::find()
         .filter(contacts::Column::DeletedAt.is_null())
         .order_by_asc(contacts::Column::Id)
         .limit(1000)
         .all(&ctx.db)
         .await?;
-    format::json(rows)
+    format::json(readable_contacts(&rows, &caller))
+}
+
+/// Filter `rows` down to the ones `caller`'s record-level ABAC policy
+/// allows to read, masking `preferred_channel` on a row whose decision
+/// carries the `mask` obligation. A denied row is **omitted** — with
+/// enforcement on and a policy that denies read on some contacts, a
+/// collection read must not disclose more than the equivalent single
+/// `GET /{pid}` would (CRM-T24; `agents/share/security.md` invariant 5).
+/// With enforcement off (the default) or no deny rule configured,
+/// `authorize_record` never denies, so this is a no-op.
+fn readable_contacts(rows: &[contacts::Model], caller: &MaybeAuthUser) -> Vec<serde_json::Value> {
+    rows.iter()
+        .filter_map(|row| {
+            let obligations = auth::authorize_record(
+                caller,
+                authentication_verifier::Action::Read,
+                &auth::contact_resource_attrs(row),
+            )
+            .ok()?;
+            let mut value = serde_json::json!(row);
+            if obligations.iter().any(|o| o == "mask") {
+                value = auth::mask_text_json(value, &["preferred_channel"]);
+            }
+            Some(value)
+        })
+        .collect()
 }
 
 /// `GET /api/contacts/{pid}` — the contact + its merged timeline
 /// (activities, deals, tickets — chronological; CRM-R1).
+///
+/// Record-level ABAC (CRM-T24): a `mask` obligation on the decision
+/// redacts the contact's `preferred_channel`
+/// (`auth::mask_json`/`auth::MASKED` names it as the channel-detail
+/// field CRM-R15 masks). The bundled activities/deals/tickets rows are
+/// **not** re-authorized or masked here — each carries its own
+/// resource attributes a caller might read differently under, and
+/// folding that in is a separate, larger change (spec CRM-T24 note).
+///
+/// # Errors
+///
+/// `403` when the record-level ABAC policy denies reading this contact.
 #[debug_handler]
-async fn get_contact(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Result<Response> {
+async fn get_contact(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path(pid): Path<String>,
+) -> Result<Response> {
     let contact = records::find_contact(&ctx.db, records::parse_pid(&pid)?).await?;
+    let obligations = auth::authorize_record(
+        &caller,
+        authentication_verifier::Action::Read,
+        &auth::contact_resource_attrs(&contact),
+    )
+    .map_err(record_rejection)?;
     let activity_rows = activities::Entity::find()
         .filter(activities::Column::SubjectKind.eq("contact"))
         .filter(activities::Column::SubjectPid.eq(contact.pid))
@@ -189,8 +237,12 @@ async fn get_contact(State(ctx): State<AppContext>, Path(pid): Path<String>) -> 
         .filter(tickets::Column::DeletedAt.is_null())
         .all(&ctx.db)
         .await?;
+    let mut contact_json = serde_json::json!(contact);
+    if obligations.iter().any(|o| o == "mask") {
+        contact_json = auth::mask_text_json(contact_json, &["preferred_channel"]);
+    }
     format::json(serde_json::json!({
-        "contact": contact,
+        "contact": contact_json,
         "activities": activity_rows,
         "deals": deal_rows,
         "tickets": ticket_rows,
@@ -207,6 +259,12 @@ async fn repoint_contact(
     Json(payload): Json<RepointPayload>,
 ) -> Result<Response> {
     let contact = records::find_contact(&ctx.db, records::parse_pid(&pid)?).await?;
+    auth::authorize_record(
+        &caller,
+        authentication_verifier::Action::Write,
+        &auth::contact_resource_attrs(&contact),
+    )
+    .map_err(record_rejection)?;
     let mut problems = Problems::new();
     problems.require_ref(
         "person_ref",

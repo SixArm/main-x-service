@@ -7,8 +7,8 @@ use sea_orm::{PaginatorTrait, QueryOrder, QuerySelect, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::{ensure_valid, unprocessable};
-use crate::auth::MaybeAuthUser;
+use super::{ensure_valid, record_rejection, unprocessable};
+use crate::auth::{self, MaybeAuthUser};
 use crate::metrics::Metrics;
 use crate::models::_entities::{
     activities, contacts, deals, forecast_snapshots, leads, pipeline_stages, pipelines,
@@ -512,6 +512,7 @@ struct DealListParams {
 #[debug_handler]
 async fn list_deals(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Query(params): Query<DealListParams>,
 ) -> Result<Response> {
     let mut query = deals::Entity::find().filter(deals::Column::DeletedAt.is_null());
@@ -523,7 +524,34 @@ async fn list_deals(
         .limit(2000)
         .all(&ctx.db)
         .await?;
-    format::json(rows)
+    format::json(readable_deals(&rows, &caller))
+}
+
+/// Filter `rows` down to the ones `caller`'s record-level ABAC policy
+/// allows to read, masking `amount_minor` on a row whose decision
+/// carries the `mask` obligation. A denied row is **omitted** — with
+/// enforcement on and a policy that denies read on some deals, a
+/// collection read must not disclose more than the equivalent single
+/// read would (CRM-T24; `agents/share/security.md` invariant 5, same
+/// reasoning `relationships.rs`'s `readable_contacts` applies to
+/// contacts). With enforcement off (the default) or no deny rule
+/// configured, `authorize_record` never denies, so this is a no-op.
+fn readable_deals(rows: &[deals::Model], caller: &MaybeAuthUser) -> Vec<serde_json::Value> {
+    rows.iter()
+        .filter_map(|row| {
+            let obligations = auth::authorize_record(
+                caller,
+                authentication_verifier::Action::Read,
+                &auth::deal_resource_attrs(row),
+            )
+            .ok()?;
+            let mut value = serde_json::json!(row);
+            if obligations.iter().any(|o| o == "mask") {
+                value = auth::mask_json(value, &["amount_minor"]);
+            }
+            Some(value)
+        })
+        .collect()
 }
 
 /// `POST /api/deals/{pid}/stage` — the Kanban stage move: validates
@@ -545,6 +573,12 @@ async fn deal_stage(
         .one(&txn)
         .await?
         .ok_or(Error::NotFound)?;
+    auth::authorize_record(
+        &caller,
+        authentication_verifier::Action::Write,
+        &auth::deal_resource_attrs(&deal),
+    )
+    .map_err(record_rejection)?;
     if deal.closed_at.is_some() {
         return Err(unprocessable("deal is closed — reopen it first"));
     }
@@ -635,6 +669,12 @@ async fn reopen_deal(
         .one(&txn)
         .await?
         .ok_or(Error::NotFound)?;
+    auth::authorize_record(
+        &caller,
+        authentication_verifier::Action::Write,
+        &auth::deal_resource_attrs(&deal),
+    )
+    .map_err(record_rejection)?;
     if deal.closed_at.is_none() {
         return Err(unprocessable("deal is not closed"));
     }
