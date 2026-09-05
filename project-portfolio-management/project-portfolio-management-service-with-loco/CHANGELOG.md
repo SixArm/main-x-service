@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security — audit the oversight bulk-read/export endpoints (SEC-PPM-2)
+
+`GET /api/auditor/evidence-pack` (bundles a period's decisions plus up to
+2000 audit rows, JSON or CSV) and `GET /api/auditor/trail` (the
+estate-wide audit-trail explorer) only ever *read* `audit_logs` to build
+their response — neither wrote a row for the act of exporting/reading
+it, unlike the posture `agents/share/bulk-import-export.md` §8 ("every
+export is audited") and case-service's SEC-B8 require. Both handlers now
+write an `audit_logs` row (actor, requested window, and — for the
+evidence pack — format) before delivering the response, and a write
+failure now refuses the response rather than silently under-recording
+the disclosure. New DB-gated request tests
+(`tests/requests/oversight.rs`) prove each endpoint writes exactly the
+expected audit row, readable back via `GET /api/plans/audit/recent`.
+See spec/index.md SEC-PPM-2.
+
 ### Added — control action → task conversion (T-26 remainder)
 
 - **Control action → task conversion** (`POST
