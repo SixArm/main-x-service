@@ -11,7 +11,8 @@
 //! number in `[0.0, 1.0]`.
 
 use care_pathway_matcher::{
-    CarePathway, CodeSystem, ConditionCode, MatchConfig, MatchingEngine, normalize, phonetic,
+    CarePathway, CodeSystem, ConditionCode, MatchConfig, MatchingEngine, RelationKind,
+    RelationshipRef, normalize, phonetic,
 };
 use proptest::prelude::*;
 
@@ -39,26 +40,56 @@ fn condition_code() -> impl Strategy<Value = ConditionCode> {
     (code_system(), "\\PC{0,12}").prop_map(|(system, code)| ConditionCode { system, code })
 }
 
+/// A relation kind — the five fixed variants plus a free-form `Custom`
+/// label (CPM-T2).
+fn relation_kind() -> impl Strategy<Value = RelationKind> {
+    prop_oneof![
+        Just(RelationKind::PrecededBy),
+        Just(RelationKind::FollowedBy),
+        Just(RelationKind::SimilarTo),
+        Just(RelationKind::Supersedes),
+        Just(RelationKind::SupersededBy),
+        text().prop_map(RelationKind::Custom),
+    ]
+}
+
+/// A relationship reference with an arbitrary (possibly empty or
+/// blank-folding) `pathway_id`, since `RelationshipRef` has no
+/// validating constructor to route around (CPM-T2).
+fn relationship() -> impl Strategy<Value = RelationshipRef> {
+    (relation_kind(), text()).prop_map(|(relation, pathway_id)| RelationshipRef {
+        relation,
+        pathway_id,
+    })
+}
+
 /// A `CarePathway` varying only the few string-bearing fields the task
-/// calls out — name, pathway code, provider, condition codes, keywords —
-/// via lightweight direct field assignment (no builder). Everything else
-/// stays at its `Default` so construction is cheap.
+/// calls out — name, pathway code, provider, condition codes, keywords,
+/// relationships, tags — via lightweight direct field assignment (no
+/// builder). Everything else stays at its `Default` so construction is
+/// cheap.
 fn pathway() -> impl Strategy<Value = CarePathway> {
     (
         text(),                   // name
         prop::option::of(text()), // pathway_code
         prop::option::of(text()), // provider_id
         prop::collection::vec(condition_code(), 0..3),
-        prop::collection::vec(text(), 0..3), // keywords
+        prop::collection::vec(text(), 0..3),         // keywords
+        prop::collection::vec(relationship(), 0..3), // relationships (CPM-T2)
+        prop::collection::vec(text(), 0..3),         // tags (CPM-T2)
     )
-        .prop_map(|(name, code, provider, conditions, keywords)| {
-            let mut p = CarePathway::new(name);
-            p.pathway_code = code;
-            p.provider_id = provider;
-            p.condition_codes = conditions;
-            p.keywords = keywords;
-            p
-        })
+        .prop_map(
+            |(name, code, provider, conditions, keywords, relationships, tags)| {
+                let mut p = CarePathway::new(name);
+                p.pathway_code = code;
+                p.provider_id = provider;
+                p.condition_codes = conditions;
+                p.keywords = keywords;
+                p.relationships = relationships;
+                p.tags = tags;
+                p
+            },
+        )
 }
 
 /// A value that is sometimes well-formed (a small non-negative float,

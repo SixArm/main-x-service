@@ -10,6 +10,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — fuzz/property/bench coverage for `relationships`/`tags` (CPM-T2)
+
+These two components landed 2026-08-28 but were exercised only by the
+hand-written unit tests in `src/matcher.rs` — the property suite, the
+`cargo-fuzz` harness, and the Criterion bench never touched either
+field. Ported organization-matcher's identical ORGM-T2 fix:
+`tests/property_tests.rs`'s `pathway()` now generates `relationships`
+(a `RelationshipRef` struct literal, the five fixed `RelationKind`
+variants plus a free-form `Custom` label) and `tags`, covered by the
+existing never-panic/bounded-score/symmetric-matching properties with
+no new property needed. `fuzz/fuzz_targets/match_care_pathways.rs`
+appends a relationship/tag derived from the raw fuzz bytes to both
+pathways after the JSON-tuple decode, so the field paths are reachable
+on every run rather than depending on the corpus finding them by
+chance. `benches/match_pair.rs` gained a `relationships_and_tags` group
+(`partial_overlap`) so a perf regression on either component's Jaccard
+cost is visible. See spec/index.md CPM-T2.
+
 ### Added — `MatchConfig::validated` guards against adversarial weights (CPM-T1)
 
 Every `MatchConfig` field is `pub` and directly settable, and nothing
