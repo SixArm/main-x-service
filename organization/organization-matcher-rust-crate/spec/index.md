@@ -329,7 +329,7 @@ async, or panics to library code.
     + public_api + doctests) all green, 0 failed; `cargo clippy
     --all-targets -- -D warnings` clean.
 
-- [ ] **ORGM-T2 (S) Fuzz coverage for the `relationships`/`tags`
+- [x] **ORGM-T2 (S) Fuzz coverage for the `relationships`/`tags`
       components.** These two components (PRO-H7, already `[x]` above)
       have zero presence in the crate's fuzz/property/bench harnesses —
       only the hand-written unit tests in `src/matcher.rs` exercise
@@ -342,6 +342,26 @@ async, or panics to library code.
       properties (§24) hold with populated `relationships`/`tags`
       fields; `cargo +nightly fuzz run match_organizations` (short
       smoke) runs clean with the new field paths reachable.
+      **Resolution (2026-09-05):** `org_strategy()` gained
+      `relation_kind_strategy()` (the four `RelationKind` variants) and
+      `relationship_strategy()` (built via a `RelationshipRef` struct
+      literal rather than `RelationshipRef::new`, so the properties
+      also exercise the possibly-empty/malformed `organization_id` the
+      constructor would have rejected), plus a `tags` `Vec<String>`
+      generator — both wired into the `Organization` the four existing
+      properties already build, so no new property was needed. The
+      fuzz target's random byte mutation rarely produces a populated
+      `Vec<RelationshipRef>`/`Vec<String>` unseeded, so
+      `fuzz/fuzz_targets/match_organizations.rs` now **appends** a
+      relationship/tag derived from the raw fuzz bytes to both
+      organizations after the existing JSON-tuple decode, and runs the
+      bounded-score assertions a second time — this forces the field
+      paths reachable on every run rather than depending on the corpus
+      finding them by chance. Verified: `cargo test` (property + unit +
+      doctests all green), `cargo clippy --all-targets -- -D warnings`,
+      `cargo fmt --check`, and `cargo +nightly fuzz run
+      match_organizations -- -max_total_time=20` — 2.3M executions in
+      20s, no crashes.
 
 ## 24. Testing strategy
 

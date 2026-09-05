@@ -18,7 +18,7 @@
 
 use organization_matcher::{
     Confidence, IdentifierScheme, MatchConfig, MatchingEngine, OrgIdentifier, Organization,
-    PostalAddress, normalize, phonetic,
+    PostalAddress, RelationKind, RelationshipRef, normalize, phonetic,
 };
 use proptest::prelude::*;
 
@@ -58,6 +58,27 @@ fn identifier_strategy() -> impl Strategy<Value = OrgIdentifier> {
     (scheme_strategy(), any_text()).prop_map(|(scheme, value)| OrgIdentifier { scheme, value })
 }
 
+/// Any of the four relationship kinds (ORGM-T2).
+fn relation_kind_strategy() -> impl Strategy<Value = RelationKind> {
+    prop_oneof![
+        Just(RelationKind::SubOrganizationOf),
+        Just(RelationKind::ParentOrganizationOf),
+        Just(RelationKind::SuccessorOf),
+        Just(RelationKind::PredecessorOf),
+    ]
+}
+
+/// A relationship reference with an arbitrary (possibly empty or
+/// malformed) `organization_id` — built via a struct literal rather than
+/// [`RelationshipRef::new`], so the adversarial-input properties below
+/// also exercise the id the constructor would have rejected (ORGM-T2).
+fn relationship_strategy() -> impl Strategy<Value = RelationshipRef> {
+    (relation_kind_strategy(), any_text()).prop_map(|(relation, organization_id)| RelationshipRef {
+        relation,
+        organization_id,
+    })
+}
+
 /// A lightweight optional address carrying only locality + postal code —
 /// enough to exercise the field-by-field address scorer without a full
 /// arbitrary `Strategy` over the nested type.
@@ -86,9 +107,21 @@ fn org_strategy() -> impl Strategy<Value = Organization> {
         prop::collection::vec(identifier_strategy(), 0..3),
         prop::collection::vec(any_text(), 0..3), // same_as
         address_strategy(),
+        prop::collection::vec(relationship_strategy(), 0..3), // ORGM-T2
+        prop::collection::vec(any_text(), 0..4),              // tags (ORGM-T2)
     )
         .prop_map(
-            |(name, url, jurisdiction, keywords, identifiers, same_as, address)| {
+            |(
+                name,
+                url,
+                jurisdiction,
+                keywords,
+                identifiers,
+                same_as,
+                address,
+                relationships,
+                tags,
+            )| {
                 let mut o = Organization::new(name);
                 o.url = url;
                 o.jurisdiction = jurisdiction;
@@ -96,6 +129,8 @@ fn org_strategy() -> impl Strategy<Value = Organization> {
                 o.identifiers = identifiers;
                 o.same_as = same_as;
                 o.address = address;
+                o.relationships = relationships;
+                o.tags = tags;
                 o
             },
         )
