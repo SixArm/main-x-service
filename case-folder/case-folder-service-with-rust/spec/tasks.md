@@ -86,18 +86,26 @@
     (`openapi.yaml` is a static reference doc, not loaded or served by
     any code path). YAML re-validated (`python3 -c "import yaml;
     yaml.safe_load(open('openapi.yaml'))"`) after the edit.
-- [ ] **LT-19** [`testing.md`](testing.md)'s unit-test inventory
-  (`src/nhs.rs` 8 + `src/controllers/alerts.rs` 6 = 14, and `cargo test`
-  passes are described only in those terms) has drifted since **T-AUTH**
-  landed: `src/auth/mod.rs` carries 7 `#[test]`s and `src/auth/crypto.rs`
-  carries 2 more, neither module mentioned in the doc — *(verified:
-  `grep -rn '#\[test\]' src | xargs -I{} …` counts 23 unit tests total in
-  `src/`, against the 14 the doc enumerates)*. The same "doc says a count,
-  code has moved past it" pattern **LT-16** fixed once for
-  `testing.md`/`README.md`'s request-test count. **Acceptance:**
-  `testing.md` gets a `src/auth/` section naming what each of the 9 tests
-  pins (HS256 round-trip, expired-session eviction, cookie vs bearer
-  resolution, …), and the running total is corrected.
+- [x] **LT-19** *(resolved 2026-09-05.)* [`testing.md`](testing.md)'s
+  unit-test inventory (`src/nhs.rs` 8 + `src/controllers/alerts.rs` 6 =
+  14, and `cargo test` passes are described only in those terms) had
+  drifted since **T-AUTH** landed: `src/auth/mod.rs` carries 7
+  `#[test]`s and `src/auth/crypto.rs` carries 2 more, neither module
+  mentioned in the doc — *(verified: `grep -rn '#\[test\]' src |
+  xargs -I{} …` counts 23 unit tests total in `src/`, against the 14
+  the doc enumerated)*. The same "doc says a count, code has moved
+  past it" pattern **LT-16** fixed once for `testing.md`/`README.md`'s
+  request-test count. **Resolution:** `testing.md`'s summary table
+  and `README.md`'s `cargo test` comment both corrected from `21` to
+  `23` (the table had already grown a "`src/auth/mod.rs` — session
+  lifecycle" section for 7 of the 9 auth tests since this task was
+  written, but was still one module and 2 tests short); added the
+  missing "`src/auth/crypto.rs` — HS256 magic-link token signing (2
+  tests)" section naming `hs256_signs_and_verifies_round_trip` and
+  `hs256_rejects_a_wrong_secret`. Verified: `cargo test --lib` — 23
+  passed, 0 failed, matching the corrected count exactly; `cargo fmt
+  --check` / `cargo clippy --all-targets -- -D warnings` clean
+  (doc-only change, but rechecked per the three-part discipline).
 
 ## Production gates
 
