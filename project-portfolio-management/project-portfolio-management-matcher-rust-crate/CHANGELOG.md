@@ -10,6 +10,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Documented — the caller must bound `goals`/`keywords`/`relationships`/`tags` array sizes
+
+Each is compared by Jaccard over every element — an unbounded O(n·m)
+operation — and this crate has no length cap of its own on any of the
+four. The family's SEC-M1 caps live only in
+`project-portfolio-management-service`'s validation layer, which runs
+before this crate is ever called; a standalone integrator has no
+equivalent. Ported case-matcher's identical fix: added a "the caller
+must bound array sizes" section to the crate-root docs and a matching
+note on `MatchingEngine::match_plans`'s rustdoc, a new `AGENTS.md`
+golden rule, and a §22 anti-pattern line, all pointing at the service's
+`MAX_ARRAY_LEN` (256) / `MAX_ITEM_LEN` (512) as the reference cap. No
+code change; see spec/index.md §23.
+
 ### Changed
 - MSRV raised to Rust 1.96 (N-2 policy tightened from N-3; see spec/rust-msrv-n-minus-2/index.md).
 

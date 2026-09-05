@@ -75,6 +75,14 @@ impl MatchingEngine {
     /// not affect the score. Returns the populated [`MatchResult`].
     /// Infallible by contract.
     ///
+    /// **The caller must bound `goals`/`keywords`/`relationships`/`tags`
+    /// array sizes.** This crate has no length cap of its own; each is
+    /// scored by Jaccard over every element, an unbounded O(n·m)
+    /// operation. See the crate-root docs ("The caller must bound array
+    /// sizes") for the reference cap
+    /// (`project-portfolio-management-service`'s `MAX_ARRAY_LEN` /
+    /// `MAX_ITEM_LEN`) a standalone integrator should copy.
+    ///
     /// # Examples
     ///
     /// ```
