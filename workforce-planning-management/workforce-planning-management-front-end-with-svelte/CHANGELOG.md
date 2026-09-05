@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — root sign-in gate (WPM-T38)
+
+No `+layout.server.ts` existed anywhere under `src/routes`, so a
+visitor with no session reached every page — profile, payroll,
+wellbeing, all of them — and only discovered they were signed out once
+an API call silently failed through the BFF proxy. New root
+`src/routes/+layout.server.ts` redirects to `/signin` (303) when
+`locals.sessionId` is `null`, excluding `/signin`/`/verify` themselves.
+Chosen over person-front-end's narrower per-mutation-page guard: WPM's
+pages mix read content with embedded actions (the retention sweep on
+`/privacy`, payroll lifecycle actions, …) rather than separating reads
+and writes onto dedicated routes, so a root gate fits WPM's actual page
+shape better than a small mutation-only subset would.
+
+This app runs SPA mode (`ssr = false`), so the redirect never appears
+in the raw document response — it surfaces through SvelteKit's
+client-side data fetch during hydration, confirmed empirically via
+`curl .../employees/__data.json` returning
+`{"type":"redirect","location":"/signin"}`. `tests/e2e/smoke.spec.ts`
+gained a `signIn()` helper (injects a fake `__Host-mxi_session` cookie
+via Playwright) and a new `"sign-in gate (WPM-T38)"` describe proving
+the redirect; every pre-existing smoke test moved under a
+`"signed-in smoke coverage"` describe whose `beforeEach` now signs in
+first, verified green (all 12 Playwright + 10 vitest tests pass). See
+`../spec/tasks.md` WPM-T38.
+
 ### Added — reasonable adjustments panel (WPM-T36 / WPM-R33, 2026-07-25)
 
 - Employee profile: a Reasonable-adjustments panel — the
