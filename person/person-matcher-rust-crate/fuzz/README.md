@@ -19,6 +19,7 @@ crates adopt the same shape (see *Rolling out* below).
 | `match_persons` | Deserialize a JSON `[person_a, person_b]` tuple → `MatchingEngine::match_persons`. The whole deserialize → normalize → score path; asserts finite score in `[0,1]` in both argument orders. |
 | `normalizer` | The pure `Normalizer` string helpers (name / postcode / phone / E.164 / address / phonetic / email) over arbitrary UTF-8 — never-panic. |
 | `scorer` | The pure `Scorer` similarities (Jaro-Winkler / Levenshtein / exact / combined) over two arbitrary UTF-8 strings; asserts finite similarity in `[0,1]`. |
+| `identifiers` | Every one of the 42 national-identifier parsers + 9 passport-format validators in `src/identifiers.rs` over arbitrary UTF-8 — never-panic only (T-35); the module's own string-parsing-heaviest attack surface, and previously the only one of the four pure-helper modules with no fuzz coverage at all. |
 
 ## Running
 

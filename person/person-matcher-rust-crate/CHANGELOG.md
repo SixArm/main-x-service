@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — fuzz coverage for the national-identifier parsers (T-35)
+- New `fuzz/fuzz_targets/identifiers.rs` libFuzzer target feeding arbitrary
+  UTF-8 into every one of the 42 national-identifier parsers plus the 9
+  passport-format validators in `src/identifiers.rs`, pinning the
+  never-panic invariant on the module with the most string-parsing-heavy
+  attack surface in the crate — previously the only pure-helper module
+  (alongside `Scorer` and `Normalizer`, both already covered) with no
+  fuzz target at all. Registered as `[[bin]] identifiers` in
+  `fuzz/Cargo.toml`; documented in `fuzz/README.md`. Smoke-verified clean
+  for 30s / ~907k executions with no crash.
+
 ### Changed
 - MSRV raised to Rust 1.96 (N-2 policy tightened from N-3; see spec/rust-msrv-n-minus-2/index.md).
 
