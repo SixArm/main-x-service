@@ -8,6 +8,20 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Removed — dead `FluvioProducer`/`FluvioConsumer` stubs (T-33)
+
+`src/streaming/producer.rs`'s `FluvioProducer` and
+`src/streaming/consumer.rs`'s `FluvioConsumer` were `EventProducer`/
+`EventConsumer` trait impls whose every method was `todo!()` — dead
+code with zero construction sites anywhere in the crate. The real
+production Fluvio path is `src/relay.rs`'s `FluvioSink : EventSink`
+(BUS-3, feature-gated `fluvio`), which was already live; the stubs
+just invited a future contributor to "finish" the wrong seam. Deleted
+`src/streaming/consumer.rs` outright (its only content was
+`FluvioConsumer`) along with the now-unimplemented `EventConsumer`
+trait, and removed `FluvioProducer` from `producer.rs`. No behaviour
+change — nothing called either type.
+
 ### Added — a real gRPC server (T-6, repo `tasks.md` PRO-H11 reference)
 
 `src/api/grpc/` is a working `tonic::transport::Server`, replacing the

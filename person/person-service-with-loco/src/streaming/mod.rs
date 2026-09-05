@@ -1,14 +1,16 @@
-//! Event streaming: the [`PersonEvent`](crate::streaming::PersonEvent) envelope and producer/consumer
-//! traits.
+//! Event streaming: the [`PersonEvent`](crate::streaming::PersonEvent) envelope and the producer
+//! trait.
 //!
 //! Every CRUD/merge/link operation emits a [`PersonEvent`](crate::streaming::PersonEvent) so downstream
 //! systems (analytics, cache invalidation, replication) can react. The
-//! transport is pluggable behind two traits: [`EventProducer`](crate::streaming::EventProducer) publishes
-//! events and [`EventConsumer`](crate::streaming::EventConsumer) reads them. The default in-process
-//! implementation is [`InMemoryEventPublisher`](crate::streaming::producer::InMemoryEventPublisher) (see [`producer`](crate::streaming::producer)); a
-//! Fluvio-backed transport is the intended production target. Event
-//! payloads serialize via Serde with an internally-tagged `event_type`
-//! discriminator, so the wire form is self-describing JSON.
+//! transport is pluggable behind the [`EventProducer`](crate::streaming::EventProducer) trait. The
+//! default in-process implementation is
+//! [`InMemoryEventPublisher`](crate::streaming::producer::InMemoryEventPublisher) (see [`producer`](crate::streaming::producer)); the real
+//! production transport is [`crate::relay::FluvioSink`] (`EventSink`,
+//! the durable outbox relay — a separate, already-implemented seam from
+//! this module's `EventProducer`; spec T-33). Event payloads serialize
+//! via Serde with an internally-tagged `event_type` discriminator, so
+//! the wire form is self-describing JSON.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -17,8 +19,6 @@ use uuid::Uuid;
 use crate::Result;
 use crate::models::Person;
 
-/// Event consumer interface (stub) for reading the stream.
-pub mod consumer;
 /// The canonical durable-bus [`Envelope`] + transport selector (Phase 2).
 pub mod envelope;
 /// In-process and (future) Fluvio event publishers.
@@ -135,20 +135,3 @@ pub trait EventProducer: Send + Sync {
 }
 
 pub use producer::InMemoryEventPublisher;
-
-/// Consumes [`PersonEvent`]s from a stream (stub interface).
-pub trait EventConsumer {
-    /// Begin a subscription, establishing any underlying connection.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the subscription cannot be established.
-    fn subscribe(&mut self) -> Result<()>;
-
-    /// Pull the next event, or `Ok(None)` when the stream is exhausted.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if reading the next event from the stream fails.
-    fn next_event(&mut self) -> Result<Option<PersonEvent>>;
-}

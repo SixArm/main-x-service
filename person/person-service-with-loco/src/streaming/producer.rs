@@ -2,8 +2,12 @@
 //!
 //! [`InMemoryEventPublisher`] buffers events in a shared `Vec` for
 //! development and testing — it lets tests assert on what was emitted.
-//! [`FluvioProducer`](crate::streaming::producer::FluvioProducer) is the production transport stub. Both implement
-//! the [`EventProducer`](crate::streaming::EventProducer) trait from the parent module.
+//! It implements the [`EventProducer`](crate::streaming::EventProducer)
+//! trait from the parent module. The real production transport is
+//! [`crate::relay::FluvioSink`] (`EventSink`, not `EventProducer` — a
+//! separate, already-implemented seam) — an earlier unimplemented
+//! producer placeholder for this trait was removed rather than finished,
+//! since it named the wrong seam entirely (spec T-33).
 
 use super::{EventProducer, PersonEvent};
 use crate::Result;
@@ -87,21 +91,5 @@ impl EventProducer for InMemoryEventPublisher {
 
         self.events.lock().unwrap().push(event);
         Ok(())
-    }
-}
-
-/// Production [`EventProducer`] backed by Fluvio (not yet implemented).
-///
-/// Placeholder for a durable, partitioned stream. The Fluvio client
-/// handle will live in this struct once wired up.
-pub struct FluvioProducer {
-    // Fluvio producer will be initialized here
-}
-
-impl EventProducer for FluvioProducer {
-    /// Unimplemented; panics via `todo!` until the Fluvio client lands.
-    fn publish(&self, _event: PersonEvent) -> Result<()> {
-        // TODO: Implement Fluvio event publishing
-        todo!("Implement Fluvio event publishing")
     }
 }

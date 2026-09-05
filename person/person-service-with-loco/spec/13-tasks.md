@@ -1016,7 +1016,7 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     via `is_match`/`classify_match`, unaffected by this change since it
     only removes a duplicate hardcoded literal).
 
-- [ ] **T-33 (S) — Remove the dead `FluvioProducer`/`FluvioConsumer` stubs superseded by the outbox relay.**
+- [x] **T-33 (S) — Remove the dead `FluvioProducer`/`FluvioConsumer` stubs superseded by the outbox relay.** *(resolved 2026-09-05.)*
   `src/streaming/producer.rs`'s `FluvioProducer` and
   `src/streaming/consumer.rs`'s `FluvioConsumer` are `EventProducer`/
   `EventConsumer` trait impls whose every method is `todo!("Implement
@@ -1037,6 +1037,16 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     -D warnings` clean; `grep -rn "todo!" src/` returns nothing under
     `src/streaming/`; a doc comment or the file's removal makes clear
     `relay::FluvioSink` is the real broker sink.
+  - **Resolved.** Deleted `src/streaming/consumer.rs` (its only content
+    was the dead `FluvioConsumer`) and the `EventConsumer` trait it
+    implemented (nothing else did); removed `FluvioProducer` from
+    `src/streaming/producer.rs`, leaving `InMemoryEventPublisher` as the
+    module's only `EventProducer`. Both files' module doc comments now
+    point at `crate::relay::FluvioSink` as the real production transport
+    rather than naming the removed stubs. `cargo build --lib` / `cargo
+    clippy --all-targets -- -D warnings` clean; `grep -rn "todo!"
+    src/streaming/` returns nothing; `cargo test --lib` unaffected (355
+    passed, same count).
 
 - [ ] **T-34 (M) — FHIR reads honour ABAC masking obligations (currently unmasked).**
   `src/api/rest/handlers.rs` calls `authorize_record` on every
