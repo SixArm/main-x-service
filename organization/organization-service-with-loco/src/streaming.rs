@@ -90,6 +90,14 @@ pub struct Envelope {
     pub actor: Option<String>,
     /// The record's denormalised label (its name) at event time.
     pub name: String,
+    /// For a `Merged` event, the absorbed duplicate's pid; `None`
+    /// otherwise. The link-graph aggregator's merge-repointing consumer
+    /// keys on this to move edges from the duplicate onto the survivor
+    /// (`agents/share/cross-service-linking.md` §5.3). Additive — does
+    /// not bump [`SCHEMA_VERSION`]; absent on deserialize (an older
+    /// stored envelope, or a non-merge kind) defaults to `None`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub merged_from: Option<String>,
 }
 
 /// The fixed entity name, used as the deserialize default for
@@ -225,6 +233,19 @@ fn envelope(kind: EventKind, pid: &str, name: &str, actor: Option<&str>) -> Enve
         seq: next_seq(),
         actor: actor.map(ToString::to_string),
         name: name.to_string(),
+        merged_from: None,
+    }
+}
+
+/// Build a fresh [`EventKind::Merged`] envelope for the surviving `pid`,
+/// carrying the absorbed `merged_from` duplicate's pid. Identical to
+/// [`envelope(EventKind::Merged, …)`](envelope) but with `merged_from`
+/// populated, so the link-graph aggregator's merge-repointing consumer
+/// can move edges off the duplicate onto the survivor.
+fn merge_envelope(pid: &str, name: &str, actor: Option<&str>, merged_from: &Uuid) -> Envelope {
+    Envelope {
+        merged_from: Some(merged_from.to_string()),
+        ..envelope(EventKind::Merged, pid, name, actor)
     }
 }
 
@@ -560,12 +581,12 @@ pub async fn merge_and_emit(
         EventTransport::Memory => {
             let merged = main.into_active_model().update_data(db, merged_org).await?;
             duplicate.into_active_model().soft_delete(db).await?;
-            publish_with_actor(
-                EventKind::Merged,
+            publisher().publish(merge_envelope(
                 &merged.pid.to_string(),
                 &merged.name,
                 actor,
-            );
+                &dup_pid,
+            ));
             publish_with_actor(EventKind::Deleted, &dup_pid.to_string(), &dup_name, actor);
             audit_best_effort(db, merged.pid, "merged", actor, Some(merged.data.clone())).await;
             audit_best_effort(db, dup_pid, "merged_into", actor, None).await;
@@ -578,12 +599,7 @@ pub async fn merge_and_emit(
                 .update_data(&txn, merged_org)
                 .await?;
             duplicate.into_active_model().soft_delete(&txn).await?;
-            let merged_env = envelope(
-                EventKind::Merged,
-                &merged.pid.to_string(),
-                &merged.name,
-                actor,
-            );
+            let merged_env = merge_envelope(&merged.pid.to_string(), &merged.name, actor, &dup_pid);
             OutboxPublisher.publish(&txn, &merged_env).await?;
             let deleted_env = envelope(EventKind::Deleted, &dup_pid.to_string(), &dup_name, actor);
             OutboxPublisher.publish(&txn, &deleted_env).await?;
@@ -662,6 +678,40 @@ mod tests {
         assert_eq!(back.event_id, env.event_id);
         assert_eq!(back.seq, env.seq);
         assert_eq!(back.actor.as_deref(), Some("user-9"));
+    }
+
+    /// spec §13 (umbrella T-13): an ordinary (non-merge) envelope carries
+    /// no `merged_from`, and is not serialized on the wire at all
+    /// (additive field, omitted rather than `null` — matches
+    /// `#[serde(skip_serializing_if = "Option::is_none")]`).
+    #[test]
+    fn ordinary_envelope_has_no_merged_from() {
+        let env = envelope(EventKind::Created, "pid-1", "Acme", None);
+        assert_eq!(env.merged_from, None);
+        let json = serde_json::to_value(&env).unwrap();
+        assert!(
+            !json.as_object().unwrap().contains_key("merged_from"),
+            "merged_from must be omitted, not null, when absent: {json}"
+        );
+    }
+
+    /// spec §13 (umbrella T-13): `merge_envelope` builds a `Merged`
+    /// envelope carrying the absorbed duplicate's pid in `merged_from` —
+    /// the field the link-graph aggregator's merge-repointing consumer
+    /// (`agents/share/cross-service-linking.md` §5.3) needs to move edges
+    /// from the duplicate onto the survivor. It round-trips through JSON.
+    #[test]
+    fn merge_envelope_carries_merged_from() {
+        let dup_pid = Uuid::new_v4();
+        let env = merge_envelope("survivor-pid", "Acme Inc", Some("user-1"), &dup_pid);
+        assert_eq!(env.kind, EventKind::Merged);
+        assert_eq!(env.pid, "survivor-pid");
+        assert_eq!(env.merged_from, Some(dup_pid.to_string()));
+
+        let json = serde_json::to_value(&env).unwrap();
+        assert_eq!(json["merged_from"], dup_pid.to_string());
+        let back: Envelope = serde_json::from_value(json).unwrap();
+        assert_eq!(back.merged_from, Some(dup_pid.to_string()));
     }
 
     /// `actor` is `None` on the back-compat path and populated otherwise.

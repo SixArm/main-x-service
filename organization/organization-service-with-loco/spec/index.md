@@ -747,14 +747,43 @@ organization is not a data subject.
   gap: `src/validation.rs` checks `url`/`same_as[i]` for an `http(s)://`
   scheme and `address.country`/`jurisdiction` against the ISO 3166-1
   alpha-2/alpha-3 registry (249 currently-assigned codes).
-- [ ] Cross-service link **target** readiness — organization is a v1
+- [x] Cross-service link **target** readiness — organization is a v1
   link target only (§8;
   [`agents/share/cross-service-linking.md`](../../../agents/share/cross-service-linking.md)),
   so no `entity_links` table. Confirm the `created`/`deleted`/`merged`
   events carry the fields the aggregator's presence oracle + merge-repoint
   need (`pid`; `merged_from` on merge), and confirm the matcher adapter
   never sees cross-service links (only within-entity `relationships[]`
-  reach `MatchingEngine`). Mirrors umbrella spec §13 T-13.
+  reach `MatchingEngine`). Mirrors umbrella spec §13 T-13. *(resolved
+  2026-09-05.)* `created`/`updated`/`deleted` already carried `pid`
+  (the presence oracle's need); `merged` did not carry `merged_from` at
+  all — `Envelope` had no such field, unlike the person-style crates
+  (person/worker/place/thing/event/course), which all carry a dedicated
+  `merged_from: Option<String>` populated by a `for_merge`/`merge_envelope`
+  constructor. *(verified: `grep -rln merged_from */*/src/streaming.rs`
+  found no hit under any of the four loco-idiomatic registries —
+  organization, care-pathway, case, portfolio — before this fix; the six
+  person-style crates all had it.)* Added `merged_from: Option<String>`
+  to `Envelope` (`#[serde(skip_serializing_if = "Option::is_none",
+  default)]` — additive, does not bump `SCHEMA_VERSION`; absent on an
+  older stored envelope defaults to `None`) and a new `merge_envelope`
+  constructor mirroring `envelope` but with `merged_from` populated;
+  `merge_and_emit` now builds the survivor's `Merged` event via
+  `merge_envelope` under both transports, threading the duplicate's pid.
+  The matcher-adapter confirmation was separately verified: the crate's
+  matching path (`src/search/`, `organization_matcher::MatchingEngine`)
+  takes only the stored `Organization` payload, which has no
+  cross-service-link field for a scan to reach — there was nothing to
+  fix there, only to confirm. New DB-free `src/streaming.rs` tests
+  (`ordinary_envelope_has_no_merged_from`, `merge_envelope_carries_merged_from`)
+  and a new DB-gated `tests/merge_event_carries_merged_from.rs` (own test
+  binary, `outbox` transport) asserting the persisted `event_outbox`
+  row's `payload["merged_from"]` equals the absorbed duplicate's pid.
+  Verified: `cargo build --all-targets`, `cargo fmt --check`, `cargo
+  clippy --all-targets -- -D warnings`, and `scripts/ci-check.sh test-db
+  organization/organization-service-with-loco` all clean (205 lib tests
+  + the new streaming tests + the new DB-gated test, plus the rest of
+  the DB-gated suite, all passing); no `Cargo.lock` churn.
 - [x] Request-level integration tests (Postgres; `#[ignore]`-gated).
 - [x] Offline token verification — `src/auth.rs` embeds
   `authentication-verifier` behind a process-wide `Verifier`

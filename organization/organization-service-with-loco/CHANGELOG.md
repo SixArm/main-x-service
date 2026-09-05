@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — `merged_from` on the `Merged` event envelope (umbrella spec §13 T-13)
+
+`Envelope` had no way to name which duplicate a `Merged` event's
+survivor absorbed — unlike the six person-style crates
+(person/worker/place/thing/event/course), which all carry a dedicated
+`merged_from: Option<String>`. Without it, the link-graph aggregator's
+merge-repointing consumer has no way to know which edges to move off
+the duplicate onto the survivor. Added `merged_from` to `Envelope`
+(additive, does not bump `SCHEMA_VERSION`) and a `merge_envelope`
+constructor that populates it; `merge_and_emit` now builds the
+survivor's `Merged` event through it under both the `memory` and
+`outbox` transports. New DB-free `src/streaming.rs` tests plus a new
+DB-gated `tests/merge_event_carries_merged_from.rs` (own binary,
+`outbox` transport) pin that the persisted `event_outbox` row's
+payload carries the absorbed duplicate's pid. See spec §13.
+
 ### Fixed — FHIR `GET /fhir/Organization` search now resolves through the Tantivy index (ORG-T5)
 
 The FHIR search handler ran a capped in-memory scan over `OrgModel::list`
