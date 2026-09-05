@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security — root sign-in gate (PF-T22)
+
+`src/hooks.server.ts` stashed `locals.sessionId` from the cookie but
+nothing redirected an anonymous visitor away from a clinical/PII route
+— the whiteboard, stay detail, bed-request board, and locate were all
+reachable with no session, with `PATIENT_FLOW_REQUIRE_AUTH` (default
+off) the only real gate. New root `src/routes/+layout.server.ts`
+redirects to `/signin` when `locals.sessionId === null`, exempting
+`/signin`, `/verify`, and any path ending `/kiosk` — the whiteboard's
+wall-touchscreen display has no interactive session, so it stays
+reachable (with or without `?masked=1`) exactly as before.
+`tests/e2e/board.spec.ts` gained a `sign-in gate` describe (anonymous
+redirect + kiosk-stays-reachable coverage) alongside the existing
+suite, now wrapped in a `signed-in smoke coverage` describe that
+injects a fake session cookie. See spec `tasks.md` PF-T22 (repo
+`tasks.md` WEB-1).
+
 ### Added
 
 - 2026-07-19 — SVAR strong fit: new **/edd** route (nav-linked): every occupied bed's expected

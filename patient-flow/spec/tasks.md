@@ -223,24 +223,43 @@ code + tests in one PR.
     passes (1 + 8 tests across the crate's two suites), 0 failed;
     `cargo test --lib`: 72 passed (unchanged), 0 failed; `cargo
     build`/`clippy --all-targets -- -D warnings` clean.
-- [ ] PF-T22 **Front-end has no page-visit sign-in guard.**
-  `src/hooks.server.ts` (PF-T18) stashes `locals.sessionId` from the
-  cookie but nothing redirects an anonymous visitor away from a
+- [x] PF-T22 **Front-end has no page-visit sign-in guard.** *(resolved
+  2026-09-05.)* `src/hooks.server.ts` (PF-T18) stashed `locals.sessionId`
+  from the cookie but nothing redirected an anonymous visitor away from a
   clinical/PII route (whiteboard, stay detail, bed-request board,
-  locate) — *(verified: `grep -rn requireSignedIn src` returns zero
-  hits, and no `+layout.server.ts` exists anywhere under `src/routes`)*.
-  This matches repo `tasks.md` **WEB-1**'s finding that the
+  locate) — *(verified: `grep -rn requireSignedIn src` returned zero
+  hits, and no `+layout.server.ts` existed anywhere under `src/routes`)*.
+  This matched repo `tasks.md` **WEB-1**'s finding that the
   `requireSignedIn` pattern PRO-H10 added to the ten entity front-ends
-  never reached any of the five consumer apps. Today's only real gate is
+  never reached any of the five consumer apps — this is the first of the
+  five to close it, following WEB-1's own fix pattern (a stubbed session
+  cookie makes guarded pages render in the existing suite rather than
+  weakening the guard) and the identical `+layout.server.ts` shape
+  already shipped for `workforce-planning-management`
+  (WPM-T38)/`contact-relationship-management` (CRM-T26)/
+  `content-management-system` (CMS-T31). Today's only real gate remains
   `PATIENT_FLOW_REQUIRE_AUTH` on the API, which defaults off (per
   `agents/share/security.md` §4), so an anonymous visitor with front-end
-  access today sees live patient data. **Acceptance:** a `requireSignedIn`
-  helper (or `+layout.server.ts` check on `locals.sessionId`) redirects an
-  anonymous visitor to `/signin` on protected routes, preserving the
-  existing `?masked=1` kiosk exemption for the whiteboard; one Playwright
-  test pins the anonymous-303 behaviour, matching WEB-1's fix pattern
-  (a stubbed session cookie makes guarded pages render in the existing
-  suite rather than weakening the guard).
+  access previously saw live patient data.
+  **Resolution:** new root `src/routes/+layout.server.ts` redirects
+  `303` to `/signin` when `locals.sessionId === null`, except for
+  `/signin`, `/verify`, and any path ending `/kiosk` — the whiteboard's
+  wall-touchscreen display (`/wards/[pid]/kiosk`, optionally
+  `?masked=1`) has no interactive session to sign in with, so it stays
+  reachable regardless of the `masked` query value, matching the same
+  path shape `+layout.svelte` already uses for its own chrome-less
+  kiosk rendering. `tests/e2e/board.spec.ts` split into a `sign-in gate`
+  describe (no session cookie: a protected page and the home page both
+  redirect to `/signin`, `/signin` itself stays reachable, and the
+  kiosk's existing masked-mode content assertions now run signed
+  **out** to prove the exemption) and a `signed-in smoke coverage`
+  describe wrapping every pre-existing test behind a `beforeEach` that
+  injects the fake `__Host-mxi_session` cookie (WPM-T38's exact
+  pattern — the server checks the cookie's presence only, never its
+  validity). Verified: `npm run check` (svelte-check) clean, `npm test`
+  (vitest, 22/22) clean, `npx playwright test` 10/10 passed (twice, to
+  rule out flake), `npm run lint` clean save for one pre-existing,
+  untouched `.d.ts` formatting warning.
 - [ ] PF-T23 **Zero test coverage on the BFF session/token-exchange
   code.** `src/lib/server/{session,auth,config}.ts` (PF-T18's
   httpOnly-cookie helpers, magic-link request/verify, and the
