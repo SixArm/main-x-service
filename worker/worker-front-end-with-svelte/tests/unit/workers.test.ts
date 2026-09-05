@@ -142,6 +142,26 @@ describe("WorkerRepository", () => {
         expect(result.total).toBe(42);
     });
 
+    // T-30: `phonetic` reaches the wire exactly as `fuzzy` does
+    // (`src/lib/api/workers.ts` maps both `SearchOptions` fields straight
+    // through to the `/api/workers/search` query string) — previously
+    // only `fuzzy` had coverage, so a typo in the `phonetic` mapping
+    // would have gone unnoticed.
+    it("reaches the wire with phonetic=true, same as fuzzy", async () => {
+        let capturedUrl = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                capturedUrl = String(input);
+                return jsonResponse({ success: true, data: [sampleWorker], error: null });
+            }),
+        });
+        const repo = new WorkerRepository(client);
+        await repo.search({ q: "Smith", fuzzy: true, phonetic: true });
+        expect(capturedUrl).toContain("phonetic=true");
+        expect(capturedUrl).toContain("fuzzy=true");
+    });
+
     // Pins: the cross-service link endpoints — URL, method, and that the
     // envelope's `data` is what the caller receives.
     it("GETs the links sub-resource on listLinks", async () => {

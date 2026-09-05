@@ -9,6 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — test coverage for the phonetic search toggle (T-30)
+
+`SearchOptions.phonetic` was wired all the way to the
+`/api/workers/search` query string (`src/lib/api/workers.ts`), same as
+`fuzzy`, but only `fuzzy` had a test pinning it reached the wire. New
+`WorkerRepository` test in `tests/unit/workers.test.ts` asserts
+`phonetic=true` (and `fuzzy=true`) both appear in the request URL. See
+spec §13 T-30.
+
 ### Added — GDPR export download on the detail page (T-20)
 
 A button on `/workers/[id]` fetches `GET /api/workers/{id}/export` through the
