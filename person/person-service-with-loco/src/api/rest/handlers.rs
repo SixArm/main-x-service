@@ -575,8 +575,13 @@ fn search_offset_within_bound(offset: usize) -> bool {
 /// caller's record-level read visibility and the client's `mask_sensitive`
 /// request. Pure, so the concealment/masking decision is unit-tested apart
 /// from the DB/search machinery.
+///
+/// `pub(crate)` (T-37) so the gRPC `ListPersons` RPC
+/// (`crate::api::grpc::service`) can apply the exact same per-hit
+/// disposition REST's `list_persons`/`search_persons` do, rather than
+/// reimplementing the rule on a second surface.
 #[derive(Debug, PartialEq, Eq)]
-enum ResultDisposition {
+pub(crate) enum ResultDisposition {
     /// The caller may not read this record: omit it from the page so its
     /// existence is never revealed (concealment).
     Omit,
@@ -593,7 +598,7 @@ enum ResultDisposition {
 /// mask. When `PERSON_REQUIRE_AUTH` is off, `read_visibility` yields
 /// `Some(vec![])`, so this collapses to "mask iff the client asked" —
 /// exactly the pre-SEC-G3 behaviour.
-fn search_result_disposition(
+pub(crate) fn search_result_disposition(
     visibility: Option<&[String]>,
     mask_sensitive: bool,
 ) -> ResultDisposition {

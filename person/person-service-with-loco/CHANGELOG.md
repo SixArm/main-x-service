@@ -8,6 +8,26 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — SEC-G3 per-record read-visibility filtering/masking on the gRPC `ListPersons` RPC (T-37)
+
+`ListPersons` previously applied only the blanket `Read` check, so
+under an ABAC policy denying some records but not others it
+over-disclosed relative to the equivalent REST `list_persons`/
+`search_persons` (security invariant #5). `search_result_disposition`
+and `ResultDisposition` (`src/api/rest/handlers.rs`) are now
+`pub(crate)`, and `ListPersons` calls `auth::read_visibility` +
+`search_result_disposition` per row exactly as REST does: a denied
+record is omitted (concealed, not merely `403`'d), and a
+`mask`-obligated one is redacted. New DB-gated test
+`list_persons_over_grpc_applies_sec_g3_disposition`
+(`tests/grpc_sec_g3.rs`, its own test binary, mirroring
+`tests/enforcement.rs`) proves all three dispositions over a real
+`ListPersons` call under a real ABAC policy. Also documented (not
+fixed, out of scope): gRPC's `person_from_proto` never wires the
+proto `active` field into a created record — every gRPC create lands
+`active = true` regardless of what the client sent, unlike REST's
+`create_person`.
+
 ### Added — HIPAA §164.528 disclosure-accounting on the gRPC `GetPerson` read path (T-36)
 
 The gRPC `GetPerson` RPC now writes the same disclosure-accounting
