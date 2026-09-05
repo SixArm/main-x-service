@@ -339,7 +339,7 @@ code + tests in one PR.
         expected) and the matching-type acceptance for each, alongside
         the pre-existing `Person`-only `ref_rules` test.
 
-- [ ] CRM-T26 **Front-end sign-in gate.** No `+layout.server.ts`
+- [x] CRM-T26 **Front-end sign-in gate.** No `+layout.server.ts`
       exists and `hooks.server.ts` only populates `locals.sessionId`
       without redirecting (verified: `find src/routes -iname
       "+layout.server.ts"` returns nothing); every deal/ticket/
@@ -349,6 +349,23 @@ code + tests in one PR.
       per-protected-route guard redirects a session-less visitor to
       sign-in (excluding the public sign-in/verify routes); a
       Playwright spec pins it; svelte-check 0. (CRM-D12)
+      **Resolution (2026-09-05):** ported WPM-T38's identical fix
+      (same task shape, same underlying architecture — same session
+      cookie, same SPA `ssr = false` mode, same `hooks.server.ts`
+      shape). New root `src/routes/+layout.server.ts` redirects to
+      `/signin` (303) when `locals.sessionId` is `null`, excluding
+      `/signin`/`/verify`. Root gate chosen over a narrower
+      per-mutation-page guard for the same reason as WPM: this app's
+      pages (deal board, ticket queue, executive/dpo dashboards) mix
+      read content with embedded actions rather than separating reads
+      and writes onto dedicated routes. `tests/e2e/smoke.spec.ts`
+      gained the same `signIn()` cookie-injection helper and a
+      `"sign-in gate (CRM-T26)"` describe proving the redirect; all 12
+      pre-existing tests moved under a `"signed-in smoke coverage"`
+      describe whose `beforeEach` now signs in first. Verified: `npm
+      run check` (svelte-check: 425 files, 0 errors, 0 warnings), `npx
+      playwright test` (15 passed), `npx vitest run` (5 passed,
+      unchanged).
 
 - [ ] CRM-T27 **Front-end test coverage for honesty rendering.**
       `tests/unit/crm.test.ts` is the only vitest file, covering
