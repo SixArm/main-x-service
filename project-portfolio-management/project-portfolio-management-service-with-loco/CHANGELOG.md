@@ -9,6 +9,33 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — `list`/`search`/`check-duplicates` could disclose a plan the caller's direct read denies (SEC-PPM-1)
+
+`GET /{pid}` and `GET /{pid}/export` were the only handlers running a
+record-level ABAC decision (`crate::auth::authorize_record`); `list`,
+`search`, and `check_duplicates` returned every plan's pid/name (or
+scored hit) unconditionally. With
+`PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` on and a policy that
+**denies** read past some phase gate (`resource.stage`, PPM-3), those
+three collection endpoints still surfaced a denied plan's existence and
+name — a collection read disclosing more than the equivalent single
+read (`agents/share/security.md` invariant 5). A new `readable_refs`
+helper filters `list`/`search` rows through `authorize_record` per row
+(keyed on the row's own `stage` column), omitting a denied one rather
+than erroring the whole call; `check_duplicates` gained a
+`MaybeAuthUser` extractor (it took none before) and applies the
+identical per-candidate filter before scoring a hit. With enforcement
+off (the default) or no deny rule configured, this is a no-op. New
+DB-gated test (`tests/list_search_check_duplicates_authz.rs`) advances
+one plan through gate 0 and proves a denied caller's
+`list`/`search`/`check-duplicates` all omit it while still surfacing an
+ungated plan, and that an unrestricted caller sees both everywhere. See
+spec/index.md SEC-PPM-1 (including a correction to the task's original
+"mask the lead/owner-org fields" framing — `PlanRef`/`ScoredRef` never
+carried those fields to begin with, so the real, provable gap was
+authorization filtering, not field redaction — the same finding
+care-pathway-service's twin task CP-T2 made).
+
 ### Security — audit the oversight bulk-read/export endpoints (SEC-PPM-2)
 
 `GET /api/auditor/evidence-pack` (bundles a period's decisions plus up to
