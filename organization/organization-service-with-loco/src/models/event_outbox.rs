@@ -205,6 +205,7 @@ mod tests {
             seq: 7,
             actor: Some("user-1".to_string()),
             name: "Acme, Inc.".to_string(),
+            merged_from: None,
         }
     }
 

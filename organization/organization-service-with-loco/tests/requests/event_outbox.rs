@@ -33,6 +33,7 @@ fn created_envelope(model: &OrgModel) -> Envelope {
         seq: 1,
         actor: None,
         name: model.name.clone(),
+        merged_from: None,
     }
 }
 
