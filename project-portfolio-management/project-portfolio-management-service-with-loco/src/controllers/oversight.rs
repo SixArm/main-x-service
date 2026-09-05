@@ -39,6 +39,7 @@ use crate::models::_entities::{
     audit_logs, benefits, budget_lines, gate_reviews, insight_snapshots, merge_records, milestones,
     plans, proposals, risks, scenarios,
 };
+use crate::models::audit_logs::Model as AuditModel;
 use crate::models::visibility as vis_models;
 
 /// Load all live rows of one entity (soft-deleted excluded).
@@ -364,12 +365,35 @@ struct TrailQuery {
 /// by actor / action / entity pid / window; rows newest first plus
 /// integrity stats over the filtered set (per-day counts, actorless
 /// count, distinct actors).
+///
+/// Itself a bulk read of governance/audit content, so the act of
+/// reading it is audited (SEC-PPM-2) — the same posture
+/// `agents/share/bulk-import-export.md` §8 requires of a bulk export,
+/// and delivery is gated on that write succeeding (never disclose, then
+/// find out the disclosure went unrecorded).
 #[debug_handler]
 async fn auditor_trail(
     axum::extract::Query(query): axum::extract::Query<TrailQuery>,
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     headers: HeaderMap,
 ) -> Result<Response> {
+    AuditModel::record(
+        &ctx.db,
+        Uuid::nil(),
+        "oversight_auditor_trail_read",
+        caller.actor(),
+        Some(serde_json::json!({
+            "from": query.from.clone(),
+            "to": query.to.clone(),
+            "actor_filter": query.actor.clone(),
+            "action_filter": query.action.clone(),
+            "entity_filter": query.entity.clone(),
+            "limit": query.limit,
+        })),
+    )
+    .await
+    .map_err(Error::Model)?;
     let limit = query.limit.unwrap_or(100).min(500);
     let mut find = audit_logs::Entity::find();
     if let Some(actor) = query.actor.as_deref() {
@@ -537,16 +561,32 @@ struct EvidenceQuery {
 /// `GET /api/auditor/evidence-pack?from=&to=&format=json|csv` — the
 /// period's decisions plus its audit rows (cap 2000, oldest first) in
 /// one bundle; `csv` flattens the audit rows for spreadsheet review.
+///
+/// A bulk export of governance/audit content is itself audited
+/// (SEC-PPM-2), the same posture `case-service`'s bulk export uses
+/// (SEC-B8) and `agents/share/bulk-import-export.md` §8 requires;
+/// delivery is gated on that write succeeding.
 #[debug_handler]
 async fn evidence_pack(
     axum::extract::Query(query): axum::extract::Query<EvidenceQuery>,
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
 ) -> Result<Response> {
     let win = WindowQuery {
         from: query.from.clone(),
         to: query.to.clone(),
     };
     let (from, to) = window(&win);
+    let format = query.format.clone().unwrap_or_else(|| "json".to_string());
+    AuditModel::record(
+        &ctx.db,
+        Uuid::nil(),
+        "oversight_evidence_pack_exported",
+        caller.actor(),
+        Some(serde_json::json!({ "from": from, "to": to, "format": format })),
+    )
+    .await
+    .map_err(Error::Model)?;
     let audit_rows = audit_logs::Entity::find()
         .filter(audit_logs::Column::CreatedAt.gte(from))
         .filter(audit_logs::Column::CreatedAt.lte(to))

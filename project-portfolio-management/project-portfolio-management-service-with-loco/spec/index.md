@@ -777,7 +777,7 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   gets redacted `lead_ref`/owner-org fields from `list`, `search`, and
   `check-duplicates`, exactly as `GET /{pid}` already redacts them.
 
-- [ ] **SEC-PPM-2 (S) Audit the oversight bulk-read/export endpoints.**
+- [x] **SEC-PPM-2 (S) Audit the oversight bulk-read/export endpoints.**
   `GET /api/auditor/evidence-pack` bundles a period's decisions plus up
   to 2000 audit rows (JSON or CSV) — a bulk export of governance/audit
   content structurally identical to the class `case-service`'s SEC-G1
@@ -795,7 +795,26 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   succeeding — the same posture `case-service`'s bulk export uses
   (SEC-B8). Three-part change: spec §9.13/§13 +
   `src/controllers/oversight.rs` + a DB-gated request test.
-  **Acceptance:** a DB-gated test proves calling either endpoint writes
+  **Resolution (2026-09-05):** both handlers now take `caller:
+  MaybeAuthUser` (already imported in this file, used elsewhere —
+  a no-op auth change, it does not enforce anything by itself) and
+  call `AuditModel::record(&ctx.db, Uuid::nil(), "oversight_…", 
+  caller.actor(), Some(snapshot))` before assembling the response —
+  `"oversight_evidence_pack_exported"` (snapshot: `from`/`to`/`format`)
+  and `"oversight_auditor_trail_read"` (snapshot: `from`/`to` plus the
+  actor/action/entity/limit filters). `entity_pid` is `Uuid::nil()`,
+  matching the family convention for an estate-wide action naming no
+  single entity (see e.g. care-pathway's/case's `disclosure::
+  record_access` calls for a FHIR search). The write is awaited and
+  its error propagated via `?` — a real DB error surfaces as `500`
+  before either endpoint constructs a body, so a failed audit write
+  never ships alongside a delivered response. `auditor_trail`'s query
+  struct carries no `format` (the endpoint always returns JSON), so
+  only `evidence_pack`'s snapshot names one, exactly as the endpoint
+  itself distinguishes `json`/`csv`. Two new DB-gated tests
+  (`tests/requests/oversight.rs`) call each endpoint once and then read
+  `GET /api/plans/audit/recent`, asserting the expected `action` is
+  present with the expected snapshot fields. **Acceptance:** a DB-gated test proves calling either endpoint writes
   exactly one new `audit_logs` row naming the actor and the requested
   window/format, and that a write failure prevents the response from
   being returned.
