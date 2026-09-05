@@ -9,6 +9,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — `list`/`search`/`check-duplicates` could disclose a pathway the caller's direct read denies (CP-T2)
+
+`GET /{pid}` and `GET /{pid}/export` were the only handlers running a
+record-level ABAC decision (`crate::auth::authorize_record`); `list`,
+`search`, and `check_duplicates` returned every active pathway's
+pid/name (or scored-hit) unconditionally. With `CARE_PATHWAY_REQUIRE_AUTH`
+on and a policy that **denies** read on some pathways (e.g. a
+`resource.sensitive_setting`-gated rule — the exact scenario `GET /{pid}`'s
+own docs describe), those three collection endpoints still surfaced a
+denied pathway's existence and name — a collection read disclosing more
+than the equivalent single read (`agents/share/security.md` invariant
+5). A new `readable_refs` helper filters `list`/`search` rows through
+`authorize_record` per record, omitting a denied one rather than
+erroring the whole call; `check_duplicates` gained a `MaybeAuthUser`
+extractor (it took none before) and applies the identical per-candidate
+filter before scoring a hit. With enforcement off (the default) or no
+deny rule configured, this is a no-op. New DB-gated test
+(`tests/list_search_check_duplicates_authz.rs`) proves a denied
+caller's `list`/`search`/`check-duplicates` all omit a sensitive
+pathway while still surfacing an ordinary one, and that an unrestricted
+caller sees both everywhere. See spec/index.md CP-T2 (including a
+correction to the task's original "mask the provider fields" framing —
+`PathwayRef`/`ScoredRef` never carried `provider_name`/`provider_id` to
+begin with, so the real, provable gap was authorization filtering, not
+field redaction).
+
 ### Changed — FHIR `PlanDefinition` search now resolves through Tantivy (CP-T4)
 
 `GET /fhir/PlanDefinition?<params>` scanned up to `FHIR_SEARCH_SCAN_CAP`

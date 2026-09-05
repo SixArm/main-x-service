@@ -238,6 +238,46 @@ impl PathwayRef {
     }
 }
 
+/// Filter `rows` down to the ones `caller`'s record-level ABAC policy
+/// allows to read, projecting each survivor to a [`PathwayRef`].
+///
+/// `get_one`/`get_export` already run [`crate::auth::authorize_record`]
+/// per pathway; `list` and `search` did not, so a policy that **denies**
+/// read on some pathways (e.g. a `resource.sensitive_setting`-gated
+/// rule, as `get_one`'s own docs describe) still let those pathways'
+/// pid + name leak through the collection endpoints even though the
+/// direct `GET /{pid}` would `403` — a collection read disclosing more
+/// than the equivalent single read (spec CP-T2;
+/// `agents/share/security.md` invariant 5). A denied row is **omitted**,
+/// not surfaced with an error, since the array as a whole still succeeds
+/// for the rows the caller may see.
+///
+/// There is no `mask` **obligation** step here (unlike `get_one`): a
+/// [`PathwayRef`] carries only `{pid, name}` — it never held
+/// `provider_name`/`provider_id` to begin with, so there is nothing left
+/// for that obligation to redact on this projection.
+///
+/// With `CARE_PATHWAY_REQUIRE_AUTH` off (the default) or no configured
+/// deny rule, `authorize_record` never denies, so this is a no-op and
+/// every row passes through unchanged.
+///
+/// # Errors
+///
+/// Propagates a row's stored-JSON parse failure.
+fn readable_refs(rows: &[PathwayModel], caller: &MaybeAuthUser) -> Result<Vec<PathwayRef>> {
+    let mut refs = Vec::with_capacity(rows.len());
+    for row in rows {
+        let pathway = row.to_pathway()?;
+        let attrs = crate::auth::care_pathway_resource_attrs(&pathway);
+        if crate::auth::authorize_record(caller, authentication_verifier::Action::Read, &attrs)
+            .is_ok()
+        {
+            refs.push(PathwayRef::of(row));
+        }
+    }
+    Ok(refs)
+}
+
 /// Request body for `POST /match`: a query plus the explicit candidate
 /// list to rank it against. Nothing is persisted — this is pure scoring.
 #[derive(Debug, Deserialize)]
@@ -541,7 +581,7 @@ async fn list(
     )
     .await
     .map_err(audit_unavailable)?;
-    let refs: Vec<PathwayRef> = rows.iter().map(PathwayRef::of).collect();
+    let refs = readable_refs(&rows, &caller)?;
     Ok(with_page_headers(format::json(refs)?, total, limit, offset))
 }
 
@@ -603,7 +643,7 @@ async fn search(
     )
     .await
     .map_err(audit_unavailable)?;
-    let refs: Vec<PathwayRef> = rows.iter().map(PathwayRef::of).collect();
+    let refs = readable_refs(&rows, &caller)?;
     Ok(with_page_headers(format::json(refs)?, total, limit, offset))
 }
 
@@ -631,12 +671,18 @@ async fn match_against(Json(req): Json<MatchRequest>) -> Result<Response> {
 /// [`CHECK_DUPLICATES_SCAN_CAP`] active rows and matches each, logging a
 /// `WARN` if the cap is hit (results may then be incomplete — spec §13 T-6).
 ///
+/// A candidate the caller's record-level ABAC policy denies reading is
+/// **omitted**, same as [`readable_refs`] does for `list`/`search` (spec
+/// CP-T2) — a duplicate check must not reveal a sensitive pathway's
+/// existence to a caller who could not `GET` it directly.
+///
 /// # Errors
 ///
 /// Propagates DB query and payload-parse errors.
 #[debug_handler]
 async fn check_duplicates(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Json(query): Json<CarePathway>,
 ) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
@@ -664,15 +710,22 @@ async fn check_duplicates(
         // against the query; only classified matches are surfaced.
         let candidate = row.to_pathway()?;
         let r = engine.match_care_pathways(&query, &candidate);
-        if r.is_match {
-            hits.push(ScoredRef {
-                pid: row.pid.to_string(),
-                name: row.name.clone(),
-                score: r.score,
-                confidence: format!("{:?}", r.confidence),
-                is_match: r.is_match,
-            });
+        if !r.is_match {
+            continue;
         }
+        let attrs = crate::auth::care_pathway_resource_attrs(&candidate);
+        if crate::auth::authorize_record(&caller, authentication_verifier::Action::Read, &attrs)
+            .is_err()
+        {
+            continue;
+        }
+        hits.push(ScoredRef {
+            pid: row.pid.to_string(),
+            name: row.name.clone(),
+            score: r.score,
+            confidence: format!("{:?}", r.confidence),
+            is_match: r.is_match,
+        });
     }
     // Best matches first. `f64` is only partially ordered, so NaN scores
     // (which the engine never emits) fall back to "equal" rather than panic.
