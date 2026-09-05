@@ -177,6 +177,7 @@ impl Hooks for App {
         AppRoutes::with_default_routes()
             .add_route(controllers::graph::routes())
             .add_route(controllers::compliance::routes())
+            .add_route(controllers::admin::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
     }

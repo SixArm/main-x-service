@@ -786,7 +786,7 @@ unblocked.
     proves a failed pass advances neither gauge while a prior real
     (non-zero) divergence value survives untouched.
 
-- [ ] T-36 (S): Add an operator-forceable reconciliation pass.
+- [x] T-36 (S): Add an operator-forceable reconciliation pass.
   *(verified: the same runbook states "There is **no** endpoint, task,
   or admin route to force a pass on demand, list the last-run time per
   entity, or see a pass/fail counter — confirmed absent, not merely
@@ -805,6 +805,45 @@ unblocked.
   **Acceptance:** an authorized operator can trigger and observe one
   reconciliation pass without restarting the process; the runbook's
   "confirmed absent" line is no longer true.
+  **Resolution (2026-09-05):** chose the admin-endpoint path (a loco
+  CLI task cannot be triggered from a running operator tool without
+  process/exec access, and case-service's own reference pattern for
+  this class of privileged action is an HTTP endpoint, not a CLI task).
+  `src/auth.rs::authorize_reconcile` (a new `Action::Destructive`
+  check against the `link_graph` entity, alongside the existing
+  `may_see_governed`/`enforce`) gates the new `POST
+  /api/admin/reconcile/{entity}` (`src/controllers/admin.rs`), which
+  builds a `reconcile::HttpAuthoritativeSource::from_env_for(&entity)`
+  — `404` when `entity` is unrecognised or has no
+  `LINK_GRAPH_RECONCILE_URL_<ENTITY>` configured, since there is
+  nothing to force — and otherwise calls
+  `reconcile::reconcile(&ctx.db, &source)` directly, the exact same
+  call the periodic worker (`run_periodic`) makes, so the two paths
+  cannot drift. This is a control-plane action, not a new **link**-write
+  endpoint of this service's own (the `AGENTS.md` "read-only to the
+  world" invariant governs edge creation/withdrawal, which still lives
+  only in each owning entity service): it triggers a repair of this
+  aggregator's *own* read-model against a source it is already
+  configured to trust, the same category of action the periodic worker
+  already performs unattended. New DB-gated test
+  (`tests/force_reconcile.rs`, its own binary — mints real PASETO
+  tokens against a throwaway key set, same shape as `tests/
+  concealment.rs`): no token → `401`; an authenticated caller without
+  `access=admin`/`svc=true` → `403` (the blanket guard's coarse `read`
+  check on `link_graph` would admit the path, but the handler's own
+  destructive check still refuses it); an unconfigured entity → `404`
+  even for an authorised admin; an authorised admin against a
+  mocked-HTTP `case` source (a tiny local Axum server spun up inside
+  the test, serving one fixed `subject_of` edge) → `200`, reporting
+  `divergence_count: 1` and advancing the same
+  `reconciliation_last_success_unixtime` /
+  `reconciliation_divergence` gauges T-34/T-35 already cover; a second
+  forced pass against the now-repaired read-model converges to `0`,
+  proving this calls the real repair logic, not a stub. Verified:
+  `cargo build --lib`, `cargo clippy --all-targets -- -D warnings`,
+  `cargo test --lib` (106 passed), `cargo test -- --ignored` against a
+  real Postgres (all suites green, including the new binary), `cargo
+  fmt --check`.
 
 ### Tests
 

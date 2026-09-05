@@ -414,6 +414,40 @@ pub fn enforce(
     }
 }
 
+/// May this caller force one reconciliation pass on demand (T-36)?
+///
+/// This is a control-plane action, not a link **write** of this
+/// service's own (see `AGENTS.md` "read-only to the world") — it
+/// triggers the exact same repair [`crate::reconcile::reconcile`]
+/// already performs periodically, just on demand rather than on the
+/// worker's timer. As with case-service's bulk `subject_of` dump
+/// (SEC-G1), forcing a whole-entity read-model repair (and observing
+/// its resulting divergence count) is treated as more sensitive than
+/// an ordinary read even though this service is otherwise read-only:
+/// [`Action::Destructive`], which the built-in default policy grants
+/// only to a machine peer (`svc=true`) or an `access=admin` caller.
+/// Enforcement **off** ⇒ always allowed (the family default-off
+/// posture every other guard in this crate shares).
+///
+/// # Errors
+///
+/// `401` for a missing/invalid bearer token; `403` when the policy
+/// denies the destructive action.
+pub fn authorize_reconcile(headers: &HeaderMap) -> Result<(), (StatusCode, String)> {
+    if !require_auth() {
+        return Ok(());
+    }
+    let claims = bearer_claims(headers, &verifier().current())?;
+    let decision = policy()
+        .current()
+        .evaluate(&claims, Action::Destructive, GRAPH_ENTITY);
+    if decision.allowed {
+        Ok(())
+    } else {
+        Err((StatusCode::FORBIDDEN, decision.reason))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

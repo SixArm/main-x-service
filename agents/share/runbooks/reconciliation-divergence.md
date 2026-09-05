@@ -69,13 +69,22 @@ without cross-referencing logs.
 | Whether a pass ran and what happened | logs, `reconciliation pass complete` (info, carries `divergence=`) / `reconciliation pass failed` (warn, carries the error) | Still the only place a failed pass's *error detail* is visible — the gauges tell you *that* it failed (staleness), not *why* |
 | Whether a source is even configured | boot log — a worker is spawned only when its `LINK_GRAPH_RECONCILE_URL_<ENTITY>` is set and passes the SEC-B7 check below | Silence from an entity can mean "converged" or "never configured" — check the env, not just the metric |
 
-There is **no** endpoint, task, or admin route to force a pass on
-demand, list the last-run time per entity, or see a pass/fail counter —
-confirmed absent, not merely undocumented. The only lever an operator
-has is restarting the process (which waits out the full
-`LINK_GRAPH_RECONCILE_SECS` again before the first pass, since the
-initial tick is deliberately skipped so boot isn't blocked) or
-restarting with a smaller interval temporarily.
+**Forcing a pass on demand (T-36, 2026-09-05).** `POST
+/api/admin/reconcile/{entity}` runs one reconciliation pass for
+`entity` immediately, calling the exact same `reconcile()` the periodic
+worker calls — so the two paths cannot drift — and updates the same
+`reconciliation_divergence` / `reconciliation_last_success_unixtime`
+gauges. It is `Action::Destructive`-gated (the built-in default policy
+admits only `svc=true` or `access=admin`, matching case-service's bulk
+`subject_of` dump), and answers `404` when `entity` has no
+`LINK_GRAPH_RECONCILE_URL_<ENTITY>` configured — there is nothing to
+force. This closes the gap the rest of this section still describes for
+context: before it, the only lever an operator had was restarting the
+process (which waits out the full `LINK_GRAPH_RECONCILE_SECS` again
+before the first pass, since the initial tick is deliberately skipped so
+boot isn't blocked) or restarting with a smaller interval temporarily —
+there was no endpoint, task, or admin route to force a pass on demand,
+list the last-run time per entity, or see a pass/fail counter.
 
 ## Symptoms → checks → actions
 
@@ -134,9 +143,11 @@ field, so the peer's own response is the fastest way to find out which
 one you're in.
 
 **"I need to force reconciliation right now, not wait for the timer."**
-There is no way to. Restart the process (accepting the first-tick skip,
-so the next real pass is still `LINK_GRAPH_RECONCILE_SECS` away), or
-temporarily lower `LINK_GRAPH_RECONCILE_SECS` and restart.
+`POST /api/admin/reconcile/{entity}` as an `svc=true`/`access=admin`
+caller (T-36) — no restart needed. Before T-36 the only lever was
+restarting the process (accepting the first-tick skip, so the next real
+pass was still `LINK_GRAPH_RECONCILE_SECS` away), or temporarily
+lowering `LINK_GRAPH_RECONCILE_SECS` and restarting.
 
 ## A worked example, if you want to see the mechanism before trusting it
 
