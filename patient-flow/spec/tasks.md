@@ -193,7 +193,7 @@ code + tests in one PR.
   - **Resolved.** Added the `paths` entry (audited sensitive-read
     summary, no mask obligation noted per the handler's own doc
     comment) and extended `spec_shape` to assert the path is present.
-- [ ] PF-T21 **No allowlist test on the time-analysis response shape.**
+- [x] PF-T21 **No allowlist test on the time-analysis response shape.** *(resolved 2026-09-05.)*
   `tests/requests/flows.rs::full_journey_request_to_deep_clean` asserts
   the documented fields (`lead_time_ms`, `value_time_ms`, `span_days`,
   `classified_days`, `clock.*`, `confidence`) are *present*, but nothing
@@ -209,6 +209,20 @@ code + tests in one PR.
   test asserts `timeline.as_object().unwrap().keys()` is a subset of a
   named allowlist (or an exact `BTreeSet` match), so adding an
   undocumented field fails CI rather than shipping silently.
+  - **Resolved.** Added an exact `BTreeSet` comparison right after the
+    `timeline` fetch in `full_journey_request_to_deep_clean`: the
+    response's top-level keys must equal the eleven-entry allowlist
+    (`as_of`, `stay`, `note`, `clock`, `lead_time_ms`, `value_time_ms`,
+    `span_days`, `classified_days`, `green_days`, `coverage`,
+    `confidence`) read off `src/controllers/stays.rs::stay_time_analysis`'s
+    actual `json!({...})` body, not guessed from the doc comment. A
+    future field addition/removal now fails this assertion instead of
+    silently changing the wire contract. Verified against a real
+    Postgres 18 via `scripts/ci-check.sh test-db
+    patient-flow/patient-flow-service-with-rust`: full DB-gated suite
+    passes (1 + 8 tests across the crate's two suites), 0 failed;
+    `cargo test --lib`: 72 passed (unchanged), 0 failed; `cargo
+    build`/`clippy --all-targets -- -D warnings` clean.
 - [ ] PF-T22 **Front-end has no page-visit sign-in guard.**
   `src/hooks.server.ts` (PF-T18) stashes `locals.sessionId` from the
   cookie but nothing redirects an anonymous visitor away from a

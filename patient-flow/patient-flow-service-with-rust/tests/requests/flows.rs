@@ -103,6 +103,37 @@ async fn full_journey_request_to_deep_clean() {
             .get(&format!("/api/stays/{stay_pid}/time-analysis"))
             .await
             .json();
+
+        // PF-T21: an exact key-set match, not just presence — the
+        // family-wide refusal to surface per-person rate/throughput
+        // fields (agents/share/time-based-analysis.md §7) must fail CI
+        // if a future change adds one silently, not just go unasserted.
+        let keys: std::collections::BTreeSet<&str> = timeline
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        let allowlist: std::collections::BTreeSet<&str> = [
+            "as_of",
+            "stay",
+            "note",
+            "clock",
+            "lead_time_ms",
+            "value_time_ms",
+            "span_days",
+            "classified_days",
+            "green_days",
+            "coverage",
+            "confidence",
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(
+            keys, allowlist,
+            "time-analysis response gained/lost a top-level field"
+        );
+
         for key in [
             "lead_time_ms",
             "value_time_ms",
