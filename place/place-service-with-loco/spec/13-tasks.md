@@ -364,30 +364,45 @@ clearly described manual check confirms the acceptance criterion.
   new `observability::tests`), `cargo test --test otlp_export --test
   otlp_middleware` 4/4.
 
-- [ ] **T-14 (M) — Wire the review-queue `score_breakdown` that already
-  has a database column.** `migrations/2026071900000001_create_review_queue/up.sql`
+- [x] **T-14 (M) — Wire the review-queue `score_breakdown` that already
+  has a database column.** *(resolved 2026-09-05.)*
+  `migrations/2026071900000001_create_review_queue/up.sql`
   declares `score_breakdown JSONB NULL` and `db::review_queue::ReviewQueueRow`
-  carries the field, but `handlers::batch_deduplicate` always builds
+  carries the field, but `handlers::batch_deduplicate` always built
   `NewReviewItem { …, score_breakdown: None, … }` even though the
   `MatchResult` computed one line above (`state.matcher.score(&places[i],
   &places[j])`) has a real per-field breakdown, and the wire type
-  `ReviewQueueItem` (`src/api/rest/handlers.rs`) has no `score_breakdown`
-  field at all — so `review_row_to_item` cannot surface a value even if
-  one were persisted. The front-end already anticipates this exact fix:
-  `place-front-end-with-svelte`'s T-23 built its comparison-panel
+  `ReviewQueueItem` (`src/api/rest/handlers.rs`) had no `score_breakdown`
+  field at all — so `review_row_to_item` could not surface a value even
+  if one were persisted. The front-end already anticipated this exact
+  fix: `place-front-end-with-svelte`'s T-23 built its comparison-panel
   breakdown table against this column and documented the gap as "a
   candidate follow-up for `place-service-with-loco`'s own `spec/13-tasks.md`".
   *(verified: `grep -n score_breakdown src/api/rest/handlers.rs` shows
   only the hard-coded `None` at line 830 and no field on the
   `ReviewQueueItem` struct at lines 737–753; the column exists per
-  `migrations/2026071900000001_create_review_queue/up.sql`.)*
-  **Acceptance:** `serde_json::to_value(result.breakdown)` (or an
-  equivalent per-field map) is persisted on `batch_deduplicate` and
-  serialized on `ReviewQueueItem`; a DB-gated test round-trips a scan and
-  asserts the returned `GET /api/places/review-queue` item's
-  `score_breakdown` is non-null and matches the matcher's own component
-  scores; `cargo test --lib` + clippy pedantic clean; three-part change
-  (spec §9/§13 + code + test).
+  `migrations/2026071900000001_create_review_queue/up.sql`.)* This
+  mirrors `thing-service`'s identical T-12 (same gap, same fix shape).
+  **Resolution:** `matching::scoring::MatchBreakdown` gained
+  `#[derive(Serialize)]`; the `deduplicate` scan loop now sets
+  `score_breakdown: serde_json::to_value(&result.breakdown).ok()` on
+  each `NewReviewItem`. The wire type `ReviewQueueItem` gained an
+  `Option<serde_json::Value>` `score_breakdown` field, populated both
+  when the scan response is built directly and by `review_row_to_item`
+  (the `GET /api/places/review-queue` path). New DB-gated
+  `tests/review_queue_score_breakdown.rs` (`#[ignore]`d): seeds two
+  identical-name places **directly through `SeaOrmPlaceRepository`**
+  (bypassing `POST /api/places`'s own real-time duplicate check, which
+  would otherwise reject the second seed with `409` before the batch
+  scan ever runs), scans via `POST /api/places/deduplicate`, and asserts
+  both the scan response's and a subsequent
+  `GET /api/places/review-queue`'s `score_breakdown` are non-null with
+  `name_score` `1.0` — matching the matcher's own component score for
+  an exact-name pair. Verified: `cargo build --all-targets`, `cargo fmt
+  --check`, `cargo clippy --all-targets -- -D warnings`, and
+  `scripts/ci-check.sh test-db place/place-service-with-loco` all clean
+  (231 lib tests + the new review-queue test, plus the rest of the
+  DB-gated suite, all passing); no `Cargo.lock` churn.
 
 - [x] **T-15 (M) — Mask sensitive fields on `check-duplicates` /
   create's `409` candidates.** *(resolved 2026-09-05.)*
