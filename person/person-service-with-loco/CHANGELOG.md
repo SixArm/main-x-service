@@ -8,6 +8,25 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — spec-drift CI check (T-7)
+
+New `scripts/spec-drift-check.sh` + `.spec-allow` fail a PR that
+changes `src/matching/**` or `src/models/person.rs` without also
+updating `spec/`, adapted from the sibling `person-matcher-rust-crate`
+reference implementation of the same discipline — with a fix along
+the way: that reference anchors its watched/spec patterns as if the
+crate were the repository root, which never matches the
+monorepo-root-relative paths `git diff --name-only` actually returns,
+so its own stated acceptance criterion does not hold as shipped. This
+crate's copy anchors both patterns with its own path prefix instead,
+and was verified directly against three real (reverted) commits: a
+code-only change fails, the same change plus a `spec/` edit passes,
+and the same change with a matching `.spec-allow` entry passes. A
+`.github/workflows/spec-drift.yml` documents the intended wiring,
+matching this crate's other nested (and, like them, not
+GitHub-Actions-discovered in this monorepo) workflow files. See
+spec §13 T-7.
+
 ### Added — SEC-G3 per-record read-visibility filtering/masking on the gRPC `ListPersons` RPC (T-37)
 
 `ListPersons` previously applied only the blanket `Read` check, so
