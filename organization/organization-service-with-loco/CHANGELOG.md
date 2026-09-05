@@ -9,6 +9,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — FHIR `GET /fhir/Organization` search now resolves through the Tantivy index (ORG-T5)
+
+The FHIR search handler ran a capped in-memory scan over `OrgModel::list`
+even though the native `/search` endpoint already queries the Tantivy
+index. A text-bearing param (`name`, `address`, `address-city`,
+`address-postalcode`, `identifier`) is now resolved via
+`SearchEngine::search`, the same full-text field set `/search` queries;
+`FhirOrgSearchParams::matches` still runs on every candidate as the
+authoritative, field-precise filter — only retrieval moved, not the
+matching semantics. A bare-`_id` or fully empty request keeps the
+original capped scan, since there is no text to search on.
+
 ### Fixed — `score_breakdown` was never actually surfaced on review-queue rows (ORG-T1)
 
 The `deduplicate` scan hard-coded `score_breakdown: None` when storing

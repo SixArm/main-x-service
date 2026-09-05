@@ -1084,8 +1084,8 @@ organization is not a data subject.
     to a checksum-neutral but well-formed URL at the same length, since
     it is no longer accepted otherwise.
 
-- [ ] **ORG-T5 (S) Wire FHIR `GET /fhir/Organization` search onto the
-  Tantivy index.** The FHIR search handler
+- [x] **ORG-T5 (S) Wire FHIR `GET /fhir/Organization` search onto the
+  Tantivy index.** *(resolved 2026-09-05.)* The FHIR search handler
   (`controllers/fhir.rs::search`) still runs a capped Postgres scan via
   `OrganizationModel::list`, exactly as the Tantivy roll-out task above
   already calls out ("Not wired to Tantivy: the FHIR `GET
@@ -1098,6 +1098,36 @@ organization is not a data subject.
   param allows it) instead of the scan cap; the `CapabilityStatement`'s
   declared search params are unchanged; existing FHIR search tests stay
   green plus a new test proving a hit beyond the old scan cap is found.
+  - **Resolved.** A text-bearing param (`name` / `address` /
+    `address-city` / `address-postalcode` / `identifier`, checked in
+    that preference order) is now resolved via
+    `crate::search::SearchEngine::search` — the same tokenised
+    full-text field set (name, legal name, alternate names,
+    identifiers, keywords, address, url) the native `/search` endpoint
+    queries — with `FhirOrgSearchParams::matches` still running on
+    every candidate as the authoritative, field-precise filter
+    (unchanged; only *retrieval* moved). A request carrying no
+    text-bearing param (bare `_id`, or no params at all) keeps the
+    original capped `OrgModel::list` scan, since there is no text to
+    search on. `organizations::parse_pids` bumped to `pub(crate)` and
+    reused rather than duplicated. `CapabilityStatement` untouched (no
+    search params changed). New `tests/requests/fhir.rs` (two DB-gated
+    tests): the target org is created **first** (lowest/oldest id, the
+    position `OrgModel::list`'s newest-first scan would reach last) and
+    is still found by both `name=` and `address-city=` ahead of several
+    newer distractors, with `address-city` confirmed field-precise (a
+    distractor sharing no city does not appear); a second test pins the
+    unchanged bare-`_id` fallback path. Literally exceeding the old
+    1000-row `FHIR_SEARCH_SCAN_CAP` to prove the scan would have missed
+    a hit was judged impractical (it would mean creating 1000+ live,
+    indexed rows in one test) — the ordering-independence test above is
+    the tractable proxy for the same underlying claim: retrieval no
+    longer depends on `OrgModel::list`'s row-count/recency behaviour at
+    all for a text query. Verified against a real Postgres 18 via
+    `scripts/ci-check.sh test-db organization/organization-service-with-loco`:
+    full DB-gated suite passes (34 tests in the main request suite), 0
+    failed; `cargo test --lib`: 203 passed (unchanged), 0 failed;
+    `cargo build`/`clippy --all-targets -- -D warnings` clean.
 
 ## 14. Implementation status
 
