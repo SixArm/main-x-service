@@ -24,7 +24,7 @@
 //! - **Soundex shape** — the phonetic encoder returns `None` or a
 //!   `[A-Z][0-9]{3}` code for any UTF-8 input, and never panics.
 
-use case_matcher::{Case, Confidence, MatchingEngine};
+use case_matcher::{Case, Confidence, MatchConfig, MatchingEngine};
 use case_matcher::{normalize, phonetic};
 use proptest::prelude::*;
 
@@ -66,6 +66,35 @@ fn case_strategy() -> impl Strategy<Value = Case> {
                 c
             },
         )
+}
+
+/// A value that is sometimes well-formed (a small non-negative float,
+/// suitable for either a weight or a threshold) and sometimes
+/// deliberately adversarial (negative, `NaN`, infinite) — the values
+/// `MatchConfig::validated` must reject, generated alongside the ones
+/// it must accept.
+fn adversarial_weight() -> impl Strategy<Value = f64> {
+    prop_oneof![
+        3 => 0.0f64..=1.0,
+        1 => Just(f64::NAN),
+        1 => Just(f64::INFINITY),
+        1 => Just(f64::NEG_INFINITY),
+        1 => -10.0f64..0.0,
+    ]
+}
+
+/// Build a `MatchConfig` from 7 adversarial-or-well-formed values: the
+/// 6 weights in field-declaration order, then the threshold.
+fn config_from(values: &[f64]) -> MatchConfig {
+    MatchConfig {
+        threshold: values[6],
+        title_weight: values[0],
+        subjects_weight: values[1],
+        case_number_weight: values[2],
+        case_type_weight: values[3],
+        status_weight: values[4],
+        keywords_weight: values[5],
+    }
 }
 
 // ---------- Properties ----------
@@ -196,5 +225,37 @@ proptest! {
     #[test]
     fn phonetic_same_is_symmetric(a in ".*", b in ".*") {
         prop_assert_eq!(phonetic::same(&a, &b), phonetic::same(&b, &a));
+    }
+
+    /// For an arbitrary adversarial-or-well-formed weight vector
+    /// (including negative/zero/`NaN`/infinite values),
+    /// `MatchConfig::validated` must reject any config that is not
+    /// actually finite-and-non-negative-throughout, and — the property
+    /// that matters downstream — a config it DOES accept must never let
+    /// `weighted_average` push a score outside `[0.0, 1.0]` or produce
+    /// `NaN`.
+    #[test]
+    fn validated_config_never_produces_an_unbounded_score(
+        values in prop::collection::vec(adversarial_weight(), 7),
+        a in case_strategy(), b in case_strategy(),
+    ) {
+        let config = config_from(&values);
+        if let Ok(validated) = config.validated() {
+            let engine = MatchingEngine::new(validated);
+            let r = engine.match_cases(&a, &b);
+            prop_assert!(!r.score.is_nan(), "validated config produced a NaN score");
+            prop_assert!(
+                (0.0..=1.0).contains(&r.score),
+                "validated config produced an out-of-range score: {}",
+                r.score
+            );
+        } else {
+            let weights_ok = values[..6].iter().all(|w| w.is_finite() && *w >= 0.0);
+            let threshold_ok = values[6].is_finite() && (0.0..=1.0).contains(&values[6]);
+            prop_assert!(
+                !(weights_ok && threshold_ok),
+                "validated() rejected a well-formed config: {values:?}"
+            );
+        }
     }
 }
