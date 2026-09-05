@@ -10,6 +10,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — the `fetch` feature is now exercised by CI (AV-1)
+
+`default = []` means the repo's plain `cargo test` never compiled, let
+alone ran, `from_paseto_keys_url` or its SEC-V1 HTTPS-only / timeout /
+no-redirect / body-cap tests. `scripts/ci-check.sh`'s `test` stage now
+appends `--features fetch` for this crate specifically (a new
+`extra_test_features_for()` lookup, empty/no-op for every other crate),
+so the repo's own CI actually compiles and runs the fetch-gated tests.
+`AGENTS.md`/`README.md` note this.
+
 ### Changed
 - MSRV raised to Rust 1.96 (N-2 policy tightened from N-3; see spec/rust-msrv-n-minus-2/index.md).
 
