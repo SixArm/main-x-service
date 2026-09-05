@@ -161,7 +161,7 @@
     status flips and the merge deep-link is seeded correctly) — both run
     via `bin/e2e` against a live `person-service-with-loco`.
 
-- [ ] T-31: Audit log has a hard, silent 100-entry cap with no way to see
+- [x] T-31: Audit log has a hard, silent 100-entry cap with no way to see
   older history. `src/routes/persons/[id]/audit/+page.svelte` calls
   `repo.audit(id, 100)` on mount and never offers a "load more" /
   pagination control (verified: read the full component — one `onMount`
@@ -176,4 +176,24 @@
     shape; the audit page gains a "load more" control tested by a
     Playwright smoke test asserting a second page of stubbed entries
     appends rather than replaces the first.
+  - **Resolved 2026-09-06.** The presumption was false: confirmed
+    against `person-service-with-loco/src/api/rest/handlers.rs`'s
+    `AuditLogQuery` and `src/db/audit.rs::get_logs_for_entity` that the
+    service's audit endpoint has **no offset/cursor parameter at all**
+    (only `limit`). Paging is therefore driven by re-requesting with a
+    **larger `limit`** each "load more" click rather than an offset —
+    since the endpoint is newest-first and un-paginated, a bigger-limit
+    response is always a superset whose prefix matches the previous
+    response byte-for-byte, so replacing `entries` with it is visually
+    indistinguishable from appending. `hasMore` tracks whether the last
+    fetch came back exactly as long as requested (a shorter response
+    means nothing older remains, hiding the control). Added
+    `audit.loadMore`/`audit.loadingMore` to all 13 locales.
+    `tests/unit/persons.test.ts::"sends a larger limit on a subsequent
+    audit() call"` pins the request shape; a new
+    `tests/e2e/persons.spec.ts` smoke test stubs 150 entries and asserts
+    the rendered list grows 100 → 150 on a "Load more" click without
+    losing the first page. Verified: `npm test` (101 passed), `npm run
+    test:e2e` (18 passed), `npm run check` (0 errors), `npm run lint`
+    clean.
 

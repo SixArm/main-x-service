@@ -9,6 +9,30 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — audit log "load more" control (T-31)
+
+`/persons/[id]/audit` had a hard, silent 100-entry cap with no way to
+see older history — the page fetched `repo.audit(id, 100)` once on
+mount and offered no pagination control. Confirmed against
+`person-service-with-loco`'s `AuditLogQuery`/`get_logs_for_entity`
+that the service's audit endpoint has **no offset/cursor parameter at
+all** (only `limit`, newest-first) — correcting the task's original
+presumption that one probably existed. The fix therefore pages by
+**re-requesting with a larger `limit`** each time rather than an
+offset: because the endpoint is newest-first and un-paginated, a
+bigger-limit response is always a superset whose prefix is
+byte-identical to the previous one, so replacing the local `entries`
+array with it is visually indistinguishable from appending — nothing
+already on screen moves, only more appears below. A "Load more" button
+(hidden once a response comes back shorter than requested, meaning the
+server has nothing older left) drives this; 13-locale
+`audit.loadMore`/`audit.loadingMore` strings added.
+`tests/unit/persons.test.ts` pins the paged request shape (a bigger
+`limit` reaches the wire as a bigger `limit` query value); a new
+`tests/e2e/persons.spec.ts` smoke test stubs 150 audit entries and
+confirms clicking "Load more" grows the rendered list from 100 to 150
+without losing the first page's entries. See spec/13-tasks.md T-31.
+
 ### Added — GDPR export download on the detail page (T-20)
 
 A button on `/persons/[id]` fetches `GET /api/persons/{id}/export` through
