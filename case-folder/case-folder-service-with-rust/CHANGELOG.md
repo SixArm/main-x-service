@@ -10,6 +10,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Removed — dead nested CI workflows (LT-17)
+
+`.github/workflows/{quality,security}.yml` were never referenced by
+either root pipeline (`grep -rl case-folder .github/workflows/
+.woodpecker.yml` found nothing) — this repo has no Actions runner
+configured to pick up a nested `.github/`, so both were pure
+duplication of root CI stages this crate already gets for free
+(`fmt`/`clippy` via `scripts/ci-crates.sh`'s generic discovery;
+`cargo deny check` via the root `deny` stage, backed by this crate's
+own `deny.toml`) that never actually ran. Deleted both, matching
+`patient-flow-service-with-rust`'s PF-T1 precedent. See spec
+`tasks.md` LT-17 (cross-referenced at the project level as `T-17`).
+
 ### Fixed — stale unit-test count in `testing.md`/`README.md` (LT-19)
 
 `testing.md`'s summary table and `README.md`'s `cargo test` comment

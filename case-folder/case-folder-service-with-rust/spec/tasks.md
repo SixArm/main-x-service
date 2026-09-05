@@ -59,17 +59,26 @@
 - [ ] **LT-14** CSV / FHIR export of the audit log (P2)
 - [ ] **LT-15** NHS Spine PDS lookup on folder registration (P3)
 
-- [ ] **LT-17** Nested `.github/workflows/{quality,security}.yml` in this
-  crate are wired into neither `.github/workflows/` nor `.woodpecker.yml`
-  at the repo root *(verified: `grep -rl case-folder ../../.github/workflows/
-  ../../.woodpecker.yml` finds nothing)* — root CI already runs
+- [x] **LT-17** *(resolved 2026-09-05.)* Nested
+  `.github/workflows/{quality,security}.yml` in this crate were wired
+  into neither `.github/workflows/` nor `.woodpecker.yml` at the repo
+  root *(verified: `grep -rl case-folder ../../.github/workflows/
+  ../../.woodpecker.yml` found nothing)* — root CI already runs
   `fmt`/`clippy`/`test`/`deny` against this crate via
   `scripts/ci-crates.sh`'s generic Cargo.toml discovery, so these files
-  never execute and only look like coverage. Cross-referenced at the
-  cross-edition level as root **T-17** (same finding, decide once).
-  **Acceptance:** delete the two files, or add a one-line comment at the
-  top of each explaining why they're kept as a deliberate local-only
-  convenience despite never running in CI.
+  never executed and only looked like coverage. Cross-referenced at the
+  cross-edition level as root **T-17** (same finding, decided once).
+  **Resolution:** deleted both files — each was pure duplication of a
+  root CI stage this crate already gets for free (`quality.yml`'s
+  `fmt`/`clippy` jobs; `security.yml`'s `cargo deny check`, which this
+  crate's own `deny.toml` already backs at the root `deny` stage), with
+  no crate-specific setup (Postgres service, extra env, …) that the
+  generic stages lack. Matches `patient-flow-service-with-rust`'s
+  PF-T1 precedent of not carrying nested workflow files at all, rather
+  than the documented-local-convenience alternative. Verified: `cargo
+  fmt --check` and `cargo clippy --all-targets -- -D warnings` both
+  clean directly (unaffected by the deletion, since neither ever ran
+  from these files); no code change.
 - [x] **LT-18** `openapi.yaml`'s `bearerAuth` scheme declares
   `bearerFormat: JWT`, but `src/auth/mod.rs::bearer_token` /
   `identity_from_headers` treat the bearer value as the raw opaque
