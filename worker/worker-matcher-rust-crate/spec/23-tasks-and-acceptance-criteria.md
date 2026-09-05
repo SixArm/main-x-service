@@ -12,8 +12,9 @@ Single source of truth for outstanding work; absorbs what an SDD workflow would 
 - [ ] Define + test multi-code comparison semantics for Daitch-Mokotoff (FR-22a candidate): non-empty code-set intersection → `1.0`; single-name match → `0.5`; disjoint → `0.0`.
 - **Acceptance:** Default-config behaviour and existing tests unchanged. New unit tests cover Double Metaphone primary/secondary equality (`Stephen`/`Steven`) and Daitch-Mokotoff Slavic-cluster equality (`Schwarz`/`Shvarts`). Documented "opt-in only" until T-9's corpus methodology is run.
 
-**T-17.1 (residual).**
-- [ ] TSV rows in `agents/national-person-identifiers.tsv` for the 7 FR-85..FR-91 schemes (parsers shipped without their TSV rows; verified missing — the file has no `br_cpf`/`cn_rrn`/`in_aadhaar`/`jp_my_number`/`mx_curp`/`nz_nhi`/`za_id` rows as of this audit).
+**T-17.1 (residual).** *(resolved 2026-09-05.)*
+- [x] TSV rows in `agents/national-person-identifiers.tsv` for the 7 FR-85..FR-91 schemes (parsers shipped without their TSV rows; verified missing — the file had no `br_cpf`/`cn_rrn`/`in_aadhaar`/`jp_my_number`/`mx_curp`/`nz_nhi`/`za_id` rows as of this audit).
+  - **Resolved.** Added the seven rows (Brazil CPF, China Resident Identity Card / RRN, India Aadhaar, Japan My Number, Mexico CURP, New Zealand NHI, South Africa ID), each summarising the check-digit algorithm and format documented on the corresponding `parse_*` function's doc comment in `src/identifiers.rs`, in the file's existing alphabetical-by-endonym-slug order. The row count went from 46 to 53 data rows; every row (old and new) still has exactly 10 tab-separated columns, verified with `awk -F'\t' '{print NF}'`. Editorial-only per this crate's own golden rules ("small batched edits are fine; no spec update required" for the code itself) — no `.rs` file changed, `cargo test --lib` unaffected (434 passed).
 
 **T-33 — Relationships as a weighted component (§8.1 / §8.6a / §12.2 / §13.1). Done 2026-08-28 (v0.7.0).**
 - [x] Add `relationships: Vec<RelationshipRef>` to `Worker` and the `RelationshipRef` / `RelationKind` types (`LineManagerOf`, `ReportsTo`; re-export from crate root).

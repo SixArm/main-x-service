@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documented — the 7 T-17.1 identifier schemes' TSV rows (T-17.1 residual)
+
+`agents/national-person-identifiers.tsv` had no row for the Brazil CPF,
+China Resident Identity Card (RRN), India Aadhaar, Japan My Number,
+Mexico CURP, New Zealand NHI, and South Africa ID parsers, even though
+`src/identifiers.rs` shipped all seven `parse_*` functions. Added all
+seven rows, in the file's existing alphabetical order, each summarising
+the check-digit algorithm from the corresponding parser's own doc
+comment. Editorial only — no code changed.
+
 ### Changed
 - MSRV raised to Rust 1.96 (N-2 policy tightened from N-3; see spec/rust-msrv-n-minus-2/index.md).
 
