@@ -5,6 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::error::{Error, Result};
+
 /// Per-component weights + the probable-match threshold.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchConfig {
@@ -88,6 +90,49 @@ impl MatchConfig {
         }
     }
 
+    /// Validate this config's weights and threshold, returning it
+    /// unchanged on success. Every field on `MatchConfig` is `pub` and
+    /// directly settable — the plain struct literal is still how the
+    /// presets and the common case build a config — but a caller
+    /// assembling one from untrusted input (e.g. deserialized) can call
+    /// this additive, opt-in check, where a negative or non-finite
+    /// weight reaching [`crate::scoring::weighted_average`] unchecked
+    /// could push a score outside `[0.0, 1.0]` or produce `NaN`,
+    /// breaking the crate's own "scores stay bounded and finite"
+    /// invariant (spec §19/§21). Same shape as the sibling
+    /// `organization-matcher`/`care-pathway-matcher` crates' identical
+    /// `MatchConfig`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidConfig`] naming the first offending
+    /// field if any weight is negative, `NaN`, or infinite, or if
+    /// `threshold` is outside `[0.0, 1.0]`.
+    pub fn validated(self) -> Result<Self> {
+        let weights = [
+            ("title_weight", self.title_weight),
+            ("subjects_weight", self.subjects_weight),
+            ("case_number_weight", self.case_number_weight),
+            ("case_type_weight", self.case_type_weight),
+            ("status_weight", self.status_weight),
+            ("keywords_weight", self.keywords_weight),
+        ];
+        for (name, weight) in weights {
+            if !weight.is_finite() || weight < 0.0 {
+                return Err(Error::InvalidConfig(format!(
+                    "{name} must be a finite, non-negative number, got {weight}"
+                )));
+            }
+        }
+        if !self.threshold.is_finite() || !(0.0..=1.0).contains(&self.threshold) {
+            return Err(Error::InvalidConfig(format!(
+                "threshold must be finite and within [0.0, 1.0], got {}",
+                self.threshold
+            )));
+        }
+        Ok(self)
+    }
+
     /// Sum of every per-component weight (`1.0` for the documented
     /// defaults).
     ///
@@ -131,5 +176,64 @@ mod tests {
         assert!((l.threshold - 0.70).abs() < 1e-9);
         assert!((s.weight_total() - d.weight_total()).abs() < 1e-9);
         assert!((l.title_weight - d.title_weight).abs() < 1e-9);
+    }
+
+    /// The default config, and the two presets, all pass validation
+    /// unchanged — `validated` must never reject a well-formed config.
+    #[test]
+    fn validated_accepts_the_defaults_and_presets() {
+        assert!(MatchConfig::default().validated().is_ok());
+        assert!(MatchConfig::strict().validated().is_ok());
+        assert!(MatchConfig::lenient().validated().is_ok());
+    }
+
+    /// A negative weight on any single field is rejected.
+    #[test]
+    fn validated_rejects_a_negative_weight() {
+        let c = MatchConfig {
+            title_weight: -0.1,
+            ..MatchConfig::default()
+        };
+        assert!(c.validated().is_err());
+    }
+
+    /// `NaN` and infinite weights are rejected, not silently propagated
+    /// into `weighted_average`.
+    #[test]
+    fn validated_rejects_nan_and_infinite_weights() {
+        let c = MatchConfig {
+            subjects_weight: f64::NAN,
+            ..MatchConfig::default()
+        };
+        assert!(c.validated().is_err());
+
+        let c = MatchConfig {
+            case_number_weight: f64::INFINITY,
+            ..MatchConfig::default()
+        };
+        assert!(c.validated().is_err());
+    }
+
+    /// A threshold outside `[0.0, 1.0]` (including `NaN`) is rejected
+    /// even when every weight is well-formed.
+    #[test]
+    fn validated_rejects_an_out_of_range_threshold() {
+        let c = MatchConfig {
+            threshold: 1.5,
+            ..MatchConfig::default()
+        };
+        assert!(c.validated().is_err());
+
+        let c = MatchConfig {
+            threshold: -0.01,
+            ..MatchConfig::default()
+        };
+        assert!(c.validated().is_err());
+
+        let c = MatchConfig {
+            threshold: f64::NAN,
+            ..MatchConfig::default()
+        };
+        assert!(c.validated().is_err());
     }
 }

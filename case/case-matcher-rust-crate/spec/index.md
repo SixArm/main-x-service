@@ -133,6 +133,20 @@ Threshold 0.85. Presets: `strict()` 0.95, `lenient()` 0.70.
 Changing any default weight is a three-part change: edit this section,
 the `MatchConfig` defaults, and `CHANGELOG.md`.
 
+**Validation.** Every field is `pub` and directly settable — the plain
+struct literal is still how the presets and the common case build a
+config — but a caller assembling one from untrusted input (e.g.
+deserialized config) can call the additive, opt-in
+`MatchConfig::validated(self) -> Result<Self>`, which rejects a
+negative, `NaN`, or infinite weight on any of the six fields, or a
+threshold outside `[0.0, 1.0]`, returning `Error::InvalidConfig` naming
+the first offending field. This exists because such a value reaching
+§17's renormaliser unchecked can push the returned score outside
+`[0.0, 1.0]` or produce `NaN`, breaking the bounded-and-finite
+invariant §19 documents and the `Confidence` banding built on it. Same
+shape as the sibling `organization-matcher`/`care-pathway-matcher`
+crates' identical `MatchConfig`.
+
 ## 8. Normalisation
 
 `fold` (trim + NFKC + lowercase, diacritic-preserving); `case_number`
@@ -245,6 +259,23 @@ contributing weights.
 Total functions (no `unwrap`/`expect`/`panic`); no `unsafe`;
 deterministic; explainable; diacritic-correct.
 
+**Bounded-and-finite score, and what covers it.** `MatchResult::score`
+is claimed finite and in `[0.0, 1.0]` for every input the matcher is
+driven with. This is proven two ways, deliberately covering different
+`MatchConfig` populations: `tests/proptests.rs`'s
+`score_is_finite_and_bounded` drives the engine over arbitrary `Case`
+pairs under `MatchingEngine::default_config()` — the built-in presets
+only. A **hand-built** `MatchConfig` (a struct literal with an
+arbitrary weight or threshold, e.g. from deserialized config) is a
+*different* population the presets never exercise, and is covered
+separately: `validated_config_never_produces_an_unbounded_score`
+generates adversarial weight/threshold vectors and asserts the
+guarantee holds for any config that clears `MatchConfig::validated`
+(§7) — an unvalidated hand-built config carrying a negative, `NaN`, or
+infinite weight is explicitly **not** covered by this invariant, which
+is exactly why `validated` exists rather than trusting every `pub`
+field unconditionally.
+
 ## 20. Consumption
 
 `case-service` embeds this crate via an adapter and calls
@@ -346,25 +377,32 @@ IO, async, or panics to library code.
       **Acceptance:** `cargo bench --no-run` compiles the new group; a
       local `cargo bench` run shows near-linear (or worse) scaling with
       array size, recorded in a `CHANGELOG.md` note.
-- [ ] **Property-test `MatchConfig` values other than the built-in
-      presets.** *(Verified: `grep -n "MatchConfig" tests/proptests.rs`
-      returns no hits — the SEC-M6 property suite (§24) only ever
-      exercises `MatchingEngine::new(MatchConfig::default())`; the six
-      weight fields on `MatchConfig` are all `pub` with no validating
-      constructor, so a caller can build one directly with e.g. a
-      negative or `NaN` weight.)* Add a `proptest` strategy generating
-      arbitrary finite `MatchConfig` weights/threshold and assert the
-      same never-panic / finite-`[0.0,1.0]`-score invariants §19
-      already claims for the default config. If an adversarial config
-      (e.g. all-zero weights, so the renormalisation divisor is zero)
-      can break the invariant, decide whether `MatchConfig` needs a
-      validating constructor (`try_new` returning `Result`) or the
-      invariant is scoped to configs built via `default()`/`strict()`/
-      `lenient()` — record the decision in spec §19/§21.
-      **Acceptance:** the new proptest passes (or a validating
-      constructor is added and the property is re-run against it), and
-      §19/§21 states explicitly whether the finite-score guarantee
-      covers hand-built `MatchConfig` values.
+- [x] **Property-test `MatchConfig` values other than the built-in
+      presets.** *(resolved 2026-09-05.)* The SEC-M6 property suite
+      (§24) only ever exercised `MatchingEngine::new(MatchConfig::default())`;
+      the six weight fields on `MatchConfig` were all `pub` with no
+      validating constructor, so a caller could build one directly with
+      e.g. a negative or `NaN` weight.
+  - **Resolved.** Ported organization-matcher's/care-pathway-matcher's
+    identical `MatchConfig::validated(self) -> Result<Self>` fix
+    (§7): rejects a negative/`NaN`/infinite weight on any of the six
+    fields, or a threshold outside `[0.0, 1.0]`, via the new
+    `Error::InvalidConfig(String)` variant naming the first offending
+    field — the plain struct literal keeps working for the common
+    case. Six new unit tests (`src/config.rs`) pin the accept/reject
+    boundary. A new proptest
+    (`validated_config_never_produces_an_unbounded_score`,
+    `tests/proptests.rs`) generates a 7-value adversarial vector (6
+    weights + threshold) and asserts an accepted config's score stays
+    finite and in `[0.0, 1.0]` while a rejected one really was
+    malformed — so the answer to "does the finite-score guarantee
+    cover hand-built `MatchConfig` values" is: **only once validated**
+    (§19 states this explicitly; no `MatchingEngine::try_new` or
+    similar was added — validation stays a config-construction step,
+    not an engine-construction one). Verified: `cargo test` (52 lib +
+    9 proptests + 13 public-API + 7 doctests, all green, up from 46 lib
+    + 8 proptests), `cargo clippy --all-targets --all-features -- -D
+    warnings`, `cargo fmt --check`, `cargo doc --no-deps` all clean.
 
 ## 24. Testing strategy
 

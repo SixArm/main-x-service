@@ -11,6 +11,11 @@ pub enum Error {
     /// A failure during input normalization.
     #[error("Normalization error: {0}")]
     Normalization(String),
+    /// A hand-built `MatchConfig` failed [`crate::config::MatchConfig::validated`]:
+    /// a weight is negative, `NaN`, or infinite, or `threshold` is
+    /// outside `[0.0, 1.0]`.
+    #[error("Invalid match config: {0}")]
+    InvalidConfig(String),
 }
 
 /// Convenience alias for results returning a crate [`enum@Error`].
