@@ -21,8 +21,8 @@ use sea_orm::{QueryOrder, QuerySelect, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::{conflict, ensure_valid, unprocessable};
-use crate::auth::MaybeAuthUser;
+use super::{authz_error, conflict, ensure_valid, unprocessable};
+use crate::auth::{self, Action, MaybeAuthUser};
 use crate::models::_entities::{content_types, templates};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
@@ -234,9 +234,24 @@ async fn list(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Result<
 }
 
 /// `GET /api/content-types/{pid}`.
+///
+/// # Errors
+///
+/// `403` when the record-level ABAC policy denies reading this content type.
 #[debug_handler]
-async fn show(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Result<Response> {
-    format::json(records::find_content_type(&ctx.db, records::parse_pid(&pid)?).await?)
+async fn show(
+    State(ctx): State<AppContext>,
+    Path(pid): Path<String>,
+    caller: MaybeAuthUser,
+) -> Result<Response> {
+    let row = records::find_content_type(&ctx.db, records::parse_pid(&pid)?).await?;
+    auth::authorize_record(
+        &caller,
+        Action::Read,
+        &auth::content_type_resource_attrs(&row),
+    )
+    .map_err(authz_error)?;
+    format::json(row)
 }
 
 /// `POST /api/content-types/{pid}/compatibility` — classify a proposed
@@ -265,6 +280,12 @@ async fn update(
     Json(payload): Json<UpdatePayload>,
 ) -> Result<Response> {
     let row = records::find_content_type(&ctx.db, records::parse_pid(&pid)?).await?;
+    auth::authorize_record(
+        &caller,
+        Action::Write,
+        &auth::content_type_resource_attrs(&row),
+    )
+    .map_err(authz_error)?;
     ensure_valid(&validate_type(&payload.base))?;
     ensure_template_exists(&ctx.db, row.site_pid, payload.base.template_key.as_deref()).await?;
     if payload.base.key != row.key
@@ -371,6 +392,12 @@ async fn remove(
     caller: MaybeAuthUser,
 ) -> Result<Response> {
     let row = records::find_content_type(&ctx.db, records::parse_pid(&pid)?).await?;
+    auth::authorize_record(
+        &caller,
+        Action::Delete,
+        &auth::content_type_resource_attrs(&row),
+    )
+    .map_err(authz_error)?;
     let txn = ctx.db.begin().await?;
     let type_pid = row.pid;
     let name = row.name.clone();

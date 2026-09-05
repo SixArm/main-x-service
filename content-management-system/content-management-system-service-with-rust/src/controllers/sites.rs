@@ -9,8 +9,8 @@ use sea_orm::{PaginatorTrait, QueryOrder, QuerySelect, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::{conflict, ensure_valid};
-use crate::auth::MaybeAuthUser;
+use super::{authz_error, conflict, ensure_valid};
+use crate::auth::{self, Action, MaybeAuthUser};
 use crate::models::_entities::{content_types, sites, templates};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
@@ -223,9 +223,19 @@ async fn list_sites(State(ctx): State<AppContext>) -> Result<Response> {
 
 /// `GET /api/sites/{pid}` — one site with its templates and content
 /// types (the operator's whole namespace in one read).
+///
+/// # Errors
+///
+/// `403` when the record-level ABAC policy denies reading this site.
 #[debug_handler]
-async fn get_site(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Result<Response> {
+async fn get_site(
+    State(ctx): State<AppContext>,
+    Path(pid): Path<String>,
+    caller: MaybeAuthUser,
+) -> Result<Response> {
     let site = records::find_site(&ctx.db, records::parse_pid(&pid)?).await?;
+    auth::authorize_record(&caller, Action::Read, &auth::site_resource_attrs(&site))
+        .map_err(authz_error)?;
     let template_rows = templates::Entity::find()
         .filter(templates::Column::SitePid.eq(site.pid))
         .filter(templates::Column::DeletedAt.is_null())
@@ -259,6 +269,8 @@ async fn update_site(
     Json(payload): Json<SitePayload>,
 ) -> Result<Response> {
     let site = records::find_site(&ctx.db, records::parse_pid(&pid)?).await?;
+    auth::authorize_record(&caller, Action::Write, &auth::site_resource_attrs(&site))
+        .map_err(authz_error)?;
     ensure_valid(&validate_site(&payload))?;
     if payload.key != site.key
         && records::find_site_by_key(&ctx.db, &payload.key)
@@ -330,6 +342,8 @@ async fn delete_site(
     caller: MaybeAuthUser,
 ) -> Result<Response> {
     let site = records::find_site(&ctx.db, records::parse_pid(&pid)?).await?;
+    auth::authorize_record(&caller, Action::Delete, &auth::site_resource_attrs(&site))
+        .map_err(authz_error)?;
     let type_count = content_types::Entity::find()
         .filter(content_types::Column::SitePid.eq(site.pid))
         .filter(content_types::Column::DeletedAt.is_null())
