@@ -1367,19 +1367,53 @@ the evidence bundle.
   Kanban already exists for the *service's* stored review model in the
   sibling crates) can be pointed at it in a follow-up.
 
-- [ ] **CP-T2 (M) Extend the ABAC `mask` obligation to `list`, `search`,
-  and `check-duplicates`.** Only the single-record `GET /{pid}` and
-  `GET /{pid}/export` handlers call `crate::auth::authorize_record`; the
-  `list`, `search`, and `check_duplicates` handlers return unmasked
-  provider name/id even under a `mask`-obligated policy. This is the
-  same gap as the family's SEC-G3 (partial for person) and violates
-  `agents/share/security.md` invariant 5 ("masking on every read
-  path"). *(Verified: `grep -n "async fn list\|async fn search\|async fn check_duplicates\|authorize_record"
-  src/controllers/care_pathways.rs` shows `authorize_record` only at the
-  two lines that also match `get`/`get_export`.)* Three-part change.
-  **Acceptance:** a DB-gated test with a `mask`-obligation policy proves
-  `list`/`search`/`check-duplicates` responses redact `provider_name`/
-  `provider_id` exactly as `GET /{pid}/masked` does.
+- [x] **CP-T2 (M) Extend record-level ABAC to `list`, `search`, and
+  `check-duplicates`.** *(resolved 2026-09-05.)* Only the single-record
+  `GET /{pid}` and `GET /{pid}/export` handlers called
+  `crate::auth::authorize_record`; `list`, `search`, and
+  `check_duplicates` ran no record-level decision at all — a policy
+  denying read on some pathways (e.g. a `resource.sensitive_setting`-
+  gated `deny` rule) still let those pathways' existence and name leak
+  through the collection endpoints even though the direct `GET /{pid}`
+  would `403`. This is the same gap as the family's SEC-G3 (partial for
+  person) and violates `agents/share/security.md` invariant 5 ("masking
+  on every read path" — restated here as "no aggregate read may
+  disclose more than the equivalent single read").
+  **Correction to the original framing:** this task as written asked
+  for the `mask` **obligation** (provider_name/provider_id redaction) on
+  these three endpoints, mirroring `GET /{pid}`. That framing does not
+  fit the code: `PathwayRef`/`ScoredRef` (the response shapes for
+  `list`/`search`/`check-duplicates`) carry only `{pid, name}` /
+  `{pid, name, score, confidence, is_match}` — they never held
+  `provider_name`/`provider_id` to begin with, so there is nothing for a
+  `mask` obligation to redact on them (checked in case-service too:
+  its analogous `CaseRef`/`ScoredRef` are equally thin — this is a
+  family-wide DTO shape, not a care-pathway-specific oversight). The
+  actual, provable gap is **authorization filtering**, not field
+  redaction: a caller whose direct read a `deny` rule blocks must not
+  still see that pathway's pid + name via the collection endpoints.
+  **Resolution:** a new `readable_refs` helper (`src/controllers/
+  care_pathways.rs`) runs `authorize_record` per row for `list`/
+  `search`, omitting a denied row from the response rather than erroring
+  the whole call; `check_duplicates` (which took no caller/auth
+  parameter before this change) gained a `MaybeAuthUser` extractor and
+  applies the identical per-candidate filter before scoring a hit into
+  the response. With `CARE_PATHWAY_REQUIRE_AUTH` off (the default) or no
+  configured deny rule, `authorize_record` never denies, so this is a
+  no-op — unchanged behaviour for every existing deployment.
+  **Acceptance (met):** a DB-gated test
+  (`tests/list_search_check_duplicates_authz.rs`) with a policy denying
+  read on `resource.sensitive_setting=true` pathways for `dept=outsider`
+  proves that caller's `list`, `search`, and `check-duplicates` all omit
+  the sensitive pathway (confirmed by a control assertion that the
+  direct `GET /{pid}` is itself `403`), while still surfacing an
+  ordinary pathway, and that an unrestricted caller sees both everywhere
+  — the omission is scoped to the denied caller/record pair, not a
+  blanket regression. Verified green against a real Postgres
+  (`scripts/ci-check.sh test-db …`), plus `cargo test --lib` (318,
+  unchanged count — the fix needed no new unit test, only the new
+  request-level suite), `cargo fmt --check`, and `cargo clippy
+  --all-targets -- -D warnings`, all clean.
 
 - [x] **CP-T3 (S) `same_as` URL well-formedness validation.** *(resolved
   2026-09-04.)*
