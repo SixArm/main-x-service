@@ -59,7 +59,7 @@ secret and no per-request introspection call.
 | Public API | `Verifier::{from_paseto_keys_value, from_paseto_keys_url, verify, key_count, unsupported_key_count, algorithms}`, `ReloadableVerifier` (0.8 hot-reload holder), `Claims` (incl. the 0.3 `attrs` ABAC claim), `VerifyError` (incl. the 2026-07-27 `UnsupportedAlgorithm` variant), and the `abac` module (`Policy`, `Rule`, `Action`, `ActionPattern`, `Effect`, `Decision`, `ReloadablePolicy` — re-exported at the root). |
 | Features | `fetch` — HTTPS key-set loading via `reqwest` (rustls). Default: none. |
 | Build | `cargo build` |
-| Test | `cargo test` (fully offline; throwaway Ed25519 test keypair). |
+| Test | `cargo test` (fully offline; throwaway Ed25519 test keypair). **`cargo test --features fetch`** additionally compiles and runs `from_paseto_keys_url` and its SEC-V1 HTTPS-only / timeout / no-redirect / body-cap tests — the repo's own `scripts/ci-check.sh test` runs this crate with `--features fetch` (AV-1: without it, those items were never compiled, let alone run, by CI). |
 | Lint | `cargo clippy` |
 | Package | `cargo package --list` |
 

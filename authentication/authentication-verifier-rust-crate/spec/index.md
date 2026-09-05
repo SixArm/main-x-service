@@ -434,7 +434,7 @@ attribute values, so it is safe for 403 bodies and audit trails.
 - [ ] Refetch-on-`UnknownKid` helper (or document the pattern per
       entity spec §13 T-5 key rotation).
 - [ ] Property-test the PASETO-keys parser against fuzzed documents.
-- [ ] **AV-1 (S) Exercise the `fetch` feature in CI.** *(verified:
+- [x] **AV-1 (S) Exercise the `fetch` feature in CI.** *(verified:
       `default = []` and `fetch = ["dep:reqwest"]` in `Cargo.toml`;
       `scripts/ci-check.sh`'s `test` stage runs plain `cargo test` with
       no `--features` flag for every crate, confirmed by grepping it
@@ -453,6 +453,19 @@ attribute values, so it is safe for 403 bodies and audit trails.
       **Acceptance:** a CI run (or a documented local
       `cargo test --features fetch`) actually compiles and passes the
       `fetch`-gated tests; `AGENTS.md`/`README.md` note how to run it.
+      **Resolution (2026-09-05):** chose the crate-specific-override
+      path in `scripts/ci-check.sh` (a dedicated CI job would run the
+      exact same command anyway, and this keeps the two CI platforms —
+      GitHub Actions + Woodpecker — byte-identical, which is this
+      script's whole reason to exist). A new `extra_test_features_for()`
+      lookup names this crate → `--features fetch`, appended onto the
+      `test` stage's `cargo test` invocation; empty (a no-op) for every
+      other crate. Verified locally that this actually changes what
+      runs: plain `cargo test` is 54 unit + 4 doc tests, `cargo test
+      --features fetch` is 57 unit + 5 doc tests — the 3 SEC-V1 tests
+      plus the `from_paseto_keys_url` doctest, exactly the gap this task
+      named. `AGENTS.md`'s Test row and `README.md`'s Testing section
+      both now say CI runs this crate with `--features fetch` and why.
 
 - [ ] **AV-2 (S) Cut a dated release for the accumulated `[Unreleased]`
       changes.** *(verified: `CHANGELOG.md`'s `[Unreleased]` section

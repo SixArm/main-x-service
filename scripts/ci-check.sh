@@ -12,7 +12,10 @@
 # Stages:
 #   fmt         cargo fmt --check
 #   clippy      cargo clippy --all-targets -- -D warnings
-#   test        cargo test            (DB-gated suites stay skipped)
+#   test        cargo test            (DB-gated suites stay skipped;
+#               a crate named in extra_test_features_for() below also
+#               gets its listed --features, e.g. authentication-verifier's
+#               `fetch` — otherwise never compiled or run, AV-1)
 #   test-db     cargo test -- --ignored --test-threads=1, for crates
 #               enrolled in ci/db-suites.txt; a no-op for any other
 #               crate. Serial because the suites share one database.
@@ -81,6 +84,23 @@ enrolled_for_db() {
     | grep -Fxq "${crate}"
 }
 
+# Extra `cargo test` flags for a crate whose optional Cargo features are
+# otherwise never compiled, let alone run, by this script's plain
+# `cargo test` (AV-1). A crate-specific override here, not a file like
+# `ci/db-suites.txt`, because today there is exactly one entry — add a
+# file if a second candidate appears and this grows unwieldy.
+extra_test_features_for() {
+  local crate="$1"
+  case "${crate}" in
+    authentication/authentication-verifier-rust-crate)
+      # `fetch` gates `from_paseto_keys_url` and its SEC-V1 HTTPS-only /
+      # timeout / no-redirect / body-cap tests — dead code and untested
+      # invariants from CI's point of view without this.
+      printf -- '--features fetch'
+      ;;
+  esac
+}
+
 # The declared MSRV, from its single source of truth. Every crate's
 # `rust-version` must equal this; keeping the number in one file is what
 # stops ~50 hand-edited manifests drifting apart.
@@ -124,7 +144,7 @@ run_stage() {
       ( cd "${crate}" && cargo clippy --all-targets $(locked_flag "${crate}") -- -D warnings )
       ;;
     test)
-      ( cd "${crate}" && cargo test $(locked_flag "${crate}") )
+      ( cd "${crate}" && cargo test $(locked_flag "${crate}") $(extra_test_features_for "${crate}") )
       ;;
     test-db)
       if ! enrolled_for_db "${crate}"; then

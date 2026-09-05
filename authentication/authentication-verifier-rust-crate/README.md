@@ -202,8 +202,13 @@ than a locally held key, so any service can embed it.
 
 ```bash
 cargo test                  # offline unit tests (throwaway Ed25519 keypair)
-cargo test --features fetch # also compile the HTTP loader
+cargo test --features fetch # also compile and run the HTTP loader + its SEC-V1 tests
 ```
+
+The repo's own CI (`scripts/ci-check.sh test`) runs this crate with
+`--features fetch` (AV-1) — without it, `from_paseto_keys_url` and its
+SEC-V1 HTTPS-only / timeout / no-redirect / body-cap tests would never
+be compiled, let alone run, by CI.
 
 ## License
 
