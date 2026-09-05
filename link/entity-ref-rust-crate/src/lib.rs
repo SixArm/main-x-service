@@ -22,10 +22,10 @@
 //! original rollout plan (`agents/share/cross-service-linking.md` §2/§11)
 //! framed this as copyable per project until a second non-aggregator
 //! consumer justified a shared dependency; in practice it is embedded as
-//! a real Cargo `path` dependency by eight crates (as of 2026-08-04):
-//! the `link-graph-service-with-loco` aggregator, the three entity
-//! services that originate edges (person, worker, case), and four
-//! consumer apps (contact-relationship-management,
+//! a real Cargo `path` dependency by nine crates (as of 2026-09-05):
+//! the `link-graph-service-with-loco` aggregator, the four entity
+//! services that originate edges (person, worker, case, care-pathway),
+//! and four consumer apps (contact-relationship-management,
 //! content-management-system, patient-flow,
 //! workforce-planning-management) that validate/dereference cross-service
 //! refs without originating edges. See the crate's `README.md` for the
@@ -565,5 +565,29 @@ mod tests {
             assert_eq!(EdgeKind::from_token(k.as_str()), Some(k));
         }
         assert_eq!(EdgeKind::from_token("nope"), None);
+    }
+
+    /// ER-3: the README's "## Types" table names every `EntityType::ALL` /
+    /// `EdgeKind::ALL` wire token, so the public-surface documentation
+    /// can't silently drift behind a new registry entry the way it did
+    /// for `continues_as` (added 2026-08-24, first named in the README
+    /// only on 2026-09-05).
+    #[test]
+    fn readme_types_table_names_every_entity_type_and_edge_kind() {
+        let readme = include_str!("../README.md");
+        for t in EntityType::ALL {
+            assert!(
+                readme.contains(t.as_str()),
+                "README's Types table is missing EntityType token {:?}",
+                t.as_str()
+            );
+        }
+        for k in EdgeKind::ALL {
+            assert!(
+                readme.contains(k.as_str()),
+                "README's Types table is missing EdgeKind token {:?}",
+                k.as_str()
+            );
+        }
     }
 }
