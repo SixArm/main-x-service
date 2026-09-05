@@ -5,6 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::error::{Error, Result};
+
 /// Per-component weights, the timeframe Gaussian width, and the
 /// probable-match threshold.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,6 +113,63 @@ impl MatchConfig {
         }
     }
 
+    /// Validate this config's weights, `timeframe_sigma_days`, and
+    /// threshold, returning it unchanged on success. Every field on
+    /// `MatchConfig` is `pub` and directly settable — the plain struct
+    /// literal is still how the presets and the common case build a
+    /// config — but a caller assembling one from untrusted input (e.g.
+    /// deserialized config) can call this additive, opt-in check.
+    ///
+    /// `timeframe_score`'s own Gaussian decay already falls back to a
+    /// 1-day width for a non-positive `timeframe_sigma_days` (including
+    /// `NaN`, since `sigma > 0.0` is `false` for `NaN`), so a bad sigma
+    /// can never itself produce an unbounded or `NaN` score — but it
+    /// would otherwise be **silently ignored** rather than reported.
+    /// Validating it here surfaces the caller's mistake instead of
+    /// quietly substituting a different value than the one they set.
+    /// Every weight, by contrast, has no such internal fallback: an
+    /// unchecked negative or non-finite weight reaching
+    /// [`crate::scoring::weighted_average`] can push the returned score
+    /// outside `[0.0, 1.0]` or produce `NaN`, breaking the crate's own
+    /// "scores stay bounded and finite" invariant (spec §19/§24) and
+    /// the [`crate::Confidence`] banding built on it. Same shape as the
+    /// sibling `organization-matcher`/`care-pathway-matcher`/
+    /// `case-matcher` crates' `MatchConfig::validated`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidConfig`] naming the first offending
+    /// field if any weight or `timeframe_sigma_days` is negative,
+    /// `NaN`, or infinite, or if `threshold` is outside `[0.0, 1.0]`.
+    pub fn validated(self) -> Result<Self> {
+        let weights = [
+            ("name_weight", self.name_weight),
+            ("goals_weight", self.goals_weight),
+            ("code_weight", self.code_weight),
+            ("owner_org_weight", self.owner_org_weight),
+            ("parent_weight", self.parent_weight),
+            ("timeframe_weight", self.timeframe_weight),
+            ("keywords_weight", self.keywords_weight),
+            ("relationships_weight", self.relationships_weight),
+            ("tags_weight", self.tags_weight),
+            ("timeframe_sigma_days", self.timeframe_sigma_days),
+        ];
+        for (name, weight) in weights {
+            if !weight.is_finite() || weight < 0.0 {
+                return Err(Error::InvalidConfig(format!(
+                    "{name} must be a finite, non-negative number, got {weight}"
+                )));
+            }
+        }
+        if !self.threshold.is_finite() || !(0.0..=1.0).contains(&self.threshold) {
+            return Err(Error::InvalidConfig(format!(
+                "threshold must be finite and within [0.0, 1.0], got {}",
+                self.threshold
+            )));
+        }
+        Ok(self)
+    }
+
     /// Sum of every per-component weight (`1.0` for the documented
     /// defaults). Test-only invariant check.
     #[cfg(test)]
@@ -152,5 +211,82 @@ mod tests {
         assert!((s.weight_total() - d.weight_total()).abs() < 1e-9);
         assert!((l.name_weight - d.name_weight).abs() < 1e-9);
         assert!((l.timeframe_sigma_days - d.timeframe_sigma_days).abs() < 1e-9);
+    }
+
+    /// The default config, and the two presets, all pass validation
+    /// unchanged — `validated` must never reject a well-formed config.
+    #[test]
+    fn validated_accepts_the_defaults_and_presets() {
+        assert!(MatchConfig::default().validated().is_ok());
+        assert!(MatchConfig::strict().validated().is_ok());
+        assert!(MatchConfig::lenient().validated().is_ok());
+    }
+
+    /// A negative weight on any single field is rejected.
+    #[test]
+    fn validated_rejects_a_negative_weight() {
+        let c = MatchConfig {
+            name_weight: -0.1,
+            ..MatchConfig::default()
+        };
+        assert!(c.validated().is_err());
+    }
+
+    /// `NaN` and infinite weights are rejected, not silently propagated
+    /// into `weighted_average`.
+    #[test]
+    fn validated_rejects_nan_and_infinite_weights() {
+        let c = MatchConfig {
+            goals_weight: f64::NAN,
+            ..MatchConfig::default()
+        };
+        assert!(c.validated().is_err());
+
+        let c = MatchConfig {
+            code_weight: f64::INFINITY,
+            ..MatchConfig::default()
+        };
+        assert!(c.validated().is_err());
+    }
+
+    /// A negative or non-finite `timeframe_sigma_days` is rejected too,
+    /// even though `timeframe_score` would otherwise silently substitute
+    /// a 1-day fallback rather than propagate it into an unbounded score.
+    #[test]
+    fn validated_rejects_a_bad_timeframe_sigma() {
+        let c = MatchConfig {
+            timeframe_sigma_days: -1.0,
+            ..MatchConfig::default()
+        };
+        assert!(c.validated().is_err());
+
+        let c = MatchConfig {
+            timeframe_sigma_days: f64::NAN,
+            ..MatchConfig::default()
+        };
+        assert!(c.validated().is_err());
+    }
+
+    /// A threshold outside `[0.0, 1.0]` (including `NaN`) is rejected
+    /// even when every weight is well-formed.
+    #[test]
+    fn validated_rejects_an_out_of_range_threshold() {
+        let c = MatchConfig {
+            threshold: 1.5,
+            ..MatchConfig::default()
+        };
+        assert!(c.validated().is_err());
+
+        let c = MatchConfig {
+            threshold: -0.01,
+            ..MatchConfig::default()
+        };
+        assert!(c.validated().is_err());
+
+        let c = MatchConfig {
+            threshold: f64::NAN,
+            ..MatchConfig::default()
+        };
+        assert!(c.validated().is_err());
     }
 }

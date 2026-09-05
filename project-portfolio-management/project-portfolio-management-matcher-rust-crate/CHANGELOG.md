@@ -10,6 +10,29 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — `MatchConfig::validated`, guarding against caller-supplied negative/NaN weights
+
+Every `MatchConfig` field is `pub` with no validating constructor, and
+the property-test suite only ever exercised
+`MatchingEngine::default_config()` — a caller-built config with a
+negative, `NaN`, or infinite weight (or a bad `timeframe_sigma_days` /
+out-of-range threshold) could reach `scoring::weighted_average`
+unchecked, pushing the returned score outside `[0.0, 1.0]` or producing
+`NaN`. Ported case-matcher's/organization-matcher's/care-pathway-
+matcher's identical `MatchConfig::validated(self) -> Result<Self>` fix:
+rejects a negative/`NaN`/infinite weight on any of the nine fields or
+on `timeframe_sigma_days`, or a threshold outside `[0.0, 1.0]`, via a
+new `Error::InvalidConfig(String)` variant naming the first offending
+field; the plain struct literal keeps working for the common case.
+Seven new unit tests in `src/config.rs`; a new proptest
+(`validated_config_never_produces_an_unbounded_score`,
+`tests/property_tests.rs`) generates adversarial weight/sigma/threshold
+vectors and asserts an accepted config's score stays finite and bounded
+while a rejected one really was malformed. Spec §7 documents the
+validator; §19 states explicitly that the bounded-and-finite score
+guarantee covers a hand-built `MatchConfig` only once it clears
+`validated`. See spec/index.md §23.
+
 ### Documented — the caller must bound `goals`/`keywords`/`relationships`/`tags` array sizes
 
 Each is compared by Jaccard over every element — an unbounded O(n·m)
