@@ -8,6 +8,17 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — service route test for `check-duplicates` (entity spec E-1)
+
+Three docs once disagreed on this endpoint's path; the code-serves-what
+question was settled and the losing docs fixed back in 2026-06-13, but
+no **service** route test ever pinned the path itself. New
+`tests/check_duplicates_route.rs`: `POST /api/places/check-duplicates`
+returns `200` with the `DuplicateCheckResponse` envelope, and the
+pre-fix doc-drifted `POST /api/places/duplicates` resolves `405` (that
+path matches `/api/places/{id}`, which has no `POST` handler) rather
+than serving check-duplicates. See `../spec/13-tasks.md` E-1.
+
 ### Added — guard `contained_in_place` against self-reference and cycles (T-16)
 
 `spec/16-open-questions.md` OQ-2 claimed "validation rejects on
