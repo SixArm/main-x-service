@@ -426,4 +426,31 @@ describe("PersonRepository", () => {
       }),
     ).rejects.toThrow(/does not permit person/);
   });
+
+  // T-31: the audit page's "load more" control has no server-side
+  // offset/cursor to drive it (the service's `AuditLogQuery` only ever
+  // takes `limit`), so paging works by re-requesting with a **larger**
+  // `limit` each time. Pins the request shape that behaviour depends
+  // on: the endpoint hit, and that a bigger requested limit reaches the
+  // wire as a bigger `limit` query value — not silently capped or lost.
+  it("sends a larger limit on a subsequent audit() call (the 'load more' shape)", async () => {
+    const capturedLimits: string[] = [];
+    let capturedPathname = "";
+    const client = new ApiClient({
+      baseUrl: "http://test",
+      fetch: mockFetch(async (input) => {
+        const url = new URL(String(input));
+        capturedPathname = url.pathname;
+        capturedLimits.push(url.searchParams.get("limit") ?? "");
+        return jsonResponse({ success: true, data: [], error: null });
+      }),
+    });
+    const repo = new PersonRepository(client);
+
+    await repo.audit("p1", 100);
+    await repo.audit("p1", 200);
+
+    expect(capturedPathname).toContain("/api/persons/p1/audit");
+    expect(capturedLimits).toEqual(["100", "200"]);
+  });
 });

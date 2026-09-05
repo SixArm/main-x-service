@@ -349,6 +349,60 @@ test.describe("Person front-end smoke", () => {
         ).toBeEnabled();
         await expect(panel.getByRole("button", { name: "Reject" })).toBeEnabled();
     });
+
+    // Pins T-31: the audit page's "load more" control. The service's
+    // audit endpoint has no offset/cursor (only `limit`, newest-first —
+    // see `+page.svelte`'s header comment), so a second, larger-limit
+    // request must come back as a strict superset whose first page is
+    // unchanged — the DOM effect of "load more" appending rather than
+    // replacing, even though the component re-fetches the whole list.
+    test("audit page's 'load more' control appends a second page of stubbed entries", async ({
+        page,
+    }) => {
+        const id = "0c4f1e2a-0000-4000-8000-0000000000cc";
+        const envelope = (data: unknown) =>
+            JSON.stringify({ success: true, data, error: null });
+        const TOTAL = 150;
+        const allEntries = Array.from({ length: TOTAL }, (_, i) => ({
+            id: `audit-${i}`,
+            entity_type: "person",
+            entity_id: id,
+            action: `action-${i}`,
+            user_id: null,
+            created_at: new Date(2026, 0, 1, 0, 0, TOTAL - i).toISOString(),
+        }));
+
+        await page.route(`**/api/persons/${id}/audit**`, (route) => {
+            const url = new URL(route.request().url());
+            const limit = Number(url.searchParams.get("limit") ?? "100");
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: envelope(allEntries.slice(0, Math.min(limit, TOTAL))),
+            });
+        });
+
+        await page.goto(`/persons/${id}/audit`);
+        await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
+
+        // First page: exactly 100 entries (the component's PAGE_SIZE),
+        // the "load more" control offered since more remain.
+        await expect(page.locator(".entries > li")).toHaveCount(100);
+        await expect(page.getByText("action-0")).toBeVisible();
+        const loadMore = page.getByRole("button", { name: "Load more" });
+        await expect(loadMore).toBeVisible();
+
+        await loadMore.click();
+
+        // Second page: the total grows to 150 (all that exist) — the
+        // first entry is still there (never replaced), and the newly
+        // revealed tail is now present too.
+        await expect(page.locator(".entries > li")).toHaveCount(TOTAL);
+        await expect(page.getByText("action-0")).toBeVisible();
+        await expect(page.getByText(`action-${TOTAL - 1}`)).toBeVisible();
+        // Nothing left to fetch — the control must not still offer more.
+        await expect(loadMore).not.toBeVisible();
+    });
 });
 
 // Pins the PRO-H10 page-visit guard itself (WEB-1): with NO session
