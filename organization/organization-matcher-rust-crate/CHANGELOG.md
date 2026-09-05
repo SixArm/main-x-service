@@ -10,6 +10,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — fuzz/property coverage for `relationships`/`tags` (ORGM-T2)
+
+These two components had zero presence in the fuzz/property harnesses —
+only the hand-written unit tests in `src/matcher.rs` exercised them.
+`tests/property_tests.rs`'s `org_strategy()` now generates
+`relationships` (via a new `RelationshipRef` struct literal, so the
+possibly-empty/malformed `organization_id` `RelationshipRef::new` would
+reject is exercised too) and `tags`, so the four existing never-panic /
+bounded-score / symmetric-matching properties now cover both fields with
+no new property needed. `fuzz/fuzz_targets/match_organizations.rs`
+appends a relationship/tag derived from the raw fuzz bytes to both
+organizations after the JSON-tuple decode (random byte mutation rarely
+produces a populated `Vec` unseeded), so the field paths are reachable
+on every run rather than depending on the corpus finding them by chance.
+See spec/index.md ORGM-T2.
+
 ### Added — `MatchConfig::validated` guards against adversarial weights (ORGM-T1)
 
 Every `MatchConfig` field is `pub` and directly settable, and nothing
