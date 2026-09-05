@@ -180,6 +180,80 @@ async fn case_read_sees_governed_edges_that_others_have_concealed() {
             .await
             .unwrap();
         assert_eq!(reads.len(), 1, "a concealed read audits nothing");
+
+        // spec §11.4: the SAME governance holds on `/neighbors`, not only
+        // `/edges` — a caller must not learn a subject_of edge exists by
+        // walking the person's neighbourhood either.
+        let (hk, hv) = bearer(&case_reader);
+        let body: Value = request
+            .get(&format!("/api/neighbors/{person}"))
+            .add_header(hk, hv)
+            .await
+            .json();
+        let neighbor_edges = body["data"]["edges"].as_array().unwrap();
+        assert!(
+            neighbor_edges.iter().any(|e| e["kind"] == "subject_of"),
+            "case-reader's neighbors view sees the subject_of edge: {neighbor_edges:?}"
+        );
+
+        let (hk, hv) = bearer(&other);
+        let body: Value = request
+            .get(&format!("/api/neighbors/{person}"))
+            .add_header(hk, hv)
+            .await
+            .json();
+        let neighbor_edges = body["data"]["edges"].as_array().unwrap();
+        assert!(
+            !neighbor_edges.iter().any(|e| e["kind"] == "subject_of"),
+            "non-case caller's neighbors view must not reveal subject_of: {neighbor_edges:?}"
+        );
+
+        // spec §11.4: and on `/single-view` — a person's golden-record
+        // view must not surface that they are the subject of a case to a
+        // caller without case-read authorisation.
+        let (hk, hv) = bearer(&case_reader);
+        let body: Value = request
+            .get(&format!("/api/single-view/{person}"))
+            .add_header(hk, hv)
+            .await
+            .json();
+        let affiliations = body["data"]["affiliations"].as_array().unwrap();
+        assert!(
+            affiliations.iter().any(|a| a["kind"] == "subject_of"),
+            "case-reader's single-view sees the subject_of affiliation: {affiliations:?}"
+        );
+        let single_view_reads = audit_log::Entity::find()
+            .filter(audit_log::Column::Action.eq("read_single_view"))
+            .all(&ctx.db)
+            .await
+            .unwrap();
+        assert_eq!(
+            single_view_reads.len(),
+            1,
+            "the surfaced subject_of single-view read is audited"
+        );
+
+        let (hk, hv) = bearer(&other);
+        let body: Value = request
+            .get(&format!("/api/single-view/{person}"))
+            .add_header(hk, hv)
+            .await
+            .json();
+        let affiliations = body["data"]["affiliations"].as_array().unwrap();
+        assert!(
+            !affiliations.iter().any(|a| a["kind"] == "subject_of"),
+            "non-case caller's single-view must not reveal subject_of: {affiliations:?}"
+        );
+        let single_view_reads = audit_log::Entity::find()
+            .filter(audit_log::Column::Action.eq("read_single_view"))
+            .all(&ctx.db)
+            .await
+            .unwrap();
+        assert_eq!(
+            single_view_reads.len(),
+            1,
+            "the concealed single-view read audits nothing further"
+        );
     })
     .await;
 }

@@ -856,6 +856,23 @@ unblocked.
   status lifecycle, single-view, unlink, freshness, `400`s).
 - [ ] T-26: Bus-gated round-trip + replay-rebuild suite (§11.3), feature
   `fluvio`.
-- [ ] T-27: Governance tests — no-leak + audit (§11.4).
+- [x] T-27: Governance tests — no-leak + audit (§11.4). *(resolved
+  2026-09-05.)* `tests/concealment.rs` covered only `/api/edges`, but
+  §11.4 requires no-leak proof across `/edges`, `/neighbors`, **and**
+  `/single-view`. *(verified: `src/controllers/graph.rs` — all three
+  handlers call `auth::conceal_governed` (lines 264/321/346), but
+  `tests/concealment.rs` only drove `GET /api/edges`.)* Extended the
+  existing test (same fixtures, tokens, and restrictive ABAC policy) to
+  also assert: a case-authorised caller's `GET /api/neighbors/{person}`
+  and `GET /api/single-view/{person}` both surface the `subject_of`
+  edge/affiliation, while a non-case caller's calls to the same two
+  endpoints do not — and that `single-view`'s surfaced read is audited
+  under `read_single_view` exactly once (matching `read_edge`'s existing
+  once-per-surfaced-read pin), with no further row on the concealed
+  read. Verified: `cargo build --all-targets`, `cargo fmt --check`,
+  `cargo clippy --all-targets -- -D warnings`, and `scripts/ci-check.sh
+  test-db link/link-graph-service-with-loco` all clean (106 lib tests +
+  the extended `concealment.rs` test, plus the rest of the DB-gated
+  suite, all passing); no `Cargo.lock` churn.
 - [ ] T-28: Criterion benchmarks for `neighbors` / `edges` /
   `single-view` (§11.6).

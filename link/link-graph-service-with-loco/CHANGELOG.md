@@ -14,6 +14,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — governance no-leak coverage for `/neighbors` and `/single-view` (T-27)
+
+`tests/concealment.rs` proved the `subject_of` concealment invariant
+only on `GET /api/edges`, but spec §11.4 requires it across `/edges`,
+`/neighbors`, and `/single-view` alike — all three call
+`auth::conceal_governed`. Extended the test (same fixtures/policy) to
+also assert a case-authorised caller's `/neighbors/{person}` and
+`/single-view/{person}` surface the edge/affiliation while a non-case
+caller's calls to the same endpoints do not, and that a surfaced
+`single-view` read is audited under `read_single_view` exactly once.
+See spec §13 T-27.
+
 ### Added — operator-forceable reconciliation pass (T-36)
 
 There was no endpoint, task, or admin route to force a reconciliation
