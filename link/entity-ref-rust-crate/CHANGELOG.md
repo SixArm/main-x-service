@@ -12,7 +12,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — README drift (ER-1, ER-3) + missing manifest `readme` field (ER-4)
 
+- **ER-1**: "Who actually consumes this" was stale at eight crates;
+  `care-pathway-service-with-loco` is a ninth (and ships its own
+  `EdgeKind::ContinuesAs` journey-edge origination, 2026-08-24) but
+  wasn't listed. Updated the count and narrative.
+- **ER-3**: the "## Types" table's `EdgeKind` row named five kinds,
+  omitting `continues_as` (added 2026-08-24); the `EntityType` row
+  elided `care_pathway_instance`/`patient_flow_stay` behind "…". Both
+  rows now name every `EntityType::ALL`/`EdgeKind::ALL` member. New
+  `readme_types_table_names_every_entity_type_and_edge_kind` unit test
+  (`include_str!`s `README.md`) pins this so it can't silently drift
+  behind a future registry addition again.
+- **ER-4**: `Cargo.toml` had no `readme` field, so the published
+  crates.io page showed only the one-line `description`. Added
+  `readme = "README.md"`; `cargo package --list` now includes it.
 
 ### Added — cargo-fuzz harness (SEC-I2)
 

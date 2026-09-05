@@ -32,14 +32,14 @@ assert_eq!(EdgeKind::SubjectOf.sensitivity(), Sensitivity::High); // case → pe
 
 | Item | Purpose |
 |---|---|
-| `EntityType` | The globally-unique entity discriminator (`person`, `worker`, …, `courseinstance`, `care_pathway`); `as_str`, `from_token`, and the `service()` map (course + courseinstance → `course-service`). |
+| `EntityType` | The globally-unique entity discriminator — all 12: `person`, `worker`, `organization`, `case`, `place`, `thing`, `event`, `course`, `courseinstance`, `care_pathway`, `care_pathway_instance`, `patient_flow_stay`; `as_str`, `from_token`, and the `service()` map (course + courseinstance → `course-service`). The last two — `care_pathway_instance` and `patient_flow_stay` — exist only for `continues_as` (below): the first sub-resource type after `courseinstance`, and the first type owned by a consumer app rather than an index registry. |
 | `EntityRef` | `{entity_type, id: Uuid}`; `FromStr`/`Display`/serde as the `"type:uuid"` URN (one indexable `TEXT` column). |
-| `EdgeKind` | The closed v1 registry (`same_identity`, `works_at`, `member_of`, `employed_by`, `subject_of`) with `is_symmetric` / `is_temporal` / `inverse` / `sensitivity` / `permits(from, to)`. |
+| `EdgeKind` | The closed v1 registry — all 6: `same_identity`, `works_at`, `member_of`, `employed_by`, `subject_of`, `continues_as` (the journey edge, landed 2026-08-24, care-pathway-instance → care-pathway-instance \| patient-flow-stay \| case) — with `is_symmetric` / `is_temporal` / `inverse` / `sensitivity` / `permits(from, to)`. |
 | `Sensitivity` | `Medium` (affiliation / identity) vs `High` (`case → person`, §10). |
 
 ## Who actually consumes this
 
-As of 2026-08-04, eight crates depend on this one as a real Cargo `path`
+As of 2026-09-05, nine crates depend on this one as a real Cargo `path`
 dependency (`entity-ref = { path = "../../link/entity-ref-rust-crate" }`)
 — not a copy-per-project, despite the framing above:
 
@@ -49,9 +49,13 @@ dependency (`entity-ref = { path = "../../link/entity-ref-rust-crate" }`)
   `models/entity_presence.rs`, `probe.rs`, `reconcile.rs`, and
   `suggest/{job,mod}.rs`.
 - **`person-service-with-loco`**, **`worker-service-with-loco`**,
-  **`case-service-with-loco`** — the three entity services that
-  originate edges (`entity_links` write-side + `linked`/`unlinked`
-  events), as the design doc anticipated.
+  **`case-service-with-loco`**, **`care-pathway-service-with-loco`** —
+  the four entity services that originate edges (`entity_links`
+  write-side + `linked`/`unlinked` events), as the design doc
+  anticipated. Care-pathway is the newest of the four (2026-08-24): it
+  originates the `continues_as` journey edge (`src/controllers/links.rs`,
+  `src/journey.rs`), not just `same_identity`/`works_at`/`member_of`/
+  `employed_by`/`subject_of`.
 - **`contact-relationship-management-service-with-rust`**,
   **`content-management-system-service-with-rust`**,
   **`patient-flow-service-with-rust`**,
@@ -72,8 +76,8 @@ Cross-service links are still **never** a matcher signal — see
 > family's three-part discipline (this README/CHANGELOG + code + tests)
 > for any behavioural change.
 
-- [ ] **ER-1 (S) "Who actually consumes this" is stale — a ninth consumer
-      exists and isn't listed.** *(verified:
+- [x] **ER-1 (S) "Who actually consumes this" is stale — a ninth consumer
+      exists and isn't listed.** *(resolved 2026-09-05; verified:
       `grep -rl "entity-ref" --include=Cargo.toml .` from the repo root,
       excluding this crate's own manifest and its `fuzz/`, finds NINE
       consumers today: the eight this README's "Who actually consumes
@@ -84,12 +88,12 @@ Cross-service links are still **never** a matcher signal — see
       `entity-ref = { path = "../../link/entity-ref-rust-crate" }`, and
       `agents/share/cross-service-linking.md` §11 records why: care-pathway
       landed the `continues_as` write-side 2026-08-24 — the **fifth**
-      edge-originating service, not just a fourth consumer app)*. Update
-      the "Who actually consumes this" list and its "eight crates"
-      count to nine, adding care-pathway alongside person/worker/case as
-      an edge-originating service (it uses `EntityRef`/`EdgeKind` in its
-      `entity_links` write-side, not just to validate/dereference refs
-      like the four consumer apps).
+      edge-originating service, not just a fourth consumer app)*.
+      **Resolved:** updated the "Who actually consumes this" list and
+      its "eight crates" count to nine, adding care-pathway alongside
+      person/worker/case as an edge-originating service (it uses
+      `EntityRef`/`EdgeKind` in its `entity_links` write-side, not just
+      to validate/dereference refs like the four consumer apps).
       **Acceptance:** the count and the list match a fresh
       `grep -rl "entity-ref" --include=Cargo.toml .` run.
 
@@ -118,34 +122,37 @@ Cross-service links are still **never** a matcher signal — see
       `[Unreleased]` content and no MSRV/version mismatch against
       `Cargo.toml`; `cargo publish --dry-run` succeeds.
 
-- [ ] **ER-3 (S) The "## Types" table omits `continues_as` (and doesn't
-      name the two entity types it needs).** *(verified: this README's
-      "## Types" table lists the `EdgeKind` registry as "(`same_identity`,
-      `works_at`, `member_of`, `employed_by`, `subject_of`)" — five
-      kinds — but `src/lib.rs`'s `EdgeKind` enum and its `ALL` const
-      carry a sixth, `ContinuesAs` (landed 2026-08-24, tested by
+- [x] **ER-3 (S) The "## Types" table omits `continues_as` (and doesn't
+      name the two entity types it needs).** *(resolved 2026-09-05;
+      verified: this README's "## Types" table listed the `EdgeKind`
+      registry as "(`same_identity`, `works_at`, `member_of`,
+      `employed_by`, `subject_of`)" — five kinds — but `src/lib.rs`'s
+      `EdgeKind` enum and its `ALL` const carry a sixth, `ContinuesAs`
+      (landed 2026-08-24, tested by
       `continues_as_names_a_journey_and_only_a_journey`); the
       `EntityType` row's `"… courseinstance, care_pathway"` elision
-      likewise predates and doesn't name the two entity types
+      likewise predated and didn't name the two entity types
       `ContinuesAs` needs, `CarePathwayInstance` and `PatientFlowStay`,
-      both present in `EntityType::ALL`)*. Add `continues_as` to the
-      `EdgeKind` row and name `care_pathway_instance` /
-      `patient_flow_stay` explicitly in the `EntityType` row (or drop
-      the lossy `…` elision entirely and list all twelve), so the
-      README's public-surface table matches `src/lib.rs`'s `ALL`
-      constants without a reader having to cross-check the source.
-      **Acceptance:** every `EdgeKind::ALL` / `EntityType::ALL` member
-      is named somewhere in the "## Types" table (a doctest or a simple
-      script assertion is a reasonable way to pin this so it can't
-      silently drift again).
+      both present in `EntityType::ALL`)*. **Resolved:** the
+      `EdgeKind` row now names `continues_as`; the `EntityType` row
+      drops the lossy `…` elision and lists all twelve. New
+      `readme_types_table_names_every_entity_type_and_edge_kind` unit
+      test (`include_str!`s this file) asserts every `EntityType::ALL`/
+      `EdgeKind::ALL` token appears somewhere in the README, so a
+      future registry addition can't silently drift behind this table
+      again.
 
-- [ ] **ER-4 (S) Add `readme = "README.md"` to `Cargo.toml`.**
-      *(verified: `Cargo.toml` declares `description`/`license`/
-      `repository`/`keywords`/`categories` but no `readme` field, so
-      the published crates.io page for `entity-ref` 0.2.0 shows only
-      the one-line `description`, not this file's worked example and
-      "Who actually consumes this" narrative)*. A one-line manifest
-      addition, worth landing alongside ER-2's release so the next
-      published version renders the README on crates.io.
-      **Acceptance:** `cargo package --list` includes `README.md`;
-      the next `cargo publish --dry-run` (ER-2) shows the readme wired.
+- [x] **ER-4 (S) Add `readme = "README.md"` to `Cargo.toml`.**
+      *(resolved 2026-09-05; verified: `Cargo.toml` declared
+      `description`/`license`/`repository`/`keywords`/`categories` but
+      no `readme` field, so the published crates.io page for
+      `entity-ref` 0.2.0 showed only the one-line `description`, not
+      this file's worked example and "Who actually consumes this"
+      narrative)*. A one-line manifest addition; still worth cutting
+      alongside ER-2's deferred release so the next published version
+      renders the README on crates.io.
+      **Resolved:** added `readme = "README.md"`. Verified: `cargo
+      package --list` now includes `README.md`; the `cargo publish
+      --dry-run` re-check (ER-2, not landed in this change) is
+      deferred to that release, since ER-2 also carries its own
+      version bump and `[Unreleased]` reorganisation.
