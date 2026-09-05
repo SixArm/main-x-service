@@ -5,6 +5,7 @@
 mod cases;
 mod entity_links;
 mod event_outbox;
+mod review_queue;
 
 use std::sync::Once;
 

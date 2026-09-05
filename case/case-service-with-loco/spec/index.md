@@ -803,7 +803,7 @@ the other v1 edge kinds even though it shares the same edge shape.
   proves the round-trip; `DESTRUCTIVE_POST_SUFFIXES`'s existing 401/403
   matrix test now exercises a real route instead of a placeholder path.
 
-- [ ] **T-8 (M) Expose the `review_queue` REST surface.**
+- [x] **T-8 (M) Expose the `review_queue` REST surface.**
   `src/models/review_queue.rs` already has `upsert`/`list`/`decide`
   functions (added for the bulk-import pipeline, BLK-5), and the
   `review_queue` table has carried `provenance` from day one, but
@@ -819,10 +819,41 @@ the other v1 edge kinds even though it shares the same edge shape.
   two endpoints, first-writer-wins on `decide` per the family contract.
   Three-part change: spec §9/§13 + `src/controllers/cases.rs` (or a new
   `controllers/review_queue.rs`) + a DB-gated request test.
-  **Acceptance:** `GET /api/cases/review-queue` lists pending pairs
-  written by the bulk-import pipeline; `POST .../{id}/decision` accepts
-  `confirmed`/`rejected` once and `409`s (or documented equivalent) on a
-  second decision of the same row; DB-gated test proves both.
+  **Resolution (2026-09-05):** ported organization-service's identical
+  surface into `src/controllers/cases.rs` (kept in the same controller
+  file rather than a new module, matching how case's other read-only
+  collection endpoints — `/merges/recent`, `/audit/recent` — already
+  live alongside CRUD): `ReviewStatus`/`ReviewQueueItem`/
+  `review_row_to_item` (wire field names `case_id_a`/`case_id_b`, this
+  entity's analog of organization's `organization_id_a`/`_b`),
+  `GET /review-queue[?status=&limit=]` (unknown `status` token → `422`),
+  and `POST /review-queue/{id}/decision` (first-writer-wins in SQL via
+  the existing `decide` helper's `WHERE status = 'pending'` guard;
+  `AlreadyDecided` → `422`, `NotFound` → `404`; each decision writes a
+  best-effort `review_decision` audit row). Not added to
+  `DESTRUCTIVE_POST_SUFFIXES` — organization's own review-decision
+  endpoint isn't either; only `merge`/`deduplicate`/`import`/`erase` are
+  destructive-tier. There is no `/deduplicate` (T-7) yet to create real
+  rows through the API, so the DB-gated tests
+  (`tests/requests/review_queue.rs`) seed a row directly through
+  `crate::models::review_queue::upsert` — the same storage a bulk
+  import or a future `/deduplicate` would both write through — then
+  exercise both endpoints: a seeded `pending` item lists correctly and
+  an unknown status filter is `422`
+  (`review_queue_lists_a_seeded_pending_item`); a decision is
+  first-writer-wins, a second decision on the same item is `422`, and a
+  decision on an unknown id is `404`
+  (`a_decision_is_first_writer_wins`). **Acceptance (adjusted):**
+  `GET /api/cases/review-queue` lists pending pairs; `POST
+  .../{id}/decision` accepts `confirmed`/`rejected` once and returns
+  `422` (not `409` — matching the family's existing `decide` contract,
+  e.g. organization's, rather than inventing a new status code for
+  case alone) on a second decision of the same row; a DB-gated test
+  proves both. Verified: `cargo build --lib`, `cargo clippy
+  --all-targets -- -D warnings`, `cargo test --lib` (264 passed, 12
+  ignored), `cargo test -- --ignored` against a real Postgres (36
+  passed in the `mod.rs` binary, including both new tests), `cargo fmt
+  --check`.
 
 - [x] **T-9 (S) `subject_of` link read denial should be `404`, not `403`,
   per the later family precedent.** *(resolved 2026-09-04.)* §12.1 of this spec already flags

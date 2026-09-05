@@ -9,6 +9,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — expose the stored review queue over the API (T-8)
+
+`src/models/review_queue.rs` already had `upsert`/`list`/`decide`
+helpers (added for the BLK-5 bulk-import pipeline, which routes a
+keyless import row's likely duplicate here with `provenance =
+"import"`), but nothing called `list`/`decide` from a controller — a
+row routed to review was invisible over the API. Added
+`GET /api/cases/review-queue[?status=&limit=]` and
+`POST /api/cases/review-queue/{id}/decision`, ported from
+organization-service's identical surface: an unknown `status` filter is
+`422`, a decision is first-writer-wins in SQL (only a `pending` item can
+be decided; an already-decided item is `422`, an unknown id `404`), and
+each decision writes a `review_decision` audit row (best-effort). There
+is no batch-scan endpoint yet (`/deduplicate`, T-7); these two endpoints
+only surface rows a bulk import (or a future T-7) already wrote. New
+DB-gated request tests (`tests/requests/review_queue.rs`) seed a row
+directly through the model layer and exercise both endpoints. See
+spec/index.md T-8.
+
 ### Security — `subject_of` link read denial is `404`, not `403` (T-9)
 
 `src/controllers/links.rs`'s single-case link endpoints
