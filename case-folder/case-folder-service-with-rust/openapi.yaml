@@ -446,10 +446,15 @@ components:
       type: apiKey
       in: cookie
       name: cts_session
+    # The bearer credential is the same opaque session id `sessionCookie`
+    # carries (src/auth/mod.rs::identity_from_headers looks both up via
+    # an identical session-store lookup) — not a JWT. The only JWT this
+    # service issues is the short-lived magic-link token, accepted only
+    # at POST /api/auth/verify, never as a bearer credential elsewhere.
+    # `bearerFormat` is therefore omitted rather than misdeclared.
     bearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: JWT
   parameters:
     Id:
       name: id

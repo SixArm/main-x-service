@@ -70,7 +70,7 @@
   **Acceptance:** delete the two files, or add a one-line comment at the
   top of each explaining why they're kept as a deliberate local-only
   convenience despite never running in CI.
-- [ ] **LT-18** `openapi.yaml`'s `bearerAuth` scheme declares
+- [x] **LT-18** `openapi.yaml`'s `bearerAuth` scheme declares
   `bearerFormat: JWT`, but `src/auth/mod.rs::bearer_token` /
   `identity_from_headers` treat the bearer value as the raw opaque
   session id, never as a decoded JWT *(verified by reading both files —
@@ -78,7 +78,14 @@
   which is accepted only at `POST /api/auth/verify`, never as a bearer
   credential elsewhere)*. Cross-referenced as root **T-18**.
   **Acceptance:** `bearerFormat` is corrected or removed, matching the
-  actual credential shape.
+  actual credential shape. *(resolved 2026-09-05.)*
+  - **Resolved.** Removed the misdeclared `bearerFormat: JWT` line from
+    `openapi.yaml`'s `bearerAuth` scheme and added a comment explaining
+    the credential is the same opaque session id `sessionCookie`
+    carries. No code change — this was a docs-only correctness fix
+    (`openapi.yaml` is a static reference doc, not loaded or served by
+    any code path). YAML re-validated (`python3 -c "import yaml;
+    yaml.safe_load(open('openapi.yaml'))"`) after the edit.
 - [ ] **LT-19** [`testing.md`](testing.md)'s unit-test inventory
   (`src/nhs.rs` 8 + `src/controllers/alerts.rs` 6 = 14, and `cargo test`
   passes are described only in those terms) has drifted since **T-AUTH**
