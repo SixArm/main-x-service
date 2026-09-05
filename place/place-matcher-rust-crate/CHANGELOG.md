@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **(spec/10-open-questions.md OQ-K, resolved — closes OQ-F) Opt-in
+  `local_id` scoring.** `local_id` was unconditionally unscored — a
+  correct default (different organisations may issue colliding
+  values), but with no way for a caller who legitimately compares
+  records from one known source to opt in. `MatchConfig` gains
+  `score_local_id: bool` (default `false`, preserving prior behaviour
+  byte-for-byte) and `local_id_weight: f64` (default `0.05`); when
+  `score_local_id` is `true`, a new `local_id_score` component
+  (exact-match after trim, `None` if either side's trimmed value is
+  empty or absent — mirroring the empty-value guard already on
+  `place_ids`/`PlaceId`) joins the weighted sum. Adding a fourth
+  boolean config field tripped clippy pedantic's
+  `struct_excessive_bools`; resolved with a narrow, documented
+  `#[allow(clippy::struct_excessive_bools)]` on `MatchConfig` rather
+  than changing the field's type. Four new unit tests in
+  `src/matcher.rs`; `cargo test` (169 lib tests, up from 165) +
+  `cargo clippy --all-targets -- -D warnings` + `cargo doc --no-deps`
+  all clean. Spec §6 (new §6.7a) and §7 updated in the same change;
+  `AGENTS.md`'s "do not score `local_id`" rule now states the opt-in.
+
 ### Security
 
 - **(spec/10-open-questions.md OQ-I, resolved) Empty-value identity bypass
