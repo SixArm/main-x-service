@@ -161,6 +161,16 @@ locality 0.25, postal 0.20, region 0.15, country 0.10; renormalised over
 the fields present on both sides. `None` when either record lacks an
 address.
 
+**Postal-code exact-anchor boost.** After the weighted average above, a
+postal code present and fold-equal on both sides adds
+`POSTAL_CODE_ANCHOR_BONUS` (`0.10`, capped at `POSTAL_CODE_ANCHOR_CEILING`
+= `0.95`) — mirroring §9's Soundex bonus for names. A shared postal code
+is strong, fine-grained locality evidence (especially alphanumeric
+schemes like UK/Canada), so it corroborates a partially- or
+fuzzily-disagreeing street/locality/region rather than only claiming its
+own `0.20` share of the average. Never fires on a blank (post-fold)
+postal code or when only one side carries one.
+
 ## 11. URL / domain
 
 Compared on extracted registered domain: equal → 1.0, else
@@ -281,7 +291,20 @@ async, or panics to library code.
       tests in `src/matcher.rs` and a `tests/public_api.rs` case.
 - [ ] Optional `phone`/`email` exact-match component.
 - [ ] Consider a configurable legal-suffix list (currently a const).
-- [ ] Address: postal-code exact-anchor boost.
+- [x] **Address: postal-code exact-anchor boost.** *(resolved
+      2026-09-05.)* Added `POSTAL_CODE_ANCHOR_BONUS`/
+      `POSTAL_CODE_ANCHOR_CEILING` (0.10/0.95) to `src/matcher.rs`,
+      mirroring the existing name-component Soundex bonus: a postal code
+      present and fold-equal on both sides nudges `address_score`'s
+      weighted average up after computing it, rather than only
+      contributing its plain 0.20 field weight. Never fires on a blank
+      (post-fold) or one-sided postal code. Three new unit tests pin the
+      exact boosted amount (via a by-hand reconstruction of the
+      pre-anchor weighted average), the blank-postal-code no-op, and the
+      one-sided-postal-code no-op. See §10. Verified: `cargo test` (62
+      unit + 8 property + 12 integration + 10 doctests, all green),
+      `cargo clippy --all-targets -- -D warnings` clean, `cargo fmt
+      --check` clean, `cargo +nightly fuzz build` still compiles.
 - [ ] Split this single `spec/index.md` into the numbered §-per-file
       layout used by the sibling matcher crates.
 - [x] **ORGM-T1 (S) Guard `MatchConfig` against caller-supplied
