@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — exact key-set allowlist on the time-analysis response (PF-T21)
+
+`tests/requests/flows.rs::full_journey_request_to_deep_clean` asserted
+the documented `time-analysis` fields were *present*, but nothing
+asserted the top-level key set was *exactly* that — so a future change
+could have added a per-person rate/throughput field without any test
+failing, silently breaking the family-wide refusal in
+[`agents/share/time-based-analysis.md` §7](../../agents/share/time-based-analysis.md).
+Added an exact `BTreeSet` comparison against the eleven documented
+top-level keys, read off the handler's actual response body rather
+than guessed from prose.
+
 ### Fixed — OpenAPI doc was missing `/api/stays/{pid}/time-analysis` (PF-T20)
 
 The route landed in PF-T19 but `src/openapi.rs`'s hand-written `paths`
