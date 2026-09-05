@@ -135,8 +135,18 @@ pub async fn metrics_prom() -> impl IntoResponse {
     )
 }
 
+/// Query parameters for `POST /api/places` (T-15): whether to mask
+/// sensitive fields on the `409` duplicate-candidate body, same flag
+/// name and default (`false`) as [`SearchQuery::mask_sensitive`].
+#[derive(Debug, Clone, Deserialize, IntoParams)]
+pub struct CreatePlaceQuery {
+    /// Mask sensitive fields on the `409` candidate list.
+    pub mask_sensitive: Option<bool>,
+}
+
 /// Create a place (with real-time duplicate detection).
 #[utoipa::path(post, path = "/api/places", tag = "places",
+    params(CreatePlaceQuery),
     request_body = Place,
     responses(
         (status = 201, description = "Created", body = Place),
@@ -145,6 +155,7 @@ pub async fn metrics_prom() -> impl IntoResponse {
     ))]
 pub async fn create_place(
     State(state): State<AppState>,
+    Query(q): Query<CreatePlaceQuery>,
     Json(mut place): Json<Place>,
 ) -> impl IntoResponse {
     normalize_place(&mut place);
@@ -169,7 +180,7 @@ pub async fn create_place(
     }
 
     // Real-time duplicate detection.
-    let candidates = find_candidates(&state, &place).await;
+    let candidates = find_candidates(&state, &place, q.mask_sensitive.unwrap_or(false)).await;
     let dups: Vec<ScoredCandidate> = candidates
         .into_iter()
         .filter(|c| c.score >= state.matcher.threshold())
@@ -541,7 +552,20 @@ pub struct ScoredCandidate {
 
 /// Score a request place against existing records, returning candidates
 /// sorted by descending score.
-async fn find_candidates(state: &AppState, place: &Place) -> Vec<ScoredCandidate> {
+///
+/// `mask_sensitive`: when `true`, each candidate's `place` is redacted
+/// via [`mask_place`] before being returned — the same function and
+/// default `search_places` uses. Per `agents/share/security.md`
+/// invariant 5, a bulk/aggregate read (candidates found via a
+/// duplicate probe) must never reveal more than the equivalent single
+/// `GET` would; without this, a caller who cannot see a place's full
+/// record via `GET` could still recover it by posting a near-duplicate
+/// probe to `check-duplicates` or `create` (T-15).
+async fn find_candidates(
+    state: &AppState,
+    place: &Place,
+    mask_sensitive: bool,
+) -> Vec<ScoredCandidate> {
     let ids = state
         .search_engine
         .search_by_name(&place.name, 50)
@@ -557,7 +581,11 @@ async fn find_candidates(state: &AppState, place: &Place) -> Vec<ScoredCandidate
         if let Ok(Some(existing)) = state.place_repository.get_by_id(&uuid).await {
             let r = state.matcher.score(place, &existing);
             out.push(ScoredCandidate {
-                place: existing,
+                place: if mask_sensitive {
+                    mask_place(&existing)
+                } else {
+                    existing
+                },
                 score: r.score,
                 confidence: confidence_label(&r.confidence).to_string(),
             });
@@ -571,7 +599,12 @@ async fn find_candidates(state: &AppState, place: &Place) -> Vec<ScoredCandidate
     out
 }
 
-/// Match a candidate place against existing records.
+/// Match a candidate place against existing records. Out of T-15's
+/// scope (never masked): a caller of `/match` supplies the probe
+/// record explicitly to compare it, unlike `check-duplicates`/`create`,
+/// where the probe is a record the caller is trying to *persist* and
+/// masking closes the "recover a hidden record via a near-duplicate
+/// probe" path those two endpoints are exposed to.
 #[utoipa::path(post, path = "/api/places/match", tag = "matching",
     request_body = Place,
     responses((status = 200, body = [ScoredCandidate])))]
@@ -579,7 +612,7 @@ pub async fn match_place(
     State(state): State<AppState>,
     Json(place): Json<Place>,
 ) -> impl IntoResponse {
-    let candidates = find_candidates(&state, &place).await;
+    let candidates = find_candidates(&state, &place, false).await;
     (StatusCode::OK, Json(ApiResponse::success(candidates)))
 }
 
@@ -592,15 +625,24 @@ pub struct DuplicateCheckResponse {
     pub candidates: Vec<ScoredCandidate>,
 }
 
+/// Query parameters for `POST /api/places/check-duplicates` (T-15).
+#[derive(Debug, Clone, Deserialize, IntoParams)]
+pub struct CheckDuplicatesQuery {
+    /// Mask sensitive fields on the returned candidates.
+    pub mask_sensitive: Option<bool>,
+}
+
 /// Check for duplicates without creating a record.
 #[utoipa::path(post, path = "/api/places/check-duplicates", tag = "matching",
+    params(CheckDuplicatesQuery),
     request_body = Place,
     responses((status = 200, body = DuplicateCheckResponse)))]
 pub async fn check_duplicates(
     State(state): State<AppState>,
+    Query(q): Query<CheckDuplicatesQuery>,
     Json(place): Json<Place>,
 ) -> impl IntoResponse {
-    let candidates = find_candidates(&state, &place).await;
+    let candidates = find_candidates(&state, &place, q.mask_sensitive.unwrap_or(false)).await;
     let threshold = state.matcher.threshold();
     let duplicates_found = candidates.iter().any(|c| c.score >= threshold);
     (

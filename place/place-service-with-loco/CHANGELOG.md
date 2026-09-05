@@ -8,6 +8,24 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Security — mask sensitive fields on `check-duplicates` / create's `409` candidates (T-15)
+
+`GET /api/places/search` already honoured `?mask_sensitive=`, but
+`check_duplicates`/`find_candidates` returned the full, unmasked stored
+record on both `POST /api/places/check-duplicates` and the `409` body
+`POST /api/places` returns on a duplicate hit — a caller who cannot see
+a place's full record via `GET` could still recover it by posting a
+near-duplicate probe (`agents/share/security.md` invariant 5).
+`find_candidates` now takes a `mask_sensitive` flag and redacts each
+candidate via the existing `mask_place` when set; `check_duplicates`
+and `create_place` each accept a matching `?mask_sensitive=` query
+parameter (default `false`, same as `search`), so create's own `409`
+body honours the flag the caller's create request carries.
+`match_place` is deliberately left unmasked — a `/match` caller
+supplies the probe explicitly to compare it, so there is no hidden
+record to protect there. Mirrors `thing-service`'s identical T-13. See
+spec §13 T-15.
+
 ### Added — service route test for `check-duplicates` (entity spec E-1)
 
 Three docs once disagreed on this endpoint's path; the code-serves-what
