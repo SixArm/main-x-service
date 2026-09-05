@@ -17,8 +17,8 @@
 //! [`IdentifierScheme::is_deterministic`] scheme classifier.
 
 use organization_matcher::{
-    Confidence, IdentifierScheme, MatchingEngine, OrgIdentifier, Organization, PostalAddress,
-    normalize, phonetic,
+    Confidence, IdentifierScheme, MatchConfig, MatchingEngine, OrgIdentifier, Organization,
+    PostalAddress, normalize, phonetic,
 };
 use proptest::prelude::*;
 
@@ -115,6 +115,37 @@ fn wellformed_org() -> impl Strategy<Value = Organization> {
             o.keywords = keywords;
             o
         })
+}
+
+/// A value that is sometimes well-formed (a small non-negative float,
+/// suitable for either a weight or a threshold) and sometimes
+/// deliberately adversarial (negative, `NaN`, infinite) — the values
+/// `MatchConfig::validated` (ORGM-T1) must reject, generated alongside
+/// the ones it must accept.
+fn adversarial_weight() -> impl Strategy<Value = f64> {
+    prop_oneof![
+        3 => 0.0f64..=1.0,
+        1 => Just(f64::NAN),
+        1 => Just(f64::INFINITY),
+        1 => Just(f64::NEG_INFINITY),
+        1 => -10.0f64..0.0,
+    ]
+}
+
+/// Build a `MatchConfig` from 9 adversarial-or-well-formed values: the
+/// 8 weights in field-declaration order, then the threshold.
+fn config_from(values: &[f64]) -> MatchConfig {
+    MatchConfig {
+        threshold: values[8],
+        name_weight: values[0],
+        address_weight: values[1],
+        url_weight: values[2],
+        jurisdiction_weight: values[3],
+        founding_date_weight: values[4],
+        keywords_weight: values[5],
+        relationships_weight: values[6],
+        tags_weight: values[7],
+    }
 }
 
 // ---------- Properties ----------
@@ -223,5 +254,37 @@ proptest! {
             Confidence::High => 2,
         };
         prop_assert!(rank(Confidence::classify(hi)) >= rank(Confidence::classify(lo)));
+    }
+
+    /// ORGM-T1: for an arbitrary adversarial-or-well-formed weight
+    /// vector (including negative/zero/`NaN`/infinite values),
+    /// `MatchConfig::validated` must reject any config that is not
+    /// actually finite-and-non-negative-throughout, and — the property
+    /// that matters downstream — a config it DOES accept must never
+    /// let `weighted_average` push a score outside `[0.0, 1.0]` or
+    /// produce `NaN`.
+    #[test]
+    fn validated_config_never_produces_an_unbounded_score(
+        values in prop::collection::vec(adversarial_weight(), 9),
+        a in org_strategy(), b in org_strategy(),
+    ) {
+        let config = config_from(&values);
+        if let Ok(validated) = config.validated() {
+            let engine = MatchingEngine::new(validated);
+            let r = engine.match_organizations(&a, &b);
+            prop_assert!(!r.score.is_nan(), "validated config produced a NaN score");
+            prop_assert!(
+                (0.0..=1.0).contains(&r.score),
+                "validated config produced an out-of-range score: {}",
+                r.score
+            );
+        } else {
+            let weights_ok = values[..8].iter().all(|w| w.is_finite() && *w >= 0.0);
+            let threshold_ok = values[8].is_finite() && (0.0..=1.0).contains(&values[8]);
+            prop_assert!(
+                !(weights_ok && threshold_ok),
+                "validated() rejected a well-formed config: {values:?}"
+            );
+        }
     }
 }
