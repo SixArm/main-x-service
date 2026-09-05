@@ -8,6 +8,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — HIPAA §164.528 disclosure-accounting on the gRPC `GetPerson` read path (T-36)
+
+The gRPC `GetPerson` RPC now writes the same disclosure-accounting
+audit row REST's `GET /api/persons/{id}` does. `grpc_access_context`
+(`src/api/grpc/service.rs`) reads the `x-purpose-of-use` /
+`x-disclosure-recipient` / `x-destination-region` declarations off
+gRPC metadata — the transport-specific counterpart of the Axum
+`disclosure::AccessContext` extractor, which reads the same three
+headers off an HTTP request. The write happens only after
+`authorize_record` allows the read (a denied request discloses
+nothing, so it logs nothing), and a failed write refuses the call
+(`Status::unavailable`) when `PERSON_AUDIT_FAIL_CLOSED` is on, exactly
+as REST's `503` does. No behaviour change when `PERSON_AUDIT_READS` is
+off (the default).
+
 ### Removed — dead `FluvioProducer`/`FluvioConsumer` stubs (T-33)
 
 `src/streaming/producer.rs`'s `FluvioProducer` and
