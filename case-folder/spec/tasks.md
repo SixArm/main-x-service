@@ -77,35 +77,42 @@
 
 ## Cross-edition hygiene (found 2026-09-04)
 
-- [ ] **T-17** Dead nested CI: `case-folder-service-with-rust/.github/workflows/`
-  (`quality.yml`, `security.yml`) is not referenced by either root pipeline
-  — *(verified: `grep -rl case-folder .github/workflows/ .woodpecker.yml`
-  finds nothing)*. Root `scripts/ci-crates.sh` already discovers this crate
-  (any dir with a `Cargo.toml`) and runs `fmt`/`clippy`/`test`/`deny`
-  against it via the family stages, so the nested workflows are pure
-  duplication that never actually runs on GitHub (this repo has no Actions
-  runner configured to pick up a nested `.github/`) — a contributor
-  checking this path's Actions tab sees green-looking jobs that never
-  executed. `patient-flow-service-with-rust`'s PF-T1 already faced the same
-  question and explicitly deferred nested workflows; case-folder's were
-  simply left in place unresolved. **Acceptance:** either delete both
-  files (root CI already covers the same checks) or, if kept deliberately
-  as a documented redundant local-CI convenience, say so in a comment at
-  the top of each file and in this app's `spec/index.md`/`AGENTS.md` —
-  either way the ambiguity is gone.
-- [ ] **T-18** `openapi.yaml`'s `bearerAuth` scheme claims
-  `bearerFormat: JWT`, but the value it actually accepts is the **opaque
-  session id** (the same string as the `cts_session` cookie) — *(verified:
-  `case-folder-service-with-rust/src/auth/mod.rs::bearer_token` strips the
-  `Bearer ` prefix and passes the raw string straight to session lookup;
-  nothing JWT-shaped is parsed on that path, only the `verify`-response's
-  short-lived magic token is a real JWT and it is never accepted as a
-  bearer credential)*. A client following the declared `bearerFormat`
-  would reasonably assume it can mint or inspect a JWT, which is wrong and
-  could mislead an integrator. **Acceptance:** `bearerFormat` reads
-  something accurate (e.g. omitted, or `Opaque session id`), and
+- [x] **T-17** *(resolved 2026-09-05, in step with the Loco-edition
+  `LT-17`.)* Dead nested CI:
+  `case-folder-service-with-rust/.github/workflows/` (`quality.yml`,
+  `security.yml`) was not referenced by either root pipeline —
+  *(verified: `grep -rl case-folder .github/workflows/
+  .woodpecker.yml` found nothing)*. Root `scripts/ci-crates.sh`
+  already discovers this crate (any dir with a `Cargo.toml`) and runs
+  `fmt`/`clippy`/`test`/`deny` against it via the family stages, so
+  the nested workflows were pure duplication that never actually ran
+  on GitHub (this repo has no Actions runner configured to pick up a
+  nested `.github/`) — a contributor checking this path's Actions tab
+  saw green-looking jobs that never executed. `patient-flow-service-with-rust`'s
+  PF-T1 already faced the same question and explicitly deferred nested
+  workflows; case-folder's were simply left in place unresolved until
+  now. **Resolution:** deleted both files (root CI already covers the
+  same checks, with no crate-specific setup the generic stages lack).
+- [x] **T-18** *(resolved 2026-09-05 — the fix landed as the
+  Loco-edition `LT-18`; this project-level entry was left unticked at
+  the time and is synced now.)* `openapi.yaml`'s `bearerAuth` scheme
+  claimed `bearerFormat: JWT`, but the value it actually accepts is
+  the **opaque session id** (the same string as the `cts_session`
+  cookie) — *(verified:
+  `case-folder-service-with-rust/src/auth/mod.rs::bearer_token` strips
+  the `Bearer ` prefix and passes the raw string straight to session
+  lookup; nothing JWT-shaped is parsed on that path, only the
+  `verify`-response's short-lived magic token is a real JWT and it is
+  never accepted as a bearer credential)*. A client following the
+  declared `bearerFormat` would reasonably assume it can mint or
+  inspect a JWT, which was wrong and could mislead an integrator.
+  **Resolution:** removed the misdeclared `bearerFormat: JWT` line
+  from `openapi.yaml`'s `bearerAuth` scheme and added a comment
+  explaining the credential is the same opaque session id
+  `sessionCookie` carries; YAML re-validated after the edit.
   [`api-contract.md`](../case-folder-service-with-rust/spec/api-contract.md)
-  is checked for the same claim.
+  carries no `bearerFormat` claim of its own, so no matching edit was
+  needed there.
 
 - [ ] **T-19** [audit-integrity.md](audit-integrity.md)'s hash-chain +
   signature design (driving **T-G2**) reinvents a scheme the family
