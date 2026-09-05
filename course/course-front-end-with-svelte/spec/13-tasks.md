@@ -52,7 +52,7 @@
   `tests/unit/session.test.ts` (+2 — `requireSignedIn` throws a
   303-to-`/signin` redirect when signed out, passes through silently
   when signed in).
-- [ ] T-30: Playwright smoke coverage for `/board` and `/calendar`.
+- [x] T-30: Playwright smoke coverage for `/board` and `/calendar`. *(resolved 2026-09-06.)*
   Both routes landed 2026-07-19 (CHANGELOG "SVAR moderate fit") but
   `tests/e2e/courses.spec.ts` (the only e2e suite) never gained a case
   for either. `agents/testing.md` states the smoke suite's goal as
@@ -69,7 +69,17 @@
     `data-testid="instance-calendar"` — both stubbing
     `search()`/`listInstances()` via `page.route(...)` per the suite's
     existing convention.
-- [ ] T-31: Playwright smoke coverage for `/courses/[id]` and
+  - **Resolved.** Added `"board renders the Kanban with lifecycle
+    column headings"` and `"calendar renders the instance calendar"`
+    to `tests/e2e/courses.spec.ts`, stubbing `**/api/courses/search**`
+    with an empty `{items:[],total:0}` result — the board's columns
+    come from the fixed `COURSE_STATUSES` list independent of course
+    data, and an empty result means `/calendar`'s `listInstances()`
+    fan-out never fires, so no further stub is needed for either
+    shell check. Verified: `npx playwright test` (13 passed, up from
+    9), `npm test` (58 passed), `npm run check` (0 errors), `npm run
+    lint` clean.
+- [x] T-31: Playwright smoke coverage for `/courses/[id]` and
   `/courses/[id]/audit` route shells. Neither is visited as a general
   render check today: `/courses/[id]` is only touched incidentally by
   the T-20 GDPR-export test (which asserts the export button, not the
@@ -82,6 +92,13 @@
     Audit link are visible; a second visits
     `/courses/{id}/audit` (stubbing the audit endpoint) and asserts
     the heading and at least one rendered audit entry.
+  - **Resolved.** Added `"course detail renders heading, edit link,
+    and audit link"` (stubs `**/api/courses/{id}`, asserts the `<h1>`
+    heading equals the stubbed course name plus the "Edit"/"Audit"
+    links) and `"course audit page renders heading and an audit
+    entry"` (stubs `**/api/courses/{id}/audit**` with one entry,
+    asserts the "Audit log" heading and the entry's action text) to
+    `tests/e2e/courses.spec.ts`.
 - [ ] T-32: `/courses` list has no pagination beyond a hardcoded
   `limit: 50` and no total-count indicator. `src/lib/api/courses.ts`'s
   `search()` and `src/lib/api/client.ts`'s `ApiClient` never read the
