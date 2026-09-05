@@ -596,7 +596,7 @@ code + tests in one PR.
       the routes that currently inline the logic call it instead;
       svelte-check 0; Playwright green. (WPM-D16)
 
-- [ ] WPM-T40 **List pagination headers.** No controller emits
+- [x] WPM-T40 **List pagination headers.** No controller emits
       `X-Total-Count`/`X-Limit`/`X-Offset`, and list handlers cap with
       a hardcoded `.limit(...)` (e.g. `hr_core.rs`'s `.limit(500)` and
       `.limit(200)`) rather than accepting `?limit=&offset=` (verified:
@@ -610,3 +610,28 @@ code + tests in one PR.
       bound `offset` (400 past it), and set the three response
       headers; a request test pins clamping and the offset bound;
       clippy pedantic clean. (WPM-D9, WPM-R7)
+      **Resolution (2026-09-05):** ported the family's `Page`/
+      `with_page_headers` pattern (already used by care-pathway-service,
+      case-service, organization-service, …) into
+      `src/controllers/mod.rs` — `MAX_LIMIT` (500), `MAX_OFFSET`
+      (10 000), `Page { limit, offset }` (`resolve`/`check_offset`), and
+      `with_page_headers`. `limit`/`offset` are declared as plain fields
+      on each query struct rather than `#[serde(flatten)]`-ed onto
+      `Page` — a flattened struct deserializes `axum::extract::Query`
+      values from a string-keyed map, so `limit=2` would arrive as the
+      string `"2"` and fail to parse as a `u64`, a spurious `400` on a
+      valid request; the `Page` value is constructed explicitly inside
+      each handler instead. `GET /api/employees` (default limit 500,
+      unchanged) and `GET /api/benefit-plans` (default limit 200,
+      unchanged) both now accept `?limit=&offset=`, clamp `limit` to
+      `MAX_LIMIT`, reject an out-of-bound `offset` with `400`, and stamp
+      all three headers; the employee list's total reflects its
+      `?department=`/`?status=` filters (counted before paging, via
+      `Select::count`). New DB-gated tests
+      (`tests/requests/pagination.rs`): `employee_list_paginates_and_clamps`
+      (page size, true total, limit clamp, offset bound) and
+      `benefit_plan_list_paginates` (page size + offset bound). Verified:
+      `cargo build --lib`, `cargo clippy --all-targets -- -D warnings`,
+      `cargo test --lib` (140 passed), `cargo test -- --ignored` against
+      a real Postgres (21 passed, including both new tests), `cargo fmt
+      --check`.

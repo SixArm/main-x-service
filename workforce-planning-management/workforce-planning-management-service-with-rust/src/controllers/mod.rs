@@ -61,3 +61,82 @@ pub fn record_rejection((status, reason): (StatusCode, String)) -> Error {
     };
     Error::CustomError(status, ErrorDetail::new(code, &reason))
 }
+
+// ─── Pagination (WPM-T40; agents/share/restful.md) ──────────────────────────
+
+/// Largest page any collection read will serve. A bigger `limit` is
+/// **clamped** to this rather than refused.
+pub const MAX_LIMIT: u64 = 500;
+
+/// Largest accepted `offset`; past this a request is a `400` — an
+/// unbounded offset would otherwise make the database materialise
+/// arbitrarily many rows only to discard them (SEC-G7). Deep paging
+/// past this bound wants a cursor, not a bigger number.
+pub const MAX_OFFSET: u64 = 10_000;
+
+/// `?limit=` / `?offset=` for a collection read.
+///
+/// Declared as its own type (not `#[serde(flatten)]`-ed onto a wider
+/// query struct): a flattened struct deserializes from a string-keyed
+/// map, so `limit=2` would arrive as the string `"2"` and fail to parse
+/// as a `u64` — a spurious `400` on a valid request.
+#[derive(Debug, Default, Clone, Copy, serde::Deserialize)]
+pub struct Page {
+    /// Page size; absent, zero, or unparseable ⇒ the endpoint default.
+    #[serde(default)]
+    pub limit: Option<u64>,
+    /// Rows to skip; absent ⇒ 0.
+    #[serde(default)]
+    pub offset: Option<u64>,
+}
+
+impl Page {
+    /// The clamped `(limit, offset)` this request will actually use. A
+    /// zero `limit` falls back to `default_limit`: an empty page and an
+    /// empty collection look identical to a client, and only one is an
+    /// answer.
+    #[must_use]
+    pub fn resolve(self, default_limit: u64) -> (u64, u64) {
+        let limit = self
+            .limit
+            .filter(|l| *l > 0)
+            .unwrap_or(default_limit)
+            .min(MAX_LIMIT);
+        (limit, self.offset.unwrap_or(0))
+    }
+
+    /// Reject an out-of-bound offset before it reaches the database.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `400` when the offset exceeds [`MAX_OFFSET`].
+    pub fn check_offset(self) -> Result<()> {
+        if self.offset.unwrap_or(0) > MAX_OFFSET {
+            return Err(Error::CustomError(
+                StatusCode::BAD_REQUEST,
+                ErrorDetail::new(
+                    "offset_too_large",
+                    format!("offset must not exceed {MAX_OFFSET}; narrow the query instead"),
+                ),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Stamp `X-Total-Count` / `X-Limit` / `X-Offset` onto a response
+/// (`agents/share/restful.md`).
+#[must_use]
+pub fn with_page_headers(mut response: Response, total: u64, limit: u64, offset: u64) -> Response {
+    let headers = response.headers_mut();
+    for (name, value) in [
+        ("x-total-count", total),
+        ("x-limit", limit),
+        ("x-offset", offset),
+    ] {
+        if let Ok(value) = axum::http::HeaderValue::from_str(&value.to_string()) {
+            headers.insert(name, value);
+        }
+    }
+    response
+}
