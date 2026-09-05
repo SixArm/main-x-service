@@ -8,6 +8,31 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — FHIR `Practitioner` round-trip fidelity: five dropped fields now parse back (T-19)
+
+`from_fhir_worker` (the FHIR→domain half of the `/fhir/Practitioner`
+conversion) carried five `TODO`s: identifiers always decoded to
+`IdentifierType::Other` regardless of what `to_fhir_worker` encoded, and
+`additional_names`, `marital_status`, `multiple_birth`, and
+`managing_organization` were silently dropped — so a client reading a
+`Practitioner`, editing an unrelated field, and writing it back lost
+that data. All five now round-trip: identifier type is recovered from
+`Identifier.type.coding[0].code` via `IdentifierType`'s own
+`#[serde(rename_all = "UPPERCASE")]` + `#[serde(other)]` derive (a
+correction to the task's original wording, which named
+`Identifier.system` — that field never carried the type vocabulary on
+the way out); additional names reuse a new shared `parse_one_fhir_name`
+helper over every name entry after the first; marital status prefers
+`maritalStatus.text`, falling back to the coding's `code`;
+multiple-birth handles both the boolean and integer choice-element
+forms; managing organization strips the `Organization/` reference
+prefix and parses the remainder as the UUID the internal field actually
+is. New unit tests `round_trip_preserves_previously_dropped_fields` and
+`unrecognised_fhir_identifier_type_code_is_other` (`src/api/fhir/mod.rs`,
+DB-free). `Worker.links` is a real, **unmarked** sixth round-trip gap in
+the same function, left open as a follow-up rather than fixed alongside
+these five. See spec/13-tasks.md T-19.
+
 ### Added — DB-gated round-trip test for the review-queue persistence module (T-18)
 
 `src/db/review_queue.rs` (normalized-pair upsert / list / first-writer-

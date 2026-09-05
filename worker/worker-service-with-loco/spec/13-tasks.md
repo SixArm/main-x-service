@@ -669,27 +669,63 @@ clearly described manual check confirms the acceptance criterion.
     0 failed; `cargo build`/`clippy --all-targets -- -D warnings`
     clean.
 
-- [ ] **T-19 — FHIR Practitioner round-trip fidelity: parse the fields `from_fhir_worker` still drops.**
-  T-12 (done) mounted `/fhir/Practitioner`, but five `TODO`s remain in the
-  FHIR→domain direction (verified: `grep -n TODO src/api/fhir/mod.rs` —
-  lines 301, 409, 420, 421, 423): identifiers always decode to
-  `IdentifierType::Other` regardless of the FHIR `Identifier.system`, and
-  `additional_names`, `marital_status`, `multiple_birth`, and
-  `managing_organization` are silently dropped on `POST`/`PUT
+- [x] **T-19 — FHIR Practitioner round-trip fidelity: parse the fields `from_fhir_worker` still drops.** *(resolved 2026-09-05.)*
+  T-12 (done) mounted `/fhir/Practitioner`, but five `TODO`s remained in the
+  FHIR→domain direction (lines 301, 409, 420, 421, 423): identifiers always
+  decoded to `IdentifierType::Other` regardless of what `to_fhir` encoded,
+  and `additional_names`, `marital_status`, `multiple_birth`, and
+  `managing_organization` were silently dropped on `POST`/`PUT
   /fhir/Practitioner` even though `to_fhir` emits them going out — so a
   client that reads a `Practitioner`, edits an unrelated field, and writes
-  it back loses that data. No open task tracks closing these (T-3's open
-  item is `Bundle` typed-struct promotion + Touchstone validation, a
-  different surface).
-  - [ ] Map `Identifier.system` back to the domain `IdentifierType` enum
+  it back lost that data.
+  - [x] Map the identifier's type back to the domain `IdentifierType` enum
     via its existing serde vocabulary instead of defaulting to `Other`.
-  - [ ] Parse `additional_names`, `marital_status`, `multiple_birth`, and
+    **Correction to this task's original wording:** it named
+    `Identifier.system` as the field to read; that field never carried the
+    type vocabulary on the way out — `to_fhir_identifiers` writes
+    `id.system.clone()` into it verbatim (the identifier's own
+    assigning-authority string) and encodes the type instead as
+    `Identifier.type.coding[0].code` (`id.identifier_type.to_string()`,
+    the UPPERCASE wire token). Reading `system` for the type would have
+    reproduced the exact `Other`-always bug this task closes, just via a
+    different wrong field; `parse_fhir_identifier_type` reads
+    `type.coding[0].code` and deserializes it through `IdentifierType`'s
+    own `#[serde(rename_all = "UPPERCASE")]` + `#[serde(other)]` derive
+    (the "existing serde vocabulary" the task asked for), matching the
+    hand-rolled equivalent `db/repositories.rs::identifiers_from_db`
+    already uses for the same mapping.
+  - [x] Parse `additional_names`, `marital_status`, `multiple_birth`, and
     a `managing_organization` reference back from the resource.
-  - **Acceptance:** a round-trip unit test in `src/api/fhir/mod.rs` —
-    `to_fhir` a `Worker` carrying two-plus `IdentifierType` variants,
-    `additional_names`, `marital_status`, and `multiple_birth`, then
-    `from_fhir_worker` the result, and assert the values survive instead
-    of degrading to `Other`/`None`/`vec![]`; `cargo test --lib` green.
+    `additional_names` reuses a new shared `parse_one_fhir_name` helper
+    (factored out of `parse_fhir_name`) over every FHIR name entry after
+    the first; `marital_status` reads `maritalStatus.text` (falling back
+    to the coding's `code`); `multiple_birth` handles both the
+    `multipleBirthBoolean` and `multipleBirthInteger` choice-element
+    forms (a nonzero birth order still means `true` — the internal model
+    has no slot for the order itself); `managing_organization` strips the
+    `Organization/` prefix from the reference and parses the remainder as
+    a UUID (the internal field's real type — a malformed or hand-edited
+    reference is dropped rather than stored unparsed).
+  - **Acceptance (met).** New unit tests in `src/api/fhir/mod.rs`:
+    `round_trip_preserves_previously_dropped_fields` builds a `Worker`
+    with two distinct `IdentifierType` variants (`NPI`, `TAX`), an
+    additional name, `marital_status`, `multiple_birth`, and a
+    `managing_organization`, round-trips it through `to_fhir_worker` →
+    `from_fhir_worker`, and asserts every one of those five values
+    survives unchanged (not `Other`/`None`/`vec![]`);
+    `unrecognised_fhir_identifier_type_code_is_other` pins the fail-safe
+    — a code FHIR never declared this crate's vocabulary for still
+    degrades to `Other`, not an error or a panic. `cargo test --lib`:
+    316 passed (314 + 2 new), 0 failed, 11 ignored (unchanged — this is
+    a DB-free unit-test task); `cargo fmt --check` and `cargo clippy
+    --all-targets -- -D warnings` both clean.
+  - **Left open, not silently.** `Worker.links` is a *sixth*,
+    **unmarked** round-trip gap in the same function: `to_fhir_worker`
+    emits `fhir_worker.link` from `worker.links`, but `from_fhir_worker`
+    still hard-codes `links: vec![]` — this task's five `TODO`s never
+    named it, and it is out of scope here rather than silently fixed
+    alongside them. Tracked as a follow-up, not a new task item, since
+    no acceptance criterion covers it yet.
 
 - [ ] **T-20 — gRPC surface: close the T-6 documented parity gaps.**
   T-6 (landed 2026-09-02) explicitly documents three REST-vs-gRPC gaps as
