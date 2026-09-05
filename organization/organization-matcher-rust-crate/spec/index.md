@@ -129,6 +129,18 @@ total that is not forced back down to 1.0. The original six components'
 own sum-to-1.0 property (and every score they alone produce) is
 unaffected — see `MatchConfig`'s own rustdoc for the full reasoning.
 
+**Validation (ORGM-T1).** Every field is `pub` and directly settable —
+the plain struct literal is still how the presets and the common case
+build a config — but a caller assembling one from untrusted input
+(e.g. deserialized config) can call the additive, opt-in
+`MatchConfig::validated(self) -> Result<Self>`, which rejects a
+negative, `NaN`, or infinite weight on any of the eight fields, or a
+threshold outside `[0.0, 1.0]`, returning `Error::InvalidConfig` naming
+the first offending field. This exists because such a value reaching
+§17's renormaliser unchecked can push the returned score outside
+`[0.0, 1.0]` or produce `NaN`, breaking the bounded-and-finite
+invariant §24 documents and the `Confidence` banding built on it.
+
 ## 8. Normalisation
 
 `fold` (trim + NFKC + lowercase); `legal_name` (fold + punctuation→space
@@ -272,8 +284,8 @@ async, or panics to library code.
 - [ ] Address: postal-code exact-anchor boost.
 - [ ] Split this single `spec/index.md` into the numbered §-per-file
       layout used by the sibling matcher crates.
-- [ ] **ORGM-T1 (S) Guard `MatchConfig` against caller-supplied
-      negative/NaN weights.** Every field on `MatchConfig` is `pub` and
+- [x] **ORGM-T1 (S) Guard `MatchConfig` against caller-supplied
+      negative/NaN weights.** *(resolved 2026-09-05.)* Every field on `MatchConfig` is `pub` and
       directly settable, and nothing validates them — a caller-built
       config with a negative or `NaN` weight reaches
       `scoring::weighted_average` unchecked, where a negative
@@ -296,6 +308,26 @@ async, or panics to library code.
       returned config is well-formed, and that the fallible constructor
       actually rejects the malformed ones; `cargo clippy --all-targets
       -- -D warnings` stays clean.
+  - **Resolved.** `MatchConfig::validated(self) -> Result<Self>`
+    (reusing the crate's existing `Error`/`Result`, not a new
+    `MatchError` type) checks all eight weights plus the threshold and
+    returns the new `Error::InvalidConfig(String)` variant naming the
+    first offending field; the plain struct literal is untouched, so
+    this is additive. Five new unit tests
+    (`src/config.rs`) pin the accept/reject boundary directly. The
+    acceptance proptest
+    (`validated_config_never_produces_an_unbounded_score`,
+    `tests/property_tests.rs`) generates a 9-value adversarial-or-
+    well-formed vector (8 weights + threshold) via a new
+    `adversarial_weight()` strategy mixing normal `[0.0, 1.0]` floats
+    with `NaN`/`±infinity`/negative values: when `validated()` accepts
+    the resulting config, the engine's score against two arbitrary
+    organizations stays finite and in `[0.0, 1.0]`; when it rejects,
+    the test asserts at least one component actually was malformed
+    (`validated` never rejects a genuinely well-formed config).
+    Documented in spec §7. Verified: `cargo test` (lib + property_tests
+    + public_api + doctests) all green, 0 failed; `cargo clippy
+    --all-targets -- -D warnings` clean.
 
 - [ ] **ORGM-T2 (S) Fuzz coverage for the `relationships`/`tags`
       components.** These two components (PRO-H7, already `[x]` above)

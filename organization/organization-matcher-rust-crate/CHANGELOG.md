@@ -10,6 +10,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — `MatchConfig::validated` guards against adversarial weights (ORGM-T1)
+
+Every `MatchConfig` field is `pub` and directly settable, and nothing
+validated them — a negative, `NaN`, or infinite weight (or an
+out-of-range threshold) reached `scoring::weighted_average` unchecked,
+where it could push a returned score outside `[0.0, 1.0]` or produce
+`NaN`. Added the additive, opt-in `MatchConfig::validated(self) ->
+Result<Self>`, rejecting a malformed weight or threshold with the new
+`Error::InvalidConfig` variant; the plain struct literal is unchanged
+for the common case. A new proptest generates adversarial-or-well-formed
+weight vectors and confirms `validated`'s accept/reject boundary holds
+and that an accepted config never produces an unbounded or NaN score.
+
 ## [0.2.0] - 2026-08-28
 
 ### Added — relationships and tags implemented in code (PRO-H7)
