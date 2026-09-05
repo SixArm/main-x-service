@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — root sign-in gate (CRM-T26)
+
+No `+layout.server.ts` existed anywhere under `src/routes`, so a
+visitor with no session reached every page — the deal board, ticket
+queue, executive dashboard, all of them — and only discovered they
+were signed out once an API call silently failed through the BFF
+proxy. Ported workforce-planning-management-front-end's identical
+WPM-T38 fix (same underlying architecture): new root
+`src/routes/+layout.server.ts` redirects to `/signin` (303) when
+`locals.sessionId` is `null`, excluding `/signin`/`/verify`. `tests/e2e/smoke.spec.ts`
+gained a `signIn()` helper (injects a fake `__Host-mxi_session` cookie
+via Playwright) and a `"sign-in gate (CRM-T26)"` describe; all 12
+pre-existing tests moved under a `"signed-in smoke coverage"` describe
+whose `beforeEach` now signs in first, verified green (15 Playwright +
+5 vitest tests pass). See `../spec/tasks.md` CRM-T26.
+
 ### Added — engagement + partners areas (CRM-T20, 2026-07-20)
 
 - `/engagement` (cadence aging, workload with recorded sentiment,
