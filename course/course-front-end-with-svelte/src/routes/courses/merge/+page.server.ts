@@ -6,6 +6,10 @@
 import type { PageServerLoad } from "./$types";
 import { requireSignedIn } from "$lib/server/session";
 
+// `page.data.title` convention (see `../../+layout.svelte`): mirrors
+// this route's own <svelte:head><title> so SharePicker gets the right
+// title without reading the DOM.
 export const load: PageServerLoad = ({ locals }) => {
   requireSignedIn(locals);
+  return { title: "Merge courses · Course Service" };
 };

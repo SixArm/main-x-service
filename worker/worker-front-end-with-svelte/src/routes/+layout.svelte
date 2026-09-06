@@ -1,6 +1,6 @@
 <!--
   Root layout — the app shell wrapping every route: a sidebar (brand, nav,
-  theme picker, locale picker) plus a <main> that renders the active page.
+  theme/share/text-size pickers) plus a <main> that renders the active page.
 
   $props:
     - children: Snippet — the active route's rendered content.
@@ -8,9 +8,9 @@
   Notable bits:
     - Imports global CSS once here.
     - `page` (from $app/state) is read to set aria-current on the active
-      nav link.
-    - THEMES feeds the Lily theme picker; the locale picker sources its
-      list from the i18n store (i18n.locales) so it can never drift.
+      nav link, and `page.data.title` feeds SharePicker (see `pageTitle`
+      below).
+    - THEMES feeds the Lily theme picker.
 -->
 <script lang="ts">
     import "../app.css";
@@ -120,9 +120,13 @@
             "United Kingdom National Health Service Wales for Practitioners",
     };
 
-    import { LocalePicker } from "lily-design-system-svelte-locale-picker";
+    import {
+        SharePicker,
+        type ShareTarget,
+    } from "lily-design-system-svelte-share-picker";
+    import { TextSizePicker } from "lily-design-system-svelte-text-size-picker";
     import { enhance } from "$app/forms";
-    import { i18n, LOCALE_LABELS, isRtl, t } from "$lib/i18n.svelte.js";
+    import { i18n, isRtl, t } from "$lib/i18n.svelte.js";
     import { browser } from "$app/environment";
     import type { LayoutData } from "./$types";
 
@@ -130,7 +134,50 @@
     // file: dependency to use Lily's accessibility-primitive Button:
     // import Button from "lily-design-system-svelte-headless/src/lib/components/Button/Button.svelte";
 
-    const LOCALES = [...i18n.locales];
+    // Text sizes offered by the Lily TextSizePicker. Applied as
+    // `data-text-size` on <html> (attribute-based, mirroring ThemePicker's
+    // `data-theme`); see app.css for the corresponding font-size scale.
+    const SIZES = ["small", "medium", "large", "x-large"];
+    const SIZE_LABELS: Record<string, string> = {
+        small: "Small",
+        medium: "Medium",
+        large: "Large",
+        "x-large": "Extra large",
+    };
+
+    // Share destinations for the Lily SharePicker. Lily ships no
+    // third-party URLs — each `href` builder is ours. `url`/`title` are
+    // supplied by SharePicker at share time (current page URL; the leaf
+    // page's title, sourced from `page.data.title` below — the
+    // `page.data.title` convention, set per-route by each route's load
+    // function so it stays in sync with that page's own <svelte:head>
+    // <title> without SharePicker having to read the DOM).
+    const SHARE_TARGETS: ShareTarget[] = [
+        {
+            id: "linkedin",
+            label: "LinkedIn",
+            href: (url) =>
+                `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+        },
+        {
+            id: "mastodon",
+            label: "Mastodon",
+            href: (url, title) =>
+                `https://mastodon.social/share?text=${encodeURIComponent(`${title} ${url}`)}`,
+        },
+        {
+            id: "bluesky",
+            label: "Bluesky",
+            href: (url, title) =>
+                `https://bsky.app/intent/compose?text=${encodeURIComponent(`${title} ${url}`)}`,
+        },
+        {
+            id: "reddit",
+            label: "Reddit",
+            href: (url, title) =>
+                `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
+        },
+    ];
 
     // `data.signedIn` is resolved server-side from the httpOnly session
     // cookie (`+layout.server.ts`).
@@ -139,6 +186,14 @@
     // Whether a session is present (server-resolved); drives the chrome's
     // sign-in / sign-out affordance.
     const signedIn = $derived(data.signedIn);
+
+    // The `page.data.title` convention: each route's own load function
+    // (`+page.ts`/`+page.server.ts`) returns a plain `title` string that
+    // mirrors what that route's `<svelte:head><title>` renders, so the
+    // layout — which does not know which leaf page is active — can read
+    // it here for SharePicker without scraping `document.title`. Falls
+    // back to the brand name for the rare route that sets none.
+    const pageTitle = $derived(page.data?.title ?? t("brand.name"));
 
     // Hamburger toggle state for the top navigation bar (narrow viewports).
     let menuOpen = $state(false);
@@ -205,13 +260,20 @@
                     themeLabels={THEME_LABELS}
                     storageKey="lily-theme"
                 />
-                <LocalePicker
-                    label={t("chrome.language")}
-                    locales={LOCALES}
-                    localeLabels={LOCALE_LABELS}
-                    value={i18n.locale}
-                    applyDir={false}
-                    onChange={(code) => i18n.set(code)}
+                <TextSizePicker
+                    label={t("chrome.text_size")}
+                    sizes={SIZES}
+                    sizeLabels={SIZE_LABELS}
+                    defaultValue="medium"
+                    storageKey="lily-text-size"
+                />
+                <SharePicker
+                    label={t("chrome.share")}
+                    title={pageTitle}
+                    targets={SHARE_TARGETS}
+                    copyLabel={t("share.copy_link")}
+                    copiedLabel={t("share.copied")}
+                    copyFailedLabel={t("share.copy_failed")}
                 />
             </div>
             <section class="session" aria-label="Session">
@@ -339,7 +401,8 @@
         gap: 0.75rem;
     }
     .chrome :global(.theme-picker-button),
-    .chrome :global(.locale-picker-button) {
+    .chrome :global(.text-size-picker-button),
+    .chrome :global(.share-picker-button) {
         padding: 0.375rem 0.5rem;
         font-size: 0.875rem;
         color: var(--mxi-color-fg);

@@ -15,7 +15,12 @@ export async function load({ fetch, params }) {
             { nhsNumber: move.nhsNumber },
             { fetch },
         );
-        return { move, folders: siblings.items };
+        // `page.data.title` convention (see `../../+layout.svelte`).
+        return {
+            move,
+            folders: siblings.items,
+            title: `${move.folderTitle} move · Case Tracking`,
+        };
     } catch (e) {
         if (e instanceof ApiError && e.status === 404)
             error(404, 'Move event not found');

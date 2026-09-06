@@ -13,7 +13,8 @@ export async function load({ fetch, url }) {
     try {
         const list = await api.folders.list({ q }, { fetch });
         cache.setFolders(list.items);
-        return { query: q };
+        // `page.data.title` convention (see `../+layout.svelte`).
+        return { query: q, title: 'Folders · Case Tracking' };
     } catch (e) {
         error(503, (e as Error).message);
     }

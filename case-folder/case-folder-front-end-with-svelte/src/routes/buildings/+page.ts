@@ -12,7 +12,8 @@ export async function load({ fetch }) {
         const places = await api.places.list({}, { fetch });
         cache.setBuildings(places.buildings);
         cache.setRooms(places.rooms);
-        return {};
+        // `page.data.title` convention (see `../+layout.svelte`).
+        return { title: 'Buildings · Case Tracking' };
     } catch (e) {
         error(503, (e as Error).message);
     }

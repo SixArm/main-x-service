@@ -13,7 +13,8 @@ export async function load({ fetch }) {
         cache.setBuildings(places.buildings);
         cache.setRooms(places.rooms);
         cache.setCabinets(places.cabinets);
-        return {};
+        // `page.data.title` convention (see `../+layout.svelte`).
+        return { title: 'Cabinets · Case Tracking' };
     } catch (e) {
         error(503, (e as Error).message);
     }

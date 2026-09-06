@@ -12,10 +12,12 @@ export async function load({ fetch, params }) {
             api.places.show(params.id, { fetch }),
             api.places.history(params.id, { fetch }),
         ]);
+        // `page.data.title` convention (see `../../+layout.svelte`).
         return {
             place: show.place,
             folders: show.folders,
             presences: history.presences,
+            title: `${show.place.name} · Case Tracking`,
         };
     } catch (e) {
         if (e instanceof ApiError && e.status === 404)

@@ -25,7 +25,12 @@ export async function load({ fetch, params }) {
         const candidates = patientFolders.items.filter(
             (f) => f.volumeId !== detail.volume.id,
         );
-        return { detail, candidates };
+        // `page.data.title` convention (see `../../+layout.svelte`).
+        return {
+            detail,
+            candidates,
+            title: `${detail.volume.title} · Case Tracking`,
+        };
     } catch (e) {
         if (e instanceof ApiError && e.status === 404)
             error(404, 'Volume not found');

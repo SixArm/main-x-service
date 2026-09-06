@@ -10,7 +10,19 @@ import { browser } from "$app/environment";
 
 /** Locales the UI is translated into. */
 export const LOCALES = [
-  "en", "cy", "es", "fr", "de", "ar", "ru", "hi", "zh", "bn", "pt", "id", "ur",
+  "en",
+  "cy",
+  "es",
+  "fr",
+  "de",
+  "ar",
+  "ru",
+  "hi",
+  "zh",
+  "bn",
+  "pt",
+  "id",
+  "ur",
 ] as const;
 
 /** A supported locale code (one of {@link LOCALES}). */
@@ -21,9 +33,19 @@ export const DEFAULT_LOCALE: Locale = "en";
 
 /** Human-readable name for the locale switcher, written in that locale. */
 export const LOCALE_LABELS: Record<Locale, string> = {
-  en: "English", cy: "Cymraeg", es: "Español", fr: "Français", de: "Deutsch",
-  ar: "العربية", ru: "Русский", hi: "हिन्दी", zh: "中文", bn: "বাংলা",
-  pt: "Português", id: "Bahasa Indonesia", ur: "اردو",
+  en: "English",
+  cy: "Cymraeg",
+  es: "Español",
+  fr: "Français",
+  de: "Deutsch",
+  ar: "العربية",
+  ru: "Русский",
+  hi: "हिन्दी",
+  zh: "中文",
+  bn: "বাংলা",
+  pt: "Português",
+  id: "Bahasa Indonesia",
+  ur: "اردو",
 };
 
 /** Right-to-left locales; the layout mirrors `<html dir>`. */
@@ -32,7 +54,9 @@ export const RTL_LOCALES = ["ar", "ur"] as const satisfies readonly Locale[];
 /** Whether `locale` is written right-to-left. */
 export function isRtl(locale: string): boolean {
   const primary = normaliseLocale(locale);
-  return primary !== null && (RTL_LOCALES as readonly string[]).includes(primary);
+  return (
+    primary !== null && (RTL_LOCALES as readonly string[]).includes(primary)
+  );
 }
 
 /** localStorage key under which the chosen UI locale persists. */
@@ -61,6 +85,11 @@ const STRINGS = {
     "nav.articles": "Knowledge base",
     "nav.signin": "Sign in",
     "chrome.language": "Language",
+    "nav.share": "Share",
+    "nav.text_size": "Text size",
+    "share.copy_link": "Copy link",
+    "share.copied": "Link copied",
+    "share.copy_failed": "Could not copy — copy it from the address bar",
     "common.loading": "Loading…",
     "common.error": "Failed to load",
     "common.status": "Status",
@@ -120,6 +149,11 @@ const STRINGS = {
     "nav.articles": "Sylfaen wybodaeth",
     "nav.signin": "Mewngofnodi",
     "chrome.language": "Iaith",
+    "nav.share": "Rhannu",
+    "nav.text_size": "Maint testun",
+    "share.copy_link": "Copïo dolen",
+    "share.copied": "Dolen wedi'i chopïo",
+    "share.copy_failed": "Methu copïo — copïwch o'r bar cyfeiriad",
     "common.loading": "Wrthi'n llwytho…",
     "common.error": "Methwyd llwytho",
     "common.status": "Statws",
@@ -179,6 +213,12 @@ const STRINGS = {
     "nav.articles": "Base de conocimiento",
     "nav.signin": "Iniciar sesión",
     "chrome.language": "Idioma",
+    "nav.share": "Compartir",
+    "nav.text_size": "Tamaño del texto",
+    "share.copy_link": "Copiar enlace",
+    "share.copied": "Enlace copiado",
+    "share.copy_failed":
+      "No se pudo copiar — cópielo desde la barra de direcciones",
     "common.loading": "Cargando…",
     "common.error": "Error al cargar",
     "common.status": "Estado",
@@ -238,6 +278,12 @@ const STRINGS = {
     "nav.articles": "Base de connaissances",
     "nav.signin": "Se connecter",
     "chrome.language": "Langue",
+    "nav.share": "Partager",
+    "nav.text_size": "Taille du texte",
+    "share.copy_link": "Copier le lien",
+    "share.copied": "Lien copié",
+    "share.copy_failed":
+      "Impossible de copier — copiez-le depuis la barre d'adresse",
     "common.loading": "Chargement…",
     "common.error": "Échec du chargement",
     "common.status": "Statut",
@@ -257,7 +303,8 @@ const STRINGS = {
     "contact.withdraw": "Retirer",
     "contact.subjectAccess": "Télécharger mes données",
     "contact.erase": "Effacer (anonymiser)",
-    "contact.eraseConfirm": "Effacer ce contact ? Cette action est irréversible.",
+    "contact.eraseConfirm":
+      "Effacer ce contact ? Cette action est irréversible.",
     "lead.score": "Score",
     "lead.breakdown": "Détail du score",
     "lead.source": "Source",
@@ -297,6 +344,12 @@ const STRINGS = {
     "nav.articles": "Wissensdatenbank",
     "nav.signin": "Anmelden",
     "chrome.language": "Sprache",
+    "nav.share": "Teilen",
+    "nav.text_size": "Textgröße",
+    "share.copy_link": "Link kopieren",
+    "share.copied": "Link kopiert",
+    "share.copy_failed":
+      "Kopieren fehlgeschlagen — bitte aus der Adressleiste kopieren",
     "common.loading": "Wird geladen…",
     "common.error": "Laden fehlgeschlagen",
     "common.status": "Status",
@@ -316,7 +369,8 @@ const STRINGS = {
     "contact.withdraw": "Widerrufen",
     "contact.subjectAccess": "Meine Daten herunterladen",
     "contact.erase": "Löschen (anonymisieren)",
-    "contact.eraseConfirm": "Diesen Kontakt löschen? Dies kann nicht rückgängig gemacht werden.",
+    "contact.eraseConfirm":
+      "Diesen Kontakt löschen? Dies kann nicht rückgängig gemacht werden.",
     "lead.score": "Score",
     "lead.breakdown": "Score-Aufschlüsselung",
     "lead.source": "Quelle",
@@ -356,6 +410,11 @@ const STRINGS = {
     "nav.articles": "قاعدة المعرفة",
     "nav.signin": "تسجيل الدخول",
     "chrome.language": "اللغة",
+    "nav.share": "مشاركة",
+    "nav.text_size": "حجم النص",
+    "share.copy_link": "نسخ الرابط",
+    "share.copied": "تم نسخ الرابط",
+    "share.copy_failed": "تعذر النسخ — انسخه من شريط العنوان",
     "common.loading": "جارٍ التحميل…",
     "common.error": "فشل التحميل",
     "common.status": "الحالة",
@@ -375,7 +434,8 @@ const STRINGS = {
     "contact.withdraw": "سحب",
     "contact.subjectAccess": "تنزيل بياناتي",
     "contact.erase": "محو (إخفاء الهوية)",
-    "contact.eraseConfirm": "هل تريد محو جهة الاتصال هذه؟ لا يمكن التراجع عن هذا.",
+    "contact.eraseConfirm":
+      "هل تريد محو جهة الاتصال هذه؟ لا يمكن التراجع عن هذا.",
     "lead.score": "النقاط",
     "lead.breakdown": "تفصيل النقاط",
     "lead.source": "المصدر",
@@ -415,6 +475,12 @@ const STRINGS = {
     "nav.articles": "База знаний",
     "nav.signin": "Войти",
     "chrome.language": "Язык",
+    "nav.share": "Поделиться",
+    "nav.text_size": "Размер текста",
+    "share.copy_link": "Копировать ссылку",
+    "share.copied": "Ссылка скопирована",
+    "share.copy_failed":
+      "Не удалось скопировать — скопируйте из адресной строки",
     "common.loading": "Загрузка…",
     "common.error": "Не удалось загрузить",
     "common.status": "Статус",
@@ -434,7 +500,8 @@ const STRINGS = {
     "contact.withdraw": "Отозвать",
     "contact.subjectAccess": "Скачать мои данные",
     "contact.erase": "Удалить (обезличить)",
-    "contact.eraseConfirm": "Удалить этот контакт? Это действие нельзя отменить.",
+    "contact.eraseConfirm":
+      "Удалить этот контакт? Это действие нельзя отменить.",
     "lead.score": "Оценка",
     "lead.breakdown": "Разбор оценки",
     "lead.source": "Источник",
@@ -474,6 +541,11 @@ const STRINGS = {
     "nav.articles": "ज्ञान आधार",
     "nav.signin": "साइन इन",
     "chrome.language": "भाषा",
+    "nav.share": "साझा करें",
+    "nav.text_size": "टेक्स्ट का आकार",
+    "share.copy_link": "लिंक कॉपी करें",
+    "share.copied": "लिंक कॉपी हो गया",
+    "share.copy_failed": "कॉपी नहीं हो सका — इसे एड्रेस बार से कॉपी करें",
     "common.loading": "लोड हो रहा है…",
     "common.error": "लोड विफल",
     "common.status": "स्थिति",
@@ -493,7 +565,8 @@ const STRINGS = {
     "contact.withdraw": "वापस लें",
     "contact.subjectAccess": "मेरा डेटा डाउनलोड करें",
     "contact.erase": "मिटाएँ (गुमनाम करें)",
-    "contact.eraseConfirm": "इस संपर्क को मिटाएँ? इसे पूर्ववत नहीं किया जा सकता।",
+    "contact.eraseConfirm":
+      "इस संपर्क को मिटाएँ? इसे पूर्ववत नहीं किया जा सकता।",
     "lead.score": "स्कोर",
     "lead.breakdown": "स्कोर विवरण",
     "lead.source": "स्रोत",
@@ -533,6 +606,11 @@ const STRINGS = {
     "nav.articles": "知识库",
     "nav.signin": "登录",
     "chrome.language": "语言",
+    "nav.share": "分享",
+    "nav.text_size": "文字大小",
+    "share.copy_link": "复制链接",
+    "share.copied": "链接已复制",
+    "share.copy_failed": "无法复制 — 请从地址栏复制",
     "common.loading": "加载中…",
     "common.error": "加载失败",
     "common.status": "状态",
@@ -592,6 +670,11 @@ const STRINGS = {
     "nav.articles": "জ্ঞানভান্ডার",
     "nav.signin": "সাইন ইন",
     "chrome.language": "ভাষা",
+    "nav.share": "শেয়ার করুন",
+    "nav.text_size": "টেক্সটের আকার",
+    "share.copy_link": "লিঙ্ক কপি করুন",
+    "share.copied": "লিঙ্ক কপি হয়েছে",
+    "share.copy_failed": "কপি করা যায়নি — ঠিকানা বার থেকে কপি করুন",
     "common.loading": "লোড হচ্ছে…",
     "common.error": "লোড ব্যর্থ",
     "common.status": "অবস্থা",
@@ -611,7 +694,8 @@ const STRINGS = {
     "contact.withdraw": "প্রত্যাহার",
     "contact.subjectAccess": "আমার ডেটা ডাউনলোড করুন",
     "contact.erase": "মুছুন (বেনামী করুন)",
-    "contact.eraseConfirm": "এই পরিচিতিটি মুছবেন? এটি পূর্বাবস্থায় ফেরানো যাবে না।",
+    "contact.eraseConfirm":
+      "এই পরিচিতিটি মুছবেন? এটি পূর্বাবস্থায় ফেরানো যাবে না।",
     "lead.score": "স্কোর",
     "lead.breakdown": "স্কোর বিশ্লেষণ",
     "lead.source": "উৎস",
@@ -651,6 +735,12 @@ const STRINGS = {
     "nav.articles": "Base de conhecimento",
     "nav.signin": "Entrar",
     "chrome.language": "Idioma",
+    "nav.share": "Partilhar",
+    "nav.text_size": "Tamanho do texto",
+    "share.copy_link": "Copiar link",
+    "share.copied": "Link copiado",
+    "share.copy_failed":
+      "Não foi possível copiar — copie a partir da barra de endereço",
     "common.loading": "Carregando…",
     "common.error": "Falha ao carregar",
     "common.status": "Status",
@@ -710,6 +800,11 @@ const STRINGS = {
     "nav.articles": "Basis pengetahuan",
     "nav.signin": "Masuk",
     "chrome.language": "Bahasa",
+    "nav.share": "Bagikan",
+    "nav.text_size": "Ukuran teks",
+    "share.copy_link": "Salin tautan",
+    "share.copied": "Tautan disalin",
+    "share.copy_failed": "Tidak dapat menyalin — salin dari bilah alamat",
     "common.loading": "Memuat…",
     "common.error": "Gagal memuat",
     "common.status": "Status",
@@ -729,7 +824,8 @@ const STRINGS = {
     "contact.withdraw": "Tarik",
     "contact.subjectAccess": "Unduh data saya",
     "contact.erase": "Hapus (anonimkan)",
-    "contact.eraseConfirm": "Hapus kontak ini? Tindakan ini tidak dapat dibatalkan.",
+    "contact.eraseConfirm":
+      "Hapus kontak ini? Tindakan ini tidak dapat dibatalkan.",
     "lead.score": "Skor",
     "lead.breakdown": "Rincian skor",
     "lead.source": "Sumber",
@@ -769,6 +865,11 @@ const STRINGS = {
     "nav.articles": "علمی ذخیرہ",
     "nav.signin": "سائن ان",
     "chrome.language": "زبان",
+    "nav.share": "شیئر کریں",
+    "nav.text_size": "متن کا سائز",
+    "share.copy_link": "لنک کاپی کریں",
+    "share.copied": "لنک کاپی ہو گیا",
+    "share.copy_failed": "کاپی نہیں ہو سکا — اسے ایڈریس بار سے کاپی کریں",
     "common.loading": "لوڈ ہو رہا ہے…",
     "common.error": "لوڈ ناکام",
     "common.status": "حیثیت",
@@ -816,13 +917,18 @@ export type StringKey = keyof (typeof STRINGS)["en"];
 export const STRING_KEYS = Object.keys(STRINGS.en) as StringKey[];
 
 /** Raw per-locale strings table, exposed for coverage testing. */
-export const STRINGS_BY_LOCALE: Record<Locale, Record<string, string>> = STRINGS;
+export const STRINGS_BY_LOCALE: Record<
+  Locale,
+  Record<string, string>
+> = STRINGS;
 
 // Normalise raw input to a supported locale, or null if unsupported.
 function normaliseLocale(raw: string | null | undefined): Locale | null {
   if (!raw) return null;
   const primary = raw.trim().split(/[-_]/)[0]?.toLowerCase() ?? "";
-  return (LOCALES as readonly string[]).includes(primary) ? (primary as Locale) : null;
+  return (LOCALES as readonly string[]).includes(primary)
+    ? (primary as Locale)
+    : null;
 }
 
 // Seed the reactive locale from localStorage (default off the browser).

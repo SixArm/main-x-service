@@ -21,8 +21,20 @@ declare global {
     interface Locals {
       sessionId: string | null;
     }
-    /** Shared page load data (unused — no load functions). */
-    interface PageData {}
+    /**
+     * Shared page load data. `title` follows the `page.data.title`
+     * convention (see `routes/+layout.svelte`): every route's own load
+     * function returns a plain `title` string mirroring what that
+     * route's `<svelte:head><title>` renders, so the layout — which
+     * does not know which leaf page is active — can read it for
+     * SharePicker without scraping `document.title`. Optional because
+     * a route may not set one (falls back to the brand name) and
+     * because SvelteKit's own internal error/data states don't carry
+     * it either.
+     */
+    interface PageData {
+      title?: string;
+    }
     /** Ephemeral page state for shallow routing (unused). */
     interface PageState {}
     /** Adapter platform context (unused). */

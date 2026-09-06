@@ -85,7 +85,6 @@ export interface Page<T> {
   offset: number;
 }
 
-
 /**
  * Lean fetch wrapper for the Case Service's raw-JSON (no envelope) API.
  * Resolves to the parsed response body, or throws {@link ApiError} on any
