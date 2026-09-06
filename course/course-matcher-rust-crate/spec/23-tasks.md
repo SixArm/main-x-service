@@ -15,6 +15,9 @@
       [`course-service-with-loco/benches/matching_bench.rs`](../../course-service-with-loco/benches/matching_bench.rs)
       cover `match_courses` on a populated pair, the deterministic
       short-circuit path, and `find_matches` ranking 100 candidates.
+      This crate also carries its own Criterion bench,
+      [`benches/match_pair.rs`](../benches/match_pair.rs) (added in
+      `[0.7.0]`, T-15) — see §24 for how the two relate.
 - [x] T-9: `IdentifierScheme` doc comment per-variant — every variant
       now carries a one-line example + a deterministic-vs-provider-
       scoped tag in [`src/course.rs`](../src/course.rs).
@@ -112,21 +115,19 @@
         clippy's `many_single_char_names` threshold. `cargo test
         --lib`: 95 passed (up from 92), 0 failed; `cargo build`/
         `clippy --all-targets -- -D warnings` clean.
-- [ ] T-15: Reconcile `spec/24-testing-strategy.md` and this file's
+- [x] T-15: Reconcile `spec/24-testing-strategy.md` and this file's
       T-8 entry with the crate-local Criterion bench added in
-      `[0.7.0]`. Update §24's "Benchmarks live at
-      `course-service-with-loco/benches/matching_bench.rs`" line to
-      also name this crate's own `benches/match_pair.rs` (four groups:
-      single-pair scoring, deterministic short-circuits, `rank`
-      throughput at N=10/100/1000, per-preset cost), and add a
-      cross-reference note on T-8 pointing at this crate's bench so a
-      reader of this file isn't left thinking benches exist only
-      service-side. *(verified: `CHANGELOG.md` `[0.7.0]` "Added —
-      Criterion benchmarks" entry describes `benches/match_pair.rs`,
-      which exists at `benches/match_pair.rs`;
-      `spec/24-testing-strategy.md` and T-8's body still describe only
-      the service-side bench.)*
-      - **Acceptance:** §24 and the T-8 note above both name
+      `[0.7.0]`. *(Resolved.)* §24's "Benchmarks live at" line now
+      names this crate's own `benches/match_pair.rs` (confirmed: four
+      groups — single-pair scoring, deterministic short-circuits,
+      `rank` throughput at N=10/100/1000, per-preset cost) alongside
+      the service-side bench, with a note on how the two relate; T-8
+      above cross-references it. *(verified: `CHANGELOG.md` `[0.7.0]`
+      "Added — Criterion benchmarks" entry describes
+      `benches/match_pair.rs`, which exists at `benches/match_pair.rs`;
+      `spec/24-testing-strategy.md` and T-8's body previously described
+      only the service-side bench.)*
+      - **Acceptance (met):** §24 and the T-8 note above both name
         `benches/match_pair.rs` alongside the service-side bench; no
         code change required.
 
