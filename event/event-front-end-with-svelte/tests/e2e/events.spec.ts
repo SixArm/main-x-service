@@ -56,6 +56,84 @@ test.describe("Event front-end smoke", () => {
         await expect(page.getByLabel(/Duplicate event ID/)).toBeVisible();
     });
 
+    // Pins T-27: the calendar renders both a timed event and an all-day
+    // event, and selecting one navigates to its detail page. The all-day
+    // case is not incidental — `end_date` equal to `start_date` (the
+    // common shape for a same-day all-day event) previously made the
+    // event silently invisible: `@svar-ui/calendar-store` requires an
+    // all-day event's `end` to be strictly after `start`, and the page
+    // was passing `end_date` straight through with no exclusive-end
+    // adjustment. See the fix in `src/routes/calendar/+page.svelte`.
+    test("calendar renders a timed and an all-day event, and navigates on select", async ({
+        page,
+    }) => {
+        const timedId = "0c4f1e2a-0000-4000-8000-00000000000f";
+        const allDayId = "0c4f1e2a-0000-4000-8000-000000000010";
+        const today = new Date();
+        const dayInThisMonth = new Date(today.getFullYear(), today.getMonth(), 12)
+            .toISOString()
+            .slice(0, 10);
+        await page.route("**/api/events/search**", async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({
+                    success: true,
+                    data: [
+                        {
+                            id: timedId,
+                            name: "Board Meeting",
+                            start_date: `${dayInThisMonth}T09:00:00Z`,
+                            end_date: `${dayInThisMonth}T10:00:00Z`,
+                            event_status: "scheduled",
+                            event_type: "meeting",
+                        },
+                        {
+                            id: allDayId,
+                            name: "Site Closure",
+                            // start == end is the shape that used to be
+                            // filtered out entirely (a same-day all-day
+                            // event, the common case).
+                            start_date: `${dayInThisMonth}T00:00:00Z`,
+                            end_date: `${dayInThisMonth}T00:00:00Z`,
+                            all_day: true,
+                            event_status: "scheduled",
+                            event_type: "holiday",
+                        },
+                    ],
+                    error: null,
+                }),
+            });
+        });
+        await page.route(`**/api/events/${allDayId}`, async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({
+                    success: true,
+                    data: {
+                        id: allDayId,
+                        name: "Site Closure",
+                        start_date: `${dayInThisMonth}T00:00:00Z`,
+                        all_day: true,
+                        event_status: "scheduled",
+                        event_type: "holiday",
+                    },
+                    error: null,
+                }),
+            });
+        });
+
+        await page.goto("/calendar");
+        const calendar = page.getByTestId("event-calendar");
+        await expect(calendar).toBeVisible();
+        await expect(calendar.getByText("Board Meeting", { exact: false })).toBeVisible();
+        await expect(calendar.getByText("Site Closure", { exact: false })).toBeVisible();
+
+        await calendar.getByText("Site Closure", { exact: false }).click();
+        await expect(page).toHaveURL(`/events/${allDayId}`);
+    });
+
     // Pins FR-5: the detail page renders the event identity once loaded.
     // The Event Service GET is stubbed at the browser boundary so the smoke
     // suite needs no backing service.

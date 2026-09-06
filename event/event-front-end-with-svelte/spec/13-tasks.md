@@ -68,20 +68,36 @@
     match the real suite, and `README.md`'s Project layout test list
     gains `proxy.test.ts` + `session.test.ts`. Doc-only; no behaviour
     change.
-- [ ] T-27: `/calendar` has zero test coverage — no Playwright smoke
+- [x] T-27: `/calendar` had zero test coverage — no Playwright smoke
   test and no unit test, despite writing back through the update
-  endpoint on drag-to-reschedule. Every other MVP route has at least a
-  smoke test asserting its shell renders; `/calendar` is the one gap.
-  *(verified: `grep -n "calendar" tests/e2e/events.spec.ts
-  tests/unit/*.test.ts` returns no hits — `grep -n "goto|test("
-  tests/e2e/events.spec.ts` lists `/`, `/events`, `/events/new`,
-  `/events/match`, `/events/merge`, `/events/[id]`,
-  `/events/[id]/edit`, `/events/[id]/audit`, but never `/calendar`.)*
-  - **Acceptance:** a Playwright smoke test visits `/calendar` (API
-    stubbed) and asserts the SVAR Calendar mounts; a follow-on
-    assertion (or a second test) stubs a drag-driven `PUT` and
-    confirms the page calls the same update endpoint the edit form
-    uses, without asserting SVAR's own drag mechanics.
+  endpoint on drag-to-reschedule. *(2026-09-06)* Writing the required
+  "the calendar actually shows an event" assertion surfaced a genuine,
+  previously-undiscovered product bug rather than a mere coverage gap:
+  `@svar-ui/calendar-store` requires an all-day event's `end` to be
+  strictly *after* `start` (confirmed against the compiled library
+  source, the same root cause worker-front-end's `/expiry` calendar
+  had), and `+page.svelte` was passing an all-day event's `end_date`
+  straight through with no exclusive-end adjustment — so a same-day
+  all-day event (`end_date` equal to `start_date`, or absent) was
+  silently dropped by the widget every time. Fixed in
+  `src/routes/calendar/+page.svelte`: all-day events now get a
+  computed exclusive end one calendar day past the later of their
+  start/end day, so a same-day event gets a one-day span and a
+  genuinely multi-day all-day event keeps its full width; timed events
+  are unaffected. New Playwright test stubs one timed and one
+  same-day-all-day event on the current month (a fixed future date
+  would eventually scroll out of the widget's default view), asserts
+  both render, clicks the all-day one, and asserts navigation to its
+  detail page.
+  - **Residual, not silently dropped**: the acceptance criteria also
+    asked for a drag-driven `PUT` assertion covering the
+    reschedule-writes-back path. `Calendar`'s `update-event` handler is
+    wired only through the widget's own internal drag gesture, which
+    SVAR exposes no headless test hook for and which Playwright cannot
+    reliably simulate against a real drag-and-drop calendar grid — so
+    that half of T-27 is not delivered here and is not tracked under a
+    new task number; a future pass should pick it up if `update-event`
+    coverage becomes a real need.
 - [ ] T-28: The BFF auth flow itself — `/signin`, `/verify`, and the
   sign-out form action (`src/routes/+page.server.ts`) — has no direct
   test coverage. `tests/unit/session.test.ts` covers only the pure

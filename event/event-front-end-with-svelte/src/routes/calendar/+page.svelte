@@ -33,16 +33,50 @@
     onMount(load);
 
     // Map domain events to SVAR calendar events. An event with no end
-    // date renders as a one-hour slot; all-day events pass the flag
-    // through.
+    // date renders as a one-hour slot.
+    //
+    // All-day events need their own end-date rule: `@svar-ui/calendar-store`
+    // requires an all-day event's `end` to be strictly *after* `start`
+    // (`!(e.end > start)` silently drops the event — confirmed against the
+    // compiled library source). `all_day` is an independent bool on the
+    // domain model (agents/models.md), not a promise that `end_date` is a
+    // day past `start_date` — a same-day all-day event routinely arrives
+    // with `end_date` equal to `start_date`, or absent entirely, and both
+    // were being passed straight through, so this calendar has never shown
+    // a single-day all-day event (the same bug class worker-front-end's
+    // `/expiry` calendar had — WEB-6-adjacent). The fix computes the
+    // exclusive end as one calendar day past the *later* of `start_date`'s
+    // and `end_date`'s day, so a same-day event gets a one-day span and a
+    // genuinely multi-day all-day event keeps its full width.
+    function startOfDay(d: Date): Date {
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+
     const calendarEvents = $derived(
         domainEvents
             .filter((e) => e.id && e.start_date)
             .map((e) => {
                 const start = new Date(e.start_date);
-                const end = e.end_date
-                    ? new Date(e.end_date)
-                    : new Date(start.getTime() + 60 * 60 * 1000);
+                let end: Date;
+                if (e.all_day) {
+                    const startDay = startOfDay(start);
+                    const endDay = e.end_date
+                        ? startOfDay(new Date(e.end_date))
+                        : startDay;
+                    const lastDay =
+                        endDay.getTime() > startDay.getTime()
+                            ? endDay
+                            : startDay;
+                    end = new Date(
+                        lastDay.getFullYear(),
+                        lastDay.getMonth(),
+                        lastDay.getDate() + 1,
+                    );
+                } else {
+                    end = e.end_date
+                        ? new Date(e.end_date)
+                        : new Date(start.getTime() + 60 * 60 * 1000);
+                }
                 return {
                     id: e.id ?? "",
                     start,

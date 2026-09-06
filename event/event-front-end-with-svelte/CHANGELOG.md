@@ -9,6 +9,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — the calendar never showed a same-day all-day event (T-27)
+
+`/calendar` had zero test coverage, and writing the required "an event
+actually renders" Playwright assertion surfaced a genuine, previously
+shipped bug: `@svar-ui/calendar-store` requires an all-day event's
+`end` to be strictly *after* `start`, but `+page.svelte` passed a
+same-day all-day event's `end_date` straight through unchanged
+(equal to `start_date`, or absent) — the widget silently dropped every
+such event. This is the same root cause worker-front-end's `/expiry`
+calendar had. Fixed by computing an exclusive end one calendar day past
+the later of the event's start/end day for all-day events only; timed
+events are unchanged. New Playwright test in `tests/e2e/events.spec.ts`
+stubs a timed and a same-day-all-day event, asserts both render, and
+asserts selecting the all-day one navigates to its detail page. See
+spec §13 T-27, including the residual (no coverage yet for the
+drag-driven `PUT` on reschedule — SVAR exposes no headless hook for its
+drag gesture).
+
 ### Added — GDPR export download on the detail page (T-20)
 
 A button on `/events/[id]` fetches `GET /api/events/{id}/export` through the
