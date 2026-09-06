@@ -28,10 +28,24 @@ Single source of truth for outstanding work; absorbs what an SDD workflow would 
 - [x] Add `tags_weight` (default `0.05`, supporting-signal cluster) and include the field in the probabilistic weighted average (§12.3); keep weights renormalised; update `agents/matching-algorithm.md` detail tables + `CHANGELOG.md`.
 - **Acceptance:** two records sharing tags score higher with a documented `tags_score`; empty tags do not participate; default weights renormalise correctly; `cargo test` + `cargo clippy --all-targets -- -D warnings` clean.
 
-**T-35 — Fuzz coverage for the national-identifier parsers (`src/identifiers.rs`).**
-- [ ] Add a `fuzz/fuzz_targets/identifiers.rs` libFuzzer target that feeds arbitrary UTF-8 directly into each of the 42+ per-scheme parse/validate functions in `src/identifiers.rs` (verified: `fuzz/fuzz_targets/` has only `match_workers.rs`, `scorer.rs`, `normalizer.rs` — none references `identifiers::`, and the JSON-blob `match_workers` target cannot reliably reach deeply-nested per-scheme fields by byte fuzzing alone).
-- [ ] Pin the never-panic + no-overflow invariant (`agents/share/security.md` invariant 2) across every scheme's checksum/regex validation, including the T-17.1 residual schemes once their TSV rows land.
+**T-35 — Fuzz coverage for the national-identifier parsers (`src/identifiers.rs`).** *(resolved.)*
+- [x] Add a `fuzz/fuzz_targets/identifiers.rs` libFuzzer target that feeds arbitrary UTF-8 directly into each of the 42+ per-scheme parse/validate functions in `src/identifiers.rs` (verified: `fuzz/fuzz_targets/` has only `match_workers.rs`, `scorer.rs`, `normalizer.rs` — none references `identifiers::`, and the JSON-blob `match_workers` target cannot reliably reach deeply-nested per-scheme fields by byte fuzzing alone).
+- [x] Pin the never-panic + no-overflow invariant (`agents/share/security.md` invariant 2) across every scheme's checksum/regex validation, including the T-17.1 residual schemes once their TSV rows land.
 - **Acceptance:** `cargo +nightly fuzz run identifiers` runs clean for the CI smoke duration; every parser in `src/identifiers.rs` is reachable from the new target's call list.
+  **Resolved.** Ported from person-matcher's identical, already-resolved
+  T-35. The new target calls all 51 functions in `src/identifiers.rs`
+  (42 personal-identifier parsers, `parse_uk_nhs_number` through
+  `parse_za_id`, plus the 9 passport validators, `parse_cy_passport`
+  through `parse_sk_passport`) — a `grep -c "^pub fn parse_"
+  src/identifiers.rs` count (51) matches the target's own call count
+  exactly, so nothing was left unreachable. Registered as the fourth
+  `[[bin]]` in `fuzz/Cargo.toml` alongside `match_workers`/`normalizer`/
+  `scorer`; documented in `fuzz/README.md`. Smoke run clean: `cargo
+  +nightly fuzz run identifiers -- -max_total_time=30` → 735,706
+  executions, no crash. `cargo test --lib` (434/434), `cargo clippy
+  --all-targets -- -D warnings`, and `cargo fmt --check` all clean and
+  unaffected on the main crate (the `fuzz/` crate is standalone, per
+  the family convention).
 
 **T-36 — Library-level input-size bounds for standalone use (`agents/share/security.md` invariant 3).**
 - [ ] Add `MAX_TEXT_LEN`/`MAX_ARRAY_LEN`-style caps (mirroring the family-wide SEC-M1 bounds) inside `MatchingEngine`/`Scorer` itself, not only at the embedding service's HTTP boundary (verified: no `MAX_TEXT_LEN`/`MAX_ARRAY_LEN`/length-guard hits in `src/matcher.rs`, `src/scorer.rs`, or `src/models.rs`; the crate is published as "usable standalone" per `agents/share/overview.md`, so a standalone caller can pass unbounded strings straight into the O(n·m) Jaro-Winkler/Levenshtein scorers with no library-side ceiling).
