@@ -38,9 +38,9 @@ Single source of truth for outstanding work; absorbs what an SDD workflow would 
 - [ ] Document the caps + their defaults in §7 (NFR) and §13 (configuration).
 - **Acceptance:** a pathological multi-megabyte name/address input degrades gracefully (bounded time) rather than unboundedly scaling; new unit + proptest cases pin the ceiling; `cargo test` and `cargo clippy --all-targets -- -D warnings` clean.
 
-**T-37 — Document the assessments-data boundary in §2 Scope.**
-- [ ] Add an explicit "out of scope" clause to `spec/02-scope.md` stating that `worker-service`'s aptitude / personality / psychometric / selection assessment data (per-scale results, score bands, derived profile — the `worker-service` row of `agents/share/overview.md`) is never a matcher input, output, or scoring signal, mirroring the existing organisation-level-identifiers out-of-scope paragraph already in that section (verified: `grep -rni 'assessment|psychometric|aptitude|personality'` across this crate's `spec/` and `src/` returns zero hits — the boundary holds in practice but is nowhere stated).
-- **Acceptance:** §2 states the boundary in the same style as the organisation-level-identifiers paragraph, cross-referencing `worker-service`.
+**T-37 — Document the assessments-data boundary in §2 Scope.** *(Resolved.)*
+- [x] Add an explicit "out of scope" clause to `spec/02-scope.md` stating that `worker-service`'s aptitude / personality / psychometric / selection assessment data (per-scale results, score bands, derived profile — the `worker-service` row of `agents/share/overview.md`) is never a matcher input, output, or scoring signal, mirroring the existing organisation-level-identifiers out-of-scope paragraph already in that section (verified: `grep -rni 'assessment|psychometric|aptitude|personality'` across this crate's `spec/` and `src/` returned zero hits — the boundary held in practice but was nowhere stated).
+- **Acceptance (met):** §2 now carries an "Out of scope (permanently): assessment data" paragraph in the same style as the organisation-level-identifiers paragraph, cross-referencing `worker-service`. No code change; `cargo test` / `cargo clippy --all-targets -- -D warnings` clean.
 
 ---
 

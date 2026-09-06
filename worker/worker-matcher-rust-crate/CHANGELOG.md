@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — document the assessments-data boundary in §2 Scope (T-37)
+
+`worker-service` records aptitude / personality / psychometric /
+selection assessment data per worker, and this crate's `Worker` model
+never carried any assessment-derived field — the boundary held in
+practice (zero hits for assessment/psychometric/aptitude/personality
+across `spec/`/`src/`) but was nowhere stated. New "Out of scope
+(permanently): assessment data" paragraph in `spec/02-scope.md`,
+mirroring the existing organisation-level-identifiers paragraph. No
+code change. See spec/23-tasks-and-acceptance-criteria.md T-37.
+
 ### Fixed — doc drift: stale MSRV 1.95/N-3 reference (2026-09-06)
 
 `Cargo.toml` already declares `rust-version = "1.96"` (matching
