@@ -551,6 +551,10 @@ session on sign-out and the BFF clears the cookie. CSRF protection (§6 FR
       the distinct rate-limited UI state, not the generic failure one;
       `pnpm test` (incl. the 13-locale key-parity check) green.
 
+- [x] **T-12: `/verify` crashed with a raw 500 when the authentication service was unreachable.** *(resolved 2026-09-06.)* `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch, token)` with no `try`/`catch`. A network-level failure (the authentication service unreachable, timed out, connection reset) makes `fetch` throw rather than resolve — uncaught, that propagated out of `load` and SvelteKit rendered its generic 500 error page instead of this route's own friendly UI. The same bug class was found and fixed first in `place-front-end-with-svelte` (T-26) and `thing-front-end-with-svelte` (T-23); ported here.
+  - **Resolved.** A `try`/`catch` around the call, a new `"serviceUnavailable"` error variant, and its message (all 13 locales) in `+page.svelte`.
+  - **Acceptance:** unlike the other front-ends, this crate already had a real stub-auth-server e2e harness (`tests/e2e/mock-auth-server.mjs`), so the fix is pinned there: a new `magic-network-error` token makes the stub reset the connection, and a new Playwright test in `tests/e2e/smoke.spec.ts` asserts the friendly message renders with a `200` response rather than a raw 500 — verified to fail with the `try`/`catch` reverted and pass with it restored. Three-part change: spec (here) + code + test.
+
 ## 14. Implementation status
 
 Shipped (v0.1, prior bearer-token SPA model, since fully removed): all

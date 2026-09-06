@@ -22,6 +22,7 @@ import { test, expect } from "@playwright/test";
 // Must match tests/e2e/mock-auth-server.mjs's fixture data.
 const EMAIL = "alice@example.com";
 const VALID_MAGIC_TOKEN = "magic-123";
+const NETWORK_ERROR_MAGIC_TOKEN = "magic-network-error";
 
 test("sign-up page shows the create-account form", async ({ page }) => {
   await page.goto("/signup", { waitUntil: "networkidle" });
@@ -74,6 +75,28 @@ test("verify route reports an error when the token is missing", async ({
   await page.goto("/verify", { waitUntil: "networkidle" });
   await expect(
     page.getByRole("heading", { name: "Could not sign you in" }),
+  ).toBeVisible();
+});
+
+// Pins the fix ported from place-front-end's T-26: before it, an
+// unreachable authentication service made `load` throw uncaught, and
+// SvelteKit rendered its generic 500 page instead of this route's own
+// UI — confirmed directly by reproducing the scenario before fixing it.
+test("verify route shows a friendly error when the auth service is unreachable, not a raw 500", async ({
+  page,
+}) => {
+  const response = await page.goto(
+    `/verify?token=${NETWORK_ERROR_MAGIC_TOKEN}`,
+    { waitUntil: "networkidle" },
+  );
+  expect(response?.status()).toBe(200);
+  await expect(
+    page.getByRole("heading", { name: "Could not sign you in" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "We could not reach the sign-in service. Please try again in a moment.",
+    ),
   ).toBeVisible();
 });
 
