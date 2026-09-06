@@ -14,7 +14,9 @@
     const message = $derived(
         data.error === "missingToken"
             ? t("verify.error.missingToken")
-            : t("verify.error.invalid"),
+            : data.error === "serviceUnavailable"
+              ? t("verify.error.serviceUnavailable")
+              : t("verify.error.invalid"),
     );
 </script>
 

@@ -138,6 +138,8 @@ const STRINGS = {
     "verify.error.title": "Could not sign you in",
     "verify.error.missingToken": "This link is missing its token.",
     "verify.error.invalid": "This link is invalid or expired.",
+    "verify.error.serviceUnavailable":
+      "We could not reach the sign-in service. Please try again in a moment.",
     "verify.error.requestNew": "Request a new link",
   },
   cy: {
@@ -186,6 +188,8 @@ const STRINGS = {
     "verify.error.title": "Methwyd â'ch mewngofnodi",
     "verify.error.missingToken": "Mae'r ddolen hon yn colli ei thocyn.",
     "verify.error.invalid": "Mae'r ddolen hon yn annilys neu wedi dod i ben.",
+    "verify.error.serviceUnavailable":
+      "Ni allem gyrraedd y gwasanaeth mewngofnodi. Rhowch gynnig eto mewn munud.",
     "verify.error.requestNew": "Gofyn am ddolen newydd",
   },
   es: {
@@ -234,6 +238,8 @@ const STRINGS = {
     "verify.error.title": "No se pudo iniciar tu sesión",
     "verify.error.missingToken": "A este enlace le falta su token.",
     "verify.error.invalid": "Este enlace no es válido o ha caducado.",
+    "verify.error.serviceUnavailable":
+      "No pudimos comunicarnos con el servicio de inicio de sesión. Inténtalo de nuevo en un momento.",
     "verify.error.requestNew": "Solicitar un nuevo enlace",
   },
   fr: {
@@ -282,6 +288,8 @@ const STRINGS = {
     "verify.error.title": "Impossible de vous connecter",
     "verify.error.missingToken": "Ce lien n'a pas de jeton.",
     "verify.error.invalid": "Ce lien est invalide ou expiré.",
+    "verify.error.serviceUnavailable":
+      "Nous n'avons pas pu joindre le service de connexion. Veuillez réessayer dans un instant.",
     "verify.error.requestNew": "Demander un nouveau lien",
   },
   de: {
@@ -330,6 +338,8 @@ const STRINGS = {
     "verify.error.title": "Anmeldung nicht möglich",
     "verify.error.missingToken": "Diesem Link fehlt sein Token.",
     "verify.error.invalid": "Dieser Link ist ungültig oder abgelaufen.",
+    "verify.error.serviceUnavailable":
+      "Der Anmeldedienst konnte nicht erreicht werden. Bitte versuchen Sie es in Kürze erneut.",
     "verify.error.requestNew": "Neuen Link anfordern",
   },
   ar: {
@@ -378,6 +388,8 @@ const STRINGS = {
     "verify.error.title": "تعذر تسجيل دخولك",
     "verify.error.missingToken": "هذا الرابط يفتقد إلى رمزه المميز.",
     "verify.error.invalid": "هذا الرابط غير صالح أو منتهي الصلاحية.",
+    "verify.error.serviceUnavailable":
+      "تعذر الوصول إلى خدمة تسجيل الدخول. يرجى المحاولة مرة أخرى بعد لحظات.",
     "verify.error.requestNew": "طلب رابط جديد",
   },
   ru: {
@@ -426,6 +438,8 @@ const STRINGS = {
     "verify.error.title": "Не удалось выполнить вход",
     "verify.error.missingToken": "В этой ссылке отсутствует токен.",
     "verify.error.invalid": "Эта ссылка недействительна или просрочена.",
+    "verify.error.serviceUnavailable":
+      "Не удалось связаться со службой входа. Пожалуйста, повторите попытку через некоторое время.",
     "verify.error.requestNew": "Запросить новую ссылку",
   },
   hi: {
@@ -474,6 +488,8 @@ const STRINGS = {
     "verify.error.title": "आपको साइन इन नहीं किया जा सका",
     "verify.error.missingToken": "इस लिंक में इसका टोकन गायब है।",
     "verify.error.invalid": "यह लिंक अमान्य या समाप्त हो चुका है।",
+    "verify.error.serviceUnavailable":
+      "हम साइन-इन सेवा तक नहीं पहुँच सके। कृपया कुछ देर बाद पुनः प्रयास करें।",
     "verify.error.requestNew": "एक नया लिंक अनुरोध करें",
   },
   zh: {
@@ -522,6 +538,7 @@ const STRINGS = {
     "verify.error.title": "无法为您登录",
     "verify.error.missingToken": "此链接缺少其令牌。",
     "verify.error.invalid": "此链接无效或已过期。",
+    "verify.error.serviceUnavailable": "无法连接到登录服务，请稍后重试。",
     "verify.error.requestNew": "请求新链接",
   },
   bn: {
@@ -570,6 +587,8 @@ const STRINGS = {
     "verify.error.title": "আপনাকে সাইন ইন করা যায়নি",
     "verify.error.missingToken": "এই লিঙ্কে এর টোকেন অনুপস্থিত।",
     "verify.error.invalid": "এই লিঙ্কটি অবৈধ বা মেয়াদোত্তীর্ণ।",
+    "verify.error.serviceUnavailable":
+      "সাইন-ইন পরিষেবাটিতে পৌঁছানো যায়নি। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন।",
     "verify.error.requestNew": "একটি নতুন লিঙ্ক অনুরোধ করুন",
   },
   pt: {
@@ -618,6 +637,8 @@ const STRINGS = {
     "verify.error.title": "Não foi possível iniciar a sua sessão",
     "verify.error.missingToken": "Falta o token a este link.",
     "verify.error.invalid": "Este link é inválido ou expirou.",
+    "verify.error.serviceUnavailable":
+      "Não foi possível contatar o serviço de login. Tente novamente em instantes.",
     "verify.error.requestNew": "Solicitar um novo link",
   },
   id: {
@@ -666,6 +687,8 @@ const STRINGS = {
     "verify.error.title": "Tidak dapat memproses masuk Anda",
     "verify.error.missingToken": "Tautan ini kehilangan tokennya.",
     "verify.error.invalid": "Tautan ini tidak valid atau kedaluwarsa.",
+    "verify.error.serviceUnavailable":
+      "Kami tidak dapat menjangkau layanan masuk. Silakan coba lagi sebentar lagi.",
     "verify.error.requestNew": "Minta tautan baru",
   },
   ur: {
@@ -714,6 +737,8 @@ const STRINGS = {
     "verify.error.title": "آپ کو سائن ان نہیں کیا جا سکا",
     "verify.error.missingToken": "اس لنک میں اس کا ٹوکن غائب ہے۔",
     "verify.error.invalid": "یہ لنک غلط یا میعاد ختم شدہ ہے۔",
+    "verify.error.serviceUnavailable":
+      "ہم سائن ان سروس تک نہیں پہنچ سکے۔ براہ کرم تھوڑی دیر بعد دوبارہ کوشش کریں۔",
     "verify.error.requestNew": "ایک نیا لنک طلب کریں",
   },
 } as const;

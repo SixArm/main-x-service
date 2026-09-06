@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — `/verify` crashed with a raw 500 when the authentication service was unreachable (FE-5)
+
+`src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch,
+token)` with no `try`/`catch`. A network-level failure (the
+authentication service unreachable, timed out, connection reset) makes
+`fetch` throw rather than resolve — uncaught, that propagated out of
+`load` and SvelteKit rendered its generic 500 error page instead of
+this route's own friendly UI. The same bug class was found and fixed
+first in `place-front-end-with-svelte` (T-26) and
+`thing-front-end-with-svelte` (T-23); ported here: a `try`/`catch`
+around the call, a new `"serviceUnavailable"` error variant, and its
+message in `+page.svelte`. New `tests/unit/verify.test.ts` unit-tests
+the `load` function directly (missing token / service unavailable /
+invalid token), verified to fail with the `try`/`catch` reverted and
+pass with it restored. See spec §13 FE-5.
+
 ### Fixed — the delivery calendar never showed a milestone event
 
 `@svar-ui/calendar-store` requires an all-day event's `end` to be

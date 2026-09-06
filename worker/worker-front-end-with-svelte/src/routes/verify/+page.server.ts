@@ -23,7 +23,23 @@ export const load: PageServerLoad = async ({ url, fetch, cookies }) => {
   if (!token) {
     return { error: "missingToken" as const };
   }
-  const upstream = await verifyMagicLink(fetch, token);
+  // A network-level failure (the authentication service unreachable,
+  // timed out, DNS failure, connection reset, …) is a different failure
+  // mode from a token the service actively rejected: `fetch` throws
+  // rather than resolving with a non-ok `Response`. Uncaught, that
+  // propagates out of `load` and SvelteKit renders its generic 500
+  // error page instead of this route's own friendly UI — the same class
+  // of bug place-front-end's T-26 found and fixed, ported here. Caught
+  // so the visitor sees an honest "try again" message instead, distinct
+  // from "this link is invalid or has expired" (which would misattribute
+  // the problem to the token when the real cause is the service being
+  // unreachable).
+  let upstream: Response;
+  try {
+    upstream = await verifyMagicLink(fetch, token);
+  } catch {
+    return { error: "serviceUnavailable" as const };
+  }
   if (!upstream.ok) {
     return { error: "invalidToken" as const };
   }

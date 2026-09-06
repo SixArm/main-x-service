@@ -26,6 +26,10 @@ const PID = "11111111-1111-4111-8111-111111111111";
 const EMAIL = "alice@example.com";
 const NAME = "Alice";
 const VALID_MAGIC_TOKEN = "magic-123";
+// A magic-link token that simulates the auth service being unreachable
+// (see the `req.socket.destroy()` handling below) — must match
+// smoke.spec.ts's copy of the same constant.
+const NETWORK_ERROR_MAGIC_TOKEN = "magic-network-error";
 
 // A second identity carrying `access=admin` — the operator who manages
 // other users' ABAC attributes. Distinct from `PID`/`EMAIL` above (an
@@ -113,6 +117,15 @@ const server = createServer(async (req, res) => {
     const token = decodeURIComponent(
       pathname.slice("/api/auth/magic-link/".length),
     );
+    if (token === NETWORK_ERROR_MAGIC_TOKEN) {
+      // Simulate the auth service being unreachable: reset the
+      // connection instead of answering, so the BFF's `fetch` rejects
+      // rather than resolving with a non-ok `Response` — the scenario
+      // `+page.server.ts`'s try/catch around `verifyMagicLink` exists
+      // to handle (smoke.spec.ts pins the friendly message this produces).
+      req.socket.destroy();
+      return;
+    }
     const identity =
       token === VALID_MAGIC_TOKEN
         ? { pid: PID, name: NAME, email: EMAIL, isAdmin: false }
