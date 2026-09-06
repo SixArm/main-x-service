@@ -2606,6 +2606,99 @@ mod tests {
         assert_eq!(r.breakdown.phonetic_name_score, None);
     }
 
+    /// Pins OQ-7 / T-38: `total_weight` (the probabilistic-average
+    /// denominator in [`MatchingEngine::calculate_weighted_score`]) gains
+    /// the phonetic bonus's `0.05` weight **only when the bonus condition
+    /// holds** (`phonetic_name_score > 0.9`) — never merely because a
+    /// phonetic score was computed. Uses the private
+    /// `score_given_name`/`score_family_name`/`score_phonetic_names`
+    /// helpers (a deliberate, narrow exception to this module's usual
+    /// "pin observable behaviour, not internals" rule — the whole point
+    /// of this test is pinning an aggregation rule with no other
+    /// observable surface) to derive the exact expected score from the
+    /// fixture's own real sub-scores, so the assertion doesn't depend on
+    /// a hand-computed Jaro-Winkler constant.
+    ///
+    /// Two fixtures, both scoring on given-name + family-name only (no
+    /// other component contributes to `total_weight`), so the only
+    /// question is whether the `+= 0.05` line executes:
+    /// - Case A: given names identical (Soundex always matches), family
+    ///   names phonetically dissimilar ("Smith" vs "Johnson") — the
+    ///   phonetic mean is `0.5`, `Some` but not `> 0.9`, so the bonus must
+    ///   **not** apply.
+    /// - Case B: both names identical on both sides — phonetic mean is
+    ///   `1.0`, so the bonus **does** apply.
+    #[test]
+    fn total_weight_includes_phonetic_bonus_only_when_bonus_applies() {
+        let engine = MatchingEngine::new(MatchConfig {
+            use_phonetic_matching: true,
+            ..MatchConfig::default()
+        });
+        let given_weight = engine.config.given_name_weight;
+        let family_weight = engine.config.family_name_weight;
+
+        // Case A: phonetic mean 0.5 (Some, but not > 0.9) -> bonus excluded.
+        let a1 = Person::builder()
+            .given_name("Robert")
+            .family_name("Smith")
+            .build();
+        let a2 = Person::builder()
+            .given_name("Robert")
+            .family_name("Johnson")
+            .build();
+        let phonetic_a = engine.score_phonetic_names(&a1, &a2);
+        assert_eq!(
+            phonetic_a,
+            Some(0.5),
+            "fixture precondition: expected a Some(0.5) phonetic mean (one \
+             name matches, one doesn't) — adjust the fixture names if this \
+             fails, the test logic below depends on it"
+        );
+        let given_a = engine.score_given_name(&a1, &a2).unwrap();
+        let family_a = engine.score_family_name(&a1, &a2).unwrap();
+        let expected_weighted_sum_a = given_a * given_weight + family_a * family_weight;
+        let expected_total_weight_a = given_weight + family_weight; // bonus excluded
+        let expected_score_a = expected_weighted_sum_a / expected_total_weight_a;
+        let result_a = engine.match_persons(&a1, &a2);
+        assert!(
+            approx_eq(result_a.score, expected_score_a),
+            "expected {expected_score_a} (bonus weight excluded from total_weight), got {}",
+            result_a.score
+        );
+
+        // Case B: phonetic mean 1.0 (> 0.9) -> bonus included.
+        let b1 = Person::builder()
+            .given_name("Robert")
+            .family_name("Smith")
+            .build();
+        let b2 = Person::builder()
+            .given_name("Robert")
+            .family_name("Smith")
+            .build();
+        let phonetic_b = engine.score_phonetic_names(&b1, &b2);
+        assert_eq!(phonetic_b, Some(1.0));
+        let given_b = engine.score_given_name(&b1, &b2).unwrap();
+        let family_b = engine.score_family_name(&b1, &b2).unwrap();
+        let expected_weighted_sum_b =
+            given_b * given_weight + family_b * family_weight + phonetic_b.unwrap() * 0.05;
+        let expected_total_weight_b = given_weight + family_weight + 0.05; // bonus included
+        let expected_score_b = expected_weighted_sum_b / expected_total_weight_b;
+        let result_b = engine.match_persons(&b1, &b2);
+        assert!(
+            approx_eq(result_b.score, expected_score_b),
+            "expected {expected_score_b} (bonus weight included in total_weight), got {}",
+            result_b.score
+        );
+
+        // The two candidate denominators are genuinely different (0.35 vs
+        // 0.40 at default weights), so this also guards against a future
+        // change silently making both cases converge on one semantics.
+        assert!(
+            (expected_total_weight_a - expected_total_weight_b).abs() > 1e-9,
+            "fixture no longer discriminates the two total_weight semantics"
+        );
+    }
+
     /// Two empty addresses share no comparable sub-field, so
     /// `compare_addresses` returns the neutral `0.5` fallback rather than
     /// `0.0` (false penalty) or `1.0` (false agreement). Pins the

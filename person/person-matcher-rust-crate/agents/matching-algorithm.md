@@ -196,6 +196,13 @@ score = weighted_sum / total_weight   (or 0.0 if total_weight == 0)
 is_match = score >= match_threshold
 ```
 
+`total_weight` gains the phonetic bonus's `0.05` weight **only when the
+bonus condition holds** (`s > 0.9`) — never unconditionally just because a
+phonetic score was computed. This is a resolved open question (spec §22
+OQ-7 / T-38), pinned byte-for-byte by
+`matcher::tests::total_weight_includes_phonetic_bonus_only_when_bonus_applies`
+in `src/matcher.rs`.
+
 Notes:
 - Weights are renormalised against participating fields. A record with only name and DOB does NOT silently get a low score for "missing" United Kingdom National Health Service Number — the missing field is simply not counted.
 - The phonetic bonus is asymmetric: it only ever pushes the score up.
