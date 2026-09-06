@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { AUTH_STUB_PORT } from "./tests/e2e/auth-stub-port";
 
 // The smoke suite's "signed-in" state (WEB-1). PRO-H10 put every mutation
 // page (`/things/new`, `/things/[id]/edit`, `/things/merge`, `/review`) behind
@@ -35,6 +36,9 @@ export default defineConfig({
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 1 : 0,
     reporter: "list",
+    // Starts the auth stub server (T-23) before the webServer below boots,
+    // since AUTH_API_URL is read once at the preview server's startup.
+    globalSetup: "./tests/e2e/global-setup.ts",
     use: {
         baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:4173",
         trace: "retain-on-failure",
@@ -44,6 +48,7 @@ export default defineConfig({
         port: 4173,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
+        env: { AUTH_API_URL: `http://127.0.0.1:${AUTH_STUB_PORT}` },
     },
     projects: [
         {

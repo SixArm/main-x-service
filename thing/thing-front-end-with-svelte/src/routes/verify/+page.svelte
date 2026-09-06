@@ -12,7 +12,9 @@
     const message = $derived(
         data.error === "missingToken"
             ? "This sign-in link is missing its token."
-            : "This sign-in link is invalid or has expired.",
+            : data.error === "serviceUnavailable"
+              ? "We could not reach the sign-in service. Please try again in a moment."
+              : "This sign-in link is invalid or has expired.",
     );
 </script>
 

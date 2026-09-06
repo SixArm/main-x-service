@@ -9,6 +9,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — unreachable authentication service crashed /verify with a raw 500, and new E2E coverage for /signin and /verify (T-23)
+
+`tests/e2e/things.spec.ts` had no Playwright coverage for `/signin` or
+`/verify` at all — the outbound magic-link calls happen server-side
+(`src/lib/server/auth.ts`), so `page.route` cannot stub them. Ported
+`place-front-end-with-svelte`'s T-26 test infrastructure verbatim: a
+real in-process stub HTTP server (`tests/e2e/auth-stub-server.ts`)
+standing in for the authentication service, wired via `AUTH_API_URL`
+in `playwright.config.ts`. New `tests/e2e/auth.spec.ts` (5 tests).
+
+Writing the "unreachable service" scenario surfaced a real bug this
+crate shared with place-front-end's pre-fix state:
+`src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch,
+token)` with no `try`/`catch`. A network-level failure makes `fetch`
+throw rather than resolve — uncaught, that propagated out of `load`
+and SvelteKit rendered its generic 500 page instead of this route's
+own friendly UI. Fixed with the identical pattern place-front-end
+landed: a `try`/`catch` around the call and a new `"serviceUnavailable"`
+error variant with its own message. Verified to fail with the
+`try`/`catch` reverted and pass with it restored. See spec §13 T-23.
+
 ### Added — pagination on the list/search route (T-28)
 
 `/things` called `search({ limit: 50 })` with no `offset` and no way
