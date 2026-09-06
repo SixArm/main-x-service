@@ -17,6 +17,7 @@ load-bearing invariants:
 | `match_workers` | Deserialize a JSON `[worker_a, worker_b]` tuple → `MatchingEngine::match_workers`. The whole deserialize → normalize → score path; asserts finite score in `[0,1]` in both argument orders. |
 | `normalizer` | The pure `Normalizer` string helpers (name / postcode / phone / E.164 / address / phonetic / email) over arbitrary UTF-8 — never-panic. |
 | `scorer` | The pure `Scorer` similarities (Jaro-Winkler / Levenshtein / exact / combined) over two arbitrary UTF-8 strings; asserts finite similarity in `[0,1]`. |
+| `identifiers` | All 42 national-identifier parsers + 9 passport-format validators in `src/identifiers.rs`, fed the same arbitrary UTF-8; never-panic only (T-35). |
 
 ## Running
 

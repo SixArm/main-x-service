@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — fuzz target for the national-identifier parsers (T-35)
+
+`fuzz/fuzz_targets/identifiers.rs` (new, the fourth target alongside
+`match_workers`/`normalizer`/`scorer`) feeds arbitrary UTF-8 directly
+into all 51 functions in `src/identifiers.rs` — 42 per-scheme
+personal-identifier parsers plus 9 per-country passport-format
+validators — asserting only the never-panic invariant
+(`agents/share/security.md` invariant 2). Ported from person-matcher's
+identical, already-resolved T-35. Smoke run clean: `cargo +nightly
+fuzz run identifiers -- -max_total_time=30` → 735,706 executions, no
+crash. See spec/23-tasks-and-acceptance-criteria.md T-35.
+
 ### Added — document the assessments-data boundary in §2 Scope (T-37)
 
 `worker-service` records aptitude / personality / psychometric /
