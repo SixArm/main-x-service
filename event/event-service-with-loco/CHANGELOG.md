@@ -8,6 +8,19 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — doc drift: stale MSRV 1.95/N-3 reference (2026-09-06)
+
+`Cargo.toml` already declares `rust-version = "1.96"` (matching
+`ci/msrv.txt` and the repository's current **N-2** policy), but the
+`[0.6.0] - 2026-08-27` entry below still says `"1.95"` and "current stable minus
+three" — the policy in effect when that entry was written, since
+tightened. That entry is left as-written (a dated record of what was
+true then); this entry is the correction, matching the pattern already
+used elsewhere in the family (e.g. course-service T-29,
+authentication-verifier AV-3, organization-matcher). No behaviour
+change — `Cargo.toml`, `ci/msrv.txt`, and `scripts/ci-check.sh msrv`
+already agreed on 1.96 before this change.
+
 ### Verified — timezone correctness of the date-proximity scorer (T-2)
 
 T-2 asked to "replace naive UTC offsets with `chrono-tz` conversions in
