@@ -9,6 +9,47 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — persist the review queue to `course_match_scores` (T-27)
+
+`POST /api/courses/deduplicate` classified pairs into the review band
+and returned `ReviewQueueItem`s in the response, but never wrote them
+anywhere — the `course_match_scores` SeaORM table existed precisely to
+hold these rows and was referenced nowhere outside its own definition.
+
+- `CourseRepository` gained `upsert_review_items` / `list_review_items`
+  / `decide_review_item` (`src/db/mod.rs`), backed by a typed SeaORM
+  `on_conflict(...).exec_with_returning(...)` upsert and a guarded
+  `update_many().filter(status = 'Pending')` decision (rather than
+  case-service's raw-SQL pattern, since `course_match_scores` is
+  already a full typed entity here).
+- `run_batch_dedup` now persists the candidates it finds in one batch
+  after the scan completes, instead of holding them only in the
+  response body.
+- New `GET /api/courses/review-queue` (`?status=&limit=`) and
+  `POST /api/courses/review-queue/{id}/decision`
+  (`{"status": "Confirmed" | "Rejected", "reviewed_by": Option<String>}`),
+  wired on both router surfaces + `ApiDoc`. First-writer-wins: an
+  already-decided item is `422`, an unknown id is `404`.
+- Pair order is normalized in application code
+  (`models::review_queue::canonical_pair`, shared with the batch scan's
+  own `seen_pairs` set) against the existing plain
+  `UNIQUE (course_id, candidate_id)` constraint — no migration change.
+  The stored/wire status tokens stay this crate's existing PascalCase
+  (`Pending`/`Confirmed`/`Rejected`/`AutoMerged`) rather than switching
+  to the family's lowercase convention, since the migration's own
+  column default is `DEFAULT 'Pending'`. No `provenance` column (course
+  has no bulk-import pipeline routing keyless duplicates here) and no
+  `MaybeAuthUser` extractor, so `reviewed_by` is client-supplied,
+  mirroring `MergeRequest::merged_by`.
+- 3 new unit tests (`models::review_queue::tests`) + a new DB-gated
+  integration test
+  (`review_queue_persists_across_a_rescan_and_decides_once`) proving a
+  batch run's candidates survive a fresh repository read, a decision
+  applies exactly once, and a re-scan upserts the score while keeping a
+  decided row's status. `cargo test --lib` 135/135 (was 132);
+  `clippy --all-targets -- -D warnings` / `fmt --check` clean; full
+  DB-gated suite green. See spec §13 T-27.
+
 ### Added — `TODO(fhir)`-marked fidelity-gap comments in the FHIR mapper (T-30)
 
 `agents/share/fhir.md` §2 requires "every drop of fidelity is a

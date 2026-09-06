@@ -98,3 +98,29 @@ pub fn course_json(suffix: &str) -> Value {
         "status": "published",
     })
 }
+
+/// Seed a minimal course directly through the repository + search index,
+/// bypassing `POST /api/courses`' real-time duplicate check entirely.
+///
+/// Used to build deliberately near-duplicate fixtures for the review-queue
+/// tests: two records sharing a similar `name` would otherwise `409` on
+/// the second create, exactly the fixture-collision class documented in
+/// the family's `reference_realtime_dedup_breaks_test_fixtures` memory —
+/// the fix there, as here, is to write through the repository (and, since
+/// indexing normally happens in the create handler rather than the
+/// repository, the search engine too) instead of through the guarded HTTP
+/// endpoint.
+pub async fn seed_course(state: &course_service::api::rest::AppState, name: &str) -> uuid::Uuid {
+    use course_service::models::Course;
+    let course = Course::new(name);
+    let created = state
+        .course_repository
+        .create(&course)
+        .await
+        .expect("seed course directly via the repository");
+    state
+        .search_engine
+        .index_course(&created)
+        .expect("index seeded course");
+    created.id
+}

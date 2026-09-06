@@ -24,6 +24,7 @@ pub use identifier::{CourseIdentifier, IdentifierType};
 pub use merge::{MergeRecord, MergeRequest, MergeResponse, MergeStatus};
 pub use organization::{Provider, ProviderKind};
 pub use review_queue::{
-    BatchDeduplicationRequest, BatchDeduplicationResponse, ReviewQueueItem, ReviewStatus,
+    BatchDeduplicationRequest, BatchDeduplicationResponse, DecideOutcome, NewReviewItem,
+    ReviewDecisionRequest, ReviewQueueItem, ReviewStatus, canonical_pair,
 };
 pub use syllabus::Syllabus;

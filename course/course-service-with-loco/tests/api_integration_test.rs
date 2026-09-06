@@ -265,6 +265,130 @@ async fn batch_dedup_returns_response_shape() {
     assert!(data["review_items"].is_array());
 }
 
+/// T-27 — a batch-dedup run's candidates are persisted to
+/// `course_match_scores`: they survive as a fresh repository read (not
+/// just this run's own response body), a `Pending` item can be decided
+/// exactly once (first-writer-wins), and a re-scan upserts — refreshing
+/// the stored score while leaving a decided row's `status` untouched.
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored"]
+async fn review_queue_persists_across_a_rescan_and_decides_once() {
+    let state = common::create_test_app_state().await;
+
+    // Two near-duplicate courses, seeded directly through the repository
+    // (bypassing the create endpoint's real-time duplicate check — see
+    // `common::seed_course`'s doc comment). A shared token keeps them
+    // discoverable as a candidate pair via the fuzzy name search; the
+    // differing suffix keeps their match score below 1.0, so the pair
+    // lands in the review queue rather than auto-merging.
+    let token = uuid::Uuid::new_v4().simple().to_string();
+    let name_a = format!("{token} ReviewQueuePersist Alpha");
+    let name_b = format!("{token} ReviewQueuePersist Beta");
+    let a = common::seed_course(&state, &name_a).await;
+    let b = common::seed_course(&state, &name_b).await;
+
+    let app = course_service::api::rest::create_router(state);
+
+    // Run the batch scan. A wide gap between the two thresholds keeps
+    // this robust to the exact matcher score: well above `threshold`
+    // (found, queued) and comfortably below `auto_merge_threshold`
+    // (never auto-merged away before this test can inspect it).
+    let dedup_req = json!({
+        "threshold": 0.50,
+        "max_candidates": 10,
+        "auto_merge_threshold": 0.999,
+    });
+    let (status, env) = send(
+        &app,
+        Method::POST,
+        "/api/courses/deduplicate",
+        Some(dedup_req.clone()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body: {env}");
+    let review_items = env["data"]["review_items"]
+        .as_array()
+        .expect("review_items array");
+    let seeded_pair = review_items
+        .iter()
+        .find(|i| {
+            let ids = [
+                i["course_id_a"].as_str().unwrap_or_default(),
+                i["course_id_b"].as_str().unwrap_or_default(),
+            ];
+            ids.contains(&a.to_string().as_str()) && ids.contains(&b.to_string().as_str())
+        })
+        .unwrap_or_else(|| panic!("seeded pair not found among review_items: {review_items:?}"));
+    assert_eq!(seeded_pair["status"], "Pending");
+    let item_id = seeded_pair["id"].as_str().unwrap().to_string();
+
+    // Survives "restart": queryable via a fresh repository read, not just
+    // this run's own response body.
+    let (status, env) = send(&app, Method::GET, "/api/courses/review-queue", None).await;
+    assert_eq!(status, StatusCode::OK);
+    let items = env["data"]["items"].as_array().expect("items array");
+    assert!(
+        items.iter().any(|i| i["id"] == json!(item_id)),
+        "persisted item missing from GET /review-queue: {items:?}"
+    );
+
+    // Decide it — confirmed.
+    let (status, env) = send(
+        &app,
+        Method::POST,
+        &format!("/api/courses/review-queue/{item_id}/decision"),
+        Some(json!({ "status": "Confirmed", "reviewed_by": "test-suite" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body: {env}");
+    assert_eq!(env["data"]["status"], "Confirmed");
+    assert_eq!(env["data"]["reviewed_by"], "test-suite");
+
+    // Deciding an already-decided item is a 422 (first-writer-wins).
+    let (status, _) = send(
+        &app,
+        Method::POST,
+        &format!("/api/courses/review-queue/{item_id}/decision"),
+        Some(json!({ "status": "Rejected" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+    // Deciding an unknown id is a 404.
+    let (status, _) = send(
+        &app,
+        Method::POST,
+        "/api/courses/review-queue/00000000-0000-0000-0000-000000000000/decision",
+        Some(json!({ "status": "Confirmed" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    // A re-scan upserts: the score columns refresh, but the decided
+    // row's `status` is left untouched.
+    let (status, env) = send(
+        &app,
+        Method::POST,
+        "/api/courses/deduplicate",
+        Some(dedup_req),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body: {env}");
+    let (status, env) = send(
+        &app,
+        Method::GET,
+        "/api/courses/review-queue?status=Confirmed",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let items = env["data"]["items"].as_array().expect("items array");
+    assert!(
+        items.iter().any(|i| i["id"] == json!(item_id)),
+        "decided row must keep its Confirmed status across a re-scan: {items:?}"
+    );
+}
+
 /// `CourseInstance` sub-resource: create → list → soft-delete round trip.
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]

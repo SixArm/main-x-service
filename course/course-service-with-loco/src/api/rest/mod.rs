@@ -44,6 +44,8 @@ pub use state::AppState;
         handlers::match_course,
         handlers::merge_courses,
         handlers::deduplicate,
+        handlers::get_review_queue,
+        handlers::review_decision,
         handlers::list_instances,
         handlers::create_instance,
         handlers::get_instance,
@@ -84,6 +86,7 @@ pub use state::AppState;
         crate::models::BatchDeduplicationResponse,
         crate::models::ReviewQueueItem,
         crate::models::ReviewStatus,
+        crate::models::ReviewDecisionRequest,
         crate::matching::MatchBreakdown,
         crate::validation::ValidationError,
         crate::db::audit::AuditEntry,
@@ -92,6 +95,7 @@ pub use state::AppState;
         handlers::SearchResponse,
         handlers::ScoredCandidate,
         handlers::AuditQuery,
+        handlers::ReviewQueueListResponse,
     )),
     tags(
         (name = "health",     description = "Liveness probe"),
@@ -129,6 +133,12 @@ pub fn create_router(state: AppState) -> Router {
         )
         .route("/courses/merge", post(handlers::merge_courses))
         .route("/courses/deduplicate", post(handlers::deduplicate))
+        // Persisted review queue (T-27).
+        .route("/courses/review-queue", get(handlers::get_review_queue))
+        .route(
+            "/courses/review-queue/{id}/decision",
+            post(handlers::review_decision),
+        )
         // Course CRUD by id.
         .route(
             "/courses/{id}",
@@ -218,6 +228,12 @@ pub fn courses_routes() -> loco_rs::controller::Routes {
         )
         .add("/courses/merge", post(handlers::merge_courses))
         .add("/courses/deduplicate", post(handlers::deduplicate))
+        // Persisted review queue (T-27).
+        .add("/courses/review-queue", get(handlers::get_review_queue))
+        .add(
+            "/courses/review-queue/{id}/decision",
+            post(handlers::review_decision),
+        )
         .add(
             "/courses/{id}",
             get(handlers::get_course)

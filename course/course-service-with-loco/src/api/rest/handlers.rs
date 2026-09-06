@@ -28,8 +28,9 @@ use super::state::AppState;
 use crate::api::{ApiError, ApiResponse};
 use crate::db::audit::{AuditContext, AuditEntry};
 use crate::models::{
-    BatchDeduplicationRequest, BatchDeduplicationResponse, Course, CourseInstance, MergeRecord,
-    MergeRequest, MergeResponse, MergeStatus, ReviewQueueItem, ReviewStatus,
+    BatchDeduplicationRequest, BatchDeduplicationResponse, Course, CourseInstance, DecideOutcome,
+    MergeRecord, MergeRequest, MergeResponse, MergeStatus, NewReviewItem, ReviewDecisionRequest,
+    ReviewQueueItem, ReviewStatus, canonical_pair,
 };
 use crate::streaming::{CourseEvent, EventKind};
 use crate::validation::{ValidationError, validate_course, validate_instance};
@@ -1035,6 +1036,7 @@ async fn run_batch_dedup(
     };
     let mut seen_pairs: HashSet<(Uuid, Uuid)> = HashSet::new();
     let mut soft_deleted: HashSet<Uuid> = HashSet::new();
+    let mut pending_items: Vec<NewReviewItem> = Vec::new();
     let mut offset: u64 = 0;
 
     loop {
@@ -1081,20 +1083,14 @@ async fn run_batch_dedup(
                     soft_deleted.insert(candidate.id);
                     response.auto_merged += 1;
                 } else {
-                    response.review_items.push(ReviewQueueItem {
-                        id: Uuid::new_v4(),
+                    pending_items.push(NewReviewItem {
                         course_id_a: probe.id,
                         course_id_b: candidate.id,
                         match_score: r.score,
                         match_quality: confidence_label(r.confidence).to_string(),
                         detection_method: "BatchScan".to_string(),
                         score_breakdown: serde_json::to_value(&r.breakdown).ok(),
-                        status: ReviewStatus::Pending,
-                        reviewed_by: None,
-                        created_at: Utc::now(),
-                        reviewed_at: None,
                     });
-                    response.queued_for_review += 1;
                 }
             }
         }
@@ -1104,6 +1100,22 @@ async fn run_batch_dedup(
             break;
         }
     }
+
+    // T-27 — persist the candidates found this run to `course_match_scores`
+    // so they survive a process restart, rather than existing only in this
+    // response body. Pair order is normalized on write (`canonical_pair`),
+    // so a re-scan upserts: the score columns refresh, but a previously
+    // decided row's `status` is left untouched (see
+    // `CourseRepository::upsert_review_items`).
+    if !pending_items.is_empty() {
+        let stored = state
+            .course_repository
+            .upsert_review_items(&pending_items)
+            .await?;
+        response.queued_for_review += stored.len() as u64;
+        response.review_items = stored;
+    }
+
     Ok(response)
 }
 
@@ -1170,11 +1182,98 @@ async fn auto_merge(
     Ok(())
 }
 
-/// Order a pair of ids deterministically (smaller first) so an
-/// unordered `(a, b)` pair has a single key in the dedup `seen_pairs`
-/// set regardless of scan order.
-fn canonical_pair(a: Uuid, b: Uuid) -> (Uuid, Uuid) {
-    if a < b { (a, b) } else { (b, a) }
+// ────────────────── Persisted review queue (T-27) ──────────────────
+
+/// Query parameters for `GET /api/courses/review-queue`.
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct ReviewQueueListQuery {
+    /// Optional status filter (`Pending` / `Confirmed` / `Rejected` /
+    /// `AutoMerged`).
+    pub status: Option<ReviewStatus>,
+    /// Maximum items to return (default 100; the repository caps at 500).
+    pub limit: Option<u64>,
+}
+
+/// Response body for `GET /api/courses/review-queue`.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ReviewQueueListResponse {
+    /// The stored review-queue items, newest first.
+    pub items: Vec<ReviewQueueItem>,
+    /// Number of items returned.
+    pub total: usize,
+}
+
+/// T-27 — list the persisted duplicate review queue (newest first).
+/// A batch scan's candidates ([`deduplicate`]) survive a process
+/// restart because they are read back from `course_match_scores`
+/// here, not held only in the scan's own response body.
+#[utoipa::path(
+    get, path = "/api/courses/review-queue",
+    params(ReviewQueueListQuery),
+    responses((status = 200, body = ReviewQueueListResponse)),
+    tag = "matching",
+)]
+pub async fn get_review_queue(
+    State(state): State<AppState>,
+    Query(query): Query<ReviewQueueListQuery>,
+) -> impl IntoResponse {
+    match state
+        .course_repository
+        .list_review_items(query.status, query.limit.unwrap_or(100))
+        .await
+    {
+        Ok(items) => {
+            let total = items.len();
+            Json(ApiResponse::success(ReviewQueueListResponse {
+                items,
+                total,
+            }))
+            .into_response()
+        }
+        Err(e) => error_response(&e),
+    }
+}
+
+/// T-27 — decide one `Pending` review item (`Confirmed` or `Rejected`).
+///
+/// First-writer-wins: only a `Pending` item transitions
+/// (`CourseRepository::decide_review_item`'s storage-layer guard); an
+/// already-decided item is `422`, an unknown id `404`.
+#[utoipa::path(
+    post, path = "/api/courses/review-queue/{id}/decision",
+    params(("id" = uuid::Uuid, Path,)),
+    request_body = ReviewDecisionRequest,
+    responses(
+        (status = 200, body = ReviewQueueItem),
+        (status = 404, body = ApiError),
+        (status = 422, body = ApiError),
+    ),
+    tag = "matching",
+)]
+pub async fn review_decision(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<ReviewDecisionRequest>,
+) -> impl IntoResponse {
+    if !req.status.is_decision() {
+        return validation_response(&[ValidationError {
+            field: "status".into(),
+            message: "status must be `Confirmed` or `Rejected`".into(),
+        }]);
+    }
+    match state
+        .course_repository
+        .decide_review_item(id, req.status, req.reviewed_by.as_deref())
+        .await
+    {
+        Ok(DecideOutcome::Decided(item)) => Json(ApiResponse::success(*item)).into_response(),
+        Ok(DecideOutcome::NotFound) => not_found_response("Review item not found"),
+        Ok(DecideOutcome::AlreadyDecided(current)) => validation_response(&[ValidationError {
+            field: "status".into(),
+            message: format!("item is already `{current:?}`; only `Pending` items can be decided"),
+        }]),
+        Err(e) => error_response(&e),
+    }
 }
 
 // ────────────────── Privacy (FR-15, FR-16) ──────────────────
