@@ -63,6 +63,8 @@ The `Confidence` band is **independent of `match_threshold`**: `score >= 0.90 �
 | Address | See §12.4 of spec | Weighted average over postcode/city/line-1 contributions (`Σ(score × weight) / Σ(weight)`, weights `0.5 / 0.3 / 0.2`); line-1 is `(house_number, street)` after `parse_address_line`. |
 | Phone | E.164 equality (preferred) or legacy national-significant comparison (fallback) | `phone` falls back to `mobile`. |
 | Email | Exact equality of canonical form from `Normalizer::normalize_email` | Both must parse, else `None`. Gmail dot/+-folding opt-in via `MatchConfig::gmail_dot_folding`. |
+| Relationships | Typed-set Jaccard over `(relation, person_id)` pairs — `\|A ∩ B\| / \|A ∪ B\|` — see §12.2 / T-33 | `None` when either side's `relationships` list is empty. Default weight `0.05`; supporting signal, never resolved against a registry. |
+| Tags | Set Jaccard over case-insensitively normalised tag sets — `\|A ∩ B\| / \|A ∪ B\|` — see §12.2 / T-34 | `None` when either side's `tags` list is empty. Default weight `0.05`; supporting signal; normalisation (trim + lowercase) happens at scoring time, not on construction. |
 | Phonetic | Mean Soundex equality of given + family | Only contributes if `> 0.9`. |
 
 ## When You Change Weights

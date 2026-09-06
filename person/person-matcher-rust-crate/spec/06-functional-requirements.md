@@ -5,6 +5,8 @@ Identifiers use **MUST**/**SHOULD**/**MAY** (RFC 2119) semantics.
 ### 6.1 Person Model
 - **FR-1 / FR-2 / FR-3** `Person` exposes the fields in §8.1 (42 national-identifier fields + `passport_books: Vec<PassportBook>`) and is constructible via a fluent `PersonBuilder` with one setter per identifier. `Person` is `Clone + PartialEq + Eq + Debug + Serialize + Deserialize`.
 - **FR-4** `Person::validate()` MUST require at least one identifying field — a name (`given_name` or `family_name`), any of the 42 national identifiers, or a non-empty `passport_books`. Otherwise return `MatchingError::MissingField`.
+- **FR-92** `Person::relationships: Vec<RelationshipRef>` (default empty; §8.1/§8.6a) MUST NOT contribute to `Person::validate()`'s identifying-field check (FR-4) — it is a **supporting** signal, never identifying on its own. `MatchBreakdown::relationships_score` = typed-set Jaccard over `(relation, person_id)` pairs when both sides are non-empty, else `None` (§12.2, T-33).
+- **FR-93** `Person::tags: Vec<String>` (default empty; §8.1) MUST NOT contribute to `Person::validate()`'s identifying-field check (FR-4). `MatchBreakdown::tags_score` = set Jaccard over the case-insensitively normalised (trim + lowercase) tag sets when both sides are non-empty, else `None` (§12.2, T-34).
 
 ### 6.2 Matching Engine
 - **FR-5..FR-10** `MatchingEngine` (configured by `MatchConfig`) exposes `match_persons(&p1, &p2) -> MatchResult { score, is_match, confidence, breakdown }` and `deterministic_match(&p1, &p2) -> bool` (independent of `match_threshold`). `score ∈ [0.0, 1.0]`; `is_match` iff `score >= match_threshold` (modulo FR-47). Missing fields are omitted from the weighted average and reflected as `None` — never throw.

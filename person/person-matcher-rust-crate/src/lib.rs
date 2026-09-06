@@ -20,7 +20,7 @@
 //!
 //! | Module | Purpose |
 //! |---|---|
-//! | [`models`]       | Data structures: [`Person`], [`PersonBuilder`], [`Address`], [`BloodType`], [`Gender`], [`PassportBook`]. |
+//! | [`models`]       | Data structures: [`Person`], [`PersonBuilder`], [`Address`], [`BloodType`], [`Gender`], [`PassportBook`], [`RelationshipRef`], [`RelationKind`]. |
 //! | [`identifiers`]  | 42 national personal-identifier parsers + 9 passport-format validators (one parser per scheme; never cross-matched). |
 //! | [`nicknames`]    | Opt-in [`NicknameTable`] that lifts the given-name score for known nickname classes (Michael ↔ Mike, …). |
 //! | [`normalizer`]   | Text normalisation: names, postcodes, phone numbers, phonetic codes. |
@@ -171,7 +171,9 @@ pub mod scorer;
 
 pub use error::{MatchingError, Result};
 pub use matcher::{Confidence, MatchBreakdown, MatchConfig, MatchResult, MatchingEngine};
-pub use models::{Address, BloodType, Gender, PassportBook, Person, PersonBuilder};
+pub use models::{
+    Address, BloodType, Gender, PassportBook, Person, PersonBuilder, RelationKind, RelationshipRef,
+};
 pub use nicknames::NicknameTable;
 pub use normalizer::{Normalizer, ParsedAddressLine};
 pub use scorer::{Scorer, SimilarityAlgorithm};

@@ -16,18 +16,45 @@ Full list in [`agents/delivered-tasks.md`](../agents/delivered-tasks.md); covers
 - [ ] Test multi-code semantics for Daitch-Mokotoff: non-empty code-set intersection → `1.0`, single-name match → `0.5`, disjoint → `0.0`.
 - **Acceptance:** default-config behaviour and existing tests unchanged; new unit tests cover Double Metaphone (`"Stephen"`/`"Steven"`) and Daitch-Mokotoff (`"Schwarz"`/`"Shvarts"`); documented as opt-in only until T-9's corpus methodology is run.
 
-**T-33 — Relationships as a weighted component (§8.1 / §8.6a / §12.2 / §13.1).**
-- [ ] Add `relationships: Vec<RelationshipRef>` to `Person` and the `RelationshipRef` / `RelationKind` types (re-export from crate root).
-- [ ] Score relationships by typed-set Jaccard over `(relation, person_id)` pairs; `None` when either side is empty; add `relationships_score` to `MatchBreakdown`.
-- [ ] Add `relationships_weight` (default `0.05`) and include the field in the probabilistic weighted average (§12.3); update `agents/matching-algorithm.md` detail tables + `CHANGELOG.md`.
-- [ ] Add an FR in §6 for relationship matching and cross-reference it from §8.1.
+**T-33 — Relationships as a weighted component (§8.1 / §8.6a / §12.2 / §13.1).** *(resolved.)*
+- [x] Add `relationships: Vec<RelationshipRef>` to `Person` and the `RelationshipRef` / `RelationKind` types (re-export from crate root).
+- [x] Score relationships by typed-set Jaccard over `(relation, person_id)` pairs; `None` when either side is empty; add `relationships_score` to `MatchBreakdown`.
+- [x] Add `relationships_weight` (default `0.05`) and include the field in the probabilistic weighted average (§12.3); update `agents/matching-algorithm.md` detail tables + `CHANGELOG.md`.
+- [x] Add an FR in §6 for relationship matching and cross-reference it from §8.1.
 - **Acceptance:** two records sharing related-person ids score higher with a documented `relationships_score`; empty relationships do not participate; default weights renormalise correctly; `cargo test` + `cargo clippy --all-targets -- -D warnings` clean.
+  **Resolved.** Ported from worker-matcher's identical, already-shipped
+  T-33. `RelationKind` carries **5** variants
+  (`ParentOf`/`ChildOf`, `SiblingOf`, `GuardianOf`/`WardOf`) rather than
+  worker's 2-variant seed — this crate's own §8.6a already named that
+  exact 5-variant design target as "planned, not yet implemented"
+  before this task landed, so the pre-declared spec text was followed
+  rather than worker's narrower precedent. `relationships_score` and
+  `relationships_weight` wired into `calculate_breakdown`/
+  `calculate_weighted_score` alongside `email_score`, before the
+  phonetic bonus. New FR-92 (§6.1) states relationships MUST NOT
+  contribute to `Person::validate()`'s identifying-field check —
+  verified directly against `validate()`'s source, which never
+  references the field. 13 new unit tests (Jaccard identity/disjoint/
+  partial-overlap/empty-side, plus full-engine participate/disagree/
+  absent-doesn't-dilute cases) mirror worker-matcher's own suite.
+  `cargo test --lib` (431/431, up from 418), `cargo test --doc`
+  (183/183, three `MatchConfig` struct-literal call sites in
+  `examples/`/`tests/` updated for the two new fields), `cargo clippy
+  --all-targets -- -D warnings`, `cargo fmt --check`, and `cargo bench
+  --no-run` all clean.
 
-**T-34 — Tags as a weighted component (§8.1 / §8.5 / §12.2 / §13.1).**
-- [ ] Add `tags: Vec<String>` to `Person` (default empty); normalise tags case-insensitively (trim + lowercase, de-duplicated) at score time.
-- [ ] Score tags by plain set Jaccard over the normalised tag sets; `None` when either side is empty; add `tags_score` to `MatchBreakdown`.
-- [ ] Add `tags_weight` (default `0.05`, supporting-signal cluster) and include the field in the probabilistic weighted average (§12.3); update `agents/matching-algorithm.md` detail tables + `CHANGELOG.md`.
+**T-34 — Tags as a weighted component (§8.1 / §8.5 / §12.2 / §13.1).** *(resolved.)*
+- [x] Add `tags: Vec<String>` to `Person` (default empty); normalise tags case-insensitively (trim + lowercase, de-duplicated) at score time.
+- [x] Score tags by plain set Jaccard over the normalised tag sets; `None` when either side is empty; add `tags_score` to `MatchBreakdown`.
+- [x] Add `tags_weight` (default `0.05`, supporting-signal cluster) and include the field in the probabilistic weighted average (§12.3); update `agents/matching-algorithm.md` detail tables + `CHANGELOG.md`.
 - **Acceptance:** two records sharing tags score higher with a documented `tags_score`; empty tags do not participate; default weights renormalise correctly; `cargo test` + `cargo clippy --all-targets -- -D warnings` clean.
+  **Resolved** in the same change as T-33 (see above). One deliberate
+  deviation from worker-matcher's own `score_tags`: this crate's
+  version also **trims** each tag before lowercasing (worker's does
+  not) — the task's own acceptance text explicitly calls out "trim +
+  lowercase", so the stricter, harmless normalisation was kept rather
+  than matching worker's implementation byte-for-byte. New FR-93
+  (§6.1) mirrors FR-92 for tags.
 
 **T-35 — Fuzz target for national-identifier parsing (§12.1 / §14 / `src/identifiers.rs`).** *(resolved 2026-09-05.)*
 - [x] Add `fuzz/fuzz_targets/identifiers.rs` exercising every one of the 42 national-identifier parsers + the 9 passport-format validators in `src/identifiers.rs` with raw fuzzer bytes (never-panic + no cross-scheme false-equality).
