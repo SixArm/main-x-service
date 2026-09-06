@@ -78,16 +78,31 @@ export class ThingRepository {
    *
    * WHY the normalisation: the service may return either a bare array or a
    * `{ items, total }` envelope depending on version/endpoint; this method
-   * collapses both into a stable `{ items, total }` so callers never branch.
+   * collapses both into a stable `{ items, total, limit, offset }` so
+   * callers never branch.
+   *
+   * `total`/`limit`/`offset` prefer the family-wide `X-Total-Count`/
+   * `X-Limit`/`X-Offset` response headers (`agents/share/restful.md`)
+   * over anything the body itself carries — the headers are the
+   * authoritative count of rows matching the query *ignoring*
+   * `limit`/`offset` (T-28), where the body's own `total` (when
+   * present at all) may just echo the page length. A service that
+   * predates the headers still works: the fallbacks below make that
+   * case behave exactly as it always did.
    *
    * @param opts - Query text and search/pagination flags.
-   * @returns Matching things and a total count (item count when no total).
+   * @returns Matching things, the total count, and the limit/offset the
+   *   service actually applied (which may differ from what was asked
+   *   for, e.g. a clamped `limit`).
    * @throws {ApiError} On a failed request.
    */
-  async search(
-    opts: SearchOptions,
-  ): Promise<{ items: Thing[]; total: number }> {
-    const data = await this.http.get<
+  async search(opts: SearchOptions): Promise<{
+    items: Thing[];
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
+    const { data, response } = await this.http.getWithHeaders<
       Thing[] | { items: Thing[]; total?: number }
     >("/api/things/search", {
       query: {
@@ -99,10 +114,20 @@ export class ThingRepository {
         mask_sensitive: opts.mask_sensitive,
       },
     });
-    // Bare-array response: total is simply the number of items returned.
-    if (Array.isArray(data)) return { items: data, total: data.length };
-    // Enveloped response: fall back to item count if total is omitted.
-    return { items: data.items, total: data.total ?? data.items.length };
+    const items = Array.isArray(data) ? data : data.items;
+    const bodyTotal = Array.isArray(data) ? undefined : data.total;
+    const header = (name: string): number | undefined => {
+      const raw = response.headers.get(name);
+      if (raw === null) return undefined;
+      const value = Number(raw);
+      return Number.isFinite(value) ? value : undefined;
+    };
+    return {
+      items,
+      total: header("x-total-count") ?? bodyTotal ?? items.length,
+      limit: header("x-limit") ?? opts.limit ?? items.length,
+      offset: header("x-offset") ?? opts.offset ?? 0,
+    };
   }
 
   /**

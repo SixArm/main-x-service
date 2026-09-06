@@ -63,6 +63,49 @@ test.describe("Thing front-end smoke", () => {
         await expect(page.getByText("[redacted]")).not.toBeVisible();
     });
 
+    // Pins T-28: the family-wide X-Total-Count/X-Offset headers drive the
+    // "N of M" indicator and the Next control, which re-fetches with the
+    // advanced offset (the client's fixed page size, 50) rather than
+    // stopping at the first 50 results with no way to see more.
+    test("things list next-page control advances the offset", async ({ page }) => {
+        let capturedOffset: string | null = null;
+        await page.route("**/api/things/search**", async (route) => {
+            const url = new URL(route.request().url());
+            capturedOffset = url.searchParams.get("offset");
+            const onSecondPage = capturedOffset === "50";
+            const thing = {
+                id: onSecondPage ? "0c4f1e2a-0000-4000-8000-00000000000d" : "0c4f1e2a-0000-4000-8000-00000000000c",
+                name: onSecondPage ? "Second page item" : "First page item",
+            };
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                headers: {
+                    "X-Total-Count": "100",
+                    "X-Limit": "50",
+                    "X-Offset": onSecondPage ? "50" : "0",
+                },
+                body: JSON.stringify({ success: true, data: [thing], error: null }),
+            });
+        });
+
+        await page.goto("/things");
+        await expect(page.getByText("First page item")).toBeVisible();
+        await expect(page.getByText("1–1 of 100")).toBeVisible();
+        await expect(page.getByRole("button", { name: "Previous" })).toBeDisabled();
+        await expect(page.getByRole("button", { name: "Next" })).toBeEnabled();
+
+        await page.getByRole("button", { name: "Next" }).click();
+        expect(capturedOffset).toBe("50");
+        await expect(page.getByText("Second page item")).toBeVisible();
+        await expect(page.getByText("51–51 of 100")).toBeVisible();
+        await expect(page.getByRole("button", { name: "Previous" })).toBeEnabled();
+
+        await page.getByRole("button", { name: "Previous" }).click();
+        expect(capturedOffset).toBe("0");
+        await expect(page.getByText("First page item")).toBeVisible();
+    });
+
     // Pins: the new-thing form shows the required Name field and Create button.
     test("new thing form renders required name field", async ({ page }) => {
         await page.goto("/things/new");

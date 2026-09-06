@@ -9,6 +9,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — pagination on the list/search route (T-28)
+
+`/things` called `search({ limit: 50 })` with no `offset` and no way
+to page past the first 50 results, and `ApiClient` discarded response
+headers entirely, so the family-wide `X-Total-Count`/`X-Limit`/
+`X-Offset` pagination headers (`agents/share/restful.md`) were never
+read. `ApiClient` gains `getWithHeaders` (its `request` core now
+returns `{data, response}` internally; every other verb still sees
+only `data`), and `ThingRepository.search` uses it to return `{ items,
+total, limit, offset }`, preferring the headers over anything the body
+carries — falling back exactly as before when a service predates them.
+`/things` gained a fixed 50-row page size, Previous/Next buttons
+(disabled at each end), and an "N of M" indicator; a new query or
+toggle submit always starts back at offset 0, and only the pagination
+buttons (and the mask-sensitive toggle, which stays on the current
+page) pass an explicit offset. New `things.previousPage`/
+`things.nextPage`/`things.pageRange` keys across all 13 locales. See
+spec/13-tasks.md T-28.
+
 ### Added — `mask_sensitive` toggle on the list/search UI (T-27)
 
 `ThingRepository.search()` already declared and forwarded

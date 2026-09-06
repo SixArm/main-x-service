@@ -10,11 +10,16 @@ function mockFetch(impl: (input: RequestInfo | URL, init?: RequestInit) => Promi
     return impl as unknown as typeof fetch;
 }
 
-// Build a JSON Response with the expected content-type header.
-function jsonResponse(body: unknown, status = 200): Response {
+// Build a JSON Response with the expected content-type header. `extraHeaders`
+// lets a test (T-28) also stub the family-wide pagination headers.
+function jsonResponse(
+    body: unknown,
+    status = 200,
+    extraHeaders: Record<string, string> = {},
+): Response {
     return new Response(JSON.stringify(body), {
         status,
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...extraHeaders },
     });
 }
 
@@ -103,6 +108,46 @@ describe("ThingRepository", () => {
         const repo = new ThingRepository(client);
         const result = await repo.search({ q: "Pride" });
         expect(result.total).toBe(1);
+    });
+
+    // Pins T-28: the family-wide X-Total-Count/X-Limit/X-Offset response
+    // headers (agents/share/restful.md) take priority over anything the
+    // body itself carries — the headers are the authoritative count
+    // ignoring limit/offset, where a bare-array body has no room for one
+    // at all.
+    it("prefers X-Total-Count/X-Limit/X-Offset headers over the body", async () => {
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async () =>
+                jsonResponse(
+                    { success: true, data: [sampleThing], error: null },
+                    200,
+                    { "X-Total-Count": "431", "X-Limit": "25", "X-Offset": "50" },
+                ),
+            ),
+        });
+        const repo = new ThingRepository(client);
+        const result = await repo.search({ q: "Pride", limit: 25, offset: 50 });
+        expect(result.items).toHaveLength(1);
+        expect(result.total).toBe(431);
+        expect(result.limit).toBe(25);
+        expect(result.offset).toBe(50);
+    });
+
+    // Pins: a service with no pagination headers still works, falling
+    // back to the requested limit/offset (or item count / 0) exactly as
+    // it did before the headers existed.
+    it("falls back to the requested limit/offset when headers are absent", async () => {
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async () =>
+                jsonResponse({ success: true, data: [sampleThing], error: null }),
+            ),
+        });
+        const repo = new ThingRepository(client);
+        const result = await repo.search({ q: "Pride", limit: 50 });
+        expect(result.limit).toBe(50);
+        expect(result.offset).toBe(0);
     });
 
     // Pins: get(id) issues GET /api/things/{id}.

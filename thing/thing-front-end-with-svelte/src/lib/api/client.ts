@@ -144,6 +144,20 @@ export class ApiClient {
     return this.request<T>("GET", path, opts);
   }
   /**
+   * As {@link get}, but also returns the raw {@link Response} so a
+   * caller can read response headers — e.g. the family-wide
+   * `X-Total-Count`/`X-Limit`/`X-Offset` pagination headers
+   * (`agents/share/restful.md`), which the plain `data` a normal `get`
+   * returns has no room to carry (T-28).
+   * @throws {ApiError} On non-2xx response or `success: false` envelope.
+   */
+  getWithHeaders<T>(
+    path: string,
+    opts?: RequestOptions,
+  ): Promise<{ data: T; response: Response }> {
+    return this.requestWithResponse<T>("GET", path, opts);
+  }
+  /**
    * Issue a `POST` (typically with `opts.body`) and return the data.
    * @throws {ApiError} On non-2xx response or `success: false` envelope.
    */
@@ -167,8 +181,9 @@ export class ApiClient {
   }
 
   /**
-   * Core request pipeline shared by all verbs: build the URL, send the
-   * request, then interpret the response against the envelope contract.
+   * Core request pipeline shared by all verbs: delegates to
+   * {@link requestWithResponse} and discards the raw `Response`, which
+   * every verb but {@link getWithHeaders} has no use for.
    * @throws {ApiError} On non-JSON body, non-2xx status, or failed envelope.
    */
   private async request<T>(
@@ -176,6 +191,20 @@ export class ApiClient {
     path: string,
     opts: RequestOptions = {},
   ): Promise<T> {
+    const { data } = await this.requestWithResponse<T>(method, path, opts);
+    return data;
+  }
+
+  /**
+   * As {@link request}, but resolves to both the envelope's `data` and
+   * the raw {@link Response} — the one place headers are reachable.
+   * @throws {ApiError} On non-JSON body, non-2xx status, or failed envelope.
+   */
+  private async requestWithResponse<T>(
+    method: string,
+    path: string,
+    opts: RequestOptions = {},
+  ): Promise<{ data: T; response: Response }> {
     const url = this.buildUrl(path, opts.query);
     const headers: Record<string, string> = {
       ...this.defaultHeaders,
@@ -203,7 +232,7 @@ export class ApiClient {
 
     // 204 No Content has no envelope to parse — resolve to undefined.
     if (response.status === 204) {
-      return undefined as T;
+      return { data: undefined as T, response };
     }
 
     // Read the body as text first so we can give a useful error on
@@ -230,8 +259,9 @@ export class ApiClient {
     if (parsed && parsed.success === false) {
       throw new ApiError(response.status, parsed.error);
     }
-    // Success: hand back just the inner data (undefined if the body was empty).
-    return (parsed?.data ?? undefined) as T;
+    // Success: hand back the inner data (undefined if the body was empty)
+    // plus the raw response, for callers that need its headers.
+    return { data: (parsed?.data ?? undefined) as T, response };
   }
 
   /**
