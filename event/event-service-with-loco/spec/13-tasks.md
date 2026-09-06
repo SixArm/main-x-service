@@ -450,17 +450,39 @@ clearly described manual check confirms the acceptance criterion.
   detection (create-time check, `POST /api/events/deduplicate`) goes
   entirely through the crate-local `scoring::ProbabilisticScorer` /
   `DeterministicScorer` in `src/matching/scoring.rs`. `to_matcher_event`
-  is called only from its own module's `#[cfg(test)]` block — it is
-  dead in every production code path. *(verified: `grep -rn
-  "to_matcher_event\|matcher_lib\|calculate_score" src/` — the only
-  non-doc-comment call sites for `to_matcher_event` are inside
-  `src/matching/adapter.rs`'s own `mod tests`, lines 438–508.)* Either
-  surface the canonical-crate score as an actual second opinion (e.g.
-  in the score breakdown, or a config-gated comparison path) or remove
-  the adapter + re-export and record why in `agents/matching.md`.
-  **Acceptance:** `to_matcher_event`/`matcher_lib` is either called
-  from a real request path with a test proving it, or removed with a
-  spec note explaining the two-implementation history.
+  is not called from any REST handler or business-logic path.
+  **Correction (2026-09-06): the task's own "only from its own
+  module's `#[cfg(test)]` block" verification was wrong** — a targeted
+  grep of `src/` alone missed `tests/duplicate_detection.rs`, a
+  514-line, always-run (no `#[ignore]`) integration suite of 18 tests
+  explicitly documented as "end-to-end duplicate-detection integration
+  tests for the event-service ↔ event-matcher bridge", exercising
+  `to_matcher_event` + `matcher_lib::MatchingEngine` across the
+  DateTime→RFC3339, location-variant, party, identifier-scheme, and
+  event-type/status projections (verified: `cargo test --test
+  duplicate_detection` — 18/18 passing). So this is not dead,
+  untested, or unproven code; it is a real, substantial, currently
+  green bridge test suite that simply isn't wired into a live request
+  path. That materially changes the calculus for "remove it": deleting
+  the adapter would also delete ~500 lines of adapter logic **and**
+  ~500 lines of genuine, passing integration coverage documenting the
+  service ↔ matcher contract, which is not the "half-built dead code"
+  case T-13 (this same file) turned out to be. Left open rather than
+  resolved unilaterally, since both remaining options are now real
+  product decisions rather than low-judgment cleanup: (a) actually
+  invoke `to_matcher_event`/`matcher_lib` from a live path (e.g. as a
+  config-gated second opinion in the deduplicate/create-time check,
+  surfaced in the score breakdown) — a real feature needing its own
+  design; or (b) deliberately keep it test-only as a standing
+  cross-crate contract/regression suite (arguably already valuable on
+  its own merits, independent of any production wiring) and reword
+  this task from "wire or retire" to reflect that it is a considered
+  choice, not a gap.
+  **Acceptance:** either `to_matcher_event`/`matcher_lib` is wired into
+  a real request path with a test proving it, or this task is closed
+  as "kept test-only, deliberately" with the reasoning above folded
+  into `agents/matching.md` — not removed, given the existing test
+  investment this correction surfaced.
 
 - [x] **T-13 — Resolve the unused `match_window_overlap` time scorer.**
   *(Resolved 2026-09-06.)* `matching::algorithms::time_matching::match_window_overlap`
