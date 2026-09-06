@@ -16,7 +16,11 @@ export const actions: Actions = {
     if (!email) {
       return { sent: false, error: "email-required" };
     }
-    const ok = await signup(fetch, email, name, locale);
-    return ok ? { sent: true, error: null } : { sent: false, error: "failed" };
+    const outcome = await signup(fetch, email, name, locale);
+    if (outcome === "sent") return { sent: true, error: null };
+    return {
+      sent: false,
+      error: outcome === "rateLimited" ? "rate-limited" : "failed",
+    };
   },
 };

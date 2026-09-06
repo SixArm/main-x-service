@@ -26,6 +26,10 @@ const PID = "11111111-1111-4111-8111-111111111111";
 const EMAIL = "alice@example.com";
 const NAME = "Alice";
 const VALID_MAGIC_TOKEN = "magic-123";
+// An email that simulates the auth service's rate limit (5 requests /
+// 5 min per email) being exceeded — must match smoke.spec.ts's copy of
+// the same constant (AFE-4).
+const RATE_LIMITED_EMAIL = "toomany@example.com";
 // A magic-link token that simulates the auth service being unreachable
 // (see the `req.socket.destroy()` handling below) — must match
 // smoke.spec.ts's copy of the same constant.
@@ -104,12 +108,20 @@ const server = createServer(async (req, res) => {
   }
 
   if (pathname === "/api/auth/signup" && method === "POST") {
-    await readBody(req);
+    const body = await readBody(req);
+    const { email } = JSON.parse(body || "{}");
+    if (email === RATE_LIMITED_EMAIL) {
+      return sendJson(res, 429, { error: "rate_limited" });
+    }
     return sendJson(res, 200, undefined);
   }
 
   if (pathname === "/api/auth/magic-link" && method === "POST") {
-    await readBody(req);
+    const body = await readBody(req);
+    const { email } = JSON.parse(body || "{}");
+    if (email === RATE_LIMITED_EMAIL) {
+      return sendJson(res, 429, { error: "rate_limited" });
+    }
     return sendJson(res, 200, undefined);
   }
 

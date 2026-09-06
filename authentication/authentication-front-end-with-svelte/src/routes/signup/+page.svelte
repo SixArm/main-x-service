@@ -31,7 +31,9 @@
         </label>
         <input type="hidden" name="locale" value={i18n.locale} />
         <button class="button" type="submit">{t("signup.submit")}</button>
-        {#if form?.error}
+        {#if form?.error === "rate-limited"}
+            <p class="banner" role="alert">{t("account.rateLimited")}</p>
+        {:else if form?.error}
             <p class="banner" role="alert">{t("signup.failed")}</p>
         {/if}
     </form>

@@ -109,6 +109,8 @@ const STRINGS = {
     "account.signinPrompt.or": "or",
     "account.signinPrompt.create": "create an account",
     "account.loadFailed": "Failed to load profile",
+    "account.rateLimited":
+      "Too many requests. Please wait a few minutes and try again.",
     // Sign in
     "signin.title": "Sign in",
     "signin.email": "Email",
@@ -162,6 +164,8 @@ const STRINGS = {
     "account.signinPrompt.or": "neu",
     "account.signinPrompt.create": "creu cyfrif",
     "account.loadFailed": "Methwyd â llwytho'r proffil",
+    "account.rateLimited":
+      "Gormod o geisiadau. Arhoswch ychydig funudau a rhowch gynnig arall arni.",
     "signin.title": "Mewngofnodi",
     "signin.email": "E-bost",
     "signin.submit": "E-bostiwch ddolen hud ataf",
@@ -212,6 +216,8 @@ const STRINGS = {
     "account.signinPrompt.or": "o",
     "account.signinPrompt.create": "crear una cuenta",
     "account.loadFailed": "No se pudo cargar el perfil",
+    "account.rateLimited":
+      "Demasiadas solicitudes. Espere unos minutos e inténtelo de nuevo.",
     "signin.title": "Iniciar sesión",
     "signin.email": "Correo electrónico",
     "signin.submit": "Envíame un enlace mágico",
@@ -262,6 +268,8 @@ const STRINGS = {
     "account.signinPrompt.or": "ou",
     "account.signinPrompt.create": "créer un compte",
     "account.loadFailed": "Échec du chargement du profil",
+    "account.rateLimited":
+      "Trop de requêtes. Veuillez patienter quelques minutes et réessayer.",
     "signin.title": "Se connecter",
     "signin.email": "E-mail",
     "signin.submit": "Envoyez-moi un lien magique",
@@ -312,6 +320,8 @@ const STRINGS = {
     "account.signinPrompt.or": "oder",
     "account.signinPrompt.create": "ein Konto erstellen",
     "account.loadFailed": "Profil konnte nicht geladen werden",
+    "account.rateLimited":
+      "Zu viele Anfragen. Bitte warten Sie einige Minuten und versuchen Sie es erneut.",
     "signin.title": "Anmelden",
     "signin.email": "E-Mail",
     "signin.submit": "Schick mir einen Magic Link",
@@ -362,6 +372,8 @@ const STRINGS = {
     "account.signinPrompt.or": "أو",
     "account.signinPrompt.create": "إنشاء حساب",
     "account.loadFailed": "فشل تحميل الملف الشخصي",
+    "account.rateLimited":
+      "طلبات كثيرة جدًا. يرجى الانتظار بضع دقائق والمحاولة مرة أخرى.",
     "signin.title": "تسجيل الدخول",
     "signin.email": "البريد الإلكتروني",
     "signin.submit": "أرسل لي رابطًا سحريًا",
@@ -412,6 +424,8 @@ const STRINGS = {
     "account.signinPrompt.or": "или",
     "account.signinPrompt.create": "создать учётную запись",
     "account.loadFailed": "Не удалось загрузить профиль",
+    "account.rateLimited":
+      "Слишком много запросов. Подождите несколько минут и повторите попытку.",
     "signin.title": "Войти",
     "signin.email": "Эл. почта",
     "signin.submit": "Отправьте мне волшебную ссылку",
@@ -462,6 +476,8 @@ const STRINGS = {
     "account.signinPrompt.or": "या",
     "account.signinPrompt.create": "एक खाता बनाएँ",
     "account.loadFailed": "प्रोफ़ाइल लोड करने में विफल",
+    "account.rateLimited":
+      "बहुत अधिक अनुरोध। कृपया कुछ मिनट प्रतीक्षा करें और फिर से प्रयास करें।",
     "signin.title": "साइन इन करें",
     "signin.email": "ईमेल",
     "signin.submit": "मुझे एक मैजिक लिंक ईमेल करें",
@@ -512,6 +528,7 @@ const STRINGS = {
     "account.signinPrompt.or": "或",
     "account.signinPrompt.create": "创建账户",
     "account.loadFailed": "加载个人资料失败",
+    "account.rateLimited": "请求过多。请稍等几分钟后重试。",
     "signin.title": "登录",
     "signin.email": "电子邮箱",
     "signin.submit": "给我发送一个魔法链接",
@@ -561,6 +578,8 @@ const STRINGS = {
     "account.signinPrompt.or": "অথবা",
     "account.signinPrompt.create": "একটি অ্যাকাউন্ট তৈরি করুন",
     "account.loadFailed": "প্রোফাইল লোড করতে ব্যর্থ",
+    "account.rateLimited":
+      "অনেক বেশি অনুরোধ। কয়েক মিনিট অপেক্ষা করে আবার চেষ্টা করুন।",
     "signin.title": "সাইন ইন",
     "signin.email": "ইমেল",
     "signin.submit": "আমাকে একটি ম্যাজিক লিঙ্ক ইমেল করুন",
@@ -611,6 +630,8 @@ const STRINGS = {
     "account.signinPrompt.or": "ou",
     "account.signinPrompt.create": "criar uma conta",
     "account.loadFailed": "Falha ao carregar o perfil",
+    "account.rateLimited":
+      "Demasiados pedidos. Aguarde alguns minutos e tente novamente.",
     "signin.title": "Entrar",
     "signin.email": "E-mail",
     "signin.submit": "Envie-me um link mágico",
@@ -661,6 +682,8 @@ const STRINGS = {
     "account.signinPrompt.or": "atau",
     "account.signinPrompt.create": "buat akun",
     "account.loadFailed": "Gagal memuat profil",
+    "account.rateLimited":
+      "Terlalu banyak permintaan. Harap tunggu beberapa menit dan coba lagi.",
     "signin.title": "Masuk",
     "signin.email": "Email",
     "signin.submit": "Kirimi saya tautan ajaib",
@@ -711,6 +734,8 @@ const STRINGS = {
     "account.signinPrompt.or": "یا",
     "account.signinPrompt.create": "ایک اکاؤنٹ بنائیں",
     "account.loadFailed": "پروفائل لوڈ کرنے میں ناکام",
+    "account.rateLimited":
+      "بہت زیادہ درخواستیں۔ چند منٹ انتظار کریں اور دوبارہ کوشش کریں۔",
     "signin.title": "سائن ان کریں",
     "signin.email": "ای میل",
     "signin.submit": "مجھے ایک جادوئی لنک ای میل کریں",

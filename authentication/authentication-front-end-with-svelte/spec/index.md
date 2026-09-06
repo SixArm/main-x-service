@@ -527,26 +527,44 @@ session on sign-out and the BFF clears the cookie. CSRF protection (§6 FR
     `pnpm run check` (svelte-check, 0 errors) and `pnpm test` (vitest,
     17/17) unaffected.
 
-- [ ] **AFE-4 (S) Surface the `429` rate-limit response distinctly from
-      a generic failure.** The auth service rate-limits `signup`/
-      `magic-link` issuance (5 requests / 5 min per email,
-      `authentication-service-with-loco/AGENTS.md`) and returns `429`
-      over the cap. *(verified: `src/lib/server/auth.ts`'s
-      `requestMagicLink`/`signup` both return only `res.ok` — a plain
+- [x] **AFE-4 (S) Surface the `429` rate-limit response distinctly from
+      a generic failure.** *(resolved 2026-09-06.)* The auth service
+      rate-limits `signup`/`magic-link` issuance (5 requests / 5 min
+      per email, `authentication-service-with-loco/AGENTS.md`) and
+      returns `429` over the cap. *(verified: `src/lib/server/auth.ts`'s
+      `requestMagicLink`/`signup` returned only `res.ok` — a plain
       boolean — discarding the status code entirely, so
-      `src/routes/signin/+page.server.ts`'s action collapses every
+      `src/routes/signin/+page.server.ts`'s action collapsed every
       non-2xx response, `429` included, into the single generic
-      `error: "failed"` outcome; no `i18n` key or UI copy distinguishes
-      "try again in a few minutes" from any other failure)*. Since the
+      `error: "failed"` outcome; no `i18n` key or UI copy distinguished
+      "try again in a few minutes" from any other failure.)* Since the
       always-`200` anti-enumeration shape means `429` is the one
       documented non-2xx outcome these two endpoints intentionally
-      produce, it is worth a distinct, honest message rather than a
-      generic "something went wrong". Change
-      `requestMagicLink`/`signup` to return the status (or a small
-      result enum), add an `account.rateLimited` i18n key (13 locales,
-      mirroring `tests/unit/i18n.test.ts`'s key-parity assertion), and
-      wire it into the `signin`/`signup` `+page.server.ts` actions and
-      pages.
+      produce, it was worth a distinct, honest message rather than a
+      generic "something went wrong".
+  - **Resolved.** `requestMagicLink`/`signup` now return a
+    `MagicLinkOutcome` (`"sent" | "rateLimited" | "failed"`) instead of
+    a boolean, classifying `429` distinctly from any other non-2xx
+    status. Both `signin`/`signup` `+page.server.ts` actions map
+    `"rateLimited"` to a new `error: "rate-limited"` outcome, and both
+    pages render the new `account.rateLimited` i18n key ("Too many
+    requests. Please wait a few minutes and try again.") instead of
+    the generic `signin.failed`/`signup.failed` copy when it fires.
+    Added across all 13 locales — `tests/unit/i18n.test.ts`'s existing
+    full-coverage assertion covers it, no new test needed there.
+  - New `tests/unit/auth.test.ts` (8 cases) pins `requestMagicLink`/
+    `signup`'s three-way classification and request-body shape
+    directly against a mocked `fetch`. `tests/e2e/mock-auth-server.mjs`
+    gained a `RATE_LIMITED_EMAIL` fixture returning `429` from both
+    endpoints; two new `tests/e2e/smoke.spec.ts` cases (one per page)
+    submit that email and assert the distinct message renders (and the
+    generic one does not) — verified to fail with the BFF/page changes
+    reverted and pass with them restored.
+  - **Acceptance met:** `pnpm test` 25/25 (was 17); `pnpm run check`
+    clean; `pnpm exec playwright test` 13/13 (was 11); `pnpm run lint`
+    clean save for two pre-existing, untouched files
+    (`src/lib/server/admin.ts`,
+    `src/routes/admin/attributes/+page.server.ts`).
       **Acceptance:** a stubbed `429` response in a unit test produces
       the distinct rate-limited UI state, not the generic failure one;
       `pnpm test` (incl. the 13-locale key-parity check) green.
