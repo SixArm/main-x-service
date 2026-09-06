@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — vitest coverage for the BFF session/token-exchange code (PF-T23)
+
+`src/lib/server/{session,auth}.ts` — the httpOnly-cookie helpers,
+magic-link request/verify, and the session→PASETO `exchangeToken`
+call — had no direct unit tests; only `bed-card.test.ts` and (since
+PF-T19) `verify.test.ts` existed, and the latter only exercises them
+indirectly through `/verify`'s `load` function. Three new suites:
+`tests/unit/session.test.ts` (9 cases: `parseSessionId`,
+`sessionIdFromResponse` including its `getSetCookie`-unavailable
+fallback, and the cookie-attribute pins), `tests/unit/auth.test.ts`
+(10 cases: `verifyMagicLink`, `requestMagicLink`, `exchangeToken`,
+`signout`, all against a mocked `fetch`), and
+`tests/unit/proxy.test.ts` (8 cases: the actual
+`src/routes/api/proxy/[...path]/+server.ts` `GET`/`POST` handlers
+invoked directly — header stripping/stamping, the session→Bearer
+exchange, body forwarding, response header allow-listing — with only
+`exchangeToken` mocked, rather than `page.route`-intercepting the
+whole proxy the way `board.spec.ts` does). `npm test` 52/52 (was 22).
+See spec/tasks.md PF-T23.
+
 ### Fixed — `/verify` crashed with a raw 500 when the authentication service was unreachable (PF-T19)
 
 `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch,

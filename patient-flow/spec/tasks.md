@@ -260,22 +260,41 @@ code + tests in one PR.
   (vitest, 22/22) clean, `npx playwright test` 10/10 passed (twice, to
   rule out flake), `npm run lint` clean save for one pre-existing,
   untouched `.d.ts` formatting warning.
-- [ ] PF-T23 **Zero test coverage on the BFF session/token-exchange
-  code.** `src/lib/server/{session,auth,config}.ts` (PF-T18's
-  httpOnly-cookie helpers, magic-link request/verify, and the
-  session→PASETO `exchangeToken` call) have no unit tests, and
-  `tests/e2e/board.spec.ts` — the only e2e spec file — stubs the proxy
-  wholesale (`page.route("**/api/proxy/**", …)` at line 180) rather than
-  routing through `src/routes/api/proxy/[...path]/+server.ts` — *(verified:
-  `find tests/unit` lists only `bed-card.test.ts`; `grep -rn
-  exchangeToken tests/` matches nothing outside the mocked route
-  handler)*. The BFF pattern is this app's whole "no token in browser
-  JS" security property (`agents/share/authentication-sessions.md` §6);
-  it is currently unverified by any test, inert or not. **Acceptance:**
-  a vitest suite exercises `session.ts`'s cookie helpers directly and
-  `auth.ts`'s magic-link functions against a mocked fetch, and one e2e
-  test hits the real `/api/proxy/[...path]` route (auth-service stubbed
-  or skipped when unset) instead of intercepting it.
+- [x] PF-T23 **Zero test coverage on the BFF session/token-exchange
+  code.** *(resolved 2026-09-06.)* `src/lib/server/{session,auth}.ts`
+  (PF-T18's httpOnly-cookie helpers, magic-link request/verify, and the
+  session→PASETO `exchangeToken` call) had no direct unit tests — only
+  `bed-card.test.ts` existed when this task was written; `verify.test.ts`
+  was added since (the PF-T19 `/verify` network-error-crash fix pass)
+  but only exercises `session.ts`/`auth.ts` indirectly through the
+  `/verify` `load` function, not their own branches (e.g.
+  `sessionIdFromResponse`'s `getSetCookie`-absent fallback,
+  `requestMagicLink`'s body shape, `exchangeToken`'s null-token and
+  non-ok branches, `signout`'s skip-if-no-token path) — and
+  `tests/e2e/board.spec.ts` stubs the proxy wholesale via
+  `page.route("**/api/proxy/**", …)` rather than routing through
+  `src/routes/api/proxy/[...path]/+server.ts`.
+  - **Resolved.** New `tests/unit/session.test.ts` (9 cases) covers
+    `parseSessionId`/`sessionIdFromResponse` directly, including the
+    `getSetCookie`-unavailable fallback and the cookie-attribute pins;
+    new `tests/unit/auth.test.ts` (10 cases) covers `verifyMagicLink`,
+    `requestMagicLink`, `exchangeToken`, and `signout` against a
+    mocked `fetch`. For the proxy half of the acceptance, rather than
+    adding a Playwright e2e test — which would mean either standing up
+    the real patient-flow service or restructuring this app's
+    deliberately backend-free e2e config (`playwright.config.ts`'s own
+    comment: "no running Rust service is required") — new
+    `tests/unit/proxy.test.ts` (8 cases) imports and invokes the actual
+    `GET`/`POST` route handlers directly (the same no-browser pattern
+    `verify.test.ts` already established for `/verify`'s `load`
+    function), with only `exchangeToken` mocked: header
+    stripping/stamping, the session→Bearer exchange (present, absent,
+    and failed-exchange branches), body forwarding, and response
+    header allow-listing are all exercised against the real handler
+    code, not a `page.route` stub. `npm test` (vitest) 52/52 (was 22);
+    `npm run check` clean; `npm run lint` clean save for the
+    pre-existing, untouched `svar-filter-augment.d.ts` warning noted in
+    PF-T21/T22.
 - [x] PF-T24 **Fix: the `/edd` calendar (PF-T15a) never actually showed
   an expected-discharge event.** *(resolved 2026-09-06.)*
   `@svar-ui/calendar-store` requires an all-day event's `end` to be
