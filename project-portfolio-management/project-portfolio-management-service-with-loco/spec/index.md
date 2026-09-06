@@ -1452,6 +1452,20 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   points/velocity/retro-notes, `/engineering` gains the `DevOps`
   metrics + releases; svelte-check 0, vitest 45, Playwright 21.
 
+- [x] **Doc drift: stale MSRV 1.95 / N-3 reference (2026-09-06).** An
+  earlier entry above said `rust-version = "1.95"` and "current stable
+  minus three," matching the repository's MSRV policy at the time it
+  was written (even though it already linked to
+  `spec/rust-msrv-n-minus-2/index.md`, an inconsistency in the entry
+  itself). The policy has since tightened to **N-2**, and `Cargo.toml`
+  already declares `rust-version = "1.96"` — the entry above is left
+  as-written (it is a dated record of what was true then) rather than
+  edited to claim a value it never actually set; this entry is the
+  correction, matching the pattern already used for `CHANGELOG.md`'s
+  equivalent fix. No behaviour change; `Cargo.toml`, `ci/msrv.txt`, and
+  `scripts/ci-check.sh msrv` all already agreed on 1.96 before this
+  entry — only the prose here was stale.
+
 ## 14. Implementation status
 
 **Implemented (MVP v0.1.0 + PPM Phases A/B/C; see §13 for the
