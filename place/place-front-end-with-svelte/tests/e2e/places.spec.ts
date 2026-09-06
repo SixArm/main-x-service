@@ -105,6 +105,53 @@ test.describe("Place front-end smoke", () => {
         ).not.toBeVisible();
     });
 
+    // Pins T-27: the list/search page's "Mask sensitive fields" checkbox
+    // sets `mask_sensitive` on the search request and re-fetches
+    // immediately (unlike fuzzy/phonetic, which wait for the next
+    // explicit submit) — mirroring the detail page's masked-view toggle
+    // above. The two stubbed responses carry different totals so the
+    // rendered count is the visible proof the toggle actually changed
+    // which response was used, not just the outgoing request.
+    test("places list toggles mask_sensitive on the search request", async ({
+        page,
+    }) => {
+        const place = {
+            id: "0c4f1e2a-0000-4000-8000-00000000000b",
+            name: "Central Park",
+            address: { address_locality: "New York" },
+        };
+        let lastUrl = "";
+        await page.route("**/api/places/search**", async (route) => {
+            lastUrl = route.request().url();
+            const masked = lastUrl.includes("mask_sensitive=true");
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({
+                    success: true,
+                    data: { items: [place], total: masked ? 1 : 2 },
+                    error: null,
+                }),
+            });
+        });
+
+        await page.goto("/places");
+        await expect(page.getByText("2 places")).toBeVisible();
+        expect(lastUrl).not.toContain("mask_sensitive=true");
+
+        await page
+            .getByRole("checkbox", { name: "Mask sensitive fields" })
+            .check();
+        await expect(page.getByText("1 place", { exact: true })).toBeVisible();
+        expect(lastUrl).toContain("mask_sensitive=true");
+
+        await page
+            .getByRole("checkbox", { name: "Mask sensitive fields" })
+            .uncheck();
+        await expect(page.getByText("2 places")).toBeVisible();
+        expect(lastUrl).toContain("mask_sensitive=false");
+    });
+
     // Pins the FE-4 review screen: the board, the keyboard-reachable queue
     // table, and the side-by-side comparison the Compare button opens. The
     // queue and both sides of the pair are stubbed at the network layer so

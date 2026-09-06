@@ -5,7 +5,11 @@
     - query           — current search text (bound to SearchBox).
     - places / total  — current result page and its total count.
     - loading / error — request status surfaced in the UI.
-    - fuzzy / phonetic — search toggles forwarded to the search endpoint.
+    - fuzzy / phonetic — search toggles forwarded to the search endpoint;
+      take effect on the next explicit search submit.
+    - maskSensitive   — mask_sensitive toggle (T-27); re-fetches
+      immediately on change, mirroring the detail page's masked-view
+      toggle (T-19).
 
   Selecting a grid row navigates to that place's detail page.
 -->
@@ -24,6 +28,7 @@
     let error = $state<string | null>(null);
     let fuzzy = $state(true);
     let phonetic = $state(false);
+    let maskSensitive = $state(false);
 
     // One repository instance for this page (no global HTTP store).
     const repo = PlaceRepository.withFetch();
@@ -38,6 +43,7 @@
                 limit: 50,
                 fuzzy,
                 phonetic,
+                mask_sensitive: maskSensitive,
             });
             places = res.items;
             total = res.total;
@@ -53,6 +59,16 @@
     // Row-select handler: navigate to the place detail page.
     function openPlace(place: Place) {
         if (place.id) goto(`/places/${place.id}`);
+    }
+
+    // Unlike fuzzy/phonetic (which only take effect on the next explicit
+    // search submit), masking re-fetches immediately on toggle — the same
+    // "flip and re-fetch now" behaviour the detail page's masked-view
+    // toggle (T-19) uses, since it's a view choice rather than a search
+    // strategy the operator is still composing.
+    function toggleMaskSensitive() {
+        maskSensitive = !maskSensitive;
+        void runSearch(query);
     }
 
     // Initial load: list everything once on mount. The effect has no
@@ -83,6 +99,14 @@
         <label
             ><input type="checkbox" bind:checked={phonetic} />
             {t("places.phonetic")}</label
+        >
+        <label
+            ><input
+                type="checkbox"
+                checked={maskSensitive}
+                onchange={toggleMaskSensitive}
+            />
+            {t("places.maskSensitive")}</label
         >
         <span class="muted" style="margin-left: auto">
             {loading
