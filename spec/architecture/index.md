@@ -10,18 +10,9 @@ See also:
 
 - [../index.md](../index.md) — monorepo index + the entity table
 - [../data-modeling.md](../data-modeling.md) — SQL-first data-modeling rules
-- [../data.md](../data.md) — data conventions
 - [../postgresql/index.md](../postgresql/index.md) — PostgreSQL spec
 - [../../agents/share/architecture.md](../../agents/share/architecture.md) — the per-service architecture brief this expands on
 - [../../agents/share/index.md](../../agents/share/index.md) — shared reference-doc index
-
-> **Note on links.** Several per-topic references below point at
-> `agents/share/*.md` rather than `spec/<topic>/index.md`. As of this
-> writing the only monorepo-level topic spec dirs that exist are
-> `spec/postgresql/` and this `spec/architecture/`; the canonical
-> match / merge / search / dataflow / auditability / tech-stack
-> references live under `agents/share/`. When a `spec/<topic>/index.md`
-> is later promoted, repoint the link.
 
 ---
 
@@ -31,11 +22,14 @@ The monorepo is organised by **domain entity**, not by layer. Each
 entity owns a top-level directory containing the full vertical slice for
 that entity: front-end, library crate, service crate, and umbrella docs.
 
-Entities (10): `person`, `worker`, `place`, `thing`, `event`, `course`,
-`organization`, `care-pathway`, `case`, `authentication`. Plus one
-**consumer application** that is not itself an indexed entity:
-`case-folder` (NHS paper case-note folder location tracking; it consumes
-the person / place / worker services).
+Entity registries (10): `person`, `worker`, `place`, `thing`, `event`,
+`course`, `organization`, `care-pathway`, `case`, `portfolio`
+(project-portfolio-management). `authentication` is not one of the ten
+registries — it is the central SSO provider (§1 below) — and
+`link-graph-service` is a cross-cutting aggregator, not an entity
+registry either. Plus one **consumer application** that is not itself an
+indexed entity: `case-folder` (NHS paper case-note folder location
+tracking; it consumes the person / place / worker services).
 
 Each entity directory holds these parts:
 
@@ -71,7 +65,8 @@ deliberate, in-progress convergence — not an accident.
 
 ### 2a. loco.rs services (the reference style)
 
-Entities: **authentication, organization, care-pathway, case.**
+Entities: **authentication, organization, care-pathway, case, portfolio,
+link-graph-service.**
 
 These are real [loco.rs](https://loco.rs/) 0.16 services (Axum 0.8
 under the hood). Characteristics:
@@ -127,9 +122,10 @@ Differences from the loco style:
   contacts, links, …) — not DTO-as-JSONB. JSONB is reserved for opaque
   snapshots only (audit old/new values, merge `transferred_data`,
   review-queue `score_breakdown`). See [../data-modeling.md](../data-modeling.md).
-- A broader surface: FHIR R5 endpoints, Tantivy search, privacy/GDPR
-  endpoints, batch deduplication — features the loco services have
-  deferred in favour of a thinner first cut.
+- A broader surface: FHIR R5 endpoints, privacy/GDPR endpoints, batch
+  deduplication — features the loco services (largely) deferred in
+  favour of a thinner first cut. Tantivy search is **not** one of
+  these: it is live on every entity registry regardless of style (§6).
 
 ### Why both — and the convergence plan
 
@@ -145,13 +141,13 @@ left their idiomatic-controller rewrite deferred.)
 
 | Aspect | loco style | MPI style |
 | ------ | ---------- | --------- |
-| Entities | authentication, organization, care-pathway, case | person, worker, place, thing, event, course |
+| Entities | authentication, organization, care-pathway, case, portfolio, link-graph-service | person, worker, place, thing, event, course |
 | Framework seam | loco `Hooks` + `AppContext` | hand-built Axum `Router` + `AppState` |
 | Endpoints | loco controllers | `api/rest` handlers (+ `api/fhir`, `api/grpc`) |
 | Migrations | `sea-orm-migration` | SeaORM migrations |
 | Persistence | matcher DTO as JSONB (+ denormalised handles) | normalized child tables |
 | Matching | embedded matcher crate, same type stored & matched | embedded matcher + service-side adapter |
-| Search | Postgres `ILIKE` (Tantivy deferred) | Tantivy full-text |
+| Search | Tantivy full-text (live on every entity registry) | Tantivy full-text |
 | Role | reference target | converging toward loco |
 
 ---
@@ -225,9 +221,10 @@ SQL).
 ## 5. Request lifecycle / data flows
 
 The three core write/read flows are identical in intent across both
-styles (the loco services implement thinner first cuts — e.g. `ILIKE`
-candidate selection instead of Tantivy, no privacy step yet). Canonical
-flow reference: [../../agents/share/dataflow.md](../../agents/share/dataflow.md).
+styles (the loco services implement thinner first cuts in some areas —
+e.g. no privacy step in case — but candidate selection is Tantivy on
+both styles, not `ILIKE`). Canonical flow reference:
+[../../agents/share/dataflow.md](../../agents/share/dataflow.md).
 
 **Create** (`POST /api/<plural>`):
 
@@ -244,7 +241,7 @@ Validation failures return `422`. See
 **Match** (`POST /api/<plural>/match`, `/check-duplicates`):
 
 ```
-HTTP POST → candidate selection (search / ILIKE) → fetch candidates →
+HTTP POST → candidate selection (Tantivy search) → fetch candidates →
   matcher.find_matches → score + classify (certain/probable/possible) → response
 ```
 
@@ -276,7 +273,7 @@ services).
 | CRUD + soft-delete | Create/read/update/delete with `active` flag, never hard-deleted | [../../agents/share/overview.md](../../agents/share/overview.md) |
 | Identifiers | Multiple per record (type + system + value) | [../../agents/share/overview.md](../../agents/share/overview.md) |
 | Matching | Probabilistic (weighted fuzzy) + deterministic (short-circuit) | [../../agents/share/match.md](../../agents/share/match.md) |
-| Search | Full-text / fuzzy / phonetic (Tantivy in MPI; `ILIKE` in loco) | [../../agents/share/search.md](../../agents/share/search.md) |
+| Search | Full-text / fuzzy / phonetic — Tantivy, live on both styles | [../../agents/share/search.md](../../agents/share/search.md) |
 | Merge | Confirmed-duplicate merge with link tracking + snapshot | [../../agents/share/merge.md](../../agents/share/merge.md) |
 | Audit logging | HIPAA-style who/what/when, old/new values as JSON | [../../agents/share/auditability.md](../../agents/share/auditability.md) |
 | Event streaming | `*Created/*Updated/*Deleted/*Merged` on every change | [../../agents/share/event-bus.md](../../agents/share/event-bus.md) |
@@ -285,14 +282,16 @@ services).
 | REST + OpenAPI | JSON REST API with Utoipa/Swagger docs | [../../agents/share/restful.md](../../agents/share/restful.md) |
 | Observability | tracing + OpenTelemetry; Prometheus text exposition | [../../agents/share/observability.md](../../agents/share/observability.md) |
 
-**Implemented vs planned (loco services):** CRUD, matching, name search
-(`ILIKE`), merge, audit, in-memory event streaming, OpenAPI/Swagger, and
-offline cross-service token verification are wired (target: PASETO
-v4.public; RS256/JWKS decommissioned). **Deferred:** Tantivy full-text,
-per-field privacy / GDPR export, durable event bus, blanket `/api/*`
-enforcement. The MPI services additionally ship Tantivy search, FHIR R5,
-privacy/GDPR endpoints, and batch deduplication today; the gRPC API is a
-stub in both styles.
+**Implemented vs planned (loco services):** CRUD, matching, Tantivy
+full-text search, merge, audit, event streaming (durable outbox,
+default-off), OpenAPI/Swagger, and offline cross-service token
+verification (PASETO v4.public) are wired. **Deferred (varies by
+crate — see the capability matrix in
+[../../agents/share/overview.md](../../agents/share/overview.md)):**
+per-field privacy / GDPR export (not yet in case), FHIR R5 (not yet in
+portfolio). The MPI services additionally ship FHIR R5, privacy/GDPR
+endpoints, and batch deduplication today; the gRPC API is a stub in
+both styles.
 
 ---
 

@@ -17,13 +17,12 @@ Briefs feeding this page:
 [agents/share/match-search-merge.md](../../agents/share/match-search-merge.md).
 
 Related monorepo docs: data conventions in
-[spec/data.md](../data.md); the per-topic family briefs for
-[search](../../agents/share/search.md) and
-[merge](../../agents/share/merge.md); the system
-[architecture](../../agents/share/architecture.md). (Sibling
-`spec/search/` and `spec/merge/` umbrella specs are not yet split out;
-the `agents/share/*` briefs above are the canonical short-form for
-those topics today.)
+[spec/data-modeling.md](../data-modeling.md); the sibling umbrella specs
+[search](../search/index.md) and [merge](../merge/index.md); the system
+[architecture](../architecture/index.md). The per-topic family briefs
+[agents/share/search.md](../../agents/share/search.md) and
+[agents/share/merge.md](../../agents/share/merge.md) remain as quick
+references.
 
 ---
 
@@ -331,9 +330,10 @@ per-component `score_breakdown`.
 
 **Candidate generation / blocking is a consumer concern, not part of the
 matcher libraries.** In the services, candidate sets are sourced from
-search (Tantivy full-text where implemented; ILIKE name/title search in
-the loco.rs services where Tantivy is **deferred**) before the matcher
-scores the survivors. The matcher crates expose `match_one_to_many` /
+Tantivy full-text search — live family-wide across all ten entity
+registries (see [agents/share/overview.md](../../agents/share/overview.md)'s
+capability matrix, footnote ¹) — before the matcher scores the
+survivors. The matcher crates expose `match_one_to_many` /
 `rank_one_to_many` helpers for scoring a query against a candidate slice,
 but do no blocking themselves.
 
@@ -356,6 +356,6 @@ the matcher sits in the request flow).
 | DTO-is-matcher-type embedding (loco.rs services) | Implemented (organization, care-pathway, case) |
 | Duplicate detection (409 on create, check, batch, review queue) | Implemented |
 | Geo matching (Haversine + Gaussian decay) | Implemented (place) |
-| **Tantivy full-text candidate generation / blocking** | Implemented in the original FHIR-shaped services; **deferred** in the loco.rs services (ILIKE search in the interim) |
+| **Tantivy full-text candidate generation / blocking** | Implemented family-wide — all ten entity registries index via Tantivy (fuzzy + phonetic; duplicate-check blocked on the index) |
 | Population-scale Fellegi-Sunter EM weight training | Out of scope (matcher libraries) |
 | Cross-scheme identity resolution; non-Latin phonetic encoders | Out of scope / opt-in deferred |

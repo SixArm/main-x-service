@@ -48,18 +48,18 @@ representative service manifests
 | HTTP layer | hyper, tower, tower-http | CORS, compression, tracing middleware |
 | Database | PostgreSQL 18+ | Persistence (NOT SQLite) |
 | ORM / migrations | SeaORM 2.0 + sea-orm-migration | Async ORM; schema migrations |
-| Search | Tantivy 0.22 | Embedded full-text search (target; several services still ILIKE) |
+| Search | Tantivy 0.22 | Embedded full-text search — live on all ten entity registries |
 | API docs | Utoipa 5 + utoipa-swagger-ui 9 (or hand-written OpenAPI) | OpenAPI 3.0 spec + Swagger UI |
 | Serialization | Serde + serde_json | JSON request/response |
 | Logging | tracing + tracing-subscriber | Structured logs |
-| Observability | OpenTelemetry (0.27) OTLP + tracing-opentelemetry; Prometheus 0.13 | Distributed traces, metrics, `/metrics.prom` |
+| Observability | OpenTelemetry 0.32 OTLP + tracing-opentelemetry 0.33; Prometheus 0.13 | Distributed traces, metrics, `/metrics.prom` |
 | String matching | strsim, fuzzy-matcher | Jaro-Winkler, Levenshtein |
 | Geo | geo, haversine | Coordinate distance (place / event matching) |
 | gRPC | Tonic 0.12 + Prost 0.13 | High-throughput RPC stub |
 | Timestamps | chrono 0.4 | Dates, times, durations |
 | Error handling | thiserror 2 + anyhow 1 | Typed + contextual errors |
 | Password hashing | argon2 0.5 | Magic-link / credential hashing (where used) |
-| Authentication | rusty_paseto (PASETO v4.public) + authentication-verifier 0.1 | Server-side Postgres **cookie sessions** are the session; cross-service auth is short-lived **PASETO v4.public** tokens verified offline against the published Ed25519 key (`/.well-known/paseto-keys`). `jsonwebtoken`/RS256 + JWKS is **decommissioned**. See [`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md). |
+| Authentication | rusty_paseto (PASETO v4.public) + authentication-verifier 0.9 | Server-side Postgres **cookie sessions** are the session; cross-service auth is short-lived **PASETO v4.public** tokens verified offline against the published Ed25519 key (`/.well-known/paseto-keys`). `jsonwebtoken`/RS256 + JWKS is **decommissioned**. See [`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md). |
 | Testing | assertables, tokio-test, mockall, tempfile (+ rstest, insta, serial_test in loco services) | Unit + integration + snapshot tests |
 | Benchmarking | Criterion 0.5 | Statistical performance benchmarks |
 | Memory allocator | MiMalloc 0.1 | Faster allocator on MUSL static builds (NOT jemalloc) |
@@ -115,8 +115,9 @@ to be closed, not as an alternative standard:
 | Crate | Deviation | Target |
 |---|---|---|
 | Older services (`person` and peers) | SeaORM columns use `with-time` (the `time` crate) at the persistence boundary; the domain layer is `chrono` (bridged in `db/convert.rs`) | unify on SeaORM `with-chrono` |
-| Several services | ILIKE / Postgres `pg_trgm` name search rather than Tantivy full-text | Tantivy 0.22 |
-| Event streaming | in-memory publisher | Fluvio durable stream |
+| Event streaming | default transport is still the in-memory publisher (`<ENTITY>_EVENT_TRANSPORT` defaults to `memory`); the durable Postgres outbox and the `FluvioSink` relay are implemented on all ten registries but opt-in, and only case's relay points at a live deployed broker today | flip the default, and point the remaining nine relays at a broker |
+
+Closed since this table was last drift-checked: Tantivy full-text search (was ILIKE/`pg_trgm`) is now live on all ten entity registries — see [`search/index.md`](../search/index.md).
 
 When a crate is brought to target, drop its row here and update its
 `Cargo.toml` and the crate spec's §13 task queue in the same PR
@@ -207,8 +208,10 @@ Pulls in: `loco-rs` (Hooks / AppContext / CLI / loco config),
 the sibling `*-matcher` crate (reused as the API DTO),
 `authentication-verifier`. Dev-deps add `rstest`, `insta`,
 `serial_test`, and in-process short-lived-token minting for auth tests
-(target: PASETO v4.public via `rusty_paseto`; the prior RS256 path —
-`jsonwebtoken`, `rsa`, `sha2`, `base64` — is being decommissioned).
+(PASETO v4.public via `rusty_paseto`; the prior RS256 path —
+`jsonwebtoken`, `rsa`, `sha2`, `base64` — was decommissioned 2026-08-21,
+repo-wide; `cargo deny check` is clean. See
+[`../../agents/share/security.md`](../../agents/share/security.md) §7).
 Search is Postgres `ILIKE`; events are in-memory; OpenAPI is
 hand-written or Utoipa.
 
@@ -222,7 +225,7 @@ Pulls in (beyond the loco set): `hyper` + `tower` + `tower-http`
 explicitly, `sea-orm-migration` directly, `tantivy` 0.22, `tonic` +
 `prost` + `tonic-build` (gRPC, with a `build.rs`), `utoipa` +
 `utoipa-swagger-ui` + `openapiv3`, `fluvio`, the full OpenTelemetry
-0.27 stack + `tracing-opentelemetry` + `prometheus`, `chrono` **and**
+0.32 stack + `tracing-opentelemetry` 0.33 + `prometheus`, `chrono` **and**
 `time`, `strsim` + `fuzzy-matcher`, `argon2`, `bigdecimal`, `dotenvy`,
 plus Criterion benches (`matching`, `search`, `validation`, `bridge`)
 and a tuned `[profile.release]` (`lto = true`, `codegen-units = 1`,

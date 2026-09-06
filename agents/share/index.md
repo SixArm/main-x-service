@@ -62,6 +62,11 @@ Per-crate `spec.md`:
 | [observability.md](observability.md)                             | Observability summary (alias for the Loco doc)         |
 | [rust-tracing-opentelemetry-stack.md](rust-tracing-opentelemetry-stack.md) | OpenTelemetry, tracing, metrics, logs, spans           |
 | [postgresql.md](postgresql.md)                                   | PostgreSQL database, extensions                        |
+| [postgresql-sessions-with-jsonb/](postgresql-sessions-with-jsonb/index.md) | Reference pattern: session storage in a JSONB column — used by `authentication-sessions.md` §3 |
+| [postgresql-job-queues-with-skip-locked/](postgresql-job-queues-with-skip-locked/index.md) | Reference pattern: `FOR UPDATE SKIP LOCKED` job queues (no external broker) |
+| [postgresql-pub-sub-with-listen-notify/](postgresql-pub-sub-with-listen-notify/index.md) | Reference pattern: `LISTEN`/`NOTIFY` pub/sub |
+| [postgresql-rate-limiting/](postgresql-rate-limiting/index.md)   | Reference pattern: rate limiting in PostgreSQL          |
+| [postgresql-caching-with-unlogged-tables/](postgresql-caching-with-unlogged-tables/index.md) | Reference pattern: caching via `UNLOGGED` tables        |
 | [privacy.md](privacy.md)                                         | Data masking, GDPR, consent                            |
 | [restful.md](restful.md)                                         | RESTful API guidance                                   |
 | [fhir.md](fhir.md)                                               | HL7 FHIR R5 API (resource mapping per entity, endpoints, Bundle/OperationOutcome/CapabilityStatement, auth/masking, per-entity adoption) |

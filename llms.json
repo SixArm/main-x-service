@@ -23,7 +23,17 @@
         { "title": "tasks.md", "url": "tasks.md", "description": "The live, repo-spanning work queue" },
         { "title": "plan.md", "url": "plan.md", "description": "Cross-subproject planning" },
         { "title": "tutorials/", "url": "tutorials/", "description": "Six live-verified walkthroughs: getting started, identity lifecycle, auth & ABAC, cross-service linking, bulk import/export, the event bus" },
+        { "title": "tutorials/01-getting-started.md", "url": "tutorials/01-getting-started.md", "description": "Tutorial 1: getting started" },
+        { "title": "tutorials/02-identity-lifecycle.md", "url": "tutorials/02-identity-lifecycle.md", "description": "Tutorial 2: identity lifecycle" },
+        { "title": "tutorials/03-authentication-abac.md", "url": "tutorials/03-authentication-abac.md", "description": "Tutorial 3: authentication & ABAC" },
+        { "title": "tutorials/04-cross-service-linking.md", "url": "tutorials/04-cross-service-linking.md", "description": "Tutorial 4: cross-service linking" },
+        { "title": "tutorials/05-bulk-import-export.md", "url": "tutorials/05-bulk-import-export.md", "description": "Tutorial 5: bulk import/export" },
+        { "title": "tutorials/06-event-bus.md", "url": "tutorials/06-event-bus.md", "description": "Tutorial 6: the event bus" },
         { "title": "examples/", "url": "examples/", "description": "Runnable reference material: Podman compose stacks, synthetic data fixtures, an ABAC policy cookbook, per-service .http request collections" },
+        { "title": "examples/compose/", "url": "examples/compose/", "description": "Podman compose stacks" },
+        { "title": "examples/data/", "url": "examples/data/", "description": "Synthetic data fixtures" },
+        { "title": "examples/policies/", "url": "examples/policies/", "description": "ABAC policy cookbook" },
+        { "title": "examples/api/", "url": "examples/api/", "description": "Per-service .http request collections" },
         { "title": "sixarm-services-skill/", "url": "sixarm-services-skill/SKILL.md", "description": "A Claude Code skill explaining this system's concepts, terminology, and worked examples" },
         { "title": "sixarm-services-maintainer-skill/", "url": "sixarm-services-maintainer-skill/SKILL.md", "description": "A Claude Code skill for making a code/spec/infrastructure change here" }
       ]

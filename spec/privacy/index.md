@@ -280,10 +280,15 @@ embedded personal data of its own.
 
 ## 7. Implemented vs deferred
 
-Privacy maturity varies by service generation. The MPI services
-(person / worker / place) carry the full privacy stack; the newer
-loco.rs services defer parts of it. This is intentional and recorded
-per-crate in `spec.md`.
+Privacy maturity varies by service generation, but the loco.rs services
+have **since closed** most of the gap this section used to describe as
+"deferred". The MPI services (person / worker / place) carry the full
+privacy stack; organization, care-pathway, and portfolio now carry
+per-field masking + GDPR export too (wired to the ABAC `mask`
+obligation, per
+[`agents/share/authorization-attributes.md`](../../agents/share/authorization-attributes.md)
+§11); case masks and exports inline without a dedicated module. This is
+recorded per-crate in each `spec.md`.
 
 | Service | Per-field masking | GDPR export | Consent model | Erasure (anonymise) |
 |---|---|---|---|---|
@@ -291,17 +296,24 @@ per-crate in `spec.md`.
 | worker | ✅ `mask_worker` + `/masked` | ✅ `/export` | ✅ | soft delete |
 | place | ✅ `mask_place` + `/masked` | ✅ `/export` | ✅ | soft delete |
 | authentication | n/a (minimal data) | ✅ `/account/export` | n/a | ✅ true anonymise |
-| organization | ⏳ **deferred** | ⏳ **deferred** | — | soft delete |
-| care-pathway | ⏳ **deferred** | ⏳ **deferred** | — | soft delete |
-| case | ⏳ **deferred** (per-field masking + GDPR export) | ⏳ **deferred** | — | soft delete |
+| organization | ✅ `src/privacy.rs` + `/{pid}/masked`, wired to the ABAC `mask` obligation on `GET /{pid}` | ✅ `/{pid}/export` (audited) | — | soft delete |
+| care-pathway | ✅ `src/privacy.rs` + `/{pid}/masked`, wired to the ABAC `mask` obligation | ✅ `/{pid}/export` (audited) | — | soft delete |
+| portfolio | ✅ `src/privacy.rs` + `/{pid}/masked` | ✅ `/{pid}/export` | — | soft delete |
+| case | ✅ inline `mask_case` (no dedicated `src/privacy` module) + `/{pid}/masked` | ✅ `/{pid}/export` (audited as a disclosure, HIPAA §164.528) | — | soft delete (+ a `POST /{pid}/erase` action beyond plain soft-delete) |
 
-The organization, care-pathway, and case `spec.md` overviews explicitly
-list per-field privacy masking and GDPR export as **deferred** — they
-ship CRUD + matching + audit + event streaming first. Case data is
-personal data, so its masking/export gap is the most consequential of the
-three and is flagged in its spec. When these are implemented they MUST
-follow the `mask_value` / `/<plural>/{id}/masked` / `/<plural>/{id}/export`
-shape defined in §1–§2 so the behaviour stays uniform across the index.
+This corrects an earlier version of this section, which listed
+organization/care-pathway/case's masking and export as **deferred**
+across the board — a claim overtaken by each crate's own build-out
+(organization and care-pathway each ship a real `src/privacy.rs`; case
+ships the same behaviour without a dedicated module). Case's per-field
+masking module row in
+[`agents/share/overview.md`](../../agents/share/overview.md)'s
+capability matrix is a genuine "–" (no `src/privacy.rs` file), which is
+why this table calls case's masking "inline" rather than crediting it
+the same module organization/care-pathway/portfolio have — the
+behaviour a caller sees (a masked view + a masked/audited export) is
+equivalent either way. All four now follow the same
+`/{pid}/masked` + `/{pid}/export` shape defined in §1–§2.
 
 ---
 

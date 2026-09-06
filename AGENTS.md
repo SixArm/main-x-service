@@ -329,10 +329,12 @@ everywhere:
 ### The `agents/` directory: older subprojects only
 
 The six original entity crates (person, worker, place, thing, event,
-course) and the matcher crates carry an `agents/` directory of
-reference docs — `index.md`, `spec-driven-development.md`,
-`models.md`, `matching.md`, `restful.md`, `testing.md`. Twenty-two
-newer subprojects do not, and that is a decision rather than a gap:
+course), those same six entities' front-ends, and the matcher crates
+carry an `agents/` directory of reference docs — `index.md`,
+`spec-driven-development.md`, `models.md`, `matching.md`,
+`restful.md`, `testing.md`. That's 22 subprojects (6 service + 6
+front-end + 10 matcher); the other 22 newer subprojects do not, and
+that is a decision rather than a gap:
 those files restate what the spec already says, and a restatement
 that nobody regenerates is exactly the drift the SDD discipline
 exists to prevent. Newer subprojects keep the same material in

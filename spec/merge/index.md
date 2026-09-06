@@ -11,21 +11,25 @@ Each service owns its own merge implementation — there is no shared
 merge crate — but they all follow the conventions below. The family
 splits into two implementation lineages:
 
-- **Loco lineage** (`organization`, `care-pathway`, `case`): pure fold
-  in `src/merge.rs`, persisted to a `merge_records` table, exposed at
-  `POST /merge` + `GET /merges/recent`. This is the canonical shape and
-  the one this spec describes in detail.
+- **Loco lineage** (`organization`, `care-pathway`, `case`, and
+  `portfolio` — the latter carries the same `src/merge.rs` +
+  `merge_records` + `POST /merge` shape and is included in this lineage
+  throughout this doc, even though earlier revisions of this list
+  omitted it): pure fold in `src/merge.rs`, persisted to a
+  `merge_records` table, exposed at `POST /merge` + `GET /merges/recent`.
+  This is the canonical shape and the one this spec describes in detail.
 - **MPI lineage** (`person`, `place`, `thing`, `event`, `worker`,
   `course`): the older multi-table model in `src/models/merge.rs`
   (`MergeRequest` / `MergeRecord` / `MergeResponse`). Same workflow,
   different persistence; see §8.
 
 > Related (monorepo topic specs that exist): [postgresql](../postgresql/index.md),
-> [search](../search/index.md), [architecture](../architecture/index.md).
-> Some sibling topic specs referenced below — `../matching/index.md`,
-> `../auditability/index.md`, `../event-streaming/index.md` — are not yet
-> written; until they land, the live sources are the per-crate specs and
-> the `agents/share/*.md` briefs cited inline.
+> [search](../search/index.md), [architecture](../architecture/index.md),
+> [matching](../matching/index.md), [auditability](../auditability/index.md),
+> and [event-streaming](../event-streaming/index.md) — this corrects an
+> earlier version of this note that described the latter three as "not
+> yet written"; all three now exist and are linked directly below rather
+> than only through the `agents/share/*.md` briefs.
 
 ---
 
@@ -161,9 +165,13 @@ drives a `POST /merge`. Candidate pairs come from:
 Candidate generation (blocking / search) is covered by the search /
 dedup reference — [`agents/share/search.md`](../../agents/share/search.md)
 and the [search spec](../search/index.md). In the loco lineage,
-`check-duplicates` matches the query against stored records; full
-search-blocked candidate generation and the batch deduplicate scan are
-**deferred** (see §9).
+`check-duplicates` candidates are now **search-blocked** on all four
+crates (organization, care-pathway, case, portfolio — Tantivy
+`index.candidates(&query, …)`, landed alongside each crate's Tantivy
+migration, 2026-07-31 through 2026-08-02), not deferred; what remains
+**deferred**, and only in three of the four, is the **batch
+`deduplicate` scan endpoint** — organization has it, care-pathway/case/
+portfolio do not yet (see §9).
 
 ---
 
@@ -230,11 +238,14 @@ row and merge record.
 | `Merged` | the survivor (`main_pid` + merged name) |
 | `Deleted` | the retired duplicate (`duplicate_pid` + its name) |
 
-In the loco lineage these go through the in-memory `EventPublisher`
-seam (`streaming::publish_with_actor`); a durable bus (outbox + Fluvio)
-is deferred. The event taxonomy — `Created` / `Updated` / `Deleted` /
-`Merged` (and `Linked` / `Unlinked` in the MPI lineage) — is shared
-across the family.
+In the loco lineage these go through the `EventPublisher` seam
+(`streaming::publish_with_actor`), in-memory by default
+(`<ENTITY>_EVENT_TRANSPORT=memory`); a durable outbox + `FluvioSink`
+relay is **shipped, default-off, on all ten entity registries** — not
+deferred code, just off by default — see
+[`spec/event-streaming/index.md`](../event-streaming/index.md) §4/§8.
+The event taxonomy — `Created` / `Updated` / `Deleted` / `Merged` (and
+`Linked` / `Unlinked` in the MPI lineage) — is shared across the family.
 
 ---
 
@@ -269,7 +280,7 @@ across the family.
 
 ## 8. Lineage comparison
 
-| Aspect | Loco lineage (`organization`, `care-pathway`, `case`) | MPI lineage (`person`, `place`, `thing`, `event`, `worker`, `course`) |
+| Aspect | Loco lineage (`organization`, `care-pathway`, `case`, `portfolio`) | MPI lineage (`person`, `place`, `thing`, `event`, `worker`, `course`) |
 | --- | --- | --- |
 | Pure fold | `src/merge.rs` (`merge_*`) → `MergeOutcome` | inline in REST handler |
 | History model | `src/models/merge_records.rs` + `merge_records` table | `src/models/merge.rs` (`MergeRecord`, `MergeStatus`) |
@@ -304,13 +315,21 @@ differ only in persistence shape and surrounding plumbing.
 
 - Automated **un-merge / reverse** endpoint (data is recoverable
   manually; MPI `Reversed` status is modeled but unused).
-- Search-blocked **candidate generation** and the **batch
-  `deduplicate`** scan in the loco lineage (MPI lineage has the batch
-  scan).
+- The **batch `deduplicate`** scan endpoint in the loco lineage —
+  implemented only in **organization**; care-pathway, case, and
+  portfolio don't yet expose it (MPI lineage has the batch scan on
+  every crate). **Not** deferred any more: search-blocked **candidate
+  generation** for `check-duplicates`, which is now implemented on all
+  four loco crates (§4) — an earlier version of this list grouped the
+  two together as both deferred, which was true only for the batch scan.
 - A formal **review queue** table in the loco lineage (MPI lineage has
   `ReviewQueueItem`).
-- **Durable event bus** (outbox + Fluvio) for the `Merged` / `Deleted`
-  events; currently in-memory.
+- **Durable event bus flip** — the outbox + `FluvioSink` transport
+  itself has **shipped**, default-off, on all ten entity registries
+  (not deferred code); what's still open is a deployment actually
+  setting `<ENTITY>_EVENT_TRANSPORT=outbox` for `Merged`/`Deleted`
+  events, which remains a per-deployment decision (§6,
+  [`spec/event-streaming/index.md`](../event-streaming/index.md)).
 - **Merge UI** in the organization and case front-ends (API client
   present; no page).
 
@@ -329,8 +348,9 @@ differ only in persistence shape and surrounding plumbing.
   [care-pathway](../../care-pathway/spec/index.md) ·
   [organization](../../organization/spec/index.md) ·
   [case](../../case/spec/index.md).
-- Existing topic siblings: [search](../search/index.md),
-  [architecture](../architecture/index.md).
-- Planned topic siblings (not yet written): [matching](../matching/index.md),
+- Topic siblings: [search](../search/index.md),
+  [architecture](../architecture/index.md),
+  [matching](../matching/index.md),
   [auditability](../auditability/index.md),
-  [event-streaming](../event-streaming/index.md).
+  [event-streaming](../event-streaming/index.md) — all now written
+  (corrects the "not yet written" note this list used to carry).

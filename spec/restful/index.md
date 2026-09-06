@@ -8,8 +8,8 @@ CORS, the extra API layers, pagination, masking, and metrics.
 It is grounded in the actual code. Two generations of service coexist
 and they differ in concrete ways (response envelope, extra API layers),
 so each section calls out **loco services** (organization, care-pathway,
-case) versus the **older Axum services** (person, worker, place, thing,
-event, course) where they diverge.
+case, portfolio) versus the **older Axum services** (person, worker,
+place, thing, event, course) where they diverge.
 
 See also the brief shared note
 [`../../agents/share/restful.md`](../../agents/share/restful.md) and the
@@ -57,9 +57,14 @@ the entity plural.
 | `GET` | `/api/organizations/whoami` | Verified bearer-token claims (`401` without one) |
 
 The older Axum services additionally expose `POST /api/<plural>/deduplicate`
-(a batch index scan) and the privacy reads
-`GET /api/<plural>/{pid}/masked` and `GET /api/<plural>/{pid}/export`
-(see §7). They also mount a health route at `/api/health`.
+(a batch index scan) and mount a health route at `/api/health`. The
+privacy reads `GET /api/<plural>/{pid}/masked` and
+`GET /api/<plural>/{pid}/export` are **not** older-services-only any
+more: organization, care-pathway, case, and portfolio all expose them
+too (§7.3). `POST /api/<plural>/deduplicate` itself is the one
+older-services-only item left in this list among the loco crates —
+organization has it, care-pathway/case/portfolio don't yet (§9,
+[`../merge/index.md`](../merge/index.md) §9).
 
 Literal sub-paths (`/search`, `/merge`, `/whoami`, `/merges/recent`, …)
 are registered **before** the `/{pid}` captures so the dynamic segment
@@ -71,7 +76,7 @@ does not shadow them. This ordering is a hard convention — see the
 
 This is the main wire difference between the two generations.
 
-- **Loco services** (organization, care-pathway, case) return **raw
+- **Loco services** (organization, care-pathway, case, portfolio) return **raw
   loco JSON**: the handler's value is the body. Create/update/list/search
   return a lightweight `{pid, name}` reference (`OrgRef`); `GET /{pid}`
   returns the full stored payload; errors surface as loco's own JSON
@@ -178,24 +183,33 @@ Two extractors, two postures:
 | `AuthUser` | Rejects with `401` | A missing/invalid token rejects before the handler runs. `GET /api/<plural>/whoami` takes `AuthUser`, so reaching its body proves end-to-end verification; it echoes the verified claims |
 
 **Blanket enforcement.** A process-wide flag (`<ENTITY>_REQUIRE_AUTH`,
-e.g. `ORGANIZATION_REQUIRE_AUTH`) turns on an Axum middleware layer
+e.g. `ORGANIZATION_REQUIRE_AUTH`) turns on a middleware layer
 (`enforce`, wired in `src/app.rs`) that requires a valid PASETO bearer
 token (service-to-service) or a valid session (BFF/browser) on
 **every route except** the public health/ping and OpenAPI/Swagger paths
 (`is_public_path`: `/_health`, `/_ping`, `/api-docs/openapi.json`,
 `/swagger-ui*`). It is **off by default** (`1`/`true`/`yes`/`on`,
 case-insensitive, are the only truthy values); unset/blank/junk leaves
-today's opt-in-per-handler behaviour. Activation is an operations
-decision once the SSO token flow is live.
+today's opt-in-per-handler behaviour. This is **implemented and shipped
+on all ten entity registries** (not organization alone — see
+[`../authentication/index.md`](../authentication/index.md) §7); the SSO
+token flow it depends on has been live since 2026-07-04, so activation
+is purely a per-deployment operations decision now, not something
+waiting on unshipped code.
 
 The verification key source is environment-driven: `<ENTITY>_PASETO_KEYS`
 (the published Ed25519 public key set; absent ⇒ empty key set ⇒ every
 token rejected, but the service still boots), `<ENTITY>_TOKEN_ISSUER`
 (default `authentication-service`), `<ENTITY>_TOKEN_AUDIENCE` (default
-`main-x-service`). Boot-time key fetch over HTTP from
-`/.well-known/paseto-keys` is a deferred follow-up; today the key set is
-injected via env. (Code follow-up pending; this supersedes the prior
-`<ENTITY>_JWKS` / `_JWT_*` RS256 vars.)
+`main-x-service`). **Boot-time key fetch over HTTP is implemented**:
+when `<ENTITY>_PASETO_KEYS_URL` is set, the service fetches the key set
+once at boot via `Verifier::from_paseto_keys_url` (the fetched set wins
+over the env key set; a fetch failure falls back to the env path with a
+warning, so the service always boots) and, in organization at least,
+polls the URL in the background to pick up key rotation. This
+supersedes the prior `<ENTITY>_JWKS` / `_JWT_*` RS256 vars, which are
+removed, not merely deprecated (see
+[`agents/share/security.md`](../../agents/share/security.md) §7).
 
 ---
 
@@ -220,58 +234,134 @@ injected via env. (Code follow-up pending; this supersedes the prior
 
 ---
 
-## 6. Additional API layers (older services)
+## 6. Additional API layers
 
-The older Axum services carry two extra API layers beyond REST. The
-loco services do **not** (they are REST/JSON only).
+FHIR R5 has landed in three loco services, so this section is no longer
+"older services only" for that layer; gRPC is still older-services-only
+and still a stub.
 
 ### 6.1 FHIR R5
 
-- Mounted under `/fhir/<Resource>` (e.g. `/fhir/Person`).
-- Five endpoints per resource: `GET /fhir/Person/{id}`,
-  `POST /fhir/Person`, `PUT /fhir/Person/{id}`,
-  `DELETE /fhir/Person/{id}`, `GET /fhir/Person` (search).
-- FHIR search parameters: `name`, `family`, `given`, `identifier`,
-  `birthdate`, `gender`, `_count`.
-- Resource converters and bundle handling live in `src/api/fhir/`.
-- **Status:** implemented in person (and the other older services as a
-  partial Person/entity resource); **not** present in the loco services.
+- Mounted under `/fhir/<Resource>` (e.g. `/fhir/Person`, `/fhir/Organization`).
+- Five endpoints per resource: `GET /fhir/<Resource>/{id}`,
+  `POST /fhir/<Resource>`, `PUT /fhir/<Resource>/{id}`,
+  `DELETE /fhir/<Resource>/{id}`, `GET /fhir/<Resource>` (search), plus
+  `GET /fhir/metadata` (`CapabilityStatement`).
+- FHIR search parameters vary by resource — see
+  [`agents/share/fhir.md`](../../agents/share/fhir.md) §6.
+- **Status:** implemented in the older Axum services (person, worker,
+  place, thing, event — course is excluded, mapped instead to a
+  non-standard `Basic` resource per fhir.md §3) **and** in three loco
+  services — **organization** (`Organization`, the reference
+  implementation), **care-pathway** (`PlanDefinition`), and **case**
+  (`Task`, carrying the `subject_of`-edge governance from
+  [cross-service-linking.md](../../agents/share/cross-service-linking.md)
+  §10). This corrects an earlier version of this section that said FHIR
+  was "not present in the loco services" — it is present in three of
+  the four; **portfolio** is the one loco service still out of FHIR
+  scope (no FHIR resource meaningfully models a plan/portfolio, per
+  fhir.md §3). Resource converters and bundle handling live in
+  `src/api/fhir/` (older services) or `src/fhir/` (loco services).
 
 ### 6.2 gRPC (Tonic)
 
-- Reserved high-throughput interface mirroring REST/FHIR.
-- **Status: stub.** The `.proto` service is not defined and `serve()` is
-  a no-op; the module (`src/api/grpc/mod.rs`) only sketches the intended
-  Tonic wiring. Callers should use the REST API until it is implemented.
+- Reserved high-throughput interface mirroring REST/FHIR. Not present
+  in any loco service (organization/care-pathway/case/portfolio) — see
+  [`agents/share/overview.md`](../../agents/share/overview.md)'s
+  capability matrix, gRPC-stub row.
+- **Status: stub**, in the older services that declare it (person,
+  worker, event — place and thing declare a `tonic` dependency in
+  anticipation of a not-yet-built server but have no `src/api/grpc`
+  module either). The `.proto` service is not defined and `serve()` is
+  a no-op; the module (`src/api/grpc/mod.rs`, where present) only
+  sketches the intended Tonic wiring. Callers should use the REST API
+  until it is implemented.
 
 ---
 
 ## 7. Pagination, search params, masking on reads
 
+### 7.1 Pagination — the family-wide header contract
+
+This section previously described pagination as ad hoc and
+inconsistent per service (a fixed loco list cap of 100, a fixed loco
+search cap of 50, an older-service search default of 10/max 100, no
+shared contract). **That description is superseded.**
+[`agents/share/restful.md`](../../agents/share/restful.md)'s Pagination
+section is the current, family-wide, present-tense contract for every
+collection-read endpoint (`GET /<plural>`, `/search`, and any other
+paginated list), and this document defers to it rather than restating
+it in full:
+
+- `?limit=` and `?offset=` query params on every collection read;
+  totals/limit/offset are reported in **response headers**
+  (`X-Total-Count`, `X-Limit`, `X-Offset`), not a body envelope — so a
+  bare-JSON-array endpoint (every loco endpoint, §1.3) keeps returning a
+  bare array.
+- **Omitting both params preserves each endpoint's pre-existing
+  behaviour** — the old ad hoc numbers below are exactly what an
+  unparameterised request still gets today; they were never wrong, they
+  were just not the whole story.
+- **`limit` is clamped**, not rejected, to a per-endpoint `MAX_LIMIT`
+  (500 for list/search surfaces) — a caller asking for more gets the
+  max and an honest `X-Limit`.
+- **`offset` is bounded**; a request beyond the bound is `400` (SEC-G7)
+  rather than materialising an unbounded number of rows to discard.
+- Zero/unparseable values fall back to the default rather than erroring.
+
+The pre-existing per-endpoint defaults this contract preserves:
+
 - **List caps.** `GET /api/<plural>` is capped (loco: 100 active rows,
   newest first, soft-deleted excluded) as a guard against unbounded
-  responses. `/search` is capped too (loco: 50; `ILIKE '%q%'` over
-  active rows). `check-duplicates` does an in-memory full scan up to a
-  named cap (`CHECK_DUPLICATES_SCAN_CAP = 1000`) and logs a `WARN` when
-  it hits the cap so truncation is observable; lifting it requires
-  blocking / candidate pre-selection.
-- **Pagination.** The older services' search takes `limit`
-  (default 10, max 100) + `offset`. See
-  [`../search/index.md`](../search/index.md).
-- **Search params** (older services' full-text search): `q`, `limit`,
-  `offset`, `fuzzy` (bool), `phonetic` (bool), `mask_sensitive` (bool).
-  Loco services currently expose only `q` (Postgres `ILIKE`; Tantivy
-  full-text is deferred).
-- **Masking option on reads.** The older services support a
-  `mask_sensitive=true` query option and dedicated
-  `GET /api/<plural>/{pid}/masked` and `GET /api/<plural>/{pid}/export`
-  (GDPR) endpoints. Per-field masking / GDPR export is **deferred** in
-  the loco services. See [`../privacy/index.md`](../privacy/index.md).
+  responses absent `limit`/`offset`. `check-duplicates` does an
+  in-memory full scan up to a named cap (`CHECK_DUPLICATES_SCAN_CAP =
+  1000`) on the crates that still scan; on organization, care-pathway,
+  case, and portfolio, `check-duplicates` candidates are search-blocked
+  via Tantivy instead (§7.2), so the cap there bounds the index result
+  count, not a row-by-row DB scan.
+- **`/search`** (loco): historically a fixed cap of 50 with no client
+  `limit`/`offset` — see §7.2; that has changed along with the Tantivy
+  migration.
+- **The older services' search** default `limit` is 10, max 100 (now
+  one instance of the family-wide `MAX_LIMIT` clamp rather than a
+  bespoke rule). See [`../search/index.md`](../search/index.md).
+
+### 7.2 Search params
+
+Every entity registry's `/search` now takes `q`, `limit`, `offset`,
+`fuzzy` (bool), `phonetic` (bool) — Tantivy full-text is **implemented
+on all ten registries**, not just the older services (see
+[`../search/index.md`](../search/index.md) for the full, corrected
+picture; this document previously said the loco services "currently
+expose only `q` (Postgres `ILIKE`; Tantivy full-text is deferred)",
+which is no longer the case — organization removed its `ILIKE` method
+entirely once Tantivy landed). `mask_sensitive` (bool) remains specific
+to the older services' richer search response shape (§7.3); portfolio
+additionally accepts `kind` as a filter.
+
+### 7.3 Masking option on reads
+
+The older services support a `mask_sensitive=true` query option and
+dedicated `GET /api/<plural>/{pid}/masked` and
+`GET /api/<plural>/{pid}/export` (GDPR) endpoints. **Per-field masking
+and GDPR export are now implemented in the loco services too** —
+organization, care-pathway, and portfolio each ship a `src/privacy.rs`
+module wired to the ABAC `mask` obligation; case masks and exports
+inline without a dedicated module. This corrects an earlier "deferred"
+claim here — see [`../privacy/index.md`](../privacy/index.md) §7 for
+the corrected per-crate table. `/search` itself carries no
+`mask_sensitive` option on the loco services because it returns only
+slim `{pid, name}`/`{pid, title}` refs with no sensitive fields to mask
+(same reasoning as [`../search/index.md`](../search/index.md) §6.2).
 
 Audit and event reads (`/audit/recent`, `/{pid}/audit`,
-`/events/recent`) are described in [`../auditability/index.md`](../auditability/index.md);
-the event stream is an in-memory, per-process ring buffer
-(`EventView {kind, pid, name, seq}`) and is not durable.
+`/events/recent`) are described in [`../auditability/index.md`](../auditability/index.md).
+The event stream is in-memory **by default**
+(`<ENTITY>_EVENT_TRANSPORT=memory`); a durable Postgres outbox +
+`FluvioSink` relay is shipped, default-off, on all ten entity
+registries — see [`../event-streaming/index.md`](../event-streaming/index.md)
+§4/§8, which corrects an earlier "not durable" claim here that no
+longer reflects what ships, only what's on by default.
 
 ---
 
@@ -285,45 +375,54 @@ Where present, Prometheus metrics are exposed as:
 
 Configure the scraper with `metrics_path: /metrics.prom`. The metric
 inventory (entity-CRUD counters, an HTTP request counter, latency
-histograms) lives in each older service's `src/metrics.rs`, with the
-handler in `src/api/rest/handlers.rs`.
+histograms) lives in each service's `src/metrics.rs`, with the handler
+in `src/api/rest/handlers.rs` (older services) or
+`src/controllers/metrics.rs` (loco services).
 
-- **Status:** implemented in the older Axum services (e.g. person).
-  The loco services rely on loco/OpenTelemetry observability and do not
-  yet expose `/metrics.prom`. See
-  [`../observability/index.md`](../observability/index.md) and
+- **Status: implemented on every service, both generations** —
+  person/worker/place/thing/event/course (older Axum) **and**
+  organization/care-pathway/case/portfolio/authentication (loco), each
+  via its own `src/metrics.rs` + handler. This corrects an earlier
+  version of this section that said the loco services "do not yet
+  expose `/metrics.prom`" — they do; `/metrics.prom` (Prometheus) is
+  separate from OTLP distributed tracing, which is a genuinely
+  per-crate-varying picture (§9's OTLP row, and
+  [`../observability/index.md`](../observability/index.md)). See also
   [`../../agents/share/observability.md`](../../agents/share/observability.md).
 
 ---
 
 ## 9. Implemented vs deferred (summary)
 
-| Capability | Loco services (org / care-pathway / case) | Older Axum services (person / …) |
+| Capability | Loco services (org / care-pathway / case / portfolio) | Older Axum services (person / …) |
 |---|---|---|
 | CRUD + soft-delete | Implemented | Implemented |
 | `ApiResponse` envelope | No (raw loco JSON) | Yes |
-| Search | `ILIKE` (`q` only) | Tantivy full-text (`q`,`fuzzy`,`phonetic`,paging) |
-| Match / check-duplicates / merge | Implemented | Implemented |
-| Batch `deduplicate` | Deferred | Implemented |
+| Search | **Tantivy full-text** (`q`,`fuzzy`,`phonetic`,paging) — historical `ILIKE` superseded, see [`../search/index.md`](../search/index.md) | Tantivy full-text (`q`,`fuzzy`,`phonetic`,paging) |
+| Match / check-duplicates / merge | Implemented; `check-duplicates` search-blocked via Tantivy on all four | Implemented |
+| Batch `deduplicate` | Implemented in **organization** only; care-pathway/case/portfolio don't yet expose it | Implemented |
 | OpenAPI / Swagger | Hand-written, test-pinned | Utoipa-derived |
-| Token auth (MaybeAuthUser / AuthUser / whoami) — target PASETO v4.public, RS256/JWKS decommissioned | Implemented (code follow-up pending) | — |
-| Blanket `/api/*` enforcement | Flag, off by default | — |
-| FHIR R5 | No | Implemented (partial) |
-| gRPC (Tonic) | No | Stub |
-| Privacy masking / GDPR export | Deferred | Implemented |
+| Token auth (MaybeAuthUser / AuthUser / whoami) — PASETO v4.public, RS256/JWKS decommissioned | **Implemented** (shipped 2026-07-04; no code follow-up pending) | Implemented (same PASETO model, all six services) |
+| Blanket `/api/*` enforcement (`<ENTITY>_REQUIRE_AUTH`) | Implemented, flag off by default | **Implemented, flag off by default** — this corrects an earlier "—" here; all six older services carry it too, not just the loco four (§4) |
+| FHIR R5 | Organization/care-pathway/case: **implemented**; portfolio: no (no meaningful FHIR resource) | Implemented (partial; course maps to a non-standard `Basic` resource instead) |
+| gRPC (Tonic) | No | Stub, in person/worker/event only |
+| Privacy masking / GDPR export | **Implemented** — organization/care-pathway/portfolio via `src/privacy.rs`, case inline (§7.3) | Implemented |
 | `/metrics.prom` | Implemented | Implemented |
+| OTLP distributed tracing | organization: implemented; care-pathway/case/portfolio: not yet (see [`../observability/index.md`](../observability/index.md)) | person/worker/event/course/place/thing: implemented |
 
 ---
 
 ## Cross-references
 
-- [`../../agents/share/restful.md`](../../agents/share/restful.md) — brief shared RESTful note
-- [`../authentication/index.md`](../authentication/index.md) — token issuance + verification (planned sibling topic)
-- [`../auditability/index.md`](../auditability/index.md) — audit log + event stream (planned sibling topic)
-- [`../privacy/index.md`](../privacy/index.md) — masking + GDPR export (planned sibling topic)
-- [`../observability/index.md`](../observability/index.md) — tracing + metrics (planned sibling topic)
-- [`../validation/index.md`](../validation/index.md) — validation rules / `422` (planned sibling topic)
-- [`../search/index.md`](../search/index.md) — search params + pagination (planned sibling topic)
+- [`../../agents/share/restful.md`](../../agents/share/restful.md) — brief shared RESTful note, including the current pagination header contract (§7.1)
+- [`../authentication/index.md`](../authentication/index.md) — token issuance + verification
+- [`../auditability/index.md`](../auditability/index.md) — audit log + event stream
+- [`../privacy/index.md`](../privacy/index.md) — masking + GDPR export
+- [`../observability/index.md`](../observability/index.md) — tracing + metrics
+- [`../validation/index.md`](../validation/index.md) — validation rules / `422`
+- [`../search/index.md`](../search/index.md) — search params + pagination
+- [`../event-streaming/index.md`](../event-streaming/index.md) — the durable outbox + Fluvio transport (§7.3)
+- [`../merge/index.md`](../merge/index.md) — record merge, including the loco-lineage batch-`deduplicate` gap (§9)
 - [`../index.md`](../index.md) — monorepo spec index
 - Per-entity API references, e.g.
   [`../../person/person-service-with-loco/agents/restful.md`](../../person/person-service-with-loco/agents/restful.md)

@@ -5,8 +5,8 @@ the twelve crates under `agents/share/overview.md`: the ten entity
 registries (person, worker, place, thing, event, course, organization,
 care-pathway, case, portfolio), authentication-service, and
 link-graph-service. Grounded in `std::env::var` call sites and each
-crate's `config/*.yaml` Tera templates as of 2026-08-03 — not in prior
-docs, several of which had drifted (see §7).
+crate's `config/*.yaml` Tera templates, last re-verified 2026-08-30 —
+not in prior docs, several of which had drifted (see §7).
 
 This is a **reference**, not a tutorial. For how these variables fit
 together operationally, see [`loco.md`](loco.md) (the config/Tera
