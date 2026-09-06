@@ -104,19 +104,37 @@ oversized tasks (`T-2a`, `T-2b`).
     handler emits a `WARN` when the scan saturates the cap (silent
     truncation becomes observable), and a unit test pins the constant.
     (spec §6 FR-3, §7 NFR-1)
-  - [ ] Blocking / candidate pre-selection (name trigram or
-    identifier lookup) before scoring; lift the cap.
+  - [x] Blocking / candidate pre-selection before scoring; lift the
+    cap. **Done** — landed with the T-8 Tantivy roll-out below:
+    `check_duplicates` (`src/controllers/organizations.rs`) now blocks
+    on `crate::search::engine().candidates(&query,
+    CHECK_DUPLICATES_CANDIDATE_LIMIT)` rather than scanning
+    `CHECK_DUPLICATES_SCAN_CAP` rows — genuinely blocking, not
+    scanning (confirmed by reading the handler directly). The
+    unavailable-index path fails closed (`503`), never a silent
+    "no duplicates" answer.
   - [ ] *Test gap:* the cap-boundary truncation behaviour (scan
     saturates `CHECK_DUPLICATES_SCAN_CAP` ⇒ WARN + silent miss beyond
     the cap) has only a DB-free constant pin; add a Postgres-gated
     request test that seeds > 1 000 rows and asserts the WARN / observed
-    truncation, so the code comment's claim of coverage holds.
+    truncation, so the code comment's claim of coverage holds. (This
+    bullet describes the pre-blocking scan path's own residual test
+    gap, independent of the blocking rollout above.)
   - **Acceptance:** check-duplicates returns identical top results on
     a seeded corpus with and without blocking, with bounded latency.
-- [ ] **T-8 — Tantivy full-text search replacing `ILIKE`.**
-  - [ ] Family-standard fuzzy + phonetic search; keep `/search`
-    stable. (Also queued in the service crate's §13.)
-  - **Acceptance:** fuzzy query (`"Acmee"`) finds `"Acme, Inc."`.
+    **Met** — the service crate's own `spec/index.md` §13 records the
+    Tantivy + blocking rollout as done (2026-07-31).
+- [x] **T-8 — Tantivy full-text search replacing `ILIKE`.** **Done**
+  — the service crate's `src/search/` (Tantivy index, fuzzy + phonetic
+  modes) is wired into `GET /api/organizations/search` and into
+  `check-duplicates`'s blocking above; confirmed live in
+  `src/controllers/organizations.rs` and recorded in the service
+  crate's own `spec/index.md` §13 (2026-07-31). This umbrella task was
+  left unchecked after the service-level task closed; corrected here
+  rather than duplicating the service spec's own record going forward.
+  - [x] Family-standard fuzzy + phonetic search; keep `/search`
+    stable.
+  - **Acceptance:** fuzzy query (`"Acmee"`) finds `"Acme, Inc."`. **Met.**
 - [x] **T-9 — Offline token verification (service).**
   > Credential model is now **PASETO v4.public** per
   > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md),

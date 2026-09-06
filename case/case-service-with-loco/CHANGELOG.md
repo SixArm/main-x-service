@@ -9,6 +9,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — doc drift: stale "check-duplicates has no search-backed blocking yet" comment (2026-09-06)
+
+`CHECK_DUPLICATES_SCAN_CAP`'s doc comment (`src/controllers/cases.rs`)
+and `fhir.rs`'s `FHIR_SEARCH_SCAN_CAP` cross-reference still described
+`check-duplicates` as an in-memory scan with "no search-backed
+candidate blocking yet" — true when spec §13 T-6 was still open, not
+true since T-6's search-blocked-candidates rollout landed (the
+`check_duplicates` handler's own doc comment already said so
+correctly; only the constant's comment and the FHIR cross-reference
+had drifted). Confirmed by reading `check_duplicates`: it blocks on
+`crate::search::engine().candidates(...)`, never scans. The constant
+is no longer read by any handler — kept only because a unit test pins
+its historical value. No behaviour change.
+
 ### Added — expose the stored review queue over the API (T-8)
 
 `src/models/review_queue.rs` already had `upsert`/`list`/`decide`

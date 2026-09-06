@@ -48,9 +48,10 @@ use crate::metrics::Metrics;
 use crate::models::cases::Model as CaseModel;
 use crate::streaming;
 
-/// Max active rows scanned per FHIR search (in-memory filter, mirroring
-/// the native `check-duplicates` scan model; beyond this, candidates are
-/// silently missed — see `cases::CHECK_DUPLICATES_SCAN_CAP`).
+/// Max active rows scanned per FHIR search (in-memory filter — unlike the
+/// native `check-duplicates` path, which now blocks on the search index
+/// instead of scanning, spec §13 T-6). Beyond this cap, candidates are
+/// silently missed.
 const FHIR_SEARCH_SCAN_CAP: u64 = 1000;
 
 /// Build a `application/fhir+json` response with the given status and
