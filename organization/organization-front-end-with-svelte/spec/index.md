@@ -316,17 +316,34 @@ controls when they land.
     pre-existing unrelated long-line debt, confirmed unchanged by this
     diff being purely additive).
 
-- [ ] **ORGFE-T4 (S) Inline identifier-format validation (LEI/DUNS
-  length).** Named as an open question in §16 since v0.1; the service
-  now validates LEI/GLN/DUNS/VAT check digits server-side (SEC-M5), but
-  the create/edit form gives no client-side hint before the round-trip
-  `422`. *(Verified: `agents/share/security.md` §2 SEC-M5 confirms the
-  server-side check; no client-side format check exists in
-  `src/lib/components/OrganizationForm.svelte`.)* Add pure length/format
-  hints (not full check-digit re-implementation — that stays
-  server-authoritative) surfaced inline per identifier row.
-  **Acceptance:** a vitest unit test on the new pure helper; the form
-  still submits and relies on the server's `422` as the authority.
+- [x] **ORGFE-T4 (S) Inline identifier-format validation (LEI/DUNS
+  length).** *(resolved 2026-09-06.)* Named as an open question in §16
+  since v0.1; the service validates LEI/GLN/DUNS/VAT check digits
+  server-side (SEC-M5), but the create/edit form gave no client-side
+  hint before the round-trip `422`. *(Verified: `agents/share/security.md`
+  §2 SEC-M5 confirms the server-side check; no client-side format check
+  existed in `src/lib/components/OrganizationForm.svelte`.)*
+  - **Resolved.** New pure `src/lib/identifier-format.ts::identifierFormatHint(scheme,
+    value)` — length/charset/prefix shape checks for exactly the four
+    schemes the server's `identifier_problem` (SEC-M5) validates (LEI:
+    20 alphanumeric; DUNS: 9 digits; GLN: 13 digits; VAT: 2-letter
+    prefix + 2–13 alphanumerics), deliberately never recomputing LEI's
+    ISO 7064 or GLN's GS1 check digit — a value that passes this hint
+    can still be rejected `422` server-side. Every other scheme
+    (TaxId, NAICS, ISIC v4, SIC, the deterministic-but-unvalidated
+    Iso6523/Wikidata/Ror/Isni, and the `Custom` variant) is
+    unconstrained, mirroring the server exactly. Wired into
+    `OrganizationForm.svelte`'s identifiers fieldset as an inline
+    `<p class="muted small">` hint per row, reactive via `{@const}` —
+    the form still submits regardless and relies on the server's `422`
+    as the authority.
+  - New `tests/unit/identifier-format.test.ts` (18 cases) covers all
+    four validated schemes' pass/fail boundaries plus every
+    unconstrained scheme and the blank-value/`Custom` no-op cases.
+    Verified to fail (import error) with the new module removed.
+  - **Acceptance met:** `pnpm test` 96/96 (was 78); `pnpm run check`
+    clean; `pnpm exec playwright test` 15/15 (unchanged); `pnpm run
+    lint` clean save for two pre-existing, untouched files.
 
 - [ ] **ORGFE-T5 (S) Real-time duplicate warning on the create form.**
   Also named as an open question in §16 since v0.1: the create form has
