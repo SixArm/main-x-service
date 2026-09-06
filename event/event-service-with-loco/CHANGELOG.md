@@ -8,6 +8,26 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Removed — the dead `organizations` table cluster and `Organization` model (T-14)
+
+`db::models::organizations` (plus its three child tables
+`organization_addresses`/`organization_contacts`/
+`organization_identifiers`) and the standalone
+`crate::models::Organization` domain struct were migrated and defined
+but never written to by any code path — genuinely dead, not merely
+unwired (verified against a real Postgres: all four tables were empty
+and no `ActiveModel`/`Entity::insert` call exists anywhere in `src/`).
+Removed the model (`src/models/organization.rs`), its `models::mod.rs`
+registration, its entry in `src/api/rest/mod.rs`'s OpenAPI schema list
+(found during removal — the original task's grep missed it on a
+`models::organization` vs. `models::Organization` capitalisation
+mismatch), and the four SeaORM entity modules from `src/db/models.rs`.
+Added `migration/m20260906_000001_drop_dead_organizations.rs` (a new
+migration, not an edit to the original create migration) to actually
+drop the four tables; its `down()` recreates them verbatim from the
+original `up.sql`. Verified end-to-end against a real Postgres in both
+directions. See spec/13-tasks.md T-14.
+
 ### Fixed — T-12's stale "dead code" verification (doc-only correction)
 
 T-12 claimed `to_matcher_event`/`matcher_lib` were called only from

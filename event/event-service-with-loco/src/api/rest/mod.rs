@@ -76,7 +76,6 @@ pub use state::AppState;
             crate::models::Event,
             crate::models::EventLink,
             crate::models::event::LinkType,
-            crate::models::Organization,
             crate::models::Identifier,
             crate::models::identifier::IdentifierType,
             crate::models::identifier::IdentifierUse,

@@ -503,7 +503,7 @@ clearly described manual check confirms the acceptance criterion.
   `agents/matching.md`; `cargo build --lib` / `cargo test --lib` /
   `cargo clippy --all-targets -- -D warnings` clean.
 
-- [ ] **T-14 — Retire or wire the dead `organizations` table and
+- [x] **T-14 — Retire or wire the dead `organizations` table and
   `Organization` model.** `src/models/organization.rs::Organization`
   (a standalone venue-operator/promoter record, per its doc comment) is
   referenced nowhere outside its own module and the blanket
@@ -521,6 +521,34 @@ clearly described manual check confirms the acceptance criterion.
   with a test proving it, or the model/table/migration are removed
   (with a down-migration and CHANGELOG entry) and `models::mod.rs`'s
   doc comment updated to stop describing it as delivered.
+  **Resolved.** Retired rather than wired: the "belongs_to a party row"
+  half of the original claim did not hold up under a second grep —
+  `organization_id` appears only on the cluster's own three child
+  tables (`organization_addresses`/`organization_contacts`/
+  `organization_identifiers`), never on an event/party table, so
+  nothing outside the cluster itself would need repointing. A closer
+  look also found one reference the original verification's grep
+  pattern missed on a capitalisation technicality (`models::organization`
+  vs. `models::Organization`): `src/api/rest/mod.rs`'s OpenAPI
+  `components(schemas(...))` list carried `crate::models::Organization`
+  — advertised in the Swagger doc despite no endpoint ever using it.
+  Removed `src/models/organization.rs`, its `pub mod`/`pub use` in
+  `models::mod.rs` (doc comment included), the OpenAPI schema entry,
+  and the four SeaORM entity modules (`organizations` +
+  its three children) from `src/db/models.rs`. Added
+  `migration/m20260906_000001_drop_dead_organizations.rs` — a **new**
+  migration rather than an edit to the original create migration, so a
+  database that already ran the old one and one that never did agree
+  on the schema either way; `down()` reuses the original `up.sql`
+  verbatim via `include_str!` rather than duplicating the DDL.
+  **Acceptance met:** verified against a real Postgres
+  (`scripts/test-db.sh up` + `scripts/ci-check.sh test-db`) — all 10
+  migrations apply cleanly, `\dt organizations*` finds nothing
+  afterward, and both the drop SQL and the recreate SQL were applied
+  by hand a second time to confirm each direction is idempotent and
+  reversible; `cargo test --lib` (167/167), the full DB-gated suite,
+  `cargo clippy --all-targets -- -D warnings`, and `cargo fmt --check`
+  all clean.
 
 - [ ] **T-15 — Persist the dedup review queue (promotes OQ-4 to a
   task).** `POST /api/events/deduplicate` computes `ReviewQueueItem`s
