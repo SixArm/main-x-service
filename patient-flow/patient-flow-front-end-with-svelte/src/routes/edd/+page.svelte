@@ -47,13 +47,27 @@
   // One all-day calendar event per expected discharge. Names may
   // arrive masked from the service; the calendar renders whatever the
   // read surface allowed.
+  //
+  // `@svar-ui/calendar-store` requires an all-day event's `end` to be
+  // strictly *after* `start` (`!(e.end > start)` silently drops the
+  // event — confirmed against the compiled library source). `end: day`
+  // — the same Date as `start` — therefore filtered out every
+  // expected-discharge event this calendar was ever asked to show (the
+  // same bug worker-front-end's and person-front-end's `/expiry`
+  // calendars had). Fixed with the following calendar day, the minimum
+  // exclusive span a one-day all-day event needs.
   const events = $derived(
     entries.map((e) => {
       const day = new Date(e.card.edd ?? "");
+      const nextDay = new Date(
+        day.getFullYear(),
+        day.getMonth(),
+        day.getDate() + 1,
+      );
       return {
         id: e.stayPid,
         start: day,
-        end: day,
+        end: nextDay,
         allDay: true,
         text: `${e.ward} ${e.card.number} — ${e.card.display_name ?? e.card.number}`,
       };

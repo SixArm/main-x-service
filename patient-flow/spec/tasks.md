@@ -276,6 +276,23 @@ code + tests in one PR.
   `auth.ts`'s magic-link functions against a mocked fetch, and one e2e
   test hits the real `/api/proxy/[...path]` route (auth-service stubbed
   or skipped when unset) instead of intercepting it.
+- [x] PF-T24 **Fix: the `/edd` calendar (PF-T15a) never actually showed
+  an expected-discharge event.** *(resolved 2026-09-06.)*
+  `@svar-ui/calendar-store` requires an all-day event's `end` to be
+  strictly after `start`, but `+page.svelte` passed `end: day` — the
+  same `Date` object as `start` — so the SVAR Calendar widget silently
+  dropped every EDD event it was ever asked to show, and the route had
+  zero test coverage to catch it (confirmed: `grep -n "edd" tests/`
+  matched only unrelated `BedCard.edd` fixture fields, never the
+  `/edd` route or `edd-calendar` testid). The identical bug and fix
+  already landed in worker-front-end's and person-front-end's
+  `/expiry` calendars. Fixed by computing the following calendar day
+  as `end`; new Playwright test stubs one occupied bed with an EDD on
+  the 12th of the current month (a fixed date would eventually scroll
+  outside the widget's default "today's month" view), asserts the
+  event renders, and asserts selecting it navigates to `/stays/{pid}`.
+  Verified the assertion actually fails without the fix before
+  confirming it passes with it.
 
 ## Production gates (P0 — design-only until a real deployment)
 

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — the EDD calendar never showed an expected-discharge event (PF-T24)
+
+`@svar-ui/calendar-store` requires an all-day event's `end` to be
+strictly after `start`, but `/edd`'s `+page.svelte` passed `end: day`
+— the same `Date` object as `start` — so the SVAR Calendar widget
+silently dropped every expected-discharge event it was ever asked to
+show, and the route had zero test coverage to catch it. The identical
+bug was already found and fixed in worker-front-end's and
+person-front-end's `/expiry` calendars. Fixed by computing the
+following calendar day as `end`. New Playwright test
+(`tests/e2e/board.spec.ts`) stubs one occupied bed with an EDD on the
+current month, asserts the event renders, and asserts selecting it
+navigates to `/stays/{pid}`. See `spec/tasks.md` PF-T24.
+
 ### Security — root sign-in gate (PF-T22)
 
 `src/hooks.server.ts` stashed `locals.sessionId` from the cookie but
