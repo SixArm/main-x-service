@@ -10,6 +10,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — page-visit guard on `/admin/attributes` (AFE-1)
+
+`/admin/attributes`'s entire purpose is submitting a `PUT`, but an
+anonymous visit rendered an in-page "Sign in as an admin to manage
+attributes." message instead of redirecting — unlike the
+person/worker/thing/event/course reference crates' PRO-H10 page-visit
+guard, which redirects a signed-out visitor to `/signin` for exactly
+this page shape. New `requireSignedIn(locals)` in
+`src/lib/server/session.ts`, called at the top of `load` (before the
+`?pid=` branch, so a bare `/admin/attributes` visit redirects too).
+Declared as a TypeScript assertion function
+(`asserts locals is App.Locals & { sessionId: string }`) rather than
+the reference crates' plain `void`, since this route's `load` still
+needs `locals.sessionId` narrowed to pass to `getUserAttributes`
+afterward. The `save` action's existing `401` is untouched (form
+actions don't redirect on `POST` failure). New unit tests
+(`tests/unit/session.test.ts`) plus two e2e cases
+(`tests/e2e/admin-attributes.spec.ts`) replacing the old
+in-page-message assertion. `pnpm test` 27/27 (was 25); `pnpm run
+check` clean; `pnpm run test:e2e` 14/14; `pnpm run build` clean. See
+spec/index.md AFE-1.
+
 ### Added — distinct message for a rate-limited sign-in/sign-up request (AFE-4)
 
 `requestMagicLink`/`signup` (`src/lib/server/auth.ts`) returned only

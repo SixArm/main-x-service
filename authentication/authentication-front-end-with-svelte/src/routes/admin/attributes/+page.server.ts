@@ -3,18 +3,22 @@
 // (GET) and loaded server-side; saving PUTs the whole map. The admin API
 // requires the signed-in operator to carry `access=admin` (else 403,
 // surfaced here). No token ever reaches the browser.
+//
+// Page-visit guard (AFE-1 / PRO-H10): this page's entire purpose is
+// submitting a PUT, so an anonymous visitor is redirected to /signin
+// rather than shown an in-page "sign in" message — see
+// `$lib/server/session.ts::requireSignedIn` for the policy rationale.
 
 import type { Actions, PageServerLoad } from "./$types";
 import { fail } from "@sveltejs/kit";
 import { getUserAttributes, putUserAttributes } from "$lib/server/admin";
+import { requireSignedIn } from "$lib/server/session";
 import type { UserAttributes } from "$lib/api/types";
 
 export const load: PageServerLoad = async ({ url, locals, fetch }) => {
+  requireSignedIn(locals);
   const pid = url.searchParams.get("pid")?.trim() || null;
   if (!pid) return { pid: null, target: null as UserAttributes | null };
-  if (!locals.sessionId) {
-    return { pid, target: null, error: "Sign in as an admin to manage attributes." };
-  }
   const result = await getUserAttributes(
     fetch,
     locals.sessionId,

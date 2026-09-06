@@ -6,6 +6,31 @@
 // server reads/sets that cookie here and exchanges it for short-lived
 // PASETO tokens server-side — the browser never sees a token.
 
+import { redirect } from "@sveltejs/kit";
+
+/**
+ * Page-visit guard (PRO-H10 / AFE-1): redirect an unauthenticated visitor
+ * to `/signin` rather than render a page whose entire purpose is a
+ * mutation. `locals.sessionId` is presence-only (set from the httpOnly
+ * cookie, never re-validated here) — a UX convenience in front of the
+ * auth service's real enforcement, not a substitute for it. Mirrors the
+ * person/worker/thing/event/course reference (`$lib/server/session.ts`,
+ * repo `tasks.md` PRO-H10).
+ *
+ * Declared as a TypeScript assertion function (rather than plain `void`,
+ * as the reference crates have it): unlike those crates' guarded pages,
+ * this route's `load` still needs `locals.sessionId` narrowed to `string`
+ * afterward to pass it to `getUserAttributes`, so the narrowing is real
+ * type safety, not decoration.
+ */
+export function requireSignedIn(
+  locals: App.Locals,
+): asserts locals is App.Locals & { sessionId: string } {
+  if (locals.sessionId === null) {
+    redirect(303, "/signin");
+  }
+}
+
 /** The httpOnly session cookie name (host-locked via the `__Host-` prefix). */
 export const SESSION_COOKIE = "__Host-mxi_session";
 

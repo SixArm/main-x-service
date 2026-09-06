@@ -452,7 +452,7 @@ session on sign-out and the BFF clears the cookie. CSRF protection (§6 FR
       BFF/cookie migration — no token lives in the browser at all
       (`authentication-sessions.md` §3, §6); see the BFF task above.
 
-- [ ] **AFE-1 (S) Extend the PRO-H10 page-visit guard to
+- [x] **AFE-1 (S) Extend the PRO-H10 page-visit guard to
       `/admin/attributes`.** Repo `tasks.md` PRO-H10 (2026-08-29,
       DONE) decided the family's page-visit posture — guard only pages
       whose entire purpose is a mutation, redirect to `/signin` via a
@@ -473,6 +473,31 @@ session on sign-out and the BFF clears the cookie. CSRF protection (§6 FR
       don't redirect on POST failure the same way), add a unit test.
       **Acceptance:** an anonymous visit to `/admin/attributes` (any
       `?pid=`) redirects to `/signin`; `pnpm test` green.
+  - **Resolved (2026-09-06).** `requireSignedIn(locals)` added to
+    `src/lib/server/session.ts`, called at the top of
+    `/admin/attributes`'s `load` (before the `?pid=` branch, so a bare
+    `/admin/attributes` visit redirects too, not just one with a target
+    chosen) — removing the in-page "Sign in as an admin..." message
+    entirely; the `save` action's existing ad-hoc `401` is untouched, per
+    the acceptance note (form actions don't redirect on `POST` failure
+    the same way `load` does). One deliberate deviation from the
+    reference crates' signature: `requireSignedIn` is declared as a
+    TypeScript **assertion function**
+    (`asserts locals is App.Locals & { sessionId: string }`) rather than
+    plain `void`, because — unlike the reference crates' guarded pages,
+    which call it and return immediately — this route's `load` still
+    needs `locals.sessionId` narrowed to `string` afterward to pass it to
+    `getUserAttributes`; the narrowing is genuine type safety here, not
+    decoration copied for its own sake. New `requireSignedIn` unit tests
+    in `tests/unit/session.test.ts` (redirects when signed out; passes
+    through silently when signed in, mirroring the reference crates'
+    own test shape) plus two `tests/e2e/admin-attributes.spec.ts` cases
+    (anonymous + `?pid=` redirects to `/signin`; anonymous with no
+    `?pid=` at all also redirects) replacing the old in-page-message
+    assertion the guard now makes unreachable. `pnpm test` 27/27 (was
+    25); `pnpm run check` 0 errors/warnings; `pnpm run test:e2e` 14/14
+    (`admin-attributes.spec.ts` up from 4 to 5 tests: one old case
+    replaced by two new ones); `pnpm run build` clean.
 
 - [ ] **AFE-2 (M) No UI for the GDPR account-export / erasure rights
       the backend already implements.** The auth service exposes
