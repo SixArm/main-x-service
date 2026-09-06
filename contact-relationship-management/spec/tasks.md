@@ -423,3 +423,22 @@ code + tests in one PR.
       cases); svelte-check 0; existing Playwright suite stays green.
       (CRM-D10)
 
+- [x] CRM-T28 **Fix: `/followups`'s calendar never actually showed an
+      upcoming follow-up event.** *(resolved 2026-09-06.)*
+      `@svar-ui/calendar-store` requires an all-day event's `end` to be
+      strictly after `start`, but `+page.svelte` passed `end: day` —
+      the same `Date` object as `start` — so the SVAR Calendar widget
+      silently dropped every upcoming follow-up it was ever asked to
+      show. The existing test only asserted the calendar's wrapper
+      `<div>` was visible, not that an event actually rendered inside
+      it, so the bug went uncaught. The identical bug and fix already
+      landed in worker-front-end's/person-front-end's `/expiry`
+      calendars and ppm-front-end's `/calendar`. Fixed by computing
+      the following calendar day as `end`; strengthened the test to
+      assert the calendar renders the event text, with the stubbed
+      follow-up's due date computed relative to the actual test-run
+      date (a fixed date would eventually scroll outside the widget's
+      default "today's month" view). Verified the strengthened
+      assertion actually fails without the fix before confirming it
+      passes with it.
+

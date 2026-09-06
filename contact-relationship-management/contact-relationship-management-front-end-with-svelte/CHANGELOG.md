@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — the follow-ups calendar never showed an upcoming event (CRM-T28)
+
+`@svar-ui/calendar-store` requires an all-day event's `end` to be
+strictly after `start`, but `/followups`'s `+page.svelte` passed
+`end: day` — the same `Date` object as `start` — so the SVAR Calendar
+widget silently dropped every upcoming follow-up it was ever asked to
+show. The existing test only asserted the calendar's wrapper was
+visible, not that an event actually rendered inside it. The identical
+bug was already found and fixed in worker-front-end's/person-front-end's
+`/expiry` calendars and ppm-front-end's `/calendar`. Fixed by computing
+the following calendar day as `end`; strengthened the test to assert
+the calendar renders the event text, with the stubbed due date
+computed relative to the actual test-run date. See `spec/tasks.md`
+CRM-T28.
+
 ### Added — root sign-in gate (CRM-T26)
 
 No `+layout.server.ts` existed anywhere under `src/routes`, so a
