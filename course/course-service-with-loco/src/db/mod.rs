@@ -22,8 +22,9 @@ use crate::config::DatabaseConfig;
 use crate::db::outbox::OutboxInsert;
 use crate::models::{
     Course, CourseIdentifier, CourseInstance, CourseInstanceStatus, CourseLink, CourseMode,
-    CourseStatus, EducationalLevel, IdentifierType, InteractivityType, LearningResourceType,
-    LinkType, MergeRecord, Schedule,
+    CourseStatus, DecideOutcome, EducationalLevel, IdentifierType, InteractivityType,
+    LearningResourceType, LinkType, MergeRecord, NewReviewItem, ReviewQueueItem, ReviewStatus,
+    Schedule, canonical_pair,
 };
 use crate::streaming::EventTransport;
 use crate::streaming::envelope::EventKind;
@@ -100,6 +101,29 @@ pub trait CourseRepository: Send + Sync {
     /// `Deleted` outbox row for the duplicate on the same transaction.
     /// Returns the reloaded survivor.
     async fn merge(&self, survivor: &Course, duplicate_id: &Uuid) -> Result<Course>;
+
+    // Persisted review queue (T-27, `course_match_scores`).
+    /// Insert-or-refresh review-queue candidate pairs and return the
+    /// stored rows. Pair order is normalized to [`canonical_pair`]
+    /// before write, so `(a, b)` and `(b, a)` upsert the same row: a
+    /// re-scan refreshes the score columns but never touches a
+    /// previously-decided row's `status`.
+    async fn upsert_review_items(&self, items: &[NewReviewItem]) -> Result<Vec<ReviewQueueItem>>;
+    /// List stored review-queue items, newest first, optionally
+    /// filtered by `status`. `limit` is capped at 500.
+    async fn list_review_items(
+        &self,
+        status: Option<ReviewStatus>,
+        limit: u64,
+    ) -> Result<Vec<ReviewQueueItem>>;
+    /// Record an operator decision on one `Pending` review item.
+    /// First-writer-wins: only a `Pending` row transitions.
+    async fn decide_review_item(
+        &self,
+        id: Uuid,
+        status: ReviewStatus,
+        reviewed_by: Option<&str>,
+    ) -> Result<DecideOutcome>;
 }
 
 /// SeaORM-backed [`CourseRepository`] implementation over a `PostgreSQL`
@@ -428,6 +452,144 @@ impl CourseRepository for SeaOrmCourseRepository {
             .await?
             .ok_or(crate::Error::NotFound)
     }
+
+    async fn upsert_review_items(&self, items: &[NewReviewItem]) -> Result<Vec<ReviewQueueItem>> {
+        use models::course_match_scores;
+        use sea_orm::sea_query::OnConflict;
+
+        let mut out = Vec::with_capacity(items.len());
+        for item in items {
+            // Normalize the pair order so (a, b) and (b, a) share one row
+            // under the migration's plain `UNIQUE (course_id, candidate_id)`
+            // constraint (T-27).
+            let (course_id, candidate_id) = canonical_pair(item.course_id_a, item.course_id_b);
+            let active = course_match_scores::ActiveModel {
+                id: Set(Uuid::new_v4()),
+                course_id: Set(course_id),
+                candidate_id: Set(candidate_id),
+                match_score: Set(item.match_score),
+                match_quality: Set(item.match_quality.clone()),
+                detection_method: Set(item.detection_method.clone()),
+                score_breakdown: Set(item.score_breakdown.clone()),
+                status: Set(enum_to_string(&ReviewStatus::Pending)?),
+                reviewed_by: Set(None),
+                created_at: Set(OffsetDateTime::now_utc()),
+                reviewed_at: Set(None),
+            };
+            // On conflict, refresh only the score-describing columns — the
+            // row's `id`, `status`, `reviewed_by`, and `reviewed_at` are
+            // left untouched, so a re-scan never clobbers a decided item.
+            let on_conflict = OnConflict::columns([
+                course_match_scores::Column::CourseId,
+                course_match_scores::Column::CandidateId,
+            ])
+            .update_columns([
+                course_match_scores::Column::MatchScore,
+                course_match_scores::Column::MatchQuality,
+                course_match_scores::Column::DetectionMethod,
+                course_match_scores::Column::ScoreBreakdown,
+            ])
+            .to_owned();
+            let model = course_match_scores::Entity::insert(active)
+                .on_conflict(on_conflict)
+                .exec_with_returning(&self.db)
+                .await
+                .map_err(|e| map_db(&e))?;
+            out.push(review_row_to_item(model)?);
+        }
+        Ok(out)
+    }
+
+    async fn list_review_items(
+        &self,
+        status: Option<ReviewStatus>,
+        limit: u64,
+    ) -> Result<Vec<ReviewQueueItem>> {
+        use models::course_match_scores;
+
+        let mut query = course_match_scores::Entity::find()
+            .order_by_desc(course_match_scores::Column::CreatedAt)
+            .order_by_asc(course_match_scores::Column::Id)
+            .limit(limit.min(500));
+        if let Some(status) = status {
+            query = query.filter(course_match_scores::Column::Status.eq(enum_to_string(&status)?));
+        }
+        let rows = query.all(&self.db).await.map_err(|e| map_db(&e))?;
+        rows.into_iter().map(review_row_to_item).collect()
+    }
+
+    async fn decide_review_item(
+        &self,
+        id: Uuid,
+        status: ReviewStatus,
+        reviewed_by: Option<&str>,
+    ) -> Result<DecideOutcome> {
+        use models::course_match_scores;
+        use sea_orm::sea_query::Expr;
+
+        // The transition guard is the `WHERE status = 'Pending'` filter on
+        // this single UPDATE statement: it runs atomically in Postgres, so
+        // concurrent decisions cannot double-apply — exactly one caller's
+        // update matches a row, the rest affect zero rows.
+        let result = course_match_scores::Entity::update_many()
+            .col_expr(
+                course_match_scores::Column::Status,
+                Expr::value(enum_to_string(&status)?),
+            )
+            .col_expr(
+                course_match_scores::Column::ReviewedBy,
+                Expr::value(reviewed_by.map(ToString::to_string)),
+            )
+            .col_expr(
+                course_match_scores::Column::ReviewedAt,
+                Expr::value(OffsetDateTime::now_utc()),
+            )
+            .filter(course_match_scores::Column::Id.eq(id))
+            .filter(course_match_scores::Column::Status.eq(enum_to_string(&ReviewStatus::Pending)?))
+            .exec(&self.db)
+            .await
+            .map_err(|e| map_db(&e))?;
+
+        if result.rows_affected == 1 {
+            let row = course_match_scores::Entity::find_by_id(id)
+                .one(&self.db)
+                .await
+                .map_err(|e| map_db(&e))?
+                .ok_or(crate::Error::NotFound)?;
+            return Ok(DecideOutcome::Decided(Box::new(review_row_to_item(row)?)));
+        }
+
+        // No row was affected: either the id doesn't exist, or it exists
+        // but isn't `Pending`. Probe to tell the two apart.
+        match course_match_scores::Entity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| map_db(&e))?
+        {
+            Some(row) => Ok(DecideOutcome::AlreadyDecided(enum_from_string(
+                &row.status,
+            )?)),
+            None => Ok(DecideOutcome::NotFound),
+        }
+    }
+}
+
+/// Map a stored `course_match_scores` row onto the wire
+/// [`ReviewQueueItem`] shape (T-27).
+fn review_row_to_item(row: models::course_match_scores::Model) -> Result<ReviewQueueItem> {
+    Ok(ReviewQueueItem {
+        id: row.id,
+        course_id_a: row.course_id,
+        course_id_b: row.candidate_id,
+        match_score: row.match_score,
+        match_quality: row.match_quality,
+        detection_method: row.detection_method,
+        score_breakdown: row.score_breakdown,
+        status: enum_from_string(&row.status)?,
+        reviewed_by: row.reviewed_by,
+        created_at: offset_to_ts(row.created_at),
+        reviewed_at: row.reviewed_at.map(offset_to_ts),
+    })
 }
 
 /// Apply the merged `course`'s parent-row update + wholesale child-row

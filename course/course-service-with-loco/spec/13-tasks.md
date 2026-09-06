@@ -46,7 +46,7 @@
 - [x] AU-2: **Key rotation + ABAC policy hot-reload without a restart** — the loco-style half of the family AU-1/AU-2 rollout (case was the reference; the five axum-style services landed the same day as AU-1). The verifier and the ABAC policy became reloadable holders (`ReloadableVerifier` / `ReloadablePolicy`) read per-request by the blanket guard and the bearer extractors, replacing boot-only `OnceLock` snapshots. `spawn_key_refresh` re-fetches `COURSE_PASETO_KEYS_URL` every `COURSE_PASETO_KEYS_REFRESH_SECS` (default 3600; `0` disables); a failed fetch keeps the current key set. `spawn_policy_watcher` polls `COURSE_ABAC_POLICY_FILE`'s mtime every 15s and reloads; a malformed edit falls back to the built-in default. `tests/enforcement.rs` is the activation proof (its own binary, `#[ignore]`d — needs a database). **Landed 2026-08-01** (see `CHANGELOG.md`; had no §13 entry until this DOC-2 pass).
 - [x] T-23: **Durable event bus — Phase 3, `FluvioSink` (BUS-3)** — copy-adapts the completed **case-service** reference (`agents/share/event-bus.md` §5/§8; `case/case-service-with-loco/src/relay.rs`, BUS-1). Correction en route: the family capability matrix (`agents/share/overview.md`) had claimed course carries "in-memory events only, no durable outbox" — false since T-21/T-22 landed the real `course_outbox` table + working `EventTransport::Outbox` switch + a relay already wired into `App::after_routes`; course is a legitimate `FluvioSink` target like every other outbox-carrying service. The real-broker `impl EventSink`, behind this crate's own `fluvio` Cargo feature (off by default; `fluvio` 0.50) — a default build's dependency tree and behaviour are unchanged. One producer per topic (`fluvio::Fluvio::connect_with_config` + `topic_producer`, held for the sink's lifetime), partitioned by record `pid` per §7. New config: `COURSE_FLUVIO_ENDPOINT` (the broker's SC address; unset ⇒ `LoggingSink`, unchanged default behaviour) and `COURSE_EVENT_TOPIC` (default `mxi.course.events`). **No silent fallback**: an endpoint configured **without** the `fluvio` feature refuses to start the relay at all (logged at `error`), rather than a `LoggingSink` masquerade that would mark outbox rows `published_at` without ever reaching the broker the operator asked for — the same shape as the family's artifact-store "no fallback on an explicit backend choice" rule (`agents/share/bulk-import-export.md` §12). The initial connection retries indefinitely rather than falling back, for the same reason. `compose.fluvio.yaml` + `Dockerfile.fluvio-cli` provision a local SC+SPU broker (Fluvio's own documented Docker Compose layout, translated to this repo's Podman conventions, `mxi-course-fluvio-*` container names) for opt-in manual runs; **not** wired into any automated CI stage. This crate has no `compliance/soup.tsv` (unlike case), so no SOUP register update. **Done (2026-08-03):** `cargo build`/`clippy --all-targets -D warnings`/`fmt --check` clean under both default features and `--features fluvio` (the real `fluvio` 0.50 API compiling is the actual verification of correct usage); `cargo test --lib` passes the same count under both configs. `tests/fluvio_relay.rs` is a `#![cfg(feature = "fluvio")]`-gated, `#[ignore]`d round-trip (enqueue via `SeaOrmCourseRepository::create` under the outbox transport → `FluvioSink` → `drain_once` → assert `published_at`), verified by compiling under the feature, not by an actual execution (no automated run in this repo stands up a broker) — same posture as case's `fluvio_relay_publishes_an_outbox_row_to_a_real_topic` (BUS-1) and person's `s3_round_trip_against_a_live_endpoint` (BLK-4). Deviation from the case template: course has no loco `request::<App, _, _>` test harness, so the test drives `SeaOrmCourseRepository` directly against a `DATABASE_URL`-configured Postgres, matching this crate's existing `outbox_atomicity_tests` shape rather than case's loco-request pattern. Full DB-gated suite (`scripts/ci-check.sh test-db course/course-service-with-loco`) green with zero regressions. Remaining: BUS-2 (link-graph Fluvio consumer, cross-cutting) and wiring the CourseInstance sub-resource onto the outbox.
 - [x] T-26 (2026-08-30, PRO-H12 slice 1 of 7): **OpenTelemetry OTLP export.** New `src/observability.rs` — this crate carried no observability module at all before this change (unlike person/worker/event, PRO-H9, which each had a dead stub to replace). Close port of person-service's `src/observability.rs` (itself ported from link-graph-service's, the family's original reference): the `tracing-opentelemetry` bridge over an OTLP/gRPC `SdkTracerProvider`/`SdkMeterProvider`, export-on-by-default at `OTLP_ENDPOINT` (default `http://localhost:4317`) with `service.name` from `OTLP_SERVICE_NAME` (default `course-service`), both deliberately unprefixed per the shared doc. `App::init_logger`/`on_shutdown` (`src/app.rs`) install/flush it; `observability::trace_mw` is layered as the outermost middleware on **both** of this crate's router-construction surfaces (`App::after_routes` and `api::rest::create_router`) — the same two-surface adaptation person/worker/event needed, confirmed rather than assumed identical. Unlike person/worker/event, **no `tonic` dev-dependency rename was needed**: this crate carries no gRPC stub of its own (`agents/share/overview.md`'s capability matrix), so the in-process OTLP collector tests' `tonic = "0.14"` dev-dependency is a plain, un-renamed dependency — proof the rename PRO-H9 needed is conditional on the gRPC-stub collision, not a fixed step of the port. `tests/otlp_export.rs` + `tests/otlp_middleware.rs` + `tests/otlp_collector/` (ported from person-service) prove real export against a real in-process gRPC listener in a normal `cargo test` run — a `tracing` span and a metric both reach the collector's decoded protobuf, and a served request's `traceparent` header matches its exported span's trace id. Verified independently: `cargo fmt --check` clean, `cargo clippy --all-targets -- -D warnings` clean, `cargo deny check` clean, MSRV check (`cargo +1.96 check --all-targets`) clean, `cargo test --lib` 132/132 (was 124, +8 new `observability::tests`), `cargo test --test otlp_export --test otlp_middleware` 4/4. `agents/share/{overview.md,observability.md,rust-tracing-opentelemetry-stack.md}` updated to reflect course as the fourth crate carrying a real exporter (PRO-H12's remaining scope: place, thing, organization, care-pathway, case, portfolio).
-- [ ] T-27: Persist the review queue to `course_match_scores` + add
+- [x] T-27: Persist the review queue to `course_match_scores` + add
   list/decision endpoints. `POST /api/courses/deduplicate` classifies
   pairs into the review band and returns `ReviewQueueItem`s in the
   response (`src/models/review_queue.rs`,
@@ -68,6 +68,59 @@
     `pending` item can be confirmed or rejected exactly once; a
     re-scan upserts (refreshes score, keeps a decided row's decision)
     per the shared UNIQUE-upsert convention.
+  - **Resolved (2026-09-06).** `CourseRepository` gained
+    `upsert_review_items` / `list_review_items` / `decide_review_item`
+    (`src/db/mod.rs`), backed by a **typed** SeaORM `ActiveModel` +
+    `on_conflict(...).exec_with_returning(...)` upsert and a guarded
+    `update_many().col_expr(...).filter(status = 'Pending')` decision —
+    deliberately not case-service's raw-SQL `review_queue.rs` pattern,
+    since `course_match_scores` is already a full `DeriveEntityModel`
+    entity (see `agents/share/observability.md`-style per-crate
+    verification: check the actual code, not another crate's template).
+    `run_batch_dedup` (`src/api/rest/handlers.rs`) now collects
+    `NewReviewItem`s during the scan and upserts them in one batch after
+    paging completes, replacing the old in-memory-only
+    `response.review_items.push(...)`. `GET /api/courses/review-queue`
+    (optional `?status=&limit=`) and
+    `POST /api/courses/review-queue/{id}/decision` (body
+    `{ "status": "Confirmed" | "Rejected", "reviewed_by": Option<String> }`)
+    are wired on both router surfaces + `ApiDoc`.
+    **Two deliberate deviations from the family pattern this task cited**,
+    both load-bearing and verified against this crate's own code rather
+    than assumed from case/organization's shape: (1) pair order is
+    normalized in **application code** (`models::review_queue::
+    canonical_pair`, shared with the batch scan's own `seen_pairs` set)
+    against the migration's existing plain `UNIQUE (course_id,
+    candidate_id)` constraint, rather than a schema change to a
+    normalized-pair constraint — the migration was not touched; (2) the
+    stored/wire status tokens stay this crate's pre-existing **PascalCase**
+    (`"Pending"`/`"Confirmed"`/`"Rejected"`/`"AutoMerged"`, `ReviewStatus`'s
+    existing serde form with no `rename_all`) rather than switching to the
+    family's lowercase tokens, because the migration's own column default
+    is `DEFAULT 'Pending'` — switching casing would have broken that
+    default and the OpenAPI schema this crate already publishes. There is
+    no `provenance` column (course has no bulk-import pipeline routing
+    keyless duplicates here, unlike case/organization) and no
+    `MaybeAuthUser` extractor (unlike case), so `reviewed_by` is
+    client-supplied on the decision request body, mirroring this crate's
+    existing `MergeRequest::merged_by` convention rather than derived
+    from a bearer token. 3 new unit tests (`models::review_queue::tests`:
+    `is_decision` gating, the PascalCase wire-token pin, and
+    `reviewed_by` defaulting) plus a new DB-gated integration test
+    (`tests/api_integration_test.rs`:
+    `review_queue_persists_across_a_rescan_and_decides_once` — seeds two
+    near-duplicate courses directly through the repository + search index
+    to route around the create endpoint's own real-time duplicate check,
+    runs a batch scan, confirms the item, pins first-writer-wins via a
+    second decision attempt (`422`) and an unknown id (`404`), then
+    re-scans and confirms the `Confirmed` status survives the upsert).
+    `cargo test --lib` 135/135 (was 132); `cargo clippy --all-targets --
+    -D warnings` clean; `cargo fmt --check` clean; `cargo doc --no-deps`
+    adds no new warnings; the full DB-gated suite
+    (`scripts/ci-check.sh test-db course/course-service-with-loco`)
+    green including the new integration test. The `migration/` sub-crate
+    is untouched (no schema change), so its own separate CI checks were
+    unaffected — verified independently rather than assumed.
 - [ ] T-28: Wire the `syllabus_sections` sub-resource to persistence +
   CRUD endpoints. The domain field is validated on every create/update
   (`src/validation/mod.rs:153`, `cap_array`) and the DB schema is

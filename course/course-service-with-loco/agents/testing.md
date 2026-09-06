@@ -5,7 +5,7 @@
 ### Unit tests
 
 Embedded in source files via `#[cfg(test)] mod tests`. Run with
-`cargo test --lib` — 125 tests today (123 run + 2 DB-gated `#[ignore]`;
+`cargo test --lib` — 135 tests today (133 run + 2 DB-gated `#[ignore]`;
 run it for the live count).
 
 | Module | Tests | What's covered |
@@ -30,7 +30,8 @@ run it for the live count).
 | `fhir::search` (`src/fhir/search.rs`, T-20) | 5 | Empty params match everything; `_id` must match exactly; `identifier` token matches course code + scheme; `code` matches the course coding; `name` matches an alias case-insensitively |
 | `metrics` (`src/metrics.rs`) | 2 | Registry render includes the declared counters + HELP/TYPE banners; an increment is reflected in the rendered exposition (T-16) |
 | `api::rest` (`src/api/rest/mod.rs`) | 3 | `metrics_routes()` is mounted at root (no `/api` prefix); `ApiDoc::openapi()` builds with the expected path surface (incl. `/metrics.prom`); a **live** `GET /metrics.prom` via `tower::oneshot` returns `200` + `text/plain; version=0.0.4` and reflects a counter increment (T-16) |
-| `api::rest::handlers` (`src/api/rest/handlers.rs`) | 4 | `fold_duplicate_into_main` unions collections + dedupes identifiers; fold doesn't mutate inputs; `canonical_pair` is order-independent; batch-dedup (FR-9) threshold-band classification (skip / review-queue / auto-merge boundary semantics) |
+| `api::rest::handlers` (`src/api/rest/handlers.rs`) | 4 | `fold_duplicate_into_main` unions collections + dedupes identifiers; fold doesn't mutate inputs; `canonical_pair` is order-independent (now imported from `models::review_queue`); batch-dedup (FR-9) threshold-band classification (skip / review-queue / auto-merge boundary semantics) |
+| `models::review_queue` (`src/models/review_queue.rs`, T-27) | 3 | `ReviewStatus::is_decision` accepts only `Confirmed`/`Rejected`; the wire tokens stay this crate's existing PascalCase (`Pending`/`Confirmed`/`Rejected`/`AutoMerged`, no `rename_all`); `ReviewDecisionRequest::reviewed_by` defaults to `None` when omitted |
 | `api::rest::auth` (`src/api/rest/auth.rs`, T-15/AU-2) | 25 | Bearer parsing (missing / non-bearer / tampered / expired header → 401); the full ABAC matrix (empty attrs read-only, `access=write`, `access=admin`, `svc=true`, first-match deny, 401-vs-403 distinction); `derive_action` per-method + destructive-suffix routing; enforce on/off across public, FHIR, and out-of-prefix paths; boot-time verifier fetch success/fallback |
 | `api::rest::state` (`src/api/rest/state.rs`) | 2 | An empty verifier builds with zero keys; `env_or` falls back when unset |
 | `api::rest::fhir` (`src/api/rest/fhir.rs`, T-20) | 2 | The FHIR routes mount under `/fhir`; the `CapabilityStatement` matches the mounted routes and is labelled non-standard |
@@ -64,7 +65,7 @@ Add a new bridge test when:
 
 ### Integration tests
 
-`tests/api_integration_test.rs` — 12 tests, all `#[ignore]`-tagged
+`tests/api_integration_test.rs` — 13 tests, all `#[ignore]`-tagged
 so `cargo test --lib` stays fast. Drive `tower::ServiceExt::oneshot`
 against the full Axum router with real PostgreSQL + Tantivy + the
 in-memory event publisher.
@@ -82,9 +83,10 @@ DATABASE_URL=postgres://course_user:course_password@localhost:5434/course \
 
 Coverage: health, full lifecycle (create + GET + PUT + soft-delete),
 422 validation, search hit, check-duplicates, match, merge, batch
-dedup response shape, instance sub-resource round-trip, audit log
-records CREATE then UPDATE, masked view clears provider, GDPR export
-envelope shape.
+dedup response shape, **the persisted review queue survives a re-scan
+and decides exactly once (T-27)**, instance sub-resource round-trip,
+audit log records CREATE then UPDATE, masked view clears provider,
+GDPR export envelope shape.
 
 `tests/common/mod.rs` builds `AppState` against env-configured
 Postgres + a process-shared Tantivy `TempDir` (concurrent tests
@@ -135,9 +137,9 @@ podman compose -f compose.fluvio.yaml down -v
 ## Running tests
 
 ```bash
-cargo test --lib                              # 123 unit tests, no DB needed (+ 2 DB-gated #[ignore])
+cargo test --lib                              # 133 unit tests, no DB needed (+ 2 DB-gated #[ignore])
 cargo test --test duplicate_detection         # 14 bridge tests, no DB needed
-cargo test --test api_integration_test -- --ignored   # 12 integration tests, DB required
+cargo test --test api_integration_test -- --ignored   # 13 integration tests, DB required
 cargo test --test enforcement -- --ignored    # 1 auth-activation test, DB required
 cargo test --features fluvio --test fluvio_relay -- --ignored   # 1 test, DB + Fluvio broker required
 cargo bench                                   # 3 criterion benches

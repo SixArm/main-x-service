@@ -121,10 +121,21 @@ spec.md FR-19.
 | POST | `/api/courses/match` | Find candidate matches for a request course |
 | POST | `/api/courses/check-duplicates` | Real-time duplicate check |
 | POST | `/api/courses/merge` | Merge two courses |
-| POST | `/api/courses/deduplicate` | Batch dedup scan |
+| POST | `/api/courses/deduplicate` | Batch dedup scan — candidates are persisted (T-27), not just returned |
+| GET | `/api/courses/review-queue` | Persisted review queue (`?status=&limit=`, `status`/`limit` optional) |
+| POST | `/api/courses/review-queue/{id}/decision` | Decide a `Pending` item (`{"status": "Confirmed" \| "Rejected", "reviewed_by": Option<String>}`); first-writer-wins — `422` if already decided, `404` if unknown |
 
 Blocking: by `name` (FuzzyTermQuery, multi-token) AND/OR by
 `(provider_id, course_code)` when both present.
+
+**Review-queue status tokens are this crate's existing PascalCase**
+(`Pending`/`Confirmed`/`Rejected`/`AutoMerged`, `ReviewStatus`'s serde
+form with no `rename_all`) — **not** the lowercase tokens some sibling
+registries use (`agents/share/match-search-merge.md`). Pair order is
+normalized to `models::review_queue::canonical_pair` (smaller UUID
+first) before every persisted write, so a re-scan upserts the same row
+(`course_match_scores`'s `UNIQUE (course_id, candidate_id)`) rather than
+duplicating it under the reverse ordering.
 
 ## CourseInstance sub-resource
 
