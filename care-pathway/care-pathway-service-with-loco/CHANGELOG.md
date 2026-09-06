@@ -9,6 +9,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — doc drift: stale "check-duplicates has no search-backed blocking yet" comments (2026-09-06)
+
+`CHECK_DUPLICATES_SCAN_CAP`'s doc comment, the `check_duplicates`
+handler's own doc comment, the `search` handler's doc comment, and
+`fhir.rs`'s `FHIR_SEARCH_SCAN_CAP` cross-reference (`src/controllers/care_pathways.rs`,
+`src/controllers/fhir.rs`) all still described `check-duplicates` as
+an in-memory scan with "no search-backed candidate blocking yet" and
+`search` as `ILIKE`-backed — both true when spec §13 T-6 was still
+open, neither true since T-6's Tantivy + search-blocked-candidates
+rollout landed. `check_duplicates` blocks on `crate::search::engine().candidates(...)`
+and `search` calls `crate::search::engine()...search_page(...)`
+directly; confirmed by reading both handlers. `CHECK_DUPLICATES_SCAN_CAP`
+is no longer read by any handler — kept only because a unit test pins
+its historical value. No behaviour change; corrected the comments to
+match the code they describe. See `spec/13-tasks.md` T-6, updated in
+the same pass.
+
 ### Fixed — doc drift: stale MSRV 1.95/N-3 reference (2026-09-06)
 
 `Cargo.toml` already declares `rust-version = "1.96"` (matching

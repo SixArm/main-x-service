@@ -23,14 +23,15 @@ use crate::models::cases::Model as CaseModel;
 use crate::models::merge_records::Model as MergeRecordModel;
 use crate::streaming;
 
-/// Maximum number of stored cases scanned in-memory by
-/// `check-duplicates`.
+/// Historical cap on how many stored cases `check-duplicates` once
+/// scanned in-memory, before spec §13 T-6's search-blocked candidates
+/// landed.
 ///
-/// `check-duplicates` has no search-backed candidate blocking yet
-/// (deferred — spec §13 T-6), so it loads up to this many active rows
-/// and matches each against the query. When the scan reaches this cap
-/// the result may be incomplete; the handler emits a `WARN`. Raising
-/// the cap is a stop-gap — the real fix is search-blocked candidates.
+/// `check-duplicates` no longer scans at all — it blocks on the search
+/// index instead (see [`check_duplicates`] and
+/// [`CHECK_DUPLICATES_CANDIDATE_LIMIT`]). This constant is kept only
+/// because a unit test pins its historical value; it is not read by
+/// any handler.
 pub const CHECK_DUPLICATES_SCAN_CAP: u64 = 1000;
 
 /// Maximum number of **blocked candidates** `check-duplicates` scores a

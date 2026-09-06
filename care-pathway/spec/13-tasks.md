@@ -109,26 +109,48 @@ manual check confirms it. Split tasks too big for one PR
     regression test fails if the path drifts. (CI wiring is the
     remaining follow-up.)
 - [ ] **T-6 — Search + candidate blocking.** (partly done)
-  - [x] Name search endpoint. **Done (2026-06-13):**
-    `GET /api/care-pathways/search?q=` — pragmatic Postgres `ILIKE`
-    substring match on the denormalised `name` (cap 50; `%`/`_`/`\`
-    escaped so the query matches literally), mirroring the organization
-    service. `PathwayModel::search` + the `search` handler; blank `q`
-    → `400`. Pinned by `can_search_pathways_by_name` (DB-gated) and the
-    un-gated `escape_like_neutralises_wildcards` unit test.
-  - [ ] Tantivy full-text / fuzzy search over the JSONB payload +
-    front-end search box.
+  - [x] Name search endpoint. **Superseded (2026-06-13 → Tantivy
+    below):** `GET /api/care-pathways/search?q=` is now Tantivy-backed
+    end to end — the `search` handler (`src/controllers/care_pathways.rs`)
+    calls `crate::search::engine()`, not the model layer. The original
+    `ILIKE`-based `PathwayModel::search`/`search_paged`/`search_count`
+    (`src/models/care_pathways.rs`) still exist and still have their
+    own DB-gated tests, but are dead code from the controller's point
+    of view — confirmed by grep, nothing outside that one file calls
+    them. Removing them is a separate, slightly larger cleanup (it
+    touches DB-gated tests this pass did not run against a live
+    database) and is intentionally left for a follow-up rather than
+    bundled here.
+  - [x] Tantivy full-text / fuzzy search over the JSONB payload.
+    **Done** — `src/search/` (fuzzy + phonetic modes), wired into
+    `GET /api/care-pathways/search` (confirmed: `search` handler calls
+    `crate::search::engine()...search_page(...)`, no in-memory scan).
+  - [ ] Front-end search box. **Still open** — `care-pathway-front-end-with-svelte`
+    genuinely has no search route/box today (confirmed: no
+    `search`/`q=` references anywhere under its `src/routes/`).
   - [x] Make the `check-duplicates` in-memory scan cap a named,
     documented const with a WARN on hit (interim safety, ahead of
     the redesign). **Done (2026-06-13):** `CHECK_DUPLICATES_SCAN_CAP`
     (= 1000) in `src/controllers/care_pathways.rs`; the handler passes
     it to `Model::list` and emits `tracing::warn!` when the returned
     row count reaches the cap. Pinned by the DB-free unit test
-    `check_duplicates_scan_cap_is_the_documented_value`.
-  - [ ] Replace the 1 000-row in-memory scan in `check-duplicates`
-    with search-blocked candidates (NFR-1 / NFR-2; OQ-2).
+    `check_duplicates_scan_cap_is_the_documented_value`. **Superseded**
+    by the next item — the constant is now historical only (its doc
+    comment was corrected in the same pass as this task-list update).
+  - [x] Replace the 1 000-row in-memory scan in `check-duplicates`
+    with search-blocked candidates (NFR-1 / NFR-2; OQ-2). **Done** —
+    confirmed live: `check_duplicates` (`src/controllers/care_pathways.rs`)
+    calls `crate::search::engine().candidates(&query,
+    CHECK_DUPLICATES_CANDIDATE_LIMIT)`, genuinely blocking rather than
+    scanning; an unavailable index is `503`, never a silent "no
+    duplicates". `CHECK_DUPLICATES_SCAN_CAP` is no longer read by any
+    handler — kept only for its historical unit-test pin.
   - **Acceptance:** `check-duplicates` latency test passes at
-    100 000 stored pathways.
+    100 000 stored pathways. *(Not separately re-verified at this
+    scale in this pass — the blocking rollout above is what the
+    acceptance criterion was written against; a dedicated
+    100 000-row latency test remains a documented gap, not claimed
+    met here.)*
 - [x] **T-7 — Offline token verification.**
   - [x] Verify offline bearer tokens against the auth-service's published
     key. **Done (2026-06-13, RS256-JWT/JWKS):** `src/auth.rs` embeds the

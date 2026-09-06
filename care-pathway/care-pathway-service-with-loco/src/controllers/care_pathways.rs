@@ -21,14 +21,15 @@ use crate::models::care_pathways::Model as PathwayModel;
 use crate::models::merge_records::Model as MergeRecordModel;
 use crate::streaming;
 
-/// Maximum number of stored pathways scanned in-memory by
-/// `check-duplicates`.
+/// Historical cap on how many stored pathways `check-duplicates` once
+/// scanned in-memory, before spec §13 T-6's search-blocked candidates
+/// landed.
 ///
-/// `check-duplicates` has no search-backed candidate blocking yet
-/// (deferred — spec §13 T-6), so it loads up to this many active rows
-/// and matches each against the query. When the scan reaches this cap
-/// the result may be incomplete; the handler emits a `WARN`. Raising
-/// the cap is a stop-gap — the real fix is search-blocked candidates.
+/// `check-duplicates` no longer scans at all — it blocks on the search
+/// index instead (see [`check_duplicates`] and
+/// [`CHECK_DUPLICATES_CANDIDATE_LIMIT`]). This constant is kept only
+/// because a unit test pins its historical value; it is not read by
+/// any handler.
 pub const CHECK_DUPLICATES_SCAN_CAP: u64 = 1000;
 
 /// Maximum number of **blocked candidates** `check-duplicates` scores a
@@ -585,10 +586,14 @@ async fn list(
     Ok(with_page_headers(format::json(refs)?, total, limit, offset))
 }
 
-/// Case-insensitive name search: `GET /api/care-pathways/search?q=stroke`.
-/// Pragmatic Postgres `ILIKE` over the denormalised `name` (cap 50);
-/// full-text / fuzzy search is deferred (spec §13 T-6). Response is a
-/// `[PathwayRef]` array; a missing or blank `q` is a `400`.
+/// Full-text name search: `GET /api/care-pathways/search?q=stroke`.
+/// Backed by the Tantivy index (`crate::search`; `?fuzzy=true` for
+/// edit-distance tolerance, `?phonetic=true` for Soundex, which takes
+/// precedence over `fuzzy` when both are set) — spec §13 T-6's
+/// full-text/fuzzy rollout is done; the plain-`ILIKE` search this
+/// replaced is gone. Response is a `[PathwayRef]` array; a missing or
+/// blank `q` is a `400`; an unavailable index is `503`, never a
+/// disguised empty result.
 ///
 /// # Errors
 ///
@@ -667,9 +672,9 @@ async fn match_against(Json(req): Json<MatchRequest>) -> Result<Response> {
 ///
 /// `POST /api/care-pathways/check-duplicates` — request body is a
 /// [`CarePathway`] query; response is a score-sorted `[ScoredRef]` array.
-/// In-memory scan (no search-backed blocking yet): loads up to
-/// [`CHECK_DUPLICATES_SCAN_CAP`] active rows and matches each, logging a
-/// `WARN` if the cap is hit (results may then be incomplete — spec §13 T-6).
+/// Blocks on up to [`CHECK_DUPLICATES_CANDIDATE_LIMIT`] search-index
+/// candidates rather than scanning the table (spec §13 T-6, landed);
+/// an unavailable index is `503`, never a silent "no duplicates".
 ///
 /// A candidate the caller's record-level ABAC policy denies reading is
 /// **omitted**, same as [`readable_refs`] does for `list`/`search` (spec
