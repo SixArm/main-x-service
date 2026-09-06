@@ -25,8 +25,7 @@
 //! - External [`Identifier`](crate::models::identifier::Identifier)s
 //!   (submodule [`identifier`](crate::models::identifier)).
 //! - Operational records:
-//!   [`Consent`](crate::models::consent::Consent),
-//!   [`Organization`](crate::models::organization::Organization), merge
+//!   [`Consent`](crate::models::consent::Consent), merge
 //!   records ([`MergeRecord`](crate::models::merge::MergeRecord) et
 //!   al.), and the dedup review queue
 //!   ([`ReviewQueueItem`](crate::models::review_queue::ReviewQueueItem)
@@ -64,8 +63,6 @@ pub mod event;
 pub mod identifier;
 /// Merge request / response / history records.
 pub mod merge;
-/// The [`Organization`] record (richer than a [`Party`] reference).
-pub mod organization;
 /// Deduplication review-queue and batch-dedup request / response.
 pub mod review_queue;
 
@@ -73,7 +70,6 @@ pub use consent::{Consent, ConsentStatus, ConsentType};
 pub use event::{Event, EventLink, LinkType};
 pub use identifier::{Identifier, IdentifierType, IdentifierUse};
 pub use merge::{MergeRecord, MergeRequest, MergeResponse, MergeStatus};
-pub use organization::Organization;
 pub use review_queue::{
     BatchDeduplicationRequest, BatchDeduplicationResponse, ReviewQueueItem, ReviewStatus,
 };

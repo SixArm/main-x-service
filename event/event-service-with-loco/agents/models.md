@@ -153,7 +153,7 @@ Typed pointer to another resource (used for `about`, `works`):
 `other_event_id: Uuid`, `link_type: LinkType` (`ReplacedBy`,
 `Replaces`, `Refer`, `Seealso`).
 
-### Organization, MergeRequest/Response/Record, ReviewQueueItem, Consent
+### MergeRequest/Response/Record, ReviewQueueItem, Consent
 
 Unchanged in shape from before; see the corresponding source files
 under `src/models/`. They are used in the merge, batch-dedup,
@@ -165,8 +165,14 @@ SeaORM entity modules (`src/db/models.rs`) map to these tables:
 
 - `events` — scalar fields + JSONB arrays (`alternate_names`, `image`, `same_as`, `keywords`, `in_language`)
 - `event_identifiers`, `event_locations`, `event_parties`, `event_offers`, `event_links`, `event_sub_events`
-- `organizations` + `organization_addresses` / `organization_contacts` / `organization_identifiers`
 - `audit_log`
+
+> The `organizations` table cluster (`organizations` +
+> `organization_addresses`/`organization_contacts`/
+> `organization_identifiers`) and the standalone `Organization` domain
+> model were retired 2026-09-06 (spec §13 T-14) — they were migrated
+> but never written to by any code path. `PartyKind::Organization`
+> (the party-kind discriminator, above) is unrelated and unaffected.
 
 Migrations live in `migrations/` as numbered SQL `up.sql` / `down.sql` pairs.
 
@@ -186,7 +192,6 @@ Migrations live in `migrations/` as numbered SQL `up.sql` / `down.sql` pairs.
 - `src/models/event.rs` — `Event`, `EventLink`, `LinkType`
 - `src/models/mod.rs` — `Address`, `ContactPoint`, `Location`, `Place`, `VirtualLocation`, `Party`, `PartyKind`, `Reference`, `Offer`, `OfferAvailability`, `EventStatus`, `EventAttendanceMode`, `EventType`
 - `src/models/identifier.rs` — `Identifier`, `IdentifierType`, `IdentifierUse`
-- `src/models/organization.rs` — `Organization`
 - `src/models/merge.rs` — `MergeRequest`, `MergeResponse`, `MergeRecord`, `MergeStatus`
 - `src/models/review_queue.rs` — `ReviewQueueItem`, `ReviewStatus`, `BatchDeduplicationRequest`, `BatchDeduplicationResponse`
 - `src/models/consent.rs` — `Consent`, `ConsentType`, `ConsentStatus`
