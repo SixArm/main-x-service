@@ -108,21 +108,26 @@
   new/changed files.
 - [x] T-22 (2026-08-28, PRO-H5): Auth — adopt BFF + httpOnly cookie + CSRF (per [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)). **BFF + httpOnly cookie + PASETO exchange are implemented**: `/signin` (magic-link request) and `/verify` (consumes the link, sets `__Host-mxi_session`, httpOnly/Secure/`SameSite=Lax`) at `src/routes/{signin,verify}/`; `src/hooks.server.ts` reads the cookie into `locals.sessionId`; `src/routes/api/proxy/[...path]/+server.ts` is the reverse proxy that drops the browser's cookie, exchanges the session for a short-lived PASETO (`src/lib/server/auth.ts`), and forwards with `Authorization: Bearer …`. No `mxi_access_token`/`localStorage` bearer, no fragment handoff — the browser never holds a token. **CSRF closed**: `/verify` additionally sets a second, **non-httpOnly**, Secure, `SameSite=Lax` cookie `__Host-mxi_csrf` (`generateCsrfToken()`/`CSRF_COOKIE`/`CSRF_COOKIE_OPTIONS`, `src/lib/server/session.ts`); `ApiClient` (`src/lib/api/client.ts`) reads it from `document.cookie` when running in the browser and echoes it as `X-CSRF-Token` on every non-GET/HEAD request; the proxy verifies the header matches the cookie (`verifyCsrf`, constant-value equality — both sides are BFF-issued, so no timing-safe compare is needed) and additionally rejects a present-but-mismatched `Origin`/`Referer`, returning `403 {"error":"csrf"}` **without forwarding upstream** on either failure. Sign-out (root `+page.server.ts`'s `signout` action) clears both cookies. Tests: `tests/unit/session.test.ts` (10, `verifyCsrf`/`generateCsrfToken`/cookie-option pins), `tests/unit/proxy.test.ts` (7, the route handler exercised directly — GET always passes, missing/mismatched token 403s, Origin/Referer backstop), `tests/unit/client.test.ts` (+3, the browser header-attach path via jsdom's real `document.cookie`, which required pointing `vite.config.ts`'s jsdom `testURL` at `https://` since a `__Host-`-prefixed cookie only sets over a secure origin).
 
-- [ ] T-28: Backfill spec + test coverage for the `/expiry` identity-document
-  expiry calendar route (SVAR Calendar, month view, read-only) — it ships
-  and is listed in `spec/05-information-architecture.md` line 15, but has
-  no functional requirement in `spec/06-functional-requirements.md`, no
-  prior `§13` task, and zero Playwright coverage: `tests/e2e/persons.spec.ts`
-  never references `/expiry` or `data-testid="expiry-calendar"`, and the
-  only i18n reference is the bare key existence check in `i18n.test.ts`
-  line 189 (verified: grepped both test files, neither exists; same
-  undocumented-shipped-feature pattern T-18/T-25 already found once for
-  `/review`).
-  - **Acceptance:** a new FR in `spec/06-functional-requirements.md`; a
-    Playwright smoke test stubbing `PersonRepository.search()` and
-    asserting the calendar renders expiring documents and that selecting
-    an event navigates to `/persons/[id]`; a loading/error-state test for
-    the `onMount` fetch failure path.
+- [x] T-28: Backfill spec + test coverage for the `/expiry` identity-document
+  expiry calendar route (SVAR Calendar, month view, read-only). *(2026-09-06)*
+  Writing the required "the calendar actually shows an event" assertion
+  surfaced a genuine, previously-shipped bug rather than a mere coverage
+  gap: `@svar-ui/calendar-store` requires an all-day event's `end` to be
+  strictly *after* `start` (confirmed against the compiled library
+  source), and `+page.svelte` was passing `end: day` — the same `Date`
+  object as `start` — so **every expiry event this calendar was ever
+  asked to show was silently dropped**. The identical bug was already
+  found and fixed in worker-front-end's `/expiry` (repo `tasks.md`, PR
+  #267); this crate is the probable origin the pattern was copied from.
+  Fixed by computing the following calendar day as `end`, the minimum
+  exclusive span a one-day all-day event needs. Added FR-23
+  (`spec/06-functional-requirements.md`) and a Playwright smoke test
+  (`tests/e2e/persons.spec.ts`) stubbing a person with one expiring
+  document, asserting the event renders, and asserting selecting it
+  navigates to `/persons/{id}`.
+  - **Acceptance:** `npm test` (101 passed, unaffected), `npx playwright
+    test --project=smoke` (19 passed, up from 18), `npm run check` (0
+    errors), `npm run lint` (clean).
 
 - [ ] T-29: Session-expiry UX on a proxied `401`/`403` — closes OQ-3(b).
   `src/routes/api/proxy/[...path]/+server.ts` only ever relays the
