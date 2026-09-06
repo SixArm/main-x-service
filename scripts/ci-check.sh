@@ -87,8 +87,8 @@ enrolled_for_db() {
 # Extra `cargo test` flags for a crate whose optional Cargo features are
 # otherwise never compiled, let alone run, by this script's plain
 # `cargo test` (AV-1). A crate-specific override here, not a file like
-# `ci/db-suites.txt`, because today there is exactly one entry — add a
-# file if a second candidate appears and this grows unwieldy.
+# `ci/db-suites.txt`, because there are only a couple of entries — switch
+# to a file if this grows unwieldy.
 extra_test_features_for() {
   local crate="$1"
   case "${crate}" in
@@ -97,6 +97,14 @@ extra_test_features_for() {
       # timeout / no-redirect / body-cap tests — dead code and untested
       # invariants from CI's point of view without this.
       printf -- '--features fetch'
+      ;;
+    person/person-service-with-loco)
+      # `parquet` gates `src/bulk/parquet_format.rs` (the bulk-export
+      # Parquet codec, agents/share/bulk-import-export.md §11 step 4) —
+      # self-contained (no live endpoint needed, unlike this crate's `s3`
+      # feature), and until now never compiled or run by CI at all
+      # (documented as a known gap in that same doc).
+      printf -- '--features parquet'
       ;;
   esac
 }

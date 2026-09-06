@@ -279,10 +279,17 @@ adds one section + a §13 task declaring only what differs:
    `Boolean`, `Json` → non-nullable `Utf8` carrying the same JSON text
    CSV cells hold. A build without the feature still recognises the
    `format` token but returns a clean error rather than a silent JSONL
-   substitution. **Known gap:** the reference crate's own CI does not
-   pass `--features parquet`, so the feature is exercised by local runs
-   only today — a family-wide "does this crate's CI even build its
-   optional features" question, not specific to Parquet.
+   substitution. **Gap closed (2026-09-06).** `scripts/ci-check.sh`'s
+   `extra_test_features_for()` (the same seam `fetch` already used for
+   `authentication-verifier`) now passes `--features parquet` when
+   running `cargo test` on this crate, so CI actually compiles and runs
+   `src/bulk/parquet_format.rs`'s tests rather than only exercising them
+   locally. This closes the Parquet-specific instance of the gap; the
+   broader family-wide "does this crate's CI even build its optional
+   features" question stands for other crates' other features (e.g.
+   this same crate's `s3`, which needs a live S3-compatible endpoint and
+   so is a different, harder problem than Parquet's self-contained
+   round-trip).
 5. **S3 artifact store** (feature-gated). ✅ *(done 2026-08-02, person, BLK-4)*
    Ported care-pathway's §12-resolved async `ArtifactStore` design to
    person's `src/bulk/store.rs`: `PERSON_BULK_ARTIFACT_BACKEND` selects

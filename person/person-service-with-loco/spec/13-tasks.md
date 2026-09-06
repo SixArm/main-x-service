@@ -65,10 +65,15 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   `std::io::Cursor` impl). Green: `cargo build`/`test`/`clippy --all-targets
   -D warnings`/`fmt --check`, each run **twice** — default features and
   `--features parquet` — plus the DB-gated suite against a real Postgres
-  under both. **Known gap:** family CI does not pass `--features parquet`
-  to this crate, so the feature is exercised only by local runs today
-  (repo tasks.md BLK-3, spec §10.7 records this explicitly rather than
-  silently).
+  under both. **Known gap, closed 2026-09-06:** family CI did not pass
+  `--features parquet` to this crate, so the feature was exercised only
+  by local runs. `scripts/ci-check.sh`'s `extra_test_features_for()` (the
+  same seam `authentication-verifier`'s `fetch` already used) now passes
+  `--features parquet` when running `cargo test` on this crate — a
+  scripts-only change, no crate code touched. Verified locally: `cargo
+  test --lib --features parquet` (358/358, unchanged pass count from
+  default features + the parquet-gated tests already present). See
+  `agents/share/bulk-import-export.md` §11 step 4.
 
 - [x] **BLK-4: S3-compatible `ArtifactStore` (feature-gated).**
   *(done 2026-08-02)* Ported the care-pathway service's reference

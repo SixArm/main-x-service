@@ -136,6 +136,19 @@ this family builds on) and pointing `PROTOC` at it in `build.rs`
 before compiling — verified this time by an actual CI run, not a local
 success generalised without checking.
 
+### Fixed — family CI never exercised this crate's `parquet` Cargo feature (BLK-3 known gap)
+
+BLK-3 (below, 2026-08-02) shipped Parquet bulk export behind a
+`parquet` Cargo feature and noted a known gap: family CI ran a plain
+`cargo test` on this crate, so `src/bulk/parquet_format.rs` and its
+tests were exercised only by local runs, never by CI. Root-repo
+`scripts/ci-check.sh`'s `extra_test_features_for()` (the same seam
+`authentication-verifier`'s `fetch` already used) now passes
+`--features parquet` when running `cargo test` on this crate.
+Scripts-only change — no crate code touched. Verified locally: `cargo
+test --lib --features parquet` (358/358). See spec §13 and
+`agents/share/bulk-import-export.md` §11 step 4.
+
 ## [0.6.0] - 2026-08-27
 
 ### Added — TSV bulk import/export, and fuzzed row decoders
