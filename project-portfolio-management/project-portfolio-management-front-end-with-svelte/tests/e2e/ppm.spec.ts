@@ -7,6 +7,18 @@ import { test, expect, type Page } from "@playwright/test";
 const PROPOSAL = "11111111-1111-4111-8111-111111111111";
 const IDEA = "22222222-2222-4222-8222-222222222222";
 
+// The SVAR Calendar (`/calendar`) always opens on today's month, so a
+// stubbed milestone due date must be computed relative to the actual
+// test-run date — a fixed past/future date would scroll out of the
+// widget's default view and never render, masking the very bug this
+// date exists to catch.
+const MILESTONE_DUE = (() => {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), 24)
+    .toISOString()
+    .slice(0, 10);
+})();
+
 const DASHBOARD = {
   as_of: "2026-07-18T12:00:00Z",
   collections: [
@@ -341,7 +353,7 @@ async function stubPpm(page: Page) {
         as_of: "2026-07-19T00:00:00Z",
         kinds: ["milestone", "demo", "release", "checkpoint"],
         milestones: [{ pid: "m-1", name: "Sprint demo", kind: "demo",
-          due: "2026-07-24", done: false,
+          due: MILESTONE_DUE, done: false,
           item: { pid: "w-1", name: "Platform rebuild", kind: "Project" } }],
       } });
     if (/^\/api\/plans\/w-1\/velocity$/.test(path))
@@ -542,6 +554,12 @@ test("engineering estate area renders blocked, moscow, and delivery links", asyn
 test("delivery calendar lists milestones with kinds", async ({ page }) => {
   await stubPpm(page);
   await page.goto("/calendar");
-  await expect(page.getByTestId("milestone-calendar")).toBeVisible();
+  const calendar = page.getByTestId("milestone-calendar");
+  await expect(calendar).toBeVisible();
+  // Pins the widget actually rendering the event, not just the fallback
+  // `<ul>` below it — the two are separate render paths, and an all-day
+  // event with `end` equal to `start` was previously dropped silently
+  // by @svar-ui/calendar-store (see the fix in +page.svelte).
+  await expect(calendar.getByText("demo: Sprint demo", { exact: false })).toBeVisible();
   await expect(page.getByTestId("milestone-list").getByText(/demo: Sprint demo/)).toBeVisible();
 });

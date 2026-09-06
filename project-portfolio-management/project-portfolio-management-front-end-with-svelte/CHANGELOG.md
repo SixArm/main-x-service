@@ -9,6 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — the delivery calendar never showed a milestone event
+
+`@svar-ui/calendar-store` requires an all-day event's `end` to be
+strictly after `start`, but `/calendar`'s `+page.svelte` passed
+`end: day` — the same `Date` object as `start` — so the SVAR Calendar
+widget silently dropped every milestone it was ever asked to show. The
+existing e2e test never caught this because it asserted only the
+fallback `<ul>` list, a separate render path from the calendar widget
+itself. The identical bug was already found and fixed in
+worker-front-end's and person-front-end's `/expiry` calendars. Fixed
+by computing the following calendar day as `end`; the test now also
+asserts the widget itself renders the event, with the stubbed
+milestone's due date computed relative to the actual test-run date so
+it stays inside the widget's default "today's month" view.
+
 ### Added — the time-based-analysis view (TBA-8)
 
 `/plans/{pid}/flow`, linked from the plan detail page: the delivery
