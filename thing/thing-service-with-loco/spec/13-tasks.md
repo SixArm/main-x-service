@@ -143,11 +143,33 @@ clearly described manual check confirms the acceptance criterion.
   - [ ] `compute_match` augmented with cosine-similarity score.
   - **Acceptance:** A/B harness shows ≥ 2 % uplift on a labelled
     duplicate set.
-- [ ] **T-6 — Spec-drift CI guard.**
-  - [ ] Fail PR if `src/matching/**` or `src/models/thing.rs`
+- [x] **T-6 — Spec-drift CI guard.** *(resolved 2026-09-06.)*
+  - [x] Fail PR if `src/matching/**` or `src/models/thing.rs`
     changes without a `spec.md` edit.
   - **Acceptance:** `bash scripts/spec-drift-check.sh main HEAD`
     exits non-zero on a code-only PR.
+  - **Resolved.** Copy-adapted `scripts/spec-drift-check.sh` +
+    `.github/workflows/spec-drift.yml` + `.spec-allow` from the
+    person-service reference (same discipline `person-matcher`/
+    `worker-matcher`/`place-matcher`/`event-matcher` also carry),
+    watching `src/(matching/.*\.rs|models/thing\.rs)` and this crate's
+    own `spec/` directory. Verified both branches by actually
+    exercising the script against real commits, not by inspection
+    alone: a code-only change to `src/models/thing.rs` (no `spec/`
+    edit) exits non-zero; adding a `spec/` edit in the same commit
+    exits `0`. That exercise caught a real latent bug the reference
+    script (and, presumably, its other copies) also carries: when
+    `.spec-allow` holds only comment/blank lines — its own documented
+    steady state — `grep -Ev` matching nothing exits `1`, and under
+    `set -e -o pipefail` the script died silently *before* printing
+    its intended FAIL message, rather than reaching it. Fixed here
+    with `(grep -Ev … || true) | paste …`; not touched in the
+    person-service/matcher originals as that would exceed this task's
+    scope, but worth a follow-up there. The workflow file is
+    documentation of intended CI wiring (this repo's root
+    `.github/workflows/ci.yml` is what GitHub Actions actually
+    discovers for a nested subcrate `.yml`, same caveat the reference
+    already states) rather than live CI.
 - [ ] **T-8 — Bulk import / export.**
   - [ ] `bulk_jobs` migration (per
     [`../../../agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md)
