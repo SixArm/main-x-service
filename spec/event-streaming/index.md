@@ -7,10 +7,13 @@ durable-bus design lives in
 [`agents/share/event-bus.md`](../../agents/share/event-bus.md), and each
 service crate's own `spec/index.md` records that crate's adoption state.
 
-This spec clearly separates **IMPLEMENTED** (what ships today: the
-in-memory Phase 1 seam) from **DESIGNED / PLANNED** (the durable
-transactional-outbox + Fluvio bus). The event stream is **complementary
-to, not a replacement for, the audit log** — see
+This spec separates the **in-memory Phase 1 seam** (still the default
+behaviour everywhere) from the **durable transactional-outbox + Fluvio
+bus** (Phases 2 and 3) — both of which have now **landed family-wide**,
+default-off via `<ENTITY>_EVENT_TRANSPORT=memory`. "Landed" here means
+the code is shipped and tested, not that a deployment has flipped the
+switch: see §4.6/§8 for the precise, per-phase status. The event stream
+is **complementary to, not a replacement for, the audit log** — see
 [`agents/share/auditability.md`](../../agents/share/auditability.md) and
 §6 below.
 
@@ -39,20 +42,28 @@ operational reactors.
 |---|---|---|
 | Purpose | Compliance / forensic trail | Operational change feed |
 | Audience | Auditors, operators | Re-indexer, caches, analytics |
-| Store | `audit_logs` table (durable) | In-memory today; Fluvio (planned) |
-| Replayable | Query by time/record | Offsets + replay (planned) |
+| Store | `audit_logs` table (durable) | In-memory by default; a Postgres outbox + Fluvio relay is shipped (`<ENTITY>_EVENT_TRANSPORT=outbox`, default-off) — see §4, §8 |
+| Replayable | Query by time/record | Offsets + replay — shipped via Fluvio consumer offsets once a deployment flips the transport (§4.3) |
 | Spec | [auditability.md](../../agents/share/auditability.md) | this document |
 
-## 2. Current state — IMPLEMENTED (Phase 1)
+## 2. Current state — the default transport (Phase 1, in-memory)
 
-Two shapes exist today, **both process-local and volatile**.
+Two shapes exist, **both process-local and volatile by default** — this
+is the behaviour every service still has out of the box
+(`<ENTITY>_EVENT_TRANSPORT=memory`, unset). §4 describes the durable
+outbox + Fluvio path that now sits **behind** this default on all ten
+entity registries; nothing below changes until a deployment flips the
+transport.
 
 ### 2.1 Loco services — canonical envelope + publisher seam
 
-The loco services (organization, care-pathway, case) implement **Phase
-1** of the durable-bus design: the canonical versioned envelope and the
-publisher trait, wired to an in-memory ring buffer. Reference
-implementation: `care-pathway-service-with-loco/src/streaming.rs`.
+The loco services (organization, care-pathway, case, portfolio)
+implement **Phase 1** of the durable-bus design: the canonical versioned
+envelope and the publisher trait, wired to an in-memory ring buffer by
+default. Reference implementation: `care-pathway-service-with-loco/src/streaming.rs`.
+Every one of these four also carries the Phase 2/3 durable path (§4) —
+`streaming.rs` selects the transport at construction, so this section
+describes only the `memory` branch.
 
 **`Envelope`** — the canonical, versioned event shape (one shape per
 entity and transport):
@@ -110,8 +121,8 @@ writes one `audit_logs` row.
 
 ### 2.2 Legacy Axum services — `EventProducer` / `EventConsumer`
 
-The older Axum-era services (person, worker, place, thing, event)
-predate the canonical envelope. Reference:
+The older Axum-era services (person, worker, place, thing, event,
+course) predate the canonical envelope's origin. Reference:
 `person-service-with-loco/src/streaming/mod.rs`. They use a
 **producer/consumer trait pair** over a richer, record-bearing event
 enum:
@@ -123,18 +134,26 @@ enum:
   carries a `chrono::DateTime<Utc>`.
 - **`EventProducer`** trait — `publish(&self, event) -> Result<()>`.
 - **`EventConsumer`** trait (stub) — `subscribe()` / `next_event()`.
-- **`InMemoryEventPublisher`** — the default in-process producer; a
-  Fluvio-backed transport is the stated production target.
+- **`InMemoryEventPublisher`** — the default in-process producer.
 
-The durable design (§4) **unifies both shapes** behind one
-`EventPublisher` trait and one `Envelope`; the loco free functions
-become a thin `InMemoryPublisher`, and the legacy `EventProducer` is
-adapted to the same seam.
+**The Fluvio-backed transport is no longer just the stated target — it
+has shipped in all six of these services** (`src/relay.rs` +
+`FluvioSink`, alongside course's own `course_outbox` table and
+`src/db/outbox.rs`), on the same terms as the loco services (§4): a
+Postgres outbox behind `<ENTITY>_EVENT_TRANSPORT=outbox` and a relay
+worker behind the `fluvio` Cargo feature, both off by default. The
+durable design (§4) **unified both shapes** behind one `EventPublisher`
+trait and one `Envelope`; the loco free functions became a thin
+`InMemoryPublisher`, and the legacy `EventProducer` was adapted to the
+same seam.
 
-## 3. Limitations of the in-memory stream
+## 3. Limitations of the in-memory (`memory`) transport
 
-Both Phase 1 shapes share the same volatility, which is exactly what the
-durable design exists to remove:
+Both Phase 1 shapes share the same volatility under the **default**
+transport. The durable design (§4) removes every limitation below, and
+is shipped — a deployment removes them today by setting
+`<ENTITY>_EVENT_TRANSPORT=outbox` and building with the `fluvio`
+feature; nothing here is waiting on unwritten code:
 
 | Limitation | Consequence |
 |---|---|
@@ -146,12 +165,24 @@ durable design exists to remove:
 `seq` being per-process is a symptom of the same constraint: it is
 unique and monotonic only within one running process.
 
-## 4. The durable design — PLANNED
+## 4. The durable design — IMPLEMENTED family-wide, default-off
 
 A faithful summary of [`agents/share/event-bus.md`](../../agents/share/event-bus.md)
-(the primary source — read it for the full schema, SQL, and rollout).
-Transport target: **Fluvio**. This design supersedes the "durable event
-bus" deferral notes in the service specs.
+(the primary source — read it for the full schema, SQL, rollout detail,
+and exactly what "shipped" does and doesn't mean per phase; its §8 is
+authoritative over this section). Transport: **Fluvio**. This design
+has superseded the "durable event bus" deferral notes in the service
+specs — **the transactional outbox (Phase 2) and the `FluvioSink` relay
+(Phase 3) are both landed on all ten entity registries** (person,
+worker, place, thing, event, course, organization, care-pathway, case,
+portfolio). "Landed" means the migration, the outbox writer, the relay
+worker, and the feature-gated Fluvio sink all exist and are tested —
+**not** that a deployment has switched them on: every service still
+defaults to `<ENTITY>_EVENT_TRANSPORT=memory` (§4.5), so this is a
+no-behaviour-change-by-default rollout, and today only **case**'s
+producer side is pointed at a real deployed Fluvio broker — the other
+nine sinks are wired and idle until a deployment sets their own
+`<ENTITY>_FLUVIO_ENDPOINT`.
 
 ### 4.1 Transactional outbox (no lost events)
 
@@ -182,14 +213,19 @@ UNIQUE` dedup key, `entity`, `entity_pid`, `kind`, `occurred_at`,
 Durability of *history* is Fluvio's job (topic retention), not the
 outbox's.
 
-### 4.2 Relay worker → Fluvio
+### 4.2 Relay worker → Fluvio — shipped on all ten registries
 
 A **loco Postgres-backed worker** (`queue.kind: Postgres`, per
 [`agents/share/loco.md`](../../agents/share/loco.md)) drains the outbox
-to a `FluvioSink` (behind a `fluvio` cargo feature). The sink — not the
-request path — holds the Fluvio client, so request latency is unaffected
-and a Fluvio outage only **backs up the outbox**; it never fails a
-write. See §6 for the relationship to the job queue.
+to a `FluvioSink` (behind a `fluvio` cargo feature, off by default). The
+sink — not the request path — holds the Fluvio client, so request
+latency is unaffected and a Fluvio outage only **backs up the outbox**;
+it never fails a write. `FluvioSink` itself landed in **case** first
+(BUS-1, 2026-08-02) and rolled to the other nine registries the next day
+(BUS-3, 2026-08-03); an endpoint configured
+(`<ENTITY>_FLUVIO_ENDPOINT`) without the `fluvio` feature built in
+refuses to start the relay rather than silently falling back to
+`LoggingSink`. See §6 for the relationship to the job queue.
 
 ### 4.3 Topics, partitioning, ordering, delivery
 
@@ -229,36 +265,65 @@ DB-free). `outbox` ⇒ durable; the relay worker + `fluvio` feature must
 be built in. Handlers call `publish(&env, tx)` and never know the
 transport.
 
-### 4.6 Staged rollout
+### 4.6 Staged rollout — status
 
 1. **Land the envelope + trait seam** with `InMemoryPublisher` wired as
-   today — pure refactor, behaviour identical, tests stay DB-free.
-   *(This is Phase 1, already done in the loco services.)*
+   today — pure refactor, behaviour identical, tests stay DB-free. ✅
+   **Done** (Phase 1, every service, both shapes — §2).
 2. **Add `event_outbox`** migration + `OutboxPublisher`; switch handlers
-   to write the outbox row on their existing transaction.
-3. **Add the relay worker + `FluvioSink`** behind feature `fluvio`.
+   to write the outbox row on their existing transaction. ✅ **Done,
+   all ten entity registries** — storage layer landed 2026-07-06 in
+   care-pathway as the reference, then rolled family-wide (course
+   confirmed 2026-08-03 with its own `course_outbox` table).
+3. **Add the relay worker + `FluvioSink`** behind feature `fluvio`. ✅
+   **Done, all ten entity registries** — relay + `LoggingSink` landed
+   2026-08-02 in case (adapted from the organization reference);
+   `FluvioSink` itself landed 2026-08-03 in case (BUS-1), then rolled to
+   the other nine the same day (BUS-3). No automated CI stage in this
+   repo stands up a live broker, so the feature-gated round-trip test
+   per crate is verified by compiling under `--features fluvio`, not by
+   an actual execution against a broker.
 4. **Flip `<ENTITY>_EVENT_TRANSPORT=outbox`** per service in deployment;
-   stand up consumers (search re-indexer first).
+   stand up consumers (search re-indexer first). **Partially done**: the
+   *first real consumer* — the link-graph aggregator, ahead of a search
+   re-indexer — landed 2026-08-03 (BUS-2) and already consumes all ten
+   topics. Flipping any deployment's own transport to `outbox` with a
+   real broker, and standing up a search re-indexer / cache-invalidation
+   / analytics consumer, remain **per-deployment / roadmap** work
+   outside this repo's own CI (see §5, §8).
 5. Adopt per entity in spec-priority order; the `memory` default means
-   un-migrated crates keep working throughout.
+   un-migrated crates keep working throughout. ✅ **Done for the
+   producer side and the aggregator consumer** — every crate now carries
+   steps 1–3; nothing is left un-migrated on the producer side.
 
 A shared, dependency-light `mxi-events` crate SHOULD eventually own the
 `Envelope` + `EventKind` types and the `topic_for` / `partition_key`
-helpers; until a second consumer ships, copy-per-crate is accepted
-(open question in the design doc).
+helpers; every consumer instead copies the `Envelope` shape per crate,
+and that remains the case even now that the aggregator is a second real
+consumer (open question in the design doc — not revisited since BUS-2).
 
-## 5. Consumers — PLANNED
+## 5. Consumers — one landed, the rest still planned
 
-Each is a standalone Fluvio consumer (Rust, sharing `mxi-events`),
+Each is a standalone Fluvio consumer (Rust, copying the `Envelope`
+shape per crate — no shared `mxi-events` crate exists, §4.6),
 **idempotent on `event_id`**, tracking its own offset:
 
-- **Search re-indexer** — keeps Tantivy in step with DB writes via the
-  stream instead of inline indexing; replayable for full index rebuilds
-  (see [`spec/search`](../search/index.md) for the search target).
-- **Cross-entity cache invalidation** — e.g. a place address change
-  notifies workers referencing it.
-- **Analytics / audit aggregation** — a durable sink for the change feed
-  (complements, does not replace, `audit_logs`).
+- **Cross-service link aggregator** ([link-graph-service](../../link/link-graph-service-with-loco)) —
+  ✅ **landed 2026-08-03 (BUS-2)**, the first real consumer in the
+  family: one task per entity topic, behind the `fluvio` feature,
+  deduping via a `processed_events` table. It already consumes all ten
+  entity topics, ahead of the search re-indexer this section originally
+  listed first. See [cross-service-linking.md](../../agents/share/cross-service-linking.md) §4.3.
+- **Search re-indexer** — PLANNED. Would keep Tantivy in step with DB
+  writes via the stream instead of inline indexing; replayable for full
+  index rebuilds (see [`spec/search`](../search/index.md) for the
+  search target — note that inline indexing already keeps Tantivy in
+  sync today on all ten registries, so this consumer is an alternative
+  indexing path, not the only route to a working search index).
+- **Cross-entity cache invalidation** — PLANNED. E.g. a place address
+  change notifies workers referencing it.
+- **Analytics / audit aggregation** — PLANNED. A durable sink for the
+  change feed (complements, does not replace, `audit_logs`).
 
 ## 6. Relationships
 
@@ -276,12 +341,14 @@ outbox is effectively a second skip-locked queue drained by that worker.
 ### 6.2 To the audit log
 
 The event stream and the audit log are **siblings, not substitutes**
-(§1). In Phase 1 they are written in the same handler but independently
-(the in-memory publish is best-effort; the audit row is the durable
-record). In the durable design they become **transactionally
-co-committed**: `audit_logs` and `event_outbox` are inserted in the same
-transaction as the entity change, so the compliance trail and the
-operational feed can never disagree. The audit log stays the
+(§1). Under the default `memory` transport they are written in the same
+handler but independently (the in-memory publish is best-effort; the
+audit row is the durable record). Under the shipped `outbox` transport
+they are **transactionally co-committed**: `audit_logs` and
+`event_outbox` are inserted in the same transaction as the entity
+change, so the compliance trail and the operational feed can never
+disagree — this is live today on any service a deployment switches to
+`outbox` (§4.5), not a future state. The audit log stays the
 authoritative compliance record; the stream stays the operational feed.
 See [`agents/share/auditability.md`](../../agents/share/auditability.md).
 
@@ -309,16 +376,16 @@ infrastructure-free.
 
 | Capability | State |
 |---|---|
-| Canonical versioned `Envelope` (loco services) | IMPLEMENTED (Phase 1) |
-| `EventPublisher` seam + `InMemoryPublisher` ring buffer (cap 1000) | IMPLEMENTED (Phase 1) |
-| `EventView` projection at `/events/recent` | IMPLEMENTED (Phase 1) |
+| Canonical versioned `Envelope` (loco services) | IMPLEMENTED (Phase 1, default `memory`) |
+| `EventPublisher` seam + `InMemoryPublisher` ring buffer (cap 1000) | IMPLEMENTED (Phase 1, default `memory`) |
+| `EventView` projection at `/events/recent` | IMPLEMENTED |
 | Legacy `EventProducer` / `EventConsumer` + `InMemoryEventPublisher` | IMPLEMENTED (legacy Axum services) |
-| `occurred_at` + `data` snapshot in envelope | PLANNED (Phase 2 / outbox) |
-| `event_outbox` table + `OutboxPublisher` (same-tx) | PLANNED (Phase 2) |
-| Relay worker + `FluvioSink` (`fluvio` feature) | PLANNED (Phase 3) |
-| Topic-per-entity, partition-by-`pid`, replay/offsets | PLANNED |
-| Downstream consumers (re-indexer, cache invalidation, analytics) | PLANNED |
-| Shared `mxi-events` crate | PLANNED (open question) |
+| `occurred_at` + `data` snapshot in envelope | **IMPLEMENTED** (Phase 2 / outbox, all ten entity registries; default-off) |
+| `event_outbox` table + `OutboxPublisher` (same-tx) | **IMPLEMENTED** (Phase 2, all ten entity registries; default-off) |
+| Relay worker + `FluvioSink` (`fluvio` feature) | **IMPLEMENTED** (Phase 3, all ten entity registries; feature + endpoint both off by default; only case's producer targets a real deployed broker today) |
+| Topic-per-entity, partition-by-`pid`, replay/offsets | **IMPLEMENTED** (ships with the Phase 3 relay; live once a deployment sets the transport + endpoint) |
+| Downstream consumers | **link-graph aggregator: IMPLEMENTED** (BUS-2, 2026-08-03, consumes all ten topics). Search re-indexer, cache invalidation, analytics: PLANNED |
+| Shared `mxi-events` crate | PLANNED (open question) — every consumer including the now-landed aggregator copies the `Envelope` shape per crate instead |
 
 ## See also
 

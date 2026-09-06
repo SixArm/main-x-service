@@ -301,8 +301,9 @@ don't know the transport.
 - **Analytics / audit aggregation** — a durable sink for the change feed
   (complements, doesn't replace, `audit_logs`).
 
-Each is a standalone Fluvio consumer (Rust, sharing `mxi-events`),
-idempotent on `event_id`, tracking its own offset.
+Each is a standalone Fluvio consumer (Rust, copying the `Envelope`
+shape per crate — see §4, §11), idempotent on `event_id`, tracking its
+own offset.
 
 ## 10. Testing strategy
 
@@ -319,8 +320,12 @@ idempotent on `event_id`, tracking its own offset.
 
 ## 11. Open questions
 
-- Shared `mxi-events` crate now, or copy-per-crate until a second
-  consumer exists? (Lean: extract when the first real consumer ships.)
+- Shared `mxi-events` crate now, or copy-per-crate? The stated trigger
+  ("extract when the first real consumer ships") fired 2026-08-03 when
+  link-graph-service (BUS-2) became the first real consumer, but no
+  crate was extracted — `link-graph-service`'s `Envelope` is still
+  defined locally in `src/events.rs`. Still open in practice; either
+  extract now or drop the trigger condition as decided-against.
 - Full snapshot in `data` vs reference-only for large records (case,
   person) — per-entity decision; default full.
 - Schema-registry / Avro vs JSON envelope — JSON for v1 (matches today's

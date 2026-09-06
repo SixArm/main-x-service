@@ -23,9 +23,9 @@ implements the service side identically. It supersedes the per-crate
 Applies to every entity service. The loco-idiomatic services embed
 [`authentication-verifier`](../../authentication/authentication-verifier-rust-crate)
 via `src/auth.rs`: **organization**, **care-pathway**, **case**,
-**portfolio**. The five older api/rest-architecture services
-(**person / worker / place / thing / event**) embed the same verifier in
-`src/api/rest/auth.rs` (opt-in `AuthUser` extractor + `whoami`,
+**portfolio**. The six older api/rest-architecture services
+(**person / worker / place / thing / event / course**) embed the same
+verifier in `src/api/rest/auth.rs` (opt-in `AuthUser` extractor + `whoami`,
 env-driven `<ENTITY>_PASETO_KEYS` / `_TOKEN_ISSUER` / `_TOKEN_AUDIENCE`)
 and, as of 2026-07-04, carry the same default-off blanket middleware
 (`<ENTITY>_REQUIRE_AUTH`, flag read at router construction — restart to
@@ -66,6 +66,7 @@ One boolean env var per service, read once:
 | organization | `ORGANIZATION_REQUIRE_AUTH` |
 | care-pathway | `CARE_PATHWAY_REQUIRE_AUTH` |
 | case | `CASE_REQUIRE_AUTH` |
+| portfolio | `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` |
 
 Parsed leniently: `1`/`true`/`yes`/`on` (case-insensitive) ⇒ enabled;
 anything else (incl. unset/blank) ⇒ disabled. Expose it from `src/auth.rs`

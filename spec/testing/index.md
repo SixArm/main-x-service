@@ -374,6 +374,30 @@ push regardless.
 > the same either way: fmt + clippy gate on every change, and a
 > Postgres-backed job runs the database layer.
 
+### 6.1 The root CI machinery
+
+The per-crate `ci.yaml`/`quality.yml` workflows above are what a single
+crate runs; what actually drives **family-wide** CI is the root
+`scripts/ci-check.sh` + `scripts/ci-crates.sh` machinery, since there is
+no root `Cargo.toml` and so nothing can `--workspace` across the whole
+tree. `scripts/ci-crates.sh` discovers all ~55 crates and feeds them to
+`scripts/ci-check.sh`, which both `.github/workflows/ci.yml` and
+`.woodpecker.yml` (Codeberg) call identically, stage by stage: `fmt`,
+`docs`, `clippy`, `test`, `test-db`, `deny`, `evidence`, `fuzz`, `msrv`,
+`bench`. See the root [`AGENTS.md`](../../AGENTS.md) "Continuous
+integration" section for the full stage table and how to run any stage
+locally (`scripts/ci-check.sh <stage> [crate]`).
+
+**`ci/db-suites.txt` is an allowlist, not a denylist.** The `test-db`
+stage (`cargo test -- --ignored`, i.e. the DB-gated suites §2 above
+describes) only actually runs for a crate once its `--ignored` suite
+has been **observed green** and added to that file — it is a no-op for
+every other crate (`DB_SUITES_FORCE=1` overrides this, which is how a
+crate gets observed green in the first place). A crate's request tests
+existing and passing locally is not the same as CI running them; check
+`ci/db-suites.txt` to see whether a given crate's DB-gated suite is
+actually enrolled.
+
 ---
 
 ## 7. Adding tests — quick rules

@@ -1,3 +1,5 @@
 # latitude longitude as decimal degrees
 
-If a program uses latitude and longitude, then use a decimal type, not a float type.
+See [latitude-longitude-altitude-elevation](../latitude-longitude-altitude-elevation/index.md),
+which covers this rule (always a decimal type, never a float type) plus
+the field-naming convention.
