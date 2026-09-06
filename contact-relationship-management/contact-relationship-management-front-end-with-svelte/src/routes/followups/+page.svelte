@@ -27,13 +27,27 @@
     })();
   });
 
+  // `@svar-ui/calendar-store` requires an all-day event's `end` to be
+  // strictly *after* `start` (`!(e.end > start)` silently drops the
+  // event — confirmed against the compiled library source). `end: day`
+  // — the same Date as `start` — therefore filtered out every
+  // upcoming follow-up this calendar was ever asked to show (the same
+  // bug and fix as worker-front-end's/person-front-end's `/expiry`
+  // and ppm-front-end's `/calendar`). Fixed with the following
+  // calendar day, the minimum exclusive span a one-day all-day event
+  // needs.
   const events = $derived(
     upcoming.map((item) => {
       const day = new Date(`${item.due_on}T00:00:00`);
+      const nextDay = new Date(
+        day.getFullYear(),
+        day.getMonth(),
+        day.getDate() + 1,
+      );
       return {
         id: item.pid,
         start: day,
-        end: day,
+        end: nextDay,
         allDay: true,
         text: `${item.kind}: ${item.summary}`,
       };

@@ -342,6 +342,14 @@ test.describe("signed-in smoke coverage", () => {
   test("follow-ups page renders overdue aging and the calendar", async ({
     page,
   }) => {
+    // The calendar always opens on today's month, so the stubbed
+    // upcoming follow-up's due date is computed relative to the
+    // actual test-run date — a fixed date would eventually scroll
+    // outside the widget's default view.
+    const today = new Date();
+    const dueInThisMonth = new Date(today.getFullYear(), today.getMonth(), 18)
+      .toISOString()
+      .slice(0, 10);
     await page.route("**/api/proxy/insights/followups", (route) =>
       route.fulfill({
         json: {
@@ -367,7 +375,7 @@ test.describe("signed-in smoke coverage", () => {
               subject_kind: "account",
               subject_pid: "ac1",
               actor_ref: null,
-              due_on: "2026-07-28",
+              due_on: dueInThisMonth,
               overdue_days: null,
             },
           ],
@@ -382,7 +390,13 @@ test.describe("signed-in smoke coverage", () => {
     await expect(
       page.getByTestId("followups-overdue").getByText("19"),
     ).toBeVisible();
-    await expect(page.getByTestId("followups-calendar")).toBeVisible();
+    const calendar = page.getByTestId("followups-calendar");
+    await expect(calendar).toBeVisible();
+    // Pins the widget actually rendering the event, not just its
+    // wrapper — `@svar-ui/calendar-store` silently drops an all-day
+    // event whose `end` is not strictly after `start` (see the fix in
+    // +page.svelte), and the wrapper alone renders regardless.
+    await expect(calendar.getByText("meeting: QBR", { exact: false })).toBeVisible();
   });
 
   test("executive area renders the pack, hygiene findings, and trends", async ({
