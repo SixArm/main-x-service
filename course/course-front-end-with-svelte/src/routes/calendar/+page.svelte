@@ -43,6 +43,11 @@
         }
     });
 
+    // Midnight of the same calendar day (drops any time-of-day component).
+    function startOfDay(d: Date): Date {
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+
     // The instance's overall window renders as an all-day span; each
     // concrete session as a timed event.
     const events = $derived(
@@ -57,10 +62,26 @@
             }[] = [];
             const schedule = instance.schedule;
             if (schedule?.start_date) {
+                const start = new Date(schedule.start_date);
+                const end = new Date(schedule.end_date ?? schedule.start_date);
+                // The SVAR calendar store drops an all-day event whose
+                // `end` is not strictly after `start` (`!(e.end > start)`),
+                // which silently loses a single-day window since `end`
+                // otherwise equals `start` exactly. Use an exclusive end:
+                // one day past the later of the two calendar days.
+                const lastDay =
+                    startOfDay(end) > startOfDay(start)
+                        ? startOfDay(end)
+                        : startOfDay(start);
+                const nextDay = new Date(
+                    lastDay.getFullYear(),
+                    lastDay.getMonth(),
+                    lastDay.getDate() + 1,
+                );
                 out.push({
                     id: `${course.id}::${instance.id}::window`,
-                    start: new Date(schedule.start_date),
-                    end: new Date(schedule.end_date ?? schedule.start_date),
+                    start,
+                    end: nextDay,
                     allDay: true,
                     text: label,
                 });

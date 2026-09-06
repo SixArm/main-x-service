@@ -135,4 +135,25 @@
     cap and paginate the underlying fetch) rather than presenting a
     silently partial board/calendar as complete; a unit or e2e test
     pins the notice appears when `total > items.length`.
+- [x] T-34: `/calendar` silently dropped an instance's schedule window
+  whenever `end_date` was absent — the same all-day-event bug already
+  found and fixed in the person/worker/event/ppm/patient-flow/CRM
+  front-ends. `src/routes/calendar/+page.svelte` built the window
+  event with `end: new Date(schedule.end_date ?? schedule.start_date)`
+  and `allDay: true`; with no `end_date`, `end` equals `start` exactly,
+  and the SVAR `@svar-ui/calendar-store` all-day path requires a
+  strictly later `end` (`!(e.end > start)` silently drops the event),
+  so the window rendered nothing and the calendar looked simply empty
+  for that instance. *(verified against the compiled library source,
+  `node_modules/.pnpm/@svar-ui+calendar-store@2.6.0/…/dist/index.mjs`,
+  same as the other six fixes.)*
+  - **Resolved.** The window's `end` is now computed as one calendar
+    day past the later of `start_date`'s and `end_date`'s day (a
+    `startOfDay` helper + an exclusive `nextDay`), so a same-day window
+    (the common case — a course instance with no `end_date`) renders
+    correctly and a genuinely multi-day window is unaffected. New
+    Playwright test `"calendar renders a same-day instance window"` in
+    `tests/e2e/courses.spec.ts`, verified to fail without the fix
+    (reverting `end: nextDay` to the pre-fix `end` reproduces the
+    silent drop) and pass with it.
 

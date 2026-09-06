@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — `/calendar` silently dropped a same-day instance window (T-34)
+
+`src/routes/calendar/+page.svelte` set an all-day window event's `end`
+to `schedule.end_date ?? schedule.start_date` — with no `end_date`
+(the common case), `end` equalled `start` exactly, and the SVAR
+`@svar-ui/calendar-store` all-day path requires a strictly later `end`
+(`!(e.end > start)` silently drops the event), so the instance's
+schedule window never rendered. Same bug class already found and
+fixed in the person/worker/event/project-portfolio-management/
+patient-flow/contact-relationship-management front-ends this session.
+`end` is now computed as one calendar day past the later of
+`start_date`'s and `end_date`'s day, so both a same-day window and a
+genuinely multi-day one render correctly. New Playwright test in
+`tests/e2e/courses.spec.ts`, verified to fail without the fix and pass
+with it. See spec §13 T-34.
+
 ### Added — Playwright smoke coverage for `/board`, `/calendar`, and the course detail/audit shells (T-30, T-31)
 
 Pure test-writing, no behaviour change. `/board` and `/calendar`
