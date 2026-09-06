@@ -30,6 +30,39 @@ test.describe("Thing front-end smoke", () => {
         await expect(page.getByRole("main").getByRole("link", { name: "New thing" })).toBeVisible();
     });
 
+    // Pins T-27: the "Mask sensitive" checkbox on /things sets
+    // mask_sensitive on the search call and re-fetches immediately (no
+    // form re-submit needed), rendering the masked vs. unmasked value the
+    // stub returns for the same query.
+    test("things list mask-sensitive toggle re-fetches with mask_sensitive", async ({
+        page,
+    }) => {
+        await page.route("**/api/things/search**", async (route) => {
+            const url = new URL(route.request().url());
+            const masked = url.searchParams.get("mask_sensitive") === "true";
+            const thing = {
+                id: "0c4f1e2a-0000-4000-8000-00000000000b",
+                name: masked ? "[redacted]" : "Pride and Prejudice",
+            };
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({ success: true, data: [thing], error: null }),
+            });
+        });
+
+        await page.goto("/things");
+        await expect(page.getByText("Pride and Prejudice")).toBeVisible();
+
+        await page.getByLabel("Mask sensitive").check();
+        await expect(page.getByText("[redacted]")).toBeVisible();
+        await expect(page.getByText("Pride and Prejudice")).not.toBeVisible();
+
+        await page.getByLabel("Mask sensitive").uncheck();
+        await expect(page.getByText("Pride and Prejudice")).toBeVisible();
+        await expect(page.getByText("[redacted]")).not.toBeVisible();
+    });
+
     // Pins: the new-thing form shows the required Name field and Create button.
     test("new thing form renders required name field", async ({ page }) => {
         await page.goto("/things/new");
