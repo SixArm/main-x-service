@@ -66,6 +66,14 @@ describe("OrganizationRepository", () => {
     expect(calls[0]?.url).toBe("http://svc.test/api/organizations/p1/export");
   });
 
+  // Pins ORGFE-T3: audit() hits the dedicated /audit endpoint by pid.
+  it("audit() GETs the /audit endpoint by pid", async () => {
+    const { repo, calls } = spyClient();
+    await repo.audit("p1");
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe("http://svc.test/api/organizations/p1/audit");
+  });
+
   it("create() POSTs the payload", async () => {
     const { repo, calls } = spyClient();
     await repo.create(org);

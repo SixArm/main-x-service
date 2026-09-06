@@ -15,6 +15,8 @@
       always reflects the server's actual masking rules.
     - exporting:  boolean             — disables the export button
       while the GDPR export request is in flight.
+    - showAudit / audit / auditLoading / auditError — the audit panel
+      (ORGFE-T3), lazy-loaded behind a toggle.
 
   `pid` comes from the route param. Loads on mount (SPA, client-only).
 -->
@@ -25,7 +27,7 @@
     import { OrganizationRepository } from "$lib/api/organizations";
     import { excludeSelf } from "$lib/api/build";
     import { t } from "$lib/i18n.svelte";
-    import type { Organization, ScoredRef } from "$lib/api/types";
+    import type { AuditEntry, Organization, ScoredRef } from "$lib/api/types";
 
     const repo = OrganizationRepository.withFetch();
     // Route param; `?? ""` satisfies strict typing (param is always set here).
@@ -38,6 +40,14 @@
     let checking = $state(false);
     let masked = $state(false);
     let exporting = $state(false);
+
+    // Audit trail: lazy-loaded behind a toggle so the detail page stays
+    // lean on first paint (ORGFE-T3, copy-adapted from
+    // care-pathway-front-end-with-svelte's equivalent panel).
+    let showAudit = $state(false);
+    let audit = $state<AuditEntry[] | null>(null);
+    let auditLoading = $state(false);
+    let auditError = $state<string | null>(null);
 
     // Fetch the plain or masked record depending on `masked`, replacing
     // whatever is currently shown. Shared by the initial load and the
@@ -115,6 +125,28 @@
             checking = false;
         }
     }
+
+    /** Toggle the audit panel; lazy-load the trail on first open. */
+    async function toggleAudit() {
+        showAudit = !showAudit;
+        // Fetch only on open, and only once / not while already loading.
+        if (!showAudit || audit !== null || auditLoading) return;
+        auditLoading = true;
+        auditError = null;
+        try {
+            const rows = await repo.audit(pid);
+            // Defensive newest-first sort by created_at (the service
+            // already orders this way; tolerate missing timestamps).
+            audit = [...rows].sort((a, b) =>
+                (b.created_at ?? "").localeCompare(a.created_at ?? ""),
+            );
+        } catch (err) {
+            auditError =
+                err instanceof Error ? err.message : t("detail.auditLoadFailed");
+        } finally {
+            auditLoading = false;
+        }
+    }
 </script>
 
 <svelte:head><title>{org?.name ?? t("detail.organization")} — Main X</title></svelte:head>
@@ -182,6 +214,36 @@
                     </li>
                 {/each}
             </ul>
+        {/if}
+    {/if}
+
+    <div class="row" style="margin-top:1rem">
+        <button class="button" onclick={toggleAudit}>
+            {showAudit ? t("detail.hideAudit") : t("detail.showAudit")}
+        </button>
+    </div>
+
+    <!-- Audit-trail panel: rendered only when toggled open; rows are
+         newest-first by created_at (sorted in `toggleAudit`), with "—"
+         shown for a null actor. -->
+    {#if showAudit}
+        <h2>{t("detail.auditTrail")}</h2>
+        {#if auditLoading}
+            <p>{t("detail.loadingAudit")}</p>
+        {:else if auditError}
+            <p class="banner" role="alert">{auditError}</p>
+        {:else if audit && audit.length > 0}
+            <ul class="stack">
+                {#each audit as entry, i (i)}
+                    <li class="surface row">
+                        <strong>{entry.action}</strong>
+                        <span>{entry.actor ?? "—"}</span>
+                        {#if entry.created_at}<span>{entry.created_at}</span>{/if}
+                    </li>
+                {/each}
+            </ul>
+        {:else}
+            <p>{t("detail.noAuditEntries")}</p>
         {/if}
     {/if}
 {/if}

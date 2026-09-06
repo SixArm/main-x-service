@@ -238,6 +238,52 @@ test("detail page downloads the GDPR export as JSON", async ({ page }) => {
   });
 });
 
+// Pins ORGFE-T3: the audit-trail toggle is lazy-loaded and covers its
+// loading/empty/error states, matching the pattern already shipped in
+// care-pathway-front-end-with-svelte.
+test("detail page audit panel shows loading then entries", async ({ page }) => {
+  // Override just the /audit path with a deliberately delayed response so
+  // the transient loading state is observable before it resolves.
+  await page.route(`**/api/organizations/${PID}/audit`, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return route.fulfill({
+      json: [
+        { action: "created", actor: "tester", created_at: "2026-08-01T09:00:00Z" },
+        { action: "updated", actor: null, created_at: "2026-08-02T10:00:00Z" },
+      ],
+    });
+  });
+  await page.goto(`/${PID}`, { waitUntil: "networkidle" });
+  await expect(page.getByRole("heading", { name: "Audit trail" })).not.toBeVisible();
+
+  await page.getByRole("button", { name: "Show audit trail" }).click();
+  await expect(page.getByText("Loading audit trail…")).toBeVisible();
+  await expect(page.getByText("updated")).toBeVisible();
+  await expect(page.getByText("created")).toBeVisible();
+  await expect(page.getByText("—")).toBeVisible(); // null actor on the second row
+
+  await page.getByRole("button", { name: "Hide audit trail" }).click();
+  await expect(page.getByRole("heading", { name: "Audit trail" })).not.toBeVisible();
+});
+
+test("detail page audit panel shows an empty state", async ({ page }) => {
+  await page.route(`**/api/organizations/${PID}/audit`, (route) =>
+    route.fulfill({ json: [] }),
+  );
+  await page.goto(`/${PID}`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Show audit trail" }).click();
+  await expect(page.getByText("No audit entries.")).toBeVisible();
+});
+
+test("detail page audit panel shows an error state", async ({ page }) => {
+  await page.route(`**/api/organizations/${PID}/audit`, (route) =>
+    route.fulfill({ status: 500, json: { error: "boom" } }),
+  );
+  await page.goto(`/${PID}`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Show audit trail" }).click();
+  await expect(page.getByRole("alert")).toBeVisible();
+});
+
 test("edit page renders the edit form", async ({ page }) => {
   await page.goto(`/${PID}/edit`, { waitUntil: "networkidle" });
   await expect(

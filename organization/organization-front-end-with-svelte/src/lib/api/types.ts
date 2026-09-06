@@ -263,3 +263,20 @@ export interface BatchDeduplicationResponse {
   /** The stored candidate pairs (stable ids across re-scans). */
   review_items: ReviewQueueItem[];
 }
+
+/// One audit-log row from `GET /api/organizations/{pid}/audit`.
+/// Mirrors the service's `audit_logs` SeaORM model (serialized field
+/// names): `action` (created/updated/deleted/merged/exported), nullable
+/// `actor` (the caller's user pid when a verified token was presented,
+/// else `null`), an optional JSON `snapshot`, and the `created_at`
+/// timestamp.
+export interface AuditEntry {
+  /** The audited operation: `created` / `updated` / `deleted` / `merged` / `exported`. */
+  action: string;
+  /** Caller's user pid when a verified token was presented, else `null`. */
+  actor: string | null;
+  /** Optional JSON snapshot of the record state for the audited action. */
+  snapshot?: unknown;
+  /** ISO-8601 timestamp of when the action was recorded. */
+  created_at?: string;
+}

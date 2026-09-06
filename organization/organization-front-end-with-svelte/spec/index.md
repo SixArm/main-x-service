@@ -283,18 +283,38 @@ controls when they land.
     clean; `pnpm exec playwright test` 12/12 (was 10); `pnpm run
     lint` clean.
 
-- [ ] **ORGFE-T3 (S) Audit-trail view.** The service exposes `GET
-  /api/organizations/audit/recent` and `GET /{pid}/audit`
-  (`agents/share/auditability.md`), and this front-end's own roadmap
-  names "audit views" as next work, but no route or repository method
-  calls either endpoint. *(Verified: `find src/routes -maxdepth 1
-  -type d` lists no audit route, and `grep -rn audit
-  src/lib/api/*.ts` returns no hits.)* Add an `audit(pid)` repository
-  method and a detail-page "Show audit trail" toggle, matching the
-  pattern already shipped in the sibling
-  `care-pathway-front-end-with-svelte`. **Acceptance:** vitest pins the
-  new repository method; a Playwright smoke test covers the toggle
-  (loading/empty/error states).
+- [x] **ORGFE-T3 (S) Audit-trail view.** *(resolved 2026-09-06.)* The
+  service exposes `GET /api/organizations/audit/recent` and `GET
+  /{pid}/audit` (`agents/share/auditability.md`), and this front-end's
+  own roadmap named "audit views" as next work, but no route or
+  repository method called either endpoint. *(Verified: `find
+  src/routes -maxdepth 1 -type d` listed no audit route, and `grep -rn
+  audit src/lib/api/*.ts` returned no hits before this change.)*
+  - **Resolved.** `OrganizationRepository.audit(pid)` (`GET
+    /api/organizations/{pid}/audit`) plus an `AuditEntry` type
+    (mirroring the service's `audit_logs` row shape — `action` /
+    `actor` / `snapshot` / `created_at`) added to `types.ts`. The
+    detail page gained a lazily-loaded "Show audit trail"/"Hide audit
+    trail" toggle rendering entries newest-first (defensive
+    client-side sort by `created_at`), copy-adapted verbatim from
+    `care-pathway-front-end-with-svelte`'s equivalent panel — new i18n
+    keys `detail.showAudit` / `detail.hideAudit` / `detail.auditTrail`
+    / `detail.loadingAudit` / `detail.noAuditEntries` /
+    `detail.auditLoadFailed` across all 13 locales (reusing
+    care-pathway's translations for parity).
+  - One new `tests/unit/organizations.test.ts` case pins `audit()`
+    hits the dedicated endpoint. Three new `tests/e2e/smoke.spec.ts`
+    cases cover the toggle's loading (a deliberately delayed stub
+    response makes the transient "Loading audit trail…" text
+    observable), empty, and error states — all three verified to fail
+    (30s timeout waiting for the "Show audit trail" button) with the
+    detail-page change reverted and pass with it restored.
+  - **Acceptance met:** `pnpm test` 78/78 (was 77); `pnpm run check`
+    clean; `pnpm exec playwright test` 15/15 (was 12); `pnpm run
+    lint` clean save for the pre-existing, untouched
+    `svar-filter-augment.d.ts` warning (and the file's own
+    pre-existing unrelated long-line debt, confirmed unchanged by this
+    diff being purely additive).
 
 - [ ] **ORGFE-T4 (S) Inline identifier-format validation (LEI/DUNS
   length).** Named as an open question in §16 since v0.1; the service
