@@ -96,7 +96,7 @@
     unchecking the toggle swaps the rendered value both ways. Verified:
     `npm test` (92 passed), `npx playwright test` (14 passed, up from
     13), `npm run check` (0 errors), `npm run lint` clean.
-- [ ] T-28: **Pagination on the `/things` list/search route.**
+- [x] T-28: **Pagination on the `/things` list/search route.** *(resolved 2026-09-06.)*
   `place-service`'s family-wide pagination convention
   (`agents/share/restful.md`: `?limit=&offset=` plus
   `X-Total-Count`/`X-Limit`/`X-Offset` response headers) is never
@@ -114,6 +114,33 @@
   Playwright test stubs a response with `X-Total-Count` greater than
   the page size and asserts the next-page control fetches with the
   advanced `offset`; three-part change (spec §6/§9 + code + test).
+  - **Resolved.** `ApiClient` gained `getWithHeaders` (and a private
+    `requestWithResponse` core `request` now delegates to), so a
+    caller can read response headers without disturbing the envelope
+    contract every other verb relies on. `ThingRepository.search` now
+    calls it and returns `{ items, total, limit, offset }`, preferring
+    `X-Total-Count`/`X-Limit`/`X-Offset` over anything the body itself
+    carries — the headers are the authoritative count ignoring
+    `limit`/`offset`, and a bare-array body has no room for one at all
+    — falling back to the pre-existing behaviour when a service
+    predates the headers. `/things` gained a fixed `PAGE_SIZE` (50,
+    same default as before), an `offset` `$state` (updated from the
+    service's *actually-applied* `X-Offset`, which may clamp), and
+    Previous/Next buttons (disabled at each end) plus a "N of M"
+    indicator, shown once a search returns any total > 0. A new query
+    or toggle submit always starts back at offset 0 (`runSearch`'s
+    default parameter); only the pagination buttons and the
+    mask-sensitive toggle's `onchange` (which stays on the current
+    page — masking is a view change, not a new query) pass an explicit
+    offset. New `things.previousPage`/`things.nextPage`/
+    `things.pageRange` i18n keys across all 13 locales. Two new unit
+    tests pin the header-preference and the header-absent fallback; a
+    new Playwright test stubs `X-Total-Count: 100` and asserts clicking
+    Next sends `offset=50` and Previous returns to `offset=0`, with the
+    indicator and button disabled-states updating each way. Verified:
+    `npm test` (94 passed, up from 92), `npx playwright test` (15
+    passed, up from 14), `npm run check` (0 errors), `npm run lint`
+    clean.
 - [x] T-29: **401/403 handling in `ApiClient`.** *(resolved 2026-09-06.)*
   `ApiError` exposes `isNotFound()`/`isConflict()`/`isValidation()`
   helpers but nothing for `401`/`403`, and no route reacts to either
