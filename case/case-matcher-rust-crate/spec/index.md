@@ -363,7 +363,7 @@ IO, async, or panics to library code.
       doctests, all green, including the newly-noted `match_cases`
       doctest), `cargo clippy --all-targets --all-features -- -D
       warnings`, `cargo fmt --check`.
-- [ ] **Criterion bench group scaling `subjects`/`keywords` array size
+- [x] **Criterion bench group scaling `subjects`/`keywords` array size
       per `Case`, not just candidate-list length.**
       *(Verified: `grep -n "fn bench_" benches/match_pair.rs` shows
       `bench_match_pair`, `bench_deterministic`, `bench_rank` — the
@@ -377,6 +377,13 @@ IO, async, or panics to library code.
       **Acceptance:** `cargo bench --no-run` compiles the new group; a
       local `cargo bench` run shows near-linear (or worse) scaling with
       array size, recorded in a `CHANGELOG.md` note.
+      **Resolved (2026-09-06).** `bench_field_arrays` added to
+      `benches/match_pair.rs`: `n`-entry `subjects`/`keywords`
+      (10/100/1000, half-overlapping), `Throughput::Elements(n)`.
+      Recorded run: `n=10` 8.19 µs, `n=100` 87.07 µs, `n=1000`
+      2.437 ms — super-linear (10× array-size growth from 100→1000
+      costs ~28×, not ~10×), confirming the O(n·m) Jaccard cost is
+      real. See `CHANGELOG.md`.
 - [x] **Property-test `MatchConfig` values other than the built-in
       presets.** *(resolved 2026-09-05.)* The SEC-M6 property suite
       (§24) only ever exercised `MatchingEngine::new(MatchConfig::default())`;
