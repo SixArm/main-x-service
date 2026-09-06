@@ -10,6 +10,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — distinct message for a rate-limited sign-in/sign-up request (AFE-4)
+
+`requestMagicLink`/`signup` (`src/lib/server/auth.ts`) returned only
+`res.ok` — a plain boolean — so a `429` from the auth service's rate
+limit (5 requests / 5 min per email) collapsed into the same generic
+`error: "failed"` outcome as any other non-2xx response, with no i18n
+key or UI copy distinguishing "try again in a few minutes" from any
+other failure. Both functions now return a `MagicLinkOutcome`
+(`"sent" | "rateLimited" | "failed"`); the `signin`/`signup`
+`+page.server.ts` actions map `rateLimited` to `error: "rate-limited"`,
+and both pages render a new `account.rateLimited` i18n key across all
+13 locales instead of the generic failure copy. New
+`tests/unit/auth.test.ts` (8 cases) pins the classification directly;
+`tests/e2e/mock-auth-server.mjs` gained a `RATE_LIMITED_EMAIL` fixture
+and two new e2e cases assert the distinct message, verified to fail
+without the fix. `pnpm test` 25/25 (was 17); `pnpm exec playwright
+test` 13/13 (was 11). See spec/index.md AFE-4.
+
 ### Fixed — `/verify` crashed with a raw 500 when the authentication service was unreachable (T-12)
 
 `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch,

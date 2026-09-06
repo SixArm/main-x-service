@@ -22,18 +22,36 @@ export function verifyMagicLink(
   );
 }
 
+/**
+ * Outcome of a magic-link-issuing call (`requestMagicLink` / `signup`).
+ * `rateLimited` is the one documented non-2xx outcome these endpoints
+ * intentionally produce (5 requests / 5 min per email,
+ * `authentication-service-with-loco/AGENTS.md`) — distinct from any
+ * other failure so the UI can say "try again in a few minutes" rather
+ * than a generic "something went wrong" (AFE-4).
+ */
+export type MagicLinkOutcome = "sent" | "rateLimited" | "failed";
+
+/** Classify a magic-link-issuing response by status: 2xx -> sent, 429 ->
+ *  rateLimited, anything else -> failed. */
+function classify(res: Response): MagicLinkOutcome {
+  if (res.ok) return "sent";
+  if (res.status === 429) return "rateLimited";
+  return "failed";
+}
+
 /** Request a magic link for an existing account (sign in). */
 export async function requestMagicLink(
   fetchFn: FetchFn,
   email: string,
   locale?: string,
-): Promise<boolean> {
+): Promise<MagicLinkOutcome> {
   const res = await fetchFn(`${AUTH_API_URL}/api/auth/magic-link`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email, locale }),
   });
-  return res.ok;
+  return classify(res);
 }
 
 /** Create a passwordless account and trigger a magic link (sign up). */
@@ -42,13 +60,13 @@ export async function signup(
   email: string,
   name?: string,
   locale?: string,
-): Promise<boolean> {
+): Promise<MagicLinkOutcome> {
   const res = await fetchFn(`${AUTH_API_URL}/api/auth/signup`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email, name, locale }),
   });
-  return res.ok;
+  return classify(res);
 }
 
 /** Exchange the opaque session id for a short-lived PASETO (server-to-

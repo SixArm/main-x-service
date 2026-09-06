@@ -23,6 +23,7 @@ import { test, expect } from "@playwright/test";
 const EMAIL = "alice@example.com";
 const VALID_MAGIC_TOKEN = "magic-123";
 const NETWORK_ERROR_MAGIC_TOKEN = "magic-network-error";
+const RATE_LIMITED_EMAIL = "toomany@example.com";
 
 test("sign-up page shows the create-account form", async ({ page }) => {
   await page.goto("/signup", { waitUntil: "networkidle" });
@@ -49,6 +50,33 @@ test("sign-in submits the email and confirms the link was sent", async ({
   await page.getByLabel("Email").fill(EMAIL);
   await page.getByRole("button", { name: "Email me a magic link" }).click();
   await expect(page.getByText(/a magic link is on its way/)).toBeVisible();
+});
+
+// Pins AFE-4: a 429 from the auth service's rate limit renders a
+// distinct "try again in a few minutes" message rather than the generic
+// "Request failed" every other non-2xx outcome shows.
+test("sign-in shows a distinct message when the auth service rate-limits the request", async ({
+  page,
+}) => {
+  await page.goto("/signin", { waitUntil: "networkidle" });
+  await page.getByLabel("Email").fill(RATE_LIMITED_EMAIL);
+  await page.getByRole("button", { name: "Email me a magic link" }).click();
+  await expect(
+    page.getByText("Too many requests. Please wait a few minutes and try again."),
+  ).toBeVisible();
+  await expect(page.getByText("Request failed")).not.toBeVisible();
+});
+
+test("sign-up shows a distinct message when the auth service rate-limits the request", async ({
+  page,
+}) => {
+  await page.goto("/signup", { waitUntil: "networkidle" });
+  await page.getByLabel("Email").fill(RATE_LIMITED_EMAIL);
+  await page.getByRole("button", { name: "Send magic link" }).click();
+  await expect(
+    page.getByText("Too many requests. Please wait a few minutes and try again."),
+  ).toBeVisible();
+  await expect(page.getByText("Sign up failed")).not.toBeVisible();
 });
 
 test("verify route consumes the token and lands on the signed-in dashboard", async ({
