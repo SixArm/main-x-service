@@ -560,6 +560,101 @@ impl PassportBook {
     }
 }
 
+/// The kind of typed relationship one [`Person`] asserts toward
+/// another, carried on a [`RelationshipRef`].
+///
+/// `ParentOf`/`ChildOf` and `GuardianOf`/`WardOf` are inverse pairs — if
+/// person A holds `ParentOf` pointing at person B, the converse fact is
+/// that B `ChildOf` A — but the matcher does **not** resolve or
+/// cross-check that inverse relationship; it only compares the raw
+/// `(relation, person_id)` pairs each side asserts (spec §12.2).
+/// `SiblingOf` is symmetric: either sibling may assert it of the other,
+/// and both assertions use the same variant. The enum is expected to
+/// grow (e.g. `SpouseOf`) as consuming services add relationship
+/// kinds; a new variant is purely additive.
+///
+/// # Example
+///
+/// ```
+/// use person_matcher::RelationKind;
+///
+/// let k = RelationKind::ParentOf;
+/// assert_eq!(k, RelationKind::ParentOf);
+/// assert_ne!(k, RelationKind::ChildOf);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum RelationKind {
+    /// This person is the parent of the referenced person.
+    ParentOf,
+    /// This person is the child of the referenced person.
+    ChildOf,
+    /// This person is a sibling of the referenced person (symmetric).
+    SiblingOf,
+    /// This person is the legal guardian of the referenced person.
+    GuardianOf,
+    /// This person is the ward of the referenced person (inverse of
+    /// `GuardianOf`).
+    WardOf,
+}
+
+/// A typed reference from one [`Person`] to another, by opaque id in
+/// the consuming registry (e.g. "this person's parent is person `X`").
+///
+/// `RelationshipRef` is a **supporting** matching signal, not an
+/// identifying one: the matcher never resolves `person_id` against a
+/// registry (it has none) — it only compares the two persons'
+/// relationship **sets** via typed-set Jaccard over `(relation,
+/// person_id)` pairs (spec §8.6a / §12.2 / T-33).
+///
+/// Construct via [`RelationshipRef::new`], which trims `person_id` and
+/// rejects an empty result, so two records carrying different
+/// incidental whitespace around the same id compare equal.
+///
+/// # Example
+///
+/// ```
+/// use person_matcher::{RelationKind, RelationshipRef};
+///
+/// let r = RelationshipRef::new(RelationKind::ParentOf, " person-42 ").unwrap();
+/// assert_eq!(r.person_id, "person-42");
+/// assert_eq!(r.relation, RelationKind::ParentOf);
+///
+/// assert!(RelationshipRef::new(RelationKind::ChildOf, "   ").is_none());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RelationshipRef {
+    /// The kind of relationship this side asserts. See [`RelationKind`].
+    pub relation: RelationKind,
+    /// Opaque id of the related person in the consuming registry.
+    /// Whitespace-trimmed and non-empty — see [`RelationshipRef::new`].
+    pub person_id: String,
+}
+
+impl RelationshipRef {
+    /// Construct a relationship reference, trimming `person_id` and
+    /// rejecting an empty result.
+    ///
+    /// Returns `None` when `person_id` is empty after trimming.
+    ///
+    /// ```
+    /// use person_matcher::{RelationKind, RelationshipRef};
+    /// let r = RelationshipRef::new(RelationKind::ChildOf, "person-7").unwrap();
+    /// assert_eq!(r.person_id, "person-7");
+    /// assert!(RelationshipRef::new(RelationKind::ChildOf, "").is_none());
+    /// ```
+    #[must_use]
+    pub fn new(relation: RelationKind, person_id: impl AsRef<str>) -> Option<Self> {
+        let person_id = person_id.as_ref().trim();
+        if person_id.is_empty() {
+            return None;
+        }
+        Some(Self {
+            relation,
+            person_id: person_id.to_string(),
+        })
+    }
+}
+
 /// Core person demographic data structure.
 ///
 /// Every field is optional. The matcher tolerates missing data field-by-field
@@ -940,6 +1035,26 @@ pub struct Person {
     /// Local hospital or practice identifier. Not normalised — different
     /// organisations may issue colliding values.
     pub local_id: Option<String>,
+
+    /// Typed references to other persons (by opaque id) in the
+    /// consuming registry — e.g. "this person's parent is person X". A
+    /// **supporting** signal only: never identifying on its own, and
+    /// the matcher never resolves the reference (it has no registry) —
+    /// it only compares the two persons' relationship **sets** via
+    /// typed-set Jaccard. Default empty. See [`RelationshipRef`] /
+    /// [`RelationKind`]; spec §8.1 / §8.6a / §12.2 / §13.1 (T-33).
+    #[serde(default)]
+    pub relationships: Vec<RelationshipRef>,
+
+    /// Operator-applied free-text labels (e.g. `"vip"`,
+    /// `"outreach-cohort-3"`). Stored verbatim; compared
+    /// case-insensitively at match time, consistent with the crate's
+    /// normalise-at-match-time convention for names / emails /
+    /// identifiers. A **supporting** signal only: never identifying on
+    /// its own. Default empty. See spec §8.1 / §8.5 / §12.2 / §13.1
+    /// (T-34).
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 impl Person {
@@ -1204,6 +1319,10 @@ pub struct PersonBuilder {
     email: Option<String>,
     /// Staged [`Person::local_id`].
     local_id: Option<String>,
+    /// Staged [`Person::relationships`].
+    relationships: Vec<RelationshipRef>,
+    /// Staged [`Person::tags`].
+    tags: Vec<String>,
 }
 
 impl PersonBuilder {
@@ -1849,6 +1968,63 @@ impl PersonBuilder {
         self
     }
 
+    /// Append a single relationship reference. Chainable; call multiple
+    /// times to record several relationships.
+    ///
+    /// ```
+    /// # use person_matcher::{RelationKind, RelationshipRef, Person};
+    /// let p = Person::builder()
+    ///     .add_relationship(RelationshipRef::new(RelationKind::ParentOf, "person-42").unwrap())
+    ///     .build();
+    /// assert_eq!(p.relationships.len(), 1);
+    /// ```
+    #[must_use]
+    pub fn add_relationship(mut self, relationship: RelationshipRef) -> Self {
+        self.relationships.push(relationship);
+        self
+    }
+
+    /// Replace the entire relationship list.
+    ///
+    /// ```
+    /// # use person_matcher::{RelationKind, RelationshipRef, Person};
+    /// let refs = vec![RelationshipRef::new(RelationKind::ChildOf, "person-1").unwrap()];
+    /// let p = Person::builder().relationships(refs).build();
+    /// assert_eq!(p.relationships.len(), 1);
+    /// ```
+    #[must_use]
+    pub fn relationships(mut self, value: Vec<RelationshipRef>) -> Self {
+        self.relationships = value;
+        self
+    }
+
+    /// Append a single tag. Chainable; call multiple times to record
+    /// several tags.
+    ///
+    /// ```
+    /// # use person_matcher::Person;
+    /// let p = Person::builder().add_tag("vip").add_tag("outreach-cohort-3").build();
+    /// assert_eq!(p.tags, vec!["vip".to_string(), "outreach-cohort-3".to_string()]);
+    /// ```
+    #[must_use]
+    pub fn add_tag<S: Into<String>>(mut self, value: S) -> Self {
+        self.tags.push(value.into());
+        self
+    }
+
+    /// Replace the entire tag list.
+    ///
+    /// ```
+    /// # use person_matcher::Person;
+    /// let p = Person::builder().tags(vec!["vip".to_string()]).build();
+    /// assert_eq!(p.tags.len(), 1);
+    /// ```
+    #[must_use]
+    pub fn tags(mut self, value: Vec<String>) -> Self {
+        self.tags = value;
+        self
+    }
+
     /// Consume the builder and produce the [`Person`].
     ///
     /// ```
@@ -1919,6 +2095,8 @@ impl PersonBuilder {
             mobile: self.mobile,
             email: self.email,
             local_id: self.local_id,
+            relationships: self.relationships,
+            tags: self.tags,
         }
     }
 }

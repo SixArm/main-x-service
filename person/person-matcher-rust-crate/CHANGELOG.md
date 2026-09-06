@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — relationships and tags as weighted matching components (T-33 / T-34)
+
+`Person` gains `relationships: Vec<RelationshipRef>` and `tags:
+Vec<String>` (both default empty), and `MatchBreakdown` gains
+`relationships_score` / `tags_score` — ported from worker-matcher's
+identical, already-shipped T-33/T-34. `RelationKind` (re-exported from
+the crate root, alongside `RelationshipRef`) carries five variants —
+`ParentOf`/`ChildOf` (inverse pair), `SiblingOf` (symmetric),
+`GuardianOf`/`WardOf` (inverse pair) — matching this crate's own §8.6a
+design target rather than worker's narrower 2-variant seed.
+
+Relationships score by typed-set Jaccard over `(relation, person_id)`
+pairs; tags score by set Jaccard over case-insensitively normalised
+(trim + lowercase) tag sets. Both are `None` when either side is
+empty, so absence never dilutes the weighted average. Both default to
+`relationships_weight`/`tags_weight = 0.05`, the same supporting-signal
+tier as `birth_place_weight`/`death_place_weight`.
+
+New FR-92/FR-93 (§6.1) state neither field contributes to
+`Person::validate()`'s identifying-field check — verified directly
+against `validate()`'s source, which never references either field.
+13 new unit tests (Jaccard identity/disjoint/partial-overlap/empty-side
+for both components, plus full-engine participate/disagree/
+absent-doesn't-dilute cases) mirror worker-matcher's own suite;
+`cargo test --lib` 431/431 (was 418). `cargo test --doc` 183/183
+(three pre-existing `MatchConfig` struct-literal call sites in
+`examples/`/`tests/` updated for the two new fields). `cargo clippy
+--all-targets -- -D warnings`, `cargo fmt --check`, and `cargo bench
+--no-run` all clean. See spec/23-tasks-and-acceptance-criteria.md
+T-33/T-34.
+
 ### Added — pin OQ-7's `total_weight` phonetic-bonus semantics (T-38)
 
 `total_weight` (the probabilistic-average denominator) has always

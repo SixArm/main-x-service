@@ -39,12 +39,13 @@
 //! ```
 
 use crate::identifiers;
-use crate::models::{Address, PassportBook, Person};
+use crate::models::{Address, PassportBook, Person, RelationKind, RelationshipRef};
 use crate::nicknames::NicknameTable;
 use crate::normalizer::Normalizer;
 use crate::scorer::{Scorer, SimilarityAlgorithm};
 use chrono::{Datelike, NaiveDate};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// Tunable configuration for the matching engine.
 ///
@@ -121,6 +122,8 @@ use serde::{Deserialize, Serialize};
 ///     death_place_weight: 0.05,
 ///     phone_weight: 0.025,
 ///     email_weight: 0.05,
+///     relationships_weight: 0.05,
+///     tags_weight: 0.05,
 ///     use_phonetic_matching: true,
 ///     name_algorithm: SimilarityAlgorithm::JaroWinkler,
 ///     strict_mode: false,
@@ -295,6 +298,21 @@ pub struct MatchConfig {
     /// [`crate::Normalizer::normalize_email`]).
     pub email_weight: f64,
 
+    /// Weight for relationship-set similarity: typed-set Jaccard over
+    /// `(relation, person_id)` pairs (see [`crate::RelationshipRef`]).
+    /// Defaults to `0.05` — a supporting signal, not identifying: two
+    /// unrelated persons can share no relationships, so absence carries
+    /// no penalty, but a shared, specific relationship (e.g. the same
+    /// recorded parent) is real corroborating evidence. Spec §12.2 (T-33).
+    pub relationships_weight: f64,
+
+    /// Weight for tag-set similarity (plain set Jaccard over normalised
+    /// tags). Defaults to `0.05`, the same supporting-signal weight as
+    /// [`Self::relationships_weight`]: two records sharing operator-
+    /// assigned tags (e.g. `"vip"`, `"outreach-cohort-3"`) is weak
+    /// positive evidence on its own. Spec §12.2 (T-34).
+    pub tags_weight: f64,
+
     /// Whether to add a phonetic-name bonus when both names sound alike.
     pub use_phonetic_matching: bool,
 
@@ -413,6 +431,8 @@ impl Default for MatchConfig {
             death_place_weight: 0.05,
             phone_weight: 0.05,
             email_weight: 0.05,
+            relationships_weight: 0.05,
+            tags_weight: 0.05,
             use_phonetic_matching: true,
             name_algorithm: SimilarityAlgorithm::Combined,
             strict_mode: false,
@@ -773,6 +793,17 @@ pub struct MatchBreakdown {
     /// `None` if either side is absent or fails to parse as an email.
     #[serde(default)]
     pub email_score: Option<f64>,
+    /// Score for relationship-set similarity: typed-set Jaccard over
+    /// `(relation, person_id)` pairs, `|A ∩ B| / |A ∪ B|`. `None` when
+    /// either side has no relationships recorded. See
+    /// [`crate::RelationshipRef`]; spec §12.2 (T-33).
+    #[serde(default)]
+    pub relationships_score: Option<f64>,
+    /// Score for tag-set similarity: set Jaccard over the
+    /// case-insensitively normalised tag sets, `|A ∩ B| / |A ∪ B|`.
+    /// `None` when either side has no tags recorded. Spec §12.2 (T-34).
+    #[serde(default)]
+    pub tags_score: Option<f64>,
     /// Mean Soundex match across given and family names (`0.0`, `0.5`, or `1.0`).
     pub phonetic_name_score: Option<f64>,
 }
@@ -1598,6 +1629,11 @@ impl MatchingEngine {
             death_place_score: self.score_death_place(person1, person2),
             phone_score: self.score_phone(person1, person2),
             email_score: self.score_email(person1, person2),
+            relationships_score: score_relationships(
+                &person1.relationships,
+                &person2.relationships,
+            ),
+            tags_score: score_tags(&person1.tags, &person2.tags),
             phonetic_name_score: if self.config.use_phonetic_matching {
                 self.score_phonetic_names(person1, person2)
             } else {
@@ -1840,6 +1876,14 @@ impl MatchingEngine {
         if let Some(score) = breakdown.email_score {
             weighted_sum += score * self.config.email_weight;
             total_weight += self.config.email_weight;
+        }
+        if let Some(score) = breakdown.relationships_score {
+            weighted_sum += score * self.config.relationships_weight;
+            total_weight += self.config.relationships_weight;
+        }
+        if let Some(score) = breakdown.tags_score {
+            weighted_sum += score * self.config.tags_weight;
+            total_weight += self.config.tags_weight;
         }
 
         // Phonetic match is a bonus only — never lowers the score.
@@ -2211,6 +2255,54 @@ fn score_passport_books(a: &[PassportBook], b: &[PassportBook]) -> Option<f64> {
     Some(f64::from(passport_books_share_pair(a, b)))
 }
 
+/// Score a pair of relationship-reference lists for the probabilistic
+/// breakdown: typed-set **Jaccard** over `(relation, person_id)` pairs
+/// — `|A ∩ B| / |A ∪ B|` — so a `ParentOf` reference only agrees with a
+/// `ParentOf` reference to the **same** person. Returns `None` if
+/// either side has no relationships recorded at all (the field is
+/// irrelevant for this pair, not evidence of non-match). See spec
+/// §12.2 / T-33.
+fn score_relationships(a: &[RelationshipRef], b: &[RelationshipRef]) -> Option<f64> {
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    let set_a: HashSet<(RelationKind, &str)> = a
+        .iter()
+        .map(|r| (r.relation, r.person_id.as_str()))
+        .collect();
+    let set_b: HashSet<(RelationKind, &str)> = b
+        .iter()
+        .map(|r| (r.relation, r.person_id.as_str()))
+        .collect();
+    Some(jaccard(&set_a, &set_b))
+}
+
+/// Score a pair of tag lists for the probabilistic breakdown: set
+/// **Jaccard** over the case-insensitively normalised tag sets —
+/// `|A ∩ B| / |A ∪ B|`. Normalisation (trim + lowercase) happens here,
+/// at scoring time, consistent with the crate's verbatim-storage
+/// convention for names / emails / identifiers — [`crate::Person::tags`]
+/// stores tags exactly as provided. Returns `None` if either side has
+/// no tags recorded at all. See spec §12.2 / T-34.
+fn score_tags(a: &[String], b: &[String]) -> Option<f64> {
+    if a.is_empty() || b.is_empty() {
+        return None;
+    }
+    let set_a: HashSet<String> = a.iter().map(|t| t.trim().to_lowercase()).collect();
+    let set_b: HashSet<String> = b.iter().map(|t| t.trim().to_lowercase()).collect();
+    Some(jaccard(&set_a, &set_b))
+}
+
+/// Jaccard similarity `|A ∩ B| / |A ∪ B|` over two sets, `0.0` when both
+/// are empty (never called on that case here since callers already
+/// short-circuit on either side being empty, but kept safe by
+/// construction).
+fn jaccard<T: Eq + std::hash::Hash>(a: &HashSet<T>, b: &HashSet<T>) -> f64 {
+    let intersection = u32::try_from(a.intersection(b).count()).unwrap_or(u32::MAX);
+    let union = u32::try_from(a.union(b).count()).unwrap_or(u32::MAX);
+    f64::from(intersection) / f64::from(union)
+}
+
 /// Score a pair of `NaiveDate` values for the date-of-birth component.
 ///
 /// - `1.0` when the dates are exactly equal.
@@ -2431,6 +2523,171 @@ mod tests {
         let c = MatchConfig::lenient();
         assert!((c.match_threshold - 0.75).abs() < 1e-9);
         assert!(c.use_phonetic_matching);
+    }
+
+    /// Pins the default weight both new supporting-signal components use
+    /// (spec §13.1, T-33 / T-34).
+    #[test]
+    fn config_default_relationships_and_tags_weight_is_005() {
+        let c = MatchConfig::default();
+        assert!((c.relationships_weight - 0.05).abs() < 1e-9);
+        assert!((c.tags_weight - 0.05).abs() < 1e-9);
+    }
+
+    // ---------- relationships & tags (T-33 / T-34) ----------
+
+    #[test]
+    fn score_relationships_identical_sets_scores_one() {
+        let a = vec![RelationshipRef::new(RelationKind::ParentOf, "p1").unwrap()];
+        let b = a.clone();
+        assert_eq!(score_relationships(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn score_relationships_disjoint_sets_scores_zero() {
+        let a = vec![RelationshipRef::new(RelationKind::ParentOf, "p1").unwrap()];
+        let b = vec![RelationshipRef::new(RelationKind::ChildOf, "p1").unwrap()];
+        // Same person id, different relation kind: not the same pair.
+        assert_eq!(score_relationships(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn score_relationships_partial_overlap_scores_jaccard_ratio() {
+        let a = vec![
+            RelationshipRef::new(RelationKind::ParentOf, "p1").unwrap(),
+            RelationshipRef::new(RelationKind::ChildOf, "p2").unwrap(),
+        ];
+        let b = vec![
+            RelationshipRef::new(RelationKind::ParentOf, "p1").unwrap(),
+            RelationshipRef::new(RelationKind::ChildOf, "p3").unwrap(),
+        ];
+        // intersection = {(ParentOf, p1)} = 1; union = 3.
+        let score = score_relationships(&a, &b).unwrap();
+        assert!((score - 1.0 / 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn score_relationships_empty_either_side_is_none() {
+        let empty: Vec<RelationshipRef> = vec![];
+        let some = vec![RelationshipRef::new(RelationKind::ParentOf, "p1").unwrap()];
+        assert_eq!(score_relationships(&empty, &some), None);
+        assert_eq!(score_relationships(&some, &empty), None);
+        assert_eq!(score_relationships(&empty, &empty), None);
+    }
+
+    #[test]
+    fn score_tags_case_insensitive_identical_scores_one() {
+        let a = vec!["VIP".to_string(), "Outreach".to_string()];
+        let b = vec!["vip".to_string(), "outreach".to_string()];
+        assert_eq!(score_tags(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn score_tags_disjoint_sets_scores_zero() {
+        let a = vec!["vip".to_string()];
+        let b = vec!["research".to_string()];
+        assert_eq!(score_tags(&a, &b), Some(0.0));
+    }
+
+    #[test]
+    fn score_tags_partial_overlap_scores_jaccard_ratio() {
+        let a = vec!["vip".to_string(), "outreach".to_string()];
+        let b = vec!["VIP".to_string(), "research".to_string()];
+        // intersection = {"vip"} = 1; union = {"vip", "outreach", "research"} = 3.
+        let score = score_tags(&a, &b).unwrap();
+        assert!((score - 1.0 / 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn score_tags_trims_whitespace_before_comparing() {
+        let a = vec![" vip ".to_string()];
+        let b = vec!["VIP".to_string()];
+        assert_eq!(score_tags(&a, &b), Some(1.0));
+    }
+
+    #[test]
+    fn score_tags_empty_either_side_is_none() {
+        let empty: Vec<String> = vec![];
+        let some = vec!["vip".to_string()];
+        assert_eq!(score_tags(&empty, &some), None);
+        assert_eq!(score_tags(&some, &empty), None);
+        assert_eq!(score_tags(&empty, &empty), None);
+    }
+
+    #[test]
+    fn relationships_and_tags_absent_do_not_enter_the_weighted_average() {
+        // Renormalisation sanity check: with neither field populated on
+        // either side, `relationships_score`/`tags_score` are `None`
+        // and neither weight enters the denominator — an exact name +
+        // DOB match still scores a clean 1.0, not diluted by two
+        // "missing" components treated as zero.
+        let engine = MatchingEngine::default_config();
+        let a = Person::builder()
+            .given_name("Ann")
+            .family_name("Lee")
+            .date_of_birth(dob(1990, 1, 1))
+            .build();
+        let b = a.clone();
+        let result = engine.match_persons(&a, &b);
+        assert_eq!(result.breakdown.relationships_score, None);
+        assert_eq!(result.breakdown.tags_score, None);
+        assert!((result.score - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn relationships_and_tags_participate_when_present_and_agree() {
+        let engine = MatchingEngine::default_config();
+        let rel = RelationshipRef::new(RelationKind::ParentOf, "person-42").unwrap();
+        let a = Person::builder()
+            .given_name("Ann")
+            .family_name("Lee")
+            .date_of_birth(dob(1990, 1, 1))
+            .add_relationship(rel.clone())
+            .add_tag("VIP")
+            .build();
+        let b = Person::builder()
+            .given_name("Ann")
+            .family_name("Lee")
+            .date_of_birth(dob(1990, 1, 1))
+            .add_relationship(rel)
+            .add_tag("vip")
+            .build();
+        let result = engine.match_persons(&a, &b);
+        assert_eq!(result.breakdown.relationships_score, Some(1.0));
+        assert_eq!(result.breakdown.tags_score, Some(1.0));
+        assert!((result.score - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn relationships_and_tags_disagreement_pulls_score_down_but_stays_bounded() {
+        // Both sides carry data (so the components participate) but
+        // disagree entirely: the weighted-average renormalisation must
+        // still land in [0.0, 1.0], and a strong name+DOB match should
+        // outweigh two small (0.05 default) supporting-signal misses.
+        let engine = MatchingEngine::default_config();
+        let a = Person::builder()
+            .given_name("Ann")
+            .family_name("Lee")
+            .date_of_birth(dob(1990, 1, 1))
+            .add_relationship(RelationshipRef::new(RelationKind::ParentOf, "p1").unwrap())
+            .add_tag("vip")
+            .build();
+        let b = Person::builder()
+            .given_name("Ann")
+            .family_name("Lee")
+            .date_of_birth(dob(1990, 1, 1))
+            .add_relationship(RelationshipRef::new(RelationKind::ParentOf, "p2").unwrap())
+            .add_tag("research")
+            .build();
+        let result = engine.match_persons(&a, &b);
+        assert_eq!(result.breakdown.relationships_score, Some(0.0));
+        assert_eq!(result.breakdown.tags_score, Some(0.0));
+        assert!((0.0..=1.0).contains(&result.score));
+        assert!(result.score < 1.0);
+        assert!(
+            result.is_match,
+            "strong name+DOB match should still clear the default 0.85 threshold"
+        );
     }
 
     // ---------- probabilistic match ----------

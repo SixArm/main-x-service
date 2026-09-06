@@ -15,10 +15,9 @@ Identifier-field naming convention: `<cc>_<scheme>` where `<cc>` is the ISO 3166
 - `passport_books: Vec<PassportBook>` (identifying field; FR-50..FR-52).
 - Contacts: `phone: Option<String>`; `mobile: Option<String>` (fallback); `email: Option<String>` (FR-35/FR-36); `local_id: Option<String>` (NOT scored; OQ-2).
 
-**Planned, not yet implemented** (tracked as **T-33** / **T-34** in §23.2 — no `relationships`/`tags` field, no `RelationshipRef`/`RelationKind` type, and no `relationships_score`/`tags_score` breakdown field exists in `src/` today; do not treat the two bullets below as current behaviour):
+**Relationships (implemented — T-33)** — `relationships: Vec<RelationshipRef>` (default empty; §8.6a): typed references to other persons by registry id, as a **supporting** signal (not identifying on its own): two records that reference the **same** related persons (same parent / child / sibling / guardian ids) are more likely the same person, scored by typed-set Jaccard (§12.2) and weighted `relationships_weight` (§13.1).
 
-- Relationships: `relationships: Vec<RelationshipRef>` (default empty; §8.6a) — typed references to other persons by registry id. A **supporting** signal, NOT an identifying field on its own: two records that reference the **same** related persons (same parent / child / sibling / guardian ids) are more likely the same person. Once T-33 lands: scored by typed-set overlap (§12.2), weighted `relationships_weight` (§13.1).
-- Tags: `tags: Vec<String>` (default empty) — short free-text operator labels (e.g. `"vip"`, `"review"`). A **supporting** signal, NOT an identifying field on its own: two records carrying overlapping tag sets are weakly more likely the same person. Once T-34 lands: scored by plain set **Jaccard** over the case-insensitively normalised tags (§12.2), weighted `tags_weight` (§13.1).
+**Tags (implemented — T-34)** — `tags: Vec<String>` (default empty): operator-applied free-text labels (e.g. `"vip"`, `"review"`), stored verbatim and normalised (trim + lowercase) case-insensitively at scoring time, as a **supporting** signal (not identifying on its own): two records carrying the **same** tags are weakly more likely the same person, scored by set Jaccard (§12.2) and weighted `tags_weight` (§13.1).
 
 ### 8.2 `Gender`
 
@@ -40,13 +39,13 @@ All fields are `Option<String>`: `line1`, `line2`, `city`, `county`, `postcode`,
 
 `PassportBook { country: String, number: String, issued: Option<NaiveDate>, expires: Option<NaiveDate> }`. `country` is ISO 3166-1 alpha-2 uppercased (2 ASCII letters); `number` is whitespace-stripped, uppercased, non-empty; dates are metadata only (NOT matched). `PassportBook::new(country, number) -> Option<PassportBook>` canonicalises and rejects invalid input. Derives `Debug + Clone + PartialEq + Eq + Serialize + Deserialize`; re-exported from the crate root.
 
-### 8.6a `RelationshipRef` / `RelationKind` (planned — T-33, not yet implemented)
+### 8.6a `RelationshipRef` / `RelationKind` (implemented — T-33)
 
-Design target: `RelationshipRef { relation: RelationKind, person_id: String }` references another person in the consuming registry by **opaque id**; `person_id` is whitespace-trimmed and non-empty. `RelationKind` is an enum mirroring the service `Person`: `ParentOf`, `ChildOf`, `SiblingOf`, `GuardianOf`, `WardOf`. The matcher would **not** resolve the references (it has no registry) — it would only compare the two persons' relationship **sets** (§12.2). Neither type exists in `src/models.rs` today; see §23.2 T-33.
+`RelationshipRef { relation: RelationKind, person_id: String }` references another person in the consuming registry by **opaque id**; `person_id` whitespace-trimmed and non-empty via `RelationshipRef::new`. `RelationKind` mirrors the consuming service's own `Person` relationship vocabulary: `ParentOf`, `ChildOf` (inverses — A `ParentOf` B ⇔ B `ChildOf` A), `SiblingOf` (symmetric), `GuardianOf`, `WardOf` (inverses); extensible (e.g. `SpouseOf` later). The matcher does **not** resolve the references (it has no registry) — it only compares the two persons' relationship **sets** (§12.2).
 
 ### 8.5 `MatchBreakdown`
 
-Every field is `Option<f64>`: `None` = not scored; `Some(v)` ∈ `[0.0, 1.0]`. One `<scheme>_score` per identifier (42) plus `passport_book_score`, plus demographic / FHIR: `given_name_score`, `family_name_score`, `date_of_birth_score`, `death_date_score`, `gender_score`, `blood_type_score`, `multiple_birth_score`, `birth_place_score`, `death_place_score`, `address_score`, `phone_score`, `email_score`, `phonetic_name_score`. (`relationships_score` / `tags_score` are **planned**, not yet fields on `MatchBreakdown` — T-33 / T-34, §23.2.)
+Every field is `Option<f64>`: `None` = not scored; `Some(v)` ∈ `[0.0, 1.0]`. One `<scheme>_score` per identifier (42) plus `passport_book_score`, plus demographic / FHIR: `given_name_score`, `family_name_score`, `date_of_birth_score`, `death_date_score`, `gender_score`, `blood_type_score`, `multiple_birth_score`, `birth_place_score`, `death_place_score`, `address_score`, `phone_score`, `email_score`, `relationships_score`, `tags_score`, `phonetic_name_score`. All `#[serde(default)]` so legacy payloads deserialise with `None` for later-added fields.
 
 ---
 
