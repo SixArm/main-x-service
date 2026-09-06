@@ -9,6 +9,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — `/expiry` silently truncated with no signal to the operator (T-29)
+
+`onMount` called `repo.search({ q: "*", limit: 200 })` and only read
+`res.items`, discarding `res.total` even though `WorkerRepository.search()`
+already returns `{ items, total }`. When more than 200 workers carried
+documents, the calendar silently showed a partial window — the code's
+own comment named this ("a window, not a promise of completeness") but
+nothing in the UI said so. A visible notice now appears above the
+calendar whenever `total > items.length` ("Showing up to N of M
+workers", new i18n key `expiry.truncationNotice` across all 13
+locales). New Playwright test, verified to fail without the fix and
+pass with it; the existing T-28 test now also asserts the notice is
+absent when the window is complete. See spec §13 T-29.
+
 ### Fixed — the expiry calendar never actually showed any events (T-28)
 
 `/expiry`'s per-document event built `end: day` — the *same* `Date`
