@@ -483,7 +483,7 @@ attribute values, so it is safe for 403 bodies and audit trails.
       warnings`, `cargo fmt --check` all green; `CHANGELOG.md` has no
       stale `[Unreleased]` content; `cargo publish --dry-run` succeeds.
 
-- [ ] **AV-3 (S) Reconcile §16's stale version-bump open question.**
+- [x] **AV-3 (S) Reconcile §16's stale version-bump open question.** *(resolved 2026-09-06.)*
       *(verified: §16 currently reads "Version-bump for the unreleased
       hardening — the next release needs a number that doesn't
       collide with … `[0.8.0]` … (Lean: `0.9.0`, decided alongside the
@@ -501,6 +501,20 @@ attribute values, so it is safe for 403 bodies and audit trails.
       accurate.
       **Acceptance:** §16 no longer asserts an unresolved version-bump
       decision that §13/§14 show as already made.
+      - **Resolved.** §16's "Version-bump for the unreleased hardening"
+        bullet is now struck (`~~…~~ — RESOLVED: 0.9.0 …`), matching
+        the doc's own convention (the "PASETO library choice" entry
+        immediately below it), and points at AV-2 for the *next*
+        unreleased-changes bump rather than restating a decision
+        already made. Along the way, found and fixed the identical
+        drift in two more places while it was in view: `AGENTS.md`'s
+        "Unreleased since v0.8.0 … `Cargo.toml` is still `0.8.0`"
+        paragraph (stale — `Cargo.toml` has read `0.9.0` since the
+        release this paragraph itself describes), and
+        `CHANGELOG.md`'s `### Added — declared MSRV (Rust 1.95)` entry
+        citing the now-deleted `spec/rust-msrv-n-minus-3/index.md`
+        (the repo's MSRV policy moved to N-2; `Cargo.toml` already
+        declares `1.96`). Doc-only; no code or behaviour change.
 
 - [ ] **AV-4 (M) Resolve the Axum-extractor open question with real
       duplication data.** §16 asks "Should the crate offer an Axum
@@ -587,13 +601,11 @@ major.
 - Should the crate offer an Axum extractor, or stay framework-free and
   let each service wrap it? (Currently framework-free.)
 - Multiple audiences per verifier, if peers ever get distinct `aud`s.
-- **Version-bump for the unreleased hardening** — the next release
-  needs a number that doesn't collide with the existing `[0.8.0] -
-  2026-07-05` heading; SEC-V1/V2/V4 are behavioural hardening
-  (arguably a minor, not a patch, since e.g. SEC-V2 changes an ABAC
-  decision in a real if narrow case) and algorithm agility is
-  additive-but-security-relevant. (Lean: `0.9.0`, decided alongside the
-  crates.io publish call, both explicitly deferred by H-5.)
+- ~~**Version-bump for the unreleased hardening**~~ — RESOLVED: `0.9.0`
+  (§13/§14), released 2026-08-05. SEC-V1/V2/V4's behavioural hardening
+  and the algorithm-agility work landed together in that release; the
+  next such decision (the `[Unreleased]` changes accumulating since
+  then) is tracked separately as AV-2.
 - ~~PASETO library choice~~ — resolved: `rusty_paseto` (v4 public,
   `default-features = false`) ships in v0.2.0 and builds under
   `#![forbid(unsafe_code)]` (shared-doc §10).

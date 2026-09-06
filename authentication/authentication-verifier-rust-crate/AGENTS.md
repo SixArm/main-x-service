@@ -42,16 +42,17 @@ secret and no per-request introspection call.
 > and the verifier (`ReloadableVerifier`, 0.8) — key rotation with no
 > restart. See `CHANGELOG.md` for each.
 >
-> **Unreleased since v0.8.0 (security hardening + fuzzing +
-> verifier algorithm agility).** `Cargo.toml` is still `0.8.0` — these
-> landed in code and tests but not yet in a dated `CHANGELOG.md`
-> heading or a version bump (a deliberate H-5 deferral, not an
-> oversight): SEC-V1 (`from_paseto_keys_url` now requires HTTPS, or
-> HTTP to loopback only, with a timeout/no-redirect/64 KiB body cap),
-> SEC-V2 (a negated `resource.`/`env.` condition no longer matches
-> vacuously when the namespace is absent), a `fuzz/` cargo-fuzz harness
-> (SEC-I2), and (2026-07-27) the `Verifier` becoming algorithm-agile —
-> see the golden rule below and `spec/index.md` §5/§13/§14.
+> **v0.9.0 (2026-08-05) — security hardening + fuzzing + verifier
+> algorithm agility, shipped.** SEC-V1 (`from_paseto_keys_url` now
+> requires HTTPS, or HTTP to loopback only, with a
+> timeout/no-redirect/64 KiB body cap), SEC-V2 (a negated
+> `resource.`/`env.` condition no longer matches vacuously when the
+> namespace is absent), a `fuzz/` cargo-fuzz harness (SEC-I2), and
+> (2026-07-27) the `Verifier` becoming algorithm-agile all landed
+> together in this release — see the golden rule below and
+> `spec/index.md` §5/§13/§14. `Cargo.toml` reads `0.9.0`; further
+> changes have since accumulated in `CHANGELOG.md`'s `[Unreleased]`
+> with no release cut yet (tracked as AV-2).
 
 | Question | Answer |
 |---|---|
