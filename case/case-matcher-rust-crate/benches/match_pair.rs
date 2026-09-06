@@ -202,11 +202,63 @@ fn bench_config_variants(c: &mut Criterion) {
     group.finish();
 }
 
+/// Two records held fixed except for `subjects`/`keywords`, whose size
+/// is grown to `n` entries each — the counterpart to `bench_rank`'s
+/// candidate-count scaling, but for a single `Case`'s own array fields
+/// (AGENTS.md golden rule 6: this crate has no length cap of its own on
+/// either field, so the Jaccard cost is O(n·m) per pair). Roughly half
+/// the entries overlap between the two sides, so the Jaccard set
+/// intersection/union does real work rather than short-circuiting on an
+/// empty intersection.
+fn build_with_arrays(n: usize) -> (Case, Case) {
+    let mut a = build_reference();
+    let mut b = build_near_duplicate();
+    a.subjects = (0..n).map(|i| format!("person:{i:08x}")).collect();
+    a.keywords = (0..n).map(|i| format!("tag-{i}")).collect();
+    b.subjects = (0..n)
+        .map(|i| {
+            if i.is_multiple_of(2) {
+                format!("person:{i:08x}")
+            } else {
+                format!("person:other-{i:08x}")
+            }
+        })
+        .collect();
+    b.keywords = (0..n)
+        .map(|i| {
+            if i.is_multiple_of(2) {
+                format!("tag-{i}")
+            } else {
+                format!("tag-other-{i}")
+            }
+        })
+        .collect();
+    (a, b)
+}
+
+/// `match_cases` at 10/100/1000-entry `subjects`/`keywords`, with
+/// `Throughput::Elements` so Criterion reports per-entry cost and the
+/// O(n·m) Jaccard scaling is visible directly in `cargo bench` output.
+fn bench_field_arrays(c: &mut Criterion) {
+    let mut group = c.benchmark_group("field_arrays");
+    let engine = MatchingEngine::default_config();
+
+    for &n in &[10usize, 100, 1000] {
+        let pair = build_with_arrays(n);
+        group.throughput(Throughput::Elements(n as u64));
+        group.bench_with_input(BenchmarkId::from_parameter(n), &pair, |b, (a, b2)| {
+            b.iter(|| engine.match_cases(black_box(a), black_box(b2)));
+        });
+    }
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_match_pair,
     bench_deterministic,
     bench_rank,
-    bench_config_variants
+    bench_config_variants,
+    bench_field_arrays
 );
 criterion_main!(benches);

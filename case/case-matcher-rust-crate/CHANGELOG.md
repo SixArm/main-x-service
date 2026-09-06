@@ -10,6 +10,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — `bench_field_arrays` Criterion group: `subjects`/`keywords` array-size scaling
+
+`benches/match_pair.rs` had `bench_rank` scaling *candidate-list*
+length (10/100/1000) but nothing scaling a single `Case`'s own
+`subjects`/`keywords` arrays — the O(n·m) Jaccard cost AGENTS.md golden
+rule 6 warns about (this crate has no length cap of its own on either
+field) was inferable from the source but never directly visible in
+`cargo bench` output. New `bench_field_arrays`: two records held fixed
+except `subjects`/`keywords`, grown together to `n` entries each
+(roughly half overlapping, so the Jaccard intersection/union does real
+work rather than short-circuiting empty), with `Throughput::Elements`
+so Criterion reports per-entry cost.
+
+Recorded scaling (`cargo bench --bench match_pair -- field_arrays`,
+this machine): `n=10` 8.19 µs (1.22 Melem/s), `n=100` 87.07 µs
+(1.15 Melem/s), `n=1000` 2.437 ms (0.41 Melem/s) — markedly
+**super-linear**: a 10× growth in `n` from 100→1000 costs ~28× the
+time, not ~10×, confirming the O(n·m) cost is real and growing faster
+than the array size alone. `cargo bench --no-run` compiles the new
+group; `cargo build --benches`/`clippy --all-targets --all-features -D
+warnings`/`fmt --check` all clean. See spec/index.md.
+
 ### Added — `MatchConfig::validated`, guarding against caller-supplied negative/NaN weights
 
 Every `MatchConfig` field is `pub` with no validating constructor, and
