@@ -71,24 +71,35 @@
   and proxy-rejection matrix (mirroring `thing-front-end-with-svelte`'s
   `tests/unit/session.test.ts` + `tests/unit/proxy.test.ts`); three-part
   change (spec §8/§9 + code + test).
-- [ ] T-25: **Page-visit guard on mutation-only pages.** `/places/new`,
-  `/places/[id]/edit`, `/places/merge`, and `/review` render their forms
-  to an unauthenticated visitor and let the submit fail server-side,
-  rather than redirecting to `/signin` first. `thing-front-end-with-svelte`
-  already ships this as its own T-26 (PRO-H10):
-  `requireSignedIn(locals)` in `src/lib/server/session.ts`, called from
-  a `+page.server.ts` on each mutation-only route, `redirect(303,
-  "/signin")` when `locals.sessionId` is absent; read/list/search/view
-  pages stay public, matching the backend's default-allow-read /
-  mutation-deny ABAC posture rather than inventing a separate front-end
-  policy. *(verified: `grep -rln requireSignedIn src/` in this project
-  returns nothing; `find src/routes -name "+page.server.ts"` lists only
-  `/`, `/verify`, `/signin` — none of the four mutation-only routes has
-  one.)* **Acceptance:** an unauthenticated visit to any of the four
-  routes above redirects `303` to `/signin`; `/places`, `/places/[id]`,
-  and `/places/[id]/audit` stay reachable unauthenticated; a unit test
-  pins `requireSignedIn`'s pass/redirect behaviour; three-part change
-  (spec §8/§9 + code + test).
+- [x] T-25: **Page-visit guard on mutation-only pages.** *(resolved
+  2026-09-06.)* `/places/new`, `/places/[id]/edit`, `/places/merge`,
+  and `/review` rendered their forms to an unauthenticated visitor and
+  let the submit fail server-side, rather than redirecting to `/signin`
+  first.
+  - **Resolved.** Ported `thing-front-end-with-svelte`'s T-26 pattern
+    verbatim: `requireSignedIn(locals)` added to
+    `src/lib/server/session.ts` (redirects `303` to `/signin` when
+    `locals.sessionId` is absent — `App.Locals`/`hooks.server.ts`
+    already set it here, no change needed there), called from a new
+    `+page.server.ts` on each of the four mutation-only routes.
+    `/places`, `/places/[id]`, and `/places/[id]/audit` stay public.
+  - **A pre-existing gap this surfaced**: this project's
+    `playwright.config.ts` carried no stub session cookie at all
+    (unlike `thing`/`worker`'s `SMOKE_STORAGE_STATE`), so three
+    existing smoke tests (`/places/new`, `/places/merge`, `/review`)
+    would have started 303ing to `/signin` the moment the guard
+    landed. Added the identical `SMOKE_STORAGE_STATE` stub cookie
+    (presence-only, never validated, never sent to a real service) as
+    the chromium project's default `storageState`, and a new "page-visit
+    guard" describe block in `tests/e2e/places.spec.ts` that drops the
+    cookie (`test.use({ storageState: { cookies: [], origins: [] } })`)
+    to pin the anonymous-redirect path itself.
+  - **Acceptance:** a unit test (`tests/unit/session.test.ts`, new)
+    pins `requireSignedIn`'s pass/redirect behaviour; four new
+    Playwright tests assert an anonymous visit to each of the four
+    guarded routes redirects `303` to `/signin` — verified to **fail**
+    with the four `+page.server.ts` files removed and **pass** with
+    them restored. Three-part change: spec (here) + code + test.
 - [x] T-26: **E2E coverage for `/signin` and `/verify`.** *(resolved
   2026-09-05.)* `tests/e2e/` contained exactly one spec file,
   `places.spec.ts`; there was no Playwright smoke test for the

@@ -1,6 +1,12 @@
 // End-to-end smoke tests: load each primary route in a real browser and
 // assert its key landmarks render. These pin routing + page scaffolding,
 // not API behaviour (the backend may be absent; only static UI is checked).
+//
+// The suite carries a stub `__Host-mxi_session` cookie
+// (`SMOKE_STORAGE_STATE` in playwright.config.ts), so the pages PRO-H10
+// put behind `requireSignedIn` render instead of 303ing to /signin. The
+// guard is presence-only, so a stub is enough; the "page-visit guard"
+// describe at the bottom drops the cookie and pins the redirect itself.
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
@@ -220,4 +226,28 @@ test.describe("Place front-end smoke", () => {
         expect(JSON.parse(readFileSync(saved as string, "utf8"))).toEqual(payload);
         await expect(page.getByRole("button", { name: "Export data (GDPR)" })).toBeEnabled();
     });
+});
+
+// Pins the PRO-H10 page-visit guard itself (T-25): with NO session
+// cookie, every mutation page 303s to /signin rather than rendering a
+// form whose submit would fail. This is the one place the smoke suite
+// runs anonymous — the stub cookie above would otherwise make a removed
+// or broken guard invisible. Read/list/view pages stay public and are
+// deliberately not listed here; see AGENTS.md "Page-visit guard".
+test.describe("Place front-end page-visit guard", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    const guarded = [
+        "/places/new",
+        "/places/0c4f1e2a-0000-4000-8000-000000000001/edit",
+        "/places/merge",
+        "/review",
+    ];
+
+    for (const path of guarded) {
+        test(`anonymous visit to ${path} redirects to /signin`, async ({ page }) => {
+            await page.goto(path);
+            await expect(page).toHaveURL(/\/signin(\?|$)/);
+        });
+    }
 });
