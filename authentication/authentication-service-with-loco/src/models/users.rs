@@ -555,24 +555,6 @@ impl ActiveModel {
         self.update(db).await.map_err(ModelError::from)
     }
 
-    /// Sets the information for a reset password request,
-    /// generates a unique reset password token, and updates it in the
-    /// database.
-    ///
-    /// This method records the timestamp when the reset password token is sent
-    /// and generates a unique token for the user.
-    ///
-    /// # Arguments
-    ///
-    /// # Errors
-    ///
-    /// when has DB query error
-    pub async fn set_forgot_password_sent(mut self, db: &DatabaseConnection) -> ModelResult<Model> {
-        self.reset_sent_at = ActiveValue::set(Some(Local::now().into()));
-        self.reset_token = ActiveValue::Set(Some(Uuid::new_v4().to_string()));
-        self.update(db).await.map_err(ModelError::from)
-    }
-
     /// Records the verification time when a user verifies their
     /// email and updates it in the database.
     ///

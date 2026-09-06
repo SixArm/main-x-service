@@ -196,52 +196,6 @@ async fn can_verification_token() {
     );
 }
 
-/// Pins `set_forgot_password_sent`: it stamps the reset sent-at timestamp
-/// and generates a reset token (loco scaffold; unused by passwordless).
-#[tokio::test]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
-#[serial]
-async fn can_set_forgot_password_sent() {
-    configure_insta!();
-
-    let boot = boot_test::<App>()
-        .await
-        .expect("Failed to boot test application");
-    seed::<App>(&boot.app_context)
-        .await
-        .expect("Failed to seed database");
-
-    let user = Model::find_by_pid(&boot.app_context.db, "11111111-1111-1111-1111-111111111111")
-        .await
-        .expect("Failed to find user by PID");
-
-    assert!(
-        user.reset_sent_at.is_none(),
-        "Expected no reset sent timestamp"
-    );
-    assert!(user.reset_token.is_none(), "Expected no reset token");
-
-    let result = user
-        .into_active_model()
-        .set_forgot_password_sent(&boot.app_context.db)
-        .await;
-
-    assert!(result.is_ok(), "Failed to set forgot password sent");
-
-    let user = Model::find_by_pid(&boot.app_context.db, "11111111-1111-1111-1111-111111111111")
-        .await
-        .expect("Failed to find user by PID after setting forgot password sent");
-
-    assert!(
-        user.reset_sent_at.is_some(),
-        "Expected reset sent timestamp to be present"
-    );
-    assert!(
-        user.reset_token.is_some(),
-        "Expected reset token to be present"
-    );
-}
-
 /// Pins `verified`: marking the email verified stamps `email_verified_at`
 /// (this is the field magic-link redemption sets on first sign-in).
 #[tokio::test]

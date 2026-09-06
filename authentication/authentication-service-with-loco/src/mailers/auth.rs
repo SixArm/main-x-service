@@ -1,87 +1,33 @@
-//! Auth mailer: the magic-link sign-in email plus loco's stock
-//! welcome / forgot-password templates.
+//! Auth mailer: the magic-link sign-in email.
 //!
-//! The **magic-link** email is the one that matters here: it is rendered
-//! from the dependency-light [`crate::i18n`] catalog (English + Welsh) so
-//! no templating engine or on-disk template is needed on that path. The
-//! `welcome` and `forgot` templates are loco scaffolding kept for
-//! completeness; the passwordless flow never checks a password, so
-//! `forgot_password` is not wired into any route today.
+//! The **magic-link** email is the only one this crate sends: it is
+//! rendered from the dependency-light [`crate::i18n`] catalog (English
+//! + Welsh) so no templating engine or on-disk template is needed. The
+//! loco-scaffolded `welcome` / `forgot-password` mailer functions and
+//! their embedded template directories were removed (2026-09-06,
+//! `spec/index.md` §13) — the passwordless flow never checks a
+//! password and no route ever called them; see the CHANGELOG and
+//! `spec/index.md` §5 for the retained-then-removed history.
 //!
 //! In development there is no SMTP, so [`crate::controllers::auth`] logs
 //! the link to the tracing console and treats a send failure as benign.
-#![allow(non_upper_case_globals)]
 
 use loco_rs::prelude::*;
-use serde_json::json;
 
 use crate::models::users;
 
-/// Embedded `welcome` email template directory (loco `mail_template`).
-static welcome: Dir<'_> = include_dir!("src/mailers/auth/welcome");
-/// Embedded `forgot`-password email template directory (loco scaffolding;
-/// unused by the passwordless flow).
-static forgot: Dir<'_> = include_dir!("src/mailers/auth/forgot");
-// The magic-link email no longer renders from the on-disk template
+// The magic-link email does not render from an on-disk template
 // directory: it is localised via the dependency-light `crate::i18n`
 // catalog (see `send_magic_link`). The `src/mailers/auth/magic_link/*.t`
 // files are retained as the English reference copy.
 
-/// Mailer for auth emails (magic-link, welcome, forgot). In development
-/// the magic link is logged rather than sent (no SMTP configured).
+/// Mailer for the magic-link email. In development the magic link is
+/// logged rather than sent (no SMTP configured).
 pub struct Emailer {}
-// Opt into loco's `Mailer` trait using its default `mail` / `opts` /
-// `mail_template` implementations; no overrides are needed.
+// Opt into loco's `Mailer` trait using its default `mail` / `opts`
+// implementations; no overrides are needed.
 impl Mailer for Emailer {}
 impl Emailer {
-    /// Sending welcome email the the given user
-    ///
-    /// # Errors
-    ///
-    /// When email sending is failed
-    pub async fn send_welcome(ctx: &AppContext, user: &users::Model) -> Result<()> {
-        Self::mail_template(
-            ctx,
-            &welcome,
-            mailer::Args {
-                to: user.email.clone(),
-                locals: json!({
-                  "name": user.name,
-                  "verifyToken": user.email_verification_token,
-                  "domain": ctx.config.server.full_url()
-                }),
-                ..Default::default()
-            },
-        )
-        .await?;
-
-        Ok(())
-    }
-
-    /// Sending forgot password email
-    ///
-    /// # Errors
-    ///
-    /// When email sending is failed
-    pub async fn forgot_password(ctx: &AppContext, user: &users::Model) -> Result<()> {
-        Self::mail_template(
-            ctx,
-            &forgot,
-            mailer::Args {
-                to: user.email.clone(),
-                locals: json!({
-                  "name": user.name,
-                  "resetToken": user.reset_token,
-                  "domain": ctx.config.server.full_url()
-                }),
-                ..Default::default()
-            },
-        )
-        .await?;
-
-        Ok(())
-    }
-
     /// Sends a magic link authentication email to the user, rendered in
     /// the given `locale` (falls back to English for an unsupported tag).
     ///
