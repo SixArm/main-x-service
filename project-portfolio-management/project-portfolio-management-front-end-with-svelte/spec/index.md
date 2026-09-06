@@ -696,7 +696,7 @@ links are **never** a match signal (entity spec §1).
 - [x] vitest unit suite, 8 files / 62 tests: `client`, `plans`
   (`PlanRepository`), `merge-validation`, `capabilities`, `ppm`,
   `plan-form`, `i18n`, `layout` (hamburger-toggle render test). See §11.
-- [x] Playwright e2e smoke, 23 tests across `tests/e2e/{smoke,ppm}.spec.ts`:
+- [x] Playwright e2e smoke, 25 tests across `tests/e2e/{smoke,ppm}.spec.ts`:
   the plan identity routes render, the merge page + recent-merges table,
   the nav's merge link, check-duplicates self-exclusion, every
   oversight/executive dashboard view, and the Kanban board (columns,
@@ -708,6 +708,23 @@ links are **never** a match signal (entity spec §1).
   the BFF proxy prefix, so 21/23 tests had been failing since
   2026-07-20/`ad95088e` respectively, undetected because no other
   command in this project's test pyramid runs Playwright.
+- [x] **Fix: `/calendar` never actually rendered a milestone event
+  (2026-09-06).** `@svar-ui/calendar-store` requires an all-day event's
+  `end` to be strictly *after* `start`; `+page.svelte` passed
+  `end: day` — the same `Date` object as `start` — so the SVAR Calendar
+  widget silently dropped every milestone it was ever asked to show.
+  The existing `"delivery calendar lists milestones with kinds"` test
+  never caught this because it asserted only the fallback `<ul>`
+  (`milestone-list`), a separate render path from the calendar widget
+  itself. The identical bug and fix already landed in worker-front-end
+  and person-front-end's `/expiry` calendars (repo `tasks.md`). Fixed
+  by computing the following calendar day as `end`; the test now also
+  asserts the calendar widget (`milestone-calendar`) itself renders the
+  event text, and the stubbed milestone's due date is computed relative
+  to the actual test-run date (a fixed date would eventually scroll
+  outside the widget's default "today's month" view). Verified the
+  strengthened assertion actually fails without the fix before
+  confirming it passes with it.
 
 ## 14. Implementation status
 
