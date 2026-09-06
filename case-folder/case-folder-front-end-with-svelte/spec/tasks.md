@@ -80,18 +80,23 @@
   (`prettier --write .`), and CI-gate a `format:check`/`--check` step
   alongside the existing `npm run lint` in [`AGENTS.md`](../AGENTS.md)
   §"CI gate".
-- [ ] **ST-18** `UserView.role` (from `GET /api/auth/me`) is rendered in
-  three places (`+layout.svelte`, `move/+page.svelte`,
-  `workers/+page.svelte`) but there is no test asserting the signed-in
-  user's own role renders correctly in the nav utility row — *(verified:
-  `grep -rn "user.role" tests/`/`src/routes/+layout.svelte` shows the
-  template reads `user.role` at line 178, but `tests/e2e/auth.spec.ts`
-  only asserts the signed-in email and sign-out flow, never the role
-  suffix)*. Once **T-G1**'s CIS2/OIDC roles land this becomes an ABAC
-  signal worth trusting the UI reflects correctly. **Acceptance:** one
-  Playwright assertion (or vitest component test) pins that a stub user
-  carrying a `role` renders `(role)` next to their name, and one pins the
-  no-role case renders nothing.
+- [x] **ST-18** *(resolved 2026-09-06.)* `UserView.role` (from `GET
+  /api/auth/me`) is rendered in three places (`+layout.svelte`,
+  `move/+page.svelte`, `workers/+page.svelte`) but there was no test
+  asserting the signed-in user's own role renders correctly in the nav
+  utility row. Once **T-G1**'s CIS2/OIDC roles land this becomes an
+  ABAC signal worth trusting the UI reflects correctly.
+  - **Resolved.** Two new `vitest`/`@testing-library/svelte` cases in
+    `src/routes/layout.test.ts` (extending the existing hamburger-toggle
+    describe block, which already seeded a stub user but never asserted
+    on the role text): one seeds `role: 'clerk'` and asserts the
+    `.auth-status` element's text contains `Test Operator(clerk)`; the
+    other seeds `role: null` and asserts the name renders with no `(`
+    at all. Verified to fail (assert the missing text) with the
+    template's `{#if user.role}` branch stripped, and pass with it
+    restored.
+  - **Acceptance met:** `npm run test:unit` — 50/50 (was 47); `npm run
+    check` clean.
 
 - [ ] **ST-19** `src/lib/api/schema.d.ts` is a **committed, generated**
   file (`npm run gen:api` runs `openapi-typescript` against the sibling
