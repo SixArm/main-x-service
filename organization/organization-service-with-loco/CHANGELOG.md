@@ -9,6 +9,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — real-time duplicate check on create (`409`) (ORG-T3)
+
+`POST /api/organizations` validated and inserted unconditionally,
+leaving `check-duplicates`/`deduplicate` as separate calls a caller
+could simply never make. Extracted `check_duplicates`'s scoring guts
+into a shared `score_against_index` helper and reused it in `create`:
+a likely-duplicate candidate now `409`s with the candidate matches in
+`ErrorDetail.errors`, and the record is not created. An unavailable
+search index degrades to "no duplicates found" for `create` (unlike
+`check_duplicates`'s hard `503`) — mirroring person-service's
+`check_duplicates_internal`, since blocking every write over an
+unrelated Tantivy hiccup would be a far larger availability regression
+than refusing one explicit check.
+
+Found only by running the DB-gated suite (not `cargo test --lib`):
+several existing tests created near-duplicate organizations via `POST`
+to set up `merge`/`deduplicate`/pagination fixtures, and now `409`'d on
+the second create since it runs the identical `is_match` check those
+features test. Fixed by seeding the extra rows directly through the
+model layer (a new shared `seed_directly` test helper in
+`tests/requests/mod.rs`), bypassing the HTTP guard — the same pattern
+person-service's own `create_minimal_person` test helper already uses
+for the identical problem. New test
+`create_conflicts_on_a_real_time_duplicate` proves the round trip; see
+spec/index.md ORG-T3.
+
 ### Added — `merged_from` on the `Merged` event envelope (umbrella spec §13 T-13)
 
 `Envelope` had no way to name which duplicate a `Merged` event's

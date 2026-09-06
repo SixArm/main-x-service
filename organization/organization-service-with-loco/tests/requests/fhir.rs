@@ -35,7 +35,7 @@ fn entry_ids(bundle: &Value) -> Vec<&str> {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn fhir_search_by_name_and_city_resolve_through_the_index() {
     super::isolate_search_index();
-    request::<App, _, _>(|request, _ctx| async move {
+    request::<App, _, _>(|request, ctx| async move {
         // The target is created FIRST — the oldest, lowest-id row, the
         // position `OrgModel::list`'s `ORDER BY id DESC` scan reaches
         // last, not first.
@@ -49,16 +49,24 @@ async fn fhir_search_by_name_and_city_resolve_through_the_index() {
             .json();
         let target_pid = target["pid"].as_str().expect("pid").to_string();
 
-        // Several newer distractors, none sharing the target's name or city.
+        // Several newer distractors, none sharing the target's name or
+        // city. Seeded directly (ORG-T3): these near-identical names
+        // (differing only by a trailing digit, with an otherwise-shared
+        // "Distractor Holdings" prefix the matcher's Jaro-Winkler
+        // prefix bonus weighs heavily) are near-duplicates of *each
+        // other* even with distinct localities — exactly what the
+        // real-time create check now exists to catch — so seeding past
+        // it is the same fix `organizations.rs`'s equivalent fixtures
+        // needed.
         for i in 0..5 {
-            let created = request
-                .post("/api/organizations")
-                .json(&json!({
+            super::seed_directly(
+                &ctx,
+                json!({
                     "name": format!("Distractor Holdings {i}"),
-                    "address": { "locality": "Someplace Ordinary" },
-                }))
-                .await;
-            assert_eq!(created.status_code(), 200, "distractor {i} should create");
+                    "address": { "locality": format!("Someplace Ordinary {i}") },
+                }),
+            )
+            .await;
         }
 
         // `name=` resolves via the index and finds the (oldest) target.

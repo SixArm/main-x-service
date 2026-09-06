@@ -1069,7 +1069,7 @@ organization is not a data subject.
   likewise carry masked names/identifiers when the caller is
   mask-obligated.
 
-- [ ] **ORG-T3 (M) Real-time duplicate check on create (`409`).**
+- [x] **ORG-T3 (M) Real-time duplicate check on create (`409`).**
   `POST /api/organizations` has no duplicate short-circuit at all — the
   handler validates and inserts unconditionally, leaving
   `check-duplicates`/`deduplicate` as separate, opt-in calls a caller
@@ -1084,6 +1084,52 @@ organization is not a data subject.
   `409` with candidate matches in the body; creating a genuinely new
   record still succeeds; the existing `check-duplicates`/`deduplicate`
   behaviour is unchanged.
+  **Resolved.** Extracted `check_duplicates`'s scoring guts into a
+  shared `score_against_index(ctx, index, query)` helper and called it
+  from `create` too, before the write. The two callers deliberately
+  handle an **unavailable search index differently**:
+  `check_duplicates` still hard-refuses (`503`, unchanged), but `create`
+  **degrades to "no duplicates found"** rather than blocking every
+  write — mirroring person-service's `check_duplicates_internal`
+  (which returns an empty candidate list on a search failure rather
+  than propagating it). Blocking every organization from being created
+  over an unrelated Tantivy hiccup would be a far larger availability
+  regression than refusing one explicit check. A hit returns `409` with
+  `ErrorDetail { error: "duplicate_detected", description, errors:
+  <candidate ScoredRef array> }` (loco's `ErrorDetail.errors` field is
+  built for exactly this — arbitrary structured detail alongside the
+  message) and the record is never created.
+  **A real, non-obvious side effect found only by running the DB-gated
+  suite** (not `cargo test --lib`, which stayed green throughout):
+  every existing test that created two near-duplicate organizations via
+  `POST` to set up a `merge`/`deduplicate`/pagination fixture started
+  `409`-ing on the second create, since create now runs the identical
+  `is_match` check those features test. Fixed by seeding the extra
+  row(s) directly through the model layer
+  (`streaming::create_and_emit`, a new shared `seed_directly` test
+  helper in `tests/requests/mod.rs`), bypassing the HTTP guard entirely
+  — the established family precedent for this exact problem (see
+  person-service's `create_minimal_person`, which already documents
+  choosing different birth years for the same reason). Affected:
+  `merge_folds_duplicate_into_survivor`,
+  `deduplicate_review_queue_round_trip`, `list_and_search_are_paginated`,
+  and `fhir_search_by_name_and_city_resolve_through_the_index` (whose
+  "distractor" rows differed only by a trailing digit sharing a long
+  prefix — Jaro-Winkler's prefix bonus rewards that heavily, so they
+  were near-duplicates of *each other* despite each being unrelated to
+  the test's actual target). See `reference_realtime_dedup_breaks_test_fixtures`
+  memory for the general pattern; this will very likely recur when the
+  same feature rolls to care-pathway/case/portfolio.
+  **Acceptance met:** new DB-gated test
+  `tests/requests/organizations.rs::create_conflicts_on_a_real_time_duplicate`
+  proves a real-time duplicate `409`s with the existing pid in
+  `errors`, the duplicate is never created (collection stays at 1 row),
+  and a genuinely unrelated record still creates normally. Confirmed to
+  fail (temporarily disabled the dup-check block) before restoring the
+  fix. Verified against a real Postgres (`scripts/test-db.sh up` +
+  `scripts/ci-check.sh test-db`, 35/35 request tests green); `cargo
+  test --lib` (205/205), `cargo clippy --all-targets -- -D warnings`,
+  and `cargo fmt --check` all clean.
 
 - [x] **ORG-T4 (S) URL well-formedness + ISO 3166 country-code
   validation.** *(resolved 2026-09-04.)*
@@ -1215,14 +1261,15 @@ logging plus a `tracing-opentelemetry` bridge over an OTLP/gRPC
 exporter, `trace_mw` layered on this crate's one router-construction
 surface); green build + clippy.
 
-Still open (§13): richer validation beyond identifier check-digits (URL
-well-formedness, ISO country codes); real-time duplicate check on
-create (`409`); an `S3` `ArtifactStore` backend for BLK-5; a
+Still open (§13): an `S3`
+`ArtifactStore` backend for BLK-5; a
 `ConnectionTrait`-generic `streaming::create_and_emit`/`update_and_emit`
 so the BLK-5 per-row upsert can be advisory-lock-protected (SEC-B3)
 without a pool deadlock; moving the FHIR structured search onto the
 Tantivy index; cross-service link **target** readiness confirmation
-(§8, §13).
+(§8, §13). (Richer validation beyond identifier check-digits and the
+real-time duplicate check on create, both formerly listed here, are
+resolved — see ORG-T4 and ORG-T3.)
 
 ## 15. Roadmap
 
@@ -1239,9 +1286,12 @@ import/export, key rotation + policy hot-reload (AU-2).
   single JSONB payload) once search lands? Tantivy search has since
   landed (§13) without normalising — this question is unresolved, not
   answered by that landing.
-- Real-time duplicate check on create (409) vs the explicit endpoint?
-  Still just the explicit `check-duplicates`/`import` paths; `POST
-  /api/organizations` never blocks on a match today.
+- ~~Real-time duplicate check on create (409) vs the explicit
+  endpoint?~~ — **RESOLVED (ORG-T3): both.** `POST /api/organizations`
+  now blocks on a real-time match (`409`, sharing `check_duplicates`'s
+  scoring); the explicit `check-duplicates`/`deduplicate`/`import`
+  paths are unchanged and remain available for a caller that wants to
+  check without creating, or scan the whole corpus.
 - ~~Periodic re-fetch of the PASETO key set (key rotation)~~ —
   **RESOLVED by AU-2** (§13, §7): `auth::spawn_key_refresh` re-fetches
   `ORGANIZATION_PASETO_KEYS_URL` on `ORGANIZATION_PASETO_KEYS_REFRESH_SECS`

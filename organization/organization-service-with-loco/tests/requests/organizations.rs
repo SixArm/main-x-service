@@ -20,6 +20,8 @@ use organization_service::app::App;
 use serde_json::json;
 use serial_test::serial;
 
+use super::seed_directly;
+
 /// A representative create payload (the body is the
 /// `organization_matcher::Organization` shape, snake_case wire format).
 fn acme() -> serde_json::Value {
@@ -57,6 +59,61 @@ async fn can_create_and_round_trip() {
         assert_eq!(org["same_as"][0], "https://www.wikidata.org/wiki/Q42");
         assert_eq!(org["founding_date"], "1985-04-01");
         assert_eq!(org["jurisdiction"], "US");
+    })
+    .await;
+}
+
+/// Real-time duplicate detection on create (ORG-T3): creating a record
+/// that duplicates an existing one is `409` carrying the candidate
+/// matches, and the record is **not** created; creating a genuinely new
+/// record afterwards still succeeds normally.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn create_conflicts_on_a_real_time_duplicate() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created: serde_json::Value = request
+            .post("/api/organizations")
+            .json(&acme())
+            .await
+            .json();
+        let existing_pid = created["pid"].as_str().expect("pid").to_string();
+
+        // Same sameAs URL as `acme()` → the matcher's deterministic
+        // short-circuit, same signal `can_check_duplicates` already
+        // pins for the read-only endpoint.
+        let conflict = request
+            .post("/api/organizations")
+            .json(&json!({
+                "name": "Acme Incorporated (duplicate attempt)",
+                "same_as": ["https://www.wikidata.org/wiki/Q42"]
+            }))
+            .await;
+        assert_eq!(
+            conflict.status_code(),
+            409,
+            "a real-time duplicate must 409"
+        );
+        let body: serde_json::Value = conflict.json();
+        assert_eq!(body["error"], "duplicate_detected");
+        let candidates = body["errors"].as_array().expect("candidate matches array");
+        assert!(
+            candidates.iter().any(|c| c["pid"] == existing_pid),
+            "the existing Acme should be reported as the conflicting candidate: {body}"
+        );
+
+        // The would-be duplicate was never created — only the original
+        // Acme is in the collection.
+        let list: serde_json::Value = request.get("/api/organizations").await.json();
+        assert_eq!(list.as_array().unwrap().len(), 1);
+
+        // A genuinely new, unrelated record still creates normally.
+        let unrelated = request
+            .post("/api/organizations")
+            .json(&json!({"name": "Wholly Unrelated Trading Company"}))
+            .await;
+        assert_eq!(unrelated.status_code(), 200, "a new record still succeeds");
     })
     .await;
 }
@@ -363,12 +420,14 @@ async fn can_check_duplicates() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn list_and_search_are_paginated() {
     super::isolate_search_index();
-    request::<App, _, _>(|request, _ctx| async move {
+    request::<App, _, _>(|request, ctx| async move {
+        // Seeded directly (ORG-T3): these five rows are near-identical
+        // by design (same shared "Paging" word, so `search?q=Paging`
+        // below finds all five) — exactly the pattern the real-time
+        // create check now flags, so `POST` would 409 from the second
+        // row on.
         for i in 0..5 {
-            request
-                .post("/api/organizations")
-                .json(&json!({"name": format!("Paging Test {i}")}))
-                .await;
+            seed_directly(&ctx, json!({"name": format!("Paging Test {i}")})).await;
         }
 
         // Read one response header as a string; loco's test response
@@ -616,7 +675,7 @@ async fn check_duplicates_blocks_on_identifier_not_only_name() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn merge_folds_duplicate_into_survivor() {
     super::isolate_search_index();
-    request::<App, _, _>(|request, _ctx| async move {
+    request::<App, _, _>(|request, ctx| async move {
         let main: serde_json::Value = request
             .post("/api/organizations")
             .json(&acme())
@@ -624,15 +683,18 @@ async fn merge_folds_duplicate_into_survivor() {
             .json();
         let main_pid = main["pid"].as_str().expect("main pid").to_string();
 
-        let dup: serde_json::Value = request
-            .post("/api/organizations")
-            .json(&json!({
+        // Seeded directly (ORG-T3): this row is a near-duplicate of
+        // `main` by design (that's what the merge below exercises), so
+        // a second `POST` would now `409` under the real-time check.
+        let dup = seed_directly(
+            &ctx,
+            json!({
                 "name": "Acme Incorporated",
                 "keywords": ["hardware"],
                 "identifiers": [{"scheme": "Duns", "value": "150483782"}]
-            }))
-            .await
-            .json();
+            }),
+        )
+        .await;
         let dup_pid = dup["pid"].as_str().expect("dup pid").to_string();
 
         let response = request
@@ -907,12 +969,14 @@ async fn merge_unknown_pid_is_404() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn deduplicate_review_queue_round_trip() {
     super::isolate_search_index();
-    request::<App, _, _>(|request, _ctx| async move {
+    request::<App, _, _>(|request, ctx| async move {
+        // Seeded directly (ORG-T3): these two rows are near-identical by
+        // design — the whole point of this test — so the second `POST`
+        // would now `409` under the real-time create check.
         for name in ["Acme, Inc.", "Acme Inc"] {
             let mut org = acme();
             org["name"] = json!(name);
-            let created = request.post("/api/organizations").json(&org).await;
-            assert_eq!(created.status_code(), 200, "create should succeed");
+            seed_directly(&ctx, org).await;
         }
 
         // Scan: the near-identical pair lands in the stored queue.
