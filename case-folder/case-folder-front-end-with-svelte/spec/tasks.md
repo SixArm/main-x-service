@@ -111,19 +111,35 @@
   - **Acceptance met:** `npm run test:unit` — 50/50 (was 47); `npm run
     check` clean.
 
-- [ ] **ST-19** `src/lib/api/schema.d.ts` is a **committed, generated**
+- [x] **ST-19** `src/lib/api/schema.d.ts` is a **committed, generated**
   file (`npm run gen:api` runs `openapi-typescript` against the sibling
   crate's `openapi.yaml`) with no CI step re-generating and diffing it —
-  *(verified: `grep -n "gen:api\|schema.d.ts" AGENTS.md` finds the
+  *(verified: `grep -n "gen:api\|schema.d.ts" AGENTS.md` found the
   script documented as a manual recipe step only; the "CI gate" section
-  lists just `npm run check` + `npm run test:e2e`)*. **ST-16**'s
+  listed just `npm run check` + `npm run test:e2e`)*. **ST-16**'s
   "regenerating produces no diff" claim was a one-off manual check on
   2026-08-29, not an enforced invariant — a future `openapi.yaml` edit
-  (e.g. this pass's **LT-18** `bearerFormat` fix) can drift silently
-  from the checked-in types with nothing failing. **Acceptance:** a CI
-  step runs `npm run gen:api` and fails the build on a non-empty `git
-  diff` against the committed file, added to the CI gate list in
-  [`AGENTS.md`](../AGENTS.md).
+  (e.g. this pass's **LT-18** `bearerFormat` fix) could drift silently
+  from the checked-in types with nothing failing.
+  - **Resolved.** New `npm run verify:api` script
+    (`npm run gen:api && git diff --exit-code -- src/lib/api/schema.d.ts`),
+    added to the [`AGENTS.md`](../AGENTS.md) §9 CI gate list. Landing
+    it immediately found two real drifts it was designed to catch:
+    `gen:api`'s raw `openapi-typescript` output uses double-quoted
+    string literals, while this project's Prettier config (`.prettierrc`,
+    landed in ST-17) prefers single quotes — so `gen:api` never
+    reformatted its own output, meaning every regeneration would fail
+    `format:check` and (with this task's new gate) `verify:api` too on
+    quote style alone, masking any real diff underneath. Fixed by
+    chaining `prettier --write` onto `gen:api` itself. Once that noise
+    was removed, a genuine drift surfaced: the sign-out endpoint's
+    `openapi.yaml` summary had gained "Idempotent — always succeeds,
+    even with no session." that was never regenerated into
+    `schema.d.ts`. Regenerated and committed alongside this task.
+  - **Acceptance met:** `npm run verify:api` fails on a reverted
+    `schema.d.ts` (both drift classes reproduced and confirmed to
+    trip it) and passes once regenerated; `npm run check` / `format:check`
+    / `lint` / `test:unit` all clean.
 
 ## Production gates
 

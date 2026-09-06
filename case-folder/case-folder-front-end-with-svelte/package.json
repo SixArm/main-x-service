@@ -16,7 +16,8 @@
     "lint": "eslint .",
     "format": "prettier --write src",
     "format:check": "prettier --check src",
-    "gen:api": "openapi-typescript ../case-folder-service-with-rust/openapi.yaml -o src/lib/api/schema.d.ts"
+    "gen:api": "openapi-typescript ../case-folder-service-with-rust/openapi.yaml -o src/lib/api/schema.d.ts && prettier --write src/lib/api/schema.d.ts",
+    "verify:api": "npm run gen:api && git diff --exit-code -- src/lib/api/schema.d.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.3",
