@@ -62,6 +62,56 @@ test.describe("Person front-end smoke", () => {
         await expect(page.getByRole("button", { name: /Find matches/ })).toBeVisible();
     });
 
+    // Pins T-28-equivalent (WEB-6): the expiry calendar renders an
+    // all-day event and navigates to the person on select. The all-day
+    // case is not incidental — `@svar-ui/calendar-store` requires an
+    // all-day event's `end` to be strictly after `start`, and the page
+    // was passing `end: day` — the same Date as `start` — so every
+    // expiry event this calendar was ever asked to show was silently
+    // dropped. See the fix in `src/routes/expiry/+page.svelte`.
+    test("expiry calendar renders and navigates to the person on select", async ({
+        page,
+    }) => {
+        const id = "0c4f1e2a-0000-4000-8000-00000000000e";
+        const today = new Date();
+        const dayInThisMonth = new Date(today.getFullYear(), today.getMonth(), 15)
+            .toISOString()
+            .slice(0, 10);
+        const person = {
+            id,
+            name: { family: "Bennet", given: ["Jane"] },
+            gender: "female",
+            documents: [
+                {
+                    document_type: "Passport",
+                    number: "X1234567",
+                    expiry_date: dayInThisMonth,
+                },
+            ],
+        };
+        await page.route("**/api/persons/search**", async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({ success: true, data: [person], error: null }),
+            });
+        });
+        await page.route(`**/api/persons/${id}`, async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({ success: true, data: person, error: null }),
+            });
+        });
+
+        await page.goto("/expiry");
+        await expect(page.getByRole("heading", { name: "Expiries" })).toBeVisible();
+        const calendar = page.getByTestId("expiry-calendar");
+        await expect(calendar).toBeVisible();
+        await calendar.getByText("Bennet", { exact: false }).click();
+        await expect(page).toHaveURL(`/persons/${id}`);
+    });
+
     // Pins: the person detail page renders the cross-service links panel
     // (heading + kind select). The detail page renders nothing until the
     // record loads, so this stubs the two API calls at the network layer

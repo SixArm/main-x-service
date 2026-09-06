@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — the expiry calendar never showed any events (T-28)
+
+`/expiry` shipped with no test coverage and no functional requirement,
+and writing the required "an event actually renders" Playwright
+assertion surfaced a genuine, previously-shipped bug:
+`@svar-ui/calendar-store` requires an all-day event's `end` to be
+strictly after `start`, but `+page.svelte` passed `end: day` — the
+same `Date` object as `start` — so every identity-document expiry
+event this calendar was ever asked to show was silently dropped. The
+identical bug was already fixed in worker-front-end's `/expiry`
+(repo `tasks.md`); this crate is the probable origin the pattern was
+copied from. Fixed by computing the following calendar day as `end`.
+Added FR-23 (`spec/06-functional-requirements.md`) and a Playwright
+smoke test asserting the calendar renders an expiring document and
+navigates to `/persons/{id}` on select. See spec §13 T-28.
+
 ### Added — audit log "load more" control (T-31)
 
 `/persons/[id]/audit` had a hard, silent 100-entry cap with no way to
