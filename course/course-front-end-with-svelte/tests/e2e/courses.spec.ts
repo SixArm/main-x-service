@@ -132,6 +132,63 @@ test.describe("Course front-end smoke", () => {
         await expect(page.getByTestId("instance-calendar")).toBeVisible();
     });
 
+    // Regression: an instance schedule window with no `end_date` set the
+    // all-day event's `end` equal to its `start`. The SVAR calendar store
+    // drops such an event (`!(e.end > start)`), so the window silently
+    // never rendered even though the API returned it. Fixed by computing
+    // an exclusive `end` one day past the window's last calendar day.
+    test("calendar renders a same-day instance window", async ({ page }) => {
+        const courseId = "0c4f1e2a-0000-4000-8000-0000000000ff";
+        const today = new Date();
+        const dayInThisMonth = new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            15,
+        );
+        const startDate = dayInThisMonth.toISOString().slice(0, 10);
+
+        await page.route("**/api/courses/search**", async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({
+                    success: true,
+                    data: {
+                        items: [{ id: courseId, name: "Intro to Widgets" }],
+                        total: 1,
+                    },
+                    error: null,
+                }),
+            });
+        });
+        await page.route(
+            `**/api/courses/${courseId}/instances`,
+            async (route) => {
+                await route.fulfill({
+                    status: 200,
+                    contentType: "application/json",
+                    body: JSON.stringify({
+                        success: true,
+                        data: [
+                            {
+                                id: "instance-1",
+                                name: "Spring cohort",
+                                // No end_date: the bug case.
+                                schedule: { start_date: startDate },
+                            },
+                        ],
+                        error: null,
+                    }),
+                });
+            },
+        );
+
+        await page.goto("/calendar");
+        const calendar = page.getByTestId("instance-calendar");
+        await expect(calendar).toBeVisible();
+        await expect(calendar.getByText("Spring cohort")).toBeVisible();
+    });
+
     // Pins T-31: "/courses/[id]" renders its identity heading plus the
     // Edit and Audit links — landmarks the existing GDPR-export test
     // never asserted (it only checks the export button).
