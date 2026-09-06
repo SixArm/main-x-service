@@ -48,6 +48,24 @@ describe("OrganizationRepository", () => {
     expect(calls[0]?.url).toBe("http://svc.test/api/organizations/a%2Fb%201");
   });
 
+  // Pins ORGFE-T2: masked() hits the dedicated /masked endpoint rather
+  // than requesting the plain record and redacting client-side.
+  it("masked() GETs the /masked endpoint by pid", async () => {
+    const { repo, calls } = spyClient();
+    await repo.masked("p1");
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe("http://svc.test/api/organizations/p1/masked");
+  });
+
+  // Pins ORGFE-T2: exportGdpr() hits the dedicated /export endpoint and
+  // returns the payload unchanged (the caller only saves it as a file).
+  it("exportGdpr() GETs the /export endpoint by pid", async () => {
+    const { repo, calls } = spyClient();
+    await repo.exportGdpr("p1");
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.url).toBe("http://svc.test/api/organizations/p1/export");
+  });
+
   it("create() POSTs the payload", async () => {
     const { repo, calls } = spyClient();
     await repo.create(org);

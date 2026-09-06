@@ -155,6 +155,14 @@ async function stubApi(page: Page) {
     if (path === `/api/organizations/${DUP_PID}` && method === "GET") {
       return route.fulfill({ json: ORG_DUP });
     }
+    if (path === `/api/organizations/${PID}/masked` && method === "GET") {
+      return route.fulfill({ json: { ...ORG, name: "***REDACTED***", telephone: null, email: null } });
+    }
+    if (path === `/api/organizations/${PID}/export` && method === "GET") {
+      return route.fulfill({
+        json: { subject: PID, exported_at: "2026-09-06T00:00:00Z", masked: false, organization: ORG },
+      });
+    }
     if (path === `/api/organizations/${PID}` && method === "PUT") {
       return route.fulfill({ json: { pid: PID, name: ORG.name } });
     }
@@ -187,6 +195,47 @@ test("new page shows the create form", async ({ page }) => {
 test("detail page renders the fetched organization", async ({ page }) => {
   await page.goto(`/${PID}`, { waitUntil: "networkidle" });
   await expect(page.getByRole("heading", { name: "Acme, Inc." })).toBeVisible();
+});
+
+// Pins ORGFE-T2: the masked-view toggle re-fetches through
+// GET /api/organizations/{pid}/masked and back, rather than redacting
+// client-side — the two stubs return visibly different names so the
+// test can tell which endpoint actually answered.
+test("detail page toggles between the plain and masked view", async ({ page }) => {
+  await page.goto(`/${PID}`, { waitUntil: "networkidle" });
+  await expect(page.getByRole("heading", { name: "Acme, Inc." })).toBeVisible();
+  await expect(page.getByText("Showing the masked view")).not.toBeVisible();
+
+  await page.getByRole("button", { name: "Show masked" }).click();
+  await expect(page.getByRole("heading", { name: "***REDACTED***" })).toBeVisible();
+  await expect(page.getByText("Showing the masked view")).toBeVisible();
+
+  await page.getByRole("button", { name: "Show full" }).click();
+  await expect(page.getByRole("heading", { name: "Acme, Inc." })).toBeVisible();
+  await expect(page.getByText("Showing the masked view")).not.toBeVisible();
+});
+
+// Pins ORGFE-T2: the GDPR export button fetches GET /{pid}/export and
+// saves what came back as `organization-<pid>-export.json` — a real
+// browser download (Blob object URL + synthetic anchor), asserted
+// through Playwright's download event, with the saved bytes compared
+// to the stubbed payload so a silently-empty file cannot pass.
+test("detail page downloads the GDPR export as JSON", async ({ page }) => {
+  await page.goto(`/${PID}`, { waitUntil: "networkidle" });
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Export data (GDPR)" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe(`organization-${PID}-export.json`);
+  const path = await download.path();
+  const fs = await import("node:fs/promises");
+  const saved = JSON.parse(await fs.readFile(path as string, "utf-8"));
+  expect(saved).toEqual({
+    subject: PID,
+    exported_at: "2026-09-06T00:00:00Z",
+    masked: false,
+    organization: ORG,
+  });
 });
 
 test("edit page renders the edit form", async ({ page }) => {

@@ -82,6 +82,36 @@ export class OrganizationRepository {
   }
 
   /**
+   * `GET /api/organizations/{pid}/masked` — the record with telephone,
+   * email, street line, and fiscal identifiers redacted, regardless of
+   * the caller's policy. Distinct from the `mask` obligation on
+   * {@link get}: this is a caller *asking* for the redacted form (a
+   * screen share, a support call, an export preview), not the
+   * deployment deciding what a caller may see.
+   * @returns The masked record.
+   * @throws {@link ApiError} (404) when no record has that pid.
+   */
+  masked(pid: string): Promise<Organization> {
+    return this.http.get<Organization>(
+      `/api/organizations/${encodeURIComponent(pid)}/masked`,
+    );
+  }
+
+  /**
+   * `GET /api/organizations/{pid}/export` — the GDPR right-of-access
+   * export envelope. Audited server-side on every call, including a
+   * masked one. The shape is service-defined and never interpreted
+   * here — callers only serialize and save what came back (see the
+   * detail page's download action).
+   * @throws {@link ApiError} (404) when no record has that pid.
+   */
+  exportGdpr(pid: string): Promise<unknown> {
+    return this.http.get<unknown>(
+      `/api/organizations/${encodeURIComponent(pid)}/export`,
+    );
+  }
+
+  /**
    * `POST /api/organizations`.
    * @param org The new record (only `name` is required).
    * @returns The created `{pid, name}` ref.
@@ -216,8 +246,6 @@ export class OrganizationRepository {
    * first (the service caps the response at 100 rows).
    */
   recentMerges(): Promise<MergeRecordRow[]> {
-    return this.http.get<MergeRecordRow[]>(
-      "/api/organizations/merges/recent",
-    );
+    return this.http.get<MergeRecordRow[]>("/api/organizations/merges/recent");
   }
 }

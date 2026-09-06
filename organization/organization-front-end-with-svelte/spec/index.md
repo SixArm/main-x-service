@@ -252,15 +252,36 @@ controls when they land.
   redirect to `/signin`; the existing signed-out layout affordance is
   unchanged.
 
-- [ ] **ORGFE-T2 (S) Masked view + GDPR export UI.** The service exposes
-  `GET /{pid}/masked` and `GET /{pid}/export`, but nothing in this
-  front-end calls either. *(Verified: `grep -rn "masked\|/export"
-  src/lib/api/*.ts src/routes/` returns no hits.)* Add
-  `OrganizationRepository.masked(pid)`/`.export(pid)` plus a detail-page
-  affordance (e.g. a "View masked" toggle and a "Download GDPR export"
-  action). **Acceptance:** vitest pins for the two new repository
-  methods; a Playwright smoke test (API stubbed) exercises the toggle
-  and the export action.
+- [x] **ORGFE-T2 (S) Masked view + GDPR export UI.** *(resolved
+  2026-09-06.)* The service exposes `GET /{pid}/masked` and `GET
+  /{pid}/export`, but nothing in this front-end called either.
+  *(Verified: `grep -rn "masked\|/export" src/lib/api/*.ts
+  src/routes/` returned no hits before this change.)*
+  - **Resolved.** `OrganizationRepository.masked(pid)` /
+    `.exportGdpr(pid)` added, plus a detail-page ("Show masked"/"Show
+    full", `aria-pressed`) toggle that re-fetches through the masked
+    endpoint on click rather than redacting client-side (copy-adapted
+    from place/event-front-end's equivalent masked-view toggle), and
+    a "Export data (GDPR)" button that downloads the export envelope
+    as `organization-<pid>-export.json` via a Blob object URL +
+    synthetic anchor (the payload is service-defined and never
+    interpreted, only serialized). A banner appears while the masked
+    view is shown. New i18n keys `detail.showMasked` /
+    `detail.showFull` / `detail.maskedNotice` / `detail.exportGdpr` /
+    `detail.exportingGdpr` across all 13 locales.
+  - Two new `tests/unit/organizations.test.ts` cases pin `masked()`
+    and `exportGdpr()` hit their dedicated endpoints. Two new
+    `tests/e2e/smoke.spec.ts` cases: one stubs plain vs. masked
+    responses (distinguished by `/masked` in the URL, different
+    `name` values) and toggles both ways; one stubs the export
+    endpoint, clicks the button, awaits the browser `download` event,
+    and asserts both the suggested filename and that the saved bytes
+    parse back to the stubbed payload. Both verified to fail (30s
+    timeout) with the detail-page change reverted and pass with it
+    restored.
+  - **Acceptance met:** `pnpm test` 77/77 (was 75); `pnpm run check`
+    clean; `pnpm exec playwright test` 12/12 (was 10); `pnpm run
+    lint` clean.
 
 - [ ] **ORGFE-T3 (S) Audit-trail view.** The service exposes `GET
   /api/organizations/audit/recent` and `GET /{pid}/audit`

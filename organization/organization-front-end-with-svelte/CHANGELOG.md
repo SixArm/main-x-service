@@ -9,6 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — masked view + GDPR export UI on the detail page (ORGFE-T2)
+
+The service exposes `GET /{pid}/masked` and `GET /{pid}/export`, but
+nothing in this front-end called either. Added
+`OrganizationRepository.masked(pid)` / `.exportGdpr(pid)`, a
+detail-page "Show masked"/"Show full" toggle that re-fetches through
+the masked endpoint on click rather than redacting client-side
+(copy-adapted from place/event-front-end's equivalent), and an "Export
+data (GDPR)" button that downloads the export envelope as
+`organization-<pid>-export.json`. New i18n keys `detail.showMasked` /
+`detail.showFull` / `detail.maskedNotice` / `detail.exportGdpr` /
+`detail.exportingGdpr` across all 13 locales. New unit + e2e tests,
+verified to fail without the fix. `pnpm test` 77/77 (was 75); `pnpm
+exec playwright test` 12/12 (was 10). See spec/index.md ORGFE-T2.
+
 ### Fixed — `/verify` crashed with a raw 500 when the authentication service was unreachable (ORGFE-T6)
 
 `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch,
