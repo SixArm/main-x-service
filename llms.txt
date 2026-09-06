@@ -70,6 +70,10 @@ GPL-2.0-only OR GPL-3.0-only`; front-ends `MIT OR Apache-2.0` — see
 
 - [link-graph-service-with-loco](link/link-graph-service-with-loco/spec/index.md): Read-model aggregator for cross-service entity linking; carries the family's original OpenTelemetry OTLP exporter
 
+## GitHub Pages
+
+- [main-x-service.github.io/](main-x-service.github.io/index.md): Public documentation front door for this monorepo (SvelteKit + Lily Design System, static/prerendered); published via `git subtree` to a sibling read-only repo, see [spec/monorepo-github-pages/](spec/monorepo-github-pages/index.md)
+
 ## Front-end projects (SvelteKit operator SPAs)
 
 - [person-front-end-with-svelte](person/person-front-end-with-svelte/spec/index.md): Operator UI for Person CRUD/search/match/merge/audit
