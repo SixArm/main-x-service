@@ -56,10 +56,30 @@ async function stubApi(page: Page) {
 
     // Instances endpoints.
     if (path === "/api/instances/caseload" && method === "GET") {
-      return json({ note: "derived caseload", total: 1, by_status: {}, by_urgency: {} });
+      return json({
+        note: "derived caseload",
+        total: 1,
+        by_status: {},
+        by_urgency: {},
+      });
     }
     if (path === `/api/instances/${INSTANCE_PID}/status` && method === "POST") {
       return json({ ...INSTANCE, status: "on_hold" });
+    }
+    if (
+      path === `/api/instances/${INSTANCE_PID}/segments` &&
+      method === "POST"
+    ) {
+      const body = req.postDataJSON() as { label: string };
+      return json({
+        pid: "seg-1",
+        instance_pid: INSTANCE_PID,
+        position: 0,
+        ...body,
+      });
+    }
+    if (path === `/api/instances/${INSTANCE_PID}/clock` && method === "POST") {
+      return json({ ok: true });
     }
 
     // Insight lenses.
@@ -68,7 +88,11 @@ async function stubApi(page: Page) {
         as_of: "2026-07-20T00:00:00Z",
         note: "settings from the DTO's care_setting",
         total: 1,
-        by_setting: { EmergencyDepartment: [{ pid: PID, name: PATHWAY.name, specialty: "stroke" }] },
+        by_setting: {
+          EmergencyDepartment: [
+            { pid: PID, name: PATHWAY.name, specialty: "stroke" },
+          ],
+        },
         by_specialty: { stroke: 1 },
       });
     }
@@ -76,18 +100,36 @@ async function stubApi(page: Page) {
       return json({
         as_of: "2026-07-20T00:00:00Z",
         note: "coverage over condition_codes × care_setting",
-        conditions: [{ condition: "Icd10:I63.9", settings: ["EmergencyDepartment"] }],
-        gaps: [{ rule: "no_primary_care_pathway", detail: "no primary care", condition: "Icd10:I63.9" }],
+        conditions: [
+          { condition: "Icd10:I63.9", settings: ["EmergencyDepartment"] },
+        ],
+        gaps: [
+          {
+            rule: "no_primary_care_pathway",
+            detail: "no primary care",
+            condition: "Icd10:I63.9",
+          },
+        ],
       });
     }
     if (path === "/api/care-pathways/insights/variants") {
-      return json({ as_of: "x", note: "cross-provider variants", variants: [] });
+      return json({
+        as_of: "x",
+        note: "cross-provider variants",
+        variants: [],
+      });
     }
     if (path === "/api/care-pathways/insights/providers") {
       return json({
         as_of: "x",
         note: "provider directory",
-        providers: [{ provider: "trust-1", pathways: 1, by_setting: { EmergencyDepartment: 1 } }],
+        providers: [
+          {
+            provider: "trust-1",
+            pathways: 1,
+            by_setting: { EmergencyDepartment: 1 },
+          },
+        ],
       });
     }
     if (path === "/api/care-pathways/insights/languages") {
@@ -95,7 +137,9 @@ async function stubApi(page: Page) {
         as_of: "x",
         note: "per-language counts over in_language",
         by_language: { en: 1 },
-        single_language_conditions: [{ condition: "Icd10:I63.9", language: "en" }],
+        single_language_conditions: [
+          { condition: "Icd10:I63.9", language: "en" },
+        ],
       });
     }
 
@@ -113,7 +157,10 @@ async function stubApi(page: Page) {
       return json([{ pid: PID, name: PATHWAY.name }]);
     }
 
-    return route.fulfill({ status: 404, json: { error: "unhandled in stub", path } });
+    return route.fulfill({
+      status: 404,
+      json: { error: "unhandled in stub", path },
+    });
   });
 }
 
@@ -123,12 +170,16 @@ test.beforeEach(async ({ page }) => {
 
 test("registry grid renders the seeded pathway", async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
-  await expect(page.getByRole("heading", { name: "Care pathways" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Care pathways" }),
+  ).toBeVisible();
   await expect(page.getByTestId("pathway-grid")).toBeVisible();
   await expect(page.getByText(PATHWAY.name)).toBeVisible();
 });
 
-test("detail page renders the fetched pathway and its instances", async ({ page }) => {
+test("detail page renders the fetched pathway and its instances", async ({
+  page,
+}) => {
   await page.goto(`/${PID}`, { waitUntil: "networkidle" });
   await expect(page.getByRole("heading", { name: PATHWAY.name })).toBeVisible();
   await expect(page.getByTestId("pathway-instances")).toBeVisible();
@@ -151,11 +202,42 @@ test("insights page renders the five lens tables", async ({ page }) => {
   await expect(page.getByText("provider directory")).toBeVisible();
 });
 
-test("board renders the pathway's instances as Kanban cards", async ({ page }) => {
+test("board renders the pathway's instances as Kanban cards", async ({
+  page,
+}) => {
   await page.goto("/board", { waitUntil: "networkidle" });
   await expect(page.getByRole("heading", { name: "Board" })).toBeVisible();
   await expect(page.getByTestId("instance-board")).toBeVisible();
   await expect(page.getByText(SUBJECT).first()).toBeVisible();
+});
+
+test("board: records a segment and starts the clock (CPFE-T3)", async ({
+  page,
+}) => {
+  await page.goto("/board", { waitUntil: "networkidle" });
+  const panel = page.getByTestId("record-segment-panel");
+  await expect(panel).toBeVisible();
+
+  // Nothing selected yet: the clock buttons are disabled.
+  await expect(
+    page.getByRole("button", { name: "Start clock" }),
+  ).toBeDisabled();
+
+  await page.getByTestId("segment-instance").selectOption(INSTANCE_PID);
+  await expect(page.getByRole("button", { name: "Start clock" })).toBeEnabled();
+
+  await page.getByRole("button", { name: "Start clock" }).click();
+  await expect(page.getByTestId("record-success")).toContainText(
+    "Clock started.",
+  );
+
+  await panel.getByLabel("Label").fill("First consultation");
+  await panel.getByLabel("Started at").fill("2026-01-01T09:00");
+  await panel.getByRole("button", { name: "Record segment" }).click();
+
+  await expect(page.getByTestId("record-success")).toContainText(
+    'Segment "First consultation" recorded.',
+  );
 });
 
 test("gantt renders the instance timeline", async ({ page }) => {

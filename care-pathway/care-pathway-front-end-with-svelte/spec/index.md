@@ -297,7 +297,7 @@ for any access/audit requirements.
   Playwright smoke test (API stubbed) exercises the toggle and export
   action.
 
-- [ ] **CPFE-T3 (S) Wire the segment/clock recording UI.** This crate's
+- [x] **CPFE-T3 (S) Wire the segment/clock recording UI.** This crate's
   own `AGENTS.md` already documents `POST /api/instances/{pid}/segments`
   and `POST /api/instances/{pid}/clock` as "client methods; not yet
   wired to a route" — the repository has the calls, no page uses them.
@@ -308,6 +308,25 @@ for any access/audit requirements.
   the existing TBA repository methods. **Acceptance:** vitest pins for
   the new call sites; a Playwright smoke test covers the happy path
   (API stubbed).
+  **Resolved.** Added a "Record a segment" panel to `/board` below the
+  Kanban (independent of which card, if any, is selected there): an
+  instance picker, start/stop clock buttons, and a segment form (label,
+  stage, category, waste, started/ended-at, actor, location, note)
+  calling the existing `TbaRepository.recordSegment`/`.setClock`. The
+  waste/category pairing is guarded client-side (waste disabled and
+  forced `null` on `value_adding`; required on
+  `unnecessary_non_value_adding`), mirroring the service's
+  `tba.rs::validate_segment_fields` rule so a bad combination is caught
+  before the round trip rather than only via a `422`. Literal English
+  labels (not `t()`), matching `/time`'s existing precedent for this
+  data-heavy TBA area. **Acceptance met:** `tests/unit/board.test.ts`
+  (4 new vitest tests: blocked submit with no instance, blocked submit
+  with a required-but-missing waste, a successful segment POST with the
+  right payload shape, and the start-clock button/disabled-state
+  contract) plus a new Playwright case in `tests/e2e/smoke.spec.ts`
+  ("board: records a segment and starts the clock") stubbing both new
+  endpoints end-to-end. Both were confirmed to fail against the
+  pre-fix page (reverted via `git stash`) before the fix landed.
 
 - [ ] **CPFE-T4 (S) Real-time duplicate warning on the create form.**
   Open question in §16 since v0.1, still unaddressed. *(Verified:
