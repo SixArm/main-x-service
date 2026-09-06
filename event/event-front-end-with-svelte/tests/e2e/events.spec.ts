@@ -161,6 +161,48 @@ test.describe("Event front-end smoke", () => {
         await expect(page.getByRole("link", { name: "Audit" })).toBeVisible();
     });
 
+    // Pins T-19: the masked-view toggle re-fetches through
+    // GET /api/events/{id}/masked and back, rather than redacting
+    // client-side — the two stubs return visibly different descriptions
+    // so the test can tell which endpoint actually answered.
+    test("event detail toggles between the plain and masked view", async ({
+        page,
+    }) => {
+        const id = "0c4f1e2a-0000-4000-8000-00000000000a";
+        const base = {
+            id,
+            name: "Annual Conference",
+            start_date: "2026-06-01T09:00:00Z",
+        };
+        await page.route("**/api/events/**", async (route) => {
+            const url = route.request().url();
+            const envelope = url.includes("/masked")
+                ? { success: true, data: { ...base, description: "***REDACTED***" }, error: null }
+                : { success: true, data: { ...base, description: "Full conference details" }, error: null };
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify(envelope),
+            });
+        });
+
+        await page.goto(`/events/${id}`);
+        await expect(page.getByText("Full conference details")).toBeVisible();
+        await expect(
+            page.getByText("Showing the masked view"),
+        ).not.toBeVisible();
+
+        await page.getByRole("button", { name: "Show masked" }).click();
+        await expect(page.getByText("***REDACTED***")).toBeVisible();
+        await expect(page.getByText("Showing the masked view")).toBeVisible();
+
+        await page.getByRole("button", { name: "Show full" }).click();
+        await expect(page.getByText("Full conference details")).toBeVisible();
+        await expect(
+            page.getByText("Showing the masked view"),
+        ).not.toBeVisible();
+    });
+
     // Pins FR-6: the edit page renders its shell heading even before the
     // record loads (the EventForm fills in once the GET resolves).
     test("edit page renders its heading", async ({ page }) => {

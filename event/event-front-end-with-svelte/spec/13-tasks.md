@@ -18,7 +18,25 @@
 - [x] T-16: Theming tokens in `app.css` extracted to a small theme module. *(closed as won't-do, 2026-09-03 — repo `tasks.md` WEB-6)* Superseded by the Lily `ThemePicker` adopted 2026-07-31 (`src/routes/+layout.svelte` imports it from `lily-design-system-svelte-theme-picker` and offers the DaisyUI theme ids), which is the theming mechanism now. The 42 `--mxi-*` custom properties in `src/app.css` `:root` are the contract components consume, and CSS is where custom properties belong; a JS "theme module" would re-export what the stylesheet already provides and add a second place for the same values to drift.
 - [x] T-17: `check-duplicates` endpoint wired into create form (preview before commit). *(closed as superseded by T-6, 2026-09-03 — repo `tasks.md` WEB-6)* `POST /api/events` already runs the identical duplicate check (`check_duplicates_internal` is the same function behind both routes) and answers `409` **with the candidate matches, creating nothing** — and `/events/new` renders them inline (T-6). The create is therefore already the preview: a pre-submit `checkDuplicates()` call would run the matcher a second time to show the same list. What the investigation did surface is different and belongs to the **service**, not this front-end: neither the API nor the form offers any way to create past a `409` — a legitimate near-duplicate can never be created through the UI, because no override exists to wire a button to. That is an authorisation question (an override is `destructive`-class work), recorded under WEB-6 for the service specs to take up if a deployment needs it.
 - [ ] T-18: Batch deduplicate-scan results UI.
-- [ ] T-19: Masked-view toggle on detail page.
+- [x] T-19: Masked-view toggle on detail page. *(resolved 2026-09-06)*
+  `EventRepository.masked()` (`GET /api/events/{id}/masked`) already
+  existed but was never wired into `/events/[id]/+page.svelte` — the
+  detail page only ever called `repo.get(id)`, unlike place-front-end's
+  equivalent T-19, which was the copy-adapt source here. A button in
+  the header (`aria-pressed={masked}`, labelled "Show masked"/"Show
+  full") re-fetches through the masked endpoint on toggle rather than
+  redacting client-side, and a banner ("Showing the masked view — some
+  fields are redacted.") appears while the masked view is shown. New
+  i18n keys `detail.showMasked` / `detail.showFull` /
+  `detail.maskedNotice` across all 13 locales (reusing place-front-end's
+  translations for parity). A new `tests/unit/events.test.ts` case pins
+  `masked()` GETs `/api/events/{id}/masked`; a new
+  `tests/e2e/events.spec.ts` case stubs plain vs. masked responses
+  (distinguished by `/masked` in the URL, different `description`
+  values) and toggles both ways, verified to fail (timeout waiting for
+  the "Show masked" button) with the page change reverted and pass with
+  it restored. `npm test` 61/61 (was 60); `npx playwright test` 14/14
+  (was 13); `npm run check` / `npm run lint` clean.
 - [x] T-20: GDPR-export download button. *(2026-09-03, repo `tasks.md` WEB-5 — copy-adapted from person's reference)* A button on `/events/[id]` calls the existing `EventRepository.exportGdpr(id)` (`GET /api/events/{id}/export`) and hands the service-defined payload to the browser as a downloaded `event-<id>-export.json` — serialised verbatim, never interpreted, through a Blob object URL and a synthetic anchor (revoked once the click has fired). An `exporting` state disables the button while the request is in flight; errors go to the existing banner. New keys `detail.exportGdpr` / `detail.exportingGdpr` ×13 locales.
   - **Acceptance:** `tests/unit/events.test.ts` pins `exportGdpr()` GETs `/api/events/{id}/export` and returns the payload unchanged; a Playwright smoke test stubs the endpoint, clicks the button, awaits the browser `download` event, and asserts both the suggested filename and that the saved bytes parse back to the stubbed payload.
 - [ ] T-21: Validate the SVAR licensing fit (free GPL-3.0 vs Pro) — see §16 OQ-1.

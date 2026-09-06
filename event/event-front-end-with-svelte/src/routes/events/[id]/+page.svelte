@@ -1,9 +1,13 @@
 <!--
   Event detail page (route "/events/[id]") — loads one event by id and
   renders its identity, locations, parties, identifiers, and offers, with
-  edit/audit/delete actions.
+  edit/audit/delete actions. A masked-view toggle (T-19) re-fetches
+  through GET /api/events/{id}/masked instead of the plain record.
 
   State ($state): the loaded event, error, and loading flag.
+    - masked — whether the masked view is currently shown; re-fetches on
+      toggle rather than masking client-side, so this always reflects
+      the server's actual masking rules.
   Derived ($derived): `id` read from the route param.
 -->
 <script lang="ts">
@@ -19,20 +23,35 @@
     let error = $state<string | null>(null);
     let loading = $state(true);
     let exporting = $state(false);
+    let masked = $state(false);
 
     // Route param identifying which event to display.
     const id = $derived(page.params.id as string);
 
-    // Fetch the event once on mount.
-    onMount(async () => {
+    // Fetch the plain or masked record depending on `masked`, replacing
+    // whatever is currently shown. Shared by the initial load and the
+    // toggle handler so both go through one code path.
+    async function load() {
+        loading = true;
+        error = null;
         try {
-            event = await repo.get(id);
+            event = masked ? await repo.masked(id) : await repo.get(id);
         } catch (err) {
             error = err instanceof Error ? err.message : String(err);
         } finally {
             loading = false;
         }
-    });
+    }
+
+    // Flip the toggle and re-fetch through the new endpoint (T-19). A
+    // dedicated request per view, not client-side redaction — the
+    // server, not this page, decides what counts as sensitive.
+    function toggleMasked() {
+        masked = !masked;
+        void load();
+    }
+
+    onMount(load);
 
     // Soft-delete after a confirm prompt, then return to the list.
     async function handleDelete() {
@@ -104,6 +123,9 @@
     <header class="row" style="justify-content: space-between">
         <h1>{event.name}</h1>
         <div class="row">
+            <button class="button" aria-pressed={masked} onclick={toggleMasked}>
+                {masked ? t("detail.showFull") : t("detail.showMasked")}
+            </button>
             <a href={`/events/${id}/edit`} class="button">{t("detail.edit")}</a>
             <a href={`/events/${id}/audit`} class="button"
                 >{t("detail.audit")}</a
@@ -120,6 +142,10 @@
             >
         </div>
     </header>
+
+    {#if masked}
+        <div class="banner" role="status">{t("detail.maskedNotice")}</div>
+    {/if}
 
     <section class="surface stack">
         <h2>{t("detail.identity")}</h2>

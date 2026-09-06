@@ -177,6 +177,23 @@ describe("EventRepository", () => {
         expect(result.total).toBe(1);
     });
 
+    // Pins T-19: masked() GETs the dedicated /masked endpoint rather than
+    // requesting the plain record and redacting client-side.
+    it("GETs /api/events/{id}/masked on masked()", async () => {
+        let capturedUrl = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                capturedUrl = String(input);
+                return jsonResponse({ success: true, data: sampleEvent, error: null });
+            }),
+        });
+        const repo = new EventRepository(client);
+        const result = await repo.masked("event-1");
+        expect(capturedUrl).toContain("/api/events/event-1/masked");
+        expect(result.id).toBe("event-1");
+    });
+
     // Pins: health() targets the /api/health endpoint.
     it("uses /api/health for health-check", async () => {
         let capturedUrl = "";
