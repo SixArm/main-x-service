@@ -825,15 +825,22 @@ impl MatchingEngine {
     }
 
     /// Compare two addresses as a weight-renormalised blend of postcode,
-    /// city, and street-line similarity.
+    /// city, street-line, and (OQ-L) line 2 / county / country similarity.
     ///
-    /// The three sub-components carry fixed weights — postcode `0.5`, city
-    /// `0.3`, line 1 `0.2` — but only the components present on *both* sides
-    /// participate, and the result is renormalised by the participating
-    /// weight so a postcode-only comparison still spans the full `[0.0, 1.0]`
-    /// range. Postcode is compared as exact equality after
-    /// whitespace/case normalisation; city via Jaro-Winkler on normalised
-    /// names; line 1 via a 0.6 street-similarity / 0.4 house-number-equality
+    /// The primary sub-components carry fixed weights — postcode `0.5`,
+    /// city `0.3`, line 1 `0.2` — and the three OQ-L supporting fields add
+    /// `0.1` (line 2), `0.1` (county), `0.05` (country) on top; only the
+    /// components present on *both* sides participate, and the result is
+    /// renormalised by the participating weight so a postcode-only
+    /// comparison still spans the full `[0.0, 1.0]` range and the OQ-L
+    /// fields never change a score when absent (the overwhelmingly common
+    /// case — they are additive, not a redistribution of the original
+    /// three). Postcode is compared as exact equality after
+    /// whitespace/case normalisation; city / line 2 / county / country via
+    /// Jaro-Winkler on normalised names (line 2 / county / country also
+    /// require the normalised form to be non-empty on both sides, so a
+    /// shared blank value cannot score a spurious `1.0` — see the call
+    /// site); line 1 via a 0.6 street-similarity / 0.4 house-number-equality
     /// blend (falling back to street-only when a house number is absent on
     /// either side). When no sub-component fires, returns the neutral `0.5`
     /// rather than `0.0`, so an empty-vs-empty address is treated as "no
@@ -876,6 +883,48 @@ impl MatchingEngine {
             };
             weighted_sum += line1_score * 0.2;
             total_weight += 0.2;
+        }
+
+        // Low-weight supporting fields (OQ-L): line 2, county, and country
+        // are real corroborating signal but weaker than postcode/city/line 1
+        // (line 2 is often absent or purely incidental — a flat number, a
+        // care-of; county and country are coarse and shared by many
+        // unrelated places), so each carries a small sub-weight and only
+        // participates when populated on *both* sides — same
+        // weight-renormalised-average treatment as the three fields above.
+        // Each is guarded against a shared **blank** value scoring a
+        // spurious `1.0` (`Scorer::jaro_winkler_similarity("", "")` returns
+        // `1.0` by design — the empty-pair identity case): normalise first,
+        // then require the normalised form to be non-empty on both sides
+        // before it contributes, mirroring `local_id_score`'s "a blank
+        // value on both sides must never count as shared identity" rule
+        // (spec §6.7a). `city`/line 1 above predate this guard and are
+        // left as they were found — see the OQ-L changelog entry.
+        if let (Some(line2_a), Some(line2_b)) = (&addr1.line2, &addr2.line2) {
+            let norm1 = Normalizer::normalize_name(line2_a);
+            let norm2 = Normalizer::normalize_name(line2_b);
+            if !norm1.is_empty() && !norm2.is_empty() {
+                weighted_sum += Scorer::jaro_winkler_similarity(&norm1, &norm2) * 0.1;
+                total_weight += 0.1;
+            }
+        }
+
+        if let (Some(county1), Some(county2)) = (&addr1.county, &addr2.county) {
+            let norm1 = Normalizer::normalize_name(county1);
+            let norm2 = Normalizer::normalize_name(county2);
+            if !norm1.is_empty() && !norm2.is_empty() {
+                weighted_sum += Scorer::jaro_winkler_similarity(&norm1, &norm2) * 0.1;
+                total_weight += 0.1;
+            }
+        }
+
+        if let (Some(country1), Some(country2)) = (&addr1.country, &addr2.country) {
+            let norm1 = Normalizer::normalize_name(country1);
+            let norm2 = Normalizer::normalize_name(country2);
+            if !norm1.is_empty() && !norm2.is_empty() {
+                weighted_sum += Scorer::jaro_winkler_similarity(&norm1, &norm2) * 0.05;
+                total_weight += 0.05;
+            }
         }
 
         if total_weight == 0.0 {
@@ -1648,6 +1697,79 @@ mod tests {
         let b = Address::new().with_postcode("CF10 1AA");
         let s = MatchingEngine::compare_addresses(&a, &b);
         assert!((s - 1.0).abs() < 1e-9);
+    }
+
+    // ---------- address line 2 / county / country (OQ-L) ----------
+
+    // Pins spec §6.4 (OQ-L) — each of line2/county/country only
+    // participates when populated on both sides, and an identical value
+    // on each alone (nothing else populated) scores the sub-component's
+    // full weight, i.e. 1.0 overall (the only participating component).
+    #[test]
+    fn address_line2_county_country_each_score_alone_when_only_field_present() {
+        let a = Address::new().with_line2("Flat 2");
+        let b = Address::new().with_line2("Flat 2");
+        assert!((MatchingEngine::compare_addresses(&a, &b) - 1.0).abs() < 1e-9);
+
+        let a = Address::new().with_county("South Glamorgan");
+        let b = Address::new().with_county("South Glamorgan");
+        assert!((MatchingEngine::compare_addresses(&a, &b) - 1.0).abs() < 1e-9);
+
+        let a = Address::new().with_country("Wales");
+        let b = Address::new().with_country("Wales");
+        assert!((MatchingEngine::compare_addresses(&a, &b) - 1.0).abs() < 1e-9);
+    }
+
+    // A postcode match plus a line2/county/country mismatch must still
+    // renormalise correctly rather than crashing the score out of range —
+    // and the OQ-L fields' small weight must not overpower postcode.
+    #[test]
+    fn address_line2_county_country_absent_on_one_side_does_not_participate() {
+        let with_county = Address::new()
+            .with_postcode("CF10 1AA")
+            .with_county("South Glamorgan");
+        let without_county = Address::new().with_postcode("CF10 1AA");
+        let s = MatchingEngine::compare_addresses(&with_county, &without_county);
+        // Only postcode participates (county is one-sided) → full weight.
+        assert!((s - 1.0).abs() < 1e-9, "got {s}");
+    }
+
+    // County disagreement pulls the score down but stays bounded, and
+    // postcode (weight 0.5) still dominates over county (weight 0.1).
+    #[test]
+    fn address_county_mismatch_pulls_score_down_but_postcode_dominates() {
+        let a = Address::new()
+            .with_postcode("CF10 1AA")
+            .with_county("South Glamorgan");
+        let b = Address::new()
+            .with_postcode("CF10 1AA")
+            .with_county("Powys");
+        let s = MatchingEngine::compare_addresses(&a, &b);
+        assert!((0.0..1.0).contains(&s), "got {s}");
+        assert!(s > 0.5, "postcode agreement should still dominate: got {s}");
+    }
+
+    // SEC-M2: a blank line2/county/country shared by both sides must not
+    // score a spurious 1.0 the way `jaro_winkler_similarity("", "")`
+    // would if fed directly — the sub-component must not participate at
+    // all when either side normalises to empty, mirroring
+    // `local_id_score`'s "blank on both sides is not shared identity" rule.
+    #[test]
+    fn address_blank_line2_county_country_do_not_score_spurious_identity() {
+        let a = Address::new()
+            .with_line2("   ")
+            .with_county("   ")
+            .with_country("   ");
+        let b = Address::new()
+            .with_line2("   ")
+            .with_county("   ")
+            .with_country("   ");
+        // None of the three participate (all blank-after-normalise on both
+        // sides), and no other sub-component is populated either, so the
+        // whole address falls back to the neutral 0.5 — never a spurious
+        // 1.0 from three "matching" blanks.
+        let s = MatchingEngine::compare_addresses(&a, &b);
+        assert!((s - 0.5).abs() < 1e-9, "got {s}");
     }
 
     // ---------- phonetic ----------

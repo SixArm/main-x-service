@@ -7,7 +7,6 @@ The following design questions are deliberately unresolved. Proposing a resoluti
 - **OQ-C — Multi-polygon / area definitions.** `area_as_metre_2` is scalar. Should `Place` gain an optional polygonal extent (WKT, GeoJSON, `Vec<(f64, f64)>`) and a point-in-polygon / overlap scorer?
 - **OQ-D — Locale-aware street-type vocabulary.** Should `expand_street_abbreviations` gain locale vocabularies for `rue` / `straße` / `via` / `calle` / `straat`? If so: opt-in field, Cargo feature, or always-on?
 - **OQ-E — Phonetic-encoder choice.** American Soundex is English-tuned. Add Double Metaphone or Daitch-Mokotoff behind a Cargo feature, default unchanged?
-- **OQ-G — Address `line2`, `county`, `country` scoring.** These are stored but not scored (§6.4). Should they contribute, and with what sub-weights?
 - **OQ-H — Per-category default for `coordinates_scale_metres`.** The `50.0` m default suits venue precision; dense urban chains may need a per-category default.
 
 The following are grounded follow-up **tasks** rather than open design
@@ -88,22 +87,42 @@ checklist — see `spec/index.md`'s table of contents, §1–§13 with no
   updated in the same change. This resolves OQ-F, removed from the
   list above.
 
-- **OQ-L (task, S) — Resolve OQ-G: score address `line2`/`county`/
-  `country` as low-weight supporting fields.** These three fields are
-  stored on `Address` but never read by `src/scorer.rs`'s address
-  scoring, per the spec's own §6.4 note this open question already
-  cites. *(verified: `grep -n "line2\|county\|country"
-  src/scorer.rs` returns nothing — the address scorer only reads
-  `line1`/`locality`/`region`/`postcode`.)* **Acceptance:** each of
-  `line2`/`county`/`country` contributes a small sub-weight within the
-  existing weighted field-by-field address score (only when present on
-  both sides, per the crate's "only fields present in both records
-  contribute" rule), with the address component's own weight unchanged
-  in `MatchConfig`'s top-level sum (so this is a redistribution within
-  address scoring, not a new top-level component); unit tests cover
-  each field's presence/absence contribution; `cargo test` + clippy
-  pedantic clean; spec §6.4 updated (this closes OQ-G — remove it from
-  the list above once landed).
+- ~~**OQ-L (task, S) — Resolve OQ-G: score address `line2`/`county`/
+  `country` as low-weight supporting fields.**~~ — **RESOLVED.** These
+  three fields are stored on `Address` but were never read by address
+  scoring — *(verified, with one correction to the task's own claim:
+  the scoring function is `MatchingEngine::compare_addresses` in
+  `src/matcher.rs`, not `src/scorer.rs` as originally cited, and the
+  existing fields it reads are `postcode`/`city`/`line1`, not
+  `locality`/`region`; `grep -n "line2\|county\|country"
+  src/matcher.rs` before this change confirmed the three were absent
+  from that function).* Each of `line2` (`0.1`), `county` (`0.1`),
+  `country` (`0.05`) now contributes a small sub-weight in
+  `compare_addresses`'s existing weight-renormalised average, only when
+  populated on both sides. **Chosen interpretation of "redistribution
+  within address scoring, not a new top-level component":** the three
+  new sub-weights are **additive** on top of the unchanged
+  `postcode`/`city`/`line1` weights (`0.5`/`0.3`/`0.2`, still summing to
+  `1.0` among themselves) rather than shrinking them to make room — this
+  keeps `address_score` for the overwhelmingly common case (line2/
+  county/country absent) byte-identical to before, and satisfies "not a
+  new top-level component" because `MatchConfig::address_weight` itself
+  is untouched; a true redistribution would have silently changed every
+  existing address comparison that never populates the three new
+  fields. Each is guarded against a shared **blank** value scoring a
+  spurious `1.0` (`Scorer::jaro_winkler_similarity("", "")` is `1.0` by
+  design) — normalise first, then require non-empty on both sides,
+  mirroring `local_id_score`'s "blank on both sides is not shared
+  identity" rule (§6.7a); `city`/line 1 predate this guard and were left
+  as found (a separate, narrower finding, not in this task's scope).
+  Four new unit tests in `src/matcher.rs` (each field alone; one-sided
+  presence doesn't participate; a real mismatch stays bounded and
+  postcode still dominates; three blank values together fall back to
+  the neutral `0.5`, not a spurious near-1.0). `cargo test` (173 lib
+  tests, up from 169; 97 integration/doctest) + `cargo clippy
+  --all-targets -- -D warnings` + `cargo fmt --check` + `cargo doc
+  --no-deps` all clean. §6.4 updated; this closes OQ-G, removed from
+  the list above.
 
 ---
 
