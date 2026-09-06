@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — pin OQ-7's `total_weight` phonetic-bonus semantics (T-38)
+
+`total_weight` (the probabilistic-average denominator) has always
+gained the phonetic bonus's `0.05` weight only when the bonus condition
+holds (`phonetic_name_score > 0.9`), never unconditionally — but this
+was documented intent (§22 OQ-7, "current behaviour is judged correct")
+with no test pinning it. New
+`matcher::tests::total_weight_includes_phonetic_bonus_only_when_bonus_applies`
+constructs two fixtures (phonetic mean `0.5` vs `1.0`) and asserts the
+score matches only the "excluded unless applied" formula, derived from
+each fixture's own real sub-scores. Verified to fail when the guard is
+temporarily loosened to always include the bonus. OQ-7 marked
+Resolved, cross-referenced from `agents/matching-algorithm.md`. `cargo
+test` 418/418 (was 417); `cargo clippy --all-targets -- -D warnings` /
+`cargo fmt --check` clean. See spec/23-tasks-and-acceptance-criteria.md
+T-38.
+
 ### Fixed — doc drift: stale MSRV 1.95/N-3 reference (2026-09-06)
 
 `Cargo.toml` already declares `rust-version = "1.96"` (matching

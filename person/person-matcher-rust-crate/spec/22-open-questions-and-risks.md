@@ -3,7 +3,7 @@
 Open questions are tracked here until resolved.
 
 - **OQ-1..OQ-6 — Resolved.** Middle-name scoring (T-25 / FR-49); email + `local_id` (T-11 / FR-35/36); `#[non_exhaustive]` on `Person` / `Address` (T-8 / FR-53); address sub-score weighted average (T-3 / §12); strict-mode enforcement (T-4 / FR-47); `MatchingError` cleanup leaving only `MissingField` (T-13).
-- **OQ-7 — Open.** Should the phonetic bonus participate in `total_weight` only when applied (current) or always? Current behaviour is judged correct; the OQ tracks the intent to document it explicitly.
+- **OQ-7 — Resolved (T-38).** The phonetic bonus participates in `total_weight` only when it applies (i.e. only when `phonetic_name_score > 0.9`), never unconditionally just because a phonetic score was computed — pinned byte-for-byte by `matcher::tests::total_weight_includes_phonetic_bonus_only_when_bonus_applies` in `src/matcher.rs`, and documented in `agents/matching-algorithm.md`'s Probabilistic Scoring Pipeline (§12.3).
 
 ### 22.1 Risks
 
