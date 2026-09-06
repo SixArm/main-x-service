@@ -35,6 +35,9 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | DELETE | `/api/cases/{pid}` | Soft-delete |
 | POST | `/api/cases/match` | Rank a `{query, candidates}` set |
 | POST | `/api/cases/check-duplicates` | Match a query against stored cases |
+| POST | `/api/cases/deduplicate` | Batch-scan stored cases (search-blocked); persist candidates to the stored review queue |
+| GET | `/api/cases/review-queue` | Stored review queue (filter `status`, `limit`) |
+| POST | `/api/cases/review-queue/{id}/decision` | Decide a pending review item (`confirmed` / `rejected`) |
 | POST | `/api/cases/merge` | Merge a duplicate into a survivor (`422` equal pids, `404` unknown) |
 | GET | `/api/cases/merges/recent` | Merge-history records |
 | GET | `/api/cases/whoami` | Verified PASETO-token claims (`401` without one) |
@@ -164,7 +167,7 @@ src/
 ├── app.rs                 loco Hooks (routes, truncate, spawns the outbox relay)
 ├── bin/main.rs            loco CLI entrypoint
 ├── version.rs             Accepts-version header negotiation (api-versioning.md)
-├── controllers/cases.rs   CRUD + match + check-duplicates + merge + audit/events/verify + erase + whoami
+├── controllers/cases.rs   CRUD + match + check-duplicates + deduplicate + review-queue + merge + audit/events/verify + erase + whoami
 ├── controllers/links.rs   cross-service `subject_of` edges (§8.6): create/list/delete + bulk pull
 ├── controllers/fhir.rs    FHIR R5 `Task` CRUD + search + CapabilityStatement
 ├── controllers/compliance.rs  service identification + SBOM (`/api/compliance*`)

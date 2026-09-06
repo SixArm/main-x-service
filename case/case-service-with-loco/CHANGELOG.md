@@ -9,6 +9,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — batch `POST /api/cases/deduplicate` endpoint (T-7)
+
+`src/auth.rs::DESTRUCTIVE_POST_SUFFIXES` has listed `/deduplicate` as a
+destructive-action path since ABAC landed, but no handler existed
+behind it. Added `deduplicate` to `src/controllers/cases.rs`: it loads
+up to `CHECK_DUPLICATES_SCAN_CAP` (1000, previously a dead constant
+kept only for a unit test) active cases as scan seeds, and for each
+seed asks the search index for its own blocked candidates — the same
+fuzzy-title/exact-identifier/phonetic routes `check-duplicates` already
+uses — rather than comparing every pair, so the batch scan doesn't
+reintroduce the O(n²) scale cliff Tantivy blocking was built to remove
+(T-6). Hits are persisted through the existing `review_queue::upsert`
+at `provenance = "operator"`, composing directly with T-8's
+`GET /review-queue` / `POST /review-queue/{id}/decision` endpoints.
+New DB-gated test `tests/requests/cases.rs::
+deduplicate_finds_and_queues_a_stored_pair` proves the full round trip
+against a real Postgres, including that a re-scan upserts rather than
+duplicates. See spec/index.md T-7.
+
 ### Fixed — doc drift: stale "check-duplicates has no search-backed blocking yet" comment (2026-09-06)
 
 `CHECK_DUPLICATES_SCAN_CAP`'s doc comment (`src/controllers/cases.rs`)
