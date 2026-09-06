@@ -1158,6 +1158,20 @@ organization is not a data subject.
     failed; `cargo test --lib`: 203 passed (unchanged), 0 failed;
     `cargo build`/`clippy --all-targets -- -D warnings` clean.
 
+- [x] **Doc drift: stale MSRV 1.95 / N-3 reference (2026-09-06).** The
+  2026-08-20 entry above said `rust-version = "1.95"` and "current
+  stable minus three," matching the repository's MSRV policy at the
+  time it was written (even though it already linked to
+  `spec/rust-msrv-n-minus-2/index.md`, an inconsistency in the entry
+  itself). The policy has since tightened to **N-2**, and `Cargo.toml`
+  already declares `rust-version = "1.96"` — the entry above is left
+  as-written (it is a dated record of what was true then) rather than
+  edited to claim a value it never actually set; this entry is the
+  correction, matching the pattern already used for `CHANGELOG.md`'s
+  equivalent fix. No behaviour change; `Cargo.toml`, `ci/msrv.txt`, and
+  `scripts/ci-check.sh msrv` all already agreed on 1.96 before this
+  entry — only the prose here was stale.
+
 ## 14. Implementation status
 
 Done: loco boot; organizations table + migration; CRUD (blank name →
