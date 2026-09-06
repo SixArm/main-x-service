@@ -9,6 +9,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — audit-trail view on the detail page (ORGFE-T3)
+
+The service exposes `GET /{pid}/audit`, but no route or repository
+method called it. Added `OrganizationRepository.audit(pid)` + an
+`AuditEntry` type, and a lazily-loaded "Show audit trail" toggle on the
+detail page rendering entries newest-first — copy-adapted from
+care-pathway-front-end-with-svelte's equivalent panel. New i18n keys
+across all 13 locales. New unit test pins the repository method; three
+new e2e tests cover the toggle's loading/empty/error states, verified
+to fail without the fix. `pnpm test` 78/78 (was 77); `pnpm exec
+playwright test` 15/15 (was 12). See spec/index.md ORGFE-T3.
+
 ### Added — masked view + GDPR export UI on the detail page (ORGFE-T2)
 
 The service exposes `GET /{pid}/masked` and `GET /{pid}/export`, but

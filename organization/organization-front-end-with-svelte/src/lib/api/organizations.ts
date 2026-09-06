@@ -4,6 +4,7 @@ import { API_BASE_URL } from "$lib/config";
 import { ApiClient } from "./client";
 import type { Page, PageRequest } from "./client";
 import type {
+  AuditEntry,
   BatchDeduplicationResponse,
   MatchRankResult,
   MergeRecordRow,
@@ -94,6 +95,17 @@ export class OrganizationRepository {
   masked(pid: string): Promise<Organization> {
     return this.http.get<Organization>(
       `/api/organizations/${encodeURIComponent(pid)}/masked`,
+    );
+  }
+
+  /**
+   * `GET /api/organizations/{pid}/audit` — the audit trail for one
+   * organization (service orders newest first).
+   * @returns The audit-log entries for the organization.
+   */
+  audit(pid: string): Promise<AuditEntry[]> {
+    return this.http.get<AuditEntry[]>(
+      `/api/organizations/${encodeURIComponent(pid)}/audit`,
     );
   }
 
