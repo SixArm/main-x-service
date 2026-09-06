@@ -71,10 +71,55 @@ test.describe("Worker front-end smoke", () => {
         await expect(page.getByRole("heading", { name: "Expiries" })).toBeVisible();
         const calendar = page.getByTestId("expiry-calendar");
         await expect(calendar).toBeVisible();
+        // total === items.length (1) here: no truncation notice.
+        await expect(page.getByTestId("expiry-truncation-notice")).toBeHidden();
 
         // The one event this fixture produces: "Bennet — Passport".
         await calendar.getByText("Bennet", { exact: false }).click();
         await expect(page).toHaveURL(`/workers/${id}`);
+    });
+
+    // Pins T-29: `/expiry`'s search is a capped window (limit 200), not a
+    // promise of completeness. When the service reports more workers than
+    // fit in that window (`total > items.length`), a truncation notice
+    // must say so rather than silently showing a partial calendar.
+    test("expiry calendar shows a truncation notice when the window is partial", async ({
+        page,
+    }) => {
+        const id = "0c4f1e2a-0000-4000-8000-00000000000f";
+        const today = new Date();
+        const dayInThisMonth = new Date(today.getFullYear(), today.getMonth(), 16)
+            .toISOString()
+            .slice(0, 10);
+        const worker = {
+            id,
+            name: { family: "Osei", given: ["Ama"] },
+            gender: "female",
+            documents: [
+                {
+                    document_type: "Passport",
+                    number: "Y7654321",
+                    expiry_date: dayInThisMonth,
+                },
+            ],
+        };
+        await page.route("**/api/workers/search**", async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({
+                    success: true,
+                    data: { items: [worker], total: 250 },
+                    error: null,
+                }),
+            });
+        });
+
+        await page.goto("/expiry");
+        await expect(page.getByRole("heading", { name: "Expiries" })).toBeVisible();
+        const notice = page.getByTestId("expiry-truncation-notice");
+        await expect(notice).toBeVisible();
+        await expect(notice).toHaveText("Showing up to 1 of 250 workers");
     });
 
     // Pins: the workers list shows its heading, the search box, and the

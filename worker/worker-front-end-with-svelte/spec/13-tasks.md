@@ -221,18 +221,26 @@
     covers this component), `npx playwright test` (16 passed, up from
     15), `npm run check` (0 errors), `npm run lint` clean.
 
-- [ ] T-29: **Expiry-calendar truncation indicator.** `/expiry`'s
-  `onMount` calls `repo.search({ q: "*", limit: 200 })` and only reads
-  `res.items`, discarding `res.total` even though
-  `WorkerRepository.search()` already returns `{ items, total }`
-  (verified: `src/lib/api/workers.ts` lines 82-100). When more than 200
-  workers carry documents, the calendar silently shows a partial
-  window with no signal to the operator — the code comment even names
-  this ("a window, not a promise of completeness") but nothing in the
-  UI says so. Surface `res.total` (e.g. "showing up to 200 of N
-  workers") when it exceeds the fetched count.
-  - **Acceptance:** a component/unit test pins that the truncation
-    notice appears when `total > items.length` and is absent otherwise.
+- [x] T-29: **Expiry-calendar truncation indicator.** *(resolved
+  2026-09-06.)* `/expiry`'s `onMount` called `repo.search({ q: "*",
+  limit: 200 })` and only read `res.items`, discarding `res.total` even
+  though `WorkerRepository.search()` already returns `{ items, total
+  }`. When more than 200 workers carried documents, the calendar
+  silently showed a partial window with no signal to the operator —
+  the code comment even named this ("a window, not a promise of
+  completeness") but nothing in the UI said so.
+  - **Resolved.** `res.total` is now kept in a `total` state variable;
+    a `truncated = $derived(total > records.length)` drives a visible
+    notice (`data-testid="expiry-truncation-notice"`, new i18n key
+    `expiry.truncationNotice` across all 13 locales, interpolated via
+    `tf`) shown above the calendar whenever the window is genuinely
+    partial.
+  - **Acceptance:** a Playwright test pins that the truncation notice
+    appears when `total > items.length` (stubbing `{items, total: 250}`
+    with 1 item) and is absent when `total === items.length` (the
+    existing T-28 test, which now additionally asserts the notice is
+    hidden). Verified to fail without the fix (temporarily reverting
+    `total = res.total`) and pass with it.
 
 - [x] T-30: **Test coverage for the phonetic search toggle.** *(resolved
   2026-09-05.)* `/workers` offers a `phonetic` checkbox alongside
