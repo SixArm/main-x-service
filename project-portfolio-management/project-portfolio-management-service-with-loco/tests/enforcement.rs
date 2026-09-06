@@ -208,6 +208,43 @@ async fn enforcement_on_gates_the_real_router() {
             200,
             "access=write may create"
         );
+
+        // SEC-PPM-3: the oversight bulk-read endpoints (board pack,
+        // board investments, auditor trail, evidence pack) are gated as
+        // a privileged (Action::Destructive) read, not just the
+        // blanket read-allow default a plain caller gets on `/api/plans`
+        // above — the built-in default policy grants `destructive` only
+        // to `access=admin` or `svc=true`.
+        let oversight_paths = [
+            "/api/board/pack",
+            "/api/board/investments",
+            "/api/auditor/trail",
+            "/api/auditor/evidence-pack",
+        ];
+        for path in oversight_paths {
+            let (pk, pv) = auth_header(&mint(&kid, &[]));
+            assert_eq!(
+                request.get(path).add_header(pk, pv).await.status_code(),
+                403,
+                "{path} denies a plain-read-tier caller (SEC-PPM-3)"
+            );
+        }
+        for path in oversight_paths {
+            let (ak, av) = auth_header(&mint(&kid, &[("access", &["admin"])]));
+            assert_eq!(
+                request.get(path).add_header(ak, av).await.status_code(),
+                200,
+                "{path} allows an access=admin caller (SEC-PPM-3)"
+            );
+        }
+        for path in oversight_paths {
+            let (sk, sv) = auth_header(&mint(&kid, &[("svc", &["true"])]));
+            assert_eq!(
+                request.get(path).add_header(sk, sv).await.status_code(),
+                200,
+                "{path} allows a svc=true caller (SEC-PPM-3)"
+            );
+        }
     })
     .await;
 

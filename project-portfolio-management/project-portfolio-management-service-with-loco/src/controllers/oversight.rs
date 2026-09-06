@@ -53,6 +53,35 @@ macro_rules! live {
     };
 }
 
+/// Authorise one of the oversight bulk-read endpoints (SEC-PPM-3) as a
+/// privileged read: [`Action::Destructive`], which the built-in default
+/// policy grants only to a machine peer (`svc=true`) or an `admin`
+/// caller — mirroring case-service's `authorize_bulk` for its analogous
+/// `subject_of` bulk dump (SEC-G1). These four endpoints (`board_pack`,
+/// `board_investments`, `auditor_trail`, `evidence_pack`) each expose
+/// the full audit trail or board investment register with no
+/// per-record scope to key a finer check on, so — unlike the
+/// per-`{pid}` reads elsewhere in this crate — the coarse blanket-guard
+/// `read` tier is not enough: under the built-in default ABAC policy
+/// every authenticated caller can read, which would let any signed-in
+/// caller pull the whole estate. A no-op when
+/// `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` is off, matching every
+/// other authorisation in this service.
+fn authorize_oversight_read(caller: &MaybeAuthUser) -> Result<()> {
+    authorize_record(
+        caller,
+        Action::Destructive,
+        &std::collections::BTreeMap::new(),
+    )
+    .map_err(|(status, reason)| {
+        Error::CustomError(
+            status,
+            loco_rs::controller::ErrorDetail::new("forbidden", reason),
+        )
+    })?;
+    Ok(())
+}
+
 /// A `?from=&to=` window (dates or RFC 3339 instants); defaults to the
 /// trailing 90 days.
 #[derive(Debug, Deserialize)]
@@ -112,8 +141,10 @@ fn money_lines(rows: &[&budget_lines::Model]) -> Vec<insights::MoneyLine> {
 async fn board_pack(
     axum::extract::Query(query): axum::extract::Query<WindowQuery>,
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     headers: HeaderMap,
 ) -> Result<Response> {
+    authorize_oversight_read(&caller)?;
     let (from, to) = window(&query);
     let items = live!(plans, &ctx.db);
     let risk_rows = live!(risks, &ctx.db);
@@ -226,7 +257,12 @@ async fn board_pack(
 /// the passed gate), and approved / promoted proposals (with the
 /// requested amount). Cap 100.
 #[debug_handler]
-async fn board_investments(State(ctx): State<AppContext>, headers: HeaderMap) -> Result<Response> {
+async fn board_investments(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    headers: HeaderMap,
+) -> Result<Response> {
+    authorize_oversight_read(&caller)?;
     let items = live!(plans, &ctx.db);
     let by_pid: std::collections::BTreeMap<Uuid, &plans::Model> =
         items.iter().map(|i| (i.pid, i)).collect();
@@ -378,6 +414,7 @@ async fn auditor_trail(
     caller: MaybeAuthUser,
     headers: HeaderMap,
 ) -> Result<Response> {
+    authorize_oversight_read(&caller)?;
     AuditModel::record(
         &ctx.db,
         Uuid::nil(),
@@ -572,6 +609,7 @@ async fn evidence_pack(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
 ) -> Result<Response> {
+    authorize_oversight_read(&caller)?;
     let win = WindowQuery {
         from: query.from.clone(),
         to: query.to.clone(),
