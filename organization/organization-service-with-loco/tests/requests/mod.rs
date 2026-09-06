@@ -4,10 +4,39 @@
 
 use std::sync::Once;
 
+use loco_rs::app::AppContext;
+use serde_json::json;
+
 mod bulk;
 mod event_outbox;
 mod fhir;
 mod organizations;
+
+/// Seed an organization **directly through the model layer**
+/// (`streaming::create_and_emit`), bypassing `POST /api/organizations`'s
+/// real-time duplicate check (ORG-T3) entirely.
+///
+/// Several fixtures below deliberately create near-duplicate (or
+/// merely near-identical-looking) rows to exercise `merge`/
+/// `deduplicate`/search/pagination — but ORG-T3's create-time check
+/// runs the exact same matcher `is_match` call those features test, so
+/// a pair similar enough to matter to them (or simply differing only
+/// by a trailing digit in an otherwise-shared name) is, by
+/// construction, also similar enough to now `409` on a second `POST`.
+/// This mirrors person-service's own precedent for the identical
+/// problem (see `create_minimal_person`'s callers there): seed past the
+/// guard rather than let old fixtures collide with the new feature.
+pub(crate) async fn seed_directly(
+    ctx: &AppContext,
+    payload: serde_json::Value,
+) -> serde_json::Value {
+    let org: organization_matcher::Organization =
+        serde_json::from_value(payload).expect("payload should deserialize as an Organization");
+    let model = organization_service::streaming::create_and_emit(&ctx.db, &org, None)
+        .await
+        .expect("direct seed should succeed");
+    json!({ "pid": model.pid.to_string(), "name": model.name })
+}
 
 /// Point the full-text index at a per-process temp directory.
 ///

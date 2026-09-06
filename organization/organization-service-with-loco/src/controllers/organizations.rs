@@ -115,10 +115,23 @@ fn http_err(err: ModelError) -> Error {
 
 /// Create an organization.
 ///
-/// `POST /api/organizations`. Body: an `Organization`. On success returns
-/// `200` with an `OrgRef` (`{pid, name}`); a blank name is `422`. Writes
-/// an audit row and publishes a `Created` event (both best-effort,
-/// stamped with the caller `actor` when a token was presented).
+/// `POST /api/organizations`. Body: an `Organization`. Runs real-time
+/// duplicate detection first (ORG-T3, `agents/share/dataflow.md`'s
+/// Create Flow): a likely-duplicate candidate makes this a `409`
+/// carrying the candidate [`ScoredRef`]s (in `ErrorDetail.errors`)
+/// rather than creating the row — `check-duplicates`/`deduplicate` stay
+/// available as separate, explicit calls, but a caller can no longer
+/// skip the check entirely by simply never making one. An **unavailable
+/// search index degrades to "no duplicates found"** here, unlike
+/// `check_duplicates`'s hard `503`: blocking every organization from
+/// being created over an unrelated search-index hiccup would be a far
+/// larger availability regression than refusing one explicit check
+/// (mirrors person-service's `check_duplicates_internal`, which returns
+/// an empty candidate list on a search failure rather than propagating
+/// it). On success returns `200` with an `OrgRef` (`{pid, name}`); a
+/// blank name is `422`. Writes an audit row and publishes a `Created`
+/// event (both best-effort, stamped with the caller `actor` when a
+/// token was presented).
 #[debug_handler]
 async fn create(
     State(ctx): State<AppContext>,
@@ -126,6 +139,22 @@ async fn create(
     Json(org): Json<Organization>,
 ) -> Result<Response> {
     validate(&org)?;
+    if let Some(index) = crate::search::engine() {
+        let candidates = score_against_index(&ctx, index, &org).await?;
+        if !candidates.is_empty() {
+            return Err(Error::CustomError(
+                StatusCode::CONFLICT,
+                ErrorDetail {
+                    error: Some("duplicate_detected".to_string()),
+                    description: Some(
+                        "potential duplicate organizations found; review matches before creating"
+                            .to_string(),
+                    ),
+                    errors: serde_json::to_value(&candidates).ok(),
+                },
+            ));
+        }
+    }
     // Write + `Created` event, atomic under the active transport (memory
     // ring buffer, or one transaction spanning the row + `event_outbox`).
     let model = streaming::create_and_emit(&ctx.db, &org, caller.actor()).await?;
@@ -422,6 +451,47 @@ pub const CHECK_DUPLICATES_SCAN_CAP: u64 = 1000;
 /// depends on similarity rather than on insertion order.
 pub const CHECK_DUPLICATES_CANDIDATE_LIMIT: usize = 200;
 
+/// Score `query` against `index`'s **blocked** candidates (up to
+/// [`CHECK_DUPLICATES_CANDIDATE_LIMIT`]) and return every match, highest
+/// score first. `partial_cmp` returns `None` only on NaN scores; those
+/// are treated as equal so the sort stays total and never panics.
+///
+/// Shared by [`check_duplicates`] (the explicit endpoint) and [`create`]
+/// (real-time detection, ORG-T3) — each decides separately what an
+/// **unavailable index** means for its own call, which is why that
+/// check is not folded into this helper: `check_duplicates` refuses
+/// (`503`), while `create` degrades to "no duplicates found" (see
+/// `create`'s own doc comment for why).
+async fn score_against_index(
+    ctx: &AppContext,
+    index: &crate::search::SearchEngine,
+    query: &Organization,
+) -> Result<Vec<ScoredRef>> {
+    let engine = MatchingEngine::new(MatchConfig::default());
+    let hits = index.candidates(query, CHECK_DUPLICATES_CANDIDATE_LIMIT)?;
+    let rows = OrgModel::find_by_pids(&ctx.db, &parse_pids(&hits)).await?;
+    let mut hits: Vec<ScoredRef> = Vec::new();
+    for row in &rows {
+        let candidate = row.to_org()?;
+        let r = engine.match_organizations(query, &candidate);
+        if r.is_match {
+            hits.push(ScoredRef {
+                pid: row.pid.to_string(),
+                name: row.name.clone(),
+                score: r.score,
+                confidence: format!("{:?}", r.confidence),
+                is_match: r.is_match,
+            });
+        }
+    }
+    hits.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    Ok(hits)
+}
+
 /// Find stored organizations that match the query above the threshold.
 ///
 /// `POST /api/organizations/check-duplicates`. Body: an `Organization`.
@@ -434,7 +504,6 @@ async fn check_duplicates(
     State(ctx): State<AppContext>,
     Json(query): Json<Organization>,
 ) -> Result<Response> {
-    let engine = MatchingEngine::new(MatchConfig::default());
     // Blocking, not scanning. An unavailable index is surfaced rather
     // than silently answering "no duplicates" — that answer would let a
     // caller create a duplicate believing it had been checked.
@@ -447,30 +516,7 @@ async fn check_duplicates(
             ),
         ));
     };
-    let hits = index.candidates(&query, CHECK_DUPLICATES_CANDIDATE_LIMIT)?;
-    let rows = OrgModel::find_by_pids(&ctx.db, &parse_pids(&hits)).await?;
-    let mut hits: Vec<ScoredRef> = Vec::new();
-    for row in &rows {
-        let candidate = row.to_org()?;
-        let r = engine.match_organizations(&query, &candidate);
-        if r.is_match {
-            hits.push(ScoredRef {
-                pid: row.pid.to_string(),
-                name: row.name.clone(),
-                score: r.score,
-                confidence: format!("{:?}", r.confidence),
-                is_match: r.is_match,
-            });
-        }
-    }
-    // Highest score first. `partial_cmp` returns None only on NaN scores;
-    // treat those as equal so the sort stays total and never panics.
-    hits.sort_by(|a, b| {
-        b.score
-            .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    format::json(hits)
+    format::json(score_against_index(&ctx, index, &query).await?)
 }
 
 // ─── Batch deduplication + stored review queue ──────────────────────────────
