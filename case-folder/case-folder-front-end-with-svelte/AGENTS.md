@@ -118,6 +118,7 @@ work — install **fails loudly** if it is absent.
 npm run check
 npm run format:check
 npm run lint
+npm run verify:api
 USE_UPSTREAM_STUBS=1 cargo run -- start   # in ../case-folder-service-with-rust
 npm run test:e2e
 ```
@@ -132,6 +133,17 @@ All required green:
   project's existing style — no reformatting churn on adoption).
 - `npm run lint` (ESLint) — unchanged; runs alongside Prettier rather
   than in place of it, same as every sibling front-end.
+- `npm run verify:api` (ST-19) — regenerates `src/lib/api/schema.d.ts`
+  from the sibling crate's `openapi.yaml` (`npm run gen:api`, which
+  also runs Prettier on its own output so the comparison isn't
+  polluted by formatting noise) and fails on any resulting `git diff`.
+  Catches an `openapi.yaml` edit whose generated types were never
+  regenerated — a real one is exactly what this task found on
+  landing: `gen:api`'s raw output had drifted from the committed file
+  in both an actual doc-comment update and, separately, quote style
+  (double vs. this project's single-quote convention, since `gen:api`
+  never ran Prettier on its own output before this change). `npm run
+  gen:api` fixes it locally.
 - `npm run test:e2e` — the Playwright suite (14 spec files, 73
   `test()` cases; see [spec/testing.md](spec/testing.md) for the table).
   The Loco API must be running in **stub mode** (see Prerequisites in

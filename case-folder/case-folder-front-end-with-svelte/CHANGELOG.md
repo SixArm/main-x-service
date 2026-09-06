@@ -10,6 +10,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — CI gate for generated API types drift (ST-19)
+
+`src/lib/api/schema.d.ts` is a committed, generated file with no CI
+step re-generating and diffing it — ST-16's "regenerating produces no
+diff" claim was a one-off manual check, not an enforced invariant. New
+`npm run verify:api` script (`npm run gen:api && git diff --exit-code
+-- src/lib/api/schema.d.ts`), added to the AGENTS.md §9 CI gate list.
+Landing it immediately found two real drifts: `gen:api`'s raw
+`openapi-typescript` output used double-quoted strings against this
+project's single-quote Prettier config (ST-17), so every regeneration
+would fail `format:check` on quote style alone, masking any real diff
+underneath — fixed by chaining `prettier --write` onto `gen:api`
+itself. With that noise gone, a genuine drift surfaced: the sign-out
+endpoint's `openapi.yaml` summary had gained "Idempotent — always
+succeeds, even with no session." that was never regenerated into
+`schema.d.ts`; regenerated and committed. `npm run check` /
+`format:check` / `lint` / `test:unit` (50/50) all clean; `verify:api`
+confirmed to fail against the pre-fix committed file and pass once
+regenerated. See spec/tasks.md ST-19.
+
 ### Added — Prettier, and a first-time `src` reformat (ST-17)
 
 `package.json` had no `prettier`/`prettier-plugin-svelte` devDependency,

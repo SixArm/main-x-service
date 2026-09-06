@@ -181,7 +181,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Clear the session cookie. */
+        /** Clear the session cookie. Idempotent — always succeeds, even with no session. */
         post: {
             parameters: {
                 query?: never;
