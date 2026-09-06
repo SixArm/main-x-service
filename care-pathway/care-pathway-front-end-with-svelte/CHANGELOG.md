@@ -9,6 +9,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — wired the segment/clock recording UI on `/board` (CPFE-T3)
+
+`TbaRepository.recordSegment`/`.setClock` already existed, but no page
+called them — a journey could never actually be mapped by hand from the
+UI. Added a "Record a segment" panel below the Kanban board: an
+instance picker, start/stop clock buttons, and a segment form (label,
+stage, category, waste, started/ended-at, actor, location, note). The
+waste/category pairing is guarded client-side (waste disabled and
+forced `null` on a `value_adding` segment; required on
+`unnecessary_non_value_adding`), mirroring the service's
+`tba.rs::validate_segment_fields` rule. New `tests/unit/board.test.ts`
+(4 tests) plus a new Playwright case in `tests/e2e/smoke.spec.ts`.
+
 ### Fixed — `/verify` crashed with a raw 500 when the authentication service was unreachable (CPFE-T5)
 
 `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch,

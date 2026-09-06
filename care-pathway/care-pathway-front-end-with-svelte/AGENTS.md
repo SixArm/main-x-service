@@ -51,7 +51,7 @@ src/
     ├── [pid]/+page.svelte        detail + instances + delete + check-duplicates + merge + audit-trail toggle
     ├── [pid]/edit/+page.svelte   edit
     ├── insights/+page.svelte     the five registry lenses as tables (directory / coverage / variants / providers / languages)
-    ├── board/+page.svelte        instance Kanban (one pathway; drag = POST /api/instances/{pid}/status)
+    ├── board/+page.svelte        instance Kanban (one pathway; drag = POST /api/instances/{pid}/status) + a "Record a segment" panel (segment/clock recording, CPFE-T3)
     ├── gantt/+page.svelte        instance timeline Gantt (one pathway; enrolled_on → next_review/closed/today)
     ├── sequence/+page.svelte     intervention-sequence Gantt (a pathway template's interventions)
     └── time/+page.svelte         time-based analysis: cohort ratio + NHS access-standard score + constraints + Little's Law, and one journey's timeline wall
@@ -79,7 +79,7 @@ src/
 | Time-based analysis — cohort (`/time`) | `GET /api/care-pathways/{pid}/time-analysis?standard=` · `GET /api/care-pathways/{pid}/constraints` |
 | Time-based analysis — journey (`/time`) | `GET /api/instances/{pid}/timeline` · `GET /api/instances/{pid}/time-analysis` |
 | Access-standard catalogue + flow | `GET /api/instances/time-standards` · `GET /api/instances/flow?window_days=&pathway=` |
-| Segment / clock recording (client methods; not yet wired to a route) | `POST /api/instances/{pid}/segments` · `POST /api/instances/{pid}/clock` |
+| Segment / clock recording (`/board` "Record a segment" panel, CPFE-T3) | `POST /api/instances/{pid}/segments` · `POST /api/instances/{pid}/clock` |
 
 ## Commands
 
