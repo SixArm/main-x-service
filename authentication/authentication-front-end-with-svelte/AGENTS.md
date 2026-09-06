@@ -137,7 +137,10 @@ pnpm run build
 Configure the auth-service base URL with `AUTH_API_URL` (see
 `.env.example`; NOT `PUBLIC_API_BASE_URL` — see Ground rule 6).
 
-`pnpm run test:e2e` (playwright) is **green (6/6)**. It no longer relies
+`pnpm run test:e2e` (playwright) is **green (14/14, as of AFE-1)** — the
+`6/6` this line once said was stale even before AFE-1: AFE-3 had already
+grown the suite to 10 by adding `admin-attributes.spec.ts` without
+updating this count. It no longer relies
 on `page.route()` (which only intercepts browser-issued requests, and
 every auth-service call moved server-side under the BFF migration —
 that gap, silently red since `f66ff50f`, is why the suite used to fail

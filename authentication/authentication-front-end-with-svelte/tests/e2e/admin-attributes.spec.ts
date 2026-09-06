@@ -7,8 +7,9 @@
 // handler and a second, `access=admin` login identity instead.
 //
 // Covers: viewing an existing user's attributes as an admin, saving a
-// valid change, the 403 path (signed in, but not an admin), and the 401
-// path (no session at all).
+// valid change, the 403 path (signed in, but not an admin), and the
+// AFE-1 page-visit guard (no session at all -> redirect to /signin,
+// mirroring the person/worker/thing/event/course reference pattern).
 import { test, expect } from "@playwright/test";
 
 // Must match tests/e2e/mock-auth-server.mjs's fixture data.
@@ -63,14 +64,25 @@ test("a signed-in, non-admin caller sees the 403 the service returns", async ({
   await expect(page.getByText(TARGET_EMAIL)).not.toBeVisible();
 });
 
-test("an unauthenticated visitor is asked to sign in, not shown the target", async ({
+// AFE-1: this page's entire purpose is submitting a PUT, so an anonymous
+// visit redirects to /signin (the family's page-visit guard,
+// `$lib/server/session.ts::requireSignedIn`) rather than rendering an
+// in-page "sign in" message the visitor could dismiss and never act on.
+test("an unauthenticated visitor is redirected to /signin, not shown the target", async ({
   page,
 }) => {
   await page.goto(`/admin/attributes?pid=${TARGET_PID}`, {
     waitUntil: "networkidle",
   });
-  await expect(page.getByRole("alert")).toContainText(
-    "Sign in as an admin to manage attributes.",
-  );
+  await expect(page).toHaveURL(/\/signin(\?|$)/);
   await expect(page.getByText(TARGET_EMAIL)).not.toBeVisible();
+});
+
+// The guard fires even with no `?pid=` at all — the acceptance criterion
+// is "any anonymous visit", not "only once a target is chosen".
+test("an unauthenticated visitor with no ?pid= is also redirected to /signin", async ({
+  page,
+}) => {
+  await page.goto("/admin/attributes", { waitUntil: "networkidle" });
+  await expect(page).toHaveURL(/\/signin(\?|$)/);
 });
