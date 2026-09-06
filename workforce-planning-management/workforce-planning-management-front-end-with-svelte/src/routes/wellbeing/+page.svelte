@@ -12,6 +12,7 @@
     wellbeingUptake,
     type WellbeingEntitlement,
   } from "$lib/api/wpm";
+  import { mean, percentWithWorkings } from "$lib/format";
   import { t } from "$lib/i18n.svelte";
 
   type Uptake = Awaited<ReturnType<typeof wellbeingUptake>>;
@@ -93,7 +94,10 @@
 
   function cell(value: PulseResult["overall"]): string {
     if (value.suppressed) return t("wb.pulseSuppressed");
-    return `${t("wb.pulseMean")} ${value.mean?.toFixed(1)} · ${value.count} ${t("wb.pulseResponses")}`;
+    // `mean` guards the `undefined` case (should not happen once
+    // disclosed, but a silent "undefined" in the label would be a worse
+    // failure than a "—" placeholder) — see $lib/format.ts (WPM-T39).
+    return `${t("wb.pulseMean")} ${mean(value.mean) ?? "—"} · ${value.count} ${t("wb.pulseResponses")}`;
   }
 
   function cohort(rule: WellbeingEntitlement): string {
@@ -177,17 +181,10 @@
                 <span class="chip">{response}: {count}</span>
               {/each}
             </td>
-            <td>
-              {row.uptake_rate.value === null
-                ? "—"
-                : `${Math.round(row.uptake_rate.value * 100)}% (${row.uptake_rate.numerator}/${row.uptake_rate.denominator})`}
-            </td>
+            <td>{percentWithWorkings(row.uptake_rate)}</td>
             <td>
               {#if row.enrolment_conversion}
-                {t("wb.conversion")}:
-                {row.enrolment_conversion.value === null
-                  ? "—"
-                  : `${Math.round(row.enrolment_conversion.value * 100)}% (${row.enrolment_conversion.numerator}/${row.enrolment_conversion.denominator})`}
+                {t("wb.conversion")}: {percentWithWorkings(row.enrolment_conversion)}
               {/if}
             </td>
           </tr>

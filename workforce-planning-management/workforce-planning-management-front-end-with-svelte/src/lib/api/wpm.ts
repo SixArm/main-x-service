@@ -14,6 +14,7 @@ import type {
   OrgNode,
   Payslip,
   PayrollRun,
+  Ratio,
   Requisition,
   Review,
   SuccessionEntry,
@@ -250,7 +251,7 @@ export function trainingAnalytics(init?: FetchLike): Promise<{
   departments: Array<{
     department: string;
     by_status: Record<string, number>;
-    completion_rate: { numerator: number; denominator: number; value: number | null };
+    completion_rate: Ratio;
     certs_expiring: number;
   }>;
 }> {
@@ -732,12 +733,8 @@ export function wellbeingUptake(init?: FetchLike): Promise<{
     name: string;
     kind: "health" | "benefit";
     by_response: Record<string, number>;
-    uptake_rate: { numerator: number; denominator: number; value: number | null };
-    enrolment_conversion: {
-      numerator: number;
-      denominator: number;
-      value: number | null;
-    } | null;
+    uptake_rate: Ratio;
+    enrolment_conversion: Ratio | null;
   }>;
 }> {
   return api("/wellbeing/uptake", init);

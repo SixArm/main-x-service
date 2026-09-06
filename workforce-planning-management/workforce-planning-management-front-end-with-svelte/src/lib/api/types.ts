@@ -117,6 +117,19 @@ export interface Benchmark {
   as_of: string;
 }
 
+/**
+ * A ratio the service already computed — `numerator`/`denominator` plus
+ * the derived `value`, or `null` when the denominator was zero. A zero
+ * denominator must render as "no data", never as `0%`: "we measured and
+ * it was zero" and "we had nothing to measure" are different claims, and
+ * only the service knows which one is true. See `$lib/format.ts`.
+ */
+export interface Ratio {
+  numerator: number;
+  denominator: number;
+  value: number | null;
+}
+
 /** One benchmark-comparison row (flags only, no amounts). */
 export interface ComparisonRow {
   employee_pid: string;
