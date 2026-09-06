@@ -87,11 +87,26 @@ service-side bridge test in the same PR.
 
 ## Benchmarks
 
-Benches live in the embedding
+Benches live in two places (T-15, reconciled — this crate's own bench
+was added in `[0.7.0]` but this file kept describing only the
+service-side one). This crate's own
+[`benches/match_pair.rs`](../benches/match_pair.rs) exercises
+`MatchingEngine` directly (run with `cargo bench` from this crate):
+
+- `match_pair/identical_clone` / `fuzzy_near_match` / `unrelated_pair`
+  — single-pair scoring across the score range.
+- `deterministic/shared_doi` / `same_provider_course_code` —
+  deterministic short-circuits.
+- `rank/{10,100,1000}` — `rank` throughput at increasing candidate
+  counts.
+- `config_variants/{default,strict,lenient}` — the same fuzzy pair
+  under each shipped `MatchConfig` preset.
+
+The embedding
 [`course-service-with-loco/benches/matching_bench.rs`](../../course-service-with-loco/benches/matching_bench.rs)
-so the baseline reflects the production path (adapter +
-`CourseMatcher` facade) rather than the bare library. Run with
-`cargo bench` from that crate. Coverage:
+complements it, so the baseline also reflects the production path
+(adapter + `CourseMatcher` facade), not just the bare library. Run
+with `cargo bench` from that crate. Coverage:
 
 - `match_courses/populated_pair` — full all-components scoring on
   two fully-populated courses.

@@ -9,6 +9,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — doc drift: benchmarks described as service-side only (T-15)
+
+`[0.7.0]` added this crate's own `benches/match_pair.rs`, but
+`spec/24-testing-strategy.md`, `agents/testing.md`, and `spec/23-tasks.md`
+T-8 still said benchmarks lived only in
+`course-service-with-loco/benches/matching_bench.rs`. All three now
+name `benches/match_pair.rs` (four Criterion groups: `match_pair`,
+`deterministic`, `rank`, `config_variants`) alongside the service-side
+bench, with a note on how the two relate (this crate measures the
+library in isolation; the service-side bench measures it behind the
+production adapter). No code change. `cargo test` / `cargo bench
+--no-run` / `cargo clippy --all-targets -- -D warnings` / `cargo fmt
+--check` all clean. See spec/23-tasks.md T-15.
+
 ### Fixed — doc drift: stale MSRV 1.95/N-3 reference (2026-09-06)
 
 `Cargo.toml` already declares `rust-version = "1.96"` (matching

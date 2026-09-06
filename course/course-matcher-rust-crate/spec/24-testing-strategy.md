@@ -14,8 +14,15 @@ See [`agents/testing.md`](../agents/testing.md). Summary:
 - Fuzzing (`fuzz/`, `cargo-fuzz`, nightly-only, standalone crate):
   `match_courses` and `normalize` libFuzzer targets (SEC-I2).
 - Bridge tests live in the embedding service crate.
-- Benchmarks live at
+- Benchmarks live in two places: this crate's own
+  [`benches/match_pair.rs`](../benches/match_pair.rs) (four Criterion
+  groups — single-pair scoring, deterministic short-circuits, `rank`
+  throughput at N=10/100/1000, and per-preset cost — exercising
+  `MatchingEngine` directly), and
   [`course-service-with-loco/benches/matching_bench.rs`](../../course-service-with-loco/benches/matching_bench.rs)
-  (driven through the service-side `CourseMatcher` facade so the
-  baseline reflects production paths).
+  (driven through the service-side `CourseMatcher` facade so that
+  baseline reflects production paths). The two are complementary, not
+  redundant: this crate's bench measures the library in isolation, the
+  service-side bench measures it behind the adapter a real request
+  actually goes through.
 
