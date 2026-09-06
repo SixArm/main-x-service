@@ -411,4 +411,90 @@ test.describe("signed-in smoke coverage", () => {
     await result.getByRole("link", { name: "Open stay" }).click();
     await expect(page).toHaveURL(`/stays/${STAY}`);
   });
+
+  // Pins: the expected-discharge calendar renders an all-day event and
+  // navigates to the stay on select. Not incidental — `@svar-ui/
+  // calendar-store` requires an all-day event's `end` to be strictly
+  // after `start`, and the page was passing `end: day` — the same Date
+  // as `start` — so every EDD event this calendar was ever asked to
+  // show was silently dropped. See the fix in
+  // `src/routes/edd/+page.svelte`. The stubbed EDD date is computed
+  // relative to the actual test-run date — the widget always opens on
+  // today's month, so a fixed date would eventually scroll out of view.
+  test("EDD calendar renders and navigates to the stay on select", async ({
+    page,
+  }) => {
+    const today = new Date();
+    const eddInThisMonth = new Date(today.getFullYear(), today.getMonth(), 12)
+      .toISOString()
+      .slice(0, 10);
+    await page.route("**/api/proxy/**", async (route) => {
+      const url = new URL(route.request().url());
+      const path = url.pathname.replace("/api/proxy", "");
+      if (path === "/api/wards")
+        return route.fulfill({
+          json: [
+            {
+              pid: WARD,
+              site_pid: "s",
+              name: "Ward 7 — Respiratory",
+              code: "W7",
+              kind: "inpatient",
+              specialty: "respiratory",
+              open: true,
+              escalation: false,
+            },
+          ],
+        });
+      if (path === `/api/whiteboard/${WARD}`)
+        return route.fulfill({
+          json: {
+            ward_pid: WARD,
+            ward_name: "Ward 7 — Respiratory",
+            ward_code: "W7",
+            kind: "inpatient",
+            closed_to_admissions: false,
+            escalation: false,
+            as_of: "2026-09-06T09:00:00Z",
+            masked: false,
+            cards: [
+              {
+                bed_pid: BED_FREE,
+                bay_name: "Bay A",
+                number: "W7-A-1",
+                state: "occupied",
+                state_since: "2026-09-01T08:00:00Z",
+                closure_reason: null,
+                deep_clean_required: false,
+                side_room: false,
+                stay_pid: STAY,
+                display_name: "Test Patient 001",
+                named_nurse_ref: null,
+                consultant_ref: null,
+                edd: eddInThisMonth,
+                edd_missing: false,
+                edd_overdue: false,
+                ccd_met: true,
+                discharge_pathway: "p1",
+                discharge_ready: true,
+                dtoc: false,
+                senior_review_today: true,
+                red_green_today: "green",
+                infection: [],
+              },
+            ],
+          },
+        });
+      return route.fulfill({ status: 404, json: { description: "unstubbed" } });
+    });
+
+    await page.goto("/edd");
+    await expect(
+      page.getByRole("heading", { name: "Expected discharges" }),
+    ).toBeVisible();
+    const calendar = page.getByTestId("edd-calendar");
+    await expect(calendar).toBeVisible();
+    await calendar.getByText("Test Patient 001", { exact: false }).click();
+    await expect(page).toHaveURL(`/stays/${STAY}`);
+  });
 });
