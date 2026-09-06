@@ -68,9 +68,19 @@ best pairwise score across both lists.
 
 `match_end_dates(a, b)` — like `match_start_dates`; both `None` → `0.5`.
 
-`match_window_overlap(a_start, a_end, b_start, b_end)` — Jaccard
-ratio of the two `[start, end)` intervals when both ends are known;
-falls back to `match_start_dates` otherwise.
+> **Removed (T-13, 2026-09-06): `match_window_overlap`.** A
+> `match_window_overlap(a_start, a_end, b_start, b_end)` helper (Jaccard
+> ratio of the two `[start, end]` intervals) was implemented and unit
+> tested here but never called from `scoring::ProbabilisticScorer`,
+> which scores `start_date`/`end_date` independently instead. Wiring it
+> in would mean unilaterally resolving `event-matcher`'s own still-open
+> **OQ-C** (`event-matcher-rust-crate/spec/10-open-questions.md`:
+> whether the matcher should score window overlap instead of, or in
+> addition to, independent endpoint proximity, and how a
+> `start_date`-only record should participate) — a canonical-crate
+> design question this service crate defers to rather than answering
+> unilaterally with a half-built, uncalled function of its own. Removed
+> rather than left dead; revisit once OQ-C resolves upstream.
 
 ### Location (`location_matching`)
 
