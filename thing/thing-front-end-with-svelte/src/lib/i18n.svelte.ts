@@ -87,6 +87,8 @@ export const LOCALE_KEY = "mxi.thing.locale";
 // going through the `en`-fallback path of `translate`.
 export const STRINGS = {
   en: {
+    "auth.sessionExpired": "Your session has expired. Redirecting to sign in…",
+    "auth.accessDenied": "You don't have permission to do that.",
     "nav.review": "Review",
     "review.run": "Run scan",
     "review.intro":
@@ -287,6 +289,9 @@ export const STRINGS = {
     "identifier.add": "+ Add identifier",
   },
   cy: {
+    "auth.sessionExpired":
+      "Mae eich sesiwn wedi dod i ben. Yn ailgyfeirio i fewngofnodi…",
+    "auth.accessDenied": "Nid oes gennych ganiatâd i wneud hynny.",
     "nav.review": "Adolygu",
     "review.run": "Rhedeg sgan",
     "review.intro":
@@ -474,6 +479,9 @@ export const STRINGS = {
     "identifier.add": "+ Ychwanegu dynodydd",
   },
   es: {
+    "auth.sessionExpired":
+      "Tu sesión ha caducado. Redirigiendo para iniciar sesión…",
+    "auth.accessDenied": "No tienes permiso para hacer eso.",
     "nav.review": "Revisión",
     "review.run": "Ejecutar análisis",
     "review.intro":
@@ -661,6 +669,9 @@ export const STRINGS = {
     "identifier.add": "+ Añadir identificador",
   },
   fr: {
+    "auth.sessionExpired":
+      "Votre session a expiré. Redirection vers la connexion…",
+    "auth.accessDenied": "Vous n'avez pas la permission de faire cela.",
     "nav.review": "Révision",
     "review.run": "Lancer l'analyse",
     "review.intro":
@@ -848,6 +859,9 @@ export const STRINGS = {
     "identifier.add": "+ Ajouter un identifiant",
   },
   de: {
+    "auth.sessionExpired":
+      "Ihre Sitzung ist abgelaufen. Weiterleitung zur Anmeldung…",
+    "auth.accessDenied": "Sie haben keine Berechtigung dazu.",
     "nav.review": "Überprüfung",
     "review.run": "Scan starten",
     "review.intro":
@@ -1035,6 +1049,9 @@ export const STRINGS = {
     "identifier.add": "+ Bezeichner hinzufügen",
   },
   ar: {
+    "auth.sessionExpired":
+      "انتهت صلاحية جلستك. جارٍ إعادة التوجيه لتسجيل الدخول…",
+    "auth.accessDenied": "ليس لديك إذن للقيام بذلك.",
     "nav.review": "المراجعة",
     "review.run": "تشغيل الفحص",
     "review.intro":
@@ -1219,6 +1236,8 @@ export const STRINGS = {
     "identifier.add": "+ إضافة معرّف",
   },
   ru: {
+    "auth.sessionExpired": "Сессия истекла. Перенаправление на страницу входа…",
+    "auth.accessDenied": "У вас нет разрешения на это.",
     "nav.review": "Проверка",
     "review.run": "Запустить проверку",
     "review.intro":
@@ -1405,6 +1424,9 @@ export const STRINGS = {
     "identifier.add": "+ Добавить идентификатор",
   },
   hi: {
+    "auth.sessionExpired":
+      "आपका सत्र समाप्त हो गया है। साइन इन पर रीडायरेक्ट किया जा रहा है…",
+    "auth.accessDenied": "आपको ऐसा करने की अनुमति नहीं है।",
     "nav.review": "समीक्षा",
     "review.run": "स्कैन चलाएं",
     "review.intro":
@@ -1592,6 +1614,8 @@ export const STRINGS = {
     "identifier.add": "+ पहचानकर्ता जोड़ें",
   },
   zh: {
+    "auth.sessionExpired": "您的会话已过期。正在重定向到登录…",
+    "auth.accessDenied": "您没有权限执行此操作。",
     "nav.review": "审核",
     "review.run": "运行扫描",
     "review.intro":
@@ -1771,6 +1795,9 @@ export const STRINGS = {
     "identifier.add": "+ 添加标识符",
   },
   bn: {
+    "auth.sessionExpired":
+      "আপনার সেশনের মেয়াদ শেষ হয়ে গেছে। সাইন ইন-এ পুনঃনির্দেশ করা হচ্ছে…",
+    "auth.accessDenied": "আপনার এটি করার অনুমতি নেই।",
     "nav.review": "পর্যালোচনা",
     "review.run": "স্ক্যান চালান",
     "review.intro":
@@ -1957,6 +1984,8 @@ export const STRINGS = {
     "identifier.add": "+ শনাক্তকারী যোগ করুন",
   },
   pt: {
+    "auth.sessionExpired": "Sua sessão expirou. Redirecionando para o login…",
+    "auth.accessDenied": "Você não tem permissão para fazer isso.",
     "nav.review": "Revisão",
     "review.run": "Executar varredura",
     "review.intro":
@@ -2144,6 +2173,9 @@ export const STRINGS = {
     "identifier.add": "+ Adicionar identificador",
   },
   id: {
+    "auth.sessionExpired":
+      "Sesi Anda telah kedaluwarsa. Mengalihkan ke halaman masuk…",
+    "auth.accessDenied": "Anda tidak memiliki izin untuk melakukan itu.",
     "nav.review": "Tinjauan",
     "review.run": "Jalankan pemindaian",
     "review.intro":
@@ -2331,6 +2363,9 @@ export const STRINGS = {
     "identifier.add": "+ Tambah pengenal",
   },
   ur: {
+    "auth.sessionExpired":
+      "آپ کا سیشن ختم ہو گیا ہے۔ سائن ان کی طرف بھیجا جا رہا ہے…",
+    "auth.accessDenied": "آپ کو ایسا کرنے کی اجازت نہیں ہے۔",
     "nav.review": "جائزہ",
     "review.run": "اسکین چلائیں",
     "review.intro":

@@ -18,6 +18,7 @@
     import SearchBox from "$lib/components/SearchBox.svelte";
     import ThingGrid from "$lib/components/ThingGrid.svelte";
     import { ThingRepository } from "$lib/api/things.js";
+    import { describeApiError } from "$lib/api/errorHandling.js";
     import type { Thing } from "$lib/api/types.js";
     import { t, translate } from "$lib/i18n.svelte.js";
 
@@ -45,7 +46,7 @@
             things = res.items;
             total = res.total;
         } catch (err) {
-            error = err instanceof Error ? err.message : String(err);
+            error = describeApiError(err);
             things = [];
             total = 0;
         } finally {

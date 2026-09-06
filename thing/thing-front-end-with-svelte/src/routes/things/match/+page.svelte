@@ -19,6 +19,7 @@
     import FieldRow from "$lib/forms/FieldRow.svelte";
     import ThingIdentifierInput from "$lib/components/ThingIdentifierInput.svelte";
     import { ThingRepository } from "$lib/api/things.js";
+    import { describeApiError } from "$lib/api/errorHandling.js";
     import type {
         MatchRequest,
         MatchResult,
@@ -59,7 +60,7 @@
             };
             results = await repo.match(req);
         } catch (err) {
-            error = err instanceof Error ? err.message : String(err);
+            error = describeApiError(err);
             results = [];
         } finally {
             loading = false;

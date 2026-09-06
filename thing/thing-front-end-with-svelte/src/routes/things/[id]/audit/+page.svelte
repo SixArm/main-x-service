@@ -15,6 +15,7 @@
     import { page } from "$app/state";
     import { onMount } from "svelte";
     import { ThingRepository } from "$lib/api/things.js";
+    import { describeApiError } from "$lib/api/errorHandling.js";
     import type { AuditEntry } from "$lib/api/types.js";
     import { t } from "$lib/i18n.svelte.js";
 
@@ -28,7 +29,7 @@
         try {
             entries = await repo.audit(id, 100);
         } catch (err) {
-            error = err instanceof Error ? err.message : String(err);
+            error = describeApiError(err);
         } finally {
             loading = false;
         }

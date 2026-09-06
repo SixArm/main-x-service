@@ -72,6 +72,48 @@ describe("ApiClient", () => {
         }
     });
 
+    // Pins T-29: isUnauthorized/isForbidden expose the two auth-specific
+    // statuses the same way isConflict already does for 409.
+    it("exposes ApiError.isUnauthorized for 401", async () => {
+        const client = new ApiClient({
+            baseUrl: "http://localhost:8080",
+            fetch: mockFetch(async () =>
+                jsonResponse(
+                    { success: false, data: null, error: { code: "UNAUTHORIZED", message: "no token" } },
+                    401,
+                ),
+            ),
+        });
+        try {
+            await client.get("/api/things");
+            throw new Error("should have thrown");
+        } catch (err) {
+            expect(err).toBeInstanceOf(ApiError);
+            expect((err as ApiError).isUnauthorized).toBe(true);
+            expect((err as ApiError).isForbidden).toBe(false);
+        }
+    });
+
+    it("exposes ApiError.isForbidden for 403", async () => {
+        const client = new ApiClient({
+            baseUrl: "http://localhost:8080",
+            fetch: mockFetch(async () =>
+                jsonResponse(
+                    { success: false, data: null, error: { code: "FORBIDDEN", message: "denied" } },
+                    403,
+                ),
+            ),
+        });
+        try {
+            await client.get("/api/things");
+            throw new Error("should have thrown");
+        } catch (err) {
+            expect(err).toBeInstanceOf(ApiError);
+            expect((err as ApiError).isForbidden).toBe(true);
+            expect((err as ApiError).isUnauthorized).toBe(false);
+        }
+    });
+
     // Pins: defined query params are serialised; undefined/null are omitted.
     it("appends query string parameters and skips nullish values", async () => {
         let capturedUrl = "";

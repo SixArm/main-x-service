@@ -9,6 +9,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — 401/403 handling in `ApiClient` (T-29)
+
+`ApiError` had `isNotFound`/`isConflict`/`isValidation` but nothing for
+`401`/`403`, so a session that expired mid-visit (or a
+`THING_REQUIRE_AUTH`-gated `403`) surfaced as a raw, untranslated error
+banner rather than reacting to it. `ApiError` gains `isUnauthorized`
+(401) / `isForbidden` (403); a new `describeApiError(err)`
+(`src/lib/api/errorHandling.ts`) redirects to `/signin` on 401 and
+returns a translated access-denied message on 403, falling back to the
+error's own message (byte-identical to every route's previous inline
+`err instanceof Error ? err.message : String(err)`) for anything else.
+All 8 routes with a catch block now call it; the merge page's second
+catch block (which prefers the service's structured `CODE: message`
+for other statuses) checks the two auth statuses first and falls
+through to that existing behaviour otherwise. New
+`auth.sessionExpired`/`auth.accessDenied` keys across all 13 locales.
+New `tests/unit/errorHandling.test.ts` (5 tests) plus two new
+`ApiError` getter tests in `tests/unit/client.test.ts`. See
+spec/13-tasks.md T-29.
+
 ### Added — GDPR export download on the detail page (T-20)
 
 A button on `/things/[id]` fetches `GET /api/things/{id}/export` through the
