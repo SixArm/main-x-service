@@ -36,6 +36,8 @@ the family-wide source of truth; the briefer versions under
 | [special-files-for-public-repos](special-files-for-public-repos/index.md) | The special top-level files every public repo carries (LICENSE.md, CITATION.cff, SECURITY.md, AI_STATEMENT.md, …) |
 | [free-open-source-funding](free-open-source-funding/index.md) | Funding channels for a free/open-source repo (GitHub Sponsors, Open Collective, `.github/FUNDING.yml`) |
 | [trusted-publishing](trusted-publishing/index.md) | OIDC-based crate publishing (no long-lived API tokens) — adopt once production-ready across every forge and target we use |
+| [node-current-version](node-current-version/index.md) | The Node.js version policy for every SvelteKit front-end (currently 26): `engines`, `engine-strict`, and per-project pins |
+| [monorepo-github-pages](monorepo-github-pages/index.md) | Publishing a monorepo GitHub Pages site via `git subtree` to a sibling read-only export repo — see [`main-x-service.github.io/`](../main-x-service.github.io/) |
 
 ### Data & persistence
 

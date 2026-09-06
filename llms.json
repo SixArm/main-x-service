@@ -74,6 +74,12 @@
       ]
     },
     {
+      "title": "GitHub Pages",
+      "items": [
+        { "title": "main-x-service.github.io/", "url": "main-x-service.github.io/index.md", "description": "Public documentation front door for this monorepo (SvelteKit + Lily Design System, static/prerendered); published via git subtree to a sibling read-only repo, see spec/monorepo-github-pages/" }
+      ]
+    },
+    {
       "title": "Front-end projects (SvelteKit operator SPAs)",
       "items": [
         { "title": "person-front-end-with-svelte", "url": "person/person-front-end-with-svelte/spec/index.md", "description": "Operator UI for Person CRUD/search/match/merge/audit" },
