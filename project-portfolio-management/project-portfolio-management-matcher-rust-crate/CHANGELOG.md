@@ -10,6 +10,36 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — `bench_field_arrays` Criterion group: per-field array-size scaling
+
+`benches/match_pair.rs` had `bench_rank` scaling *candidate-list*
+length (10/100/1000) but nothing scaling a single `Plan`'s own
+`goals`/`keywords`/`relationships`/`tags` arrays — the O(n·m) cost
+AGENTS.md golden rule 8 warns about (none of the four has a length cap
+of its own) was inferable from the source but never directly visible
+in `cargo bench` output. New `bench_field_arrays`: for each of the four
+fields in turn, two records held fixed except that one field, grown to
+`n` entries (10/100/1000, roughly half overlapping so the Jaccard
+intersection/union does real work) while the other three stay at their
+usual fixture size — so each field's own cost is visible on its own
+axis rather than conflated with the others.
+
+Recorded scaling (`cargo bench --bench match_pair -- field_arrays`,
+this machine):
+
+| field | n=10 | n=100 | n=1000 |
+|---|---|---|---|
+| goals | 7.21 µs | 50.85 µs | 1.143 ms |
+| keywords | 5.76 µs | 34.36 µs | 1.049 ms |
+| tags | 6.17 µs | 37.19 µs | 1.224 ms |
+| relationships | 12.09 µs | 90.91 µs | 1.481 ms |
+
+All four are markedly **super-linear**: a 10× growth in `n` from
+100→1000 costs 22–30× the time, not ~10×, confirming the O(n·m) cost
+is real for every one of them. `cargo bench --no-run` compiles the new
+group; `cargo build --benches`/`clippy --all-targets -D
+warnings`/`fmt --check`/`test` all clean. See spec/index.md.
+
 ### Fixed — doc drift: stale MSRV 1.95/N-3 reference (2026-09-06)
 
 `Cargo.toml` already declares `rust-version = "1.96"` (matching

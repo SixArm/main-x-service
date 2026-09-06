@@ -213,11 +213,110 @@ fn bench_config_variants(c: &mut Criterion) {
     group.finish();
 }
 
+/// For each of the four unbounded array fields
+/// (`goals`/`keywords`/`relationships`/`tags`), two records held fixed
+/// except that one field, grown to `n` entries (10/100/1000) — the
+/// other array fields stay at their `build_reference`/
+/// `build_near_duplicate` size, so each field's own O(n·m) cost is
+/// visible on its own axis rather than conflated with the others
+/// (AGENTS.md golden rule 8: none of the four has a length cap of its
+/// own). Roughly half the entries overlap between the two sides, so
+/// the Jaccard set intersection/union does real work rather than
+/// short-circuiting on an empty intersection.
+fn bench_field_arrays(c: &mut Criterion) {
+    let mut group = c.benchmark_group("field_arrays");
+    let engine = MatchingEngine::default_config();
+
+    for &n in &[10usize, 100, 1000] {
+        group.throughput(Throughput::Elements(n as u64));
+
+        let mut a = build_reference();
+        let mut b = build_near_duplicate();
+        a.goals = (0..n).map(|i| goal(&format!("Milestone {i}"))).collect();
+        b.goals = (0..n)
+            .map(|i| {
+                goal(&if i.is_multiple_of(2) {
+                    format!("Milestone {i}")
+                } else {
+                    format!("Other milestone {i}")
+                })
+            })
+            .collect();
+        group.bench_with_input(BenchmarkId::new("goals", n), &(a, b), |bencher, (a, b)| {
+            bencher.iter(|| engine.match_plans(black_box(a), black_box(b)));
+        });
+
+        let mut a = build_reference();
+        let mut b = build_near_duplicate();
+        a.keywords = (0..n).map(|i| format!("kw-{i}")).collect();
+        b.keywords = (0..n)
+            .map(|i| {
+                if i.is_multiple_of(2) {
+                    format!("kw-{i}")
+                } else {
+                    format!("other-kw-{i}")
+                }
+            })
+            .collect();
+        group.bench_with_input(
+            BenchmarkId::new("keywords", n),
+            &(a, b),
+            |bencher, (a, b)| {
+                bencher.iter(|| engine.match_plans(black_box(a), black_box(b)));
+            },
+        );
+
+        let mut a = build_reference();
+        let mut b = build_near_duplicate();
+        a.tags = (0..n).map(|i| format!("tag-{i}")).collect();
+        b.tags = (0..n)
+            .map(|i| {
+                if i.is_multiple_of(2) {
+                    format!("tag-{i}")
+                } else {
+                    format!("other-tag-{i}")
+                }
+            })
+            .collect();
+        group.bench_with_input(BenchmarkId::new("tags", n), &(a, b), |bencher, (a, b)| {
+            bencher.iter(|| engine.match_plans(black_box(a), black_box(b)));
+        });
+
+        let mut a = build_reference();
+        let mut b = build_near_duplicate();
+        a.relationships = (0..n)
+            .map(|i| PlanRelationship {
+                relation: RelationKind::DependsOn,
+                plan_id: format!("plan:{i:08x}"),
+            })
+            .collect();
+        b.relationships = (0..n)
+            .map(|i| PlanRelationship {
+                relation: RelationKind::DependsOn,
+                plan_id: if i.is_multiple_of(2) {
+                    format!("plan:{i:08x}")
+                } else {
+                    format!("plan:other-{i:08x}")
+                },
+            })
+            .collect();
+        group.bench_with_input(
+            BenchmarkId::new("relationships", n),
+            &(a, b),
+            |bencher, (a, b)| {
+                bencher.iter(|| engine.match_plans(black_box(a), black_box(b)));
+            },
+        );
+    }
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_match_pair,
     bench_deterministic,
     bench_rank,
-    bench_config_variants
+    bench_config_variants,
+    bench_field_arrays
 );
 criterion_main!(benches);
