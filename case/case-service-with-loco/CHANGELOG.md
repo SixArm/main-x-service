@@ -174,16 +174,21 @@ it was for record-level ABAC.
 - `criterion` is a new dev-dependency; test-only, so it is not in any
   release artefact.
 
-### Added — declared MSRV (Rust 1.95)
+### Added — declared MSRV (Rust 1.96)
 
-- `Cargo.toml` now declares `rust-version = "1.95"`, the repository's
-  **current stable minus three** floor
-  (`spec/rust-msrv-n-minus-3/index.md`). Sourced from `ci/msrv.txt` and
+- `Cargo.toml` now declares `rust-version = "1.96"`, the repository's
+  **current stable minus two** floor
+  (`spec/rust-msrv-n-minus-2/index.md`). Sourced from `ci/msrv.txt` and
   enforced by `scripts/ci-check.sh msrv`, which asserts the declared
   value matches that file and then compiles the crate — `--all-targets`,
-  so benches and tests count — against the 1.95 toolchain. Behaviour is
+  so benches and tests count — against the 1.96 toolchain. Behaviour is
   unchanged; what changes is that the floor is now a checked claim
-  rather than an unstated assumption.
+  rather than an unstated assumption. *(Corrected 2026-09-06: this entry
+  originally said 1.95 / N-3, matching the policy at the time it was
+  written; the repository-wide MSRV policy has since tightened to N-2,
+  and `Cargo.toml` already declares 1.96 — this entry is edited in place,
+  since it was still `[Unreleased]`, rather than left to misstate the
+  crate's actual floor.)*
 
 ## [0.2.0] - 2026-08-05
 ### Added — `seed_examples` CLI task (EX-4, 2026-08-04)

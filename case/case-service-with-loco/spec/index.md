@@ -1420,6 +1420,19 @@ the other v1 edge kinds even though it shares the same edge shape.
   round; verified by a live fresh-database migrate. Every other table
   this crate creates via the helper is already plural (no-op).
 
+- [x] **Doc drift: stale MSRV 1.95 / N-3 reference (2026-09-06).** The
+  2026-08-20 entry above said `rust-version = "1.95"` and "current
+  stable minus three," matching the repository's MSRV policy at the
+  time it was written. The policy has since tightened to **N-2**
+  (`spec/rust-msrv-n-minus-2/index.md`), and `Cargo.toml` already
+  declares `rust-version = "1.96"` — the entry above is left as-written
+  (it is a dated record of what was true then) rather than edited to
+  claim a value it never actually set; this entry is the correction,
+  matching the pattern already used for `CHANGELOG.md`'s equivalent
+  fix. No behaviour change; `Cargo.toml`, `ci/msrv.txt`, and
+  `scripts/ci-check.sh msrv` all already agreed on 1.96 before this
+  entry — only the prose here was stale.
+
 ## 14. Implementation status
 
 Done: loco boot; cases table + migration; CRUD with `422` validation on
