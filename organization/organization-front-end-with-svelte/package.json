@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "=26"
+  },
   "description": "SvelteKit front-end for the Organization Service (Main X Index): organization CRUD + matching.",
   "license": "MIT OR Apache-2.0",
   "scripts": {

@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "=26"
+  },
   "description": "Case Tracking for paper medical records in NHS hospital settings. Tracks paper folders by NHS Number across physical file cabinets.",
   "scripts": {
     "dev": "vite dev",
