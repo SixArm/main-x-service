@@ -9,6 +9,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — masked-view toggle on the event detail page (T-19)
+
+`EventRepository.masked()` (`GET /api/events/{id}/masked`) already
+existed but was never wired into `/events/[id]/+page.svelte`. A button
+in the header ("Show masked"/"Show full") re-fetches through the masked
+endpoint on toggle rather than redacting client-side — copy-adapted
+from place-front-end's equivalent T-19 — plus a banner while the masked
+view is shown. New i18n keys `detail.showMasked` / `detail.showFull` /
+`detail.maskedNotice` across all 13 locales. New unit test pins
+`masked()` GETs the dedicated endpoint; new e2e test stubs plain vs.
+masked responses and toggles both ways, verified to fail without the
+fix. `npm test` 61/61 (was 60); `npx playwright test` 14/14 (was 13).
+See spec/13-tasks.md T-19.
+
 ### Fixed — `/verify` crashed with a raw 500 when the authentication service was unreachable (T-29)
 
 `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch,
