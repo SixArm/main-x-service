@@ -462,24 +462,24 @@ clearly described manual check confirms the acceptance criterion.
   from a real request path with a test proving it, or removed with a
   spec note explaining the two-implementation history.
 
-- [ ] **T-13 — Resolve the unused `match_window_overlap` time scorer.**
-  `matching::algorithms::time_matching::match_window_overlap` (Jaccard
-  ratio of two events' `[start, end]` windows) is implemented and unit
-  tested (`algorithms.rs::window_overlap`), but never called from
-  `scoring::ProbabilisticScorer::calculate_score`, which instead scores
-  `start_date` and `end_date` independently via separate `START`/`END`
-  weights. *(verified: `grep -rn "match_window_overlap" src/` — only
-  the definition and its own unit test; `scoring.rs`'s weight table has
-  no `WINDOW_OVERLAP` entry.)* This is exactly the open question
+- [x] **T-13 — Resolve the unused `match_window_overlap` time scorer.**
+  *(Resolved 2026-09-06.)* `matching::algorithms::time_matching::match_window_overlap`
+  (Jaccard ratio of two events' `[start, end]` windows) was implemented
+  and unit tested (`algorithms.rs::window_overlap`), but never called
+  from `scoring::ProbabilisticScorer::calculate_score`, which instead
+  scores `start_date` and `end_date` independently via separate
+  `START`/`END` weights. This was exactly the open question
   event-matcher's own `spec/10-open-questions.md` OQ-C leaves
-  unresolved, but here it is half-built: the function exists with no
-  caller. Decide whether window-overlap replaces, blends with, or stays
-  dead alongside the independent start/end scoring, and either wire it
-  behind a `MatchingConfig` flag or delete it.
-  **Acceptance:** `match_window_overlap` has at least one production
-  call site with an integration/unit test proving its effect on a real
-  match score, or is removed and the decision recorded in
+  unresolved, but here it was half-built: the function existed with no
+  caller. **Removed** rather than wired, since wiring it in would mean
+  unilaterally resolving OQ-C at the service level instead of deferring
+  to the canonical matcher crate's own open design question; the
+  decision (and the pointer back to OQ-C) is recorded in
   `agents/matching.md`.
+  **Acceptance (met):** `match_window_overlap` and its unit test
+  (`window_overlap`) are removed; the decision is recorded in
+  `agents/matching.md`; `cargo build --lib` / `cargo test --lib` /
+  `cargo clippy --all-targets -- -D warnings` clean.
 
 - [ ] **T-14 — Retire or wire the dead `organizations` table and
   `Organization` model.** `src/models/organization.rs::Organization`

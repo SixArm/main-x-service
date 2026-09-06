@@ -128,38 +128,16 @@ pub mod time_matching {
         }
     }
 
-    /// Score the overlap between two events' time windows.
-    /// Returns the Jaccard ratio: |intersection| / |union|.
-    /// If either end is open-ended, fall back to `match_start_dates`.
-    #[must_use]
-    pub fn match_window_overlap(
-        a_start: DateTime<Utc>,
-        a_end: Option<DateTime<Utc>>,
-        b_start: DateTime<Utc>,
-        b_end: Option<DateTime<Utc>>,
-    ) -> f64 {
-        let (Some(ae), Some(be)) = (a_end, b_end) else {
-            return match_start_dates(a_start, b_start);
-        };
-        let inter_start = a_start.max(b_start);
-        let inter_end = ae.min(be);
-        if inter_end <= inter_start {
-            return 0.0;
-        }
-        let union_start = a_start.min(b_start);
-        let union_end = ae.max(be);
-        // Both spans are positive second counts; saturate to `u32`
-        // (≈136 years) so the `f64` conversion is lossless. Realistic
-        // event windows are far below the cap, so the ratio is exact.
-        let inter_secs = inter_end.signed_duration_since(inter_start).num_seconds();
-        let union_secs = union_end.signed_duration_since(union_start).num_seconds();
-        let inter = f64::from(u32::try_from(inter_secs.max(0)).unwrap_or(u32::MAX));
-        let union = f64::from(u32::try_from(union_secs.max(0)).unwrap_or(u32::MAX));
-        if union <= 0.0 {
-            return 0.0;
-        }
-        (inter / union).clamp(0.0, 1.0)
-    }
+    // `match_window_overlap` (Jaccard ratio of two `[start, end]` windows)
+    // was removed here (T-13, 2026-09-06): it had no production caller —
+    // `scoring::ProbabilisticScorer::calculate_score` scores `start_date`
+    // and `end_date` independently instead — and wiring it in would mean
+    // unilaterally resolving `event-matcher`'s own still-open OQ-C
+    // (`event-matcher-rust-crate/spec/10-open-questions.md`: whether the
+    // matcher should score window overlap instead of, or in addition to,
+    // independent endpoint proximity). This crate defers to that decision
+    // rather than half-building a second, service-local answer to the
+    // same open question. See `agents/matching.md`.
 }
 
 // ============================================================================
@@ -568,19 +546,6 @@ mod tests {
         );
         let s = time_matching::match_start_dates(new_york_as_utc, utc_instant);
         assert!(s > 0.999, "got {s}");
-    }
-
-    /// Window overlap is the Jaccard ratio of the two intervals.
-    #[test]
-    fn window_overlap() {
-        let s = time_matching::match_window_overlap(
-            dt(2026, 3, 1, 9),
-            Some(dt(2026, 3, 1, 12)),
-            dt(2026, 3, 1, 10),
-            Some(dt(2026, 3, 1, 13)),
-        );
-        // intersection 10–12 (2h) ; union 9–13 (4h) → 0.5
-        assert!((s - 0.5).abs() < 0.01, "got {s}");
     }
 
     /// Two places sharing an external id match deterministically (1.0).

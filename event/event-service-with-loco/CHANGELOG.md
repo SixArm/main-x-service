@@ -8,6 +8,20 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Removed — the unused `match_window_overlap` time scorer (T-13)
+
+`matching::algorithms::time_matching::match_window_overlap` (Jaccard
+ratio of two events' `[start, end]` windows) was implemented and unit
+tested but never called from `scoring::ProbabilisticScorer`, which
+scores `start_date`/`end_date` independently instead. Wiring it in
+would mean unilaterally resolving `event-matcher`'s own still-open
+OQ-C (whether the matcher should score window overlap instead of, or
+in addition to, independent endpoint proximity) at the service level.
+Removed rather than left half-built with no caller; the decision is
+recorded in `agents/matching.md`. `cargo test --lib` / `cargo clippy
+--all-targets -- -D warnings` / `cargo fmt --check` clean. See
+spec/13-tasks.md T-13.
+
 ### Fixed — doc drift: stale MSRV 1.95/N-3 reference (2026-09-06)
 
 `Cargo.toml` already declares `rust-version = "1.96"` (matching
