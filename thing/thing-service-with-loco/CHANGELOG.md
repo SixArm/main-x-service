@@ -8,6 +8,41 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Changed — MSRV bumped to Rust 1.96, undocumented until now
+
+`Cargo.toml` already declares `rust-version = "1.96"` (matching
+`ci/msrv.txt`, the repository's **current stable minus two** floor —
+`spec/rust-msrv-n-minus-2/index.md`), but no `CHANGELOG.md` entry ever
+recorded the bump from the `[0.6.0]` release's declared `1.95`. Found
+while working T-6 (below) — the historical `[0.6.0]` entry is left
+as-is (it accurately describes what was true at that release, under
+the then-current N-3 policy); this entry documents the bump that
+happened after it. Same underlying drift pattern already fixed in
+course-service (T-29) and authentication-verifier (AV-3), but a
+different shape here: those two crates' stale claim was still in
+`[Unreleased]` (so correcting it in place was honest); this crate's
+stale claim is under an already-dated, already-released heading, so
+rewriting it would misstate history — a new entry is the right fix.
+
+### Added — spec-drift CI guard (T-6)
+
+Copy-adapted `scripts/spec-drift-check.sh` + `.github/workflows/
+spec-drift.yml` + `.spec-allow` from the person-service reference
+(the same discipline person-matcher/worker-matcher/place-matcher/
+event-matcher already carry): fails a PR that changes
+`src/matching/**` or `src/models/thing.rs` without also updating
+`spec/`, unless the change matches a `.spec-allow` pattern. Verified
+against real commits (not by inspection): a code-only change to
+`src/models/thing.rs` exits non-zero; adding a `spec/` edit exits `0`.
+That exercise found and fixed a real latent bug in the copied script:
+`grep -Ev` over an all-comment `.spec-allow` (its documented steady
+state) exits `1`, which under `set -e -o pipefail` silently aborted
+the script before its intended FAIL message — `(grep … || true) |
+paste …` fixes it. The workflow file documents intended CI wiring
+(this repo's root `ci.yml` is what GitHub Actions actually runs for a
+nested subcrate `.yml`); it is not itself live CI. See spec/13-tasks.md
+T-6.
+
 ### Added — persist and serve the review-queue `score_breakdown` (T-12)
 
 `POST /api/things/deduplicate` always wrote `score_breakdown: None` on
