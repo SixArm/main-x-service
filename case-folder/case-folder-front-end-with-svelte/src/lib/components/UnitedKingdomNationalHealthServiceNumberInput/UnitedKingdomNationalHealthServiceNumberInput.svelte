@@ -50,9 +50,9 @@
     //   - NHS Number format: https://www.nhs.uk/nhs-services/online-services/find-nhs-number/
 
     let {
-        class: className = "",
+        class: className = '',
         label,
-        value = $bindable(""),
+        value = $bindable(''),
         required = false,
         disabled = false,
         ...restProps
@@ -71,7 +71,7 @@
 
     // Pattern for NHS number format: XXX XXX XXXX (3 digits, space, 3 digits, space, 4 digits)
     // Defined as a constant to avoid Svelte template expression parsing of curly braces
-    const nhsPattern = "[0-9]{3} [0-9]{3} [0-9]{4}";
+    const nhsPattern = '[0-9]{3} [0-9]{3} [0-9]{4}';
 </script>
 
 <!-- UnitedKingdomNationalHealthServiceNumberInput.svelte -->

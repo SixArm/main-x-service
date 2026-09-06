@@ -35,7 +35,8 @@
 
     // Distinguishes a scanned folder id (UUID v4 shape) from an NHS Number
     // so `scan()` can pick the exact-show vs. NHS-list endpoint.
-    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const UUID =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     function badgeType(status: string): 'success' | 'warning' | 'default' {
         if (status === 'in-cabinet') return 'success';
@@ -55,7 +56,9 @@
                 results = [await api.folders.show(raw)];
             } else {
                 // Treat the input as an NHS Number; normalise then list.
-                const list = await api.folders.list({ nhsNumber: formatNhsNumber(raw) });
+                const list = await api.folders.list({
+                    nhsNumber: formatNhsNumber(raw),
+                });
                 results = list.items;
             }
             searched = true;
@@ -80,8 +83,15 @@
 {/if}
 
 <Form label={t('scan.formLabel')} onsubmit={scan}>
-    <Field label={t('scan.fieldLabel')} description={t('scan.fieldDescription')}>
-        <TextInput label={t('scan.fieldLabel')} bind:value={term} placeholder={t('scan.placeholder')} />
+    <Field
+        label={t('scan.fieldLabel')}
+        description={t('scan.fieldDescription')}
+    >
+        <TextInput
+            label={t('scan.fieldLabel')}
+            bind:value={term}
+            placeholder={t('scan.placeholder')}
+        />
     </Field>
     <div class="actions">
         <Button type="submit">{t('scan.formLabel')}</Button>
@@ -97,8 +107,12 @@
                     <li>
                         <a href="/folders/{folder.id}">{folder.title}</a>
                         — {folder.patientName}
-                        <Badge type={badgeType(folder.status)}>{statusLabel(folder.status)}</Badge>
-                        <a href="/move?folder={folder.id}" class="button">{t('scan.moveThisFolder')}</a>
+                        <Badge type={badgeType(folder.status)}
+                            >{statusLabel(folder.status)}</Badge
+                        >
+                        <a href="/move?folder={folder.id}" class="button"
+                            >{t('scan.moveThisFolder')}</a
+                        >
                     </li>
                 {/each}
             </ul>

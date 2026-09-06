@@ -28,7 +28,7 @@
         gender = null,
         address = null,
         label = undefined,
-        class: className = ''
+        class: className = '',
     }: {
         name: string;
         nhsNumber: string;

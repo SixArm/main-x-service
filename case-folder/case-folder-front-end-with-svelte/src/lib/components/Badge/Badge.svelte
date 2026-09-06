@@ -52,17 +52,17 @@
     // References:
     //   - WAI-ARIA status role: https://www.w3.org/TR/wai-aria-1.2/#status
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
-        type = "default",
+        class: className = '',
+        type = 'default',
         label = undefined,
         children,
         ...restProps
     }: {
         /** Badge variant for semantic meaning */
-        type?: "default" | "info" | "success" | "warning" | "error";
+        type?: 'default' | 'info' | 'success' | 'warning' | 'error';
         /** Accessible label for screen readers */
         label?: string;
         /** The badge content (text, number, etc.) */

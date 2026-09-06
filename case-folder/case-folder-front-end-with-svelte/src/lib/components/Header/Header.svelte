@@ -51,10 +51,10 @@
     //   - MDN header element: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/header
     //   - WAI-ARIA Banner Landmark: https://www.w3.org/WAI/ARIA/apd/practices/landmark-regions/
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         label = undefined,
         children,
         ...restProps
@@ -66,10 +66,6 @@
 </script>
 
 <!-- Header.svelte -->
-<header
-    class={`header ${className}`}
-    aria-label={label}
-    {...restProps}
->
+<header class={`header ${className}`} aria-label={label} {...restProps}>
     {@render children?.()}
 </header>

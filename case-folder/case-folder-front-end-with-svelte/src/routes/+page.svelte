@@ -26,9 +26,14 @@
 {#if stats}
     <Banner type="info">
         <strong>{t('dashboard.welcomePrefix')}</strong>
-        {tf(stats.folders.inTransit === 1 ? 'dashboard.inTransit.one' : 'dashboard.inTransit.other', {
-            n: stats.folders.inTransit
-        })}
+        {tf(
+            stats.folders.inTransit === 1
+                ? 'dashboard.inTransit.one'
+                : 'dashboard.inTransit.other',
+            {
+                n: stats.folders.inTransit,
+            },
+        )}
         <a href="/move">{t('dashboard.moveFolderPage')}</a>
         {t('dashboard.pageToRecord')}
     </Banner>
@@ -36,19 +41,30 @@
     <section class="metric-grid" aria-label={t('dashboard.folderSummary')}>
         <Card heading={t('dashboard.patients')} headingLevel={3}>
             <p class="metric-value">{stats.patients}</p>
-            <p class="metric-sub">{tf('dashboard.foldersTracked', { n: stats.folders.total })}</p>
+            <p class="metric-sub">
+                {tf('dashboard.foldersTracked', { n: stats.folders.total })}
+            </p>
         </Card>
         <Card heading={t('dashboard.inCabinet')} headingLevel={3}>
             <p class="metric-value">{stats.folders.inCabinet}</p>
-            <p class="metric-sub"><Badge type="success">{t('badge.located')}</Badge></p>
+            <p class="metric-sub">
+                <Badge type="success">{t('badge.located')}</Badge>
+            </p>
         </Card>
         <Card heading={t('dashboard.inTransitCard')} headingLevel={3}>
             <p class="metric-value">{stats.folders.inTransit}</p>
-            <p class="metric-sub"><Badge type="warning">{t('badge.porterInMotion')}</Badge></p>
+            <p class="metric-sub">
+                <Badge type="warning">{t('badge.porterInMotion')}</Badge>
+            </p>
         </Card>
         <Card heading={t('dashboard.buildings')} headingLevel={3}>
             <p class="metric-value">{stats.places.buildings}</p>
-            <p class="metric-sub">{tf('dashboard.roomsCabinets', { rooms: stats.places.rooms, cabinets: stats.places.cabinets })}</p>
+            <p class="metric-sub">
+                {tf('dashboard.roomsCabinets', {
+                    rooms: stats.places.rooms,
+                    cabinets: stats.places.cabinets,
+                })}
+            </p>
         </Card>
         <Card heading={t('dashboard.moves24h')} headingLevel={3}>
             <p class="metric-value">{stats.moves24h}</p>
@@ -63,7 +79,9 @@
     <div class="toolbar">
         <h2 id="folders-heading">{t('dashboard.folderRegister')}</h2>
         <div>
-            <a href="/folders" class="button secondary">{t('dashboard.viewAll')}</a>
+            <a href="/folders" class="button secondary"
+                >{t('dashboard.viewAll')}</a
+            >
             <a href="/folders/new" class="button">{t('dashboard.addFolder')}</a>
         </div>
     </div>
@@ -105,14 +123,23 @@
                 <!-- Capacity may be null (uncapped); treat as 0 so the
                      percentage maths is skipped and we show ∞ / — instead. -->
                 {@const cap = c.capacity ?? 0}
-                {@const percent = cap > 0 ? Math.round((c.folderCount / cap) * 100) : 0}
+                {@const percent =
+                    cap > 0 ? Math.round((c.folderCount / cap) * 100) : 0}
                 <SummaryListItem term={c.label}>
                     <span>{c.folderCount} / {cap || '∞'}</span>
                     <!-- Traffic-light fill: red >85%, amber >60%, else green. -->
-                    <Badge type={percent > 85 ? 'error' : percent > 60 ? 'warning' : 'success'}>
+                    <Badge
+                        type={percent > 85
+                            ? 'error'
+                            : percent > 60
+                              ? 'warning'
+                              : 'success'}
+                    >
                         {cap > 0 ? `${percent}%` : '—'}
                     </Badge>
-                    <div style="font-size: var(--nhs-font-size-14); color: var(--nhs-dark-grey);">
+                    <div
+                        style="font-size: var(--nhs-font-size-14); color: var(--nhs-dark-grey);"
+                    >
                         {c.containerPath || '?'}
                     </div>
                 </SummaryListItem>

@@ -54,7 +54,9 @@ describe('isValidNhsNumber (Modulus 11)', () => {
         }
     });
     it('treats grouped and bare forms identically', () => {
-        expect(isValidNhsNumber('943 476 5919')).toBe(isValidNhsNumber('9434765919'));
+        expect(isValidNhsNumber('943 476 5919')).toBe(
+            isValidNhsNumber('9434765919'),
+        );
         expect(isValidNhsNumber('943-476-5919')).toBe(true);
     });
 });

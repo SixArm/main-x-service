@@ -23,7 +23,7 @@ import type {
     Stats,
     User,
     Volume,
-    Worker
+    Worker,
 } from '$lib/store/types';
 import type { components } from './schema';
 
@@ -38,7 +38,8 @@ const DEFAULT_BASE = '';
 function baseUrl(): string {
     const fromEnv =
         typeof import.meta !== 'undefined' &&
-        (import.meta as { env?: { VITE_API_BASE_URL?: string } }).env?.VITE_API_BASE_URL;
+        (import.meta as { env?: { VITE_API_BASE_URL?: string } }).env
+            ?.VITE_API_BASE_URL;
     return (fromEnv && fromEnv.replace(/\/$/, '')) || DEFAULT_BASE;
 }
 
@@ -60,7 +61,7 @@ export class ApiError extends Error {
     constructor(
         message: string,
         public readonly status: number,
-        public readonly body: unknown
+        public readonly body: unknown,
     ) {
         super(message);
         this.name = 'ApiError';
@@ -97,7 +98,7 @@ async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
         headers: opts.body ? { 'content-type': 'application/json' } : undefined,
         body: opts.body ? JSON.stringify(opts.body) : undefined,
         // Send the HttpOnly session cookie on every request.
-        credentials: 'include'
+        credentials: 'include',
     };
     let response: Response;
     try {
@@ -106,7 +107,7 @@ async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
         throw new ApiError(
             `Cannot reach Case Tracking API at ${baseUrl()}${path}: ${(e as Error).message}`,
             0,
-            null
+            null,
         );
     }
     const text = await response.text();
@@ -188,7 +189,7 @@ function toPatient(p: ApiPatient): Patient {
         name: p.name,
         dateOfBirth: p.date_of_birth,
         folderCount: p.folder_count,
-        source: p.source
+        source: p.source,
     };
 }
 
@@ -205,7 +206,7 @@ function toFolder(f: ApiFolder): Folder {
         lastMovedAt: f.last_moved_at,
         notes: f.notes,
         volumeId: f.volume_id,
-        volumeTitle: f.volume_title
+        volumeTitle: f.volume_title,
     };
 }
 
@@ -224,7 +225,7 @@ function toAlert(a: ApiAlert): Alert {
         toCabinetLabel: a.to_cabinet_label,
         movedBy: a.moved_by,
         movedAt: a.moved_at,
-        reason: a.reason
+        reason: a.reason,
     };
 }
 
@@ -238,7 +239,7 @@ function toVolume(v: ApiVolume): Volume {
         cabinetId: v.cabinet_id,
         cabinetLabel: v.cabinet_label,
         status: v.status,
-        folderCount: v.folder_count
+        folderCount: v.folder_count,
     };
 }
 
@@ -254,7 +255,7 @@ function toVolumeDetail(body: ApiVolumeShow): VolumeDetail {
     return {
         volume: toVolume(vol),
         folders: folders.map(toFolder),
-        history: history.map(toMove)
+        history: history.map(toMove),
     };
 }
 
@@ -274,7 +275,7 @@ function toMove(m: ApiMove): MoveEvent {
         movedBy: m.moved_by,
         workerRole: m.worker_role,
         movedAt: m.moved_at,
-        reason: m.reason
+        reason: m.reason,
     };
 }
 
@@ -287,7 +288,7 @@ function toRoom(p: ApiPlace): Room {
         id: p.id,
         name: p.name,
         buildingId: p.contained_in_place,
-        description: p.description
+        description: p.description,
     };
 }
 
@@ -299,7 +300,7 @@ function toCabinet(p: ApiCabinet): Cabinet {
         capacity: p.capacity,
         description: p.description,
         folderCount: p.folder_count,
-        containerPath: p.container_path
+        containerPath: p.container_path,
     };
 }
 
@@ -319,7 +320,7 @@ function toPresence(p: ApiPresence): Presence {
         enteredAt: p.entered_at,
         leftAt: p.left_at,
         enteredReason: p.entered_reason,
-        leftReason: p.left_reason
+        leftReason: p.left_reason,
     };
 }
 
@@ -329,10 +330,10 @@ function toStats(s: ApiStats): Stats {
         folders: {
             total: s.folders.total,
             inCabinet: s.folders.in_cabinet,
-            inTransit: s.folders.in_transit
+            inTransit: s.folders.in_transit,
         },
         places: s.places,
-        moves24h: s.moves_24h
+        moves24h: s.moves_24h,
     };
 }
 
@@ -368,12 +369,16 @@ export const api = {
         /// response carries the link so it can be shown / clicked.
         async requestLink(
             email: string,
-            opts: FetchOpts = {}
+            opts: FetchOpts = {},
         ): Promise<{ sent: boolean; magicLink: string | null }> {
-            const body = await request<{ sent: boolean; magic_link?: string | null }>(
-                '/api/auth/request',
-                { method: 'POST', body: { email }, fetchImpl: opts.fetch }
-            );
+            const body = await request<{
+                sent: boolean;
+                magic_link?: string | null;
+            }>('/api/auth/request', {
+                method: 'POST',
+                body: { email },
+                fetchImpl: opts.fetch,
+            });
             return { sent: body.sent, magicLink: body.magic_link ?? null };
         },
 
@@ -382,7 +387,7 @@ export const api = {
             const body = await request<{ user: ApiUser }>('/api/auth/verify', {
                 method: 'POST',
                 body: { token },
-                fetchImpl: opts.fetch
+                fetchImpl: opts.fetch,
             });
             return body.user;
         },
@@ -391,57 +396,68 @@ export const api = {
         /// authenticated.
         async me(opts: FetchOpts = {}): Promise<User> {
             const body = await request<{ user: ApiUser }>('/api/auth/me', {
-                fetchImpl: opts.fetch
+                fetchImpl: opts.fetch,
             });
             return body.user;
         },
 
         /// End the session (clears the cookie).
         async logout(opts: FetchOpts = {}): Promise<void> {
-            await request<null>('/api/auth/logout', { method: 'POST', fetchImpl: opts.fetch });
-        }
+            await request<null>('/api/auth/logout', {
+                method: 'POST',
+                fetchImpl: opts.fetch,
+            });
+        },
     },
 
     async stats(opts: FetchOpts = {}): Promise<Stats> {
-        const body = await request<ApiStats>('/api/stats', { fetchImpl: opts.fetch });
+        const body = await request<ApiStats>('/api/stats', {
+            fetchImpl: opts.fetch,
+        });
         return toStats(body);
     },
 
     alerts: {
         async list(opts: FetchOpts = {}): Promise<Alert[]> {
             const body = await request<ApiList<ApiAlert>>('/api/alerts', {
-                fetchImpl: opts.fetch
+                fetchImpl: opts.fetch,
             });
             return body.items.map(toAlert);
-        }
+        },
     },
 
     folders: {
         async list(
             params: { q?: string; nhsNumber?: string } = {},
-            opts: FetchOpts = {}
+            opts: FetchOpts = {},
         ): Promise<{ items: Folder[]; query?: string }> {
             const qs = new URLSearchParams();
             if (params.q) qs.set('q', params.q);
             if (params.nhsNumber) qs.set('nhs_number', params.nhsNumber);
             const suffix = qs.toString() ? `?${qs}` : '';
-            const body = await request<ApiList<ApiFolder>>(`/api/folders${suffix}`, {
-                fetchImpl: opts.fetch
-            });
+            const body = await request<ApiList<ApiFolder>>(
+                `/api/folders${suffix}`,
+                {
+                    fetchImpl: opts.fetch,
+                },
+            );
             return { items: body.items.map(toFolder), query: body.query };
         },
 
         async show(id: string, opts: FetchOpts = {}): Promise<Folder> {
-            const body = await request<ApiFolder>(`/api/folders/${encodeURIComponent(id)}`, {
-                fetchImpl: opts.fetch
-            });
+            const body = await request<ApiFolder>(
+                `/api/folders/${encodeURIComponent(id)}`,
+                {
+                    fetchImpl: opts.fetch,
+                },
+            );
             return toFolder(body);
         },
 
         async history(id: string, opts: FetchOpts = {}): Promise<MoveEvent[]> {
             const body = await request<ApiList<ApiMove>>(
                 `/api/folders/${encodeURIComponent(id)}/history`,
-                { fetchImpl: opts.fetch }
+                { fetchImpl: opts.fetch },
             );
             return body.items.map(toMove);
         },
@@ -462,28 +478,31 @@ export const api = {
                     date_of_birth: input.dateOfBirth ?? null,
                     title: input.title,
                     cabinet_id: input.cabinetId ?? null,
-                    notes: input.notes ?? null
-                }
+                    notes: input.notes ?? null,
+                },
             });
             return toFolder(body);
-        }
+        },
     },
 
     patients: {
         async list(
             params: { q?: string } = {},
-            opts: FetchOpts = {}
+            opts: FetchOpts = {},
         ): Promise<{ items: Patient[]; query?: string }> {
             const qs = params.q ? `?q=${encodeURIComponent(params.q)}` : '';
-            const body = await request<ApiList<ApiPatient>>(`/api/patients${qs}`, {
-                fetchImpl: opts.fetch
-            });
+            const body = await request<ApiList<ApiPatient>>(
+                `/api/patients${qs}`,
+                {
+                    fetchImpl: opts.fetch,
+                },
+            );
             return { items: body.items.map(toPatient), query: body.query };
         },
 
         async show(
             nhs: string,
-            opts: FetchOpts = {}
+            opts: FetchOpts = {},
         ): Promise<{
             patient: Patient | null;
             folders: Folder[];
@@ -493,22 +512,22 @@ export const api = {
         }> {
             const body = await request<ApiPatientShow>(
                 `/api/patients/${encodeURIComponent(nhs)}`,
-                { fetchImpl: opts.fetch }
+                { fetchImpl: opts.fetch },
             );
             return {
                 patient: body.patient ? toPatient(body.patient) : null,
                 folders: body.folders.map(toFolder),
                 history: body.history.map(toMove),
                 nhsNumber: body.nhs_number,
-                patientServiceMatch: body.patient_service_match
+                patientServiceMatch: body.patient_service_match,
             };
-        }
+        },
     },
 
     places: {
         async list(
             params: { q?: string; kind?: 'building' | 'room' | 'cabinet' } = {},
-            opts: FetchOpts = {}
+            opts: FetchOpts = {},
         ): Promise<{
             buildings: Building[];
             rooms: Room[];
@@ -521,24 +540,27 @@ export const api = {
             if (params.kind) qs.set('kind', params.kind);
             const suffix = qs.toString() ? `?${qs}` : '';
             const body = await request<ApiPlacesIndex>(`/api/places${suffix}`, {
-                fetchImpl: opts.fetch
+                fetchImpl: opts.fetch,
             });
             return {
                 buildings: body.buildings.map(toBuilding),
                 rooms: body.rooms.map(toRoom),
                 cabinets: body.cabinets.map(toCabinet),
                 query: body.query,
-                kind: body.kind
+                kind: body.kind,
             };
         },
 
         async show(
             id: string,
-            opts: FetchOpts = {}
+            opts: FetchOpts = {},
         ): Promise<{ place: ApiPlace; folders: Folder[] }> {
-            const body = await request<ApiPlaceShow>(`/api/places/${encodeURIComponent(id)}`, {
-                fetchImpl: opts.fetch
-            });
+            const body = await request<ApiPlaceShow>(
+                `/api/places/${encodeURIComponent(id)}`,
+                {
+                    fetchImpl: opts.fetch,
+                },
+            );
             const { folders, ...place } = body;
             return { place, folders: folders.map(toFolder) };
         },
@@ -547,11 +569,11 @@ export const api = {
         /// own in/out timeline; a room/building aggregates its cabinets.
         async history(
             id: string,
-            opts: FetchOpts = {}
+            opts: FetchOpts = {},
         ): Promise<{ place: ApiPlace; presences: Presence[] }> {
             const body = await request<ApiPlaceHistory>(
                 `/api/places/${encodeURIComponent(id)}/history`,
-                { fetchImpl: opts.fetch }
+                { fetchImpl: opts.fetch },
             );
             const { presences, ...place } = body;
             return { place, presences: presences.map(toPresence) };
@@ -571,31 +593,37 @@ export const api = {
                     kind: input.kind,
                     contained_in_place: input.containedInPlace ?? null,
                     description: input.description ?? null,
-                    capacity: input.capacity ?? null
-                }
+                    capacity: input.capacity ?? null,
+                },
             });
-        }
+        },
     },
 
     volumes: {
         async list(
             params: { q?: string; nhsNumber?: string } = {},
-            opts: FetchOpts = {}
+            opts: FetchOpts = {},
         ): Promise<{ items: Volume[]; query?: string }> {
             const qs = new URLSearchParams();
             if (params.q) qs.set('q', params.q);
             if (params.nhsNumber) qs.set('nhs_number', params.nhsNumber);
             const suffix = qs.toString() ? `?${qs}` : '';
-            const body = await request<ApiList<ApiVolume>>(`/api/volumes${suffix}`, {
-                fetchImpl: opts.fetch
-            });
+            const body = await request<ApiList<ApiVolume>>(
+                `/api/volumes${suffix}`,
+                {
+                    fetchImpl: opts.fetch,
+                },
+            );
             return { items: body.items.map(toVolume), query: body.query };
         },
 
         async show(id: string, opts: FetchOpts = {}): Promise<VolumeDetail> {
-            const body = await request<ApiVolumeShow>(`/api/volumes/${encodeURIComponent(id)}`, {
-                fetchImpl: opts.fetch
-            });
+            const body = await request<ApiVolumeShow>(
+                `/api/volumes/${encodeURIComponent(id)}`,
+                {
+                    fetchImpl: opts.fetch,
+                },
+            );
             return toVolumeDetail(body);
         },
 
@@ -609,32 +637,38 @@ export const api = {
                 body: {
                     nhs_number: input.nhsNumber,
                     title: input.title,
-                    cabinet_id: input.cabinetId ?? null
-                }
+                    cabinet_id: input.cabinetId ?? null,
+                },
             });
             return toVolume(body);
         },
 
         async rename(id: string, title: string): Promise<VolumeDetail> {
-            const body = await request<ApiVolumeShow>(`/api/volumes/${encodeURIComponent(id)}`, {
-                method: 'PATCH',
-                body: { title }
-            });
+            const body = await request<ApiVolumeShow>(
+                `/api/volumes/${encodeURIComponent(id)}`,
+                {
+                    method: 'PATCH',
+                    body: { title },
+                },
+            );
             return toVolumeDetail(body);
         },
 
         async addFolder(id: string, folderId: string): Promise<VolumeDetail> {
             const body = await request<ApiVolumeShow>(
                 `/api/volumes/${encodeURIComponent(id)}/folders`,
-                { method: 'POST', body: { folder_id: folderId } }
+                { method: 'POST', body: { folder_id: folderId } },
             );
             return toVolumeDetail(body);
         },
 
-        async removeFolder(id: string, folderId: string): Promise<VolumeDetail> {
+        async removeFolder(
+            id: string,
+            folderId: string,
+        ): Promise<VolumeDetail> {
             const body = await request<ApiVolumeShow>(
                 `/api/volumes/${encodeURIComponent(id)}/folders/${encodeURIComponent(folderId)}`,
-                { method: 'DELETE' }
+                { method: 'DELETE' },
             );
             return toVolumeDetail(body);
         },
@@ -646,7 +680,7 @@ export const api = {
                 workerId?: string | null;
                 movedBy?: string;
                 reason?: string;
-            }
+            },
         ): Promise<VolumeDetail> {
             const body = await request<ApiVolumeShow>(
                 `/api/volumes/${encodeURIComponent(id)}/move`,
@@ -656,23 +690,26 @@ export const api = {
                         to_cabinet_id: input.toCabinetId ?? null,
                         worker_id: input.workerId ?? null,
                         moved_by: input.movedBy ?? null,
-                        reason: input.reason ?? null
-                    }
-                }
+                        reason: input.reason ?? null,
+                    },
+                },
             );
             return toVolumeDetail(body);
-        }
+        },
     },
 
     workers: {
         async list(
             params: { q?: string } = {},
-            opts: FetchOpts = {}
+            opts: FetchOpts = {},
         ): Promise<{ items: Worker[]; query?: string }> {
             const qs = params.q ? `?q=${encodeURIComponent(params.q)}` : '';
-            const body = await request<ApiList<ApiWorker>>(`/api/workers${qs}`, {
-                fetchImpl: opts.fetch
-            });
+            const body = await request<ApiList<ApiWorker>>(
+                `/api/workers${qs}`,
+                {
+                    fetchImpl: opts.fetch,
+                },
+            );
             return { items: body.items.map(toWorker), query: body.query };
         },
 
@@ -680,41 +717,47 @@ export const api = {
         /// patients (a superset), and their move log.
         async show(
             id: string,
-            opts: FetchOpts = {}
+            opts: FetchOpts = {},
         ): Promise<{
             worker: Worker;
             movedFolders: Folder[];
             patientFolders: Folder[];
             moves: MoveEvent[];
         }> {
-            const body = await request<ApiWorkerShow>(`/api/workers/${encodeURIComponent(id)}`, {
-                fetchImpl: opts.fetch
-            });
+            const body = await request<ApiWorkerShow>(
+                `/api/workers/${encodeURIComponent(id)}`,
+                {
+                    fetchImpl: opts.fetch,
+                },
+            );
             return {
                 worker: toWorker(body.worker),
                 movedFolders: body.moved_folders.map(toFolder),
                 patientFolders: body.patient_folders.map(toFolder),
-                moves: body.moves.map(toMove)
+                moves: body.moves.map(toMove),
             };
-        }
+        },
     },
 
     moves: {
         async list(
             params: { q?: string } = {},
-            opts: FetchOpts = {}
+            opts: FetchOpts = {},
         ): Promise<{ items: MoveEvent[]; query?: string }> {
             const qs = params.q ? `?q=${encodeURIComponent(params.q)}` : '';
             const body = await request<ApiList<ApiMove>>(`/api/moves${qs}`, {
-                fetchImpl: opts.fetch
+                fetchImpl: opts.fetch,
             });
             return { items: body.items.map(toMove), query: body.query };
         },
 
         async show(id: string, opts: FetchOpts = {}): Promise<MoveEvent> {
-            const body = await request<ApiMove>(`/api/moves/${encodeURIComponent(id)}`, {
-                fetchImpl: opts.fetch
-            });
+            const body = await request<ApiMove>(
+                `/api/moves/${encodeURIComponent(id)}`,
+                {
+                    fetchImpl: opts.fetch,
+                },
+            );
             return toMove(body);
         },
 
@@ -732,12 +775,12 @@ export const api = {
                     to_cabinet_id: input.toCabinetId ?? null,
                     worker_id: input.workerId ?? null,
                     moved_by: input.movedBy ?? null,
-                    reason: input.reason ?? null
-                }
+                    reason: input.reason ?? null,
+                },
             });
             return toMove(body);
-        }
-    }
+        },
+    },
 };
 
 export {
@@ -750,5 +793,5 @@ export {
     toStats,
     toVolume,
     toVolumeDetail,
-    toWorker
+    toWorker,
 };

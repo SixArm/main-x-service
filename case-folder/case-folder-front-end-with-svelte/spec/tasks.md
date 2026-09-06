@@ -65,21 +65,34 @@
   in root **T-12**; this row was left unticked after that landed —
   reconciled 2026-08-29.
 
-- [ ] **ST-17** No Prettier at all: `package.json` has no `prettier`
-  or `prettier-plugin-svelte` devDependency, no `format`/`format:check`
-  script, and no `.prettierrc`/`prettier.config.*` file — *(verified:
-  `grep -i prettier package.json` and `ls .prettierrc*` both empty)*.
-  Every other checked sibling front-end (e.g.
-  `patient-flow-front-end-with-svelte`) carries `prettier` +
-  `prettier-plugin-svelte` as devDependencies with `format`/`lint`
-  scripts wired to it, so this app's `npm run lint` (ESLint only) is the
-  one place in the family relying on ESLint alone for style. This is the
-  exact gap the task brief's known-lead named ("case-folder's front-end
-  lacks the plugin entirely"). **Acceptance:** add `prettier` +
-  `prettier-plugin-svelte` as devDependencies, a `format` script
-  (`prettier --write .`), and CI-gate a `format:check`/`--check` step
-  alongside the existing `npm run lint` in [`AGENTS.md`](../AGENTS.md)
-  §"CI gate".
+- [x] **ST-17** *(resolved 2026-09-06.)* No Prettier at all:
+  `package.json` had no `prettier` or `prettier-plugin-svelte`
+  devDependency, no `format`/`format:check` script, and no
+  `.prettierrc`/`prettier.config.*` file, so this app's `npm run lint`
+  (ESLint only) was the one place in the family relying on ESLint
+  alone for style.
+  - **Resolved.** Added `prettier` + `prettier-plugin-svelte` as
+    devDependencies; `format` (`prettier --write src`) and
+    `format:check` (`prettier --check src`) scripts, **scoped to
+    `src`** like every sibling front-end's own scripts (not `.` —
+    running unscoped over the whole project also reformats
+    `spec/*.md`, `pnpm-lock.yaml`, and config files nobody intended to
+    touch, discovered by trying it first and reverting); a new
+    `.prettierrc` (`tabWidth: 4`, `singleQuote: true`,
+    `prettier-plugin-svelte`) matching this project's **existing**
+    style, chosen specifically so adopting the tool needed a real
+    first-time reformat rather than an arbitrary style change.
+  - **The first-time reformat is part of this same change** (85 files
+    under `src` had never been Prettier-formatted): verified
+    mechanical-only (trailing commas, line wraps, quote
+    normalisation — no logic touched) by diffing several files by
+    hand and by `npm run check` / `npm run test:unit` / `npm run lint`
+    all staying green afterwards (50/50 unit tests, 0 errors, 0
+    ESLint issues).
+  - `AGENTS.md` §"CI gate" now lists `npm run format:check` alongside
+    `npm run check` and `npm run lint`.
+  - **Acceptance met:** `npm run format:check` is clean; `npm run
+    lint`/`npm run check` unaffected.
 - [x] **ST-18** *(resolved 2026-09-06.)* `UserView.role` (from `GET
   /api/auth/me`) is rendered in three places (`+layout.svelte`,
   `move/+page.svelte`, `workers/+page.svelte`) but there was no test

@@ -33,7 +33,9 @@
         if (debounce) clearTimeout(debounce);
         debounce = setTimeout(() => {
             const next = query.trim();
-            const target = next ? `/history?q=${encodeURIComponent(next)}` : '/history';
+            const target = next
+                ? `/history?q=${encodeURIComponent(next)}`
+                : '/history';
             goto(target, { keepFocus: true, replaceState: true });
         }, 200);
     }
@@ -53,7 +55,10 @@
 </div>
 
 <div class="panel">
-    <DataTable label={t('history.tableLabel')} caption={t('history.tableCaption')}>
+    <DataTable
+        label={t('history.tableLabel')}
+        caption={t('history.tableCaption')}
+    >
         <DataTableHead>
             <DataTableRow>
                 <th scope="col">{t('common.when')}</th>
@@ -69,10 +74,18 @@
             {#each cache.moves as move (move.id)}
                 <DataTableRow>
                     <DataTableTD>
-                        <a href="/history/{move.id}">{new Date(move.movedAt).toLocaleString('en-GB')}</a>
+                        <a href="/history/{move.id}"
+                            >{new Date(move.movedAt).toLocaleString('en-GB')}</a
+                        >
                     </DataTableTD>
                     <DataTableTD>
-                        <a href="/patients/{move.nhsNumber.replaceAll(' ', '')}" class="nhs-number">
+                        <a
+                            href="/patients/{move.nhsNumber.replaceAll(
+                                ' ',
+                                '',
+                            )}"
+                            class="nhs-number"
+                        >
                             {move.nhsNumber}
                         </a>
                     </DataTableTD>
@@ -80,14 +93,16 @@
                     <DataTableTD>{move.fromCabinetLabel}</DataTableTD>
                     <DataTableTD>{move.toCabinetLabel}</DataTableTD>
                     <DataTableTD>
-                        {move.movedBy}{#if move.workerRole} ({move.workerRole}){/if}
+                        {move.movedBy}{#if move.workerRole}
+                            ({move.workerRole}){/if}
                     </DataTableTD>
                     <DataTableTD>{move.reason ?? ''}</DataTableTD>
                 </DataTableRow>
             {/each}
             {#if cache.moves.length === 0}
                 <DataTableRow>
-                    <DataTableTD colspan={7}>{t('history.noMatch')}</DataTableTD>
+                    <DataTableTD colspan={7}>{t('history.noMatch')}</DataTableTD
+                    >
                 </DataTableRow>
             {/if}
         </DataTableBody>

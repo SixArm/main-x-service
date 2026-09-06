@@ -14,14 +14,14 @@ export async function load({ fetch }) {
             api.places.list({}, { fetch }),
             api.folders.list({}, { fetch }),
             api.moves.list({}, { fetch }),
-            api.volumes.list({}, { fetch })
+            api.volumes.list({}, { fetch }),
         ]);
         return {
             stats,
             cabinets: places.cabinets,
             folders: folders.items,
             moves: moves.items,
-            volumes: volumes.items
+            volumes: volumes.items,
         };
     } catch (e) {
         error(503, (e as Error).message);

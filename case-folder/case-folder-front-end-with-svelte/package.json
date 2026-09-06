@@ -14,6 +14,8 @@
     "test:e2e:headed": "playwright test --headed",
     "test:unit": "vitest run",
     "lint": "eslint .",
+    "format": "prettier --write src",
+    "format:check": "prettier --check src",
     "gen:api": "openapi-typescript ../case-folder-service-with-rust/openapi.yaml -o src/lib/api/schema.d.ts"
   },
   "devDependencies": {
@@ -31,6 +33,8 @@
     "globals": "^17.6.0",
     "jsdom": "^29.1.1",
     "openapi-typescript": "^7.13.0",
+    "prettier": "^3.3.0",
+    "prettier-plugin-svelte": "^3.3.0",
     "svelte": "^5.25.0",
     "svelte-check": "^4.2.0",
     "svelte-eslint-parser": "^1.8.0",

@@ -48,12 +48,14 @@
             const volume = await api.volumes.create({
                 nhsNumber: formatted,
                 title: title.trim(),
-                cabinetId: cabinetId || null
+                cabinetId: cabinetId || null,
             });
             await goto(`/volumes/${volume.id}`);
         } catch (e) {
             if (e instanceof ApiError && e.status === 422) {
-                const body = e.body as { errors?: Record<string, string> } | null;
+                const body = e.body as {
+                    errors?: Record<string, string>;
+                } | null;
                 const errs = body?.errors ?? {};
                 if (errs.nhs_number) nhsError = errs.nhs_number;
                 if (errs.title) titleError = errs.title;
@@ -71,21 +73,36 @@
 <p>{t('volumeNew.intro')}</p>
 
 {#if submitError}
-    <Alert type="error" heading={t('volumeNew.cannotCreate')}>{submitError}</Alert>
+    <Alert type="error" heading={t('volumeNew.cannotCreate')}
+        >{submitError}</Alert
+    >
 {/if}
 
 <Form label={t('volumeNew.formLabel')} onsubmit={handleSubmit}>
-    <Field label={t('volumeNew.patientNhs')} required error={nhsError} description={t('volumeNew.nhsDescription')}>
+    <Field
+        label={t('volumeNew.patientNhs')}
+        required
+        error={nhsError}
+        description={t('volumeNew.nhsDescription')}
+    >
         <UnitedKingdomNationalHealthServiceNumberInput
             label={t('common.nhsNumber')}
             bind:value={nhsNumber}
             required
         />
     </Field>
-    <Field label={t('volumeNew.titleLabel')} required error={titleError} description={t('volumeNew.titleDescription')}>
+    <Field
+        label={t('volumeNew.titleLabel')}
+        required
+        error={titleError}
+        description={t('volumeNew.titleDescription')}
+    >
         <input bind:value={title} required />
     </Field>
-    <Field label={t('volumeNew.initialCabinet')} description={t('volumeNew.initialCabinetDescription')}>
+    <Field
+        label={t('volumeNew.initialCabinet')}
+        description={t('volumeNew.initialCabinetDescription')}
+    >
         <select bind:value={cabinetId}>
             <option value="">{t('common.inTransitOption')}</option>
             {#each cache.cabinets as c (c.id)}

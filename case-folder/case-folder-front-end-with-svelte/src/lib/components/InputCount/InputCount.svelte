@@ -17,7 +17,7 @@
         min = 1,
         max = 99,
         label,
-        class: className = ''
+        class: className = '',
     }: {
         value?: number;
         min?: number;

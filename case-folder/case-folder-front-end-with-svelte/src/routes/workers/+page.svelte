@@ -21,7 +21,10 @@
 <p>{t('workers.intro')}</p>
 
 <div class="panel">
-    <DataTable label={t('workers.tableLabel')} caption={t('workers.tableCaption')}>
+    <DataTable
+        label={t('workers.tableLabel')}
+        caption={t('workers.tableCaption')}
+    >
         <DataTableHead>
             <DataTableRow>
                 <th scope="col">{t('common.name')}</th>
@@ -31,13 +34,18 @@
         <DataTableBody>
             {#each data.workers as worker (worker.id)}
                 <DataTableRow>
-                    <DataTableTD><a href="/workers/{worker.id}">{worker.name}</a></DataTableTD>
+                    <DataTableTD
+                        ><a href="/workers/{worker.id}">{worker.name}</a
+                        ></DataTableTD
+                    >
                     <DataTableTD>{worker.role ?? '—'}</DataTableTD>
                 </DataTableRow>
             {/each}
             {#if data.workers.length === 0}
                 <DataTableRow>
-                    <DataTableTD colspan={2}>{t('workers.noWorkers')}</DataTableTD>
+                    <DataTableTD colspan={2}
+                        >{t('workers.noWorkers')}</DataTableTD
+                    >
                 </DataTableRow>
             {/if}
         </DataTableBody>

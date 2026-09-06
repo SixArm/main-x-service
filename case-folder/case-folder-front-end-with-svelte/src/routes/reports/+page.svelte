@@ -25,13 +25,17 @@
 
     // Count moves within the trailing 24-hour and 7-day windows.
     const throughput24h = $derived(
-        data.moves.filter((m) => new Date(m.movedAt).getTime() >= since(24)).length
+        data.moves.filter((m) => new Date(m.movedAt).getTime() >= since(24))
+            .length,
     );
     const throughput7d = $derived(
-        data.moves.filter((m) => new Date(m.movedAt).getTime() >= since(24 * 7)).length
+        data.moves.filter((m) => new Date(m.movedAt).getTime() >= since(24 * 7))
+            .length,
     );
 
-    const inTransit = $derived(data.folders.filter((f) => f.status === 'in-transit'));
+    const inTransit = $derived(
+        data.folders.filter((f) => f.status === 'in-transit'),
+    );
 
     // Per-worker activity from the move log: tally moves by `movedBy`,
     // then sort busiest-first for the leaderboard table.
@@ -40,10 +44,10 @@
             data.moves.reduce<Record<string, number>>((acc, m) => {
                 acc[m.movedBy] = (acc[m.movedBy] ?? 0) + 1;
                 return acc;
-            }, {})
+            }, {}),
         )
             .map(([worker, count]) => ({ worker, count }))
-            .sort((a, b) => b.count - a.count)
+            .sort((a, b) => b.count - a.count),
     );
 
     // Occupancy percentage string; "—" when the cabinet is uncapped.
@@ -60,11 +64,32 @@
 <div class="panel">
     <h3>{t('reports.atAGlance')}</h3>
     <ul class="report-kpis">
-        <li>{t('reports.kpiPatients')} <strong>{data.stats.patients}</strong></li>
-        <li>{t('reports.kpiFolders')} <strong>{data.stats.folders.total}</strong> {tf('reports.kpiFoldersDetail', { inCabinet: data.stats.folders.inCabinet, inTransit: data.stats.folders.inTransit })}</li>
-        <li>{t('reports.kpiVolumes')} <strong>{data.volumes.length}</strong></li>
-        <li>{t('reports.kpiCabinets')} <strong>{data.stats.places.cabinets}</strong> {tf('reports.kpiCabinetsDetail', { n: data.stats.places.buildings })}</li>
-        <li>{t('reports.kpiMoves')} <strong>{throughput24h}</strong> · {t('reports.kpiMoves7d')} <strong>{throughput7d}</strong></li>
+        <li>
+            {t('reports.kpiPatients')} <strong>{data.stats.patients}</strong>
+        </li>
+        <li>
+            {t('reports.kpiFolders')}
+            <strong>{data.stats.folders.total}</strong>
+            {tf('reports.kpiFoldersDetail', {
+                inCabinet: data.stats.folders.inCabinet,
+                inTransit: data.stats.folders.inTransit,
+            })}
+        </li>
+        <li>
+            {t('reports.kpiVolumes')} <strong>{data.volumes.length}</strong>
+        </li>
+        <li>
+            {t('reports.kpiCabinets')}
+            <strong>{data.stats.places.cabinets}</strong>
+            {tf('reports.kpiCabinetsDetail', {
+                n: data.stats.places.buildings,
+            })}
+        </li>
+        <li>
+            {t('reports.kpiMoves')} <strong>{throughput24h}</strong> · {t(
+                'reports.kpiMoves7d',
+            )} <strong>{throughput7d}</strong>
+        </li>
     </ul>
 </div>
 
@@ -82,10 +107,18 @@
         <DataTableBody>
             {#each data.cabinets as cab (cab.id)}
                 <DataTableRow>
-                    <DataTableTD><a href="/cabinets/{cab.id}">{cab.label}</a></DataTableTD>
+                    <DataTableTD
+                        ><a href="/cabinets/{cab.id}">{cab.label}</a
+                        ></DataTableTD
+                    >
                     <DataTableTD>{cab.folderCount}</DataTableTD>
                     <DataTableTD>{cab.capacity ?? '—'}</DataTableTD>
-                    <DataTableTD>{utilisation(cab.folderCount, cab.capacity)}</DataTableTD>
+                    <DataTableTD
+                        >{utilisation(
+                            cab.folderCount,
+                            cab.capacity,
+                        )}</DataTableTD
+                    >
                 </DataTableRow>
             {/each}
         </DataTableBody>
@@ -98,7 +131,9 @@
         {#if inTransit.length > 0}
             <ul class="report-list">
                 {#each inTransit as folder (folder.id)}
-                    <li><a href="/folders/{folder.id}">{folder.title}</a> — {folder.patientName}</li>
+                    <li>
+                        <a href="/folders/{folder.id}">{folder.title}</a> — {folder.patientName}
+                    </li>
                 {/each}
             </ul>
         {:else}

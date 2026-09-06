@@ -15,8 +15,8 @@ vi.mock('$lib/api/client', () => ({
     api: {
         folders: { create: vi.fn() },
         moves: { create: vi.fn() },
-        places: { create: vi.fn() }
-    }
+        places: { create: vi.fn() },
+    },
 }));
 
 import { cache } from './cache.svelte';
@@ -37,7 +37,7 @@ function folder(over: Partial<Folder> = {}): Folder {
         notes: null,
         volumeId: null,
         volumeTitle: null,
-        ...over
+        ...over,
     };
 }
 
@@ -50,7 +50,7 @@ function cabinet(over: Partial<Cabinet> = {}): Cabinet {
         description: null,
         folderCount: 0,
         containerPath: '',
-        ...over
+        ...over,
     };
 }
 
@@ -61,7 +61,7 @@ beforeEach(() => {
         patients: 0,
         folders: { total: 0, inCabinet: 0, inTransit: 0 },
         places: { buildings: 0, rooms: 0, cabinets: 0 },
-        moves24h: 0
+        moves24h: 0,
     });
     cache.setFolders([]);
     cache.setPatients([]);
@@ -77,7 +77,11 @@ beforeEach(() => {
 describe('setters hydrate the reactive getters', () => {
     it('setUser / clearUser', () => {
         expect(cache.user).toBeNull();
-        cache.setUser({ email: 'a@b.test', name: 'Mira', role: 'administrator' });
+        cache.setUser({
+            email: 'a@b.test',
+            name: 'Mira',
+            role: 'administrator',
+        });
         expect(cache.user?.name).toBe('Mira');
         cache.clearUser();
         expect(cache.user).toBeNull();
@@ -108,9 +112,16 @@ describe('upsertFolder', () => {
 
 describe('lookups', () => {
     beforeEach(() => {
-        cache.setBuildings([{ id: 'b1', name: 'Main Hospital', description: null } as Building]);
+        cache.setBuildings([
+            { id: 'b1', name: 'Main Hospital', description: null } as Building,
+        ]);
         cache.setRooms([
-            { id: 'r1', name: 'Records Room', buildingId: 'b1', description: null } as Room
+            {
+                id: 'r1',
+                name: 'Records Room',
+                buildingId: 'b1',
+                description: null,
+            } as Room,
         ]);
         cache.setCabinets([cabinet({ id: 'c1', roomId: 'r1' })]);
     });
@@ -136,30 +147,50 @@ describe('cabinetLocation', () => {
 
     it('prefers the cabinet containerPath when present', () => {
         cache.setCabinets([
-            cabinet({ id: 'c1', containerPath: 'Main Hospital — Records Room — Cabinet A1' })
+            cabinet({
+                id: 'c1',
+                containerPath: 'Main Hospital — Records Room — Cabinet A1',
+            }),
         ]);
-        expect(cache.cabinetLocation('c1')).toBe('Main Hospital — Records Room — Cabinet A1');
+        expect(cache.cabinetLocation('c1')).toBe(
+            'Main Hospital — Records Room — Cabinet A1',
+        );
     });
 
     it('derives "Building — Room" when containerPath is empty', () => {
-        cache.setBuildings([{ id: 'b1', name: 'Main Hospital', description: null } as Building]);
-        cache.setRooms([
-            { id: 'r1', name: 'Records Room', buildingId: 'b1', description: null } as Room
+        cache.setBuildings([
+            { id: 'b1', name: 'Main Hospital', description: null } as Building,
         ]);
-        cache.setCabinets([cabinet({ id: 'c1', roomId: 'r1', containerPath: '' })]);
-        expect(cache.cabinetLocation('c1')).toBe('Main Hospital — Records Room');
+        cache.setRooms([
+            {
+                id: 'r1',
+                name: 'Records Room',
+                buildingId: 'b1',
+                description: null,
+            } as Room,
+        ]);
+        cache.setCabinets([
+            cabinet({ id: 'c1', roomId: 'r1', containerPath: '' }),
+        ]);
+        expect(cache.cabinetLocation('c1')).toBe(
+            'Main Hospital — Records Room',
+        );
     });
 
     it('substitutes "?" for an unresolved room or building', () => {
         // Cabinet present but its room (and therefore building) is not cached.
-        cache.setCabinets([cabinet({ id: 'c1', roomId: 'missing', containerPath: '' })]);
+        cache.setCabinets([
+            cabinet({ id: 'c1', roomId: 'missing', containerPath: '' }),
+        ]);
         expect(cache.cabinetLocation('c1')).toBe('? — ?');
     });
 });
 
 describe('recordMove cache side effects', () => {
     it('prepends the move and updates the folder location in place', async () => {
-        cache.setFolders([folder({ id: 'f1', cabinetId: 'c1', status: 'in-cabinet' })]);
+        cache.setFolders([
+            folder({ id: 'f1', cabinetId: 'c1', status: 'in-cabinet' }),
+        ]);
         const event: MoveEvent = {
             id: 'm1',
             folderId: 'f1',
@@ -175,11 +206,14 @@ describe('recordMove cache side effects', () => {
             movedBy: 'Mira',
             workerRole: null,
             movedAt: '2026-06-02T09:00:00+00:00',
-            reason: 'Transfer'
+            reason: 'Transfer',
         };
         vi.mocked(api.moves.create).mockResolvedValue(event);
 
-        const returned = await cache.recordMove({ folderId: 'f1', toCabinetId: 'c2' });
+        const returned = await cache.recordMove({
+            folderId: 'f1',
+            toCabinetId: 'c2',
+        });
 
         expect(returned).toBe(event);
         expect(cache.moves[0].id).toBe('m1');
@@ -191,7 +225,9 @@ describe('recordMove cache side effects', () => {
     });
 
     it('marks the folder in-transit when the move has no destination cabinet', async () => {
-        cache.setFolders([folder({ id: 'f1', cabinetId: 'c1', status: 'in-cabinet' })]);
+        cache.setFolders([
+            folder({ id: 'f1', cabinetId: 'c1', status: 'in-cabinet' }),
+        ]);
         const event: MoveEvent = {
             id: 'm2',
             folderId: 'f1',
@@ -207,7 +243,7 @@ describe('recordMove cache side effects', () => {
             movedBy: 'Mira',
             workerRole: null,
             movedAt: '2026-06-02T11:00:00+00:00',
-            reason: null
+            reason: null,
         };
         vi.mocked(api.moves.create).mockResolvedValue(event);
 
@@ -234,7 +270,7 @@ describe('recordMove cache side effects', () => {
             movedBy: 'Mira',
             workerRole: null,
             movedAt: '2026-06-02T12:00:00+00:00',
-            reason: null
+            reason: null,
         };
         vi.mocked(api.moves.create).mockResolvedValue(event);
 
@@ -250,10 +286,15 @@ describe('addFolder', () => {
         const created = folder({ id: 'fNew', title: 'Brand New' });
         vi.mocked(api.folders.create).mockResolvedValue(created);
 
-        const returned = await cache.addFolder({ nhsNumber: '943 476 5919', title: 'Brand New' });
+        const returned = await cache.addFolder({
+            nhsNumber: '943 476 5919',
+            title: 'Brand New',
+        });
 
         expect(returned).toBe(created);
-        expect(cache.folders.find((f) => f.id === 'fNew')?.title).toBe('Brand New');
+        expect(cache.folders.find((f) => f.id === 'fNew')?.title).toBe(
+            'Brand New',
+        );
     });
 });
 
@@ -264,15 +305,18 @@ describe('addBuilding / addRoom / addCabinet', () => {
             name: 'Main Hospital',
             description: 'Acute',
             contained_in_place: null,
-            container_path: 'Main Hospital'
+            container_path: 'Main Hospital',
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
 
-        const id = await cache.addBuilding({ name: 'Main Hospital', description: 'Acute' });
+        const id = await cache.addBuilding({
+            name: 'Main Hospital',
+            description: 'Acute',
+        });
 
         expect(id).toBe('b1');
         expect(cache.buildings).toEqual([
-            { id: 'b1', name: 'Main Hospital', description: 'Acute' }
+            { id: 'b1', name: 'Main Hospital', description: 'Acute' },
         ]);
     });
 
@@ -282,11 +326,14 @@ describe('addBuilding / addRoom / addCabinet', () => {
             name: 'Records Room',
             description: null,
             contained_in_place: 'b1',
-            container_path: 'Main Hospital — Records Room'
+            container_path: 'Main Hospital — Records Room',
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
 
-        const id = await cache.addRoom({ name: 'Records Room', buildingId: 'b1' });
+        const id = await cache.addRoom({
+            name: 'Records Room',
+            buildingId: 'b1',
+        });
 
         expect(id).toBe('r1');
         expect(cache.rooms[0].buildingId).toBe('b1');
@@ -299,11 +346,15 @@ describe('addBuilding / addRoom / addCabinet', () => {
             description: null,
             contained_in_place: 'r1',
             container_path: 'Main Hospital — Records Room — Cabinet A1',
-            capacity: 100
+            capacity: 100,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
 
-        const id = await cache.addCabinet({ label: 'Cabinet A1', roomId: 'r1', capacity: 100 });
+        const id = await cache.addCabinet({
+            label: 'Cabinet A1',
+            roomId: 'r1',
+            capacity: 100,
+        });
 
         expect(id).toBe('c1');
         expect(cache.cabinets[0].label).toBe('Cabinet A1');

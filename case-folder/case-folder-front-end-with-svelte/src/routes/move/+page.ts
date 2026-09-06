@@ -12,7 +12,7 @@ export async function load({ fetch }) {
     try {
         const [places, workers] = await Promise.all([
             api.places.list({ kind: 'cabinet' }, { fetch }),
-            api.workers.list({}, { fetch })
+            api.workers.list({}, { fetch }),
         ]);
         cache.setCabinets(places.cabinets);
         cache.setWorkers(workers.items);

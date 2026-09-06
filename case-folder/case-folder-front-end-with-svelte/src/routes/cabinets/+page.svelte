@@ -21,16 +21,17 @@
         cache.cabinets.map((c) => {
             // null capacity ⇒ uncapped, so skip the percentage maths.
             const cap = c.capacity ?? 0;
-            const percent = cap > 0 ? Math.round((c.folderCount / cap) * 100) : 0;
+            const percent =
+                cap > 0 ? Math.round((c.folderCount / cap) * 100) : 0;
             const room = cache.roomById(c.roomId);
             const building = cache.buildingById(room?.buildingId);
             return {
                 ...c,
                 percent,
                 roomName: room?.name ?? '?',
-                buildingName: building?.name ?? '?'
+                buildingName: building?.name ?? '?',
             };
-        })
+        }),
     );
 
     // Traffic-light occupancy badge: red >85%, amber >60%, else green.
@@ -49,7 +50,10 @@
 </div>
 
 <div class="panel">
-    <DataTable label={t('cabinets.tableLabel')} caption={t('cabinets.tableCaption')}>
+    <DataTable
+        label={t('cabinets.tableLabel')}
+        caption={t('cabinets.tableCaption')}
+    >
         <DataTableHead>
             <DataTableRow>
                 <th scope="col">{t('cabinets.colLabel')}</th>
@@ -64,14 +68,19 @@
         <DataTableBody>
             {#each rows as cab (cab.id)}
                 <DataTableRow>
-                    <DataTableTD><a href="/cabinets/{cab.id}">{cab.label}</a></DataTableTD>
+                    <DataTableTD
+                        ><a href="/cabinets/{cab.id}">{cab.label}</a
+                        ></DataTableTD
+                    >
                     <DataTableTD>{cab.buildingName}</DataTableTD>
                     <DataTableTD>{cab.roomName}</DataTableTD>
                     <DataTableTD>{cab.capacity ?? '—'}</DataTableTD>
                     <DataTableTD>{cab.folderCount}</DataTableTD>
                     <DataTableTD>
                         {#if cab.capacity}
-                            <Badge type={utilType(cab.percent)}>{cab.percent}%</Badge>
+                            <Badge type={utilType(cab.percent)}
+                                >{cab.percent}%</Badge
+                            >
                         {:else}
                             <Badge type="default">—</Badge>
                         {/if}

@@ -7,9 +7,9 @@
 // augmentation** (the import below makes it merge rather than shadow)
 // adding the one helper this app uses; delete it when upstream fixes
 // the types path.
-import "@svar-ui/svelte-filter";
+import '@svar-ui/svelte-filter';
 
-declare module "@svar-ui/svelte-filter" {
+declare module '@svar-ui/svelte-filter' {
     /**
      * Compile a FilterBar / FilterBuilder rule tree into an array
      * transform: returns a function that filters a row array.

@@ -15,7 +15,7 @@ afterEach(() => {
 
 // A minimal routed-page stand-in for the layout's `children` snippet.
 const children = createRawSnippet(() => ({
-    render: () => '<p data-testid="content">content</p>'
+    render: () => '<p data-testid="content">content</p>',
 }));
 
 // The header navigation collapses behind the hamburger on narrow viewports;
@@ -24,7 +24,11 @@ const children = createRawSnippet(() => ({
 // user, so seed the cache first. (spec ui-conventions "Navigation & layout".)
 describe('+layout top navigation', () => {
     it('hamburger toggles nav visibility (aria-expanded + .open)', async () => {
-        cache.setUser({ email: 'op@example.test', name: 'Test Operator', role: null });
+        cache.setUser({
+            email: 'op@example.test',
+            name: 'Test Operator',
+            role: null,
+        });
 
         const { getByLabelText, container } = render(Layout, { children });
         const button = getByLabelText('Toggle navigation');
@@ -54,7 +58,11 @@ describe('+layout top navigation', () => {
 // rendered text either way.
 describe('+layout signed-in role suffix', () => {
     it('renders "(role)" next to the name when the user carries a role', () => {
-        cache.setUser({ email: 'op@example.test', name: 'Test Operator', role: 'clerk' });
+        cache.setUser({
+            email: 'op@example.test',
+            name: 'Test Operator',
+            role: 'clerk',
+        });
 
         const { container } = render(Layout, { children });
         const status = container.querySelector('.auth-status');
@@ -62,7 +70,11 @@ describe('+layout signed-in role suffix', () => {
     });
 
     it('renders no parenthetical when the user has no role', () => {
-        cache.setUser({ email: 'op@example.test', name: 'Test Operator', role: null });
+        cache.setUser({
+            email: 'op@example.test',
+            name: 'Test Operator',
+            role: null,
+        });
 
         const { container } = render(Layout, { children });
         const status = container.querySelector('.auth-status');

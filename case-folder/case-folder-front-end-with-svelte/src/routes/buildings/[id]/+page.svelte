@@ -44,14 +44,16 @@
             await cache.addRoom({
                 name: newRoomName.trim(),
                 buildingId: building.id,
-                description: newRoomDescription.trim() || undefined
+                description: newRoomDescription.trim() || undefined,
             });
             newRoomName = '';
             newRoomDescription = '';
             await invalidateAll();
         } catch (e) {
             if (e instanceof ApiError && e.status === 422) {
-                const body = e.body as { errors?: Record<string, string> } | null;
+                const body = e.body as {
+                    errors?: Record<string, string>;
+                } | null;
                 roomError = body?.errors?.name ?? e.message;
             } else {
                 roomError = (e as Error).message;
@@ -80,8 +82,15 @@
                 <DataTableBody>
                     {#each data.rooms as room (room.id)}
                         <DataTableRow>
-                            <DataTableTD><a href="/rooms/{room.id}">{room.name}</a></DataTableTD>
-                            <DataTableTD>{cache.cabinets.filter((c) => c.roomId === room.id).length}</DataTableTD>
+                            <DataTableTD
+                                ><a href="/rooms/{room.id}">{room.name}</a
+                                ></DataTableTD
+                            >
+                            <DataTableTD
+                                >{cache.cabinets.filter(
+                                    (c) => c.roomId === room.id,
+                                ).length}</DataTableTD
+                            >
                             <DataTableTD>{room.description ?? ''}</DataTableTD>
                         </DataTableRow>
                     {/each}
@@ -95,7 +104,11 @@
     <div class="panel">
         <h3>{t('buildingDetail.addRoom')}</h3>
         <Form label={t('buildingDetail.addRoomLabel')} onsubmit={addRoom}>
-            <Field label={t('buildingDetail.roomName')} required error={roomError}>
+            <Field
+                label={t('buildingDetail.roomName')}
+                required
+                error={roomError}
+            >
                 <input bind:value={newRoomName} required />
             </Field>
             <Field label={t('common.description')}>
@@ -113,7 +126,10 @@
 <h3>{t('buildingDetail.presenceHistory')}</h3>
 <p>{t('buildingDetail.presenceIntro')}</p>
 <div class="panel">
-    <DataTable label={t('buildingDetail.presenceTable')} caption={t('buildingDetail.presenceCaption')}>
+    <DataTable
+        label={t('buildingDetail.presenceTable')}
+        caption={t('buildingDetail.presenceCaption')}
+    >
         <DataTableHead>
             <DataTableRow>
                 <th scope="col">{t('common.folder')}</th>
@@ -126,24 +142,36 @@
         <DataTableBody>
             {#each data.presences as p (p.cabinetId + p.folderId + p.enteredAt)}
                 <DataTableRow>
-                    <DataTableTD><a href="/folders/{p.folderId}">{p.folderTitle}</a></DataTableTD>
+                    <DataTableTD
+                        ><a href="/folders/{p.folderId}">{p.folderTitle}</a
+                        ></DataTableTD
+                    >
                     <DataTableTD>
-                        <a href="/patients/{p.nhsNumber.replaceAll(' ', '')}">{p.patientName}</a>
+                        <a href="/patients/{p.nhsNumber.replaceAll(' ', '')}"
+                            >{p.patientName}</a
+                        >
                     </DataTableTD>
                     <DataTableTD>{p.cabinetLabel}</DataTableTD>
-                    <DataTableTD>{new Date(p.enteredAt).toLocaleString('en-GB')}</DataTableTD>
+                    <DataTableTD
+                        >{new Date(p.enteredAt).toLocaleString(
+                            'en-GB',
+                        )}</DataTableTD
+                    >
                     <DataTableTD>
                         {#if p.leftAt}
                             {new Date(p.leftAt).toLocaleString('en-GB')}
                         {:else}
-                            <Badge type="success">{t('common.stillHere')}</Badge>
+                            <Badge type="success">{t('common.stillHere')}</Badge
+                            >
                         {/if}
                     </DataTableTD>
                 </DataTableRow>
             {/each}
             {#if data.presences.length === 0}
                 <DataTableRow>
-                    <DataTableTD colspan={5}>{t('buildingDetail.noPresence')}</DataTableTD>
+                    <DataTableTD colspan={5}
+                        >{t('buildingDetail.noPresence')}</DataTableTD
+                    >
                 </DataTableRow>
             {/if}
         </DataTableBody>

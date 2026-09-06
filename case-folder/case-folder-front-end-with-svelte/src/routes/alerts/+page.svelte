@@ -28,7 +28,10 @@
 <p>{t('alerts.intro')}</p>
 
 <div class="panel">
-    <DataTable label={t('alerts.tableLabel')} caption={t('alerts.tableCaption')}>
+    <DataTable
+        label={t('alerts.tableLabel')}
+        caption={t('alerts.tableCaption')}
+    >
         <DataTableHead>
             <DataTableRow>
                 <th scope="col">{t('common.when')}</th>
@@ -43,14 +46,26 @@
             {#each data.alerts as alert (alert.moveId)}
                 <DataTableRow>
                     <DataTableTD>
-                        <a href="/history/{alert.moveId}">{new Date(alert.movedAt).toLocaleString('en-GB')}</a>
+                        <a href="/history/{alert.moveId}"
+                            >{new Date(alert.movedAt).toLocaleString(
+                                'en-GB',
+                            )}</a
+                        >
                     </DataTableTD>
-                    <DataTableTD><a href="/folders/{alert.folderId}">{alert.folderTitle}</a></DataTableTD>
+                    <DataTableTD
+                        ><a href="/folders/{alert.folderId}"
+                            >{alert.folderTitle}</a
+                        ></DataTableTD
+                    >
                     <DataTableTD>
-                        <a href="/patients/{nhsSlug(alert.nhsNumber)}">{alert.patientName}</a>
+                        <a href="/patients/{nhsSlug(alert.nhsNumber)}"
+                            >{alert.patientName}</a
+                        >
                     </DataTableTD>
                     <DataTableTD>
-                        <Badge type="warning">{alert.fromBuilding} → {alert.toBuilding}</Badge>
+                        <Badge type="warning"
+                            >{alert.fromBuilding} → {alert.toBuilding}</Badge
+                        >
                     </DataTableTD>
                     <DataTableTD>{alert.movedBy}</DataTableTD>
                     <DataTableTD>{alert.reason ?? ''}</DataTableTD>

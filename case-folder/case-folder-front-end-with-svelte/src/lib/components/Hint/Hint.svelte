@@ -42,10 +42,10 @@
     // References:
     //   - WAI Forms Tutorial - Instructions: https://www.w3.org/WAI/tutorials/forms/instructions/
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         id = undefined,
         children,
         ...restProps
@@ -57,10 +57,6 @@
 </script>
 
 <!-- Hint.svelte -->
-<p
-    class={`hint ${className}`}
-    {id}
-    {...restProps}
->
+<p class={`hint ${className}`} {id} {...restProps}>
     {@render children?.()}
 </p>

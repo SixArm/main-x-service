@@ -26,7 +26,7 @@
         { id: 'title', header: t('grid.folder'), width: 200 },
         { id: 'cabinetLabel', header: t('grid.cabinet'), width: 220 },
         { id: 'status', header: t('grid.status'), width: 110 },
-        { id: 'lastMovedAt', header: t('grid.lastMoved'), flexgrow: 1 }
+        { id: 'lastMovedAt', header: t('grid.lastMoved'), flexgrow: 1 },
     ]);
 
     let rows = $derived(
@@ -37,14 +37,16 @@
             title: f.title,
             cabinetLabel: f.cabinetLabel,
             status: f.status,
-            lastMovedAt: f.lastMovedAt ? new Date(f.lastMovedAt).toLocaleString('en-GB') : '—'
-        }))
+            lastMovedAt: f.lastMovedAt
+                ? new Date(f.lastMovedAt).toLocaleString('en-GB')
+                : '—',
+        })),
     );
 
     // FilterBar fields over the flattened rows (all columns are
     // human-meaningful here, so every column is filterable).
     const filterFields = $derived(
-        columns.map((c) => ({ id: c.id, label: c.header, type: 'text' }))
+        columns.map((c) => ({ id: c.id, label: c.header, type: 'text' })),
     );
 
     // The FilterBar's current rule tree; null = show everything.
@@ -54,9 +56,9 @@
     const filtered = $derived(
         filterRules
             ? createArrayFilter(
-                  filterRules as Parameters<typeof createArrayFilter>[0]
+                  filterRules as Parameters<typeof createArrayFilter>[0],
               )(rows)
-            : rows
+            : rows,
     );
 </script>
 
@@ -66,7 +68,8 @@
             <div class="filter-wrap">
                 <FilterBar
                     fields={filterFields}
-                    onchange={({ value }: { value: unknown }) => (filterRules = value)}
+                    onchange={({ value }: { value: unknown }) =>
+                        (filterRules = value)}
                 />
             </div>
             <Grid data={filtered} {columns} />

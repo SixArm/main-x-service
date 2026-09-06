@@ -13,12 +13,16 @@ describe('Icon', () => {
     });
 
     it('exposes a label as an accessible image', () => {
-        const { getByRole } = render(Icon, { props: { name: 'printer', label: 'Print' } });
+        const { getByRole } = render(Icon, {
+            props: { name: 'printer', label: 'Print' },
+        });
         expect(getByRole('img', { name: 'Print' })).toBeInTheDocument();
     });
 
     it('renders nothing for an unknown icon name', () => {
-        const { container } = render(Icon, { props: { name: 'does-not-exist' } });
+        const { container } = render(Icon, {
+            props: { name: 'does-not-exist' },
+        });
         expect(container.querySelector('svg')).toBeNull();
     });
 });

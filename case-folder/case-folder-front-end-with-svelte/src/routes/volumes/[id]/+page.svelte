@@ -66,7 +66,8 @@
             await action();
             await invalidateAll();
         } catch (e) {
-            pageError = e instanceof ApiError ? e.message : (e as Error).message;
+            pageError =
+                e instanceof ApiError ? e.message : (e as Error).message;
         }
     }
 
@@ -86,7 +87,7 @@
         run(async () => {
             await api.volumes.move(volume.id, {
                 toCabinetId: moveCabinetId || null,
-                reason: moveReason.trim() || undefined
+                reason: moveReason.trim() || undefined,
             });
             moveReason = '';
         });
@@ -97,12 +98,15 @@
 <h2>{volume.title}</h2>
 <p>
     <a href="/patients/{nhsSlug(volume.nhsNumber)}">{volume.patientName}</a>
-    · <Badge type={badgeType(volume.status)}>{statusLabel(volume.status)}</Badge>
+    · <Badge type={badgeType(volume.status)}>{statusLabel(volume.status)}</Badge
+    >
     · {volume.cabinetLabel}
 </p>
 
 {#if pageError}
-    <Alert type="error" heading={t('volumeDetail.somethingWrong')}>{pageError}</Alert>
+    <Alert type="error" heading={t('volumeDetail.somethingWrong')}
+        >{pageError}</Alert
+    >
 {/if}
 
 <div class="panel">
@@ -120,13 +124,22 @@
             <DataTableBody>
                 {#each folders as folder (folder.id)}
                     <DataTableRow>
-                        <DataTableTD><a href="/folders/{folder.id}">{folder.title}</a></DataTableTD>
+                        <DataTableTD
+                            ><a href="/folders/{folder.id}">{folder.title}</a
+                            ></DataTableTD
+                        >
                         <DataTableTD>{folder.cabinetLabel}</DataTableTD>
                         <DataTableTD>
-                            <Badge type={badgeType(folder.status)}>{statusLabel(folder.status)}</Badge>
+                            <Badge type={badgeType(folder.status)}
+                                >{statusLabel(folder.status)}</Badge
+                            >
                         </DataTableTD>
                         <DataTableTD>
-                            <button type="button" class="link-button" onclick={() => removeFolder(folder.id)}>
+                            <button
+                                type="button"
+                                class="link-button"
+                                onclick={() => removeFolder(folder.id)}
+                            >
                                 {t('common.remove')}
                             </button>
                         </DataTableTD>
@@ -140,7 +153,11 @@
 
     {#if data.candidates.length > 0}
         <Form label={t('volumeDetail.addFolderLabel')} onsubmit={addFolder}>
-            <Field label={tf('volumeDetail.addFolderFor', { patient: volume.patientName })}>
+            <Field
+                label={tf('volumeDetail.addFolderFor', {
+                    patient: volume.patientName,
+                })}
+            >
                 <select bind:value={addFolderId}>
                     <option value="">{t('volumeDetail.chooseFolder')}</option>
                     {#each data.candidates as f (f.id)}
@@ -176,15 +193,22 @@
                 <select bind:value={moveCabinetId}>
                     <option value="">{t('common.inTransitOption')}</option>
                     {#each cache.cabinets as c (c.id)}
-                        <option value={c.id}>{c.label} ({c.containerPath})</option>
+                        <option value={c.id}
+                            >{c.label} ({c.containerPath})</option
+                        >
                     {/each}
                 </select>
             </Field>
             <Field label={t('common.reason')}>
-                <input bind:value={moveReason} placeholder={t('volumeDetail.moveReasonPlaceholder')} />
+                <input
+                    bind:value={moveReason}
+                    placeholder={t('volumeDetail.moveReasonPlaceholder')}
+                />
             </Field>
             <div class="actions">
-                <Button type="submit">{t('volumeDetail.moveVolumeButton')}</Button>
+                <Button type="submit"
+                    >{t('volumeDetail.moveVolumeButton')}</Button
+                >
             </div>
         </Form>
     </div>
@@ -197,13 +221,16 @@
     {#each history as move (move.id)}
         <article class="move-card">
             <div class="move-route">
-                <a href="/history/{move.id}"><strong>{move.folderTitle}</strong></a>:
+                <a href="/history/{move.id}"
+                    ><strong>{move.folderTitle}</strong></a
+                >:
                 <span>{move.fromCabinetLabel}</span>
                 <span class="move-arrow" aria-hidden="true">→</span>
                 <span>{move.toCabinetLabel}</span>
             </div>
             <p class="move-meta">
-                {move.movedBy}{#if move.workerRole} ({move.workerRole}){/if}
+                {move.movedBy}{#if move.workerRole}
+                    ({move.workerRole}){/if}
                 · {new Date(move.movedAt).toLocaleString('en-GB')}
                 {#if move.reason}· {move.reason}{/if}
             </p>

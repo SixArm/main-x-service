@@ -17,8 +17,8 @@
     const rows = $derived(
         cache.buildings.map((b) => ({
             ...b,
-            roomCount: cache.rooms.filter((r) => r.buildingId === b.id).length
-        }))
+            roomCount: cache.rooms.filter((r) => r.buildingId === b.id).length,
+        })),
     );
 </script>
 
@@ -30,7 +30,10 @@
 </div>
 
 <div class="panel">
-    <DataTable label={t('buildings.tableLabel')} caption={t('buildings.tableCaption')}>
+    <DataTable
+        label={t('buildings.tableLabel')}
+        caption={t('buildings.tableCaption')}
+    >
         <DataTableHead>
             <DataTableRow>
                 <th scope="col">{t('common.name')}</th>
@@ -41,13 +44,19 @@
         <DataTableBody>
             {#each rows as b (b.id)}
                 <DataTableRow>
-                    <DataTableTD><a href="/buildings/{b.id}">{b.name}</a></DataTableTD>
+                    <DataTableTD
+                        ><a href="/buildings/{b.id}">{b.name}</a></DataTableTD
+                    >
                     <DataTableTD>{b.roomCount}</DataTableTD>
                     <DataTableTD>{b.description ?? ''}</DataTableTD>
                 </DataTableRow>
             {/each}
             {#if rows.length === 0}
-                <DataTableRow><DataTableTD colspan={3}>{t('buildings.noBuildings')}</DataTableTD></DataTableRow>
+                <DataTableRow
+                    ><DataTableTD colspan={3}
+                        >{t('buildings.noBuildings')}</DataTableTD
+                    ></DataTableRow
+                >
             {/if}
         </DataTableBody>
     </DataTable>

@@ -19,7 +19,7 @@ import type {
     Room,
     Stats,
     User,
-    Worker
+    Worker,
 } from './types';
 
 /**
@@ -191,7 +191,7 @@ function createCache() {
                 cabinetId: event.toCabinetId,
                 cabinetLabel: event.toCabinetLabel,
                 status: event.toCabinetId ? 'in-cabinet' : 'in-transit',
-                lastMovedAt: event.movedAt
+                lastMovedAt: event.movedAt,
             };
         }
         return event;
@@ -204,13 +204,20 @@ function createCache() {
      * @returns The new building's id (so callers can navigate to it).
      * @throws {ApiError} On a rejected create.
      */
-    async function addBuilding(input: { name: string; description?: string }): Promise<string> {
+    async function addBuilding(input: {
+        name: string;
+        description?: string;
+    }): Promise<string> {
         const place = await api.places.create({
             name: input.name,
             kind: 'building',
-            description: input.description
+            description: input.description,
         });
-        buildings.push({ id: place.id, name: place.name, description: place.description });
+        buildings.push({
+            id: place.id,
+            name: place.name,
+            description: place.description,
+        });
         return place.id;
     }
 
@@ -231,13 +238,13 @@ function createCache() {
             name: input.name,
             kind: 'room',
             containedInPlace: input.buildingId,
-            description: input.description
+            description: input.description,
         });
         rooms.push({
             id: place.id,
             name: place.name,
             buildingId: place.contained_in_place,
-            description: place.description
+            description: place.description,
         });
         return place.id;
     }
@@ -262,7 +269,7 @@ function createCache() {
             kind: 'cabinet',
             containedInPlace: input.roomId,
             capacity: input.capacity,
-            description: input.description
+            description: input.description,
         });
         cabinets.push({
             id: place.id,
@@ -271,7 +278,7 @@ function createCache() {
             capacity: place.capacity,
             description: place.description,
             folderCount: 0,
-            containerPath: place.container_path
+            containerPath: place.container_path,
         });
         return place.id;
     }
@@ -381,7 +388,7 @@ function createCache() {
         buildingById,
         roomById,
         cabinetById,
-        cabinetLocation
+        cabinetLocation,
     };
 }
 

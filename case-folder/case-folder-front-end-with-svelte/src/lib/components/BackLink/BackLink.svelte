@@ -50,10 +50,10 @@
     // References:
     //   - GOV.UK back link pattern: https://design-system.service.gov.uk/components/back-link/
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         href,
         label = undefined,
         children,
@@ -70,11 +70,6 @@
 </script>
 
 <!-- BackLink.svelte -->
-<a
-    class={`back-link ${className}`}
-    {href}
-    aria-label={label}
-    {...restProps}
->
+<a class={`back-link ${className}`} {href} aria-label={label} {...restProps}>
     {@render children?.()}
 </a>

@@ -27,19 +27,22 @@
     let printNote = $state('');
 
     // Reduce volumes to the {id,title} shape the dialog's checklist needs.
-    const labelOptions = $derived(data.volumes.map((v) => ({ id: v.id, title: v.title })));
+    const labelOptions = $derived(
+        data.volumes.map((v) => ({ id: v.id, title: v.title })),
+    );
 
     // Demo stub: report the queued label/copy count instead of printing.
     function onPrint(detail: { selected: string[]; copies: number }) {
         const n = detail.selected.length;
-        const copy = detail.copies === 1 ? t('volumes.copy') : t('volumes.copies');
+        const copy =
+            detail.copies === 1 ? t('volumes.copy') : t('volumes.copies');
         printNote =
             n === 0
                 ? t('volumes.noLabelsSelected')
                 : tf(n === 1 ? 'volumes.queued.one' : 'volumes.queued.other', {
                       n,
                       copies: detail.copies,
-                      copy
+                      copy,
                   });
         showLabels = false;
     }
@@ -62,8 +65,13 @@
 <div class="toolbar">
     <h2>{t('volumes.heading')}</h2>
     <div class="actions">
-        <button type="button" class="button secondary" onclick={() => (showLabels = true)}>
-            <Icon name="printer" /> {t('volumes.printLabels')}
+        <button
+            type="button"
+            class="button secondary"
+            onclick={() => (showLabels = true)}
+        >
+            <Icon name="printer" />
+            {t('volumes.printLabels')}
         </button>
         <a href="/volumes/new" class="button">{t('volumes.newVolume')}</a>
     </div>
@@ -74,10 +82,17 @@
     <Alert type="success">{printNote}</Alert>
 {/if}
 
-<LabelsDialogBox bind:open={showLabels} volumes={labelOptions} onprint={onPrint} />
+<LabelsDialogBox
+    bind:open={showLabels}
+    volumes={labelOptions}
+    onprint={onPrint}
+/>
 
 <div class="panel">
-    <DataTable label={t('volumes.tableLabel')} caption={t('volumes.tableCaption')}>
+    <DataTable
+        label={t('volumes.tableLabel')}
+        caption={t('volumes.tableCaption')}
+    >
         <DataTableHead>
             <DataTableRow>
                 <th scope="col">{t('common.title')}</th>
@@ -90,20 +105,29 @@
         <DataTableBody>
             {#each data.volumes as volume (volume.id)}
                 <DataTableRow>
-                    <DataTableTD><a href="/volumes/{volume.id}">{volume.title}</a></DataTableTD>
+                    <DataTableTD
+                        ><a href="/volumes/{volume.id}">{volume.title}</a
+                        ></DataTableTD
+                    >
                     <DataTableTD>
-                        <a href="/patients/{nhsSlug(volume.nhsNumber)}">{volume.patientName}</a>
+                        <a href="/patients/{nhsSlug(volume.nhsNumber)}"
+                            >{volume.patientName}</a
+                        >
                     </DataTableTD>
                     <DataTableTD>{volume.folderCount}</DataTableTD>
                     <DataTableTD>{volume.cabinetLabel}</DataTableTD>
                     <DataTableTD>
-                        <Badge type={badgeType(volume.status)}>{statusLabel(volume.status)}</Badge>
+                        <Badge type={badgeType(volume.status)}
+                            >{statusLabel(volume.status)}</Badge
+                        >
                     </DataTableTD>
                 </DataTableRow>
             {/each}
             {#if data.volumes.length === 0}
                 <DataTableRow>
-                    <DataTableTD colspan={5}>{t('volumes.noVolumes')}</DataTableTD>
+                    <DataTableTD colspan={5}
+                        >{t('volumes.noVolumes')}</DataTableTD
+                    >
                 </DataTableRow>
             {/if}
         </DataTableBody>

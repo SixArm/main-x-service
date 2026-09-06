@@ -54,10 +54,10 @@
     //   - WAI-ARIA Navigation Landmark: https://www.w3.org/TR/wai-aria-1.2/#navigation
     //   - WAI-ARIA Landmarks: https://www.w3.org/WAI/ARIA/apd/practices/landmark-regions/
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         label,
         children,
         ...restProps
@@ -71,10 +71,6 @@
 </script>
 
 <!-- NavigationMenu.svelte -->
-<nav
-    class={`navigation-menu ${className}`}
-    aria-label={label}
-    {...restProps}
->
+<nav class={`navigation-menu ${className}`} aria-label={label} {...restProps}>
     {@render children?.()}
 </nav>

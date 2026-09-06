@@ -13,7 +13,9 @@ export const ssr = false;
 const PUBLIC_PREFIXES = ['/login', '/auth/callback'];
 
 function isPublic(pathname: string): boolean {
-    return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+    return PUBLIC_PREFIXES.some(
+        (p) => pathname === p || pathname.startsWith(`${p}/`),
+    );
 }
 
 export async function load({ url, fetch }) {

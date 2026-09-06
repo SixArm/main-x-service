@@ -28,10 +28,10 @@
     // References:
     //   - HTML thead element: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/thead
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         children,
         ...restProps
     }: {
@@ -42,9 +42,6 @@
 </script>
 
 <!-- DataTableHead.svelte -->
-<thead
-    class={`data-table-head ${className}`}
-    {...restProps}
->
+<thead class={`data-table-head ${className}`} {...restProps}>
     {@render children?.()}
 </thead>

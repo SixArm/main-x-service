@@ -27,7 +27,9 @@
 
     let actionNote = $state('');
 
-    function badgeType(status: string): 'success' | 'warning' | 'info' | 'default' {
+    function badgeType(
+        status: string,
+    ): 'success' | 'warning' | 'info' | 'default' {
         if (status === 'in-cabinet') return 'success';
         if (status === 'in-transit') return 'warning';
         return 'default';
@@ -45,7 +47,9 @@
         } else if (key === 'patient' || key === 'case-notes') {
             // Already on the patient record; case notes are listed below.
         } else {
-            actionNote = tf('patientDetail.demoUnavailable', { action: key.replaceAll('-', ' ') });
+            actionNote = tf('patientDetail.demoUnavailable', {
+                action: key.replaceAll('-', ' '),
+            });
         }
     }
 </script>
@@ -66,7 +70,11 @@
         dateOfBirth={data.patient.dateOfBirth}
     />
     <p class="muted">{t('patientDetail.sourcePrefix')} {data.patient.source}</p>
-    <ButtonBar active="patient" onselect={onAction} label={t('patientDetail.recordActions')} />
+    <ButtonBar
+        active="patient"
+        onselect={onAction}
+        label={t('patientDetail.recordActions')}
+    />
     {#if actionNote}
         <Alert type="info">{actionNote}</Alert>
     {/if}
@@ -96,20 +104,31 @@
                         </DataTableTD>
                         <DataTableTD>
                             {#if folder.volumeId}
-                                <a href="/volumes/{folder.volumeId}">{folder.volumeTitle ?? t('common.volume')}</a>
+                                <a href="/volumes/{folder.volumeId}"
+                                    >{folder.volumeTitle ??
+                                        t('common.volume')}</a
+                                >
                             {:else}
                                 —
                             {/if}
                         </DataTableTD>
                         <DataTableTD>{folder.cabinetLabel}</DataTableTD>
                         <DataTableTD>
-                            <Badge type={badgeType(folder.status)}>{statusLabel(folder.status)}</Badge>
+                            <Badge type={badgeType(folder.status)}
+                                >{statusLabel(folder.status)}</Badge
+                            >
                         </DataTableTD>
                         <DataTableTD>
-                            {folder.lastMovedAt ? new Date(folder.lastMovedAt).toLocaleString('en-GB') : '—'}
+                            {folder.lastMovedAt
+                                ? new Date(folder.lastMovedAt).toLocaleString(
+                                      'en-GB',
+                                  )
+                                : '—'}
                         </DataTableTD>
                         <DataTableTD>
-                            <a href="/move?folder={folder.id}">{t('common.move')}</a>
+                            <a href="/move?folder={folder.id}"
+                                >{t('common.move')}</a
+                            >
                         </DataTableTD>
                     </DataTableRow>
                 {/each}
@@ -119,7 +138,9 @@
         <p>{t('patientDetail.noFoldersYet')}</p>
     {/if}
     <p style="margin-top: var(--nhs-space-3);">
-        <a href="/folders/new" class="button">{t('patientDetail.addFolderForPatient')}</a>
+        <a href="/folders/new" class="button"
+            >{t('patientDetail.addFolderForPatient')}</a
+        >
     </p>
 </div>
 
@@ -136,7 +157,8 @@
                 <span>{move.toCabinetLabel}</span>
             </div>
             <p class="move-meta">
-                {move.movedBy}{#if move.workerRole} ({move.workerRole}){/if}
+                {move.movedBy}{#if move.workerRole}
+                    ({move.workerRole}){/if}
                 · {new Date(move.movedAt).toLocaleString('en-GB')}
                 {#if move.reason}· {move.reason}{/if}
             </p>

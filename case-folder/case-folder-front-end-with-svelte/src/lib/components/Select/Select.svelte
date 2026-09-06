@@ -58,12 +58,12 @@
     // References:
     //   - MDN select element: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/select
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         label,
-        value = $bindable(""),
+        value = $bindable(''),
         required = false,
         disabled = false,
         children,

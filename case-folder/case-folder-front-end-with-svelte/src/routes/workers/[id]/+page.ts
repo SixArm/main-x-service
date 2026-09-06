@@ -10,7 +10,8 @@ export async function load({ fetch, params }) {
     try {
         return await api.workers.show(params.id, { fetch });
     } catch (e) {
-        if (e instanceof ApiError && e.status === 404) error(404, 'Worker not found');
+        if (e instanceof ApiError && e.status === 404)
+            error(404, 'Worker not found');
         error(503, (e as Error).message);
     }
 }

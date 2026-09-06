@@ -7,8 +7,12 @@ import InputCount from './InputCount.svelte';
 
 describe('InputCount', () => {
     it('increments and decrements within bounds', async () => {
-        const { getByRole } = render(InputCount, { props: { label: 'Copies', value: 2 } });
-        const input = getByRole('spinbutton', { name: 'Copies' }) as HTMLInputElement;
+        const { getByRole } = render(InputCount, {
+            props: { label: 'Copies', value: 2 },
+        });
+        const input = getByRole('spinbutton', {
+            name: 'Copies',
+        }) as HTMLInputElement;
         expect(input.value).toBe('2');
 
         await fireEvent.click(getByRole('button', { name: 'Increase Copies' }));
@@ -19,7 +23,9 @@ describe('InputCount', () => {
     });
 
     it('disables decrement at the minimum', () => {
-        const { getByRole } = render(InputCount, { props: { label: 'Copies', value: 1, min: 1 } });
+        const { getByRole } = render(InputCount, {
+            props: { label: 'Copies', value: 1, min: 1 },
+        });
         expect(getByRole('button', { name: 'Decrease Copies' })).toBeDisabled();
     });
 });

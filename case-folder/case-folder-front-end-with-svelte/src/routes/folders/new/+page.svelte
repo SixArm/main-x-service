@@ -61,14 +61,16 @@
                 dateOfBirth: dateOfBirth || undefined,
                 title: title.trim(),
                 cabinetId: cabinetId || null,
-                notes: notes.trim() || undefined
+                notes: notes.trim() || undefined,
             });
             await goto(`/folders/${folder.id}`);
         } catch (e) {
             // Map server validation (snake_case keys) onto the form fields;
             // fall back to a banner if none matched.
             if (e instanceof ApiError && e.status === 422) {
-                const body = e.body as { errors?: Record<string, string> } | null;
+                const body = e.body as {
+                    errors?: Record<string, string>;
+                } | null;
                 const errs = body?.errors ?? {};
                 if (errs.nhs_number) nhsError = errs.nhs_number;
                 if (errs.patient_name) nameError = errs.patient_name;
@@ -90,29 +92,51 @@
 <p>{t('folderNew.intro')}</p>
 
 {#if submitError}
-    <Alert type="error" heading={t('folderNew.cannotSave')}>{submitError}</Alert>
+    <Alert type="error" heading={t('folderNew.cannotSave')}>{submitError}</Alert
+    >
 {/if}
 
 <Form label={t('folderNew.formLabel')} onsubmit={handleSubmit}>
-    <Field label={t('common.nhsNumber')} required error={nhsError} description={t('folderNew.nhsDescription')}>
+    <Field
+        label={t('common.nhsNumber')}
+        required
+        error={nhsError}
+        description={t('folderNew.nhsDescription')}
+    >
         <UnitedKingdomNationalHealthServiceNumberInput
             label={t('common.nhsNumber')}
             bind:value={nhsNumber}
             required
         />
     </Field>
-    <Field label={t('folderNew.titleLabel')} required error={titleError} description={t('folderNew.titleDescription')}>
+    <Field
+        label={t('folderNew.titleLabel')}
+        required
+        error={titleError}
+        description={t('folderNew.titleDescription')}
+    >
         <input bind:value={title} required />
     </Field>
 
-    <Field label={t('folderNew.patientName')} error={nameError} description={t('folderNew.patientNameDescription')}>
+    <Field
+        label={t('folderNew.patientName')}
+        error={nameError}
+        description={t('folderNew.patientNameDescription')}
+    >
         <input bind:value={patientName} />
     </Field>
-    <Field label={t('common.dateOfBirth')} error={dobError} description={t('folderNew.dobDescription')}>
+    <Field
+        label={t('common.dateOfBirth')}
+        error={dobError}
+        description={t('folderNew.dobDescription')}
+    >
         <input type="date" bind:value={dateOfBirth} />
     </Field>
 
-    <Field label={t('folderNew.initialCabinet')} description={t('folderNew.initialCabinetDescription')}>
+    <Field
+        label={t('folderNew.initialCabinet')}
+        description={t('folderNew.initialCabinetDescription')}
+    >
         <select bind:value={cabinetId}>
             <option value="">{t('common.inTransitOption')}</option>
             {#each cache.cabinets as c (c.id)}

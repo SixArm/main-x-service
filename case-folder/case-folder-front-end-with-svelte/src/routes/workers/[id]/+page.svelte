@@ -46,13 +46,20 @@
         <DataTableBody>
             {#each folders as folder (folder.id)}
                 <DataTableRow>
-                    <DataTableTD><a href="/folders/{folder.id}">{folder.title}</a></DataTableTD>
+                    <DataTableTD
+                        ><a href="/folders/{folder.id}">{folder.title}</a
+                        ></DataTableTD
+                    >
                     <DataTableTD>
-                        <a href="/patients/{nhsSlug(folder.nhsNumber)}">{folder.patientName}</a>
+                        <a href="/patients/{nhsSlug(folder.nhsNumber)}"
+                            >{folder.patientName}</a
+                        >
                     </DataTableTD>
                     <DataTableTD>{folder.cabinetLabel}</DataTableTD>
                     <DataTableTD>
-                        <Badge type={badgeType(folder.status)}>{statusLabel(folder.status)}</Badge>
+                        <Badge type={badgeType(folder.status)}
+                            >{statusLabel(folder.status)}</Badge
+                        >
                     </DataTableTD>
                 </DataTableRow>
             {/each}
@@ -68,17 +75,25 @@
 <div class="panel">
     <h3>{tf('workerDetail.foldersMoved', { n: data.movedFolders.length })}</h3>
     {#if data.movedFolders.length > 0}
-        {@render folderTable(data.movedFolders, t('workerDetail.foldersMovedTable'))}
+        {@render folderTable(
+            data.movedFolders,
+            t('workerDetail.foldersMovedTable'),
+        )}
     {:else}
         <p>{t('workerDetail.noMovedFolders')}</p>
     {/if}
 </div>
 
 <div class="panel">
-    <h3>{tf('workerDetail.patientsFolders', { n: data.patientFolders.length })}</h3>
+    <h3>
+        {tf('workerDetail.patientsFolders', { n: data.patientFolders.length })}
+    </h3>
     <p>{t('workerDetail.patientsFoldersIntro')}</p>
     {#if data.patientFolders.length > 0}
-        {@render folderTable(data.patientFolders, t('workerDetail.patientsFoldersTable'))}
+        {@render folderTable(
+            data.patientFolders,
+            t('workerDetail.patientsFoldersTable'),
+        )}
     {:else}
         <p>{t('workerDetail.noPatientFolders')}</p>
     {/if}
@@ -91,13 +106,17 @@
     {#each data.moves as move (move.id)}
         <article class="move-card">
             <div class="move-route">
-                <a href="/history/{move.id}"><strong>{move.folderTitle}</strong></a>:
+                <a href="/history/{move.id}"
+                    ><strong>{move.folderTitle}</strong></a
+                >:
                 <span>{move.fromCabinetLabel}</span>
                 <span class="move-arrow" aria-hidden="true">→</span>
                 <span>{move.toCabinetLabel}</span>
             </div>
             <p class="move-meta">
-                {move.patientName} · {new Date(move.movedAt).toLocaleString('en-GB')}
+                {move.patientName} · {new Date(move.movedAt).toLocaleString(
+                    'en-GB',
+                )}
                 {#if move.reason}· {move.reason}{/if}
             </p>
         </article>
