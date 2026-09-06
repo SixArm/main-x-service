@@ -8,6 +8,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — T-12's stale "dead code" verification (doc-only correction)
+
+T-12 claimed `to_matcher_event`/`matcher_lib` were called only from
+`src/matching/adapter.rs`'s own inline `#[cfg(test)]` block, based on a
+`grep -rn ... src/` that never looked in `tests/`. In fact
+`tests/duplicate_detection.rs` is a 514-line, always-run (no
+`#[ignore]`), 18-test integration suite explicitly documented as the
+"event-service ↔ event-matcher bridge", exercising the adapter and
+matcher engine extensively (`cargo test --test duplicate_detection` —
+18/18 passing). No code changed: the adapter and its production-wiring
+question are exactly as they were: this only corrects the task's
+factual premise so a future pass doesn't delete well-tested code (or
+invent new wiring) on the strength of an incomplete grep. See
+spec/13-tasks.md T-12.
+
 ### Removed — the unused `match_window_overlap` time scorer (T-13)
 
 `matching::algorithms::time_matching::match_window_overlap` (Jaccard
