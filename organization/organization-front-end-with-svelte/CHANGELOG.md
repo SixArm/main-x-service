@@ -9,6 +9,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — inline LEI/DUNS/GLN/VAT format hints on the create/edit form (ORGFE-T4)
+
+The service validates LEI/GLN/DUNS/VAT check digits server-side
+(SEC-M5), but the create/edit form gave no client-side hint before the
+round-trip `422`. New pure `identifierFormatHint(scheme, value)`
+mirrors the server's length/charset/prefix shape checks for exactly
+those four schemes — never recomputing LEI's ISO 7064 or GLN's GS1
+check digit, so a value that passes can still be rejected `422`
+server-side. Wired into `OrganizationForm.svelte`'s identifiers
+fieldset as an inline hint per row. New
+`tests/unit/identifier-format.test.ts` (18 cases), verified to fail
+with the module removed. `pnpm test` 96/96 (was 78). See
+spec/index.md ORGFE-T4.
+
 ### Added — audit-trail view on the detail page (ORGFE-T3)
 
 The service exposes `GET /{pid}/audit`, but no route or repository

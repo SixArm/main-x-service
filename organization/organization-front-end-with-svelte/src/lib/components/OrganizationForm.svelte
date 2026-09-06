@@ -22,6 +22,7 @@
     import { ALL_SCHEMES } from "$lib/api/types";
     import type { IdentifierScheme, OrgIdentifier, Organization } from "$lib/api/types";
     import { buildOrganization } from "$lib/api/build";
+    import { identifierFormatHint } from "$lib/identifier-format";
     import { t } from "$lib/i18n.svelte";
 
     let {
@@ -158,6 +159,7 @@
         <!-- Keyed by index `i`: rows have no stable id and are only
              appended/removed at the end, so positional keys are fine. -->
         {#each identifiers as identifier, i (i)}
+            {@const hint = identifierFormatHint(identifier.scheme, identifier.value)}
             <div class="row">
                 <select bind:value={identifier.scheme}>
                     {#each ALL_SCHEMES as scheme (String(scheme))}
@@ -167,6 +169,9 @@
                 <input type="text" bind:value={identifier.value} placeholder={t("form.value")} />
                 <button type="button" onclick={() => removeIdentifier(i)}>{t("form.remove")}</button>
             </div>
+            {#if hint}
+                <p class="muted small" data-testid="identifier-hint-{i}">{hint}</p>
+            {/if}
         {/each}
         <button type="button" onclick={addIdentifier}>{t("form.addIdentifier")}</button>
     </fieldset>
