@@ -9,6 +9,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — `Custom(label)` editing for case type / status / identifier scheme (FE-5)
+
+`CaseForm` had no handling for the `case_matcher` wire shape's
+`Custom(String)` variant on case type, status, or identifier scheme —
+selecting a case seeded with one silently dropped it (identifiers) or
+left the dropdown unselected. Each of the three dropdowns gained a
+"Custom" option that reveals a label text input, reassembled on submit
+into the `{ Custom: "<label>" }` wire shape; client-side validation
+blocks submit rather than ever sending `{ Custom: "" }`. Identifier
+rows changed shape internally to let the `<select>` bind the sentinel
+while keeping a separate label field per row — incidentally fixing a
+real prior bug where a seeded Custom-scheme identifier was silently
+dropped on load. New i18n keys `form.customLabel` /
+`form.customLabelRequired` across all 13 locales. `tests/unit/case-form.test.ts`
+gained 4 new cases plus one rewritten from "drops" to "preserves" a
+seeded Custom-scheme row, all verified to fail without the fix.
+`pnpm test` 77/77 (was 73); `pnpm exec playwright test` 8/8 (unchanged).
+See spec/index.md FE-5.
+
 ### Fixed — `/verify` crashed with a raw 500 when the authentication service was unreachable (T-7)
 
 `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch,

@@ -119,9 +119,9 @@ describe("CaseForm assembly", () => {
     ]);
   });
 
-  // Pins: Custom-scheme identifier rows are dropped on seed (the scheme
-  // <select> only offers unit schemes), per the form's documented behaviour.
-  it("drops seeded Custom-scheme identifier rows", async () => {
+  // Pins FE-5: a seeded Custom-scheme identifier row now survives (it used
+  // to be dropped, since the scheme <select> only offered unit schemes).
+  it("preserves a seeded Custom-scheme identifier row", async () => {
     const { container, submitted } = renderForm({
       title: "Case",
       identifiers: [
@@ -131,6 +131,77 @@ describe("CaseForm assembly", () => {
     });
     await submit(container);
     const rec = submitted[0]!;
-    expect(rec.identifiers).toEqual([{ scheme: "Docket", value: "HB-1" }]);
+    expect(rec.identifiers).toEqual([
+      { scheme: { Custom: "InternalRef" }, value: "X-1" },
+      { scheme: "Docket", value: "HB-1" },
+    ]);
+  });
+});
+
+// FE-5: `Custom(label)` editing for case type / status / identifier scheme.
+// Each dropdown offers a "Custom" option that reveals a label text input,
+// reassembled into the `{ Custom: "<label>" }` wire shape on submit.
+describe("CaseForm Custom(label) editing (FE-5)", () => {
+  // Pins: selecting "Custom" for case type reveals a label input, and the
+  // round-trip payload shape is `{ Custom: "<label>" }`.
+  it("selects Custom for case type and sends { Custom: label }", async () => {
+    const { container, getByLabelText, submitted } = renderForm({
+      title: "Case",
+    });
+    const caseTypeSelect = container.querySelectorAll("select")[0]!;
+    await fireEvent.change(caseTypeSelect, { target: { value: "Custom" } });
+    await fireEvent.input(getByLabelText("Custom label"), {
+      target: { value: "  Guardianship  " },
+    });
+    await submit(container);
+    expect(submitted[0]?.case_type).toEqual({ Custom: "Guardianship" });
+  });
+
+  // Pins: selecting "Custom" for status reveals a label input, and the
+  // round-trip payload shape is `{ Custom: "<label>" }`.
+  it("selects Custom for status and sends { Custom: label }", async () => {
+    const { container, getByLabelText, submitted } = renderForm({
+      title: "Case",
+    });
+    const statusSelect = container.querySelectorAll("select")[1]!;
+    await fireEvent.change(statusSelect, { target: { value: "Custom" } });
+    await fireEvent.input(getByLabelText("Custom label"), {
+      target: { value: "  Under appeal  " },
+    });
+    await submit(container);
+    expect(submitted[0]?.status).toEqual({ Custom: "Under appeal" });
+  });
+
+  // Pins: selecting "Custom" for an identifier row's scheme reveals a label
+  // input alongside the value input, and the round-trip payload shape is
+  // `{ scheme: { Custom: "<label>" }, value: "<value>" }`.
+  it("selects Custom for an identifier scheme and sends { Custom: label }", async () => {
+    const { container, getByLabelText, getByText, submitted } = renderForm({
+      title: "Case",
+    });
+    await fireEvent.click(getByText("+ Add identifier"));
+    const schemeSelect = container.querySelectorAll("fieldset select")[0]!;
+    await fireEvent.change(schemeSelect, { target: { value: "Custom" } });
+    await fireEvent.input(getByLabelText("Custom label"), {
+      target: { value: "  InternalRef  " },
+    });
+    await fireEvent.input(container.querySelector("fieldset input[type=text]:last-of-type")!, {
+      target: { value: "X-9" },
+    });
+    await submit(container);
+    expect(submitted[0]?.identifiers).toEqual([
+      { scheme: { Custom: "InternalRef" }, value: "X-9" },
+    ]);
+  });
+
+  // Pins: selecting "Custom" but leaving the label blank blocks submit with
+  // a clear error, rather than sending `{ Custom: "" }`.
+  it("blocks submit when a selected Custom label is left blank", async () => {
+    const { container, onsubmit, getByText } = renderForm({ title: "Case" });
+    const caseTypeSelect = container.querySelectorAll("select")[0]!;
+    await fireEvent.change(caseTypeSelect, { target: { value: "Custom" } });
+    await submit(container);
+    expect(onsubmit).not.toHaveBeenCalled();
+    expect(getByText("A custom label is required.")).toBeTruthy();
   });
 });

@@ -29,7 +29,6 @@
   } from "$lib/api/types";
   import type {
     Case,
-    CaseIdentifier,
     CaseStatus,
     CaseType,
     IdentifierScheme,
@@ -47,6 +46,21 @@
     onsubmit: (record: Case) => Promise<void>;
   } = $props();
 
+  /** The unit (non-Custom) identifier schemes, for the `schemeKind` select. */
+  type UnitScheme = Exclude<IdentifierScheme, { Custom: string }>;
+
+  /**
+   * Editable identifier row (FE-5). Splits `CaseIdentifier.scheme` into a
+   * select-bindable `schemeKind` (a unit scheme, or the "Custom" sentinel)
+   * plus a separate `customLabel` text field, mirroring caseType/status
+   * above. Reassembled into a wire `CaseIdentifier` in `build()`.
+   */
+  interface IdentifierRow {
+    schemeKind: UnitScheme | "Custom";
+    customLabel: string;
+    value: string;
+  }
+
   // Seed the form once from `initial` (read without tracking) so later
   // parent re-renders of `initial` don't clobber in-progress edits.
   const seed = untrack(() => initial);
@@ -57,13 +71,28 @@
   let caseNumber = $state(seed.case_number ?? "");
   let agencyId = $state(seed.agency_id ?? "");
   let agencyName = $state(seed.agency_name ?? "");
-  // Enum selects use "" for the unselected ("—") option. `Custom` variants
-  // are objects, so only seed the select when the value is a bare string.
-  let caseType = $state<CaseType | "">(
-    typeof seed.case_type === "string" ? seed.case_type : "",
+  // Enum selects use "" for the unselected ("—") option and "Custom" as a
+  // sentinel for the `{ Custom: string }` variant (FE-5) — a native
+  // <select> can only bind a string, so the object variant is represented
+  // by the sentinel plus a separate text field for its label, and the two
+  // are reassembled in `build()`.
+  let caseType = $state<CaseType | "Custom" | "">(
+    typeof seed.case_type === "string"
+      ? seed.case_type
+      : seed.case_type
+        ? "Custom"
+        : "",
   );
-  let status = $state<CaseStatus | "">(
-    typeof seed.status === "string" ? seed.status : "",
+  let caseTypeCustom = $state(
+    seed.case_type && typeof seed.case_type === "object"
+      ? seed.case_type.Custom
+      : "",
+  );
+  let status = $state<CaseStatus | "Custom" | "">(
+    typeof seed.status === "string" ? seed.status : seed.status ? "Custom" : "",
+  );
+  let statusCustom = $state(
+    seed.status && typeof seed.status === "object" ? seed.status.Custom : "",
   );
   let priority = $state<Priority | "">(
     typeof seed.priority === "string" ? seed.priority : "",
@@ -76,10 +105,18 @@
   let keywords = $state((seed.keywords ?? []).join(", "));
   let sameAs = $state((seed.same_as ?? []).join(", "));
   let inLanguage = $state((seed.in_language ?? []).join(", "));
-  // Identifiers stay structured; drop any seeded `Custom`-scheme rows since
-  // the scheme `<select>` only offers the unit schemes.
-  let identifiers = $state<CaseIdentifier[]>(
-    (seed.identifiers ?? []).filter((i) => typeof i.scheme === "string"),
+  // Identifiers stay structured, but the editable row shape splits the
+  // scheme into a select-bindable `schemeKind` (a unit scheme or the
+  // "Custom" sentinel, FE-5) plus a separate `customLabel` text field —
+  // the same pattern as caseType/status above. A seeded Custom-scheme row
+  // now survives (it used to be silently dropped, since the scheme
+  // `<select>` only offered the unit schemes).
+  let identifiers = $state<IdentifierRow[]>(
+    (seed.identifiers ?? []).map((i) =>
+      typeof i.scheme === "string"
+        ? { schemeKind: i.scheme, customLabel: "", value: i.value }
+        : { schemeKind: "Custom", customLabel: i.scheme.Custom, value: i.value },
+    ),
   );
 
   // UI flags: `submitting` disables the button; `error` drives the banner.
@@ -101,23 +138,49 @@
 
   // Append a fresh identifier row (immutable reassignment so `$state` reacts).
   function addIdentifier() {
-    identifiers = [...identifiers, { scheme: "Docket", value: "" }];
+    identifiers = [
+      ...identifiers,
+      { schemeKind: "Docket", customLabel: "", value: "" },
+    ];
   }
   // Drop the identifier row at index `i`.
   function removeIdentifier(i: number) {
     identifiers = identifiers.filter((_, idx) => idx !== i);
   }
 
+  // Any row whose scheme is "Custom" but whose label is blank, among rows
+  // that would actually be emitted (non-blank value) — used to block
+  // submit with a clear error rather than sending `{ Custom: "" }`.
+  function hasBlankCustomIdentifierLabel(): boolean {
+    return identifiers.some(
+      (i) =>
+        i.schemeKind === "Custom" &&
+        i.customLabel.trim().length === 0 &&
+        i.value.trim().length > 0,
+    );
+  }
+
   // Assemble the wire `Case` from the flat form state: trim title, collapse
-  // blanks to null, split list fields, map "" enum back to null, and drop
-  // empty identifier rows.
+  // blanks to null, split list fields, map "" enum back to null, reassemble
+  // the "Custom" sentinel + label pairs (FE-5) into `{ Custom: "<label>" }`,
+  // and drop empty identifier rows.
   function build(): Case {
     const record: Case = { title: title.trim() };
     record.case_number = blankToNull(caseNumber);
     record.agency_id = blankToNull(agencyId);
     record.agency_name = blankToNull(agencyName);
-    record.case_type = caseType === "" ? null : (caseType as CaseType);
-    record.status = status === "" ? null : (status as CaseStatus);
+    record.case_type =
+      caseType === ""
+        ? null
+        : caseType === "Custom"
+          ? { Custom: caseTypeCustom.trim() }
+          : (caseType as CaseType);
+    record.status =
+      status === ""
+        ? null
+        : status === "Custom"
+          ? { Custom: statusCustom.trim() }
+          : (status as CaseStatus);
     record.priority = priority === "" ? null : (priority as Priority);
     record.opened_date = blankToNull(openedDate);
     record.alternate_titles = splitList(alternateTitles);
@@ -127,18 +190,33 @@
     record.in_language = splitList(inLanguage);
     record.identifiers = identifiers
       .filter((i) => i.value.trim().length > 0)
-      .map((i) => ({ scheme: i.scheme, value: i.value.trim() }));
+      .map((i) => ({
+        scheme:
+          i.schemeKind === "Custom"
+            ? { Custom: i.customLabel.trim() }
+            : i.schemeKind,
+        value: i.value.trim(),
+      }));
     return record;
   }
 
   // Submit handler: block the native navigation, client-validate the
-  // required title, then hand the built record to the parent's `onsubmit`,
-  // surfacing any thrown error in the banner.
+  // required title and any selected "Custom" label (FE-5: never send
+  // `{ Custom: "" }`), then hand the built record to the parent's
+  // `onsubmit`, surfacing any thrown error in the banner.
   async function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
     error = null;
     if (title.trim().length === 0) {
       error = t("form.titleRequired");
+      return;
+    }
+    if (
+      (caseType === "Custom" && caseTypeCustom.trim().length === 0) ||
+      (status === "Custom" && statusCustom.trim().length === 0) ||
+      hasBlankCustomIdentifierLabel()
+    ) {
+      error = t("form.customLabelRequired");
       return;
     }
     submitting = true;
@@ -166,7 +244,16 @@
         {#each ALL_CASE_TYPES as type (String(type))}
           <option value={type as CaseType}>{type}</option>
         {/each}
+        <option value="Custom">Custom</option>
       </select>
+      {#if caseType === "Custom"}
+        <input
+          type="text"
+          bind:value={caseTypeCustom}
+          placeholder={t("form.customLabel")}
+          aria-label={t("form.customLabel")}
+        />
+      {/if}
     </label>
     <label
       >{t("form.status")}
@@ -175,7 +262,16 @@
         {#each ALL_STATUSES as s (String(s))}
           <option value={s as CaseStatus}>{s}</option>
         {/each}
+        <option value="Custom">Custom</option>
       </select>
+      {#if status === "Custom"}
+        <input
+          type="text"
+          bind:value={statusCustom}
+          placeholder={t("form.customLabel")}
+          aria-label={t("form.customLabel")}
+        />
+      {/if}
     </label>
     <label
       >{t("form.priority")}
@@ -236,11 +332,20 @@
     <legend>{t("form.identifiers")}</legend>
     {#each identifiers as identifier, i (i)}
       <div class="row">
-        <select bind:value={identifier.scheme}>
+        <select bind:value={identifier.schemeKind}>
           {#each ALL_SCHEMES as scheme (String(scheme))}
             <option value={scheme as IdentifierScheme}>{scheme}</option>
           {/each}
+          <option value="Custom">Custom</option>
         </select>
+        {#if identifier.schemeKind === "Custom"}
+          <input
+            type="text"
+            bind:value={identifier.customLabel}
+            placeholder={t("form.customLabel")}
+            aria-label={t("form.customLabel")}
+          />
+        {/if}
         <input type="text" bind:value={identifier.value} placeholder={t("form.valuePlaceholder")} />
         <button type="button" onclick={() => removeIdentifier(i)}>{t("form.remove")}</button
         >
