@@ -12,6 +12,7 @@
     skillsMatrix,
     trainingAnalytics,
   } from "$lib/api/wpm";
+  import { percentOf, percentWithWorkings } from "$lib/format";
   import { t } from "$lib/i18n.svelte";
 
   type Matrix = Awaited<ReturnType<typeof skillsMatrix>>;
@@ -54,8 +55,6 @@
     }
   }
 
-  const pct = (done: number, total: number) =>
-    total === 0 ? "—" : `${Math.round((done / total) * 100)}%`;
 </script>
 
 <svelte:head><title>{t("nav.learning")} — WPM</title></svelte:head>
@@ -105,12 +104,7 @@
       {#each analytics.departments as dept (dept.department)}
         <tr>
           <td>{dept.department}</td>
-          <td>
-            {dept.completion_rate.value === null
-              ? "—"
-              : `${Math.round(dept.completion_rate.value * 100)}%`}
-            ({dept.completion_rate.numerator}/{dept.completion_rate.denominator})
-          </td>
+          <td>{percentWithWorkings(dept.completion_rate)}</td>
           <td>{dept.certs_expiring}</td>
         </tr>
       {:else}
@@ -148,7 +142,7 @@
         <tr>
           <td>{member.display_name ?? member.employee_pid}</td>
           <td>{member.completed_steps} / {member.total_steps}</td>
-          <td>{pct(member.completed_steps, member.total_steps)}</td>
+          <td>{percentOf(member.completed_steps, member.total_steps)}</td>
         </tr>
       {:else}
         <tr><td colspan="3" class="muted">No one enrolled.</td></tr>

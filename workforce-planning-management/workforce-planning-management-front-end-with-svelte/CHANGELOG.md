@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — centralised null-not-zero format helpers (WPM-T39)
+
+The training-completion rate, uptake rate, enrolment conversion,
+learning-path progress, pulse mean, and appraisal competency mean were
+each formatted with their own inline null-check, duplicated across
+`routes/learning`, `routes/wellbeing`, and `routes/employees/[pid]` —
+no `$lib/format.ts` counterpart to the CMS front-end's. New
+`src/lib/format.ts` (`percent`/`workings`/`percentWithWorkings`/
+`percentOf`/`mean`) plus a shared `Ratio` type in `src/lib/api/types.ts`
+replacing three duplicated anonymous type literals in `src/lib/api/wpm.ts`.
+
+Found and fixed two real inconsistencies while centralising, not just a
+refactor: `routes/learning`'s completion-rate rendering always showed
+the raw numerator/denominator even when the percentage was dashed
+(`"— (0/5)"`), while `routes/wellbeing`'s uptake/conversion rates
+collapsed to a bare `"—"` — `percentWithWorkings` now picks the latter
+convention consistently; and `routes/wellbeing`'s pulse-mean label
+silently rendered the literal string `"undefined"` when a cell's mean
+was absent, now a proper `"—"` fallback via `mean()`.
+
+`routes/mentorship` needed no change (it has no ratio/mean rendering,
+only presence fallbacks); `routes/benchmarks`' below/above-min flag
+chip was deliberately left alone — a single, non-duplicated presence
+check with no math to centralise.
+
+New `tests/unit/format.test.ts` (17 cases, each pinning the
+null-not-zero direction both ways: a real `0` renders as `0%`/`0.0`,
+never as "no data"). `npx vitest run` 30/30 (was 13); `svelte-check` 0;
+`npx playwright test` 12/12 unchanged; `npm run build` clean. See
+`spec/tasks.md` WPM-T39.
+
 ### Fixed — `/verify` crashed with a raw 500 when the authentication service was unreachable (WPM-T37)
 
 `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch,

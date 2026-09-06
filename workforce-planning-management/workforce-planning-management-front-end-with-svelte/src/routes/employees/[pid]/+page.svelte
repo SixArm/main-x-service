@@ -43,6 +43,7 @@
     type PulseSurvey,
     type WellbeingPrompt,
   } from "$lib/api/wpm";
+  import { mean } from "$lib/format";
   import { i18n, t } from "$lib/i18n.svelte";
   import type {
     Employee,
@@ -465,7 +466,7 @@
                   <span class="muted">{t("ap.withheld")}</span>
                 {:else}
                   {#each Object.entries(group.competencies ?? {}) as [competency, cell] (competency)}
-                    <span class="chip">{competency}: {cell.mean.toFixed(1)} (n={cell.count})</span>
+                    <span class="chip">{competency}: {mean(cell.mean)} (n={cell.count})</span>
                   {/each}
                   {#each group.comments ?? [] as comment (comment)}
                     <p class="muted">“{comment}”</p>

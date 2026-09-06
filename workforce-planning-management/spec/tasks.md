@@ -616,7 +616,7 @@ code + tests in one PR.
       (svelte-check: 409 files, 0 errors, 0 warnings), `npx playwright
       test` (12 passed), `npx vitest run` (10 passed, unchanged).
 
-- [ ] WPM-T39 **Front-end honesty-format module.** The null-ratio /
+- [x] WPM-T39 **Front-end honesty-format module.** The null-ratio /
       no-data rendering rules (training completion %, conversion
       rate, benchmark below/above-min flags, pulse means, appraisal
       count-carrying means) are inlined per-route rather than
@@ -633,6 +633,49 @@ code + tests in one PR.
       suite (zero-denominator, present-value, negative-flag cases);
       the routes that currently inline the logic call it instead;
       svelte-check 0; Playwright green. (WPM-D16)
+  - **Resolved (2026-09-06).** New `src/lib/format.ts` (mirroring the
+    CMS front-end's), with a new shared `Ratio` type
+    (`src/lib/api/types.ts`, replacing three duplicated anonymous
+    `{numerator, denominator, value}` inline type literals in
+    `src/lib/api/wpm.ts`): `percent`/`workings`/`percentWithWorkings`
+    for a service-supplied `Ratio`, `percentOf` for a raw `done`/`total`
+    pair the service doesn't wrap in a `Ratio` (learning-path step
+    progress), and `mean` for a one-decimal sample mean. Wired into
+    `routes/learning` (training-completion rate + path-progress
+    percentage, replacing a locally-scoped `pct()` helper),
+    `routes/wellbeing` (uptake rate, enrolment conversion, and the
+    pulse-cell mean), and `routes/employees/[pid]` (appraisal
+    competency means). **`routes/mentorship` needed no change** — on
+    inspection it has no ratio/mean rendering, only `??` presence
+    fallbacks; the task's own verification note listing it was
+    imprecise about which three routes actually carry the pattern.
+    **Benchmark below/above-min flags** (`routes/benchmarks`) were
+    deliberately **not** extracted: that's a single, non-duplicated
+    presence check (`{#if row.flag}…{:else}—{/if}`) with no rounding
+    or ratio math to centralise — nothing to unify. **One behaviour
+    fix in passing, not just a refactor**: the three duplicated
+    ratio-rendering call sites had drifted into two *inconsistent*
+    null conventions — `routes/learning`'s `completion_rate` always
+    showed the raw `(numerator/denominator)` working even when the
+    percentage was dashed (e.g. `"— (0/5)"`), while
+    `routes/wellbeing`'s `uptake_rate`/`enrolment_conversion` collapsed
+    to a bare `"—"` with no working at all. `percentWithWorkings`
+    picks the latter, more common convention as canonical (2 of 3
+    sites already did it that way, and a working next to a dashed
+    percentage was arguably confusing rather than informative);
+    `routes/wellbeing`'s pulse-mean label also silently rendered the
+    literal string `"undefined"` when a cell's `mean` was absent
+    (`value.mean?.toFixed(1)` with no fallback) — `mean()` now returns
+    `null` for that case and the caller falls back to `"—"`. New
+    `tests/unit/format.test.ts` (17 cases: present/zero/null value for
+    each of `percent`/`workings`/`percentWithWorkings`/`percentOf`, and
+    present/zero/absent for `mean`, each pinning the null-not-zero
+    direction both ways — a real `0` must render as `0%`/`0.0`, never
+    collapse into "no data"). `npx vitest run` 30/30 (was 13);
+    `svelte-check` 0 errors/warnings; `npx playwright test` 12/12
+    unchanged (the existing fixtures exercise only non-null ratios, so
+    the null-convention unification above doesn't touch any pinned
+    text); `npm run build` clean.
 
 - [x] WPM-T40 **List pagination headers.** No controller emits
       `X-Total-Count`/`X-Limit`/`X-Offset`, and list handlers cap with
