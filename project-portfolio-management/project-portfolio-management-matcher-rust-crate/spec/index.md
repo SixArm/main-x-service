@@ -486,7 +486,7 @@ this crate has no cap of its own (§23).
       unit-test). Verified: `cargo test` (23 tests: 6 unit + 10
       public-API + 7 doctests, all green), `cargo clippy --all-targets
       -- -D warnings`, `cargo fmt --check`.
-- [ ] **Criterion bench group scaling per-`Plan` array field sizes
+- [x] **Criterion bench group scaling per-`Plan` array field sizes
       (`goals`/`keywords`/`relationships`/`tags`), not just candidate-list
       length.** *(Verified: `grep -n "fn bench_" benches/match_pair.rs`
       shows only candidate-count scaling via `bench_rank`
@@ -498,6 +498,14 @@ this crate has no cap of its own (§23).
       **Acceptance:** `cargo bench --no-run` compiles the new group; a
       local `cargo bench` run's near-linear-or-worse scaling is
       recorded in a `CHANGELOG.md` note.
+      **Resolved (2026-09-06).** `bench_field_arrays` added to
+      `benches/match_pair.rs`: for each of `goals`/`keywords`/
+      `relationships`/`tags` in turn, the other three fields stay at
+      their usual fixture size while the one under test grows to
+      10/100/1000 (half-overlapping), `Throughput::Elements(n)`. All
+      four scaled super-linearly (10× array-size growth from
+      100→1000 cost 22–30× the time, not ~10×) — recorded numbers in
+      `CHANGELOG.md`.
 - [x] **Property-test `MatchConfig` values other than the built-in
       presets.** *(resolved 2026-09-05.)* The SEC-M6 property suite
       only ever exercised `MatchingEngine::new(MatchConfig::default())`;
