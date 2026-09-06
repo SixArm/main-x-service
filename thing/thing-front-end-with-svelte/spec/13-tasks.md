@@ -65,7 +65,7 @@
   round trip does not carry one today). Tests: `tests/unit/session.test.ts`
   (+2 — `requireSignedIn` throws a 303-to-`/signin` redirect when signed
   out, passes through silently when signed in).
-- [ ] T-27: **Wire `mask_sensitive` into the list/search UI.**
+- [x] T-27: **Wire `mask_sensitive` into the list/search UI.** *(resolved 2026-09-06.)*
   `ThingRepository`'s search options already declare `mask_sensitive`
   (`src/lib/api/things.ts`) and it is forwarded to
   `GET /api/things/search`, but `/things` (the list/search route)
@@ -81,6 +81,21 @@
   re-fetches; a Playwright test stubs masked vs. unmasked search
   responses and asserts the toggle changes the request/rendered values;
   three-part change (spec §6/§9 + code + test).
+  - **Resolved.** A new `maskSensitive` checkbox sits alongside the
+    existing `fuzzy`/`phonetic` toggles, wired to `search()`'s
+    `mask_sensitive` option. Unlike `fuzzy`/`phonetic` (which only take
+    effect on the *next* manual `SearchBox` submit — it fires on
+    submit, not on keystroke or checkbox change), this toggle carries
+    its own `onchange` that re-runs `runSearch(query)` immediately,
+    mirroring the detail page's masked-view toggle (T-19) so switching
+    the view doesn't require re-submitting the query too. New
+    `things.maskSensitive` i18n key across all 13 locales. New
+    Playwright test (`tests/e2e/things.spec.ts`) stubs
+    `**/api/things/search**`, branching the returned `name` on the
+    request's `mask_sensitive` query param, and asserts checking then
+    unchecking the toggle swaps the rendered value both ways. Verified:
+    `npm test` (92 passed), `npx playwright test` (14 passed, up from
+    13), `npm run check` (0 errors), `npm run lint` clean.
 - [ ] T-28: **Pagination on the `/things` list/search route.**
   `place-service`'s family-wide pagination convention
   (`agents/share/restful.md`: `?limit=&offset=` plus

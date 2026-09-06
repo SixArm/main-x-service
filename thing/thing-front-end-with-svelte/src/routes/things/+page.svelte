@@ -1,17 +1,25 @@
 <!--
   +page.svelte (/things) — Things list / search page.
 
-  Purpose: search the index (with fuzzy / phonetic toggles) and show results
-  in the SVAR ThingGrid; selecting a row navigates to that Thing's detail.
+  Purpose: search the index (with fuzzy / phonetic / mask-sensitive toggles)
+  and show results in the SVAR ThingGrid; selecting a row navigates to that
+  Thing's detail.
 
   $state:
     - query: bound search text.
     - things / total: current result set and count.
     - loading / error: request status.
     - fuzzy / phonetic: search-mode toggles passed to the API.
+    - maskSensitive (T-27): asks the server to mask sensitive fields in
+      the returned records, mirroring the detail page's masked-view
+      toggle (T-19) — the server decides what counts as sensitive, not
+      this page. Unlike fuzzy/phonetic (which only take effect on the
+      next manual search), toggling this one re-fetches immediately, so
+      switching views doesn't require re-submitting the query too.
 
   Reactive notes: an $effect runs the initial unfiltered search once on mount
-  ("*" wildcard); subsequent searches are user-triggered via runSearch.
+  ("*" wildcard); subsequent searches are user-triggered via runSearch
+  (submit, or the mask-sensitive toggle's own onchange).
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
@@ -29,6 +37,7 @@
     let error = $state<string | null>(null);
     let fuzzy = $state(true);
     let phonetic = $state(false);
+    let maskSensitive = $state(false);
 
     const repo = ThingRepository.withFetch();
 
@@ -42,6 +51,7 @@
                 limit: 50,
                 fuzzy,
                 phonetic,
+                mask_sensitive: maskSensitive,
             });
             things = res.items;
             total = res.total;
@@ -86,6 +96,14 @@
         <label
             ><input type="checkbox" bind:checked={phonetic} />
             {t("things.phonetic")}</label
+        >
+        <label
+            ><input
+                type="checkbox"
+                bind:checked={maskSensitive}
+                onchange={() => runSearch(query)}
+            />
+            {t("things.maskSensitive")}</label
         >
         <span class="muted" style="margin-left: auto">
             {loading

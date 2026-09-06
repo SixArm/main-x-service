@@ -9,6 +9,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — `mask_sensitive` toggle on the list/search UI (T-27)
+
+`ThingRepository.search()` already declared and forwarded
+`mask_sensitive` to `GET /api/things/search`, but `/things` never
+exposed it — the detail page had a masked-view toggle (T-19), the list
+page did not. A new "Mask sensitive" checkbox sits alongside the
+existing `fuzzy`/`phonetic` toggles; unlike those (which only take
+effect on the next manual search submit), this one re-fetches
+immediately on change, mirroring the detail page's masked-view toggle
+so switching views doesn't require re-submitting the query. New
+`things.maskSensitive` key across all 13 locales. New Playwright test
+stubs masked vs. unmasked search responses and asserts the toggle
+swaps the rendered value both ways. See spec/13-tasks.md T-27.
+
 ### Added — 401/403 handling in `ApiClient` (T-29)
 
 `ApiError` had `isNotFound`/`isConflict`/`isValidation` but nothing for
