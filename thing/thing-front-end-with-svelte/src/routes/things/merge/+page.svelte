@@ -26,6 +26,7 @@
     import FieldRow from "$lib/forms/FieldRow.svelte";
     import { ThingRepository } from "$lib/api/things.js";
     import { ApiError } from "$lib/api/client.js";
+    import { describeApiError } from "$lib/api/errorHandling.js";
     import { validateMerge } from "$lib/components/merge-validation.js";
     import type { MergeResponse, Thing } from "$lib/api/types.js";
     import { t, translate } from "$lib/i18n.svelte.js";
@@ -58,7 +59,7 @@
             ]);
             preview = { main: m, duplicate: d };
         } catch (err) {
-            error = err instanceof Error ? err.message : String(err);
+            error = describeApiError(err);
         }
     }
 
@@ -88,8 +89,13 @@
                 merge_reason: reason || null,
             });
         } catch (err) {
-            // Prefer the service's structured "CODE: message" for API errors.
-            if (err instanceof ApiError) {
+            if (
+                err instanceof ApiError &&
+                (err.isUnauthorized || err.isForbidden)
+            ) {
+                error = describeApiError(err);
+            } else if (err instanceof ApiError) {
+                // Prefer the service's structured "CODE: message" for API errors.
                 error = `${err.code}: ${err.message}`;
             } else {
                 error = err instanceof Error ? err.message : String(err);

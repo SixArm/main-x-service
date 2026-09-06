@@ -99,13 +99,14 @@
   Playwright test stubs a response with `X-Total-Count` greater than
   the page size and asserts the next-page control fetches with the
   advanced `offset`; three-part change (spec §6/§9 + code + test).
-- [ ] T-29: **401/403 handling in `ApiClient`.** `ApiError` exposes
-  `isNotFound()`/`isConflict()`/`isValidation()` helpers but nothing for
-  `401`/`403`, and no route reacts to either status — a session that
-  expires mid-visit (or a `THING_REQUIRE_AUTH`-gated `403`) surfaces as
-  a raw, untranslated error banner rather than a redirect to `/signin`
-  or an access-denied message, the same gap `place-front-end-with-svelte`
-  carries under its own new T-25 (401/403). *(verified: `grep -n
+- [x] T-29: **401/403 handling in `ApiClient`.** *(resolved 2026-09-06.)*
+  `ApiError` exposes `isNotFound()`/`isConflict()`/`isValidation()`
+  helpers but nothing for `401`/`403`, and no route reacts to either
+  status — a session that expires mid-visit (or a
+  `THING_REQUIRE_AUTH`-gated `403`) surfaces as a raw, untranslated
+  error banner rather than a redirect to `/signin` or an access-denied
+  message, the same gap `place-front-end-with-svelte` carries under
+  its own new T-25 (401/403). *(verified: `grep -n
   "401\|403\|isUnauthorized\|isForbidden" src/lib/api/client.ts` returns
   nothing.)* **Acceptance:** `ApiError` gains `isUnauthorized()` /
   `isForbidden()`; a `401` from the proxy (session expired/absent)
@@ -113,4 +114,32 @@
   access-denied message rather than the raw error body; unit tests pin
   both helpers and the redirect behaviour; three-part change (spec
   §8/§9 + code + test).
+  - **Resolved.** `ApiError` gained `isUnauthorized` (401) and
+    `isForbidden` (403) getters (`src/lib/api/client.ts`, mirroring
+    `isConflict`'s existing shape). New `src/lib/api/errorHandling.ts`
+    exports `describeApiError(err)`: on `isUnauthorized` it calls
+    `goto("/signin")` (from `$app/navigation`) and returns the new
+    translated `auth.sessionExpired` string; on `isForbidden` it
+    returns the new translated `auth.accessDenied` string; otherwise
+    it falls back to `err instanceof Error ? err.message :
+    String(err)` — byte-identical to what every route's catch block
+    already produced, so wiring it in changes nothing for any other
+    status. All 8 routes with a catch block
+    (`+page.svelte`, `review/+page.svelte`,
+    `things/+page.svelte`, `things/merge/+page.svelte`,
+    `things/match/+page.svelte`, `things/[id]/+page.svelte`,
+    `things/[id]/edit/+page.svelte`, `things/[id]/audit/+page.svelte`)
+    now call `describeApiError` instead of the inline ternary; the
+    merge page's second catch block (which prefers the service's
+    structured `CODE: message` for other `ApiError` statuses) checks
+    `isUnauthorized`/`isForbidden` first and falls through to that
+    existing behaviour otherwise, so 409/422/etc. are unaffected.
+    `auth.sessionExpired`/`auth.accessDenied` added to all 13 locales.
+    New `tests/unit/errorHandling.test.ts` (5 tests, mocking
+    `$app/navigation`'s `goto`) pins the redirect-on-401,
+    message-on-403 (no redirect), and every fallback case; two new
+    tests in `tests/unit/client.test.ts` pin the getters themselves.
+    Verified: `npm test` (92 passed, up from 85), `npx playwright
+    test` (13 passed, unaffected), `npm run check` (0 errors), `npm
+    run lint` clean (prettier auto-fixed two files' formatting).
 

@@ -82,6 +82,14 @@ export class ApiError extends Error {
     this.details = body?.details;
   }
 
+  /** True for HTTP 401 — missing/expired/rejected session. */
+  get isUnauthorized(): boolean {
+    return this.status === 401;
+  }
+  /** True for HTTP 403 — valid session, but the ABAC policy denied it. */
+  get isForbidden(): boolean {
+    return this.status === 403;
+  }
   /** True for HTTP 404 — the requested record does not exist. */
   get isNotFound(): boolean {
     return this.status === 404;

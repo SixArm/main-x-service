@@ -41,6 +41,7 @@
     import { Kanban, Willow, getCardShape } from "@svar-ui/svelte-kanban";
     import type { KanbanInstanceApi } from "@svar-ui/svelte-kanban";
     import { ThingRepository } from "$lib/api/things.js";
+    import { describeApiError } from "$lib/api/errorHandling.js";
     import type { ReviewQueueOptions } from "$lib/api/things.js";
     import type {
         ReviewDecision,
@@ -83,7 +84,7 @@
         try {
             items = await repo.listReviewQueue(options);
         } catch (err) {
-            error = err instanceof Error ? err.message : String(err);
+            error = describeApiError(err);
         }
     }
 
@@ -102,7 +103,7 @@
             // own list, which is unfiltered and only covers this pass.
             await load();
         } catch (err) {
-            error = err instanceof Error ? err.message : String(err);
+            error = describeApiError(err);
         } finally {
             running = false;
         }
@@ -186,7 +187,7 @@
             // the new status without waiting for the list to come back.
             selectedItem = await repo.decideReview(item.id, status);
         } catch (err) {
-            actionError = err instanceof Error ? err.message : String(err);
+            actionError = describeApiError(err);
         } finally {
             deciding = false;
             await load();

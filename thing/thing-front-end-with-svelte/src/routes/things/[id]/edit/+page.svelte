@@ -16,6 +16,7 @@
     import { onMount } from "svelte";
     import ThingForm from "$lib/components/ThingForm.svelte";
     import { ThingRepository } from "$lib/api/things.js";
+    import { describeApiError } from "$lib/api/errorHandling.js";
     import type { Thing } from "$lib/api/types.js";
     import { t } from "$lib/i18n.svelte.js";
 
@@ -30,7 +31,7 @@
         try {
             thing = await repo.get(id);
         } catch (err) {
-            error = err instanceof Error ? err.message : String(err);
+            error = describeApiError(err);
         } finally {
             loading = false;
         }

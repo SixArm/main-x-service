@@ -15,6 +15,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { ThingRepository } from "$lib/api/things.js";
+    import { describeApiError } from "$lib/api/errorHandling.js";
     import type { AuditEntry } from "$lib/api/types.js";
     import { t } from "$lib/i18n.svelte.js";
 
@@ -37,12 +38,12 @@
         } catch (err) {
             // Any failure to reach the endpoint marks the service down.
             healthStatus = "down";
-            healthMessage = err instanceof Error ? err.message : String(err);
+            healthMessage = describeApiError(err);
         }
         try {
             recent = await repo.recentAudit(20);
         } catch (err) {
-            recentError = err instanceof Error ? err.message : String(err);
+            recentError = describeApiError(err);
         }
     });
 </script>

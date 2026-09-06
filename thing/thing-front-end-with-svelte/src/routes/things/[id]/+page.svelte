@@ -22,6 +22,7 @@
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
     import { ThingRepository } from "$lib/api/things.js";
+    import { describeApiError } from "$lib/api/errorHandling.js";
     import type { Thing } from "$lib/api/types.js";
     import { t, translate } from "$lib/i18n.svelte.js";
 
@@ -44,7 +45,7 @@
         try {
             thing = masked ? await repo.masked(id) : await repo.get(id);
         } catch (err) {
-            error = err instanceof Error ? err.message : String(err);
+            error = describeApiError(err);
         } finally {
             loading = false;
         }
@@ -67,7 +68,7 @@
             await repo.softDelete(id);
             goto("/things");
         } catch (err) {
-            error = err instanceof Error ? err.message : String(err);
+            error = describeApiError(err);
         }
     }
 
@@ -103,7 +104,7 @@
             a.remove();
             URL.revokeObjectURL(url);
         } catch (err) {
-            error = err instanceof Error ? err.message : String(err);
+            error = describeApiError(err);
         } finally {
             exporting = false;
         }
