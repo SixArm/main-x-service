@@ -46,3 +46,27 @@ describe('+layout top navigation', () => {
         expect(nav!.classList.contains('open')).toBe(false);
     });
 });
+
+// The signed-in utility row renders `<name> (<role>)` when the cached user
+// carries a role, and just `<name>` (no parenthetical) when it doesn't —
+// this was previously unasserted (ST-18): `layout.test.ts` already seeded
+// `role: null` for the hamburger test above without ever checking the
+// rendered text either way.
+describe('+layout signed-in role suffix', () => {
+    it('renders "(role)" next to the name when the user carries a role', () => {
+        cache.setUser({ email: 'op@example.test', name: 'Test Operator', role: 'clerk' });
+
+        const { container } = render(Layout, { children });
+        const status = container.querySelector('.auth-status');
+        expect(status?.textContent).toContain('Test Operator(clerk)');
+    });
+
+    it('renders no parenthetical when the user has no role', () => {
+        cache.setUser({ email: 'op@example.test', name: 'Test Operator', role: null });
+
+        const { container } = render(Layout, { children });
+        const status = container.querySelector('.auth-status');
+        expect(status?.textContent).toContain('Test Operator');
+        expect(status?.textContent).not.toContain('(');
+    });
+});

@@ -10,6 +10,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — test coverage for the signed-in role suffix (ST-18)
+
+`UserView.role` is rendered next to the signed-in user's name in the
+nav utility row (`+layout.svelte`, plus `move/+page.svelte` and
+`workers/+page.svelte`), but no test asserted it renders correctly
+either way. Two new `vitest` cases in `src/routes/layout.test.ts`:
+a stub user carrying a role renders `Test Operator(clerk)`, and one
+with no role renders the name with no parenthetical at all. Verified
+to fail with the template's `{#if user.role}` branch stripped and
+pass with it restored. `npm run test:unit` 50/50 (was 47). See
+spec/tasks.md ST-18.
+
 ### Fixed — DOC-7 doc + e2e audit (2026-08-04)
 
 - **Real e2e regression, not a doc bug**: `tests/e2e/smoke.spec.ts`'s
