@@ -726,6 +726,10 @@ links are **never** a match signal (entity spec §1).
   strengthened assertion actually fails without the fix before
   confirming it passes with it.
 
+- [x] **FE-5: `/verify` crashed with a raw 500 when the authentication service was unreachable.** *(resolved 2026-09-06.)* `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch, token)` with no `try`/`catch`. A network-level failure (the authentication service unreachable, timed out, connection reset) makes `fetch` throw rather than resolve — uncaught, that propagated out of `load` and SvelteKit rendered its generic 500 error page instead of this route's own friendly UI. The same bug class was found and fixed first in `place-front-end-with-svelte` (T-26) and `thing-front-end-with-svelte` (T-23); ported here.
+  - **Resolved.** A `try`/`catch` around the call, a new `"serviceUnavailable"` error variant, and its message in `+page.svelte`.
+  - **Acceptance:** `tests/unit/verify.test.ts` (new) unit-tests the `load` function directly — pinning `missingToken`, the new `serviceUnavailable` (fetch rejects), and `invalidToken` (non-ok response) branches — verified to fail with the `try`/`catch` reverted and pass with it restored. Three-part change: spec (here) + code + test.
+
 ## 14. Implementation status
 
 **Implemented (MVP, v0.1.0).** The SvelteKit app is built and verified (svelte-check clean, vitest + Playwright green): the routes in §5 are live against the sibling service via the BFF proxy, with SVAR grid / Kanban / Gantt views, Lily theme + locale chrome, and 13-locale i18n covering the original identity + merge surface (the later oversight/executive dashboard views are English-first — CHANGELOG 2026-07-22). Open §13 items — the plan-detail audit timeline, recent activity, MatchBreakdown, child roll-up, and the issues/timeline/goals sub-routes (the roadmap sub-list in §5) — remain unchecked.
