@@ -98,6 +98,37 @@ describe("PlaceRepository", () => {
         expect(result.total).toBe(42);
     });
 
+    // Pins T-27: `mask_sensitive` is forwarded on the search request when
+    // set, and omitted (not sent as the literal string "undefined") when
+    // absent.
+    it("forwards mask_sensitive on the search request when set", async () => {
+        let capturedUrl = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                capturedUrl = String(input);
+                return jsonResponse({ success: true, data: [samplePlace], error: null });
+            }),
+        });
+        const repo = new PlaceRepository(client);
+        await repo.search({ q: "Central Park", mask_sensitive: true });
+        expect(capturedUrl).toContain("mask_sensitive=true");
+    });
+
+    it("omits mask_sensitive from the search request when unset", async () => {
+        let capturedUrl = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                capturedUrl = String(input);
+                return jsonResponse({ success: true, data: [samplePlace], error: null });
+            }),
+        });
+        const repo = new PlaceRepository(client);
+        await repo.search({ q: "Central Park" });
+        expect(capturedUrl).not.toContain("mask_sensitive");
+    });
+
     // Pins: each remaining repository method targets its documented path
     // and HTTP verb. A single captured request per call guards against the
     // /match vs /check-duplicates and per-id-path copy artifacts.

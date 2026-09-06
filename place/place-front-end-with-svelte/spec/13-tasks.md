@@ -141,19 +141,33 @@
   Verified: `npm run check` (svelte-check) clean; `npm test` (vitest,
   55/55) clean; `npx playwright test` 14/14 passing (5 new + 9
   pre-existing), run three times to rule out flake.
-- [ ] T-27: **Wire `mask_sensitive` into the list/search UI.**
-  `GET /api/places/search` accepts `mask_sensitive` and
-  `PlaceRepository`'s search method already threads it through, but
-  `/places` (the list/search route) never sets it — there is no
-  operator-facing toggle, unlike the detail page's masked-view toggle
-  (T-19). An operator who wants a masked search result set (e.g. to
-  demo or screenshot without exposing telephone/coordinates) has no way
-  to ask for one. *(verified: `grep -rn "mask_sensitive" src/routes/`
-  in this project returns nothing, while `src/lib/api/places.ts`
-  declares the parameter on the search options type.)* **Acceptance:** a
-  checkbox on `/places` (alongside the existing fuzzy-search toggle)
-  sets `mask_sensitive` on the search call and re-fetches; a Playwright
-  test stubs masked vs. unmasked search responses and asserts the
-  toggle changes the request/rendered values; three-part change (spec
-  §6/§9 + code + test).
+- [x] T-27: **Wire `mask_sensitive` into the list/search UI.**
+  *(resolved 2026-09-06.)* `GET /api/places/search` accepts
+  `mask_sensitive` and `PlaceRepository`'s search method already
+  threaded it through, but `/places` (the list/search route) never set
+  it — there was no operator-facing toggle, unlike the detail page's
+  masked-view toggle (T-19). An operator who wants a masked search
+  result set (e.g. to demo or screenshot without exposing
+  telephone/coordinates) had no way to ask for one. *(verified:
+  `grep -rn "mask_sensitive" src/routes/` in this project returned
+  nothing, while `src/lib/api/places.ts` declared the parameter on the
+  search options type.)*
+  - **Resolved.** A "Mask sensitive fields" checkbox on `/places`
+    (alongside fuzzy/phonetic) sets `mask_sensitive` on the search
+    call; unlike fuzzy/phonetic (which wait for the next explicit
+    search submit), it re-fetches immediately on toggle — the same
+    "flip and re-fetch now" behaviour T-19's detail-page masked-view
+    toggle already uses, since it's a view choice rather than a search
+    strategy the operator is still composing. New i18n key
+    `places.maskSensitive` across all 13 locales. Two new
+    `tests/unit/places.test.ts` cases pin `mask_sensitive` is forwarded
+    when set and omitted when unset; a new
+    `tests/e2e/places.spec.ts` case stubs masked vs. unmasked search
+    responses (different `total`s) and asserts both the outgoing
+    request (`mask_sensitive=true`/`=false`) and the rendered count
+    change with the toggle — verified to fail (timeout waiting for the
+    checkbox) with the UI change reverted and pass with it restored.
+  - **Acceptance met:** `npm test` 59/59 (was 57); `npm run check`
+    clean; `npx playwright test tests/e2e/places.spec.ts` 14/14 (was
+    13); `npm run lint` clean.
 

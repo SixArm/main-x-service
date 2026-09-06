@@ -9,6 +9,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — `mask_sensitive` toggle on the list/search page (T-27)
+
+`GET /api/places/search` accepts `mask_sensitive` and
+`PlaceRepository.search` already threaded it through, but `/places`
+never set it — no operator-facing toggle, unlike the detail page's
+masked-view toggle (T-19). A new "Mask sensitive fields" checkbox
+alongside fuzzy/phonetic sets `mask_sensitive` and re-fetches
+immediately on toggle (unlike fuzzy/phonetic, which wait for the next
+explicit search submit) — the same "flip and re-fetch now" behaviour
+the detail page's toggle uses. New i18n key `places.maskSensitive`
+across all 13 locales. Two new `tests/unit/places.test.ts` cases pin
+the forwarded/omitted request param; a new `tests/e2e/places.spec.ts`
+case stubs masked vs. unmasked search responses and asserts both the
+request and the rendered count change with the toggle, verified to
+fail without the fix. `npm test` 59/59 (was 57); `npx playwright test`
+14/14 (was 13). See spec/13-tasks.md T-27.
+
 ### Added — page-visit guard on mutation-only pages (T-25)
 
 `/places/new`, `/places/[id]/edit`, `/places/merge`, and `/review`
