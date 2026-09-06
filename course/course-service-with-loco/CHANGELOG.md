@@ -9,6 +9,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — `TODO(fhir)`-marked fidelity-gap comments in the FHIR mapper (T-30)
+
+`agents/share/fhir.md` §2 requires "every drop of fidelity is a
+documented, `TODO`-marked gap, never silent," but `to_fhir_basic`'s
+gaps were recorded only as prose in a doc comment. Converted the list
+into `// TODO(fhir):` markers at the end of both `to_fhir_basic` and
+`from_fhir_basic`, one per field, so a repo-wide `TODO` sweep finds
+them mechanically. Corrected in passing: the original task text said
+"twelve" fidelity gaps; the doc comment's own list is thirteen
+distinct fields — a miscount, not a scope change. No behavioural
+change: `cargo test --lib` 132/132 unchanged, `clippy`/`fmt` clean.
+See spec §13 T-30.
+
 ### Added — real OpenTelemetry OTLP export (T-26, PRO-H12 slice 1 of 7)
 
 - **2026-08-30**: new `src/observability.rs` — this crate carried no

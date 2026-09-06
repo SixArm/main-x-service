@@ -120,19 +120,27 @@
     identical stale claim) — added a new §2.1d documenting the real
     exporter, mirroring §2.1b's FHIR-reversal note style. Doc-only; no
     code or behaviour change.
-- [ ] T-30: Add `TODO`-marked fidelity-gap comments in
-  `src/fhir/mod.rs` per the family FHIR contract.
+- [x] T-30: *(resolved 2026-09-06.)* Add `TODO`-marked fidelity-gap
+  comments in `src/fhir/mod.rs` per the family FHIR contract.
   `agents/share/fhir.md` §2 requires "every drop of fidelity is a
   documented, `TODO`-marked gap, never silent," but the gaps in
-  `to_fhir_basic` (listed in T-20 above) are recorded only as prose in
-  a doc comment (`src/fhir/mod.rs:118-120`). *(verified: `grep -rn
-  "TODO\|FIXME" src/` returns zero matches repo-wide.)* Convert the
-  documented gap list into actual `// TODO(fhir):` markers at the
-  point in `to_fhir_basic`/`from_fhir_basic` where each field is
-  skipped, so a future extension pass (or a repo-wide TODO sweep)
-  finds them mechanically rather than by reading prose.
-  - **Acceptance:** each of the twelve listed fidelity gaps has a
-    corresponding `// TODO` comment in `src/fhir/mod.rs`; `cargo
-    clippy --all-targets -- -D warnings` stays clean; no behavioural
-    change.
+  `to_fhir_basic` (listed in T-20 above) were recorded only as prose in
+  a doc comment (`src/fhir/mod.rs:118-120`).
+  - **Resolved.** Converted the documented gap list into `//
+    TODO(fhir):` markers at the end of both `to_fhir_basic` (before
+    the `basic` return) and `from_fhir_basic` (before `Ok(course)`),
+    one line per field, so a future extension pass or a repo-wide
+    `TODO` sweep finds them mechanically. **Corrected in passing:**
+    the original task text said "twelve listed fidelity gaps", but the
+    doc comment's own comma-separated list is thirteen distinct
+    fields/gaps (`description`, `about`, `url`, `same_as`, `assesses`,
+    `competency_required`, `number_of_credits`, `status`, `active`,
+    `provider_id`, `credentials`, syllabus sections, and the
+    `instances` sub-resource) — a miscount in the original prose, not
+    a change in scope. All thirteen got a `TODO` marker in both
+    functions (26 total).
+  - **Acceptance met:** `cargo check --all-targets`, `cargo clippy
+    --all-targets -- -D warnings`, and `cargo fmt --check` all clean;
+    `cargo test --lib` 132/132, unchanged pass count — no behavioural
+    change, doc comments only.
 

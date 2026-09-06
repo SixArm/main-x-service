@@ -162,6 +162,27 @@ pub fn to_fhir_basic(course: &Course) -> FhirBasic {
     }));
     basic.extension = extension;
 
+    // Fidelity gaps (agents/share/fhir.md §2: every drop of fidelity is a
+    // documented, TODO-marked gap, never silent). None of these `Course`
+    // fields has a `Basic` element or an `urn:mxi:course:*` extension to
+    // ride in yet, so each is silently dropped on the way out. Add an
+    // extension (or, for `status`/`active`, use `Basic`'s own fields once
+    // FHIR resource is upgraded past the generic-`Basic` wrapper) as each
+    // becomes a real requirement — do not add a thirteenth silently.
+    // TODO(fhir): course.description is not emitted.
+    // TODO(fhir): course.about is not emitted.
+    // TODO(fhir): course.url is not emitted.
+    // TODO(fhir): course.same_as is not emitted.
+    // TODO(fhir): course.assesses is not emitted.
+    // TODO(fhir): course.competency_required is not emitted.
+    // TODO(fhir): course.number_of_credits is not emitted.
+    // TODO(fhir): course.status is not emitted.
+    // TODO(fhir): course.active is not emitted.
+    // TODO(fhir): course.provider_id is not emitted.
+    // TODO(fhir): course.credentials is not emitted.
+    // TODO(fhir): course's syllabus sections are not emitted.
+    // TODO(fhir): the `instances` sub-resource is not emitted.
+
     basic
 }
 
@@ -232,6 +253,23 @@ pub fn from_fhir_basic(fhir: &FhirBasic) -> Result<Course, String> {
             });
         }
     }
+
+    // Fidelity gaps (mirrors to_fhir_basic's TODO list — nothing recovers
+    // these fields here because to_fhir_basic never emitted them, so they
+    // default on every round-trip through FHIR):
+    // TODO(fhir): course.description is not recovered.
+    // TODO(fhir): course.about is not recovered.
+    // TODO(fhir): course.url is not recovered.
+    // TODO(fhir): course.same_as is not recovered.
+    // TODO(fhir): course.assesses is not recovered.
+    // TODO(fhir): course.competency_required is not recovered.
+    // TODO(fhir): course.number_of_credits is not recovered.
+    // TODO(fhir): course.status is not recovered.
+    // TODO(fhir): course.active is not recovered.
+    // TODO(fhir): course.provider_id is not recovered.
+    // TODO(fhir): course.credentials is not recovered.
+    // TODO(fhir): course's syllabus sections are not recovered.
+    // TODO(fhir): the `instances` sub-resource is not recovered.
 
     Ok(course)
 }
