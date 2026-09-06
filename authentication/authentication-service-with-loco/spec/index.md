@@ -928,7 +928,7 @@ only by that subject.
         header on a `403`, a `406` on an explicit unsupported version,
         and the exemption on `/.well-known/paseto-keys`.
 
-- [ ] **T-14 (S) Capture the source IP on sessions and `auth_events`.**
+- [x] **T-14 (S) Capture the source IP on sessions and `auth_events`.**
       [`agents/share/auditability.md`](../../../agents/share/auditability.md)
       documents family-wide audit rows as tracking
       `user_id, user_ip_address, user_agent`, and
@@ -953,6 +953,49 @@ only by that subject.
       **Acceptance:** DB-gated suite green; `sessions.source_ip` and
       `auth_events.source_ip` are populated on real requests; GDPR
       export includes the field.
+      **Resolved.** Used the connecting-peer address via
+      `axum::extract::ConnectInfo<SocketAddr>` (the family's `loco-rs`
+      already binds `into_make_service_with_connect_info` both in
+      production, `loco_rs::app`, and in the `loco_rs::testing`
+      request harness — confirmed by reading loco-rs's own source
+      rather than assumed — so the DB-gated round-trip test observes a
+      real peer address with no extra test-harness wiring). `X-
+      Forwarded-For` is a documented follow-up, not implemented: behind
+      a reverse proxy the captured address would name the proxy, which
+      is honestly scoped rather than silently wrong (added to §16).
+      **Deliberately excluded `source_ip` from the `auth_events`
+      keyed-integrity pre-image** (`compliance::audit_integrity::
+      AuditInput`/`AUDIT_MAC_VERSION`) — that pre-image has no per-row
+      version marker, so widening it would make every pre-existing
+      row's stored digest unrecomputable and report as tampered on the
+      next `/api/compliance/audit/verify`, which would be worse than
+      the gap this task closes. `source_ip` is metadata alongside the
+      row, the same posture the family already gives
+      `sessions.user_agent`. Two new migrations (`m20260906_000001`/
+      `m20260906_000002`, one per table, matching this crate's existing
+      one-schema-change-per-migration convention). Threaded through
+      `signup`, `magic-link` request, `verify` (redeem), `signout`, and
+      `DELETE /account` (erasure); also threaded through the admin
+      attribute-view/-assignment audit rows (`controllers/admin.rs`)
+      for consistency, since the compiler-forced signature change on
+      `AuthEvent::record_best_effort` touches those call sites anyway —
+      a CLI-issued attribute change (`tasks/attributes.rs`) has no
+      request context and records `None`. **Found and fixed in
+      passing**: `verify`'s `sessions::Model::issue` call hardcoded
+      `user_agent: None` regardless of the request — the column existed
+      and was documented as "best-effort user agent captured at
+      issuance" since day one, but nothing ever read the header. Fixed
+      at the same call site while adding `source_ip`, rather than
+      leaving one half of the pair broken next to the other. **Testing:**
+      `tests/requests/auth.rs::source_ip_is_captured_on_signup_and_redeem`
+      (new, DB-gated) proves a real signup→redeem HTTP round trip
+      populates a non-empty `sessions.source_ip` and a `source_ip` on
+      every `auth_events` row the flow writes; `account_export_returns_
+      the_callers_data` gained an assertion that the export surfaces
+      it. Confirmed to fail (reverted the `verify` call site to `None`)
+      before restoring the fix. `cargo test --lib` (90/90), the
+      DB-gated suite (41/41), `cargo clippy --all-targets -- -D
+      warnings`, and `cargo fmt --check` all clean.
 
 - [x] **T-15 (S) Audit admin reads of another user's ABAC attributes.** *(resolved 2026-09-05.)*
       `src/controllers/admin.rs::show_attributes`
@@ -1084,6 +1127,15 @@ attribute-based, not a fixed role list).
 
 ## 16. Open questions
 
+- **`source_ip` capture is the raw TCP peer, not `X-Forwarded-For`
+  (T-14).** Behind a reverse proxy / load balancer the recorded address
+  would name the proxy, not the original client. Adding
+  `X-Forwarded-For`-awareness (first hop, behind a documented trust
+  boundary — only honour it from a configured trusted proxy CIDR, per
+  the family's general SSRF/spoofing posture) is a real follow-up, not
+  implemented here; it was scoped out to keep T-14's landing
+  well-bounded rather than bundling a trust-boundary design into a
+  small audit-completeness fix.
 - Refresh tokens vs. short-lived tokens only? (Post-pivot the human
   session is a cookie session with idle + absolute TTLs; the
   cross-service PASETO is ~5 min and re-minted from the session.)

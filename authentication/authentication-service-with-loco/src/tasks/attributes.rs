@@ -444,6 +444,8 @@ impl Task for UserAttributes {
             command.op_name(),
             command.changed_key(),
             "cli",
+            // A CLI task has no request/connecting-peer address (T-14).
+            None,
         )
         .await;
         tracing::info!(user_pid = %pid, op = op, "operator updated user ABAC attributes");

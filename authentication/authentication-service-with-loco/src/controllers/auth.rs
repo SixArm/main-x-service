@@ -23,7 +23,10 @@
 //! key set at `/.well-known/paseto-keys`. In development the magic link
 //! is written to the tracing log (no SMTP required).
 
-use axum::http::StatusCode;
+use std::net::SocketAddr;
+
+use axum::extract::ConnectInfo;
+use axum::http::{HeaderMap, StatusCode, header::USER_AGENT};
 use loco_rs::controller::ErrorDetail;
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -38,6 +41,28 @@ use crate::{
     rate_limit,
     views::auth::{AccountAuditExport, AccountExport, CurrentResponse, LoginResponse},
 };
+
+/// The best-effort connecting-peer address (T-14), as recorded on
+/// sessions/`auth_events`. This is the raw TCP peer, not
+/// `X-Forwarded-For` — behind a reverse proxy it names the proxy, not
+/// the original client; adding proxy-awareness is a documented follow-up
+/// rather than silently assumed (spec §16). Advisory audit context, like
+/// `user_agent`: never authenticated, never trusted for a security
+/// decision.
+fn source_ip_of(addr: &ConnectInfo<SocketAddr>) -> String {
+    addr.0.ip().to_string()
+}
+
+/// The `User-Agent` request header, if present and valid UTF-8 — the
+/// same best-effort capture `sessions.user_agent`'s doc comment has
+/// always described, wired up here for the first time (found while
+/// threading `source_ip` through the same call site, T-14).
+fn user_agent_of(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get(USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .map(ToString::to_string)
+}
 
 /// Map an exceeded magic-link issuance quota to an HTTP `429`. Returning
 /// this *before* any account lookup or token issuance keeps abuse cheap to
@@ -221,8 +246,10 @@ fn warn_missing_allowed_origins() {
 #[debug_handler]
 async fn signup(
     State(ctx): State<AppContext>,
+    connect_info: ConnectInfo<SocketAddr>,
     Json(params): Json<SignupParams>,
 ) -> Result<Response> {
+    let source_ip = source_ip_of(&connect_info);
     // Throttle per email before any work, so abuse cannot email-bomb a
     // victim or probe for accounts. Over the limit → 429, no token issued.
     if rate_limit::check(&ctx.db, &params.email).await.is_err() {
@@ -233,6 +260,7 @@ async fn signup(
             Some(&params.email),
             None,
             Some("rate_limited"),
+            Some(&source_ip),
         )
         .await;
         return Err(rate_limited());
@@ -262,6 +290,7 @@ async fn signup(
                         Some(&params.email),
                         None,
                         Some("rejected"),
+                        Some(&source_ip),
                     )
                     .await;
                     return format::empty_json();
@@ -275,6 +304,7 @@ async fn signup(
                     Some(&params.email),
                     None,
                     Some("rejected"),
+                    Some(&source_ip),
                 )
                 .await;
                 return format::empty_json();
@@ -291,6 +321,7 @@ async fn signup(
         Some(&user.email),
         Some(user.pid),
         Some(if existing { "existing" } else { "created" }),
+        Some(&source_ip),
     )
     .await;
     // Locale selection affects only the rendered email language; the
@@ -312,8 +343,10 @@ async fn signup(
 #[debug_handler]
 async fn request_magic_link(
     State(ctx): State<AppContext>,
+    connect_info: ConnectInfo<SocketAddr>,
     Json(params): Json<MagicLinkParams>,
 ) -> Result<Response> {
+    let source_ip = source_ip_of(&connect_info);
     // Throttle per email before any lookup (see `signup`).
     if rate_limit::check(&ctx.db, &params.email).await.is_err() {
         Metrics::global().rate_limited_total.inc();
@@ -323,6 +356,7 @@ async fn request_magic_link(
             Some(&params.email),
             None,
             Some("rate_limited"),
+            Some(&source_ip),
         )
         .await;
         return Err(rate_limited());
@@ -338,6 +372,7 @@ async fn request_magic_link(
             Some(&params.email),
             None,
             Some("unknown_email"),
+            Some(&source_ip),
         )
         .await;
         return format::empty_json();
@@ -349,6 +384,7 @@ async fn request_magic_link(
         Some(&user.email),
         Some(user.pid),
         Some("issued"),
+        Some(&source_ip),
     )
     .await;
     Metrics::global().magic_link_issued_total.inc();
@@ -365,7 +401,13 @@ async fn request_magic_link(
 /// Consume a magic link: validate the token, verify the email, set the
 /// session cookie + issue a PASETO, and record the session for revocation.
 #[debug_handler]
-async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Result<Response> {
+async fn verify(
+    Path(token): Path<String>,
+    State(ctx): State<AppContext>,
+    connect_info: ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+) -> Result<Response> {
+    let source_ip = source_ip_of(&connect_info);
     // SEC-A4: atomically consume the token — the clear-and-return is a single
     // UPDATE, so two concurrent redemptions of the same link cannot both
     // succeed (only one gets a row; the loser gets `EntityNotFound` → 401).
@@ -378,6 +420,7 @@ async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Res
             None,
             None,
             Some("invalid_or_expired"),
+            Some(&source_ip),
         )
         .await;
         return unauthorized("invalid or expired magic link");
@@ -410,12 +453,16 @@ async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Res
     // session payload (shared authorization-attributes.md §6), so token
     // minting reads them from the session, not the users row. The session
     // gets its own idle/absolute TTLs (independent of the ~5-min token
-    // exp) — see `sessions::Model::issue`.
+    // exp) — see `sessions::Model::issue`. `user_agent` was previously
+    // hardcoded `None` here despite the column existing since day one —
+    // fixed in passing while threading `source_ip` (T-14) through the
+    // same call.
     sessions::Model::issue(
         &ctx.db,
         &sid,
         user.pid,
-        None,
+        user_agent_of(&headers),
+        Some(source_ip.clone()),
         sessions::session_data(&user.attributes, &csrf_token),
     )
     .await?;
@@ -426,6 +473,7 @@ async fn verify(Path(token): Path<String>, State(ctx): State<AppContext>) -> Res
         Some(&user.email),
         Some(user.pid),
         Some("ok"),
+        Some(&source_ip),
     )
     .await;
     Metrics::global().magic_link_redeemed_total.inc();
@@ -576,7 +624,11 @@ async fn me(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
 /// published key set) — that's the documented tradeoff of stateless
 /// tokens; we keep TTLs short.
 #[debug_handler]
-async fn signout(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
+async fn signout(
+    auth: AuthUser,
+    State(ctx): State<AppContext>,
+    connect_info: ConnectInfo<SocketAddr>,
+) -> Result<Response> {
     let AuthUser(claims) = auth;
     if let Ok(session) = sessions::Model::find_by_jid(&ctx.db, &claims.sid).await {
         session.into_active_model().revoke(&ctx.db).await?;
@@ -587,6 +639,7 @@ async fn signout(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Respon
         Some(&claims.email),
         uuid::Uuid::parse_str(&claims.sub).ok(),
         None,
+        Some(&source_ip_of(&connect_info)),
     )
     .await;
     Metrics::global().signout_total.inc();
@@ -696,7 +749,11 @@ async fn account_audit(auth: AuthUser, State(ctx): State<AppContext>) -> Result<
 /// treat the subject as gone (`401`). Idempotent: erasing an
 /// already-erased account is a no-op `200`.
 #[debug_handler]
-async fn delete_account(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
+async fn delete_account(
+    auth: AuthUser,
+    State(ctx): State<AppContext>,
+    connect_info: ConnectInfo<SocketAddr>,
+) -> Result<Response> {
     let AuthUser(claims) = auth;
     let user = require_active_user(&ctx, &claims).await?;
 
@@ -714,7 +771,15 @@ async fn delete_account(auth: AuthUser, State(ctx): State<AppContext>) -> Result
     sessions::Model::scrub_user_agent_for_user(&ctx.db, pid).await?;
     // The final `account_erased` audit row carries only the pid — writing the
     // email here would re-introduce the address we just scrubbed.
-    AuthEvent::record_best_effort(&ctx.db, "account_erased", None, Some(pid), Some("ok")).await;
+    AuthEvent::record_best_effort(
+        &ctx.db,
+        "account_erased",
+        None,
+        Some(pid),
+        Some("ok"),
+        Some(&source_ip_of(&connect_info)),
+    )
+    .await;
 
     format::empty_json()
 }

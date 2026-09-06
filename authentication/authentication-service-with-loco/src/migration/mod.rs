@@ -25,6 +25,10 @@ mod m20220101_000008_sessions_ttls;
 /// SEC-A9: hash the magic-link token / session `jid` / CSRF token at rest.
 mod m20220101_000009_hash_credentials_at_rest;
 mod m20260728_000001_add_auth_event_mac;
+/// `sessions.source_ip` column — best-effort connecting-peer address (T-14).
+mod m20260906_000001_sessions_source_ip;
+/// `auth_events.source_ip` column — the same, on the audit trail (T-14).
+mod m20260906_000002_auth_events_source_ip;
 
 /// loco/`SeaORM` migrator that runs every migration in order.
 pub struct Migrator;
@@ -46,6 +50,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20220101_000008_sessions_ttls::Migration),
             Box::new(m20220101_000009_hash_credentials_at_rest::Migration),
             Box::new(m20260728_000001_add_auth_event_mac::Migration),
+            Box::new(m20260906_000001_sessions_source_ip::Migration),
+            Box::new(m20260906_000002_auth_events_source_ip::Migration),
             // inject-above (do not remove this comment)
         ]
     }

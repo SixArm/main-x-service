@@ -41,7 +41,12 @@ impl Model {
     /// `email` is the normalised (trimmed, lowercased) address where
     /// applicable; `user_pid` the subject when known; `detail` an
     /// outcome marker (e.g. `rate_limited`, `unknown_email`,
-    /// `expired_token`). Pass no token or secret here.
+    /// `expired_token`). Pass no token or secret here. `source_ip` is the
+    /// best-effort connecting-peer address (T-14) — stored as a plain
+    /// column, deliberately **not** part of the MAC/hash pre-image (see
+    /// `crate::compliance::audit_integrity`, whose fixed-format pre-image
+    /// has no per-row version marker; widening it would make every
+    /// pre-existing row's stored digest unrecomputable).
     ///
     /// # Errors
     ///
@@ -52,6 +57,7 @@ impl Model {
         email: Option<&str>,
         user_pid: Option<Uuid>,
         detail: Option<&str>,
+        source_ip: Option<&str>,
     ) -> ModelResult<Self> {
         // The timestamp is part of the MAC pre-image, so it is minted here
         // rather than defaulted by the database: the alternative —
@@ -83,6 +89,7 @@ impl Model {
             hash: ActiveValue::set(Some(digests.sha256)),
             hash_sha3: ActiveValue::set(Some(digests.sha3)),
             mac: ActiveValue::set(digests.mac),
+            source_ip: ActiveValue::set(source_ip.map(ToString::to_string)),
             ..Default::default()
         }
         .insert(db)
@@ -99,8 +106,9 @@ impl Model {
         email: Option<&str>,
         user_pid: Option<Uuid>,
         detail: Option<&str>,
+        source_ip: Option<&str>,
     ) {
-        if let Err(err) = Self::record(db, event, email, user_pid, detail).await {
+        if let Err(err) = Self::record(db, event, email, user_pid, detail, source_ip).await {
             tracing::warn!(error = %err, event, "failed to write auth event");
         }
     }
@@ -121,6 +129,7 @@ impl Model {
         op: &str,
         key: Option<&str>,
         actor: &str,
+        source_ip: Option<&str>,
     ) {
         let detail = match key {
             Some(key) => format!("op={op} key={key} actor={actor}"),
@@ -132,6 +141,7 @@ impl Model {
             target_email,
             Some(target_pid),
             Some(&detail),
+            source_ip,
         )
         .await;
     }
@@ -147,6 +157,7 @@ impl Model {
         target_email: Option<&str>,
         target_pid: Uuid,
         actor: &str,
+        source_ip: Option<&str>,
     ) {
         let detail = format!("actor={actor}");
         Self::record_best_effort(
@@ -155,6 +166,7 @@ impl Model {
             target_email,
             Some(target_pid),
             Some(&detail),
+            source_ip,
         )
         .await;
     }

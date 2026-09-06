@@ -30,8 +30,9 @@
 //!     ../../../agents/share/authorization-attributes.md
 
 use std::collections::BTreeMap;
+use std::net::SocketAddr;
 
-use axum::extract::Path;
+use axum::extract::{ConnectInfo, Path};
 use axum::http::StatusCode;
 use loco_rs::controller::ErrorDetail;
 use loco_rs::prelude::*;
@@ -133,6 +134,7 @@ async fn show_attributes(
     auth: AuthUser,
     Path(pid): Path<String>,
     State(ctx): State<AppContext>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> Result<Response> {
     let AuthUser(claims) = auth;
     require_admin(&claims)?;
@@ -144,6 +146,7 @@ async fn show_attributes(
         Some(&user.email),
         user.pid,
         &format!("pid:{}", claims.sub),
+        Some(&addr.ip().to_string()),
     )
     .await;
     format::json(AttributesResponse::new(&user))
@@ -158,6 +161,7 @@ async fn replace_attributes(
     auth: AuthUser,
     Path(pid): Path<String>,
     State(ctx): State<AppContext>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(body): Json<ReplaceAttributesBody>,
 ) -> Result<Response> {
     let AuthUser(claims) = auth;
@@ -188,6 +192,7 @@ async fn replace_attributes(
         "replace",
         None,
         &format!("pid:{}", claims.sub),
+        Some(&addr.ip().to_string()),
     )
     .await;
     tracing::info!(target_pid = %target_pid, actor_pid = %claims.sub, "admin replaced user ABAC attributes");

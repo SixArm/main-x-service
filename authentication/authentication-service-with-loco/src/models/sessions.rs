@@ -78,6 +78,9 @@ impl Model {
     /// is the session payload JSONB — build it with [`session_data`] so
     /// the user's ABAC attributes and CSRF token ride along. The legacy
     /// `expires_at` column is set to the absolute ceiling for coherence.
+    /// `source_ip` is the best-effort connecting-peer address (T-14),
+    /// captured the same way as `user_agent` — neither is verified or
+    /// authenticated, both are advisory audit context.
     ///
     /// # Errors
     ///
@@ -87,6 +90,7 @@ impl Model {
         jid: &str,
         user_pid: Uuid,
         user_agent: Option<String>,
+        source_ip: Option<String>,
         data: serde_json::Value,
     ) -> ModelResult<Self> {
         let now = Local::now().fixed_offset();
@@ -110,6 +114,7 @@ impl Model {
             expires_at: ActiveValue::set(absolute),
             revoked_at: ActiveValue::set(None),
             user_agent: ActiveValue::set(user_agent),
+            source_ip: ActiveValue::set(source_ip),
             data: ActiveValue::set(data),
             last_seen_at: ActiveValue::set(Some(now)),
             idle_expires_at: ActiveValue::set(Some(idle)),
@@ -331,6 +336,7 @@ mod tests {
             last_seen_at: None,
             idle_expires_at: None,
             absolute_expires_at: None,
+            source_ip: None,
         }
     }
 

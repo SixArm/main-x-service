@@ -34,6 +34,7 @@ async fn session_secrets_are_hashed_at_rest() {
         sid,
         user_pid,
         None,
+        None,
         session_data(&attributes, csrf),
     )
     .await

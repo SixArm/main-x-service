@@ -96,6 +96,7 @@ async fn admin_can_replace_and_show_user_attributes() {
             "a8-target-session",
             target_pid,
             Some("test-agent".to_string()),
+            None,
             serde_json::json!({}),
         )
         .await

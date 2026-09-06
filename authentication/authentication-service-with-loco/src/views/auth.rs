@@ -120,6 +120,8 @@ pub struct AccountSessionExport {
     pub revoked_at: Option<String>,
     /// Best-effort user agent captured at issuance.
     pub user_agent: Option<String>,
+    /// Best-effort connecting-peer address captured at issuance (T-14).
+    pub source_ip: Option<String>,
 }
 
 impl AccountSessionExport {
@@ -132,6 +134,7 @@ impl AccountSessionExport {
             expires_at: session.expires_at.to_rfc3339(),
             revoked_at: session.revoked_at.map(|t| t.to_rfc3339()),
             user_agent: session.user_agent.clone(),
+            source_ip: session.source_ip.clone(),
         }
     }
 }
@@ -151,6 +154,9 @@ pub struct AccountAuditExport {
     pub detail: Option<String>,
     /// When the event was recorded (RFC 3339).
     pub created_at: String,
+    /// Best-effort connecting-peer address captured when the row was
+    /// written (T-14).
+    pub source_ip: Option<String>,
 }
 
 impl AccountAuditExport {
@@ -163,6 +169,7 @@ impl AccountAuditExport {
             user_pid: row.user_pid.map(|p| p.to_string()),
             detail: row.detail.clone(),
             created_at: row.created_at.to_rfc3339(),
+            source_ip: row.source_ip.clone(),
         }
     }
 }
@@ -251,6 +258,7 @@ mod tests {
             last_seen_at: None,
             idle_expires_at: None,
             absolute_expires_at: None,
+            source_ip: Some("203.0.113.7".to_string()),
         }];
         let events = vec![auth_events::Model {
             created_at: ts(),
@@ -265,6 +273,7 @@ mod tests {
             hash: None,
             hash_sha3: None,
             mac: None,
+            source_ip: Some("203.0.113.7".to_string()),
         }];
 
         let export = AccountExport::new(&user(pid), &sessions, &events);
@@ -279,6 +288,13 @@ mod tests {
         assert_eq!(export.sessions[0].jid, "jti-1");
         assert_eq!(export.auth_events.len(), 1);
         assert_eq!(export.auth_events[0].event, "signup");
+        // T-14: the captured source IP rides along on both, alongside
+        // the existing `user_agent`.
+        assert_eq!(export.sessions[0].source_ip.as_deref(), Some("203.0.113.7"));
+        assert_eq!(
+            export.auth_events[0].source_ip.as_deref(),
+            Some("203.0.113.7")
+        );
     }
 
     #[test]
