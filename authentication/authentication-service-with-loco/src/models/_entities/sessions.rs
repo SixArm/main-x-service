@@ -37,6 +37,9 @@ pub struct Model {
     /// Hard **absolute** expiry: `now + absolute TTL` at issuance, never
     /// extended. Nullable (legacy rows ⇒ no absolute bound).
     pub absolute_expires_at: Option<DateTimeWithTimeZone>,
+    /// Best-effort connecting-peer address captured at issuance (T-14).
+    /// Nullable for rows predating this column.
+    pub source_ip: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

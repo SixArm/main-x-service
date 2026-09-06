@@ -10,6 +10,34 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — capture the source IP on sessions and `auth_events` (T-14)
+
+This crate issued every session and audit row in the family without
+ever recording where the request came from. Added a nullable
+`source_ip` column to both `sessions` and `auth_events`
+(`m20260906_000001`/`_000002`), captured via
+`axum::extract::ConnectInfo<SocketAddr>` (the connecting TCP peer —
+`X-Forwarded-For` reverse-proxy awareness is a documented follow-up,
+spec §16, not implemented here) and threaded into `signup`,
+`magic-link` request, `verify` (redeem), `signout`, `DELETE /account`
+(erasure), and the admin ABAC attribute-view/-assignment audit rows.
+The GDPR account export (`GET /api/auth/account/export`) surfaces it
+alongside the existing `user_agent`. Deliberately **excluded** from the
+`auth_events` keyed-integrity MAC/hash pre-image — that pre-image has
+no per-row version marker, so widening it would make every
+pre-existing row's stored digest unrecomputable and report as tampered
+on the next `/api/compliance/audit/verify`.
+
+Found and fixed in passing: `verify`'s `sessions::Model::issue` call
+hardcoded `user_agent: None` regardless of the request, despite the
+column being documented as "best-effort user agent captured at
+issuance" since day one — fixed at the same call site.
+
+New DB-gated test `tests/requests/auth.rs::
+source_ip_is_captured_on_signup_and_redeem` proves a real signup→redeem
+round trip populates a non-null `source_ip` on both tables; confirmed
+to fail before the fix. See spec/index.md T-14.
+
 ### Removed — the unwired password-era loco scaffolding
 
 `src/mailers/auth.rs`'s `Emailer::send_welcome` / `Emailer::forgot_password`

@@ -39,6 +39,12 @@ pub struct Model {
     /// does **not** detect a row deleted wholesale (see
     /// `crate::compliance`).
     pub mac: Option<String>,
+    /// Best-effort connecting-peer address captured when the row was
+    /// written (T-14). Nullable for rows predating this column.
+    /// Deliberately **not** part of the MAC/hash pre-image (see
+    /// `crate::compliance::audit_integrity`) — widening that fixed-format
+    /// pre-image would break verification of every pre-existing row.
+    pub source_ip: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

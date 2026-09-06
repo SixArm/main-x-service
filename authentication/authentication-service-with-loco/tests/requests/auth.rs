@@ -19,9 +19,13 @@
 //! The route-table and request/response-shape tests at the bottom are
 //! DB-free and always run.
 
-use authentication_service::{app::App, models::users};
+use authentication_service::{
+    app::App,
+    models::_entities::sessions,
+    models::{auth_events::Model as AuthEvent, users},
+};
 use loco_rs::testing::prelude::*;
-use sea_orm::IntoActiveModel;
+use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 use serial_test::serial;
 
 use super::prepare_data;
@@ -224,6 +228,75 @@ async fn can_redeem_magic_link_for_access_token() {
         // Magic links are single-use (spec §6): the second redemption fails.
         let again = request.get(&format!("/api/auth/magic-link/{token}")).await;
         assert_eq!(again.status_code(), 401, "Magic links must be single-use");
+    })
+    .await;
+}
+
+/// T-14: a real signup → redeem round trip stores a non-null
+/// `source_ip` on both the issued session and every `auth_events` row
+/// the flow writes — the connecting-peer address the loco/`axum-test`
+/// harness binds to a real socket for (`ConnectInfo<SocketAddr>`), the
+/// same mechanism production boots with.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn source_ip_is_captured_on_signup_and_redeem() {
+    request::<App, _, _>(|request, ctx| async move {
+        let payload = serde_json::json!({ "email": "ip-capture@example.com" });
+        assert_eq!(
+            request
+                .post("/api/auth/signup")
+                .json(&payload)
+                .await
+                .status_code(),
+            200
+        );
+        let user = users::Model::find_by_email(&ctx.db, "ip-capture@example.com")
+            .await
+            .expect("signup should have created the user");
+        let user_pid = user.pid;
+        let token = user
+            .into_active_model()
+            .create_magic_link(&ctx.db)
+            .await
+            .expect("mint magic link")
+            .magic_link_token
+            .expect("create_magic_link returns the plaintext token");
+
+        let redeem = request.get(&format!("/api/auth/magic-link/{token}")).await;
+        assert_eq!(redeem.status_code(), 200, "redemption should succeed");
+
+        // The session `verify` issued carries a non-null, non-empty
+        // source_ip (and, incidentally, the user_agent axum-test sends —
+        // previously hardcoded `None` regardless of the request).
+        let issued_sessions = sessions::Entity::find()
+            .filter(sessions::Column::UserPid.eq(user_pid))
+            .all(&ctx.db)
+            .await
+            .expect("query sessions");
+        assert_eq!(issued_sessions.len(), 1, "one session from the redemption");
+        let source_ip = issued_sessions[0]
+            .source_ip
+            .as_deref()
+            .expect("session.source_ip should be populated");
+        assert!(!source_ip.is_empty());
+
+        // Every auth_events row this flow wrote (signup + redeem) also
+        // carries a non-null source_ip.
+        let events = AuthEvent::for_subject(&ctx.db, user_pid, "ip-capture@example.com")
+            .await
+            .expect("query auth_events");
+        assert!(
+            events.len() >= 2,
+            "signup + redeem should both be audited: {events:?}"
+        );
+        for event in &events {
+            assert!(
+                event.source_ip.as_deref().is_some_and(|ip| !ip.is_empty()),
+                "event {} is missing source_ip",
+                event.event
+            );
+        }
     })
     .await;
 }
@@ -561,6 +634,17 @@ async fn account_export_returns_the_callers_data() {
                 .as_array()
                 .is_some_and(|e| !e.is_empty()),
             "export should include the subject's auth events"
+        );
+        // T-14: the GDPR export surfaces source_ip alongside user_agent.
+        assert!(
+            body["sessions"][0]["source_ip"].is_string(),
+            "export sessions should carry source_ip: {}",
+            body["sessions"][0]
+        );
+        assert!(
+            body["auth_events"][0]["source_ip"].is_string(),
+            "export auth_events should carry source_ip: {}",
+            body["auth_events"][0]
         );
         // No credentials/secrets ever appear.
         let raw = response.text();
