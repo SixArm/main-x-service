@@ -29,9 +29,10 @@ use crate::streaming;
 ///
 /// `check-duplicates` no longer scans at all — it blocks on the search
 /// index instead (see [`check_duplicates`] and
-/// [`CHECK_DUPLICATES_CANDIDATE_LIMIT`]). This constant is kept only
-/// because a unit test pins its historical value; it is not read by
-/// any handler.
+/// [`CHECK_DUPLICATES_CANDIDATE_LIMIT`]); a unit test still pins its
+/// historical value. [`deduplicate`] (spec §13 T-7) reuses it for a
+/// different purpose: the maximum number of active cases loaded as
+/// **scan seeds** for the batch dedup pass.
 pub const CHECK_DUPLICATES_SCAN_CAP: u64 = 1000;
 
 /// Maximum number of **blocked candidates** `check-duplicates` scores a
@@ -744,6 +745,156 @@ async fn check_duplicates(
     format::json(hits)
 }
 
+/// Request body for the batch scan. With no `threshold` the matcher's
+/// own `is_match` verdict decides; with one, `score >= threshold` does.
+#[derive(Debug, Default, Deserialize)]
+struct BatchDeduplicationRequest {
+    /// Optional score threshold overriding the matcher's verdict.
+    #[serde(default)]
+    threshold: Option<f64>,
+}
+
+/// Response for the batch scan, in the family's report shape
+/// (`agents/share/match-search-merge.md` "Duplicate detection").
+#[derive(Debug, Serialize)]
+struct BatchDeduplicationResponse {
+    /// Number of cases loaded as scan seeds.
+    cases_scanned: usize,
+    /// Number of duplicate pairs found (stored rows reported).
+    duplicates_found: usize,
+    /// Auto-merged count (always 0 — no auto-merge path here).
+    auto_merged: usize,
+    /// Number of stored pairs currently `pending` review.
+    queued_for_review: usize,
+    /// The stored candidate pairs (stable ids across re-scans).
+    review_items: Vec<ReviewQueueItem>,
+}
+
+/// Scan the stored cases for likely duplicates and queue them for review.
+/// `POST /api/cases/deduplicate` (a destructive-classed POST under ABAC,
+/// like merge).
+///
+/// Loads up to [`CHECK_DUPLICATES_SCAN_CAP`] active cases as scan seeds,
+/// and for each seed asks the search index for its own **blocked**
+/// candidates — the same fuzzy-title/exact-identifier/phonetic routes,
+/// capped at [`CHECK_DUPLICATES_CANDIDATE_LIMIT`], that [`check_duplicates`]
+/// scores a single query against — rather than comparing every pair in
+/// the corpus. This is the same scale-cliff fix `check-duplicates`
+/// already applies (spec §13 T-6), extended to a full scan: a full O(n²)
+/// pairwise compare would reintroduce exactly the "record 1001 is
+/// unreachable" cliff Tantivy blocking was built to remove. A candidate
+/// named by the index but outside the scan-seed page is fetched on
+/// demand (the same batch fetch [`check_duplicates`] uses), so a corpus
+/// larger than the cap still finds pairs where at least one side is a
+/// seed. Each unordered pair is scored at most once per request; hits
+/// above threshold are **persisted** in the stored `review_queue`
+/// (normalized-pair upsert: re-scans refresh scores, decided rows keep
+/// their decision, ids stay stable). The response reports the STORED
+/// rows. Does not merge anything.
+///
+/// # Errors
+///
+/// `503` when the search index is unavailable; a DB error on the
+/// row/candidate fetch or the queue upsert; a JSON parse error when a
+/// stored payload cannot be deserialized.
+#[debug_handler]
+async fn deduplicate(
+    State(ctx): State<AppContext>,
+    Json(req): Json<BatchDeduplicationRequest>,
+) -> Result<Response> {
+    let engine = MatchingEngine::new(MatchConfig::default());
+    let Some(index) = crate::search::engine() else {
+        return Err(Error::CustomError(
+            StatusCode::SERVICE_UNAVAILABLE,
+            ErrorDetail::new(
+                "search_unavailable",
+                "the search index is unavailable, so duplicates cannot be checked",
+            ),
+        ));
+    };
+    let rows = CaseModel::list(&ctx.db, CHECK_DUPLICATES_SCAN_CAP).await?;
+    if rows.len() as u64 == CHECK_DUPLICATES_SCAN_CAP {
+        tracing::warn!(
+            cap = CHECK_DUPLICATES_SCAN_CAP,
+            "deduplicate scan hit the row cap; cases beyond the cap are \
+             not used as scan seeds (though one can still surface as a \
+             candidate of a seed within the cap). Run it more often, or \
+             narrow the corpus."
+        );
+    }
+    let mut known: std::collections::HashMap<uuid::Uuid, Case> = std::collections::HashMap::new();
+    let mut seeds = Vec::with_capacity(rows.len());
+    for row in &rows {
+        let case = row.to_case()?;
+        known.insert(row.pid, case.clone());
+        seeds.push((row.pid, case));
+    }
+
+    let mut seen_pairs = std::collections::HashSet::new();
+    let mut new_items = Vec::new();
+    for (pid, case) in &seeds {
+        let candidate_ids = index.candidates(case, CHECK_DUPLICATES_CANDIDATE_LIMIT)?;
+        for cand_pid in parse_pids(&candidate_ids) {
+            if cand_pid == *pid {
+                continue; // never pair a case with itself
+            }
+            // Normalize so (a, b) and (b, a) are the same unordered pair.
+            let pair = if *pid <= cand_pid {
+                (*pid, cand_pid)
+            } else {
+                (cand_pid, *pid)
+            };
+            if !seen_pairs.insert(pair) {
+                continue; // already scored this pair earlier in this scan
+            }
+            let candidate = if let Some(c) = known.get(&cand_pid) {
+                c.clone()
+            } else {
+                // The index can name a row outside the scan-seed page;
+                // fetch it on demand (same batch fetch check_duplicates
+                // uses).
+                let Some(fetched) = CaseModel::find_by_pids(&ctx.db, &[cand_pid])
+                    .await?
+                    .into_iter()
+                    .next()
+                else {
+                    continue; // deleted / reindex lag; skip rather than fail the scan
+                };
+                let c = fetched.to_case()?;
+                known.insert(cand_pid, c.clone());
+                c
+            };
+            let r = engine.match_cases(case, &candidate);
+            let is_dup = req.threshold.map_or(r.is_match, |t| r.score >= t);
+            if is_dup {
+                new_items.push(crate::models::review_queue::NewReviewItem {
+                    record_id_a: pair.0,
+                    record_id_b: pair.1,
+                    match_score: r.score,
+                    match_quality: format!("{:?}", r.confidence).to_lowercase(),
+                    detection_method: "batch_deduplication".to_string(),
+                    score_breakdown: serde_json::to_value(&r.breakdown).ok(),
+                    status: review_status_token(ReviewStatus::Pending).to_string(),
+                    provenance: "operator".to_string(),
+                });
+            }
+        }
+    }
+    let stored = crate::models::review_queue::upsert(&ctx.db, &new_items).await?;
+    let review_items: Vec<ReviewQueueItem> = stored.iter().map(review_row_to_item).collect();
+    let queued_for_review = review_items
+        .iter()
+        .filter(|i| i.status == ReviewStatus::Pending)
+        .count();
+    format::json(BatchDeduplicationResponse {
+        cases_scanned: seeds.len(),
+        duplicates_found: review_items.len(),
+        auto_merged: 0,
+        queued_for_review,
+        review_items,
+    })
+}
+
 /// Merge a confirmed-duplicate case into a surviving (main) case:
 /// union the duplicate's data into main, keep the duplicate's title as an
 /// alternate title, soft-delete the duplicate, record the merge history,
@@ -1170,9 +1321,9 @@ fn audit_unavailable(_: disclosure::AuditWriteRefused) -> Error {
 // `agents/share/match-search-merge.md` "Review queue") exposes
 // `GET /api/<plural>/review-queue` and
 // `POST /api/<plural>/review-queue/{id}/decision`; this closes the same
-// gap for case. There is no batch-scan endpoint yet (`/deduplicate`,
-// T-7) — these two endpoints only surface rows the bulk-import pipeline
-// (or a future T-7) already wrote.
+// gap for case. [`deduplicate`] (T-7, above) is the other writer of this
+// queue — before it landed, these two endpoints only surfaced rows the
+// bulk-import pipeline had written.
 
 /// Review disposition of one queued duplicate pair, in the family's
 /// lowercase wire tokens (matching person/worker/place/thing/organization).
@@ -1388,6 +1539,7 @@ pub fn routes() -> Routes {
         .add("/search", get(search))
         .add("/match", post(match_against))
         .add("/check-duplicates", post(check_duplicates))
+        .add("/deduplicate", post(deduplicate))
         .add("/merge", post(merge))
         .add("/merges/recent", get(recent_merges))
         .add("/review-queue", get(get_review_queue))

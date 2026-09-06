@@ -783,7 +783,7 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
-- [ ] **T-7 (M) Batch `POST /api/cases/deduplicate` endpoint.**
+- [x] **T-7 (M) Batch `POST /api/cases/deduplicate` endpoint.**
   `src/auth.rs::DESTRUCTIVE_POST_SUFFIXES` already lists `/deduplicate`
   as a destructive-action path (matching `agents/share/match-search-merge.md`'s
   "Batch — `POST /api/<plural>/deduplicate` scans the entire index"),
@@ -802,6 +802,40 @@ the other v1 edge kinds even though it shares the same edge shape.
   above threshold, writes them to `review_queue`, and a DB-gated test
   proves the round-trip; `DESTRUCTIVE_POST_SUFFIXES`'s existing 401/403
   matrix test now exercises a real route instead of a placeholder path.
+  **Resolved.** Added `deduplicate` to `src/controllers/cases.rs`,
+  registered at `POST /api/cases/deduplicate`. Reuses the
+  historically-unused `CHECK_DUPLICATES_SCAN_CAP` (1000) as the number
+  of active cases loaded as **scan seeds**, and for each seed asks the
+  search index for its own blocked candidates (the same
+  fuzzy-title/exact-identifier/phonetic routes and
+  `CHECK_DUPLICATES_CANDIDATE_LIMIT` `check_duplicates` already uses),
+  scoring each unordered pair at most once per request — a full O(n²)
+  pairwise compare would have reintroduced exactly the scale cliff
+  Tantivy blocking exists to remove (T-6). A candidate the index names
+  outside the scan-seed page is fetched on demand (the same batch fetch
+  `check_duplicates` uses), so a corpus larger than the cap still finds
+  pairs where at least one side is a seed. Hits are persisted via the
+  existing `review_queue::upsert` at `provenance = "operator"` (not
+  `"batch"` as this task originally proposed — `"operator"` matches the
+  vocabulary organization's own `/deduplicate` reference implementation
+  uses, and this crate's `provenance` values are already
+  `operator`/`import` per T-8's resolution; `"batch"` is not one of the
+  cross-service-linking provenance tokens `agents/share/
+  cross-service-linking.md` defines). **Acceptance met:**
+  `tests/requests/cases.rs::deduplicate_finds_and_queues_a_stored_pair`
+  (DB-gated) seeds a docket-matched near-duplicate pair plus an
+  unrelated third case, calls the endpoint, and proves the full round
+  trip: `duplicates_found`/`queued_for_review` are both 1, the reported
+  pair matches the two real pids (not the unrelated one), the row is
+  visible on `GET /review-queue` (T-8 composes with T-7), and a second
+  scan upserts the same row rather than creating a duplicate. The
+  existing `derive_action_matrix`/SEC-G6 unit tests in `src/auth.rs`
+  already exercised `/api/cases/deduplicate` as a literal path; it is a
+  real route now rather than a string with no handler behind it.
+  Verified against a real Postgres
+  (`scripts/test-db.sh up` + `scripts/ci-check.sh test-db`); `cargo test
+  --lib` (264/264), `cargo clippy --all-targets -- -D warnings`, and
+  `cargo fmt --check` all clean (crate + `migration/` subcrate both).
 
 - [x] **T-8 (M) Expose the `review_queue` REST surface.**
   `src/models/review_queue.rs` already has `upsert`/`list`/`decide`

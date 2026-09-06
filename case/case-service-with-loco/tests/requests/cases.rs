@@ -1077,6 +1077,89 @@ async fn check_duplicates_blocks_on_identifier_alone() {
     .await;
 }
 
+/// `POST /api/cases/deduplicate` (T-7): a stored near-duplicate pair
+/// (same docket, different titles) is found via the search-blocked
+/// candidate scan, persisted to the `review_queue` at
+/// `provenance = "operator"`, and shows up on a subsequent
+/// `GET /review-queue` — proving the round trip end to end, not just
+/// that the handler responds `200`.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn deduplicate_finds_and_queues_a_stored_pair() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let a = request.post("/api/cases").json(&housing_case()).await;
+        assert_eq!(a.status_code(), 200);
+        let a_pid = a.json::<Value>()["pid"].as_str().unwrap().to_string();
+
+        // A near-duplicate: different display title, same docket — the
+        // deterministic short-circuit `can_check_duplicates_against_
+        // stored_cases` already pins scores 1.0 / is_match.
+        let b = request
+            .post("/api/cases")
+            .json(&json!({
+                "title": "HB appeal — J. Smith",
+                "identifiers": [{"scheme": "Docket", "value": "cv-2024-001234"}]
+            }))
+            .await;
+        assert_eq!(b.status_code(), 200);
+        let b_pid = b.json::<Value>()["pid"].as_str().unwrap().to_string();
+
+        // An unrelated third case must not be paired with either.
+        let c = request
+            .post("/api/cases")
+            .json(&json!({"title": "Wholly Unrelated Matter"}))
+            .await;
+        assert_eq!(c.status_code(), 200);
+
+        let response = request
+            .post("/api/cases/deduplicate")
+            .json(&json!({}))
+            .await;
+        assert_eq!(response.status_code(), 200, "deduplicate should succeed");
+        let body: Value = response.json();
+        assert!(
+            body["cases_scanned"].as_u64().unwrap() >= 3,
+            "all three seeded cases should be scan seeds: {body}"
+        );
+        assert_eq!(body["duplicates_found"], 1, "exactly one pair: {body}");
+        assert_eq!(body["queued_for_review"], 1);
+
+        let items = body["review_items"].as_array().expect("review_items");
+        assert_eq!(items.len(), 1);
+        let pair: std::collections::HashSet<&str> = [
+            items[0]["case_id_a"].as_str().unwrap(),
+            items[0]["case_id_b"].as_str().unwrap(),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(pair, [a_pid.as_str(), b_pid.as_str()].into_iter().collect());
+        assert_eq!(items[0]["status"], "pending");
+        assert_eq!(items[0]["provenance"], "operator");
+        assert_eq!(items[0]["detection_method"], "batch_deduplication");
+
+        // The stored row is visible on the review-queue listing endpoint
+        // (T-8) too — the two features actually compose.
+        let listed: Value = request.get("/api/cases/review-queue").await.json();
+        let listed_items = listed["items"].as_array().expect("items");
+        assert_eq!(listed_items.len(), 1);
+        assert_eq!(listed_items[0]["id"], items[0]["id"]);
+
+        // Re-running the scan upserts the same row rather than creating
+        // a second one (idempotent — the normalized-pair UNIQUE
+        // constraint on `review_queue`).
+        let again: Value = request
+            .post("/api/cases/deduplicate")
+            .json(&json!({}))
+            .await
+            .json();
+        assert_eq!(again["review_items"].as_array().unwrap().len(), 1);
+        assert_eq!(again["review_items"][0]["id"], items[0]["id"]);
+    })
+    .await;
+}
+
 /// The always-masked view redacts the involved-party fields regardless
 /// of caller (enforcement is off in this suite, so no ABAC decision is
 /// in play); the descriptive shell — title — is untouched. The export
